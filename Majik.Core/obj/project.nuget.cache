@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "dgSpecHash": "CuYe2cn8hWbxQVP2r2efiPWJsJFq5TWit8SKqLcMJbx3pjpK2DmwWJneZV3u8rELoalZ9tZeCG7ItBE+DdAFNw==",
+  "success": true,
+  "projectFilePath": "/home/brett/Projects/majik/Majik.Core/Majik.Core.csproj",
+  "expectedPackageFiles": [
+    "/home/brett/.nuget/packages/microsoft.aspnetcore.app.ref/8.0.22/microsoft.aspnetcore.app.ref.8.0.22.nupkg.sha512"
+  ],
+  "logs": []
+}

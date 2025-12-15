@@ -1,0 +1,11 @@
+/home/brett/Projects/majik/Majik.Core/obj/Debug/net8.0/Majik.Core.GeneratedMSBuildEditorConfig.editorconfig
+/home/brett/Projects/majik/Majik.Core/obj/Debug/net8.0/Majik.Core.AssemblyInfoInputs.cache
+/home/brett/Projects/majik/Majik.Core/obj/Debug/net8.0/Majik.Core.AssemblyInfo.cs
+/home/brett/Projects/majik/Majik.Core/obj/Debug/net8.0/Majik.Core.csproj.CoreCompileInputs.cache
+/home/brett/Projects/majik/Majik.Core/bin/Debug/net8.0/Majik.Core.deps.json
+/home/brett/Projects/majik/Majik.Core/bin/Debug/net8.0/Majik.Core.dll
+/home/brett/Projects/majik/Majik.Core/bin/Debug/net8.0/Majik.Core.pdb
+/home/brett/Projects/majik/Majik.Core/obj/Debug/net8.0/Majik.Core.dll
+/home/brett/Projects/majik/Majik.Core/obj/Debug/net8.0/refint/Majik.Core.dll
+/home/brett/Projects/majik/Majik.Core/obj/Debug/net8.0/Majik.Core.pdb
+/home/brett/Projects/majik/Majik.Core/obj/Debug/net8.0/ref/Majik.Core.dll
