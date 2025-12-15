@@ -1,7 +1,9 @@
+using Majik.Core.Combat;
 using Majik.Core.Domain.Exceptions;
 using Majik.Core.Events;
 using Majik.Core.Game;
 using Majik.Core.Players;
+using Majik.Core.Rules;
 using Majik.Core.Services;
 using Majik.Core.Stack;
 using Majik.Core.StateMachine;
@@ -26,6 +28,7 @@ public class Game
     private Majik.Core.Stack.Stack? _stack;
     private PriorityManager? _priorityManager;
     private readonly StackResolver _stackResolver;
+    private readonly CombatManager _combatManager;
 
     /// <summary>
     /// All players in the game.
@@ -92,6 +95,11 @@ public class Game
     /// </summary>
     public PriorityManager PriorityManager => _priorityManager ?? throw new InvalidGameStateException("PriorityManager not initialized. Start game first.");
 
+    /// <summary>
+    /// The combat manager.
+    /// </summary>
+    public CombatManager CombatManager => _combatManager;
+
     public Game(IEventBus? eventBus = null)
     {
         _eventBus = eventBus ?? new Events.EventBus();
@@ -101,6 +109,9 @@ public class Game
         _zoneService = new ZoneService(_eventBus);
         _phaseManager = new PhaseManager(_eventBus);
         _stackResolver = new StackResolver(_eventBus);
+        var stateBasedActions = new Rules.StateBasedActions(_eventBus);
+        _combatManager = new CombatManager(_eventBus, stateBasedActions, _zoneService);
+        _phaseManager.SetCombatManager(_combatManager);
         TurnNumber = 0;
     }
 
@@ -244,5 +255,51 @@ public class Game
         {
             AdvancePhase();
         }
+    }
+
+    /// <summary>
+    /// Declare attackers during the declare attackers step (Rule 508).
+    /// </summary>
+    public void DeclareAttackers(Player player, IEnumerable<AttackerDeclaration> declarations)
+    {
+        if (player == null)
+        {
+            throw new ArgumentNullException(nameof(player));
+        }
+
+        if (player != ActivePlayer)
+        {
+            throw new InvalidPlayerActionException("Only active player can declare attackers");
+        }
+
+        if (PhaseManager.CurrentPhase != Majik.Core.StateMachine.PhaseStateType.DeclareAttackers)
+        {
+            throw new InvalidGameStateException("Not in declare attackers step");
+        }
+
+        _combatManager.DeclareAttackers(player, declarations);
+    }
+
+    /// <summary>
+    /// Declare blockers during the declare blockers step (Rule 509).
+    /// </summary>
+    public void DeclareBlockers(Player player, IEnumerable<BlockerDeclaration> declarations)
+    {
+        if (player == null)
+        {
+            throw new ArgumentNullException(nameof(player));
+        }
+
+        if (player == ActivePlayer)
+        {
+            throw new InvalidPlayerActionException("Active player cannot declare blockers");
+        }
+
+        if (PhaseManager.CurrentPhase != Majik.Core.StateMachine.PhaseStateType.DeclareBlockers)
+        {
+            throw new InvalidGameStateException("Not in declare blockers step");
+        }
+
+        _combatManager.DeclareBlockers(player, declarations);
     }
 }

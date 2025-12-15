@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Majik.Core")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+cfb06123c4c8c45d958f4a276858a9706a86fe17")]
 [assembly: System.Reflection.AssemblyProductAttribute("Majik.Core")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Majik.Core")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

@@ -25,8 +25,11 @@ public enum EventType
     CardMoved,
 
     // Combat Events
+    CombatStarted,
     AttackersDeclared,
     BlockersDeclared,
+    CombatDamageDealt,
+    CombatEnded,
     DamageDealt,
 
     // Ability Events

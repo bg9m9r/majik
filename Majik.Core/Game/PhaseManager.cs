@@ -1,3 +1,4 @@
+using Majik.Core.Combat;
 using Majik.Core.Domain.Exceptions;
 using Majik.Core.Events;
 using Majik.Core.Players;
@@ -19,6 +20,7 @@ public class PhaseManager
     private int _currentPhaseIndex;
     private Player? _activePlayer;
     private bool _isFirstTurn;
+    private CombatManager? _combatManager;
 
     /// <summary>
     /// The current phase.
@@ -33,6 +35,14 @@ public class PhaseManager
     public PhaseManager(IEventBus? eventBus = null)
     {
         _eventBus = eventBus;
+    }
+
+    /// <summary>
+    /// Set the combat manager for combat phase handling.
+    /// </summary>
+    public void SetCombatManager(CombatManager combatManager)
+    {
+        _combatManager = combatManager;
     }
 
     /// <summary>
@@ -235,7 +245,44 @@ public class PhaseManager
                 // For now, just auto-complete
                 break;
                 
-            // Combat phases will be handled in Phase 5
+            case PhaseStateType.BeginningOfCombat:
+                // Beginning of Combat step (Rule 507)
+                if (_combatManager != null && _activePlayer != null)
+                {
+                    _combatManager.StartCombat(_activePlayer);
+                }
+                break;
+
+            case PhaseStateType.DeclareAttackers:
+                // Declare Attackers step (Rule 508)
+                // Player must declare attackers - handled by Game.DeclareAttackers()
+                // Phase will wait for player action
+                break;
+
+            case PhaseStateType.DeclareBlockers:
+                // Declare Blockers step (Rule 509)
+                // Defending player must declare blockers - handled by Game.DeclareBlockers()
+                // Phase will wait for player action
+                break;
+
+            case PhaseStateType.CombatDamage:
+                // Combat Damage step (Rule 510)
+                // Only assign damage if combat is in progress (attackers were declared)
+                if (_combatManager != null && _combatManager.IsInCombat)
+                {
+                    _combatManager.AssignCombatDamage();
+                }
+                break;
+
+            case PhaseStateType.EndOfCombat:
+                // End of Combat step (Rule 511)
+                // Only end combat if combat is in progress
+                if (_combatManager != null && _combatManager.IsInCombat)
+                {
+                    _combatManager.EndCombat();
+                }
+                break;
+
             default:
                 // Other phases auto-complete for now
                 break;
