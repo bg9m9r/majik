@@ -162,7 +162,7 @@ CR 8xx multiplayer, CR 9xx variants.
 - Commander (CR 903): command zone, commander tax, commander damage, color identity check
 - Brawl, Standard, Modern format legality from `Legalities` JSON
 
-### Phase 24 — RNG + Hidden Information (~1 week)
+### Phase 24 — RNG + Hidden Information (~1 week) **← DONE**
 
 CR 100 (shuffling), CR 706 (hidden info).
 
@@ -327,3 +327,7 @@ Track A unlocks Track B (layer system needed for granted abilities).
   - `ScryfallCardFactory` wires triggered binder for every permanent automatically
   - 653 Core + 31 Api = 684 tests, zero warnings
 - **Phase 21 remaining** — modal/X spells, "until end of turn" pump spells (Giant Growth), "search your library" tutors, conditional triggers ("if you control..."), each-opponent effects, granted abilities ("target creature gains flying"), upkeep/phase-start triggers
+- **Phase 24** — RNG + Hidden Information ✅ done
+  - `Random/GameRandom` — seedable PRNG; `Next`, `FlipCoin`, `RollDie`, `Shuffle<T>` (Fisher-Yates). Same seed → identical sequence (replay determinism)
+  - `StateSnapshotter.Snapshot(...viewer)` — per-player view; opponent hands → "(hidden)"; library always hidden even to owner; battlefield + graveyard + exile always public
+  - 659 Core + 35 Api = 694 tests, zero warnings

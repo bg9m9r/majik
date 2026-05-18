@@ -23,7 +23,8 @@ public static class StateSnapshotter
         PhaseStateType? phase,
         Player activePlayer,
         IReadOnlyList<Player> players,
-        Majik.Core.Stack.Stack stack)
+        Majik.Core.Stack.Stack stack,
+        Player? viewer = null)
     {
         if (players == null) throw new ArgumentNullException(nameof(players));
         if (activePlayer == null) throw new ArgumentNullException(nameof(activePlayer));
@@ -34,21 +35,44 @@ public static class StateSnapshotter
             TurnNumber: turnNumber,
             Phase: phase?.ToString(),
             ActivePlayerId: activePlayer.Id,
-            Players: players.Select(SnapshotPlayer).ToList(),
+            Players: players.Select(p => SnapshotPlayer(p, viewer)).ToList(),
             Stack: stack.GetAll().Select(SnapshotStackObject).ToList());
     }
 
-    private static PlayerDto SnapshotPlayer(Player p) => new(
-        Id: p.Id,
-        Name: p.Name,
-        Life: p.LifeTotal,
-        HasLost: p.HasLost,
-        Mana: SnapshotMana(p.ManaPool),
-        Hand: SnapshotZone(p.Zones.Hand),
-        Battlefield: SnapshotZone(p.Zones.Battlefield),
-        Graveyard: SnapshotZone(p.Zones.Graveyard),
-        Library: SnapshotZone(p.Zones.Library),
-        Exile: SnapshotZone(p.Zones.Exile));
+    private static PlayerDto SnapshotPlayer(Player p, Player? viewer)
+    {
+        // CR 706 — opponent hand + library are hidden information.
+        // Viewer == p (or null = spectator-all-revealed) sees everything.
+        var hideHidden = viewer != null && !ReferenceEquals(p, viewer);
+        return new PlayerDto(
+            Id: p.Id,
+            Name: p.Name,
+            Life: p.LifeTotal,
+            HasLost: p.HasLost,
+            Mana: SnapshotMana(p.ManaPool),
+            Hand: hideHidden ? HiddenZone(p.Zones.Hand) : SnapshotZone(p.Zones.Hand),
+            Battlefield: SnapshotZone(p.Zones.Battlefield),
+            Graveyard: SnapshotZone(p.Zones.Graveyard),
+            Library: HiddenZone(p.Zones.Library),       // always hidden, even to owner
+            Exile: SnapshotZone(p.Zones.Exile));
+    }
+
+    /// <summary>Zone whose contents are hidden — DTO carries only the count.</summary>
+    private static ZoneDto HiddenZone(IZone zone)
+    {
+        var n = zone.GetCards().Count();
+        var placeholders = Enumerable.Range(0, n).Select(_ => new CardSnapshotDto(
+            InstanceId: Guid.Empty,
+            Name: "(hidden)",
+            ManaCost: "",
+            Types: System.Array.Empty<string>(),
+            Power: null,
+            Toughness: null,
+            Tapped: false,
+            SummoningSickness: false,
+            Abilities: System.Array.Empty<AbilityDto>())).ToList();
+        return new ZoneDto(placeholders);
+    }
 
     private static ManaPoolDto SnapshotMana(ManaPool pool) => new(
         Generic: pool.Generic,
