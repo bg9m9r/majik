@@ -313,3 +313,11 @@ Track A unlocks Track B (layer system needed for granted abilities).
   - 628 Core + 31 Api = 659 tests, zero warnings
 - **Phase 15, 20, 24-30** — pending; layer system deferments: Layer 2 (control), 3 (text), 4 (type), 5 (color), 7a (CDA), 7b (set base), 7d (switch); CR 613.8 dependency ordering; copies of spells on the stack
 - **Phase 26 remaining** — Battle 0-defense check (CR 704.5n) requires Battle card type from Phase 19 remainder; "spell on stack with no card" (CR 704.5e); planeswalker uniqueness already done but old (rule removed 2022)
+- **Phase 20 first cut** — Keyword runtime impls (5 keywords) ✅ done
+  - Cycling (CR 702.31) — `CyclingAbility` self-discard + draw; flags empty-library on draw attempt
+  - Scry N (CR 701.20) — `ScryAction.Peek`/`Apply` reorders library top per agent decision
+  - Ward N (CR 702.21) — `WardEffect` counters opponent's spell unless cost paid
+  - Prowess (CR 702.108) — `ProwessFactory` builds triggered ability + Layer 7c pump-until-end-of-turn
+  - Landfall (CR 702.140) — `LandfallFactory` parameterised triggered ability on land entering under your control
+  - 643 Core + 31 Api = 674 tests, zero warnings
+- **Phase 20 remaining** — ~195 keywords still ad-hoc; needs catalog pass against `KeywordRegistry` to track coverage
