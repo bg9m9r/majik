@@ -293,12 +293,25 @@ public class CombatManager
         }
 
         // Blocked: assign damage to blockers
+        // Without trample, all damage must be assigned to blockers
+        // With trample, only lethal damage must be assigned to each blocker
         foreach (var blocker in attacker.Blockers)
         {
             if (remainingPower <= 0) break;
 
             int lethalDamage = CalculateLethalDamage(blocker.Creature, attacker.HasDeathtouch);
-            int assignedDamage = Math.Min(lethalDamage, remainingPower);
+            int assignedDamage;
+            
+            if (attacker.HasTrample)
+            {
+                // With trample: assign only lethal damage, excess goes to target
+                assignedDamage = Math.Min(lethalDamage, remainingPower);
+            }
+            else
+            {
+                // Without trample: assign all remaining power to this blocker
+                assignedDamage = remainingPower;
+            }
 
             blocker.AssignDamage(assignedDamage);
             attacker.AssignDamage(assignedDamage);

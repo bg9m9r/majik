@@ -1,0 +1,160 @@
+using Majik.Core.Abilities;
+using Majik.Core.Api.Commands;
+using Majik.Core.Cards;
+using Majik.Core.Game;
+using Majik.Core.Players;
+using Majik.Core.Players.Agents;
+using Majik.Core.ValueObjects;
+
+namespace Majik.Core.Api;
+
+/// <summary>
+/// <see cref="IPlayerAgent"/> that exposes each choice as an awaiting Task.
+/// The hosting <see cref="GameFacade"/> calls these from inside the game
+/// loop and then waits; the external world (HTTP handler / WebSocket / test)
+/// resolves the task by calling <see cref="Submit"/> with a matching command.
+///
+/// One outstanding prompt at a time. Submitting a command of the wrong kind
+/// or from the wrong player throws — the caller is expected to mirror the
+/// engine's current expectation.
+/// </summary>
+public sealed class RemoteAgent : IPlayerAgent
+{
+    private readonly Player _player;
+    private readonly Func<Guid, ICard?>? _cardLookup;
+    private object? _pending;           // TaskCompletionSource<T> for currently-awaited prompt
+    private Type[]? _pendingKinds;      // allowed command types (multi for priority)
+
+    public RemoteAgent(Player player, Func<Guid, ICard?>? cardLookup = null)
+    {
+        _player = player ?? throw new ArgumentNullException(nameof(player));
+        _cardLookup = cardLookup;
+    }
+
+    /// <summary>True iff the engine is currently awaiting a command for this agent.</summary>
+    public bool HasPending => _pending != null;
+
+    /// <summary>Type the next submitted command must be (null when no prompt outstanding).</summary>
+    public IReadOnlyList<Type>? ExpectedCommandKinds => _pendingKinds;
+
+    public void Submit(GameCommand command)
+    {
+        if (command == null) throw new ArgumentNullException(nameof(command));
+
+        if (command.PlayerId != _player.Id)
+        {
+            throw new InvalidOperationException(
+                $"Command targets player {command.PlayerId} but this agent is for player {_player.Id}.");
+        }
+
+        if (_pending == null || _pendingKinds == null)
+        {
+            throw new InvalidOperationException(
+                "Agent has no pending prompt; nothing to resolve.");
+        }
+
+        if (!_pendingKinds.Contains(command.GetType()))
+        {
+            var expected = string.Join("/", _pendingKinds.Select(t => t.Name));
+            throw new InvalidOperationException(
+                $"Engine expected {expected}, got {command.GetType().Name}.");
+        }
+
+        var pending = _pending;
+        _pending = null;
+        _pendingKinds = null;
+        Resolve(pending, command);
+    }
+
+    private void Resolve(object tcs, GameCommand command)
+    {
+        switch (command)
+        {
+            case PassPriorityCommand:
+                ((TaskCompletionSource<PriorityAction>)tcs).SetResult(PriorityAction.Pass);
+                break;
+            case PlayLandCommand pl:
+                var land = ResolveCard(pl.LandInstanceId);
+                ((TaskCompletionSource<PriorityAction>)tcs).SetResult(new PriorityAction.PlayLand(land));
+                break;
+            case MulliganCommand m:
+                ((TaskCompletionSource<MulliganDecision>)tcs).SetResult(
+                    m.Keep ? MulliganDecision.Keep : MulliganDecision.Mulligan);
+                break;
+            case ChooseTargetsCommand t:
+                ((TaskCompletionSource<IReadOnlyList<object>>)tcs).SetResult(
+                    t.TargetInstanceIds.Select(id => (object)ResolveCard(id)).ToList());
+                break;
+            case ChooseXCommand x:
+                ((TaskCompletionSource<int>)tcs).SetResult(x.X);
+                break;
+            case ChooseModeCommand mc:
+                ((TaskCompletionSource<int>)tcs).SetResult(mc.ModeIndex);
+                break;
+            case ChooseManaCommand mp:
+                ((TaskCompletionSource<ManaPayment>)tcs).SetResult(
+                    new ManaPayment(mp.SourceInstanceIds.Select(ResolveCard).ToList()));
+                break;
+            case OrderTriggersCommand:
+                throw new NotImplementedException("OrderTriggers resolution wired in P9.7.");
+            case DeclareAttackersCommand or DeclareBlockersCommand:
+                throw new NotImplementedException("Combat command resolution wired in phase 10.");
+            default:
+                throw new InvalidOperationException($"Unhandled command {command.GetType().Name}.");
+        }
+    }
+
+    private ICard ResolveCard(Guid id)
+    {
+        if (_cardLookup == null)
+        {
+            throw new InvalidOperationException(
+                "RemoteAgent has no card lookup; cannot resolve card instance ID.");
+        }
+
+        return _cardLookup(id)
+            ?? throw new InvalidOperationException($"No card found for instance {id}.");
+    }
+
+    public Task<PriorityAction> ChoosePriorityActionAsync(GameContext ctx, CancellationToken ct = default)
+        => Prompt<PriorityAction>(ct,
+            typeof(PassPriorityCommand), typeof(PlayLandCommand), typeof(CastSpellCommand));
+
+    public Task<MulliganDecision> ChooseMulliganAsync(GameContext ctx, IReadOnlyList<ICard> hand, int mulligansTaken, CancellationToken ct = default)
+        => Prompt<MulliganDecision>(ct, typeof(MulliganCommand));
+
+    public Task<IReadOnlyList<object>> ChooseTargetsAsync(GameContext ctx, TargetRequest request, CancellationToken ct = default)
+        => Prompt<IReadOnlyList<object>>(ct, typeof(ChooseTargetsCommand));
+
+    public Task<int> ChooseXAsync(GameContext ctx, ICard source, CancellationToken ct = default)
+        => Prompt<int>(ct, typeof(ChooseXCommand));
+
+    public Task<int> ChooseModeAsync(GameContext ctx, IReadOnlyList<string> modes, CancellationToken ct = default)
+        => Prompt<int>(ct, typeof(ChooseModeCommand));
+
+    public Task<IReadOnlyList<ITriggeredAbility>> OrderTriggersAsync(GameContext ctx, IReadOnlyList<ITriggeredAbility> mine, CancellationToken ct = default)
+        => throw new NotImplementedException("OrderTriggers wired in P9.7.");
+
+    public Task<ManaPayment> ChooseManaSourcesAsync(GameContext ctx, ManaCost cost, CancellationToken ct = default)
+        => Prompt<ManaPayment>(ct, typeof(ChooseManaCommand));
+
+    public Task<CombatPlan> DeclareAttackersAsync(GameContext ctx, IReadOnlyList<Creature> eligibleAttackers, CancellationToken ct = default)
+        => throw new NotImplementedException("Combat wired in phase 10.");
+
+    public Task<BlockPlan> DeclareBlockersAsync(GameContext ctx, IReadOnlyList<Creature> attackers, IReadOnlyList<Creature> eligibleBlockers, CancellationToken ct = default)
+        => throw new NotImplementedException("Combat wired in phase 10.");
+
+    private Task<T> Prompt<T>(CancellationToken ct, params Type[] acceptedKinds)
+    {
+        if (_pending != null)
+        {
+            throw new InvalidOperationException("A prompt is already pending.");
+        }
+
+        var tcs = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
+        ct.Register(() => tcs.TrySetCanceled(ct));
+        _pending = tcs;
+        _pendingKinds = acceptedKinds;
+        return tcs.Task;
+    }
+}

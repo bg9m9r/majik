@@ -1,0 +1,47 @@
+# .NET build output
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+[Ll]og/
+[Ll]ogs/
+
+# Visual Studio / Rider
+.vs/
+.idea/
+*.user
+*.userprefs
+*.suo
+
+# JetBrains
+.vs/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test results
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+*.VisualState.xml
+TestResult.xml
+[Cc]overage*/
+coverage.cobertura.xml
+coverage.json
+coverage.opencover.xml
+
+# NuGet
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+project.lock.json
+
+# Local secrets
+.env
+.env.local
+appsettings.Local.json
+
+# Scratch / claude_results
+claude_results/

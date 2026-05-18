@@ -4,6 +4,7 @@ using Majik.Core.Domain.DomainEvents;
 using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Rules;
+using Majik.Core.Services;
 using Majik.Core.Zones;
 using Moq;
 using Xunit;
@@ -17,12 +18,14 @@ namespace Majik.Core.Tests.Rules;
 public class StateBasedActionsTests
 {
     private readonly Mock<IEventBus> _eventBusMock;
+    private readonly ZoneService _zoneService;
     private readonly StateBasedActions _sba;
 
     public StateBasedActionsTests()
     {
         _eventBusMock = new Mock<IEventBus>();
-        _sba = new StateBasedActions(_eventBusMock.Object);
+        _zoneService = new ZoneService(_eventBusMock.Object);
+        _sba = new StateBasedActions(_eventBusMock.Object, _zoneService);
     }
 
     [Fact]
@@ -84,6 +87,7 @@ public class StateBasedActionsTests
         var player = new Player("Alice", 20);
         var creature = new Creature("Grizzly Bears", "1G", 2, 2) { Owner = player, Controller = player };
         creature.Zone = ZoneType.Battlefield;
+        _zoneService.MoveCardTo(creature, ZoneType.Battlefield, player);
         creature.TakeDamage(2);
         var players = new List<Player> { player };
         var cards = new List<ICard> { creature };
@@ -103,6 +107,7 @@ public class StateBasedActionsTests
         var player = new Player("Alice", 20);
         var planeswalker = new Planeswalker("Jace", "2UU", 3) { Owner = player, Controller = player };
         planeswalker.Zone = ZoneType.Battlefield;
+        _zoneService.MoveCardTo(planeswalker, ZoneType.Battlefield, player);
         planeswalker.RemoveLoyalty(3);
         var players = new List<Player> { player };
         var cards = new List<ICard> { planeswalker };

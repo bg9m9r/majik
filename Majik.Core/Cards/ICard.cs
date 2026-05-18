@@ -1,3 +1,4 @@
+using Majik.Core.Abilities;
 using Majik.Core.Cards.Types;
 using Majik.Core.Players;
 using Majik.Core.Zones;
@@ -9,6 +10,12 @@ namespace Majik.Core.Cards;
 /// </summary>
 public interface ICard
 {
+    /// <summary>
+    /// Per-instance identity (stable for the lifetime of this Card object).
+    /// DTOs reference cards by this Guid to avoid serializing object graphs.
+    /// </summary>
+    Guid InstanceId { get; }
+
     /// <summary>
     /// The name of the card.
     /// </summary>
@@ -48,6 +55,16 @@ public interface ICard
     /// The current zone the card is in.
     /// </summary>
     ZoneType Zone { get; set; }
+
+    /// <summary>
+    /// Abilities attached to this card.
+    /// </summary>
+    IReadOnlyList<IAbility> Abilities { get; }
+
+    /// <summary>
+    /// Attach an ability to this card.
+    /// </summary>
+    void AddAbility(IAbility ability);
 
     /// <summary>
     /// Check if the card has a specific type.

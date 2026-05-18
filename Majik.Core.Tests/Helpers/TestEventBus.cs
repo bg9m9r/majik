@@ -10,6 +10,7 @@ public class TestEventBus : IEventBus
 {
     private readonly List<GameEvent> _publishedEvents = new();
     private readonly Dictionary<Type, List<Delegate>> _handlers = new();
+    private readonly List<Action<GameEvent>> _globalHandlers = new();
 
     public IReadOnlyList<GameEvent> PublishedEvents => _publishedEvents.AsReadOnly();
 
@@ -47,7 +48,16 @@ public class TestEventBus : IEventBus
                 }
             }
         }
+
+        foreach (var global in _globalHandlers.ToList())
+        {
+            global(@event);
+        }
     }
+
+    public void SubscribeAll(Action<GameEvent> handler) => _globalHandlers.Add(handler);
+
+    public void UnsubscribeAll(Action<GameEvent> handler) => _globalHandlers.Remove(handler);
 
     public void Clear()
     {

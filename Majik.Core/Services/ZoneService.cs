@@ -1,5 +1,6 @@
 using Majik.Core.Cards;
 using Majik.Core.Domain.Exceptions;
+using Majik.Core.Effects;
 using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Zones;
@@ -9,14 +10,21 @@ namespace Majik.Core.Services;
 /// <summary>
 /// Domain service for managing zone operations.
 /// Handles card movement between zones with proper validation.
+///
+/// When a <see cref="ReplacementBus"/> is supplied, every move builds a
+/// <see cref="ZoneMoveIntent"/> and pushes it through the bus first;
+/// replacements can mutate the destination, force "enters tapped", or
+/// cancel the move entirely (CR 614).
 /// </summary>
 public class ZoneService
 {
     private readonly IEventBus? _eventBus;
+    private readonly ReplacementBus? _replacements;
 
-    public ZoneService(IEventBus? eventBus = null)
+    public ZoneService(IEventBus? eventBus = null, ReplacementBus? replacements = null)
     {
         _eventBus = eventBus;
+        _replacements = replacements;
     }
 
     /// <summary>
@@ -24,49 +32,59 @@ public class ZoneService
     /// </summary>
     public void MoveCard(ICard card, ZoneType fromZone, ZoneType toZone, Player? controller = null)
     {
-        if (card == null)
-        {
-            throw new ArgumentNullException(nameof(card));
-        }
+        if (card == null) throw new ArgumentNullException(nameof(card));
 
-        // Validate current zone
         if (card.Zone != fromZone)
         {
             throw new InvalidZoneTransitionException(
-                fromZone, 
-                toZone, 
+                fromZone, toZone,
                 $"Card is not in expected zone. Expected: {fromZone}, Actual: {card.Zone}");
         }
 
-        // Validate zone transition
         if (!IsValidZoneTransition(fromZone, toZone))
         {
             throw new InvalidZoneTransitionException(fromZone, toZone);
         }
 
-        // Update card zone
-        card.Zone = toZone;
-
-        // Set controller if provided
-        if (controller != null && toZone == ZoneType.Battlefield)
+        // CR 614 — funnel intent through replacement bus.
+        var intent = new ZoneMoveIntent(card, fromZone, toZone, controller);
+        if (_replacements != null)
         {
-            card.Controller = controller;
+            var replaced = _replacements.Apply(intent);
+            if (replaced == null) return; // cancelled
+            intent = replaced;
         }
-        else if (toZone == ZoneType.Hand || toZone == ZoneType.Library || 
-                 toZone == ZoneType.Graveyard || toZone == ZoneType.Exile)
+
+        var finalToZone = intent.ToZone;
+        var finalController = intent.Controller;
+
+        card.Zone = finalToZone;
+
+        if (finalController != null && finalToZone == ZoneType.Battlefield)
         {
-            // In these zones, controller is always the owner
+            card.Controller = finalController;
+        }
+
+        if (finalToZone == ZoneType.Battlefield && card is Permanent permanent)
+        {
+            permanent.MarkEnteredBattlefield();
+            if (intent.EntersTapped && !permanent.IsTapped)
+            {
+                permanent.Tap();
+            }
+        }
+        else if (finalToZone is ZoneType.Hand or ZoneType.Library
+                 or ZoneType.Graveyard or ZoneType.Exile)
+        {
             card.Controller = card.Owner;
         }
 
-        // Update zone manager
         if (card.Owner != null)
         {
-            card.Owner.Zones.MoveCard(card, fromZone, toZone);
+            card.Owner.Zones.MoveCard(card, fromZone, finalToZone);
         }
 
-        // Publish domain event
-        _eventBus?.Publish(new CardMovedEvent(card, fromZone, toZone));
+        _eventBus?.Publish(new CardMovedEvent(card, fromZone, finalToZone));
     }
 
     /// <summary>
@@ -77,17 +95,5 @@ public class ZoneService
         MoveCard(card, card.Zone, toZone, controller);
     }
 
-    /// <summary>
-    /// Check if a zone transition is valid.
-    /// </summary>
-    private static bool IsValidZoneTransition(ZoneType from, ZoneType to)
-    {
-        // Cards can move from any zone to any zone
-        // In a full implementation, we'd have more specific rules
-        // For example:
-        // - Cards can only be cast from hand
-        // - Permanents enter battlefield from stack
-        // - Cards go to graveyard from battlefield when destroyed
-        return true;
-    }
+    private static bool IsValidZoneTransition(ZoneType from, ZoneType to) => true;
 }

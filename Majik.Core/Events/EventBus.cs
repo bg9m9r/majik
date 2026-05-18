@@ -7,14 +7,12 @@ namespace Majik.Core.Events;
 public class EventBus : IEventBus
 {
     private readonly Dictionary<Type, List<Delegate>> _handlers = new();
+    private readonly List<Action<GameEvent>> _globalHandlers = new();
 
-    /// <summary>
-    /// Subscribe to events of type T.
-    /// </summary>
     public void Subscribe<T>(Action<T> handler) where T : GameEvent
     {
         var eventType = typeof(T);
-        
+
         if (!_handlers.ContainsKey(eventType))
         {
             _handlers[eventType] = new List<Delegate>();
@@ -23,17 +21,14 @@ public class EventBus : IEventBus
         _handlers[eventType].Add(handler);
     }
 
-    /// <summary>
-    /// Unsubscribe from events of type T.
-    /// </summary>
     public void Unsubscribe<T>(Action<T> handler) where T : GameEvent
     {
         var eventType = typeof(T);
-        
+
         if (_handlers.TryGetValue(eventType, out var handlers))
         {
             handlers.Remove(handler);
-            
+
             if (handlers.Count == 0)
             {
                 _handlers.Remove(eventType);
@@ -41,13 +36,10 @@ public class EventBus : IEventBus
         }
     }
 
-    /// <summary>
-    /// Publish an event to all subscribers.
-    /// </summary>
     public void Publish<T>(T @event) where T : GameEvent
     {
         var eventType = typeof(T);
-        
+
         if (_handlers.TryGetValue(eventType, out var handlers))
         {
             foreach (var handler in handlers.ToList())
@@ -58,5 +50,30 @@ public class EventBus : IEventBus
                 }
             }
         }
+
+        foreach (var global in _globalHandlers.ToList())
+        {
+            global(@event);
+        }
+    }
+
+    public void SubscribeAll(Action<GameEvent> handler)
+    {
+        if (handler == null)
+        {
+            throw new ArgumentNullException(nameof(handler));
+        }
+
+        _globalHandlers.Add(handler);
+    }
+
+    public void UnsubscribeAll(Action<GameEvent> handler)
+    {
+        if (handler == null)
+        {
+            return;
+        }
+
+        _globalHandlers.Remove(handler);
     }
 }

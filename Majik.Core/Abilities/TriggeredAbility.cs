@@ -1,7 +1,9 @@
+using Majik.Core.Cards;
 using Majik.Core.Domain.ValueObjects;
+using Majik.Core.Events;
 using Majik.Core.Players;
-using Majik.Core.Stack;
 using Majik.Core.Targeting;
+using Majik.Core.Zones;
 
 namespace Majik.Core.Abilities;
 
@@ -10,6 +12,9 @@ namespace Majik.Core.Abilities;
 /// </summary>
 public class TriggeredAbility : ITriggeredAbility
 {
+    private static readonly IReadOnlySet<ZoneType> DefaultActiveZones =
+        new HashSet<ZoneType> { ZoneType.Battlefield };
+
     private ResolutionState _resolutionState;
     private readonly List<ITarget> _targets = new();
     private readonly List<IEffect> _effects = new();
@@ -21,24 +26,30 @@ public class TriggeredAbility : ITriggeredAbility
     public IReadOnlyList<ITarget> Targets => _targets.AsReadOnly();
     public IReadOnlyList<IEffect> Effects => _effects.AsReadOnly();
     public bool IsResolving => _resolutionState.IsResolving;
+    public ITriggerCondition Condition { get; }
+    public Func<bool>? InterveningIf { get; }
+    public IReadOnlySet<ZoneType> ActiveZones { get; }
 
-    public TriggeredAbility(object source, Player controller, IEnumerable<ITarget>? targets = null, IEnumerable<IEffect>? effects = null)
+    public TriggeredAbility(
+        object source,
+        Player controller,
+        ITriggerCondition condition,
+        IEnumerable<ITarget>? targets = null,
+        IEnumerable<IEffect>? effects = null,
+        Func<bool>? interveningIf = null,
+        IEnumerable<ZoneType>? activeZones = null)
     {
-        if (source == null)
-        {
-            throw new ArgumentNullException(nameof(source));
-        }
+        Source = source ?? throw new ArgumentNullException(nameof(source));
+        Controller = controller ?? throw new ArgumentNullException(nameof(controller));
+        Condition = condition ?? throw new ArgumentNullException(nameof(condition));
 
-        if (controller == null)
-        {
-            throw new ArgumentNullException(nameof(controller));
-        }
-
-        Source = source;
-        Controller = controller;
         Id = Guid.NewGuid();
         Timestamp = DateTime.UtcNow;
         _resolutionState = ResolutionState.NotResolving();
+        InterveningIf = interveningIf;
+        ActiveZones = activeZones is null
+            ? DefaultActiveZones
+            : new HashSet<ZoneType>(activeZones);
 
         if (targets != null)
         {
@@ -51,19 +62,22 @@ public class TriggeredAbility : ITriggeredAbility
         }
     }
 
-    public bool IsTriggered()
+    public bool IsTriggered(GameEvent e)
     {
-        // TODO: Check trigger condition
-        // For now, always return true
-        return true;
+        if (e == null)
+        {
+            return false;
+        }
+
+        if (Source is ICard card && !ActiveZones.Contains(card.Zone))
+        {
+            return false;
+        }
+
+        return Condition.Matches(e, this);
     }
 
-    public bool CanBePutOnStack()
-    {
-        // TODO: Check if ability can be put on stack (intervening-if clauses, etc.)
-        // For now, always return true
-        return true;
-    }
+    public bool CanBePutOnStack() => InterveningIf?.Invoke() ?? true;
 
     public void Resolve()
     {
@@ -73,14 +87,12 @@ public class TriggeredAbility : ITriggeredAbility
         }
 
         _resolutionState = ResolutionState.Resolving();
-        
-        // Resolution logic (Rule 608)
-        // Execute all effects
+
         foreach (var effect in _effects)
         {
             effect.Execute();
         }
-        
+
         _resolutionState = ResolutionState.Resolved(DateTime.UtcNow);
     }
 }

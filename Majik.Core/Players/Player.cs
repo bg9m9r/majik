@@ -14,6 +14,12 @@ public class Player
     private bool _hasLost;
 
     /// <summary>
+    /// Stable per-instance identifier. Used by DTO/web layer to reference
+    /// players across requests without serializing object graphs.
+    /// </summary>
+    public Guid Id { get; } = Guid.NewGuid();
+
+    /// <summary>
     /// The player's name.
     /// </summary>
     public string Name { get; }
@@ -45,6 +51,16 @@ public class Player
         get => _hasLost;
         set => _hasLost = value;
     }
+
+    /// <summary>
+    /// CR 704.5b — sticky flag: set true whenever the player attempted to
+    /// draw a card from an empty library. SBA picks this up and marks the
+    /// player as having lost.
+    /// </summary>
+    public bool TriedToDrawFromEmptyLibrary { get; set; }
+
+    /// <summary>CR 704.5c — poison counters; 10+ → lose.</summary>
+    public int PoisonCounters { get; set; }
 
     public Player(string name, int startingLife = 20, ZoneManager? zoneManager = null)
     {

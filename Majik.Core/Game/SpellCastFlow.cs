@@ -1,0 +1,89 @@
+using Majik.Core.Abilities;
+using Majik.Core.Cards;
+using Majik.Core.Domain.DomainEvents;
+using Majik.Core.Events;
+using Majik.Core.Players;
+using Majik.Core.Players.Agents;
+using Majik.Core.Services;
+using Majik.Core.Spells;
+using Majik.Core.ValueObjects;
+using Majik.Core.Zones;
+
+namespace Majik.Core.Game;
+
+/// <summary>
+/// Orchestrates Rule 601 spell-casting steps via async agent prompts:
+///   1. announce spell, move card from hand to stack
+///   2. choose modes
+///   3. choose X (variable costs)
+///   4. choose targets
+///   5. choose mana payment
+///   6. build Spell with chosen effects, push onto stack
+///   7. publish <see cref="SpellCastEvent"/>
+///
+/// Mana legality / X legality / target legality validation is intentionally
+/// deferred (Phase 10's `ManaPaymentResolver` and a target validator will
+/// own it). For now the flow trusts the agent.
+/// </summary>
+public sealed class SpellCastFlow
+{
+    private readonly Majik.Core.Stack.Stack _stack;
+    private readonly ZoneService _zoneService;
+    private readonly IEventBus _eventBus;
+
+    public SpellCastFlow(
+        Majik.Core.Stack.Stack stack,
+        ZoneService zoneService,
+        IEventBus eventBus)
+    {
+        _stack = stack ?? throw new ArgumentNullException(nameof(stack));
+        _zoneService = zoneService ?? throw new ArgumentNullException(nameof(zoneService));
+        _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
+    }
+
+    public async Task<Spells.Spell> CastAsync(
+        Player caster,
+        ICard card,
+        SpellDefinition definition,
+        IPlayerAgent agent,
+        GameContext ctx,
+        CancellationToken ct = default)
+    {
+        if (caster == null) throw new ArgumentNullException(nameof(caster));
+        if (card == null) throw new ArgumentNullException(nameof(card));
+        if (definition == null) throw new ArgumentNullException(nameof(definition));
+        if (agent == null) throw new ArgumentNullException(nameof(agent));
+
+        int? mode = null;
+        if (definition.Modes.Count > 0)
+        {
+            mode = await agent.ChooseModeAsync(ctx, definition.Modes, ct);
+        }
+
+        int? xValue = null;
+        if (definition.HasVariableX)
+        {
+            xValue = await agent.ChooseXAsync(ctx, card, ct);
+        }
+
+        var collectedTargets = new List<IReadOnlyList<object>>(definition.TargetRequests.Count);
+        foreach (var req in definition.TargetRequests)
+        {
+            var picked = await agent.ChooseTargetsAsync(ctx, req, ct);
+            collectedTargets.Add(picked);
+        }
+
+        var mana = await agent.ChooseManaSourcesAsync(ctx, ManaCost.Parse(card.ManaCost), ct);
+
+        var chosen = new ChosenSpellParams(mode, xValue, collectedTargets, mana);
+        var effects = definition.EffectFactory(chosen);
+
+        _zoneService.MoveCardTo(card, ZoneType.Stack, controller: caster);
+
+        var spell = new Spells.Spell(card, caster, effects: effects);
+        _stack.Push(spell);
+        _eventBus.Publish(new SpellCastEvent(spell));
+
+        return spell;
+    }
+}

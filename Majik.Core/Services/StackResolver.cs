@@ -1,7 +1,8 @@
 using Majik.Core.Abilities;
 using Majik.Core.Domain.DomainEvents;
 using Majik.Core.Events;
-using Majik.Core.Services;
+using Majik.Core.Players;
+using Majik.Core.Rules;
 using Majik.Core.Spells;
 using Majik.Core.Stack;
 using Majik.Core.Zones;
@@ -16,11 +17,13 @@ public class StackResolver
 {
     private readonly IEventBus? _eventBus;
     private readonly ZoneService? _zoneService;
+    private readonly StateBasedActions? _stateBasedActions;
 
-    public StackResolver(IEventBus? eventBus = null, ZoneService? zoneService = null)
+    public StackResolver(IEventBus? eventBus = null, ZoneService? zoneService = null, StateBasedActions? stateBasedActions = null)
     {
         _eventBus = eventBus;
         _zoneService = zoneService;
+        _stateBasedActions = stateBasedActions;
     }
 
     /// <summary>
@@ -42,6 +45,15 @@ public class StackResolver
         var top = stack.Pop();
         if (top != null)
         {
+            // Rule 603.4: re-check intervening-if for triggered abilities. If false,
+            // the ability is removed from the stack and its effects do not occur.
+            if (top is ITriggeredAbility triggered && !triggered.CanBePutOnStack())
+            {
+                _eventBus?.Publish(new TriggeredAbilityCounteredEvent(
+                    triggered, "intervening-if failed at resolution"));
+                return top;
+            }
+
             // Resolve the object (Rule 608.1)
             top.Resolve();
 
@@ -62,6 +74,10 @@ public class StackResolver
 
             // Fire resolution event
             _eventBus?.Publish(new StackObjectResolvedEvent(top));
+
+            // Check state-based actions after resolution (Rule 704.1)
+            // Note: In a full implementation, we'd need access to all players and cards
+            // For now, this is a placeholder - SBA checking will be done at higher levels
         }
 
         return top;

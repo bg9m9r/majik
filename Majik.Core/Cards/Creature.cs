@@ -81,23 +81,24 @@ public class Creature : Permanent
     }
 
     /// <summary>
-    /// Get the current power (base + effects).
-    /// For now, returns base power. Effects will be added in future.
+    /// Optional reference to the <see cref="Majik.Core.Effects.ContinuousEffectsService"/>
+    /// that owns this creature. When set, P/T and keyword lookups consult
+    /// it (CR 613 layer system). When null, base values are returned.
     /// </summary>
+    public Majik.Core.Effects.ContinuousEffectsService? ActiveEffects { get; set; }
+
+    /// <summary>Get the current power after applying continuous effects.</summary>
     public int GetPower()
     {
-        // TODO: Apply static effects, counters, etc.
-        return BasePower;
+        if (ActiveEffects == null) return BasePower;
+        return ActiveEffects.Compute(this).Power;
     }
 
-    /// <summary>
-    /// Get the current toughness (base + effects).
-    /// For now, returns base toughness. Effects will be added in future.
-    /// </summary>
+    /// <summary>Get the current toughness after applying continuous effects.</summary>
     public int GetToughness()
     {
-        // TODO: Apply static effects, counters, etc.
-        return BaseToughness;
+        if (ActiveEffects == null) return BaseToughness;
+        return ActiveEffects.Compute(this).Toughness;
     }
 
     /// <summary>
@@ -141,4 +142,11 @@ public class Creature : Permanent
     {
         return Damage >= Toughness;
     }
+
+    /// <summary>
+    /// CR 702.2b — set by combat when a deathtouch source deals nonzero
+    /// damage to this creature. The SBA pass uses this as a synonym for
+    /// "lethal damage marked." Cleared in cleanup along with Damage.
+    /// </summary>
+    public bool MarkedForDestructionByDeathtouch { get; set; }
 }

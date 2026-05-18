@@ -25,4 +25,16 @@ public interface IEventBus
     /// <typeparam name="T">The type of event being published.</typeparam>
     /// <param name="event">The event to publish.</param>
     void Publish<T>(T @event) where T : GameEvent;
+
+    /// <summary>
+    /// Subscribe to every published event regardless of concrete type.
+    /// Used by the trigger manager so it can evaluate any event against
+    /// registered triggered abilities (Rule 603).
+    /// </summary>
+    void SubscribeAll(Action<GameEvent> handler);
+
+    /// <summary>
+    /// Remove a handler previously added via <see cref="SubscribeAll"/>.
+    /// </summary>
+    void UnsubscribeAll(Action<GameEvent> handler);
 }

@@ -1,3 +1,4 @@
+using Majik.Core.Abilities;
 using Majik.Core.Domain.DomainEvents;
 using Majik.Core.Domain.Exceptions;
 using Majik.Core.Domain.ValueObjects;
@@ -15,7 +16,9 @@ public class PriorityManager
     private readonly List<Player> _players;
     private readonly Majik.Core.Stack.Stack _stack;
     private readonly IEventBus? _eventBus;
-    
+    private readonly TriggerManager? _triggerManager;
+    private Player? _activePlayer;
+
     private PriorityState _state;
 
     /// <summary>
@@ -28,7 +31,11 @@ public class PriorityManager
     /// </summary>
     public bool AllPlayersPassed => _state.AllPlayersPassed;
 
-    public PriorityManager(List<Player> players, Majik.Core.Stack.Stack stack, IEventBus? eventBus = null)
+    public PriorityManager(
+        List<Player> players,
+        Majik.Core.Stack.Stack stack,
+        IEventBus? eventBus = null,
+        TriggerManager? triggerManager = null)
     {
         if (players == null || players.Count < 2)
         {
@@ -38,6 +45,7 @@ public class PriorityManager
         _players = players;
         _stack = stack ?? throw new ArgumentNullException(nameof(stack));
         _eventBus = eventBus;
+        _triggerManager = triggerManager;
         _state = PriorityState.Reset(players.Count);
     }
 
@@ -57,6 +65,8 @@ public class PriorityManager
             throw new InvalidGameStateException($"Player {activePlayer.Name} is not in the game");
         }
 
+        _activePlayer = activePlayer;
+        DrainPendingTriggers();
         _state = PriorityState.Initial(activePlayer, _players.Count);
 
         _eventBus?.Publish(new PriorityReceivedEvent(activePlayer));
@@ -109,8 +119,19 @@ public class PriorityManager
         var nextIndex = (currentIndex + 1) % _players.Count;
         var nextPlayer = _players[nextIndex];
 
+        DrainPendingTriggers();
         _state = _state.WithCurrentPlayerKeepPassCount(nextPlayer);
         _eventBus?.Publish(new PriorityReceivedEvent(nextPlayer));
+    }
+
+    private void DrainPendingTriggers()
+    {
+        if (_triggerManager == null || _activePlayer == null)
+        {
+            return;
+        }
+
+        _triggerManager.PutPendingTriggersOnStack(_activePlayer);
     }
 
     /// <summary>

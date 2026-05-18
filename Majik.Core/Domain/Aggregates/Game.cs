@@ -29,6 +29,8 @@ public class Game
     private PriorityManager? _priorityManager;
     private readonly StackResolver _stackResolver;
     private readonly CombatManager _combatManager;
+    private readonly Rules.StateBasedActions _stateBasedActions;
+    private GameStateChecker? _stateChecker;
 
     /// <summary>
     /// All players in the game.
@@ -108,10 +110,11 @@ public class Game
         _playerService = new PlayerService(_eventBus);
         _zoneService = new ZoneService(_eventBus);
         _phaseManager = new PhaseManager(_eventBus);
-        _stackResolver = new StackResolver(_eventBus);
-        var stateBasedActions = new Rules.StateBasedActions(_eventBus);
-        _combatManager = new CombatManager(_eventBus, stateBasedActions, _zoneService);
+        _stateBasedActions = new Rules.StateBasedActions(_eventBus, _zoneService);
+        _stackResolver = new StackResolver(_eventBus, _zoneService, _stateBasedActions);
+        _combatManager = new CombatManager(_eventBus, _stateBasedActions, _zoneService);
         _phaseManager.SetCombatManager(_combatManager);
+        _stateChecker = null; // Will be initialized after game starts
         TurnNumber = 0;
     }
 
@@ -165,6 +168,9 @@ public class Game
         _stack = new Majik.Core.Stack.Stack(_eventBus);
         _priorityManager = new PriorityManager(_players, _stack, _eventBus);
         
+        // Initialize state checker for SBA checking
+        _stateChecker = new GameStateChecker(this, _stateBasedActions);
+        
         // Initialize turn and phase managers
         _turnManager.InitializeFirstTurn();
         _phaseManager.InitializeForTurn(_players[0], true);
@@ -178,6 +184,9 @@ public class Game
             
             // Process first turn phases (with stack and priority)
             _phaseManager.ProcessAllPhases(_stack, _priorityManager);
+            
+            // Check state-based actions after game starts
+            _stateChecker?.CheckStateBasedActions();
             
             _eventBus.Publish(new GameStartedEvent());
     }
@@ -196,6 +205,12 @@ public class Game
     public void Update()
     {
         _stateMachine.Update();
+        
+        // Check state-based actions after each update (Rule 704.1)
+        if (_stateChecker != null && IsStarted)
+        {
+            _stateChecker.CheckStateBasedActions();
+        }
     }
 
     /// <summary>

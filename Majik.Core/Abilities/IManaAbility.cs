@@ -4,7 +4,7 @@ namespace Majik.Core.Abilities;
 /// Interface for mana abilities.
 /// Mana abilities generate mana and don't use the stack (Rule 605).
 /// </summary>
-public interface IManaAbility
+public interface IManaAbility : IAbility
 {
     /// <summary>
     /// The source of this mana ability (usually a land or permanent).

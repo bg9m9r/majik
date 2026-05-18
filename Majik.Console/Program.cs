@@ -1,464 +1,649 @@
-using Majik.Core.Abilities;
-using Majik.Core.Cards;
-using Majik.Core.Cards.Types;
-using Majik.Core.Costs;
-using Majik.Core.Domain.Aggregates;
-using Majik.Core.Domain.DomainEvents;
-using Majik.Core.Events;
-using Majik.Core.Players;
-using Majik.Core.Services;
-using Majik.Core.Spells;
-using Majik.Core.Stack;
-using Majik.Core.Targeting;
-using Majik.Core.ValueObjects;
-using Majik.Core.Zones;
+using Majik.Core.CardData.Database;
+using Majik.Core.CardData.Import;
+using Majik.Core.CardData.Parsing;
+using Microsoft.EntityFrameworkCore;
+using System;
+using System.Text.Json;
+using DotNetEnv;
 
 namespace Majik.Console;
 
 /// <summary>
-/// Console application to test the Majik game engine.
-/// Phase 4.5: Comprehensive testing of Phase 4 features.
+/// Import tool for Scryfall bulk data JSON.
 /// </summary>
 class Program
 {
-    static void Main(string[] args)
+    static async Task Main(string[] args)
     {
-        System.Console.WriteLine("=== Majik Game Engine - Phase 4.5: Comprehensive Testing ===\n");
-
-        // Create event bus
-        var eventBus = new EventBus();
-
-        // Subscribe to all relevant events
-        SubscribeToEvents(eventBus);
-
-        // Create game
-        var game = new Game(eventBus);
-        game.AddPlayer("Alice", 20);
-        game.AddPlayer("Bob", 20);
-        var alice = game.GetPlayer("Alice");
-        var bob = game.GetPlayer("Bob");
-
-        if (alice == null || bob == null)
+        // Load .env file if it exists (for local API keys)
+        // Search up the directory tree to find .env file
+        var currentDir = new DirectoryInfo(Directory.GetCurrentDirectory());
+        while (currentDir != null)
         {
-            System.Console.WriteLine("Error: Failed to get players");
+            var envPath = Path.Combine(currentDir.FullName, ".env");
+            if (File.Exists(envPath))
+            {
+                Env.Load(envPath);
+                break;
+            }
+            currentDir = currentDir.Parent;
+        }
+        
+        // Check for commands
+        if (args.Length > 0)
+        {
+            if (args[0].Equals("import", StringComparison.OrdinalIgnoreCase))
+            {
+                await HandleImportCommand(args);
+                return;
+            }
+            else if (args[0].Equals("analyze-keywords", StringComparison.OrdinalIgnoreCase))
+            {
+                await HandleAnalyzeKeywordsCommandAsync(args);
+                return;
+            }
+            else if (args[0].Equals("ingest-claude-results", StringComparison.OrdinalIgnoreCase))
+            {
+                await HandleIngestClaudeResultsCommandAsync(args);
+                return;
+            }
+            else if (args[0].Equals("play-triggers", StringComparison.OrdinalIgnoreCase))
+            {
+                var scenario = args.Length > 1 ? args[1] : "all";
+                TriggerPlayground.Run(scenario);
+                return;
+            }
+        }
+
+        System.Console.WriteLine("Usage:");
+        System.Console.WriteLine("  Majik.Console import <path-to-json-file>");
+        System.Console.WriteLine("  Majik.Console analyze-keywords <path-to-csv-file>");
+        System.Console.WriteLine("  Majik.Console ingest-claude-results <path-to-jsonl-file>");
+        System.Console.WriteLine("  Majik.Console play-triggers [etb|apnap|intervening-if|delayed|all]");
+        System.Console.WriteLine();
+        TriggerPlayground.PrintScenarios();
+    }
+
+    /// <summary>
+    /// Handles the import command for importing Scryfall card data.
+    /// Usage: Majik.Console import <path-to-json-file>
+    /// </summary>
+    static async Task HandleImportCommand(string[] args)
+    {
+        if (args.Length < 2)
+        {
+            System.Console.WriteLine("Usage: Majik.Console import <path-to-json-file>");
+            System.Console.WriteLine("Example: Majik.Console import /home/brett/Documents/all-cards.json");
             return;
         }
 
-        System.Console.WriteLine($"Players: {alice.Name} ({alice.LifeTotal} life), {bob.Name} ({bob.LifeTotal} life)\n");
-
-        // Run all test suites
-        TestManaSystem(game, alice, bob, eventBus);
-        TestTriggerManager(game, alice, bob, eventBus);
-        TestStaticAbilities(game, alice, bob, eventBus);
-        TestReplacementEffects(game, alice, bob, eventBus);
-        TestAbilityEffects(game, alice, bob, eventBus);
-        TestIntegratedScenario(game, alice, bob, eventBus);
-
-        System.Console.WriteLine("\n=== Phase 4.5 Testing Complete ===");
-        System.Console.WriteLine("✓ Mana System");
-        System.Console.WriteLine("✓ Trigger Manager");
-        System.Console.WriteLine("✓ Static Abilities");
-        System.Console.WriteLine("✓ Replacement Effects");
-        System.Console.WriteLine("✓ Ability Effects");
-        System.Console.WriteLine("✓ Integrated Scenarios");
-    }
-
-    static void SubscribeToEvents(IEventBus eventBus)
-    {
-        eventBus.Subscribe<SpellCastEvent>(evt =>
+        var jsonFilePath = args[1];
+        
+        if (!File.Exists(jsonFilePath))
         {
-            System.Console.WriteLine($"    [Event] {evt.Spell.Controller.Name} casts {evt.Spell.Card.Name}");
-        });
-
-        eventBus.Subscribe<TargetsChosenEvent>(evt =>
-        {
-            System.Console.WriteLine($"    [Event] Targets chosen: {evt.Targets.Count} target(s)");
-        });
-
-        eventBus.Subscribe<CostsPaidEvent>(evt =>
-        {
-            System.Console.WriteLine($"    [Event] Costs paid: {string.Join(", ", evt.Costs.Select(c => c.Description))}");
-        });
-
-        eventBus.Subscribe<AbilityActivatedEvent>(evt =>
-        {
-            System.Console.WriteLine($"    [Event] {evt.Ability.Controller.Name} activates ability");
-        });
-
-        eventBus.Subscribe<TriggeredAbilityTriggeredEvent>(evt =>
-        {
-            System.Console.WriteLine($"    [Event] Triggered ability triggered from {evt.Ability.Source}");
-        });
-
-        eventBus.Subscribe<StackObjectAddedEvent>(evt =>
-        {
-            if (evt.StackObject is ISpell spell)
-            {
-                System.Console.WriteLine($"    [Stack] {spell.Card.Name} added to stack");
-            }
-            else if (evt.StackObject is IActivatedAbility)
-            {
-                System.Console.WriteLine($"    [Stack] Activated ability added to stack");
-            }
-            else if (evt.StackObject is ITriggeredAbility)
-            {
-                System.Console.WriteLine($"    [Stack] Triggered ability added to stack");
-            }
-        });
-
-        eventBus.Subscribe<StackObjectResolvedEvent>(evt =>
-        {
-            if (evt.StackObject is ISpell spell)
-            {
-                System.Console.WriteLine($"    [Stack] {spell.Card.Name} resolved");
-            }
-            else if (evt.StackObject is IActivatedAbility)
-            {
-                System.Console.WriteLine($"    [Stack] Activated ability resolved");
-            }
-            else if (evt.StackObject is ITriggeredAbility)
-            {
-                System.Console.WriteLine($"    [Stack] Triggered ability resolved");
-            }
-        });
-
-        eventBus.Subscribe<StateBasedActionExecutedEvent>(evt =>
-        {
-            System.Console.WriteLine($"    [SBA] {evt.ActionDescription}");
-        });
-    }
-
-    static void TestManaSystem(Game game, Player alice, Player bob, IEventBus eventBus)
-    {
-        System.Console.WriteLine("=== Test 1: Mana System ===\n");
-
-        // Test 1.1: Empty mana pool
-        System.Console.WriteLine("1.1: Initial mana pool state");
-        System.Console.WriteLine($"    Alice's mana pool: {alice.ManaPool}");
-        System.Console.WriteLine($"    Pool is empty: {alice.ManaPool.IsEmpty}\n");
-
-        // Test 1.2: Add mana to pool
-        System.Console.WriteLine("1.2: Adding mana to pool");
-        alice.AddManaToPool(ManaCost.Parse("RR"));
-        System.Console.WriteLine($"    Added 2 Red mana");
-        System.Console.WriteLine($"    Alice's mana pool: {alice.ManaPool}");
-        System.Console.WriteLine($"    Pool total: {alice.ManaPool.Total}\n");
-
-        // Test 1.3: Add more mana
-        System.Console.WriteLine("1.3: Adding more mana");
-        alice.AddManaToPool(ManaCost.Parse("3"));
-        System.Console.WriteLine($"    Added 3 generic mana");
-        System.Console.WriteLine($"    Alice's mana pool: {alice.ManaPool}\n");
-
-        // Test 1.4: Pay mana cost
-        System.Console.WriteLine("1.4: Paying mana cost");
-        var cost = ManaCost.Parse("1R");
-        System.Console.WriteLine($"    Cost to pay: {cost}");
-        System.Console.WriteLine($"    Can pay: {alice.ManaPool.CanPay(cost)}");
-        var (newPool, success) = alice.ManaPool.Pay(cost);
-        if (success)
-        {
-            alice.PayMana(cost);
-            System.Console.WriteLine($"    Paid successfully");
-            System.Console.WriteLine($"    Remaining mana: {alice.ManaPool}\n");
+            System.Console.WriteLine($"Error: File not found: {jsonFilePath}");
+            return;
         }
 
-        // Test 1.5: Mana ability
-        System.Console.WriteLine("1.5: Testing mana ability");
-        var forest = new Land("Forest") { Owner = alice, Controller = alice };
-        forest.Zone = ZoneType.Battlefield;
+        System.Console.WriteLine($"=== Majik Card Import Tool ===\n");
+        System.Console.WriteLine($"Importing cards from: {jsonFilePath}");
         
-        var greenMana = ManaCost.Parse("G");
-        var manaAbility = new ManaAbility(forest, alice, greenMana);
-        var activator = new ManaAbilityActivator(eventBus);
+        var fileInfo = new FileInfo(jsonFilePath);
+        System.Console.WriteLine($"File size: {fileInfo.Length / (1024.0 * 1024.0):F2} MB");
+        System.Console.WriteLine("This may take several minutes for large files...\n");
+        System.Console.WriteLine($"  Database location: {GetDatabasePath()}");
+
+        var importer = new ScryfallJsonImporter(progress: new Progress<ImportProgress>(ReportProgress));
+
+        try
+        {
+            var startTime = DateTime.Now;
+            var count = await importer.ImportFromFileAsync(jsonFilePath);
+            var duration = DateTime.Now - startTime;
+
+            System.Console.WriteLine($"\n\n✓ Import complete!");
+            System.Console.WriteLine($"  Total cards processed: {count}");
+            System.Console.WriteLine($"  Time elapsed: {duration.TotalMinutes:F2} minutes");
+        }
+        catch (Exception ex)
+        {
+            System.Console.WriteLine($"\n✗ Error during import: {ex.Message}");
+            System.Console.WriteLine($"Stack trace: {ex.StackTrace}");
+        }
+    }
+
+    /// <summary>
+    /// Reports import progress to the console.
+    /// </summary>
+    static void ReportProgress(ImportProgress progress)
+    {
+        var percent = progress.ProgressPercent;
+        var bytesProcessedMB = progress.BytesProcessed / (1024.0 * 1024.0);
+        var totalBytesMB = progress.TotalBytes / (1024.0 * 1024.0);
+
+        System.Console.Write($"\rProgress: {percent:F1}% ({bytesProcessedMB:F1}/{totalBytesMB:F1} MB) - " +
+                            $"Processed: {progress.Processed}, " +
+                            $"Imported: {progress.Imported}, " +
+                            $"Updated: {progress.Updated}, " +
+                            $"Skipped: {progress.Skipped}");
+    }
+
+    /// <summary>
+    /// Gets the database path (same logic as CardDbContext).
+    /// </summary>
+    static string GetDatabasePath()
+    {
+        var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        var majikDir = Path.Combine(appData, "Majik");
+        System.Console.WriteLine($"Database path: {Path.Combine(majikDir, "cards.db")}");
+        return Path.Combine(majikDir, "cards.db");
+    }
+
+    /// <summary>
+    /// Handles the analyze-keywords command for analyzing and categorizing keywords.
+    /// </summary>
+    static async Task HandleAnalyzeKeywordsCommandAsync(string[] args)
+    {
+        if (args.Length < 2)
+        {
+            System.Console.WriteLine("Usage: Majik.Console analyze-keywords <path-to-csv-file> [--use-claude]");
+            System.Console.WriteLine("   OR: Majik.Console analyze-keywords --from-database [--use-claude]");
+            System.Console.WriteLine("\nOptions:");
+            System.Console.WriteLine("  --from-database  Read keywords from the database (Cards.Keywords) instead of CSV");
+            System.Console.WriteLine("  --use-claude     Use Claude API to analyze unknown keywords (requires ANTHROPIC_API_KEY)");
+            return;
+        }
+
+        var useClaude = args.Contains("--use-claude", StringComparer.OrdinalIgnoreCase);
+        var fromDatabase = args.Contains("--from-database", StringComparer.OrdinalIgnoreCase);
         
-        System.Console.WriteLine($"    Forest can activate: {manaAbility.CanActivate()}");
-        var generated = activator.ActivateManaAbility(manaAbility, alice);
-        System.Console.WriteLine($"    Generated: {generated}");
-        System.Console.WriteLine($"    Alice's mana pool: {alice.ManaPool}");
-        System.Console.WriteLine($"    Forest is tapped: {forest.IsTapped}\n");
-
-        // Test 1.6: Empty mana pool
-        System.Console.WriteLine("1.6: Emptying mana pool (end of step)");
-        alice.EmptyManaPool();
-        System.Console.WriteLine($"    Alice's mana pool: {alice.ManaPool}\n");
-
-        System.Console.WriteLine("✓ Mana System Tests Complete\n");
-    }
-
-    static void TestTriggerManager(Game game, Player alice, Player bob, IEventBus eventBus)
-    {
-        System.Console.WriteLine("=== Test 2: Trigger Manager ===\n");
-
-        // Create trigger manager
-        var triggerManager = new TriggerManager(game.Stack, eventBus);
-
-        // Test 2.1: Register triggered ability
-        System.Console.WriteLine("2.1: Registering triggered ability");
-        var creature = new Creature("Lightning Elemental", "2RR", 4, 4) { Owner = alice, Controller = alice };
-        creature.Zone = ZoneType.Battlefield;
-
-        var triggeredAbility = new TriggeredAbility(
-            creature,
-            alice,
-            null,
-            new List<IEffect> { new Effect("Deal 2 damage", () => { System.Console.WriteLine("        [Effect] Deals 2 damage!"); }) }
-        );
-
-        triggerManager.RegisterTriggeredAbility(triggeredAbility);
-        System.Console.WriteLine($"    Registered triggered ability from {creature.Name}\n");
-
-        // Test 2.2: Trigger on event
-        System.Console.WriteLine("2.2: Triggering ability via event");
-        var testCard = new Instant("Test Card", "1") { Owner = alice };
-        var testEvent = new CardDrawnEvent(testCard, alice);
-        triggerManager.EvaluateTriggers(testEvent);
-        System.Console.WriteLine($"    Stack count: {game.Stack.Count}");
-        System.Console.WriteLine($"    Top of stack: {game.Stack.Top?.GetType().Name}\n");
-
-        // Test 2.3: Resolve triggered ability
-        System.Console.WriteLine("2.3: Resolving triggered ability");
-        var resolver = new StackResolver(eventBus);
-        resolver.ResolveTop(game.Stack);
-        System.Console.WriteLine($"    Stack count after resolution: {game.Stack.Count}\n");
-
-        System.Console.WriteLine("✓ Trigger Manager Tests Complete\n");
-    }
-
-    static void TestStaticAbilities(Game game, Player alice, Player bob, IEventBus eventBus)
-    {
-        System.Console.WriteLine("=== Test 3: Static Abilities ===\n");
-
-        // Create static ability manager
-        var staticManager = new StaticAbilityManager(eventBus);
-
-        // Test 3.1: Register static ability
-        System.Console.WriteLine("3.1: Registering static ability");
-        var enchantment = new Enchantment("Glorious Anthem", "") { Owner = alice, Controller = alice };
-        enchantment.Zone = ZoneType.Battlefield;
-
-        int effectAppliedCount = 0;
-        var staticAbility = new StaticAbility(
-            enchantment,
-            alice,
-            "Creatures you control get +1/+1",
-            () => enchantment.Zone == ZoneType.Battlefield,
-            () => { effectAppliedCount++; System.Console.WriteLine("        [Effect] +1/+1 applied to creatures"); }
-        );
-
-        staticManager.RegisterStaticAbility(staticAbility);
-        System.Console.WriteLine($"    Registered: {staticAbility.Description}\n");
-
-        // Test 3.2: Check if active
-        System.Console.WriteLine("3.2: Checking if static ability is active");
-        System.Console.WriteLine($"    Is active: {staticAbility.IsActive()}\n");
-
-        // Test 3.3: Apply static abilities
-        System.Console.WriteLine("3.3: Applying static abilities");
-        staticManager.ApplyStaticAbilities();
-        System.Console.WriteLine($"    Effect applied count: {effectAppliedCount}\n");
-
-        // Test 3.4: Deactivate (move to graveyard)
-        System.Console.WriteLine("3.4: Deactivating static ability (move to graveyard)");
-        enchantment.Zone = ZoneType.Graveyard;
-        System.Console.WriteLine($"    Is active: {staticAbility.IsActive()}\n");
-
-        System.Console.WriteLine("✓ Static Abilities Tests Complete\n");
-    }
-
-    static void TestReplacementEffects(Game game, Player alice, Player bob, IEventBus eventBus)
-    {
-        System.Console.WriteLine("=== Test 4: Replacement Effects ===\n");
-
-        // Create replacement effect manager
-        var replacementManager = new ReplacementEffectManager();
-
-        // Test 4.1: Register replacement effect
-        System.Console.WriteLine("4.1: Registering replacement effect");
-        var permanent = new Artifact("Fountain of Youth", "") { Owner = alice, Controller = alice };
-        permanent.Zone = ZoneType.Battlefield;
-
-        var replacementEffect = new ReplacementEffect(
-            permanent,
-            alice,
-            "Prevent the next 2 damage",
-            (evt) => evt is LifeChangedEvent lifeEvent && (lifeEvent.NewLife - lifeEvent.PreviousLife) < 0,
-            (evt) =>
+        string? csvPath = null;
+        if (!fromDatabase)
+        {
+            // Find the first argument that's not a flag
+            csvPath = args.Skip(1).FirstOrDefault(arg => 
+                !arg.StartsWith("--", StringComparison.OrdinalIgnoreCase));
+            
+            if (string.IsNullOrEmpty(csvPath))
             {
-                if (evt is LifeChangedEvent lifeEvent)
+                System.Console.WriteLine("Error: CSV file path is required when not using --from-database");
+                return;
+            }
+            
+            if (!File.Exists(csvPath))
+            {
+                System.Console.WriteLine($"Error: CSV file not found: {csvPath}");
+                return;
+            }
+        }
+
+        System.Console.WriteLine("=== Keyword Analysis Tool ===\n");
+        if (fromDatabase)
+        {
+            System.Console.WriteLine("Reading keywords from database...");
+        }
+        else
+        {
+            System.Console.WriteLine($"Analyzing keywords from: {csvPath}");
+        }
+        if (useClaude)
+        {
+            System.Console.WriteLine("Using Claude API for unknown keywords (this will take longer and use API credits)\n");
+        }
+        System.Console.WriteLine("This may take a few minutes...\n");
+
+        try
+        {
+            using var dbContext = new CardDbContext();
+            await dbContext.Database.EnsureCreatedAsync();
+            
+            // Ensure KeywordMetadata table exists (in case database was created before this entity)
+            await EnsureKeywordMetadataTableExistsAsync(dbContext);
+
+            var analyzer = new KeywordAnalyzer();
+            ClaudeKeywordAnalyzer? claudeAnalyzer = null;
+            
+            if (useClaude)
+            {
+                try
                 {
-                    var amount = lifeEvent.NewLife - lifeEvent.PreviousLife;
-                    var prevented = Math.Min(2, Math.Abs(amount));
-                    System.Console.WriteLine($"        [Replacement] Preventing {prevented} damage");
-                    // Return modified event (simplified - would create new event in real implementation)
-                    return evt;
+                    System.Console.WriteLine("Initializing Claude API analyzer...");
+                    claudeAnalyzer = new ClaudeKeywordAnalyzer(dbContext: dbContext);
+                    System.Console.WriteLine("Claude API ready!\n");
                 }
-                return evt;
+                catch (Exception ex)
+                {
+                    System.Console.WriteLine($"Warning: Could not initialize Claude API: {ex.Message}");
+                    System.Console.WriteLine("Continuing without Claude analysis...\n");
+                }
             }
-        );
+            
+            // Load card names from database to filter them out
+            System.Console.WriteLine("Loading card names from database...");
+            await analyzer.LoadCardNamesAsync(dbContext);
+            System.Console.WriteLine($"Loaded {analyzer.GetCardNameCount()} card names\n");
 
-        replacementManager.RegisterReplacementEffect(replacementEffect);
-        System.Console.WriteLine($"    Registered: {replacementEffect.Description}\n");
+            // Get keywords from CSV or database
+            List<KeywordAnalysis> analyses;
+            if (fromDatabase)
+            {
+                // Load keywords from database
+                var keywords = await analyzer.LoadKeywordsFromDatabaseAsync(
+                    dbContext,
+                    (message) => System.Console.Write(message));
+                
+                if (keywords.Count == 0)
+                {
+                    System.Console.WriteLine("No keywords found in database. Make sure cards have been imported first.");
+                    return;
+                }
+                
+                // Analyze keywords from list
+                System.Console.WriteLine("Analyzing keywords...\n");
+                analyses = await analyzer.AnalyzeKeywordsFromListAsync(
+                    keywords,
+                    (message) => System.Console.Write(message));
+            }
+            else
+            {
+                // Analyze keywords from CSV
+                System.Console.WriteLine("Analyzing keywords...\n");
+                analyses = await analyzer.AnalyzeKeywordsFromCsvAsync(
+                    csvPath!, 
+                    (message) => System.Console.Write(message));
+            }
+            
+            System.Console.WriteLine($"\n✓ Analysis complete: {analyses.Count} keywords analyzed\n");
+            
+            // Get implementation notes for official keywords if Claude is available
+            Dictionary<string, ClaudeImplementationNotes>? implementationNotes = null;
+            if (claudeAnalyzer != null)
+            {
+                // Use Claude Message Batches API (50% discount, processes all at once)
+                implementationNotes = await analyzer.GetImplementationNotesForOfficialKeywordsAsync(
+                    analyses,
+                    claudeAnalyzer,
+                    (message) => System.Console.Write(message));
+            }
 
-        // Test 4.2: Apply replacement effect
-        System.Console.WriteLine("4.2: Testing replacement effect");
-        var previousLife = alice.LifeTotal;
-        var damageEvent = new LifeChangedEvent(alice, previousLife, previousLife - 3);
-        System.Console.WriteLine($"    Original event: {damageEvent.NewLife - damageEvent.PreviousLife} life change");
-        var replaced = replacementManager.ApplyReplacementEffects(damageEvent);
-        System.Console.WriteLine($"    Replacement applied: {replaced != null}\n");
+            // Generate report
+            var report = analyzer.GenerateReport(analyses);
+            System.Console.WriteLine("=== Analysis Report ===\n");
+            System.Console.WriteLine($"Total Keywords: {report.TotalKeywords}");
+            System.Console.WriteLine("\nBy Category:");
+            foreach (var category in report.ByCategory.OrderByDescending(kvp => kvp.Value))
+            {
+                System.Console.WriteLine($"  {category.Key}: {category.Value}");
+            }
 
-        System.Console.WriteLine("✓ Replacement Effects Tests Complete\n");
+            System.Console.WriteLine($"\nOfficial Keywords: {report.OfficialKeywords.Count}");
+            System.Console.WriteLine($"Parameterized Keywords: {report.ParameterizedKeywords.Count}");
+            System.Console.WriteLine($"Card Names (filtered): {report.CardNames.Count}");
+            System.Console.WriteLine($"Custom Keywords: {report.CustomKeywords.Count}");
+            System.Console.WriteLine($"Unknown Keywords: {report.UnknownKeywords.Count}\n");
+
+            // Save to database
+            System.Console.WriteLine("Saving results to database...");
+            await analyzer.SaveAnalysesToDatabaseAsync(dbContext, analyses, implementationNotes);
+            System.Console.WriteLine("Results saved to database successfully!\n");
+            
+            if (implementationNotes != null && implementationNotes.Count > 0)
+            {
+                System.Console.WriteLine($"✓ Implementation notes retrieved for {implementationNotes.Count} official keywords.");
+                System.Console.WriteLine("All Claude data saved to database:");
+                System.Console.WriteLine("  - Notes: Implementation guidance");
+                System.Console.WriteLine("  - CodeExample: Code examples");
+                System.Console.WriteLine("  - TestingNotes: Test cases");
+                System.Console.WriteLine("  - CommonMistakes: Mistakes to avoid");
+                System.Console.WriteLine("  - RelatedKeywords: Related keywords");
+                System.Console.WriteLine("  - Complexity: Implementation complexity");
+                System.Console.WriteLine("  - ClaudeRawResponse: Full API response (for reference)\n");
+            }
+
+            System.Console.WriteLine("=== Analysis Complete ===");
+            
+            if (claudeAnalyzer != null)
+            {
+                claudeAnalyzer.Dispose();
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Console.WriteLine($"✗ Error during analysis: {ex.Message}");
+            System.Console.WriteLine($"Stack trace: {ex.StackTrace}");
+        }
     }
 
-    static void TestAbilityEffects(Game game, Player alice, Player bob, IEventBus eventBus)
+    /// <summary>
+    /// Ensures the KeywordMetadata table exists by creating it if necessary.
+    /// This is needed because the database may have been created before this entity was added.
+    /// </summary>
+    static async Task EnsureKeywordMetadataTableExistsAsync(CardDbContext dbContext)
     {
-        System.Console.WriteLine("=== Test 5: Ability Effects ===\n");
-
-        // Test 5.1: Spell with effect
-        System.Console.WriteLine("5.1: Testing spell with effect");
-        var lightningBolt = new Instant("Lightning Bolt", "R") { Owner = alice };
-        alice.Zones.Hand.AddCard(lightningBolt);
-
-        // Add mana to pool
-        alice.AddManaToPool(ManaCost.Parse("R"));
-
-        var damageEffect = new Effect("Deal 3 damage", () =>
+        // Create table if it doesn't exist (IF NOT EXISTS handles this safely)
+        // Note: SQLite doesn't support ALTER TABLE ADD COLUMN IF NOT EXISTS easily,
+        // so we'll add columns that might be missing
+        await dbContext.Database.ExecuteSqlRawAsync(@"
+            CREATE TABLE IF NOT EXISTS KeywordMetadata (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                Keyword TEXT NOT NULL UNIQUE,
+                Category INTEGER NOT NULL,
+                Confidence REAL NOT NULL,
+                Reason TEXT,
+                BaseKeyword TEXT,
+                Parameters TEXT,
+                AbilityType INTEGER,
+                Layer INTEGER,
+                Sublayer TEXT,
+                ImplementationStatus INTEGER NOT NULL DEFAULT 0,
+                Notes TEXT,
+                CodeExample TEXT,
+                TestingNotes TEXT,
+                CommonMistakes TEXT,
+                RelatedKeywords TEXT,
+                Complexity TEXT,
+                ClaudeRawResponse TEXT,
+                CreatedAt TEXT NOT NULL,
+                UpdatedAt TEXT
+            );
+        ");
+        
+        // Create ClaudeRequestCache table
+        await dbContext.Database.ExecuteSqlRawAsync(@"
+            CREATE TABLE IF NOT EXISTS ClaudeRequestCache (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                RequestHash TEXT NOT NULL UNIQUE,
+                Keyword TEXT NOT NULL,
+                RequestPrompt TEXT NOT NULL,
+                ResponseText TEXT NOT NULL,
+                ParsedNotes TEXT,
+                Model TEXT NOT NULL,
+                RequestedAt TEXT NOT NULL,
+                LastAccessedAt TEXT NOT NULL
+            );
+        ");
+        
+        // Add new columns if they don't exist (SQLite doesn't support IF NOT EXISTS for ALTER TABLE)
+        // Check if columns exist by querying table info, then add missing ones
+        var newColumns = new[]
         {
-            System.Console.WriteLine("        [Effect] Lightning Bolt deals 3 damage!");
-            bob.LoseLife(3);
-        });
-
-        var spellCaster = new SpellCaster(game.Stack, eventBus);
-        var costs = new List<ICost> { new ManaCostCost("R") };
-        var effects = new List<IEffect> { damageEffect };
-
-        System.Console.WriteLine($"    Bob's life before: {bob.LifeTotal}");
-        spellCaster.CastSpell(lightningBolt, alice, null, costs, true, true);
-        System.Console.WriteLine($"    Stack count: {game.Stack.Count}");
-
-        // Resolve spell
-        var resolver = new StackResolver(eventBus);
-        resolver.ResolveTop(game.Stack);
-        System.Console.WriteLine($"    Bob's life after: {bob.LifeTotal}\n");
-
-        // Test 5.2: Activated ability with effect
-        System.Console.WriteLine("5.2: Testing activated ability with effect");
-        var artifact = new Artifact("Staff of Fire", "") { Owner = alice, Controller = alice };
-        artifact.Zone = ZoneType.Battlefield;
-
-        alice.AddManaToPool(ManaCost.Parse("R"));
-        var tapCost = AdditionalCost.Tap(artifact);
-        var fireEffect = new Effect("Deal 1 damage", () =>
+            ("Sublayer", "TEXT"),
+            ("CodeExample", "TEXT"),
+            ("TestingNotes", "TEXT"),
+            ("CommonMistakes", "TEXT"),
+            ("RelatedKeywords", "TEXT"),
+            ("Complexity", "TEXT"),
+            ("ClaudeRawResponse", "TEXT")
+        };
+        
+        // Get existing columns
+        var existingColumns = new HashSet<string>();
+        try
         {
-            System.Console.WriteLine("        [Effect] Staff of Fire deals 1 damage!");
-            bob.LoseLife(1);
-        });
-
-        var activatedAbility = new ActivatedAbility(
-            artifact,
-            alice,
-            null,
-            new List<ICost> { new ManaCostCost("R"), tapCost },
-            new List<IEffect> { fireEffect }
-        );
-
-        var abilityActivator = new AbilityActivator(game.Stack, eventBus);
-        System.Console.WriteLine($"    Bob's life before: {bob.LifeTotal}");
-        abilityActivator.ActivateAbility(activatedAbility, alice, null, new List<ICost> { new ManaCostCost("R"), tapCost });
-        System.Console.WriteLine($"    Stack count: {game.Stack.Count}");
-
-        resolver.ResolveTop(game.Stack);
-        System.Console.WriteLine($"    Bob's life after: {bob.LifeTotal}");
-        System.Console.WriteLine($"    Artifact is tapped: {artifact.IsTapped}\n");
-
-        // Test 5.3: Multiple effects
-        System.Console.WriteLine("5.3: Testing spell with multiple effects");
-        var multiSpell = new Instant("Double Strike", "1R") { Owner = alice };
-        alice.Zones.Hand.AddCard(multiSpell);
-        alice.AddManaToPool(ManaCost.Parse("1R"));
-
-        var effect1 = new Effect("Effect 1", () => System.Console.WriteLine("        [Effect 1] First effect"));
-        var effect2 = new Effect("Effect 2", () => System.Console.WriteLine("        [Effect 2] Second effect"));
-
-        spellCaster.CastSpell(multiSpell, alice, null, new List<ICost> { new ManaCostCost("1R") }, true, true);
-        resolver.ResolveTop(game.Stack);
-        System.Console.WriteLine();
-
-        System.Console.WriteLine("✓ Ability Effects Tests Complete\n");
+            var tableInfo = await dbContext.Database.ExecuteSqlRawAsync(@"
+                SELECT name FROM pragma_table_info('KeywordMetadata');
+            ");
+            // Note: ExecuteSqlRawAsync doesn't return results, we need to use a different approach
+            // For now, just try to add columns and catch errors
+        }
+        catch
+        {
+            // Table might not exist yet, that's fine
+        }
+        
+        // Try to add each column, ignoring errors if it already exists
+        foreach (var (columnName, columnType) in newColumns)
+        {
+            try
+            {
+                // Use string interpolation for column names (safe since they're hardcoded)
+                #pragma warning disable EF1002 // SQL injection warning - column names are hardcoded, safe
+                await dbContext.Database.ExecuteSqlRawAsync($@"
+                    ALTER TABLE KeywordMetadata ADD COLUMN {columnName} {columnType};
+                ");
+                #pragma warning restore EF1002
+            }
+            catch
+            {
+                // Column already exists, ignore
+            }
+        }
+        
+        // Create indexes if they don't exist
+        await dbContext.Database.ExecuteSqlRawAsync(@"
+            CREATE INDEX IF NOT EXISTS IX_KeywordMetadata_Keyword ON KeywordMetadata(Keyword);
+            CREATE INDEX IF NOT EXISTS IX_KeywordMetadata_Category ON KeywordMetadata(Category);
+            CREATE INDEX IF NOT EXISTS IX_KeywordMetadata_ImplementationStatus ON KeywordMetadata(ImplementationStatus);
+            CREATE INDEX IF NOT EXISTS IX_KeywordMetadata_BaseKeyword ON KeywordMetadata(BaseKeyword);
+        ");
     }
 
-    static void TestIntegratedScenario(Game game, Player alice, Player bob, IEventBus eventBus)
+    /// <summary>
+    /// Handles the ingest-claude-results command for importing manually downloaded Claude batch results.
+    /// </summary>
+    static async Task HandleIngestClaudeResultsCommandAsync(string[] args)
     {
-        System.Console.WriteLine("=== Test 6: Integrated Scenario ===\n");
-
-        System.Console.WriteLine("Scenario: Alice casts a spell, Bob responds, triggers fire, effects resolve\n");
-
-        // Setup: Add mana
-        alice.AddManaToPool(ManaCost.Parse("2RR"));
-        bob.AddManaToPool(ManaCost.Parse("UU"));
-
-        // Setup: Create cards
-        var fireball = new Instant("Fireball", "2RR") { Owner = alice };
-        var counterspell = new Instant("Counterspell", "UU") { Owner = bob };
-        alice.Zones.Hand.AddCard(fireball);
-        bob.Zones.Hand.AddCard(counterspell);
-
-        // Setup: Create triggered ability
-        var triggerManager = new TriggerManager(game.Stack, eventBus);
-        var triggerSource = new Creature("Guttersnipe", "2R", 2, 2) { Owner = alice, Controller = alice };
-        triggerSource.Zone = ZoneType.Battlefield;
-
-        var triggerEffect = new Effect("Guttersnipe deals 2 damage", () =>
+        if (args.Length < 2)
         {
-            System.Console.WriteLine("        [Trigger Effect] Guttersnipe deals 2 damage to Bob!");
-            bob.LoseLife(2);
-        });
-
-        var triggeredAbility = new TriggeredAbility(triggerSource, alice, null, new List<IEffect> { triggerEffect });
-        triggerManager.RegisterTriggeredAbility(triggeredAbility);
-
-        // Step 1: Alice casts Fireball
-        System.Console.WriteLine("Step 1: Alice casts Fireball");
-        var spellCaster = new SpellCaster(game.Stack, eventBus);
-        var fireballEffect = new Effect("Fireball deals 4 damage", () =>
-        {
-            System.Console.WriteLine("        [Spell Effect] Fireball deals 4 damage to Bob!");
-            bob.LoseLife(4);
-        });
-
-        spellCaster.CastSpell(fireball, alice, null, new List<ICost> { new ManaCostCost("2RR") }, true, true);
-        System.Console.WriteLine($"    Bob's life: {bob.LifeTotal}");
-        System.Console.WriteLine($"    Stack count: {game.Stack.Count}\n");
-
-        // Step 2: Trigger fires (after spell is cast, it's already on stack)
-        System.Console.WriteLine("Step 2: Guttersnipe triggers");
-        // The spell was already cast and added to stack, so we can use the stack object
-        if (game.Stack.Top is ISpell topSpell)
-        {
-            var castEvent = new SpellCastEvent(topSpell);
-            triggerManager.EvaluateTriggers(castEvent);
-        }
-        System.Console.WriteLine($"    Stack count: {game.Stack.Count}\n");
-
-        // Step 3: Bob casts Counterspell
-        System.Console.WriteLine("Step 3: Bob casts Counterspell");
-        spellCaster.CastSpell(counterspell, bob, null, new List<ICost> { new ManaCostCost("UU") }, true, false);
-        System.Console.WriteLine($"    Stack count: {game.Stack.Count}\n");
-
-        // Step 4: Resolve stack (LIFO)
-        System.Console.WriteLine("Step 4: Resolving stack (LIFO order)");
-        var resolver = new StackResolver(eventBus);
-        System.Console.WriteLine($"    Bob's life before resolution: {bob.LifeTotal}");
-
-        while (!game.Stack.IsEmpty)
-        {
-            resolver.ResolveTop(game.Stack);
+            System.Console.WriteLine("Usage: Majik.Console ingest-claude-results <path-to-jsonl-file>");
+            System.Console.WriteLine("\nThis command imports Claude batch results from a manually downloaded JSONL file.");
+            System.Console.WriteLine("The file should contain one JSON object per line with custom_id and result fields.");
+            return;
         }
 
-        System.Console.WriteLine($"    Bob's life after resolution: {bob.LifeTotal}");
-        System.Console.WriteLine($"    Stack is empty: {game.Stack.IsEmpty}\n");
+        var jsonlPath = args[1];
+        
+        if (!File.Exists(jsonlPath))
+        {
+            System.Console.WriteLine($"Error: JSONL file not found: {jsonlPath}");
+            return;
+        }
 
-        System.Console.WriteLine("✓ Integrated Scenario Tests Complete\n");
+        System.Console.WriteLine("=== Claude Results Ingestion Tool ===\n");
+        System.Console.WriteLine($"Reading results from: {jsonlPath}\n");
+
+        try
+        {
+            using var dbContext = new CardDbContext();
+            await dbContext.Database.EnsureCreatedAsync();
+            
+            // Ensure tables exist
+            await EnsureKeywordMetadataTableExistsAsync(dbContext);
+
+            var claudeAnalyzer = new ClaudeKeywordAnalyzer(dbContext: dbContext);
+            
+            // Read and parse JSONL file
+            var lines = await File.ReadAllLinesAsync(jsonlPath);
+            System.Console.WriteLine($"Found {lines.Length} lines in JSONL file\n");
+            
+            int processed = 0;
+            int errors = 0;
+            var keywordsProcessed = new HashSet<string>();
+            
+            foreach (var line in lines)
+            {
+                if (string.IsNullOrWhiteSpace(line))
+                    continue;
+                
+                try
+                {
+                    // Parse the JSONL line - format is different from API response
+                    var jsonDoc = JsonDocument.Parse(line);
+                    var root = jsonDoc.RootElement;
+                    
+                    // Extract custom_id
+                    if (!root.TryGetProperty("custom_id", out var customIdElement))
+                    {
+                        System.Console.WriteLine($"  ⚠ Skipping line: missing custom_id");
+                        errors++;
+                        continue;
+                    }
+                    
+                    var customId = customIdElement.GetString();
+                    if (string.IsNullOrEmpty(customId))
+                    {
+                        System.Console.WriteLine($"  ⚠ Skipping line: empty custom_id");
+                        errors++;
+                        continue;
+                    }
+                    
+                    // Extract result
+                    if (!root.TryGetProperty("result", out var resultElement))
+                    {
+                        System.Console.WriteLine($"  ⚠ Skipping {customId}: missing result");
+                        errors++;
+                        continue;
+                    }
+                    
+                    // Check if result succeeded
+                    if (!resultElement.TryGetProperty("type", out var resultTypeElement) || 
+                        resultTypeElement.GetString() != "succeeded")
+                    {
+                        System.Console.WriteLine($"  ⚠ Skipping {customId}: result type is not 'succeeded'");
+                        errors++;
+                        continue;
+                    }
+                    
+                    // Extract message content
+                    if (!resultElement.TryGetProperty("message", out var messageElement) ||
+                        !messageElement.TryGetProperty("content", out var contentElement) ||
+                        contentElement.ValueKind != JsonValueKind.Array ||
+                        contentElement.GetArrayLength() == 0)
+                    {
+                        System.Console.WriteLine($"  ⚠ Skipping {customId}: missing or empty content");
+                        errors++;
+                        continue;
+                    }
+                    
+                    // Get text from first content item
+                    var firstContent = contentElement[0];
+                    if (!firstContent.TryGetProperty("text", out var textElement))
+                    {
+                        System.Console.WriteLine($"  ⚠ Skipping {customId}: missing text in content");
+                        errors++;
+                        continue;
+                    }
+                    
+                    var responseText = textElement.GetString();
+                    if (string.IsNullOrEmpty(responseText))
+                    {
+                        System.Console.WriteLine($"  ⚠ Skipping {customId}: empty text");
+                        errors++;
+                        continue;
+                    }
+                    
+                    // Extract keyword from custom_id (format: "kw{index}-{keyword}")
+                    var keywordMatch = System.Text.RegularExpressions.Regex.Match(customId, @"^kw\d+-(.+)$");
+                    if (!keywordMatch.Success)
+                    {
+                        // Try old format
+                        keywordMatch = System.Text.RegularExpressions.Regex.Match(customId, @"^keyword-\d+-(.+)$");
+                    }
+                    
+                    string keyword;
+                    if (keywordMatch.Success)
+                    {
+                        keyword = keywordMatch.Groups[1].Value;
+                    }
+                    else
+                    {
+                        // Fallback: use custom_id as-is (might be sanitized)
+                        keyword = customId;
+                        System.Console.WriteLine($"  ⚠ Could not extract keyword from custom_id '{customId}', using as-is");
+                    }
+                    
+                    // Parse the response
+                    var notes = claudeAnalyzer.ParseImplementationResponse(keyword, responseText);
+                    if (notes == null)
+                    {
+                        System.Console.WriteLine($"  ⚠ Failed to parse response for '{keyword}'");
+                        errors++;
+                        continue;
+                    }
+                    
+                    // Rebuild the prompt (we need it for caching)
+                    // We'll need to get the keyword info to build the prompt
+                    var keywordInfo = KeywordRegistry.GetKeywordInfo(keyword);
+                    var magicRule = keywordInfo != null ? "Rule 702" : null;
+                    var description = keywordInfo?.Description;
+                    var prompt = claudeAnalyzer.BuildImplementationPrompt(keyword, magicRule, description);
+                    
+                    // Store in cache
+                    await claudeAnalyzer.StoreInCacheAsync(keyword, prompt, responseText, notes, CancellationToken.None);
+                    
+                    // Update KeywordMetadata if it exists
+                    var metadata = await dbContext.KeywordMetadata
+                        .FirstOrDefaultAsync(k => k.Keyword == keyword);
+                    
+                    if (metadata != null)
+                    {
+                        metadata.Notes = notes.ImplementationNotes;
+                        metadata.CodeExample = notes.CodeExample;
+                        metadata.TestingNotes = notes.TestingNotes;
+                        metadata.Complexity = notes.Complexity;
+                        metadata.Sublayer = notes.Sublayer;
+                        metadata.ClaudeRawResponse = notes.RawResponse;
+                        
+                        if (notes.CommonMistakes != null && notes.CommonMistakes.Count > 0)
+                        {
+                            metadata.CommonMistakes = System.Text.Json.JsonSerializer.Serialize(notes.CommonMistakes);
+                        }
+                        
+                        if (notes.RelatedKeywords != null && notes.RelatedKeywords.Count > 0)
+                        {
+                            metadata.RelatedKeywords = System.Text.Json.JsonSerializer.Serialize(notes.RelatedKeywords);
+                        }
+                        
+                        if (notes.Layer.HasValue)
+                        {
+                            metadata.Layer = notes.Layer;
+                        }
+                        
+                        if (notes.AbilityType.HasValue)
+                        {
+                            metadata.AbilityType = notes.AbilityType;
+                        }
+                        
+                        metadata.UpdatedAt = DateTime.UtcNow;
+                    }
+                    
+                    keywordsProcessed.Add(keyword);
+                    processed++;
+                    
+                    if (processed % 10 == 0)
+                    {
+                        System.Console.WriteLine($"  Processed {processed}/{lines.Length} results...\r");
+                    }
+                }
+                catch (JsonException ex)
+                {
+                    System.Console.WriteLine($"  ⚠ JSON parse error: {ex.Message}");
+                    errors++;
+                    continue;
+                }
+                catch (Exception ex)
+                {
+                    System.Console.WriteLine($"  ⚠ Error processing line: {ex.Message}");
+                    errors++;
+                    continue;
+                }
+            }
+            
+            await dbContext.SaveChangesAsync();
+            
+            System.Console.WriteLine($"\n✓ Ingestion complete!\n");
+            System.Console.WriteLine($"  Processed: {processed} results");
+            System.Console.WriteLine($"  Errors: {errors}");
+            System.Console.WriteLine($"  Unique keywords: {keywordsProcessed.Count}");
+            
+            // Verify cache
+            var cacheCount = await dbContext.ClaudeRequestCache.CountAsync();
+            System.Console.WriteLine($"  Cache entries: {cacheCount}\n");
+        }
+        catch (Exception ex)
+        {
+            System.Console.WriteLine($"\n✗ Error: {ex.Message}");
+            System.Console.WriteLine($"Stack trace: {ex.StackTrace}");
+        }
     }
 }

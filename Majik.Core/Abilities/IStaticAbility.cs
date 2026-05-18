@@ -4,7 +4,7 @@ namespace Majik.Core.Abilities;
 /// Interface for static abilities.
 /// Static abilities create continuous effects and don't use the stack (Rule 604).
 /// </summary>
-public interface IStaticAbility
+public interface IStaticAbility : IAbility
 {
     /// <summary>
     /// The source of this static ability (card or permanent).

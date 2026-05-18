@@ -1,3 +1,4 @@
+using Majik.Core.Abilities;
 using Majik.Core.Cards.Types;
 using Majik.Core.Players;
 using Majik.Core.ValueObjects;
@@ -16,7 +17,9 @@ public class Card : ICard
     private readonly List<CardType> _cardTypes = new();
     private readonly List<CardSupertype> _supertypes = new();
     private readonly List<CardSubtype> _subtypes = new();
+    private readonly List<IAbility> _abilities = new();
 
+    public Guid InstanceId { get; } = Guid.NewGuid();
     public string Name { get; }
     public string ManaCost { get; }
     
@@ -81,6 +84,25 @@ public class Card : ICard
         {
             _subtypes.AddRange(subtypes);
         }
+    }
+
+    /// <summary>
+    /// Abilities attached to this card (activated, triggered, static, mana).
+    /// </summary>
+    public IReadOnlyList<IAbility> Abilities => _abilities.AsReadOnly();
+
+    /// <summary>
+    /// Attach an ability to this card. Used during card construction or by effects
+    /// that grant abilities.
+    /// </summary>
+    public void AddAbility(IAbility ability)
+    {
+        if (ability == null)
+        {
+            throw new ArgumentNullException(nameof(ability));
+        }
+
+        _abilities.Add(ability);
     }
 
     public bool HasType(CardType type)
