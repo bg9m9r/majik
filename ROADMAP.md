@@ -331,3 +331,9 @@ Track A unlocks Track B (layer system needed for granted abilities).
   - `Random/GameRandom` — seedable PRNG; `Next`, `FlipCoin`, `RollDie`, `Shuffle<T>` (Fisher-Yates). Same seed → identical sequence (replay determinism)
   - `StateSnapshotter.Snapshot(...viewer)` — per-player view; opponent hands → "(hidden)"; library always hidden even to owner; battlefield + graveyard + exile always public
   - 659 Core + 35 Api = 694 tests, zero warnings
+- **Phase 25** — Mulligan + game start ✅ done
+  - `GameDriver` accepts optional `GameRandom`; shuffles libraries on start (CR 103.1)
+  - Coin-flip starting player (CR 103.2)
+  - Invokes `MulliganController` per player before turn 1 (CR 103.4)
+  - `GameResult` now carries `StartingPlayer`; deterministic with seed
+  - 661 Core + 35 Api = 696 tests, zero warnings
