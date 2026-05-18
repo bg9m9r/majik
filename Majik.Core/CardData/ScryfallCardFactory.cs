@@ -59,10 +59,15 @@ public sealed class ScryfallCardFactory
 
         card.Owner = owner;
 
-        // Permanent-resident abilities (keyword markers, mana abilities).
-        // Instant/sorcery effects are bound at cast time, not here.
+        // Permanent-resident abilities (keyword markers, mana abilities,
+        // triggered abilities). Instant/sorcery effects are bound at cast
+        // time, not here.
         KeywordBinder.Bind(card, entity, owner);
         OracleManaBinder.Bind(card, entity, owner);
+        foreach (var trig in OracleTriggeredAbilityBinder.Bind(card, entity, owner))
+        {
+            card.AddAbility(trig);
+        }
 
         return card;
     }

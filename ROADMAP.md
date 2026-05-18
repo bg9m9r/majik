@@ -321,3 +321,9 @@ Track A unlocks Track B (layer system needed for granted abilities).
   - Landfall (CR 702.140) — `LandfallFactory` parameterised triggered ability on land entering under your control
   - 643 Core + 31 Api = 674 tests, zero warnings
 - **Phase 20 remaining** — ~195 keywords still ad-hoc; needs catalog pass against `KeywordRegistry` to track coverage
+- **Phase 21 first cut** — Oracle parser deepening ✅ done
+  - `OracleSpellBinder` extended: "target player gains N life" (Healing Salve), "counter target noncreature spell" (Negate), "counter target creature spell" (Essence Scatter)
+  - `OracleTriggeredAbilityBinder` new — synthesizes ETB / death / combat-damage-to-player triggers; effect tails: "you gain N life", "draw N cards"
+  - `ScryfallCardFactory` wires triggered binder for every permanent automatically
+  - 653 Core + 31 Api = 684 tests, zero warnings
+- **Phase 21 remaining** — modal/X spells, "until end of turn" pump spells (Giant Growth), "search your library" tutors, conditional triggers ("if you control..."), each-opponent effects, granted abilities ("target creature gains flying"), upkeep/phase-start triggers

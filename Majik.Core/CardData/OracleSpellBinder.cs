@@ -51,6 +51,15 @@ public static class OracleSpellBinder
     private static readonly Regex Discard = new(
         @"target\s+player\s+discards?\s+(?<n>\d+|one|two|three|four|five|six|seven)\s+cards?",
         RegexOptions.IgnoreCase);
+    private static readonly Regex GainLife = new(
+        @"target\s+player\s+gains?\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+li(?:fe|ves)",
+        RegexOptions.IgnoreCase);
+    private static readonly Regex CounterNoncreature = new(
+        @"counter\s+target\s+noncreature\s+spell",
+        RegexOptions.IgnoreCase);
+    private static readonly Regex CounterCreature = new(
+        @"counter\s+target\s+creature\s+spell",
+        RegexOptions.IgnoreCase);
 
     public static SpellDefinition? Bind(
         CardEntity entity,
@@ -64,6 +73,9 @@ public static class OracleSpellBinder
 
         var text = entity.OracleText ?? string.Empty;
 
+        // Order matters: more specific counters before the generic one.
+        if (CounterNoncreature.IsMatch(text)) return CounterTypedSpell(resolver, stack, requireNonCreature: true);
+        if (CounterCreature.IsMatch(text)) return CounterTypedSpell(resolver, stack, requireCreature: true);
         if (CounterSpell.IsMatch(text)) return CounterTargetSpell(resolver, stack);
 
         var m = DamageAnyTarget.Match(text);
@@ -81,8 +93,44 @@ public static class OracleSpellBinder
         m = Discard.Match(text);
         if (m.Success) return DiscardNSpell(WordToInt(m.Groups["n"].Value), resolver);
 
+        m = GainLife.Match(text);
+        if (m.Success) return GainLifeSpell(WordToInt(m.Groups["n"].Value), resolver);
+
         return null;
     }
+
+    private static SpellDefinition GainLifeSpell(int n, Func<object, object> resolver) => new(
+        Modes: Array.Empty<string>(), HasVariableX: false,
+        TargetRequests: new[] { new TargetRequest("target player", 1, 1, Array.Empty<object>()) },
+        EffectFactory: p =>
+        {
+            var target = resolver(p.Targets[0][0]);
+            return new IEffect[] { new Effect($"gain {n} life", () =>
+            {
+                if (target is Player player) player.GainLife(n);
+            }) };
+        });
+
+    private static SpellDefinition CounterTypedSpell(
+        Func<object, object> resolver,
+        Majik.Core.Stack.Stack? stack,
+        bool requireCreature = false,
+        bool requireNonCreature = false) => new(
+        Modes: Array.Empty<string>(), HasVariableX: false,
+        TargetRequests: new[] { new TargetRequest("target spell", 1, 1, Array.Empty<object>()) },
+        EffectFactory: p =>
+        {
+            var target = resolver(p.Targets[0][0]);
+            return new IEffect[] { new Effect("counter target typed spell", () =>
+            {
+                if (stack == null || target is not ISpell spell) return;
+                var isCreature = spell.Card.HasType(Majik.Core.Cards.Types.CardType.Creature);
+                if (requireCreature && !isCreature) return;
+                if (requireNonCreature && isCreature) return;
+                RemoveFromStack(stack, spell);
+                spell.Card.Zone = ZoneType.Graveyard;
+            }) };
+        });
 
     // ---------- Spell templates ----------
 
