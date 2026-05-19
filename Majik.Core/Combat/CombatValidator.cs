@@ -81,7 +81,29 @@ public class CombatValidator
             return false;
         }
 
+        // CR 702.16e — attacker with protection from blocker's colour can't
+        // be blocked by that colour. Check both directions: attacker's
+        // protection vs blocker, and blocker's protection vs attacker
+        // (the latter being relevant for combat damage but not strictly
+        // for the block declaration; here we enforce only the attacker
+        // side, which is the canonical "can't be blocked" interaction).
+        if (AttackerProtectedFromBlocker(attacker.Creature, creature))
+        {
+            return false;
+        }
+
         return true;
+    }
+
+    private static bool AttackerProtectedFromBlocker(Creature attacker, Creature blocker)
+    {
+        var blockerColors = Majik.Core.Cards.CardColors.GetColors(blocker);
+        foreach (var c in blockerColors)
+        {
+            if (Majik.Core.Rules.Protection.HasProtectionFromColor(attacker, c))
+                return true;
+        }
+        return false;
     }
 
     /// <summary>
