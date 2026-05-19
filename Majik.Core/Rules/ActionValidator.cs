@@ -48,8 +48,16 @@ public class ActionValidator
     /// </summary>
     private ValidationResult ValidateCastSpell(CastSpellAction action)
     {
-        // Use RulesEngine to validate
-        // This is a simplified version - full implementation would check all rules
+        // CR 117.1 / 302.1 — non-instant non-Flash cards need sorcery speed
+        // (active player's main phase, empty stack). Caller marks the
+        // timing window via SorcerySpeedAvailable.
+        if (!action.SorcerySpeedAvailable
+            && !TimingRules.CanCastAtInstantSpeed(action.Card))
+        {
+            return ValidationResult.Invalid(
+                $"{action.Card.Name} requires sorcery speed",
+                new RuleViolation("117.1", "non-instant cast at non-sorcery speed"));
+        }
         return ValidationResult.Valid();
     }
 
@@ -138,10 +146,16 @@ public class CastSpellAction : PlayerAction
     public ICard Card { get; }
     public Player Player { get; }
 
-    public CastSpellAction(ICard card, Player player)
+    /// <summary>True when sorcery-speed timing is currently legal (CR
+    /// 117.1a): active player's main phase + empty stack. Caller must
+    /// supply; the validator doesn't introspect the game loop.</summary>
+    public bool SorcerySpeedAvailable { get; }
+
+    public CastSpellAction(ICard card, Player player, bool sorcerySpeedAvailable = true)
     {
         Card = card;
         Player = player;
+        SorcerySpeedAvailable = sorcerySpeedAvailable;
     }
 }
 
