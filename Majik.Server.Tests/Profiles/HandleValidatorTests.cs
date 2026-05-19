@@ -12,7 +12,7 @@ public class HandleValidatorTests
     [InlineData("a1b")]
     [InlineData("AAA")]
     [InlineData("a_b-c")]
-    [InlineData("twentycharacter_nam")] // 20 chars
+    [InlineData("twentycharacter_name")] // 20 chars
     public void Validate_AcceptsValid(string handle)
     {
         var result = HandleValidator.Validate(handle);
@@ -22,6 +22,7 @@ public class HandleValidatorTests
     [Theory]
     [InlineData("ab")]                     // too short
     [InlineData("a_very_long_handle_indeed")] // 25 chars, too long
+    [InlineData("twentycharacter_name1")] // 21 chars, too long (boundary)
     [InlineData("hi!")]                    // illegal char
     [InlineData("with space")]
     [InlineData("")]
