@@ -62,6 +62,26 @@ public class Player
     /// <summary>CR 704.5c — poison counters; 10+ → lose.</summary>
     public int PoisonCounters { get; set; }
 
+    /// <summary>CR 106.13 — Energy is a player-scoped resource. Gained
+    /// via "you get {E}" effects, spent via "Pay {E}{E}: …" costs.</summary>
+    public int EnergyCounters { get; private set; }
+
+    public void GainEnergy(int amount)
+    {
+        if (amount <= 0) return;
+        EnergyCounters += amount;
+    }
+
+    /// <summary>Spend N energy if available. Atomic — returns false if
+    /// EnergyCounters &lt; amount and changes nothing.</summary>
+    public bool PayEnergy(int amount)
+    {
+        if (amount < 0) throw new ArgumentOutOfRangeException(nameof(amount));
+        if (amount > EnergyCounters) return false;
+        EnergyCounters -= amount;
+        return true;
+    }
+
     /// <summary>CR 903 — per-player commander tracking. Set by Commander
     /// format setup; null in other formats.</summary>
     public Majik.Core.Formats.Commander.CommanderState? Commander { get; set; }

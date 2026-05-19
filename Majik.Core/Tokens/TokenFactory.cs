@@ -65,4 +65,59 @@ public static class TokenFactory
 
         return token;
     }
+
+    /// <summary>Treasure (CR 111.10): colourless artifact token with
+    /// "{T}, Sacrifice this artifact: Add one mana of any color." Bound as
+    /// five ManaAbility options so the bot's mana picker can use a
+    /// Treasure to satisfy any colour pip.</summary>
+    public static Artifact CreateTreasure(Player controller, ZoneService? zones = null)
+    {
+        if (controller == null) throw new ArgumentNullException(nameof(controller));
+        var token = new Artifact("Treasure", "",
+            subtypes: new[] { CardSubtype.Treasure })
+        {
+            Owner = controller,
+            Controller = controller,
+            IsToken = true,
+        };
+        foreach (var color in new[] { "W", "U", "B", "R", "G" })
+        {
+            token.AddAbility(new ManaAbility(token, controller,
+                Majik.Core.ValueObjects.ManaCost.Parse(color)));
+        }
+        PutOnBattlefield(token, controller, zones);
+        return token;
+    }
+
+    /// <summary>Clue token. Sac+draw is the canonical effect; activated
+    /// ability binder will wire {2}, Sacrifice: Draw a card later.</summary>
+    public static Artifact CreateClue(Player controller, ZoneService? zones = null)
+    {
+        if (controller == null) throw new ArgumentNullException(nameof(controller));
+        var token = new Artifact("Clue", "",
+            subtypes: new[] { CardSubtype.Clue })
+        {
+            Owner = controller,
+            Controller = controller,
+            IsToken = true,
+        };
+        PutOnBattlefield(token, controller, zones);
+        return token;
+    }
+
+    private static void PutOnBattlefield(Artifact token, Player controller, ZoneService? zones)
+    {
+        token.Zone = ZoneType.Library; // sentinel; ZoneService validates from-zone
+        controller.Zones.Library.AddCard(token);
+        if (zones != null)
+        {
+            zones.MoveCardTo(token, ZoneType.Battlefield, controller);
+        }
+        else
+        {
+            controller.Zones.Library.RemoveCard(token);
+            token.Zone = ZoneType.Battlefield;
+            controller.Zones.Battlefield.AddCard(token);
+        }
+    }
 }

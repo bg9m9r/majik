@@ -183,7 +183,7 @@ public static class OracleSpellBinder
         var mMill = MillTarget.Match(text);
         if (mMill.Success) return MillTargetSpell(WordToInt(mMill.Groups["n"].Value), resolver);
 
-        if (ScryN.IsMatch(text)) return ScryNSpell();
+        if (ScryN.IsMatch(text)) return ScryNSpell(caster, text);
 
         var mSweep = DealsDamageEachCreature.Match(text);
         if (mSweep.Success) return DealsDamageEachCreatureSpell(
@@ -395,12 +395,26 @@ public static class OracleSpellBinder
             }) };
         });
 
-    private static SpellDefinition ScryNSpell() => new(
+    // "Preordain"-style: scry happens (no-op for now), then "draw a card"
+    // tail clause fires. Cantrip portion is the substantive effect.
+    private static readonly Regex ScryThenDrawTail = new(
+        @"scry\s+\d+[^.]*[,.]?\s*then\s+draw\s+(?<n>a|an|\d+|one|two|three|four|five|six|seven)\s+cards?",
+        RegexOptions.IgnoreCase);
+
+    private static SpellDefinition ScryNSpell(Player caster, string oracleText) => new(
         Modes: Array.Empty<string>(), HasVariableX: false,
         TargetRequests: Array.Empty<TargetRequest>(),
-        // Effect deferred: needs agent prompt for which cards to put on
-        // bottom. Wires when SpellCastFlow gains library-top inspection.
-        EffectFactory: _ => new IEffect[] { new Effect("scry", () => { }) });
+        EffectFactory: _ => new IEffect[] { new Effect("scry+draw", () =>
+        {
+            // Scry portion deferred: needs agent prompt for which cards to
+            // put on bottom. Wires when SpellCastFlow gains library-top
+            // inspection.
+            var tail = ScryThenDrawTail.Match(oracleText);
+            if (tail.Success)
+            {
+                DrawCards_(caster, WordToInt(tail.Groups["n"].Value));
+            }
+        }) });
 
     private static SpellDefinition UntapTargetSpell(Func<object, object> resolver, string label) => new(
         Modes: Array.Empty<string>(), HasVariableX: false,
