@@ -202,7 +202,7 @@ public sealed class GameFacade
             EventId: e.EventId,
             Type: e.GetType().Name,
             At: e.Timestamp,
-            Payload: JsonDocument.Parse("{}").RootElement);
+            Payload: EventPayloadBuilder.Build(e));
 
         foreach (var sub in _subscribers.ToList())
         {

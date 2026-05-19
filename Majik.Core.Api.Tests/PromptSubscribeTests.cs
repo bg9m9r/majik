@@ -45,14 +45,20 @@ public class PromptSubscribeTests
     {
         var facade = GameFacade.Create("Alice", "Bob");
         var prompts = new List<PromptDto>();
-        using var subscription = facade.SubscribePrompts(prompts.Add);
+        var secondPrompt = new TaskCompletionSource();
+        using var subscription = facade.SubscribePrompts(p =>
+        {
+            prompts.Add(p);
+            if (prompts.Count == 2) secondPrompt.TrySetResult();
+        });
 
         await facade.StartAsync();
-        var initialCount = prompts.Count;
         var alice = facade.GetState().Players[0].Id;
         await facade.SubmitAsync(new PassPriorityCommand { PlayerId = alice });
 
-        prompts.Count.Should().BeGreaterThan(initialCount,
+        await secondPrompt.Task.WaitAsync(TimeSpan.FromSeconds(2));
+
+        prompts.Should().HaveCountGreaterThanOrEqualTo(2,
             "passing priority hands the prompt to Bob, which should fire a new envelope");
     }
 }
