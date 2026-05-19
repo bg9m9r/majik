@@ -37,6 +37,15 @@ public sealed class RemoteAgent : IPlayerAgent
     /// <summary>Type the next submitted command must be (null when no prompt outstanding).</summary>
     public IReadOnlyList<Type>? ExpectedCommandKinds => _pendingKinds;
 
+    /// <summary>Player slot this agent represents.</summary>
+    public Player Player => _player;
+
+    /// <summary>Fires every time the agent transitions from idle to
+    /// awaiting input. Subscribers (e.g. transport bridges) receive the
+    /// list of command types now legal. Resolved synchronously inside
+    /// the engine loop — handlers must not block.</summary>
+    public event Action<IReadOnlyList<Type>>? PromptRequested;
+
     public void Submit(GameCommand command)
     {
         if (command == null) throw new ArgumentNullException(nameof(command));
@@ -158,6 +167,10 @@ public sealed class RemoteAgent : IPlayerAgent
         ct.Register(() => tcs.TrySetCanceled(ct));
         _pending = tcs;
         _pendingKinds = acceptedKinds;
+
+        try { PromptRequested?.Invoke(acceptedKinds); }
+        catch { /* observer fault must not abort the engine */ }
+
         return tcs.Task;
     }
 }

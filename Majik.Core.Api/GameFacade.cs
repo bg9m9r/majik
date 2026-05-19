@@ -174,6 +174,28 @@ public sealed class GameFacade
         return new Subscription(() => _subscribers.Remove(handler));
     }
 
+    /// <summary>
+    /// Subscribe to prompt envelopes. Fires once each time the engine
+    /// transitions to awaiting a command from either player. Returned
+    /// <see cref="IDisposable"/> detaches the handler.
+    /// </summary>
+    public IDisposable SubscribePrompts(Action<PromptDto> handler)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        Action<IReadOnlyList<Type>> aliceHandler = kinds => handler(BuildPrompt(_alice, kinds));
+        Action<IReadOnlyList<Type>> bobHandler = kinds => handler(BuildPrompt(_bob, kinds));
+        _aliceAgent.PromptRequested += aliceHandler;
+        _bobAgent.PromptRequested += bobHandler;
+        return new Subscription(() =>
+        {
+            _aliceAgent.PromptRequested -= aliceHandler;
+            _bobAgent.PromptRequested -= bobHandler;
+        });
+    }
+
+    private PromptDto BuildPrompt(Player player, IReadOnlyList<Type> kinds)
+        => new(GameId, player.Id, kinds.Select(t => t.Name).ToList());
+
     private void BridgeEvent(GameEvent e)
     {
         var dto = new EventDto(

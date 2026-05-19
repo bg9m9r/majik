@@ -16,7 +16,8 @@ namespace Majik.Server.Hubs;
 /// </summary>
 public sealed class GameHubBridge : IDisposable
 {
-    private readonly IDisposable _subscription;
+    private readonly IDisposable _eventSubscription;
+    private readonly IDisposable _promptSubscription;
 
     public GameHubBridge(GameFacade facade, IHubContext<GameHub> hub)
     {
@@ -24,16 +25,21 @@ public sealed class GameHubBridge : IDisposable
         ArgumentNullException.ThrowIfNull(hub);
 
         var group = GameHub.GroupName(facade.GameId);
-        _subscription = facade.Subscribe(evt => Forward(hub, group, evt));
+        _eventSubscription = facade.Subscribe(evt => Forward(hub, group, "event", evt));
+        _promptSubscription = facade.SubscribePrompts(p => Forward(hub, group, "prompt", p));
     }
 
-    private static void Forward(IHubContext<GameHub> hub, string group, EventDto evt)
+    private static void Forward(IHubContext<GameHub> hub, string group, string method, object payload)
     {
         // Fire-and-forget — Subscribe handlers are sync, hub send is
         // async; observe the task so exceptions surface in logs but
         // don't block the engine loop.
-        _ = hub.Clients.Group(group).SendAsync("event", evt);
+        _ = hub.Clients.Group(group).SendAsync(method, payload);
     }
 
-    public void Dispose() => _subscription.Dispose();
+    public void Dispose()
+    {
+        _eventSubscription.Dispose();
+        _promptSubscription.Dispose();
+    }
 }

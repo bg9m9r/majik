@@ -51,3 +51,17 @@ public sealed record ManaPoolDto(int Generic, int White, int Blue, int Black, in
 
 /// <summary>Wire-format event. <see cref="Payload"/> holds type-specific data as raw JSON.</summary>
 public sealed record EventDto(Guid EventId, string Type, DateTime At, JsonElement Payload);
+
+/// <summary>
+/// Server → client envelope signalling that the engine is awaiting a
+/// command from <see cref="PlayerId"/>. The client renders the
+/// appropriate UI and responds via POST /games/{id}/commands with a
+/// command of one of the kinds in <see cref="ExpectedKinds"/>. The
+/// envelope intentionally carries no card data — opponent visibility is
+/// unaffected (the opponent already knows the prompted player is
+/// thinking).
+/// </summary>
+public sealed record PromptDto(
+    Guid GameId,
+    Guid PlayerId,
+    IReadOnlyList<string> ExpectedKinds);
