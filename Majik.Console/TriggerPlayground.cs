@@ -526,8 +526,8 @@ internal static class TriggerPlayground
             priorityManager: priority,
             combatFlow: combat);
 
-        Log("Running until game ends (no turn cap)…");
-        var result = await driver.RunGameAsync(maxTurns: int.MaxValue);
+        Log("Running game (cap 100 turns — bot vs bot; lower if too slow)…");
+        var result = await driver.RunGameAsync(maxTurns: 100);
 
         Log($"Turns played: {result.TurnsPlayed}");
         Log($"Winner: {(result.Winner?.Name ?? "(none — draw or stalled)")}");

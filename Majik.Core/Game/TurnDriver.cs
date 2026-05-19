@@ -161,6 +161,36 @@ public sealed class TurnDriver
 
     private async Task PriorityRound(Player activePlayer, CancellationToken ct)
     {
+        // Bus is a soft dependency here — only used for the SpellCastEvent
+        // publication inside SpellCastFlow. Existing engine wiring already
+        // routes the canonical bus to Stack + ZoneService + SBA; we use a
+        // local bus instance here to avoid changing TurnDriver's ctor
+        // signature. SpellCastEvent listeners that need to observe these
+        // events should subscribe to the canonical bus, which still sees
+        // StackObjectAddedEvent / StackObjectResolvedEvent.
+        var castBus = new Majik.Core.Events.EventBus();
+        var castFlow = new SpellCastFlow(_stack, _zoneService, castBus);
+        var manaResolver = new Majik.Core.Costs.ManaPaymentResolver();
+
+        async Task DispatchCast(Player actor, PriorityAction.CastSpell cast, GameContext ctx)
+        {
+            // MVP: vanilla spell definition — permanents resolve to battlefield,
+            // instants/sorceries to graveyard (StackResolver handles both).
+            // Future: wire ScryfallCardFactory.LookupSpellDefinition for
+            // effect-bearing spells.
+            var def = Majik.Core.Game.SpellDefinition.Vanilla(_ => Array.Empty<Majik.Core.Abilities.IEffect>());
+            // Pay mana up front (the SpellCastFlow doesn't enforce payment;
+            // it just collects ManaPayment for downstream effects).
+            var cost = Majik.Core.ValueObjects.ManaCost.Parse(cast.Card.ManaCost);
+            var payment = await _agents[actor].ChooseManaSourcesAsync(ctx, cost, ct);
+            if (!manaResolver.Pay(actor, cost, payment))
+            {
+                // Couldn't pay — skip silently (bot mis-picked).
+                return;
+            }
+            await castFlow.CastAsync(actor, cast.Card, def, _agents[actor], ctx, ct);
+        }
+
         var loop = new PriorityLoop(
             players: _players,
             priority: _priorityManager,
@@ -169,7 +199,8 @@ public sealed class TurnDriver
             zoneService: _zoneService,
             agents: _agents,
             turnNumberAccessor: () => _currentTurnNumber,
-            phaseAccessor: () => _currentPhase);
+            phaseAccessor: () => _currentPhase,
+            castDispatcher: DispatchCast);
 
         await loop.RunUntilRoundEndsAsync(activePlayer, ct);
     }
