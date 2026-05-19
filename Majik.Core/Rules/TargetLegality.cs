@@ -29,6 +29,23 @@ public static class TargetLegality
         return true;
     }
 
+    /// <summary>
+    /// CR 702.16e — protection from <em>colour</em> prevents targeting from
+    /// any source matching that colour. Use this overload when the caller
+    /// has the source card available (e.g. a spell being cast).
+    /// </summary>
+    public static bool CanBeTargetedBy(Creature target, ICard source, Player caster)
+    {
+        if (!CanBeTargetedBy(target, caster)) return false;
+        if (source == null) return true;
+
+        foreach (var c in Majik.Core.Cards.CardColors.GetColors(source))
+        {
+            if (Protection.HasProtectionFromColor(target, c)) return false;
+        }
+        return true;
+    }
+
     private static bool Has(Creature c, string kw) =>
         c.Abilities.OfType<KeywordAbility>().Any(k =>
             string.Equals(k.Keyword, kw, StringComparison.OrdinalIgnoreCase))
