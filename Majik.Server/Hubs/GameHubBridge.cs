@@ -4,6 +4,8 @@ using Microsoft.AspNetCore.SignalR;
 
 namespace Majik.Server.Hubs;
 
+/// <inheritdoc cref="GameHubBridge"/>
+
 /// <summary>
 /// Subscribes to a <see cref="GameFacade"/>'s event stream and rebroadcasts
 /// every event to the SignalR group that fronts that game. Lifetime is
@@ -19,22 +21,35 @@ public sealed class GameHubBridge : IDisposable
     private readonly IDisposable _eventSubscription;
     private readonly IDisposable _promptSubscription;
 
-    public GameHubBridge(GameFacade facade, IHubContext<GameHub> hub)
+    public GameHubBridge(
+        GameFacade facade,
+        IHubContext<GameHub> hub,
+        HubConnectionRegistry connections)
     {
         ArgumentNullException.ThrowIfNull(facade);
         ArgumentNullException.ThrowIfNull(hub);
+        ArgumentNullException.ThrowIfNull(connections);
 
-        var group = GameHub.GroupName(facade.GameId);
-        _eventSubscription = facade.Subscribe(evt => Forward(hub, group, "event", evt));
-        _promptSubscription = facade.SubscribePrompts(p => Forward(hub, group, "prompt", p));
+        var gameId = facade.GameId;
+        var group = GameHub.GroupName(gameId);
+
+        // Events describe public state — broadcast to whole group.
+        _eventSubscription = facade.Subscribe(evt =>
+            FireAndForget(hub.Clients.Group(group).SendAsync("event", evt)));
+
+        // Prompts are addressed to a specific player slot — push only to
+        // connections that own that slot.
+        _promptSubscription = facade.SubscribePrompts(p =>
+        {
+            var targets = connections.ConnectionsForPlayer(gameId, p.PlayerId);
+            if (targets.Count == 0) return;
+            FireAndForget(hub.Clients.Clients(targets).SendAsync("prompt", p));
+        });
     }
 
-    private static void Forward(IHubContext<GameHub> hub, string group, string method, object payload)
+    private static void FireAndForget(Task task)
     {
-        // Fire-and-forget — Subscribe handlers are sync, hub send is
-        // async; observe the task so exceptions surface in logs but
-        // don't block the engine loop.
-        _ = hub.Clients.Group(group).SendAsync(method, payload);
+        _ = task; // observed by SignalR's logging pipeline
     }
 
     public void Dispose()

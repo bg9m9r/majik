@@ -20,6 +20,7 @@ public static class MajikEngineRegistration
     public static IServiceCollection AddMajikEngine(this IServiceCollection services)
     {
         services.AddSingleton<GameRegistry>();
+        services.AddSingleton<HubConnectionRegistry>();
         services.AddSingleton<GameHubBridgeRegistry>();
         services.AddSingleton<GameSeating>();
         services.AddSingleton<ServerGameFactory>();

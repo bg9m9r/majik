@@ -14,16 +14,18 @@ namespace Majik.Server.Hubs;
 public sealed class GameHubBridgeRegistry
 {
     private readonly IHubContext<GameHub> _hub;
+    private readonly HubConnectionRegistry _connections;
     private readonly ConcurrentDictionary<Guid, GameHubBridge> _bridges = new();
 
-    public GameHubBridgeRegistry(IHubContext<GameHub> hub)
+    public GameHubBridgeRegistry(IHubContext<GameHub> hub, HubConnectionRegistry connections)
     {
         _hub = hub;
+        _connections = connections;
     }
 
     public void Attach(GameFacade facade)
     {
-        var bridge = new GameHubBridge(facade, _hub);
+        var bridge = new GameHubBridge(facade, _hub, _connections);
         if (!_bridges.TryAdd(facade.GameId, bridge))
         {
             bridge.Dispose();
