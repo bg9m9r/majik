@@ -7,12 +7,12 @@ namespace Majik.Server.Composition;
 /// <summary>
 /// Wires OIDC bearer-token auth.
 ///
-/// Production path: validate JWTs against the configured Auth0 tenant
-/// (Auth:Authority = "https://{tenant}.auth0.com/") with the API
-/// identifier as audience (Auth:Audience). On top of the standard
-/// signature/issuer/audience/lifetime checks, <see cref="Auth0TokenValidator"/>
-/// enforces the Auth0 social-identity sub format and lifts a
-/// `discordUserId` claim out of the sub.
+/// Production path: validate JWTs against the configured Descope project
+/// (Auth:Authority = "https://api.descope.com/&lt;PROJECT_ID&gt;") with the
+/// project ID as audience (Auth:Audience). On top of the standard
+/// signature/issuer/audience/lifetime checks, <see cref="DescopeTokenValidator"/>
+/// enforces a non-empty `sub` and lifts a `discordUserId` claim from
+/// either a direct claim or Descope's nested `customAttributes` JSON.
 ///
 /// Token discovery is the standard OIDC dance — metadata lives at
 /// `{authority}/.well-known/openid-configuration` and the handler
@@ -61,7 +61,7 @@ public static class AuthRegistration
                 };
                 options.Events = new JwtBearerEvents
                 {
-                    OnTokenValidated = Auth0TokenValidator.ValidateAsync,
+                    OnTokenValidated = DescopeTokenValidator.ValidateAsync,
                 };
             });
         }

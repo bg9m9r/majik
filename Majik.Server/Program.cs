@@ -7,6 +7,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddMajikEngine();
 builder.Services.AddMajikAuth(builder.Configuration);
+builder.Services.AddMajikCors(builder.Configuration);
 builder.Services.AddSignalR();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi();
@@ -16,6 +17,11 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+}
+
+if (CorsRegistration.HasAnyOrigins(builder.Configuration))
+{
+    app.UseCors(CorsRegistration.PolicyName);
 }
 
 app.UseAuthentication();
