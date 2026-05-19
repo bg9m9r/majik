@@ -10,6 +10,7 @@ namespace Majik.Server.Tests.Profiles;
 public sealed class TestMongoFixture : IDisposable
 {
     private readonly IMongoRunner _runner;
+    private readonly MongoClient _client;
     public string ConnectionString { get; }
 
     public TestMongoFixture()
@@ -21,12 +22,13 @@ public sealed class TestMongoFixture : IDisposable
         };
         _runner = MongoRunner.Run(options);
         ConnectionString = _runner.ConnectionString;
+        _client = new MongoClient(ConnectionString);
     }
 
     public IMongoDatabase NewDatabase()
     {
         var name = "test-" + Guid.NewGuid().ToString("N");
-        return new MongoClient(ConnectionString).GetDatabase(name);
+        return _client.GetDatabase(name);
     }
 
     public void Dispose() => _runner.Dispose();

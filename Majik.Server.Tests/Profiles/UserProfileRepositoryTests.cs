@@ -64,6 +64,7 @@ public class UserProfileRepositoryTests : IClassFixture<TestMongoFixture>
         var fetched = await repo.GetBySubAsync("stub-alice", CancellationToken.None);
         fetched!.Handle.Should().Be("aliceb");
         fetched.HandleDisplay.Should().Be("AliceB");
+        fetched.CreatedAt.Should().BeCloseTo(original.CreatedAt, TimeSpan.FromMilliseconds(1));
     }
 
     [Fact]
