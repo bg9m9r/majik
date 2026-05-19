@@ -45,6 +45,12 @@ public static class OracleTriggeredAbilityBinder
     private static readonly Regex DealDamageOpponent = new(
         @"deals?\s+(?<n>\d+|one|two|three|four|five|six|seven)\s+damage\s+to\s+(that\s+player|any\s+opponent)",
         RegexOptions.IgnoreCase);
+    private static readonly Regex CreateTreasure = new(
+        @"create\s+(?<n>a|an|\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+treasure\s+tokens?",
+        RegexOptions.IgnoreCase);
+    private static readonly Regex CreateClue = new(
+        @"create\s+(?<n>a|an|\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+clue\s+tokens?",
+        RegexOptions.IgnoreCase);
 
     public static IEnumerable<TriggeredAbility> Bind(ICard source, CardEntity entity, Player? controller = null)
     {
@@ -53,7 +59,23 @@ public static class OracleTriggeredAbilityBinder
         var ctrl = controller ?? source.Controller ?? source.Owner;
         if (ctrl == null) yield break;
 
+        // Scryfall's oracle text uses the card's literal name (e.g. "Ragavan
+        // deals combat damage…"); our regexes use `~` as the self-reference
+        // placeholder. Normalise by replacing every occurrence of the
+        // card's full name AND the short-name fragment before the comma
+        // (e.g. "Ragavan, Nimble Pilferer" → match both "Ragavan" and the
+        // full name) with `~`.
         var text = entity.OracleText ?? string.Empty;
+        if (!string.IsNullOrEmpty(entity.Name))
+        {
+            text = text.Replace(entity.Name, "~");
+            var commaIdx = entity.Name.IndexOf(',');
+            if (commaIdx > 0)
+            {
+                var shortName = entity.Name[..commaIdx];
+                text = text.Replace(shortName, "~");
+            }
+        }
 
         foreach (Match m in EtbLine.Matches(text))
         {
@@ -94,7 +116,6 @@ public static class OracleTriggeredAbilityBinder
         {
             var n = WordToInt(m.Groups["n"].Value);
             yield return new Effect($"gain {n} life", () => controller.GainLife(n));
-            yield break;
         }
 
         m = DrawCards.Match(effectText);
@@ -102,10 +123,33 @@ public static class OracleTriggeredAbilityBinder
         {
             var n = WordToInt(m.Groups["n"].Value);
             yield return new Effect($"draw {n}", () => DrawN(controller, n));
-            yield break;
         }
 
-        // No matched effect — fall through.
+        m = CreateTreasure.Match(effectText);
+        if (m.Success)
+        {
+            var n = WordToInt(m.Groups["n"].Value);
+            yield return new Effect($"create {n} treasure", () =>
+            {
+                for (var i = 0; i < n; i++)
+                {
+                    Majik.Core.Tokens.TokenFactory.CreateTreasure(controller);
+                }
+            });
+        }
+
+        m = CreateClue.Match(effectText);
+        if (m.Success)
+        {
+            var n = WordToInt(m.Groups["n"].Value);
+            yield return new Effect($"create {n} clue", () =>
+            {
+                for (var i = 0; i < n; i++)
+                {
+                    Majik.Core.Tokens.TokenFactory.CreateClue(controller);
+                }
+            });
+        }
     }
 
     private static void DrawN(Player player, int n)

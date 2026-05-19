@@ -271,11 +271,22 @@ public class TriggerManager
             return;
         }
 
-        if (e is CardMovedEvent moved && _boundCards.Contains(moved.Card))
+        if (e is CardMovedEvent moved)
         {
-            // The card's Zone property is updated by ZoneService before publish;
-            // re-sync registration so IsTriggered's zone check is consistent.
-            SyncCardRegistration(moved.Card);
+            // Auto-bind any card with triggered abilities the first time we
+            // see it cross a zone boundary. Without this, cards built by
+            // ScryfallCardFactory never get their oracle-bound triggers
+            // (Ragavan combat-damage Treasure, ETB life gain, etc.) wired
+            // up because nobody calls BindCard explicitly.
+            if (!_boundCards.Contains(moved.Card)
+                && moved.Card.Abilities.OfType<ITriggeredAbility>().Any())
+            {
+                _boundCards.Add(moved.Card);
+            }
+            if (_boundCards.Contains(moved.Card))
+            {
+                SyncCardRegistration(moved.Card);
+            }
         }
 
         EvaluateTriggers(e);

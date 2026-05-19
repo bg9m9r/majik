@@ -115,9 +115,11 @@ public static class TokenFactory
         }
         else
         {
-            controller.Zones.Library.RemoveCard(token);
+            // ZoneManager.MoveCard publishes CardMovedEvent for log /
+            // trigger subscribers (Treasure ETB visible, downstream
+            // triggers like Soul Warden fire).
+            controller.Zones.MoveCard(token, ZoneType.Library, ZoneType.Battlefield);
             token.Zone = ZoneType.Battlefield;
-            controller.Zones.Battlefield.AddCard(token);
         }
     }
 }
