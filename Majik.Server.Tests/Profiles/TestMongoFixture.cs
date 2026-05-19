@@ -1,4 +1,4 @@
-using Mongo2Go;
+using EphemeralMongo;
 using MongoDB.Driver;
 
 namespace Majik.Server.Tests.Profiles;
@@ -9,12 +9,17 @@ namespace Majik.Server.Tests.Profiles;
 /// dispose time.</summary>
 public sealed class TestMongoFixture : IDisposable
 {
-    private readonly MongoDbRunner _runner;
+    private readonly IMongoRunner _runner;
     public string ConnectionString { get; }
 
     public TestMongoFixture()
     {
-        _runner = MongoDbRunner.Start(singleNodeReplSet: false);
+        var options = new MongoRunnerOptions
+        {
+            Version = MongoVersion.V7,
+            Edition = MongoEdition.Community,
+        };
+        _runner = MongoRunner.Run(options);
         ConnectionString = _runner.ConnectionString;
     }
 
