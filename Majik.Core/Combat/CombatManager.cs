@@ -19,6 +19,7 @@ public class CombatManager
     private readonly CombatValidator _validator;
     private readonly StateBasedActions? _stateBasedActions;
     private readonly ZoneService? _zoneService;
+    private readonly CombatDamageAssigner _damageAssigner;
 
     private Combat? _currentCombat;
 
@@ -38,6 +39,7 @@ public class CombatManager
         _validator = new CombatValidator();
         _stateBasedActions = stateBasedActions;
         _zoneService = zoneService;
+        _damageAssigner = new CombatDamageAssigner(eventBus);
     }
 
     /// <summary>
@@ -204,223 +206,26 @@ public class CombatManager
             throw new InvalidGameStateException($"Cannot assign damage in state {_currentCombat.State}");
         }
 
-        // First strike damage step (if applicable)
-        if (HasFirstStrikeDamage(_currentCombat))
+        if (_damageAssigner.HasFirstStrikeDamage(_currentCombat))
         {
-            AssignFirstStrikeDamage(_currentCombat);
-            ResolveCombatDamage(_currentCombat, isFirstStrike: true);
-            
-            // Check state-based actions after first strike damage
-            if (_stateBasedActions != null && _currentCombat.AttackingPlayer != null)
-            {
-                var allPlayers = new[] { _currentCombat.AttackingPlayer, _currentCombat.DefendingPlayer }
-                    .Where(p => p != null)
-                    .Cast<Player>();
-                var allCards = GetAllCombatCreatures(_currentCombat);
-                _stateBasedActions.CheckStateBasedActions(allPlayers, allCards);
-            }
-
-            // Reset damage assignment for regular damage step
-            ResetDamageAssignment(_currentCombat);
+            _damageAssigner.AssignAndResolve(_currentCombat, isFirstStrike: true);
+            RunSbaForCombat(_currentCombat);
+            _damageAssigner.Reset(_currentCombat);
         }
 
-        // Regular damage step
-        AssignRegularDamage(_currentCombat);
-        ResolveCombatDamage(_currentCombat, isFirstStrike: false);
-
-        // Check state-based actions after regular damage
-        if (_stateBasedActions != null && _currentCombat.AttackingPlayer != null)
-        {
-            var allPlayers = new[] { _currentCombat.AttackingPlayer, _currentCombat.DefendingPlayer }
-                .Where(p => p != null)
-                .Cast<Player>();
-            var allCards = GetAllCombatCreatures(_currentCombat);
-            _stateBasedActions.CheckStateBasedActions(allPlayers, allCards);
-        }
+        _damageAssigner.AssignAndResolve(_currentCombat, isFirstStrike: false);
+        RunSbaForCombat(_currentCombat);
 
         _currentCombat.TransitionToResolvingDamage();
     }
 
-    /// <summary>
-    /// Check if there are any first strike creatures in combat.
-    /// </summary>
-    private bool HasFirstStrikeDamage(Combat combat)
+    private void RunSbaForCombat(Combat combat)
     {
-        return combat.Attackers.Any(a => a.CanDealFirstStrikeDamage()) ||
-               combat.GetAllBlockers().Any(b => b.CanDealFirstStrikeDamage());
-    }
-
-    /// <summary>
-    /// Assign first strike damage.
-    /// </summary>
-    private void AssignFirstStrikeDamage(Combat combat)
-    {
-        foreach (var attacker in combat.Attackers)
-        {
-            if (attacker.CanDealFirstStrikeDamage())
-            {
-                AssignAttackerDamage(attacker);
-            }
-        }
-    }
-
-    /// <summary>
-    /// Assign regular damage.
-    /// </summary>
-    private void AssignRegularDamage(Combat combat)
-    {
-        foreach (var attacker in combat.Attackers)
-        {
-            if (attacker.CanDealRegularDamage())
-            {
-                AssignAttackerDamage(attacker);
-            }
-        }
-    }
-
-    /// <summary>
-    /// Assign damage from an attacker to blockers and/or target.
-    /// </summary>
-    private void AssignAttackerDamage(Attacker attacker)
-    {
-        int remainingPower = attacker.GetPower();
-
-        if (attacker.Blockers.Count == 0)
-        {
-            // Unblocked: all damage to target
-            attacker.AssignDamage(remainingPower);
-            return;
-        }
-
-        // Blocked: assign damage to blockers
-        // Without trample, all damage must be assigned to blockers
-        // With trample, only lethal damage must be assigned to each blocker
-        foreach (var blocker in attacker.Blockers)
-        {
-            if (remainingPower <= 0) break;
-
-            int lethalDamage = CalculateLethalDamage(blocker.Creature, attacker.HasDeathtouch);
-            int assignedDamage;
-            
-            if (attacker.HasTrample)
-            {
-                // With trample: assign only lethal damage, excess goes to target
-                assignedDamage = Math.Min(lethalDamage, remainingPower);
-            }
-            else
-            {
-                // Without trample: assign all remaining power to this blocker
-                assignedDamage = remainingPower;
-            }
-
-            blocker.AssignDamage(assignedDamage);
-            attacker.AssignDamage(assignedDamage);
-            remainingPower -= assignedDamage;
-        }
-
-        // Trample: excess damage to target
-        if (attacker.HasTrample && remainingPower > 0)
-        {
-            attacker.AssignDamage(remainingPower);
-        }
-    }
-
-    /// <summary>
-    /// Calculate lethal damage for a creature.
-    /// </summary>
-    private int CalculateLethalDamage(Creature creature, bool hasDeathtouch)
-    {
-        if (hasDeathtouch)
-        {
-            return 1; // Deathtouch: 1 damage is lethal
-        }
-
-        return creature.Toughness;
-    }
-
-    /// <summary>
-    /// Resolve combat damage (apply damage to creatures, players, planeswalkers).
-    /// </summary>
-    private void ResolveCombatDamage(Combat combat, bool isFirstStrike)
-    {
-        foreach (var attacker in combat.Attackers)
-        {
-            // Deal damage to blockers
-            foreach (var blocker in attacker.Blockers)
-            {
-                if (blocker.AssignedDamage > 0)
-                {
-                    blocker.Creature.TakeDamage(blocker.AssignedDamage);
-                    _eventBus?.Publish(new CombatDamageDealtEvent(
-                        attacker.Creature, blocker.Creature, blocker.AssignedDamage, isFirstStrike));
-                }
-            }
-
-            // Deal damage to target (unblocked or trample)
-            int targetDamage = attacker.AssignedDamage - attacker.Blockers.Sum(b => b.AssignedDamage);
-
-            if (targetDamage > 0)
-            {
-                if (attacker.TargetPlayer != null)
-                {
-                    attacker.TargetPlayer.LoseLife(targetDamage);
-                    _eventBus?.Publish(new CombatDamageDealtEvent(
-                        attacker.Creature, attacker.TargetPlayer, targetDamage, isFirstStrike));
-                }
-                else if (attacker.TargetPlaneswalker != null)
-                {
-                    attacker.TargetPlaneswalker.RemoveLoyalty(targetDamage);
-                    _eventBus?.Publish(new CombatDamageDealtEvent(
-                        attacker.Creature, attacker.TargetPlaneswalker, targetDamage, isFirstStrike));
-                }
-            }
-
-            // Deal damage to attacker from blockers
-            foreach (var blocker in attacker.Blockers)
-            {
-                if (blocker.Creature.Power > 0)
-                {
-                    attacker.Creature.TakeDamage(blocker.Creature.Power);
-                    _eventBus?.Publish(new CombatDamageDealtEvent(
-                        blocker.Creature, attacker.Creature, blocker.Creature.Power, isFirstStrike));
-                }
-            }
-        }
-    }
-
-    /// <summary>
-    /// Reset damage assignment for a new damage step.
-    /// </summary>
-    private void ResetDamageAssignment(Combat combat)
-    {
-        foreach (var attacker in combat.Attackers)
-        {
-            attacker.ResetDamageAssignment();
-            foreach (var blocker in attacker.Blockers)
-            {
-                blocker.ResetDamageAssignment();
-            }
-        }
-    }
-
-    /// <summary>
-    /// Get all creatures involved in combat.
-    /// </summary>
-    private IEnumerable<ICard> GetAllCombatCreatures(Combat combat)
-    {
-        var creatures = new List<ICard>();
-        
-        foreach (var attacker in combat.Attackers)
-        {
-            creatures.Add(attacker.Creature);
-        }
-
-        foreach (var blocker in combat.GetAllBlockers())
-        {
-            creatures.Add(blocker.Creature);
-        }
-
-        return creatures;
+        if (_stateBasedActions == null || combat.AttackingPlayer == null) return;
+        var players = new[] { combat.AttackingPlayer, combat.DefendingPlayer }
+            .Where(p => p != null)
+            .Cast<Player>();
+        _stateBasedActions.CheckStateBasedActions(players, _damageAssigner.GetCombatCreatures(combat));
     }
 
     /// <summary>
