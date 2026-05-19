@@ -153,7 +153,7 @@ CR 115 / 601.2c / 608.2b.
 - Validation at cast time + resolution
 - Hexproof, Shroud, Protection block targeting
 
-### Phase 23 — Multiplayer + Formats (~2 weeks)
+### Phase 23 — Multiplayer + Formats (~2 weeks) **← FIRST CUT**
 
 CR 8xx multiplayer, CR 9xx variants.
 
@@ -367,3 +367,9 @@ Track A unlocks Track B (layer system needed for granted abilities).
   - Console `play-heuristic` scenario
   - 691 Core + 45 Api = 736 tests, zero warnings
 - **Phase 27 remaining** — spell-casting heuristic, threat assessment, MCTS-lite, difficulty levels
+- **Phase 23 first cut** — Multiplayer + Commander primitives ✅ done
+  - `GameDriver` starting-player now `_rng.Next(_players.Count)` — generalised from coin flip to N-player random pick
+  - 4-player game runs 3 turns no exceptions; 3-player priority round terminates on all-pass
+  - `Formats/Commander/CommanderState` — per-player tracker: commander card, cast-from-command-zone count (CR 903.8 tax = 2× casts), commander damage taken per opposing commander, 21+ loss check (CR 903.10a)
+  - 697 Core + 45 Api = 742 tests, zero warnings
+- **Phase 23 remaining** — wire CommanderState into GameDriver (cast from command zone, post-combat damage hook to NotifyCommanderDamage); color identity check (CR 903.4); range of influence (CR 801); format legality from DB Legalities JSON; Brawl/Standard/Modern enforcement

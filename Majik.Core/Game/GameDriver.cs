@@ -61,8 +61,9 @@ public sealed class GameDriver
             ShuffleLibrary(p);
         }
 
-        // CR 103.2 — determine starting player via coin flip.
-        var startingIndex = _rng.FlipCoin() ? 0 : 1 % _players.Count;
+        // CR 103.2 — determine starting player. Coin flip works for 2,
+        // generalised to N-player by random pick.
+        var startingIndex = _rng.Next(_players.Count);
         var startingPlayer = _players[startingIndex];
 
         // CR 103.4 — mulligan loop per player.
