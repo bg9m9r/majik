@@ -3,10 +3,12 @@ using Majik.Core.Abilities;
 using Majik.Core.Api.Commands;
 using Majik.Core.Api.Dtos;
 using Majik.Core.Cards;
+using Majik.Core.Combat;
 using Majik.Core.Events;
 using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
+using Majik.Core.Rules;
 using Majik.Core.Services;
 using Majik.Core.StateMachine;
 using Majik.Core.Zones;
@@ -18,8 +20,12 @@ namespace Majik.Core.Api;
 /// (event bus, stack, players, trigger manager, priority loop) with a
 /// command/state/events interface that's safe to ship over HTTP/JSON.
 ///
-/// Phase 9 scope: 1v1, both players are <see cref="RemoteAgent"/>s, single
-/// priority round driver. Phase 10 adds full turn/phase looping.
+/// Two run modes:
+/// - <see cref="StartAsync"/> runs a single priority round on Alice
+///   (legacy Phase-9 behavior used by most existing tests).
+/// - <see cref="StartFullGameAsync"/> runs the full
+///   <see cref="GameDriver"/> loop: shuffle, mulligan, multi-turn,
+///   state-based actions, combat, win-condition checks (Phase 10).
 /// </summary>
 public sealed class GameFacade
 {
@@ -29,12 +35,15 @@ public sealed class GameFacade
     private readonly ZoneService _zones;
     private readonly StackResolver _resolver;
     private readonly PriorityManager _priority;
+    private readonly StateBasedActions _sba;
+    private readonly CombatFlow _combatFlow;
     private readonly Player _alice;
     private readonly Player _bob;
     private readonly RemoteAgent _aliceAgent;
     private readonly RemoteAgent _bobAgent;
     private readonly PriorityLoop _loop;
     private Task? _loopTask;
+    private Task<GameDriver.GameResult>? _fullGameTask;
     private readonly List<Action<EventDto>> _subscribers = new();
     private readonly ActionLog _log = new();
 
@@ -50,8 +59,10 @@ public sealed class GameFacade
         _stack = new Majik.Core.Stack.Stack(_bus);
         _triggers = new TriggerManager(_stack, _bus);
         _zones = new ZoneService(_bus);
-        _resolver = new StackResolver(_bus, _zones);
+        _sba = new StateBasedActions(_bus, _zones, _triggers);
+        _resolver = new StackResolver(_bus, _zones, _sba);
         _priority = new PriorityManager(new List<Player> { alice, bob }, _stack, _bus, _triggers);
+        _combatFlow = new CombatFlow(_bus, _sba);
 
         _aliceAgent = new RemoteAgent(alice, LookupCard);
         _bobAgent = new RemoteAgent(bob, LookupCard);
@@ -93,6 +104,47 @@ public sealed class GameFacade
         // Yield once so the loop hits its first await.
         return Task.Delay(1, ct);
     }
+
+    /// <summary>
+    /// Run the full <see cref="GameDriver"/> loop. Returns immediately;
+    /// the driver runs in the background and reads its decisions from
+    /// the two <see cref="RemoteAgent"/>s (so callers drive it via
+    /// <see cref="SubmitAsync"/>). Use <see cref="FullGameTask"/> to
+    /// await completion.
+    ///
+    /// Phase 10 entry point — shuffle, mulligan, multi-turn, SBAs,
+    /// combat, win conditions all handled by the driver.
+    /// </summary>
+    public Task StartFullGameAsync(int maxTurns = 30, CancellationToken ct = default)
+    {
+        if (_loopTask != null || _fullGameTask != null)
+        {
+            throw new InvalidOperationException("Game already started.");
+        }
+
+        var driver = new GameDriver(
+            players: new[] { _alice, _bob },
+            agents: new Dictionary<Player, IPlayerAgent>
+            {
+                [_alice] = _aliceAgent,
+                [_bob] = _bobAgent,
+            },
+            stack: _stack,
+            zoneService: _zones,
+            triggerManager: _triggers,
+            stackResolver: _resolver,
+            stateBasedActions: _sba,
+            priorityManager: _priority,
+            combatFlow: _combatFlow,
+            eventBus: _bus);
+
+        _fullGameTask = driver.RunGameAsync(maxTurns, ct);
+        return Task.Delay(1, ct);
+    }
+
+    /// <summary>Task representing the in-flight full-game run, or null
+    /// when only <see cref="StartAsync"/> was called.</summary>
+    public Task<GameDriver.GameResult>? FullGameTask => _fullGameTask;
 
     /// <summary>
     /// Submit a player command. Returns when the engine has processed it

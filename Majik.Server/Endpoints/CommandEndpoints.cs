@@ -72,12 +72,29 @@ public static class CommandEndpoints
     private static async Task<IResult> StartGame(
         Guid id,
         ServerGameFactory factory,
-        CancellationToken ct)
+        CancellationToken ct,
+        string? mode = null,
+        int maxTurns = 30)
     {
         var facade = factory.Get(id);
         if (facade == null) return Results.NotFound(new { error = $"Game {id} not found" });
 
-        await facade.StartAsync(ct);
+        try
+        {
+            if (string.Equals(mode, "full", StringComparison.OrdinalIgnoreCase))
+            {
+                await facade.StartFullGameAsync(maxTurns, ct);
+            }
+            else
+            {
+                await facade.StartAsync(ct);
+            }
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Results.Conflict(new { error = ex.Message });
+        }
+
         return Results.Ok(facade.GetState());
     }
 
