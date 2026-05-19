@@ -140,4 +140,19 @@ public class Permanent : Card
 
         _isTapped = false;
     }
+
+    /// <summary>True if a loyalty ability (CR 606.5) has been activated
+    /// on this permanent during the current turn. Reset by
+    /// <see cref="ResetTurnState"/>.</summary>
+    public bool LoyaltyAbilityActivatedThisTurn { get; internal set; }
+
+    /// <summary>
+    /// Clear per-turn flags (loyalty-once-per-turn, attacked-this-turn,
+    /// summoning sickness). Called by the engine during the untap step.
+    /// </summary>
+    public virtual void ResetTurnState()
+    {
+        LoyaltyAbilityActivatedThisTurn = false;
+        HasSummoningSickness = false;
+    }
 }
