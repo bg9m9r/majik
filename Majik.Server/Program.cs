@@ -1,6 +1,7 @@
 using Majik.Server.Composition;
 using Majik.Server.Endpoints;
 using Majik.Server.Hubs;
+using Majik.Server.Profiles;
 using Microsoft.AspNetCore.Authorization;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -8,6 +9,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddMajikEngine();
 builder.Services.AddMajikAuth(builder.Configuration);
 builder.Services.AddMajikCors(builder.Configuration);
+builder.Services.AddMajikMongo(builder.Configuration);
 builder.Services.AddSignalR();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi();
@@ -50,6 +52,7 @@ app.MapGameEndpoints();
 app.MapSeatEndpoints();
 app.MapCommandEndpoints();
 app.MapHub<GameHub>("/hubs/game");
+app.MapProfileEndpoints();
 
 app.Run();
 
