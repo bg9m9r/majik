@@ -40,32 +40,32 @@ public static class GameEndpoints
         return routes;
     }
 
-    private static IResult CreateGame(CreateGameRequest body, GameRegistry registry)
+    private static IResult CreateGame(CreateGameRequest body, ServerGameFactory factory)
     {
         if (string.IsNullOrWhiteSpace(body.AliceName) || string.IsNullOrWhiteSpace(body.BobName))
         {
             return Results.BadRequest(new { error = "Both player names required" });
         }
 
-        var facade = registry.Create(body.AliceName, body.BobName);
+        var facade = factory.Create(body.AliceName, body.BobName);
         var response = ToCreateResponse(facade);
 
         return Results.Created($"/games/{facade.GameId}", response);
     }
 
-    private static IResult GetGame(Guid id, GameRegistry registry)
+    private static IResult GetGame(Guid id, ServerGameFactory factory)
     {
-        var facade = registry.Get(id);
+        var facade = factory.Get(id);
         return facade == null
             ? Results.NotFound(new { error = $"Game {id} not found" })
             : Results.Ok(ToCreateResponse(facade));
     }
 
-    private static IResult ListGames(GameRegistry registry)
-        => Results.Ok(new { count = registry.Count });
+    private static IResult ListGames(ServerGameFactory factory)
+        => Results.Ok(new { count = factory.Count });
 
-    private static IResult DeleteGame(Guid id, GameRegistry registry)
-        => registry.Remove(id)
+    private static IResult DeleteGame(Guid id, ServerGameFactory factory)
+        => factory.Delete(id)
             ? Results.NoContent()
             : Results.NotFound(new { error = $"Game {id} not found" });
 

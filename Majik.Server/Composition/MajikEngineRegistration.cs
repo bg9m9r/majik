@@ -1,5 +1,6 @@
 using Majik.Core.Api;
 using Majik.Core.Events;
+using Majik.Server.Hubs;
 
 namespace Majik.Server.Composition;
 
@@ -18,6 +19,8 @@ public static class MajikEngineRegistration
     public static IServiceCollection AddMajikEngine(this IServiceCollection services)
     {
         services.AddSingleton<GameRegistry>();
+        services.AddSingleton<GameHubBridgeRegistry>();
+        services.AddSingleton<ServerGameFactory>();
         return services;
     }
 }

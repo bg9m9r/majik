@@ -1,11 +1,13 @@
 using Majik.Server.Composition;
 using Majik.Server.Endpoints;
+using Majik.Server.Hubs;
 using Microsoft.AspNetCore.Authorization;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddMajikEngine();
 builder.Services.AddMajikAuth(builder.Configuration);
+builder.Services.AddSignalR();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi();
 
@@ -34,6 +36,7 @@ app.MapGet("/whoami", (System.Security.Claims.ClaimsPrincipal user) =>
    .RequireAuthorization(AuthRegistration.AsPlayerPolicy);
 
 app.MapGameEndpoints();
+app.MapHub<GameHub>("/hubs/game");
 
 app.Run();
 
