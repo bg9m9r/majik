@@ -36,8 +36,15 @@ public sealed class TurnDriver
     private readonly CombatFlow _combatFlow;
     private readonly Majik.Core.Effects.ContinuousEffectsService? _continuousEffects;
     private readonly LandDropTracker? _landDropTracker;
+    private readonly AdditionalCombatQueue _additionalCombats = new();
     private PhaseStateType _currentPhase;
     private int _currentTurnNumber;
+
+    /// <summary>Effects that grant the current turn an additional combat
+    /// phase (Aggravated Assault, Combat Celebrant, Relentless Assault)
+    /// enqueue here. The turn loop re-runs the combat sequence as long
+    /// as the queue is non-empty.</summary>
+    public AdditionalCombatQueue AdditionalCombats => _additionalCombats;
 
     public TurnDriver(
         IReadOnlyList<Player> players,
@@ -99,6 +106,17 @@ public sealed class TurnDriver
         var defender = _players.First(p => !ReferenceEquals(p, activePlayer));
         SetPhase(PhaseStateType.DeclareAttackers);
         await RunCombat(activePlayer, defender, ct);
+
+        // CR 506.4 — additional combat phases drain the queue.
+        while (_additionalCombats.TryConsume())
+        {
+            SetPhase(PhaseStateType.BeginningOfCombat);
+            await PriorityRound(activePlayer, ct);
+            SetPhase(PhaseStateType.DeclareAttackers);
+            await RunCombat(activePlayer, defender, ct);
+        }
+        // Per-turn reset so the queue doesn't bleed into the next turn.
+        _additionalCombats.Reset();
 
         // Main 2
         SetPhase(PhaseStateType.Main);
