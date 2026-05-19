@@ -53,10 +53,22 @@ class Program
                 TriggerPlayground.Run(scenario);
                 return;
             }
+            else if (args[0].Equals("fetch-bulk", StringComparison.OrdinalIgnoreCase))
+            {
+                await HandleFetchBulkCommandAsync(args);
+                return;
+            }
+            else if (args[0].Equals("fetch-set", StringComparison.OrdinalIgnoreCase))
+            {
+                await HandleFetchSetCommandAsync(args);
+                return;
+            }
         }
 
         System.Console.WriteLine("Usage:");
         System.Console.WriteLine("  Majik.Console import <path-to-json-file>");
+        System.Console.WriteLine("  Majik.Console fetch-bulk [oracle-cards|default-cards|all-cards|unique-artwork] [--no-import]");
+        System.Console.WriteLine("  Majik.Console fetch-set <set-code> [--no-import]");
         System.Console.WriteLine("  Majik.Console analyze-keywords <path-to-csv-file>");
         System.Console.WriteLine("  Majik.Console ingest-claude-results <path-to-jsonl-file>");
         System.Console.WriteLine("  Majik.Console play-triggers [etb|apnap|intervening-if|delayed|all]");
@@ -110,6 +122,83 @@ class Program
             System.Console.WriteLine($"\n✗ Error during import: {ex.Message}");
             System.Console.WriteLine($"Stack trace: {ex.StackTrace}");
         }
+    }
+
+    /// <summary>
+    /// fetch-bulk [type] [--no-import]
+    /// Downloads the named Scryfall bulk export to a temp file; optionally
+    /// imports into the local DB. Defaults to oracle-cards (smallest set of
+    /// gameplay-relevant fields, one row per unique card).
+    /// </summary>
+    static async Task HandleFetchBulkCommandAsync(string[] args)
+    {
+        var bulkType = args.Length > 1 && !args[1].StartsWith("--")
+            ? args[1] : "oracle-cards";
+        var skipImport = args.Any(a => a.Equals("--no-import", StringComparison.OrdinalIgnoreCase));
+
+        var tmpDir = Path.Combine(Path.GetTempPath(), "majik-scryfall");
+        Directory.CreateDirectory(tmpDir);
+        var destPath = Path.Combine(tmpDir, $"{bulkType}.json");
+
+        System.Console.WriteLine($"=== Majik Scryfall Bulk Download ===\n");
+        var downloader = new ScryfallDownloader(
+            log: new Progress<string>(m => System.Console.WriteLine($"  {m}")));
+        try
+        {
+            await downloader.DownloadBulkAsync(bulkType, destPath);
+        }
+        catch (Exception ex)
+        {
+            System.Console.WriteLine($"\n✗ Download failed: {ex.Message}");
+            return;
+        }
+
+        if (skipImport)
+        {
+            System.Console.WriteLine($"\n--no-import set; JSON left at {destPath}");
+            return;
+        }
+        await HandleImportCommand(new[] { "import", destPath });
+    }
+
+    /// <summary>
+    /// fetch-set <set-code> [--no-import]
+    /// Pulls every printing from a single set via /cards/search. Useful when
+    /// a new release lands and you don't want to re-pull the whole bulk file.
+    /// </summary>
+    static async Task HandleFetchSetCommandAsync(string[] args)
+    {
+        if (args.Length < 2)
+        {
+            System.Console.WriteLine("Usage: Majik.Console fetch-set <set-code> [--no-import]");
+            return;
+        }
+        var setCode = args[1];
+        var skipImport = args.Any(a => a.Equals("--no-import", StringComparison.OrdinalIgnoreCase));
+
+        var tmpDir = Path.Combine(Path.GetTempPath(), "majik-scryfall");
+        Directory.CreateDirectory(tmpDir);
+        var destPath = Path.Combine(tmpDir, $"set-{setCode.ToLowerInvariant()}.json");
+
+        System.Console.WriteLine($"=== Majik Scryfall Set Download: {setCode} ===\n");
+        var downloader = new ScryfallDownloader(
+            log: new Progress<string>(m => System.Console.WriteLine($"  {m}")));
+        try
+        {
+            await downloader.DownloadSetAsync(setCode, destPath);
+        }
+        catch (Exception ex)
+        {
+            System.Console.WriteLine($"\n✗ Download failed: {ex.Message}");
+            return;
+        }
+
+        if (skipImport)
+        {
+            System.Console.WriteLine($"\n--no-import set; JSON left at {destPath}");
+            return;
+        }
+        await HandleImportCommand(new[] { "import", destPath });
     }
 
     /// <summary>
