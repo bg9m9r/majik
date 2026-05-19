@@ -26,8 +26,30 @@ namespace Majik.Core.Players.Agents;
 /// </summary>
 public sealed class HeuristicBotAgent : IPlayerAgent
 {
+    // Cards the bot proposed to cast but that didn't actually leave hand
+    // (no SpellDef match, target-fill failed, etc.). Cleared each turn —
+    // if the bot picks something up next turn it might be castable then.
+    private readonly HashSet<Guid> _failedThisTurn = new();
+    private int _failedTurnNumber = -1;
+    private Guid? _lastProposed;
+
     public Task<PriorityAction> ChoosePriorityActionAsync(GameContext ctx, CancellationToken ct = default)
     {
+        // Reset failure memo on turn boundary.
+        if (ctx.TurnNumber != _failedTurnNumber)
+        {
+            _failedThisTurn.Clear();
+            _failedTurnNumber = ctx.TurnNumber;
+            _lastProposed = null;
+        }
+        // If our previous proposal is still in hand, the dispatcher rotated
+        // it on failure — mark it dead for this turn.
+        if (_lastProposed is Guid prev
+            && ctx.Self.Zones.Hand.GetCards().Any(c => c.InstanceId == prev))
+        {
+            _failedThisTurn.Add(prev);
+        }
+        _lastProposed = null;
         // Only attempt during a Main phase on our own turn with an empty
         // stack — land drops + sorcery-speed casts are illegal elsewhere.
         var phase = ctx.CurrentPhase;
@@ -53,6 +75,7 @@ public sealed class HeuristicBotAgent : IPlayerAgent
         var candidates = hand
             .Where(c => !c.HasType(CardType.Land))
             .Where(IsCastableSpell)
+            .Where(c => !_failedThisTurn.Contains(c.InstanceId))
             .Select(c => new { Card = c, Cost = ManaCost.Parse(c.ManaCost ?? "") })
             .OrderByDescending(x => x.Cost.TotalValue)
             .ToList();
@@ -61,6 +84,7 @@ public sealed class HeuristicBotAgent : IPlayerAgent
         {
             if (TryPickManaSources(ctx.Self, cand.Cost) != null)
             {
+                _lastProposed = cand.Card.InstanceId;
                 return Task.FromResult<PriorityAction>(
                     new PriorityAction.CastSpell(cand.Card,
                         Array.Empty<object>()));

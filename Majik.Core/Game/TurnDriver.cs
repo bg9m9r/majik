@@ -178,8 +178,13 @@ public sealed class TurnDriver
 
         async Task DispatchCast(Player actor, PriorityAction.CastSpell cast, GameContext ctx)
         {
-            static void RotateHand(ICard card)
+            static void RotateHand(ICard card, string reason)
             {
+                // Bot's per-turn failed-cards memo handles the "don't re-
+                // propose" side; this rotation is now a vestigial nudge.
+                // Kept because some agents may not memo failures, and the
+                // rotation also helps the bot iterate through alternatives
+                // by changing hand order between sweeps.
                 if (card.Owner != null && card.Zone == Majik.Core.Zones.ZoneType.Hand)
                 {
                     card.Owner.Zones.Hand.RemoveCard(card);
@@ -199,7 +204,7 @@ public sealed class TurnDriver
                 || cast.Card.HasType(Majik.Core.Cards.Types.CardType.Planeswalker);
             if (resolved == null && !isPermanent)
             {
-                RotateHand(cast.Card);
+                RotateHand(cast.Card, "no SpellDef for instant/sorcery");
                 return;
             }
             var def = resolved
@@ -211,9 +216,7 @@ public sealed class TurnDriver
             var payment = await _agents[actor].ChooseManaSourcesAsync(ctx, cost, ct);
             if (!manaResolver.Pay(actor, cost, payment))
             {
-                // Bot mis-picked sources. Rotate so the next sweep tries a
-                // different card.
-                RotateHand(cast.Card);
+                RotateHand(cast.Card, "Pay failed");
                 return;
             }
 
@@ -221,12 +224,9 @@ public sealed class TurnDriver
             {
                 await castFlow.CastAsync(actor, cast.Card, def, _agents[actor], ctx, ct);
             }
-            catch (InvalidOperationException)
+            catch (InvalidOperationException ex)
             {
-                // Targets unfilled (e.g. Counterspell with empty stack).
-                // Mana already paid — CR 601.2g says costs aren't refunded
-                // when a cast is illegal at this stage; we accept that.
-                RotateHand(cast.Card);
+                RotateHand(cast.Card, $"CastAsync threw: {ex.Message}");
             }
         }
 
