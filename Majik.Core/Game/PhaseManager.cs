@@ -13,14 +13,18 @@ namespace Majik.Core.Game;
 public class PhaseManager
 {
     private readonly IEventBus? _eventBus;
-    private readonly Queue<PhaseStateType> _extraPhases = new();
-    
+    private readonly PhaseSequenceMutator _sequenceMutator;
+
     private PhaseStateType? _currentPhase;
     private PhaseStateType[] _currentSequence = Array.Empty<PhaseStateType>();
     private int _currentPhaseIndex;
     private Player? _activePlayer;
     private bool _isFirstTurn;
     private CombatManager? _combatManager;
+
+    /// <summary>Pending-phase queue (CR 500.7–9). Exposed for callers that
+    /// need to inject an extra turn / phase / step.</summary>
+    public PhaseSequenceMutator SequenceMutator => _sequenceMutator;
 
     /// <summary>
     /// The current phase.
@@ -35,6 +39,7 @@ public class PhaseManager
     public PhaseManager(IEventBus? eventBus = null)
     {
         _eventBus = eventBus;
+        _sequenceMutator = new PhaseSequenceMutator(eventBus);
     }
 
     /// <summary>
@@ -55,7 +60,7 @@ public class PhaseManager
         _currentSequence = PhaseSequence.GetSequence(isFirstTurn);
         _currentPhaseIndex = 0;
         _currentPhase = null;
-        _extraPhases.Clear();
+        _sequenceMutator.Clear();
     }
 
     /// <summary>
@@ -98,10 +103,8 @@ public class PhaseManager
         var endingPhase = _currentPhase.Value;
         _eventBus?.Publish(new PhaseEndedEvent(endingPhase, _activePlayer));
 
-        // Check for extra phases first
-        if (_extraPhases.Count > 0)
+        if (_sequenceMutator.TryDequeue(out var extraPhase))
         {
-            var extraPhase = _extraPhases.Dequeue();
             _currentPhase = extraPhase;
             _eventBus?.Publish(new PhaseStartedEvent(extraPhase, _activePlayer));
             _eventBus?.Publish(new ExtraPhaseAddedEvent(extraPhase));
@@ -136,58 +139,29 @@ public class PhaseManager
         TransitionToNextPhase();
     }
 
-    /// <summary>
-    /// Add an extra phase to the queue.
-    /// </summary>
-    public void AddExtraPhase(PhaseStateType phase)
-    {
-        _extraPhases.Enqueue(phase);
-        _eventBus?.Publish(new ExtraPhaseAddedEvent(phase));
-    }
+    /// <summary>Queue an extra phase. Delegates to
+    /// <see cref="SequenceMutator"/>; kept here for back-compat.</summary>
+    public void AddExtraPhase(PhaseStateType phase) => _sequenceMutator.AddExtraPhase(phase);
 
-    /// <summary>
-    /// Add an extra combat phase.
-    /// </summary>
-    public void AddExtraCombatPhase()
-    {
-        // Add all combat phases
-        AddExtraPhase(PhaseStateType.BeginningOfCombat);
-        AddExtraPhase(PhaseStateType.DeclareAttackers);
-        AddExtraPhase(PhaseStateType.DeclareBlockers);
-        AddExtraPhase(PhaseStateType.CombatDamage);
-        AddExtraPhase(PhaseStateType.EndOfCombat);
-    }
+    /// <summary>Queue a complete extra combat phase.</summary>
+    public void AddExtraCombatPhase() => _sequenceMutator.AddExtraCombatPhase();
 
-    /// <summary>
-    /// Add an extra main phase.
-    /// </summary>
-    public void AddExtraMainPhase()
-    {
-        AddExtraPhase(PhaseStateType.Main);
-    }
+    /// <summary>Queue an extra main phase.</summary>
+    public void AddExtraMainPhase() => _sequenceMutator.AddExtraMainPhase();
 
-    /// <summary>
-    /// Check if the turn is complete (all phases finished).
-    /// </summary>
+    /// <summary>Check if the turn is complete (all phases finished and no
+    /// inserts pending).</summary>
     public bool IsTurnComplete()
-    {
-        return _currentPhase == null && _extraPhases.Count == 0;
-    }
+        => _currentPhase == null && _sequenceMutator.PendingCount == 0;
 
-    /// <summary>
-    /// Get the next phase that will execute.
-    /// </summary>
+    /// <summary>Get the next phase that will execute.</summary>
     public PhaseStateType? GetNextPhase()
     {
-        if (_extraPhases.Count > 0)
-        {
-            return _extraPhases.Peek();
-        }
+        var pending = _sequenceMutator.PeekNext();
+        if (pending != null) return pending;
 
         if (_currentPhaseIndex + 1 < _currentSequence.Length)
-        {
             return _currentSequence[_currentPhaseIndex + 1];
-        }
 
         return null;
     }
