@@ -70,6 +70,11 @@ public sealed class PriorityLoop
 
             // Drive one full pass: each player either acts (resets pass count)
             // or passes. Round ends when all players have passed in succession.
+            // Safety cap on non-pass actions per round to catch infinite
+            // agent loops (e.g. bot keeps proposing a cast whose payment
+            // silently fails). 500 is well above any realistic round.
+            const int kActionLimit = 500;
+            var actionCount = 0;
             while (!_priority.AllPlayersPassed && !ct.IsCancellationRequested)
             {
                 var current = _priority.CurrentPlayer
@@ -83,6 +88,14 @@ public sealed class PriorityLoop
                 {
                     _priority.PassPriority();
                     continue;
+                }
+
+                if (++actionCount > kActionLimit)
+                {
+                    System.Console.Error.WriteLine(
+                        $"PRIORITY LOOP SAFETY: {kActionLimit} non-pass actions in one round, " +
+                        $"actor={current.Name}, last action={action.GetType().Name}. Forcing round end.");
+                    return;
                 }
 
                 await ApplyActionAsync(current, action, ctx, ct);

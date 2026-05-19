@@ -164,6 +164,10 @@ public class ManaCost : IEquatable<ManaCost>
                 case 'B': black++; break;
                 case 'R': red++; break;
                 case 'G': green++; break;
+                // {C} = colourless mana (CR 107.4c). No dedicated bucket today;
+                // treat as +1 generic — pays generic costs and behaves
+                // identically for permanents like Urza's Saga ('{T}: Add {C}.').
+                case 'C': generic++; break;
             }
         }
 

@@ -562,9 +562,9 @@ internal static class TriggerPlayground
         });
 
         Log($"Per-event log → {logPath}");
-        Log("Running game (cap 50 turns — bot vs bot)…");
+        Log("Running game (no turn cap — bot vs bot)…");
         var sw = System.Diagnostics.Stopwatch.StartNew();
-        var result = await driver.RunGameAsync(maxTurns: 50);
+        var result = await driver.RunGameAsync(maxTurns: int.MaxValue);
         sw.Stop();
         Log($"Wall time: {sw.Elapsed.TotalSeconds:F2}s for {result.TurnsPlayed} turns");
 

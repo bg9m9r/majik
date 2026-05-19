@@ -217,6 +217,8 @@ public sealed class CombatFlow
 
     private void DealDamageToPlayer(Creature source, Player target, int amount)
     {
+        if (target.HasLost) return; // CR 104.2 — game over for this player
+
         var intent = new Majik.Core.Effects.DamageIntent(source, amount, TargetPlayer: target);
         intent = _replacements?.Apply(intent) ?? intent;
         if (intent == null || intent.Amount <= 0) return;

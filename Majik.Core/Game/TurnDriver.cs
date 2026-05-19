@@ -180,13 +180,22 @@ public sealed class TurnDriver
             // Future: wire ScryfallCardFactory.LookupSpellDefinition for
             // effect-bearing spells.
             var def = Majik.Core.Game.SpellDefinition.Vanilla(_ => Array.Empty<Majik.Core.Abilities.IEffect>());
-            // Pay mana up front (the SpellCastFlow doesn't enforce payment;
-            // it just collects ManaPayment for downstream effects).
             var cost = Majik.Core.ValueObjects.ManaCost.Parse(cast.Card.ManaCost);
             var payment = await _agents[actor].ChooseManaSourcesAsync(ctx, cost, ct);
             if (!manaResolver.Pay(actor, cost, payment))
             {
-                // Couldn't pay — skip silently (bot mis-picked).
+                // Bot proposed a spell whose payment can't actually commit
+                // (mismatch between TryPickManaSources and the resolver's
+                // colour-aware Pay). To prevent an infinite priority loop
+                // where the bot re-proposes the same card every prompt,
+                // move the card to the bottom of its hand so a subsequent
+                // ChoosePriorityActionAsync sweep tries a different card.
+                if (cast.Card.Owner != null
+                    && cast.Card.Zone == Majik.Core.Zones.ZoneType.Hand)
+                {
+                    cast.Card.Owner.Zones.Hand.RemoveCard(cast.Card);
+                    cast.Card.Owner.Zones.Hand.AddCard(cast.Card);
+                }
                 return;
             }
             await castFlow.CastAsync(actor, cast.Card, def, _agents[actor], ctx, ct);
