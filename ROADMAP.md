@@ -384,3 +384,10 @@ Track A unlocks Track B (layer system needed for granted abilities).
   - `Formats/Commander/CommanderState` — per-player tracker: commander card, cast-from-command-zone count (CR 903.8 tax = 2× casts), commander damage taken per opposing commander, 21+ loss check (CR 903.10a)
   - 697 Core + 45 Api = 742 tests, zero warnings
 - **Phase 23 remaining** — wire CommanderState into GameDriver (cast from command zone, post-combat damage hook to NotifyCommanderDamage); color identity check (CR 903.4); range of influence (CR 801); format legality from DB Legalities JSON; Brawl/Standard/Modern enforcement
+- **Phase 15 third cut** ✅ done — wiring + cost frameworks + modal
+  - `TurnDriver` injection of `LandDropTracker`; calls `ResetTurn` at start of every turn
+  - `Costs/IAdditionalCost` + `SacrificeCreatureCost` — CR 601.2f sacrifice-on-cast pattern
+  - `Costs/IAlternativeCost` + `FlashbackAlternativeCost` — CR 702.34 cast from graveyard for alt cost + exile on resolve
+  - Modal spell end-to-end demo: SpellCastFlow already threads ChooseModeAsync; tests for Charm-style 3-mode spell branching on selected mode
+  - 721 Core + 45 Api = 766 tests, zero warnings
+- **Phase 15 remaining** — wire `IAdditionalCost`/`IAlternativeCost` into `SpellCastFlow.CastAsync`; hold-priority semantics; Madness/Cipher/Cast-from-Exile alternative implementations

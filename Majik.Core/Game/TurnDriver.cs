@@ -35,6 +35,7 @@ public sealed class TurnDriver
     private readonly PriorityManager _priorityManager;
     private readonly CombatFlow _combatFlow;
     private readonly Majik.Core.Effects.ContinuousEffectsService? _continuousEffects;
+    private readonly LandDropTracker? _landDropTracker;
     private PhaseStateType _currentPhase;
     private int _currentTurnNumber;
 
@@ -48,9 +49,11 @@ public sealed class TurnDriver
         StateBasedActions stateBasedActions,
         PriorityManager priorityManager,
         CombatFlow combatFlow,
-        Majik.Core.Effects.ContinuousEffectsService? continuousEffects = null)
+        Majik.Core.Effects.ContinuousEffectsService? continuousEffects = null,
+        LandDropTracker? landDropTracker = null)
     {
         _continuousEffects = continuousEffects;
+        _landDropTracker = landDropTracker;
         _players = players ?? throw new ArgumentNullException(nameof(players));
         _agents = agents ?? throw new ArgumentNullException(nameof(agents));
         _stack = stack ?? throw new ArgumentNullException(nameof(stack));
@@ -67,6 +70,9 @@ public sealed class TurnDriver
         if (activePlayer == null) throw new ArgumentNullException(nameof(activePlayer));
 
         _currentTurnNumber = turnNumber;
+
+        // CR 305.2 — land drops reset at turn start.
+        _landDropTracker?.ResetTurn();
 
         // Beginning phase
         SetPhase(PhaseStateType.Untap);
