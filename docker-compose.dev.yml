@@ -1,0 +1,12 @@
+services:
+  mongo:
+    image: mongo:7
+    container_name: majik-mongo-dev
+    ports:
+      - "27017:27017"
+    volumes:
+      - majik-mongo-data:/data/db
+    restart: unless-stopped
+
+volumes:
+  majik-mongo-data:

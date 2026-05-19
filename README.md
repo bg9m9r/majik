@@ -81,3 +81,23 @@ game.StartGame();
 3. **Extensible**: Phases and turns can be dynamically added
 4. **UI-Agnostic**: Engine has no UI dependencies
 5. **Composable**: Card abilities compose from base mechanics
+
+## MongoDB (local dev)
+
+New entities (profiles, decks, matches) live in MongoDB. Card data stays on SQLite.
+
+Start the local Mongo container:
+
+```bash
+docker compose -f docker-compose.dev.yml up -d
+```
+
+Stop:
+
+```bash
+docker compose -f docker-compose.dev.yml down
+```
+
+Data persists in the `majik-mongo-data` volume. Remove with `docker compose -f docker-compose.dev.yml down -v`.
+
+Production: connection string supplied via `Mongo__ConnectionString` env var (Render).
