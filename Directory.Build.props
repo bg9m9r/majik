@@ -9,6 +9,10 @@
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <AnalysisLevel>latest</AnalysisLevel>
     <AccelerateBuildsInVisualStudio>true</AccelerateBuildsInVisualStudio>
+    <!-- .NET 10 ships package-pruning metadata for the netcore shared
+         framework but not for AspNetCore.App on every channel; opting out
+         keeps Microsoft.NET.Sdk.Web restore happy until SDK fills the gap. -->
+    <AllowMissingPrunePackageData>true</AllowMissingPrunePackageData>
   </PropertyGroup>
 
 </Project>
