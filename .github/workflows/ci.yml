@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore Majik.sln
+
+      - name: Build
+        run: dotnet build Majik.sln --no-restore --configuration Release
+
+      - name: Test
+        run: dotnet test Majik.sln --no-build --configuration Release --verbosity normal

@@ -27,8 +27,8 @@ public class ReplacementBusTests
             (i, _) => i.Target == "Bob",
             (i, _) => i with { Amount = i.Amount - 1 }));
 
-        bus.Apply(new DamageIntent(3, "Bob")).Amount.Should().Be(2);
-        bus.Apply(new DamageIntent(3, "Alice")).Amount.Should().Be(3);
+        bus.Apply(new DamageIntent(3, "Bob"))!.Amount.Should().Be(2);
+        bus.Apply(new DamageIntent(3, "Alice"))!.Amount.Should().Be(3);
     }
 
     [Fact]
