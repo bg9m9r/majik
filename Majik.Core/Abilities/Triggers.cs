@@ -75,4 +75,17 @@ public static class Triggers
     {
         return new EventTriggerCondition<SpellCastEvent>((_, _) => true);
     }
+
+    /// <summary>
+    /// CR 702.50 — Prowess. "Whenever you cast a noncreature spell, this
+    /// gets +1/+1 until end of turn." Fires on SpellCastEvent where the
+    /// spell's controller is <paramref name="controller"/> AND the spell
+    /// is non-creature.
+    /// </summary>
+    public static ITriggerCondition OnNonCreatureSpellCastByController(Player controller)
+    {
+        return new EventTriggerCondition<SpellCastEvent>((e, _) =>
+            ReferenceEquals(e.Spell.Controller, controller)
+            && !e.Spell.Card.HasType(Majik.Core.Cards.Types.CardType.Creature));
+    }
 }

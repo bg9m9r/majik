@@ -241,11 +241,20 @@ public static class KeywordRegistry
             KeywordType.Triggered,
             layer: null,
             description: "Whenever you cast a noncreature spell, this creature gets +1/+1 until end of turn.",
-            createAbility: (source, controller) => 
+            createAbility: (source, controller) =>
             {
-                // TODO: Create triggered ability for prowess
-                // This would need to be registered with TriggerManager
-                return null; // Placeholder
+                if (source is not Cards.Creature creature) return null;
+                return new Abilities.TriggeredAbility(
+                    creature, controller,
+                    Abilities.Triggers.OnNonCreatureSpellCastByController(controller),
+                    effects: new Abilities.IEffect[]
+                    {
+                        new Abilities.Effect("prowess +1/+1 EOT", () =>
+                        {
+                            creature.ActiveEffects?.Register(
+                                new Effects.ProwessPumpEffect(creature));
+                        }),
+                    });
             }));
 
         Register("landfall", new KeywordInfo(
