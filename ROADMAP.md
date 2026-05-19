@@ -361,3 +361,9 @@ Track A unlocks Track B (layer system needed for granted abilities).
   - `PriorityLoop` accepts an optional `LandDropTracker`; `PlayLand` action validates + records drop; throws on illegal drop (second drop / opponent turn / non-empty stack)
   - 685 Core + 45 Api = 730 tests, zero warnings
 - **Phase 15 remaining** — additional costs ("as you cast", CR 601.2f); alternative costs (Flashback, Madness, Cipher); modal-spell agent threading (already promptable, but no card uses modes yet); hold-priority semantics; wiring `LandDropTracker.ResetTurn` into `TurnDriver` (manual reset by caller for now)
+- **Phase 27 first cut** — Heuristic bot ✅ done
+  - `HeuristicBotAgent` — priority plays first land in hand on own Main with empty stack
+  - Combat: declares every eligible creature as attacker; blocking picks smallest creature whose toughness > attacker power (won't die)
+  - Console `play-heuristic` scenario
+  - 691 Core + 45 Api = 736 tests, zero warnings
+- **Phase 27 remaining** — spell-casting heuristic, threat assessment, MCTS-lite, difficulty levels
