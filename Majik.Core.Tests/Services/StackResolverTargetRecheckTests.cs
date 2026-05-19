@@ -62,7 +62,7 @@ public class StackResolverTargetRecheckTests
         stack.Push(spell);
 
         // Bear leaves before resolution.
-        bear.Zone = ZoneType.Graveyard;
+        bear.SetZone(ZoneType.Graveyard);
 
         resolver.ResolveTop(stack);
 

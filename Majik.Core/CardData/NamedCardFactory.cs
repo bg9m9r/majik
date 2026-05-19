@@ -42,7 +42,7 @@ public static class NamedCardFactory
             _ => new Card(name, ""),
         };
 
-        card.Owner = owner;
+        card.SetOwner(owner);
 
         if (card is Land && card.HasSupertype(CardSupertype.Basic))
         {

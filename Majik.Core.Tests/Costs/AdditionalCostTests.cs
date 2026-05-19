@@ -42,7 +42,7 @@ public class AdditionalCostTests
         // Arrange
         var player = new Player("Alice", 20);
         var permanent = new Creature("Grizzly Bears", "1G", 2, 2) { Controller = player };
-        permanent.Zone = ZoneType.Battlefield;
+        permanent.SetZone(ZoneType.Battlefield);
         var cost = AdditionalCost.Tap(permanent);
 
         // Act
@@ -58,7 +58,7 @@ public class AdditionalCostTests
         // Arrange
         var player = new Player("Alice", 20);
         var permanent = new Creature("Grizzly Bears", "1G", 2, 2) { Controller = player };
-        permanent.Zone = ZoneType.Battlefield;
+        permanent.SetZone(ZoneType.Battlefield);
         permanent.Tap();
         var cost = AdditionalCost.Tap(permanent);
 
@@ -75,7 +75,7 @@ public class AdditionalCostTests
         // Arrange
         var player = new Player("Alice", 20);
         var permanent = new Creature("Grizzly Bears", "1G", 2, 2) { Controller = player };
-        permanent.Zone = ZoneType.Battlefield;
+        permanent.SetZone(ZoneType.Battlefield);
         var cost = AdditionalCost.Tap(permanent);
 
         // Act

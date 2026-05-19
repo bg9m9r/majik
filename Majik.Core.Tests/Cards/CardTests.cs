@@ -95,7 +95,7 @@ public class CardTests
         var player = new Player("Alice", 20);
 
         // Act
-        card.Controller = player;
+        card.SetController(player);
 
         // Assert
         card.Controller.Should().Be(player);
@@ -108,7 +108,7 @@ public class CardTests
         var card = new Card("Lightning Bolt", "R", new[] { CardType.Instant });
 
         // Act
-        card.Zone = ZoneType.Hand;
+        card.SetZone(ZoneType.Hand);
 
         // Assert
         card.Zone.Should().Be(ZoneType.Hand);

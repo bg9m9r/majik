@@ -75,8 +75,8 @@ public class EtbTriggerEndToEndTests
         // creature entering the battlefield.
         var aliceWarden = MakeAnyEtbLifeGainer("Alice Warden", alice);
         var bobWarden = MakeAnyEtbLifeGainer("Bob Warden", bob);
-        aliceWarden.Zone = ZoneType.Battlefield;
-        bobWarden.Zone = ZoneType.Battlefield;
+        aliceWarden.SetZone(ZoneType.Battlefield);
+        bobWarden.SetZone(ZoneType.Battlefield);
         triggers.BindCard(aliceWarden);
         triggers.BindCard(bobWarden);
 

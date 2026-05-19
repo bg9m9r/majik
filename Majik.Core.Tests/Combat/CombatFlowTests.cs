@@ -48,7 +48,7 @@ public class CombatFlowTests
     public async Task OneAttackerNoBlockers_DefenderLosesPowerLife_AttackerTapped()
     {
         var bear = (Creature)NamedCardFactory.Create("Grizzly Bears", _alice);
-        bear.Zone = ZoneType.Battlefield;
+        bear.SetZone(ZoneType.Battlefield);
         bear.HasSummoningSickness = false;
         var flow = new CombatFlow(_bus, _sba);
         var aliceAgent = new ScriptedAgent();
@@ -71,9 +71,9 @@ public class CombatFlowTests
     {
         var atk = (Creature)NamedCardFactory.Create("Grizzly Bears", _alice);
         var blk = (Creature)NamedCardFactory.Create("Grizzly Bears", _bob);
-        atk.Owner = _alice; atk.Controller = _alice; atk.Zone = ZoneType.Battlefield;
+        atk.SetOwner(_alice); atk.SetController(_alice); atk.SetZone(ZoneType.Battlefield);
         _alice.Zones.Battlefield.AddCard(atk);
-        blk.Owner = _bob; blk.Controller = _bob; blk.Zone = ZoneType.Battlefield;
+        blk.SetOwner(_bob); blk.SetController(_bob); blk.SetZone(ZoneType.Battlefield);
         _bob.Zones.Battlefield.AddCard(blk);
         atk.HasSummoningSickness = false;
         var flow = new CombatFlow(_bus, _sba);

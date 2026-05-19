@@ -35,7 +35,7 @@ public class PriorityLoopLandDropTests
     public async Task PlayLand_FirstDropOfTurn_Succeeds()
     {
         var land = NamedCardFactory.Create("Mountain", _alice);
-        land.Zone = ZoneType.Hand;
+        land.SetZone(ZoneType.Hand);
         _alice.Zones.Hand.AddCard(land);
         var tracker = new LandDropTracker();
 
@@ -63,7 +63,7 @@ public class PriorityLoopLandDropTests
     {
         var l1 = NamedCardFactory.Create("Mountain", _alice);
         var l2 = NamedCardFactory.Create("Mountain", _alice);
-        l1.Zone = ZoneType.Hand; l2.Zone = ZoneType.Hand;
+        l1.SetZone(ZoneType.Hand); l2.SetZone(ZoneType.Hand);
         _alice.Zones.Hand.AddCard(l1);
         _alice.Zones.Hand.AddCard(l2);
         var tracker = new LandDropTracker();

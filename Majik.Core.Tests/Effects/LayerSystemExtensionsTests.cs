@@ -71,7 +71,7 @@ public class LayerSystemExtensionsTests
         svc.Register(swap);
         svc.EffectiveController(bear).Should().BeSameAs(_bob);
 
-        bear.Zone = ZoneType.Graveyard; // effect's IsActive checks zone
+        bear.SetZone(ZoneType.Graveyard); // effect's IsActive checks zone
         svc.EffectiveController(bear).Should().BeSameAs(_alice);
     }
 

@@ -43,18 +43,36 @@ public class Card : ICard
     /// </summary>
     public IReadOnlyList<CardSubtype> Subtypes => _subtypes.AsReadOnly();
     
-    public Player? Owner { get; set; }
-    
+    public Player? Owner { get; internal set; }
+
     public Player? Controller
     {
         get => _controller;
-        set => _controller = value;
+        internal set => _controller = value;
     }
-    
+
     public ZoneType Zone
     {
         get => _zone;
-        set => _zone = value;
+        internal set => _zone = value;
+    }
+
+    /// <summary>
+    /// CR 110.2 — change the controller of this card. Public seam for
+    /// external code (effects, commands) instead of touching the setter.
+    /// </summary>
+    public void ChangeController(Player? newController)
+    {
+        _controller = newController;
+    }
+
+    /// <summary>
+    /// Set the owner of this card. Typically called once at card creation
+    /// (CR 108.3); ownership only changes via specific effects.
+    /// </summary>
+    public void ChangeOwner(Player? newOwner)
+    {
+        Owner = newOwner;
     }
 
     public Card(string name, string manaCost = "", IEnumerable<CardType>? cardTypes = null, IEnumerable<CardSupertype>? supertypes = null, IEnumerable<CardSubtype>? subtypes = null)

@@ -13,7 +13,7 @@ public class ScryTests
     public void Peek_ReturnsTopN()
     {
         var cards = new[] { Card("A"), Card("B"), Card("C"), Card("D") };
-        foreach (var c in cards) { _alice.Zones.Library.AddCard(c); c.Zone = ZoneType.Library; }
+        foreach (var c in cards) { _alice.Zones.Library.AddCard(c); c.SetZone(ZoneType.Library); }
 
         var top2 = ScryAction.Peek(_alice, 2);
 
@@ -24,7 +24,7 @@ public class ScryTests
     public void Apply_BottomsAll_LibraryReordersCorrectly()
     {
         var (a, b, c, d) = (Card("A"), Card("B"), Card("C"), Card("D"));
-        foreach (var x in new[] { a, b, c, d }) { _alice.Zones.Library.AddCard(x); x.Zone = ZoneType.Library; }
+        foreach (var x in new[] { a, b, c, d }) { _alice.Zones.Library.AddCard(x); x.SetZone(ZoneType.Library); }
 
         ScryAction.Apply(_alice, 2, new ScryAction.ScryDecision(
             ToBottom: new[] { a, b },
@@ -38,7 +38,7 @@ public class ScryTests
     public void Apply_KeepsTopReorder_ReversesIfRequested()
     {
         var (a, b, c, d) = (Card("A"), Card("B"), Card("C"), Card("D"));
-        foreach (var x in new[] { a, b, c, d }) { _alice.Zones.Library.AddCard(x); x.Zone = ZoneType.Library; }
+        foreach (var x in new[] { a, b, c, d }) { _alice.Zones.Library.AddCard(x); x.SetZone(ZoneType.Library); }
 
         ScryAction.Apply(_alice, 2, new ScryAction.ScryDecision(
             ToBottom: System.Array.Empty<ICard>(),
@@ -52,7 +52,7 @@ public class ScryTests
     public void Apply_PartitionMismatch_Throws()
     {
         var a = Card("A");
-        _alice.Zones.Library.AddCard(a); a.Zone = ZoneType.Library;
+        _alice.Zones.Library.AddCard(a); a.SetZone(ZoneType.Library);
 
         var act = () => ScryAction.Apply(_alice, 1,
             new ScryAction.ScryDecision(

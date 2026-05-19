@@ -35,7 +35,7 @@ public sealed class ScryfallCardFactory
         if (entity == null)
         {
             var shell = new Card(name, "");
-            shell.Owner = owner;
+            shell.SetOwner(owner);
             return shell;
         }
 
@@ -60,7 +60,7 @@ public sealed class ScryfallCardFactory
             _ => new Card(entity.Name, manaCost, parsed.Types, parsed.Supertypes, parsed.Subtypes),
         };
 
-        card.Owner = owner;
+        card.SetOwner(owner);
 
         // Permanent-resident abilities (keyword markers, mana abilities,
         // triggered abilities). Instant/sorcery effects are bound at cast

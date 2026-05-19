@@ -86,7 +86,7 @@ public class StateBasedActionsTests
         // Arrange
         var player = new Player("Alice", 20);
         var creature = new Creature("Grizzly Bears", "1G", 2, 2) { Owner = player, Controller = player };
-        creature.Zone = ZoneType.Battlefield;
+        creature.SetZone(ZoneType.Battlefield);
         _zoneService.MoveCardTo(creature, ZoneType.Battlefield, player);
         creature.TakeDamage(2);
         var players = new List<Player> { player };
@@ -106,7 +106,7 @@ public class StateBasedActionsTests
         // Arrange
         var player = new Player("Alice", 20);
         var planeswalker = new Planeswalker("Jace", "2UU", 3) { Owner = player, Controller = player };
-        planeswalker.Zone = ZoneType.Battlefield;
+        planeswalker.SetZone(ZoneType.Battlefield);
         _zoneService.MoveCardTo(planeswalker, ZoneType.Battlefield, player);
         planeswalker.RemoveLoyalty(3);
         var players = new List<Player> { player };

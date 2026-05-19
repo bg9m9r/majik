@@ -30,7 +30,7 @@ public class RulesEngineTests
         // Arrange
         var player = new Player("Alice", 20);
         var instant = new Instant("Lightning Bolt", "R") { Owner = player };
-        instant.Zone = ZoneType.Hand;
+        instant.SetZone(ZoneType.Hand);
 
         // Act
         var result = _rulesEngine.CanCastSpell(instant, player, isMainPhase: false, isStackEmpty: true);
@@ -45,7 +45,7 @@ public class RulesEngineTests
         // Arrange
         var player = new Player("Alice", 20);
         var sorcery = new Sorcery("Fireball", "2RR") { Owner = player };
-        sorcery.Zone = ZoneType.Hand;
+        sorcery.SetZone(ZoneType.Hand);
 
         // Act
         var result = _rulesEngine.CanCastSpell(sorcery, player, isMainPhase: true, isStackEmpty: true);
@@ -60,7 +60,7 @@ public class RulesEngineTests
         // Arrange
         var player = new Player("Alice", 20);
         var sorcery = new Sorcery("Fireball", "2RR") { Owner = player };
-        sorcery.Zone = ZoneType.Hand;
+        sorcery.SetZone(ZoneType.Hand);
 
         // Act
         var result = _rulesEngine.CanCastSpell(sorcery, player, isMainPhase: false, isStackEmpty: true);
@@ -75,7 +75,7 @@ public class RulesEngineTests
         // Arrange
         var player = new Player("Alice", 20);
         var sorcery = new Sorcery("Fireball", "2RR") { Owner = player };
-        sorcery.Zone = ZoneType.Hand;
+        sorcery.SetZone(ZoneType.Hand);
 
         // Act
         var result = _rulesEngine.CanCastSpell(sorcery, player, isMainPhase: true, isStackEmpty: false);
@@ -90,7 +90,7 @@ public class RulesEngineTests
         // Arrange
         var player = new Player("Alice", 20);
         var instant = new Instant("Lightning Bolt", "R") { Owner = player };
-        instant.Zone = ZoneType.Battlefield; // Not in hand
+        instant.SetZone(ZoneType.Battlefield); // Not in hand
 
         // Act
         var result = _rulesEngine.CanCastSpell(instant, player, isMainPhase: false, isStackEmpty: true);
@@ -135,7 +135,7 @@ public class RulesEngineTests
         // Arrange
         var player = new Player("Alice", 20);
         var card = new Instant("Lightning Bolt", "R") { Owner = player };
-        card.Zone = ZoneType.Hand;
+        card.SetZone(ZoneType.Hand);
 
         // Act
         var result = _rulesEngine.CanMoveCard(card, ZoneType.Hand, ZoneType.Battlefield);
@@ -150,7 +150,7 @@ public class RulesEngineTests
         // Arrange
         var player = new Player("Alice", 20);
         var card = new Instant("Lightning Bolt", "R") { Owner = player };
-        card.Zone = ZoneType.Hand;
+        card.SetZone(ZoneType.Hand);
 
         // Act
         var result = _rulesEngine.CanMoveCard(card, ZoneType.Battlefield, ZoneType.Graveyard);

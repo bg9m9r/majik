@@ -27,17 +27,17 @@ public class AttachmentSBATests
     public void Aura_BearerLeavesBattlefield_GoesToGraveyard()
     {
         var bear = new Creature("Bear", "1G", 2, 2) { Owner = _alice, Controller = _alice };
-        bear.Zone = ZoneType.Battlefield;
+        bear.SetZone(ZoneType.Battlefield);
         _alice.Zones.Battlefield.AddCard(bear);
 
         var aura = new Enchantment("Holy Strength", "W",
             subtypes: new[] { CardSubtype.Aura }) { Owner = _alice, Controller = _alice };
-        aura.Zone = ZoneType.Battlefield;
+        aura.SetZone(ZoneType.Battlefield);
         _alice.Zones.Battlefield.AddCard(aura);
         aura.AttachTo(bear);
 
         // Bearer dies.
-        bear.Zone = ZoneType.Graveyard;
+        bear.SetZone(ZoneType.Graveyard);
         _alice.Zones.Battlefield.RemoveCard(bear);
         _alice.Zones.Graveyard.AddCard(bear);
 
@@ -51,17 +51,17 @@ public class AttachmentSBATests
     public void Equipment_BearerLeavesBattlefield_UnattachesButStays()
     {
         var bear = new Creature("Bear", "1G", 2, 2) { Owner = _alice, Controller = _alice };
-        bear.Zone = ZoneType.Battlefield;
+        bear.SetZone(ZoneType.Battlefield);
         _alice.Zones.Battlefield.AddCard(bear);
 
         var sword = new Artifact("Sword", "2",
             subtypes: new[] { CardSubtype.Equipment }) { Owner = _alice, Controller = _alice };
-        sword.Zone = ZoneType.Battlefield;
+        sword.SetZone(ZoneType.Battlefield);
         _alice.Zones.Battlefield.AddCard(sword);
         sword.AttachTo(bear);
 
         // Bearer dies.
-        bear.Zone = ZoneType.Graveyard;
+        bear.SetZone(ZoneType.Graveyard);
         _alice.Zones.Battlefield.RemoveCard(bear);
         _alice.Zones.Graveyard.AddCard(bear);
 
@@ -75,12 +75,12 @@ public class AttachmentSBATests
     public void Aura_StillLegallyAttached_NoSBAAction()
     {
         var bear = new Creature("Bear", "1G", 2, 2) { Owner = _alice, Controller = _alice };
-        bear.Zone = ZoneType.Battlefield;
+        bear.SetZone(ZoneType.Battlefield);
         _alice.Zones.Battlefield.AddCard(bear);
 
         var aura = new Enchantment("Aura", "W",
             subtypes: new[] { CardSubtype.Aura }) { Owner = _alice, Controller = _alice };
-        aura.Zone = ZoneType.Battlefield;
+        aura.SetZone(ZoneType.Battlefield);
         _alice.Zones.Battlefield.AddCard(aura);
         aura.AttachTo(bear);
 

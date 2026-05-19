@@ -57,7 +57,7 @@ public class PreventDamageTests
 
     private async Task RunUnblockedAttack(Creature attacker)
     {
-        attacker.Zone = ZoneType.Battlefield;
+        attacker.SetZone(ZoneType.Battlefield);
         attacker.HasSummoningSickness = false;
         _alice.Zones.Battlefield.AddCard(attacker);
 

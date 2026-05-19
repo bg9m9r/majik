@@ -400,7 +400,7 @@ public static class OracleSpellBinder
                 if (owner == null) return;
                 if (card.Zone == ZoneType.Graveyard) owner.Zones.Graveyard.RemoveCard(card);
                 owner.Zones.Hand.AddCard(card);
-                card.Zone = ZoneType.Hand;
+                card.SetZone(ZoneType.Hand);
             }) };
         });
 
@@ -419,7 +419,7 @@ public static class OracleSpellBinder
                     if (top == null) return;
                     pl.Zones.Library.RemoveCard(top);
                     pl.Zones.Graveyard.AddCard(top);
-                    top.Zone = ZoneType.Graveyard;
+                    top.SetZone(ZoneType.Graveyard);
                 }
             }) };
         });
@@ -543,7 +543,7 @@ public static class OracleSpellBinder
             if (pick == null) return;
             caster.Zones.Library.RemoveCard(pick);
             caster.Zones.Hand.AddCard(pick);
-            pick.Zone = ZoneType.Hand;
+            pick.SetZone(ZoneType.Hand);
             // CR 701.19c — shuffle after a search effect.
             // (No IZone.Shuffle yet; GameDriver owns shuffle. Skip for MVP —
             // search ordering not exposed via library iteration today.)
@@ -570,7 +570,7 @@ public static class OracleSpellBinder
             else if (card.Zone == ZoneType.Library) owner.Zones.Library.RemoveCard(card);
             owner.Zones.Exile.AddCard(card);
         }
-        card.Zone = ZoneType.Exile;
+        card.SetZone(ZoneType.Exile);
     }
 
     private static SpellDefinition TapTargetSpell(Func<object, object> resolver, string label) => new(
@@ -624,7 +624,7 @@ public static class OracleSpellBinder
                 owner.Zones.Exile.RemoveCard(card);
             owner.Zones.Hand.AddCard(card);
         }
-        card.Zone = ZoneType.Hand;
+        card.SetZone(ZoneType.Hand);
     }
 
     private static string NormaliseKeyword(string raw) =>
@@ -744,7 +744,7 @@ public static class OracleSpellBinder
                 if (requireCreature && !isCreature) return;
                 if (requireNonCreature && isCreature) return;
                 RemoveFromStack(stack, spell);
-                spell.Card.Zone = ZoneType.Graveyard;
+                spell.Card.SetZone(ZoneType.Graveyard);
             }) };
         });
 
@@ -781,7 +781,7 @@ public static class OracleSpellBinder
             {
                 if (stack == null || target is not ISpell spell) return;
                 RemoveFromStack(stack, spell);
-                spell.Card.Zone = ZoneType.Graveyard;
+                spell.Card.SetZone(ZoneType.Graveyard);
             }) };
         });
 
@@ -845,7 +845,7 @@ public static class OracleSpellBinder
             owner.Zones.Battlefield.RemoveCard(card);
             owner.Zones.Graveyard.AddCard(card);
         }
-        card.Zone = ZoneType.Graveyard;
+        card.SetZone(ZoneType.Graveyard);
     }
 
     private static void DrawCards_(Player player, int n)
@@ -856,7 +856,7 @@ public static class OracleSpellBinder
             if (top == null) return;
             player.Zones.Library.RemoveCard(top);
             player.Zones.Hand.AddCard(top);
-            top.Zone = ZoneType.Hand;
+            top.SetZone(ZoneType.Hand);
         }
     }
 
@@ -868,7 +868,7 @@ public static class OracleSpellBinder
             if (top == null) return;
             player.Zones.Hand.RemoveCard(top);
             player.Zones.Graveyard.AddCard(top);
-            top.Zone = ZoneType.Graveyard;
+            top.SetZone(ZoneType.Graveyard);
         }
     }
 

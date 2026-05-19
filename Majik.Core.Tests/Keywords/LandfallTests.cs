@@ -31,7 +31,7 @@ public class LandfallTests
         triggers.BindCard(src);
 
         var mountain = NamedCardFactory.Create("Mountain", _alice);
-        mountain.Zone = ZoneType.Hand;
+        mountain.SetZone(ZoneType.Hand);
         _alice.Zones.Hand.AddCard(mountain);
         zones.MoveCardTo(mountain, ZoneType.Battlefield, controller: _alice);
 
@@ -56,7 +56,7 @@ public class LandfallTests
         triggers.BindCard(src);
 
         var bear = NamedCardFactory.Create("Grizzly Bears", _alice);
-        bear.Zone = ZoneType.Hand;
+        bear.SetZone(ZoneType.Hand);
         _alice.Zones.Hand.AddCard(bear);
         zones.MoveCardTo(bear, ZoneType.Battlefield, controller: _alice);
 

@@ -37,7 +37,7 @@ public class OracleSpellBinderExtraTests
             _alice, raw => raw, stack)!;
 
         var bolt = new Instant("Bolt", "R") { Owner = _bob };
-        bolt.Zone = ZoneType.Stack;
+        bolt.SetZone(ZoneType.Stack);
         var boltSpell = new Majik.Core.Spells.Spell(bolt, _bob);
         stack.Push(boltSpell);
 
@@ -56,7 +56,7 @@ public class OracleSpellBinderExtraTests
             _alice, raw => raw, stack)!;
 
         var bear = new Creature("Bear", "1G", 2, 2) { Owner = _bob };
-        bear.Zone = ZoneType.Stack;
+        bear.SetZone(ZoneType.Stack);
         var bearSpell = new Majik.Core.Spells.Spell(bear, _bob);
         stack.Push(bearSpell);
 
@@ -75,7 +75,7 @@ public class OracleSpellBinderExtraTests
             _alice, raw => raw, stack)!;
 
         var bear = new Creature("Bear", "1G", 2, 2) { Owner = _bob };
-        bear.Zone = ZoneType.Stack;
+        bear.SetZone(ZoneType.Stack);
         var bearSpell = new Majik.Core.Spells.Spell(bear, _bob);
         stack.Push(bearSpell);
 

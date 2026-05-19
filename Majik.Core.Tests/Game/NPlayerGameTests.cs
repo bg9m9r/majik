@@ -37,7 +37,7 @@ public class NPlayerGameTests
             for (var i = 0; i < 30; i++)
             {
                 var c = NamedCardFactory.Create("Mountain", p);
-                p.Zones.Library.AddCard(c); c.Zone = ZoneType.Library;
+                p.Zones.Library.AddCard(c); c.SetZone(ZoneType.Library);
             }
         }
 

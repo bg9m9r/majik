@@ -37,7 +37,7 @@ public class HoldPriorityTests
 
         var l1 = NamedCardFactory.Create("Mountain", alice);
         var l2 = NamedCardFactory.Create("Mountain", alice);
-        l1.Zone = ZoneType.Hand; l2.Zone = ZoneType.Hand;
+        l1.SetZone(ZoneType.Hand); l2.SetZone(ZoneType.Hand);
         alice.Zones.Hand.AddCard(l1);
         alice.Zones.Hand.AddCard(l2);
 

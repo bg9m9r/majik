@@ -73,7 +73,7 @@ public class LordCostReductionTests
         svc.Register(new LordStaticEffect(lord, CardSubtype.Human));
         minion.Power.Should().Be(3);
 
-        lord.Zone = ZoneType.Graveyard;
+        lord.SetZone(ZoneType.Graveyard);
         minion.Power.Should().Be(2);
     }
 

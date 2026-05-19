@@ -58,11 +58,11 @@ public class ZoneService
         var finalToZone = intent.ToZone;
         var finalController = intent.Controller;
 
-        card.Zone = finalToZone;
+        card.SetZone(finalToZone);
 
         if (finalController != null && finalToZone == ZoneType.Battlefield)
         {
-            card.Controller = finalController;
+            card.SetController(finalController);
         }
 
         if (finalToZone == ZoneType.Battlefield && card is Permanent permanent)
@@ -76,7 +76,7 @@ public class ZoneService
         else if (finalToZone is ZoneType.Hand or ZoneType.Library
                  or ZoneType.Graveyard or ZoneType.Exile)
         {
-            card.Controller = card.Owner;
+            card.SetController(card.Owner);
         }
 
         if (card.Owner != null)

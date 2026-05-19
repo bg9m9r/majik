@@ -1,4 +1,5 @@
 using Majik.Core.Abilities;
+using Majik.Core.Cards;
 using Majik.Core.Domain.DomainEvents;
 using Majik.Core.Events;
 using Majik.Core.Players;
@@ -64,7 +65,7 @@ public class StackResolver
                     .Any(t => spellRecheck.TargetLegalityPredicate(t));
                 if (!anyLegal)
                 {
-                    spellRecheck.Card.Zone = Zones.ZoneType.Graveyard;
+                    spellRecheck.Card.SetZone(Zones.ZoneType.Graveyard);
                     _eventBus?.Publish(new StateBasedActionExecutedEvent(
                         $"{spellRecheck.Card.Name} countered: all targets illegal"));
                     return top;
@@ -125,10 +126,10 @@ public class StackResolver
         }
         else
         {
-            card.Zone = destinationZone;
+            card.SetZone(destinationZone);
             if (destinationZone == ZoneType.Battlefield)
             {
-                card.Controller = spell.Controller;
+                card.SetController(spell.Controller);
             }
         }
     }

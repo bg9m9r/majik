@@ -142,7 +142,7 @@ public class StateBasedActions
                 }
                 else
                 {
-                    creature.Zone = ZoneType.Graveyard;
+                    creature.SetZone(ZoneType.Graveyard);
                 }
                 _eventBus?.Publish(new StateBasedActionExecutedEvent($"Creature {creature.Name} died"));
                 anyExecuted = true;
@@ -171,7 +171,7 @@ public class StateBasedActions
                 }
                 else
                 {
-                    planeswalker.Zone = ZoneType.Graveyard;
+                    planeswalker.SetZone(ZoneType.Graveyard);
                 }
                 _eventBus?.Publish(new StateBasedActionExecutedEvent($"Planeswalker {planeswalker.Name} died"));
                 anyExecuted = true;
@@ -216,7 +216,7 @@ public class StateBasedActions
                 }
                 else
                 {
-                    permanent.Zone = ZoneType.Graveyard;
+                    permanent.SetZone(ZoneType.Graveyard);
                 }
                 _eventBus?.Publish(new StateBasedActionExecutedEvent(
                     $"Legend rule: {permanent.Name} put into graveyard (controlled by {permanent.Controller?.Name})"));
@@ -269,7 +269,7 @@ public class StateBasedActions
                 }
                 else
                 {
-                    planeswalker.Zone = ZoneType.Graveyard;
+                    planeswalker.SetZone(ZoneType.Graveyard);
                 }
                 _eventBus?.Publish(new StateBasedActionExecutedEvent(
                     $"Planeswalker uniqueness rule: {planeswalker.Name} put into graveyard (controlled by {planeswalker.Controller?.Name})"));
@@ -323,7 +323,7 @@ public class StateBasedActions
             {
                 perm.Unattach();
                 if (_zoneService != null) _zoneService.MoveCardTo(perm, ZoneType.Graveyard);
-                else perm.Zone = ZoneType.Graveyard;
+                else perm.SetZone(ZoneType.Graveyard);
                 _eventBus?.Publish(new StateBasedActionExecutedEvent(
                     $"Aura {perm.Name} put into graveyard — no legal attachment"));
             }
@@ -349,7 +349,7 @@ public class StateBasedActions
             if (!perm.BattleState.ShouldBeSacrificed()) continue;
 
             if (_zoneService != null) _zoneService.MoveCardTo(perm, ZoneType.Graveyard);
-            else perm.Zone = ZoneType.Graveyard;
+            else perm.SetZone(ZoneType.Graveyard);
             _eventBus?.Publish(new StateBasedActionExecutedEvent(
                 $"Battle {perm.Name} destroyed — 0 defense"));
             anyExecuted = true;
@@ -368,7 +368,7 @@ public class StateBasedActions
             if (!perm.SagaState.ShouldBeSacrificed()) continue;
 
             if (_zoneService != null) _zoneService.MoveCardTo(perm, ZoneType.Graveyard);
-            else perm.Zone = ZoneType.Graveyard;
+            else perm.SetZone(ZoneType.Graveyard);
             _eventBus?.Publish(new StateBasedActionExecutedEvent(
                 $"Saga {perm.Name} sacrificed — final chapter complete"));
             anyExecuted = true;

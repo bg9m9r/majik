@@ -31,7 +31,7 @@ public class EndOfTurnExpiryTests
         for (var i = 0; i < 5; i++)
         {
             var c = NamedCardFactory.Create("Mountain", alice);
-            alice.Zones.Library.AddCard(c); c.Zone = ZoneType.Library;
+            alice.Zones.Library.AddCard(c); c.SetZone(ZoneType.Library);
         }
 
         var bear = new Creature("Bear", "1G", 2, 2)

@@ -61,7 +61,7 @@ public class CombatManagerTests
         var player = new Player("Alice", 20);
         var targetPlayer = new Player("Bob", 20);
         var creature = new Creature("Grizzly Bears", "1G", 2, 2) { Controller = player };
-        creature.Zone = ZoneType.Battlefield;
+        creature.SetZone(ZoneType.Battlefield);
         creature.HasSummoningSickness = false;
         _combatManager.StartCombat(player);
         _combatManager.DeclareAttackers(player, new[]
@@ -81,7 +81,7 @@ public class CombatManagerTests
         var activePlayer = new Player("Alice", 20);
         var targetPlayer = new Player("Bob", 20);
         var creature = new Creature("Grizzly Bears", "1G", 2, 2) { Controller = activePlayer };
-        creature.Zone = ZoneType.Battlefield;
+        creature.SetZone(ZoneType.Battlefield);
         creature.HasSummoningSickness = false;
         _combatManager.StartCombat(activePlayer);
 
@@ -106,7 +106,7 @@ public class CombatManagerTests
         var activePlayer = new Player("Alice", 20);
         var targetPlayer = new Player("Bob", 20);
         var creature = new Creature("Grizzly Bears", "1G", 2, 2) { Controller = activePlayer };
-        creature.Zone = ZoneType.Hand; // Not on battlefield
+        creature.SetZone(ZoneType.Hand); // Not on battlefield
         _combatManager.StartCombat(activePlayer);
 
         // Act & Assert
@@ -124,8 +124,8 @@ public class CombatManagerTests
         var defendingPlayer = new Player("Bob", 20);
         var attackerCreature = new Creature("Grizzly Bears", "1G", 2, 2) { Controller = activePlayer };
         var blockerCreature = new Creature("Lightning Bolt", "R", 1, 1) { Controller = defendingPlayer };
-        attackerCreature.Zone = ZoneType.Battlefield;
-        blockerCreature.Zone = ZoneType.Battlefield;
+        attackerCreature.SetZone(ZoneType.Battlefield);
+        blockerCreature.SetZone(ZoneType.Battlefield);
         attackerCreature.HasSummoningSickness = false;
         _combatManager.StartCombat(activePlayer);
         _combatManager.DeclareAttackers(activePlayer, new[]
@@ -167,7 +167,7 @@ public class CombatManagerTests
         var activePlayer = new Player("Alice", 20);
         var targetPlayer = new Player("Bob", 20);
         var creature = new Creature("Grizzly Bears", "1G", 2, 2) { Controller = activePlayer };
-        creature.Zone = ZoneType.Battlefield;
+        creature.SetZone(ZoneType.Battlefield);
         creature.HasSummoningSickness = false;
         _combatManager.StartCombat(activePlayer);
         _combatManager.DeclareAttackers(activePlayer, new[]
@@ -193,8 +193,8 @@ public class CombatManagerTests
         var defendingPlayer = new Player("Bob", 20);
         var attackerCreature = new Creature("Grizzly Bears", "1G", 2, 2) { Controller = activePlayer };
         var blockerCreature = new Creature("Lightning Bolt", "R", 1, 1) { Controller = defendingPlayer };
-        attackerCreature.Zone = ZoneType.Battlefield;
-        blockerCreature.Zone = ZoneType.Battlefield;
+        attackerCreature.SetZone(ZoneType.Battlefield);
+        blockerCreature.SetZone(ZoneType.Battlefield);
         attackerCreature.HasSummoningSickness = false;
         _combatManager.StartCombat(activePlayer);
         _combatManager.DeclareAttackers(activePlayer, new[]
@@ -234,7 +234,7 @@ public class CombatManagerTests
         var activePlayer = new Player("Alice", 20);
         var targetPlayer = new Player("Bob", 20);
         var creature = new Creature("Grizzly Bears", "1G", 2, 2) { Controller = activePlayer };
-        creature.Zone = ZoneType.Battlefield;
+        creature.SetZone(ZoneType.Battlefield);
         creature.HasSummoningSickness = false;
         _combatManager.StartCombat(activePlayer);
         _combatManager.DeclareAttackers(activePlayer, new[]
@@ -270,8 +270,8 @@ public class CombatManagerTests
         var defendingPlayer = new Player("Bob", 20);
         var attackerCreature = new Creature("Grizzly Bears", "1G", 2, 2) { Controller = activePlayer };
         var blockerCreature = new Creature("Lightning Bolt", "R", 1, 1) { Controller = defendingPlayer };
-        attackerCreature.Zone = ZoneType.Battlefield;
-        blockerCreature.Zone = ZoneType.Battlefield;
+        attackerCreature.SetZone(ZoneType.Battlefield);
+        blockerCreature.SetZone(ZoneType.Battlefield);
         attackerCreature.HasSummoningSickness = false;
         _combatManager.StartCombat(activePlayer);
         _combatManager.DeclareAttackers(activePlayer, new[]

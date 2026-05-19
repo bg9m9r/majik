@@ -42,19 +42,23 @@ public interface ICard
     IReadOnlyList<CardSubtype> Subtypes { get; }
 
     /// <summary>
-    /// The owner of the card.
+    /// The owner of the card. Mutation goes through
+    /// <see cref="Card.ChangeOwner"/> on the concrete <see cref="Card"/>.
     /// </summary>
-    Player? Owner { get; set; }
+    Player? Owner { get; }
 
     /// <summary>
-    /// The current controller of the card.
+    /// The current controller of the card. Mutation goes through
+    /// <see cref="Card.ChangeController"/> on the concrete <see cref="Card"/>.
     /// </summary>
-    Player? Controller { get; set; }
+    Player? Controller { get; }
 
     /// <summary>
-    /// The current zone the card is in.
+    /// The current zone the card is in. Mutation is the engine's
+    /// responsibility — go through <see cref="ZoneService"/>, never set
+    /// the zone field directly.
     /// </summary>
-    ZoneType Zone { get; set; }
+    ZoneType Zone { get; }
 
     /// <summary>
     /// Abilities attached to this card.

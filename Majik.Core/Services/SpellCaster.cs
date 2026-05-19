@@ -107,7 +107,7 @@ public class SpellCaster
 
         // Move card to stack zone (Rule 601.2a)
         // TODO: Use ZoneService to move card to stack zone
-        card.Zone = ZoneType.Stack;
+        card.SetZone(ZoneType.Stack);
 
         // Add spell to stack
         _stack.Push(spell);

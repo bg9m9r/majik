@@ -47,7 +47,7 @@ public class BecomesPTEffectTests
         svc.Register(new BecomesPTEffect(bear, 0, 0));
         bear.Power.Should().Be(0);
 
-        bear.Zone = ZoneType.Graveyard;
+        bear.SetZone(ZoneType.Graveyard);
         bear.Power.Should().Be(2);
     }
 

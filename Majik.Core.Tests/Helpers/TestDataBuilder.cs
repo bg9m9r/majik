@@ -82,16 +82,16 @@ public class CardBuilder
     public Instant BuildInstant()
     {
         var card = new Instant(_name, _manaCost);
-        if (_owner != null) card.Owner = _owner;
-        if (_controller != null) card.Controller = _controller;
+        if (_owner != null) card.SetOwner(_owner);
+        if (_controller != null) card.SetController(_controller);
         return card;
     }
 
     public Creature BuildCreature(int power, int toughness)
     {
         var card = new Creature(_name, _manaCost, power, toughness);
-        if (_owner != null) card.Owner = _owner;
-        if (_controller != null) card.Controller = _controller;
+        if (_owner != null) card.SetOwner(_owner);
+        if (_controller != null) card.SetController(_controller);
         return card;
     }
 }

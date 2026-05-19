@@ -193,7 +193,7 @@ public sealed class TurnDriver
         }
         player.Zones.Library.RemoveCard(top);
         player.Zones.Hand.AddCard(top);
-        top.Zone = ZoneType.Hand;
+        top.SetZone(ZoneType.Hand);
     }
 
     private async Task PriorityRound(Player activePlayer, CancellationToken ct)
@@ -307,7 +307,7 @@ public sealed class TurnDriver
             var discard = hand[0]; // simplification: first card
             active.Zones.Hand.RemoveCard(discard);
             active.Zones.Graveyard.AddCard(discard);
-            discard.Zone = ZoneType.Graveyard;
+            discard.SetZone(ZoneType.Graveyard);
             hand.RemoveAt(0);
         }
 

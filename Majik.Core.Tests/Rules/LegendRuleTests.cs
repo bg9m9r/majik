@@ -38,8 +38,8 @@ public class LegendRuleTests
         var creature2 = new Creature("Jace, Vryn's Prodigy", "1U", 0, 1, 
             supertypes: new[] { CardSupertype.Legendary }) { Owner = player, Controller = player };
         
-        creature1.Zone = ZoneType.Battlefield;
-        creature2.Zone = ZoneType.Battlefield;
+        creature1.SetZone(ZoneType.Battlefield);
+        creature2.SetZone(ZoneType.Battlefield);
         _zoneService.MoveCardTo(creature1, ZoneType.Battlefield, player);
         _zoneService.MoveCardTo(creature2, ZoneType.Battlefield, player);
 
@@ -68,8 +68,8 @@ public class LegendRuleTests
         var creature2 = new Creature("Liliana, Heretical Healer", "1B", 0, 1, 
             supertypes: new[] { CardSupertype.Legendary }) { Owner = player, Controller = player };
         
-        creature1.Zone = ZoneType.Battlefield;
-        creature2.Zone = ZoneType.Battlefield;
+        creature1.SetZone(ZoneType.Battlefield);
+        creature2.SetZone(ZoneType.Battlefield);
         _zoneService.MoveCardTo(creature1, ZoneType.Battlefield, player);
         _zoneService.MoveCardTo(creature2, ZoneType.Battlefield, player);
 
@@ -96,8 +96,8 @@ public class LegendRuleTests
         var creature2 = new Creature("Jace, Vryn's Prodigy", "1U", 0, 1, 
             supertypes: new[] { CardSupertype.Legendary }) { Owner = player2, Controller = player2 };
         
-        creature1.Zone = ZoneType.Battlefield;
-        creature2.Zone = ZoneType.Battlefield;
+        creature1.SetZone(ZoneType.Battlefield);
+        creature2.SetZone(ZoneType.Battlefield);
         _zoneService.MoveCardTo(creature1, ZoneType.Battlefield, player1);
         _zoneService.MoveCardTo(creature2, ZoneType.Battlefield, player2);
 
@@ -125,9 +125,9 @@ public class LegendRuleTests
         var creature3 = new Creature("Jace, Vryn's Prodigy", "1U", 0, 1, 
             supertypes: new[] { CardSupertype.Legendary }) { Owner = player, Controller = player };
         
-        creature1.Zone = ZoneType.Battlefield;
-        creature2.Zone = ZoneType.Battlefield;
-        creature3.Zone = ZoneType.Battlefield;
+        creature1.SetZone(ZoneType.Battlefield);
+        creature2.SetZone(ZoneType.Battlefield);
+        creature3.SetZone(ZoneType.Battlefield);
         _zoneService.MoveCardTo(creature1, ZoneType.Battlefield, player);
         _zoneService.MoveCardTo(creature2, ZoneType.Battlefield, player);
         _zoneService.MoveCardTo(creature3, ZoneType.Battlefield, player);
@@ -154,8 +154,8 @@ public class LegendRuleTests
         var creature1 = new Creature("Grizzly Bears", "1G", 2, 2) { Owner = player, Controller = player };
         var creature2 = new Creature("Grizzly Bears", "1G", 2, 2) { Owner = player, Controller = player };
         
-        creature1.Zone = ZoneType.Battlefield;
-        creature2.Zone = ZoneType.Battlefield;
+        creature1.SetZone(ZoneType.Battlefield);
+        creature2.SetZone(ZoneType.Battlefield);
         _zoneService.MoveCardTo(creature1, ZoneType.Battlefield, player);
         _zoneService.MoveCardTo(creature2, ZoneType.Battlefield, player);
 

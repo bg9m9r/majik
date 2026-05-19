@@ -20,8 +20,8 @@ public class ManaPaymentResolverTests
     {
         var mountain1 = NamedCardFactory.Create("Mountain", _alice);
         var mountain2 = NamedCardFactory.Create("Mountain", _alice);
-        mountain1.Zone = ZoneType.Battlefield;
-        mountain2.Zone = ZoneType.Battlefield;
+        mountain1.SetZone(ZoneType.Battlefield);
+        mountain2.SetZone(ZoneType.Battlefield);
         var resolver = new ManaPaymentResolver();
 
         var success = resolver.Pay(
@@ -39,7 +39,7 @@ public class ManaPaymentResolverTests
     public void Pay_InsufficientMana_ReturnsFalse_SourcesNotTapped()
     {
         var mountain = NamedCardFactory.Create("Mountain", _alice);
-        mountain.Zone = ZoneType.Battlefield;
+        mountain.SetZone(ZoneType.Battlefield);
         var resolver = new ManaPaymentResolver();
 
         var success = resolver.Pay(

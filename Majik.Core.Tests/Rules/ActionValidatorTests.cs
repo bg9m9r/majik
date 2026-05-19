@@ -55,7 +55,7 @@ public class ActionValidatorTests
         // Arrange
         var player = new Player("Alice", 20);
         var artifact = new Artifact("Staff", "") { Owner = player, Controller = player };
-        artifact.Zone = ZoneType.Battlefield;
+        artifact.SetZone(ZoneType.Battlefield);
         var ability = new ActivatedAbility(artifact, player, null, new List<ICost>(), new List<IEffect>());
         var action = new ActivateAbilityAction(ability, player);
 

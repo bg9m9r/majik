@@ -87,7 +87,7 @@ public class GameDriverTests
         {
             var c = NamedCardFactory.Create("Mountain", p);
             p.Zones.Library.AddCard(c);
-            c.Zone = ZoneType.Library;
+            c.SetZone(ZoneType.Library);
         }
     }
 }

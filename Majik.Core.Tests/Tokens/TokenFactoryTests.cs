@@ -56,7 +56,7 @@ public class TokenFactoryTests
     public void NonToken_NotAffectedBySBAToken()
     {
         var bear = new Creature("Bear", "1G", 2, 2) { Owner = _alice, Controller = _alice };
-        bear.Zone = ZoneType.Graveyard;
+        bear.SetZone(ZoneType.Graveyard);
         _alice.Zones.Graveyard.AddCard(bear);
 
         _sba.CheckStateBasedActions(new[] { _alice }, new ICard[] { bear });

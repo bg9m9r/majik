@@ -22,14 +22,34 @@ public class Permanent : Card
     public Majik.Core.Counters.CounterCollection Counters { get; } = new();
 
     /// <summary>True if this is a token (CR 111). Tokens cease to exist
-    /// off battlefield via SBA 704.5d.</summary>
-    public bool IsToken { get; set; }
+    /// off battlefield via SBA 704.5d. Set via <see cref="MarkAsToken"/>.</summary>
+    public bool IsToken { get; internal set; }
 
-    /// <summary>Optional Battle-card tracker. SBA 704.5n consults this.</summary>
-    public Majik.Core.CardData.Battles.BattleState? BattleState { get; set; }
+    /// <summary>Optional Battle-card tracker. SBA 704.5n consults this.
+    /// Set via <see cref="AttachBattleState"/>.</summary>
+    public Majik.Core.CardData.Battles.BattleState? BattleState { get; internal set; }
 
-    /// <summary>Optional Saga-card tracker. SBA 704.5r consults this.</summary>
-    public Majik.Core.CardData.Sagas.SagaState? SagaState { get; set; }
+    /// <summary>Optional Saga-card tracker. SBA 704.5r consults this.
+    /// Set via <see cref="AttachSagaState"/>.</summary>
+    public Majik.Core.CardData.Sagas.SagaState? SagaState { get; internal set; }
+
+    /// <summary>Mark this permanent as a token (CR 111). Tokens are
+    /// removed off-battlefield by SBA 704.5d.</summary>
+    public void MarkAsToken() => IsToken = true;
+
+    /// <summary>Attach a Battle tracker (CR 310) to this permanent.</summary>
+    public void AttachBattleState(Majik.Core.CardData.Battles.BattleState state)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        BattleState = state;
+    }
+
+    /// <summary>Attach a Saga tracker (CR 714) to this permanent.</summary>
+    public void AttachSagaState(Majik.Core.CardData.Sagas.SagaState state)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        SagaState = state;
+    }
 
     /// <summary>
     /// CR 301.5 / 303.4 — the permanent this one is attached to (Aura
@@ -77,13 +97,17 @@ public class Permanent : Card
     }
 
     /// <summary>
-    /// Whether this permanent has summoning sickness.
+    /// Whether this permanent has summoning sickness (CR 302.1).
     /// </summary>
     public bool HasSummoningSickness
     {
         get => _hasSummoningSickness;
-        set => _hasSummoningSickness = value;
+        internal set => _hasSummoningSickness = value;
     }
+
+    /// <summary>Clear summoning sickness once this permanent has been
+    /// controlled continuously since the controller's most recent untap step.</summary>
+    public void ClearSummoningSickness() => _hasSummoningSickness = false;
 
     /// <summary>
     /// Timestamp when this permanent entered the battlefield.

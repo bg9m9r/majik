@@ -14,11 +14,11 @@ public class CyclingTests
     public void Cycle_DiscardsSelf_DrawsOne_WhenManaPaid()
     {
         var card = new Card("Brainstorm", "1U");
-        card.Owner = _alice; card.Zone = ZoneType.Hand;
+        card.SetOwner(_alice); card.SetZone(ZoneType.Hand);
         _alice.Zones.Hand.AddCard(card);
 
         var topOfLibrary = new Card("Top", "1");
-        topOfLibrary.Owner = _alice; topOfLibrary.Zone = ZoneType.Library;
+        topOfLibrary.SetOwner(_alice); topOfLibrary.SetZone(ZoneType.Library);
         _alice.Zones.Library.AddCard(topOfLibrary);
 
         _alice.AddManaToPool(ManaCost.Parse("1U"));
@@ -34,7 +34,7 @@ public class CyclingTests
     public void Cycle_NotInHand_Fails()
     {
         var card = new Card("Brainstorm", "1U") { Owner = _alice };
-        card.Zone = ZoneType.Library;
+        card.SetZone(ZoneType.Library);
         _alice.Zones.Library.AddCard(card);
         _alice.AddManaToPool(ManaCost.Parse("1U"));
 
@@ -46,7 +46,7 @@ public class CyclingTests
     public void Cycle_InsufficientMana_Fails()
     {
         var card = new Card("Brainstorm", "1U") { Owner = _alice };
-        card.Zone = ZoneType.Hand;
+        card.SetZone(ZoneType.Hand);
         _alice.Zones.Hand.AddCard(card);
 
         new CyclingAbility(card, ManaCost.Parse("1U"))
@@ -59,7 +59,7 @@ public class CyclingTests
     public void Cycle_EmptyLibrary_FlagsDeckOut()
     {
         var card = new Card("Brainstorm", "1U") { Owner = _alice };
-        card.Zone = ZoneType.Hand;
+        card.SetZone(ZoneType.Hand);
         _alice.Zones.Hand.AddCard(card);
         _alice.AddManaToPool(ManaCost.Parse("1U"));
 

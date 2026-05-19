@@ -33,6 +33,6 @@ public sealed class FlashbackAlternativeCost : IAlternativeCost
             card.Owner.Zones.Graveyard.RemoveCard(card);
             card.Owner.Zones.Exile.AddCard(card);
         }
-        card.Zone = ZoneType.Exile;
+        card.SetZone(ZoneType.Exile);
     }
 }

@@ -130,15 +130,15 @@ public class CombatKeywordsTests
 
     private async Task RunCombat(Creature attacker, Creature? blocker)
     {
-        attacker.Owner = _alice; attacker.Controller = _alice;
-        attacker.Zone = ZoneType.Battlefield;
+        attacker.SetOwner(_alice); attacker.SetController(_alice);
+        attacker.SetZone(ZoneType.Battlefield);
         attacker.HasSummoningSickness = false;
         _alice.Zones.Battlefield.AddCard(attacker);
 
         if (blocker != null)
         {
-            blocker.Owner = _bob; blocker.Controller = _bob;
-            blocker.Zone = ZoneType.Battlefield;
+            blocker.SetOwner(_bob); blocker.SetController(_bob);
+            blocker.SetZone(ZoneType.Battlefield);
             _bob.Zones.Battlefield.AddCard(blocker);
         }
 

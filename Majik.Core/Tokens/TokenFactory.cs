@@ -49,7 +49,7 @@ public static class TokenFactory
         }
 
         // Tokens enter the battlefield directly (CR 111.6) — not from the library.
-        token.Zone = ZoneType.Library; // sentinel for ZoneService.MoveCard's from-check
+        token.SetZone(ZoneType.Library); // sentinel for ZoneService.MoveCard's from-check
         controller.Zones.Library.AddCard(token);
 
         if (zones != null)
@@ -59,7 +59,7 @@ public static class TokenFactory
         else
         {
             controller.Zones.Library.RemoveCard(token);
-            token.Zone = ZoneType.Battlefield;
+            token.SetZone(ZoneType.Battlefield);
             controller.Zones.Battlefield.AddCard(token);
         }
 
@@ -107,7 +107,7 @@ public static class TokenFactory
 
     private static void PutOnBattlefield(Artifact token, Player controller, ZoneService? zones)
     {
-        token.Zone = ZoneType.Library; // sentinel; ZoneService validates from-zone
+        token.SetZone(ZoneType.Library); // sentinel; ZoneService validates from-zone
         controller.Zones.Library.AddCard(token);
         if (zones != null)
         {
@@ -119,7 +119,7 @@ public static class TokenFactory
             // trigger subscribers (Treasure ETB visible, downstream
             // triggers like Soul Warden fire).
             controller.Zones.MoveCard(token, ZoneType.Library, ZoneType.Battlefield);
-            token.Zone = ZoneType.Battlefield;
+            token.SetZone(ZoneType.Battlefield);
         }
     }
 }

@@ -31,7 +31,7 @@ public sealed class SacrificeCreatureCost : IAdditionalCost
         if (!CanPay(caster)) return false;
         caster.Zones.Battlefield.RemoveCard(_target);
         caster.Zones.Graveyard.AddCard(_target);
-        _target.Zone = ZoneType.Graveyard;
+        _target.SetZone(ZoneType.Graveyard);
         return true;
     }
 }

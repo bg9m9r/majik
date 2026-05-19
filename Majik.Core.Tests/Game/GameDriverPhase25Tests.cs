@@ -61,9 +61,9 @@ public class GameDriverPhase25Tests
         for (var i = 0; i < 30; i++)
         {
             var ca = NamedCardFactory.Create("Mountain", alice2);
-            alice2.Zones.Library.AddCard(ca); ca.Zone = ZoneType.Library;
+            alice2.Zones.Library.AddCard(ca); ca.SetZone(ZoneType.Library);
             var cb = NamedCardFactory.Create("Mountain", bob2);
-            bob2.Zones.Library.AddCard(cb); cb.Zone = ZoneType.Library;
+            bob2.Zones.Library.AddCard(cb); cb.SetZone(ZoneType.Library);
         }
         var stack2 = new Majik.Core.Stack.Stack(_bus);
         var trig2 = new TriggerManager(stack2, _bus);
@@ -101,7 +101,7 @@ public class GameDriverPhase25Tests
         for (var i = 0; i < n; i++)
         {
             var c = NamedCardFactory.Create("Mountain", p);
-            p.Zones.Library.AddCard(c); c.Zone = ZoneType.Library;
+            p.Zones.Library.AddCard(c); c.SetZone(ZoneType.Library);
         }
     }
 }

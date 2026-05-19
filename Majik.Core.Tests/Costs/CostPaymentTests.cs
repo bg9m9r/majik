@@ -39,7 +39,7 @@ public class CostPaymentTests
         var player = new Player("Alice", 20);
         player.AddManaToPool(ManaCost.Parse("R"));
         var permanent = new Creature("Grizzly Bears", "1G", 2, 2) { Owner = player, Controller = player };
-        permanent.Zone = ZoneType.Battlefield;
+        permanent.SetZone(ZoneType.Battlefield);
         var costs = new List<ICost>
         {
             new ManaCostCost("R"),

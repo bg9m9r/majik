@@ -53,7 +53,7 @@ public class HiddenInfoTests
     {
         var alice = new Player("Alice", 20);
         var c = new Card("LibSecret", "");
-        c.Owner = alice; c.Zone = ZoneType.Library;
+        c.SetOwner(alice); c.SetZone(ZoneType.Library);
         alice.Zones.Library.AddCard(c);
 
         var dto = StateSnapshotter.Snapshot(
@@ -71,7 +71,7 @@ public class HiddenInfoTests
         var alice = new Player("Alice", 20);
         var bob = new Player("Bob", 20);
         var bear = new Creature("Bear", "1G", 2, 2) { Owner = bob, Controller = bob };
-        bear.Zone = ZoneType.Battlefield;
+        bear.SetZone(ZoneType.Battlefield);
         bob.Zones.Battlefield.AddCard(bear);
 
         var dto = StateSnapshotter.Snapshot(
@@ -85,7 +85,7 @@ public class HiddenInfoTests
     private static void SeedHand(Player player, string name)
     {
         var c = new Card(name, "");
-        c.Owner = player; c.Zone = ZoneType.Hand;
+        c.SetOwner(player); c.SetZone(ZoneType.Hand);
         player.Zones.Hand.AddCard(c);
     }
 }

@@ -41,7 +41,7 @@ public sealed class CyclingAbility : IAbility
         // Discard self.
         controller.Zones.Hand.RemoveCard(Source);
         controller.Zones.Graveyard.AddCard(Source);
-        Source.Zone = ZoneType.Graveyard;
+        Source.SetZone(ZoneType.Graveyard);
 
         // Draw one.
         var top = controller.Zones.Library.GetCards().FirstOrDefault();
@@ -52,7 +52,7 @@ public sealed class CyclingAbility : IAbility
         }
         controller.Zones.Library.RemoveCard(top);
         controller.Zones.Hand.AddCard(top);
-        top.Zone = ZoneType.Hand;
+        top.SetZone(ZoneType.Hand);
         return true;
     }
 }

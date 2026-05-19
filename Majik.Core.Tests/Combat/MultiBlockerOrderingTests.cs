@@ -91,12 +91,12 @@ public class MultiBlockerOrderingTests
 
     private async Task RunCombat(Creature attacker, IReadOnlyList<Creature> blockers)
     {
-        attacker.Zone = ZoneType.Battlefield;
+        attacker.SetZone(ZoneType.Battlefield);
         attacker.HasSummoningSickness = false;
         _alice.Zones.Battlefield.AddCard(attacker);
         foreach (var b in blockers)
         {
-            b.Zone = ZoneType.Battlefield;
+            b.SetZone(ZoneType.Battlefield);
             _bob.Zones.Battlefield.AddCard(b);
         }
 

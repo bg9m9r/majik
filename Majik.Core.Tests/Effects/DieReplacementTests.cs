@@ -20,7 +20,7 @@ public class DieReplacementTests
 
         var alice = new Player("Alice", 20);
         var bear = new Creature("Bear", "1G", 2, 2) { Owner = alice, Controller = alice };
-        bear.Zone = ZoneType.Battlefield;
+        bear.SetZone(ZoneType.Battlefield);
         alice.Zones.Battlefield.AddCard(bear);
         bear.TakeDamage(5);
 

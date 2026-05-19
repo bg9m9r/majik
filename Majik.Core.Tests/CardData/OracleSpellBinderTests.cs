@@ -69,7 +69,7 @@ public class OracleSpellBinderTests
     public void DestroyTargetCreature_BuildsDestroySpell()
     {
         var bear = new Creature("Bear", "1G", 2, 2) { Owner = _bob };
-        bear.Zone = Majik.Core.Zones.ZoneType.Battlefield;
+        bear.SetZone(Majik.Core.Zones.ZoneType.Battlefield);
         _bob.Zones.Battlefield.AddCard(bear);
 
         var def = Bind("Doom Blade", "{1}{B}", "Destroy target nonblack creature.");
@@ -84,7 +84,7 @@ public class OracleSpellBinderTests
     {
         var stack = new Majik.Core.Stack.Stack();
         var bolt = new Instant("Bolt", "R") { Owner = _bob };
-        bolt.Zone = Majik.Core.Zones.ZoneType.Stack;
+        bolt.SetZone(Majik.Core.Zones.ZoneType.Stack);
         var bobSpell = new Majik.Core.Spells.Spell(bolt, _bob);
         stack.Push(bobSpell);
 
@@ -127,7 +127,7 @@ public class OracleSpellBinderTests
         for (var i = 0; i < n; i++)
         {
             var c = new Card($"L{i}", "");
-            c.Owner = p; c.Zone = Majik.Core.Zones.ZoneType.Library;
+            c.SetOwner(p); c.SetZone(Majik.Core.Zones.ZoneType.Library);
             p.Zones.Library.AddCard(c);
         }
     }
@@ -137,7 +137,7 @@ public class OracleSpellBinderTests
         for (var i = 0; i < n; i++)
         {
             var c = new Card($"H{i}", "");
-            c.Owner = p; c.Zone = Majik.Core.Zones.ZoneType.Hand;
+            c.SetOwner(p); c.SetZone(Majik.Core.Zones.ZoneType.Hand);
             p.Zones.Hand.AddCard(c);
         }
     }

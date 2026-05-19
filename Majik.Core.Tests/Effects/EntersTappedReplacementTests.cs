@@ -20,7 +20,7 @@ public class EntersTappedReplacementTests
         var alice = new Player("Alice", 20);
         var land = NamedCardFactory.Create("Mountain", alice);
         alice.Zones.Hand.AddCard(land);
-        land.Zone = ZoneType.Hand;
+        land.SetZone(ZoneType.Hand);
 
         // Register: "if Mountain would enter the battlefield, it enters tapped"
         rep.Register<ZoneMoveIntent>(new LambdaReplacement<ZoneMoveIntent>(
@@ -43,7 +43,7 @@ public class EntersTappedReplacementTests
         var alice = new Player("Alice", 20);
         var land = NamedCardFactory.Create("Forest", alice);
         alice.Zones.Hand.AddCard(land);
-        land.Zone = ZoneType.Hand;
+        land.SetZone(ZoneType.Hand);
 
         zones.MoveCardTo(land, ZoneType.Battlefield, controller: alice);
 
@@ -60,7 +60,7 @@ public class EntersTappedReplacementTests
         var alice = new Player("Alice", 20);
         var land = NamedCardFactory.Create("Mountain", alice);
         alice.Zones.Hand.AddCard(land);
-        land.Zone = ZoneType.Hand;
+        land.SetZone(ZoneType.Hand);
 
         // "Cards can't enter the battlefield" — silly hypothetical, just tests cancellation.
         rep.Register<ZoneMoveIntent>(new LambdaReplacement<ZoneMoveIntent>(

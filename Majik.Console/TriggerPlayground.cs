@@ -101,8 +101,8 @@ internal static class TriggerPlayground
 
         var aliceW = MakeAnyEtbLifeGainer("Alice's Warden", alice);
         var bobW = MakeAnyEtbLifeGainer("Bob's Warden",  bob);
-        aliceW.Zone = ZoneType.Battlefield;
-        bobW.Zone = ZoneType.Battlefield;
+        aliceW.SetZone(ZoneType.Battlefield);
+        bobW.SetZone(ZoneType.Battlefield);
         ctx.Triggers.BindCard(aliceW);
         ctx.Triggers.BindCard(bobW);
 
@@ -201,12 +201,12 @@ internal static class TriggerPlayground
             for (var i = 0; i < 20; i++)
             {
                 var m = Majik.Core.CardData.NamedCardFactory.Create("Mountain", p);
-                p.Zones.Library.AddCard(m); m.Zone = ZoneType.Library;
+                p.Zones.Library.AddCard(m); m.SetZone(ZoneType.Library);
             }
             for (var i = 0; i < 10; i++)
             {
                 var bear = Majik.Core.CardData.NamedCardFactory.Create("Grizzly Bears", p);
-                p.Zones.Library.AddCard(bear); bear.Zone = ZoneType.Library;
+                p.Zones.Library.AddCard(bear); bear.SetZone(ZoneType.Library);
             }
         }
 
@@ -246,9 +246,9 @@ internal static class TriggerPlayground
         for (var i = 0; i < 30; i++)
         {
             var ac = Majik.Core.CardData.NamedCardFactory.Create("Mountain", alice);
-            alice.Zones.Library.AddCard(ac); ac.Zone = ZoneType.Library;
+            alice.Zones.Library.AddCard(ac); ac.SetZone(ZoneType.Library);
             var bc = Majik.Core.CardData.NamedCardFactory.Create("Mountain", bob);
-            bob.Zones.Library.AddCard(bc); bc.Zone = ZoneType.Library;
+            bob.Zones.Library.AddCard(bc); bc.SetZone(ZoneType.Library);
         }
 
         var driver = new GameDriver(
@@ -302,11 +302,11 @@ internal static class TriggerPlayground
         var bob = new Player("Bob", 20);
 
         var mountain = factory.Create("Mountain", alice);
-        mountain.Zone = ZoneType.Battlefield;
+        mountain.SetZone(ZoneType.Battlefield);
         alice.Zones.Battlefield.AddCard(mountain);
 
         var bolt = factory.Create("Lightning Bolt", alice);
-        bolt.Zone = ZoneType.Hand;
+        bolt.SetZone(ZoneType.Hand);
         alice.Zones.Hand.AddCard(bolt);
 
         Log($"Alice life before: {alice.LifeTotal}   Bob life before: {bob.LifeTotal}");
@@ -335,7 +335,7 @@ internal static class TriggerPlayground
         var ctx = NewContext(out var alice, out var bob);
 
         var warden = MakeAnyEtbLifeGainer("Soul Warden", alice);
-        warden.Zone = ZoneType.Battlefield;
+        warden.SetZone(ZoneType.Battlefield);
         ctx.Triggers.BindCard(warden);
 
         var bear = new Creature("Grizzly Bears", "1G", 2, 2) { Owner = alice, Zone = ZoneType.Hand };
@@ -612,7 +612,7 @@ internal static class TriggerPlayground
                     bound++;
                 }
                 total++;
-                card.Zone = ZoneType.Library;
+                card.SetZone(ZoneType.Library);
                 owner.Zones.Library.AddCard(card);
             }
         }

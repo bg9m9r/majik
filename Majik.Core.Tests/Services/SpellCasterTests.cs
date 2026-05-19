@@ -52,7 +52,7 @@ public class SpellCasterTests
         // Arrange
         var player = new Player("Alice", 20);
         var card = new Instant("Lightning Bolt", "R") { Owner = player };
-        card.Zone = ZoneType.Graveyard;
+        card.SetZone(ZoneType.Graveyard);
 
         // Act
         var result = _spellCaster.CanCast(card, player, true, true);

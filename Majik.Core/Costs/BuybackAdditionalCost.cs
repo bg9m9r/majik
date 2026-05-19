@@ -40,6 +40,6 @@ public sealed class BuybackAdditionalCost : IAdditionalCost
         if (caster == null) throw new ArgumentNullException(nameof(caster));
         if (_card.Zone != ZoneType.Stack) return;
         caster.Zones.Hand.AddCard(_card);
-        _card.Zone = ZoneType.Hand;
+        _card.SetZone(ZoneType.Hand);
     }
 }

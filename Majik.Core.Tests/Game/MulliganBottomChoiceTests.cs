@@ -19,7 +19,7 @@ public class MulliganBottomChoiceTests
             var c = i < n / 2
                 ? (ICard)new Land($"Land{i}") { Owner = _alice }
                 : new Creature($"Bear{i}", "1G", 2, 2) { Owner = _alice };
-            c.Zone = ZoneType.Library;
+            c.SetZone(ZoneType.Library);
             _alice.Zones.Library.AddCard(c);
         }
     }

@@ -22,15 +22,15 @@ public class AnthemEffectTests
         var svc = new ContinuousEffectsService();
 
         var anthem = new Enchantment("Glorious Anthem", "1WW") { Owner = _alice, Controller = _alice };
-        anthem.Zone = ZoneType.Battlefield;
+        anthem.SetZone(ZoneType.Battlefield);
         _alice.Zones.Battlefield.AddCard(anthem);
 
         var aliceBear = new Creature("Bear", "1G", 2, 2) { Owner = _alice, Controller = _alice, ActiveEffects = svc };
-        aliceBear.Zone = ZoneType.Battlefield;
+        aliceBear.SetZone(ZoneType.Battlefield);
         _alice.Zones.Battlefield.AddCard(aliceBear);
 
         var bobBear = new Creature("Bear", "1G", 2, 2) { Owner = _bob, Controller = _bob, ActiveEffects = svc };
-        bobBear.Zone = ZoneType.Battlefield;
+        bobBear.SetZone(ZoneType.Battlefield);
         _bob.Zones.Battlefield.AddCard(bobBear);
 
         svc.Register(new AnthemEffect(source: anthem, controller: _alice));
@@ -46,18 +46,18 @@ public class AnthemEffectTests
     {
         var svc = new ContinuousEffectsService();
         var anthem = new Enchantment("Glorious Anthem", "1WW") { Owner = _alice, Controller = _alice };
-        anthem.Zone = ZoneType.Battlefield;
+        anthem.SetZone(ZoneType.Battlefield);
         _alice.Zones.Battlefield.AddCard(anthem);
 
         var bear = new Creature("Bear", "1G", 2, 2) { Owner = _alice, Controller = _alice, ActiveEffects = svc };
-        bear.Zone = ZoneType.Battlefield;
+        bear.SetZone(ZoneType.Battlefield);
         _alice.Zones.Battlefield.AddCard(bear);
 
         svc.Register(new AnthemEffect(anthem, _alice));
         bear.Power.Should().Be(3);
 
         // Source leaves battlefield → effect inactive
-        anthem.Zone = ZoneType.Graveyard;
+        anthem.SetZone(ZoneType.Graveyard);
         bear.Power.Should().Be(2);
     }
 

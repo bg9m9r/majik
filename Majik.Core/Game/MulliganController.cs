@@ -46,7 +46,7 @@ public sealed class MulliganController
                     {
                         player.Zones.Hand.RemoveCard(c);
                         player.Zones.Library.AddCard(c);
-                        c.Zone = ZoneType.Library;
+                        c.SetZone(ZoneType.Library);
                     }
                 }
                 return mulligansTaken;
@@ -57,7 +57,7 @@ public sealed class MulliganController
             {
                 player.Zones.Hand.RemoveCard(card);
                 player.Zones.Library.AddCard(card);
-                card.Zone = ZoneType.Library;
+                card.SetZone(ZoneType.Library);
             }
             mulligansTaken++;
         }
@@ -71,7 +71,7 @@ public sealed class MulliganController
             if (top == null) return;
             player.Zones.Library.RemoveCard(top);
             player.Zones.Hand.AddCard(top);
-            top.Zone = ZoneType.Hand;
+            top.SetZone(ZoneType.Hand);
         }
     }
 
@@ -83,7 +83,7 @@ public sealed class MulliganController
             if (top == null) return;
             player.Zones.Hand.RemoveCard(top);
             player.Zones.Library.AddCard(top);
-            top.Zone = ZoneType.Library;
+            top.SetZone(ZoneType.Library);
         }
     }
 }

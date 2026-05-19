@@ -38,7 +38,7 @@ public class TriggerManagerTests
     public void EvaluateTriggers_MatchingAbility_EnqueuesPending_DoesNotPushStack()
     {
         var ability = BuildEtbAbility(_alice, out var source);
-        source.Zone = ZoneType.Battlefield;
+        source.SetZone(ZoneType.Battlefield);
         _manager.RegisterTriggeredAbility(ability);
 
         _manager.EvaluateTriggers(new CardMovedEvent(source, ZoneType.Hand, ZoneType.Battlefield));
@@ -51,7 +51,7 @@ public class TriggerManagerTests
     public void EvaluateTriggers_NonMatchingEvent_DoesNotEnqueue()
     {
         var ability = BuildEtbAbility(_alice, out var source);
-        source.Zone = ZoneType.Battlefield;
+        source.SetZone(ZoneType.Battlefield);
         _manager.RegisterTriggeredAbility(ability);
 
         _manager.EvaluateTriggers(new CardDrawnEvent(source, _alice));
@@ -89,8 +89,8 @@ public class TriggerManagerTests
     {
         var aliceAbility = BuildEtbAbility(_alice, out var aliceSrc);
         var bobAbility = BuildEtbAbility(_bob, out var bobSrc);
-        aliceSrc.Zone = ZoneType.Battlefield;
-        bobSrc.Zone = ZoneType.Battlefield;
+        aliceSrc.SetZone(ZoneType.Battlefield);
+        bobSrc.SetZone(ZoneType.Battlefield);
         _manager.RegisterTriggeredAbility(bobAbility);
         _manager.RegisterTriggeredAbility(aliceAbility);
 
@@ -111,7 +111,7 @@ public class TriggerManagerTests
         TriggeredAbilityTriggeredEvent? captured = null;
         _bus.Subscribe<TriggeredAbilityTriggeredEvent>(e => captured = e);
         var ability = BuildEtbAbility(_alice, out var src);
-        src.Zone = ZoneType.Battlefield;
+        src.SetZone(ZoneType.Battlefield);
         _manager.RegisterTriggeredAbility(ability);
 
         _manager.EvaluateTriggers(new CardMovedEvent(src, ZoneType.Hand, ZoneType.Battlefield));
@@ -124,7 +124,7 @@ public class TriggerManagerTests
     public void AutoSubscribe_PublishedEvent_TriggersEvaluation()
     {
         var ability = BuildEtbAbility(_alice, out var src);
-        src.Zone = ZoneType.Battlefield;
+        src.SetZone(ZoneType.Battlefield);
         _manager.RegisterTriggeredAbility(ability);
 
         _bus.Publish(new CardMovedEvent(src, ZoneType.Hand, ZoneType.Battlefield));
@@ -141,7 +141,7 @@ public class TriggerManagerTests
         _manager.BindCard(source);
 
         // ZoneService updates card.Zone before publishing CardMovedEvent.
-        source.Zone = ZoneType.Battlefield;
+        source.SetZone(ZoneType.Battlefield);
         _bus.Publish(new CardMovedEvent(source, ZoneType.Hand, ZoneType.Battlefield));
 
         _manager.PendingCount.Should().Be(1);
@@ -155,7 +155,7 @@ public class TriggerManagerTests
         source.AddAbility(ability);
         _manager.BindCard(source);
 
-        source.Zone = ZoneType.Graveyard;
+        source.SetZone(ZoneType.Graveyard);
         _bus.Publish(new CardMovedEvent(source, ZoneType.Battlefield, ZoneType.Graveyard));
 
         _manager.IsRegistered(ability).Should().BeFalse();

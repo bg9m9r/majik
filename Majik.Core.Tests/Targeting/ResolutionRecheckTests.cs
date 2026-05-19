@@ -30,7 +30,7 @@ public class ResolutionRecheckTests
         TargetLegality.IsLegal(spec, bear, _alice).Should().BeTrue();
 
         // Simulate Bear dying / leaving battlefield before spell resolves.
-        bear.Zone = ZoneType.Graveyard;
+        bear.SetZone(ZoneType.Graveyard);
 
         TargetLegality.IsLegal(spec, bear, _alice).Should().BeFalse();
     }
@@ -66,7 +66,7 @@ public class ResolutionRecheckTests
         chosenTargets.All(t => TargetLegality.IsLegal(spec, t, _alice)).Should().BeTrue();
 
         // Bear dies before resolution
-        bear.Zone = ZoneType.Graveyard;
+        bear.SetZone(ZoneType.Graveyard);
 
         // At resolution — all illegal → spell would be countered (CR 608.2b)
         chosenTargets.All(t => TargetLegality.IsLegal(spec, t, _alice)).Should().BeFalse();

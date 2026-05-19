@@ -31,7 +31,7 @@ public class Zone : IZone
         {
             _cards.Add(card);
             // Update card's zone property
-            card.Zone = Type;
+            card.SetZone(Type);
         }
     }
 

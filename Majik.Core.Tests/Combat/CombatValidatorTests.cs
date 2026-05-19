@@ -26,7 +26,7 @@ public class CombatValidatorTests
         // Arrange
         var player = new Player("Alice", 20);
         var creature = new Creature("Grizzly Bears", "1G", 2, 2) { Controller = player };
-        creature.Zone = ZoneType.Battlefield;
+        creature.SetZone(ZoneType.Battlefield);
         creature.HasSummoningSickness = false;
 
         // Act
@@ -69,7 +69,7 @@ public class CombatValidatorTests
         var player1 = new Player("Alice", 20);
         var player2 = new Player("Bob", 20);
         var creature = new Creature("Grizzly Bears", "1G", 2, 2) { Controller = player1 };
-        creature.Zone = ZoneType.Battlefield;
+        creature.SetZone(ZoneType.Battlefield);
 
         // Act
         var result = _validator.CanAttack(creature, player2);
@@ -84,7 +84,7 @@ public class CombatValidatorTests
         // Arrange
         var player = new Player("Alice", 20);
         var creature = new Creature("Grizzly Bears", "1G", 2, 2) { Controller = player };
-        creature.Zone = ZoneType.Hand;
+        creature.SetZone(ZoneType.Hand);
 
         // Act
         var result = _validator.CanAttack(creature, player);
@@ -99,7 +99,7 @@ public class CombatValidatorTests
         // Arrange
         var player = new Player("Alice", 20);
         var creature = new Creature("Grizzly Bears", "1G", 2, 2) { Controller = player };
-        creature.Zone = ZoneType.Battlefield;
+        creature.SetZone(ZoneType.Battlefield);
         creature.Tap();
         creature.HasSummoningSickness = false;
 
@@ -116,7 +116,7 @@ public class CombatValidatorTests
         // Arrange
         var player = new Player("Alice", 20);
         var creature = new Creature("Grizzly Bears", "1G", 2, 2) { Controller = player };
-        creature.Zone = ZoneType.Battlefield;
+        creature.SetZone(ZoneType.Battlefield);
         creature.HasSummoningSickness = true;
 
         // Act
@@ -134,7 +134,7 @@ public class CombatValidatorTests
         var defendingPlayer = new Player("Bob", 20);
         var attackerCreature = new Creature("Grizzly Bears", "1G", 2, 2) { Controller = attackingPlayer };
         var blockerCreature = new Creature("Lightning Bolt", "R", 1, 1) { Controller = defendingPlayer };
-        blockerCreature.Zone = ZoneType.Battlefield;
+        blockerCreature.SetZone(ZoneType.Battlefield);
         var attacker = new Attacker(attackerCreature, defendingPlayer);
 
         // Act
@@ -165,7 +165,7 @@ public class CombatValidatorTests
         var attackingPlayer = new Player("Alice", 20);
         var defendingPlayer = new Player("Bob", 20);
         var blockerCreature = new Creature("Lightning Bolt", "R", 1, 1) { Controller = attackingPlayer };
-        blockerCreature.Zone = ZoneType.Battlefield;
+        blockerCreature.SetZone(ZoneType.Battlefield);
         var attacker = new Attacker(new Creature("Grizzly Bears", "1G", 2, 2), defendingPlayer);
 
         // Act
@@ -182,7 +182,7 @@ public class CombatValidatorTests
         var attackingPlayer = new Player("Alice", 20);
         var defendingPlayer = new Player("Bob", 20);
         var blockerCreature = new Creature("Lightning Bolt", "R", 1, 1) { Controller = defendingPlayer };
-        blockerCreature.Zone = ZoneType.Battlefield;
+        blockerCreature.SetZone(ZoneType.Battlefield);
         blockerCreature.Tap();
         var attacker = new Attacker(new Creature("Grizzly Bears", "1G", 2, 2), defendingPlayer);
 
@@ -242,7 +242,7 @@ public class CombatValidatorTests
         var attacker = new Player("Alice", 20);
         var owner = new Player("Bob", 20);
         var planeswalker = new Planeswalker("Jace", "2UU", 3) { Controller = owner };
-        planeswalker.Zone = ZoneType.Battlefield;
+        planeswalker.SetZone(ZoneType.Battlefield);
 
         // Act
         var result = _validator.CanAttackPlaneswalker(planeswalker, attacker);
@@ -257,7 +257,7 @@ public class CombatValidatorTests
         // Arrange
         var player = new Player("Alice", 20);
         var planeswalker = new Planeswalker("Jace", "2UU", 3) { Controller = player };
-        planeswalker.Zone = ZoneType.Battlefield;
+        planeswalker.SetZone(ZoneType.Battlefield);
 
         // Act
         var result = _validator.CanAttackPlaneswalker(planeswalker, player);
@@ -273,7 +273,7 @@ public class CombatValidatorTests
         var attacker = new Player("Alice", 20);
         var owner = new Player("Bob", 20);
         var planeswalker = new Planeswalker("Jace", "2UU", 3) { Controller = owner };
-        planeswalker.Zone = ZoneType.Battlefield;
+        planeswalker.SetZone(ZoneType.Battlefield);
         planeswalker.RemoveLoyalty(3);
 
         // Act
@@ -291,8 +291,8 @@ public class CombatValidatorTests
         var targetPlayer = new Player("Bob", 20);
         var creature1 = new Creature("Grizzly Bears", "1G", 2, 2) { Controller = activePlayer };
         var creature2 = new Creature("Lightning Bolt", "R", 1, 1) { Controller = activePlayer };
-        creature1.Zone = ZoneType.Battlefield;
-        creature2.Zone = ZoneType.Battlefield;
+        creature1.SetZone(ZoneType.Battlefield);
+        creature2.SetZone(ZoneType.Battlefield);
         creature1.HasSummoningSickness = false;
         creature2.HasSummoningSickness = false;
         var attackers = new[] { creature1, creature2 };
@@ -310,7 +310,7 @@ public class CombatValidatorTests
         // Arrange
         var activePlayer = new Player("Alice", 20);
         var creature = new Creature("Grizzly Bears", "1G", 2, 2) { Controller = activePlayer };
-        creature.Zone = ZoneType.Battlefield;
+        creature.SetZone(ZoneType.Battlefield);
         var attackers = new[] { creature };
 
         // Act
@@ -328,7 +328,7 @@ public class CombatValidatorTests
         var defendingPlayer = new Player("Bob", 20);
         var attackerCreature = new Creature("Grizzly Bears", "1G", 2, 2) { Controller = attackingPlayer };
         var blockerCreature = new Creature("Lightning Bolt", "R", 1, 1) { Controller = defendingPlayer };
-        blockerCreature.Zone = ZoneType.Battlefield;
+        blockerCreature.SetZone(ZoneType.Battlefield);
         var attacker = new Attacker(attackerCreature, defendingPlayer);
         var blocks = new[] { (blockerCreature, attacker) };
 
@@ -348,7 +348,7 @@ public class CombatValidatorTests
         var attackerCreature1 = new Creature("Grizzly Bears", "1G", 2, 2) { Controller = attackingPlayer };
         var attackerCreature2 = new Creature("Lightning Bolt", "R", 1, 1) { Controller = attackingPlayer };
         var blockerCreature = new Creature("Block", "1", 1, 1) { Controller = defendingPlayer };
-        blockerCreature.Zone = ZoneType.Battlefield;
+        blockerCreature.SetZone(ZoneType.Battlefield);
         var attacker1 = new Attacker(attackerCreature1, defendingPlayer);
         var attacker2 = new Attacker(attackerCreature2, defendingPlayer);
         var blocks = new[] { (blockerCreature, attacker1), (blockerCreature, attacker2) };

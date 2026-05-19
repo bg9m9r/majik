@@ -272,7 +272,7 @@ public static class OracleTriggeredAbilityBinder
             }
             player.Zones.Library.RemoveCard(top);
             player.Zones.Hand.AddCard(top);
-            top.Zone = ZoneType.Hand;
+            top.SetZone(ZoneType.Hand);
         }
     }
 

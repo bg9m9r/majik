@@ -18,7 +18,7 @@ public class HeuristicBotAgentTests
     public async Task Priority_WithLandInHand_OwnMainPhase_PlaysLand()
     {
         var land = NamedCardFactory.Create("Mountain", _alice);
-        land.Zone = ZoneType.Hand;
+        land.SetZone(ZoneType.Hand);
         _alice.Zones.Hand.AddCard(land);
 
         var bot = new HeuristicBotAgent();
@@ -45,7 +45,7 @@ public class HeuristicBotAgentTests
     public async Task Priority_OpponentTurn_Passes_EvenWithLand()
     {
         var land = NamedCardFactory.Create("Mountain", _alice);
-        land.Zone = ZoneType.Hand;
+        land.SetZone(ZoneType.Hand);
         _alice.Zones.Hand.AddCard(land);
 
         var bot = new HeuristicBotAgent();

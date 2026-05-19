@@ -23,7 +23,7 @@ public class OracleTriggeredAbilityBinderTests
         var zones = new ZoneService(_bus);
 
         var warden = new Creature("Soul Warden", "W", 1, 1) { Owner = _alice, Controller = _alice };
-        warden.Zone = ZoneType.Hand;
+        warden.SetZone(ZoneType.Hand);
         _alice.Zones.Hand.AddCard(warden);
 
         var entity = new CardEntity
@@ -54,11 +54,11 @@ public class OracleTriggeredAbilityBinderTests
         for (var i = 0; i < 5; i++)
         {
             var c = NamedCardFactory.Create("Mountain", _alice);
-            _alice.Zones.Library.AddCard(c); c.Zone = ZoneType.Library;
+            _alice.Zones.Library.AddCard(c); c.SetZone(ZoneType.Library);
         }
 
         var mull = new Creature("Mulldrifter", "4U", 2, 2) { Owner = _alice, Controller = _alice };
-        mull.Zone = ZoneType.Hand;
+        mull.SetZone(ZoneType.Hand);
         _alice.Zones.Hand.AddCard(mull);
 
         var entity = new CardEntity

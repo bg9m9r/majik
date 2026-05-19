@@ -38,8 +38,8 @@ public class PlaneswalkerUniquenessTests
         var jace2 = new Planeswalker("Jace, the Mind Sculptor", "2UU", 4, 
             subtypes: new[] { CardSubtype.Jace }) { Owner = player, Controller = player };
         
-        jace1.Zone = ZoneType.Battlefield;
-        jace2.Zone = ZoneType.Battlefield;
+        jace1.SetZone(ZoneType.Battlefield);
+        jace2.SetZone(ZoneType.Battlefield);
         _zoneService.MoveCardTo(jace1, ZoneType.Battlefield, player);
         _zoneService.MoveCardTo(jace2, ZoneType.Battlefield, player);
 
@@ -68,8 +68,8 @@ public class PlaneswalkerUniquenessTests
         var liliana = new Planeswalker("Liliana, Heretical Healer", "1B", 3, 
             subtypes: new[] { CardSubtype.Liliana }) { Owner = player, Controller = player };
         
-        jace.Zone = ZoneType.Battlefield;
-        liliana.Zone = ZoneType.Battlefield;
+        jace.SetZone(ZoneType.Battlefield);
+        liliana.SetZone(ZoneType.Battlefield);
         _zoneService.MoveCardTo(jace, ZoneType.Battlefield, player);
         _zoneService.MoveCardTo(liliana, ZoneType.Battlefield, player);
 
@@ -96,8 +96,8 @@ public class PlaneswalkerUniquenessTests
         var jace2 = new Planeswalker("Jace, the Mind Sculptor", "2UU", 4, 
             subtypes: new[] { CardSubtype.Jace }) { Owner = player2, Controller = player2 };
         
-        jace1.Zone = ZoneType.Battlefield;
-        jace2.Zone = ZoneType.Battlefield;
+        jace1.SetZone(ZoneType.Battlefield);
+        jace2.SetZone(ZoneType.Battlefield);
         _zoneService.MoveCardTo(jace1, ZoneType.Battlefield, player1);
         _zoneService.MoveCardTo(jace2, ZoneType.Battlefield, player2);
 
@@ -125,9 +125,9 @@ public class PlaneswalkerUniquenessTests
         var jace3 = new Planeswalker("Jace, Unraveler of Secrets", "3UU", 5, 
             subtypes: new[] { CardSubtype.Jace }) { Owner = player, Controller = player };
         
-        jace1.Zone = ZoneType.Battlefield;
-        jace2.Zone = ZoneType.Battlefield;
-        jace3.Zone = ZoneType.Battlefield;
+        jace1.SetZone(ZoneType.Battlefield);
+        jace2.SetZone(ZoneType.Battlefield);
+        jace3.SetZone(ZoneType.Battlefield);
         _zoneService.MoveCardTo(jace1, ZoneType.Battlefield, player);
         _zoneService.MoveCardTo(jace2, ZoneType.Battlefield, player);
         _zoneService.MoveCardTo(jace3, ZoneType.Battlefield, player);

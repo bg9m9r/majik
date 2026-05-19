@@ -25,12 +25,14 @@ public class Player
     public string Name { get; }
 
     /// <summary>
-    /// The player's current life total.
+    /// The player's current life total. Use <see cref="GainLife"/> /
+    /// <see cref="LoseLife"/> for in-game changes; the setter is reserved
+    /// for engine-level resets and tests.
     /// </summary>
     public int LifeTotal
     {
         get => _lifeTotal.Value;
-        set => _lifeTotal = ValueObjects.LifeTotal.Create(value);
+        internal set => _lifeTotal = ValueObjects.LifeTotal.Create(value);
     }
 
     /// <summary>
@@ -44,23 +46,38 @@ public class Player
     public ZoneManager Zones { get; }
 
     /// <summary>
-    /// Whether this player has lost the game.
+    /// Whether this player has lost the game. Set via <see cref="MarkLost"/>
+    /// or by the SBA loop.
     /// </summary>
     public bool HasLost
     {
         get => _hasLost;
-        set => _hasLost = value;
+        internal set => _hasLost = value;
     }
 
+    /// <summary>Mark this player as having lost the game (CR 104.2).
+    /// Idempotent.</summary>
+    public void MarkLost() => _hasLost = true;
+
     /// <summary>
-    /// CR 704.5b — sticky flag: set true whenever the player attempted to
-    /// draw a card from an empty library. SBA picks this up and marks the
-    /// player as having lost.
+    /// CR 704.5b — sticky flag: true whenever the player attempted to draw
+    /// a card from an empty library. Set via
+    /// <see cref="MarkTriedToDrawFromEmptyLibrary"/>; SBA picks this up.
     /// </summary>
-    public bool TriedToDrawFromEmptyLibrary { get; set; }
+    public bool TriedToDrawFromEmptyLibrary { get; internal set; }
+
+    /// <summary>Record an attempted draw from an empty library (CR 704.5b).</summary>
+    public void MarkTriedToDrawFromEmptyLibrary() => TriedToDrawFromEmptyLibrary = true;
 
     /// <summary>CR 704.5c — poison counters; 10+ → lose.</summary>
-    public int PoisonCounters { get; set; }
+    public int PoisonCounters { get; internal set; }
+
+    /// <summary>Add poison counters (CR 122 / 704.5c).</summary>
+    public void AddPoisonCounters(int amount)
+    {
+        if (amount < 0) throw new ArgumentOutOfRangeException(nameof(amount));
+        PoisonCounters += amount;
+    }
 
     /// <summary>CR 106.13 — Energy is a player-scoped resource. Gained
     /// via "you get {E}" effects, spent via "Pay {E}{E}: …" costs.</summary>
@@ -83,8 +100,15 @@ public class Player
     }
 
     /// <summary>CR 903 — per-player commander tracking. Set by Commander
-    /// format setup; null in other formats.</summary>
-    public Majik.Core.Formats.Commander.CommanderState? Commander { get; set; }
+    /// format setup via <see cref="AssignCommander"/>; null otherwise.</summary>
+    public Majik.Core.Formats.Commander.CommanderState? Commander { get; internal set; }
+
+    /// <summary>Attach a commander tracker (CR 903). Once per player.</summary>
+    public void AssignCommander(Majik.Core.Formats.Commander.CommanderState state)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        Commander = state;
+    }
 
     public Player(string name, int startingLife = 20, ZoneManager? zoneManager = null)
     {

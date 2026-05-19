@@ -36,11 +36,11 @@ public class PlaneswalkerCombatTests
     public async Task AttackPlaneswalker_UnblockedAttacker_RemovesLoyalty()
     {
         var pw = new Planeswalker("Jace", "2UU", startingLoyalty: 4) { Owner = _bob, Controller = _bob };
-        pw.Zone = ZoneType.Battlefield;
+        pw.SetZone(ZoneType.Battlefield);
         _bob.Zones.Battlefield.AddCard(pw);
 
         var bear = NewCreature("Bear", 2, 2, _alice);
-        bear.Zone = ZoneType.Battlefield;
+        bear.SetZone(ZoneType.Battlefield);
         bear.HasSummoningSickness = false;
         _alice.Zones.Battlefield.AddCard(bear);
 
@@ -67,11 +67,11 @@ public class PlaneswalkerCombatTests
     public async Task AttackPlaneswalker_LethalDamage_PutsItInGraveyard()
     {
         var pw = new Planeswalker("Jace", "2UU", startingLoyalty: 3) { Owner = _bob, Controller = _bob };
-        pw.Zone = ZoneType.Battlefield;
+        pw.SetZone(ZoneType.Battlefield);
         _bob.Zones.Battlefield.AddCard(pw);
 
         var giant = NewCreature("Giant", 5, 5, _alice);
-        giant.Zone = ZoneType.Battlefield;
+        giant.SetZone(ZoneType.Battlefield);
         giant.HasSummoningSickness = false;
         _alice.Zones.Battlefield.AddCard(giant);
 

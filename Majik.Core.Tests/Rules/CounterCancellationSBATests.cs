@@ -28,7 +28,7 @@ public class CounterCancellationSBATests
     {
         var svc = new ContinuousEffectsService();
         var bear = new Creature("Bear", "1G", 2, 2) { Owner = _alice, Controller = _alice, ActiveEffects = svc };
-        bear.Zone = ZoneType.Battlefield;
+        bear.SetZone(ZoneType.Battlefield);
         _alice.Zones.Battlefield.AddCard(bear);
         bear.Counters.Add(CounterType.PlusOnePlusOne, 3);
         bear.Counters.Add(CounterType.MinusOneMinusOne, 2);
@@ -45,7 +45,7 @@ public class CounterCancellationSBATests
     {
         var svc = new ContinuousEffectsService();
         var bear = new Creature("Bear", "1G", 2, 2) { Owner = _alice, Controller = _alice, ActiveEffects = svc };
-        bear.Zone = ZoneType.Battlefield;
+        bear.SetZone(ZoneType.Battlefield);
         _alice.Zones.Battlefield.AddCard(bear);
         bear.Counters.Add(CounterType.MinusOneMinusOne, 2);
 

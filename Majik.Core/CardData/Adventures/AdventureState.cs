@@ -31,7 +31,7 @@ public sealed class AdventureState
         if (controller == null) throw new ArgumentNullException(nameof(controller));
         controller.Zones.Hand.RemoveCard(Card);
         controller.Zones.Exile.AddCard(Card);
-        Card.Zone = ZoneType.Exile;
+        Card.SetZone(ZoneType.Exile);
         InAdventureExile = true;
     }
 
@@ -42,7 +42,7 @@ public sealed class AdventureState
         if (!InAdventureExile) return false;
         controller.Zones.Exile.RemoveCard(Card);
         controller.Zones.Hand.AddCard(Card);
-        Card.Zone = ZoneType.Hand;
+        Card.SetZone(ZoneType.Hand);
         InAdventureExile = false;
         CreatureFaceCast = true;
         return true;

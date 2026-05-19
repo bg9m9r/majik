@@ -77,7 +77,7 @@ public class TurnDriverTests
     public async Task RunTurnAsync_UntapStep_UntapsControllerPermanents()
     {
         var mountain = NamedCardFactory.Create("Mountain", _alice);
-        mountain.Zone = ZoneType.Battlefield;
+        mountain.SetZone(ZoneType.Battlefield);
         _alice.Zones.Battlefield.AddCard(mountain);
         ((Permanent)mountain).Tap();
         ((Permanent)mountain).IsTapped.Should().BeTrue();
@@ -93,7 +93,7 @@ public class TurnDriverTests
     public async Task RunTurnAsync_AttackerWithoutBlocker_DamagesDefender()
     {
         var bear = (Creature)NamedCardFactory.Create("Grizzly Bears", _alice);
-        bear.Zone = ZoneType.Battlefield;
+        bear.SetZone(ZoneType.Battlefield);
         _alice.Zones.Battlefield.AddCard(bear);
         bear.HasSummoningSickness = false;
         SeedLibrary(_alice, 3);
@@ -123,7 +123,7 @@ public class TurnDriverTests
         {
             var card = NamedCardFactory.Create($"Mountain", _alice);
             _alice.Zones.Hand.AddCard(card);
-            card.Zone = ZoneType.Hand;
+            card.SetZone(ZoneType.Hand);
         }
         SeedLibrary(_alice, 3);
         var driver = NewDriver();
@@ -159,7 +159,7 @@ public class TurnDriverTests
         {
             var c = NamedCardFactory.Create("Mountain", p);
             p.Zones.Library.AddCard(c);
-            c.Zone = ZoneType.Library;
+            c.SetZone(ZoneType.Library);
         }
     }
 

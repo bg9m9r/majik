@@ -45,16 +45,16 @@ public class FirstCombatEndToEndTests
 
         // Pre-game battlefield: Mountain (Alice), Grizzly Bears (Alice, no summoning sickness)
         var mountain = NamedCardFactory.Create("Mountain", alice);
-        mountain.Zone = ZoneType.Battlefield;
+        mountain.SetZone(ZoneType.Battlefield);
         alice.Zones.Battlefield.AddCard(mountain);
         var bear = (Creature)NamedCardFactory.Create("Grizzly Bears", alice);
-        bear.Zone = ZoneType.Battlefield;
+        bear.SetZone(ZoneType.Battlefield);
         bear.HasSummoningSickness = false;
         alice.Zones.Battlefield.AddCard(bear);
 
         // Bolt in hand
         var bolt = NamedCardFactory.Create("Lightning Bolt", alice);
-        bolt.Zone = ZoneType.Hand;
+        bolt.SetZone(ZoneType.Hand);
         alice.Zones.Hand.AddCard(bolt);
 
         // Cast flow: pay R from Mountain, target Bob.
