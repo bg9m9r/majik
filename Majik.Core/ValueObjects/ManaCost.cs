@@ -140,6 +140,14 @@ public class ManaCost : IEquatable<ManaCost>
         return new ManaCost(Generic + amount, White, Blue, Black, Red, Green, HasX);
     }
 
+    /// <summary>Construct a new ManaCost with a different generic component
+    /// (other components preserved). Used by cost-reduction effects.</summary>
+    public ManaCost WithGeneric(int newGeneric)
+    {
+        if (newGeneric < 0) newGeneric = 0;
+        return new ManaCost(newGeneric, White, Blue, Black, Red, Green, HasX);
+    }
+
     /// <summary>
     /// Convert to string representation.
     /// </summary>
