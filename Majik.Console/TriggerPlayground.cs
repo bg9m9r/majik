@@ -524,16 +524,56 @@ internal static class TriggerPlayground
             stackResolver: resolver,
             stateBasedActions: sba,
             priorityManager: priority,
-            combatFlow: combat);
+            combatFlow: combat,
+            eventBus: bus);
 
-        Log("Running game (cap 100 turns — bot vs bot; lower if too slow)…");
-        var result = await driver.RunGameAsync(maxTurns: 100);
+        // Per-event log → /tmp/majik-faceoff.log. Filter to high-signal
+        // events; full event stream is too noisy for manual reading.
+        var logPath = Path.Combine(Path.GetTempPath(), "majik-faceoff.log");
+        await using var logFile = new StreamWriter(logPath) { AutoFlush = true };
+        bus.SubscribeAll(e =>
+        {
+            string? line = e switch
+            {
+                Majik.Core.Events.TurnStartedEvent t =>
+                    $"\n=== Turn {t.TurnNumber} — {t.Player.Name} ===  "
+                    + $"life A={alice.LifeTotal} B={bob.LifeTotal}  "
+                    + $"bf A={alice.Zones.Battlefield.Count} B={bob.Zones.Battlefield.Count}",
+                Majik.Core.Events.CardDrawnEvent d =>
+                    $"  draw  {d.Player.Name} → {d.Card.Name}",
+                Majik.Core.Events.CardMovedEvent m when m.ToZone == ZoneType.Battlefield =>
+                    $"  enters battlefield  {m.Card.Name} (controller {GuessController(m.Card)})",
+                Majik.Core.Events.CardMovedEvent m when m.ToZone == ZoneType.Graveyard
+                                                     && m.FromZone == ZoneType.Battlefield =>
+                    $"  dies/goes to gy  {m.Card.Name}",
+                Majik.Core.Domain.DomainEvents.SpellCastEvent c =>
+                    $"  cast  {c.Spell.Controller.Name}: {c.Spell.Card.Name}",
+                Majik.Core.Domain.DomainEvents.CombatDamageDealtEvent cd =>
+                    $"  combat damage  {cd.Source.Name} → "
+                    + (cd.TargetPlayer?.Name ?? cd.Target?.Name ?? "?")
+                    + $"  for {cd.Amount}",
+                Majik.Core.Domain.DomainEvents.StateBasedActionExecutedEvent s =>
+                    $"  SBA  {s.ActionDescription}",
+                Majik.Core.Events.PlayerLostEvent l =>
+                    $"  *** {l.Player.Name} LOSES ***",
+                _ => null,
+            };
+            if (line != null) logFile.WriteLine(line);
+        });
+
+        Log($"Per-event log → {logPath}");
+        Log("Running game (cap 10 turns — bot vs bot; large boards slow per-turn)…");
+        var result = await driver.RunGameAsync(maxTurns: 10);
 
         Log($"Turns played: {result.TurnsPlayed}");
         Log($"Winner: {(result.Winner?.Name ?? "(none — draw or stalled)")}");
         DumpPlayer("Alice", alice);
         DumpPlayer("Bob", bob);
+        Log($"Full action log: {logPath}");
     }
+
+    private static string GuessController(ICard card) =>
+        (card as Majik.Core.Cards.Permanent)?.Controller?.Name ?? card.Owner?.Name ?? "?";
 
     private sealed record DeckStats(int total, int bound, int vanilla, List<string> missing);
 

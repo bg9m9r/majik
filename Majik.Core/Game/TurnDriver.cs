@@ -46,6 +46,8 @@ public sealed class TurnDriver
     /// as the queue is non-empty.</summary>
     public AdditionalCombatQueue AdditionalCombats => _additionalCombats;
 
+    private readonly Majik.Core.Events.IEventBus? _eventBus;
+
     public TurnDriver(
         IReadOnlyList<Player> players,
         IReadOnlyDictionary<Player, IPlayerAgent> agents,
@@ -57,10 +59,12 @@ public sealed class TurnDriver
         PriorityManager priorityManager,
         CombatFlow combatFlow,
         Majik.Core.Effects.ContinuousEffectsService? continuousEffects = null,
-        LandDropTracker? landDropTracker = null)
+        LandDropTracker? landDropTracker = null,
+        Majik.Core.Events.IEventBus? eventBus = null)
     {
         _continuousEffects = continuousEffects;
         _landDropTracker = landDropTracker;
+        _eventBus = eventBus;
         _players = players ?? throw new ArgumentNullException(nameof(players));
         _agents = agents ?? throw new ArgumentNullException(nameof(agents));
         _stack = stack ?? throw new ArgumentNullException(nameof(stack));
@@ -77,6 +81,7 @@ public sealed class TurnDriver
         if (activePlayer == null) throw new ArgumentNullException(nameof(activePlayer));
 
         _currentTurnNumber = turnNumber;
+        _eventBus?.Publish(new Majik.Core.Events.TurnStartedEvent(activePlayer, turnNumber));
 
         // CR 305.2 — land drops reset at turn start.
         _landDropTracker?.ResetTurn();
@@ -161,14 +166,10 @@ public sealed class TurnDriver
 
     private async Task PriorityRound(Player activePlayer, CancellationToken ct)
     {
-        // Bus is a soft dependency here — only used for the SpellCastEvent
-        // publication inside SpellCastFlow. Existing engine wiring already
-        // routes the canonical bus to Stack + ZoneService + SBA; we use a
-        // local bus instance here to avoid changing TurnDriver's ctor
-        // signature. SpellCastEvent listeners that need to observe these
-        // events should subscribe to the canonical bus, which still sees
-        // StackObjectAddedEvent / StackObjectResolvedEvent.
-        var castBus = new Majik.Core.Events.EventBus();
+        // Use the canonical bus if injected so SpellCastEvent reaches the
+        // same subscribers as zone/stack/SBA events. Fallback: local bus
+        // (events not externally visible — preserves prior behaviour).
+        var castBus = _eventBus ?? new Majik.Core.Events.EventBus();
         var castFlow = new SpellCastFlow(_stack, _zoneService, castBus);
         var manaResolver = new Majik.Core.Costs.ManaPaymentResolver();
 

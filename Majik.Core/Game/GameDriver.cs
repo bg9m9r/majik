@@ -46,7 +46,8 @@ public sealed class GameDriver
         StateBasedActions stateBasedActions,
         PriorityManager priorityManager,
         CombatFlow combatFlow,
-        Majik.Core.Random.GameRandom? rng = null)
+        Majik.Core.Random.GameRandom? rng = null,
+        Majik.Core.Events.IEventBus? eventBus = null)
     {
         _players = players ?? throw new ArgumentNullException(nameof(players));
         _agents = agents ?? throw new ArgumentNullException(nameof(agents));
@@ -55,7 +56,8 @@ public sealed class GameDriver
 
         _turnDriver = new TurnDriver(
             players, agents, stack, zoneService, triggerManager,
-            stackResolver, stateBasedActions, priorityManager, combatFlow);
+            stackResolver, stateBasedActions, priorityManager, combatFlow,
+            eventBus: eventBus);
     }
 
     public async Task<GameResult> RunGameAsync(int maxTurns = 30, CancellationToken ct = default)

@@ -113,23 +113,18 @@ public class StackResolver
         var card = spell.Card;
         var destinationZone = GetSpellDestinationZone(spell);
 
-        // Move card from stack to destination zone
+        // Move card from stack to destination zone through ZoneService so
+        // the destination zone's collection is updated AND CardMovedEvent
+        // fires (downstream listeners — combat, triggers, log — rely on
+        // these events). Direct card.Zone mutation skipped owner-zone
+        // bookkeeping and silently created limbo permanents.
         if (_zoneService != null && card.Owner != null)
         {
-            // Use zone service to move card
-            // For now, just update the zone property
-            // Full zone service integration will be added
-            card.Zone = destinationZone;
-
-            // If moving to battlefield, set controller
-            if (destinationZone == ZoneType.Battlefield)
-            {
-                card.Controller = spell.Controller;
-            }
+            _zoneService.MoveCardTo(card, destinationZone,
+                destinationZone == ZoneType.Battlefield ? spell.Controller : null);
         }
         else
         {
-            // Fallback: just update zone
             card.Zone = destinationZone;
             if (destinationZone == ZoneType.Battlefield)
             {
