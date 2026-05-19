@@ -81,11 +81,26 @@ public static class CommandEndpoints
         return Results.Ok(facade.GetState());
     }
 
-    private static IResult GetState(Guid id, ServerGameFactory factory)
+    private static IResult GetState(
+        Guid id,
+        ClaimsPrincipal user,
+        ServerGameFactory factory,
+        GameSeating seating)
     {
         var facade = factory.Get(id);
-        return facade == null
-            ? Results.NotFound(new { error = $"Game {id} not found" })
-            : Results.Ok(facade.GetState());
+        if (facade == null) return Results.NotFound(new { error = $"Game {id} not found" });
+
+        var sub = user.FindFirst("sub")?.Value;
+        if (sub == null) return Results.Unauthorized();
+
+        // CR 706 — visibility scoped to the caller's first claimed slot.
+        // A caller without a seat cannot peek at the game state.
+        var slots = seating.SlotsForSub(id, sub);
+        if (slots.Count == 0) return Results.Forbid();
+
+        var snapshot = facade.GetStateFor(slots.First());
+        return snapshot == null
+            ? Results.NotFound(new { error = "Player slot not found" })
+            : Results.Ok(snapshot);
     }
 }

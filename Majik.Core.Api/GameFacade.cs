@@ -133,11 +133,37 @@ public sealed class GameFacade
 
     public byte[] SaveSnapshotBytes() => JsonSerializer.SerializeToUtf8Bytes(SaveSnapshot());
 
+    /// <summary>Full-information snapshot (spectator view). Use
+    /// <see cref="GetStateFor"/> for a per-player view that masks
+    /// opponent hidden zones.</summary>
     public GameStateDto GetState() => StateSnapshotter.Snapshot(
         GameId, turnNumber: 1, phase: PhaseStateType.Main,
         activePlayer: _priority.CurrentPlayer ?? _alice,
         players: new[] { _alice, _bob },
         stack: _stack);
+
+    /// <summary>Per-player snapshot. CR 706 hidden information (opponent
+    /// hand) is masked. Pass the requesting player's id; returns null
+    /// when the id matches no slot in this game.</summary>
+    public GameStateDto? GetStateFor(Guid viewerPlayerId)
+    {
+        var viewer = ResolveSlot(viewerPlayerId);
+        if (viewer == null) return null;
+
+        return StateSnapshotter.Snapshot(
+            GameId, turnNumber: 1, phase: PhaseStateType.Main,
+            activePlayer: _priority.CurrentPlayer ?? _alice,
+            players: new[] { _alice, _bob },
+            stack: _stack,
+            viewer: viewer);
+    }
+
+    private Player? ResolveSlot(Guid id)
+    {
+        if (_alice.Id == id) return _alice;
+        if (_bob.Id == id) return _bob;
+        return null;
+    }
 
     /// <summary>
     /// Stream events. Returned <see cref="IDisposable"/> unsubscribes.
