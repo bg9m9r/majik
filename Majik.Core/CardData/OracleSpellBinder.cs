@@ -157,6 +157,11 @@ public static class OracleSpellBinder
     private static readonly Regex CreateTokens = new(
         @"create\s+(?<n>a|an|\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?<p>\d+)/(?<t>\d+)\s+(?<colour>white|blue|black|red|green|colorless)?\s*(?<subtype>[A-Za-z]+)\s+creature\s+tokens?(?:\s+with\s+(?<keywords>[A-Za-z, ]+))?",
         RegexOptions.IgnoreCase);
+    // "Creatures you control gain KEYWORD until end of turn." — global
+    // keyword grant; companion to CreaturesYouControlPump's +P/+T grant.
+    private static readonly Regex CreaturesYouControlGain = new(
+        @"creatures\s+you\s+control\s+gain\s+(?<kw>flying|trample|first\s+strike|double\s+strike|deathtouch|lifelink|vigilance|haste|reach|menace|indestructible)\s+until\s+end\s+of\s+turn",
+        RegexOptions.IgnoreCase);
 
     public static SpellDefinition? Bind(
         CardEntity entity,
@@ -205,6 +210,10 @@ public static class OracleSpellBinder
             int.Parse(mGlobal.Groups["p"].Value),
             int.Parse(mGlobal.Groups["t"].Value),
             caster, effects);
+
+        var mGrantAll = CreaturesYouControlGain.Match(text);
+        if (mGrantAll.Success && effects != null) return CreaturesYouControlGainKeywordSpell(
+            NormaliseKeyword(mGrantAll.Groups["kw"].Value), caster, effects);
 
         var m = DamageAnyTarget.Match(text);
         if (m.Success) return DamageAnySpell(WordToInt(m.Groups["n"].Value), resolver);
@@ -311,6 +320,19 @@ public static class OracleSpellBinder
             foreach (var c in caster.Zones.Battlefield.GetCards().OfType<Creature>())
             {
                 effects.Register(new GlobalPumpEffect(c, p, t));
+            }
+        }) });
+
+    private static SpellDefinition CreaturesYouControlGainKeywordSpell(
+        string keyword, Player caster,
+        Majik.Core.Effects.ContinuousEffectsService effects) => new(
+        Modes: Array.Empty<string>(), HasVariableX: false,
+        TargetRequests: Array.Empty<TargetRequest>(),
+        EffectFactory: _ => new IEffect[] { new Effect($"creatures gain {keyword} EOT", () =>
+        {
+            foreach (var c in caster.Zones.Battlefield.GetCards().OfType<Creature>())
+            {
+                effects.Register(new GrantKeywordUntilEndOfTurnEffect(c, keyword));
             }
         }) });
 
