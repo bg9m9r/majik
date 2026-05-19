@@ -304,7 +304,13 @@ Track A unlocks Track B (layer system needed for granted abilities).
   - `CardData/Vehicles/CrewAction.Crew` — totals untapped non-sick crewmates' power vs cost; taps + registers effect
   - `CardData/Sagas/SagaState` — tracks lore counters via `Permanent.Counters`; `AdvanceAndChapter` adds + returns new count; `ShouldBeSacrificed()` for SBA 704.5r
   - 705 Core + 45 Api = 750 tests, zero warnings
-- **Phase 19 remaining** — Adventures (alternate cast from exile), MDFCs/Transform (two-faced cards), Battles (defense counters), Class (level abilities), Mutate, Planeswalker loyalty-ability activation
+- **Phase 19c** — Adventures + MDFCs + Battles + Class ✅ done
+  - `CardData/Adventures/AdventureState` — Adventure cast exiles; creature face castable from exile (CR 715.4)
+  - `CardData/MDFCs/MdfcState` — front/back face tracker; `Transform()` swaps (CR 711)
+  - `CardData/Battles/BattleState` — defense counters on `Permanent.Counters`; `TakeDamage` removes; `ShouldBeSacrificed` at 0 (CR 310 / 704.5n)
+  - `CardData/Classes/ClassState` — sequential level-up 1→N (CR 716)
+  - 712 Core + 45 Api = 757 tests, zero warnings
+- **Phase 19 remaining** — Mutate (CR 702.139), Planeswalker loyalty-ability activation flow
 - **Phase 22** — Targeting + Legality ✅ done
   - `Targeting/TargetSpec` — declarative spec: type filters (creature/player/planeswalker/artifact/enchantment/land), controller filters, additional predicate
   - `Targeting/TargetLegality` — single-candidate `IsLegal()` + `EnumerateLegal()` walker over battlefield + players
