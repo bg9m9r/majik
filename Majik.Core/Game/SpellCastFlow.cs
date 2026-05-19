@@ -13,17 +13,14 @@ namespace Majik.Core.Game;
 
 /// <summary>
 /// Orchestrates Rule 601 spell-casting steps via async agent prompts:
+///   0. casting permission check (CR 117.1, sorcery vs instant speed)
 ///   1. announce spell, move card from hand to stack
 ///   2. choose modes
-///   3. choose X (variable costs)
+///   3. choose X (variable costs); X is added to the mana cost
 ///   4. choose targets
 ///   5. choose mana payment
 ///   6. build Spell with chosen effects, push onto stack
 ///   7. publish <see cref="SpellCastEvent"/>
-///
-/// Mana legality / X legality / target legality validation is intentionally
-/// deferred (Phase 10's `ManaPaymentResolver` and a target validator will
-/// own it). For now the flow trusts the agent.
 /// </summary>
 public sealed class SpellCastFlow
 {
@@ -41,6 +38,11 @@ public sealed class SpellCastFlow
         _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
     }
 
+    /// <summary>
+    /// Throws <see cref="InvalidOperationException"/> if the spell can't be
+    /// cast right now (CR 117.1). Caller (priority loop) catches and
+    /// re-prompts the agent for a different action.
+    /// </summary>
     public async Task<Spells.Spell> CastAsync(
         Player caster,
         ICard card,
@@ -53,6 +55,14 @@ public sealed class SpellCastFlow
         if (card == null) throw new ArgumentNullException(nameof(card));
         if (definition == null) throw new ArgumentNullException(nameof(definition));
         if (agent == null) throw new ArgumentNullException(nameof(agent));
+
+        // CR 117.1 — sorcery-speed gating.
+        if (ctx.CurrentPhase.HasValue
+            && !CastingPermission.CanCast(card, caster, ctx.ActivePlayer,
+                ctx.CurrentPhase.Value, _stack.IsEmpty, out var reason))
+        {
+            throw new InvalidOperationException($"Cannot cast {card.Name}: {reason}");
+        }
 
         int? mode = null;
         if (definition.Modes.Count > 0)
@@ -73,7 +83,14 @@ public sealed class SpellCastFlow
             collectedTargets.Add(picked);
         }
 
-        var mana = await agent.ChooseManaSourcesAsync(ctx, ManaCost.Parse(card.ManaCost), ct);
+        // Cost = printed mana cost + X (generic) if applicable.
+        var totalCost = ManaCost.Parse(card.ManaCost);
+        if (xValue.HasValue && xValue.Value > 0)
+        {
+            totalCost = totalCost.AddGenericCost(xValue.Value);
+        }
+
+        var mana = await agent.ChooseManaSourcesAsync(ctx, totalCost, ct);
 
         var chosen = new ChosenSpellParams(mode, xValue, collectedTargets, mana);
         var effects = definition.EffectFactory(chosen);

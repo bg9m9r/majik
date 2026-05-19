@@ -26,6 +26,8 @@ public sealed class PriorityLoop
     private readonly IReadOnlyDictionary<Player, IPlayerAgent> _agents;
     private readonly Func<int> _turnNumberAccessor;
     private readonly Func<PhaseStateType?> _phaseAccessor;
+    private readonly LandDropTracker? _landDropTracker;
+    private Player? _activePlayer;
 
     public PriorityLoop(
         IReadOnlyList<Player> players,
@@ -35,7 +37,8 @@ public sealed class PriorityLoop
         ZoneService zoneService,
         IReadOnlyDictionary<Player, IPlayerAgent> agents,
         Func<int> turnNumberAccessor,
-        Func<PhaseStateType?> phaseAccessor)
+        Func<PhaseStateType?> phaseAccessor,
+        LandDropTracker? landDropTracker = null)
     {
         _players = players ?? throw new ArgumentNullException(nameof(players));
         _priority = priority ?? throw new ArgumentNullException(nameof(priority));
@@ -45,6 +48,7 @@ public sealed class PriorityLoop
         _agents = agents ?? throw new ArgumentNullException(nameof(agents));
         _turnNumberAccessor = turnNumberAccessor;
         _phaseAccessor = phaseAccessor;
+        _landDropTracker = landDropTracker;
     }
 
     /// <summary>
@@ -53,6 +57,7 @@ public sealed class PriorityLoop
     /// </summary>
     public async Task RunUntilRoundEndsAsync(Player activePlayer, CancellationToken ct = default)
     {
+        _activePlayer = activePlayer;
         while (true)
         {
             _priority.InitializeForPhase(activePlayer);
@@ -95,6 +100,17 @@ public sealed class PriorityLoop
         switch (action)
         {
             case PriorityAction.PlayLand land:
+                if (_landDropTracker != null && _activePlayer != null)
+                {
+                    var phase = _phaseAccessor() ?? PhaseStateType.Main;
+                    if (!_landDropTracker.CanPlayLand(
+                        actor, _activePlayer, phase, _stack.IsEmpty, out var reason))
+                    {
+                        throw new InvalidOperationException(
+                            $"Cannot play {land.Land.Name}: {reason}");
+                    }
+                    _landDropTracker.RecordLandPlayed(actor);
+                }
                 _zoneService.MoveCardTo(land.Land, ZoneType.Battlefield, controller: actor);
                 break;
             case PriorityAction.CastSpell:

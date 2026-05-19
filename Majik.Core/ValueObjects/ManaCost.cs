@@ -132,6 +132,15 @@ public class ManaCost : IEquatable<ManaCost>
     public static ManaCost Zero => new(0, 0, 0, 0, 0, 0, false);
 
     /// <summary>
+    /// Add N generic mana to this cost (e.g. paying X as part of a spell cost).
+    /// </summary>
+    public ManaCost AddGenericCost(int amount)
+    {
+        if (amount < 0) throw new ArgumentOutOfRangeException(nameof(amount));
+        return new ManaCost(Generic + amount, White, Blue, Black, Red, Green, HasX);
+    }
+
+    /// <summary>
     /// Convert to string representation.
     /// </summary>
     public override string ToString()

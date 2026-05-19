@@ -355,4 +355,9 @@ Track A unlocks Track B (layer system needed for granted abilities).
   - `Spell.ChosenTargets` + `TargetLegalityPredicate`; `StackResolver` re-checks on resolution (CR 608.2b) — all-targets-illegal → spell countered, card to graveyard
   - `Game/AbilityActivationFlow` — symmetric to `SpellCastFlow` for activated abilities: target prompts → mana payment → push onto stack → fire `AbilityActivatedEvent`
   - 680 Core + 45 Api = 725 tests, zero warnings
-- **Phase 15 remaining** — wire `CastingPermission` + `LandDropTracker` into `SpellCastFlow`/`TurnDriver` (currently free-standing helpers); additional costs ("as you cast"); alternative costs (Flashback, Madness); X spells variable cost; modal spell prompts; hold-priority semantics
+- **Phase 15 second cut** ✅ done — wiring + X-cost
+  - `SpellCastFlow.CastAsync` enforces `CastingPermission` (throws on sorcery on opponent's turn or with non-empty stack)
+  - X-cost wired: after `ChooseXAsync`, the agent's mana prompt includes the X amount as additional generic mana (via new `ManaCost.AddGenericCost`)
+  - `PriorityLoop` accepts an optional `LandDropTracker`; `PlayLand` action validates + records drop; throws on illegal drop (second drop / opponent turn / non-empty stack)
+  - 685 Core + 45 Api = 730 tests, zero warnings
+- **Phase 15 remaining** — additional costs ("as you cast", CR 601.2f); alternative costs (Flashback, Madness, Cipher); modal-spell agent threading (already promptable, but no card uses modes yet); hold-priority semantics; wiring `LandDropTracker.ResetTurn` into `TurnDriver` (manual reset by caller for now)
