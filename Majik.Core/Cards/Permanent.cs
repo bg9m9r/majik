@@ -25,6 +25,12 @@ public class Permanent : Card
     /// off battlefield via SBA 704.5d.</summary>
     public bool IsToken { get; set; }
 
+    /// <summary>Optional Battle-card tracker. SBA 704.5n consults this.</summary>
+    public Majik.Core.CardData.Battles.BattleState? BattleState { get; set; }
+
+    /// <summary>Optional Saga-card tracker. SBA 704.5r consults this.</summary>
+    public Majik.Core.CardData.Sagas.SagaState? SagaState { get; set; }
+
     /// <summary>
     /// CR 301.5 / 303.4 — the permanent this one is attached to (Aura
     /// enchanting its target, Equipment equipped to a creature). Null when

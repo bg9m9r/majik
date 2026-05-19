@@ -62,6 +62,10 @@ public class Player
     /// <summary>CR 704.5c — poison counters; 10+ → lose.</summary>
     public int PoisonCounters { get; set; }
 
+    /// <summary>CR 903 — per-player commander tracking. Set by Commander
+    /// format setup; null in other formats.</summary>
+    public Majik.Core.Formats.Commander.CommanderState? Commander { get; set; }
+
     public Player(string name, int startingLife = 20, ZoneManager? zoneManager = null)
     {
         if (string.IsNullOrWhiteSpace(name))

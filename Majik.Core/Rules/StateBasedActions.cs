@@ -56,6 +56,9 @@ public class StateBasedActions
             if (CheckCounterCancellation(cardList)) anyExecuted = true;
             if (CheckTokensCeaseToExist(cardList)) anyExecuted = true;
             if (CheckAttachmentLegality(cardList)) anyExecuted = true;
+            if (CheckBattleDestroyed(cardList)) anyExecuted = true;
+            if (CheckSagaSacrificed(cardList)) anyExecuted = true;
+            if (CheckSpellWithNoCard()) anyExecuted = true;
             if (CheckCreatureDeath(cardList)) anyExecuted = true;
             if (CheckPlaneswalkerDeath(cardList)) anyExecuted = true;
             if (CheckLegendRule(cardList)) anyExecuted = true;
@@ -318,6 +321,48 @@ public class StateBasedActions
         }
         return anyExecuted;
     }
+
+    /// <summary>CR 704.5n — Battle with 0 defense counters → graveyard.</summary>
+    private bool CheckBattleDestroyed(IEnumerable<ICard> allCards)
+    {
+        bool anyExecuted = false;
+        foreach (var perm in allCards.OfType<Permanent>().ToList())
+        {
+            if (perm.Zone != ZoneType.Battlefield) continue;
+            if (perm.BattleState == null) continue;
+            if (!perm.BattleState.ShouldBeSacrificed()) continue;
+
+            if (_zoneService != null) _zoneService.MoveCardTo(perm, ZoneType.Graveyard);
+            else perm.Zone = ZoneType.Graveyard;
+            _eventBus?.Publish(new StateBasedActionExecutedEvent(
+                $"Battle {perm.Name} destroyed — 0 defense"));
+            anyExecuted = true;
+        }
+        return anyExecuted;
+    }
+
+    /// <summary>CR 704.5r — Saga with all chapters complete → sacrifice.</summary>
+    private bool CheckSagaSacrificed(IEnumerable<ICard> allCards)
+    {
+        bool anyExecuted = false;
+        foreach (var perm in allCards.OfType<Permanent>().ToList())
+        {
+            if (perm.Zone != ZoneType.Battlefield) continue;
+            if (perm.SagaState == null) continue;
+            if (!perm.SagaState.ShouldBeSacrificed()) continue;
+
+            if (_zoneService != null) _zoneService.MoveCardTo(perm, ZoneType.Graveyard);
+            else perm.Zone = ZoneType.Graveyard;
+            _eventBus?.Publish(new StateBasedActionExecutedEvent(
+                $"Saga {perm.Name} sacrificed — final chapter complete"));
+            anyExecuted = true;
+        }
+        return anyExecuted;
+    }
+
+    /// <summary>CR 704.5e — spell on stack with no card ceases to exist.
+    /// Engine-built spells always carry a card; no-op for now.</summary>
+    private bool CheckSpellWithNoCard() => false;
 
     /// <summary>
     /// CR 704.5d — a token in a zone other than the battlefield ceases

@@ -149,4 +149,9 @@ public class Creature : Permanent
     /// "lethal damage marked." Cleared in cleanup along with Damage.
     /// </summary>
     public bool MarkedForDestructionByDeathtouch { get; set; }
+
+    /// <summary>CR 903.3 — flagged if this creature is its controller's
+    /// commander. Combat damage from a commander is tracked per-opponent
+    /// for the 21-damage loss condition (CR 903.10a).</summary>
+    public bool IsCommander { get; set; }
 }

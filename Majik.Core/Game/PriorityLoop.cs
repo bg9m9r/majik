@@ -27,6 +27,8 @@ public sealed class PriorityLoop
     private readonly Func<int> _turnNumberAccessor;
     private readonly Func<PhaseStateType?> _phaseAccessor;
     private readonly LandDropTracker? _landDropTracker;
+    private readonly Func<Player, PriorityAction.CastSpell, GameContext, Task>? _castDispatcher;
+    private readonly Func<Player, PriorityAction.ActivateAbility, GameContext, Task>? _activateDispatcher;
     private Player? _activePlayer;
 
     public PriorityLoop(
@@ -38,8 +40,12 @@ public sealed class PriorityLoop
         IReadOnlyDictionary<Player, IPlayerAgent> agents,
         Func<int> turnNumberAccessor,
         Func<PhaseStateType?> phaseAccessor,
-        LandDropTracker? landDropTracker = null)
+        LandDropTracker? landDropTracker = null,
+        Func<Player, PriorityAction.CastSpell, GameContext, Task>? castDispatcher = null,
+        Func<Player, PriorityAction.ActivateAbility, GameContext, Task>? activateDispatcher = null)
     {
+        _castDispatcher = castDispatcher;
+        _activateDispatcher = activateDispatcher;
         _players = players ?? throw new ArgumentNullException(nameof(players));
         _priority = priority ?? throw new ArgumentNullException(nameof(priority));
         _stack = stack ?? throw new ArgumentNullException(nameof(stack));
@@ -79,10 +85,20 @@ public sealed class PriorityLoop
                     continue;
                 }
 
-                ApplyAction(current, action);
-                // Action taken — priority resets to active player (Rule 117.3c).
-                _priority.HoldPriority();
-                _priority.InitializeForPhase(activePlayer);
+                await ApplyActionAsync(current, action, ctx, ct);
+
+                if (HoldsPriority(action))
+                {
+                    // CR 117.3c — actor keeps priority instead of passing.
+                    // Reset the pass count but DO NOT shift current player.
+                    _priority.HoldPriority();
+                }
+                else
+                {
+                    // Action taken — priority returns to active player.
+                    _priority.HoldPriority();
+                    _priority.InitializeForPhase(activePlayer);
+                }
             }
 
             if (_stack.IsEmpty)
@@ -95,7 +111,7 @@ public sealed class PriorityLoop
         }
     }
 
-    private void ApplyAction(Player actor, PriorityAction action)
+    private async Task ApplyActionAsync(Player actor, PriorityAction action, GameContext ctx, CancellationToken ct)
     {
         switch (action)
         {
@@ -113,11 +129,18 @@ public sealed class PriorityLoop
                 }
                 _zoneService.MoveCardTo(land.Land, ZoneType.Battlefield, controller: actor);
                 break;
-            case PriorityAction.CastSpell:
-            case PriorityAction.ActivateAbility:
-                // Routed through SpellCastFlow / ability activation in later phases.
-                throw new NotImplementedException(
-                    "CastSpell / ActivateAbility require SpellCastFlow (phase 8.6).");
+            case PriorityAction.CastSpell cast:
+                if (_castDispatcher == null)
+                    throw new InvalidOperationException(
+                        "PriorityLoop received CastSpell but no castDispatcher was supplied.");
+                await _castDispatcher(actor, cast, ctx);
+                break;
+            case PriorityAction.ActivateAbility activate:
+                if (_activateDispatcher == null)
+                    throw new InvalidOperationException(
+                        "PriorityLoop received ActivateAbility but no activateDispatcher was supplied.");
+                await _activateDispatcher(actor, activate, ctx);
+                break;
             case PriorityAction.PassAction:
                 _priority.PassPriority();
                 break;
@@ -128,4 +151,12 @@ public sealed class PriorityLoop
 
     private GameContext MakeContext(Player self, Player activePlayer) =>
         new(self, _players, activePlayer, _turnNumberAccessor(), _phaseAccessor(), _stack);
+
+    private static bool HoldsPriority(PriorityAction action) => action switch
+    {
+        PriorityAction.CastSpell cs => cs.HoldPriority,
+        PriorityAction.ActivateAbility a => a.HoldPriority,
+        PriorityAction.PlayLand pl => pl.HoldPriority,
+        _ => false,
+    };
 }

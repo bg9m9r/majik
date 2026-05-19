@@ -222,6 +222,17 @@ public sealed class CombatFlow
         {
             source.Controller.GainLife(intent.Amount);
         }
+
+        // CR 903.10a — track commander damage per-attacker on the defender.
+        if (source.IsCommander && target.Commander != null)
+        {
+            target.Commander.TakeCommanderDamage(source, intent.Amount);
+            if (target.Commander.HasLostToCommanderDamage())
+            {
+                target.HasLost = true;
+            }
+        }
+
         _bus.Publish(new CombatDamageDealtEvent(source, target, intent.Amount));
     }
 
