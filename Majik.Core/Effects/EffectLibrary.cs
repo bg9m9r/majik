@@ -3,47 +3,63 @@ using Majik.Core.Abilities;
 namespace Majik.Core.Effects;
 
 /// <summary>
-/// Registry of built-in effect implementations.
-/// Effects are registered by their unique ID and can be retrieved for use in abilities.
+/// Read-only catalog of built-in effect implementations.
+///
+/// Registration is engine-internal and seals on first access — once any
+/// public lookup runs, the table is frozen for the process lifetime and
+/// further registration throws. This eliminates the mutable-global-state
+/// hazard the previous shape carried (any caller could mutate the
+/// registry mid-game, with no thread-safety guarantee on writes after
+/// init).
 /// </summary>
 public static class EffectLibrary
 {
     private static readonly Dictionary<string, IEffect> _effects = new();
     private static readonly Dictionary<string, EffectMetadata> _metadata = new();
-    private static bool _initialized = false;
+    private static bool _sealed;
     private static readonly object _lock = new();
 
     /// <summary>
-    /// Initialize the effect library with built-in effects.
+    /// Pre-warm the catalog. Idempotent. Calling explicitly is rarely
+    /// necessary — any lookup auto-initialises and seals.
     /// </summary>
-    public static void Initialize()
+    public static void Initialize() => EnsureInitialized();
+
+    /// <summary>
+    /// Whether the catalog has been sealed (initial registration
+    /// complete). Useful for asserting startup ordering in tests.
+    /// </summary>
+    public static bool IsSealed => Volatile.Read(ref _sealed);
+
+    private static void EnsureInitialized()
     {
-        if (_initialized)
-            return;
+        if (Volatile.Read(ref _sealed)) return;
 
         lock (_lock)
         {
-            if (_initialized)
-                return;
-
+            if (_sealed) return;
             RegisterBuiltInEffects();
-            _initialized = true;
+            Volatile.Write(ref _sealed, true);
         }
     }
 
     /// <summary>
-    /// Register a built-in effect.
+    /// Engine-internal registration. Only callable before the catalog
+    /// seals; the built-in initializer is the only legitimate caller.
+    /// Friend assemblies may register additional effects at startup
+    /// before any lookup occurs.
     /// </summary>
-    public static void Register(string effectId, IEffect effect, EffectMetadata metadata)
+    internal static void Register(string effectId, IEffect effect, EffectMetadata metadata)
     {
+        if (Volatile.Read(ref _sealed))
+            throw new InvalidOperationException(
+                $"EffectLibrary is sealed; cannot register '{effectId}'. Register during startup before any lookup.");
+
         if (string.IsNullOrWhiteSpace(effectId))
             throw new ArgumentException("Effect ID cannot be null or empty", nameof(effectId));
-        
-        if (effect == null)
-            throw new ArgumentNullException(nameof(effect));
-        
-        if (metadata == null)
-            throw new ArgumentNullException(nameof(metadata));
+
+        ArgumentNullException.ThrowIfNull(effect);
+        ArgumentNullException.ThrowIfNull(metadata);
 
         _effects[effectId] = effect;
         _metadata[effectId] = metadata;
@@ -54,7 +70,7 @@ public static class EffectLibrary
     /// </summary>
     public static IEffect? GetEffect(string effectId)
     {
-        Initialize();
+        EnsureInitialized();
         return _effects.TryGetValue(effectId, out var effect) ? effect : null;
     }
 
@@ -63,7 +79,7 @@ public static class EffectLibrary
     /// </summary>
     public static EffectMetadata? GetMetadata(string effectId)
     {
-        Initialize();
+        EnsureInitialized();
         return _metadata.TryGetValue(effectId, out var metadata) ? metadata : null;
     }
 
@@ -72,7 +88,7 @@ public static class EffectLibrary
     /// </summary>
     public static bool IsRegistered(string effectId)
     {
-        Initialize();
+        EnsureInitialized();
         return _effects.ContainsKey(effectId);
     }
 
@@ -81,7 +97,7 @@ public static class EffectLibrary
     /// </summary>
     public static IEnumerable<string> GetAllEffectIds()
     {
-        Initialize();
+        EnsureInitialized();
         return _effects.Keys;
     }
 
