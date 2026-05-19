@@ -111,4 +111,15 @@ public static class Triggers
             && e.Card.HasType(CardType.Land)
             && ReferenceEquals(e.Card.Controller, controller));
     }
+
+    /// <summary>CR 500 — "At the beginning of your upkeep / end step / draw
+    /// step, …" trigger. Fires on StepStartedEvent matching the requested
+    /// phase, restricted to <paramref name="controller"/>'s own turns.</summary>
+    public static ITriggerCondition OnStepBegin(
+        Player controller, Majik.Core.StateMachine.PhaseStateType step)
+    {
+        return new EventTriggerCondition<Majik.Core.Events.StepStartedEvent>((e, _) =>
+            e.StepType == step
+            && ReferenceEquals(e.Player, controller));
+    }
 }

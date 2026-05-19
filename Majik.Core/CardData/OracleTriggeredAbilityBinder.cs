@@ -66,6 +66,12 @@ public static class OracleTriggeredAbilityBinder
     private static readonly Regex LandfallLine = new(
         @"(?:landfall\s*[—-]\s*)?whenever a land (?:you control\s+)?enters(?:\s+the battlefield)?(?:\s+under your control)?\s*,\s*(?<effect>[^.]+)\.",
         RegexOptions.IgnoreCase);
+    private static readonly Regex UpkeepLine = new(
+        @"at the beginning of (?:your |each player's )?upkeep\s*,\s*(?<effect>[^.]+)\.",
+        RegexOptions.IgnoreCase);
+    private static readonly Regex EndStepLine = new(
+        @"at the beginning of (?:your |each player's )?end step\s*,\s*(?<effect>[^.]+)\.",
+        RegexOptions.IgnoreCase);
 
     public static IEnumerable<TriggeredAbility> Bind(ICard source, CardEntity entity, Player? controller = null)
     {
@@ -131,6 +137,28 @@ public static class OracleTriggeredAbilityBinder
             yield return new TriggeredAbility(
                 source, ctrl,
                 Triggers.OnAttackSelf(source),
+                effects: effects);
+        }
+
+        // "At the beginning of your upkeep, …"
+        foreach (Match m in UpkeepLine.Matches(text))
+        {
+            var effects = BuildEffects(m.Groups["effect"].Value, ctrl, source).ToList();
+            if (effects.Count == 0) continue;
+            yield return new TriggeredAbility(
+                source, ctrl,
+                Triggers.OnStepBegin(ctrl, Majik.Core.StateMachine.PhaseStateType.Upkeep),
+                effects: effects);
+        }
+
+        // "At the beginning of your end step, …"
+        foreach (Match m in EndStepLine.Matches(text))
+        {
+            var effects = BuildEffects(m.Groups["effect"].Value, ctrl, source).ToList();
+            if (effects.Count == 0) continue;
+            yield return new TriggeredAbility(
+                source, ctrl,
+                Triggers.OnStepBegin(ctrl, Majik.Core.StateMachine.PhaseStateType.End),
                 effects: effects);
         }
 

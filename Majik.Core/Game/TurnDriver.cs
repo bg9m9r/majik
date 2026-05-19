@@ -84,6 +84,7 @@ public sealed class TurnDriver
         if (activePlayer == null) throw new ArgumentNullException(nameof(activePlayer));
 
         _currentTurnNumber = turnNumber;
+        _activePlayerForStepEvents = activePlayer;
         _eventBus?.Publish(new Majik.Core.Events.TurnStartedEvent(activePlayer, turnNumber));
 
         // CR 305.2 — land drops reset at turn start.
@@ -140,7 +141,18 @@ public sealed class TurnDriver
         Cleanup(activePlayer);
     }
 
-    private void SetPhase(PhaseStateType phase) => _currentPhase = phase;
+    private Player? _activePlayerForStepEvents;
+
+    private void SetPhase(PhaseStateType phase)
+    {
+        _currentPhase = phase;
+        // CR 500 — emit StepStartedEvent so binders for "at the beginning
+        // of your upkeep / end step / draw step" triggers can fire.
+        if (_activePlayerForStepEvents != null)
+        {
+            _eventBus?.Publish(new Majik.Core.Events.StepStartedEvent(phase, _activePlayerForStepEvents));
+        }
+    }
 
     private void UntapStep(Player active)
     {
