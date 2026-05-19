@@ -116,6 +116,18 @@ public static class OracleSpellBinder
     private static readonly Regex YouGainLife = new(
         @"you\s+gain\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+life",
         RegexOptions.IgnoreCase);
+    // "Counter target spell unless its controller pays {N}."
+    private static readonly Regex CounterUnlessPay = new(
+        @"counter\s+target\s+spell\s+unless\s+its\s+controller\s+pays\s+\{?(?<n>\d+)\}?",
+        RegexOptions.IgnoreCase);
+    // "Target player mills N cards."
+    private static readonly Regex MillTarget = new(
+        @"target\s+player\s+mills\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+cards?",
+        RegexOptions.IgnoreCase);
+    // "Scry N" — placeholder bind (effect deferred until agent prompt wired).
+    private static readonly Regex ScryN = new(
+        @"\bscry\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b",
+        RegexOptions.IgnoreCase);
     // "Create [a|N] [P]/[T] [colour] [subtype] creature token[s]."
     // Captures: count, P, T, optional colour, subtype.
     private static readonly Regex CreateTokens = new(
@@ -135,9 +147,15 @@ public static class OracleSpellBinder
         var text = entity.OracleText ?? string.Empty;
 
         // Order matters: more specific counters before the generic one.
+        if (CounterUnlessPay.IsMatch(text)) return CounterTargetSpell(resolver, stack);
         if (CounterNoncreature.IsMatch(text)) return CounterTypedSpell(resolver, stack, requireNonCreature: true);
         if (CounterCreature.IsMatch(text)) return CounterTypedSpell(resolver, stack, requireCreature: true);
         if (CounterSpell.IsMatch(text)) return CounterTargetSpell(resolver, stack);
+
+        var mMill = MillTarget.Match(text);
+        if (mMill.Success) return MillTargetSpell(WordToInt(mMill.Groups["n"].Value), resolver);
+
+        if (ScryN.IsMatch(text)) return ScryNSpell();
 
         var m = DamageAnyTarget.Match(text);
         if (m.Success) return DamageAnySpell(WordToInt(m.Groups["n"].Value), resolver);
@@ -211,6 +229,33 @@ public static class OracleSpellBinder
 
         return null;
     }
+
+    private static SpellDefinition MillTargetSpell(int n, Func<object, object> resolver) => new(
+        Modes: Array.Empty<string>(), HasVariableX: false,
+        TargetRequests: new[] { new TargetRequest("target player", 1, 1, Array.Empty<object>()) },
+        EffectFactory: p =>
+        {
+            var target = resolver(p.Targets[0][0]);
+            return new IEffect[] { new Effect($"mill {n}", () =>
+            {
+                if (target is not Player pl) return;
+                for (var i = 0; i < n; i++)
+                {
+                    var top = pl.Zones.Library.GetCards().FirstOrDefault();
+                    if (top == null) return;
+                    pl.Zones.Library.RemoveCard(top);
+                    pl.Zones.Graveyard.AddCard(top);
+                    top.Zone = ZoneType.Graveyard;
+                }
+            }) };
+        });
+
+    private static SpellDefinition ScryNSpell() => new(
+        Modes: Array.Empty<string>(), HasVariableX: false,
+        TargetRequests: Array.Empty<TargetRequest>(),
+        // Effect deferred: needs agent prompt for which cards to put on
+        // bottom. Wires when SpellCastFlow gains library-top inspection.
+        EffectFactory: _ => new IEffect[] { new Effect("scry", () => { }) });
 
     private static SpellDefinition UntapTargetSpell(Func<object, object> resolver, string label) => new(
         Modes: Array.Empty<string>(), HasVariableX: false,
