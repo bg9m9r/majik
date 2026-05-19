@@ -76,6 +76,10 @@ public static class OracleSpellBinder
     private static readonly Regex EachPlayerDraws = new(
         @"each\s+player\s+draws\s+(?<n>\d+|a|one|two|three|four|five|six|seven)\s+cards?",
         RegexOptions.IgnoreCase);
+    // "You lose N life." — chip-damage rider.
+    private static readonly Regex YouLoseLife = new(
+        @"you\s+lose\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+life",
+        RegexOptions.IgnoreCase);
     // "Tap target {permanent|creature|artifact|land|...}." — \b so "untap"
     // doesn't match.
     private static readonly Regex TapTarget = new(
@@ -233,6 +237,9 @@ public static class OracleSpellBinder
 
         m = EachPlayerDraws.Match(text);
         if (m.Success) return EachPlayerDrawsSpell(WordToInt(m.Groups["n"].Value));
+
+        m = YouLoseLife.Match(text);
+        if (m.Success) return YouLoseLifeSpell(WordToInt(m.Groups["n"].Value), caster);
 
         // More-specific destroys before generic — nonland before permanent before land.
         if (DestroyNonlandPermanent.IsMatch(text)) return DestroyTargetSpell(
@@ -652,6 +659,11 @@ public static class OracleSpellBinder
         Modes: Array.Empty<string>(), HasVariableX: false,
         TargetRequests: Array.Empty<TargetRequest>(),
         EffectFactory: _ => new IEffect[] { new Effect($"each player draws {n}", () => { }) });
+
+    private static SpellDefinition YouLoseLifeSpell(int n, Player caster) => new(
+        Modes: Array.Empty<string>(), HasVariableX: false,
+        TargetRequests: Array.Empty<TargetRequest>(),
+        EffectFactory: _ => new IEffect[] { new Effect($"you lose {n}", () => caster.LoseLife(n)) });
 
     /// <summary>Layer 7c +P/+T effect with end-of-turn expiry.</summary>
     private sealed class PumpUntilEndOfTurnEffect : Majik.Core.Effects.ContinuousEffect

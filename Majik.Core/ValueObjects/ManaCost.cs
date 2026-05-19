@@ -168,6 +168,11 @@ public class ManaCost : IEquatable<ManaCost>
                 // treat as +1 generic — pays generic costs and behaves
                 // identically for permanents like Urza's Saga ('{T}: Add {C}.').
                 case 'C': generic++; break;
+                // {S} = snow mana (CR 107.4g). Snow is restricted source —
+                // some costs (Skred, Marit Lage's Slumber) require {S}-
+                // specific payment. MVP treats as +1 generic so snow lands
+                // can pay regular costs; snow-specific gating deferred.
+                case 'S': generic++; break;
             }
         }
 
