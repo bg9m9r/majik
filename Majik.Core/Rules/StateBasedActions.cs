@@ -19,15 +19,18 @@ public class StateBasedActions
     private readonly IEventBus? _eventBus;
     private readonly ZoneService? _zoneService;
     private readonly TriggerManager? _triggerManager;
+    private readonly Majik.Core.Effects.ReplacementBus? _replacements;
 
     public StateBasedActions(
         IEventBus? eventBus = null,
         ZoneService? zoneService = null,
-        TriggerManager? triggerManager = null)
+        TriggerManager? triggerManager = null,
+        Majik.Core.Effects.ReplacementBus? replacements = null)
     {
         _eventBus = eventBus;
         _zoneService = zoneService;
         _triggerManager = triggerManager;
+        _replacements = replacements;
     }
 
     /// <summary>
@@ -120,6 +123,19 @@ public class StateBasedActions
             var dies = creature.IsDead() || creature.MarkedForDestructionByDeathtouch;
             if (dies)
             {
+                // CR 614 — route destroys through replacement bus first;
+                // regeneration shields / totem armor can cancel.
+                if (_replacements != null)
+                {
+                    var result = _replacements.Apply(
+                        new Majik.Core.Effects.DestroyIntent(creature));
+                    if (result == null)
+                    {
+                        creature.MarkedForDestructionByDeathtouch = false;
+                        continue;
+                    }
+                }
+
                 if (_zoneService != null)
                 {
                     _zoneService.MoveCardTo(creature, ZoneType.Graveyard);
