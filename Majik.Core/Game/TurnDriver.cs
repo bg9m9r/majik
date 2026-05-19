@@ -119,7 +119,9 @@ public sealed class TurnDriver
         foreach (var card in active.Zones.Battlefield.GetCards().OfType<Permanent>().ToList())
         {
             if (card.IsTapped) card.Untap();
-            card.HasSummoningSickness = false;
+            // CR 502 — clears summoning sickness, loyalty-once-per-turn,
+            // and any other turn-scoped per-permanent flags.
+            card.ResetTurnState();
         }
     }
 
