@@ -74,7 +74,7 @@ class Program
         System.Console.WriteLine("  Majik.Console import <path-to-json-file>");
         System.Console.WriteLine("  Majik.Console fetch-bulk [oracle-cards|default-cards|all-cards|unique-artwork] [--no-import]");
         System.Console.WriteLine("  Majik.Console fetch-set <set-code> [--no-import]");
-        System.Console.WriteLine("  Majik.Console compare-sets [--include-digital] [--missing-only] [--partial-only]");
+        System.Console.WriteLine("  Majik.Console compare-sets [--include-digital] [--missing-only] [--partial-only] [--sync] [--dry-run] [--max N]");
         System.Console.WriteLine("  Majik.Console analyze-keywords <path-to-csv-file>");
         System.Console.WriteLine("  Majik.Console ingest-claude-results <path-to-jsonl-file>");
         System.Console.WriteLine("  Majik.Console play-triggers [etb|apnap|intervening-if|delayed|all]");
@@ -209,14 +209,29 @@ class Program
 
     /// <summary>
     /// compare-sets [--include-digital] [--missing-only] [--partial-only]
+    ///              [--sync] [--dry-run] [--max NN]
     /// Lists Scryfall's known sets, compares against distinct Set codes in
     /// the local DB, prints a diff.
+    ///
+    /// --sync: after diff, download + import every set in the missing /
+    ///   partial buckets (respects --missing-only / --partial-only).
+    /// --dry-run: print the sync plan (which sets would be fetched) but
+    ///   don't hit the network.
+    /// --max NN: cap the sync to the first NN sets (useful for testing).
     /// </summary>
     static async Task HandleCompareSetsCommandAsync(string[] args)
     {
         var includeDigital = args.Any(a => a.Equals("--include-digital", StringComparison.OrdinalIgnoreCase));
         var missingOnly = args.Any(a => a.Equals("--missing-only", StringComparison.OrdinalIgnoreCase));
         var partialOnly = args.Any(a => a.Equals("--partial-only", StringComparison.OrdinalIgnoreCase));
+        var sync = args.Any(a => a.Equals("--sync", StringComparison.OrdinalIgnoreCase));
+        var dryRun = args.Any(a => a.Equals("--dry-run", StringComparison.OrdinalIgnoreCase));
+        var maxIdx = Array.FindIndex(args, a => a.Equals("--max", StringComparison.OrdinalIgnoreCase));
+        var maxSets = int.MaxValue;
+        if (maxIdx >= 0 && maxIdx + 1 < args.Length && int.TryParse(args[maxIdx + 1], out var parsedMax))
+        {
+            maxSets = parsedMax;
+        }
 
         System.Console.WriteLine($"=== Majik Set Comparison ===\n");
 
@@ -307,6 +322,62 @@ class Program
                     + (localCodesOnly.Count > 20 ? $" … +{localCodesOnly.Count - 20} more" : ""));
             }
         }
+
+        // ---- --sync: fetch + import each set in the chosen buckets ----
+        if (!sync) return;
+
+        var syncList = new List<ScryfallSet>();
+        if (!partialOnly) syncList.AddRange(missing);
+        if (!missingOnly) syncList.AddRange(partial.Select(p => p.s));
+
+        if (syncList.Count == 0)
+        {
+            System.Console.WriteLine("\nNothing to sync.");
+            return;
+        }
+
+        // Newest first — most likely to be the cards the user actually wants.
+        syncList = syncList
+            .OrderByDescending(s => s.ReleasedAt ?? "")
+            .Take(maxSets)
+            .ToList();
+
+        System.Console.WriteLine();
+        System.Console.WriteLine($"Sync plan: {syncList.Count} set(s) → /tmp/majik-scryfall/");
+        foreach (var s in syncList)
+        {
+            System.Console.WriteLine($"  {s.Code,-6} {s.Name} ({s.ReleasedAt ?? "?"}) — {s.CardCount} cards");
+        }
+        if (dryRun)
+        {
+            System.Console.WriteLine("\n--dry-run: nothing downloaded.");
+            return;
+        }
+
+        System.Console.WriteLine();
+        var tmpDir = Path.Combine(Path.GetTempPath(), "majik-scryfall");
+        Directory.CreateDirectory(tmpDir);
+
+        int ok = 0, failed = 0;
+        for (var i = 0; i < syncList.Count; i++)
+        {
+            var s = syncList[i];
+            System.Console.WriteLine($"\n[{i + 1}/{syncList.Count}] {s.Code} — {s.Name}");
+            var destPath = Path.Combine(tmpDir, $"set-{s.Code.ToLowerInvariant()}.json");
+            try
+            {
+                await downloader.DownloadSetAsync(s.Code, destPath);
+                await HandleImportCommand(new[] { "import", destPath });
+                ok++;
+            }
+            catch (Exception ex)
+            {
+                System.Console.WriteLine($"  ✗ {s.Code} failed: {ex.Message}");
+                failed++;
+            }
+        }
+
+        System.Console.WriteLine($"\nSync complete: {ok} succeeded, {failed} failed.");
     }
 
     /// <summary>
