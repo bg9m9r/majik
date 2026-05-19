@@ -15,6 +15,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Majik.Core.Api.Tests", "Maj
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Majik.Server", "Majik.Server\Majik.Server.csproj", "{BB5B6C9A-678D-46E4-9BF8-E75AAA13A9C1}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Majik.Server.Tests", "Majik.Server.Tests\Majik.Server.Tests.csproj", "{2765BC0E-45F7-42C4-9FDC-6B6994F6F559}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -97,6 +99,18 @@ Global
 		{BB5B6C9A-678D-46E4-9BF8-E75AAA13A9C1}.Release|x64.Build.0 = Release|Any CPU
 		{BB5B6C9A-678D-46E4-9BF8-E75AAA13A9C1}.Release|x86.ActiveCfg = Release|Any CPU
 		{BB5B6C9A-678D-46E4-9BF8-E75AAA13A9C1}.Release|x86.Build.0 = Release|Any CPU
+		{2765BC0E-45F7-42C4-9FDC-6B6994F6F559}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2765BC0E-45F7-42C4-9FDC-6B6994F6F559}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2765BC0E-45F7-42C4-9FDC-6B6994F6F559}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{2765BC0E-45F7-42C4-9FDC-6B6994F6F559}.Debug|x64.Build.0 = Debug|Any CPU
+		{2765BC0E-45F7-42C4-9FDC-6B6994F6F559}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{2765BC0E-45F7-42C4-9FDC-6B6994F6F559}.Debug|x86.Build.0 = Debug|Any CPU
+		{2765BC0E-45F7-42C4-9FDC-6B6994F6F559}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2765BC0E-45F7-42C4-9FDC-6B6994F6F559}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2765BC0E-45F7-42C4-9FDC-6B6994F6F559}.Release|x64.ActiveCfg = Release|Any CPU
+		{2765BC0E-45F7-42C4-9FDC-6B6994F6F559}.Release|x64.Build.0 = Release|Any CPU
+		{2765BC0E-45F7-42C4-9FDC-6B6994F6F559}.Release|x86.ActiveCfg = Release|Any CPU
+		{2765BC0E-45F7-42C4-9FDC-6B6994F6F559}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
