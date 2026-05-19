@@ -1,3 +1,4 @@
+using Majik.Server.Auth;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 
@@ -6,11 +7,16 @@ namespace Majik.Server.Composition;
 /// <summary>
 /// Wires OIDC bearer-token auth.
 ///
-/// IdP-agnostic by design: the server validates JWTs against whatever
-/// authority is configured in `Auth:Authority` (Auth0, Cognito, Keycloak,
-/// Azure AD, etc.). Token discovery is the standard OIDC dance —
-/// metadata lives at `{authority}/.well-known/openid-configuration` and
-/// the handler caches the signing keys.
+/// Production path: validate JWTs against the configured Auth0 tenant
+/// (Auth:Authority = "https://{tenant}.auth0.com/") with the API
+/// identifier as audience (Auth:Audience). On top of the standard
+/// signature/issuer/audience/lifetime checks, <see cref="Auth0TokenValidator"/>
+/// enforces the Auth0 social-identity sub format and lifts a
+/// `discordUserId` claim out of the sub.
+///
+/// Token discovery is the standard OIDC dance — metadata lives at
+/// `{authority}/.well-known/openid-configuration` and the handler
+/// caches the signing keys.
 ///
 /// When `Auth:Authority` is missing or empty, auth is disabled — useful
 /// for local development before an IdP is provisioned. In that mode
@@ -52,6 +58,10 @@ public static class AuthRegistration
                     ValidateLifetime = true,
                     ValidateIssuerSigningKey = true,
                     NameClaimType = "sub",
+                };
+                options.Events = new JwtBearerEvents
+                {
+                    OnTokenValidated = Auth0TokenValidator.ValidateAsync,
                 };
             });
         }

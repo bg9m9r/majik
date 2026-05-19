@@ -130,6 +130,17 @@ Auth backend: **Auth0** tenant with the **Discord social connection** enabled. T
 4. `/game/:id` — claim seat on enter (POST /games/{id}/seat); both seats must be claimed before start. "Start game" button calls POST /games/{id}/start?mode=full when both seats are filled.
 5. HTTP interceptor attaches `Authorization: Bearer <token>` to every request and `accessTokenFactory` to the SignalR connection builder.
 
+### API-side Auth0 token validation
+
+The server's `JwtBearer` scheme validates every incoming token against the configured Auth0 tenant (signature, issuer, audience, lifetime), then runs `Auth0TokenValidator` as an `OnTokenValidated` event handler for two Auth0-specific extras:
+
+1. **Sub format enforcement.** Rejects tokens whose `sub` claim doesn't follow Auth0's social-identity layout `oauth2|{provider}|{external-id}`. Tokens from the default username/password DB connection (`auth0|...`) or M2M client credentials get a 401 instead of slipping through with a sub the rest of the server can't reason about.
+2. **Discord convenience claim.** When the provider is `discord`, the validator lifts the raw snowflake out of the sub and adds it as a `discordUserId` claim on the principal. Downstream code (audit log, future friends list) reads that without re-parsing.
+
+Endpoints stay protected by the existing `AsPlayer` authorization policy; this work runs *before* authorization so a malformed-sub token never reaches the policy check. `GameSeating` continues to key seats by the full `sub` (`oauth2|discord|{id}`) — that value is what's stable and what the user authenticates as.
+
+Disabled when `Auth:Authority` is empty (dev convenience before the tenant is provisioned).
+
 ### Auth0 setup notes
 
 One-time tenant config required before slice 1 lands:
