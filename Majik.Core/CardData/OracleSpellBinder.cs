@@ -124,6 +124,14 @@ public static class OracleSpellBinder
     private static readonly Regex PutPlusCounter = new(
         @"put\s+(?<n>a|an|\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+\+1/\+1\s+counters?\s+on\s+target\s+creature",
         RegexOptions.IgnoreCase);
+    // "Gain control of target creature."
+    private static readonly Regex GainControl = new(
+        @"gain\s+control\s+of\s+target\s+creature",
+        RegexOptions.IgnoreCase);
+    // "Creatures you control get +P/+T until end of turn."
+    private static readonly Regex CreaturesYouControlPump = new(
+        @"creatures\s+you\s+control\s+get\s+\+(?<p>\d+)/\+(?<t>\d+)\s+until\s+end\s+of\s+turn",
+        RegexOptions.IgnoreCase);
     // "Counter target spell unless its controller pays {N}."
     private static readonly Regex CounterUnlessPay = new(
         @"counter\s+target\s+spell\s+unless\s+its\s+controller\s+pays\s+\{?(?<n>\d+)\}?",
@@ -150,6 +158,14 @@ public static class OracleSpellBinder
         CardEntity entity,
         Player caster,
         Func<object, object> resolver,
+        Majik.Core.Stack.Stack? stack) =>
+        Bind(entity, caster, resolver, null, stack);
+
+    public static SpellDefinition? Bind(
+        CardEntity entity,
+        Player caster,
+        Func<object, object> resolver,
+        Majik.Core.Effects.ContinuousEffectsService? effects,
         Majik.Core.Stack.Stack? stack)
     {
         if (entity == null) throw new ArgumentNullException(nameof(entity));
@@ -176,6 +192,15 @@ public static class OracleSpellBinder
         var mPlus = PutPlusCounter.Match(text);
         if (mPlus.Success) return PutPlusOnePlusOneSpell(
             WordToInt(mPlus.Groups["n"].Value), resolver);
+
+        if (GainControl.IsMatch(text) && effects != null)
+            return GainControlSpell(resolver, caster, effects);
+
+        var mGlobal = CreaturesYouControlPump.Match(text);
+        if (mGlobal.Success && effects != null) return CreaturesYouControlPumpSpell(
+            int.Parse(mGlobal.Groups["p"].Value),
+            int.Parse(mGlobal.Groups["t"].Value),
+            caster, effects);
 
         var m = DamageAnyTarget.Match(text);
         if (m.Success) return DamageAnySpell(WordToInt(m.Groups["n"].Value), resolver);
@@ -251,6 +276,48 @@ public static class OracleSpellBinder
             m.Groups["subtype"].Value);
 
         return null;
+    }
+
+    private static SpellDefinition GainControlSpell(
+        Func<object, object> resolver, Player caster,
+        Majik.Core.Effects.ContinuousEffectsService effects) => new(
+        Modes: Array.Empty<string>(), HasVariableX: false,
+        TargetRequests: new[] { new TargetRequest("target creature", 1, 1, Array.Empty<object>()) },
+        EffectFactory: p =>
+        {
+            var target = resolver(p.Targets[0][0]);
+            return new IEffect[] { new Effect("gain control", () =>
+            {
+                if (target is Permanent perm)
+                    effects.Register(new Majik.Core.Effects.ControlChangeEffect(perm, caster));
+            }) };
+        });
+
+    private static SpellDefinition CreaturesYouControlPumpSpell(
+        int p, int t, Player caster,
+        Majik.Core.Effects.ContinuousEffectsService effects) => new(
+        Modes: Array.Empty<string>(), HasVariableX: false,
+        TargetRequests: Array.Empty<TargetRequest>(),
+        EffectFactory: _ => new IEffect[] { new Effect($"creatures +{p}/+{t} EOT", () =>
+        {
+            foreach (var c in caster.Zones.Battlefield.GetCards().OfType<Creature>())
+            {
+                effects.Register(new GlobalPumpEffect(c, p, t));
+            }
+        }) });
+
+    /// <summary>Layer 7c pump-this-creature effect, EOT.</summary>
+    private sealed class GlobalPumpEffect : Majik.Core.Effects.ContinuousEffect
+    {
+        private readonly Creature _target;
+        private readonly int _p, _t;
+        public GlobalPumpEffect(Creature target, int p, int t)
+        { _target = target; _p = p; _t = t; }
+        public override Majik.Core.Effects.Layer Layer => Majik.Core.Effects.Layer.PT_Modify;
+        public override bool ExpiresAtEndOfTurn => true;
+        public override bool AppliesTo(Creature c) => ReferenceEquals(c, _target);
+        public override void Apply(Majik.Core.Effects.CreatureCharacteristics chars)
+        { chars.Power += _p; chars.Toughness += _t; }
     }
 
     private static SpellDefinition DealsDamageEachCreatureSpell(int n, Player caster) => new(
