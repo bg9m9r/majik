@@ -32,6 +32,7 @@ internal static class TriggerPlayground
             case "play-game-db": RunPlayGameDb(); break;
             case "play-full-game": RunPlayFullGame().GetAwaiter().GetResult(); break;
             case "play-heuristic": RunPlayHeuristic().GetAwaiter().GetResult(); break;
+            case "play-modern-faceoff": RunModernFaceoff().GetAwaiter().GetResult(); break;
             case "all":
                 RunEtb();
                 RunApnap();
@@ -60,6 +61,7 @@ internal static class TriggerPlayground
         System.Console.WriteLine("  play-game-db    Load Lightning Bolt/Mountain from Scryfall DB, play one slice");
         System.Console.WriteLine("  play-full-game  Bot vs bot through GameDriver, multiple full turns");
         System.Console.WriteLine("  play-heuristic  HeuristicBotAgent — plays lands + attacks + blocks");
+        System.Console.WriteLine("  play-modern-faceoff  Boros Energy vs Eldrazi-Affinity, HeuristicBot vs HeuristicBot");
         System.Console.WriteLine("  all             Run every scenario in sequence");
     }
 
@@ -264,8 +266,8 @@ internal static class TriggerPlayground
             priorityManager: priority,
             combatFlow: combat);
 
-        Log("Running 5 turns (bots just pass priority, no attacks)…");
-        var result = await driver.RunGameAsync(maxTurns: 5);
+        Log("Running until game ends (no turn cap; bots pass priority)…");
+        var result = await driver.RunGameAsync(maxTurns: int.MaxValue);
 
         Log($"Turns played: {result.TurnsPlayed}");
         Log($"Winner: {(result.Winner?.Name ?? "(none — turn cap reached)")}");
@@ -424,6 +426,152 @@ internal static class TriggerPlayground
         ITriggeredAbility t => $"trigger({t.Controller.Name})",
         _ => obj.GetType().Name,
     };
+
+    private const string BorosEnergyDeck = @"
+4 Ajani, Nacatl Pariah
+4 Guide of Souls
+4 Ocelot Pride
+4 Phlage, Titan of Fire's Fury
+4 Ragavan, Nimble Pilferer
+3 Seasoned Pyromancer
+3 Voice of Victory
+4 Galvanic Discharge
+2 Thraben Charm
+2 Erode
+3 Goblin Bombardment
+3 Arena of Glory
+3 Sacred Foundry
+3 Plains
+2 Elegant Parlor
+3 Marsh Flats
+4 Flooded Strand
+4 Arid Mesa
+1 Mountain";
+
+    private const string EldraziAffinityDeck = @"
+1 Haywire Mite
+4 Kappa Cannoneer
+4 Pinnacle Emissary
+3 Emry, Lurker of the Loch
+4 Claws of Gix
+1 Skateboard
+4 Engineered Explosives
+4 Mishra's Bauble
+3 Tormod's Crypt
+4 Mox Opal
+1 Shadowspear
+1 Welding Jar
+3 Metallic Rebuke
+4 Weapons Manufacturing
+4 Urza's Saga
+1 Thundering Falls
+4 Polluted Delta
+3 Steam Vents
+1 Breeding Pool
+1 Scalding Tarn
+4 Flooded Strand
+1 Island";
+
+    private static async Task RunModernFaceoff()
+    {
+        Banner("Scenario: Modern face-off — Boros Energy vs Eldrazi/Affinity");
+
+        var dbPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "Majik", "cards.db");
+        if (!File.Exists(dbPath))
+        {
+            Log($"Scryfall DB missing at {dbPath} — skipping.");
+            Log("Run `dotnet run --project Majik.Console -- import <scryfall-all-cards.json>` first.");
+            return;
+        }
+
+        using var db = new CardDbContext();
+        var factory = new ScryfallCardFactory(new DbCardRepository(db));
+
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+
+        var aliceStats = BuildDeck(factory, alice, BorosEnergyDeck);
+        var bobStats = BuildDeck(factory, bob, EldraziAffinityDeck);
+
+        Log($"Alice (Boros Energy): {aliceStats.total} cards, {aliceStats.bound} bound, {aliceStats.vanilla} vanilla shells");
+        if (aliceStats.missing.Count > 0)
+            Log($"  Not in DB: {string.Join(", ", aliceStats.missing.Distinct())}");
+        Log($"Bob   (Eldrazi-Affinity): {bobStats.total} cards, {bobStats.bound} bound, {bobStats.vanilla} vanilla shells");
+        if (bobStats.missing.Count > 0)
+            Log($"  Not in DB: {string.Join(", ", bobStats.missing.Distinct())}");
+
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var zones = new ZoneService(bus);
+        var triggers = new TriggerManager(stack, bus);
+        var resolver = new Majik.Core.Services.StackResolver(bus, zones);
+        var sba = new Majik.Core.Rules.StateBasedActions(bus, zones, triggers);
+        var priority = new PriorityManager(new List<Player> { alice, bob }, stack, bus, triggers);
+        var combat = new Majik.Core.Combat.CombatFlow(bus, sba);
+
+        var driver = new GameDriver(
+            players: new[] { alice, bob },
+            agents: new Dictionary<Player, IPlayerAgent>
+            {
+                [alice] = new HeuristicBotAgent(),
+                [bob] = new HeuristicBotAgent(),
+            },
+            stack: stack,
+            zoneService: zones,
+            triggerManager: triggers,
+            stackResolver: resolver,
+            stateBasedActions: sba,
+            priorityManager: priority,
+            combatFlow: combat);
+
+        Log("Running until game ends (no turn cap)…");
+        var result = await driver.RunGameAsync(maxTurns: int.MaxValue);
+
+        Log($"Turns played: {result.TurnsPlayed}");
+        Log($"Winner: {(result.Winner?.Name ?? "(none — draw or stalled)")}");
+        DumpPlayer("Alice", alice);
+        DumpPlayer("Bob", bob);
+    }
+
+    private sealed record DeckStats(int total, int bound, int vanilla, List<string> missing);
+
+    private static DeckStats BuildDeck(ScryfallCardFactory factory, Player owner, string decklist)
+    {
+        var missing = new List<string>();
+        int total = 0, bound = 0, vanilla = 0;
+        foreach (var rawLine in decklist.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var line = rawLine.Trim();
+            if (line.Length == 0) continue;
+            var space = line.IndexOf(' ');
+            if (space < 0 || !int.TryParse(line[..space], out var count)) continue;
+            var name = line[(space + 1)..].Trim();
+            for (var i = 0; i < count; i++)
+            {
+                var card = factory.Create(name, owner);
+                if (card.GetType() == typeof(Card))
+                {
+                    vanilla++;
+                    missing.Add(name);
+                }
+                else
+                {
+                    bound++;
+                }
+                total++;
+                card.Zone = ZoneType.Library;
+                owner.Zones.Library.AddCard(card);
+            }
+        }
+        return new DeckStats(total, bound, vanilla, missing);
+    }
+
+    private static void DumpPlayer(string label, Player p)
+    {
+        Log($"{label}: life={p.LifeTotal} hand={p.Zones.Hand.Count} library={p.Zones.Library.Count} graveyard={p.Zones.Graveyard.Count} battlefield={p.Zones.Battlefield.Count}");
+    }
 
     private static void Banner(string title)
     {

@@ -146,7 +146,14 @@ public sealed class TurnDriver
     private void DrawCard(Player player)
     {
         var top = player.Zones.Library.GetCards().FirstOrDefault();
-        if (top == null) return;
+        if (top == null)
+        {
+            // CR 704.5b — draw from empty library flags the player for
+            // state-based loss. Without this flag, the game can stall
+            // forever (no win condition fires).
+            player.TriedToDrawFromEmptyLibrary = true;
+            return;
+        }
         player.Zones.Library.RemoveCard(top);
         player.Zones.Hand.AddCard(top);
         top.Zone = ZoneType.Hand;
