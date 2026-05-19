@@ -54,6 +54,9 @@ public static class OracleTriggeredAbilityBinder
     private static readonly Regex CreateClue = new(
         @"create\s+(?<n>a|an|\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+clue\s+tokens?",
         RegexOptions.IgnoreCase);
+    private static readonly Regex PutPlusCounterOnSelf = new(
+        @"put\s+(?<n>a|an|\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+\+1/\+1\s+counters?\s+on\s+~",
+        RegexOptions.IgnoreCase);
     private static readonly Regex GetEnergy = new(
         @"you get\s+((?:\{E\}\s*)+)",
         RegexOptions.IgnoreCase);
@@ -91,7 +94,7 @@ public static class OracleTriggeredAbilityBinder
 
         foreach (Match m in EtbLine.Matches(text))
         {
-            var effects = BuildEffects(m.Groups["effect"].Value, ctrl).ToList();
+            var effects = BuildEffects(m.Groups["effect"].Value, ctrl, source).ToList();
             if (effects.Count == 0) continue;
             yield return new TriggeredAbility(
                 source, ctrl,
@@ -101,7 +104,7 @@ public static class OracleTriggeredAbilityBinder
 
         foreach (Match m in DiesLine.Matches(text))
         {
-            var effects = BuildEffects(m.Groups["effect"].Value, ctrl).ToList();
+            var effects = BuildEffects(m.Groups["effect"].Value, ctrl, source).ToList();
             if (effects.Count == 0) continue;
             yield return new TriggeredAbility(
                 source, ctrl,
@@ -111,7 +114,7 @@ public static class OracleTriggeredAbilityBinder
 
         foreach (Match m in CombatDamagePlayer.Matches(text))
         {
-            var effects = BuildEffects(m.Groups["effect"].Value, ctrl).ToList();
+            var effects = BuildEffects(m.Groups["effect"].Value, ctrl, source).ToList();
             if (effects.Count == 0) continue;
             yield return new TriggeredAbility(
                 source, ctrl,
@@ -123,7 +126,7 @@ public static class OracleTriggeredAbilityBinder
         // "Whenever ~ attacks, ..." per-attacker trigger (CR 508.1f).
         foreach (Match m in AttackLine.Matches(text))
         {
-            var effects = BuildEffects(m.Groups["effect"].Value, ctrl).ToList();
+            var effects = BuildEffects(m.Groups["effect"].Value, ctrl, source).ToList();
             if (effects.Count == 0) continue;
             yield return new TriggeredAbility(
                 source, ctrl,
@@ -136,7 +139,7 @@ public static class OracleTriggeredAbilityBinder
         // 'Landfall — …' shorthand.
         foreach (Match m in LandfallLine.Matches(text))
         {
-            var effects = BuildEffects(m.Groups["effect"].Value, ctrl).ToList();
+            var effects = BuildEffects(m.Groups["effect"].Value, ctrl, source).ToList();
             if (effects.Count == 0) continue;
             yield return new TriggeredAbility(
                 source, ctrl,
@@ -148,7 +151,7 @@ public static class OracleTriggeredAbilityBinder
         // Guide of Souls, Soul Attendant pattern.
         foreach (Match m in AnotherCreatureEnters.Matches(text))
         {
-            var effects = BuildEffects(m.Groups["effect"].Value, ctrl).ToList();
+            var effects = BuildEffects(m.Groups["effect"].Value, ctrl, source).ToList();
             if (effects.Count == 0) continue;
             yield return new TriggeredAbility(
                 source, ctrl,
@@ -157,7 +160,7 @@ public static class OracleTriggeredAbilityBinder
         }
     }
 
-    private static IEnumerable<IEffect> BuildEffects(string effectText, Player controller)
+    private static IEnumerable<IEffect> BuildEffects(string effectText, Player controller, ICard? source = null)
     {
         var m = YouGainLife.Match(effectText);
         if (m.Success)
@@ -214,6 +217,14 @@ public static class OracleTriggeredAbilityBinder
         {
             yield return new Effect("investigate", () =>
                 Majik.Core.Tokens.TokenFactory.CreateClue(controller));
+        }
+
+        m = PutPlusCounterOnSelf.Match(effectText);
+        if (m.Success && source is Permanent perm)
+        {
+            var n = WordToInt(m.Groups["n"].Value);
+            yield return new Effect($"+{n}/+{n} counter on ~", () =>
+                perm.Counters.Add(Majik.Core.Counters.CounterType.PlusOnePlusOne, n));
         }
 
         // "Create a Treasure token" shorthand without explicit pluralisation
