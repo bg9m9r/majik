@@ -1,5 +1,6 @@
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
+using Majik.Core.Players;
 
 namespace Majik.Core.Effects;
 
@@ -50,6 +51,8 @@ public sealed class ContinuousEffectsService
         {
             chars.Keywords.Add(kw.Keyword);
         }
+        // Seed printed subtypes; Layer 4 effects add/remove on top.
+        foreach (var st in creature.Subtypes) chars.Subtypes.Add(st);
 
         var applicable = _effects
             .Where(e => e.IsActive() && e.AppliesTo(creature))
@@ -78,5 +81,20 @@ public sealed class ContinuousEffectsService
     public void ExpireEndOfTurn()
     {
         _effects.RemoveAll(e => e.ExpiresAtEndOfTurn);
+    }
+
+    /// <summary>
+    /// CR 613.2 — current controller of a permanent after applying any
+    /// active Layer 2 control-change effects (latest-timestamp wins). Falls
+    /// back to <see cref="Permanent.Controller"/> when no override is active.
+    /// </summary>
+    public Player EffectiveController(Permanent perm)
+    {
+        if (perm == null) throw new ArgumentNullException(nameof(perm));
+        var swap = _effects.OfType<ControlChangeEffect>()
+            .Where(e => e.IsActive() && ReferenceEquals(e.Target, perm))
+            .OrderByDescending(e => e.Timestamp)
+            .FirstOrDefault();
+        return swap?.NewController ?? perm.Controller!;
     }
 }

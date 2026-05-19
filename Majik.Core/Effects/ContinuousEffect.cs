@@ -36,4 +36,5 @@ public sealed class CreatureCharacteristics
     public int Power { get; set; }
     public int Toughness { get; set; }
     public HashSet<string> Keywords { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public HashSet<Majik.Core.Cards.Types.CardSubtype> Subtypes { get; } = new();
 }
