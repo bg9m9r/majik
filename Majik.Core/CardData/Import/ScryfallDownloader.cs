@@ -138,8 +138,44 @@ public sealed class ScryfallDownloader
         Log($"Wrote {total} cards from set '{setCode}' → {destPath}");
     }
 
+    /// <summary>List every set Scryfall knows about. Result is JSON
+    /// objects from /sets; caller picks the fields it needs (typically
+    /// code, name, released_at, card_count, set_type, digital).</summary>
+    public async Task<IReadOnlyList<ScryfallSet>> ListSetsAsync(
+        CancellationToken ct = default)
+    {
+        Log($"Fetching set list from {ApiBase}/sets");
+        await Throttle(ct);
+        using var resp = await _http.GetAsync($"{ApiBase}/sets", ct);
+        resp.EnsureSuccessStatusCode();
+        var json = await resp.Content.ReadAsStringAsync(ct);
+
+        using var doc = JsonDocument.Parse(json);
+        var sets = new List<ScryfallSet>();
+        foreach (var s in doc.RootElement.GetProperty("data").EnumerateArray())
+        {
+            sets.Add(new ScryfallSet(
+                Code: s.GetProperty("code").GetString() ?? "",
+                Name: s.GetProperty("name").GetString() ?? "",
+                ReleasedAt: s.TryGetProperty("released_at", out var r) ? r.GetString() : null,
+                CardCount: s.TryGetProperty("card_count", out var c) ? c.GetInt32() : 0,
+                SetType: s.TryGetProperty("set_type", out var t) ? t.GetString() ?? "" : "",
+                Digital: s.TryGetProperty("digital", out var d) && d.GetBoolean()));
+        }
+        return sets;
+    }
+
     private async Task Throttle(CancellationToken ct) =>
         await Task.Delay(ThrottleMs, ct);
 
     private void Log(string msg) => _log?.Report(msg);
 }
+
+/// <summary>Subset of Scryfall's set object we surface for diffing.</summary>
+public sealed record ScryfallSet(
+    string Code,
+    string Name,
+    string? ReleasedAt,
+    int CardCount,
+    string SetType,
+    bool Digital);

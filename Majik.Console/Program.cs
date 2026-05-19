@@ -63,12 +63,18 @@ class Program
                 await HandleFetchSetCommandAsync(args);
                 return;
             }
+            else if (args[0].Equals("compare-sets", StringComparison.OrdinalIgnoreCase))
+            {
+                await HandleCompareSetsCommandAsync(args);
+                return;
+            }
         }
 
         System.Console.WriteLine("Usage:");
         System.Console.WriteLine("  Majik.Console import <path-to-json-file>");
         System.Console.WriteLine("  Majik.Console fetch-bulk [oracle-cards|default-cards|all-cards|unique-artwork] [--no-import]");
         System.Console.WriteLine("  Majik.Console fetch-set <set-code> [--no-import]");
+        System.Console.WriteLine("  Majik.Console compare-sets [--include-digital] [--missing-only] [--partial-only]");
         System.Console.WriteLine("  Majik.Console analyze-keywords <path-to-csv-file>");
         System.Console.WriteLine("  Majik.Console ingest-claude-results <path-to-jsonl-file>");
         System.Console.WriteLine("  Majik.Console play-triggers [etb|apnap|intervening-if|delayed|all]");
@@ -199,6 +205,108 @@ class Program
             return;
         }
         await HandleImportCommand(new[] { "import", destPath });
+    }
+
+    /// <summary>
+    /// compare-sets [--include-digital] [--missing-only] [--partial-only]
+    /// Lists Scryfall's known sets, compares against distinct Set codes in
+    /// the local DB, prints a diff.
+    /// </summary>
+    static async Task HandleCompareSetsCommandAsync(string[] args)
+    {
+        var includeDigital = args.Any(a => a.Equals("--include-digital", StringComparison.OrdinalIgnoreCase));
+        var missingOnly = args.Any(a => a.Equals("--missing-only", StringComparison.OrdinalIgnoreCase));
+        var partialOnly = args.Any(a => a.Equals("--partial-only", StringComparison.OrdinalIgnoreCase));
+
+        System.Console.WriteLine($"=== Majik Set Comparison ===\n");
+
+        var downloader = new ScryfallDownloader(
+            log: new Progress<string>(m => System.Console.WriteLine($"  {m}")));
+
+        IReadOnlyList<ScryfallSet> scryfallSets;
+        try
+        {
+            scryfallSets = await downloader.ListSetsAsync();
+        }
+        catch (Exception ex)
+        {
+            System.Console.WriteLine($"\n✗ Set list fetch failed: {ex.Message}");
+            return;
+        }
+
+        if (!includeDigital)
+        {
+            scryfallSets = scryfallSets.Where(s => !s.Digital).ToList();
+        }
+
+        await using var db = new CardDbContext();
+        var localCounts = db.Cards
+            .Where(c => c.Set != null)
+            .GroupBy(c => c.Set!.ToLower())
+            .Select(g => new { Code = g.Key, Count = g.Count() })
+            .ToDictionary(g => g.Code, g => g.Count);
+
+        var missing = new List<ScryfallSet>();
+        var partial = new List<(ScryfallSet s, int local)>();
+        var complete = 0;
+
+        foreach (var s in scryfallSets)
+        {
+            var code = s.Code.ToLowerInvariant();
+            if (!localCounts.TryGetValue(code, out var local))
+            {
+                missing.Add(s);
+                continue;
+            }
+            if (local < s.CardCount) partial.Add((s, local));
+            else complete++;
+        }
+
+        var localCodesOnly = localCounts.Keys
+            .Where(c => !scryfallSets.Any(s => s.Code.Equals(c, StringComparison.OrdinalIgnoreCase)))
+            .ToList();
+
+        var totalLocalCards = localCounts.Values.Sum();
+        var totalScryfallCards = scryfallSets.Sum(s => s.CardCount);
+
+        System.Console.WriteLine();
+        System.Console.WriteLine($"Local DB:  {localCounts.Count} sets / {totalLocalCards} cards");
+        System.Console.WriteLine($"Scryfall:  {scryfallSets.Count} sets / {totalScryfallCards} cards"
+            + (includeDigital ? "" : " (excluding digital)"));
+        System.Console.WriteLine();
+
+        var showMissing = !partialOnly;
+        var showPartial = !missingOnly;
+
+        if (showMissing && missing.Count > 0)
+        {
+            System.Console.WriteLine($"Missing entirely ({missing.Count}):");
+            foreach (var s in missing.OrderByDescending(s => s.ReleasedAt ?? ""))
+            {
+                System.Console.WriteLine($"  {s.Code,-6} {s.Name} ({s.ReleasedAt ?? "?"}) — {s.CardCount} cards [{s.SetType}]");
+            }
+            System.Console.WriteLine();
+        }
+
+        if (showPartial && partial.Count > 0)
+        {
+            System.Console.WriteLine($"Partial ({partial.Count}):");
+            foreach (var (s, local) in partial.OrderByDescending(p => p.s.CardCount - p.local))
+            {
+                System.Console.WriteLine($"  {s.Code,-6} {s.Name} — local {local} / scryfall {s.CardCount} (-{s.CardCount - local})");
+            }
+            System.Console.WriteLine();
+        }
+
+        if (!missingOnly && !partialOnly)
+        {
+            System.Console.WriteLine($"Up-to-date: {complete} sets");
+            if (localCodesOnly.Count > 0)
+            {
+                System.Console.WriteLine($"Local-only codes ({localCodesOnly.Count}): {string.Join(", ", localCodesOnly.Take(20))}"
+                    + (localCodesOnly.Count > 20 ? $" … +{localCodesOnly.Count - 20} more" : ""));
+            }
+        }
     }
 
     /// <summary>
