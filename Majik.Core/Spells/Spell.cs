@@ -29,6 +29,19 @@ public class Spell : ISpell
     public IReadOnlyList<IEffect> Effects => _effects.AsReadOnly();
     public bool IsResolving => _resolutionState.IsResolving;
 
+    /// <summary>
+    /// Raw targets selected at cast time (CR 601.2c). Independent of the
+    /// engine's <see cref="ITarget"/> abstraction — used by resolution
+    /// recheck (CR 608.2b) to validate against current game state.
+    /// </summary>
+    public IList<object> ChosenTargets { get; } = new List<object>();
+
+    /// <summary>
+    /// Predicate the resolver uses to check whether at least one chosen
+    /// target is still legal. Null = spell has no targets (always passes).
+    /// </summary>
+    public Func<object, bool>? TargetLegalityPredicate { get; set; }
+
     public Spell(ICard card, Player controller, IEnumerable<ITarget>? targets = null, IEnumerable<ICost>? costs = null, IEnumerable<IEffect>? effects = null)
     {
         if (card == null)

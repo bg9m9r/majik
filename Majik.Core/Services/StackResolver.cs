@@ -54,6 +54,23 @@ public class StackResolver
                 return top;
             }
 
+            // CR 608.2b — spell with at least one chosen target: if every
+            // target is now illegal, the spell is countered on resolution.
+            if (top is Majik.Core.Spells.Spell spellRecheck
+                && spellRecheck.ChosenTargets.Count > 0
+                && spellRecheck.TargetLegalityPredicate != null)
+            {
+                var anyLegal = spellRecheck.ChosenTargets
+                    .Any(t => spellRecheck.TargetLegalityPredicate(t));
+                if (!anyLegal)
+                {
+                    spellRecheck.Card.Zone = Zones.ZoneType.Graveyard;
+                    _eventBus?.Publish(new StateBasedActionExecutedEvent(
+                        $"{spellRecheck.Card.Name} countered: all targets illegal"));
+                    return top;
+                }
+            }
+
             // Resolve the object (Rule 608.1)
             top.Resolve();
 

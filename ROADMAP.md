@@ -349,3 +349,10 @@ Track A unlocks Track B (layer system needed for granted abilities).
   - Concurrent stress: `GameRegistry.Create` × 100 in parallel → 100 unique GameIds; 30 facades submit-in-parallel → no cross-talk in logs
   - 664 Core + 45 Api = 709 tests, zero warnings
 - **Phase 30 remaining** — frozen ability bindings (don't re-bind per Create), memory profiling, telemetry hooks (event counts, latency per phase), async timeout/cancellation on stalled agents
+- **Phase 15 first cut** — Casting completeness ✅ done
+  - `Game/CastingPermission.CanCast` — CR 117.1 sorcery vs instant gating (own turn + main phase + empty stack for sorceries; instants anytime)
+  - `Game/LandDropTracker` — CR 305.2; per-player drop count + max-per-turn (Azusa-style overrides); validates turn/phase/stack-empty; `ResetTurn` clears on turn change
+  - `Spell.ChosenTargets` + `TargetLegalityPredicate`; `StackResolver` re-checks on resolution (CR 608.2b) — all-targets-illegal → spell countered, card to graveyard
+  - `Game/AbilityActivationFlow` — symmetric to `SpellCastFlow` for activated abilities: target prompts → mana payment → push onto stack → fire `AbilityActivatedEvent`
+  - 680 Core + 45 Api = 725 tests, zero warnings
+- **Phase 15 remaining** — wire `CastingPermission` + `LandDropTracker` into `SpellCastFlow`/`TurnDriver` (currently free-standing helpers); additional costs ("as you cast"); alternative costs (Flashback, Madness); X spells variable cost; modal spell prompts; hold-priority semantics
