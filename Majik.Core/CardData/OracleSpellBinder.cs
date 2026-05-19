@@ -124,6 +124,10 @@ public static class OracleSpellBinder
     private static readonly Regex MillTarget = new(
         @"target\s+player\s+mills\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+cards?",
         RegexOptions.IgnoreCase);
+    // "Return target [TYPE] card from your graveyard to your hand."
+    private static readonly Regex ReanimateFromGraveyard = new(
+        @"return\s+target\s+(?<kind>card|creature|instant|sorcery|artifact|enchantment|planeswalker|land)?\s*card\s+from\s+your\s+graveyard\s+to\s+your\s+hand",
+        RegexOptions.IgnoreCase);
     // "Scry N" — placeholder bind (effect deferred until agent prompt wired).
     private static readonly Regex ScryN = new(
         @"\bscry\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b",
@@ -205,6 +209,9 @@ public static class OracleSpellBinder
         m = BounceTarget.Match(text);
         if (m.Success) return BounceTargetSpell(resolver, $"target {m.Groups[1].Value}");
 
+        m = ReanimateFromGraveyard.Match(text);
+        if (m.Success) return ReanimateSpell(resolver, m.Groups["kind"].Value);
+
         m = ExileTarget.Match(text);
         if (m.Success) return ExileTargetSpell(resolver, $"target {m.Groups[1].Value}");
 
@@ -229,6 +236,25 @@ public static class OracleSpellBinder
 
         return null;
     }
+
+    private static SpellDefinition ReanimateSpell(Func<object, object> resolver, string kindRaw) => new(
+        Modes: Array.Empty<string>(), HasVariableX: false,
+        TargetRequests: new[] { new TargetRequest(
+            string.IsNullOrEmpty(kindRaw) ? "target card in graveyard" : $"target {kindRaw} card in graveyard",
+            1, 1, Array.Empty<object>()) },
+        EffectFactory: p =>
+        {
+            var target = resolver(p.Targets[0][0]);
+            return new IEffect[] { new Effect("return from gy", () =>
+            {
+                if (target is not ICard card) return;
+                var owner = card.Owner;
+                if (owner == null) return;
+                if (card.Zone == ZoneType.Graveyard) owner.Zones.Graveyard.RemoveCard(card);
+                owner.Zones.Hand.AddCard(card);
+                card.Zone = ZoneType.Hand;
+            }) };
+        });
 
     private static SpellDefinition MillTargetSpell(int n, Func<object, object> resolver) => new(
         Modes: Array.Empty<string>(), HasVariableX: false,
