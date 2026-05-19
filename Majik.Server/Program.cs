@@ -1,8 +1,10 @@
 using Majik.Server.Composition;
+using Microsoft.AspNetCore.Authorization;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddMajikEngine();
+builder.Services.AddMajikAuth(builder.Configuration);
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi();
 
@@ -13,11 +15,23 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
+app.UseAuthentication();
+app.UseAuthorization();
+
 app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }))
-   .WithName("HealthCheck");
+   .WithName("HealthCheck")
+   .AllowAnonymous();
+
+app.MapGet("/whoami", (System.Security.Claims.ClaimsPrincipal user) =>
+    Results.Ok(new
+    {
+        sub = user.FindFirst("sub")?.Value,
+        name = user.Identity?.Name,
+        authenticated = user.Identity?.IsAuthenticated ?? false,
+    }))
+   .WithName("WhoAmI")
+   .RequireAuthorization(AuthRegistration.AsPlayerPolicy);
 
 app.Run();
 
-/// <summary>Marker class so test hosts and OpenAPI emitters can refer to
-/// the server entry assembly by type.</summary>
 public partial class Program { }
