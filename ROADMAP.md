@@ -337,3 +337,10 @@ Track A unlocks Track B (layer system needed for granted abilities).
   - Invokes `MulliganController` per player before turn 1 (CR 103.4)
   - `GameResult` now carries `StartingPlayer`; deterministic with seed
   - 661 Core + 35 Api = 696 tests, zero warnings
+- **Phase 29 first cut** — Persistence ✅ done
+  - `ActionLog` — append-only command sequence with timestamps
+  - `GameFacade.Log` exposes log; every `SubmitAsync` appends
+  - `GameSnapshot { State, Log }` + `GameFacade.SaveSnapshot()` / `SaveSnapshotBytes()`
+  - JSON round-trip preserves command polymorphism via existing `$type` discriminator
+  - 661 Core + 43 Api = 704 tests, zero warnings
+- **Phase 29 remaining** — replay reconstitution: `GameFacade.Load(snapshot, seed)` that recreates initial state, replays commands deterministically; durable persistence via DB row

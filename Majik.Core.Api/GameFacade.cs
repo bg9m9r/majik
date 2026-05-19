@@ -36,6 +36,7 @@ public sealed class GameFacade
     private readonly PriorityLoop _loop;
     private Task? _loopTask;
     private readonly List<Action<EventDto>> _subscribers = new();
+    private readonly ActionLog _log = new();
 
     public Guid GameId { get; } = Guid.NewGuid();
 
@@ -107,16 +108,30 @@ public sealed class GameFacade
                   : throw new InvalidOperationException($"Unknown player {command.PlayerId}.");
 
         agent.Submit(command);
+        _log.Append(command);
 
         // Give the loop a tick to consume the result.
         return Task.Delay(1, ct);
     }
+
+    /// <summary>Append-only log of every command submitted via SubmitAsync.</summary>
+    public ActionLog Log => _log;
 
     /// <summary>
     /// Serializes the current state to JSON bytes — read-only spectator
     /// snapshot. Pair with <see cref="SpectatorSnapshot.Load"/>.
     /// </summary>
     public byte[] Save() => JsonSerializer.SerializeToUtf8Bytes(GetState());
+
+    /// <summary>
+    /// Full snapshot including action log. Pair with
+    /// <see cref="GameSnapshot"/> deserialization for replay.
+    /// </summary>
+    public GameSnapshot SaveSnapshot() => new(
+        State: GetState(),
+        Log: _log.Actions.Select(a => new LoggedCommand(a.At, a.Command)).ToList());
+
+    public byte[] SaveSnapshotBytes() => JsonSerializer.SerializeToUtf8Bytes(SaveSnapshot());
 
     public GameStateDto GetState() => StateSnapshotter.Snapshot(
         GameId, turnNumber: 1, phase: PhaseStateType.Main,
