@@ -60,6 +60,9 @@ public static class OracleTriggeredAbilityBinder
     private static readonly Regex AnotherCreatureEnters = new(
         @"whenever another creature you control enters\s*,\s*(?<effect>[^.]+)\.",
         RegexOptions.IgnoreCase);
+    private static readonly Regex LandfallLine = new(
+        @"(?:landfall\s*[—-]\s*)?whenever a land (?:you control\s+)?enters(?:\s+the battlefield)?(?:\s+under your control)?\s*,\s*(?<effect>[^.]+)\.",
+        RegexOptions.IgnoreCase);
 
     public static IEnumerable<TriggeredAbility> Bind(ICard source, CardEntity entity, Player? controller = null)
     {
@@ -128,6 +131,19 @@ public static class OracleTriggeredAbilityBinder
                 effects: effects);
         }
 
+        // Landfall — "Whenever a land enters [the battlefield under your
+        // control], …" Catches both the explicit phrasing and the
+        // 'Landfall — …' shorthand.
+        foreach (Match m in LandfallLine.Matches(text))
+        {
+            var effects = BuildEffects(m.Groups["effect"].Value, ctrl).ToList();
+            if (effects.Count == 0) continue;
+            yield return new TriggeredAbility(
+                source, ctrl,
+                Triggers.OnLandEntersUnderControl(ctrl),
+                effects: effects);
+        }
+
         // "Whenever another creature you control enters, ..." — Soul Warden,
         // Guide of Souls, Soul Attendant pattern.
         foreach (Match m in AnotherCreatureEnters.Matches(text))
@@ -190,6 +206,19 @@ public static class OracleTriggeredAbilityBinder
                 m.Value, @"\{E\}", RegexOptions.IgnoreCase).Count;
             yield return new Effect($"get {n}E", () => controller.GainEnergy(n));
         }
+
+        // Investigate keyword shorthand — equivalent to "Create a Clue
+        // token." (CR 715.1). Common as an attack-trigger or ETB rider.
+        if (System.Text.RegularExpressions.Regex.IsMatch(effectText,
+                @"\binvestigate\b", RegexOptions.IgnoreCase))
+        {
+            yield return new Effect("investigate", () =>
+                Majik.Core.Tokens.TokenFactory.CreateClue(controller));
+        }
+
+        // "Create a Treasure token" shorthand without explicit pluralisation
+        // is already handled by CreateTreasure regex; the equivalent
+        // keyword shorthand "create a Treasure" trades to the same path.
     }
 
     private static void DrawN(Player player, int n)

@@ -98,4 +98,17 @@ public static class Triggers
         return new EventTriggerCondition<Majik.Core.Domain.DomainEvents.CreatureAttacksEvent>(
             (e, _) => ReferenceEquals(e.Attacker, source));
     }
+
+    /// <summary>
+    /// CR 614 / Zendikar — Landfall. "Whenever a land enters the battlefield
+    /// under your control, …" Fires on CardMovedEvent → Battlefield where
+    /// the card is a Land and its controller is <paramref name="controller"/>.
+    /// </summary>
+    public static ITriggerCondition OnLandEntersUnderControl(Player controller)
+    {
+        return new EventTriggerCondition<CardMovedEvent>((e, _) =>
+            e.ToZone == ZoneType.Battlefield
+            && e.Card.HasType(CardType.Land)
+            && ReferenceEquals(e.Card.Controller, controller));
+    }
 }
