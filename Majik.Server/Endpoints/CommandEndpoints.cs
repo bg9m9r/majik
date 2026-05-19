@@ -1,4 +1,6 @@
+using System.Security.Claims;
 using Majik.Core.Api.Commands;
+using Majik.Server.Auth;
 using Majik.Server.Composition;
 
 namespace Majik.Server.Endpoints;
@@ -36,11 +38,21 @@ public static class CommandEndpoints
     private static async Task<IResult> SubmitCommand(
         Guid id,
         GameCommand command,
+        ClaimsPrincipal user,
         ServerGameFactory factory,
+        GameSeating seating,
         CancellationToken ct)
     {
         var facade = factory.Get(id);
         if (facade == null) return Results.NotFound(new { error = $"Game {id} not found" });
+
+        var sub = user.FindFirst("sub")?.Value;
+        if (sub == null) return Results.Unauthorized();
+
+        if (!seating.OwnsSlot(id, command.PlayerId, sub))
+        {
+            return Results.Forbid();
+        }
 
         try
         {

@@ -1,4 +1,5 @@
 using Majik.Core.Api;
+using Majik.Server.Auth;
 using Majik.Server.Hubs;
 
 namespace Majik.Server.Composition;
@@ -13,11 +14,16 @@ public sealed class ServerGameFactory
 {
     private readonly GameRegistry _registry;
     private readonly GameHubBridgeRegistry _bridges;
+    private readonly GameSeating _seating;
 
-    public ServerGameFactory(GameRegistry registry, GameHubBridgeRegistry bridges)
+    public ServerGameFactory(
+        GameRegistry registry,
+        GameHubBridgeRegistry bridges,
+        GameSeating seating)
     {
         _registry = registry;
         _bridges = bridges;
+        _seating = seating;
     }
 
     public GameFacade Create(string aliceName, string bobName)
@@ -34,6 +40,7 @@ public sealed class ServerGameFactory
     public bool Delete(Guid id)
     {
         _bridges.Detach(id);
+        _seating.Drop(id);
         return _registry.Remove(id);
     }
 }

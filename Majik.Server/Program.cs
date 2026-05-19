@@ -36,6 +36,7 @@ app.MapGet("/whoami", (System.Security.Claims.ClaimsPrincipal user) =>
    .RequireAuthorization(AuthRegistration.AsPlayerPolicy);
 
 app.MapGameEndpoints();
+app.MapSeatEndpoints();
 app.MapCommandEndpoints();
 app.MapHub<GameHub>("/hubs/game");
 
