@@ -76,9 +76,10 @@ public static class OracleSpellBinder
     private static readonly Regex EachPlayerDraws = new(
         @"each\s+player\s+draws\s+(?<n>\d+|a|one|two|three|four|five|six|seven)\s+cards?",
         RegexOptions.IgnoreCase);
-    // "Tap target {permanent|creature|artifact|land|...}."
+    // "Tap target {permanent|creature|artifact|land|...}." — \b so "untap"
+    // doesn't match.
     private static readonly Regex TapTarget = new(
-        @"tap\s+target\s+(permanent|creature|artifact|land|enchantment|planeswalker)",
+        @"\btap\s+target\s+(permanent|creature|artifact|land|enchantment|planeswalker)",
         RegexOptions.IgnoreCase);
     // "Destroy target land." / "Destroy target nonland permanent." /
     // "Destroy target permanent."
@@ -106,6 +107,19 @@ public static class OracleSpellBinder
     // "Exile target {creature|permanent|artifact|enchantment|land|nonland permanent}."
     private static readonly Regex ExileTarget = new(
         @"exile\s+target\s+(creature|permanent|artifact|enchantment|land|nonland\s+permanent)",
+        RegexOptions.IgnoreCase);
+    // "Untap target {permanent|creature|artifact|land|...}."
+    private static readonly Regex UntapTarget = new(
+        @"untap\s+target\s+(permanent|creature|artifact|land|enchantment)",
+        RegexOptions.IgnoreCase);
+    // "You gain N life."
+    private static readonly Regex YouGainLife = new(
+        @"you\s+gain\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+life",
+        RegexOptions.IgnoreCase);
+    // "Create [a|N] [P]/[T] [colour] [subtype] creature token[s]."
+    // Captures: count, P, T, optional colour, subtype.
+    private static readonly Regex CreateTokens = new(
+        @"create\s+(?<n>a|an|\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?<p>\d+)/(?<t>\d+)\s+(?<colour>white|blue|black|red|green|colorless)?\s*(?<subtype>[A-Za-z]+)\s+creature\s+tokens?",
         RegexOptions.IgnoreCase);
 
     public static SpellDefinition? Bind(
@@ -181,8 +195,69 @@ public static class OracleSpellBinder
 
         if (DealsXDamageAny.IsMatch(text)) return DealsXAnyTargetSpell(resolver);
 
+        m = UntapTarget.Match(text);
+        if (m.Success) return UntapTargetSpell(resolver, $"target {m.Groups[1].Value}");
+
+        m = YouGainLife.Match(text);
+        if (m.Success) return YouGainLifeSpell(WordToInt(m.Groups["n"].Value), caster);
+
+        m = CreateTokens.Match(text);
+        if (m.Success) return CreateTokensSpell(
+            caster,
+            WordToInt(m.Groups["n"].Value),
+            int.Parse(m.Groups["p"].Value),
+            int.Parse(m.Groups["t"].Value),
+            m.Groups["subtype"].Value);
+
         return null;
     }
+
+    private static SpellDefinition UntapTargetSpell(Func<object, object> resolver, string label) => new(
+        Modes: Array.Empty<string>(), HasVariableX: false,
+        TargetRequests: new[] { new TargetRequest(label, 1, 1, Array.Empty<object>()) },
+        EffectFactory: p =>
+        {
+            var target = resolver(p.Targets[0][0]);
+            return new IEffect[] { new Effect("untap target", () =>
+            {
+                if (target is Permanent perm && perm.IsTapped) perm.Untap();
+            }) };
+        });
+
+    private static SpellDefinition YouGainLifeSpell(int n, Player caster) => new(
+        Modes: Array.Empty<string>(), HasVariableX: false,
+        TargetRequests: Array.Empty<TargetRequest>(),
+        EffectFactory: _ => new IEffect[] { new Effect($"you gain {n}", () => caster.GainLife(n)) });
+
+    private static SpellDefinition CreateTokensSpell(
+        Player caster, int count, int power, int toughness, string subtypeRaw) => new(
+        Modes: Array.Empty<string>(), HasVariableX: false,
+        TargetRequests: Array.Empty<TargetRequest>(),
+        EffectFactory: _ => new IEffect[] { new Effect($"create {count} {power}/{toughness}", () =>
+        {
+            // Subtype enum lookup is best-effort; tokens with unrecognised
+            // subtypes still spawn with no subtype attached.
+            Majik.Core.Cards.Types.CardSubtype? subtype = null;
+            if (Enum.TryParse<Majik.Core.Cards.Types.CardSubtype>(
+                char.ToUpperInvariant(subtypeRaw[0]) + subtypeRaw[1..].ToLowerInvariant(),
+                out var st))
+            {
+                subtype = st;
+            }
+
+            for (var i = 0; i < count; i++)
+            {
+                var token = new Creature(subtypeRaw, "", power, toughness,
+                    subtypes: subtype.HasValue
+                        ? new[] { subtype.Value }
+                        : Array.Empty<Majik.Core.Cards.Types.CardSubtype>())
+                {
+                    Owner = caster, Controller = caster,
+                    Zone = ZoneType.Battlefield, IsToken = true,
+                };
+                caster.Zones.Battlefield.AddCard(token);
+            }
+        }) });
 
     private static SpellDefinition ExileTargetSpell(Func<object, object> resolver, string label) => new(
         Modes: Array.Empty<string>(), HasVariableX: false,
