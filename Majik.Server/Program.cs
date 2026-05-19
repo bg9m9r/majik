@@ -1,4 +1,5 @@
 using Majik.Server.Composition;
+using Majik.Server.Endpoints;
 using Microsoft.AspNetCore.Authorization;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -31,6 +32,8 @@ app.MapGet("/whoami", (System.Security.Claims.ClaimsPrincipal user) =>
     }))
    .WithName("WhoAmI")
    .RequireAuthorization(AuthRegistration.AsPlayerPolicy);
+
+app.MapGameEndpoints();
 
 app.Run();
 
