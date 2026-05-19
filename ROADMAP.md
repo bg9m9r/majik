@@ -196,7 +196,7 @@ ASP.NET Core wrapper + separate-repo React/Svelte frontend.
 
 `GameSnapshot` entity + action log → deterministic replay.
 
-### Phase 30 — Performance + Hardening (~2 weeks)
+### Phase 30 — Performance + Hardening (~2 weeks) **← FIRST CUT**
 
 Card lookup cache, frozen ability bindings, concurrent-game stress test, telemetry.
 
@@ -344,3 +344,8 @@ Track A unlocks Track B (layer system needed for granted abilities).
   - JSON round-trip preserves command polymorphism via existing `$type` discriminator
   - 661 Core + 43 Api = 704 tests, zero warnings
 - **Phase 29 remaining** — replay reconstitution: `GameFacade.Load(snapshot, seed)` that recreates initial state, replays commands deterministically; durable persistence via DB row
+- **Phase 30 first cut** — Perf + hardening ✅ done
+  - `CachingCardRepository` decorator over `ICardRepository` — `ConcurrentDictionary` caches hits + misses; O(1) lookup after first call
+  - Concurrent stress: `GameRegistry.Create` × 100 in parallel → 100 unique GameIds; 30 facades submit-in-parallel → no cross-talk in logs
+  - 664 Core + 45 Api = 709 tests, zero warnings
+- **Phase 30 remaining** — frozen ability bindings (don't re-bind per Create), memory profiling, telemetry hooks (event counts, latency per phase), async timeout/cancellation on stalled agents
