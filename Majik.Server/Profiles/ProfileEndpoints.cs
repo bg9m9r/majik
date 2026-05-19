@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Majik.Server.Composition;
+using Microsoft.AspNetCore.Mvc;
 using MongoDB.Driver;
 
 namespace Majik.Server.Profiles;
@@ -38,7 +39,7 @@ public static class ProfileEndpoints
 
     private static async Task<IResult> GetMe(
         ClaimsPrincipal user,
-        UserProfileRepository? repo,
+        [FromServices] UserProfileRepository? repo,
         CancellationToken ct)
     {
         if (repo == null) return MongoUnavailable();
@@ -56,7 +57,7 @@ public static class ProfileEndpoints
     private static async Task<IResult> PutMe(
         PutHandleRequest body,
         ClaimsPrincipal user,
-        UserProfileRepository? repo,
+        [FromServices] UserProfileRepository? repo,
         CancellationToken ct)
     {
         if (repo == null) return MongoUnavailable();

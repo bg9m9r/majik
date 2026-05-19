@@ -23,10 +23,10 @@ public static class MongoRegistration
         var connectionString = config[ConnectionStringKey];
         if (string.IsNullOrWhiteSpace(connectionString))
         {
-            // Sentinel: register null so endpoints can detect & 503.
-            // AddSingleton<T?> won't compile (class constraint); use ServiceDescriptor directly.
-            services.Add(ServiceDescriptor.Singleton(typeof(IMongoDatabase), (IMongoDatabase?)null!));
-            services.Add(ServiceDescriptor.Singleton(typeof(UserProfileRepository), (UserProfileRepository?)null!));
+            // No registration. Endpoints inject `UserProfileRepository?` /
+            // `IMongoDatabase?`; unregistered nullable services resolve to
+            // null via IServiceProvider.GetService, which is exactly what
+            // the endpoint short-circuit (503) is checking for.
             return services;
         }
 
