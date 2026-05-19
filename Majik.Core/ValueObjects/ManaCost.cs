@@ -42,9 +42,27 @@ public class ManaCost : IEquatable<ManaCost>
     public bool HasX { get; }
 
     /// <summary>
-    /// Total mana value (generic + colored).
+    /// CR 107.4e — hybrid pips like {R/G} or {2/W}. Each pip contributes 1
+    /// to <see cref="TotalValue"/> except {2/W}-style where the higher
+    /// generic alternative is used (CR 202.3f).
     /// </summary>
-    public int TotalValue => Generic + White + Blue + Black + Red + Green;
+    public IReadOnlyList<HybridPip> HybridPips { get; } = Array.Empty<HybridPip>();
+
+    /// <summary>
+    /// CR 107.4f — Phyrexian pips like {U/P}. Each pip can be paid with
+    /// one mana of the named colour OR 2 life. Each contributes 1 to
+    /// <see cref="TotalValue"/>.
+    /// </summary>
+    public IReadOnlyList<ManaColor> PhyrexianPips { get; } = Array.Empty<ManaColor>();
+
+    /// <summary>
+    /// Total mana value (generic + colored + hybrid + phyrexian).
+    /// For {2/W} hybrids, uses the generic alternative (higher value).
+    /// </summary>
+    public int TotalValue =>
+        Generic + White + Blue + Black + Red + Green
+        + HybridPips.Sum(h => h.GenericAlternative > 0 ? h.GenericAlternative : 1)
+        + PhyrexianPips.Count;
 
     /// <summary>
     /// Whether this is a zero mana cost.
@@ -62,6 +80,14 @@ public class ManaCost : IEquatable<ManaCost>
         HasX = hasX;
     }
 
+    private ManaCost(int generic, int white, int blue, int black, int red, int green, bool hasX,
+        IReadOnlyList<HybridPip> hybrid, IReadOnlyList<ManaColor> phyrexian)
+        : this(generic, white, blue, black, red, green, hasX)
+    {
+        HybridPips = hybrid;
+        PhyrexianPips = phyrexian;
+    }
+
     /// <summary>
     /// Create a mana cost from a string representation.
     /// Examples: "3", "2RR", "1WU", "X", "3XRR"
@@ -73,18 +99,38 @@ public class ManaCost : IEquatable<ManaCost>
             return Zero;
         }
 
-        int generic = 0;
-        int white = 0;
-        int blue = 0;
-        int black = 0;
-        int red = 0;
-        int green = 0;
+        int generic = 0, white = 0, blue = 0, black = 0, red = 0, green = 0;
         bool hasX = false;
+        var hybrid = new List<HybridPip>();
+        var phyrexian = new List<ManaColor>();
 
-        // Simple parser for basic mana costs
-        // This can be extended for more complex costs
-        var upper = manaCost.ToUpperInvariant();
-        
+        // Extract braced symbols first: {R/G}, {2/W}, {U/P}, {W}, {2}, {X}.
+        var braceRegex = new System.Text.RegularExpressions.Regex(@"\{([^}]+)\}");
+        var stripped = braceRegex.Replace(manaCost, m =>
+        {
+            var inner = m.Groups[1].Value.ToUpperInvariant();
+            if (inner.Contains('/'))
+            {
+                var parts = inner.Split('/');
+                if (parts.Length == 2 && parts[1] == "P")
+                {
+                    phyrexian.Add(ParseColor(parts[0][0]));
+                }
+                else if (parts.Length == 2)
+                {
+                    var c1 = ParseColorOrGeneric(parts[0]);
+                    var c2 = ParseColorOrGeneric(parts[1]);
+                    var genAlt = int.TryParse(parts[0], out var g) ? g : 0;
+                    hybrid.Add(new HybridPip(c1, c2, genAlt));
+                }
+                return "";
+            }
+            // Plain {2} or {W} — append to remainder for the legacy parser.
+            return inner;
+        });
+
+        var upper = stripped.ToUpperInvariant();
+
         // Check for X
         if (upper.Contains('X'))
         {
@@ -92,7 +138,7 @@ public class ManaCost : IEquatable<ManaCost>
             upper = upper.Replace("X", "");
         }
 
-        // Parse generic mana (digits at the start)
+        // Parse generic mana (digits at the start — also handles unbraced "2").
         var genericMatch = System.Text.RegularExpressions.Regex.Match(upper, @"^(\d+)");
         if (genericMatch.Success)
         {
@@ -100,30 +146,45 @@ public class ManaCost : IEquatable<ManaCost>
             upper = upper.Substring(genericMatch.Length);
         }
 
-        // Parse colored mana symbols
+        // Parse remaining digit clusters that may appear after symbols (rare,
+        // but Parse used to be position-tolerant).
+        var trailing = System.Text.RegularExpressions.Regex.Match(upper, @"(\d+)");
+        if (trailing.Success && trailing.Index > 0)
+        {
+            generic += int.Parse(trailing.Groups[1].Value);
+            upper = upper.Remove(trailing.Index, trailing.Length);
+        }
+
         foreach (var c in upper)
         {
             switch (c)
             {
-                case 'W':
-                    white++;
-                    break;
-                case 'U':
-                    blue++;
-                    break;
-                case 'B':
-                    black++;
-                    break;
-                case 'R':
-                    red++;
-                    break;
-                case 'G':
-                    green++;
-                    break;
+                case 'W': white++; break;
+                case 'U': blue++; break;
+                case 'B': black++; break;
+                case 'R': red++; break;
+                case 'G': green++; break;
             }
         }
 
-        return new ManaCost(generic, white, blue, black, red, green, hasX);
+        return new ManaCost(generic, white, blue, black, red, green, hasX, hybrid, phyrexian);
+    }
+
+    private static ManaColor ParseColor(char c) => c switch
+    {
+        'W' => ManaColor.White,
+        'U' => ManaColor.Blue,
+        'B' => ManaColor.Black,
+        'R' => ManaColor.Red,
+        'G' => ManaColor.Green,
+        'C' => ManaColor.Colorless,
+        _ => ManaColor.Generic,
+    };
+
+    private static ManaColor ParseColorOrGeneric(string s)
+    {
+        if (int.TryParse(s, out _)) return ManaColor.Generic;
+        return ParseColor(s[0]);
     }
 
     /// <summary>
