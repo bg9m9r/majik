@@ -23,7 +23,9 @@ app.UseAuthorization();
 
 app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }))
    .WithName("HealthCheck")
-   .AllowAnonymous();
+   .WithTags("Meta")
+   .AllowAnonymous()
+   .Produces(StatusCodes.Status200OK);
 
 app.MapGet("/whoami", (System.Security.Claims.ClaimsPrincipal user) =>
     Results.Ok(new
@@ -33,7 +35,10 @@ app.MapGet("/whoami", (System.Security.Claims.ClaimsPrincipal user) =>
         authenticated = user.Identity?.IsAuthenticated ?? false,
     }))
    .WithName("WhoAmI")
-   .RequireAuthorization(AuthRegistration.AsPlayerPolicy);
+   .WithTags("Meta")
+   .RequireAuthorization(AuthRegistration.AsPlayerPolicy)
+   .Produces(StatusCodes.Status200OK)
+   .Produces(StatusCodes.Status401Unauthorized);
 
 app.MapGameEndpoints();
 app.MapSeatEndpoints();

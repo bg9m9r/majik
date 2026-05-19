@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Majik.Core.Api.Commands;
+using Majik.Core.Api.Dtos;
 using Majik.Server.Auth;
 using Majik.Server.Composition;
 
@@ -24,13 +25,23 @@ public static class CommandEndpoints
             .WithTags("GamePlay");
 
         group.MapPost("/commands", SubmitCommand)
-             .WithName("SubmitCommand");
+             .WithName("SubmitCommand")
+             .Produces(StatusCodes.Status204NoContent)
+             .Produces(StatusCodes.Status400BadRequest)
+             .Produces(StatusCodes.Status403Forbidden)
+             .Produces(StatusCodes.Status404NotFound);
 
         group.MapPost("/start", StartGame)
-             .WithName("StartGame");
+             .WithName("StartGame")
+             .Produces<GameStateDto>(StatusCodes.Status200OK)
+             .Produces(StatusCodes.Status404NotFound)
+             .Produces(StatusCodes.Status409Conflict);
 
         group.MapGet("/state", GetState)
-             .WithName("GetGameState");
+             .WithName("GetGameState")
+             .Produces<GameStateDto>(StatusCodes.Status200OK)
+             .Produces(StatusCodes.Status403Forbidden)
+             .Produces(StatusCodes.Status404NotFound);
 
         return routes;
     }

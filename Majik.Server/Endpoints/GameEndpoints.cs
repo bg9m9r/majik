@@ -26,16 +26,25 @@ public static class GameEndpoints
             .WithTags("Games");
 
         group.MapPost("/", CreateGame)
-             .WithName("CreateGame");
+             .WithName("CreateGame")
+             .Produces<CreateGameResponse>(StatusCodes.Status201Created)
+             .Produces(StatusCodes.Status400BadRequest)
+             .Produces(StatusCodes.Status401Unauthorized);
 
         group.MapGet("/{id:guid}", GetGame)
-             .WithName("GetGame");
+             .WithName("GetGame")
+             .Produces<CreateGameResponse>(StatusCodes.Status200OK)
+             .Produces(StatusCodes.Status401Unauthorized)
+             .Produces(StatusCodes.Status404NotFound);
 
         group.MapGet("/", ListGames)
-             .WithName("ListGames");
+             .WithName("ListGames")
+             .Produces(StatusCodes.Status200OK);
 
         group.MapDelete("/{id:guid}", DeleteGame)
-             .WithName("DeleteGame");
+             .WithName("DeleteGame")
+             .Produces(StatusCodes.Status204NoContent)
+             .Produces(StatusCodes.Status404NotFound);
 
         return routes;
     }

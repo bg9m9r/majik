@@ -22,8 +22,16 @@ public static class SeatEndpoints
             .RequireAuthorization(AuthRegistration.AsPlayerPolicy)
             .WithTags("Seating");
 
-        group.MapPost("/", ClaimSeat).WithName("ClaimSeat");
-        group.MapGet("/", GetMySeats).WithName("GetMySeats");
+        group.MapPost("/", ClaimSeat)
+             .WithName("ClaimSeat")
+             .Produces<ClaimSeatResponse>(StatusCodes.Status200OK)
+             .Produces(StatusCodes.Status400BadRequest)
+             .Produces(StatusCodes.Status404NotFound)
+             .Produces(StatusCodes.Status409Conflict);
+
+        group.MapGet("/", GetMySeats)
+             .WithName("GetMySeats")
+             .Produces(StatusCodes.Status200OK);
 
         return routes;
     }
