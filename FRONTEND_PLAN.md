@@ -17,7 +17,7 @@ Surrounding choices:
 | Framework | **Angular 18+** (standalone components, signals) | Confirmed. Standalone components avoid NgModule overhead; signals interop is solid in 18. |
 | State | **NgRx 18** + `@ngrx/effects` + `@ngrx/signals` | NgRx for global game state (canonical event-sourced shape from server). `@ngrx/signals` for component-local view state where Redux ceremony is overkill. |
 | WebSocket | **`@microsoft/signalr`** (official client) | Matches the server hub. TypeScript types ship with the package. |
-| Auth | **`angular-auth-oidc-client`** | Mature, IdP-agnostic (matches the server's IdP-agnostic OIDC config). Handles silent refresh and PKCE out of the box. |
+| Auth | **`angular-auth-oidc-client`** against **Auth0**, Discord as the social connection | Mature client, mature IdP. Auth0's Discord social connection handles the OAuth dance with Discord; the frontend only ever speaks OIDC to Auth0. Silent refresh + PKCE handled by the client library. |
 | API client | **`ng-openapi-gen`** generating from `/openapi/v1.json` | Build-time codegen produces typed services for every endpoint added in Phase 3. Regenerate when server contract changes. |
 | Styling | **Tailwind CSS** + small set of hand-written SCSS for board layout | Utility-first keeps the Arena aesthetic achievable without a heavy component library. Layout (overlap, rotation, fan) is bespoke enough that a library would fight us. |
 | Icons | **Lucide** (or Tabler) via `lucide-angular` | Clean line icons for action bar, phase bar, mana symbols. |
@@ -122,11 +122,27 @@ Two-row battlefield avoids Arena's diagonal lanes (which need animations to read
 
 ## Routing + auth flow
 
-1. `/login` — bounce through OIDC. `angular-auth-oidc-client` handles the redirect. After return, store token + decoded `sub`.
+Auth backend: **Auth0** tenant with the **Discord social connection** enabled. The frontend speaks pure OIDC to Auth0 (`https://{tenant}.auth0.com`); Auth0 handles the Discord OAuth dance and issues a signed JWT whose `sub` claim is stable per Discord user (typically `oauth2|discord|{discord_user_id}`). The server's existing IdP-agnostic JwtBearer config picks this up by pointing `Auth:Authority` at the Auth0 issuer URL.
+
+1. `/login` — bounce through Auth0's Universal Login. With Discord as the only enabled connection, the user lands directly on Discord's OAuth consent screen, then back to the app via Auth0. `angular-auth-oidc-client` handles the redirect + PKCE. After return, store the access token + decoded `sub`.
 2. `AuthGuard` protects `/lobby` and `/game/:id`.
 3. `/lobby` — list active games (GET /games returns count; future enhancement adds search), button to create new. Once created, route to `/game/:newId`.
 4. `/game/:id` — claim seat on enter (POST /games/{id}/seat); both seats must be claimed before start. "Start game" button calls POST /games/{id}/start?mode=full when both seats are filled.
 5. HTTP interceptor attaches `Authorization: Bearer <token>` to every request and `accessTokenFactory` to the SignalR connection builder.
+
+### Auth0 setup notes
+
+One-time tenant config required before slice 1 lands:
+
+- Create an Auth0 tenant (`majik-dev` for development, separate prod tenant later).
+- **Applications** → create **Single Page Application** for the frontend. Allowed callback / logout URLs include `http://localhost:4200/auth/callback` and the production origin.
+- **APIs** → create an API entry representing `Majik.Server`. Identifier (audience) is the value `Auth:Audience` on the server points at — recommend the server's production URL or a stable URN like `https://api.majik.local`.
+- **Authentication → Social → Discord** — enable, paste the Discord OAuth2 app's client id + secret, grant `identify` scope (no `email` — Discord names suffice for in-game identity).
+- **Applications → Connections** — turn off the default Username-Password DB connection; leave only Discord enabled so Universal Login skips the connection picker.
+- Server-side `appsettings.json` fills in `Auth:Authority` (`https://{tenant}.auth0.com/`, trailing slash matters) and `Auth:Audience` (the API identifier from above).
+- Frontend env config carries `clientId`, `domain`, `audience`, and scope list (`openid profile`) — the access token is what the server validates, not the ID token.
+
+The Discord-issued `sub` (`oauth2|discord|...`) is what `GameSeating` stores when a player claims a slot. Stable across logins; survives server restarts as long as the same Auth0 connection issues the token.
 
 ## Phased roadmap (frontend slices, mirror server cadence)
 
@@ -154,7 +170,7 @@ Total rough estimate: 12–15 dev days for a playable v1.
 
 The implementation plan can answer these as their slices land:
 
-- **OIDC IdP** — server is IdP-agnostic. Pick one for dev (Keycloak in a local container is the lowest-friction choice). Production IdP can wait.
+- **OIDC IdP** — **Auth0 with Discord social connection** (confirmed). Tenant setup notes above. Dev tenant + prod tenant separate; staging shares dev for now.
 - **Card image cache** — proxy through the server vs. hit Scryfall directly from the browser. Direct is simpler; revisit if CORS / rate-limit becomes an issue.
 - **Mobile / tablet support** — out of scope for v1. Design for desktop ≥1280px. Tablet-friendly layout adapts later.
 - **Spectator view** — server can support it (StateSnapshotter has a no-viewer "spectator" mode), but no UI for now. v1 = players only.
@@ -176,7 +192,7 @@ The frontend will exercise these as it lands, and may surface gaps:
 - **Action submission via SignalR** — currently every command POSTs `/games/{id}/commands`. For low-latency UX a hub-side `Submit` method would be cleaner. Add as a later server slice if HTTP-per-action proves laggy.
 - **Per-player event payload masking** — engine-side deferred per Phase 3 plan; only relevant once events carry data that opponents shouldn't see (e.g. a draw event carrying the drawn card name to the drawer). Frontend will need the masked variant when the engine adds it.
 - **CORS** — server doesn't currently enable CORS. When the frontend is hosted on a different origin from the API, add `AddCors` + an explicit allowed-origins policy on the server.
-- **OIDC IdP smoke** — verifying real OIDC flow against the JwtBearer setup needs an actual IdP — first frontend slice will surface any configuration gaps.
+- **OIDC IdP smoke** — first frontend slice's Auth0 + Discord roundtrip is the first time real tokens hit the JwtBearer setup. Watch for issuer-URL trailing-slash mismatches and audience misconfig.
 
 ## Verification
 
