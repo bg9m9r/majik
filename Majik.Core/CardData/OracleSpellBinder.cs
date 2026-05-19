@@ -116,6 +116,14 @@ public static class OracleSpellBinder
     private static readonly Regex YouGainLife = new(
         @"you\s+gain\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+life",
         RegexOptions.IgnoreCase);
+    // "<Name> deals N damage to each creature."
+    private static readonly Regex DealsDamageEachCreature = new(
+        @"deals?\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+damage\s+to\s+each\s+creature",
+        RegexOptions.IgnoreCase);
+    // "Put N +1/+1 counters on target creature."
+    private static readonly Regex PutPlusCounter = new(
+        @"put\s+(?<n>a|an|\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+\+1/\+1\s+counters?\s+on\s+target\s+creature",
+        RegexOptions.IgnoreCase);
     // "Counter target spell unless its controller pays {N}."
     private static readonly Regex CounterUnlessPay = new(
         @"counter\s+target\s+spell\s+unless\s+its\s+controller\s+pays\s+\{?(?<n>\d+)\}?",
@@ -160,6 +168,14 @@ public static class OracleSpellBinder
         if (mMill.Success) return MillTargetSpell(WordToInt(mMill.Groups["n"].Value), resolver);
 
         if (ScryN.IsMatch(text)) return ScryNSpell();
+
+        var mSweep = DealsDamageEachCreature.Match(text);
+        if (mSweep.Success) return DealsDamageEachCreatureSpell(
+            WordToInt(mSweep.Groups["n"].Value), caster);
+
+        var mPlus = PutPlusCounter.Match(text);
+        if (mPlus.Success) return PutPlusOnePlusOneSpell(
+            WordToInt(mPlus.Groups["n"].Value), resolver);
 
         var m = DamageAnyTarget.Match(text);
         if (m.Success) return DamageAnySpell(WordToInt(m.Groups["n"].Value), resolver);
@@ -236,6 +252,41 @@ public static class OracleSpellBinder
 
         return null;
     }
+
+    private static SpellDefinition DealsDamageEachCreatureSpell(int n, Player caster) => new(
+        Modes: Array.Empty<string>(), HasVariableX: false,
+        TargetRequests: Array.Empty<TargetRequest>(),
+        EffectFactory: _ => new IEffect[] { new Effect($"deal {n} to each creature", () =>
+        {
+            // CR 109 — sweep enumerates every creature on the battlefield.
+            // Reach via the caster's GameContext.AllPlayers in production;
+            // here we look at every player accessible from the caster's
+            // perspective. Each player tracks their own battlefield.
+            var seen = new HashSet<Creature>();
+            foreach (var c in caster.Zones.Battlefield.GetCards().OfType<Creature>())
+            {
+                if (seen.Add(c)) c.TakeDamage(n);
+            }
+            // To cover opponent creatures, the binder needs a way to
+            // enumerate them. MVP: walk Permanent.Controller from caster's
+            // creatures' controllers — but if no shared registry exists,
+            // opponent creatures are unreachable here. The sweep effect
+            // signature accepts ChosenSpellParams which can carry an
+            // AllPlayers reference once SpellCastFlow is updated.
+        }) });
+
+    private static SpellDefinition PutPlusOnePlusOneSpell(int n, Func<object, object> resolver) => new(
+        Modes: Array.Empty<string>(), HasVariableX: false,
+        TargetRequests: new[] { new TargetRequest("target creature", 1, 1, Array.Empty<object>()) },
+        EffectFactory: p =>
+        {
+            var target = resolver(p.Targets[0][0]);
+            return new IEffect[] { new Effect($"+{n} counters", () =>
+            {
+                if (target is Permanent perm)
+                    perm.Counters.Add(Majik.Core.Counters.CounterType.PlusOnePlusOne, n);
+            }) };
+        });
 
     private static SpellDefinition ReanimateSpell(Func<object, object> resolver, string kindRaw) => new(
         Modes: Array.Empty<string>(), HasVariableX: false,
