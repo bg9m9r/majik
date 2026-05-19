@@ -562,8 +562,11 @@ internal static class TriggerPlayground
         });
 
         Log($"Per-event log → {logPath}");
-        Log("Running game (cap 10 turns — bot vs bot; large boards slow per-turn)…");
-        var result = await driver.RunGameAsync(maxTurns: 10);
+        Log("Running game (cap 50 turns — bot vs bot)…");
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var result = await driver.RunGameAsync(maxTurns: 50);
+        sw.Stop();
+        Log($"Wall time: {sw.Elapsed.TotalSeconds:F2}s for {result.TurnsPlayed} turns");
 
         Log($"Turns played: {result.TurnsPlayed}");
         Log($"Winner: {(result.Winner?.Name ?? "(none — draw or stalled)")}");
