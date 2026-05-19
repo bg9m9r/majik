@@ -39,7 +39,16 @@ public sealed class MulliganController
 
             if (decision == MulliganDecision.Keep || mulligansTaken >= maxMulligans)
             {
-                BottomCards(player, mulligansTaken);
+                if (mulligansTaken > 0)
+                {
+                    var chosen = await agent.ChooseCardsToBottomAsync(ctx, hand, mulligansTaken, ct);
+                    foreach (var c in chosen)
+                    {
+                        player.Zones.Hand.RemoveCard(c);
+                        player.Zones.Library.AddCard(c);
+                        c.Zone = ZoneType.Library;
+                    }
+                }
                 return mulligansTaken;
             }
 

@@ -21,9 +21,12 @@ public sealed class ScriptedAgent : IPlayerAgent
     private readonly Queue<ManaPayment> _manaPayments = new();
     private readonly Queue<CombatPlan> _attackPlans = new();
     private readonly Queue<BlockPlan> _blockPlans = new();
+    private readonly Queue<Func<IReadOnlyList<ICard>, IReadOnlyList<ICard>>> _bottomChoices = new();
 
     public void QueuePriority(PriorityAction a) => _priorityActions.Enqueue(a);
     public void QueueMulligan(MulliganDecision d) => _mulligans.Enqueue(d);
+    public void QueueCardsToBottom(Func<IReadOnlyList<ICard>, IReadOnlyList<ICard>> chooser)
+        => _bottomChoices.Enqueue(chooser);
     public void QueueTargets(IReadOnlyList<object> targets) => _targets.Enqueue(targets);
     public void QueueX(int x) => _xValues.Enqueue(x);
     public void QueueMode(int m) => _modes.Enqueue(m);
@@ -37,6 +40,13 @@ public sealed class ScriptedAgent : IPlayerAgent
 
     public Task<MulliganDecision> ChooseMulliganAsync(GameContext ctx, IReadOnlyList<ICard> hand, int mulligansTaken, CancellationToken ct = default)
         => Task.FromResult(Pop(_mulligans, "mulligan"));
+
+    public Task<IReadOnlyList<ICard>> ChooseCardsToBottomAsync(GameContext ctx, IReadOnlyList<ICard> hand, int countToBottom, CancellationToken ct = default)
+    {
+        if (countToBottom == 0) return Task.FromResult<IReadOnlyList<ICard>>(Array.Empty<ICard>());
+        var chooser = Pop(_bottomChoices, "bottom cards");
+        return Task.FromResult(chooser(hand));
+    }
 
     public Task<IReadOnlyList<object>> ChooseTargetsAsync(GameContext ctx, TargetRequest request, CancellationToken ct = default)
         => Task.FromResult(Pop(_targets, "targets"));

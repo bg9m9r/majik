@@ -35,6 +35,7 @@ public class MulliganControllerTests
         var agent = new ScriptedAgent();
         agent.QueueMulligan(MulliganDecision.Mulligan);
         agent.QueueMulligan(MulliganDecision.Keep);
+        agent.QueueCardsToBottom(hand => new[] { hand[0] });
 
         var ctrl = new MulliganController();
         var taken = await ctrl.RunAsync(_alice, agent, NewContext());
@@ -51,6 +52,7 @@ public class MulliganControllerTests
         var agent = new ScriptedAgent();
         for (var i = 0; i < 8; i++) agent.QueueMulligan(MulliganDecision.Mulligan);
         agent.QueueMulligan(MulliganDecision.Keep);
+        agent.QueueCardsToBottom(hand => hand.Take(7).ToList());
 
         var ctrl = new MulliganController();
         var taken = await ctrl.RunAsync(_alice, agent, NewContext());

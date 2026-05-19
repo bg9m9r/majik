@@ -25,6 +25,14 @@ public interface IPlayerAgent
         GameContext ctx, IReadOnlyList<ICard> hand, int mulligansTaken, CancellationToken ct = default);
 
     /// <summary>
+    /// CR 103.4d — after keeping a mulliganed hand, choose which N cards
+    /// to place on the bottom of the library (N = mulligans taken).
+    /// Implementations must return exactly N cards from the hand.
+    /// </summary>
+    Task<IReadOnlyList<ICard>> ChooseCardsToBottomAsync(
+        GameContext ctx, IReadOnlyList<ICard> hand, int countToBottom, CancellationToken ct = default);
+
+    /// <summary>
     /// Pick targets satisfying the request (cardinality + legality).
     /// </summary>
     Task<IReadOnlyList<object>> ChooseTargetsAsync(

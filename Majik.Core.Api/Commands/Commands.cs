@@ -20,6 +20,7 @@ namespace Majik.Core.Api.Commands;
 [JsonDerivedType(typeof(OrderTriggersCommand), "order-triggers")]
 [JsonDerivedType(typeof(DeclareAttackersCommand), "attackers")]
 [JsonDerivedType(typeof(DeclareBlockersCommand), "blockers")]
+[JsonDerivedType(typeof(ChooseCardsToBottomCommand), "bottom")]
 public abstract record GameCommand
 {
     /// <summary>The player who submitted the command.</summary>
@@ -57,3 +58,5 @@ public sealed record DeclareBlockersCommand(
     IReadOnlyList<BlockerDeclarationDto> Blockers) : GameCommand;
 
 public sealed record BlockerDeclarationDto(Guid BlockerInstanceId, Guid AttackerInstanceId);
+
+public sealed record ChooseCardsToBottomCommand(IReadOnlyList<Guid> CardInstanceIds) : GameCommand;

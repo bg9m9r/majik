@@ -175,6 +175,8 @@ public class TurnDriverTests
             => Task.FromResult(PriorityAction.Pass);
         public Task<MulliganDecision> ChooseMulliganAsync(GameContext ctx, IReadOnlyList<ICard> hand, int mulligansTaken, CancellationToken ct = default)
             => Task.FromResult(MulliganDecision.Keep);
+        public Task<IReadOnlyList<ICard>> ChooseCardsToBottomAsync(GameContext ctx, IReadOnlyList<ICard> hand, int countToBottom, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<ICard>>(Array.Empty<ICard>());
         public Task<IReadOnlyList<object>> ChooseTargetsAsync(GameContext ctx, TargetRequest request, CancellationToken ct = default)
             => Task.FromResult<IReadOnlyList<object>>(Array.Empty<object>());
         public Task<int> ChooseXAsync(GameContext ctx, ICard source, CancellationToken ct = default) => Task.FromResult(0);

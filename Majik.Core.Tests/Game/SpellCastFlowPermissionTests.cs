@@ -93,6 +93,7 @@ public class SpellCastFlowPermissionTests
 
         public Task<PriorityAction> ChoosePriorityActionAsync(GameContext c, CancellationToken ct = default) => Task.FromResult(PriorityAction.Pass);
         public Task<MulliganDecision> ChooseMulliganAsync(GameContext c, IReadOnlyList<ICard> h, int n, CancellationToken ct = default) => Task.FromResult(MulliganDecision.Keep);
+        public Task<IReadOnlyList<ICard>> ChooseCardsToBottomAsync(GameContext c, IReadOnlyList<ICard> h, int n, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<ICard>>(System.Array.Empty<ICard>());
         public Task<IReadOnlyList<object>> ChooseTargetsAsync(GameContext c, TargetRequest r, CancellationToken ct = default) => Task.FromResult<IReadOnlyList<object>>(System.Array.Empty<object>());
         public Task<int> ChooseXAsync(GameContext c, ICard s, CancellationToken ct = default) => Task.FromResult(X);
         public Task<int> ChooseModeAsync(GameContext c, IReadOnlyList<string> modes, CancellationToken ct = default) => Task.FromResult(0);

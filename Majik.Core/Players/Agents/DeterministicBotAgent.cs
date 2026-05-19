@@ -18,6 +18,9 @@ public sealed class DeterministicBotAgent : IPlayerAgent
     public Task<MulliganDecision> ChooseMulliganAsync(GameContext ctx, IReadOnlyList<ICard> hand, int mulligansTaken, CancellationToken ct = default)
         => Task.FromResult(MulliganDecision.Keep);
 
+    public Task<IReadOnlyList<ICard>> ChooseCardsToBottomAsync(GameContext ctx, IReadOnlyList<ICard> hand, int countToBottom, CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<ICard>>(hand.Take(countToBottom).ToList());
+
     public Task<IReadOnlyList<object>> ChooseTargetsAsync(GameContext ctx, TargetRequest request, CancellationToken ct = default)
     {
         var picked = request.LegalCandidates.Take(request.MinTargets).ToList();

@@ -94,4 +94,14 @@ public sealed class HeuristicBotAgent : IPlayerAgent
 
         return Task.FromResult(new BlockPlan(assignments));
     }
+
+    public Task<IReadOnlyList<ICard>> ChooseCardsToBottomAsync(
+        GameContext ctx, IReadOnlyList<ICard> hand, int countToBottom, CancellationToken ct = default)
+    {
+        // Heuristic: bottom the most expensive cards first.
+        var sorted = hand.OrderByDescending(c =>
+                Majik.Core.ValueObjects.ManaCost.Parse(c.ManaCost ?? "").TotalValue)
+            .Take(countToBottom).ToList();
+        return Task.FromResult<IReadOnlyList<ICard>>(sorted);
+    }
 }

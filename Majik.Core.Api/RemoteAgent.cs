@@ -123,6 +123,9 @@ public sealed class RemoteAgent : IPlayerAgent
     public Task<MulliganDecision> ChooseMulliganAsync(GameContext ctx, IReadOnlyList<ICard> hand, int mulligansTaken, CancellationToken ct = default)
         => Prompt<MulliganDecision>(ct, typeof(MulliganCommand));
 
+    public Task<IReadOnlyList<ICard>> ChooseCardsToBottomAsync(GameContext ctx, IReadOnlyList<ICard> hand, int countToBottom, CancellationToken ct = default)
+        => Prompt<IReadOnlyList<ICard>>(ct, typeof(ChooseCardsToBottomCommand));
+
     public Task<IReadOnlyList<object>> ChooseTargetsAsync(GameContext ctx, TargetRequest request, CancellationToken ct = default)
         => Prompt<IReadOnlyList<object>>(ct, typeof(ChooseTargetsCommand));
 
