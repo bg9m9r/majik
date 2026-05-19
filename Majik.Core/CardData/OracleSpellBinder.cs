@@ -76,6 +76,25 @@ public static class OracleSpellBinder
     private static readonly Regex EachPlayerDraws = new(
         @"each\s+player\s+draws\s+(?<n>\d+|a|one|two|three|four|five|six|seven)\s+cards?",
         RegexOptions.IgnoreCase);
+    // "Tap target {permanent|creature|artifact|land|...}."
+    private static readonly Regex TapTarget = new(
+        @"tap\s+target\s+(permanent|creature|artifact|land|enchantment|planeswalker)",
+        RegexOptions.IgnoreCase);
+    // "Destroy target land." / "Destroy target nonland permanent." /
+    // "Destroy target permanent."
+    private static readonly Regex DestroyLand = new(
+        @"destroy\s+target\s+land\b",
+        RegexOptions.IgnoreCase);
+    private static readonly Regex DestroyNonlandPermanent = new(
+        @"destroy\s+target\s+nonland\s+permanent",
+        RegexOptions.IgnoreCase);
+    private static readonly Regex DestroyPermanent = new(
+        @"destroy\s+target\s+permanent",
+        RegexOptions.IgnoreCase);
+    // "Return target {creature|permanent|...} to its owner's hand."
+    private static readonly Regex BounceTarget = new(
+        @"return\s+target\s+(permanent|creature|artifact|enchantment|nonland\s+permanent|land)\s+to\s+(its|their)\s+owner'?s?\s+hand",
+        RegexOptions.IgnoreCase);
 
     public static SpellDefinition? Bind(
         CardEntity entity,
@@ -126,7 +145,77 @@ public static class OracleSpellBinder
         m = EachPlayerDraws.Match(text);
         if (m.Success) return EachPlayerDrawsSpell(WordToInt(m.Groups["n"].Value));
 
+        // More-specific destroys before generic — nonland before permanent before land.
+        if (DestroyNonlandPermanent.IsMatch(text)) return DestroyTargetSpell(
+            resolver, "target nonland permanent",
+            c => !c.HasType(Majik.Core.Cards.Types.CardType.Land));
+        if (DestroyPermanent.IsMatch(text)) return DestroyTargetSpell(
+            resolver, "target permanent", _ => true);
+        if (DestroyLand.IsMatch(text)) return DestroyTargetSpell(
+            resolver, "target land",
+            c => c.HasType(Majik.Core.Cards.Types.CardType.Land));
+
+        m = TapTarget.Match(text);
+        if (m.Success) return TapTargetSpell(resolver, $"target {m.Groups[1].Value}");
+
+        m = BounceTarget.Match(text);
+        if (m.Success) return BounceTargetSpell(resolver, $"target {m.Groups[1].Value}");
+
         return null;
+    }
+
+    private static SpellDefinition TapTargetSpell(Func<object, object> resolver, string label) => new(
+        Modes: Array.Empty<string>(), HasVariableX: false,
+        TargetRequests: new[] { new TargetRequest(label, 1, 1, Array.Empty<object>()) },
+        EffectFactory: p =>
+        {
+            var target = resolver(p.Targets[0][0]);
+            return new IEffect[] { new Effect("tap target", () =>
+            {
+                if (target is Permanent perm && !perm.IsTapped) perm.Tap();
+            }) };
+        });
+
+    private static SpellDefinition DestroyTargetSpell(
+        Func<object, object> resolver, string label, Func<ICard, bool> filter) => new(
+        Modes: Array.Empty<string>(), HasVariableX: false,
+        TargetRequests: new[] { new TargetRequest(label, 1, 1, Array.Empty<object>()) },
+        EffectFactory: p =>
+        {
+            var target = resolver(p.Targets[0][0]);
+            return new IEffect[] { new Effect("destroy target", () =>
+            {
+                if (target is ICard card && filter(card)) MoveToGraveyard(card);
+            }) };
+        });
+
+    private static SpellDefinition BounceTargetSpell(
+        Func<object, object> resolver, string label) => new(
+        Modes: Array.Empty<string>(), HasVariableX: false,
+        TargetRequests: new[] { new TargetRequest(label, 1, 1, Array.Empty<object>()) },
+        EffectFactory: p =>
+        {
+            var target = resolver(p.Targets[0][0]);
+            return new IEffect[] { new Effect("bounce", () =>
+            {
+                if (target is ICard card) ReturnToOwnersHand(card);
+            }) };
+        });
+
+    private static void ReturnToOwnersHand(ICard card)
+    {
+        var owner = card.Owner;
+        if (owner != null)
+        {
+            if (card.Zone == ZoneType.Battlefield)
+                owner.Zones.Battlefield.RemoveCard(card);
+            else if (card.Zone == ZoneType.Graveyard)
+                owner.Zones.Graveyard.RemoveCard(card);
+            else if (card.Zone == ZoneType.Exile)
+                owner.Zones.Exile.RemoveCard(card);
+            owner.Zones.Hand.AddCard(card);
+        }
+        card.Zone = ZoneType.Hand;
     }
 
     private static string NormaliseKeyword(string raw) =>
