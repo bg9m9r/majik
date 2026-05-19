@@ -95,6 +95,18 @@ public static class OracleSpellBinder
     private static readonly Regex BounceTarget = new(
         @"return\s+target\s+(permanent|creature|artifact|enchantment|nonland\s+permanent|land)\s+to\s+(its|their)\s+owner'?s?\s+hand",
         RegexOptions.IgnoreCase);
+    // "Search your library for a {basic land|land|creature|artifact|...} card..."
+    private static readonly Regex SearchLibrary = new(
+        @"search\s+your\s+library\s+for\s+a\s+(?<kind>basic\s+land|land|creature|artifact|enchantment|instant|sorcery|planeswalker)\s+card",
+        RegexOptions.IgnoreCase);
+    // "[Name] deals X damage to any target." — variable X damage spell.
+    private static readonly Regex DealsXDamageAny = new(
+        @"deals?\s+x\s+damage\s+to\s+any\s+target",
+        RegexOptions.IgnoreCase);
+    // "Exile target {creature|permanent|artifact|enchantment|land|nonland permanent}."
+    private static readonly Regex ExileTarget = new(
+        @"exile\s+target\s+(creature|permanent|artifact|enchantment|land|nonland\s+permanent)",
+        RegexOptions.IgnoreCase);
 
     public static SpellDefinition? Bind(
         CardEntity entity,
@@ -161,7 +173,81 @@ public static class OracleSpellBinder
         m = BounceTarget.Match(text);
         if (m.Success) return BounceTargetSpell(resolver, $"target {m.Groups[1].Value}");
 
+        m = ExileTarget.Match(text);
+        if (m.Success) return ExileTargetSpell(resolver, $"target {m.Groups[1].Value}");
+
+        m = SearchLibrary.Match(text);
+        if (m.Success) return SearchLibrarySpell(caster, m.Groups["kind"].Value);
+
+        if (DealsXDamageAny.IsMatch(text)) return DealsXAnyTargetSpell(resolver);
+
         return null;
+    }
+
+    private static SpellDefinition ExileTargetSpell(Func<object, object> resolver, string label) => new(
+        Modes: Array.Empty<string>(), HasVariableX: false,
+        TargetRequests: new[] { new TargetRequest(label, 1, 1, Array.Empty<object>()) },
+        EffectFactory: p =>
+        {
+            var target = resolver(p.Targets[0][0]);
+            return new IEffect[] { new Effect("exile target", () =>
+            {
+                if (target is ICard card) MoveToExile(card);
+            }) };
+        });
+
+    private static SpellDefinition SearchLibrarySpell(Player caster, string kindRaw) => new(
+        Modes: Array.Empty<string>(), HasVariableX: false,
+        TargetRequests: Array.Empty<TargetRequest>(),
+        EffectFactory: _ => new IEffect[] { new Effect($"tutor {kindRaw}", () =>
+        {
+            // MVP tutor: deterministic — first library card matching predicate.
+            // Real implementation: prompt agent for choice; this default keeps
+            // tests deterministic until SpellCastFlow learns library-target prompts.
+            bool Pred(ICard c) => kindRaw.ToLowerInvariant() switch
+            {
+                "basic land" => c.HasType(Majik.Core.Cards.Types.CardType.Land),
+                "land" => c.HasType(Majik.Core.Cards.Types.CardType.Land),
+                "creature" => c.HasType(Majik.Core.Cards.Types.CardType.Creature),
+                "artifact" => c.HasType(Majik.Core.Cards.Types.CardType.Artifact),
+                "enchantment" => c.HasType(Majik.Core.Cards.Types.CardType.Enchantment),
+                "instant" => c.HasType(Majik.Core.Cards.Types.CardType.Instant),
+                "sorcery" => c.HasType(Majik.Core.Cards.Types.CardType.Sorcery),
+                "planeswalker" => c.HasType(Majik.Core.Cards.Types.CardType.Planeswalker),
+                _ => false,
+            };
+            var pick = caster.Zones.Library.GetCards().FirstOrDefault(Pred);
+            if (pick == null) return;
+            caster.Zones.Library.RemoveCard(pick);
+            caster.Zones.Hand.AddCard(pick);
+            pick.Zone = ZoneType.Hand;
+            // CR 701.19c — shuffle after a search effect.
+            // (No IZone.Shuffle yet; GameDriver owns shuffle. Skip for MVP —
+            // search ordering not exposed via library iteration today.)
+        }) });
+
+    private static SpellDefinition DealsXAnyTargetSpell(Func<object, object> resolver) => new(
+        Modes: Array.Empty<string>(), HasVariableX: true,
+        TargetRequests: new[] { new TargetRequest("any target", 1, 1, Array.Empty<object>()) },
+        EffectFactory: p =>
+        {
+            var target = resolver(p.Targets[0][0]);
+            var x = p.X ?? 0;
+            return new IEffect[] { new Effect($"deal X={x}", () => DealDamage(target, x)) };
+        });
+
+    private static void MoveToExile(ICard card)
+    {
+        var owner = card.Owner;
+        if (owner != null)
+        {
+            if (card.Zone == ZoneType.Battlefield) owner.Zones.Battlefield.RemoveCard(card);
+            else if (card.Zone == ZoneType.Graveyard) owner.Zones.Graveyard.RemoveCard(card);
+            else if (card.Zone == ZoneType.Hand) owner.Zones.Hand.RemoveCard(card);
+            else if (card.Zone == ZoneType.Library) owner.Zones.Library.RemoveCard(card);
+            owner.Zones.Exile.AddCard(card);
+        }
+        card.Zone = ZoneType.Exile;
     }
 
     private static SpellDefinition TapTargetSpell(Func<object, object> resolver, string label) => new(
