@@ -100,6 +100,16 @@ public sealed class SpellCastFlow
         foreach (var req in definition.TargetRequests)
         {
             var picked = await agent.ChooseTargetsAsync(ctx, req, ct);
+            // CR 601.2c — cast is illegal if the agent can't pick enough
+            // legal targets. Throw a typed exception so the caller (cast
+            // dispatcher) can catch and abort cleanly instead of letting
+            // EffectFactory crash on Targets[0][0].
+            if (picked.Count < req.MinTargets)
+            {
+                throw new InvalidOperationException(
+                    $"Cannot cast {card.Name}: target request '{req.Description}' " +
+                    $"needs {req.MinTargets}, agent provided {picked.Count}.");
+            }
             collectedTargets.Add(picked);
         }
 

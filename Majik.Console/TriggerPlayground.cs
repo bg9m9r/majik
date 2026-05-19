@@ -511,6 +511,13 @@ internal static class TriggerPlayground
         var priority = new PriorityManager(new List<Player> { alice, bob }, stack, bus, triggers);
         var combat = new Majik.Core.Combat.CombatFlow(bus, sba);
 
+        // SpellDefinition resolver: ScryfallCardFactory hits the oracle
+        // binder for the cast card and returns a real definition when the
+        // card's text matches a known template. Null = vanilla fallback.
+        Majik.Core.Game.SpellDefinition? SpellResolver(
+            ICard card, Player caster, Majik.Core.Stack.Stack? stk)
+            => factory.LookupSpellDefinition(card.Name, caster, raw => raw, stk);
+
         var driver = new GameDriver(
             players: new[] { alice, bob },
             agents: new Dictionary<Player, IPlayerAgent>
@@ -525,7 +532,8 @@ internal static class TriggerPlayground
             stateBasedActions: sba,
             priorityManager: priority,
             combatFlow: combat,
-            eventBus: bus);
+            eventBus: bus,
+            spellDefinitionResolver: SpellResolver);
 
         // Per-event log → /tmp/majik-faceoff.log. Filter to high-signal
         // events; full event stream is too noisy for manual reading.

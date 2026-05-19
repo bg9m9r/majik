@@ -47,6 +47,7 @@ public sealed class TurnDriver
     public AdditionalCombatQueue AdditionalCombats => _additionalCombats;
 
     private readonly Majik.Core.Events.IEventBus? _eventBus;
+    private readonly Func<ICard, Player, Majik.Core.Stack.Stack?, Majik.Core.Game.SpellDefinition?>? _spellDefResolver;
 
     public TurnDriver(
         IReadOnlyList<Player> players,
@@ -60,11 +61,13 @@ public sealed class TurnDriver
         CombatFlow combatFlow,
         Majik.Core.Effects.ContinuousEffectsService? continuousEffects = null,
         LandDropTracker? landDropTracker = null,
-        Majik.Core.Events.IEventBus? eventBus = null)
+        Majik.Core.Events.IEventBus? eventBus = null,
+        Func<ICard, Player, Majik.Core.Stack.Stack?, Majik.Core.Game.SpellDefinition?>? spellDefinitionResolver = null)
     {
         _continuousEffects = continuousEffects;
         _landDropTracker = landDropTracker;
         _eventBus = eventBus;
+        _spellDefResolver = spellDefinitionResolver;
         _players = players ?? throw new ArgumentNullException(nameof(players));
         _agents = agents ?? throw new ArgumentNullException(nameof(agents));
         _stack = stack ?? throw new ArgumentNullException(nameof(stack));
@@ -175,30 +178,56 @@ public sealed class TurnDriver
 
         async Task DispatchCast(Player actor, PriorityAction.CastSpell cast, GameContext ctx)
         {
-            // MVP: vanilla spell definition — permanents resolve to battlefield,
-            // instants/sorceries to graveyard (StackResolver handles both).
-            // Future: wire ScryfallCardFactory.LookupSpellDefinition for
-            // effect-bearing spells.
-            var def = Majik.Core.Game.SpellDefinition.Vanilla(_ => Array.Empty<Majik.Core.Abilities.IEffect>());
+            static void RotateHand(ICard card)
+            {
+                if (card.Owner != null && card.Zone == Majik.Core.Zones.ZoneType.Hand)
+                {
+                    card.Owner.Zones.Hand.RemoveCard(card);
+                    card.Owner.Zones.Hand.AddCard(card);
+                }
+            }
+
+            // Resolve a proper SpellDefinition via the injected resolver
+            // (oracle-text → effects binder). Fall back to vanilla — fine
+            // for permanents (StackResolver puts them on the battlefield);
+            // for instants/sorceries with no binder match, casting would
+            // waste the card, so we skip and rotate.
+            var resolved = _spellDefResolver?.Invoke(cast.Card, actor, _stack);
+            var isPermanent = cast.Card.HasType(Majik.Core.Cards.Types.CardType.Creature)
+                || cast.Card.HasType(Majik.Core.Cards.Types.CardType.Artifact)
+                || cast.Card.HasType(Majik.Core.Cards.Types.CardType.Enchantment)
+                || cast.Card.HasType(Majik.Core.Cards.Types.CardType.Planeswalker);
+            if (resolved == null && !isPermanent)
+            {
+                RotateHand(cast.Card);
+                return;
+            }
+            var def = resolved
+                ?? Majik.Core.Game.SpellDefinition.Vanilla(_ => Array.Empty<Majik.Core.Abilities.IEffect>());
+
+            // Pay mana up front. SpellCastFlow doesn't enforce payment;
+            // it just collects ManaPayment for downstream metadata.
             var cost = Majik.Core.ValueObjects.ManaCost.Parse(cast.Card.ManaCost);
             var payment = await _agents[actor].ChooseManaSourcesAsync(ctx, cost, ct);
             if (!manaResolver.Pay(actor, cost, payment))
             {
-                // Bot proposed a spell whose payment can't actually commit
-                // (mismatch between TryPickManaSources and the resolver's
-                // colour-aware Pay). To prevent an infinite priority loop
-                // where the bot re-proposes the same card every prompt,
-                // move the card to the bottom of its hand so a subsequent
-                // ChoosePriorityActionAsync sweep tries a different card.
-                if (cast.Card.Owner != null
-                    && cast.Card.Zone == Majik.Core.Zones.ZoneType.Hand)
-                {
-                    cast.Card.Owner.Zones.Hand.RemoveCard(cast.Card);
-                    cast.Card.Owner.Zones.Hand.AddCard(cast.Card);
-                }
+                // Bot mis-picked sources. Rotate so the next sweep tries a
+                // different card.
+                RotateHand(cast.Card);
                 return;
             }
-            await castFlow.CastAsync(actor, cast.Card, def, _agents[actor], ctx, ct);
+
+            try
+            {
+                await castFlow.CastAsync(actor, cast.Card, def, _agents[actor], ctx, ct);
+            }
+            catch (InvalidOperationException)
+            {
+                // Targets unfilled (e.g. Counterspell with empty stack).
+                // Mana already paid — CR 601.2g says costs aren't refunded
+                // when a cast is illegal at this stage; we accept that.
+                RotateHand(cast.Card);
+            }
         }
 
         var loop = new PriorityLoop(

@@ -45,14 +45,14 @@ public sealed class HeuristicBotAgent : IPlayerAgent
             return Task.FromResult<PriorityAction>(new PriorityAction.PlayLand(land));
         }
 
-        // 2. Highest-CMC affordable permanent (curve play — spending all
-        //    mana on the biggest threat is usually better than wasting
-        //    mana on a one-drop late in the game). Instants and sorceries
-        //    deferred — they need a real SpellDefinition lookup.
+        // 2. Highest-CMC affordable spell — permanents (resolve via vanilla
+        //    SpellDefinition) plus instants/sorceries (caller's
+        //    SpellDefinitionResolver may bind effects; if not, the dispatcher
+        //    rotates the card on fail so we don't waste it).
         var hand = ctx.Self.Zones.Hand.GetCards();
         var candidates = hand
             .Where(c => !c.HasType(CardType.Land))
-            .Where(IsPermanentSpell)
+            .Where(IsCastableSpell)
             .Select(c => new { Card = c, Cost = ManaCost.Parse(c.ManaCost ?? "") })
             .OrderByDescending(x => x.Cost.TotalValue)
             .ToList();
@@ -70,11 +70,13 @@ public sealed class HeuristicBotAgent : IPlayerAgent
         return Task.FromResult(PriorityAction.Pass);
     }
 
-    private static bool IsPermanentSpell(ICard c) =>
+    private static bool IsCastableSpell(ICard c) =>
         c.HasType(CardType.Creature)
         || c.HasType(CardType.Artifact)
         || c.HasType(CardType.Enchantment)
-        || c.HasType(CardType.Planeswalker);
+        || c.HasType(CardType.Planeswalker)
+        || c.HasType(CardType.Instant)
+        || c.HasType(CardType.Sorcery);
 
     /// <summary>Greedy pick of untapped mana sources to cover <paramref name="cost"/>.
     /// Returns null when the cost can't be paid from current untapped lands.
@@ -138,7 +140,39 @@ public sealed class HeuristicBotAgent : IPlayerAgent
     }
 
     public Task<IReadOnlyList<object>> ChooseTargetsAsync(GameContext ctx, TargetRequest request, CancellationToken ct = default)
-        => Task.FromResult<IReadOnlyList<object>>(request.LegalCandidates.Take(request.MinTargets).ToList());
+    {
+        if (request.LegalCandidates.Count > 0)
+        {
+            return Task.FromResult<IReadOnlyList<object>>(
+                request.LegalCandidates.Take(request.MinTargets).ToList());
+        }
+
+        // Empty candidate list — fall back to engine-side picks. Card
+        // binders that lack a candidate-gathering pass (e.g. damage-any
+        // templates) get sensible defaults so the cast doesn't crash.
+        var opponent = ctx.AllPlayers.FirstOrDefault(p => !ReferenceEquals(p, ctx.Self));
+        var picked = new List<object>();
+        var label = (request.Description ?? "").ToLowerInvariant();
+
+        for (var i = 0; i < request.MinTargets; i++)
+        {
+            object? choice = label switch
+            {
+                _ when label.Contains("player") || label.Contains("any target")
+                    => opponent,
+                _ when label.Contains("creature")
+                    => opponent?.Zones.Battlefield.GetCards()
+                        .OfType<Creature>().FirstOrDefault(),
+                _ when label.Contains("permanent")
+                    => opponent?.Zones.Battlefield.GetCards().FirstOrDefault(),
+                _ when label.Contains("spell")
+                    => ctx.Stack.Top,
+                _ => opponent,
+            };
+            if (choice != null) picked.Add(choice);
+        }
+        return Task.FromResult<IReadOnlyList<object>>(picked);
+    }
 
     public Task<int> ChooseXAsync(GameContext ctx, ICard source, CancellationToken ct = default)
         => Task.FromResult(0);
