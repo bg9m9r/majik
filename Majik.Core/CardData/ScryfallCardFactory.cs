@@ -17,10 +17,13 @@ namespace Majik.Core.CardData;
 public sealed class ScryfallCardFactory
 {
     private readonly ICardRepository _repo;
+    private readonly Majik.Core.Effects.ReplacementBus? _replacements;
 
-    public ScryfallCardFactory(ICardRepository repo)
+    public ScryfallCardFactory(ICardRepository repo,
+        Majik.Core.Effects.ReplacementBus? replacements = null)
     {
         _repo = repo ?? throw new ArgumentNullException(nameof(repo));
+        _replacements = replacements;
     }
 
     public ICard Create(string name, Player owner)
@@ -67,6 +70,10 @@ public sealed class ScryfallCardFactory
         foreach (var trig in OracleTriggeredAbilityBinder.Bind(card, entity, owner))
         {
             card.AddAbility(trig);
+        }
+        if (_replacements != null)
+        {
+            ShockLandBinder.Bind(card, entity, _replacements);
         }
 
         return card;

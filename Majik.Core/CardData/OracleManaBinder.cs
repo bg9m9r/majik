@@ -36,6 +36,19 @@ public static class OracleManaBinder
         @"\{T\}\s*:\s*Add\s+((?:\{[WUBRGC]\}\s*)+)",
         RegexOptions.IgnoreCase);
 
+    // {T}: Add {R} or {W}.   — dual-color lands (Ravnica shocks, Triomes,
+    // checks, painlands, etc.). Binds a separate ManaAbility per option;
+    // the bot picks whichever colour it needs at activation time.
+    private static readonly Regex TapForModalManaRegex = new(
+        @"\{T\}\s*:\s*Add\s+(\{[WUBRGC]\})(?:\s*,\s*(\{[WUBRGC]\}))?(?:\s*,?\s*or\s+(\{[WUBRGC]\}))",
+        RegexOptions.IgnoreCase);
+
+    // {T}: Add one mana of any color.  — Mox Opal, City of Brass, etc.
+    // Bind as five separate ManaAbility options (one per WUBRG).
+    private static readonly Regex TapForAnyColorRegex = new(
+        @"\{T\}\s*:\s*Add\s+one\s+mana\s+of\s+any\s+color",
+        RegexOptions.IgnoreCase);
+
     public static void Bind(ICard card, CardEntity entity, Player controller)
     {
         if (card == null) throw new ArgumentNullException(nameof(card));
@@ -65,6 +78,30 @@ public static class OracleManaBinder
     {
         var text = entity.OracleText;
         if (string.IsNullOrWhiteSpace(text)) return;
+
+        // Any-colour mana sources (Mox Opal, City of Brass, command tower).
+        if (TapForAnyColorRegex.IsMatch(text))
+        {
+            foreach (var color in new[] { "W", "U", "B", "R", "G" })
+            {
+                card.AddAbility(new ManaAbility(card, controller, ManaCost.Parse(color)));
+            }
+            return;
+        }
+
+        // Dual / triple colour modal — bind each option as a separate
+        // ManaAbility. Bot's source-picker scans abilities and picks the
+        // first that produces the needed colour.
+        foreach (Match m in TapForModalManaRegex.Matches(text))
+        {
+            for (var i = 1; i <= 3; i++)
+            {
+                if (!m.Groups[i].Success) continue;
+                var raw = m.Groups[i].Value.Replace("{", "").Replace("}", "");
+                card.AddAbility(new ManaAbility(card, controller, ManaCost.Parse(raw)));
+            }
+            return; // matched a modal — don't double-add via the non-modal regex
+        }
 
         foreach (Match m in TapForManaRegex.Matches(text))
         {

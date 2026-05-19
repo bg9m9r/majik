@@ -19,13 +19,43 @@ public sealed class ManaPaymentResolver
         if (cost == null) throw new ArgumentNullException(nameof(cost));
         if (payment == null) throw new ArgumentNullException(nameof(payment));
 
+        // Pick the best ability per source given the cost. Dual / any-colour
+        // lands (Sacred Foundry, Mox Opal) bind multiple ManaAbility options;
+        // picking First() blindly short-pays when the bot picked the source
+        // for a colour the first ability doesn't produce. Greedy: for each
+        // source, choose the ability whose generated colour is still needed
+        // (W, U, B, R, G in cost order); fall back to the first ability
+        // when no coloured need matches.
+        var remaining = new Dictionary<char, int>
+        {
+            ['W'] = cost.White, ['U'] = cost.Blue, ['B'] = cost.Black,
+            ['R'] = cost.Red,   ['G'] = cost.Green,
+        };
         var abilities = new List<IManaAbility>(payment.Sources.Count);
         foreach (var src in payment.Sources)
         {
-            var ability = src.Abilities.OfType<IManaAbility>().FirstOrDefault()
-                ?? throw new InvalidOperationException(
-                    $"{src.Name} has no mana ability.");
-            abilities.Add(ability);
+            var options = src.Abilities.OfType<IManaAbility>().ToList();
+            if (options.Count == 0)
+                throw new InvalidOperationException($"{src.Name} has no mana ability.");
+
+            IManaAbility picked = options[0];
+            foreach (var opt in options)
+            {
+                var mana = opt.ManaGenerated;
+                char? satisfies = null;
+                if (remaining['W'] > 0 && mana.White > 0) satisfies = 'W';
+                else if (remaining['U'] > 0 && mana.Blue > 0) satisfies = 'U';
+                else if (remaining['B'] > 0 && mana.Black > 0) satisfies = 'B';
+                else if (remaining['R'] > 0 && mana.Red > 0) satisfies = 'R';
+                else if (remaining['G'] > 0 && mana.Green > 0) satisfies = 'G';
+                if (satisfies.HasValue)
+                {
+                    picked = opt;
+                    remaining[satisfies.Value]--;
+                    break;
+                }
+            }
+            abilities.Add(picked);
         }
 
         // Simulate adding mana into a copy of the pool to verify the cost
