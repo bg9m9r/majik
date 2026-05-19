@@ -102,18 +102,30 @@ public class Game
     /// </summary>
     public CombatManager CombatManager => _combatManager;
 
+    /// <summary>
+    /// Convenience overload that builds the standard service graph via
+    /// <see cref="GameDependencies.CreateDefault"/>. Production code that
+    /// needs to inject fakes or share managers should call the dependencies
+    /// overload directly.
+    /// </summary>
     public Game(IEventBus? eventBus = null)
+        : this(GameDependencies.CreateDefault(eventBus))
     {
-        _eventBus = eventBus ?? new Events.EventBus();
-        _stateMachine = new GameStateMachine(_eventBus);
-        _gameService = new GameService(_eventBus);
-        _playerService = new PlayerService(_eventBus);
-        _zoneService = new ZoneService(_eventBus);
-        _phaseManager = new PhaseManager(_eventBus);
-        _stateBasedActions = new Rules.StateBasedActions(_eventBus, _zoneService);
-        _stackResolver = new StackResolver(_eventBus, _zoneService, _stateBasedActions);
-        _combatManager = new CombatManager(_eventBus, _stateBasedActions, _zoneService);
-        _phaseManager.SetCombatManager(_combatManager);
+    }
+
+    public Game(GameDependencies dependencies)
+    {
+        ArgumentNullException.ThrowIfNull(dependencies);
+
+        _eventBus = dependencies.EventBus;
+        _stateMachine = dependencies.StateMachine;
+        _gameService = dependencies.GameService;
+        _playerService = dependencies.PlayerService;
+        _zoneService = dependencies.ZoneService;
+        _phaseManager = dependencies.PhaseManager;
+        _stateBasedActions = dependencies.StateBasedActions;
+        _stackResolver = dependencies.StackResolver;
+        _combatManager = dependencies.CombatManager;
         _stateChecker = null; // Will be initialized after game starts
         TurnNumber = 0;
     }
