@@ -21,6 +21,16 @@ public sealed class DbCardRepository : ICardRepository
     public CardEntity? GetByName(string name)
     {
         if (string.IsNullOrWhiteSpace(name)) return null;
-        return _db.Cards.AsNoTracking().FirstOrDefault(c => c.Name == name);
+
+        // Exact match first.
+        var exact = _db.Cards.AsNoTracking().FirstOrDefault(c => c.Name == name);
+        if (exact != null) return exact;
+
+        // Double-faced cards (CR 712) are stored as "Front // Back" in
+        // Scryfall. A decklist normally references only the front face;
+        // match the prefix when the exact lookup fails.
+        var prefix = name + " // ";
+        return _db.Cards.AsNoTracking()
+            .FirstOrDefault(c => c.Name.StartsWith(prefix));
     }
 }
