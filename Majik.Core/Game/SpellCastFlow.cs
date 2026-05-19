@@ -113,8 +113,10 @@ public sealed class SpellCastFlow
             collectedTargets.Add(picked);
         }
 
-        // Cost — printed + X, OR alternative cost when supplied.
-        var totalCost = alternativeCost?.AlternativeManaCost ?? ManaCost.Parse(card.ManaCost);
+        // Cost — printed + X, OR alternative cost when supplied. CR 117.7:
+        // also subtract any CostReductionAbility on the card (Affinity etc.).
+        var totalCost = alternativeCost?.AlternativeManaCost
+            ?? Majik.Core.Costs.CostReduction.GetEffectiveCost(card, caster);
         if (xValue.HasValue && xValue.Value > 0)
         {
             totalCost = totalCost.AddGenericCost(xValue.Value);

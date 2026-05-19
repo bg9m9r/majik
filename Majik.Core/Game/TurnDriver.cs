@@ -212,7 +212,8 @@ public sealed class TurnDriver
 
             // Pay mana up front. SpellCastFlow doesn't enforce payment;
             // it just collects ManaPayment for downstream metadata.
-            var cost = Majik.Core.ValueObjects.ManaCost.Parse(cast.Card.ManaCost);
+            // Apply cost-reduction (CR 117.7 — Affinity / cost-reducers).
+            var cost = Majik.Core.Costs.CostReduction.GetEffectiveCost(cast.Card, actor);
             var payment = await _agents[actor].ChooseManaSourcesAsync(ctx, cost, ct);
             if (!manaResolver.Pay(actor, cost, payment))
             {

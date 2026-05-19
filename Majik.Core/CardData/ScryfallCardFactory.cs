@@ -67,6 +67,7 @@ public sealed class ScryfallCardFactory
         // time, not here.
         KeywordBinder.Bind(card, entity, owner);
         OracleManaBinder.Bind(card, entity, owner);
+        AffinityBinder.Bind(card, entity);
         foreach (var trig in OracleTriggeredAbilityBinder.Bind(card, entity, owner))
         {
             card.AddAbility(trig);

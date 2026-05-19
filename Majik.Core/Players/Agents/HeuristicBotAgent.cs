@@ -76,7 +76,9 @@ public sealed class HeuristicBotAgent : IPlayerAgent
             .Where(c => !c.HasType(CardType.Land))
             .Where(IsCastableSpell)
             .Where(c => !_failedThisTurn.Contains(c.InstanceId))
-            .Select(c => new { Card = c, Cost = ManaCost.Parse(c.ManaCost ?? "") })
+            // Effective cost (CR 117.7 — Affinity / cost-reducers) so
+            // discounted spells are correctly judged affordable.
+            .Select(c => new { Card = c, Cost = Majik.Core.Costs.CostReduction.GetEffectiveCost(c, ctx.Self) })
             .OrderByDescending(x => x.Cost.TotalValue)
             .ToList();
 
