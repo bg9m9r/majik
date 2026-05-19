@@ -28,6 +28,11 @@ public sealed class GameDriver
     private readonly TurnDriver _turnDriver;
     private readonly StateBasedActions _sba;
     private readonly Majik.Core.Random.GameRandom _rng;
+    private readonly ExtraTurnQueue _extraTurns = new();
+
+    /// <summary>Effects that grant an extra turn enqueue here; the loop
+    /// consults this before round-robin advancement.</summary>
+    public ExtraTurnQueue ExtraTurns => _extraTurns;
 
     public sealed record GameResult(int TurnsPlayed, Player? Winner, Player? StartingPlayer);
 
@@ -89,10 +94,22 @@ public sealed class GameDriver
             if (alive.Count == 0) return new GameResult(turnNumber, null, startingPlayer);
 
             turnNumber++;
-            var active = _players[activeIndex];
-            await _turnDriver.RunTurnAsync(active, turnNumber, ct);
 
-            activeIndex = (activeIndex + 1) % _players.Count;
+            // CR 500.7 — check extra-turn queue before round-robin pickup.
+            Player active;
+            if (_extraTurns.TryDequeueNext(out var extra))
+            {
+                active = extra!;
+                // Active player index doesn't advance for an extra turn;
+                // the queue may interrupt the normal cadence multiple
+                // times in a row.
+            }
+            else
+            {
+                active = _players[activeIndex];
+                activeIndex = (activeIndex + 1) % _players.Count;
+            }
+            await _turnDriver.RunTurnAsync(active, turnNumber, ct);
         }
 
         _sba.CheckStateBasedActions(
