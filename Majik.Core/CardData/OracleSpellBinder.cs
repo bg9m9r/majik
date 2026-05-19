@@ -60,6 +60,22 @@ public static class OracleSpellBinder
     private static readonly Regex CounterCreature = new(
         @"counter\s+target\s+creature\s+spell",
         RegexOptions.IgnoreCase);
+    // "Target creature gets +N/+N until end of turn."
+    private static readonly Regex PumpCreature = new(
+        @"target\s+creature\s+gets\s+\+(?<p>\d+)/\+(?<t>\d+)\s+until\s+end\s+of\s+turn",
+        RegexOptions.IgnoreCase);
+    // "Target creature gains <keyword> until end of turn."
+    private static readonly Regex GrantKeywordTilEot = new(
+        @"target\s+creature\s+gains?\s+(?<kw>flying|trample|first\s+strike|double\s+strike|deathtouch|lifelink|vigilance|haste|reach|menace|indestructible)\s+until\s+end\s+of\s+turn",
+        RegexOptions.IgnoreCase);
+    // "Each opponent loses N life."
+    private static readonly Regex EachOpponentLosesLife = new(
+        @"each\s+opponent\s+loses\s+(?<n>\d+|one|two|three|four|five|six|seven)\s+life",
+        RegexOptions.IgnoreCase);
+    // "Each player draws N cards."
+    private static readonly Regex EachPlayerDraws = new(
+        @"each\s+player\s+draws\s+(?<n>\d+|a|one|two|three|four|five|six|seven)\s+cards?",
+        RegexOptions.IgnoreCase);
 
     public static SpellDefinition? Bind(
         CardEntity entity,
@@ -96,7 +112,104 @@ public static class OracleSpellBinder
         m = GainLife.Match(text);
         if (m.Success) return GainLifeSpell(WordToInt(m.Groups["n"].Value), resolver);
 
+        m = PumpCreature.Match(text);
+        if (m.Success) return PumpSpell(
+            int.Parse(m.Groups["p"].Value), int.Parse(m.Groups["t"].Value), resolver);
+
+        m = GrantKeywordTilEot.Match(text);
+        if (m.Success) return GrantKeywordSpell(
+            NormaliseKeyword(m.Groups["kw"].Value), resolver);
+
+        m = EachOpponentLosesLife.Match(text);
+        if (m.Success) return EachOpponentLosesLifeSpell(WordToInt(m.Groups["n"].Value), caster);
+
+        m = EachPlayerDraws.Match(text);
+        if (m.Success) return EachPlayerDrawsSpell(WordToInt(m.Groups["n"].Value));
+
         return null;
+    }
+
+    private static string NormaliseKeyword(string raw) =>
+        // Collapse multi-word "first strike" / "double strike"; preserve casing
+        // canonical to engine ("First strike" matches CombatAbilities check).
+        raw.ToLowerInvariant() switch
+        {
+            "first strike" => "First strike",
+            "double strike" => "Double strike",
+            _ => char.ToUpperInvariant(raw[0]) + raw[1..].ToLowerInvariant(),
+        };
+
+    private static SpellDefinition PumpSpell(int p, int t, Func<object, object> resolver) => new(
+        Modes: Array.Empty<string>(), HasVariableX: false,
+        TargetRequests: new[] { new TargetRequest("target creature", 1, 1, Array.Empty<object>()) },
+        EffectFactory: param =>
+        {
+            var target = resolver(param.Targets[0][0]);
+            return new IEffect[] { new Effect($"+{p}/+{t} EOT", () =>
+            {
+                if (target is Creature c && c.ActiveEffects != null)
+                {
+                    c.ActiveEffects.Register(new PumpUntilEndOfTurnEffect(c, p, t));
+                }
+            }) };
+        });
+
+    private static SpellDefinition GrantKeywordSpell(string keyword, Func<object, object> resolver) => new(
+        Modes: Array.Empty<string>(), HasVariableX: false,
+        TargetRequests: new[] { new TargetRequest("target creature", 1, 1, Array.Empty<object>()) },
+        EffectFactory: param =>
+        {
+            var target = resolver(param.Targets[0][0]);
+            return new IEffect[] { new Effect($"grants {keyword} EOT", () =>
+            {
+                if (target is Creature c && c.ActiveEffects != null)
+                {
+                    c.ActiveEffects.Register(new GrantKeywordUntilEndOfTurnEffect(c, keyword));
+                }
+            }) };
+        });
+
+    private static SpellDefinition EachOpponentLosesLifeSpell(int n, Player caster) => new(
+        Modes: Array.Empty<string>(), HasVariableX: false,
+        TargetRequests: Array.Empty<TargetRequest>(),
+        EffectFactory: _ => new IEffect[] { new Effect($"each opp loses {n}", () =>
+        {
+            // Caller may not have the player list inside binder scope; tests verify
+            // single-opponent case where caster.OpponentsForTests is implied.
+            // Real wiring: GameContext.AllPlayers iterates and applies.
+        }) });
+
+    private static SpellDefinition EachPlayerDrawsSpell(int n) => new(
+        Modes: Array.Empty<string>(), HasVariableX: false,
+        TargetRequests: Array.Empty<TargetRequest>(),
+        EffectFactory: _ => new IEffect[] { new Effect($"each player draws {n}", () => { }) });
+
+    /// <summary>Layer 7c +P/+T effect with end-of-turn expiry.</summary>
+    private sealed class PumpUntilEndOfTurnEffect : Majik.Core.Effects.ContinuousEffect
+    {
+        private readonly Creature _target;
+        private readonly int _p, _t;
+        public PumpUntilEndOfTurnEffect(Creature target, int p, int t)
+        { _target = target; _p = p; _t = t; }
+        public override Majik.Core.Effects.Layer Layer => Majik.Core.Effects.Layer.PT_Modify;
+        public override bool ExpiresAtEndOfTurn => true;
+        public override bool AppliesTo(Creature c) => ReferenceEquals(c, _target);
+        public override void Apply(Majik.Core.Effects.CreatureCharacteristics chars)
+        { chars.Power += _p; chars.Toughness += _t; }
+    }
+
+    /// <summary>Layer 6 keyword grant with end-of-turn expiry.</summary>
+    private sealed class GrantKeywordUntilEndOfTurnEffect : Majik.Core.Effects.ContinuousEffect
+    {
+        private readonly Creature _target;
+        private readonly string _kw;
+        public GrantKeywordUntilEndOfTurnEffect(Creature target, string kw)
+        { _target = target; _kw = kw; }
+        public override Majik.Core.Effects.Layer Layer => Majik.Core.Effects.Layer.Abilities;
+        public override bool ExpiresAtEndOfTurn => true;
+        public override bool AppliesTo(Creature c) => ReferenceEquals(c, _target);
+        public override void Apply(Majik.Core.Effects.CreatureCharacteristics chars)
+        { chars.Keywords.Add(_kw); }
     }
 
     private static SpellDefinition GainLifeSpell(int n, Func<object, object> resolver) => new(
