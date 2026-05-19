@@ -148,10 +148,10 @@ public static class OracleSpellBinder
     private static readonly Regex ScryN = new(
         @"\bscry\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b",
         RegexOptions.IgnoreCase);
-    // "Create [a|N] [P]/[T] [colour] [subtype] creature token[s]."
-    // Captures: count, P, T, optional colour, subtype.
+    // "Create [a|N] [P]/[T] [colour] [subtype] creature token[s] [with KW (and KW)]."
+    // Captures: count, P, T, optional colour, subtype, optional keyword list.
     private static readonly Regex CreateTokens = new(
-        @"create\s+(?<n>a|an|\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?<p>\d+)/(?<t>\d+)\s+(?<colour>white|blue|black|red|green|colorless)?\s*(?<subtype>[A-Za-z]+)\s+creature\s+tokens?",
+        @"create\s+(?<n>a|an|\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?<p>\d+)/(?<t>\d+)\s+(?<colour>white|blue|black|red|green|colorless)?\s*(?<subtype>[A-Za-z]+)\s+creature\s+tokens?(?:\s+with\s+(?<keywords>[A-Za-z, ]+))?",
         RegexOptions.IgnoreCase);
 
     public static SpellDefinition? Bind(
@@ -273,7 +273,8 @@ public static class OracleSpellBinder
             WordToInt(m.Groups["n"].Value),
             int.Parse(m.Groups["p"].Value),
             int.Parse(m.Groups["t"].Value),
-            m.Groups["subtype"].Value);
+            m.Groups["subtype"].Value,
+            ParseKeywordList(m.Groups["keywords"].Value));
 
         return null;
     }
@@ -418,8 +419,19 @@ public static class OracleSpellBinder
         TargetRequests: Array.Empty<TargetRequest>(),
         EffectFactory: _ => new IEffect[] { new Effect($"you gain {n}", () => caster.GainLife(n)) });
 
+    private static IReadOnlyList<string> ParseKeywordList(string raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return Array.Empty<string>();
+        // Split on commas / "and"; trim; canonicalise via NormaliseKeyword.
+        return raw.Replace(" and ", ",").Split(',', StringSplitOptions.RemoveEmptyEntries)
+            .Select(s => NormaliseKeyword(s.Trim()))
+            .Where(s => !string.IsNullOrWhiteSpace(s))
+            .ToList();
+    }
+
     private static SpellDefinition CreateTokensSpell(
-        Player caster, int count, int power, int toughness, string subtypeRaw) => new(
+        Player caster, int count, int power, int toughness, string subtypeRaw,
+        IReadOnlyList<string> grantedKeywords) => new(
         Modes: Array.Empty<string>(), HasVariableX: false,
         TargetRequests: Array.Empty<TargetRequest>(),
         EffectFactory: _ => new IEffect[] { new Effect($"create {count} {power}/{toughness}", () =>
@@ -444,6 +456,10 @@ public static class OracleSpellBinder
                     Owner = caster, Controller = caster,
                     Zone = ZoneType.Battlefield, IsToken = true,
                 };
+                foreach (var kw in grantedKeywords)
+                {
+                    token.AddAbility(new Majik.Core.Abilities.KeywordAbility(kw));
+                }
                 caster.Zones.Battlefield.AddCard(token);
             }
         }) });
