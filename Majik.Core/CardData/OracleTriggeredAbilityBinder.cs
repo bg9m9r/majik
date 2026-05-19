@@ -35,6 +35,9 @@ public static class OracleTriggeredAbilityBinder
     private static readonly Regex CombatDamagePlayer = new(
         @"Whenever\s+(?<ref>~|this creature)\s+deals\s+combat\s+damage\s+to\s+a\s+player\s*,\s*(?<effect>[^.]+)\.",
         RegexOptions.IgnoreCase);
+    private static readonly Regex AttackLine = new(
+        @"Whenever\s+(?<ref>~|this creature)\s+attacks\s*,\s*(?<effect>[^.]+)\.",
+        RegexOptions.IgnoreCase);
 
     private static readonly Regex YouGainLife = new(
         @"you\s+gain\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+li(?:fe|ves)",
@@ -111,6 +114,17 @@ public static class OracleTriggeredAbilityBinder
                 source, ctrl,
                 new EventTriggerCondition<CombatDamageDealtEvent>((e, _) =>
                     ReferenceEquals(e.Source, source) && e.TargetPlayer != null),
+                effects: effects);
+        }
+
+        // "Whenever ~ attacks, ..." per-attacker trigger (CR 508.1f).
+        foreach (Match m in AttackLine.Matches(text))
+        {
+            var effects = BuildEffects(m.Groups["effect"].Value, ctrl).ToList();
+            if (effects.Count == 0) continue;
+            yield return new TriggeredAbility(
+                source, ctrl,
+                Triggers.OnAttackSelf(source),
                 effects: effects);
         }
 

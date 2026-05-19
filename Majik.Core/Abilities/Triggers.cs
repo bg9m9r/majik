@@ -88,4 +88,14 @@ public static class Triggers
             ReferenceEquals(e.Spell.Controller, controller)
             && !e.Spell.Card.HasType(Majik.Core.Cards.Types.CardType.Creature));
     }
+
+    /// <summary>
+    /// CR 508.1f — "Whenever ~ attacks, …" per-attacker trigger. Fires
+    /// on CreatureAttacksEvent matching <paramref name="source"/>.
+    /// </summary>
+    public static ITriggerCondition OnAttackSelf(Majik.Core.Cards.ICard source)
+    {
+        return new EventTriggerCondition<Majik.Core.Domain.DomainEvents.CreatureAttacksEvent>(
+            (e, _) => ReferenceEquals(e.Attacker, source));
+    }
 }

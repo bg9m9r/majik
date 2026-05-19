@@ -59,6 +59,10 @@ public sealed class CombatFlow
             {
                 decl.Attacker.Tap();
             }
+            // CR 508.1f — per-attacker "attacks" event so triggered abilities
+            // ("Whenever ~ attacks, …") can fire on declaration.
+            _bus.Publish(new Majik.Core.Domain.DomainEvents.CreatureAttacksEvent(
+                decl.Attacker, decl.DefendingPlayerOrPlaneswalker));
         }
 
         if (attackPlan.Attackers.Count == 0)
