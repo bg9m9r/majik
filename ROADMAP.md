@@ -299,7 +299,12 @@ Track A unlocks Track B (layer system needed for granted abilities).
   - `Effects/AttachedBoostEffect` — Layer 7c generic boost (+P/+T) + Layer 6 keyword grant; reads `source.AttachedTo` dynamically (re-equipping transfers bonus)
   - Demos: Holy Strength aura grants +1/+2; Sword of Strength equipment grants +2/+2 + First strike; equipment transfer between bears mid-game
   - 615 Core + 31 Api = 646 tests, zero warnings
-- **Phase 19 remaining** — Vehicles (Crew), Sagas (chapter triggers), Adventures, MDFCs/Transform, Battles, Class, Mutate, Planeswalker activated loyalty abilities (mechanics, not the type itself)
+- **Phase 19b** — Vehicles + Sagas ✅ done
+  - `Effects/VehicleCrewEffect` — Layer 7b sets P/T; expires end-of-turn
+  - `CardData/Vehicles/CrewAction.Crew` — totals untapped non-sick crewmates' power vs cost; taps + registers effect
+  - `CardData/Sagas/SagaState` — tracks lore counters via `Permanent.Counters`; `AdvanceAndChapter` adds + returns new count; `ShouldBeSacrificed()` for SBA 704.5r
+  - 705 Core + 45 Api = 750 tests, zero warnings
+- **Phase 19 remaining** — Adventures (alternate cast from exile), MDFCs/Transform (two-faced cards), Battles (defense counters), Class (level abilities), Mutate, Planeswalker loyalty-ability activation
 - **Phase 22** — Targeting + Legality ✅ done
   - `Targeting/TargetSpec` — declarative spec: type filters (creature/player/planeswalker/artifact/enchantment/land), controller filters, additional predicate
   - `Targeting/TargetLegality` — single-candidate `IsLegal()` + `EnumerateLegal()` walker over battlefield + players
