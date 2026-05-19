@@ -46,6 +46,9 @@ public sealed class GameFacade
     private Task<GameDriver.GameResult>? _fullGameTask;
     private readonly List<Action<EventDto>> _subscribers = new();
     private readonly ActionLog _log = new();
+    private int _currentTurn = 1;
+    private PhaseStateType _currentPhase = PhaseStateType.Main;
+    private Player? _currentActivePlayer;
 
     public Guid GameId { get; } = Guid.NewGuid();
 
@@ -82,6 +85,9 @@ public sealed class GameFacade
             phaseAccessor: () => PhaseStateType.Main);
 
         _bus.SubscribeAll(BridgeEvent);
+        _bus.Subscribe<TurnStartedEvent>(e => { _currentTurn = e.TurnNumber; _currentActivePlayer = e.Player; });
+        _bus.Subscribe<PhaseStartedEvent>(e => { _currentPhase = e.PhaseType; });
+        _bus.Subscribe<StepStartedEvent>(e => { _currentPhase = e.StepType; });
     }
 
     public static GameFacade Create(string aliceName, string bobName)
@@ -189,8 +195,8 @@ public sealed class GameFacade
     /// <see cref="GetStateFor"/> for a per-player view that masks
     /// opponent hidden zones.</summary>
     public GameStateDto GetState() => StateSnapshotter.Snapshot(
-        GameId, turnNumber: 1, phase: PhaseStateType.Main,
-        activePlayer: _priority.CurrentPlayer ?? _alice,
+        GameId, turnNumber: _currentTurn, phase: _currentPhase,
+        activePlayer: _currentActivePlayer ?? _priority.CurrentPlayer ?? _alice,
         players: new[] { _alice, _bob },
         stack: _stack);
 
@@ -203,8 +209,8 @@ public sealed class GameFacade
         if (viewer == null) return null;
 
         return StateSnapshotter.Snapshot(
-            GameId, turnNumber: 1, phase: PhaseStateType.Main,
-            activePlayer: _priority.CurrentPlayer ?? _alice,
+            GameId, turnNumber: _currentTurn, phase: _currentPhase,
+            activePlayer: _currentActivePlayer ?? _priority.CurrentPlayer ?? _alice,
             players: new[] { _alice, _bob },
             stack: _stack,
             viewer: viewer);
