@@ -55,6 +55,9 @@ public enum CardSubtype
     Food,
     Treasure,
     Clue,
+    Construct,
+    Blood,
+    Powerstone,
 
     // Planeswalker subtypes (examples)
     Ajani,

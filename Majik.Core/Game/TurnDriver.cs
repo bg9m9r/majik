@@ -105,6 +105,8 @@ public sealed class TurnDriver
 
         // Main 1
         SetPhase(PhaseStateType.Main);
+        // CR 714.2 — Saga lore-counter tick fires at the precombat main.
+        AdvanceSagas(activePlayer);
         await PriorityRound(activePlayer, ct);
 
         // Combat
@@ -148,6 +150,21 @@ public sealed class TurnDriver
             // CR 502 — clears summoning sickness, loyalty-once-per-turn,
             // and any other turn-scoped per-permanent flags.
             card.ResetTurnState();
+        }
+    }
+
+    private void AdvanceSagas(Player active)
+    {
+        // CR 714.2 — at the precombat main, each Saga its controller
+        // controls adds a lore counter and triggers the matching chapter
+        // ability. SagaState.AdvanceAndChapter invokes the onChapter
+        // callback synchronously; the chapter's effect (token spawn,
+        // etc.) lands immediately. Future cut: route through the stack
+        // so the chapter ability respects priority + responses.
+        foreach (var perm in active.Zones.Battlefield.GetCards()
+                     .OfType<Permanent>().ToList())
+        {
+            perm.SagaState?.AdvanceAndChapter();
         }
     }
 
