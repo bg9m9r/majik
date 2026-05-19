@@ -45,16 +45,16 @@ public sealed class HeuristicBotAgent : IPlayerAgent
             return Task.FromResult<PriorityAction>(new PriorityAction.PlayLand(land));
         }
 
-        // 2. Cheapest castable permanent (creature / artifact / enchantment /
-        //    planeswalker). Instants and sorceries deferred — they need
-        //    SpellDefinition lookup which the bot can't do without a
-        //    binder. Permanents resolve fine with a vanilla SpellDefinition.
+        // 2. Highest-CMC affordable permanent (curve play — spending all
+        //    mana on the biggest threat is usually better than wasting
+        //    mana on a one-drop late in the game). Instants and sorceries
+        //    deferred — they need a real SpellDefinition lookup.
         var hand = ctx.Self.Zones.Hand.GetCards();
         var candidates = hand
             .Where(c => !c.HasType(CardType.Land))
             .Where(IsPermanentSpell)
             .Select(c => new { Card = c, Cost = ManaCost.Parse(c.ManaCost ?? "") })
-            .OrderBy(x => x.Cost.TotalValue)
+            .OrderByDescending(x => x.Cost.TotalValue)
             .ToList();
 
         foreach (var cand in candidates)
@@ -127,7 +127,15 @@ public sealed class HeuristicBotAgent : IPlayerAgent
     }
 
     public Task<MulliganDecision> ChooseMulliganAsync(GameContext ctx, IReadOnlyList<ICard> hand, int mulligansTaken, CancellationToken ct = default)
-        => Task.FromResult(MulliganDecision.Keep);
+    {
+        // Keep hands with 2–5 lands (CR 103.4 mulligan policy — most
+        // 60-card decks want 2–4 lands in their opening seven). Below
+        // 2 = mana-screwed; above 5 = mana-flooded. Always keep after
+        // 3 mulligans to avoid digging into a one-card hand.
+        var landCount = hand.Count(c => c.HasType(CardType.Land));
+        var keep = mulligansTaken >= 3 || (landCount >= 2 && landCount <= 5);
+        return Task.FromResult(keep ? MulliganDecision.Keep : MulliganDecision.Mulligan);
+    }
 
     public Task<IReadOnlyList<object>> ChooseTargetsAsync(GameContext ctx, TargetRequest request, CancellationToken ct = default)
         => Task.FromResult<IReadOnlyList<object>>(request.LegalCandidates.Take(request.MinTargets).ToList());
@@ -150,9 +158,22 @@ public sealed class HeuristicBotAgent : IPlayerAgent
     public Task<CombatPlan> DeclareAttackersAsync(GameContext ctx, IReadOnlyList<Creature> eligibleAttackers, CancellationToken ct = default)
     {
         var defender = ctx.AllPlayers.First(p => !ReferenceEquals(p, ctx.Self));
-        var attacks = eligibleAttackers
-            .Select(c => new AttackerDeclaration(c, defender))
-            .ToList();
+        var defenderCreatures = defender.Zones.Battlefield.GetCards()
+            .OfType<Creature>().Where(c => !c.IsTapped).ToList();
+
+        // Skip suicidal attacks: don't swing with a creature smaller than
+        // every untapped opposing creature unless the defender's life is
+        // dangerously low (lethal reach this turn).
+        var totalAttackPower = eligibleAttackers.Sum(c => c.Power);
+        var reach = totalAttackPower >= defender.LifeTotal;
+        var attacks = new List<AttackerDeclaration>();
+        foreach (var atk in eligibleAttackers)
+        {
+            var willDieFromAll = defenderCreatures.All(d => d.Power >= atk.Toughness)
+                                 && defenderCreatures.Count > 0;
+            if (willDieFromAll && !reach) continue;
+            attacks.Add(new AttackerDeclaration(atk, defender));
+        }
         return Task.FromResult(new CombatPlan(attacks));
     }
 
@@ -161,9 +182,41 @@ public sealed class HeuristicBotAgent : IPlayerAgent
         var assignments = new List<BlockerDeclaration>();
         var available = eligibleBlockers.ToList();
 
+        // Defender's life vs incoming raw damage — chump-block only when
+        // unblocked damage would otherwise be lethal.
+        var incomingDamage = attackers.Sum(a => a.Power);
+        var lethalIncoming = incomingDamage >= ctx.Self.LifeTotal;
+
         foreach (var atk in attackers)
         {
-            // Find smallest blocker whose toughness > attacker power (won't die).
+            // 1. Safe block that ALSO kills attacker — best outcome (one-sided).
+            var safeKill = available
+                .Where(b => b.Toughness > atk.Power && b.Power >= atk.Toughness)
+                .OrderBy(b => b.Power) // preserve bigger blockers
+                .FirstOrDefault();
+            if (safeKill != null)
+            {
+                assignments.Add(new BlockerDeclaration(safeKill, atk));
+                available.Remove(safeKill);
+                continue;
+            }
+
+            // 2. Profitable trade — both die, attacker's CMC ≥ blocker's.
+            var trade = available
+                .Where(b => b.Power >= atk.Toughness && atk.Power >= b.Toughness)
+                .Where(b => ManaCost.Parse(atk.ManaCost ?? "").TotalValue
+                            >= ManaCost.Parse(b.ManaCost ?? "").TotalValue)
+                .OrderBy(b => ManaCost.Parse(b.ManaCost ?? "").TotalValue)
+                .FirstOrDefault();
+            if (trade != null)
+            {
+                assignments.Add(new BlockerDeclaration(trade, atk));
+                available.Remove(trade);
+                continue;
+            }
+
+            // 3. Safe-but-doesn't-kill — smallest tough that survives.
+            //    (Existing behaviour, preserved for test continuity.)
             var safe = available
                 .Where(b => b.Toughness > atk.Power)
                 .OrderBy(b => b.Toughness)
@@ -172,6 +225,24 @@ public sealed class HeuristicBotAgent : IPlayerAgent
             {
                 assignments.Add(new BlockerDeclaration(safe, atk));
                 available.Remove(safe);
+                continue;
+            }
+
+            // 4. Chump — blocker dies, attacker lives. Only when otherwise
+            //    lethal this combat step.
+            if (lethalIncoming)
+            {
+                var chump = available
+                    .OrderBy(b => ManaCost.Parse(b.ManaCost ?? "").TotalValue)
+                    .FirstOrDefault();
+                if (chump != null)
+                {
+                    assignments.Add(new BlockerDeclaration(chump, atk));
+                    available.Remove(chump);
+                    incomingDamage -= atk.Power;
+                    lethalIncoming = incomingDamage >= ctx.Self.LifeTotal;
+                    continue;
+                }
             }
         }
 
