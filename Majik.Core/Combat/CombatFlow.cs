@@ -181,6 +181,10 @@ public sealed class CombatFlow
 
     private void DealDamageToCreature(Creature source, Creature target, int amount)
     {
+        // CR 702.16e — protection-from-X prevents damage from any source
+        // matching the quality. Check colour-quality before mutating state.
+        if (HasProtectionFromSource(target, source)) return;
+
         var intent = new Majik.Core.Effects.DamageIntent(source, amount, TargetCreature: target);
         intent = _replacements?.Apply(intent) ?? intent;
         if (intent == null || intent.Amount <= 0) return;
@@ -234,6 +238,17 @@ public sealed class CombatFlow
         }
 
         _bus.Publish(new CombatDamageDealtEvent(source, target, intent.Amount));
+    }
+
+    private static bool HasProtectionFromSource(ICard target, ICard source)
+    {
+        var sourceColors = Majik.Core.Cards.CardColors.GetColors(source);
+        foreach (var c in sourceColors)
+        {
+            if (Majik.Core.Rules.Protection.HasProtectionFromColor(target, c))
+                return true;
+        }
+        return false;
     }
 
     private void CleanupAfterDamage(Player attacker, Player defender)
