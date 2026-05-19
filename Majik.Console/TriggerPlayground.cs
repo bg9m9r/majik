@@ -31,6 +31,7 @@ internal static class TriggerPlayground
             case "priority-loop": RunPriorityLoop().GetAwaiter().GetResult(); break;
             case "play-game-db": RunPlayGameDb(); break;
             case "play-full-game": RunPlayFullGame().GetAwaiter().GetResult(); break;
+            case "play-heuristic": RunPlayHeuristic().GetAwaiter().GetResult(); break;
             case "all":
                 RunEtb();
                 RunApnap();
@@ -39,6 +40,7 @@ internal static class TriggerPlayground
                 RunPriorityLoop().GetAwaiter().GetResult();
                 RunPlayGameDb();
                 RunPlayFullGame().GetAwaiter().GetResult();
+                RunPlayHeuristic().GetAwaiter().GetResult();
                 break;
             default:
                 System.Console.WriteLine($"Unknown scenario '{scenario}'.");
@@ -57,6 +59,7 @@ internal static class TriggerPlayground
         System.Console.WriteLine("  priority-loop   Async PriorityLoop driven by DeterministicBotAgent vs bot");
         System.Console.WriteLine("  play-game-db    Load Lightning Bolt/Mountain from Scryfall DB, play one slice");
         System.Console.WriteLine("  play-full-game  Bot vs bot through GameDriver, multiple full turns");
+        System.Console.WriteLine("  play-heuristic  HeuristicBotAgent — plays lands + attacks + blocks");
         System.Console.WriteLine("  all             Run every scenario in sequence");
     }
 
@@ -172,6 +175,54 @@ internal static class TriggerPlayground
         Log("Alice draws again — should NOT fire");
         ctx.Bus.Publish(new CardDrawnEvent(card, alice));
         Log($"PendingCount: {ctx.Triggers.PendingCount}   Fires total: {fires}");
+    }
+
+    private static async Task RunPlayHeuristic()
+    {
+        Banner("Scenario: Heuristic bot vs heuristic bot — lands + attacks + blocks");
+
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var zones = new ZoneService(bus);
+        var triggers = new TriggerManager(stack, bus);
+        var resolver = new Majik.Core.Services.StackResolver(bus, zones);
+        var sba = new Majik.Core.Rules.StateBasedActions(bus, zones, triggers);
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+        var priority = new PriorityManager(new List<Player> { alice, bob }, stack, bus, triggers);
+        var combat = new Majik.Core.Combat.CombatFlow(bus, sba);
+
+        // Seed: 20 mountains + 10 grizzly bears each.
+        var rng = new Majik.Core.Random.GameRandom(1234);
+        foreach (var p in new[] { alice, bob })
+        {
+            for (var i = 0; i < 20; i++)
+            {
+                var m = Majik.Core.CardData.NamedCardFactory.Create("Mountain", p);
+                p.Zones.Library.AddCard(m); m.Zone = ZoneType.Library;
+            }
+            for (var i = 0; i < 10; i++)
+            {
+                var bear = Majik.Core.CardData.NamedCardFactory.Create("Grizzly Bears", p);
+                p.Zones.Library.AddCard(bear); bear.Zone = ZoneType.Library;
+            }
+        }
+
+        var driver = new GameDriver(
+            new[] { alice, bob },
+            new Dictionary<Player, IPlayerAgent>
+            {
+                [alice] = new HeuristicBotAgent(),
+                [bob] = new HeuristicBotAgent(),
+            },
+            stack, zones, triggers, resolver, sba, priority, combat, rng);
+
+        Log("Running 8 turns…");
+        var result = await driver.RunGameAsync(maxTurns: 8);
+
+        Log($"Turns: {result.TurnsPlayed}   Winner: {result.Winner?.Name ?? "(none)"}");
+        Log($"Alice life: {alice.LifeTotal}, hand={alice.Zones.Hand.Count}, battlefield={alice.Zones.Battlefield.Count}");
+        Log($"Bob life: {bob.LifeTotal}, hand={bob.Zones.Hand.Count}, battlefield={bob.Zones.Battlefield.Count}");
     }
 
     private static async Task RunPlayFullGame()
