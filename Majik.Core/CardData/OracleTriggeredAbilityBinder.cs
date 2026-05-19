@@ -51,6 +51,12 @@ public static class OracleTriggeredAbilityBinder
     private static readonly Regex CreateClue = new(
         @"create\s+(?<n>a|an|\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+clue\s+tokens?",
         RegexOptions.IgnoreCase);
+    private static readonly Regex GetEnergy = new(
+        @"you get\s+((?:\{E\}\s*)+)",
+        RegexOptions.IgnoreCase);
+    private static readonly Regex AnotherCreatureEnters = new(
+        @"whenever another creature you control enters\s*,\s*(?<effect>[^.]+)\.",
+        RegexOptions.IgnoreCase);
 
     public static IEnumerable<TriggeredAbility> Bind(ICard source, CardEntity entity, Player? controller = null)
     {
@@ -107,6 +113,18 @@ public static class OracleTriggeredAbilityBinder
                     ReferenceEquals(e.Source, source) && e.TargetPlayer != null),
                 effects: effects);
         }
+
+        // "Whenever another creature you control enters, ..." — Soul Warden,
+        // Guide of Souls, Soul Attendant pattern.
+        foreach (Match m in AnotherCreatureEnters.Matches(text))
+        {
+            var effects = BuildEffects(m.Groups["effect"].Value, ctrl).ToList();
+            if (effects.Count == 0) continue;
+            yield return new TriggeredAbility(
+                source, ctrl,
+                Triggers.OnAnyCreatureEntersBattlefield(),
+                effects: effects);
+        }
     }
 
     private static IEnumerable<IEffect> BuildEffects(string effectText, Player controller)
@@ -149,6 +167,14 @@ public static class OracleTriggeredAbilityBinder
                     Majik.Core.Tokens.TokenFactory.CreateClue(controller);
                 }
             });
+        }
+
+        m = GetEnergy.Match(effectText);
+        if (m.Success)
+        {
+            var n = System.Text.RegularExpressions.Regex.Matches(
+                m.Value, @"\{E\}", RegexOptions.IgnoreCase).Count;
+            yield return new Effect($"get {n}E", () => controller.GainEnergy(n));
         }
     }
 
