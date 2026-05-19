@@ -390,4 +390,10 @@ Track A unlocks Track B (layer system needed for granted abilities).
   - `Costs/IAlternativeCost` + `FlashbackAlternativeCost` — CR 702.34 cast from graveyard for alt cost + exile on resolve
   - Modal spell end-to-end demo: SpellCastFlow already threads ChooseModeAsync; tests for Charm-style 3-mode spell branching on selected mode
   - 721 Core + 45 Api = 766 tests, zero warnings
-- **Phase 15 remaining** — wire `IAdditionalCost`/`IAlternativeCost` into `SpellCastFlow.CastAsync`; hold-priority semantics; Madness/Cipher/Cast-from-Exile alternative implementations
+- **Phase 15 fourth cut** ✅ done — wire cost frameworks + more alt costs
+  - `SpellCastFlow.CastAsync` accepts `additionalCosts` + `alternativeCost`
+  - Additional costs paid pre-mana; alt cost replaces printed cost; OnResolved chained
+  - Card moves from any zone (not only Hand) → Stack
+  - `MadnessAlternativeCost` (CR 702.35), `CastFromExileAlternativeCost` (Suspend / Foretell / Plot / Adventure / Cascade)
+  - 728 Core + 45 Api = 773 tests, zero warnings
+- **Phase 15 remaining** — hold-priority semantics; per-keyword alt impls (Cipher / Buyback / Overload / Embalm)
