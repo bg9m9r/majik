@@ -1,6 +1,7 @@
 using Majik.Core.CardData.Database;
 using Majik.Core.CardData.Import;
 using Majik.Core.CardData.Parsing;
+using Majik.Console.Commands;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Text.Json;
@@ -51,6 +52,26 @@ class Program
             {
                 var scenario = args.Length > 1 ? args[1] : "all";
                 TriggerPlayground.Run(scenario);
+                return;
+            }
+            else if (args[0].Equals("mark-implemented", StringComparison.OrdinalIgnoreCase))
+            {
+                Environment.Exit(await ImplementedCommands.MarkAsync(args, value: true));
+                return;
+            }
+            else if (args[0].Equals("mark-unimplemented", StringComparison.OrdinalIgnoreCase))
+            {
+                Environment.Exit(await ImplementedCommands.MarkAsync(args, value: false));
+                return;
+            }
+            else if (args[0].Equals("list-implemented", StringComparison.OrdinalIgnoreCase))
+            {
+                Environment.Exit(await ImplementedCommands.ListAsync(args));
+                return;
+            }
+            else if (args[0].Equals("seed-implemented", StringComparison.OrdinalIgnoreCase))
+            {
+                Environment.Exit(await ImplementedCommands.SeedAsync(args));
                 return;
             }
             else if (args[0].Equals("fetch-bulk", StringComparison.OrdinalIgnoreCase))
