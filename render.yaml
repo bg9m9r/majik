@@ -1,0 +1,57 @@
+# Render Blueprint — Majik backend (API + MongoDB)
+# Deploy: connect this repo (github.com/bg9m9r/majik) as a Blueprint on Render.
+#
+# Secrets to set after first sync (Render dashboard → service → Environment):
+#   majik-api:
+#     Auth__Authority           e.g. https://api.descope.com/<DESCOPE_PROJECT_ID>
+#     Auth__Audience            <DESCOPE_PROJECT_ID>
+#     Mongo__ConnectionString   mongodb://<user>:<pass>@majik-mongo:27017/?authSource=admin
+#                               (user/pass = the MONGO_INITDB_ROOT_* values on majik-mongo)
+#     Cors__AllowedOrigins__0   https://majik-portal.onrender.com  (or custom domain)
+#   majik-mongo:
+#     MONGO_INITDB_ROOT_USERNAME  pick one (e.g. majik)
+#     MONGO_INITDB_ROOT_PASSWORD  auto-generated below
+
+services:
+  - type: web
+    name: majik-api
+    runtime: docker
+    plan: starter
+    region: oregon
+    rootDir: .
+    dockerfilePath: ./Majik.Server/Dockerfile
+    dockerContext: .
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: ASPNETCORE_URLS
+        value: http://0.0.0.0:10000
+      - key: Mongo__Database
+        value: majik
+      - key: Auth__Authority
+        sync: false
+      - key: Auth__Audience
+        sync: false
+      - key: Mongo__ConnectionString
+        sync: false
+      - key: Cors__AllowedOrigins__0
+        sync: false
+
+  - type: pserv
+    name: majik-mongo
+    runtime: image
+    plan: starter
+    region: oregon
+    image:
+      url: docker.io/library/mongo:7
+    disk:
+      name: mongo-data
+      mountPath: /data/db
+      sizeGB: 10
+    envVars:
+      - key: MONGO_INITDB_ROOT_USERNAME
+        sync: false
+      - key: MONGO_INITDB_ROOT_PASSWORD
+        generateValue: true
