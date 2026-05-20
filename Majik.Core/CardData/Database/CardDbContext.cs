@@ -7,6 +7,10 @@ namespace Majik.Core.CardData.Database;
 /// </summary>
 public class CardDbContext : DbContext
 {
+    public CardDbContext() { }
+
+    public CardDbContext(DbContextOptions<CardDbContext> options) : base(options) { }
+
     public DbSet<CardEntity> Cards { get; set; } = null!;
     public DbSet<CardAbilityEntity> CardAbilities { get; set; } = null!;
     public DbSet<EffectReferenceEntity> EffectReferences { get; set; } = null!;

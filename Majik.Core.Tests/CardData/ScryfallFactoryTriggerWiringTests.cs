@@ -58,5 +58,12 @@ public class ScryfallFactoryTriggerWiringTests
         public InMemRepo(Dictionary<string, CardEntity> by) { _by = by; }
         public CardEntity? GetByName(string name) =>
             _by.TryGetValue(name, out var e) ? e : null;
+
+        public IReadOnlyList<CardEntity> Search(string? q, bool implementedOnly, int limit)
+            => throw new NotImplementedException();
+
+        public bool IsImplemented(string name) => throw new NotImplementedException();
+
+        public void SetImplemented(string name, bool value) => throw new NotImplementedException();
     }
 }

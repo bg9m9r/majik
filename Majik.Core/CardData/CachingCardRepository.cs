@@ -26,6 +26,19 @@ public sealed class CachingCardRepository : ICardRepository
         return _cache.GetOrAdd(name, n => _inner.GetByName(n));
     }
 
+    public IReadOnlyList<CardEntity> Search(string? q, bool implementedOnly, int limit)
+        => _inner.Search(q, implementedOnly, limit);
+
+    public bool IsImplemented(string name)
+        => _inner.IsImplemented(name);
+
+    public void SetImplemented(string name, bool value)
+    {
+        _inner.SetImplemented(name, value);
+        // Invalidate the cache entry so subsequent GetByName reflects new flag.
+        _cache.TryRemove(name, out _);
+    }
+
     /// <summary>For tests/diagnostics: number of distinct keys cached.</summary>
     public int CacheSize => _cache.Count;
 }

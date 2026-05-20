@@ -48,5 +48,12 @@ public class InMemoryCardRepositoryTests
             if (string.IsNullOrWhiteSpace(name)) return null;
             return _by.TryGetValue(name, out var e) ? e : null;
         }
+
+        public IReadOnlyList<CardEntity> Search(string? q, bool implementedOnly, int limit)
+            => throw new NotImplementedException();
+
+        public bool IsImplemented(string name) => throw new NotImplementedException();
+
+        public void SetImplemented(string name, bool value) => throw new NotImplementedException();
     }
 }
