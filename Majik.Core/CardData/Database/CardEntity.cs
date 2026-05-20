@@ -101,4 +101,9 @@ public class CardEntity
     /// Timestamp when card was last updated.
     /// </summary>
     public DateTime? UpdatedAt { get; set; }
+
+    /// <summary>
+    /// Flag indicating whether the card's abilities have been implemented in the engine.
+    /// </summary>
+    public bool IsImplemented { get; set; }
 }
