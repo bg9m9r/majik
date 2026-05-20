@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using Majik.Core.Cards;
 
 namespace Majik.Core.Api;
 
@@ -11,9 +12,13 @@ public sealed class GameRegistry
 {
     private readonly ConcurrentDictionary<Guid, GameFacade> _games = new();
 
-    public GameFacade Create(string aliceName, string bobName)
+    public GameFacade Create(
+        string aliceName,
+        string bobName,
+        IReadOnlyList<ICard> aliceDeck,
+        IReadOnlyList<ICard> bobDeck)
     {
-        var facade = GameFacade.Create(aliceName, bobName);
+        var facade = GameFacade.Create(aliceName, bobName, aliceDeck, bobDeck);
 
         if (!_games.TryAdd(facade.GameId, facade))
         {

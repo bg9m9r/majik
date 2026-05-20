@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Majik.Core.Api;
+using Majik.Core.Cards;
 using Xunit;
 
 namespace Majik.Core.Api.Tests;
@@ -11,7 +12,7 @@ public class GameRegistryTests
     {
         var registry = new GameRegistry();
 
-        var facade = registry.Create("Alice", "Bob");
+        var facade = registry.Create("Alice", "Bob", Array.Empty<ICard>(), Array.Empty<ICard>());
 
         registry.Get(facade.GameId).Should().BeSameAs(facade);
     }
@@ -28,7 +29,7 @@ public class GameRegistryTests
     public void Remove_DeletesEntry()
     {
         var registry = new GameRegistry();
-        var facade = registry.Create("Alice", "Bob");
+        var facade = registry.Create("Alice", "Bob", Array.Empty<ICard>(), Array.Empty<ICard>());
 
         registry.Remove(facade.GameId).Should().BeTrue();
 
@@ -42,7 +43,7 @@ public class GameRegistryTests
 
         var games = Enumerable.Range(0, 100)
             .AsParallel()
-            .Select(_ => registry.Create("Alice", "Bob"))
+            .Select(_ => registry.Create("Alice", "Bob", Array.Empty<ICard>(), Array.Empty<ICard>()))
             .ToList();
 
         games.Select(g => g.GameId).Distinct().Should().HaveCount(100);

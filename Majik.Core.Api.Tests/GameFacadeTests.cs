@@ -1,6 +1,7 @@
 using System.Text.Json;
 using FluentAssertions;
 using Majik.Core.Api;
+using Majik.Core.Cards;
 using Majik.Core.Api.Commands;
 using Majik.Core.Api.Dtos;
 using Xunit;
@@ -12,7 +13,7 @@ public class GameFacadeTests
     [Fact]
     public async Task NewGame_GetState_Returns2PlayerSnapshot()
     {
-        var facade = GameFacade.Create("Alice", "Bob");
+        var facade = GameFacade.Create("Alice", "Bob", Array.Empty<ICard>(), Array.Empty<ICard>());
         await facade.StartAsync();
 
         var state = facade.GetState();
@@ -26,7 +27,7 @@ public class GameFacadeTests
     [Fact]
     public async Task PassPriorityCommand_FromBothPlayers_DrainsPriorityRound()
     {
-        var facade = GameFacade.Create("Alice", "Bob");
+        var facade = GameFacade.Create("Alice", "Bob", Array.Empty<ICard>(), Array.Empty<ICard>());
         await facade.StartAsync();
         var state = facade.GetState();
         var alice = state.Players[0].Id;
@@ -43,7 +44,7 @@ public class GameFacadeTests
     [Fact]
     public async Task Subscribe_DeliversEventDtoForCardMoves()
     {
-        var facade = GameFacade.Create("Alice", "Bob");
+        var facade = GameFacade.Create("Alice", "Bob", Array.Empty<ICard>(), Array.Empty<ICard>());
         var captured = new List<EventDto>();
         facade.Subscribe(captured.Add);
 
@@ -57,7 +58,7 @@ public class GameFacadeTests
     [Fact]
     public async Task SubmitCommand_FromWrongPlayer_Throws()
     {
-        var facade = GameFacade.Create("Alice", "Bob");
+        var facade = GameFacade.Create("Alice", "Bob", Array.Empty<ICard>(), Array.Empty<ICard>());
         await facade.StartAsync();
         var state = facade.GetState();
         var bob = state.Players[1].Id;

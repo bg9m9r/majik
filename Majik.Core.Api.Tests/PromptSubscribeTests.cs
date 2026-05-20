@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Majik.Core.Api;
 using Majik.Core.Api.Commands;
+using Majik.Core.Cards;
 using Majik.Core.Api.Dtos;
 using Xunit;
 
@@ -14,7 +15,7 @@ public class PromptSubscribeTests
     [Fact]
     public async Task SubscribePrompts_FiresOnceWhenEngineAwaitsCommand()
     {
-        var facade = GameFacade.Create("Alice", "Bob");
+        var facade = GameFacade.Create("Alice", "Bob", Array.Empty<ICard>(), Array.Empty<ICard>());
         var prompts = new List<PromptDto>();
         using var subscription = facade.SubscribePrompts(prompts.Add);
 
@@ -30,7 +31,7 @@ public class PromptSubscribeTests
     [Fact]
     public async Task SubscribePrompts_DisposeStopsDelivery()
     {
-        var facade = GameFacade.Create("Alice", "Bob");
+        var facade = GameFacade.Create("Alice", "Bob", Array.Empty<ICard>(), Array.Empty<ICard>());
         var prompts = new List<PromptDto>();
         var subscription = facade.SubscribePrompts(prompts.Add);
 
@@ -43,7 +44,7 @@ public class PromptSubscribeTests
     [Fact]
     public async Task SubscribePrompts_NextPromptFiresAfterCommandSubmitted()
     {
-        var facade = GameFacade.Create("Alice", "Bob");
+        var facade = GameFacade.Create("Alice", "Bob", Array.Empty<ICard>(), Array.Empty<ICard>());
         var prompts = new List<PromptDto>();
         var secondPrompt = new TaskCompletionSource();
         using var subscription = facade.SubscribePrompts(p =>

@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Majik.Core.Api;
 using Majik.Core.Api.Commands;
+using Majik.Core.Cards;
 using Xunit;
 
 public class ConcurrentGamesStressTests
@@ -12,7 +13,7 @@ public class ConcurrentGamesStressTests
 
         var games = await Task.WhenAll(
             Enumerable.Range(0, 100).Select(i => Task.Run(() =>
-                registry.Create($"A{i}", $"B{i}"))));
+                registry.Create($"A{i}", $"B{i}", Array.Empty<ICard>(), Array.Empty<ICard>()))));
 
         games.Should().HaveCount(100);
         games.Select(g => g.GameId).Distinct().Should().HaveCount(100);
@@ -24,7 +25,7 @@ public class ConcurrentGamesStressTests
     {
         var registry = new GameRegistry();
         var facades = Enumerable.Range(0, 30)
-            .Select(i => registry.Create($"A{i}", $"B{i}"))
+            .Select(i => registry.Create($"A{i}", $"B{i}", Array.Empty<ICard>(), Array.Empty<ICard>()))
             .ToList();
 
         // Start each game.

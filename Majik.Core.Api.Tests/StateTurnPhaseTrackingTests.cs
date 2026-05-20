@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Majik.Core.Api;
+using Majik.Core.Cards;
 using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.StateMachine;
@@ -15,7 +16,7 @@ public class StateTurnPhaseTrackingTests
     [Fact]
     public void GetState_DefaultsToTurn1MainOnFreshFacade()
     {
-        var facade = GameFacade.Create("Alice", "Bob");
+        var facade = GameFacade.Create("Alice", "Bob", Array.Empty<ICard>(), Array.Empty<ICard>());
 
         var state = facade.GetState();
 
@@ -26,7 +27,7 @@ public class StateTurnPhaseTrackingTests
     [Fact]
     public void GetState_TurnNumber_PicksUpTurnStartedEvent()
     {
-        var facade = GameFacade.Create("Alice", "Bob");
+        var facade = GameFacade.Create("Alice", "Bob", Array.Empty<ICard>(), Array.Empty<ICard>());
         var bob = facade.GetState().Players[1];
 
         facade.EventBus_Publish(new TurnStartedEvent(new Player(bob.Name), turnNumber: 7));
@@ -37,7 +38,7 @@ public class StateTurnPhaseTrackingTests
     [Fact]
     public void GetState_Phase_PicksUpPhaseStartedEvent()
     {
-        var facade = GameFacade.Create("Alice", "Bob");
+        var facade = GameFacade.Create("Alice", "Bob", Array.Empty<ICard>(), Array.Empty<ICard>());
         var alice = new Player("Alice");
 
         facade.EventBus_Publish(new PhaseStartedEvent(PhaseStateType.DeclareAttackers, alice));

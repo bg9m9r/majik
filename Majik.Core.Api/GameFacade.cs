@@ -90,8 +90,26 @@ public sealed class GameFacade
         _bus.Subscribe<StepStartedEvent>(e => { _currentPhase = e.StepType; });
     }
 
-    public static GameFacade Create(string aliceName, string bobName)
-        => new(new Player(aliceName, 20), new Player(bobName, 20));
+    public static GameFacade Create(
+        string aliceName,
+        string bobName,
+        IReadOnlyList<ICard> aliceDeck,
+        IReadOnlyList<ICard> bobDeck)
+    {
+        var alice = new Player(aliceName, 20);
+        var bob = new Player(bobName, 20);
+
+        foreach (var card in aliceDeck)
+        {
+            alice.Zones.GetZone(ZoneType.Library).AddCard(card);
+        }
+        foreach (var card in bobDeck)
+        {
+            bob.Zones.GetZone(ZoneType.Library).AddCard(card);
+        }
+
+        return new GameFacade(alice, bob);
+    }
 
     /// <summary>
     /// Kicks off the priority round. Returns immediately; the loop awaits on

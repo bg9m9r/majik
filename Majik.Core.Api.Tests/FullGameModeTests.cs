@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Majik.Core.Api;
 using Majik.Core.Api.Commands;
+using Majik.Core.Cards;
 using Majik.Core.Api.Dtos;
 using Xunit;
 
@@ -15,7 +16,7 @@ public class FullGameModeTests
     [Fact]
     public async Task StartFullGameAsync_PromptsForMulliganFirst()
     {
-        var facade = GameFacade.Create("Alice", "Bob");
+        var facade = GameFacade.Create("Alice", "Bob", Array.Empty<ICard>(), Array.Empty<ICard>());
         var prompts = new List<PromptDto>();
         var firstPrompt = new TaskCompletionSource();
         using var subscription = facade.SubscribePrompts(p =>
@@ -37,7 +38,7 @@ public class FullGameModeTests
     [Fact]
     public async Task StartFullGameAsync_CannotBeStartedTwice()
     {
-        var facade = GameFacade.Create("Alice", "Bob");
+        var facade = GameFacade.Create("Alice", "Bob", Array.Empty<ICard>(), Array.Empty<ICard>());
         await facade.StartFullGameAsync(maxTurns: 1);
 
         var act = () => facade.StartFullGameAsync(maxTurns: 1);
@@ -48,7 +49,7 @@ public class FullGameModeTests
     [Fact]
     public async Task StartFullGameAsync_FullGameTaskExposed()
     {
-        var facade = GameFacade.Create("Alice", "Bob");
+        var facade = GameFacade.Create("Alice", "Bob", Array.Empty<ICard>(), Array.Empty<ICard>());
         await facade.StartFullGameAsync(maxTurns: 1);
 
         facade.FullGameTask.Should().NotBeNull();

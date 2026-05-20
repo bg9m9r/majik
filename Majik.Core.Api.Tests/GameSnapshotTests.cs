@@ -2,6 +2,7 @@ using System.Text.Json;
 using FluentAssertions;
 using Majik.Core.Api;
 using Majik.Core.Api.Commands;
+using Majik.Core.Cards;
 using Xunit;
 
 public class GameSnapshotTests
@@ -9,7 +10,7 @@ public class GameSnapshotTests
     [Fact]
     public async Task SaveSnapshot_ContainsLog_AfterSubmits()
     {
-        var facade = GameFacade.Create("Alice", "Bob");
+        var facade = GameFacade.Create("Alice", "Bob", Array.Empty<ICard>(), Array.Empty<ICard>());
         await facade.StartAsync();
         var state = facade.GetState();
         await facade.SubmitAsync(new PassPriorityCommand { PlayerId = state.Players[0].Id });
@@ -24,7 +25,7 @@ public class GameSnapshotTests
     [Fact]
     public async Task SaveSnapshotBytes_RoundTripsViaJson()
     {
-        var facade = GameFacade.Create("Alice", "Bob");
+        var facade = GameFacade.Create("Alice", "Bob", Array.Empty<ICard>(), Array.Empty<ICard>());
         await facade.StartAsync();
         var state = facade.GetState();
         await facade.SubmitAsync(new PassPriorityCommand { PlayerId = state.Players[0].Id });

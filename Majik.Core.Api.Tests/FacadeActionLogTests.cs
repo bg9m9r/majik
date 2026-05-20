@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Majik.Core.Api;
 using Majik.Core.Api.Commands;
+using Majik.Core.Cards;
 using Xunit;
 
 public class FacadeActionLogTests
@@ -8,7 +9,7 @@ public class FacadeActionLogTests
     [Fact]
     public async Task SubmitAsync_AppendsCommandToLog()
     {
-        var facade = GameFacade.Create("Alice", "Bob");
+        var facade = GameFacade.Create("Alice", "Bob", Array.Empty<ICard>(), Array.Empty<ICard>());
         await facade.StartAsync();
         var alice = facade.GetState().Players[0].Id;
 
@@ -23,7 +24,7 @@ public class FacadeActionLogTests
     [Fact]
     public async Task LogPreservesSubmissionOrder()
     {
-        var facade = GameFacade.Create("Alice", "Bob");
+        var facade = GameFacade.Create("Alice", "Bob", Array.Empty<ICard>(), Array.Empty<ICard>());
         await facade.StartAsync();
         var state = facade.GetState();
         var alice = state.Players[0].Id;
