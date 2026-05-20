@@ -1,5 +1,6 @@
 using Majik.Server.Composition;
 using Majik.Server.Profiles;
+using MongoDB.Driver;
 
 namespace Majik.Server.Matches;
 
@@ -112,6 +113,90 @@ public sealed class MatchService
         await _matches.InsertAsync(match, ct);
 
         return Result.Ok(ToDto(match));
+    }
+
+    // -----------------------------------------------------------------------
+    // JoinAsync
+    // -----------------------------------------------------------------------
+
+    public async Task<Result<MatchDto>> JoinAsync(
+        string callerSub,
+        Guid matchId,
+        JoinMatchRequest request,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(request.DeckId))
+            return Result.Fail<MatchDto>(new MatchError("invalid-request", "deckId"));
+
+        var match = await _matches.GetByIdAsync(matchId, ct);
+        if (match == null) return Result.Fail<MatchDto>(new MatchError("match-not-found"));
+        if (match.Creator.Sub == callerSub)
+            return Result.Fail<MatchDto>(new MatchError("self-join-forbidden"));
+        if (match.State != MatchState.Open)
+            return Result.Fail<MatchDto>(new MatchError("match-not-open"));
+
+        var profile = await _profiles.GetBySubAsync(callerSub, ct);
+        if (profile == null) return Result.Fail<MatchDto>(new MatchError("no-profile"));
+
+        var opponent = new MatchPlayer
+        {
+            Sub = callerSub,
+            Handle = profile.HandleDisplay,
+            DeckId = request.DeckId.Trim(),
+        };
+
+        var now = _clock.UtcNow;
+        var setOpponent = Builders<Match>.Update
+            .Set(m => m.Opponent, opponent)
+            .Set(m => m.State, MatchState.Joined)
+            .Set(m => m.UpdatedAt, now);
+
+        var won = await _matches.TryAtomicUpdateAsync(matchId, MatchState.Open, setOpponent, ct);
+        if (!won) return Result.Fail<MatchDto>(new MatchError("match-not-open"));
+
+        _hub?.Publish(matchId, "match.opponent-joined",
+            new { matchId, opponent = new MatchPlayerDto(opponent.Sub, opponent.Handle, opponent.DeckId) });
+
+        // Create engine game (decks + facade)
+        if (_gameFactory != null)
+        {
+            var creatorDeck = await _decks.LoadAsync(match.Creator.DeckId, ct);
+            var opponentDeck = await _decks.LoadAsync(opponent.DeckId, ct);
+            var facade = _gameFactory.Create(match.Creator.Handle, opponent.Handle, creatorDeck, opponentDeck);
+            await _matches.TryAtomicUpdateAsync(matchId, MatchState.Joined,
+                Builders<Match>.Update.Set(m => m.GameId, facade.GameId),
+                ct);
+        }
+
+        // Transition Joined → Starting → Rolling
+        await TransitionStateAsync(matchId, MatchState.Joined, MatchState.Starting, now, ct);
+        await TransitionStateAsync(matchId, MatchState.Starting, MatchState.Rolling, now, ct);
+
+        // Roll dice + persist
+        var roll = _dice.Roll(match.Creator.Sub, opponent.Sub);
+        var setRoll = Builders<Match>.Update
+            .Set(m => m.Roll, roll)
+            .Set(m => m.UpdatedAt, _clock.UtcNow);
+        await _matches.TryAtomicUpdateAsync(matchId, MatchState.Rolling, setRoll, ct);
+
+        _hub?.Publish(matchId, "match.rolled",
+            new { matchId, roll = new MatchRollDto(roll.CreatorRoll, roll.OpponentRoll, roll.WinnerSub) });
+
+        var fresh = (await _matches.GetByIdAsync(matchId, ct))!;
+        return Result.Ok(ToDto(fresh));
+    }
+
+    private async Task TransitionStateAsync(Guid id, MatchState from, MatchState to, DateTime now, CancellationToken ct)
+    {
+        var update = Builders<Match>.Update
+            .Set(m => m.State, to)
+            .Set(m => m.UpdatedAt, now);
+        var moved = await _matches.TryAtomicUpdateAsync(id, from, update, ct);
+        if (moved)
+        {
+            _hub?.Publish(id, "match.state-changed",
+                new { matchId = id, state = to.ToString(), transitionedAt = now });
+        }
     }
 
     // -----------------------------------------------------------------------
