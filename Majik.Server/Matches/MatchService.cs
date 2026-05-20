@@ -312,6 +312,79 @@ public sealed class MatchService
     }
 
     // -----------------------------------------------------------------------
+    // OnPriorityPassedAsync — decrement previous holder's clock
+    // -----------------------------------------------------------------------
+
+    public async Task OnPriorityPassedAsync(Guid matchId, string newHolderSub, CancellationToken ct)
+    {
+        var match = await _matches.GetByIdAsync(matchId, ct);
+        if (match == null || match.State != MatchState.Playing) return;
+        if (match.PriorityHolderSub == null || match.PriorityStartedAt == null) return;
+
+        var now = _clock.UtcNow;
+        var elapsed = (long)(now - match.PriorityStartedAt.Value).TotalMilliseconds;
+        var prevSub = match.PriorityHolderSub;
+        var stored = prevSub == match.Creator.Sub ? match.CreatorMillisRemaining
+                   : prevSub == match.Opponent?.Sub ? match.OpponentMillisRemaining
+                   : 0;
+        var newRemaining = stored - elapsed;
+
+        if (newRemaining <= 0)
+        {
+            await OnTimeoutAsync(matchId, prevSub, ct);
+            return;
+        }
+
+        var update = MongoDB.Driver.Builders<Match>.Update
+            .Set(prevSub == match.Creator.Sub ? m => m.CreatorMillisRemaining : m => m.OpponentMillisRemaining, newRemaining)
+            .Set(m => m.PriorityHolderSub, newHolderSub)
+            .Set(m => m.PriorityStartedAt, now)
+            .Set(m => m.UpdatedAt, now);
+
+        var moved = await _matches.TryAtomicUpdateAsync(matchId, MatchState.Playing, update, ct);
+        if (!moved) return;
+
+        var fresh = (await _matches.GetByIdAsync(matchId, ct))!;
+        var newRemain = newHolderSub == fresh.Creator.Sub
+            ? fresh.CreatorMillisRemaining
+            : fresh.OpponentMillisRemaining;
+        _timeoutScheduler?.Schedule(matchId, newHolderSub, newRemain);
+        _hub?.Publish(matchId, "match.clock-update", new
+        {
+            matchId,
+            creatorMs = fresh.CreatorMillisRemaining,
+            opponentMs = fresh.OpponentMillisRemaining,
+            holder = newHolderSub,
+            startedAt = now,
+        });
+    }
+
+    // -----------------------------------------------------------------------
+    // OnTimeoutAsync — clock expired for a player
+    // -----------------------------------------------------------------------
+
+    public async Task OnTimeoutAsync(Guid matchId, string loserSub, CancellationToken ct)
+    {
+        var match = await _matches.GetByIdAsync(matchId, ct);
+        if (match == null || match.State != MatchState.Playing) return;
+
+        var winner = loserSub == match.Creator.Sub ? match.Opponent!.Sub : match.Creator.Sub;
+        var now = _clock.UtcNow;
+        var update = MongoDB.Driver.Builders<Match>.Update
+            .Set(m => m.State, MatchState.Completed)
+            .Set(m => m.WinnerSub, winner)
+            .Set(m => m.TimeoutLoserSub, loserSub)
+            .Set(m => m.UpdatedAt, now);
+        var moved = await _matches.TryAtomicUpdateAsync(matchId, MatchState.Playing, update, ct);
+        if (!moved) return;
+
+        _timeoutScheduler?.Cancel(matchId);
+        _hub?.Publish(matchId, "match.timed-out", new { matchId, loserSub, winnerSub = winner });
+        _hub?.Publish(matchId, "match.state-changed",
+            new { matchId, state = "Completed", transitionedAt = now });
+    }
+
+    // -----------------------------------------------------------------------
     // ToDto — live-balance helper
     // -----------------------------------------------------------------------
 
