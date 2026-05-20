@@ -1,5 +1,5 @@
 # Multi-stage build for Majik.Server. Context = repo root (majik.core/).
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
 COPY global.json Directory.Build.props Directory.Packages.props ./
@@ -14,7 +14,7 @@ RUN dotnet publish Majik.Server/Majik.Server.csproj \
       --no-restore \
       /p:UseAppHost=false
 
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 COPY --from=build /app/publish ./
 
