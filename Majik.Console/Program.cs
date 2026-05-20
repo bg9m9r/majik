@@ -464,9 +464,20 @@ class Program
         {
             using var dbContext = new CardDbContext();
             await dbContext.Database.EnsureCreatedAsync();
-            
+
             // Ensure KeywordMetadata table exists (in case database was created before this entity)
             await EnsureKeywordMetadataTableExistsAsync(dbContext);
+
+            // Patch schema to add IsImplemented column to Cards table
+            try
+            {
+                await CardDataSchemaPatcher.PatchAsync(dbContext.Database.GetDbConnection(), CancellationToken.None);
+            }
+            catch (Exception patchEx)
+            {
+                System.Console.WriteLine($"Warning: Failed to patch card database schema: {patchEx.Message}");
+                System.Console.WriteLine("Continuing with analysis...\n");
+            }
 
             var analyzer = new KeywordAnalyzer();
             ClaudeKeywordAnalyzer? claudeAnalyzer = null;
@@ -714,9 +725,20 @@ class Program
         {
             using var dbContext = new CardDbContext();
             await dbContext.Database.EnsureCreatedAsync();
-            
+
             // Ensure tables exist
             await EnsureKeywordMetadataTableExistsAsync(dbContext);
+
+            // Patch schema to add IsImplemented column to Cards table
+            try
+            {
+                await CardDataSchemaPatcher.PatchAsync(dbContext.Database.GetDbConnection(), CancellationToken.None);
+            }
+            catch (Exception patchEx)
+            {
+                System.Console.WriteLine($"Warning: Failed to patch card database schema: {patchEx.Message}");
+                System.Console.WriteLine("Continuing with ingestion...\n");
+            }
 
             var claudeAnalyzer = new ClaudeKeywordAnalyzer(dbContext: dbContext);
             

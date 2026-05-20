@@ -37,6 +37,17 @@ public class ScryfallJsonImporter
         // Ensure database is created
         await _dbContext.Database.EnsureCreatedAsync(cancellationToken);
 
+        // Patch schema to add IsImplemented column to Cards table
+        try
+        {
+            await CardDataSchemaPatcher.PatchAsync(_dbContext.Database.GetDbConnection(), cancellationToken);
+        }
+        catch (Exception patchEx)
+        {
+            // Log but don't crash on patch failure — the column might already exist
+            System.Console.WriteLine($"Note: Card schema patch did not complete: {patchEx.Message}");
+        }
+
         var fileInfo = new FileInfo(jsonFilePath);
         long totalBytes = fileInfo.Length;
 
