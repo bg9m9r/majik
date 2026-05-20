@@ -12,8 +12,7 @@ namespace Majik.Server.Auth;
 /// Descope `sub` values are opaque project-scoped user IDs (e.g.
 /// `U2P...`) — unlike Auth0's `oauth2|{provider}|{external-id}` layout
 /// they carry no provider info, so we don't enforce a prefix. We only
-/// require that `sub` exist and is non-empty; <see cref="GameSeating"/>
-/// keys seats by that value.
+/// require that `sub` exist and is non-empty.
 ///
 /// To get a Discord user ID into the principal, configure Descope to
 /// emit either a top-level <c>discordUserId</c> claim or a nested

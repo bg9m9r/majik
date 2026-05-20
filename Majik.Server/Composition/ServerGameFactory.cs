@@ -1,36 +1,25 @@
 using Majik.Core.Api;
-using Majik.Server.Auth;
-using Majik.Server.Hubs;
+using Majik.Core.Cards;
 
 namespace Majik.Server.Composition;
 
 /// <summary>
-/// Server-side wrapper around <see cref="GameRegistry"/> that also wires
-/// the SignalR bridge for every game it creates and tears it down on
-/// delete. Endpoints depend on this rather than the bare registry so
-/// the bridge lifecycle never desynchronises from the game lifecycle.
+/// Server-side wrapper around <see cref="GameRegistry"/> that delegates
+/// game creation and removal. The Match orchestrator now owns the SignalR
+/// side via MatchHubPublisher.
 /// </summary>
 public sealed class ServerGameFactory
 {
     private readonly GameRegistry _registry;
-    private readonly GameHubBridgeRegistry _bridges;
-    private readonly GameSeating _seating;
 
-    public ServerGameFactory(
-        GameRegistry registry,
-        GameHubBridgeRegistry bridges,
-        GameSeating seating)
+    public ServerGameFactory(GameRegistry registry)
     {
         _registry = registry;
-        _bridges = bridges;
-        _seating = seating;
     }
 
-    public GameFacade Create(string aliceName, string bobName)
+    public GameFacade Create(string aliceName, string bobName, IReadOnlyList<ICard> aliceDeck, IReadOnlyList<ICard> bobDeck)
     {
-        var facade = _registry.Create(aliceName, bobName);
-        _bridges.Attach(facade);
-        return facade;
+        return _registry.Create(aliceName, bobName, aliceDeck, bobDeck);
     }
 
     public GameFacade? Get(Guid id) => _registry.Get(id);
@@ -39,8 +28,6 @@ public sealed class ServerGameFactory
 
     public bool Delete(Guid id)
     {
-        _bridges.Detach(id);
-        _seating.Drop(id);
         return _registry.Remove(id);
     }
 }

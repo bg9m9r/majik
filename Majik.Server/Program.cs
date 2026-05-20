@@ -1,6 +1,5 @@
 using Majik.Server.Composition;
-using Majik.Server.Endpoints;
-using Majik.Server.Hubs;
+using Majik.Server.Matches;
 using Majik.Server.Profiles;
 using Microsoft.AspNetCore.Authorization;
 
@@ -10,6 +9,7 @@ builder.Services.AddMajikEngine();
 builder.Services.AddMajikAuth(builder.Configuration);
 builder.Services.AddMajikCors(builder.Configuration);
 builder.Services.AddMajikMongo(builder.Configuration);
+builder.Services.AddMajikMatches(builder.Configuration);
 builder.Services.AddSignalR();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi();
@@ -48,11 +48,9 @@ app.MapGet("/whoami", (System.Security.Claims.ClaimsPrincipal user) =>
    .Produces(StatusCodes.Status200OK)
    .Produces(StatusCodes.Status401Unauthorized);
 
-app.MapGameEndpoints();
-app.MapSeatEndpoints();
-app.MapCommandEndpoints();
-app.MapHub<GameHub>("/hubs/game");
 app.MapProfileEndpoints();
+app.MapMatchEndpoints();
+app.MapHub<MatchHub>("/hubs/match");
 
 app.Run();
 
