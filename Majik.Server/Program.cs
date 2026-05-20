@@ -1,5 +1,6 @@
 using Majik.Server.Cards;
 using Majik.Server.Composition;
+using Majik.Server.Decks;
 using Majik.Server.Matches;
 using Majik.Server.Profiles;
 using Microsoft.AspNetCore.Authorization;
@@ -11,6 +12,7 @@ builder.Services.AddMajikAuth(builder.Configuration);
 builder.Services.AddMajikCors(builder.Configuration);
 builder.Services.AddMajikMongo(builder.Configuration);
 builder.Services.AddMajikMatches(builder.Configuration);
+builder.Services.AddMajikDecks(builder.Configuration);
 builder.Services.AddSignalR();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi();
@@ -52,6 +54,7 @@ app.MapGet("/whoami", (System.Security.Claims.ClaimsPrincipal user) =>
 app.MapProfileEndpoints();
 app.MapCardsEndpoints();
 app.MapMatchEndpoints();
+app.MapDeckEndpoints();
 app.MapHub<MatchHub>("/hubs/match");
 
 app.Run();

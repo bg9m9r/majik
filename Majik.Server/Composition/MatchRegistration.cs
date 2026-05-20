@@ -14,7 +14,6 @@ public static class MatchRegistration
         services.AddSingleton<IClock, SystemClock>();
         services.AddSingleton<IRandomSource, SystemRandomSource>();
         services.AddSingleton<DiceRoller>();
-        services.AddSingleton<IDeckLoader, StubDeckLoader>();
         services.AddSingleton<IMatchHubPublisher, MatchHubPublisher>();
         services.AddSingleton(sp => new MatchTimeoutScheduler(
             async (matchId, holder, ct) =>
