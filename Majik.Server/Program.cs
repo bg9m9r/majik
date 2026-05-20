@@ -19,10 +19,10 @@ builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi();
-}
+// OpenAPI is always exposed — the portal's CI build fetches /openapi/v1.json
+// from the deployed API to regenerate its typed client during `ng build`.
+// This is an open-source MTG rules engine; the schema is not sensitive.
+app.MapOpenApi();
 
 if (CorsRegistration.HasAnyOrigins(builder.Configuration))
 {
