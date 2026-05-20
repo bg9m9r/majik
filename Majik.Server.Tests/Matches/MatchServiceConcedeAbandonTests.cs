@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Majik.Server.Matches;
 using Majik.Server.Profiles;
+using Majik.Server.Tests.Helpers;
 using Majik.Server.Tests.Profiles;
 using Xunit;
 

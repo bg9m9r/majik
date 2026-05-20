@@ -1,5 +1,5 @@
 using FluentAssertions;
-using Majik.Server.Matches;
+using Majik.Server.Tests.Helpers;
 using Xunit;
 
 namespace Majik.Server.Tests.Matches;

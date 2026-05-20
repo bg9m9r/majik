@@ -1,11 +1,12 @@
 using Majik.Core.Cards;
+using Majik.Server.Matches;
 
-namespace Majik.Server.Matches;
+namespace Majik.Server.Tests.Helpers;
 
 /// <summary>
-/// Test/stub <see cref="IDeckLoader"/> that returns 60 placeholder cards for
-/// any deckId. Used in unit tests and integration scaffolding; real snapshot
-/// resolution is wired in T9 via <see cref="Majik.Server.Decks.RealDeckLoader"/>.
+/// Test-only <see cref="IDeckLoader"/> that returns 60 placeholder cards for
+/// any deckId. Used by MatchService tests that don't exercise real deck loading.
+/// Production wiring uses <see cref="Majik.Server.Decks.RealDeckLoader"/>.
 /// </summary>
 public sealed class StubDeckLoader : IDeckLoader
 {
