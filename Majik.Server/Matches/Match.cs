@@ -79,6 +79,7 @@ public sealed class MatchPlayer
     [BsonElement("sub")] public required string Sub { get; init; }
     [BsonElement("handle")] public required string Handle { get; init; }
     [BsonElement("deckId")] public required string DeckId { get; init; }
+    [BsonElement("deckSnapshot")] public required List<string> DeckSnapshot { get; init; }
 }
 
 public sealed class MatchRoll

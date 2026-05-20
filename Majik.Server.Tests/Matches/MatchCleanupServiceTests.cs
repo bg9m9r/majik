@@ -54,7 +54,7 @@ public class MatchCleanupServiceTests : IClassFixture<TestMongoFixture>
     {
         Id = Guid.NewGuid(), State = state, Visibility = MatchVisibility.Public,
         Format = "constructed", ClockMinutes = 20,
-        Creator = new MatchPlayer { Sub = "stub-alice", Handle = "Alice", DeckId = "burn" },
+        Creator = new MatchPlayer { Sub = "stub-alice", Handle = "Alice", DeckId = "burn", DeckSnapshot = new List<string>() },
         CreatorMillisRemaining = 1_200_000, OpponentMillisRemaining = 1_200_000,
         CreatedAt = createdAt, UpdatedAt = createdAt,
     };

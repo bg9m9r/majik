@@ -22,7 +22,7 @@ public sealed record MatchDto(
     DateTime CreatedAt,
     DateTime UpdatedAt);
 
-public sealed record MatchPlayerDto(string Sub, string Handle, string DeckId);
+public sealed record MatchPlayerDto(string Sub, string Handle, string DeckId, IReadOnlyList<string> DeckSnapshot);
 public sealed record MatchRollDto(int CreatorRoll, int OpponentRoll, string WinnerSub);
 public sealed record MatchError(string Error, string? Detail = null);
 

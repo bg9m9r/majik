@@ -102,6 +102,7 @@ public sealed class MatchService
                 Sub = callerSub,
                 Handle = profile.HandleDisplay,
                 DeckId = request.DeckId,
+                DeckSnapshot = new List<string>(),
             },
             Opponent = null,
             CreatorMillisRemaining = initialBalance,
@@ -145,6 +146,7 @@ public sealed class MatchService
             Sub = callerSub,
             Handle = profile.HandleDisplay,
             DeckId = request.DeckId.Trim(),
+            DeckSnapshot = new List<string>(),
         };
 
         var now = _clock.UtcNow;
@@ -157,7 +159,7 @@ public sealed class MatchService
         if (!won) return Result.Fail<MatchDto>(new MatchError("match-not-open"));
 
         _hub?.Publish(matchId, "match.opponent-joined",
-            new { matchId, opponent = new MatchPlayerDto(opponent.Sub, opponent.Handle, opponent.DeckId) });
+            new { matchId, opponent = new MatchPlayerDto(opponent.Sub, opponent.Handle, opponent.DeckId, new List<string>()) });
 
         // Create engine game (decks + facade)
         if (_gameFactory != null)
@@ -498,10 +500,10 @@ public sealed class MatchService
             Visibility: m.Visibility.ToString(),
             Format: m.Format,
             ClockMinutes: m.ClockMinutes,
-            Creator: new MatchPlayerDto(m.Creator.Sub, m.Creator.Handle, m.Creator.DeckId),
+            Creator: new MatchPlayerDto(m.Creator.Sub, m.Creator.Handle, m.Creator.DeckId, m.Creator.DeckSnapshot),
             Opponent: m.Opponent is null
                 ? null
-                : new MatchPlayerDto(m.Opponent.Sub, m.Opponent.Handle, m.Opponent.DeckId),
+                : new MatchPlayerDto(m.Opponent.Sub, m.Opponent.Handle, m.Opponent.DeckId, m.Opponent.DeckSnapshot),
             Roll: m.Roll is null
                 ? null
                 : new MatchRollDto(m.Roll.CreatorRoll, m.Roll.OpponentRoll, m.Roll.WinnerSub),

@@ -26,7 +26,7 @@ public class MatchRepositoryTests : IClassFixture<TestMongoFixture>
             Visibility = vis,
             Format = "constructed",
             ClockMinutes = 20,
-            Creator = new MatchPlayer { Sub = creatorSub, Handle = "Alice", DeckId = "burn" },
+            Creator = new MatchPlayer { Sub = creatorSub, Handle = "Alice", DeckId = "burn", DeckSnapshot = new List<string>() },
             CreatorMillisRemaining = 1_200_000,
             OpponentMillisRemaining = 1_200_000,
             CreatedAt = DateTime.UtcNow,
