@@ -1,4 +1,6 @@
 using Majik.Core.Api;
+using Majik.Core.CardData;
+using Majik.Core.CardData.Database;
 using Majik.Core.Events;
 
 namespace Majik.Server.Composition;
@@ -19,6 +21,13 @@ public static class MajikEngineRegistration
     {
         services.AddSingleton<GameRegistry>();
         services.AddSingleton<ServerGameFactory>();
+
+        // Card data: singleton DbContext (uses default on-disk path) wrapped
+        // in a caching decorator. Tests override these via ConfigureTestServices.
+        services.AddSingleton<CardDbContext>();
+        services.AddSingleton<ICardRepository>(sp =>
+            new CachingCardRepository(new DbCardRepository(sp.GetRequiredService<CardDbContext>())));
+
         return services;
     }
 }

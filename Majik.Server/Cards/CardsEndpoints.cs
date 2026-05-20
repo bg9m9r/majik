@@ -29,7 +29,7 @@ public static class CardsEndpoints
 
     private static IResult Search(
         [FromQuery] string? q,
-        [FromQuery] bool implementedOnly,
+        [FromQuery] bool? implementedOnly,
         [FromQuery] int? limit,
         [FromServices] ICardRepository repo)
     {
@@ -38,7 +38,7 @@ public static class CardsEndpoints
         if (effectiveLimit < 1 || effectiveLimit > MaxLimit)
             return Results.BadRequest(new CardsError("invalid-limit", "1..200"));
 
-        var cards = repo.Search(q, implementedOnly, effectiveLimit);
+        var cards = repo.Search(q, implementedOnly ?? false, effectiveLimit);
 
         var dtos = cards
             .OrderBy(c => c.Name)
