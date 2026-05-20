@@ -1,22 +1,48 @@
+using System.Collections.Concurrent;
+
 namespace Majik.Server.Matches;
 
-/// <summary>Stub scheduler. T10 replaces this with real chess-clock enforcement.</summary>
+/// <summary>Per-match Timer firing the timeout callback when the priority
+/// holder's clock should hit 0. Calls to <see cref="Schedule"/> replace any
+/// previously-scheduled timer for the same matchId. The callback receives
+/// the matchId + holder sub.</summary>
 public sealed class MatchTimeoutScheduler
 {
-    private readonly Action<Guid, string>? _onTimeout;
+    private readonly Func<Guid, string, CancellationToken, Task> _onTimeout;
+    private readonly ConcurrentDictionary<Guid, Entry> _entries = new();
 
-    /// <param name="onTimeout">Callback invoked when a player's clock expires.
-    /// The stub ignores it; T10 wires real cancellation tokens.</param>
-    public MatchTimeoutScheduler(Action<Guid, string>? onTimeout = null)
+    public MatchTimeoutScheduler(Func<Guid, string, CancellationToken, Task> onTimeout)
     {
         _onTimeout = onTimeout;
     }
 
-    /// <summary>Schedule a timeout for the given match / player sub in <paramref name="millisRemaining"/> ms.
-    /// No-op in this stub.</summary>
-    public void Schedule(Guid matchId, string playerSub, long millisRemaining) { }
+    public void Schedule(Guid matchId, string holderSub, long remainingMillis)
+    {
+        Cancel(matchId);
+        var due = Math.Max(0, remainingMillis);
+        var cts = new CancellationTokenSource();
+        var entry = new Entry(holderSub, cts);
+        _entries[matchId] = entry;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(due), cts.Token);
+                _entries.TryRemove(matchId, out _);
+                await _onTimeout(matchId, holderSub, CancellationToken.None);
+            }
+            catch (TaskCanceledException) { }
+        });
+    }
 
-    /// <summary>Cancel any pending timeout for the given match.
-    /// No-op in this stub.</summary>
-    public void Cancel(Guid matchId) { }
+    public void Cancel(Guid matchId)
+    {
+        if (_entries.TryRemove(matchId, out var entry))
+        {
+            entry.Cts.Cancel();
+            entry.Cts.Dispose();
+        }
+    }
+
+    private sealed record Entry(string HolderSub, CancellationTokenSource Cts);
 }

@@ -45,7 +45,7 @@ public class MatchServiceConcedeAbandonTests : IClassFixture<TestMongoFixture>
         // alice wins with 6 vs 2
         var svc = new MatchService(matchRepo, profileRepo,
             new DiceRoller(new StubRandomSource(6, 2)), new StubDeckLoader(), new SystemClock(),
-            pub, timeoutScheduler: new MatchTimeoutScheduler(), gameFactory: null);
+            pub, timeoutScheduler: new MatchTimeoutScheduler((_, _, _) => Task.CompletedTask), gameFactory: null);
 
         var created = await svc.CreateAsync("stub-alice",
             new CreateMatchRequest("constructed", "public", "burn", 20),
@@ -200,7 +200,7 @@ public class MatchServiceConcedeAbandonTests : IClassFixture<TestMongoFixture>
         var pub = new CapturePublisher();
         var svc = new MatchService(matchRepo, profileRepo,
             new DiceRoller(new StubRandomSource()), new StubDeckLoader(), new SystemClock(),
-            pub, timeoutScheduler: new MatchTimeoutScheduler(), gameFactory: null);
+            pub, timeoutScheduler: new MatchTimeoutScheduler((_, _, _) => Task.CompletedTask), gameFactory: null);
 
         var created = await svc.CreateAsync("stub-alice",
             new CreateMatchRequest("constructed", "public", "burn", 20),

@@ -40,7 +40,7 @@ public class MatchServiceJoinTests : IClassFixture<TestMongoFixture>
         var pub = new CapturePublisher();
         var svc = new MatchService(matchRepo, profileRepo,
             new DiceRoller(rng), new StubDeckLoader(), new SystemClock(),
-            pub, timeoutScheduler: new MatchTimeoutScheduler(), gameFactory: null);
+            pub, timeoutScheduler: new MatchTimeoutScheduler((_, _, _) => Task.CompletedTask), gameFactory: null);
 
         var created = await svc.CreateAsync("stub-alice",
             new CreateMatchRequest("constructed", "public", "burn", 20),
