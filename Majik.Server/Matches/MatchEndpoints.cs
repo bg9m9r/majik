@@ -19,6 +19,7 @@ public static class MatchEndpoints
         group.MapGet("/", List).WithName("ListMatches");
         group.MapGet("/{id:guid}", Get).WithName("GetMatch");
         group.MapPost("/{id:guid}/join", Join).WithName("JoinMatch");
+        group.MapPost("/{id:guid}/roll", Roll).WithName("SubmitRoll");
         group.MapPost("/{id:guid}/play-draw", PlayDraw).WithName("ChoosePlayOrDraw");
         group.MapPost("/{id:guid}/concede", Concede).WithName("ConcedeMatch");
         group.MapDelete("/{id:guid}", Abandon).WithName("AbandonMatch");
@@ -42,7 +43,7 @@ public static class MatchEndpoints
         "match-not-open" or "not-rolling" or "cannot-concede"
             or "match-in-progress" or "game-not-started" or "self-join-forbidden"
                                    => Results.Conflict(err),
-        "not-roll-winner" or "forbidden" or "no-profile" or "private-match"
+        "not-roll-winner" or "not-a-player" or "forbidden" or "no-profile" or "private-match"
                                    => Results.Json(err, statusCode: StatusCodes.Status403Forbidden),
         _                          => Results.Json(err, statusCode: StatusCodes.Status500InternalServerError),
     };
@@ -97,6 +98,16 @@ public static class MatchEndpoints
         if (svc == null) return MongoUnavailable();
         var sub = SubOf(user); if (sub == null) return Results.Unauthorized();
         var r = await svc.PlayDrawAsync(sub, id, body, ct);
+        return MapResult(r);
+    }
+
+    private static async Task<IResult> Roll(
+        Guid id, ClaimsPrincipal user,
+        [FromServices] MatchService? svc, CancellationToken ct)
+    {
+        if (svc == null) return MongoUnavailable();
+        var sub = SubOf(user); if (sub == null) return Results.Unauthorized();
+        var r = await svc.SubmitRollAsync(sub, id, ct);
         return MapResult(r);
     }
 

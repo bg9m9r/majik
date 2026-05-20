@@ -152,13 +152,20 @@ public class MatchEndpointsGameplayTests : IClassFixture<TestMongoFixture>
         created.StatusCode.Should().Be(HttpStatusCode.Created);
         var matchDto = await created.Content.ReadFromJsonAsync<MatchDto>();
 
-        // Bob joins → dice roll happens
+        // Bob joins → match transitions to Rolling
         var joined = await bobClient.PostAsJsonAsync($"/matches/{matchDto!.Id}/join",
             new { deckId = bobDeckId.ToString() });
         joined.StatusCode.Should().Be(HttpStatusCode.OK);
         var joinedDto = await joined.Content.ReadFromJsonAsync<MatchDto>();
         joinedDto!.State.Should().Be("Rolling");
-        joinedDto.Roll!.WinnerSub.Should().Be("alice");
+
+        // Both players submit rolls (alice=6, bob=1 → alice wins)
+        var aliceRoll = await aliceClient.PostAsync($"/matches/{matchDto.Id}/roll", null);
+        aliceRoll.StatusCode.Should().Be(HttpStatusCode.OK);
+        var bobRoll = await bobClient.PostAsync($"/matches/{matchDto.Id}/roll", null);
+        bobRoll.StatusCode.Should().Be(HttpStatusCode.OK);
+        var rollDto = await bobRoll.Content.ReadFromJsonAsync<MatchDto>();
+        rollDto!.Roll!.WinnerSub.Should().Be("alice");
 
         // Alice (winner) chooses play → Playing
         var playDraw = await aliceClient.PostAsJsonAsync($"/matches/{matchDto.Id}/play-draw",

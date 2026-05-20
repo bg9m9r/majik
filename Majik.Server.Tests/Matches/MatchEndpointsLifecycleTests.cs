@@ -394,13 +394,20 @@ public class MatchEndpointsLifecycleTests : IClassFixture<TestMongoFixture>
             new { format = "constructed", visibility = "public", deckId = aliceDeckId.ToString(), clockMinutes = 20 });
         var matchDto = await created.Content.ReadFromJsonAsync<MatchDto>();
 
-        // Bob joins → triggers roll (alice wins: 6 vs 1)
+        // Bob joins → match transitions to Rolling
         var joined = await bobClient.PostAsJsonAsync($"/matches/{matchDto!.Id}/join",
             new { deckId = bobDeckId.ToString() });
         joined.StatusCode.Should().Be(HttpStatusCode.OK);
         var joinedDto = await joined.Content.ReadFromJsonAsync<MatchDto>();
-        joinedDto!.Roll.Should().NotBeNull();
-        joinedDto.Roll!.WinnerSub.Should().Be("alice");
+        joinedDto!.State.Should().Be("Rolling");
+
+        // Both players submit their rolls (alice=6, bob=1 → alice wins)
+        var aliceRoll = await aliceClient.PostAsync($"/matches/{matchDto.Id}/roll", null);
+        aliceRoll.StatusCode.Should().Be(HttpStatusCode.OK);
+        var bobRoll = await bobClient.PostAsync($"/matches/{matchDto.Id}/roll", null);
+        bobRoll.StatusCode.Should().Be(HttpStatusCode.OK);
+        var rollDto = await bobRoll.Content.ReadFromJsonAsync<MatchDto>();
+        rollDto!.Roll!.WinnerSub.Should().Be("alice");
 
         // Bob (non-winner) tries to choose play/draw
         var resp = await bobClient.PostAsJsonAsync($"/matches/{matchDto.Id}/play-draw",
@@ -434,6 +441,12 @@ public class MatchEndpointsLifecycleTests : IClassFixture<TestMongoFixture>
 
         await bobClient.PostAsJsonAsync($"/matches/{matchDto!.Id}/join",
             new { deckId = bobDeckId.ToString() });
+
+        // Both players submit rolls (alice=6, bob=1 → alice wins)
+        var aliceRoll = await aliceClient.PostAsync($"/matches/{matchDto.Id}/roll", null);
+        aliceRoll.StatusCode.Should().Be(HttpStatusCode.OK);
+        var bobRoll = await bobClient.PostAsync($"/matches/{matchDto.Id}/roll", null);
+        bobRoll.StatusCode.Should().Be(HttpStatusCode.OK);
 
         // Alice (winner) sends bad choice
         var resp = await aliceClient.PostAsJsonAsync($"/matches/{matchDto.Id}/play-draw",
