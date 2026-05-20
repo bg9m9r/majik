@@ -16,6 +16,7 @@ public sealed class Match
     [BsonId] public ObjectId InternalId { get; set; }
 
     [BsonElement("id")]
+    [BsonRepresentation(BsonType.String)]
     public required Guid Id { get; init; }
 
     [BsonElement("state")]
@@ -45,6 +46,7 @@ public sealed class Match
     public string? FirstChoice { get; set; }
 
     [BsonElement("gameId")]
+    [BsonRepresentation(BsonType.String)]
     public Guid? GameId { get; set; }
 
     [BsonElement("creatorMillisRemaining")]
