@@ -279,7 +279,8 @@ internal sealed class FakeCardRepoForGameplayTests : ICardRepository
 
     public CardEntity? GetByName(string name) => _cards.TryGetValue(name, out var c) ? c : null;
     public bool IsImplemented(string name) => _implemented.Contains(name);
-    public IReadOnlyList<CardEntity> Search(string? q, bool implementedOnly, int limit) =>
-        throw new NotImplementedException();
+    public IReadOnlyList<CardEntity> Search(string? q, bool implementedOnly, int limit,
+        IReadOnlyList<string>? colors = null, IReadOnlyList<string>? types = null, IReadOnlyList<int>? cmcBuckets = null)
+        => throw new NotImplementedException();
     public void SetImplemented(string name, bool value) => throw new NotImplementedException();
 }

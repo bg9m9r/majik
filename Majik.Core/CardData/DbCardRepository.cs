@@ -34,19 +34,85 @@ public sealed class DbCardRepository : ICardRepository
             .FirstOrDefault(c => c.Name.StartsWith(prefix));
     }
 
-    public IReadOnlyList<CardEntity> Search(string? q, bool implementedOnly, int limit)
+    public IReadOnlyList<CardEntity> Search(
+        string? q,
+        bool implementedOnly,
+        int limit,
+        IReadOnlyList<string>? colors = null,
+        IReadOnlyList<string>? types = null,
+        IReadOnlyList<int>? cmcBuckets = null)
     {
-        var query = _db.Cards.AsQueryable();
+        var hasFilters = (colors?.Count ?? 0) > 0
+                      || (types?.Count ?? 0) > 0
+                      || (cmcBuckets?.Count ?? 0) > 0;
+
+        // Over-fetch when in-memory post-filtering is needed so we can still
+        // return up to `limit` rows after the filters are applied.
+        var fetchLimit = hasFilters ? Math.Max(limit * 10, 500) : limit;
+
+        IQueryable<CardEntity> query = _db.Cards.AsNoTracking();
+
         if (!string.IsNullOrWhiteSpace(q))
         {
             var needle = q.Trim();
             query = query.Where(c => EF.Functions.Like(c.Name, $"%{needle}%"));
         }
         if (implementedOnly)
-        {
             query = query.Where(c => c.IsImplemented);
+
+        var rows = query.OrderBy(c => c.Name).Take(fetchLimit).ToList();
+        if (!hasFilters) return rows;
+
+        IEnumerable<CardEntity> filtered = rows;
+
+        if (colors != null && colors.Count > 0)
+        {
+            var colorSet = colors.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            filtered = filtered.Where(c => MatchesColors(c, colorSet));
         }
-        return query.OrderBy(c => c.Name).Take(limit).ToList();
+        if (types != null && types.Count > 0)
+        {
+            var typeSet = types.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            filtered = filtered.Where(c => MatchesTypes(c, typeSet));
+        }
+        if (cmcBuckets != null && cmcBuckets.Count > 0)
+        {
+            var hasSevenPlus = cmcBuckets.Contains(7);
+            var exactBuckets = cmcBuckets.Where(b => b < 7).ToHashSet();
+            filtered = filtered.Where(c =>
+                c.Cmc.HasValue
+                && (exactBuckets.Contains(c.Cmc.Value)
+                    || (hasSevenPlus && c.Cmc.Value >= 7)));
+        }
+
+        return filtered.Take(limit).ToList();
+    }
+
+    private static bool MatchesColors(CardEntity c, HashSet<string> filter)
+    {
+        List<string>? cardColors;
+        try
+        {
+            cardColors = System.Text.Json.JsonSerializer.Deserialize<List<string>>(c.Colors);
+        }
+        catch
+        {
+            cardColors = null;
+        }
+        cardColors ??= new List<string>();
+
+        // "C" = colorless: card must have zero colors.
+        if (filter.Contains("C") && cardColors.Count == 0) return true;
+        return cardColors.Any(cc => filter.Contains(cc, StringComparer.OrdinalIgnoreCase));
+    }
+
+    private static bool MatchesTypes(CardEntity c, HashSet<string> filter)
+    {
+        var typeLine = c.TypeLine ?? "";
+        // Split on em-dash separator (CR 205.1: "Type — Subtype").
+        var typePart = typeLine.Split(" — ")[0];
+        var typeTokens = typePart.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return typeTokens.Any(t => filter.Contains(t));
     }
 
     public bool IsImplemented(string name)

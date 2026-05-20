@@ -168,8 +168,9 @@ internal sealed class FakeCardRepoForParseTests : ICardRepository
 
     public bool IsImplemented(string name) => _cards.ContainsKey(name);
 
-    public IReadOnlyList<CardEntity> Search(string? q, bool implementedOnly, int limit) =>
-        throw new NotImplementedException();
+    public IReadOnlyList<CardEntity> Search(string? q, bool implementedOnly, int limit,
+        IReadOnlyList<string>? colors = null, IReadOnlyList<string>? types = null, IReadOnlyList<int>? cmcBuckets = null)
+        => throw new NotImplementedException();
 
     public void SetImplemented(string name, bool value) =>
         throw new NotImplementedException();

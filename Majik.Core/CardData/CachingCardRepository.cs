@@ -26,8 +26,14 @@ public sealed class CachingCardRepository : ICardRepository
         return _cache.GetOrAdd(name, n => _inner.GetByName(n));
     }
 
-    public IReadOnlyList<CardEntity> Search(string? q, bool implementedOnly, int limit)
-        => _inner.Search(q, implementedOnly, limit);
+    public IReadOnlyList<CardEntity> Search(
+        string? q,
+        bool implementedOnly,
+        int limit,
+        IReadOnlyList<string>? colors = null,
+        IReadOnlyList<string>? types = null,
+        IReadOnlyList<int>? cmcBuckets = null)
+        => _inner.Search(q, implementedOnly, limit, colors, types, cmcBuckets);
 
     public bool IsImplemented(string name)
         => _inner.IsImplemented(name);

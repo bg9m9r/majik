@@ -17,7 +17,9 @@ public class DeckServiceTests : IClassFixture<TestMongoFixture>
         public Dictionary<string, CardEntity> Cards { get; } = new(StringComparer.OrdinalIgnoreCase);
         public HashSet<string> Implemented { get; } = new(StringComparer.OrdinalIgnoreCase);
         public CardEntity? GetByName(string name) => Cards.TryGetValue(name, out var c) ? c : null;
-        public IReadOnlyList<CardEntity> Search(string? q, bool io, int l) => throw new NotImplementedException();
+        public IReadOnlyList<CardEntity> Search(string? q, bool io, int l,
+            IReadOnlyList<string>? colors = null, IReadOnlyList<string>? types = null, IReadOnlyList<int>? cmcBuckets = null)
+            => throw new NotImplementedException();
         public bool IsImplemented(string name) => Implemented.Contains(name);
         public void SetImplemented(string name, bool value) => throw new NotImplementedException();
 

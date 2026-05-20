@@ -17,8 +17,9 @@ public class DeckValidationServiceTests
         public CardEntity? GetByName(string name) =>
             Cards.TryGetValue(name, out var c) ? c : null;
 
-        public IReadOnlyList<CardEntity> Search(string? q, bool implementedOnly, int limit) =>
-            throw new NotImplementedException();
+        public IReadOnlyList<CardEntity> Search(string? q, bool implementedOnly, int limit,
+            IReadOnlyList<string>? colors = null, IReadOnlyList<string>? types = null, IReadOnlyList<int>? cmcBuckets = null)
+            => throw new NotImplementedException();
 
         public bool IsImplemented(string name) => Implemented.Contains(name);
 
