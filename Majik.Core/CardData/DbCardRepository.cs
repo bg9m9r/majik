@@ -33,4 +33,34 @@ public sealed class DbCardRepository : ICardRepository
         return _db.Cards.AsNoTracking()
             .FirstOrDefault(c => c.Name.StartsWith(prefix));
     }
+
+    public IReadOnlyList<CardEntity> Search(string? q, bool implementedOnly, int limit)
+    {
+        var query = _db.Cards.AsQueryable();
+        if (!string.IsNullOrWhiteSpace(q))
+        {
+            var needle = q.Trim();
+            query = query.Where(c => EF.Functions.Like(c.Name, $"%{needle}%"));
+        }
+        if (implementedOnly)
+        {
+            query = query.Where(c => c.IsImplemented);
+        }
+        return query.OrderBy(c => c.Name).Take(limit).ToList();
+    }
+
+    public bool IsImplemented(string name)
+    {
+        var card = _db.Cards.AsNoTracking().FirstOrDefault(c => c.Name == name);
+        return card?.IsImplemented ?? false;
+    }
+
+    public void SetImplemented(string name, bool value)
+    {
+        var card = _db.Cards.FirstOrDefault(c => c.Name == name);
+        if (card == null)
+            throw new ArgumentException($"Card not found: {name}", nameof(name));
+        card.IsImplemented = value;
+        _db.SaveChanges();
+    }
 }
