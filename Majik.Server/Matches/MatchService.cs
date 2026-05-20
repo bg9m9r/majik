@@ -1,3 +1,5 @@
+using Majik.Core.Api.Commands;
+using Majik.Core.Api.Dtos;
 using Majik.Server.Composition;
 using Majik.Server.Profiles;
 using MongoDB.Driver;
@@ -382,6 +384,84 @@ public sealed class MatchService
         _hub?.Publish(matchId, "match.timed-out", new { matchId, loserSub, winnerSub = winner });
         _hub?.Publish(matchId, "match.state-changed",
             new { matchId, state = "Completed", transitionedAt = now });
+    }
+
+    // -----------------------------------------------------------------------
+    // GetAsync
+    // -----------------------------------------------------------------------
+
+    public async Task<Result<MatchDto>> GetAsync(string callerSub, Guid matchId, CancellationToken ct)
+    {
+        var match = await _matches.GetByIdAsync(matchId, ct);
+        if (match == null) return Result.Fail<MatchDto>(new MatchError("match-not-found"));
+
+        // Invite matches are private: only party members may view
+        if (match.Visibility == MatchVisibility.Invite)
+        {
+            var isParty = callerSub == match.Creator.Sub || callerSub == match.Opponent?.Sub;
+            if (!isParty) return Result.Fail<MatchDto>(new MatchError("private-match"));
+        }
+
+        return Result.Ok(ToDto(match));
+    }
+
+    // -----------------------------------------------------------------------
+    // ListOpenPublicAsync
+    // -----------------------------------------------------------------------
+
+    public async Task<IReadOnlyList<MatchDto>> ListOpenPublicAsync(CancellationToken ct)
+    {
+        var matches = await _matches.ListOpenPublicAsync(50, ct);
+        return matches.Select(ToDto).ToList();
+    }
+
+    // -----------------------------------------------------------------------
+    // SubmitCommandAsync
+    // -----------------------------------------------------------------------
+
+    public async Task<Result<bool>> SubmitCommandAsync(
+        string callerSub, Guid matchId, GameCommand command, CancellationToken ct)
+    {
+        var match = await _matches.GetByIdAsync(matchId, ct);
+        if (match == null) return Result.Fail<bool>(new MatchError("match-not-found"));
+
+        var isParty = callerSub == match.Creator.Sub || callerSub == match.Opponent?.Sub;
+        if (!isParty) return Result.Fail<bool>(new MatchError("forbidden"));
+        if (match.State != MatchState.Playing) return Result.Fail<bool>(new MatchError("match-not-open"));
+        if (match.GameId is not Guid gid) return Result.Fail<bool>(new MatchError("game-not-started"));
+        if (_gameFactory == null) return Result.Fail<bool>(new MatchError("game-not-started"));
+
+        var facade = _gameFactory.Get(gid);
+        if (facade == null) return Result.Fail<bool>(new MatchError("game-not-started"));
+
+        await facade.SubmitAsync(command, ct);
+        return Result.Ok(true);
+    }
+
+    // -----------------------------------------------------------------------
+    // GetGameStateAsync
+    // -----------------------------------------------------------------------
+
+    public async Task<Result<GameStateDto>> GetGameStateAsync(
+        string callerSub, Guid matchId, CancellationToken ct)
+    {
+        var match = await _matches.GetByIdAsync(matchId, ct);
+        if (match == null) return Result.Fail<GameStateDto>(new MatchError("match-not-found"));
+
+        var isParty = callerSub == match.Creator.Sub || callerSub == match.Opponent?.Sub;
+        if (!isParty) return Result.Fail<GameStateDto>(new MatchError("forbidden"));
+
+        if (match.State != MatchState.Playing && match.State != MatchState.Completed)
+            return Result.Fail<GameStateDto>(new MatchError("game-not-started"));
+
+        if (match.GameId is not Guid gid) return Result.Fail<GameStateDto>(new MatchError("game-not-started"));
+        if (_gameFactory == null) return Result.Fail<GameStateDto>(new MatchError("game-not-started"));
+
+        var facade = _gameFactory.Get(gid);
+        if (facade == null) return Result.Fail<GameStateDto>(new MatchError("game-not-started"));
+
+        var state = facade.GetState();
+        return Result.Ok(state);
     }
 
     // -----------------------------------------------------------------------
