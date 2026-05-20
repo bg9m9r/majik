@@ -84,7 +84,7 @@ public sealed class MatchPlayer
 
 public sealed class MatchRoll
 {
-    [BsonElement("creatorRoll")] public required int CreatorRoll { get; init; }
-    [BsonElement("opponentRoll")] public required int OpponentRoll { get; init; }
-    [BsonElement("winnerSub")] public required string WinnerSub { get; init; }
+    [BsonElement("creatorRoll")] public int? CreatorRoll { get; set; }
+    [BsonElement("opponentRoll")] public int? OpponentRoll { get; set; }
+    [BsonElement("winnerSub")] public string? WinnerSub { get; set; }
 }

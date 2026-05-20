@@ -31,7 +31,7 @@ public class MatchServicePlayDrawTests : IClassFixture<TestMongoFixture>
     /// StubRandomSource values are the two dice rolls (creator, opponent).
     /// Returns the matchId plus the winner sub based on the rolls.
     /// </summary>
-    private async Task<(MatchService svc, CapturePublisher pub, Guid matchId, string winnerSub)>
+    private async Task<(MatchService svc, CapturePublisher pub, Guid matchId, string? winnerSub)>
         NewServiceAndRollingMatchAsync(StubRandomSource rng)
     {
         var db = _fixture.NewDatabase();
@@ -124,7 +124,7 @@ public class MatchServicePlayDrawTests : IClassFixture<TestMongoFixture>
     {
         var (svc, _, matchId, winnerSub) = await NewServiceAndRollingMatchAsync(new StubRandomSource(6, 2));
 
-        var result = await svc.PlayDrawAsync(winnerSub, matchId,
+        var result = await svc.PlayDrawAsync(winnerSub!, matchId,
             new PlayDrawRequest("mulligan"), CancellationToken.None);
 
         result.IsSuccess.Should().BeFalse();
@@ -142,7 +142,7 @@ public class MatchServicePlayDrawTests : IClassFixture<TestMongoFixture>
         var (svc, pub, matchId, winnerSub) = await NewServiceAndRollingMatchAsync(new StubRandomSource(6, 2));
         winnerSub.Should().Be("stub-alice");
 
-        var result = await svc.PlayDrawAsync(winnerSub, matchId,
+        var result = await svc.PlayDrawAsync(winnerSub!, matchId,
             new PlayDrawRequest("play"), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -167,7 +167,7 @@ public class MatchServicePlayDrawTests : IClassFixture<TestMongoFixture>
         var (svc, pub, matchId, winnerSub) = await NewServiceAndRollingMatchAsync(new StubRandomSource(6, 2));
         winnerSub.Should().Be("stub-alice");
 
-        var result = await svc.PlayDrawAsync(winnerSub, matchId,
+        var result = await svc.PlayDrawAsync(winnerSub!, matchId,
             new PlayDrawRequest("draw"), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -189,7 +189,7 @@ public class MatchServicePlayDrawTests : IClassFixture<TestMongoFixture>
         var (svc, _, matchId, winnerSub) = await NewServiceAndRollingMatchAsync(new StubRandomSource(1, 6));
         winnerSub.Should().Be("stub-bob");
 
-        var result = await svc.PlayDrawAsync(winnerSub, matchId,
+        var result = await svc.PlayDrawAsync(winnerSub!, matchId,
             new PlayDrawRequest("play"), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
@@ -209,7 +209,7 @@ public class MatchServicePlayDrawTests : IClassFixture<TestMongoFixture>
         var (svc, _, matchId, winnerSub) = await NewServiceAndRollingMatchAsync(new StubRandomSource(1, 6));
         winnerSub.Should().Be("stub-bob");
 
-        var result = await svc.PlayDrawAsync(winnerSub, matchId,
+        var result = await svc.PlayDrawAsync(winnerSub!, matchId,
             new PlayDrawRequest("draw"), CancellationToken.None);
 
         result.IsSuccess.Should().BeTrue();
