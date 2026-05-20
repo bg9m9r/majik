@@ -52,7 +52,7 @@ public class MatchServiceJoinTests : IClassFixture<TestMongoFixture>
     [Fact]
     public async Task JoinAsync_TransitionsThroughStates_PopulatesRoll()
     {
-        var rng = new StubRandomSource(4, 6); // bob wins
+        var rng = new StubRandomSource(4, 6); // bob wins (when rolls are submitted)
         var (svc, pub, matchId) = await NewServiceAndMatchAsync(rng);
 
         var result = await svc.JoinAsync("stub-bob",
@@ -65,15 +65,16 @@ public class MatchServiceJoinTests : IClassFixture<TestMongoFixture>
         dto.State.Should().Be("Rolling");
         dto.Opponent.Should().NotBeNull();
         dto.Opponent!.Sub.Should().Be("stub-bob");
+        // Roll is initialized but slots are empty until each player submits their roll
         dto.Roll.Should().NotBeNull();
-        dto.Roll!.WinnerSub.Should().Be("stub-bob");
+        dto.Roll!.WinnerSub.Should().BeNull();
+        dto.Roll.CreatorRoll.Should().BeNull();
+        dto.Roll.OpponentRoll.Should().BeNull();
 
-        // Events published in order
+        // Events published: joined + one state transition to Rolling (no auto-roll events)
         pub.Published.Select(e => e.@event).Should().ContainInOrder(
             "match.opponent-joined",
-            "match.state-changed",
-            "match.state-changed",
-            "match.rolled");
+            "match.state-changed");
     }
 
     [Fact]

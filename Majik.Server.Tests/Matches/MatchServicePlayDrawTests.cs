@@ -27,8 +27,8 @@ public class MatchServicePlayDrawTests : IClassFixture<TestMongoFixture>
     }
 
     /// <summary>
-    /// Creates a service + match in Rolling state.
-    /// StubRandomSource values are the two dice rolls (creator, opponent).
+    /// Creates a service + match in Rolling state with both dice already submitted.
+    /// StubRandomSource values are the two dice rolls (creator first, opponent second).
     /// Returns the matchId plus the winner sub based on the rolls.
     /// </summary>
     private async Task<(MatchService svc, CapturePublisher pub, Guid matchId, string? winnerSub)>
@@ -54,9 +54,13 @@ public class MatchServicePlayDrawTests : IClassFixture<TestMongoFixture>
             CancellationToken.None);
         var matchId = created.Value!.Id;
 
-        var joined = await svc.JoinAsync("stub-bob", matchId,
+        await svc.JoinAsync("stub-bob", matchId,
             new JoinMatchRequest("stompy"), CancellationToken.None);
-        var winnerSub = joined.Value!.Roll!.WinnerSub;
+
+        // Submit both players' rolls (per-player model); creator rolls first, then opponent
+        await svc.SubmitRollAsync("stub-alice", matchId, CancellationToken.None);
+        var afterRolls = await svc.SubmitRollAsync("stub-bob", matchId, CancellationToken.None);
+        var winnerSub = afterRolls.Value!.Roll!.WinnerSub;
 
         pub.Published.Clear();
         return (svc, pub, matchId, winnerSub);

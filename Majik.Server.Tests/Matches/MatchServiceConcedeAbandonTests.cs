@@ -54,6 +54,9 @@ public class MatchServiceConcedeAbandonTests : IClassFixture<TestMongoFixture>
         var matchId = created.Value!.Id;
 
         await svc.JoinAsync("stub-bob", matchId, new JoinMatchRequest("stompy"), CancellationToken.None);
+        // Per-player roll model: both players must submit rolls before PlayDraw is available
+        await svc.SubmitRollAsync("stub-alice", matchId, CancellationToken.None);
+        await svc.SubmitRollAsync("stub-bob", matchId, CancellationToken.None);
         await svc.PlayDrawAsync("stub-alice", matchId, new PlayDrawRequest("play"), CancellationToken.None);
 
         pub.Published.Clear();
