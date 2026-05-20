@@ -29,6 +29,10 @@ public static class DeckEndpoints
         group.MapDelete("/{id:guid}", Delete).WithName("DeleteDeck")
              .Produces(StatusCodes.Status204NoContent)
              .Produces<DeckError>(StatusCodes.Status404NotFound);
+        group.MapPost("/parse", Parse).WithName("ParseDeck")
+             .Produces<ParseDeckResultDto>(StatusCodes.Status200OK)
+             .Produces(StatusCodes.Status400BadRequest)
+             .Produces(StatusCodes.Status503ServiceUnavailable);
         return routes;
     }
 
@@ -93,5 +97,26 @@ public static class DeckEndpoints
         if (svc == null) return MongoUnavailable();
         var sub = SubOf(user); if (sub == null) return Results.Unauthorized();
         return MapResult(await svc.DeleteAsync(sub, id, ct), StatusCodes.Status204NoContent);
+    }
+
+    private static async Task<IResult> Parse(
+        ParseDeckRequest body, ClaimsPrincipal user,
+        [FromServices] DeckTextParser? parser,
+        CancellationToken ct)
+    {
+        if (parser is null) return Results.Json(new DeckError("mongo-not-configured"), statusCode: StatusCodes.Status503ServiceUnavailable);
+        var sub = SubOf(user); if (sub == null) return Results.Unauthorized();
+        if (body is null || string.IsNullOrWhiteSpace(body.Text))
+            return Results.BadRequest(new DeckError("empty-text"));
+        if (body.Text.Length > 100_000)
+            return Results.BadRequest(new DeckError("too-large"));
+
+        var result = await parser.ParseAsync(body.Text, ct);
+        var dto = new ParseDeckResultDto(
+            Mainboard: result.Mainboard.Select(e => new DeckCardEntryDto(e.Name, e.Count)).ToList(),
+            Sideboard: result.Sideboard.Select(e => new DeckCardEntryDto(e.Name, e.Count)).ToList(),
+            Unknown: result.Unknown,
+            Warnings: result.Warnings);
+        return Results.Ok(dto);
     }
 }

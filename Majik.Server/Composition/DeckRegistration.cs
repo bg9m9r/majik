@@ -9,6 +9,9 @@ public static class DeckRegistration
 {
     public static IServiceCollection AddMajikDecks(this IServiceCollection services, IConfiguration config)
     {
+        // DeckTextParser depends only on ICardRepository (SQLite, always available).
+        services.AddScoped<DeckTextParser>();
+
         if (!MongoRegistration.IsConfigured(config))
             return services;
 
