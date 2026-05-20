@@ -139,15 +139,22 @@ public sealed class GameFacade
     /// Phase 10 entry point — shuffle, mulligan, multi-turn, SBAs,
     /// combat, win conditions all handled by the driver.
     /// </summary>
-    public Task StartFullGameAsync(int maxTurns = 30, CancellationToken ct = default)
+    public Task StartFullGameAsync(
+        int firstPlayerSlot = 0,
+        int maxTurns = 30,
+        CancellationToken ct = default)
     {
         if (_loopTask != null || _fullGameTask != null)
         {
             throw new InvalidOperationException("Game already started.");
         }
 
+        var orderedPlayers = firstPlayerSlot == 1
+            ? new[] { _bob, _alice }
+            : new[] { _alice, _bob };
+
         var driver = new GameDriver(
-            players: new[] { _alice, _bob },
+            players: orderedPlayers,
             agents: new Dictionary<Player, IPlayerAgent>
             {
                 [_alice] = _aliceAgent,
