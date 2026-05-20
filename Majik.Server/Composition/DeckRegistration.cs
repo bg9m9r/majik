@@ -3,8 +3,8 @@ using Majik.Server.Matches;
 
 namespace Majik.Server.Composition;
 
-/// <summary>DI wiring for sub-project #3 Deck CRUD. Replaces the
-/// StubDeckLoader registration from MatchRegistration with RealDeckLoader.</summary>
+/// <summary>DI wiring for Deck CRUD. Registers MongoDB-backed repository,
+/// validation, scoped service, and the production <see cref="IDeckLoader"/>.</summary>
 public static class DeckRegistration
 {
     public static IServiceCollection AddMajikDecks(this IServiceCollection services, IConfiguration config)
