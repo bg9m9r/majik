@@ -4,6 +4,9 @@ using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using FluentAssertions;
+using Majik.Core.CardData;
+using Majik.Core.CardData.Database;
+using Majik.Server.Decks;
 using Majik.Server.Matches;
 using Majik.Server.Profiles;
 using Majik.Server.Tests.Profiles;
@@ -58,8 +61,46 @@ public class MatchEndpointsLifecycleTests : IClassFixture<TestMongoFixture>
                     services.RemoveAll<IRandomSource>();
                     services.AddSingleton<IRandomSource>(rng);
                 }
+
+                // Override card repo with fake that knows the test cards
+                services.RemoveAll<ICardRepository>();
+                services.AddSingleton<ICardRepository>(TestCardRepo());
             });
         });
+    }
+
+    private static ICardRepository TestCardRepo()
+    {
+        var repo = new FakeCardRepoForMatchTests();
+        repo.Add("Forest", "Basic Land — Forest");
+        repo.Add("Mountain", "Basic Land — Mountain");
+        repo.Add("Grizzly Bears", "Creature — Bear");
+        repo.Add("Hill Giant", "Creature — Giant");
+        return repo;
+    }
+
+    private static async Task<Guid> SeedDeckAsync(IMongoDatabase db, string ownerSub, string name, CancellationToken ct = default)
+    {
+        var deckRepo = new DeckRepository(db);
+        await deckRepo.EnsureIndexesAsync(ct);
+        var id = Guid.NewGuid();
+        await deckRepo.InsertAsync(new Deck
+        {
+            Id = id,
+            OwnerSub = ownerSub,
+            Name = name,
+            Mainboard = new List<DeckCardEntry>
+            {
+                new() { Name = "Forest", Count = 24 },
+                new() { Name = "Grizzly Bears", Count = 4 },
+                new() { Name = "Hill Giant", Count = 4 },
+                new() { Name = "Mountain", Count = 28 },
+            },
+            Sideboard = new List<DeckCardEntry>(),
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+        }, ct);
+        return id;
     }
 
     /// <summary>Factory that deliberately omits a Mongo connection string to
@@ -173,11 +214,12 @@ public class MatchEndpointsLifecycleTests : IClassFixture<TestMongoFixture>
     {
         var db = await FreshDb();
         await SeedProfile(db, "alice", "Alice");
+        var aliceDeckId = await SeedDeckAsync(db, "alice", "Alice Deck");
         using var factory = Factory(db);
         var client = AuthedClient(factory, "alice");
 
         var resp = await client.PostAsJsonAsync("/matches",
-            new { format = "constructed", visibility = "public", deckId = "deck-a", clockMinutes = 20 });
+            new { format = "constructed", visibility = "public", deckId = aliceDeckId.ToString(), clockMinutes = 20 });
 
         resp.StatusCode.Should().Be(HttpStatusCode.Created);
         var dto = await resp.Content.ReadFromJsonAsync<MatchDto>();
@@ -187,7 +229,8 @@ public class MatchEndpointsLifecycleTests : IClassFixture<TestMongoFixture>
         dto.Format.Should().Be("constructed");
         dto.ClockMinutes.Should().Be(20);
         dto.Creator.Sub.Should().Be("alice");
-        dto.Creator.DeckId.Should().Be("deck-a");
+        dto.Creator.DeckId.Should().Be(aliceDeckId.ToString());
+        dto.Creator.DeckSnapshot.Should().HaveCount(60);
         dto.Opponent.Should().BeNull();
         dto.Id.Should().NotBe(Guid.Empty);
         resp.Headers.Location.Should().NotBeNull();
@@ -252,18 +295,20 @@ public class MatchEndpointsLifecycleTests : IClassFixture<TestMongoFixture>
         var db = await FreshDb();
         await SeedProfile(db, "alice", "Alice");
         await SeedProfile(db, "bob", "Bob");
+        var aliceDeckId = await SeedDeckAsync(db, "alice", "Alice Deck");
+        var bobDeckId = await SeedDeckAsync(db, "bob", "Bob Deck");
         using var factory = Factory(db);
         var aliceClient = AuthedClient(factory, "alice");
         var bobClient = AuthedClient(factory, "bob");
 
         // Create a public match
         var pub = await aliceClient.PostAsJsonAsync("/matches",
-            new { format = "constructed", visibility = "public", deckId = "deck-a", clockMinutes = 20 });
+            new { format = "constructed", visibility = "public", deckId = aliceDeckId.ToString(), clockMinutes = 20 });
         pub.StatusCode.Should().Be(HttpStatusCode.Created);
 
         // Create an invite match
         var inv = await bobClient.PostAsJsonAsync("/matches",
-            new { format = "constructed", visibility = "invite", deckId = "deck-b", clockMinutes = 20 });
+            new { format = "constructed", visibility = "invite", deckId = bobDeckId.ToString(), clockMinutes = 20 });
         inv.StatusCode.Should().Be(HttpStatusCode.Created);
 
         var listResp = await aliceClient.GetAsync("/matches?visibility=public");
@@ -285,12 +330,13 @@ public class MatchEndpointsLifecycleTests : IClassFixture<TestMongoFixture>
         var db = await FreshDb();
         await SeedProfile(db, "alice", "Alice");
         await SeedProfile(db, "charlie", "Charlie");
+        var aliceDeckId = await SeedDeckAsync(db, "alice", "Alice Deck");
         using var factory = Factory(db);
         var aliceClient = AuthedClient(factory, "alice");
         var charlieClient = AuthedClient(factory, "charlie");
 
         var created = await aliceClient.PostAsJsonAsync("/matches",
-            new { format = "constructed", visibility = "invite", deckId = "deck-a", clockMinutes = 20 });
+            new { format = "constructed", visibility = "invite", deckId = aliceDeckId.ToString(), clockMinutes = 20 });
         created.StatusCode.Should().Be(HttpStatusCode.Created);
         var dto = await created.Content.ReadFromJsonAsync<MatchDto>();
 
@@ -309,16 +355,17 @@ public class MatchEndpointsLifecycleTests : IClassFixture<TestMongoFixture>
     {
         var db = await FreshDb();
         await SeedProfile(db, "alice", "Alice");
+        var aliceDeckId = await SeedDeckAsync(db, "alice", "Alice Deck");
         using var factory = Factory(db);
         var client = AuthedClient(factory, "alice");
 
         var created = await client.PostAsJsonAsync("/matches",
-            new { format = "constructed", visibility = "public", deckId = "deck-a", clockMinutes = 20 });
+            new { format = "constructed", visibility = "public", deckId = aliceDeckId.ToString(), clockMinutes = 20 });
         created.StatusCode.Should().Be(HttpStatusCode.Created);
         var dto = await created.Content.ReadFromJsonAsync<MatchDto>();
 
         var resp = await client.PostAsJsonAsync($"/matches/{dto!.Id}/join",
-            new { deckId = "deck-a" });
+            new { deckId = aliceDeckId.ToString() });
         resp.StatusCode.Should().Be(HttpStatusCode.Conflict);
         var body = await resp.Content.ReadFromJsonAsync<MatchError>();
         body!.Error.Should().Be("self-join-forbidden");
@@ -334,6 +381,8 @@ public class MatchEndpointsLifecycleTests : IClassFixture<TestMongoFixture>
         var db = await FreshDb();
         await SeedProfile(db, "alice", "Alice");
         await SeedProfile(db, "bob", "Bob");
+        var aliceDeckId = await SeedDeckAsync(db, "alice", "Alice Deck");
+        var bobDeckId = await SeedDeckAsync(db, "bob", "Bob Deck");
         // Stub: alice wins the roll (creator=6, opponent=1)
         var rng = new StubRandomSource(new Queue<int>(new[] { 6, 1 }));
         using var factory = Factory(db, rng);
@@ -342,12 +391,12 @@ public class MatchEndpointsLifecycleTests : IClassFixture<TestMongoFixture>
 
         // Alice creates
         var created = await aliceClient.PostAsJsonAsync("/matches",
-            new { format = "constructed", visibility = "public", deckId = "deck-a", clockMinutes = 20 });
+            new { format = "constructed", visibility = "public", deckId = aliceDeckId.ToString(), clockMinutes = 20 });
         var matchDto = await created.Content.ReadFromJsonAsync<MatchDto>();
 
         // Bob joins → triggers roll (alice wins: 6 vs 1)
         var joined = await bobClient.PostAsJsonAsync($"/matches/{matchDto!.Id}/join",
-            new { deckId = "deck-b" });
+            new { deckId = bobDeckId.ToString() });
         joined.StatusCode.Should().Be(HttpStatusCode.OK);
         var joinedDto = await joined.Content.ReadFromJsonAsync<MatchDto>();
         joinedDto!.Roll.Should().NotBeNull();
@@ -371,6 +420,8 @@ public class MatchEndpointsLifecycleTests : IClassFixture<TestMongoFixture>
         var db = await FreshDb();
         await SeedProfile(db, "alice", "Alice");
         await SeedProfile(db, "bob", "Bob");
+        var aliceDeckId = await SeedDeckAsync(db, "alice", "Alice Deck");
+        var bobDeckId = await SeedDeckAsync(db, "bob", "Bob Deck");
         // Stub: alice wins the roll
         var rng = new StubRandomSource(new Queue<int>(new[] { 6, 1 }));
         using var factory = Factory(db, rng);
@@ -378,11 +429,11 @@ public class MatchEndpointsLifecycleTests : IClassFixture<TestMongoFixture>
         var bobClient = AuthedClient(factory, "bob");
 
         var created = await aliceClient.PostAsJsonAsync("/matches",
-            new { format = "constructed", visibility = "public", deckId = "deck-a", clockMinutes = 20 });
+            new { format = "constructed", visibility = "public", deckId = aliceDeckId.ToString(), clockMinutes = 20 });
         var matchDto = await created.Content.ReadFromJsonAsync<MatchDto>();
 
         await bobClient.PostAsJsonAsync($"/matches/{matchDto!.Id}/join",
-            new { deckId = "deck-b" });
+            new { deckId = bobDeckId.ToString() });
 
         // Alice (winner) sends bad choice
         var resp = await aliceClient.PostAsJsonAsync($"/matches/{matchDto.Id}/play-draw",
@@ -402,12 +453,13 @@ public class MatchEndpointsLifecycleTests : IClassFixture<TestMongoFixture>
         var db = await FreshDb();
         await SeedProfile(db, "alice", "Alice");
         await SeedProfile(db, "bob", "Bob");
+        var aliceDeckId = await SeedDeckAsync(db, "alice", "Alice Deck");
         using var factory = Factory(db);
         var aliceClient = AuthedClient(factory, "alice");
         var bobClient = AuthedClient(factory, "bob");
 
         var created = await aliceClient.PostAsJsonAsync("/matches",
-            new { format = "constructed", visibility = "public", deckId = "deck-a", clockMinutes = 20 });
+            new { format = "constructed", visibility = "public", deckId = aliceDeckId.ToString(), clockMinutes = 20 });
         var matchDto = await created.Content.ReadFromJsonAsync<MatchDto>();
 
         var resp = await bobClient.DeleteAsync($"/matches/{matchDto!.Id}");
@@ -438,6 +490,35 @@ public class MatchEndpointsLifecycleTests : IClassFixture<TestMongoFixture>
 // ---------------------------------------------------------------------------
 // Stubs
 // ---------------------------------------------------------------------------
+
+/// <summary>In-memory ICardRepository for match endpoint integration tests.
+/// Knows the standard test cards used by SeedDeckAsync.</summary>
+internal sealed class FakeCardRepoForMatchTests : ICardRepository
+{
+    private readonly Dictionary<string, CardEntity> _cards = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _implemented = new(StringComparer.OrdinalIgnoreCase);
+
+    public void Add(string name, string typeLine)
+    {
+        _cards[name] = new CardEntity
+        {
+            Name = name,
+            ScryfallId = Guid.NewGuid().ToString(),
+            ManaCost = "",
+            TypeLine = typeLine,
+            Set = "TST",
+            CollectorNumber = "1",
+            IsImplemented = true,
+        };
+        _implemented.Add(name);
+    }
+
+    public CardEntity? GetByName(string name) => _cards.TryGetValue(name, out var c) ? c : null;
+    public bool IsImplemented(string name) => _implemented.Contains(name);
+    public IReadOnlyList<CardEntity> Search(string? q, bool implementedOnly, int limit) =>
+        throw new NotImplementedException();
+    public void SetImplemented(string name, bool value) => throw new NotImplementedException();
+}
 
 /// <summary>Deterministic IRandomSource backed by a pre-loaded queue of values.
 /// Loops when exhausted.</summary>
