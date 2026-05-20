@@ -5,6 +5,7 @@ using Majik.Core.CardData.Database;
 using Majik.Core.Cards;
 using Majik.Core.Combat;
 using Majik.Core.Players;
+using Microsoft.EntityFrameworkCore;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -24,15 +25,35 @@ public class LiveDbCoverageTests
 
     private static bool DbAvailable() => File.Exists(DbPath);
 
+    /// <summary>
+    /// Ensure the DB schema is patched before running a test that uses it.
+    /// (Idempotent; safe to call multiple times.)
+    /// </summary>
+    private static async Task EnsureDbIsPatched()
+    {
+        if (!DbAvailable()) return;
+
+        using var db = new CardDbContext();
+        try
+        {
+            await CardDataSchemaPatcher.PatchAsync(db.Database.GetDbConnection(), CancellationToken.None);
+        }
+        catch
+        {
+            // Patch may have already been applied; continue anyway
+        }
+    }
+
     public LiveDbCoverageTests(ITestOutputHelper output)
     {
         _output = output;
     }
 
     [Fact]
-    public void Mountain_FromRealDb_TapsForRed()
+    public async Task Mountain_FromRealDb_TapsForRed()
     {
         if (!DbAvailable()) return;
+        await EnsureDbIsPatched();
         using var db = new CardDbContext();
         var factory = new ScryfallCardFactory(new DbCardRepository(db));
         var card = factory.Create("Mountain", new Player("A", 20));
@@ -40,9 +61,10 @@ public class LiveDbCoverageTests
     }
 
     [Fact]
-    public void SerraAngel_FromRealDb_HasFlyingAndVigilance()
+    public async Task SerraAngel_FromRealDb_HasFlyingAndVigilance()
     {
         if (!DbAvailable()) return;
+        await EnsureDbIsPatched();
         using var db = new CardDbContext();
         var factory = new ScryfallCardFactory(new DbCardRepository(db));
         var c = (Creature)factory.Create("Serra Angel", new Player("A", 20));
@@ -52,9 +74,10 @@ public class LiveDbCoverageTests
     }
 
     [Fact]
-    public void LightningBolt_FromRealDb_DealsThreeDamage()
+    public async Task LightningBolt_FromRealDb_DealsThreeDamage()
     {
         if (!DbAvailable()) return;
+        await EnsureDbIsPatched();
         using var db = new CardDbContext();
         var factory = new ScryfallCardFactory(new DbCardRepository(db));
         var alice = new Player("A", 20);
@@ -72,9 +95,10 @@ public class LiveDbCoverageTests
     }
 
     [Fact]
-    public void Counterspell_FromRealDb_BindsCounter()
+    public async Task Counterspell_FromRealDb_BindsCounter()
     {
         if (!DbAvailable()) return;
+        await EnsureDbIsPatched();
         using var db = new CardDbContext();
         var factory = new ScryfallCardFactory(new DbCardRepository(db));
         var def = factory.LookupSpellDefinition("Counterspell", new Player("A", 20), raw => raw, stack: null);
@@ -88,9 +112,10 @@ public class LiveDbCoverageTests
     /// threshold is just a regression guard.
     /// </summary>
     [Fact]
-    public void Sample_CommonCards_BindRateAbove60Percent()
+    public async Task Sample_CommonCards_BindRateAbove60Percent()
     {
         if (!DbAvailable()) return;
+        await EnsureDbIsPatched();
         using var db = new CardDbContext();
         var factory = new ScryfallCardFactory(new DbCardRepository(db));
         var alice = new Player("A", 20);
