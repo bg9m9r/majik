@@ -200,6 +200,118 @@ public sealed class MatchService
     }
 
     // -----------------------------------------------------------------------
+    // PlayDrawAsync
+    // -----------------------------------------------------------------------
+
+    public async Task<Result<MatchDto>> PlayDrawAsync(
+        string callerSub, Guid matchId, PlayDrawRequest request, CancellationToken ct)
+    {
+        var match = await _matches.GetByIdAsync(matchId, ct);
+        if (match == null) return Result.Fail<MatchDto>(new MatchError("match-not-found"));
+        if (match.State != MatchState.Rolling) return Result.Fail<MatchDto>(new MatchError("not-rolling"));
+        if (match.Roll == null || match.Roll.WinnerSub != callerSub)
+            return Result.Fail<MatchDto>(new MatchError("not-roll-winner"));
+
+        var choice = request.Choice?.ToLowerInvariant();
+        if (choice != "play" && choice != "draw")
+            return Result.Fail<MatchDto>(new MatchError("invalid-choice"));
+
+        string firstPlayerSub = choice == "play" ? callerSub
+            : callerSub == match.Creator.Sub ? match.Opponent!.Sub : match.Creator.Sub;
+        int firstPlayerSlot = firstPlayerSub == match.Creator.Sub ? 0 : 1;
+
+        var now = _clock.UtcNow;
+        var update = Builders<Match>.Update
+            .Set(m => m.FirstChoice, choice)
+            .Set(m => m.State, MatchState.Playing)
+            .Set(m => m.PriorityHolderSub, firstPlayerSub)
+            .Set(m => m.PriorityStartedAt, now)
+            .Set(m => m.UpdatedAt, now);
+
+        var moved = await _matches.TryAtomicUpdateAsync(matchId, MatchState.Rolling, update, ct);
+        if (!moved) return Result.Fail<MatchDto>(new MatchError("not-rolling"));
+
+        if (_gameFactory != null && match.GameId is Guid gid)
+        {
+            var facade = _gameFactory.Get(gid);
+            facade?.StartFullGameAsync(firstPlayerSlot);
+        }
+        _timeoutScheduler?.Schedule(matchId, firstPlayerSub, match.ClockMinutes * 60_000L);
+        _hub?.Publish(matchId, "match.play-draw-chosen",
+            new { matchId, choice, firstPlayerSub });
+        _hub?.Publish(matchId, "match.state-changed",
+            new { matchId, state = "Playing", transitionedAt = now });
+        _hub?.Publish(matchId, "match.clock-update",
+            new { matchId, creatorMs = match.CreatorMillisRemaining, opponentMs = match.OpponentMillisRemaining, holder = firstPlayerSub, startedAt = now });
+
+        var fresh = (await _matches.GetByIdAsync(matchId, ct))!;
+        return Result.Ok(ToDto(fresh));
+    }
+
+    // -----------------------------------------------------------------------
+    // ConcedeAsync
+    // -----------------------------------------------------------------------
+
+    public async Task<Result<MatchDto>> ConcedeAsync(string callerSub, Guid matchId, CancellationToken ct)
+    {
+        var match = await _matches.GetByIdAsync(matchId, ct);
+        if (match == null) return Result.Fail<MatchDto>(new MatchError("match-not-found"));
+        var isParty = callerSub == match.Creator.Sub || callerSub == match.Opponent?.Sub;
+        if (!isParty) return Result.Fail<MatchDto>(new MatchError("forbidden"));
+        if (match.State != MatchState.Playing)
+            return Result.Fail<MatchDto>(new MatchError("cannot-concede"));
+
+        var winner = callerSub == match.Creator.Sub ? match.Opponent!.Sub : match.Creator.Sub;
+        var now = _clock.UtcNow;
+        var update = Builders<Match>.Update
+            .Set(m => m.State, MatchState.Completed)
+            .Set(m => m.WinnerSub, winner)
+            .Set(m => m.UpdatedAt, now);
+
+        var moved = await _matches.TryAtomicUpdateAsync(matchId, MatchState.Playing, update, ct);
+        if (!moved) return Result.Fail<MatchDto>(new MatchError("cannot-concede"));
+
+        _timeoutScheduler?.Cancel(matchId);
+        _hub?.Publish(matchId, "match.state-changed",
+            new { matchId, state = "Completed", transitionedAt = now });
+
+        var fresh = (await _matches.GetByIdAsync(matchId, ct))!;
+        return Result.Ok(ToDto(fresh));
+    }
+
+    // -----------------------------------------------------------------------
+    // AbandonAsync
+    // -----------------------------------------------------------------------
+
+    public async Task<Result<bool>> AbandonAsync(string callerSub, Guid matchId, CancellationToken ct)
+    {
+        var match = await _matches.GetByIdAsync(matchId, ct);
+        if (match == null) return Result.Fail<bool>(new MatchError("match-not-found"));
+        if (match.Creator.Sub != callerSub) return Result.Fail<bool>(new MatchError("forbidden"));
+        if (match.State == MatchState.Playing || match.State == MatchState.Completed)
+            return Result.Fail<bool>(new MatchError("match-in-progress"));
+        if (match.State == MatchState.Abandoned)
+            return Result.Ok(true);
+
+        var now = _clock.UtcNow;
+        var update = Builders<Match>.Update
+            .Set(m => m.State, MatchState.Abandoned)
+            .Set(m => m.UpdatedAt, now);
+        // CAS on current state to avoid race with concurrent join.
+        var moved = await _matches.TryAtomicUpdateAsync(matchId, match.State, update, ct);
+        if (!moved) return Result.Fail<bool>(new MatchError("match-in-progress"));
+
+        _timeoutScheduler?.Cancel(matchId);
+        if (_gameFactory != null && match.GameId is Guid gid)
+        {
+            _gameFactory.Delete(gid);
+        }
+        _hub?.Publish(matchId, "match.state-changed",
+            new { matchId, state = "Abandoned", transitionedAt = now });
+        return Result.Ok(true);
+    }
+
+    // -----------------------------------------------------------------------
     // ToDto — live-balance helper
     // -----------------------------------------------------------------------
 
