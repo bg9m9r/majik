@@ -1,6 +1,7 @@
 using Majik.Core.Api.Commands;
 using Majik.Core.Api.Dtos;
 using Majik.Server.Composition;
+using Majik.Server.Decks;
 using Majik.Server.Profiles;
 using MongoDB.Driver;
 
@@ -38,6 +39,8 @@ public sealed class MatchService
     private readonly IMatchHubPublisher? _hub;
     private readonly MatchTimeoutScheduler? _timeoutScheduler;
     private readonly ServerGameFactory? _gameFactory;
+    private readonly DeckRepository? _deckRepo;
+    private readonly DeckValidationService? _deckValidator;
 
     public MatchService(
         MatchRepository matches,
@@ -47,7 +50,9 @@ public sealed class MatchService
         IClock clock,
         IMatchHubPublisher? hub,
         MatchTimeoutScheduler? timeoutScheduler,
-        ServerGameFactory? gameFactory)
+        ServerGameFactory? gameFactory,
+        DeckRepository? deckRepo = null,
+        DeckValidationService? deckValidator = null)
     {
         _matches = matches;
         _profiles = profiles;
@@ -57,6 +62,44 @@ public sealed class MatchService
         _hub = hub;
         _timeoutScheduler = timeoutScheduler;
         _gameFactory = gameFactory;
+        _deckRepo = deckRepo;
+        _deckValidator = deckValidator;
+    }
+
+    // -----------------------------------------------------------------------
+    // ResolveDeckSnapshotAsync
+    // -----------------------------------------------------------------------
+
+    private async Task<(IReadOnlyList<string> snapshot, MatchError? error)>
+        ResolveDeckSnapshotAsync(string ownerSub, string deckId, CancellationToken ct)
+    {
+        if (_deckRepo == null || _deckValidator == null)
+        {
+            return (Array.Empty<string>(), null); // legacy stub path — match still works
+        }
+
+        if (!Guid.TryParse(deckId, out var id))
+        {
+            return (Array.Empty<string>(), new MatchError("deck-not-found"));
+        }
+
+        var deck = await _deckRepo.GetByIdForOwnerAsync(id, ownerSub, ct);
+        if (deck == null)
+        {
+            return (Array.Empty<string>(), new MatchError("deck-not-found"));
+        }
+
+        var validation = _deckValidator.Validate(deck);
+        if (!validation.IsValid)
+        {
+            return (Array.Empty<string>(), new MatchError("deck-invalid",
+                string.Join("; ", validation.Errors)));
+        }
+
+        var snapshot = deck.Mainboard
+            .SelectMany(e => Enumerable.Repeat(e.Name, e.Count))
+            .ToList();
+        return (snapshot, null);
     }
 
     // -----------------------------------------------------------------------
@@ -87,6 +130,9 @@ public sealed class MatchService
         if (profile is null)
             return Result.Fail<MatchDto>(new MatchError("no-profile", "Caller has no profile."));
 
+        var (creatorSnapshot, deckErr) = await ResolveDeckSnapshotAsync(callerSub, request.DeckId, ct);
+        if (deckErr != null) return Result.Fail<MatchDto>(deckErr);
+
         var now = _clock.UtcNow;
         long initialBalance = (long)clockMinutes * 60_000L;
 
@@ -102,7 +148,7 @@ public sealed class MatchService
                 Sub = callerSub,
                 Handle = profile.HandleDisplay,
                 DeckId = request.DeckId,
-                DeckSnapshot = new List<string>(),
+                DeckSnapshot = creatorSnapshot.ToList(),
             },
             Opponent = null,
             CreatorMillisRemaining = initialBalance,
@@ -141,12 +187,15 @@ public sealed class MatchService
         var profile = await _profiles.GetBySubAsync(callerSub, ct);
         if (profile == null) return Result.Fail<MatchDto>(new MatchError("no-profile"));
 
+        var (opponentSnapshot, deckErr) = await ResolveDeckSnapshotAsync(callerSub, request.DeckId, ct);
+        if (deckErr != null) return Result.Fail<MatchDto>(deckErr);
+
         var opponent = new MatchPlayer
         {
             Sub = callerSub,
             Handle = profile.HandleDisplay,
             DeckId = request.DeckId.Trim(),
-            DeckSnapshot = new List<string>(),
+            DeckSnapshot = opponentSnapshot.ToList(),
         };
 
         var now = _clock.UtcNow;
@@ -164,12 +213,19 @@ public sealed class MatchService
         // Create engine game (decks + facade)
         if (_gameFactory != null)
         {
-            var creatorDeck = await _decks.LoadAsync(match.Creator.DeckId, ct);
-            var opponentDeck = await _decks.LoadAsync(opponent.DeckId, ct);
-            var facade = _gameFactory.Create(match.Creator.Handle, opponent.Handle, creatorDeck, opponentDeck);
-            await _matches.TryAtomicUpdateAsync(matchId, MatchState.Joined,
-                Builders<Match>.Update.Set(m => m.GameId, facade.GameId),
-                ct);
+            try
+            {
+                var creatorDeck = await _decks.LoadAsync(match.Creator.DeckId, ct);
+                var opponentDeck = await _decks.LoadAsync(opponent.DeckId, ct);
+                var facade = _gameFactory.Create(match.Creator.Handle, opponent.Handle, creatorDeck, opponentDeck);
+                await _matches.TryAtomicUpdateAsync(matchId, MatchState.Joined,
+                    Builders<Match>.Update.Set(m => m.GameId, facade.GameId),
+                    ct);
+            }
+            catch (DeckLoadException ex)
+            {
+                return Result.Fail<MatchDto>(new MatchError("deck-invalid", ex.Message));
+            }
         }
 
         // Transition Joined → Starting → Rolling
