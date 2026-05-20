@@ -6,6 +6,9 @@ public sealed record CardDto(
     IReadOnlyList<string> Types,
     int? Power,
     int? Toughness,
-    bool IsImplemented);
+    bool IsImplemented,
+    int? Cmc,
+    IReadOnlyList<string> Colors,
+    string? OracleText);
 
 public sealed record CardsError(string Error, string? Detail = null);

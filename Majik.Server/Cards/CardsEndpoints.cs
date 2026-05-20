@@ -66,12 +66,25 @@ public static class CardsEndpoints
         if (c.Toughness != null && int.TryParse(c.Toughness, out var t))
             toughness = t;
 
+        IReadOnlyList<string> colors;
+        try
+        {
+            colors = System.Text.Json.JsonSerializer.Deserialize<List<string>>(c.Colors) ?? new List<string>();
+        }
+        catch
+        {
+            colors = new List<string>();
+        }
+
         return new CardDto(
             Name: c.Name,
             ManaCost: c.ManaCost ?? "",
             Types: types,
             Power: power,
             Toughness: toughness,
-            IsImplemented: c.IsImplemented);
+            IsImplemented: c.IsImplemented,
+            Cmc: c.Cmc,
+            Colors: colors,
+            OracleText: c.OracleText);
     }
 }
