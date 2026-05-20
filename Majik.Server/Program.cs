@@ -1,3 +1,4 @@
+using Majik.Server.Cards;
 using Majik.Server.Composition;
 using Majik.Server.Matches;
 using Majik.Server.Profiles;
@@ -49,6 +50,7 @@ app.MapGet("/whoami", (System.Security.Claims.ClaimsPrincipal user) =>
    .Produces(StatusCodes.Status401Unauthorized);
 
 app.MapProfileEndpoints();
+app.MapCardsEndpoints();
 app.MapMatchEndpoints();
 app.MapHub<MatchHub>("/hubs/match");
 
