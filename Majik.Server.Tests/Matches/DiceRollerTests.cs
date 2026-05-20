@@ -2,6 +2,8 @@ using FluentAssertions;
 using Majik.Server.Matches;
 using Xunit;
 
+#pragma warning disable CS0618 // Roll(string, string) is obsolete — these tests cover legacy behaviour
+
 namespace Majik.Server.Tests.Matches;
 
 public class DiceRollerTests

@@ -232,15 +232,11 @@ public sealed class MatchService
         await TransitionStateAsync(matchId, MatchState.Joined, MatchState.Starting, now, ct);
         await TransitionStateAsync(matchId, MatchState.Starting, MatchState.Rolling, now, ct);
 
-        // Roll dice + persist
-        var roll = _dice.Roll(match.Creator.Sub, opponent.Sub);
+        // Initialize empty roll record; per-player rolls land via SubmitRollAsync.
         var setRoll = Builders<Match>.Update
-            .Set(m => m.Roll, roll)
+            .Set(m => m.Roll, new MatchRoll())
             .Set(m => m.UpdatedAt, _clock.UtcNow);
         await _matches.TryAtomicUpdateAsync(matchId, MatchState.Rolling, setRoll, ct);
-
-        _hub?.Publish(matchId, "match.rolled",
-            new { matchId, roll = new MatchRollDto(roll.CreatorRoll, roll.OpponentRoll, roll.WinnerSub) });
 
         var fresh = (await _matches.GetByIdAsync(matchId, ct))!;
         return Result.Ok(ToDto(fresh));
@@ -303,6 +299,72 @@ public sealed class MatchService
             new { matchId, state = "Playing", transitionedAt = now });
         _hub?.Publish(matchId, "match.clock-update",
             new { matchId, creatorMs = match.CreatorMillisRemaining, opponentMs = match.OpponentMillisRemaining, holder = firstPlayerSub, startedAt = now });
+
+        var fresh = (await _matches.GetByIdAsync(matchId, ct))!;
+        return Result.Ok(ToDto(fresh));
+    }
+
+    // -----------------------------------------------------------------------
+    // SubmitRollAsync
+    // -----------------------------------------------------------------------
+
+    public async Task<Result<MatchDto>> SubmitRollAsync(string callerSub, Guid matchId, CancellationToken ct)
+    {
+        const int MaxTieRetries = 100;
+
+        var match = await _matches.GetByIdAsync(matchId, ct);
+        if (match == null) return Result.Fail<MatchDto>(new MatchError("match-not-found"));
+        if (match.State != MatchState.Rolling) return Result.Fail<MatchDto>(new MatchError("not-rolling"));
+
+        bool isCreator = callerSub == match.Creator.Sub;
+        bool isOpponent = match.Opponent != null && callerSub == match.Opponent.Sub;
+        if (!isCreator && !isOpponent) return Result.Fail<MatchDto>(new MatchError("not-a-player"));
+
+        var roll = match.Roll ?? new MatchRoll();
+
+        // Idempotent: if caller's slot already set, just return current snapshot
+        var callerSlotFilled = isCreator ? roll.CreatorRoll.HasValue : roll.OpponentRoll.HasValue;
+        if (callerSlotFilled)
+        {
+            return Result.Ok(ToDto(match));
+        }
+
+        // Generate this player's roll
+        int value = _dice.RollSingle();
+        if (isCreator) roll.CreatorRoll = value;
+        else roll.OpponentRoll = value;
+
+        // If both filled, resolve winner (with tie auto-reroll)
+        if (roll.CreatorRoll.HasValue && roll.OpponentRoll.HasValue)
+        {
+            int retries = 0;
+            while (roll.CreatorRoll!.Value == roll.OpponentRoll!.Value)
+            {
+                if (++retries > MaxTieRetries)
+                    throw new InvalidOperationException("Tie reroll cap exceeded — random source likely broken.");
+                roll.CreatorRoll = _dice.RollSingle();
+                roll.OpponentRoll = _dice.RollSingle();
+            }
+            roll.WinnerSub = roll.CreatorRoll.Value > roll.OpponentRoll.Value
+                ? match.Creator.Sub : match.Opponent!.Sub;
+        }
+
+        var now = _clock.UtcNow;
+        var update = Builders<Match>.Update
+            .Set(m => m.Roll, roll)
+            .Set(m => m.UpdatedAt, now);
+        var moved = await _matches.TryAtomicUpdateAsync(matchId, MatchState.Rolling, update, ct);
+        if (!moved) return Result.Fail<MatchDto>(new MatchError("not-rolling"));
+
+        // Publish per-player event for this caller's roll
+        _hub?.Publish(matchId, "match.player-rolled", new { matchId, sub = callerSub, roll = value });
+
+        // If winner determined, publish consolidated match.rolled event
+        if (roll.WinnerSub != null)
+        {
+            _hub?.Publish(matchId, "match.rolled",
+                new { matchId, roll = new MatchRollDto(roll.CreatorRoll, roll.OpponentRoll, roll.WinnerSub) });
+        }
 
         var fresh = (await _matches.GetByIdAsync(matchId, ct))!;
         return Result.Ok(ToDto(fresh));
