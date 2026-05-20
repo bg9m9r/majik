@@ -38,17 +38,28 @@ public class CardsEndpointsTests : IDisposable
             NewCard("Bear Cub", implemented: true),
             NewCard("Grizzly Bears", implemented: true),
             NewCard("Hill Giant", implemented: false),
-            NewCard("Lightning Bolt", implemented: false));
+            NewCard("Lightning Bolt", implemented: false,
+                manaCost: "{R}", typeLine: "Instant", cmc: 1, colors: new[] { "R" }));
         _db.SaveChanges();
     }
 
-    private static CardEntity NewCard(string name, bool implemented) =>
+    private static CardEntity NewCard(
+        string name,
+        bool implemented,
+        string? manaCost = "{1}{G}",
+        string typeLine = "Creature — Bear",
+        int? cmc = null,
+        string[]? colors = null) =>
         new()
         {
             Name = name,
             ScryfallId = Guid.NewGuid().ToString(),
-            ManaCost = "{1}{G}",
-            TypeLine = "Creature — Bear",
+            ManaCost = manaCost,
+            TypeLine = typeLine,
+            Cmc = cmc,
+            Colors = colors is { Length: > 0 }
+                ? System.Text.Json.JsonSerializer.Serialize(colors)
+                : "[]",
             Set = "TST",
             CollectorNumber = "1",
             IsImplemented = implemented,
@@ -158,6 +169,51 @@ public class CardsEndpointsTests : IDisposable
         var resp = await Authed(f, "stub-alice").GetAsync("/cards?limit=2");
         var body = await resp.Content.ReadFromJsonAsync<IReadOnlyList<CardDto>>();
         body!.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task GetCards_ColorsFilter_ReturnsOnlyMatchingColor()
+    {
+        using var f = Factory();
+        var resp = await Authed(f, "stub-alice").GetAsync("/cards?colors=R");
+        resp.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await resp.Content.ReadFromJsonAsync<IReadOnlyList<CardDto>>();
+        // Only Lightning Bolt is seeded with color R
+        body!.Select(c => c.Name).Should().ContainSingle().Which.Should().Be("Lightning Bolt");
+    }
+
+    [Fact]
+    public async Task GetCards_MultipleColorsFilter_ReturnsUnion()
+    {
+        using var f = Factory();
+        // R matches Lightning Bolt; G matches nothing seeded with explicit G colors
+        // Both in query → should return Lightning Bolt (union semantics)
+        var resp = await Authed(f, "stub-alice").GetAsync("/cards?colors=R&colors=G");
+        resp.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await resp.Content.ReadFromJsonAsync<IReadOnlyList<CardDto>>();
+        body!.Select(c => c.Name).Should().Contain("Lightning Bolt");
+    }
+
+    [Fact]
+    public async Task GetCards_TypesFilter_ReturnsOnlyMatchingType()
+    {
+        using var f = Factory();
+        // Instant matches only Lightning Bolt in the seeded data
+        var resp = await Authed(f, "stub-alice").GetAsync("/cards?types=Instant");
+        resp.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await resp.Content.ReadFromJsonAsync<IReadOnlyList<CardDto>>();
+        body!.Select(c => c.Name).Should().ContainSingle().Which.Should().Be("Lightning Bolt");
+    }
+
+    [Fact]
+    public async Task GetCards_CmcFilter_ReturnsOnlyMatchingCmc()
+    {
+        using var f = Factory();
+        // cmc=1 should match Lightning Bolt (seeded with cmc 1)
+        var resp = await Authed(f, "stub-alice").GetAsync("/cards?cmc=1");
+        resp.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await resp.Content.ReadFromJsonAsync<IReadOnlyList<CardDto>>();
+        body!.Select(c => c.Name).Should().ContainSingle().Which.Should().Be("Lightning Bolt");
     }
 
     public void Dispose()

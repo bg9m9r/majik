@@ -31,6 +31,9 @@ public static class CardsEndpoints
         [FromQuery] string? q,
         [FromQuery] bool? implementedOnly,
         [FromQuery] int? limit,
+        [FromQuery(Name = "colors")] string[]? colors,
+        [FromQuery(Name = "types")] string[]? types,
+        [FromQuery(Name = "cmc")] int[]? cmc,
         [FromServices] ICardRepository repo)
     {
         var effectiveLimit = limit ?? DefaultLimit;
@@ -38,7 +41,11 @@ public static class CardsEndpoints
         if (effectiveLimit < 1 || effectiveLimit > MaxLimit)
             return Results.BadRequest(new CardsError("invalid-limit", "1..200"));
 
-        var cards = repo.Search(q, implementedOnly ?? false, effectiveLimit);
+        var cards = repo.Search(
+            q, implementedOnly ?? false, effectiveLimit,
+            colors: colors,
+            types: types,
+            cmcBuckets: cmc);
 
         var dtos = cards
             .OrderBy(c => c.Name)
