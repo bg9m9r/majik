@@ -741,3 +741,121 @@ public sealed class DestroyAllBasicLandTypeTemplate : ISpellTemplate
                 $"all {basic}");
     }
 }
+
+/// <summary>
+/// "Target player draws N cards" — Inspiration (2), Opportunity (4),
+/// Tidings (4). Fixed-numeric variant (X form lives in
+/// TargetPlayerDrawsXTemplate).
+/// </summary>
+public sealed class TargetPlayerDrawsNTemplate : ISpellTemplate
+{
+    private static readonly Regex Pattern = new(
+        @"target\s+player\s+draws\s+(?<n>\d+|one|two|three|four|five|six|seven)\s+cards?",
+        RegexOptions.IgnoreCase);
+
+    public int Priority => 60;
+    public string Name => "TargetPlayerDrawsN";
+
+    public SpellDefinition? TryBind(SpellBindContext ctx) =>
+        SpellTemplateBindHelper.DefaultTryBind(this, ctx);
+
+    public IReadOnlyDictionary<string, string>? TryExtractParams(string oracleText)
+    {
+        var m = Pattern.Match(oracleText);
+        return m.Success
+            ? new Dictionary<string, string> { ["n"] = m.Groups["n"].Value }
+            : null;
+    }
+
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx)
+    {
+        var n = SpellTemplateHelpers.WordToInt(@params["n"]);
+        var resolver = ctx.Resolver;
+        return new SpellDefinition(
+            Modes: Array.Empty<string>(),
+            HasVariableX: false,
+            TargetRequests: new[] { new TargetRequest("target player", 1, 1, Array.Empty<object>()) },
+            EffectFactory: p =>
+            {
+                var target = resolver(p.Targets[0][0]);
+                return new IEffect[] { new Effect($"draw {n}", () =>
+                {
+                    if (target is not Player pl) return;
+                    for (var i = 0; i < n; i++)
+                    {
+                        var top = pl.Zones.Library.GetCards().FirstOrDefault();
+                        if (top == null) return;
+                        pl.Zones.Library.RemoveCard(top);
+                        pl.Zones.Hand.AddCard(top);
+                        top.SetZone(Majik.Core.Zones.ZoneType.Hand);
+                    }
+                }) };
+            });
+    }
+}
+
+/// <summary>
+/// "[Up to N | One or two | N | X] target creatures gain [keyword(s)]
+/// until end of turn." — Wind Sail (flying), Crusher Zendikon
+/// variants, Wave of Indifference. v1 binds with empty effect — the
+/// keyword grant requires per-target continuous effect registration
+/// not exposed at this scope.
+/// </summary>
+public sealed class MultiTargetCreaturesGainKeywordTemplate : ISpellTemplate
+{
+    private static readonly Regex Pattern = new(
+        @"(?:up\s+to\s+|one\s+or\s+two\s+|x\s+|\d+\s+)?target\s+creatures?\s+gains?\s+[\w\s,]+\s+until\s+end\s+of\s+turn",
+        RegexOptions.IgnoreCase);
+
+    public int Priority => 35; // below GrantKeywordTilEot (single target)
+    public string Name => "MultiTargetCreaturesGainKeyword";
+
+    public SpellDefinition? TryBind(SpellBindContext ctx) =>
+        SpellTemplateBindHelper.DefaultTryBind(this, ctx);
+
+    public IReadOnlyDictionary<string, string>? TryExtractParams(string oracleText)
+    {
+        var m = Pattern.Match(oracleText);
+        if (!m.Success) return null;
+        // Reject single-target form ("target creature gains") so
+        // GrantKeywordTilEot owns it.
+        if (Regex.IsMatch(m.Value, @"^target\s+creature\s+gains?", RegexOptions.IgnoreCase))
+            return null;
+        return EmptyParams.Instance;
+    }
+
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
+        StubBindHelpers.EmptyEffectSpell(new[]
+        {
+            new TargetRequest("target creature", 0, 3, Array.Empty<object>())
+        });
+}
+
+/// <summary>
+/// "Up to [N|two|three] target creatures each get +P/+P [and gain
+/// keyword]? until end of turn." — Press the Advantage, Reap What Is
+/// Sown variants, Cutthroat Maneuver. v1 binds with empty effect for
+/// the multi-target pump (per-target continuous effect requires
+/// loop-over-slot wiring not exposed here yet).
+/// </summary>
+public sealed class MultiTargetCreaturesEachGetPumpTemplate : ISpellTemplate
+{
+    private static readonly Regex Pattern = new(
+        @"(?:up\s+to\s+)?(?:two|three|four|five|x|\d+)\s+target\s+creatures\s+each\s+get\s+[+-]\d+/[+-]\d+(?:\s+and\s+gains?\s+[\w\s,]+?)?\s+until\s+end\s+of\s+turn",
+        RegexOptions.IgnoreCase);
+
+    public int Priority => 40;
+    public string Name => "MultiTargetCreaturesEachGetPump";
+
+    public SpellDefinition? TryBind(SpellBindContext ctx) =>
+        SpellTemplateBindHelper.DefaultTryBind(this, ctx);
+
+    public IReadOnlyDictionary<string, string>? TryExtractParams(string oracleText) =>
+        Pattern.IsMatch(oracleText) ? EmptyParams.Instance : null;
+
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
+        StubBindHelpers.EmptyEffectSpell(new[]
+        {
+            new TargetRequest("target creature", 0, 5, Array.Empty<object>())
+        });
+}
