@@ -147,6 +147,30 @@ internal static class LibrarySpellFactory
             }) };
         });
 
+    internal static SpellDefinition ReanimateToBattlefieldSpell(
+        Player caster, Func<object, object> resolver, string kindRaw) => new(
+        Modes: Array.Empty<string>(), HasVariableX: false,
+        TargetRequests: new[] { new TargetRequest(
+            string.IsNullOrEmpty(kindRaw) ? "target card in graveyard" : $"target {kindRaw} card in graveyard",
+            1, 1, Array.Empty<object>()) },
+        EffectFactory: p =>
+        {
+            var target = resolver(p.Targets[0][0]);
+            return new IEffect[] { new Effect("reanimate to battlefield", () =>
+            {
+                if (target is not ICard card) return;
+                var owner = card.Owner;
+                if (owner == null) return;
+                if (card.Zone == ZoneType.Graveyard) owner.Zones.Graveyard.RemoveCard(card);
+                // Reanimated permanent enters under the caster's control
+                // (CR 110.2) — the caster of the reanimation spell, not the
+                // graveyard's owner. Owner is unchanged.
+                caster.Zones.Battlefield.AddCard(card);
+                card.SetZone(ZoneType.Battlefield);
+                card.SetController(caster);
+            }) };
+        });
+
     internal static SpellDefinition ExileFromGraveyardSpell(Func<object, object> resolver, string kindRaw) => new(
         Modes: Array.Empty<string>(), HasVariableX: false,
         TargetRequests: new[] { new TargetRequest(
