@@ -6,8 +6,18 @@ namespace Majik.Core.CardData.SpellTemplates.Templates.Search;
 
 public sealed class SearchLandToBattlefieldTappedTemplate : ISpellTemplate
 {
+    // Accepts: "a basic land/land card ... put it/that card onto the
+    // battlefield tapped" AND "[up to N | up to X | N] basic land cards
+    // [or Gate cards / with different names]? ... put them/those cards
+    // onto the battlefield tapped" (Cultivate, Harrow, Explosive
+    // Vegetation, Nissa's Expedition, Boundless Realms, Reshape the
+    // Earth, etc).
+    //
+    // v1 stub fetches ONE land regardless of "up to N" wording — a
+    // simplification, but the bound spell resolves correctly for ramping
+    // the first land which is the common-case relevance check.
     private static readonly Regex Pattern = new(
-        @"search\s+your\s+library\s+for\s+a\s+(?<kind>basic\s+land|land)\s+card[^.]*put\s+(?:it|that\s+card)\s+onto\s+the\s+battlefield\s+tapped",
+        @"search\s+your\s+library\s+for\s+(?:a|(?:up\s+to\s+)?(?:one|two|three|four|five|six|seven|eight|nine|ten|x)|any\s+number\s+of)\s+(?<kind>basic\s+land|land|basic\s+land[s]?\s+and(?:/or)?\s+[\w-]+)\s+cards?\b[^.]*put\s+(?:it|that\s+card|them|those\s+cards)\s+onto\s+the\s+battlefield\s+tapped",
         RegexOptions.IgnoreCase);
 
     public int Priority => 100;
