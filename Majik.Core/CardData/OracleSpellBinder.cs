@@ -106,6 +106,18 @@ public static class OracleSpellBinder
     private static readonly Regex SearchLibrary = new(
         @"search\s+your\s+library\s+for\s+a\s+(?<kind>basic\s+land|land|creature|artifact|enchantment|instant|sorcery|planeswalker)\s+card",
         RegexOptions.IgnoreCase);
+    // "Search your library for a basic land card, put it onto the battlefield tapped, then shuffle."
+    // (Cultivate / Rampant Growth style — dispatched BEFORE SearchLibrary so the
+    //  more-specific battlefield destination wins.)
+    private static readonly Regex SearchLandToBattlefieldTapped = new(
+        @"search\s+your\s+library\s+for\s+a\s+(?<kind>basic\s+land|land)\s+card[^.]*put\s+(?:it|that\s+card)\s+onto\s+the\s+battlefield\s+tapped",
+        RegexOptions.IgnoreCase);
+    // "Search your library for a basic land card and put it onto the battlefield."
+    // (untapped variant — matches only when 'tapped' is NOT present, because the
+    //  tapped regex above is dispatched first.)
+    private static readonly Regex SearchLandToBattlefield = new(
+        @"search\s+your\s+library\s+for\s+a\s+(?<kind>basic\s+land|land)\s+card[^.]*put\s+(?:it|that\s+card)\s+onto\s+the\s+battlefield",
+        RegexOptions.IgnoreCase);
     // "[Name] deals X damage to any target." — variable X damage spell.
     private static readonly Regex DealsXDamageAny = new(
         @"deals?\s+x\s+damage\s+to\s+any\s+target",
@@ -361,6 +373,15 @@ public static class OracleSpellBinder
 
         m = ExileTarget.Match(text);
         if (m.Success) return ExileTargetSpell(resolver, $"target {m.Groups[1].Value}");
+
+        // SearchLandToBattlefieldTapped / SearchLandToBattlefield must come BEFORE
+        // SearchLibrary — the generic regex also matches "search your library for a basic
+        // land card" (it stops at the word "card"), so it would hijack these if it ran first.
+        m = SearchLandToBattlefieldTapped.Match(text);
+        if (m.Success) return SearchLandToBattlefieldSpell(caster, m.Groups["kind"].Value, tapped: true);
+
+        m = SearchLandToBattlefield.Match(text);
+        if (m.Success) return SearchLandToBattlefieldSpell(caster, m.Groups["kind"].Value, tapped: false);
 
         m = SearchLibrary.Match(text);
         if (m.Success) return SearchLibrarySpell(caster, m.Groups["kind"].Value);
@@ -763,6 +784,35 @@ public static class OracleSpellBinder
             // CR 701.19c — shuffle after a search effect.
             // (No IZone.Shuffle yet; GameDriver owns shuffle. Skip for MVP —
             // search ordering not exposed via library iteration today.)
+        }) });
+
+    // Basic land names per CR 305.6.
+    private static readonly HashSet<string> BasicLandNames =
+        new(StringComparer.OrdinalIgnoreCase) { "Plains", "Island", "Swamp", "Mountain", "Forest", "Wastes" };
+
+    private static SpellDefinition SearchLandToBattlefieldSpell(
+        Player caster, string kindRaw, bool tapped) => new(
+        Modes: Array.Empty<string>(), HasVariableX: false,
+        TargetRequests: Array.Empty<TargetRequest>(),
+        EffectFactory: _ => new IEffect[] { new Effect($"tutor land -> battlefield{(tapped ? " tapped" : "")}", () =>
+        {
+            bool Pred(ICard c)
+            {
+                if (!c.HasType(Majik.Core.Cards.Types.CardType.Land)) return false;
+                if (kindRaw.Contains("basic", StringComparison.OrdinalIgnoreCase))
+                    return BasicLandNames.Contains(c.Name);
+                return true;
+            }
+
+            var pick = caster.Zones.Library.GetCards().FirstOrDefault(Pred);
+            if (pick == null) return;
+            caster.Zones.Library.RemoveCard(pick);
+            caster.Zones.Battlefield.AddCard(pick);
+            pick.SetZone(ZoneType.Battlefield);
+            if (tapped && pick is Permanent perm)
+                perm.Tap();
+            // CR 701.19c — shuffle after a search effect (skipped for MVP;
+            // same rationale as SearchLibrarySpell above).
         }) });
 
     private static SpellDefinition DealsXAnyTargetSpell(Func<object, object> resolver) => new(

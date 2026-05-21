@@ -246,4 +246,75 @@ public class OracleSpellBinderTutorXExileTests
         bear.Zone.Should().Be(ZoneType.Battlefield);
         _alice.Zones.Exile.GetCards().Should().NotContain(bear);
     }
+
+    // ---------- Ramp tutor — search basic land onto battlefield ----------
+
+    [Fact]
+    public void Bind_SearchLandToBattlefieldTapped_FetchesBasicLandTapped()
+    {
+        var alice = new Player("Alice", 20);
+        var forest = new Land("Forest") { Owner = alice, Zone = ZoneType.Library };
+        var bear = new Creature("Bear", "1G", 2, 2) { Owner = alice, Zone = ZoneType.Library };
+        alice.Zones.Library.AddCard(bear);
+        alice.Zones.Library.AddCard(forest);
+
+        var def = OracleSpellBinder.Bind(
+            new CardEntity { Name = "Rampant Growth", ManaCost = "{1}{G}",
+              OracleText = "Search your library for a basic land card, put it onto the battlefield tapped, then shuffle." },
+            alice, raw => raw, null);
+        def.Should().NotBeNull();
+
+        var chosen = new ChosenSpellParams(null, null,
+            new IReadOnlyList<object>[0], ManaPayment.Empty);
+        foreach (var e in def!.EffectFactory(chosen)) e.Execute();
+
+        alice.Zones.Battlefield.GetCards().Should().Contain(forest);
+        alice.Zones.Library.GetCards().Should().NotContain(forest);
+        ((Permanent)forest).IsTapped.Should().BeTrue();
+        // Bear stays in library (not a basic land).
+        alice.Zones.Library.GetCards().Should().Contain(bear);
+    }
+
+    [Fact]
+    public void Bind_SearchLandToBattlefieldUntapped_FetchesBasicLandUntapped()
+    {
+        var alice = new Player("Alice", 20);
+        var forest = new Land("Forest") { Owner = alice, Zone = ZoneType.Library };
+        alice.Zones.Library.AddCard(forest);
+
+        var def = OracleSpellBinder.Bind(
+            new CardEntity { Name = "Untapped Ramp", ManaCost = "{G}",
+              OracleText = "Search your library for a basic land card and put it onto the battlefield." },
+            alice, raw => raw, null);
+        def.Should().NotBeNull();
+
+        var chosen = new ChosenSpellParams(null, null,
+            new IReadOnlyList<object>[0], ManaPayment.Empty);
+        foreach (var e in def!.EffectFactory(chosen)) e.Execute();
+
+        alice.Zones.Battlefield.GetCards().Should().Contain(forest);
+        alice.Zones.Library.GetCards().Should().NotContain(forest);
+        ((Permanent)forest).IsTapped.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Bind_SearchLandToBattlefield_NoLandInLibrary_NoOp()
+    {
+        var alice = new Player("Alice", 20);
+        var bear = new Creature("Bear", "1G", 2, 2) { Owner = alice, Zone = ZoneType.Library };
+        alice.Zones.Library.AddCard(bear);
+
+        var def = OracleSpellBinder.Bind(
+            new CardEntity { Name = "Wasted Ramp", ManaCost = "{G}",
+              OracleText = "Search your library for a basic land card and put it onto the battlefield." },
+            alice, raw => raw, null);
+        def.Should().NotBeNull();
+
+        var chosen = new ChosenSpellParams(null, null,
+            new IReadOnlyList<object>[0], ManaPayment.Empty);
+        foreach (var e in def!.EffectFactory(chosen)) e.Execute();
+
+        alice.Zones.Library.GetCards().Should().Contain(bear);
+        alice.Zones.Battlefield.GetCards().Should().BeEmpty();
+    }
 }
