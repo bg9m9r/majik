@@ -135,6 +135,21 @@ public sealed class MatchService
 
         var now = _clock.UtcNow;
         long initialBalance = (long)clockMinutes * 60_000L;
+        var creator = new MatchPlayer
+        {
+            Sub = callerSub,
+            Handle = profile.HandleDisplay,
+            DeckId = request.DeckId,
+            DeckSnapshot = creatorSnapshot.ToList(),
+        };
+
+        // vs-Bot branch: synthesize an opponent seat, skip lobby/roll, and
+        // hand the game straight to a BotPlayerAgent. Bot matches are
+        // always Invite-scoped (they never list in the public lobby).
+        if (request.BotOpponent is { } bot)
+        {
+            return await CreateBotMatchAsync(creator, request, bot, clockMinutes, initialBalance, now, ct);
+        }
 
         var match = new Match
         {
@@ -143,13 +158,7 @@ public sealed class MatchService
             Visibility = visibility,
             Format = request.Format,
             ClockMinutes = clockMinutes,
-            Creator = new MatchPlayer
-            {
-                Sub = callerSub,
-                Handle = profile.HandleDisplay,
-                DeckId = request.DeckId,
-                DeckSnapshot = creatorSnapshot.ToList(),
-            },
+            Creator = creator,
             Opponent = null,
             CreatorMillisRemaining = initialBalance,
             OpponentMillisRemaining = initialBalance,
@@ -162,6 +171,114 @@ public sealed class MatchService
         await _matches.InsertAsync(match, ct);
 
         return Result.Ok(ToDto(match));
+    }
+
+    // -----------------------------------------------------------------------
+    // CreateBotMatchAsync — vs-Bot branch of CreateAsync.
+    //
+    // Differences from the human-vs-human path:
+    //   * Opponent seat is synthesized in-process (Sub = "bot:<archetype>");
+    //     no second-player join, no roll.
+    //   * Visibility is forced to Invite so bot matches never surface in the
+    //     public lobby listing.
+    //   * State transitions go straight Open → Joined → Starting → Playing,
+    //     bypassing Rolling entirely. Bot always sits on the Opponent (Bob)
+    //     seat; creator is the first player.
+    //   * GameFacade is wired with botSeatArchetype so the engine gets a
+    //     BotPlayerAgent on the Bob seat from the moment the game starts.
+    // -----------------------------------------------------------------------
+    private async Task<Result<MatchDto>> CreateBotMatchAsync(
+        MatchPlayer creator,
+        CreateMatchRequest request,
+        BotOpponentRequest bot,
+        int clockMinutes,
+        long initialBalance,
+        DateTime now,
+        CancellationToken ct)
+    {
+        if (!Majik.Bot.Decks.BotDeckCatalog.Archetypes.Contains(bot.Archetype))
+            return Result.Fail<MatchDto>(new MatchError("invalid-request",
+                $"Unknown bot archetype '{bot.Archetype}'."));
+
+        var botSnapshot = Majik.Bot.Decks.BotDeckCatalog.Get(bot.Archetype).ToList();
+        var botPlayer = new MatchPlayer
+        {
+            Sub = $"bot:{bot.Archetype}",
+            Handle = Majik.Bot.Decks.BotDeckCatalog.DisplayName(bot.Archetype),
+            DeckId = $"bot:{bot.Archetype}",
+            DeckSnapshot = botSnapshot,
+        };
+
+        var matchId = Guid.NewGuid();
+        var match = new Match
+        {
+            Id = matchId,
+            // Insert as Open so the same Joined/Starting transition
+            // machinery (TransitionStateAsync with CAS-on-previous) works
+            // unchanged for the bot path.
+            State = MatchState.Open,
+            Visibility = MatchVisibility.Invite,
+            Format = request.Format,
+            ClockMinutes = clockMinutes,
+            Creator = creator,
+            Opponent = botPlayer,
+            CreatorMillisRemaining = initialBalance,
+            OpponentMillisRemaining = initialBalance,
+            PriorityHolderSub = null,
+            PriorityStartedAt = null,
+            CreatedAt = now,
+            UpdatedAt = now,
+        };
+        await _matches.InsertAsync(match, ct);
+
+        // Spin up the engine game with a BotPlayerAgent on the Bob seat.
+        // First-player choice for vs-Bot v1: creator (slot 0) plays first.
+        if (_gameFactory != null)
+        {
+            try
+            {
+                var creatorDeck = await _decks.LoadAsync(creator.DeckId, ct);
+                var botDeck = await _decks.LoadFromCardNamesAsync(botSnapshot, ct);
+                var facade = _gameFactory.Create(
+                    creator.Handle, botPlayer.Handle,
+                    creatorDeck, botDeck,
+                    botSeatArchetype: bot.Archetype);
+                await _matches.TryAtomicUpdateAsync(matchId, MatchState.Open,
+                    Builders<Match>.Update.Set(m => m.GameId, facade.GameId),
+                    ct);
+            }
+            catch (DeckLoadException ex)
+            {
+                return Result.Fail<MatchDto>(new MatchError("deck-invalid", ex.Message));
+            }
+        }
+
+        // Open → Joined → Starting → Playing. Skip Rolling: the bot doesn't
+        // roll and the creator always plays first.
+        await TransitionStateAsync(matchId, MatchState.Open, MatchState.Joined, now, ct);
+        await TransitionStateAsync(matchId, MatchState.Joined, MatchState.Starting, now, ct);
+
+        // Mirror PlayDrawAsync's into-Playing transition: set priority holder
+        // + start clock for the creator, then kick the engine.
+        var setPlaying = Builders<Match>.Update
+            .Set(m => m.FirstChoice, "play")
+            .Set(m => m.State, MatchState.Playing)
+            .Set(m => m.PriorityHolderSub, creator.Sub)
+            .Set(m => m.PriorityStartedAt, now)
+            .Set(m => m.UpdatedAt, now);
+        await _matches.TryAtomicUpdateAsync(matchId, MatchState.Starting, setPlaying, ct);
+
+        var fresh = (await _matches.GetByIdAsync(matchId, ct))!;
+        if (_gameFactory != null && fresh.GameId is Guid gid)
+        {
+            var facade = _gameFactory.Get(gid);
+            facade?.StartFullGameAsync(firstPlayerSlot: 0);
+        }
+        _timeoutScheduler?.Schedule(matchId, creator.Sub, clockMinutes * 60_000L);
+        _hub?.Publish(matchId, "match.state-changed",
+            new { matchId, state = "Playing", transitionedAt = now });
+
+        return Result.Ok(ToDto(fresh));
     }
 
     // -----------------------------------------------------------------------

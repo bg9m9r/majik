@@ -45,15 +45,31 @@ public sealed class RealDeckLoader : IDeckLoader
                 $"deck {deck.Name} invalid: {string.Join("; ", result.Errors)}");
         }
 
-        var cards = new List<ICard>(capacity: deck.Mainboard.Sum(e => e.Count));
-        foreach (var entry in deck.Mainboard)
+        var names = deck.Mainboard
+            .SelectMany(e => Enumerable.Repeat(e.Name, e.Count))
+            .ToList();
+        return Materialize(names);
+    }
+
+    public Task<IReadOnlyList<ICard>> LoadFromCardNamesAsync(IReadOnlyList<string> cardNames, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(cardNames);
+        // No DB lookup, no DeckValidationService — bot decks are vetted at
+        // startup by BotDeckValidator. Materialize directly.
+        return Task.FromResult(Materialize(cardNames));
+    }
+
+    /// <summary>Resolves each name through <see cref="ICardRepository"/> and
+    /// constructs a fresh typed <see cref="ICard"/> shell per occurrence. Shared
+    /// by both deck-loading paths.</summary>
+    private IReadOnlyList<ICard> Materialize(IReadOnlyList<string> names)
+    {
+        var cards = new List<ICard>(capacity: names.Count);
+        foreach (var name in names)
         {
-            var entity = _cards.GetByName(entry.Name)
-                ?? throw new DeckLoadException($"unknown card at load time: {entry.Name}");
-            for (var i = 0; i < entry.Count; i++)
-            {
-                cards.Add(CreateCard(entity));
-            }
+            var entity = _cards.GetByName(name)
+                ?? throw new DeckLoadException($"unknown card at load time: {name}");
+            cards.Add(CreateCard(entity));
         }
         return cards;
     }

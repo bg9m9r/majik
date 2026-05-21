@@ -40,8 +40,14 @@ public sealed class MatchRepository
 
     public async Task<IReadOnlyList<Match>> ListOpenPublicAsync(int limit, CancellationToken ct)
     {
+        // Bot matches synthesize an Opponent at create time and are stamped
+        // Invite, but defense-in-depth: also exclude any doc whose opponent
+        // sub starts with "bot:" so a future code-path that mis-stamps a
+        // public bot match can't leak into the lobby.
         var found = await _collection
-            .Find(x => x.State == MatchState.Open && x.Visibility == MatchVisibility.Public)
+            .Find(x => x.State == MatchState.Open
+                       && x.Visibility == MatchVisibility.Public
+                       && (x.Opponent == null || !x.Opponent.Sub.StartsWith("bot:")))
             .SortByDescending(x => x.CreatedAt)
             .Limit(limit)
             .ToListAsync(ct);

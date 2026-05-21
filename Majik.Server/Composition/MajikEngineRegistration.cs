@@ -42,6 +42,11 @@ public static class MajikEngineRegistration
         // One-time index bootstrap at startup. Idempotent.
         services.AddHostedService<CardDbIndexBootstrapper>();
 
+        // Validate bot decks against ICardRepository at startup. Logs only;
+        // never throws — keeps the server bootable even if a single bot
+        // archetype references an unimplemented card.
+        services.AddHostedService<Majik.Bot.Decks.BotDeckValidator>();
+
         return services;
     }
 }

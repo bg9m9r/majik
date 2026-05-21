@@ -30,7 +30,15 @@ public sealed record CreateMatchRequest(
     string Format,
     string Visibility,
     string DeckId,
-    int? ClockMinutes);
+    int? ClockMinutes,
+    BotOpponentRequest? BotOpponent = null);
+
+/// <summary>Sub-record on <see cref="CreateMatchRequest"/> that, when present,
+/// synthesizes an immediate vs-Bot match: the server fills the opponent seat
+/// with a <see cref="Majik.Bot.BotPlayerAgent"/> driving the named archetype's
+/// deck list. Skips the lobby/roll phases entirely — match enters Playing on
+/// creation.</summary>
+public sealed record BotOpponentRequest(string Archetype);
 
 public sealed record JoinMatchRequest(string DeckId);
 public sealed record PlayDrawRequest(string Choice);

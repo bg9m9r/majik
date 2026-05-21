@@ -17,4 +17,12 @@ public sealed class StubDeckLoader : IDeckLoader
             .ToList();
         return Task.FromResult(deck);
     }
+
+    public Task<IReadOnlyList<ICard>> LoadFromCardNamesAsync(IReadOnlyList<string> cardNames, CancellationToken ct)
+    {
+        IReadOnlyList<ICard> deck = cardNames
+            .Select(n => (ICard)new Card(n))
+            .ToList();
+        return Task.FromResult(deck);
+    }
 }
