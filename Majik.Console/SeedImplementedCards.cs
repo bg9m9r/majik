@@ -21,5 +21,7 @@ public static class SeedImplementedCards
         "Misty Rainforest", "Scalding Tarn", "Verdant Catacombs", "Marsh Flats", "Arid Mesa",
         // Undying creatures (CR 702.93 — UndyingFactory)
         "Young Wolf", "Strangleroot Geist", "Butcher Ghoul", "Geralf's Messenger",
+        // Removal + discard (OracleSpellBinder)
+        "Fatal Push", "Thoughtseize",
     };
 }
