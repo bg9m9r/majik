@@ -1,6 +1,8 @@
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
+using Majik.Core.Cards.Types;
 using Majik.Core.Combat;
+using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
 using Majik.Core.Rules;
@@ -40,6 +42,12 @@ public sealed class TurnDriver
     private PhaseStateType _currentPhase;
     private int _currentTurnNumber;
 
+    /// <summary>
+    /// Per-turn event tally — creatures died, permanents left, cards drawn.
+    /// Reset at the start of each turn; consulted by revolt / connive / draw-watchers.
+    /// </summary>
+    public TurnState TurnState { get; } = new();
+
     /// <summary>Effects that grant the current turn an additional combat
     /// phase (Aggravated Assault, Combat Celebrant, Relentless Assault)
     /// enqueue here. The turn loop re-runs the combat sequence as long
@@ -77,6 +85,41 @@ public sealed class TurnDriver
         _sba = stateBasedActions ?? throw new ArgumentNullException(nameof(stateBasedActions));
         _priorityManager = priorityManager ?? throw new ArgumentNullException(nameof(priorityManager));
         _combatFlow = combatFlow ?? throw new ArgumentNullException(nameof(combatFlow));
+
+        // Subscribe to zone-move and draw events to keep TurnState current.
+        _eventBus?.Subscribe<CardMovedEvent>(OnCardMoved);
+        _eventBus?.Subscribe<CardDrawnEvent>(OnCardDrawn);
+    }
+
+    // -----------------------------------------------------------------
+    // TurnState event handlers
+    // -----------------------------------------------------------------
+
+    private void OnCardMoved(CardMovedEvent e)
+    {
+        // Only track permanents leaving the battlefield (Rule 702.104).
+        if (e.FromZone != ZoneType.Battlefield) return;
+
+        var formerController = e.Card.Controller;
+
+        TurnState.RecordPermanentLeftBattlefield(formerController);
+
+        // A creature dying = it had the Creature type while on the battlefield
+        // and the move destination is anywhere it ceases to be a permanent
+        // (typically Graveyard, Exile, hand, library — all qualify as "died"
+        // from a tracking standpoint; Rule 700.4 defines "dies" as battlefield → graveyard,
+        // but revolt and connive count any permanent leaving, so we record
+        // both. The creature-death counter is additionally incremented here
+        // only for cards that have the Creature type at the time they leave).
+        if (e.Card.HasType(CardType.Creature))
+        {
+            TurnState.RecordCreatureDied(formerController);
+        }
+    }
+
+    private void OnCardDrawn(CardDrawnEvent e)
+    {
+        TurnState.RecordCardDrawn(e.Player);
     }
 
     public async Task RunTurnAsync(Player activePlayer, int turnNumber, CancellationToken ct = default)
@@ -89,6 +132,9 @@ public sealed class TurnDriver
 
         // CR 305.2 — land drops reset at turn start.
         _landDropTracker?.ResetTurn();
+
+        // Reset per-turn event tally (revolt, connive X, draw watchers).
+        TurnState.Reset();
 
         // Beginning phase
         SetPhase(PhaseStateType.Untap);
