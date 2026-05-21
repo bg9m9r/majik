@@ -20,13 +20,19 @@ public sealed class ThoughtseizePatternTemplate : ISpellTemplate
     public int Priority => 100;
     public string Name => "ThoughtseizePattern";
 
-    public SpellDefinition? TryBind(SpellBindContext ctx)
+    public SpellDefinition? TryBind(SpellBindContext ctx) =>
+        SpellTemplateBindHelper.DefaultTryBind(this, ctx);
+
+    public IReadOnlyDictionary<string, string>? TryExtractParams(string oracleText)
     {
-        var m = Pattern.Match(ctx.Text);
+        var m = Pattern.Match(oracleText);
         return m.Success
-            ? ThoughtseizeSpell(ctx.Caster, ctx.Resolver, SpellTemplateHelpers.WordToInt(m.Groups["life"].Value))
+            ? new Dictionary<string, string> { ["life"] = m.Groups["life"].Value }
             : null;
     }
+
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
+        ThoughtseizeSpell(ctx.Caster, ctx.Resolver, SpellTemplateHelpers.WordToInt(@params["life"]));
 
     /// <summary>
     /// Thoughtseize template (v1 — deterministic pick: first non-land card in target's hand).

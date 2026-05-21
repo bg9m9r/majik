@@ -16,8 +16,12 @@ public sealed class GainControlTemplate : ISpellTemplate
     public SpellDefinition? TryBind(SpellBindContext ctx)
     {
         if (ctx.Effects == null) return null;
-        return Pattern.IsMatch(ctx.Text)
-            ? ControlSpellFactory.GainControlSpell(ctx.Resolver, ctx.Caster, ctx.Effects)
-            : null;
+        return SpellTemplateBindHelper.DefaultTryBind(this, ctx);
     }
+
+    public IReadOnlyDictionary<string, string>? TryExtractParams(string oracleText) =>
+        Pattern.IsMatch(oracleText) ? EmptyParams.Instance : null;
+
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
+        ControlSpellFactory.GainControlSpell(ctx.Resolver, ctx.Caster, ctx.Effects!);
 }

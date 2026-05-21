@@ -14,7 +14,11 @@ public sealed class DealsXDamageAnyTemplate : ISpellTemplate
     public string Name => "DealsXDamageAny";
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
-        Pattern.IsMatch(ctx.Text)
-            ? DamageSpellFactory.DealsXAnyTargetSpell(ctx.Resolver)
-            : null;
+        SpellTemplateBindHelper.DefaultTryBind(this, ctx);
+
+    public IReadOnlyDictionary<string, string>? TryExtractParams(string oracleText) =>
+        Pattern.IsMatch(oracleText) ? EmptyParams.Instance : null;
+
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
+        DamageSpellFactory.DealsXAnyTargetSpell(ctx.Resolver);
 }

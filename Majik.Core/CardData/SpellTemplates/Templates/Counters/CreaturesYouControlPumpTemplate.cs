@@ -16,12 +16,24 @@ public sealed class CreaturesYouControlPumpTemplate : ISpellTemplate
     public SpellDefinition? TryBind(SpellBindContext ctx)
     {
         if (ctx.Effects == null) return null;
-        var m = Pattern.Match(ctx.Text);
+        return SpellTemplateBindHelper.DefaultTryBind(this, ctx);
+    }
+
+    public IReadOnlyDictionary<string, string>? TryExtractParams(string oracleText)
+    {
+        var m = Pattern.Match(oracleText);
         return m.Success
-            ? CountersSpellFactory.CreaturesYouControlPumpSpell(
-                int.Parse(m.Groups["p"].Value),
-                int.Parse(m.Groups["t"].Value),
-                ctx.Caster, ctx.Effects)
+            ? new Dictionary<string, string>
+            {
+                ["p"] = m.Groups["p"].Value,
+                ["t"] = m.Groups["t"].Value,
+            }
             : null;
     }
+
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
+        CountersSpellFactory.CreaturesYouControlPumpSpell(
+            int.Parse(@params["p"]),
+            int.Parse(@params["t"]),
+            ctx.Caster, ctx.Effects!);
 }

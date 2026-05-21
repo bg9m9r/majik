@@ -13,12 +13,18 @@ public sealed class EachPlayerDrawsTemplate : ISpellTemplate
     public int Priority => 50;
     public string Name => "EachPlayerDraws";
 
-    public SpellDefinition? TryBind(SpellBindContext ctx)
+    public SpellDefinition? TryBind(SpellBindContext ctx) =>
+        SpellTemplateBindHelper.DefaultTryBind(this, ctx);
+
+    public IReadOnlyDictionary<string, string>? TryExtractParams(string oracleText)
     {
-        var m = Pattern.Match(ctx.Text);
+        var m = Pattern.Match(oracleText);
         return m.Success
-            ? ResourceSpellFactory.EachPlayerDrawsSpell(
-                SpellTemplateHelpers.WordToInt(m.Groups["n"].Value))
+            ? new Dictionary<string, string> { ["n"] = m.Groups["n"].Value }
             : null;
     }
+
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
+        ResourceSpellFactory.EachPlayerDrawsSpell(
+            SpellTemplateHelpers.WordToInt(@params["n"]));
 }

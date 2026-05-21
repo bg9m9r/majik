@@ -13,12 +13,18 @@ public sealed class DamagePlayerTemplate : ISpellTemplate
     public int Priority => 50;
     public string Name => "DamagePlayer";
 
-    public SpellDefinition? TryBind(SpellBindContext ctx)
+    public SpellDefinition? TryBind(SpellBindContext ctx) =>
+        SpellTemplateBindHelper.DefaultTryBind(this, ctx);
+
+    public IReadOnlyDictionary<string, string>? TryExtractParams(string oracleText)
     {
-        var m = Pattern.Match(ctx.Text);
+        var m = Pattern.Match(oracleText);
         return m.Success
-            ? DamageSpellFactory.DamagePlayerSpell(
-                SpellTemplateHelpers.WordToInt(m.Groups["n"].Value), ctx.Resolver)
+            ? new Dictionary<string, string> { ["n"] = m.Groups["n"].Value }
             : null;
     }
+
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
+        DamageSpellFactory.DamagePlayerSpell(
+            SpellTemplateHelpers.WordToInt(@params["n"]), ctx.Resolver);
 }

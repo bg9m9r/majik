@@ -13,12 +13,18 @@ public sealed class DestroyCreatureCmcLimitTemplate : ISpellTemplate
     public int Priority => 100;
     public string Name => "DestroyCreatureCmcLimit";
 
-    public SpellDefinition? TryBind(SpellBindContext ctx)
+    public SpellDefinition? TryBind(SpellBindContext ctx) =>
+        SpellTemplateBindHelper.DefaultTryBind(this, ctx);
+
+    public IReadOnlyDictionary<string, string>? TryExtractParams(string oracleText)
     {
-        var m = Pattern.Match(ctx.Text);
+        var m = Pattern.Match(oracleText);
         return m.Success
-            ? DestroySpellFactory.DestroyCreatureCmcLimitSpell(
-                ctx.Resolver, SpellTemplateHelpers.WordToInt(m.Groups["n"].Value))
+            ? new Dictionary<string, string> { ["n"] = m.Groups["n"].Value }
             : null;
     }
+
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
+        DestroySpellFactory.DestroyCreatureCmcLimitSpell(
+            ctx.Resolver, SpellTemplateHelpers.WordToInt(@params["n"]));
 }

@@ -13,14 +13,24 @@ public sealed class PumpCreatureTemplate : ISpellTemplate
     public int Priority => 50;
     public string Name => "PumpCreature";
 
-    public SpellDefinition? TryBind(SpellBindContext ctx)
+    public SpellDefinition? TryBind(SpellBindContext ctx) =>
+        SpellTemplateBindHelper.DefaultTryBind(this, ctx);
+
+    public IReadOnlyDictionary<string, string>? TryExtractParams(string oracleText)
     {
-        var m = Pattern.Match(ctx.Text);
+        var m = Pattern.Match(oracleText);
         return m.Success
-            ? CountersSpellFactory.PumpSpell(
-                int.Parse(m.Groups["p"].Value),
-                int.Parse(m.Groups["t"].Value),
-                ctx.Resolver)
+            ? new Dictionary<string, string>
+            {
+                ["p"] = m.Groups["p"].Value,
+                ["t"] = m.Groups["t"].Value,
+            }
             : null;
     }
+
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
+        CountersSpellFactory.PumpSpell(
+            int.Parse(@params["p"]),
+            int.Parse(@params["t"]),
+            ctx.Resolver);
 }

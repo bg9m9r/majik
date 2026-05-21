@@ -7,17 +7,23 @@ namespace Majik.Core.CardData.SpellTemplates.Templates.Control;
 public sealed class UntapTargetTemplate : ISpellTemplate
 {
     private static readonly Regex Pattern = new(
-        @"untap\s+target\s+(permanent|creature|artifact|land|enchantment)",
+        @"untap\s+target\s+(?<kind>permanent|creature|artifact|land|enchantment)",
         RegexOptions.IgnoreCase);
 
     public int Priority => 50;
     public string Name => "UntapTarget";
 
-    public SpellDefinition? TryBind(SpellBindContext ctx)
+    public SpellDefinition? TryBind(SpellBindContext ctx) =>
+        SpellTemplateBindHelper.DefaultTryBind(this, ctx);
+
+    public IReadOnlyDictionary<string, string>? TryExtractParams(string oracleText)
     {
-        var m = Pattern.Match(ctx.Text);
+        var m = Pattern.Match(oracleText);
         return m.Success
-            ? ControlSpellFactory.UntapTargetSpell(ctx.Resolver, $"target {m.Groups[1].Value}")
+            ? new Dictionary<string, string> { ["kind"] = m.Groups["kind"].Value }
             : null;
     }
+
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
+        ControlSpellFactory.UntapTargetSpell(ctx.Resolver, $"target {@params["kind"]}");
 }
