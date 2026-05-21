@@ -34,5 +34,8 @@ public static class SeedImplementedCards
         // (OracleSpellBinder: DestroyUpToArtifactEnchantmentSpell + ExileColoredCardAlternativeCost).
         // v1: "if it's not your turn" timing restriction not enforced.
         "Force of Vigor",
+        // Artifact Creature — Construct 0/0 (WalkingBallistaFactory).
+        // {4} grow and counter-removal ping wired; ETB X counters + sorcery-speed + ping targeting deferred.
+        "Walking Ballista",
     };
 }

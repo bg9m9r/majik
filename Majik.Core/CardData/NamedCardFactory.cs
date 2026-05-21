@@ -1,6 +1,7 @@
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.CardData.Factories;
 using Majik.Core.Players;
 using Majik.Core.ValueObjects;
 
@@ -39,6 +40,9 @@ public static class NamedCardFactory
             "Runeclaw Bear"   => new Creature(name, "1G", 2, 2),
             "Hill Giant"      => new Creature(name, "3R", 3, 3),
             "Centaur Courser" => new Creature(name, "2G", 3, 3),
+
+            // Named-card factories — fully-wired cards with real abilities.
+            "Walking Ballista" => WalkingBallistaFactory.Create(owner),
 
             _ => new Card(name, ""),
         };

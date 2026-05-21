@@ -123,6 +123,17 @@ public class Card : ICard
         _abilities.Add(ability);
     }
 
+    /// <summary>
+    /// Add an extra card type after construction. Used by named-card factories
+    /// that build multi-type permanents (e.g. Artifact Creature) where the
+    /// primary concrete subclass only registers its own type.
+    /// </summary>
+    internal void AddCardType(CardType type)
+    {
+        if (!_cardTypes.Contains(type))
+            _cardTypes.Add(type);
+    }
+
     public bool HasType(CardType type)
     {
         return _cardTypes.Contains(type);
