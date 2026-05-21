@@ -107,6 +107,25 @@ internal static class DestroySpellFactory
             }
         }) });
 
+    // Generic wrath sweep — destroys every permanent matching the supplied
+    // predicate on the caster's view of the battlefield. Used by
+    // DestroyAllPermanentsTemplate to handle "destroy all artifacts /
+    // enchantments / lands / nonland permanents / permanents / [combinations]".
+    internal static SpellDefinition DestroyAllPermanentsSpell(
+        Majik.Core.Players.Player caster,
+        Func<ICard, bool> predicate,
+        string label) => new(
+        Modes: Array.Empty<string>(), HasVariableX: false,
+        TargetRequests: Array.Empty<TargetRequest>(),
+        EffectFactory: _ => new IEffect[] { new Effect($"destroy all {label}", () =>
+        {
+            var snap = caster.Zones.Battlefield.GetCards().Where(predicate).ToList();
+            foreach (var c in snap)
+            {
+                OracleSpellBinder.MoveToGraveyard(c);
+            }
+        }) });
+
     internal static SpellDefinition DestroyTargetSpell(
         Func<object, object> resolver, string label, Func<ICard, bool> filter) => new(
         Modes: Array.Empty<string>(), HasVariableX: false,
