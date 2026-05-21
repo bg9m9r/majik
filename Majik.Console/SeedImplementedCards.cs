@@ -70,5 +70,10 @@ public static class SeedImplementedCards
         // Same pattern reusable for other surveil duals: Commercial District, Lush Portico,
         // Meticulous Archive, Raucous Theater, Shadowy Backstreet.
         "Underground Mortuary",
+        // Land Creature — Forest Dryad 1/1 (DryadArborFactory).
+        // No mana cost (CR 305.8). Creature + AddCardType(Land); Forest + Dryad subtypes.
+        // {T}: Add {G} wired directly (not via Basic-land guard in OracleManaBinder).
+        // Useful for Green Sun's Zenith (fetch as a Forest creature); targeting deferred.
+        "Dryad Arbor",
     };
 }

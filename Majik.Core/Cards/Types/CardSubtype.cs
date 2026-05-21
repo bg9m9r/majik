@@ -9,6 +9,7 @@ public enum CardSubtype
 {
     // Creature subtypes (examples)
     Human,
+    Dryad,
     Phyrexian,
     Elf,
     Goblin,

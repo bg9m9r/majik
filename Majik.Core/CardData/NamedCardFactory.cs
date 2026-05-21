@@ -43,6 +43,7 @@ public static class NamedCardFactory
 
             // Named-card factories — fully-wired cards with real abilities.
             "Walking Ballista" => WalkingBallistaFactory.Create(owner),
+            "Dryad Arbor"      => DryadArborFactory.Create(owner),
             "Yawgmoth, Thran Physician" => YawgmothFactory.Create(owner),
             "Boseiju, Who Endures" => BoseijuFactory.Create(owner),
             // Artifact — {2}. Static suppression wired via TorporOrbFactory.Create(owner,
