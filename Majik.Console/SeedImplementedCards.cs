@@ -16,5 +16,8 @@ public static class SeedImplementedCards
         "Llanowar Elves", "Runeclaw Bear", "Centaur Courser",
         // Shock lands (CR 614 replacement effect — ShockLandBinder)
         "Overgrown Tomb",
+        // Fetch lands — Onslaught + Zendikar cycles (OracleLandActivatedAbilityBinder)
+        "Bloodstained Mire", "Flooded Strand", "Polluted Delta", "Wooded Foothills", "Windswept Heath",
+        "Misty Rainforest", "Scalding Tarn", "Verdant Catacombs", "Marsh Flats", "Arid Mesa",
     };
 }

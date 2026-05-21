@@ -164,6 +164,7 @@ public sealed class GameFacade
                     card.AddAbility(trig);
                 }
                 ShockLandBinder.Bind(card, entity, replacements);
+                OracleLandActivatedAbilityBinder.Bind(card, entity, controller);
                 return;
             }
         }
