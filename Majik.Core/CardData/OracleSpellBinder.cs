@@ -91,19 +91,9 @@ public static class OracleSpellBinder
             new SpellTemplates.Templates.Tokens.CreateFoodTokensTemplate(),
             new SpellTemplates.Templates.Tokens.CreateClueTokensTemplate(),
             new SpellTemplates.Templates.Tokens.CreateTokensTemplate(),
+            new SpellTemplates.Templates.Bespoke.ThoughtseizePatternTemplate(),
+            new SpellTemplates.Templates.Bespoke.MalevolentRumblePatternTemplate(),
         });
-
-    // "Target player reveals their hand. You choose a nonland card from it.
-    //  That player discards that card. You lose N life." (Thoughtseize template)
-    private static readonly Regex ThoughtseizePattern = new(
-        @"target\s+player\s+reveals\s+their\s+hand\.\s*you\s+choose\s+a\s+nonland\s+card\s+from\s+it\.\s*that\s+player\s+discards\s+that\s+card\.\s*you\s+lose\s+(?<life>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+life",
-        RegexOptions.IgnoreCase);
-    // Malevolent Rumble: "Reveal the top four cards of your library. You may put
-    // a permanent card from among them into your hand. Put the rest into your
-    // graveyard. Create a 0/1 colorless Eldrazi Spawn creature token…"
-    private static readonly Regex MalevolentRumblePattern = new(
-        @"reveal\s+the\s+top\s+four\s+cards.*permanent\s+card.*into\s+your\s+hand.*create\s+a\s+0/1\s+colorless\s+eldrazi\s+spawn",
-        RegexOptions.IgnoreCase | RegexOptions.Singleline);
 
     public static SpellDefinition? Bind(
         CardEntity entity,
@@ -123,20 +113,8 @@ public static class OracleSpellBinder
         if (caster == null) throw new ArgumentNullException(nameof(caster));
         if (resolver == null) throw new ArgumentNullException(nameof(resolver));
 
-        // New path: try the template registry first. Empty today, populated
-        // task-by-task. Null result falls through to the legacy chain below.
         var ctx = new SpellBindContext(entity, caster, resolver, effects, stack);
         if (Registry.TryBind(ctx) is { } fromRegistry) return fromRegistry;
-
-        var text = entity.OracleText ?? string.Empty;
-
-        // Thoughtseize (reveal-choose-discard + caster loses life) — before generic Discard.
-        var mTs = ThoughtseizePattern.Match(text);
-        if (mTs.Success) return ThoughtseizeSpell(caster, resolver, WordToInt(mTs.Groups["life"].Value));
-
-        // Malevolent Rumble: reveal top 4, may put first permanent to hand,
-        // rest to graveyard, create an Eldrazi Spawn token.
-        if (MalevolentRumblePattern.IsMatch(text)) return MalevolentRumbleSpell(caster);
 
         return null;
     }
@@ -154,33 +132,6 @@ public static class OracleSpellBinder
         }
         card.SetZone(ZoneType.Exile);
     }
-
-    /// <summary>
-    /// Thoughtseize template (v1 — deterministic pick: first non-land card in target's hand).
-    /// Real Thoughtseize lets the caster choose; v1 simplification picks deterministically.
-    /// Caster loses <paramref name="lifeLoss"/> life after the discard.
-    /// </summary>
-    private static SpellDefinition ThoughtseizeSpell(Player caster, Func<object, object> resolver, int lifeLoss) => new(
-        Modes: Array.Empty<string>(), HasVariableX: false,
-        TargetRequests: new[] { new TargetRequest("target player", 1, 1, Array.Empty<object>()) },
-        EffectFactory: p =>
-        {
-            var target = resolver(p.Targets[0][0]);
-            return new IEffect[] { new Effect("thoughtseize", () =>
-            {
-                if (target is not Player tp) return;
-                // v1: deterministic pick — first non-land card in target's hand.
-                var pick = tp.Zones.Hand.GetCards()
-                    .FirstOrDefault(c => !c.HasType(Majik.Core.Cards.Types.CardType.Land));
-                if (pick != null)
-                {
-                    tp.Zones.Hand.RemoveCard(pick);
-                    tp.Zones.Graveyard.AddCard(pick);
-                    pick.SetZone(ZoneType.Graveyard);
-                }
-                caster.LoseLife(lifeLoss);
-            }) };
-        });
 
     // ---------- Primitives ----------
 
@@ -230,61 +181,4 @@ public static class OracleSpellBinder
         }
     }
 
-    private static int WordToInt(string s) =>
-        s.ToLowerInvariant() switch
-        {
-            "a" or "an" or "one" => 1,
-            "two" => 2, "three" => 3, "four" => 4, "five" => 5,
-            "six" => 6, "seven" => 7, "eight" => 8, "nine" => 9, "ten" => 10,
-            _ => int.TryParse(s, out var n) ? n : 0,
-        };
-
-    /// <summary>
-    /// Malevolent Rumble (Duskmourn).
-    /// Reveal top 4 — auto-pick first permanent card to caster's hand, rest to
-    /// graveyard, create one Eldrazi Spawn token.
-    ///
-    /// v1 gaps (deferred):
-    /// - Real player choice among the revealed permanents (no prompt yet).
-    /// - "You may put … into your hand" is optional — v1 always picks if a
-    ///   permanent is present (opt-out awaits agent prompt system).
-    /// </summary>
-    private static SpellDefinition MalevolentRumbleSpell(Player caster) => new(
-        Modes: Array.Empty<string>(), HasVariableX: false,
-        TargetRequests: Array.Empty<TargetRequest>(),
-        EffectFactory: _ => new IEffect[] { new Effect("Malevolent Rumble", () =>
-        {
-            // Reveal top 4 (may be fewer if library is smaller).
-            var top4 = caster.Zones.Library.GetCards().Take(4).ToList();
-
-            if (top4.Count > 0)
-            {
-                // CR 603 / 700.3a: permanent cards — creature, artifact, enchantment,
-                // land, planeswalker, battle.
-                var permanentCard = top4.FirstOrDefault(c =>
-                    c.HasType(Majik.Core.Cards.Types.CardType.Creature) ||
-                    c.HasType(Majik.Core.Cards.Types.CardType.Artifact) ||
-                    c.HasType(Majik.Core.Cards.Types.CardType.Enchantment) ||
-                    c.HasType(Majik.Core.Cards.Types.CardType.Land) ||
-                    c.HasType(Majik.Core.Cards.Types.CardType.Planeswalker));
-
-                foreach (var c in top4)
-                {
-                    caster.Zones.Library.RemoveCard(c);
-                    if (ReferenceEquals(c, permanentCard))
-                    {
-                        caster.Zones.Hand.AddCard(c);
-                        c.SetZone(ZoneType.Hand);
-                    }
-                    else
-                    {
-                        caster.Zones.Graveyard.AddCard(c);
-                        c.SetZone(ZoneType.Graveyard);
-                    }
-                }
-            }
-
-            // Token creation is unconditional — not gated on library size.
-            Majik.Core.Tokens.TokenFactory.CreateEldraziSpawn(caster);
-        }) });
 }
