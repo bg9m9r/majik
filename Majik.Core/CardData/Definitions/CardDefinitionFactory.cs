@@ -1,6 +1,8 @@
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Costs;
+using Majik.Core.Counters;
 using Majik.Core.Players;
 using Majik.Core.ValueObjects;
 
@@ -81,9 +83,107 @@ public static class CardDefinitionFactory
         definition switch
         {
             ManaAbilityDefinition mana => new ManaAbility(card, controller, ManaCost.Parse(mana.Produces)),
+            ActivatedAbilityDefinition activated => BuildActivatedAbility(activated, card, controller),
             _ => throw new NotSupportedException(
                 $"Ability '{definition.GetType().Name}' is not yet supported by CardDefinitionFactory."),
         };
+
+    private static ActivatedAbility BuildActivatedAbility(
+        ActivatedAbilityDefinition definition, ICard card, Player controller)
+    {
+        var costs = definition.Costs.Select(c => BuildCost(c, card)).ToArray();
+        var effects = definition.Effects.Select(e => BuildEffect(e, card, controller)).ToArray();
+        // NOTE: SorcerySpeed is informational on the definition; the runtime
+        // ActivatedAbility doesn't yet carry a SorcerySpeed flag, so the
+        // restriction is preserved in JSON for the future without enforcement
+        // here. Matches the existing C# Walking Ballista deferred note.
+        return new ActivatedAbility(
+            source: card,
+            controller: controller,
+            costs: costs,
+            effects: effects);
+    }
+
+    private static ICost BuildCost(CostDefinition definition, ICard card) =>
+        definition switch
+        {
+            ManaCostDef mana => new ManaCostCost(mana.Amount),
+            RemoveCounterCostDef rc => BuildRemoveCounterCost(rc, card),
+            _ => throw new NotSupportedException(
+                $"Cost '{definition.GetType().Name}' is not yet supported by CardDefinitionFactory."),
+        };
+
+    private static ICost BuildRemoveCounterCost(RemoveCounterCostDef def, ICard card)
+    {
+        if (!string.Equals(def.From, "self", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new NotSupportedException(
+                $"RemoveCounterCostDef.From '{def.From}' is not yet supported (v1 = 'self').");
+        }
+        if (!string.Equals(def.Counter, "+1/+1", StringComparison.Ordinal))
+        {
+            throw new NotSupportedException(
+                $"RemoveCounterCostDef.Counter '{def.Counter}' is not yet supported (v1 = '+1/+1').");
+        }
+        if (card is not Permanent permanent)
+        {
+            throw new InvalidOperationException(
+                $"Card '{card.Name}' is not a Permanent — cannot remove counters from it as a cost.");
+        }
+        return new RemovePlusOnePlusOneCounterCost(permanent, def.Amount);
+    }
+
+    private static IEffect BuildEffect(EffectDefinition definition, ICard card, Player controller) =>
+        definition switch
+        {
+            PutCounterEffectDef put => BuildPutCounterEffect(put, card),
+            DealDamageStubEffectDef stub => BuildDealDamageStubEffect(stub, card),
+            _ => throw new NotSupportedException(
+                $"Effect '{definition.GetType().Name}' is not yet supported by CardDefinitionFactory."),
+        };
+
+    private static IEffect BuildPutCounterEffect(PutCounterEffectDef def, ICard card)
+    {
+        if (!string.Equals(def.Target, "self", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new NotSupportedException(
+                $"PutCounterEffectDef.Target '{def.Target}' is not yet supported (v1 = 'self').");
+        }
+        var counterType = ParseCounterType(def.Counter);
+        var amount = def.Amount;
+        return new Effect(
+            $"{card.Name}: put {amount} {def.Counter} counter(s) on self",
+            () =>
+            {
+                if (card is Permanent permanent)
+                {
+                    permanent.Counters.Add(counterType, amount);
+                }
+            });
+    }
+
+    private static IEffect BuildDealDamageStubEffect(DealDamageStubEffectDef def, ICard card)
+    {
+        // Matches the existing C# Walking Ballista deferred behavior: the
+        // effect runs (resolution proceeds normally) but doesn't route
+        // damage to a chosen target — the targeting system isn't wired
+        // yet. When the prompt system lands, this stub upgrades to a real
+        // 'deal_damage' effect type without breaking JSON files.
+        return new Effect(
+            $"{card.Name}: deal {def.Amount} damage to {def.Target} (stub — no targeting yet)",
+            () => { /* target damage deferred */ });
+    }
+
+    private static CounterType ParseCounterType(string raw) => raw switch
+    {
+        "+1/+1" => CounterType.PlusOnePlusOne,
+        "-1/-1" => CounterType.MinusOneMinusOne,
+        "Loyalty" => CounterType.Loyalty,
+        "Charge" => CounterType.Charge,
+        "Defense" => CounterType.Defense,
+        "Poison" => CounterType.Poison,
+        _ => throw new NotSupportedException($"Counter type '{raw}' is not yet supported."),
+    };
 
     private static CardType ParseType(string raw) =>
         Enum.TryParse<CardType>(raw, ignoreCase: true, out var t)

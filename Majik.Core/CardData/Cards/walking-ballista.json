@@ -1,0 +1,29 @@
+{
+  "name": "Walking Ballista",
+  "types": ["Creature", "Artifact"],
+  "subtypes": ["Construct"],
+  "manaCost": "XX",
+  "power": 0,
+  "toughness": 0,
+  "abilities": [
+    {
+      "kind": "activated",
+      "sorcerySpeed": true,
+      "costs": [
+        { "type": "mana", "amount": "4" }
+      ],
+      "effects": [
+        { "type": "put_counter", "counter": "+1/+1", "amount": 1, "target": "self" }
+      ]
+    },
+    {
+      "kind": "activated",
+      "costs": [
+        { "type": "remove_counter", "counter": "+1/+1", "amount": 1, "from": "self" }
+      ],
+      "effects": [
+        { "type": "deal_damage_stub", "amount": 1, "target": "any" }
+      ]
+    }
+  ]
+}
