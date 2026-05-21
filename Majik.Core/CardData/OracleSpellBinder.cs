@@ -8,6 +8,7 @@ using Majik.Core.Players;
 using Majik.Core.Players.Agents;
 using Majik.Core.Spells;
 using Majik.Core.Stack;
+using Majik.Core.Tokens;
 using Majik.Core.Zones;
 
 namespace Majik.Core.CardData;
@@ -173,6 +174,18 @@ public static class OracleSpellBinder
     private static readonly Regex EachPlayerMills = new(
         @"each\s+player\s+mills\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+cards?",
         RegexOptions.IgnoreCase);
+    // "Create [a|N] Treasure token(s)." — predefined artifact, no P/T text.
+    private static readonly Regex CreateTreasureTokens = new(
+        @"create\s+(?<n>a|an|\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+treasure\s+tokens?\b",
+        RegexOptions.IgnoreCase);
+    // "Create [a|N] Food token(s)."
+    private static readonly Regex CreateFoodTokens = new(
+        @"create\s+(?<n>a|an|\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+food\s+tokens?\b",
+        RegexOptions.IgnoreCase);
+    // "Create [a|N] Clue token(s)."
+    private static readonly Regex CreateClueTokens = new(
+        @"create\s+(?<n>a|an|\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+clue\s+tokens?\b",
+        RegexOptions.IgnoreCase);
     // "Create [a|N] [P]/[T] [colour] [subtype] creature token[s] [with KW (and KW)]."
     // Captures: count, P, T, optional colour, subtype, optional keyword list.
     private static readonly Regex CreateTokens = new(
@@ -319,6 +332,16 @@ public static class OracleSpellBinder
 
         m = YouGainLife.Match(text);
         if (m.Success) return YouGainLifeSpell(WordToInt(m.Groups["n"].Value), caster);
+
+        // Predefined artifact tokens — checked before creature-token regex (more specific).
+        m = CreateTreasureTokens.Match(text);
+        if (m.Success) return CreateTreasureTokensSpell(caster, WordToInt(m.Groups["n"].Value));
+
+        m = CreateFoodTokens.Match(text);
+        if (m.Success) return CreateFoodTokensSpell(caster, WordToInt(m.Groups["n"].Value));
+
+        m = CreateClueTokens.Match(text);
+        if (m.Success) return CreateClueTokensSpell(caster, WordToInt(m.Groups["n"].Value));
 
         m = CreateTokens.Match(text);
         if (m.Success) return CreateTokensSpell(
@@ -560,6 +583,33 @@ public static class OracleSpellBinder
             .ToList();
     }
 
+    private static SpellDefinition CreateTreasureTokensSpell(Player caster, int count) => new(
+        Modes: Array.Empty<string>(), HasVariableX: false,
+        TargetRequests: Array.Empty<TargetRequest>(),
+        EffectFactory: _ => new IEffect[] { new Effect($"create {count} Treasure", () =>
+        {
+            for (var i = 0; i < count; i++)
+                TokenFactory.CreateTreasure(caster);
+        }) });
+
+    private static SpellDefinition CreateFoodTokensSpell(Player caster, int count) => new(
+        Modes: Array.Empty<string>(), HasVariableX: false,
+        TargetRequests: Array.Empty<TargetRequest>(),
+        EffectFactory: _ => new IEffect[] { new Effect($"create {count} Food", () =>
+        {
+            for (var i = 0; i < count; i++)
+                TokenFactory.CreateFood(caster);
+        }) });
+
+    private static SpellDefinition CreateClueTokensSpell(Player caster, int count) => new(
+        Modes: Array.Empty<string>(), HasVariableX: false,
+        TargetRequests: Array.Empty<TargetRequest>(),
+        EffectFactory: _ => new IEffect[] { new Effect($"create {count} Clue", () =>
+        {
+            for (var i = 0; i < count; i++)
+                TokenFactory.CreateClue(caster);
+        }) });
+
     private static SpellDefinition CreateTokensSpell(
         Player caster, int count, int power, int toughness, string subtypeRaw,
         IReadOnlyList<string> grantedKeywords) => new(
@@ -577,22 +627,19 @@ public static class OracleSpellBinder
                 subtype = st;
             }
 
+            var subtypes = subtype.HasValue
+                ? new[] { subtype.Value }
+                : Array.Empty<Majik.Core.Cards.Types.CardSubtype>();
+
+            var spec = new TokenFactory.TokenSpec(
+                Name: subtypeRaw,
+                Power: power,
+                Toughness: toughness,
+                Subtypes: subtypes,
+                Keywords: grantedKeywords);
+
             for (var i = 0; i < count; i++)
-            {
-                var token = new Creature(subtypeRaw, "", power, toughness,
-                    subtypes: subtype.HasValue
-                        ? new[] { subtype.Value }
-                        : Array.Empty<Majik.Core.Cards.Types.CardSubtype>())
-                {
-                    Owner = caster, Controller = caster,
-                    Zone = ZoneType.Battlefield, IsToken = true,
-                };
-                foreach (var kw in grantedKeywords)
-                {
-                    token.AddAbility(new Majik.Core.Abilities.KeywordAbility(kw));
-                }
-                caster.Zones.Battlefield.AddCard(token);
-            }
+                TokenFactory.CreateOnBattlefield(spec, caster);
         }) });
 
     private static SpellDefinition ExileTargetSpell(Func<object, object> resolver, string label) => new(

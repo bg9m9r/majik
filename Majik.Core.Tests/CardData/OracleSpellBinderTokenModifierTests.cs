@@ -2,6 +2,8 @@ using FluentAssertions;
 using Majik.Core.Abilities;
 using Majik.Core.CardData;
 using Majik.Core.CardData.Database;
+using Majik.Core.Cards;
+using Majik.Core.Cards.Types;
 using Majik.Core.Combat;
 using Majik.Core.Game;
 using Majik.Core.Players;
@@ -47,5 +49,62 @@ public class OracleSpellBinderTokenModifierTests
         var token = _alice.Zones.Battlefield.GetCards()
             .OfType<Creature>().First(c => c.IsToken);
         CombatAbilities.HasHaste(token).Should().BeTrue();
+    }
+
+    [Fact]
+    public void Bind_CreateTreasureTokens_SpawnsTreasureArtifacts()
+    {
+        var def = OracleSpellBinder.Bind(
+            new CardEntity { Name = "Treasure Maker", ManaCost = "{1}{R}",
+              OracleText = "Create 3 Treasure tokens." },
+            _alice, raw => raw, null);
+        def.Should().NotBeNull();
+
+        var chosen = new ChosenSpellParams(null, null,
+            new IReadOnlyList<object>[0], ManaPayment.Empty);
+        foreach (var e in def!.EffectFactory(chosen)) e.Execute();
+
+        _alice.Zones.Battlefield.GetCards()
+            .OfType<Artifact>()
+            .Where(a => a.IsToken && a.Subtypes.Contains(CardSubtype.Treasure))
+            .Should().HaveCount(3);
+    }
+
+    [Fact]
+    public void Bind_CreateFoodToken_Singular_SpawnsOne()
+    {
+        var def = OracleSpellBinder.Bind(
+            new CardEntity { Name = "Foodmonger", ManaCost = "{1}{G}",
+              OracleText = "Create a Food token." },
+            _alice, raw => raw, null);
+        def.Should().NotBeNull();
+
+        var chosen = new ChosenSpellParams(null, null,
+            new IReadOnlyList<object>[0], ManaPayment.Empty);
+        foreach (var e in def!.EffectFactory(chosen)) e.Execute();
+
+        _alice.Zones.Battlefield.GetCards()
+            .OfType<Artifact>()
+            .Where(a => a.IsToken && a.Subtypes.Contains(CardSubtype.Food))
+            .Should().HaveCount(1);
+    }
+
+    [Fact]
+    public void Bind_CreateClueTokens_Plural_SpawnsTwo()
+    {
+        var def = OracleSpellBinder.Bind(
+            new CardEntity { Name = "Investigator", ManaCost = "{2}{U}",
+              OracleText = "Create 2 Clue tokens." },
+            _alice, raw => raw, null);
+        def.Should().NotBeNull();
+
+        var chosen = new ChosenSpellParams(null, null,
+            new IReadOnlyList<object>[0], ManaPayment.Empty);
+        foreach (var e in def!.EffectFactory(chosen)) e.Execute();
+
+        _alice.Zones.Battlefield.GetCards()
+            .OfType<Artifact>()
+            .Where(a => a.IsToken && a.Subtypes.Contains(CardSubtype.Clue))
+            .Should().HaveCount(2);
     }
 }
