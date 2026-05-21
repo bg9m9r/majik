@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using FluentAssertions;
 using Majik.Core.CardData;
 using Majik.Core.CardData.Database;
@@ -46,23 +47,27 @@ public class CachingCardRepositoryTests
             .AsParallel()
             .ForAll(_ => cache.GetByName("Bolt"));
 
-        // GetOrAdd may invoke factory multiple times under contention, but
-        // ConcurrentDictionary docs guarantee only one entry is stored.
-        // For tests just assert correctness, not exact hit count.
+        // Lazy<T> with ExecutionAndPublication guarantees the inner factory
+        // runs exactly once even when many threads race on the same key.
         cache.GetByName("Bolt").Should().NotBeNull();
         cache.CacheSize.Should().Be(1);
+        inner.Hits["Bolt"].Should().Be(1);
     }
 
     private sealed class CountingRepo : ICardRepository
     {
-        public Dictionary<string, int> Hits { get; } = new();
+        // ConcurrentDictionary because Concurrent_Lookup_OnlyOneInnerHitPerName
+        // fires 100 PLINQ calls in parallel. A plain Dictionary mutated from
+        // multiple threads corrupts and throws "non-concurrent collection"
+        // errors that mask the actual assertion.
+        public ConcurrentDictionary<string, int> Hits { get; } = new();
         private readonly Dictionary<string, CardEntity> _by;
 
         public CountingRepo(Dictionary<string, CardEntity> by) { _by = by; }
 
         public CardEntity? GetByName(string name)
         {
-            Hits[name] = Hits.TryGetValue(name, out var n) ? n + 1 : 1;
+            Hits.AddOrUpdate(name, 1, (_, n) => n + 1);
             return _by.TryGetValue(name, out var e) ? e : null;
         }
 

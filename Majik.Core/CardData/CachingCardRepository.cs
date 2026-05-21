@@ -13,7 +13,13 @@ namespace Majik.Core.CardData;
 public sealed class CachingCardRepository : ICardRepository
 {
     private readonly ICardRepository _inner;
-    private readonly ConcurrentDictionary<string, CardEntity?> _cache = new();
+    // Lazy<T> values, not raw CardEntity? — ConcurrentDictionary.GetOrAdd
+    // is documented to invoke the value factory multiple times under
+    // contention. Wrapping in Lazy<T> with ExecutionAndPublication mode
+    // guarantees _inner.GetByName is called exactly once per name even
+    // when many threads race on the same key. Important for cold-cache
+    // bursts (e.g. validator pre-fetching a deck's 60 names in parallel).
+    private readonly ConcurrentDictionary<string, Lazy<CardEntity?>> _cache = new();
 
     public CachingCardRepository(ICardRepository inner)
     {
@@ -23,7 +29,9 @@ public sealed class CachingCardRepository : ICardRepository
     public CardEntity? GetByName(string name)
     {
         if (string.IsNullOrWhiteSpace(name)) return null;
-        return _cache.GetOrAdd(name, n => _inner.GetByName(n));
+        return _cache.GetOrAdd(name, n => new Lazy<CardEntity?>(
+            () => _inner.GetByName(n),
+            LazyThreadSafetyMode.ExecutionAndPublication)).Value;
     }
 
     public IReadOnlyList<CardEntity> Search(
@@ -38,10 +46,16 @@ public sealed class CachingCardRepository : ICardRepository
     public IReadOnlyList<CardEntity> GetByNames(IEnumerable<string> names)
     {
         // Delegate to inner; populate per-name cache slots for each hit so that
-        // subsequent single-name GetByName calls are served from cache.
+        // subsequent single-name GetByName calls are served from cache. Wrap
+        // each entry in an already-materialized Lazy so the shape matches the
+        // GetByName path.
         var results = _inner.GetByNames(names);
         foreach (var card in results)
-            _cache.TryAdd(card.Name, card);
+        {
+            var slot = new Lazy<CardEntity?>(() => card, LazyThreadSafetyMode.PublicationOnly);
+            _ = slot.Value; // force materialization so .Value never re-runs
+            _cache.TryAdd(card.Name, slot);
+        }
         return results;
     }
 
