@@ -2,7 +2,7 @@
   "name": "Walking Ballista",
   "types": ["Creature", "Artifact"],
   "subtypes": ["Construct"],
-  "manaCost": "XX",
+  "manaCost": "{X}{X}",
   "power": 0,
   "toughness": 0,
   "abilities": [
