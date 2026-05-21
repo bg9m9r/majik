@@ -35,16 +35,19 @@ namespace Majik.Core.CardData;
 public static class OracleSpellBinder
 {
     internal static SpellTemplateRegistry Registry { get; } =
-        new SpellTemplateRegistry(new List<ISpellTemplate>());
+        new SpellTemplateRegistry(new ISpellTemplate[]
+        {
+            new SpellTemplates.Templates.Counter.CounterUnlessPayTemplate(),
+            new SpellTemplates.Templates.Counter.CounterNoncreatureTemplate(),
+            new SpellTemplates.Templates.Counter.CounterCreatureTemplate(),
+            new SpellTemplates.Templates.Counter.CounterTargetSpellTemplate(),
+        });
 
     private static readonly Regex DamageAnyTarget = new(
         @"deals?\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+damage\s+to\s+any\s+target",
         RegexOptions.IgnoreCase);
     private static readonly Regex DamagePlayer = new(
         @"deals?\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+damage\s+to\s+target\s+player",
-        RegexOptions.IgnoreCase);
-    private static readonly Regex CounterSpell = new(
-        @"counter\s+target\s+spell",
         RegexOptions.IgnoreCase);
     // "Destroy target creature if its mana value is N or less." — more specific than DestroyCreature.
     private static readonly Regex DestroyCreatureCmcLimit = new(
@@ -69,12 +72,6 @@ public static class OracleSpellBinder
         RegexOptions.IgnoreCase);
     private static readonly Regex GainLife = new(
         @"target\s+player\s+gains?\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+li(?:fe|ves)",
-        RegexOptions.IgnoreCase);
-    private static readonly Regex CounterNoncreature = new(
-        @"counter\s+target\s+noncreature\s+spell",
-        RegexOptions.IgnoreCase);
-    private static readonly Regex CounterCreature = new(
-        @"counter\s+target\s+creature\s+spell",
         RegexOptions.IgnoreCase);
     // "Target creature gets +N/+N until end of turn."
     private static readonly Regex PumpCreature = new(
@@ -171,10 +168,6 @@ public static class OracleSpellBinder
     // "Creatures you control get +P/+T until end of turn."
     private static readonly Regex CreaturesYouControlPump = new(
         @"creatures\s+you\s+control\s+get\s+\+(?<p>\d+)/\+(?<t>\d+)\s+until\s+end\s+of\s+turn",
-        RegexOptions.IgnoreCase);
-    // "Counter target spell unless its controller pays {N}."
-    private static readonly Regex CounterUnlessPay = new(
-        @"counter\s+target\s+spell\s+unless\s+its\s+controller\s+pays\s+\{?(?<n>\d+)\}?",
         RegexOptions.IgnoreCase);
     // "Target player mills N cards."
     private static readonly Regex MillTarget = new(
@@ -290,12 +283,6 @@ public static class OracleSpellBinder
         if (Registry.TryBind(ctx) is { } fromRegistry) return fromRegistry;
 
         var text = entity.OracleText ?? string.Empty;
-
-        // Order matters: more specific counters before the generic one.
-        if (CounterUnlessPay.IsMatch(text)) return CounterTargetSpell(resolver, stack);
-        if (CounterNoncreature.IsMatch(text)) return CounterTypedSpell(resolver, stack, requireNonCreature: true);
-        if (CounterCreature.IsMatch(text)) return CounterTypedSpell(resolver, stack, requireCreature: true);
-        if (CounterSpell.IsMatch(text)) return CounterTargetSpell(resolver, stack);
 
         var mMill = MillTarget.Match(text);
         if (mMill.Success) return MillTargetSpell(WordToInt(mMill.Groups["n"].Value), resolver);
@@ -1154,27 +1141,6 @@ public static class OracleSpellBinder
             }) };
         });
 
-    private static SpellDefinition CounterTypedSpell(
-        Func<object, object> resolver,
-        Majik.Core.Stack.Stack? stack,
-        bool requireCreature = false,
-        bool requireNonCreature = false) => new(
-        Modes: Array.Empty<string>(), HasVariableX: false,
-        TargetRequests: new[] { new TargetRequest("target spell", 1, 1, Array.Empty<object>()) },
-        EffectFactory: p =>
-        {
-            var target = resolver(p.Targets[0][0]);
-            return new IEffect[] { new Effect("counter target typed spell", () =>
-            {
-                if (stack == null || target is not ISpell spell) return;
-                var isCreature = spell.Card.HasType(Majik.Core.Cards.Types.CardType.Creature);
-                if (requireCreature && !isCreature) return;
-                if (requireNonCreature && isCreature) return;
-                RemoveFromStack(stack, spell);
-                spell.Card.SetZone(ZoneType.Graveyard);
-            }) };
-        });
-
     // ---------- Spell templates ----------
 
     private static SpellDefinition DamageAnySpell(int n, Func<object, object> resolver) => new(
@@ -1195,20 +1161,6 @@ public static class OracleSpellBinder
             return new IEffect[] { new Effect($"deal {n} to player", () =>
             {
                 if (target is Player player) player.LoseLife(n);
-            }) };
-        });
-
-    private static SpellDefinition CounterTargetSpell(Func<object, object> resolver, Majik.Core.Stack.Stack? stack) => new(
-        Modes: Array.Empty<string>(), HasVariableX: false,
-        TargetRequests: new[] { new TargetRequest("target spell", 1, 1, Array.Empty<object>()) },
-        EffectFactory: p =>
-        {
-            var target = resolver(p.Targets[0][0]);
-            return new IEffect[] { new Effect("counter target spell", () =>
-            {
-                if (stack == null || target is not ISpell spell) return;
-                RemoveFromStack(stack, spell);
-                spell.Card.SetZone(ZoneType.Graveyard);
             }) };
         });
 
@@ -1383,7 +1335,7 @@ public static class OracleSpellBinder
         }
     }
 
-    private static void RemoveFromStack(Majik.Core.Stack.Stack stack, IStackObject spell)
+    internal static void RemoveFromStack(Majik.Core.Stack.Stack stack, IStackObject spell)
     {
         var keep = new List<IStackObject>();
         while (!stack.IsEmpty)
