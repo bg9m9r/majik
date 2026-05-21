@@ -17,6 +17,7 @@ public class CardDbContext : DbContext
     public DbSet<CardAbilityEffectEntity> CardAbilityEffects { get; set; } = null!;
     public DbSet<KeywordMetadataEntity> KeywordMetadata { get; set; } = null!;
     public DbSet<ClaudeRequestCacheEntity> ClaudeRequestCache { get; set; } = null!;
+    public DbSet<CompiledSpellTemplateEntity> CompiledSpellTemplates { get; set; } = null!;
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
@@ -196,6 +197,29 @@ public class CardDbContext : DbContext
                 .IsRequired();
             
             entity.Property(e => e.LastAccessedAt)
+                .IsRequired();
+        });
+
+        // Configure CompiledSpellTemplateEntity
+        modelBuilder.Entity<CompiledSpellTemplateEntity>(entity =>
+        {
+            entity.HasKey(e => e.CardName);
+
+            entity.HasIndex(e => e.TemplateName);
+
+            entity.Property(e => e.CardName)
+                .IsRequired()
+                .HasMaxLength(500);
+
+            entity.Property(e => e.TemplateName)
+                .IsRequired()
+                .HasMaxLength(100);
+
+            entity.Property(e => e.ParamsJson)
+                .IsRequired()
+                .HasDefaultValue("{}");
+
+            entity.Property(e => e.CompiledAt)
                 .IsRequired();
         });
     }
