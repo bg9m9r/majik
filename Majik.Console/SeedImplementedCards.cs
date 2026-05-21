@@ -103,5 +103,13 @@ public static class SeedImplementedCards
         // Lifegain trigger: artifact/creature leaves controller's graveyard → gain 1 life.
         // "You may" opt-out + batched simultaneous-leavers deferred.
         "Dredger's Insight",
+
+        // Creature — Insect Warrior {1}{G} 3/2 (KraulHarpoonerFactory).
+        // Reach + ETB Undergrowth +X/+0 EOT wired; targeting, fight, "you may" deferred.
+        "Kraul Harpooner",
+
+        // Creature — Bear {G} 1/1 (BadgermoleCubFactory). Shell only.
+        // Earthbend 1 ETB + tap-creature-for-mana trigger deferred.
+        "Badgermole Cub",
     };
 }

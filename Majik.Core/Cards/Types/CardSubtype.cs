@@ -22,6 +22,7 @@ public enum CardSubtype
     Cat,
     Dog,
     Elemental,
+    Bear,
     Insect,
     Spirit,
     Warrior,

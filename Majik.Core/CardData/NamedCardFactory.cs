@@ -83,6 +83,17 @@ public static class NamedCardFactory
             // "You may put …" opt-out + batched simultaneous-leavers deferred.
             "Dredger's Insight" => DredgersInsightFactory.Create(owner),
 
+            // Creature — Insect Warrior {1}{G} 3/2 (KraulHarpoonerFactory).
+            // Reach keyword wired.
+            // ETB Undergrowth: +X/+0 EOT, X = creature cards in controller's graveyard — wired.
+            // Targeting (flying creature you don't control) + fight step + "you may" prompt deferred.
+            "Kraul Harpooner" => KraulHarpoonerFactory.Create(owner),
+
+            // Creature — Bear {G} 1/1 (BadgermoleCubFactory). Shell only.
+            // Earthbend 1 ETB (animate-land mechanic) deferred — no land→creature infra.
+            // "Whenever you tap a creature for mana, add {G}" deferred — no tap-watcher infra.
+            "Badgermole Cub" => BadgermoleCubFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
