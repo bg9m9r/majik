@@ -23,5 +23,7 @@ public static class SeedImplementedCards
         "Young Wolf", "Strangleroot Geist", "Butcher Ghoul", "Geralf's Messenger",
         // Removal + discard (OracleSpellBinder)
         "Fatal Push", "Thoughtseize",
+        // Dies-trigger land destruction (OracleTriggeredAbilityBinder — dies-destroy-land)
+        "Fulminator Mage",
     };
 }

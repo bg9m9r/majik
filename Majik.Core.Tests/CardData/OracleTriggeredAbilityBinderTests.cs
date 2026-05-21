@@ -129,4 +129,84 @@ public class OracleTriggeredAbilityBinderTests
         // ETB pattern matches, but effect tail doesn't — produces no ability.
         bindings.Should().BeEmpty();
     }
+
+    [Fact]
+    public void Dies_DestroyTargetLand_BindsAndFires()
+    {
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+
+        // Fulminator Mage on Alice's battlefield.
+        var fulm = new Creature("Fulminator Mage", "1BR", 2, 2)
+        {
+            Owner = _alice, Controller = _alice, Zone = ZoneType.Battlefield,
+        };
+        _alice.Zones.Battlefield.AddCard(fulm);
+
+        // Bob has a Mountain on his battlefield.
+        var bobLand = new Majik.Core.Cards.Land("Mountain");
+        bobLand.SetOwner(_bob);
+        bobLand.SetZone(ZoneType.Battlefield);
+        _bob.Zones.Battlefield.AddCard(bobLand);
+
+        var allPlayers = new List<Player> { _alice, _bob };
+
+        var entity = new CardEntity
+        {
+            Name = "Fulminator Mage",
+            TypeLine = "Creature — Elemental Shaman",
+            OracleText = "When Fulminator Mage dies, you may destroy target land.",
+        };
+        foreach (var ab in OracleTriggeredAbilityBinder.Bind(fulm, entity, _alice, allPlayers))
+        {
+            fulm.AddAbility(ab);
+        }
+        triggers.BindCard(fulm);
+
+        // Simulate death — publish the event with card.Zone still at Battlefield
+        // (matching the test-harness convention used by Dies_GainLife_BindsAndFires).
+        _bus.Publish(new Majik.Core.Events.CardMovedEvent(fulm, ZoneType.Battlefield, ZoneType.Graveyard));
+
+        triggers.PutPendingTriggersOnStack(_alice);
+        stack.Pop()!.Resolve();
+
+        _bob.Zones.Battlefield.GetCards().Should().NotContain(bobLand,
+            "the land should have been destroyed by Fulminator Mage's trigger");
+        _bob.Zones.Graveyard.GetCards().Should().Contain(bobLand,
+            "destroyed lands move to the graveyard (CR 701.7)");
+    }
+
+    [Fact]
+    public void Dies_DestroyTargetLand_NoOp_WhenNoOpponents()
+    {
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+
+        var fulm = new Creature("Fulminator Mage", "1BR", 2, 2)
+        {
+            Owner = _alice, Controller = _alice, Zone = ZoneType.Battlefield,
+        };
+        _alice.Zones.Battlefield.AddCard(fulm);
+
+        // allPlayers only contains Alice — no opponents to destroy a land from.
+        var allPlayers = new List<Player> { _alice };
+
+        var entity = new CardEntity
+        {
+            Name = "Fulminator Mage",
+            OracleText = "When Fulminator Mage dies, you may destroy target land.",
+        };
+        foreach (var ab in OracleTriggeredAbilityBinder.Bind(fulm, entity, _alice, allPlayers))
+        {
+            fulm.AddAbility(ab);
+        }
+        triggers.BindCard(fulm);
+
+        // Should not throw — trigger fires but no opponent land is available.
+        _bus.Publish(new Majik.Core.Events.CardMovedEvent(fulm, ZoneType.Battlefield, ZoneType.Graveyard));
+        triggers.PutPendingTriggersOnStack(_alice);
+        var trigger = stack.Pop();
+        var act = () => trigger!.Resolve();
+        act.Should().NotThrow();
+    }
 }

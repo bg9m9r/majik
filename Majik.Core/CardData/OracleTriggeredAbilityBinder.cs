@@ -60,6 +60,9 @@ public static class OracleTriggeredAbilityBinder
     private static readonly Regex GetEnergy = new(
         @"you get\s+((?:\{E\}\s*)+)",
         RegexOptions.IgnoreCase);
+    private static readonly Regex DestroyTargetLand = new(
+        @"(?:you\s+may\s+)?destroy\s+target\s+land",
+        RegexOptions.IgnoreCase);
     private static readonly Regex AnotherCreatureEnters = new(
         @"whenever another creature you control enters\s*,\s*(?<effect>[^.]+)\.",
         RegexOptions.IgnoreCase);
@@ -73,7 +76,9 @@ public static class OracleTriggeredAbilityBinder
         @"at the beginning of (?:your |each player's )?end step\s*,\s*(?<effect>[^.]+)\.",
         RegexOptions.IgnoreCase);
 
-    public static IEnumerable<TriggeredAbility> Bind(ICard source, CardEntity entity, Player? controller = null)
+    public static IEnumerable<TriggeredAbility> Bind(
+        ICard source, CardEntity entity, Player? controller = null,
+        IReadOnlyList<Player>? allPlayers = null)
     {
         if (source == null) throw new ArgumentNullException(nameof(source));
         if (entity == null) throw new ArgumentNullException(nameof(entity));
@@ -110,12 +115,21 @@ public static class OracleTriggeredAbilityBinder
 
         foreach (Match m in DiesLine.Matches(text))
         {
-            var effects = BuildEffects(m.Groups["effect"].Value, ctrl, source).ToList();
+            var effectText = m.Groups["effect"].Value;
+            var effects = BuildEffects(effectText, ctrl, source, allPlayers).ToList();
             if (effects.Count == 0) continue;
+            // CR 603.6a: dies-trigger sources must be active in Graveyard too,
+            // because ZoneService moves the card before publishing CardMovedEvent.
+            // Mirror UndyingFactory's activeZones approach.
+            var hasDestroyLand = DestroyTargetLand.IsMatch(effectText);
+            var activeZones = hasDestroyLand
+                ? new[] { ZoneType.Battlefield, ZoneType.Graveyard }
+                : (IEnumerable<ZoneType>?)null;
             yield return new TriggeredAbility(
                 source, ctrl,
                 Triggers.OnDies(source),
-                effects: effects);
+                effects: effects,
+                activeZones: activeZones);
         }
 
         foreach (Match m in CombatDamagePlayer.Matches(text))
@@ -188,7 +202,9 @@ public static class OracleTriggeredAbilityBinder
         }
     }
 
-    private static IEnumerable<IEffect> BuildEffects(string effectText, Player controller, ICard? source = null)
+    private static IEnumerable<IEffect> BuildEffects(
+        string effectText, Player controller, ICard? source = null,
+        IReadOnlyList<Player>? allPlayers = null)
     {
         var m = YouGainLife.Match(effectText);
         if (m.Success)
@@ -253,6 +269,34 @@ public static class OracleTriggeredAbilityBinder
             var n = WordToInt(m.Groups["n"].Value);
             yield return new Effect($"+{n}/+{n} counter on ~", () =>
                 perm.Counters.Add(Majik.Core.Counters.CounterType.PlusOnePlusOne, n));
+        }
+
+        // "destroy target land" (Fulminator Mage — CR 701.7).
+        // v1: pick the first land on any opponent's battlefield and destroy it
+        // (move to graveyard). Real targeting / "you may" prompt waits for the
+        // triggered-ability target system. Opponent resolution requires allPlayers;
+        // if null (factory path without game context) the effect no-ops.
+        m = DestroyTargetLand.Match(effectText);
+        if (m.Success)
+        {
+            // Capture allPlayers list at bind time so the closure doesn't hold
+            // a mutable reference that might be re-assigned.
+            var players = allPlayers;
+            yield return new Effect("destroy target land", () =>
+            {
+                if (players == null) return;
+                foreach (var opponent in players.Where(p => !ReferenceEquals(p, controller)))
+                {
+                    var land = opponent.Zones.Battlefield.GetCards()
+                        .OfType<Land>()
+                        .FirstOrDefault();
+                    if (land == null) continue;
+                    opponent.Zones.Battlefield.RemoveCard(land);
+                    opponent.Zones.Graveyard.AddCard(land);
+                    land.SetZone(ZoneType.Graveyard);
+                    break; // destroy only one land (CR 701.7)
+                }
+            });
         }
 
         // "Create a Treasure token" shorthand without explicit pluralisation
