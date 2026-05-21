@@ -21,11 +21,14 @@ public static class MajikEngineRegistration
     {
         services.AddSingleton<GameRegistry>();
 
-        // Card data: singleton DbContext (uses default on-disk path) wrapped
-        // in a caching decorator. Tests override these via ConfigureTestServices.
-        services.AddSingleton<CardDbContext>();
-        services.AddSingleton<ICardRepository>(sp =>
-            new CachingCardRepository(new DbCardRepository(sp.GetRequiredService<CardDbContext>())));
+        // Card data: factory-per-call DbContext (EF Core DbContext is NOT
+        // thread-safe — a shared singleton would race under concurrent
+        // requests). DbCardRepository creates a fresh CardDbContext via the
+        // factory delegate inside each public method. Wrapped in a caching
+        // decorator that itself remains singleton-safe.
+        // Tests override these via ConfigureTestServices.
+        services.AddSingleton<ICardRepository>(_ =>
+            new CachingCardRepository(new DbCardRepository(() => new CardDbContext())));
 
         // ServerGameFactory takes ICardRepository so it can run the full binder
         // pipeline at game-start. Registered after ICardRepository so the DI
