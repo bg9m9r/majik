@@ -1,0 +1,11 @@
+{
+  "name": "Dryad Arbor",
+  "types": ["Creature", "Land"],
+  "subtypes": ["Forest", "Dryad"],
+  "manaCost": "",
+  "power": 1,
+  "toughness": 1,
+  "abilities": [
+    { "kind": "mana", "produces": "G" }
+  ]
+}
