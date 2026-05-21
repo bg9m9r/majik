@@ -1,0 +1,28 @@
+{
+  "name": "Dredger's Insight",
+  "types": ["Enchantment"],
+  "manaCost": "1G",
+  "abilities": [
+    {
+      "kind": "triggered",
+      "trigger": { "type": "etb_self" },
+      "effects": [
+        {
+          "type": "mill_then_pick_first_matching_to_hand",
+          "amount": 4,
+          "matchingTypes": ["Artifact", "Creature", "Land"]
+        }
+      ]
+    },
+    {
+      "kind": "triggered",
+      "trigger": {
+        "type": "card_leaves_your_graveyard",
+        "cardTypes": ["Artifact", "Creature"]
+      },
+      "effects": [
+        { "type": "gain_life_self", "amount": 1 }
+      ]
+    }
+  ]
+}
