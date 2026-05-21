@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Majik.Core.CardData.Database;
 using Majik.Core.CardData.SpellTemplates;
 using Majik.Core.Cards;
@@ -99,6 +100,56 @@ public static class OracleSpellBinder
         ArgumentNullException.ThrowIfNull(caster);
         ArgumentNullException.ThrowIfNull(resolver);
         return Registry.TryBind(new SpellBindContext(entity, caster, resolver, effects, stack));
+    }
+
+    /// <summary>
+    /// Compiled fast-path entry. When a card has a row in
+    /// <c>CompiledSpellTemplates</c>, the caller (typically
+    /// <see cref="ScryfallCardFactory.LookupSpellDefinition"/>) passes the
+    /// stored <paramref name="templateName"/> + <paramref name="paramsJson"/>
+    /// here and we skip the registry's regex scan entirely.
+    ///
+    /// Falls back to <see cref="Bind"/>'s live registry walk when:
+    /// - <paramref name="templateName"/> doesn't resolve in
+    ///   <see cref="Registry.OrderedTemplates"/> (template was removed or
+    ///   renamed since compile time), or
+    /// - the resolved template's <see cref="ISpellTemplate.CanBind"/>
+    ///   returns false for this <paramref name="ctx"/> (e.g. a
+    ///   Effects-gated template asked at vanilla-cast time).
+    /// </summary>
+    public static SpellDefinition? BindCompiled(
+        string templateName,
+        string paramsJson,
+        CardEntity entity,
+        Player caster,
+        Func<object, object> resolver,
+        Majik.Core.Effects.ContinuousEffectsService? effects,
+        Majik.Core.Stack.Stack? stack)
+    {
+        ArgumentNullException.ThrowIfNull(templateName);
+        ArgumentNullException.ThrowIfNull(entity);
+        ArgumentNullException.ThrowIfNull(caster);
+        ArgumentNullException.ThrowIfNull(resolver);
+
+        var ctx = new SpellBindContext(entity, caster, resolver, effects, stack);
+
+        var template = Registry.OrderedTemplates
+            .FirstOrDefault(t => string.Equals(t.Name, templateName, StringComparison.Ordinal));
+        if (template is null)
+        {
+            // Compiled DB references a template this build doesn't know
+            // about — fall back to live walk so the request still resolves.
+            return Registry.TryBind(ctx);
+        }
+
+        if (!template.CanBind(ctx)) return null;
+
+        var @params = string.IsNullOrEmpty(paramsJson)
+            ? (IReadOnlyDictionary<string, string>)new Dictionary<string, string>()
+            : JsonSerializer.Deserialize<Dictionary<string, string>>(paramsJson)
+              ?? new Dictionary<string, string>();
+
+        return template.Rehydrate(@params, ctx);
     }
 
     internal static void MoveToExile(ICard card)
