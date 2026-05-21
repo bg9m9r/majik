@@ -21,9 +21,21 @@ public sealed class ServerGameFactory
         _cardRepo = cardRepo;
     }
 
-    public GameFacade Create(string aliceName, string bobName, IReadOnlyList<ICard> aliceDeck, IReadOnlyList<ICard> bobDeck)
+    public GameFacade Create(
+        string aliceName,
+        string bobName,
+        IReadOnlyList<ICard> aliceDeck,
+        IReadOnlyList<ICard> bobDeck,
+        string? botSeatArchetype = null)
     {
-        return _registry.Create(aliceName, bobName, aliceDeck, bobDeck, _cardRepo);
+        var facade = _registry.Create(aliceName, bobName, aliceDeck, bobDeck, _cardRepo);
+        if (botSeatArchetype != null)
+        {
+            // vs-Bot match: Bob seat is the bot, driven by HeuristicStrategy.
+            var botCfg = new Majik.Bot.BotConfig(botSeatArchetype);
+            facade.ReplaceBobAgent(new Majik.Bot.BotPlayerAgent(facade.Bob, botCfg));
+        }
+        return facade;
     }
 
     public GameFacade? Get(Guid id) => _registry.Get(id);

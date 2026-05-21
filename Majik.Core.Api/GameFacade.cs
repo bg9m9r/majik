@@ -43,7 +43,9 @@ public sealed class GameFacade
     private readonly Player _bob;
     private readonly RemoteAgent _aliceAgent;
     private readonly RemoteAgent _bobAgent;
-    private readonly PriorityLoop _loop;
+    private IPlayerAgent _aliceAgentEffective;
+    private IPlayerAgent _bobAgentEffective;
+    private PriorityLoop _loop;
     private Task? _loopTask;
     private Task<GameDriver.GameResult>? _fullGameTask;
     private readonly List<Action<EventDto>> _subscribers = new();
@@ -74,6 +76,14 @@ public sealed class GameFacade
 
     public bool IsRoundComplete => _loopTask?.IsCompleted ?? false;
 
+    /// <summary>The Alice/creator-slot player. Exposed so tooling can wire
+    /// a non-RemoteAgent (e.g. <see cref="Majik.Bot.BotPlayerAgent"/>) before
+    /// the game starts.</summary>
+    public Player Alice => _alice;
+
+    /// <summary>The Bob/opponent-slot player. See <see cref="Alice"/>.</summary>
+    public Player Bob => _bob;
+
     /// <summary>
     /// The game's replacement-effect bus. Binders (e.g. ShockLandBinder)
     /// register handlers here during deck load; ZoneService reads from it on
@@ -99,24 +109,51 @@ public sealed class GameFacade
         _aliceAgent.PromptRequested += _ => PulsePromptSignal();
         _bobAgent.PromptRequested += _ => PulsePromptSignal();
 
-        _loop = new PriorityLoop(
-            players: new[] { alice, bob },
-            priority: _priority,
-            stack: _stack,
-            stackResolver: _resolver,
-            zoneService: _zones,
-            agents: new Dictionary<Player, IPlayerAgent>
-            {
-                [alice] = _aliceAgent,
-                [bob] = _bobAgent,
-            },
-            turnNumberAccessor: () => 1,
-            phaseAccessor: () => PhaseStateType.Main);
+        _aliceAgentEffective = _aliceAgent;
+        _bobAgentEffective = _bobAgent;
+
+        _loop = BuildPriorityLoop();
 
         _bus.SubscribeAll(BridgeEvent);
         _bus.Subscribe<TurnStartedEvent>(e => { _currentTurn = e.TurnNumber; _currentActivePlayer = e.Player; });
         _bus.Subscribe<PhaseStartedEvent>(e => { _currentPhase = e.PhaseType; });
         _bus.Subscribe<StepStartedEvent>(e => { _currentPhase = e.StepType; });
+    }
+
+    private PriorityLoop BuildPriorityLoop() => new PriorityLoop(
+        players: new[] { _alice, _bob },
+        priority: _priority,
+        stack: _stack,
+        stackResolver: _resolver,
+        zoneService: _zones,
+        agents: new Dictionary<Player, IPlayerAgent>
+        {
+            [_alice] = _aliceAgentEffective,
+            [_bob] = _bobAgentEffective,
+        },
+        turnNumberAccessor: () => 1,
+        phaseAccessor: () => PhaseStateType.Main);
+
+    /// <summary>Replaces the Alice-seat agent (typically with a
+    /// <see cref="Majik.Bot.BotPlayerAgent"/>). Must be called before
+    /// <see cref="StartAsync"/> / <see cref="StartFullGameAsync"/>; throws
+    /// once the game is running. After swap, <see cref="SubmitAsync"/> for
+    /// that seat will throw — the bot drives itself.</summary>
+    public void ReplaceAliceAgent(IPlayerAgent agent) => SwapAgent(_alice, agent);
+
+    /// <summary>Replaces the Bob-seat agent. See <see cref="ReplaceAliceAgent"/>.</summary>
+    public void ReplaceBobAgent(IPlayerAgent agent) => SwapAgent(_bob, agent);
+
+    private void SwapAgent(Player seat, IPlayerAgent agent)
+    {
+        ArgumentNullException.ThrowIfNull(agent);
+        if (_loopTask != null || _fullGameTask != null)
+            throw new InvalidOperationException("Cannot replace agent after the game has started.");
+
+        if (ReferenceEquals(seat, _alice)) _aliceAgentEffective = agent;
+        else _bobAgentEffective = agent;
+
+        _loop = BuildPriorityLoop();
     }
 
     public static GameFacade Create(
@@ -242,8 +279,8 @@ public sealed class GameFacade
             players: orderedPlayers,
             agents: new Dictionary<Player, IPlayerAgent>
             {
-                [_alice] = _aliceAgent,
-                [_bob] = _bobAgent,
+                [_alice] = _aliceAgentEffective,
+                [_bob] = _bobAgentEffective,
             },
             stack: _stack,
             zoneService: _zones,
@@ -275,6 +312,13 @@ public sealed class GameFacade
         var agent = command.PlayerId == _alice.Id ? _aliceAgent
                   : command.PlayerId == _bob.Id ? _bobAgent
                   : throw new InvalidOperationException($"Unknown player {command.PlayerId}.");
+
+        // After a seat-swap the effective agent for that seat is no longer
+        // the RemoteAgent — the bot drives itself, so external Submit calls
+        // are nonsensical.
+        var effective = command.PlayerId == _alice.Id ? _aliceAgentEffective : _bobAgentEffective;
+        if (!ReferenceEquals(effective, agent))
+            throw new InvalidOperationException("Cannot submit to a bot seat.");
 
         // Capture the signal BEFORE submitting. agent.Submit resolves the
         // TCS the engine is awaiting; the engine then resumes on the

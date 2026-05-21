@@ -23,4 +23,7 @@ public sealed class MatchHubPublisher : IMatchHubPublisher
                 if (t.IsFaulted) _log.LogError(t.Exception, "Hub publish failed: {Event}", @event);
             }, TaskScheduler.Default);
     }
+
+    public void PublishBotThinking(Guid matchId, bool thinking)
+        => Publish(matchId, "match.bot-thinking", new { matchId, thinking });
 }
