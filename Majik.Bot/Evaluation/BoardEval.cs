@@ -19,7 +19,7 @@ public static class BoardEval
         var boardPower = SumPower(self);
         var boardToughness = SumToughness(self);
         var oppThreats = SumPower(opp);
-        var manaSources = CountLandsAndRocks(self);
+        var manaSources = CountLands(self);
         var handSize = self.Zones.Hand.Count;
         var tempo = ctx.ActivePlayer == opp ? CountUntappedLands(self) : 0;
         var keyCard = HasKeyCardInPlay(self) ? 1 : 0;
@@ -45,7 +45,7 @@ public static class BoardEval
     private static int SumToughness(Player p)
         => p.Zones.Battlefield.GetCards().OfType<Creature>().Sum(c => Math.Max(0, c.Toughness));
 
-    private static int CountLandsAndRocks(Player p)
+    private static int CountLands(Player p)
         => p.Zones.Battlefield.GetCards().Count(c => c is Land);
 
     private static int CountUntappedLands(Player p)
