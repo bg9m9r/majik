@@ -165,6 +165,7 @@ public sealed class GameFacade
                 }
                 ShockLandBinder.Bind(card, entity, replacements);
                 OracleLandActivatedAbilityBinder.Bind(card, entity, controller);
+                OracleLoyaltyAbilityBinder.Bind(card, entity, controller);
                 return;
             }
         }
