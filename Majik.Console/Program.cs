@@ -99,6 +99,12 @@ class Program
                 await CompileTemplatesCommand.RunAsync();
                 return;
             }
+            else if (args[0].Equals("diagnose-clauses", StringComparison.OrdinalIgnoreCase))
+            {
+                var top = (args.Length >= 2 && int.TryParse(args[1], out var n)) ? n : 40;
+                await DiagnoseClausesCommand.RunAsync(top);
+                return;
+            }
         }
 
         System.Console.WriteLine("Usage:");
