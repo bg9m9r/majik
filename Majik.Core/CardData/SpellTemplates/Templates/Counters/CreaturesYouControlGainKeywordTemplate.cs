@@ -13,11 +13,10 @@ public sealed class CreaturesYouControlGainKeywordTemplate : ISpellTemplate
     public int Priority => 50;
     public string Name => "CreaturesYouControlGainKeyword";
 
-    public SpellDefinition? TryBind(SpellBindContext ctx)
-    {
-        if (ctx.Effects == null) return null;
-        return SpellTemplateBindHelper.DefaultTryBind(this, ctx);
-    }
+    public SpellDefinition? TryBind(SpellBindContext ctx) =>
+        SpellTemplateBindHelper.DefaultTryBind(this, ctx);
+
+    public bool CanBind(SpellBindContext ctx) => ctx.Effects != null;
 
     public IReadOnlyDictionary<string, string>? TryExtractParams(string oracleText)
     {

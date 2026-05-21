@@ -30,6 +30,22 @@ public interface ISpellTemplate
     /// <summary>Return null if this template doesn't match.</summary>
     SpellDefinition? TryBind(SpellBindContext ctx);
 
+    /// <summary>
+    /// Whether the template's <see cref="Rehydrate"/> can produce a valid
+    /// <see cref="SpellDefinition"/> with the supplied
+    /// <see cref="SpellBindContext"/>. Used by the live <c>TryBind</c>
+    /// path AND the compiled fast path to short-circuit before invoking
+    /// <see cref="Rehydrate"/> on a context that's missing a dependency.
+    ///
+    /// Default: <c>true</c>. Templates that require optional services
+    /// from <see cref="SpellBindContext"/> (e.g.
+    /// <see cref="SpellBindContext.Effects"/> for static-effect templates)
+    /// override and check those dependencies here. Returning <c>false</c>
+    /// behaves the same as the template not matching at all — the registry
+    /// moves on to the next candidate.
+    /// </summary>
+    bool CanBind(SpellBindContext ctx) => true;
+
     // --------------------------------------------------------------------
     // Phase 2 seam: split parsing (oracle text → params) from construction
     // (params + ctx → SpellDefinition). Pre-compile pipeline runs
@@ -107,6 +123,7 @@ public static class SpellTemplateBindHelper
         ArgumentNullException.ThrowIfNull(template);
         ArgumentNullException.ThrowIfNull(ctx);
 
+        if (!template.CanBind(ctx)) return null;
         var @params = template.TryExtractParams(ctx.Text);
         return @params is null ? null : template.Rehydrate(@params, ctx);
     }

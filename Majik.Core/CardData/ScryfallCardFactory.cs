@@ -18,12 +18,15 @@ public sealed class ScryfallCardFactory
 {
     private readonly ICardRepository _repo;
     private readonly Majik.Core.Effects.ReplacementBus? _replacements;
+    private readonly ICompiledSpellTemplateRepository? _compiledRepo;
 
     public ScryfallCardFactory(ICardRepository repo,
-        Majik.Core.Effects.ReplacementBus? replacements = null)
+        Majik.Core.Effects.ReplacementBus? replacements = null,
+        ICompiledSpellTemplateRepository? compiledSpellRepo = null)
     {
         _repo = repo ?? throw new ArgumentNullException(nameof(repo));
         _replacements = replacements;
+        _compiledRepo = compiledSpellRepo;
     }
 
     public ICard Create(string name, Player owner)
@@ -101,6 +104,22 @@ public sealed class ScryfallCardFactory
     {
         var entity = _repo.GetByName(name);
         if (entity == null) return null;
+
+        // Phase 2 fast path: if the offline compile pipeline has a row for
+        // this card, route through Rehydrate instead of walking the regex
+        // registry. Falls back to the live walk when the compiled table is
+        // unwired (no repo configured), the card has no compiled row, or
+        // the stored template doesn't resolve in this build's Registry.
+        var compiled = _compiledRepo?.Lookup(entity.Name);
+        if (compiled is not null)
+        {
+            var fast = OracleSpellBinder.BindCompiled(
+                compiled.TemplateName,
+                compiled.ParamsJson,
+                entity, caster, targetResolver, effects: null, stack);
+            if (fast is not null) return fast;
+        }
+
         return OracleSpellBinder.Bind(entity, caster, targetResolver, stack);
     }
 
