@@ -53,17 +53,15 @@ public static class OracleSpellBinder
             new SpellTemplates.Templates.Destroy.DestroyCreatureTemplate(),
             new SpellTemplates.Templates.Destroy.DestroyLandTemplate(),
             new SpellTemplates.Templates.Destroy.DestroyPermanentTemplate(),
+            new SpellTemplates.Templates.Resource.DrawCardsTemplate(),
+            new SpellTemplates.Templates.Resource.DiscardTemplate(),
+            new SpellTemplates.Templates.Resource.GainLifeTemplate(),
+            new SpellTemplates.Templates.Resource.YouGainLifeTemplate(),
+            new SpellTemplates.Templates.Resource.YouLoseLifeTemplate(),
+            new SpellTemplates.Templates.Resource.EachPlayerDrawsTemplate(),
+            new SpellTemplates.Templates.Resource.TargetPlayerLosesLifeTemplate(),
         });
 
-    private static readonly Regex DrawCards = new(
-        @"draw\s+(?<n>\d+|a|one|two|three|four|five|six|seven)\s+cards?",
-        RegexOptions.IgnoreCase);
-    private static readonly Regex Discard = new(
-        @"target\s+player\s+discards?\s+(?<n>\d+|one|two|three|four|five|six|seven)\s+cards?",
-        RegexOptions.IgnoreCase);
-    private static readonly Regex GainLife = new(
-        @"target\s+player\s+gains?\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+li(?:fe|ves)",
-        RegexOptions.IgnoreCase);
     // "Target creature gets +N/+N until end of turn."
     private static readonly Regex PumpCreature = new(
         @"target\s+creature\s+gets\s+\+(?<p>\d+)/\+(?<t>\d+)\s+until\s+end\s+of\s+turn",
@@ -71,14 +69,6 @@ public static class OracleSpellBinder
     // "Target creature gains <keyword> until end of turn."
     private static readonly Regex GrantKeywordTilEot = new(
         @"target\s+creature\s+gains?\s+(?<kw>flying|trample|first\s+strike|double\s+strike|deathtouch|lifelink|vigilance|haste|reach|menace|indestructible)\s+until\s+end\s+of\s+turn",
-        RegexOptions.IgnoreCase);
-    // "Each player draws N cards."
-    private static readonly Regex EachPlayerDraws = new(
-        @"each\s+player\s+draws\s+(?<n>\d+|a|one|two|three|four|five|six|seven)\s+cards?",
-        RegexOptions.IgnoreCase);
-    // "You lose N life." — chip-damage rider.
-    private static readonly Regex YouLoseLife = new(
-        @"you\s+lose\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+life",
         RegexOptions.IgnoreCase);
     // "Tap target {permanent|creature|artifact|land|...}." — \b so "untap"
     // doesn't match.
@@ -112,10 +102,6 @@ public static class OracleSpellBinder
     // "Untap target {permanent|creature|artifact|land|...}."
     private static readonly Regex UntapTarget = new(
         @"untap\s+target\s+(permanent|creature|artifact|land|enchantment)",
-        RegexOptions.IgnoreCase);
-    // "You gain N life."
-    private static readonly Regex YouGainLife = new(
-        @"you\s+gain\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+life",
         RegexOptions.IgnoreCase);
     // "Put N +1/+1 counters on target creature."
     private static readonly Regex PutPlusCounter = new(
@@ -198,10 +184,6 @@ public static class OracleSpellBinder
     // keyword grant; companion to CreaturesYouControlPump's +P/+T grant.
     private static readonly Regex CreaturesYouControlGain = new(
         @"creatures\s+you\s+control\s+gain\s+(?<kw>flying|trample|first\s+strike|double\s+strike|deathtouch|lifelink|vigilance|haste|reach|menace|indestructible)\s+until\s+end\s+of\s+turn",
-        RegexOptions.IgnoreCase);
-    // "Target player loses N life."
-    private static readonly Regex TargetPlayerLosesLife = new(
-        @"target\s+player\s+loses?\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+life",
         RegexOptions.IgnoreCase);
     // "Exile target card from a graveyard." / "Exile target card from your graveyard."
     // / "Exile target creature card from a graveyard." (with optional card-type filter)
@@ -297,35 +279,17 @@ public static class OracleSpellBinder
         if (mGrantAll.Success && effects != null) return CreaturesYouControlGainKeywordSpell(
             NormaliseKeyword(mGrantAll.Groups["kw"].Value), caster, effects);
 
-        var m = DrawCards.Match(text);
-        if (m.Success) return DrawNSpell(WordToInt(m.Groups["n"].Value), caster);
-
         // Thoughtseize (reveal-choose-discard + caster loses life) — before generic Discard.
         var mTs = ThoughtseizePattern.Match(text);
         if (mTs.Success) return ThoughtseizeSpell(caster, resolver, WordToInt(mTs.Groups["life"].Value));
 
-        m = Discard.Match(text);
-        if (m.Success) return DiscardNSpell(WordToInt(m.Groups["n"].Value), resolver);
-
-        m = GainLife.Match(text);
-        if (m.Success) return GainLifeSpell(WordToInt(m.Groups["n"].Value), resolver);
-
-        m = PumpCreature.Match(text);
+        var m = PumpCreature.Match(text);
         if (m.Success) return PumpSpell(
             int.Parse(m.Groups["p"].Value), int.Parse(m.Groups["t"].Value), resolver);
 
         m = GrantKeywordTilEot.Match(text);
         if (m.Success) return GrantKeywordSpell(
             NormaliseKeyword(m.Groups["kw"].Value), resolver);
-
-        m = EachPlayerDraws.Match(text);
-        if (m.Success) return EachPlayerDrawsSpell(WordToInt(m.Groups["n"].Value));
-
-        m = YouLoseLife.Match(text);
-        if (m.Success) return YouLoseLifeSpell(WordToInt(m.Groups["n"].Value), caster);
-
-        var mTpl = TargetPlayerLosesLife.Match(text);
-        if (mTpl.Success) return TargetPlayerLosesLifeSpell(WordToInt(mTpl.Groups["n"].Value), resolver);
 
         m = TapTarget.Match(text);
         if (m.Success) return TapTargetSpell(resolver, $"target {m.Groups[1].Value}");
@@ -364,9 +328,6 @@ public static class OracleSpellBinder
 
         m = UntapTarget.Match(text);
         if (m.Success) return UntapTargetSpell(resolver, $"target {m.Groups[1].Value}");
-
-        m = YouGainLife.Match(text);
-        if (m.Success) return YouGainLifeSpell(WordToInt(m.Groups["n"].Value), caster);
 
         // Investigate keyword action (CR 701.30) — checked before CreateClueTokens "create" pattern.
         var mInvN = InvestigateNTimes.Match(text);
@@ -640,11 +601,6 @@ public static class OracleSpellBinder
                 if (target is Permanent perm && perm.IsTapped) perm.Untap();
             }) };
         });
-
-    private static SpellDefinition YouGainLifeSpell(int n, Player caster) => new(
-        Modes: Array.Empty<string>(), HasVariableX: false,
-        TargetRequests: Array.Empty<TargetRequest>(),
-        EffectFactory: _ => new IEffect[] { new Effect($"you gain {n}", () => caster.GainLife(n)) });
 
     private static IReadOnlyList<string> ParseKeywordList(string raw)
     {
@@ -941,28 +897,6 @@ public static class OracleSpellBinder
             }) };
         });
 
-    private static SpellDefinition EachPlayerDrawsSpell(int n) => new(
-        Modes: Array.Empty<string>(), HasVariableX: false,
-        TargetRequests: Array.Empty<TargetRequest>(),
-        EffectFactory: _ => new IEffect[] { new Effect($"each player draws {n}", () => { }) });
-
-    private static SpellDefinition YouLoseLifeSpell(int n, Player caster) => new(
-        Modes: Array.Empty<string>(), HasVariableX: false,
-        TargetRequests: Array.Empty<TargetRequest>(),
-        EffectFactory: _ => new IEffect[] { new Effect($"you lose {n}", () => caster.LoseLife(n)) });
-
-    private static SpellDefinition TargetPlayerLosesLifeSpell(int n, Func<object, object> resolver) => new(
-        Modes: Array.Empty<string>(), HasVariableX: false,
-        TargetRequests: new[] { new TargetRequest("target player", 1, 1, Array.Empty<object>()) },
-        EffectFactory: p =>
-        {
-            var target = resolver(p.Targets[0][0]);
-            return new IEffect[] { new Effect($"target player loses {n}", () =>
-            {
-                if (target is Player pl) pl.LoseLife(n);
-            }) };
-        });
-
     private static SpellDefinition ExileFromGraveyardSpell(Func<object, object> resolver, string kindRaw) => new(
         Modes: Array.Empty<string>(), HasVariableX: false,
         TargetRequests: new[] { new TargetRequest(
@@ -1006,18 +940,6 @@ public static class OracleSpellBinder
         { chars.Keywords.Add(_kw); }
     }
 
-    private static SpellDefinition GainLifeSpell(int n, Func<object, object> resolver) => new(
-        Modes: Array.Empty<string>(), HasVariableX: false,
-        TargetRequests: new[] { new TargetRequest("target player", 1, 1, Array.Empty<object>()) },
-        EffectFactory: p =>
-        {
-            var target = resolver(p.Targets[0][0]);
-            return new IEffect[] { new Effect($"gain {n} life", () =>
-            {
-                if (target is Player player) player.GainLife(n);
-            }) };
-        });
-
     /// <summary>
     /// Thoughtseize template (v1 — deterministic pick: first non-land card in target's hand).
     /// Real Thoughtseize lets the caster choose; v1 simplification picks deterministically.
@@ -1042,23 +964,6 @@ public static class OracleSpellBinder
                     pick.SetZone(ZoneType.Graveyard);
                 }
                 caster.LoseLife(lifeLoss);
-            }) };
-        });
-
-    private static SpellDefinition DrawNSpell(int n, Player caster) => new(
-        Modes: Array.Empty<string>(), HasVariableX: false,
-        TargetRequests: Array.Empty<TargetRequest>(),
-        EffectFactory: _ => new IEffect[] { new Effect($"draw {n}", () => DrawCards_(caster, n)) });
-
-    private static SpellDefinition DiscardNSpell(int n, Func<object, object> resolver) => new(
-        Modes: Array.Empty<string>(), HasVariableX: false,
-        TargetRequests: new[] { new TargetRequest("target player", 1, 1, Array.Empty<object>()) },
-        EffectFactory: p =>
-        {
-            var target = resolver(p.Targets[0][0]);
-            return new IEffect[] { new Effect($"discard {n}", () =>
-            {
-                if (target is Player pl) DiscardCards(pl, n);
             }) };
         });
 
@@ -1093,18 +998,6 @@ public static class OracleSpellBinder
             player.Zones.Library.RemoveCard(top);
             player.Zones.Hand.AddCard(top);
             top.SetZone(ZoneType.Hand);
-        }
-    }
-
-    private static void DiscardCards(Player player, int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
-            var top = player.Zones.Hand.GetCards().FirstOrDefault();
-            if (top == null) return;
-            player.Zones.Hand.RemoveCard(top);
-            player.Zones.Graveyard.AddCard(top);
-            top.SetZone(ZoneType.Graveyard);
         }
     }
 
