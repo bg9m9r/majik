@@ -1,0 +1,18 @@
+{
+  "name": "Boseiju, Who Endures",
+  "types": ["Land"],
+  "supertypes": ["Legendary"],
+  "abilities": [
+    { "kind": "mana", "produces": "G" },
+    {
+      "kind": "activated",
+      "costs": [
+        { "type": "mana", "amount": "1G" },
+        { "type": "discard_self" }
+      ],
+      "effects": [
+        { "type": "destroy_target_stub", "targetFilter": "artifact_enchantment_nonbasic_land" }
+      ]
+    }
+  ]
+}

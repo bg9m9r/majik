@@ -13,6 +13,7 @@ namespace Majik.Core.CardData.Definitions;
 [JsonDerivedType(typeof(RemoveCounterCostDef), "remove_counter")]
 [JsonDerivedType(typeof(TapSelfCostDef), "tap_self")]
 [JsonDerivedType(typeof(SacrificeSelfCostDef), "sacrifice_self")]
+[JsonDerivedType(typeof(DiscardSelfCostDef), "discard_self")]
 public abstract class CostDefinition { }
 
 /// <summary>Mana cost — parsed via <see cref="Majik.Core.ValueObjects.ManaCost.Parse"/>.
@@ -44,3 +45,7 @@ public sealed class TapSelfCostDef : CostDefinition { }
 /// <summary>Sacrifice this permanent — CR 701.16. No additional fields;
 /// the cost always targets the activating permanent itself.</summary>
 public sealed class SacrificeSelfCostDef : CostDefinition { }
+
+/// <summary>Discard this card — required for activated abilities that
+/// fire from the hand (Channel, CR 702.74). No additional fields.</summary>
+public sealed class DiscardSelfCostDef : CostDefinition { }
