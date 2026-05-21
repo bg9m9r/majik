@@ -85,33 +85,14 @@ public static class OracleSpellBinder
             new SpellTemplates.Templates.Counters.GrantKeywordTilEotTemplate(),
             new SpellTemplates.Templates.Counters.CreaturesYouControlPumpTemplate(),
             new SpellTemplates.Templates.Counters.CreaturesYouControlGainKeywordTemplate(),
+            new SpellTemplates.Templates.Tokens.InvestigateNTimesTemplate(),
+            new SpellTemplates.Templates.Tokens.InvestigateSingleTemplate(),
+            new SpellTemplates.Templates.Tokens.CreateTreasureTokensTemplate(),
+            new SpellTemplates.Templates.Tokens.CreateFoodTokensTemplate(),
+            new SpellTemplates.Templates.Tokens.CreateClueTokensTemplate(),
+            new SpellTemplates.Templates.Tokens.CreateTokensTemplate(),
         });
 
-    // "Create [a|N] Treasure token(s)." — predefined artifact, no P/T text.
-    private static readonly Regex CreateTreasureTokens = new(
-        @"create\s+(?<n>a|an|\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+treasure\s+tokens?\b",
-        RegexOptions.IgnoreCase);
-    // "Create [a|N] Food token(s)."
-    private static readonly Regex CreateFoodTokens = new(
-        @"create\s+(?<n>a|an|\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+food\s+tokens?\b",
-        RegexOptions.IgnoreCase);
-    // "Create [a|N] Clue token(s)."
-    private static readonly Regex CreateClueTokens = new(
-        @"create\s+(?<n>a|an|\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+clue\s+tokens?\b",
-        RegexOptions.IgnoreCase);
-    // "Investigate." / "Investigate N times." — CR 701.30 keyword action:
-    // create a Clue token.
-    private static readonly Regex InvestigateSingle = new(
-        @"^\s*investigate\s*\.",
-        RegexOptions.IgnoreCase | RegexOptions.Multiline);
-    private static readonly Regex InvestigateNTimes = new(
-        @"investigate\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+times",
-        RegexOptions.IgnoreCase);
-    // "Create [a|N] [P]/[T] [colour] [subtype] creature token[s] [with KW (and KW)]."
-    // Captures: count, P, T, optional colour, subtype, optional keyword list.
-    private static readonly Regex CreateTokens = new(
-        @"create\s+(?<n>a|an|\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?<p>\d+)/(?<t>\d+)\s+(?<colour>white|blue|black|red|green|colorless)?\s*(?<subtype>[A-Za-z]+)\s+creature\s+tokens?(?:\s+with\s+(?<keywords>[A-Za-z, ]+))?",
-        RegexOptions.IgnoreCase);
     // "Target player reveals their hand. You choose a nonland card from it.
     //  That player discards that card. You lose N life." (Thoughtseize template)
     private static readonly Regex ThoughtseizePattern = new(
@@ -153,117 +134,12 @@ public static class OracleSpellBinder
         var mTs = ThoughtseizePattern.Match(text);
         if (mTs.Success) return ThoughtseizeSpell(caster, resolver, WordToInt(mTs.Groups["life"].Value));
 
-        // Investigate keyword action (CR 701.30) — checked before CreateClueTokens "create" pattern.
-        var mInvN = InvestigateNTimes.Match(text);
-        if (mInvN.Success) return InvestigateNTimesSpell(caster, WordToInt(mInvN.Groups["n"].Value));
-
-        if (InvestigateSingle.IsMatch(text))
-            return InvestigateNTimesSpell(caster, 1);
-
-        // Predefined artifact tokens — checked before creature-token regex (more specific).
-        var m = CreateTreasureTokens.Match(text);
-        if (m.Success) return CreateTreasureTokensSpell(caster, WordToInt(m.Groups["n"].Value));
-
-        m = CreateFoodTokens.Match(text);
-        if (m.Success) return CreateFoodTokensSpell(caster, WordToInt(m.Groups["n"].Value));
-
-        m = CreateClueTokens.Match(text);
-        if (m.Success) return CreateClueTokensSpell(caster, WordToInt(m.Groups["n"].Value));
-
-        m = CreateTokens.Match(text);
-        if (m.Success) return CreateTokensSpell(
-            caster,
-            WordToInt(m.Groups["n"].Value),
-            int.Parse(m.Groups["p"].Value),
-            int.Parse(m.Groups["t"].Value),
-            m.Groups["subtype"].Value,
-            ParseKeywordList(m.Groups["keywords"].Value));
-
         // Malevolent Rumble: reveal top 4, may put first permanent to hand,
         // rest to graveyard, create an Eldrazi Spawn token.
         if (MalevolentRumblePattern.IsMatch(text)) return MalevolentRumbleSpell(caster);
 
         return null;
     }
-
-    private static IReadOnlyList<string> ParseKeywordList(string raw)
-    {
-        if (string.IsNullOrWhiteSpace(raw)) return Array.Empty<string>();
-        // Split on commas / "and"; trim; canonicalise via NormaliseKeyword.
-        return raw.Replace(" and ", ",").Split(',', StringSplitOptions.RemoveEmptyEntries)
-            .Select(s => SpellTemplates.Templates.Counters.CountersSpellFactory.NormaliseKeyword(s.Trim()))
-            .Where(s => !string.IsNullOrWhiteSpace(s))
-            .ToList();
-    }
-
-    private static SpellDefinition CreateTreasureTokensSpell(Player caster, int count) => new(
-        Modes: Array.Empty<string>(), HasVariableX: false,
-        TargetRequests: Array.Empty<TargetRequest>(),
-        EffectFactory: _ => new IEffect[] { new Effect($"create {count} Treasure", () =>
-        {
-            for (var i = 0; i < count; i++)
-                TokenFactory.CreateTreasure(caster);
-        }) });
-
-    private static SpellDefinition CreateFoodTokensSpell(Player caster, int count) => new(
-        Modes: Array.Empty<string>(), HasVariableX: false,
-        TargetRequests: Array.Empty<TargetRequest>(),
-        EffectFactory: _ => new IEffect[] { new Effect($"create {count} Food", () =>
-        {
-            for (var i = 0; i < count; i++)
-                TokenFactory.CreateFood(caster);
-        }) });
-
-    private static SpellDefinition CreateClueTokensSpell(Player caster, int count) => new(
-        Modes: Array.Empty<string>(), HasVariableX: false,
-        TargetRequests: Array.Empty<TargetRequest>(),
-        EffectFactory: _ => new IEffect[] { new Effect($"create {count} Clue", () =>
-        {
-            for (var i = 0; i < count; i++)
-                TokenFactory.CreateClue(caster);
-        }) });
-
-    // CR 701.30 — "To investigate" means to create a Clue token.
-    private static SpellDefinition InvestigateNTimesSpell(Player caster, int count) => new(
-        Modes: Array.Empty<string>(), HasVariableX: false,
-        TargetRequests: Array.Empty<TargetRequest>(),
-        EffectFactory: _ => new IEffect[] { new Effect($"investigate {count}", () =>
-        {
-            for (var i = 0; i < count; i++)
-                TokenFactory.CreateClue(caster);
-        }) });
-
-    private static SpellDefinition CreateTokensSpell(
-        Player caster, int count, int power, int toughness, string subtypeRaw,
-        IReadOnlyList<string> grantedKeywords) => new(
-        Modes: Array.Empty<string>(), HasVariableX: false,
-        TargetRequests: Array.Empty<TargetRequest>(),
-        EffectFactory: _ => new IEffect[] { new Effect($"create {count} {power}/{toughness}", () =>
-        {
-            // Subtype enum lookup is best-effort; tokens with unrecognised
-            // subtypes still spawn with no subtype attached.
-            Majik.Core.Cards.Types.CardSubtype? subtype = null;
-            if (Enum.TryParse<Majik.Core.Cards.Types.CardSubtype>(
-                char.ToUpperInvariant(subtypeRaw[0]) + subtypeRaw[1..].ToLowerInvariant(),
-                out var st))
-            {
-                subtype = st;
-            }
-
-            var subtypes = subtype.HasValue
-                ? new[] { subtype.Value }
-                : Array.Empty<Majik.Core.Cards.Types.CardSubtype>();
-
-            var spec = new TokenFactory.TokenSpec(
-                Name: subtypeRaw,
-                Power: power,
-                Toughness: toughness,
-                Subtypes: subtypes,
-                Keywords: grantedKeywords);
-
-            for (var i = 0; i < count; i++)
-                TokenFactory.CreateOnBattlefield(spec, caster);
-        }) });
 
     internal static void MoveToExile(ICard card)
     {
