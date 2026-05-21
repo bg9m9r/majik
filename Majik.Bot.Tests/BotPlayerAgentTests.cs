@@ -29,4 +29,14 @@ public class BotPlayerAgentTests
         var act = async () => await agent.ChoosePriorityActionAsync(s.Context, cts.Token);
         await act.Should().ThrowAsync<OperationCanceledException>();
     }
+
+    [Fact]
+    public async Task ChoosePriorityAction_FiresOnThinkingCallback_TrueThenFalse()
+    {
+        var s = new BotTestScenario();
+        var calls = new List<bool>();
+        var agent = new BotPlayerAgent(s.Self, new BotConfig("Burn"), thinking => calls.Add(thinking));
+        await agent.ChoosePriorityActionAsync(s.Context);
+        calls.Should().Equal(new[] { true, false });
+    }
 }

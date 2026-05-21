@@ -26,14 +26,18 @@ public sealed class ServerGameFactory
         string bobName,
         IReadOnlyList<ICard> aliceDeck,
         IReadOnlyList<ICard> bobDeck,
-        string? botSeatArchetype = null)
+        string? botSeatArchetype = null,
+        Action<bool>? onBotThinking = null)
     {
         var facade = _registry.Create(aliceName, bobName, aliceDeck, bobDeck, _cardRepo);
         if (botSeatArchetype != null)
         {
             // vs-Bot match: Bob seat is the bot, driven by HeuristicStrategy.
+            // onBotThinking lets the caller (MatchService) bridge the
+            // engine-internal callback to the SignalR hub without making
+            // Majik.Bot depend on Majik.Server.
             var botCfg = new Majik.Bot.BotConfig(botSeatArchetype);
-            facade.ReplaceBobAgent(new Majik.Bot.BotPlayerAgent(facade.Bob, botCfg));
+            facade.ReplaceBobAgent(new Majik.Bot.BotPlayerAgent(facade.Bob, botCfg, onBotThinking));
         }
         return facade;
     }

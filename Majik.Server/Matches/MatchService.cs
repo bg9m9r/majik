@@ -214,6 +214,11 @@ public sealed class MatchService
             DeckSnapshot = botSnapshot,
         };
 
+        // matchId is generated up-front so the bot-thinking callback can
+        // close over it before the facade (and its embedded bot agent) are
+        // constructed below.
+        var matchId = Guid.NewGuid();
+
         // 1) Load decks + create facade BEFORE any DB write so a
         //    DeckLoadException cannot leave an orphan Match document.
         GameFacade? facade = null;
@@ -223,10 +228,18 @@ public sealed class MatchService
             {
                 var creatorDeck = await _decks.LoadAsync(creator.DeckId, ct);
                 var botDeck = await _decks.LoadFromCardNamesAsync(botSnapshot, ct);
+                // Bridge engine-internal bot-thinking signal to the SignalR
+                // hub so the frontend can show a "Bot is thinking…"
+                // indicator while the policy runs.
+                var hubForCallback = _hub;
+                Action<bool>? onBotThinking = hubForCallback != null
+                    ? thinking => hubForCallback.PublishBotThinking(matchId, thinking)
+                    : null;
                 facade = _gameFactory.Create(
                     creator.Handle, botPlayer.Handle,
                     creatorDeck, botDeck,
-                    botSeatArchetype: bot.Archetype);
+                    botSeatArchetype: bot.Archetype,
+                    onBotThinking: onBotThinking);
             }
             catch (DeckLoadException ex)
             {
@@ -234,7 +247,6 @@ public sealed class MatchService
             }
         }
 
-        var matchId = Guid.NewGuid();
         var match = new Match
         {
             Id = matchId,
