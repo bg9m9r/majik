@@ -38,6 +38,10 @@ services:
         value: http://0.0.0.0:10000
       - key: Mongo__Database
         value: majik
+      - key: CARDS_SEED_TAG
+        # Bump this to a new release tag (e.g. cards-seed-2026-06-01)
+        # to trigger a fresh download on next deploy. See docs/RENDER_CARDS_SEED.md.
+        value: cards-seed-2026-05-20
       - key: Auth__Authority
         sync: false
       - key: Auth__Audience
