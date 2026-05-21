@@ -13,7 +13,19 @@ public sealed class CounterUnlessPayTemplate : ISpellTemplate
     public string Name => "CounterUnlessPay";
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
-        Pattern.IsMatch(ctx.Text)
-            ? CounterSpellFactory.CounterTargetSpell(ctx.Resolver, ctx.Stack)
+        SpellTemplateBindHelper.DefaultTryBind(this, ctx);
+
+    public IReadOnlyDictionary<string, string>? TryExtractParams(string oracleText)
+    {
+        var m = Pattern.Match(oracleText);
+        // Capture the cost payable even though we don't simulate the "unless
+        // pay" rider yet — recording it now keeps the compiled row faithful
+        // to the oracle and lets a future Rehydrate consume it.
+        return m.Success
+            ? new Dictionary<string, string> { ["n"] = m.Groups["n"].Value }
             : null;
+    }
+
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
+        CounterSpellFactory.CounterTargetSpell(ctx.Resolver, ctx.Stack);
 }

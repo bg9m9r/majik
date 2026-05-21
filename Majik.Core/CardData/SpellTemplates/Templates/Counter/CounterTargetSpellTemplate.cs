@@ -12,7 +12,11 @@ public sealed class CounterTargetSpellTemplate : ISpellTemplate
     public string Name => "CounterTargetSpell";
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
-        Pattern.IsMatch(ctx.Text)
-            ? CounterSpellFactory.CounterTargetSpell(ctx.Resolver, ctx.Stack)
-            : null;
+        SpellTemplateBindHelper.DefaultTryBind(this, ctx);
+
+    public IReadOnlyDictionary<string, string>? TryExtractParams(string oracleText) =>
+        Pattern.IsMatch(oracleText) ? EmptyParams.Instance : null;
+
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
+        CounterSpellFactory.CounterTargetSpell(ctx.Resolver, ctx.Stack);
 }

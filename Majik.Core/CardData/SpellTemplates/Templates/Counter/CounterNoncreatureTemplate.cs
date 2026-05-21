@@ -12,7 +12,11 @@ public sealed class CounterNoncreatureTemplate : ISpellTemplate
     public string Name => "CounterNoncreature";
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
-        Pattern.IsMatch(ctx.Text)
-            ? CounterSpellFactory.CounterTypedSpell(ctx.Resolver, ctx.Stack, requireNonCreature: true)
-            : null;
+        SpellTemplateBindHelper.DefaultTryBind(this, ctx);
+
+    public IReadOnlyDictionary<string, string>? TryExtractParams(string oracleText) =>
+        Pattern.IsMatch(oracleText) ? EmptyParams.Instance : null;
+
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
+        CounterSpellFactory.CounterTypedSpell(ctx.Resolver, ctx.Stack, requireNonCreature: true);
 }
