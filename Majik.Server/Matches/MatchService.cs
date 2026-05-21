@@ -301,7 +301,16 @@ public sealed class MatchService
             }
             if (_gameFactory != null && facade != null)
             {
-                _gameFactory.Delete(facade.GameId);
+                try
+                {
+                    _gameFactory.Delete(facade.GameId);
+                }
+                catch (Exception facEx)
+                {
+                    _logger?.LogError(facEx,
+                        "Failed to dispose facade during bot-match setup cleanup. GameId={GameId}",
+                        facade.GameId);
+                }
             }
             _logger?.LogError(ex,
                 "Bot match setup failed; rolled back. MatchId={MatchId}", matchId);
