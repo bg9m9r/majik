@@ -75,5 +75,9 @@ public static class SeedImplementedCards
         // {T}: Add {G} wired directly (not via Basic-land guard in OracleManaBinder).
         // Useful for Green Sun's Zenith (fetch as a Forest creature); targeting deferred.
         "Dryad Arbor",
+        // Legendary Creature — Halfling Citizen 1/2 (DelightedHalflingFactory).
+        // {T}: Add one mana of any color — 5 ManaAbility instances (one per WUBRG) wired.
+        // Usage restriction (legendary-only mana) + "spell can't be countered" rider deferred.
+        "Delighted Halfling",
     };
 }

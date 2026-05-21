@@ -57,6 +57,11 @@ public static class NamedCardFactory
             // ETB-tapped restriction + untapped gate on surveil + player prompt deferred.
             "Underground Mortuary" => UndergroundMortuaryFactory.Create(owner),
 
+            // Legendary Creature — Halfling Citizen 1/2 (DelightedHalflingFactory).
+            // {T}: Add one mana of any color — 5 ManaAbility instances (one per WUBRG) wired.
+            // Usage restriction (legendary-only mana) + "spell can't be countered" rider deferred.
+            "Delighted Halfling" => DelightedHalflingFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 

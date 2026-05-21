@@ -31,6 +31,8 @@ public enum CardSubtype
     Knight,
     Soldier,
     Shaman,
+    Halfling,
+    Citizen,
 
     // Land subtypes (examples)
     Forest,
