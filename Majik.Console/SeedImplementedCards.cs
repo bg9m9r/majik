@@ -111,5 +111,16 @@ public static class SeedImplementedCards
         // Creature — Bear {G} 1/1 (BadgermoleCubFactory). Shell only.
         // Earthbend 1 ETB + tap-creature-for-mana trigger deferred.
         "Badgermole Cub",
+
+        // Creature — Orc Archer {1}{B} 1/1 (OrcishBowmastersFactory).
+        // Flash keyword wired.
+        // ETB damage-any-target trigger, opponent-draw watcher, amass Orcs 1 deferred.
+        "Orcish Bowmasters",
+
+        // Artifact — {2} (AgathasSoulCauldronFactory).
+        // {T}: exile first card from controller's graveyard; if creature card, +1/+1 counter
+        // on first creature on controller's battlefield — wired (v1 auto-pick).
+        // Static mana-color-substitute + ability-grant via imprint deferred.
+        "Agatha's Soul Cauldron",
     };
 }

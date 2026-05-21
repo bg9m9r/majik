@@ -94,6 +94,17 @@ public static class NamedCardFactory
             // "Whenever you tap a creature for mana, add {G}" deferred — no tap-watcher infra.
             "Badgermole Cub" => BadgermoleCubFactory.Create(owner),
 
+            // Creature — Orc Archer {1}{B} 1/1 (OrcishBowmastersFactory).
+            // Flash keyword wired.
+            // ETB damage trigger + opponent-draw watcher + amass Orcs 1 deferred.
+            "Orcish Bowmasters" => OrcishBowmastersFactory.Create(owner),
+
+            // Artifact — {2} (AgathasSoulCauldronFactory).
+            // {T}: Exile first card from controller's graveyard; if creature, +1/+1 counter
+            // on first creature on controller's battlefield — wired (v1 auto-pick).
+            // Static mana-color-substitute + ability-grant via imprint deferred.
+            "Agatha's Soul Cauldron" => AgathasSoulCauldronFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 

@@ -34,6 +34,8 @@ public enum CardSubtype
     Shaman,
     Halfling,
     Citizen,
+    Orc,
+    Archer,
 
     // Land subtypes (examples)
     Forest,
