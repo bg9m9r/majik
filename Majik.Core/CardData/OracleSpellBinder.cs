@@ -9,6 +9,7 @@ using Majik.Core.Players.Agents;
 using Majik.Core.Spells;
 using Majik.Core.Stack;
 using Majik.Core.Tokens;
+using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
 
 namespace Majik.Core.CardData;
@@ -242,6 +243,13 @@ public static class OracleSpellBinder
     private static readonly Regex ThoughtseizePattern = new(
         @"target\s+player\s+reveals\s+their\s+hand\.\s*you\s+choose\s+a\s+nonland\s+card\s+from\s+it\.\s*that\s+player\s+discards\s+that\s+card\.\s*you\s+lose\s+(?<life>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+life",
         RegexOptions.IgnoreCase);
+    // "Search your library for a <color> creature card with mana value X or less,
+    //  put it onto the battlefield, then shuffle. Shuffle <name> into its owner's
+    //  library." (Green Sun's Zenith pattern — X-cost green creature tutor.)
+    // The "shuffle into library" suffix distinguishes GSZ from a generic tutor.
+    private static readonly Regex GreenSunsZenithPattern = new(
+        @"search\s+your\s+library\s+for\s+a\s+(?<color>green|white|blue|black|red)\s+creature\s+card\s+with\s+mana\s+value\s+x\s+or\s+less[^.]*put\s+it\s+onto\s+the\s+battlefield[^.]*shuffle\.\s*shuffle[^.]+into\s+its\s+owner'?s?\s+library",
+        RegexOptions.IgnoreCase);
 
     public static SpellDefinition? Bind(
         CardEntity entity,
@@ -390,6 +398,12 @@ public static class OracleSpellBinder
 
         m = ExileTarget.Match(text);
         if (m.Success) return ExileTargetSpell(resolver, $"target {m.Groups[1].Value}");
+
+        // GreenSunsZenithPattern must come before SearchLibrary / SearchLandToBattlefield
+        // because its oracle text also contains "search your library for a … creature card"
+        // and would otherwise be caught by those generic regexes.
+        var mGsz = GreenSunsZenithPattern.Match(text);
+        if (mGsz.Success) return GreenSunsZenithSpell(caster, mGsz.Groups["color"].Value);
 
         // SearchLandToBattlefieldTapped / SearchLandToBattlefield must come BEFORE
         // SearchLibrary — the generic regex also matches "search your library for a basic
@@ -831,6 +845,56 @@ public static class OracleSpellBinder
             // CR 701.19c — shuffle after a search effect (skipped for MVP;
             // same rationale as SearchLibrarySpell above).
         }) });
+
+    /// <summary>
+    /// Green Sun's Zenith template — {X}{G} sorcery (Rule 107.4b X cost).
+    /// Tutors the first library card whose color matches <paramref name="colorRaw"/> and
+    /// whose mana value ≤ X, placing it directly onto the battlefield (CR 701.19a).
+    ///
+    /// Color is determined by <see cref="CardColors.GetColors"/>, which derives color
+    /// from the card's mana cost pips (CR 105.2a).
+    ///
+    /// Post-resolution self-return-to-library (the "Shuffle Green Sun's Zenith into
+    /// its owner's library" clause, CR 608.2c override) is DEFERRED — v1 lets the
+    /// spell go to the graveyard like any other sorcery. Engine infrastructure for
+    /// a generic "ShuffleSourceToLibraryOnResolve" hook in SpellCastFlow is needed
+    /// to implement it correctly.
+    /// </summary>
+    private static SpellDefinition GreenSunsZenithSpell(Player caster, string colorRaw) => new(
+        Modes: Array.Empty<string>(), HasVariableX: true,
+        TargetRequests: Array.Empty<TargetRequest>(),
+        EffectFactory: p =>
+        {
+            var x = p.X ?? 0;
+            // Map the oracle-text color word to the ManaColor enum value.
+            var targetColor = colorRaw.ToLowerInvariant() switch
+            {
+                "white"  => ManaColor.White,
+                "blue"   => ManaColor.Blue,
+                "black"  => ManaColor.Black,
+                "red"    => ManaColor.Red,
+                "green"  => ManaColor.Green,
+                _        => ManaColor.Green,
+            };
+            return new IEffect[] { new Effect($"GSZ x={x}", () =>
+            {
+                // CR 701.19a — search is a library action; pick the first qualifying card.
+                // Real implementation would prompt the agent; v1 is deterministic (first match).
+                var pick = caster.Zones.Library.GetCards()
+                    .FirstOrDefault(c =>
+                        c.HasType(Majik.Core.Cards.Types.CardType.Creature) &&
+                        CardColors.GetColors(c).Contains(targetColor) &&
+                        ManaCost.Parse(c.ManaCost).TotalValue <= x);
+                if (pick != null)
+                {
+                    caster.Zones.Library.RemoveCard(pick);
+                    caster.Zones.Battlefield.AddCard(pick);
+                    pick.SetZone(ZoneType.Battlefield);
+                }
+                // CR 701.19c — shuffle after a search effect (deferred, same rationale
+                // as other search spells in this binder).
+            }) };
+        });
 
     private static SpellDefinition DealsXAnyTargetSpell(Func<object, object> resolver) => new(
         Modes: Array.Empty<string>(), HasVariableX: true,

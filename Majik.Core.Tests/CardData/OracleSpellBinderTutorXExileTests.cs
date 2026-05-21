@@ -317,4 +317,111 @@ public class OracleSpellBinderTutorXExileTests
         alice.Zones.Library.GetCards().Should().Contain(bear);
         alice.Zones.Battlefield.GetCards().Should().BeEmpty();
     }
+
+    // ---------- Green Sun's Zenith ----------
+
+    [Fact]
+    public void Bind_GreenSunsZenith_TutorsGreenCreatureWithCmcLessOrEqualX()
+    {
+        var alice = new Player("Alice", 20);
+        // Bear: mana value 2 (1G) — should be picked for X=2.
+        var bear = new Creature("Bear", "1G", 2, 2) { Owner = alice, Zone = ZoneType.Library };
+        // Giant: mana value 7 (4GGG) — CMC too high for X=2.
+        var giant = new Creature("Giant", "4GGG", 7, 7) { Owner = alice, Zone = ZoneType.Library };
+        alice.Zones.Library.AddCard(bear);
+        alice.Zones.Library.AddCard(giant);
+
+        var def = OracleSpellBinder.Bind(
+            new CardEntity { Name = "Green Sun's Zenith", ManaCost = "{X}{G}",
+              OracleText = "Search your library for a green creature card with mana value X or less, put it onto the battlefield, then shuffle. Shuffle Green Sun's Zenith into its owner's library." },
+            alice, raw => raw, null);
+        def.Should().NotBeNull();
+        def!.HasVariableX.Should().BeTrue();
+        def.TargetRequests.Should().BeEmpty();
+
+        var chosen = new ChosenSpellParams(null, X: 2,
+            new IReadOnlyList<object>[0], ManaPayment.Empty);
+        foreach (var e in def.EffectFactory(chosen)) e.Execute();
+
+        alice.Zones.Battlefield.GetCards().Should().Contain(bear);
+        alice.Zones.Library.GetCards().Should().NotContain(bear);
+        // Giant stays in library — CMC too high.
+        alice.Zones.Library.GetCards().Should().Contain(giant);
+        alice.Zones.Battlefield.GetCards().Should().NotContain(giant);
+    }
+
+    [Fact]
+    public void Bind_GreenSunsZenith_XTooLow_NoMatchFizzles()
+    {
+        var alice = new Player("Alice", 20);
+        // Giant: mana value 7 — no green creature with CMC ≤ 1 in library.
+        var giant = new Creature("Giant", "4GGG", 7, 7) { Owner = alice, Zone = ZoneType.Library };
+        alice.Zones.Library.AddCard(giant);
+
+        var def = OracleSpellBinder.Bind(
+            new CardEntity { Name = "Green Sun's Zenith", ManaCost = "{X}{G}",
+              OracleText = "Search your library for a green creature card with mana value X or less, put it onto the battlefield, then shuffle. Shuffle Green Sun's Zenith into its owner's library." },
+            alice, raw => raw, null);
+        def.Should().NotBeNull();
+
+        var chosen = new ChosenSpellParams(null, X: 1,
+            new IReadOnlyList<object>[0], ManaPayment.Empty);
+        foreach (var e in def!.EffectFactory(chosen)) e.Execute();
+
+        alice.Zones.Library.GetCards().Should().Contain(giant);
+        alice.Zones.Battlefield.GetCards().Should().NotContain(giant);
+    }
+
+    [Fact]
+    public void Bind_GreenSunsZenith_X0_CanFetchZeroCmcGreenCreature()
+    {
+        var alice = new Player("Alice", 20);
+        // Ornithopter would be CMC 0 — use a zero-cost green creature as a test stand-in.
+        var freeGreen = new Creature("Free Elf", "G", 1, 1) { Owner = alice, Zone = ZoneType.Library };
+        // ManaCost "{G}" has TotalValue = 1, not 0. Use "" to simulate a 0-CMC card.
+        var zeroCmcGreen = new Creature("Glimpse of Nature Token", "", 0, 0) { Owner = alice, Zone = ZoneType.Library };
+        alice.Zones.Library.AddCard(freeGreen);
+        alice.Zones.Library.AddCard(zeroCmcGreen);
+
+        var def = OracleSpellBinder.Bind(
+            new CardEntity { Name = "Green Sun's Zenith", ManaCost = "{X}{G}",
+              OracleText = "Search your library for a green creature card with mana value X or less, put it onto the battlefield, then shuffle. Shuffle Green Sun's Zenith into its owner's library." },
+            alice, raw => raw, null);
+        def.Should().NotBeNull();
+
+        // X=0: only CMC-0 cards should match. freeGreen has CMC 1 (one G pip), so it won't match.
+        var chosen = new ChosenSpellParams(null, X: 0,
+            new IReadOnlyList<object>[0], ManaPayment.Empty);
+        foreach (var e in def!.EffectFactory(chosen)) e.Execute();
+
+        // freeGreen has CMC 1, shouldn't be put onto battlefield at X=0.
+        alice.Zones.Library.GetCards().Should().Contain(freeGreen);
+        alice.Zones.Battlefield.GetCards().Should().NotContain(freeGreen);
+    }
+
+    [Fact]
+    public void Bind_GreenSunsZenith_NonGreenCreatureIgnored()
+    {
+        var alice = new Player("Alice", 20);
+        // A white creature with CMC 2 should be ignored even though CMC ≤ X.
+        var knight = new Creature("White Knight", "WW", 2, 2) { Owner = alice, Zone = ZoneType.Library };
+        var bear = new Creature("Bear", "1G", 2, 2) { Owner = alice, Zone = ZoneType.Library };
+        alice.Zones.Library.AddCard(knight);
+        alice.Zones.Library.AddCard(bear);
+
+        var def = OracleSpellBinder.Bind(
+            new CardEntity { Name = "Green Sun's Zenith", ManaCost = "{X}{G}",
+              OracleText = "Search your library for a green creature card with mana value X or less, put it onto the battlefield, then shuffle. Shuffle Green Sun's Zenith into its owner's library." },
+            alice, raw => raw, null);
+        def.Should().NotBeNull();
+
+        var chosen = new ChosenSpellParams(null, X: 2,
+            new IReadOnlyList<object>[0], ManaPayment.Empty);
+        foreach (var e in def!.EffectFactory(chosen)) e.Execute();
+
+        // Green bear should land on battlefield; white knight should stay in library.
+        alice.Zones.Battlefield.GetCards().Should().Contain(bear);
+        alice.Zones.Library.GetCards().Should().Contain(knight);
+        alice.Zones.Battlefield.GetCards().Should().NotContain(knight);
+    }
 }

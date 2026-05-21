@@ -27,5 +27,8 @@ public static class SeedImplementedCards
         "Fulminator Mage",
         // ETB graveyard-to-library trigger (OracleTriggeredAbilityBinder); Flash+Reach via KeywordBinder
         "Endurance",
+        // X-cost green creature tutor; puts target directly onto battlefield (OracleSpellBinder)
+        // Note: post-resolution self-return-to-library deferred (v1 goes to graveyard instead).
+        "Green Sun's Zenith",
     };
 }
