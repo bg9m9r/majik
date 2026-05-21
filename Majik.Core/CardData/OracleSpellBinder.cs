@@ -3,6 +3,7 @@ using Majik.Core.Abilities;
 using Majik.Core.CardData.Database;
 using Majik.Core.Cards;
 using Majik.Core.Game;
+using Majik.Core.Keywords;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
 using Majik.Core.Spells;
@@ -144,6 +145,14 @@ public static class OracleSpellBinder
     private static readonly Regex MillTarget = new(
         @"target\s+player\s+mills\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+cards?",
         RegexOptions.IgnoreCase);
+    // "Mill N cards." — self-mill (caster only; must not match "target player mills").
+    private static readonly Regex MillSelf = new(
+        @"^\s*mill\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+cards?\b",
+        RegexOptions.IgnoreCase | RegexOptions.Multiline);
+    // "Surveil N." — look at top N, default decision sends all to graveyard.
+    private static readonly Regex SurveilSelf = new(
+        @"^\s*surveil\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b",
+        RegexOptions.IgnoreCase | RegexOptions.Multiline);
     // "Return target [TYPE] card from your graveyard to your hand."
     private static readonly Regex ReanimateFromGraveyard = new(
         @"return\s+target\s+(?<kind>card|creature|instant|sorcery|artifact|enchantment|planeswalker|land)?\s*card\s+from\s+your\s+graveyard\s+to\s+your\s+hand",
@@ -191,6 +200,12 @@ public static class OracleSpellBinder
 
         var mMill = MillTarget.Match(text);
         if (mMill.Success) return MillTargetSpell(WordToInt(mMill.Groups["n"].Value), resolver);
+
+        var mMillSelf = MillSelf.Match(text);
+        if (mMillSelf.Success) return MillSelfSpell(caster, WordToInt(mMillSelf.Groups["n"].Value));
+
+        var mSurveil = SurveilSelf.Match(text);
+        if (mSurveil.Success) return SurveilSelfSpell(caster, WordToInt(mSurveil.Groups["n"].Value));
 
         if (ScryN.IsMatch(text)) return ScryNSpell(caster, text);
 
@@ -413,16 +428,31 @@ public static class OracleSpellBinder
             return new IEffect[] { new Effect($"mill {n}", () =>
             {
                 if (target is not Player pl) return;
-                for (var i = 0; i < n; i++)
-                {
-                    var top = pl.Zones.Library.GetCards().FirstOrDefault();
-                    if (top == null) return;
-                    pl.Zones.Library.RemoveCard(top);
-                    pl.Zones.Graveyard.AddCard(top);
-                    top.SetZone(ZoneType.Graveyard);
-                }
+                MillAction.Apply(pl, n);
             }) };
         });
+
+    private static SpellDefinition MillSelfSpell(Player caster, int n) => new(
+        Modes: Array.Empty<string>(), HasVariableX: false,
+        TargetRequests: Array.Empty<TargetRequest>(),
+        EffectFactory: _ => new IEffect[] { new Effect($"mill self {n}", () =>
+        {
+            MillAction.Apply(caster, n);
+        }) });
+
+    private static SpellDefinition SurveilSelfSpell(Player caster, int n) => new(
+        Modes: Array.Empty<string>(), HasVariableX: false,
+        TargetRequests: Array.Empty<TargetRequest>(),
+        EffectFactory: _ => new IEffect[] { new Effect($"surveil {n}", () =>
+        {
+            // Default decision: everything peeked goes to graveyard.
+            // Agent-driven choice awaits prompt system.
+            var peeked = SurveilAction.Peek(caster, n);
+            if (peeked.Count == 0) return;
+            SurveilAction.Apply(caster, n, new SurveilAction.SurveilDecision(
+                ToGraveyard: peeked.ToList(),
+                TopOrder: Array.Empty<ICard>()));
+        }) });
 
     // "Preordain"-style: scry happens (no-op for now), then "draw a card"
     // tail clause fires. Cantrip portion is the substantive effect.

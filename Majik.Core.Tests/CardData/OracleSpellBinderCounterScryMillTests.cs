@@ -58,4 +58,57 @@ public class OracleSpellBinderCounterScryMillTests
         def.Should().NotBeNull();
         def!.TargetRequests.Should().BeEmpty();
     }
+
+    [Fact]
+    public void MillSelf_NoTarget_CasterMillsOwnLibrary()
+    {
+        for (var i = 0; i < 3; i++)
+        {
+            var c = new Land($"L{i}") { Owner = _alice, Zone = ZoneType.Library };
+            _alice.Zones.Library.AddCard(c);
+        }
+
+        var def = OracleSpellBinder.Bind(
+            new CardEntity { Name = "Self Mill", ManaCost = "{U}",
+              OracleText = "Mill 2 cards." },
+            _alice, raw => raw, null);
+        def.Should().NotBeNull();
+        def!.TargetRequests.Should().BeEmpty();
+
+        var chosen = new ChosenSpellParams(null, null,
+            new IReadOnlyList<object>[0], ManaPayment.Empty);
+        foreach (var e in def.EffectFactory(chosen)) e.Execute();
+
+        _alice.Zones.Graveyard.GetCards().Should().HaveCount(2);
+        _alice.Zones.Library.GetCards().Should().HaveCount(1);
+
+        // bob's library must be untouched
+        _bob.Zones.Graveyard.GetCards().Should().BeEmpty();
+    }
+
+    [Fact]
+    public void SurveilSelf_DefaultDecision_AllToGraveyard()
+    {
+        for (var i = 0; i < 3; i++)
+        {
+            var c = new Land($"L{i}") { Owner = _alice, Zone = ZoneType.Library };
+            _alice.Zones.Library.AddCard(c);
+        }
+
+        var def = OracleSpellBinder.Bind(
+            new CardEntity { Name = "Surveil Spell", ManaCost = "{U}",
+              OracleText = "Surveil 2." },
+            _alice, raw => raw, null);
+        def.Should().NotBeNull();
+        def!.TargetRequests.Should().BeEmpty();
+
+        var chosen = new ChosenSpellParams(null, null,
+            new IReadOnlyList<object>[0], ManaPayment.Empty);
+        foreach (var e in def.EffectFactory(chosen)) e.Execute();
+
+        // Surveil 2 with default "all to graveyard" decision: top 2 go to GY,
+        // 1 remaining card stays in library.
+        _alice.Zones.Graveyard.GetCards().Should().HaveCount(2);
+        _alice.Zones.Library.GetCards().Should().HaveCount(1);
+    }
 }
