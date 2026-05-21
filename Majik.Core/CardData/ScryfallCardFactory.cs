@@ -75,9 +75,10 @@ public sealed class ScryfallCardFactory
         }
         if (_replacements != null)
         {
-            // Chain (most specific → least): Shock → Conditional → Unconditional.
+            // Chain (most specific → least): Shock → Subtype → Count → Unconditional.
             // Each binder short-circuits when its predecessors claim the card.
             if (!ShockLandBinder.Bind(card, entity, _replacements) &&
+                !SubtypeEntersTappedBinder.Bind(card, entity, _replacements) &&
                 !ConditionalEntersTappedBinder.Bind(card, entity, _replacements))
             {
                 EntersTappedBinder.Bind(card, entity, _replacements);
