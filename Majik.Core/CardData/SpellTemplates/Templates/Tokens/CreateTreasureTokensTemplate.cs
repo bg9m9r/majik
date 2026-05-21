@@ -13,11 +13,17 @@ public sealed class CreateTreasureTokensTemplate : ISpellTemplate
     public int Priority => 50;
     public string Name => "CreateTreasureTokens";
 
-    public SpellDefinition? TryBind(SpellBindContext ctx)
+    public SpellDefinition? TryBind(SpellBindContext ctx) =>
+        SpellTemplateBindHelper.DefaultTryBind(this, ctx);
+
+    public IReadOnlyDictionary<string, string>? TryExtractParams(string oracleText)
     {
-        var m = Pattern.Match(ctx.Text);
+        var m = Pattern.Match(oracleText);
         return m.Success
-            ? TokensSpellFactory.CreateTreasureTokensSpell(ctx.Caster, SpellTemplateHelpers.WordToInt(m.Groups["n"].Value))
+            ? new Dictionary<string, string> { ["n"] = m.Groups["n"].Value }
             : null;
     }
+
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
+        TokensSpellFactory.CreateTreasureTokensSpell(ctx.Caster, SpellTemplateHelpers.WordToInt(@params["n"]));
 }

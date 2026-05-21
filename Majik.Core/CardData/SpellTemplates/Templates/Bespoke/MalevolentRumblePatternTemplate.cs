@@ -23,12 +23,14 @@ public sealed class MalevolentRumblePatternTemplate : ISpellTemplate
     public int Priority => 100;
     public string Name => "MalevolentRumblePattern";
 
-    public SpellDefinition? TryBind(SpellBindContext ctx)
-    {
-        return Pattern.IsMatch(ctx.Text)
-            ? MalevolentRumbleSpell(ctx.Caster)
-            : null;
-    }
+    public SpellDefinition? TryBind(SpellBindContext ctx) =>
+        SpellTemplateBindHelper.DefaultTryBind(this, ctx);
+
+    public IReadOnlyDictionary<string, string>? TryExtractParams(string oracleText) =>
+        Pattern.IsMatch(oracleText) ? EmptyParams.Instance : null;
+
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
+        MalevolentRumbleSpell(ctx.Caster);
 
     /// <summary>
     /// Malevolent Rumble (Duskmourn).

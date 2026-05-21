@@ -13,17 +13,31 @@ public sealed class CreateTokensTemplate : ISpellTemplate
     public int Priority => 10;
     public string Name => "CreateTokens";
 
-    public SpellDefinition? TryBind(SpellBindContext ctx)
+    public SpellDefinition? TryBind(SpellBindContext ctx) =>
+        SpellTemplateBindHelper.DefaultTryBind(this, ctx);
+
+    public IReadOnlyDictionary<string, string>? TryExtractParams(string oracleText)
     {
-        var m = Pattern.Match(ctx.Text);
+        var m = Pattern.Match(oracleText);
         return m.Success
-            ? TokensSpellFactory.CreateTokensSpell(
-                ctx.Caster,
-                SpellTemplateHelpers.WordToInt(m.Groups["n"].Value),
-                int.Parse(m.Groups["p"].Value),
-                int.Parse(m.Groups["t"].Value),
-                m.Groups["subtype"].Value,
-                TokensSpellFactory.ParseKeywordList(m.Groups["keywords"].Value))
+            ? new Dictionary<string, string>
+            {
+                ["n"]        = m.Groups["n"].Value,
+                ["p"]        = m.Groups["p"].Value,
+                ["t"]        = m.Groups["t"].Value,
+                ["colour"]   = m.Groups["colour"].Value,
+                ["subtype"]  = m.Groups["subtype"].Value,
+                ["keywords"] = m.Groups["keywords"].Value,
+            }
             : null;
     }
+
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
+        TokensSpellFactory.CreateTokensSpell(
+            ctx.Caster,
+            SpellTemplateHelpers.WordToInt(@params["n"]),
+            int.Parse(@params["p"]),
+            int.Parse(@params["t"]),
+            @params["subtype"],
+            TokensSpellFactory.ParseKeywordList(@params["keywords"]));
 }

@@ -13,10 +13,12 @@ public sealed class InvestigateSingleTemplate : ISpellTemplate
     public int Priority => 50;
     public string Name => "InvestigateSingle";
 
-    public SpellDefinition? TryBind(SpellBindContext ctx)
-    {
-        return Pattern.IsMatch(ctx.Text)
-            ? TokensSpellFactory.InvestigateNTimesSpell(ctx.Caster, 1)
-            : null;
-    }
+    public SpellDefinition? TryBind(SpellBindContext ctx) =>
+        SpellTemplateBindHelper.DefaultTryBind(this, ctx);
+
+    public IReadOnlyDictionary<string, string>? TryExtractParams(string oracleText) =>
+        Pattern.IsMatch(oracleText) ? EmptyParams.Instance : null;
+
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
+        TokensSpellFactory.InvestigateNTimesSpell(ctx.Caster, 1);
 }

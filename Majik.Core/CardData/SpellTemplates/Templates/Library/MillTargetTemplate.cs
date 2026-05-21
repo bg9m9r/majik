@@ -13,11 +13,17 @@ public sealed class MillTargetTemplate : ISpellTemplate
     public int Priority => 50;
     public string Name => "MillTarget";
 
-    public SpellDefinition? TryBind(SpellBindContext ctx)
+    public SpellDefinition? TryBind(SpellBindContext ctx) =>
+        SpellTemplateBindHelper.DefaultTryBind(this, ctx);
+
+    public IReadOnlyDictionary<string, string>? TryExtractParams(string oracleText)
     {
-        var m = Pattern.Match(ctx.Text);
+        var m = Pattern.Match(oracleText);
         return m.Success
-            ? LibrarySpellFactory.MillTargetSpell(SpellTemplateHelpers.WordToInt(m.Groups["n"].Value), ctx.Resolver)
+            ? new Dictionary<string, string> { ["n"] = m.Groups["n"].Value }
             : null;
     }
+
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
+        LibrarySpellFactory.MillTargetSpell(SpellTemplateHelpers.WordToInt(@params["n"]), ctx.Resolver);
 }

@@ -13,11 +13,17 @@ public sealed class GreenSunsZenithPatternTemplate : ISpellTemplate
     public int Priority => 100;
     public string Name => "GreenSunsZenithPattern";
 
-    public SpellDefinition? TryBind(SpellBindContext ctx)
+    public SpellDefinition? TryBind(SpellBindContext ctx) =>
+        SpellTemplateBindHelper.DefaultTryBind(this, ctx);
+
+    public IReadOnlyDictionary<string, string>? TryExtractParams(string oracleText)
     {
-        var m = Pattern.Match(ctx.Text);
+        var m = Pattern.Match(oracleText);
         return m.Success
-            ? SearchSpellFactory.GreenSunsZenithSpell(ctx.Caster, m.Groups["color"].Value)
+            ? new Dictionary<string, string> { ["color"] = m.Groups["color"].Value }
             : null;
     }
+
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
+        SearchSpellFactory.GreenSunsZenithSpell(ctx.Caster, @params["color"]);
 }

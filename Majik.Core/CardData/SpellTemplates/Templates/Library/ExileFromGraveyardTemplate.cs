@@ -13,11 +13,17 @@ public sealed class ExileFromGraveyardTemplate : ISpellTemplate
     public int Priority => 50;
     public string Name => "ExileFromGraveyard";
 
-    public SpellDefinition? TryBind(SpellBindContext ctx)
+    public SpellDefinition? TryBind(SpellBindContext ctx) =>
+        SpellTemplateBindHelper.DefaultTryBind(this, ctx);
+
+    public IReadOnlyDictionary<string, string>? TryExtractParams(string oracleText)
     {
-        var m = Pattern.Match(ctx.Text);
+        var m = Pattern.Match(oracleText);
         return m.Success
-            ? LibrarySpellFactory.ExileFromGraveyardSpell(ctx.Resolver, m.Groups["kind"].Value.Trim())
+            ? new Dictionary<string, string> { ["kind"] = m.Groups["kind"].Value.Trim() }
             : null;
     }
+
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
+        LibrarySpellFactory.ExileFromGraveyardSpell(ctx.Resolver, @params["kind"]);
 }

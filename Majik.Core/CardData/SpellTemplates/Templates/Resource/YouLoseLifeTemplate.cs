@@ -13,12 +13,18 @@ public sealed class YouLoseLifeTemplate : ISpellTemplate
     public int Priority => 50;
     public string Name => "YouLoseLife";
 
-    public SpellDefinition? TryBind(SpellBindContext ctx)
+    public SpellDefinition? TryBind(SpellBindContext ctx) =>
+        SpellTemplateBindHelper.DefaultTryBind(this, ctx);
+
+    public IReadOnlyDictionary<string, string>? TryExtractParams(string oracleText)
     {
-        var m = Pattern.Match(ctx.Text);
+        var m = Pattern.Match(oracleText);
         return m.Success
-            ? ResourceSpellFactory.YouLoseLifeSpell(
-                SpellTemplateHelpers.WordToInt(m.Groups["n"].Value), ctx.Caster)
+            ? new Dictionary<string, string> { ["n"] = m.Groups["n"].Value }
             : null;
     }
+
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
+        ResourceSpellFactory.YouLoseLifeSpell(
+            SpellTemplateHelpers.WordToInt(@params["n"]), ctx.Caster);
 }

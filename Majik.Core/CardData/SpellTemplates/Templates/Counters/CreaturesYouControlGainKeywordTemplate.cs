@@ -16,11 +16,19 @@ public sealed class CreaturesYouControlGainKeywordTemplate : ISpellTemplate
     public SpellDefinition? TryBind(SpellBindContext ctx)
     {
         if (ctx.Effects == null) return null;
-        var m = Pattern.Match(ctx.Text);
+        return SpellTemplateBindHelper.DefaultTryBind(this, ctx);
+    }
+
+    public IReadOnlyDictionary<string, string>? TryExtractParams(string oracleText)
+    {
+        var m = Pattern.Match(oracleText);
         return m.Success
-            ? CountersSpellFactory.CreaturesYouControlGainKeywordSpell(
-                CountersSpellFactory.NormaliseKeyword(m.Groups["kw"].Value),
-                ctx.Caster, ctx.Effects)
+            ? new Dictionary<string, string> { ["kw"] = m.Groups["kw"].Value }
             : null;
     }
+
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
+        CountersSpellFactory.CreaturesYouControlGainKeywordSpell(
+            CountersSpellFactory.NormaliseKeyword(@params["kw"]),
+            ctx.Caster, ctx.Effects!);
 }

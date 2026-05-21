@@ -14,7 +14,11 @@ public sealed class CreaturesGetPlusCounterTemplate : ISpellTemplate
     public string Name => "CreaturesGetPlusCounter";
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
-        Pattern.IsMatch(ctx.Text)
-            ? CountersSpellFactory.CreaturesGetPlusCounterSpell(ctx.Caster)
-            : null;
+        SpellTemplateBindHelper.DefaultTryBind(this, ctx);
+
+    public IReadOnlyDictionary<string, string>? TryExtractParams(string oracleText) =>
+        Pattern.IsMatch(oracleText) ? EmptyParams.Instance : null;
+
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
+        CountersSpellFactory.CreaturesGetPlusCounterSpell(ctx.Caster);
 }
