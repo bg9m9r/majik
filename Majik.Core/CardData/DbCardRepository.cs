@@ -55,13 +55,20 @@ public sealed class DbCardRepository : ICardRepository
         var db = _contextFactory();
         try
         {
-            var exact = db.Cards.AsNoTracking().FirstOrDefault(c => c.Name == name);
+            // Scryfall stores one row per printing. Prefer the implemented
+            // representative if any exists; otherwise fall back to any row.
+            var exact = db.Cards.AsNoTracking()
+                .Where(c => c.Name == name)
+                .OrderByDescending(c => c.IsImplemented)
+                .FirstOrDefault();
             if (exact != null) return exact;
 
             // Double-faced cards (CR 712) stored as "Front // Back" — match prefix.
             var prefix = name + " // ";
             return db.Cards.AsNoTracking()
-                .FirstOrDefault(c => c.Name.StartsWith(prefix));
+                .Where(c => c.Name.StartsWith(prefix))
+                .OrderByDescending(c => c.IsImplemented)
+                .FirstOrDefault();
         }
         finally
         {
@@ -163,8 +170,17 @@ public sealed class DbCardRepository : ICardRepository
         try
         {
             // EF translates to `WHERE Name IN (...)` which uses IX_Cards_Name index.
-            return db.Cards.AsNoTracking()
+            // Scryfall stores one row per printing — "Forest" has ~3900 rows. The
+            // IsImplemented flag is set on a single representative row per name
+            // (the canonical one). Return one row per name, preferring the
+            // implemented printing so downstream consumers see the correct flag.
+            var rows = db.Cards.AsNoTracking()
                 .Where(c => set.Contains(c.Name))
+                .ToList();
+
+            return rows
+                .GroupBy(c => c.Name)
+                .Select(g => g.OrderByDescending(c => c.IsImplemented).First())
                 .ToList();
         }
         finally
