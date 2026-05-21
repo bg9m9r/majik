@@ -63,5 +63,12 @@ public static class SeedImplementedCards
         // while the Orb is on the battlefield; TriggerManager.EvaluateTriggers gates creature-ETB events.
         // Multiple simultaneous Orbs stack correctly. Common sideboard hate vs. CiP creatures.
         "Torpor Orb",
+        // U/B dual surveil land — Murders at Karlov Manor (UndergroundMortuaryFactory).
+        // {T}: Add {U} and {T}: Add {B} — two ManaAbility instances, player selects at activation.
+        // ETB trigger: surveil 1 — default-all-graveyard decision wired.
+        // ETB-tapped restriction + untapped gate on surveil trigger + player prompt deferred.
+        // Same pattern reusable for other surveil duals: Commercial District, Lush Portico,
+        // Meticulous Archive, Raucous Theater, Shadowy Backstreet.
+        "Underground Mortuary",
     };
 }

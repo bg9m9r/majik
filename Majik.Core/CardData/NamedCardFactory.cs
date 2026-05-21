@@ -50,6 +50,12 @@ public static class NamedCardFactory
             // produces the correct card shape without live suppression (test/vanilla use).
             "Torpor Orb" => TorporOrbFactory.Create(owner),
 
+            // U/B dual surveil land — Murders at Karlov Manor (UndergroundMortuaryFactory).
+            // {T}: Add {U} or {B} — two ManaAbility instances wired.
+            // ETB trigger: surveil 1 (default-all-graveyard decision) — wired.
+            // ETB-tapped restriction + untapped gate on surveil + player prompt deferred.
+            "Underground Mortuary" => UndergroundMortuaryFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
