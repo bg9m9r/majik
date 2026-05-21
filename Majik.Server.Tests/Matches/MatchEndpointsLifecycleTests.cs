@@ -527,6 +527,8 @@ internal sealed class FakeCardRepoForMatchTests : ICardRepository
     }
 
     public CardEntity? GetByName(string name) => _cards.TryGetValue(name, out var c) ? c : null;
+    public IReadOnlyList<CardEntity> GetByNames(IEnumerable<string> names) =>
+        names.Select(n => GetByName(n)).OfType<CardEntity>().ToList();
     public bool IsImplemented(string name) => _implemented.Contains(name);
     public IReadOnlyList<CardEntity> Search(string? q, bool implementedOnly, int limit,
         IReadOnlyList<string>? colors = null, IReadOnlyList<string>? types = null, IReadOnlyList<int>? cmcBuckets = null)

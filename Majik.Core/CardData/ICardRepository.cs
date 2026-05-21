@@ -28,6 +28,13 @@ public interface ICardRepository
         IReadOnlyList<string>? types = null,
         IReadOnlyList<int>? cmcBuckets = null);
 
+    /// <summary>Bulk exact-name lookup. Returns all cards whose
+    /// <c>Name</c> exactly matches one of the supplied names (case-sensitive,
+    /// same collation as the DB). Unknown names are silently omitted.
+    /// Uses <c>WHERE Name IN (...)</c> which hits the <c>IX_Cards_Name</c>
+    /// index instead of a table-scan LIKE.</summary>
+    IReadOnlyList<CardEntity> GetByNames(IEnumerable<string> names);
+
     /// <summary>Read-only check by exact name. Returns false when the
     /// card isn't in the DB.</summary>
     bool IsImplemented(string name);

@@ -153,6 +153,26 @@ public sealed class DbCardRepository : ICardRepository
         return typeTokens.Any(t => filter.Contains(t));
     }
 
+    public IReadOnlyList<CardEntity> GetByNames(IEnumerable<string> names)
+    {
+        if (names == null) return Array.Empty<CardEntity>();
+        var set = names.Distinct().ToList();
+        if (set.Count == 0) return Array.Empty<CardEntity>();
+
+        var db = _contextFactory();
+        try
+        {
+            // EF translates to `WHERE Name IN (...)` which uses IX_Cards_Name index.
+            return db.Cards.AsNoTracking()
+                .Where(c => set.Contains(c.Name))
+                .ToList();
+        }
+        finally
+        {
+            Dispose(db);
+        }
+    }
+
     public bool IsImplemented(string name)
     {
         var db = _contextFactory();

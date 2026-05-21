@@ -216,6 +216,107 @@ public class CardsEndpointsTests : IDisposable
         body!.Select(c => c.Name).Should().ContainSingle().Which.Should().Be("Lightning Bolt");
     }
 
+    // ---- POST /cards/by-name ----
+
+    [Fact]
+    public async Task PostByName_Unauth_Returns401()
+    {
+        using var f = Factory();
+        var resp = await Authed(f, null).PostAsJsonAsync("/cards/by-name", new { names = new[] { "Bear Cub" } });
+        resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task PostByName_EmptyList_ReturnsEmptyArray()
+    {
+        using var f = Factory();
+        var resp = await Authed(f, "stub-alice").PostAsJsonAsync("/cards/by-name", new { names = Array.Empty<string>() });
+        resp.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await resp.Content.ReadFromJsonAsync<IReadOnlyList<CardDto>>();
+        body.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task PostByName_NullBody_ReturnsEmptyArray()
+    {
+        using var f = Factory();
+        // Send an explicit null names list
+        var resp = await Authed(f, "stub-alice").PostAsJsonAsync("/cards/by-name", new { names = (string[]?)null });
+        resp.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await resp.Content.ReadFromJsonAsync<IReadOnlyList<CardDto>>();
+        body.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task PostByName_TooManyNames_Returns400()
+    {
+        using var f = Factory();
+        var names = Enumerable.Range(0, 201).Select(i => $"Card {i}").ToArray();
+        var resp = await Authed(f, "stub-alice").PostAsJsonAsync("/cards/by-name", new { names });
+        resp.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var body = await resp.Content.ReadFromJsonAsync<CardsError>();
+        body!.Error.Should().Be("too-many-names");
+    }
+
+    [Fact]
+    public async Task PostByName_ExactNames_ReturnsMatchingCardsOnly()
+    {
+        using var f = Factory();
+        var resp = await Authed(f, "stub-alice").PostAsJsonAsync("/cards/by-name",
+            new { names = new[] { "Bear Cub", "Lightning Bolt" } });
+        resp.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await resp.Content.ReadFromJsonAsync<IReadOnlyList<CardDto>>();
+        body!.Select(c => c.Name).Should()
+            .BeEquivalentTo(new[] { "Bear Cub", "Lightning Bolt" });
+    }
+
+    [Fact]
+    public async Task PostByName_ResultsSortedByName()
+    {
+        using var f = Factory();
+        // Post in reverse order; response should be alphabetical
+        var resp = await Authed(f, "stub-alice").PostAsJsonAsync("/cards/by-name",
+            new { names = new[] { "Lightning Bolt", "Bear Cub" } });
+        resp.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await resp.Content.ReadFromJsonAsync<IReadOnlyList<CardDto>>();
+        body!.Select(c => c.Name).Should().ContainInOrder("Bear Cub", "Lightning Bolt");
+    }
+
+    [Fact]
+    public async Task PostByName_UnknownNamesOmitted()
+    {
+        using var f = Factory();
+        var resp = await Authed(f, "stub-alice").PostAsJsonAsync("/cards/by-name",
+            new { names = new[] { "Bear Cub", "Nonexistent Card XYZ" } });
+        resp.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await resp.Content.ReadFromJsonAsync<IReadOnlyList<CardDto>>();
+        body!.Select(c => c.Name).Should().ContainSingle().Which.Should().Be("Bear Cub");
+    }
+
+    [Fact]
+    public async Task PostByName_SubstringDoesNotMatch()
+    {
+        using var f = Factory();
+        // "Bear" is a substring of "Bear Cub" — should NOT match exact-name semantics
+        var resp = await Authed(f, "stub-alice").PostAsJsonAsync("/cards/by-name",
+            new { names = new[] { "Bear" } });
+        resp.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await resp.Content.ReadFromJsonAsync<IReadOnlyList<CardDto>>();
+        body.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task PostByName_DuplicateNamesDeduplicatedInResponse()
+    {
+        using var f = Factory();
+        // Sending same name twice should return it only once
+        var resp = await Authed(f, "stub-alice").PostAsJsonAsync("/cards/by-name",
+            new { names = new[] { "Bear Cub", "Bear Cub" } });
+        resp.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await resp.Content.ReadFromJsonAsync<IReadOnlyList<CardDto>>();
+        body!.Select(c => c.Name).Should().ContainSingle().Which.Should().Be("Bear Cub");
+    }
+
     public void Dispose()
     {
         _db.Dispose();

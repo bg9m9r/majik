@@ -35,6 +35,16 @@ public sealed class CachingCardRepository : ICardRepository
         IReadOnlyList<int>? cmcBuckets = null)
         => _inner.Search(q, implementedOnly, limit, colors, types, cmcBuckets);
 
+    public IReadOnlyList<CardEntity> GetByNames(IEnumerable<string> names)
+    {
+        // Delegate to inner; populate per-name cache slots for each hit so that
+        // subsequent single-name GetByName calls are served from cache.
+        var results = _inner.GetByNames(names);
+        foreach (var card in results)
+            _cache.TryAdd(card.Name, card);
+        return results;
+    }
+
     public bool IsImplemented(string name)
         => _inner.IsImplemented(name);
 

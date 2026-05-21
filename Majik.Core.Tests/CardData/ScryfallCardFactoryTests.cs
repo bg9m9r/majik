@@ -139,6 +139,9 @@ public class ScryfallCardFactoryTests
         public CardEntity? GetByName(string name) =>
             _by.TryGetValue(name, out var e) ? e : null;
 
+        public IReadOnlyList<CardEntity> GetByNames(IEnumerable<string> names) =>
+            names.Select(n => GetByName(n)).OfType<CardEntity>().ToList();
+
         public IReadOnlyList<CardEntity> Search(string? q, bool implementedOnly, int limit,
             IReadOnlyList<string>? colors = null, IReadOnlyList<string>? types = null, IReadOnlyList<int>? cmcBuckets = null)
             => throw new NotImplementedException();

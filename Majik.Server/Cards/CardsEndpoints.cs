@@ -24,7 +24,43 @@ public static class CardsEndpoints
              .Produces<CardsError>(StatusCodes.Status400BadRequest)
              .Produces(StatusCodes.Status401Unauthorized);
 
+        group.MapPost("/by-name", GetByNames)
+             .WithName("GetCardsByName")
+             .Produces<IReadOnlyList<CardDto>>(StatusCodes.Status200OK)
+             .Produces<CardsError>(StatusCodes.Status400BadRequest)
+             .Produces(StatusCodes.Status401Unauthorized);
+
         return routes;
+    }
+
+    private const int MaxByNameCount = 200;
+
+    private static IResult GetByNames(
+        [FromBody] CardsByNameRequest body,
+        [FromServices] ICardRepository repo,
+        [FromServices] ILoggerFactory loggerFactory)
+    {
+        var logger = loggerFactory.CreateLogger("Majik.Cards");
+        if (body?.Names == null || body.Names.Count == 0)
+            return Results.Ok(Array.Empty<CardDto>());
+        if (body.Names.Count > MaxByNameCount)
+            return Results.BadRequest(new CardsError("too-many-names", $"max {MaxByNameCount}"));
+        try
+        {
+            var cards = repo.GetByNames(body.Names);
+            var dtos = new List<CardDto>(cards.Count);
+            foreach (var c in cards.OrderBy(c => c.Name))
+            {
+                try { dtos.Add(ToDto(c)); }
+                catch (Exception ex) { logger.LogError(ex, "ToDto failed for '{Name}'", c.Name); }
+            }
+            return Results.Ok(dtos);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "GetByNames failed. count={Count}", body.Names.Count);
+            return Results.Json(new CardsError("by-name-failed", ex.Message), statusCode: 500);
+        }
     }
 
     private static IResult Search(
@@ -124,3 +160,6 @@ public static class CardsEndpoints
             OracleText: c.OracleText);
     }
 }
+
+/// <summary>Request body for <c>POST /cards/by-name</c>.</summary>
+public sealed record CardsByNameRequest(IReadOnlyList<string> Names);
