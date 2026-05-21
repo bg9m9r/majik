@@ -19,5 +19,7 @@ public static class SeedImplementedCards
         // Fetch lands — Onslaught + Zendikar cycles (OracleLandActivatedAbilityBinder)
         "Bloodstained Mire", "Flooded Strand", "Polluted Delta", "Wooded Foothills", "Windswept Heath",
         "Misty Rainforest", "Scalding Tarn", "Verdant Catacombs", "Marsh Flats", "Arid Mesa",
+        // Undying creatures (CR 702.93 — UndyingFactory)
+        "Young Wolf", "Strangleroot Geist", "Butcher Ghoul", "Geralf's Messenger",
     };
 }

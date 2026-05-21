@@ -2,6 +2,7 @@ using System.Text.Json;
 using Majik.Core.Abilities;
 using Majik.Core.CardData.Database;
 using Majik.Core.Cards;
+using Majik.Core.Keywords;
 using Majik.Core.Players;
 
 namespace Majik.Core.CardData;
@@ -9,8 +10,8 @@ namespace Majik.Core.CardData;
 /// <summary>
 /// Reads the Scryfall <see cref="CardEntity.Keywords"/> JSON array and
 /// attaches a <see cref="KeywordAbility"/> for each evergreen keyword the
-/// engine knows how to act on (currently: combat-relevant + Flash). Non-
-/// evergreen / mechanically-complex keywords (Storm, Suspend, Kicker, …)
+/// engine knows how to act on (currently: combat-relevant + Flash + Undying).
+/// Non-evergreen / mechanically-complex keywords (Storm, Suspend, Kicker, …)
 /// are ignored here and would need bespoke binders.
 /// </summary>
 public static class KeywordBinder
@@ -26,6 +27,8 @@ public static class KeywordBinder
         "First strike", "Double strike",
         "Deathtouch", "Lifelink", "Reach", "Menace",
         "Defender", "Indestructible", "Flash",
+        // Death-triggered keywords
+        "Undying",
     };
 
     public static void Bind(ICard card, CardEntity entity, Player controller)
@@ -37,9 +40,20 @@ public static class KeywordBinder
         var keywords = ParseKeywordsArray(entity.Keywords);
         foreach (var kw in keywords)
         {
-            if (Recognized.Contains(kw))
+            if (!Recognized.Contains(kw)) continue;
+
+            card.AddAbility(new KeywordAbility(kw, card, controller));
+
+            // Keywords that require an additional triggered ability beyond the
+            // marker. Each factory handles its own preconditions.
+            if (kw.Equals("Undying", StringComparison.OrdinalIgnoreCase)
+                && card is Creature undyingCreature)
             {
-                card.AddAbility(new KeywordAbility(kw, card, controller));
+                // Set controller on the card if not already set, so the factory
+                // can bind the trigger correctly.
+                if (undyingCreature.Controller == null)
+                    undyingCreature.SetController(controller);
+                card.AddAbility(UndyingFactory.Build(undyingCreature));
             }
         }
     }
