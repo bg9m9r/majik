@@ -250,3 +250,176 @@ public sealed class RegenerateTargetTemplate : ISpellTemplate
             new TargetRequest("target creature", 1, 1, Array.Empty<object>())
         });
 }
+
+/// <summary>
+/// "Put target [creature|permanent|nonland permanent|attacking creature]
+/// on top of its owner's library." — Time Ebb, Totally Lost, Boomerang
+/// variants, Condemn. Removes the target from the battlefield and
+/// inserts at index 0 of the owner's library (top).
+/// </summary>
+public sealed class PutTargetOnTopOfLibraryTemplate : ISpellTemplate
+{
+    private static readonly Regex Pattern = new(
+        @"put\s+target\s+(?:[\w-]+\s+)*?(?:creature|permanent|card|nonland\s+permanent)\s+on\s+top\s+of\s+its\s+owner'?s?\s+library",
+        RegexOptions.IgnoreCase);
+
+    public int Priority => 60;
+    public string Name => "PutTargetOnTopOfLibrary";
+
+    public SpellDefinition? TryBind(SpellBindContext ctx) =>
+        SpellTemplateBindHelper.DefaultTryBind(this, ctx);
+
+    public IReadOnlyDictionary<string, string>? TryExtractParams(string oracleText) =>
+        Pattern.IsMatch(oracleText) ? EmptyParams.Instance : null;
+
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx)
+    {
+        var resolver = ctx.Resolver;
+        return new SpellDefinition(
+            Modes: Array.Empty<string>(),
+            HasVariableX: false,
+            TargetRequests: new[] { new TargetRequest("target permanent", 1, 1, Array.Empty<object>()) },
+            EffectFactory: p =>
+            {
+                var target = resolver(p.Targets[0][0]);
+                return new IEffect[] { new Effect("to top of library", () =>
+                {
+                    if (target is not ICard card) return;
+                    var owner = card.Owner;
+                    if (owner == null) return;
+                    if (card.Zone == Majik.Core.Zones.ZoneType.Battlefield) owner.Zones.Battlefield.RemoveCard(card);
+                    else if (card.Zone == Majik.Core.Zones.ZoneType.Graveyard) owner.Zones.Graveyard.RemoveCard(card);
+                    else if (card.Zone == Majik.Core.Zones.ZoneType.Hand) owner.Zones.Hand.RemoveCard(card);
+                    owner.Zones.Library.InsertCardAt(0, card);
+                    card.SetZone(Majik.Core.Zones.ZoneType.Library);
+                }) };
+            });
+    }
+}
+
+/// <summary>
+/// "Put target [X] on the bottom of its owner's library." — Mystic
+/// Repeal, Hindering Light. Mirrors PutTargetOnTopOfLibrary but
+/// appends to the library tail.
+/// </summary>
+public sealed class PutTargetOnBottomOfLibraryTemplate : ISpellTemplate
+{
+    private static readonly Regex Pattern = new(
+        @"put\s+target\s+(?:[\w-]+\s+)*?(?:creature|permanent|card|nonland\s+permanent)\s+on\s+the\s+bottom\s+of\s+its\s+owner'?s?\s+library",
+        RegexOptions.IgnoreCase);
+
+    public int Priority => 60;
+    public string Name => "PutTargetOnBottomOfLibrary";
+
+    public SpellDefinition? TryBind(SpellBindContext ctx) =>
+        SpellTemplateBindHelper.DefaultTryBind(this, ctx);
+
+    public IReadOnlyDictionary<string, string>? TryExtractParams(string oracleText) =>
+        Pattern.IsMatch(oracleText) ? EmptyParams.Instance : null;
+
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx)
+    {
+        var resolver = ctx.Resolver;
+        return new SpellDefinition(
+            Modes: Array.Empty<string>(),
+            HasVariableX: false,
+            TargetRequests: new[] { new TargetRequest("target permanent", 1, 1, Array.Empty<object>()) },
+            EffectFactory: p =>
+            {
+                var target = resolver(p.Targets[0][0]);
+                return new IEffect[] { new Effect("to bottom of library", () =>
+                {
+                    if (target is not ICard card) return;
+                    var owner = card.Owner;
+                    if (owner == null) return;
+                    if (card.Zone == Majik.Core.Zones.ZoneType.Battlefield) owner.Zones.Battlefield.RemoveCard(card);
+                    else if (card.Zone == Majik.Core.Zones.ZoneType.Graveyard) owner.Zones.Graveyard.RemoveCard(card);
+                    else if (card.Zone == Majik.Core.Zones.ZoneType.Hand) owner.Zones.Hand.RemoveCard(card);
+                    owner.Zones.Library.AddCard(card);
+                    card.SetZone(Majik.Core.Zones.ZoneType.Library);
+                }) };
+            });
+    }
+}
+
+/// <summary>
+/// "Target player draws X cards" — Stroke of Genius, Blue Sun's
+/// Zenith (lossy on shuffle-self), Mind Spring. Variable-X draw with
+/// player target. v1 uses the spell's X for the count.
+/// </summary>
+public sealed class TargetPlayerDrawsXTemplate : ISpellTemplate
+{
+    private static readonly Regex Pattern = new(
+        @"target\s+player\s+draws\s+x\s+cards?",
+        RegexOptions.IgnoreCase);
+
+    public int Priority => 80;
+    public string Name => "TargetPlayerDrawsX";
+
+    public SpellDefinition? TryBind(SpellBindContext ctx) =>
+        SpellTemplateBindHelper.DefaultTryBind(this, ctx);
+
+    public IReadOnlyDictionary<string, string>? TryExtractParams(string oracleText) =>
+        Pattern.IsMatch(oracleText) ? EmptyParams.Instance : null;
+
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx)
+    {
+        var resolver = ctx.Resolver;
+        return new SpellDefinition(
+            Modes: Array.Empty<string>(),
+            HasVariableX: true,
+            TargetRequests: new[] { new TargetRequest("target player", 1, 1, Array.Empty<object>()) },
+            EffectFactory: p =>
+            {
+                var target = resolver(p.Targets[0][0]);
+                var x = p.X ?? 0;
+                return new IEffect[] { new Effect($"draw X={x}", () =>
+                {
+                    if (target is not Player pl) return;
+                    for (var i = 0; i < x; i++)
+                    {
+                        var top = pl.Zones.Library.GetCards().FirstOrDefault();
+                        if (top == null) return;
+                        pl.Zones.Library.RemoveCard(top);
+                        pl.Zones.Hand.AddCard(top);
+                        top.SetZone(Majik.Core.Zones.ZoneType.Hand);
+                    }
+                }) };
+            });
+    }
+}
+
+/// <summary>
+/// Mixed-sign pump — "Target creature gets +N/-M" or "-N/+M until end
+/// of turn". Catches Lash of Malice (+2/-2), Belbe's Armor variants.
+/// Lower priority than PumpCreature (+/+) and DebuffCreature (-/-) so
+/// those win on their respective shapes.
+/// </summary>
+public sealed class MixedSignPumpTemplate : ISpellTemplate
+{
+    private static readonly Regex Pattern = new(
+        @"target\s+creature\s+gets\s+(?<p>[+-]\d+)/(?<t>[+-]\d+)\s+until\s+end\s+of\s+turn",
+        RegexOptions.IgnoreCase);
+
+    public int Priority => 40;
+    public string Name => "MixedSignPump";
+
+    public SpellDefinition? TryBind(SpellBindContext ctx) =>
+        SpellTemplateBindHelper.DefaultTryBind(this, ctx);
+
+    public IReadOnlyDictionary<string, string>? TryExtractParams(string oracleText)
+    {
+        var m = Pattern.Match(oracleText);
+        if (!m.Success) return null;
+        var p = m.Groups["p"].Value;
+        var t = m.Groups["t"].Value;
+        if ((p[0] == '+') == (t[0] == '+')) return null; // skip pure +/+ and -/-
+        return new Dictionary<string, string> { ["p"] = p, ["t"] = t };
+    }
+
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
+        Majik.Core.CardData.SpellTemplates.Templates.Counters.CountersSpellFactory.PumpSpell(
+            int.Parse(@params["p"]),
+            int.Parse(@params["t"]),
+            ctx.Resolver);
+}

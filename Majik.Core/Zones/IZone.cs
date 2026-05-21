@@ -47,4 +47,15 @@ public interface IZone
     /// Clear all cards from this zone.
     /// </summary>
     void Clear();
+
+    /// <summary>
+    /// Insert a card at a specific index. Used for "put on top of
+    /// library" (index 0) and similar ordered-zone effects. Default
+    /// implementation appends to the end; ordered zones (Library,
+    /// Stack) override.
+    /// </summary>
+    void InsertCardAt(int index, ICard card)
+    {
+        AddCard(card);
+    }
 }
