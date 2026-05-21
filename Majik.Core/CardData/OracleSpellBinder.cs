@@ -212,6 +212,15 @@ public static class OracleSpellBinder
     private static readonly Regex CreaturesYouControlGain = new(
         @"creatures\s+you\s+control\s+gain\s+(?<kw>flying|trample|first\s+strike|double\s+strike|deathtouch|lifelink|vigilance|haste|reach|menace|indestructible)\s+until\s+end\s+of\s+turn",
         RegexOptions.IgnoreCase);
+    // "Target player loses N life."
+    private static readonly Regex TargetPlayerLosesLife = new(
+        @"target\s+player\s+loses?\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+life",
+        RegexOptions.IgnoreCase);
+    // "Exile target card from a graveyard." / "Exile target card from your graveyard."
+    // / "Exile target creature card from a graveyard." (with optional card-type filter)
+    private static readonly Regex ExileFromGraveyard = new(
+        @"exile\s+target\s+(?<kind>creature|instant|sorcery|artifact|enchantment|planeswalker|land)?\s*card\s+from\s+(?:a|your)\s+graveyard",
+        RegexOptions.IgnoreCase);
 
     public static SpellDefinition? Bind(
         CardEntity entity,
@@ -323,6 +332,9 @@ public static class OracleSpellBinder
         m = YouLoseLife.Match(text);
         if (m.Success) return YouLoseLifeSpell(WordToInt(m.Groups["n"].Value), caster);
 
+        var mTpl = TargetPlayerLosesLife.Match(text);
+        if (mTpl.Success) return TargetPlayerLosesLifeSpell(WordToInt(mTpl.Groups["n"].Value), resolver);
+
         // More-specific destroys before generic — nonland before permanent before land.
         if (DestroyNonlandPermanent.IsMatch(text)) return DestroyTargetSpell(
             resolver, "target nonland permanent",
@@ -341,6 +353,11 @@ public static class OracleSpellBinder
 
         m = ReanimateFromGraveyard.Match(text);
         if (m.Success) return ReanimateSpell(resolver, m.Groups["kind"].Value);
+
+        // ExileFromGraveyard before ExileTarget — "exile target creature card from a graveyard"
+        // would otherwise match ExileTarget's creature alternative first.
+        var mEgy = ExileFromGraveyard.Match(text);
+        if (mEgy.Success) return ExileFromGraveyardSpell(resolver, mEgy.Groups["kind"].Value.Trim());
 
         m = ExileTarget.Match(text);
         if (m.Success) return ExileTargetSpell(resolver, $"target {m.Groups[1].Value}");
@@ -885,6 +902,33 @@ public static class OracleSpellBinder
         Modes: Array.Empty<string>(), HasVariableX: false,
         TargetRequests: Array.Empty<TargetRequest>(),
         EffectFactory: _ => new IEffect[] { new Effect($"you lose {n}", () => caster.LoseLife(n)) });
+
+    private static SpellDefinition TargetPlayerLosesLifeSpell(int n, Func<object, object> resolver) => new(
+        Modes: Array.Empty<string>(), HasVariableX: false,
+        TargetRequests: new[] { new TargetRequest("target player", 1, 1, Array.Empty<object>()) },
+        EffectFactory: p =>
+        {
+            var target = resolver(p.Targets[0][0]);
+            return new IEffect[] { new Effect($"target player loses {n}", () =>
+            {
+                if (target is Player pl) pl.LoseLife(n);
+            }) };
+        });
+
+    private static SpellDefinition ExileFromGraveyardSpell(Func<object, object> resolver, string kindRaw) => new(
+        Modes: Array.Empty<string>(), HasVariableX: false,
+        TargetRequests: new[] { new TargetRequest(
+            string.IsNullOrEmpty(kindRaw) ? "target card in graveyard" : $"target {kindRaw} card in graveyard",
+            1, 1, Array.Empty<object>()) },
+        EffectFactory: p =>
+        {
+            var target = resolver(p.Targets[0][0]);
+            return new IEffect[] { new Effect("exile from gy", () =>
+            {
+                if (target is ICard card && card.Zone == ZoneType.Graveyard)
+                    MoveToExile(card);
+            }) };
+        });
 
     /// <summary>Layer 7c +P/+T effect with end-of-turn expiry.</summary>
     private sealed class PumpUntilEndOfTurnEffect : Majik.Core.Effects.ContinuousEffect

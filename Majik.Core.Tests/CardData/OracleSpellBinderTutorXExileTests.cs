@@ -118,4 +118,132 @@ public class OracleSpellBinderTutorXExileTests
 
         bear.Zone.Should().Be(ZoneType.Exile);
     }
+
+    // ---------- Target player loses N life ----------
+
+    [Fact]
+    public void TargetPlayerLosesLife_DropsTargetLifeByN()
+    {
+        var bob = new Player("Bob", 20);
+
+        var def = OracleSpellBinder.Bind(
+            new CardEntity { Name = "Drain Life", ManaCost = "{B}",
+              OracleText = "Target player loses 3 life." },
+            _alice, raw => raw, null);
+        def.Should().NotBeNull();
+        def!.TargetRequests.Should().ContainSingle(r => r.Description == "target player");
+
+        var chosen = new ChosenSpellParams(null, null,
+            new[] { new object[] { bob } }, ManaPayment.Empty);
+        foreach (var e in def.EffectFactory(chosen)) e.Execute();
+
+        bob.LifeTotal.Should().Be(17);
+        _alice.LifeTotal.Should().Be(20); // caster unaffected
+    }
+
+    [Fact]
+    public void TargetPlayerLosesLife_WordNumber_DropsLifeByN()
+    {
+        var bob = new Player("Bob", 20);
+
+        var def = OracleSpellBinder.Bind(
+            new CardEntity { Name = "X", ManaCost = "{2}{B}",
+              OracleText = "Target player loses five life." },
+            _alice, raw => raw, null);
+        def.Should().NotBeNull();
+
+        var chosen = new ChosenSpellParams(null, null,
+            new[] { new object[] { bob } }, ManaPayment.Empty);
+        foreach (var e in def!.EffectFactory(chosen)) e.Execute();
+
+        bob.LifeTotal.Should().Be(15);
+    }
+
+    // ---------- Exile from graveyard ----------
+
+    [Fact]
+    public void ExileFromGraveyard_AnyCard_MovesCardToExile()
+    {
+        var corpse = new Creature("Bear", "1G", 2, 2) { Owner = _alice, Zone = ZoneType.Graveyard };
+        _alice.Zones.Graveyard.AddCard(corpse);
+
+        var def = OracleSpellBinder.Bind(
+            new CardEntity { Name = "Bojuka Bog", ManaCost = "",
+              OracleText = "Exile target card from a graveyard." },
+            _alice, raw => raw, null);
+        def.Should().NotBeNull();
+        def!.TargetRequests.Should().ContainSingle(r => r.Description == "target card in graveyard");
+
+        var chosen = new ChosenSpellParams(null, null,
+            new[] { new object[] { corpse } }, ManaPayment.Empty);
+        foreach (var e in def.EffectFactory(chosen)) e.Execute();
+
+        _alice.Zones.Exile.GetCards().Should().Contain(corpse);
+        _alice.Zones.Graveyard.GetCards().Should().NotContain(corpse);
+        corpse.Zone.Should().Be(ZoneType.Exile);
+    }
+
+    [Fact]
+    public void ExileFromGraveyard_CreatureCard_UsesTypedLabel()
+    {
+        var corpse = new Creature("Wolf", "1G", 2, 2) { Owner = _alice, Zone = ZoneType.Graveyard };
+        _alice.Zones.Graveyard.AddCard(corpse);
+
+        var def = OracleSpellBinder.Bind(
+            new CardEntity { Name = "Relic of Progenitus", ManaCost = "{1}",
+              OracleText = "Exile target creature card from a graveyard." },
+            _alice, raw => raw, null);
+        def.Should().NotBeNull();
+        def!.TargetRequests.Should().ContainSingle(r => r.Description == "target creature card in graveyard");
+
+        var chosen = new ChosenSpellParams(null, null,
+            new[] { new object[] { corpse } }, ManaPayment.Empty);
+        foreach (var e in def.EffectFactory(chosen)) e.Execute();
+
+        _alice.Zones.Exile.GetCards().Should().Contain(corpse);
+        _alice.Zones.Graveyard.GetCards().Should().NotContain(corpse);
+    }
+
+    [Fact]
+    public void ExileFromYourGraveyard_MovesCardToExile()
+    {
+        var corpse = new Creature("Bear", "1G", 2, 2) { Owner = _alice, Zone = ZoneType.Graveyard };
+        _alice.Zones.Graveyard.AddCard(corpse);
+
+        var def = OracleSpellBinder.Bind(
+            new CardEntity { Name = "Withered Wretch", ManaCost = "{B}",
+              OracleText = "Exile target card from your graveyard." },
+            _alice, raw => raw, null);
+        def.Should().NotBeNull();
+
+        var chosen = new ChosenSpellParams(null, null,
+            new[] { new object[] { corpse } }, ManaPayment.Empty);
+        foreach (var e in def!.EffectFactory(chosen)) e.Execute();
+
+        _alice.Zones.Exile.GetCards().Should().Contain(corpse);
+        _alice.Zones.Graveyard.GetCards().Should().NotContain(corpse);
+    }
+
+    [Fact]
+    public void ExileFromGraveyard_CardNotInGraveyard_NoOp()
+    {
+        // If a card is on the battlefield (wrong zone), the effect should not move it.
+        var bear = new Creature("Bear", "1G", 2, 2)
+        { Owner = _alice, Controller = _alice, Zone = ZoneType.Battlefield };
+        _alice.Zones.Battlefield.AddCard(bear);
+
+        var def = OracleSpellBinder.Bind(
+            new CardEntity { Name = "Bojuka Bog", ManaCost = "",
+              OracleText = "Exile target card from a graveyard." },
+            _alice, raw => raw, null);
+        def.Should().NotBeNull();
+
+        var chosen = new ChosenSpellParams(null, null,
+            new[] { new object[] { bear } }, ManaPayment.Empty);
+        foreach (var e in def!.EffectFactory(chosen)) e.Execute();
+
+        // Card should remain on battlefield; exile should be empty.
+        bear.Zone.Should().Be(ZoneType.Battlefield);
+        _alice.Zones.Exile.GetCards().Should().NotContain(bear);
+    }
 }
