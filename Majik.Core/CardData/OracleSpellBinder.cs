@@ -194,6 +194,14 @@ public static class OracleSpellBinder
     private static readonly Regex CreateClueTokens = new(
         @"create\s+(?<n>a|an|\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+clue\s+tokens?\b",
         RegexOptions.IgnoreCase);
+    // "Investigate." / "Investigate N times." — CR 701.30 keyword action:
+    // create a Clue token.
+    private static readonly Regex InvestigateSingle = new(
+        @"^\s*investigate\s*\.",
+        RegexOptions.IgnoreCase | RegexOptions.Multiline);
+    private static readonly Regex InvestigateNTimes = new(
+        @"investigate\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+times",
+        RegexOptions.IgnoreCase);
     // "Create [a|N] [P]/[T] [colour] [subtype] creature token[s] [with KW (and KW)]."
     // Captures: count, P, T, optional colour, subtype, optional keyword list.
     private static readonly Regex CreateTokens = new(
@@ -347,6 +355,13 @@ public static class OracleSpellBinder
 
         m = YouGainLife.Match(text);
         if (m.Success) return YouGainLifeSpell(WordToInt(m.Groups["n"].Value), caster);
+
+        // Investigate keyword action (CR 701.30) — checked before CreateClueTokens "create" pattern.
+        var mInvN = InvestigateNTimes.Match(text);
+        if (mInvN.Success) return InvestigateNTimesSpell(caster, WordToInt(mInvN.Groups["n"].Value));
+
+        if (InvestigateSingle.IsMatch(text))
+            return InvestigateNTimesSpell(caster, 1);
 
         // Predefined artifact tokens — checked before creature-token regex (more specific).
         m = CreateTreasureTokens.Match(text);
@@ -644,6 +659,16 @@ public static class OracleSpellBinder
         Modes: Array.Empty<string>(), HasVariableX: false,
         TargetRequests: Array.Empty<TargetRequest>(),
         EffectFactory: _ => new IEffect[] { new Effect($"create {count} Clue", () =>
+        {
+            for (var i = 0; i < count; i++)
+                TokenFactory.CreateClue(caster);
+        }) });
+
+    // CR 701.30 — "To investigate" means to create a Clue token.
+    private static SpellDefinition InvestigateNTimesSpell(Player caster, int count) => new(
+        Modes: Array.Empty<string>(), HasVariableX: false,
+        TargetRequests: Array.Empty<TargetRequest>(),
+        EffectFactory: _ => new IEffect[] { new Effect($"investigate {count}", () =>
         {
             for (var i = 0; i < count; i++)
                 TokenFactory.CreateClue(caster);

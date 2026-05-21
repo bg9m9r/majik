@@ -107,4 +107,44 @@ public class OracleSpellBinderTokenModifierTests
             .Where(a => a.IsToken && a.Subtypes.Contains(CardSubtype.Clue))
             .Should().HaveCount(2);
     }
+
+    // CR 701.30 — Investigate keyword action creates one Clue token.
+    [Fact]
+    public void Bind_Investigate_SpawnsOneClueToken()
+    {
+        var def = OracleSpellBinder.Bind(
+            new CardEntity { Name = "Sleuth", ManaCost = "{2}{U}",
+              OracleText = "Investigate." },
+            _alice, raw => raw, null);
+        def.Should().NotBeNull();
+
+        var chosen = new ChosenSpellParams(null, null,
+            new IReadOnlyList<object>[0], ManaPayment.Empty);
+        foreach (var e in def!.EffectFactory(chosen)) e.Execute();
+
+        _alice.Zones.Battlefield.GetCards()
+            .OfType<Artifact>()
+            .Where(a => a.IsToken && a.Subtypes.Contains(CardSubtype.Clue))
+            .Should().HaveCount(1);
+    }
+
+    // CR 701.30 — "Investigate N times" creates N Clue tokens.
+    [Fact]
+    public void Bind_InvestigateThreeTimes_SpawnsThreeClueTokens()
+    {
+        var def = OracleSpellBinder.Bind(
+            new CardEntity { Name = "Triple Sleuth", ManaCost = "{3}{U}",
+              OracleText = "Investigate three times." },
+            _alice, raw => raw, null);
+        def.Should().NotBeNull();
+
+        var chosen = new ChosenSpellParams(null, null,
+            new IReadOnlyList<object>[0], ManaPayment.Empty);
+        foreach (var e in def!.EffectFactory(chosen)) e.Execute();
+
+        _alice.Zones.Battlefield.GetCards()
+            .OfType<Artifact>()
+            .Where(a => a.IsToken && a.Subtypes.Contains(CardSubtype.Clue))
+            .Should().HaveCount(3);
+    }
 }
