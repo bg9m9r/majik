@@ -423,3 +423,88 @@ public sealed class MixedSignPumpTemplate : ISpellTemplate
             int.Parse(@params["t"]),
             ctx.Resolver);
 }
+
+/// <summary>
+/// Variable-X pump — "Target creature gets +X/+0", "+X/+X", "+N/+X",
+/// "-X/-X" until end of turn. Captures variants the fixed-numeric
+/// PumpCreature/DebuffCreature templates miss. Routes through the
+/// new CountersSpellFactory.PumpSpellX which respects the spell's X
+/// at resolution.
+/// </summary>
+public sealed class VarXPumpTemplate : ISpellTemplate
+{
+    private static readonly Regex Pattern = new(
+        @"target\s+creature(?:\s+(?:you\s+control|an\s+opponent\s+controls|you\s+don'?t\s+control))?\s+gets\s+(?<p>[+-](?:\d+|x))/(?<t>[+-](?:\d+|x))(?:\s+and\s+gains?\s+[\w\s,-]+?)?\s+until\s+end\s+of\s+turn",
+        RegexOptions.IgnoreCase);
+
+    public int Priority => 70; // beats fixed PumpCreature (50) when X is in either axis
+    public string Name => "VarXPump";
+
+    public SpellDefinition? TryBind(SpellBindContext ctx) =>
+        SpellTemplateBindHelper.DefaultTryBind(this, ctx);
+
+    public IReadOnlyDictionary<string, string>? TryExtractParams(string oracleText)
+    {
+        var m = Pattern.Match(oracleText);
+        if (!m.Success) return null;
+        var p = m.Groups["p"].Value;
+        var t = m.Groups["t"].Value;
+        // Only fire when at least one axis is X — otherwise fixed-numeric
+        // templates handle it.
+        bool hasX = p.Contains('x', StringComparison.OrdinalIgnoreCase) ||
+                    t.Contains('x', StringComparison.OrdinalIgnoreCase);
+        if (!hasX) return null;
+        return new Dictionary<string, string> { ["p"] = p, ["t"] = t };
+    }
+
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
+        Majik.Core.CardData.SpellTemplates.Templates.Counters.CountersSpellFactory.PumpSpellX(
+            @params["p"], @params["t"], ctx.Resolver);
+}
+
+/// <summary>
+/// "Add {fixed mana cost}." — Dark Ritual, Cabal Ritual, Pyretic
+/// Ritual, Seething Song. Parses the mana sequence and adds it to
+/// the caster's mana pool at resolution.
+/// </summary>
+public sealed class AddFixedManaTemplate : ISpellTemplate
+{
+    // "Add {B}{B}{B}." with no trailing clause (single-line). Multi-clause
+    // ritual variants (threshold-add, per-creature-add) fall through to
+    // the composer or single-template path.
+    private static readonly Regex Pattern = new(
+        @"^\s*add\s+(?<mana>(?:\{[^\}]+\})+)\.?\s*$",
+        RegexOptions.IgnoreCase);
+
+    public int Priority => 60;
+    public string Name => "AddFixedMana";
+
+    public SpellDefinition? TryBind(SpellBindContext ctx) =>
+        SpellTemplateBindHelper.DefaultTryBind(this, ctx);
+
+    public IReadOnlyDictionary<string, string>? TryExtractParams(string oracleText)
+    {
+        var m = Pattern.Match(oracleText);
+        return m.Success
+            ? new Dictionary<string, string> { ["mana"] = m.Groups["mana"].Value }
+            : null;
+    }
+
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx)
+    {
+        var caster = ctx.Caster;
+        // Strip braces — ManaCost.Parse accepts both bracketed and
+        // bracket-less forms but normalizing keeps it predictable.
+        var raw = @params["mana"];
+        var compact = raw.Replace("{", "").Replace("}", "");
+        return new SpellDefinition(
+            Modes: Array.Empty<string>(),
+            HasVariableX: false,
+            TargetRequests: Array.Empty<TargetRequest>(),
+            EffectFactory: _ => new IEffect[] { new Effect($"add {compact}", () =>
+            {
+                var cost = Majik.Core.ValueObjects.ManaCost.Parse(compact);
+                caster.AddManaToPool(cost);
+            }) });
+    }
+}

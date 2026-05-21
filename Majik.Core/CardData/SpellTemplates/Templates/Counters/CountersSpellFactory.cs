@@ -123,6 +123,39 @@ internal static class CountersSpellFactory
             }
         }) });
 
+    // Mirrors PumpSpell but uses the spell's X for whichever stat axis
+    // is captured as 'x' instead of a digit. Either or both stats may
+    // be X. Negative-sign X (e.g. Toxic Deluge) supported.
+    internal static SpellDefinition PumpSpellX(
+        string pToken, string tToken,
+        Func<object, object> resolver) => new(
+        Modes: Array.Empty<string>(),
+        HasVariableX: true,
+        TargetRequests: new[] { new TargetRequest("target creature", 1, 1, Array.Empty<object>()) },
+        EffectFactory: param =>
+        {
+            var target = resolver(param.Targets[0][0]);
+            var x = param.X ?? 0;
+            var p = ResolveAxis(pToken, x);
+            var t = ResolveAxis(tToken, x);
+            return new IEffect[] { new Effect($"{p:+#;-#;0}/{t:+#;-#;0} X={x}", () =>
+            {
+                if (target is Creature c && c.ActiveEffects != null)
+                {
+                    c.ActiveEffects.Register(new PumpUntilEndOfTurnEffect(c, p, t));
+                }
+            }) };
+        });
+
+    private static int ResolveAxis(string token, int x)
+    {
+        if (string.IsNullOrEmpty(token)) return 0;
+        var sign = token[0];
+        var body = token.Substring(1);
+        int mag = body.Equals("x", StringComparison.OrdinalIgnoreCase) ? x : int.Parse(body);
+        return sign == '-' ? -mag : mag;
+    }
+
     internal static string NormaliseKeyword(string raw) =>
         // Collapse multi-word "first strike" / "double strike"; preserve casing
         // canonical to engine ("First strike" matches CombatAbilities check).
