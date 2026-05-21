@@ -158,7 +158,7 @@ internal static class LibrarySpellFactory
             return new IEffect[] { new Effect("exile from gy", () =>
             {
                 if (target is ICard card && card.Zone == ZoneType.Graveyard)
-                    MoveToExile(card);
+                    OracleSpellBinder.MoveToExile(card);
             }) };
         });
 
@@ -176,17 +176,4 @@ internal static class LibrarySpellFactory
         }
     }
 
-    private static void MoveToExile(ICard card)
-    {
-        var owner = card.Owner;
-        if (owner != null)
-        {
-            if (card.Zone == ZoneType.Battlefield) owner.Zones.Battlefield.RemoveCard(card);
-            else if (card.Zone == ZoneType.Graveyard) owner.Zones.Graveyard.RemoveCard(card);
-            else if (card.Zone == ZoneType.Hand) owner.Zones.Hand.RemoveCard(card);
-            else if (card.Zone == ZoneType.Library) owner.Zones.Library.RemoveCard(card);
-            owner.Zones.Exile.AddCard(card);
-        }
-        card.SetZone(ZoneType.Exile);
-    }
 }
