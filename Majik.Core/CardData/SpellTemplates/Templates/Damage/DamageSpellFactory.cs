@@ -29,6 +29,22 @@ internal static class DamageSpellFactory
             }) };
         });
 
+    internal static SpellDefinition DealsXDamageEachCreatureSpell(Player caster) => new(
+        Modes: Array.Empty<string>(), HasVariableX: true,
+        TargetRequests: Array.Empty<TargetRequest>(),
+        EffectFactory: p =>
+        {
+            var x = p.X ?? 0;
+            return new IEffect[] { new Effect($"deal X={x} to each creature", () =>
+            {
+                var seen = new HashSet<Creature>();
+                foreach (var c in caster.Zones.Battlefield.GetCards().OfType<Creature>())
+                {
+                    if (seen.Add(c)) c.TakeDamage(x);
+                }
+            }) };
+        });
+
     internal static SpellDefinition DealsDamageEachCreatureSpell(int n, Player caster) => new(
         Modes: Array.Empty<string>(), HasVariableX: false,
         TargetRequests: Array.Empty<TargetRequest>(),
