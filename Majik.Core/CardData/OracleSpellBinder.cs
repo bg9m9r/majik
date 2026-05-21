@@ -1,36 +1,22 @@
-using System.Text.RegularExpressions;
-using Majik.Core.Abilities;
 using Majik.Core.CardData.Database;
 using Majik.Core.CardData.SpellTemplates;
 using Majik.Core.Cards;
 using Majik.Core.Game;
-using Majik.Core.Keywords;
 using Majik.Core.Players;
-using Majik.Core.Players.Agents;
-using Majik.Core.Spells;
 using Majik.Core.Stack;
-using Majik.Core.Tokens;
-using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
 
 namespace Majik.Core.CardData;
 
 /// <summary>
-/// Pattern-matches an instant/sorcery's oracle text to one of a handful of
-/// canonical templates, returning a runnable <see cref="SpellDefinition"/>.
-/// Returns null when no template matches — caller can fall back to a
-/// vanilla shell so the card still loads.
+/// Entry point for binding an instant/sorcery's oracle text to a runnable
+/// <see cref="SpellDefinition"/>. All matching lives in
+/// <see cref="Registry"/> — one <see cref="ISpellTemplate"/> per oracle
+/// pattern, grouped by family under <c>Majik.Core/CardData/SpellTemplates/Templates/</c>.
 ///
-/// Templates handled (first match wins):
-///   - "Counter target spell."                       → counter
-///   - "Deals N damage to any target."               → damage (creature or player)
-///   - "Deals N damage to target player [or planeswalker]." → player damage
-///   - "Destroy target creature."                    → destroy creature
-///   - "Destroy target artifact or enchantment."     → destroy permanent
-///   - "Draw N cards."                               → draw (caster)
-///   - "Target player discards N cards."             → discard
-///
-/// Word numerals ("one", "two", "three", …) are translated to digits.
+/// Returns <c>null</c> when no template matches; callers (e.g.
+/// <see cref="ScryfallCardFactory.LookupSpellDefinition"/>) fall back
+/// to a vanilla shell so the card still loads.
 /// </summary>
 public static class OracleSpellBinder
 {
@@ -109,14 +95,10 @@ public static class OracleSpellBinder
         Majik.Core.Effects.ContinuousEffectsService? effects,
         Majik.Core.Stack.Stack? stack)
     {
-        if (entity == null) throw new ArgumentNullException(nameof(entity));
-        if (caster == null) throw new ArgumentNullException(nameof(caster));
-        if (resolver == null) throw new ArgumentNullException(nameof(resolver));
-
-        var ctx = new SpellBindContext(entity, caster, resolver, effects, stack);
-        if (Registry.TryBind(ctx) is { } fromRegistry) return fromRegistry;
-
-        return null;
+        ArgumentNullException.ThrowIfNull(entity);
+        ArgumentNullException.ThrowIfNull(caster);
+        ArgumentNullException.ThrowIfNull(resolver);
+        return Registry.TryBind(new SpellBindContext(entity, caster, resolver, effects, stack));
     }
 
     internal static void MoveToExile(ICard card)
@@ -132,8 +114,6 @@ public static class OracleSpellBinder
         }
         card.SetZone(ZoneType.Exile);
     }
-
-    // ---------- Primitives ----------
 
     internal static void DealDamage(object target, int n)
     {
@@ -155,18 +135,6 @@ public static class OracleSpellBinder
         card.SetZone(ZoneType.Graveyard);
     }
 
-    private static void DrawCards_(Player player, int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
-            var top = player.Zones.Library.GetCards().FirstOrDefault();
-            if (top == null) return;
-            player.Zones.Library.RemoveCard(top);
-            player.Zones.Hand.AddCard(top);
-            top.SetZone(ZoneType.Hand);
-        }
-    }
-
     internal static void RemoveFromStack(Majik.Core.Stack.Stack stack, IStackObject spell)
     {
         var keep = new List<IStackObject>();
@@ -180,5 +148,4 @@ public static class OracleSpellBinder
             stack.Push(keep[i]);
         }
     }
-
 }
