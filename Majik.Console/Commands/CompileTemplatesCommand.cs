@@ -62,43 +62,14 @@ public static class CompileTemplatesCommand
         const int chunkSize = 1000;
         var pending = new List<CompiledSpellTemplateEntity>(chunkSize);
 
-        // The composer cannot be pre-compiled (it depends on the live
-        // registry), so it's measured here via a separate TryBind pass
-        // before the normal TryExtractParams loop. When the composer
-        // binds, count it and skip persistence. Otherwise fall through
-        // to the single-template path.
-        var composer = registry.OrderedTemplates
-            .FirstOrDefault(t => t.Name == "ClauseComposition");
-
         foreach (var entity in entities)
         {
             var oracle = entity.OracleText ?? string.Empty;
-
-            if (composer is not null)
-            {
-                var stubEntity = new CardEntity { Name = entity.Name, OracleText = oracle };
-                var stubCtx = new SpellBindContext(stubEntity, null!, _ => null!, null, null);
-                SpellDefinition? composed = null;
-                try { composed = composer.TryBind(stubCtx); }
-                catch (Exception ex)
-                {
-                    SysConsole.Error.WriteLine($"  [compose] {entity.Name}: {ex.GetType().Name}: {ex.Message}");
-                }
-                if (composed is not null)
-                {
-                    matched++;
-                    perTemplate["ClauseComposition"] =
-                        perTemplate.GetValueOrDefault("ClauseComposition") + 1;
-                    continue;
-                }
-            }
-
             ISpellTemplate? winner = null;
             IReadOnlyDictionary<string, string>? winningParams = null;
 
             foreach (var t in registry.OrderedTemplates)
             {
-                if (ReferenceEquals(t, composer)) continue;
                 var p = t.TryExtractParams(oracle);
                 if (p is null) continue;
                 winner = t;
