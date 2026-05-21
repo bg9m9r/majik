@@ -74,6 +74,10 @@ public static class OracleSpellBinder
             new SpellTemplates.Templates.Control.BounceTargetTemplate(),
             new SpellTemplates.Templates.Control.ExileTargetTemplate(),
             new SpellTemplates.Templates.Control.GainControlTemplate(),
+            new SpellTemplates.Templates.Search.SearchLandToBattlefieldTappedTemplate(),
+            new SpellTemplates.Templates.Search.SearchLandToBattlefieldTemplate(),
+            new SpellTemplates.Templates.Search.GreenSunsZenithPatternTemplate(),
+            new SpellTemplates.Templates.Search.SearchLibraryTemplate(),
         });
 
     // "Target creature gets +N/+N until end of turn."
@@ -83,22 +87,6 @@ public static class OracleSpellBinder
     // "Target creature gains <keyword> until end of turn."
     private static readonly Regex GrantKeywordTilEot = new(
         @"target\s+creature\s+gains?\s+(?<kw>flying|trample|first\s+strike|double\s+strike|deathtouch|lifelink|vigilance|haste|reach|menace|indestructible)\s+until\s+end\s+of\s+turn",
-        RegexOptions.IgnoreCase);
-    // "Search your library for a {basic land|land|creature|artifact|...} card..."
-    private static readonly Regex SearchLibrary = new(
-        @"search\s+your\s+library\s+for\s+a\s+(?<kind>basic\s+land|land|creature|artifact|enchantment|instant|sorcery|planeswalker)\s+card",
-        RegexOptions.IgnoreCase);
-    // "Search your library for a basic land card, put it onto the battlefield tapped, then shuffle."
-    // (Cultivate / Rampant Growth style — dispatched BEFORE SearchLibrary so the
-    //  more-specific battlefield destination wins.)
-    private static readonly Regex SearchLandToBattlefieldTapped = new(
-        @"search\s+your\s+library\s+for\s+a\s+(?<kind>basic\s+land|land)\s+card[^.]*put\s+(?:it|that\s+card)\s+onto\s+the\s+battlefield\s+tapped",
-        RegexOptions.IgnoreCase);
-    // "Search your library for a basic land card and put it onto the battlefield."
-    // (untapped variant — matches only when 'tapped' is NOT present, because the
-    //  tapped regex above is dispatched first.)
-    private static readonly Regex SearchLandToBattlefield = new(
-        @"search\s+your\s+library\s+for\s+a\s+(?<kind>basic\s+land|land)\s+card[^.]*put\s+(?:it|that\s+card)\s+onto\s+the\s+battlefield",
         RegexOptions.IgnoreCase);
     // "Put N +1/+1 counters on target creature."
     private static readonly Regex PutPlusCounter = new(
@@ -150,13 +138,6 @@ public static class OracleSpellBinder
     //  That player discards that card. You lose N life." (Thoughtseize template)
     private static readonly Regex ThoughtseizePattern = new(
         @"target\s+player\s+reveals\s+their\s+hand\.\s*you\s+choose\s+a\s+nonland\s+card\s+from\s+it\.\s*that\s+player\s+discards\s+that\s+card\.\s*you\s+lose\s+(?<life>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+life",
-        RegexOptions.IgnoreCase);
-    // "Search your library for a <color> creature card with mana value X or less,
-    //  put it onto the battlefield, then shuffle. Shuffle <name> into its owner's
-    //  library." (Green Sun's Zenith pattern — X-cost green creature tutor.)
-    // The "shuffle into library" suffix distinguishes GSZ from a generic tutor.
-    private static readonly Regex GreenSunsZenithPattern = new(
-        @"search\s+your\s+library\s+for\s+a\s+(?<color>green|white|blue|black|red)\s+creature\s+card\s+with\s+mana\s+value\s+x\s+or\s+less[^.]*put\s+it\s+onto\s+the\s+battlefield[^.]*shuffle\.\s*shuffle[^.]+into\s+its\s+owner'?s?\s+library",
         RegexOptions.IgnoreCase);
     // Malevolent Rumble: "Reveal the top four cards of your library. You may put
     // a permanent card from among them into your hand. Put the rest into your
@@ -222,24 +203,6 @@ public static class OracleSpellBinder
         m = GrantKeywordTilEot.Match(text);
         if (m.Success) return GrantKeywordSpell(
             NormaliseKeyword(m.Groups["kw"].Value), resolver);
-
-        // GreenSunsZenithPattern must come before SearchLibrary / SearchLandToBattlefield
-        // because its oracle text also contains "search your library for a … creature card"
-        // and would otherwise be caught by those generic regexes.
-        var mGsz = GreenSunsZenithPattern.Match(text);
-        if (mGsz.Success) return GreenSunsZenithSpell(caster, mGsz.Groups["color"].Value);
-
-        // SearchLandToBattlefieldTapped / SearchLandToBattlefield must come BEFORE
-        // SearchLibrary — the generic regex also matches "search your library for a basic
-        // land card" (it stops at the word "card"), so it would hijack these if it ran first.
-        m = SearchLandToBattlefieldTapped.Match(text);
-        if (m.Success) return SearchLandToBattlefieldSpell(caster, m.Groups["kind"].Value, tapped: true);
-
-        m = SearchLandToBattlefield.Match(text);
-        if (m.Success) return SearchLandToBattlefieldSpell(caster, m.Groups["kind"].Value, tapped: false);
-
-        m = SearchLibrary.Match(text);
-        if (m.Success) return SearchLibrarySpell(caster, m.Groups["kind"].Value);
 
         // Investigate keyword action (CR 701.30) — checked before CreateClueTokens "create" pattern.
         var mInvN = InvestigateNTimes.Match(text);
@@ -429,115 +392,6 @@ public static class OracleSpellBinder
             for (var i = 0; i < count; i++)
                 TokenFactory.CreateOnBattlefield(spec, caster);
         }) });
-
-    private static SpellDefinition SearchLibrarySpell(Player caster, string kindRaw) => new(
-        Modes: Array.Empty<string>(), HasVariableX: false,
-        TargetRequests: Array.Empty<TargetRequest>(),
-        EffectFactory: _ => new IEffect[] { new Effect($"tutor {kindRaw}", () =>
-        {
-            // MVP tutor: deterministic — first library card matching predicate.
-            // Real implementation: prompt agent for choice; this default keeps
-            // tests deterministic until SpellCastFlow learns library-target prompts.
-            bool Pred(ICard c) => kindRaw.ToLowerInvariant() switch
-            {
-                "basic land" => c.HasType(Majik.Core.Cards.Types.CardType.Land),
-                "land" => c.HasType(Majik.Core.Cards.Types.CardType.Land),
-                "creature" => c.HasType(Majik.Core.Cards.Types.CardType.Creature),
-                "artifact" => c.HasType(Majik.Core.Cards.Types.CardType.Artifact),
-                "enchantment" => c.HasType(Majik.Core.Cards.Types.CardType.Enchantment),
-                "instant" => c.HasType(Majik.Core.Cards.Types.CardType.Instant),
-                "sorcery" => c.HasType(Majik.Core.Cards.Types.CardType.Sorcery),
-                "planeswalker" => c.HasType(Majik.Core.Cards.Types.CardType.Planeswalker),
-                _ => false,
-            };
-            var pick = caster.Zones.Library.GetCards().FirstOrDefault(Pred);
-            if (pick == null) return;
-            caster.Zones.Library.RemoveCard(pick);
-            caster.Zones.Hand.AddCard(pick);
-            pick.SetZone(ZoneType.Hand);
-            // CR 701.19c — shuffle after a search effect.
-            // (No IZone.Shuffle yet; GameDriver owns shuffle. Skip for MVP —
-            // search ordering not exposed via library iteration today.)
-        }) });
-
-    // Basic land names per CR 305.6.
-    private static readonly HashSet<string> BasicLandNames =
-        new(StringComparer.OrdinalIgnoreCase) { "Plains", "Island", "Swamp", "Mountain", "Forest", "Wastes" };
-
-    private static SpellDefinition SearchLandToBattlefieldSpell(
-        Player caster, string kindRaw, bool tapped) => new(
-        Modes: Array.Empty<string>(), HasVariableX: false,
-        TargetRequests: Array.Empty<TargetRequest>(),
-        EffectFactory: _ => new IEffect[] { new Effect($"tutor land -> battlefield{(tapped ? " tapped" : "")}", () =>
-        {
-            bool Pred(ICard c)
-            {
-                if (!c.HasType(Majik.Core.Cards.Types.CardType.Land)) return false;
-                if (kindRaw.Contains("basic", StringComparison.OrdinalIgnoreCase))
-                    return BasicLandNames.Contains(c.Name);
-                return true;
-            }
-
-            var pick = caster.Zones.Library.GetCards().FirstOrDefault(Pred);
-            if (pick == null) return;
-            caster.Zones.Library.RemoveCard(pick);
-            caster.Zones.Battlefield.AddCard(pick);
-            pick.SetZone(ZoneType.Battlefield);
-            if (tapped && pick is Permanent perm)
-                perm.Tap();
-            // CR 701.19c — shuffle after a search effect (skipped for MVP;
-            // same rationale as SearchLibrarySpell above).
-        }) });
-
-    /// <summary>
-    /// Green Sun's Zenith template — {X}{G} sorcery (Rule 107.4b X cost).
-    /// Tutors the first library card whose color matches <paramref name="colorRaw"/> and
-    /// whose mana value ≤ X, placing it directly onto the battlefield (CR 701.19a).
-    ///
-    /// Color is determined by <see cref="CardColors.GetColors"/>, which derives color
-    /// from the card's mana cost pips (CR 105.2a).
-    ///
-    /// Post-resolution self-return-to-library (the "Shuffle Green Sun's Zenith into
-    /// its owner's library" clause, CR 608.2c override) is DEFERRED — v1 lets the
-    /// spell go to the graveyard like any other sorcery. Engine infrastructure for
-    /// a generic "ShuffleSourceToLibraryOnResolve" hook in SpellCastFlow is needed
-    /// to implement it correctly.
-    /// </summary>
-    private static SpellDefinition GreenSunsZenithSpell(Player caster, string colorRaw) => new(
-        Modes: Array.Empty<string>(), HasVariableX: true,
-        TargetRequests: Array.Empty<TargetRequest>(),
-        EffectFactory: p =>
-        {
-            var x = p.X ?? 0;
-            // Map the oracle-text color word to the ManaColor enum value.
-            var targetColor = colorRaw.ToLowerInvariant() switch
-            {
-                "white"  => ManaColor.White,
-                "blue"   => ManaColor.Blue,
-                "black"  => ManaColor.Black,
-                "red"    => ManaColor.Red,
-                "green"  => ManaColor.Green,
-                _        => ManaColor.Green,
-            };
-            return new IEffect[] { new Effect($"GSZ x={x}", () =>
-            {
-                // CR 701.19a — search is a library action; pick the first qualifying card.
-                // Real implementation would prompt the agent; v1 is deterministic (first match).
-                var pick = caster.Zones.Library.GetCards()
-                    .FirstOrDefault(c =>
-                        c.HasType(Majik.Core.Cards.Types.CardType.Creature) &&
-                        CardColors.GetColors(c).Contains(targetColor) &&
-                        ManaCost.Parse(c.ManaCost).TotalValue <= x);
-                if (pick != null)
-                {
-                    caster.Zones.Library.RemoveCard(pick);
-                    caster.Zones.Battlefield.AddCard(pick);
-                    pick.SetZone(ZoneType.Battlefield);
-                }
-                // CR 701.19c — shuffle after a search effect (deferred, same rationale
-                // as other search spells in this binder).
-            }) };
-        });
 
     internal static void MoveToExile(ICard card)
     {
