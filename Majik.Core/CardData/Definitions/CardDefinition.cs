@@ -62,6 +62,7 @@ public sealed class CardDefinition
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "kind")]
 [JsonDerivedType(typeof(ManaAbilityDefinition), "mana")]
 [JsonDerivedType(typeof(ActivatedAbilityDefinition), "activated")]
+[JsonDerivedType(typeof(TriggeredAbilityDefinition), "triggered")]
 public abstract class AbilityDefinition { }
 
 /// <summary>
@@ -95,4 +96,15 @@ public sealed class ActivatedAbilityDefinition : AbilityDefinition
     public List<CostDefinition> Costs { get; set; } = new();
     public List<EffectDefinition> Effects { get; set; } = new();
     public bool SorcerySpeed { get; set; } = false;
+}
+
+/// <summary>
+/// Triggered ability — <see cref="Trigger"/> picks the condition;
+/// <see cref="Effects"/> resolve in order when it fires. Uses the stack
+/// (intervening-if + delayed triggers handled by the engine elsewhere).
+/// </summary>
+public sealed class TriggeredAbilityDefinition : AbilityDefinition
+{
+    public TriggerDefinition Trigger { get; set; } = new EnterBattlefieldSelfTriggerDef();
+    public List<EffectDefinition> Effects { get; set; } = new();
 }

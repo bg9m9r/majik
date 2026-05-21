@@ -85,8 +85,30 @@ public static class CardDefinitionFactory
         {
             ManaAbilityDefinition mana => new ManaAbility(card, controller, ManaCost.Parse(mana.Produces)),
             ActivatedAbilityDefinition activated => BuildActivatedAbility(activated, card, controller),
+            TriggeredAbilityDefinition triggered => BuildTriggeredAbility(triggered, card, controller),
             _ => throw new NotSupportedException(
                 $"Ability '{definition.GetType().Name}' is not yet supported by CardDefinitionFactory."),
+        };
+
+    private static TriggeredAbility BuildTriggeredAbility(
+        TriggeredAbilityDefinition definition, ICard card, Player controller)
+    {
+        var condition = BuildTrigger(definition.Trigger, card);
+        var effects = definition.Effects.Select(e => BuildEffect(e, card, controller)).ToArray();
+        return new TriggeredAbility(
+            source: card,
+            controller: controller,
+            condition: condition,
+            effects: effects);
+    }
+
+    private static Majik.Core.Abilities.ITriggerCondition BuildTrigger(
+        TriggerDefinition definition, ICard card) =>
+        definition switch
+        {
+            EnterBattlefieldSelfTriggerDef => Majik.Core.Abilities.Triggers.OnEnterBattlefieldSelf(card),
+            _ => throw new NotSupportedException(
+                $"Trigger '{definition.GetType().Name}' is not yet supported by CardDefinitionFactory."),
         };
 
     private static ActivatedAbility BuildActivatedAbility(
@@ -162,9 +184,42 @@ public static class CardDefinitionFactory
             PutCounterEffectDef put => BuildPutCounterEffect(put, card),
             DealDamageStubEffectDef stub => BuildDealDamageStubEffect(stub, card),
             DrawCardEffectDef draw => BuildDrawCardEffect(draw, card, controller),
+            SurveilSelfEffectDef surveil => BuildSurveilSelfEffect(surveil, card, controller),
             _ => throw new NotSupportedException(
                 $"Effect '{definition.GetType().Name}' is not yet supported by CardDefinitionFactory."),
         };
+
+    private static IEffect BuildSurveilSelfEffect(SurveilSelfEffectDef def, ICard card, Player controller)
+    {
+        var amount = def.Amount;
+        return new Effect(
+            $"{card.Name}: surveil {amount}",
+            () =>
+            {
+                var peeked = Majik.Core.Keywords.SurveilAction.Peek(controller, amount);
+                if (peeked.Count == 0) return;
+
+                // Consult the registered agent when available; fall back to
+                // the pre-agent default (all-to-graveyard) when none is
+                // registered. Mirrors the existing C# Underground Mortuary
+                // path. TODO: remove sync-over-async once IEffect.Execute
+                // becomes async.
+                var agent = Majik.Core.Players.Agents.AgentRegistry.Get(controller);
+                Majik.Core.Keywords.SurveilAction.SurveilDecision decision;
+                if (agent != null)
+                {
+                    decision = agent.ChooseSurveilDecisionAsync(null, peeked)
+                        .GetAwaiter().GetResult();
+                }
+                else
+                {
+                    decision = new Majik.Core.Keywords.SurveilAction.SurveilDecision(
+                        ToGraveyard: peeked.ToList(),
+                        TopOrder: Array.Empty<Majik.Core.Cards.ICard>());
+                }
+                Majik.Core.Keywords.SurveilAction.Apply(controller, amount, decision);
+            });
+    }
 
     private static IEffect BuildDrawCardEffect(DrawCardEffectDef def, ICard card, Player controller)
     {
