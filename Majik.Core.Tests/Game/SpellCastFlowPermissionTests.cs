@@ -102,5 +102,9 @@ public class SpellCastFlowPermissionTests
         { ManaCallback?.Invoke(cost); return Task.FromResult(ManaPayment.Empty); }
         public Task<CombatPlan> DeclareAttackersAsync(GameContext c, IReadOnlyList<Creature> e, CancellationToken ct = default) => Task.FromResult(CombatPlan.None);
         public Task<BlockPlan> DeclareBlockersAsync(GameContext c, IReadOnlyList<Creature> a, IReadOnlyList<Creature> e, CancellationToken ct = default) => Task.FromResult(BlockPlan.None);
+        public Task<Majik.Core.Keywords.ScryAction.ScryDecision> ChooseScryDecisionAsync(GameContext? ctx, IReadOnlyList<ICard> peeked, CancellationToken ct = default)
+            => Task.FromResult(new Majik.Core.Keywords.ScryAction.ScryDecision(ToBottom: peeked.ToList(), TopOrder: System.Array.Empty<ICard>()));
+        public Task<Majik.Core.Keywords.SurveilAction.SurveilDecision> ChooseSurveilDecisionAsync(GameContext? ctx, IReadOnlyList<ICard> peeked, CancellationToken ct = default)
+            => Task.FromResult(new Majik.Core.Keywords.SurveilAction.SurveilDecision(ToGraveyard: peeked.ToList(), TopOrder: System.Array.Empty<ICard>()));
     }
 }

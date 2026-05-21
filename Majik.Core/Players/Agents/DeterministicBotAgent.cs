@@ -1,6 +1,7 @@
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Game;
+using Majik.Core.Keywords;
 using Majik.Core.ValueObjects;
 
 namespace Majik.Core.Players.Agents;
@@ -44,4 +45,24 @@ public sealed class DeterministicBotAgent : IPlayerAgent
 
     public Task<BlockPlan> DeclareBlockersAsync(GameContext ctx, IReadOnlyList<Creature> attackers, IReadOnlyList<Creature> eligibleBlockers, CancellationToken ct = default)
         => Task.FromResult(BlockPlan.None);
+
+    /// <summary>
+    /// Default all-to-bottom: most aggressive "keep nothing on top" semantic.
+    /// Matches pre-agent default behaviour in <c>OracleSpellBinder.ScryNSpell</c>.
+    /// </summary>
+    public Task<ScryAction.ScryDecision> ChooseScryDecisionAsync(
+        GameContext? ctx, IReadOnlyList<ICard> peeked, CancellationToken ct = default)
+        => Task.FromResult(new ScryAction.ScryDecision(
+            ToBottom: peeked.ToList(),
+            TopOrder: Array.Empty<ICard>()));
+
+    /// <summary>
+    /// Default all-to-graveyard: matches pre-agent default behaviour in
+    /// <c>OracleSpellBinder.SurveilSelfSpell</c> and <c>UndergroundMortuaryFactory</c>.
+    /// </summary>
+    public Task<SurveilAction.SurveilDecision> ChooseSurveilDecisionAsync(
+        GameContext? ctx, IReadOnlyList<ICard> peeked, CancellationToken ct = default)
+        => Task.FromResult(new SurveilAction.SurveilDecision(
+            ToGraveyard: peeked.ToList(),
+            TopOrder: Array.Empty<ICard>()));
 }

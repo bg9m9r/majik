@@ -632,13 +632,26 @@ public static class OracleSpellBinder
         TargetRequests: Array.Empty<TargetRequest>(),
         EffectFactory: _ => new IEffect[] { new Effect($"surveil {n}", () =>
         {
-            // Default decision: everything peeked goes to graveyard.
-            // Agent-driven choice awaits prompt system.
             var peeked = SurveilAction.Peek(caster, n);
             if (peeked.Count == 0) return;
-            SurveilAction.Apply(caster, n, new SurveilAction.SurveilDecision(
-                ToGraveyard: peeked.ToList(),
-                TopOrder: Array.Empty<ICard>()));
+
+            // Consult the registered agent when available; fall back to the
+            // pre-agent default (all-to-graveyard) when none is registered.
+            // TODO: remove sync-over-async once IEffect.Execute becomes async.
+            var agent = AgentRegistry.Get(caster);
+            SurveilAction.SurveilDecision decision;
+            if (agent != null)
+            {
+                decision = agent.ChooseSurveilDecisionAsync(null, peeked)
+                    .GetAwaiter().GetResult();
+            }
+            else
+            {
+                decision = new SurveilAction.SurveilDecision(
+                    ToGraveyard: peeked.ToList(),
+                    TopOrder: Array.Empty<ICard>());
+            }
+            SurveilAction.Apply(caster, n, decision);
         }) });
 
     // "Preordain"-style: scry happens (default-all-bottom decision), then "draw a card"
@@ -652,14 +665,26 @@ public static class OracleSpellBinder
         TargetRequests: Array.Empty<TargetRequest>(),
         EffectFactory: _ => new IEffect[] { new Effect("scry+draw", () =>
         {
-            // Default decision: everything peeked goes to bottom of library.
-            // Agent-driven choice awaits prompt system.
             var peeked = ScryAction.Peek(caster, n);
             if (peeked.Count > 0)
             {
-                ScryAction.Apply(caster, n, new ScryAction.ScryDecision(
-                    ToBottom: peeked.ToList(),
-                    TopOrder: Array.Empty<ICard>()));
+                // Consult the registered agent when available; fall back to the
+                // pre-agent default (all-to-bottom) when none is registered.
+                // TODO: remove sync-over-async once IEffect.Execute becomes async.
+                var agent = AgentRegistry.Get(caster);
+                ScryAction.ScryDecision decision;
+                if (agent != null)
+                {
+                    decision = agent.ChooseScryDecisionAsync(null, peeked)
+                        .GetAwaiter().GetResult();
+                }
+                else
+                {
+                    decision = new ScryAction.ScryDecision(
+                        ToBottom: peeked.ToList(),
+                        TopOrder: Array.Empty<ICard>());
+                }
+                ScryAction.Apply(caster, n, decision);
             }
 
             var tail = ScryThenDrawTail.Match(oracleText);

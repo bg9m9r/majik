@@ -2,6 +2,7 @@ using Majik.Core.Abilities;
 using Majik.Core.Api.Commands;
 using Majik.Core.Cards;
 using Majik.Core.Game;
+using Majik.Core.Keywords;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
 using Majik.Core.ValueObjects;
@@ -155,6 +156,15 @@ public sealed class RemoteAgent : IPlayerAgent
 
     public Task<BlockPlan> DeclareBlockersAsync(GameContext ctx, IReadOnlyList<Creature> attackers, IReadOnlyList<Creature> eligibleBlockers, CancellationToken ct = default)
         => throw new NotImplementedException("Combat wired in phase 10.");
+
+    // TODO (v2): wire Scry/Surveil prompts through the command channel
+    // (ChooseScryCommand / ChooseSurveilCommand) once the prompt system
+    // is updated to handle sync-over-async in effect closures.
+    public Task<ScryAction.ScryDecision> ChooseScryDecisionAsync(GameContext? ctx, IReadOnlyList<ICard> peeked, CancellationToken ct = default)
+        => throw new NotImplementedException("Scry prompt wired in v2 (effect async refactor).");
+
+    public Task<SurveilAction.SurveilDecision> ChooseSurveilDecisionAsync(GameContext? ctx, IReadOnlyList<ICard> peeked, CancellationToken ct = default)
+        => throw new NotImplementedException("Surveil prompt wired in v2 (effect async refactor).");
 
     private Task<T> Prompt<T>(CancellationToken ct, params Type[] acceptedKinds)
     {

@@ -2,6 +2,7 @@ using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Keywords;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
 using Majik.Core.ValueObjects;
 
 namespace Majik.Core.CardData.Factories;
@@ -31,9 +32,10 @@ namespace Majik.Core.CardData.Factories;
 /// - <b>"If it entered untapped" gate on surveil trigger</b>: the trigger
 ///   should only fire when the land entered untapped. v1 always fires (no
 ///   tapped-state tracking on ETB at trigger evaluation time).
-/// - <b>Surveil decision player prompt</b>: real play puts the decision to
-///   the player (keep on top or send to graveyard per card). v1 defaults all
-///   peeked cards to graveyard via <see cref="SurveilAction.Apply"/>.
+/// - <b>Surveil decision player prompt</b>: agent-driven via
+///   <see cref="IPlayerAgent.ChooseSurveilDecisionAsync"/> when the owner's
+///   agent is registered in <see cref="AgentRegistry"/>; falls back to
+///   all-to-graveyard default when none is registered.
 /// </summary>
 public static class UndergroundMortuaryFactory
 {
@@ -70,11 +72,22 @@ public static class UndergroundMortuaryFactory
                 var peeked = SurveilAction.Peek(owner, 1);
                 if (peeked.Count == 0) return;
 
-                // v1 default: all peeked cards to graveyard.
-                // Real implementation routes through a player prompt.
-                var decision = new SurveilAction.SurveilDecision(
-                    ToGraveyard: peeked.ToList(),
-                    TopOrder: Array.Empty<ICard>());
+                // Consult the registered agent when available; fall back to the
+                // pre-agent default (all-to-graveyard) when none is registered.
+                // TODO: remove sync-over-async once IEffect.Execute becomes async.
+                var agent = AgentRegistry.Get(owner);
+                SurveilAction.SurveilDecision decision;
+                if (agent != null)
+                {
+                    decision = agent.ChooseSurveilDecisionAsync(null, peeked)
+                        .GetAwaiter().GetResult();
+                }
+                else
+                {
+                    decision = new SurveilAction.SurveilDecision(
+                        ToGraveyard: peeked.ToList(),
+                        TopOrder: Array.Empty<ICard>());
+                }
                 SurveilAction.Apply(owner, 1, decision);
             });
 

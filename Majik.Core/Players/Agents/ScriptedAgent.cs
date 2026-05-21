@@ -1,6 +1,7 @@
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Game;
+using Majik.Core.Keywords;
 using Majik.Core.ValueObjects;
 
 namespace Majik.Core.Players.Agents;
@@ -22,6 +23,8 @@ public sealed class ScriptedAgent : IPlayerAgent
     private readonly Queue<CombatPlan> _attackPlans = new();
     private readonly Queue<BlockPlan> _blockPlans = new();
     private readonly Queue<Func<IReadOnlyList<ICard>, IReadOnlyList<ICard>>> _bottomChoices = new();
+    private readonly Queue<ScryAction.ScryDecision> _scryDecisions = new();
+    private readonly Queue<SurveilAction.SurveilDecision> _surveilDecisions = new();
 
     public void QueuePriority(PriorityAction a) => _priorityActions.Enqueue(a);
     public void QueueMulligan(MulliganDecision d) => _mulligans.Enqueue(d);
@@ -34,6 +37,10 @@ public sealed class ScriptedAgent : IPlayerAgent
     public void QueueMana(ManaPayment p) => _manaPayments.Enqueue(p);
     public void QueueAttackers(CombatPlan p) => _attackPlans.Enqueue(p);
     public void QueueBlockers(BlockPlan p) => _blockPlans.Enqueue(p);
+    /// <summary>Pre-queue a Scry decision; falls back to all-bottom when queue is empty.</summary>
+    public void QueueScryDecision(ScryAction.ScryDecision d) => _scryDecisions.Enqueue(d);
+    /// <summary>Pre-queue a Surveil decision; falls back to all-graveyard when queue is empty.</summary>
+    public void QueueSurveilDecision(SurveilAction.SurveilDecision d) => _surveilDecisions.Enqueue(d);
 
     public Task<PriorityAction> ChoosePriorityActionAsync(GameContext ctx, CancellationToken ct = default)
         => Task.FromResult(Pop(_priorityActions, "priority"));
@@ -68,6 +75,28 @@ public sealed class ScriptedAgent : IPlayerAgent
 
     public Task<BlockPlan> DeclareBlockersAsync(GameContext ctx, IReadOnlyList<Creature> attackers, IReadOnlyList<Creature> eligibleBlockers, CancellationToken ct = default)
         => Task.FromResult(Pop(_blockPlans, "blockers"));
+
+    public Task<ScryAction.ScryDecision> ChooseScryDecisionAsync(
+        GameContext? ctx, IReadOnlyList<ICard> peeked, CancellationToken ct = default)
+    {
+        if (_scryDecisions.Count > 0)
+            return Task.FromResult(_scryDecisions.Dequeue());
+        // Default: all peeked cards to bottom (matching pre-agent behaviour).
+        return Task.FromResult(new ScryAction.ScryDecision(
+            ToBottom: peeked.ToList(),
+            TopOrder: Array.Empty<ICard>()));
+    }
+
+    public Task<SurveilAction.SurveilDecision> ChooseSurveilDecisionAsync(
+        GameContext? ctx, IReadOnlyList<ICard> peeked, CancellationToken ct = default)
+    {
+        if (_surveilDecisions.Count > 0)
+            return Task.FromResult(_surveilDecisions.Dequeue());
+        // Default: all peeked cards to graveyard (matching pre-agent behaviour).
+        return Task.FromResult(new SurveilAction.SurveilDecision(
+            ToGraveyard: peeked.ToList(),
+            TopOrder: Array.Empty<ICard>()));
+    }
 
     private static T Pop<T>(Queue<T> q, string what)
     {

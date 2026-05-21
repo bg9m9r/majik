@@ -2,6 +2,7 @@ using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Game;
+using Majik.Core.Keywords;
 using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
 using Creature = Majik.Core.Cards.Creature;
@@ -318,4 +319,26 @@ public sealed class HeuristicBotAgent : IPlayerAgent
             .Take(countToBottom).ToList();
         return Task.FromResult<IReadOnlyList<ICard>>(sorted);
     }
+
+    /// <summary>
+    /// Default all-to-bottom. Future improvement: keep cards that combo with
+    /// current hand / board state (e.g. curve-fillers, payoffs already in hand).
+    /// For v1 this matches the pre-agent default in <c>OracleSpellBinder.ScryNSpell</c>.
+    /// </summary>
+    public Task<ScryAction.ScryDecision> ChooseScryDecisionAsync(
+        GameContext? ctx, IReadOnlyList<ICard> peeked, CancellationToken ct = default)
+        => Task.FromResult(new ScryAction.ScryDecision(
+            ToBottom: peeked.ToList(),
+            TopOrder: Array.Empty<ICard>()));
+
+    /// <summary>
+    /// Default all-to-graveyard. Future improvement: keep cards needed on top
+    /// (e.g. lands when mana-screwed). For v1 this matches the pre-agent default
+    /// in <c>OracleSpellBinder.SurveilSelfSpell</c> and <c>UndergroundMortuaryFactory</c>.
+    /// </summary>
+    public Task<SurveilAction.SurveilDecision> ChooseSurveilDecisionAsync(
+        GameContext? ctx, IReadOnlyList<ICard> peeked, CancellationToken ct = default)
+        => Task.FromResult(new SurveilAction.SurveilDecision(
+            ToGraveyard: peeked.ToList(),
+            TopOrder: Array.Empty<ICard>()));
 }

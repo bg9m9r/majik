@@ -1,6 +1,7 @@
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Game;
+using Majik.Core.Keywords;
 using Majik.Core.ValueObjects;
 
 namespace Majik.Core.Players.Agents;
@@ -74,4 +75,35 @@ public interface IPlayerAgent
     /// </summary>
     Task<BlockPlan> DeclareBlockersAsync(
         GameContext ctx, IReadOnlyList<Creature> attackers, IReadOnlyList<Creature> eligibleBlockers, CancellationToken ct = default);
+
+    /// <summary>
+    /// CR 701.20 — Scry N: decide which of the peeked cards go to the bottom
+    /// of the library (<see cref="ScryAction.ScryDecision.ToBottom"/>) and
+    /// which return to the top in player-chosen order
+    /// (<see cref="ScryAction.ScryDecision.TopOrder"/>).
+    /// <para>
+    /// <paramref name="ctx"/> may be <see langword="null"/> in v1 effect closures
+    /// that don't have a GameContext available (sync-over-async wart; TODO: pass
+    /// ctx once effects become async).
+    /// </para>
+    /// </summary>
+    Task<ScryAction.ScryDecision> ChooseScryDecisionAsync(
+        GameContext? ctx,
+        IReadOnlyList<ICard> peeked,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// CR 701.42 — Surveil N: decide which of the peeked cards go to the
+    /// graveyard (<see cref="SurveilAction.SurveilDecision.ToGraveyard"/>) and
+    /// which return to the top in player-chosen order
+    /// (<see cref="SurveilAction.SurveilDecision.TopOrder"/>).
+    /// <para>
+    /// <paramref name="ctx"/> may be <see langword="null"/> in v1 effect closures
+    /// (same sync-over-async constraint as <see cref="ChooseScryDecisionAsync"/>).
+    /// </para>
+    /// </summary>
+    Task<SurveilAction.SurveilDecision> ChooseSurveilDecisionAsync(
+        GameContext? ctx,
+        IReadOnlyList<ICard> peeked,
+        CancellationToken ct = default);
 }
