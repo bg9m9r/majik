@@ -60,6 +60,15 @@ public static class OracleSpellBinder
             new SpellTemplates.Templates.Resource.YouLoseLifeTemplate(),
             new SpellTemplates.Templates.Resource.EachPlayerDrawsTemplate(),
             new SpellTemplates.Templates.Resource.TargetPlayerLosesLifeTemplate(),
+            new SpellTemplates.Templates.Library.MillTargetTemplate(),
+            new SpellTemplates.Templates.Library.MillSelfTemplate(),
+            new SpellTemplates.Templates.Library.EachOpponentMillsTemplate(),
+            new SpellTemplates.Templates.Library.EachPlayerMillsTemplate(),
+            new SpellTemplates.Templates.Library.SurveilSelfTemplate(),
+            new SpellTemplates.Templates.Library.ScrySelfTemplate(),
+            new SpellTemplates.Templates.Library.ScryNTemplate(),
+            new SpellTemplates.Templates.Library.ReanimateFromGraveyardTemplate(),
+            new SpellTemplates.Templates.Library.ExileFromGraveyardTemplate(),
         });
 
     // "Target creature gets +N/+N until end of turn."
@@ -123,38 +132,6 @@ public static class OracleSpellBinder
     private static readonly Regex CreaturesYouControlPump = new(
         @"creatures\s+you\s+control\s+get\s+\+(?<p>\d+)/\+(?<t>\d+)\s+until\s+end\s+of\s+turn",
         RegexOptions.IgnoreCase);
-    // "Target player mills N cards."
-    private static readonly Regex MillTarget = new(
-        @"target\s+player\s+mills\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+cards?",
-        RegexOptions.IgnoreCase);
-    // "Mill N cards." — self-mill (caster only; must not match "target player mills").
-    private static readonly Regex MillSelf = new(
-        @"^\s*mill\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+cards?\b",
-        RegexOptions.IgnoreCase | RegexOptions.Multiline);
-    // "Surveil N." — look at top N, default decision sends all to graveyard.
-    private static readonly Regex SurveilSelf = new(
-        @"^\s*surveil\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b",
-        RegexOptions.IgnoreCase | RegexOptions.Multiline);
-    // "Return target [TYPE] card from your graveyard to your hand."
-    private static readonly Regex ReanimateFromGraveyard = new(
-        @"return\s+target\s+(?<kind>card|creature|instant|sorcery|artifact|enchantment|planeswalker|land)?\s*card\s+from\s+your\s+graveyard\s+to\s+your\s+hand",
-        RegexOptions.IgnoreCase);
-    // "Scry N." — standalone (no draw tail; must not match "scry N, then draw").
-    private static readonly Regex ScrySelf = new(
-        @"^\s*scry\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b",
-        RegexOptions.IgnoreCase | RegexOptions.Multiline);
-    // "Scry N" — generic (catches "Scry N, then draw …" and any other scry variant).
-    private static readonly Regex ScryN = new(
-        @"\bscry\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b",
-        RegexOptions.IgnoreCase);
-    // "Each opponent mills N cards."
-    private static readonly Regex EachOpponentMills = new(
-        @"each\s+opponent\s+mills\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+cards?",
-        RegexOptions.IgnoreCase);
-    // "Each player mills N cards."
-    private static readonly Regex EachPlayerMills = new(
-        @"each\s+player\s+mills\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+cards?",
-        RegexOptions.IgnoreCase);
     // "Create [a|N] Treasure token(s)." — predefined artifact, no P/T text.
     private static readonly Regex CreateTreasureTokens = new(
         @"create\s+(?<n>a|an|\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+treasure\s+tokens?\b",
@@ -184,11 +161,6 @@ public static class OracleSpellBinder
     // keyword grant; companion to CreaturesYouControlPump's +P/+T grant.
     private static readonly Regex CreaturesYouControlGain = new(
         @"creatures\s+you\s+control\s+gain\s+(?<kw>flying|trample|first\s+strike|double\s+strike|deathtouch|lifelink|vigilance|haste|reach|menace|indestructible)\s+until\s+end\s+of\s+turn",
-        RegexOptions.IgnoreCase);
-    // "Exile target card from a graveyard." / "Exile target card from your graveyard."
-    // / "Exile target creature card from a graveyard." (with optional card-type filter)
-    private static readonly Regex ExileFromGraveyard = new(
-        @"exile\s+target\s+(?<kind>creature|instant|sorcery|artifact|enchantment|planeswalker|land)?\s*card\s+from\s+(?:a|your)\s+graveyard",
         RegexOptions.IgnoreCase);
     // "Target player reveals their hand. You choose a nonland card from it.
     //  That player discards that card. You lose N life." (Thoughtseize template)
@@ -234,27 +206,6 @@ public static class OracleSpellBinder
 
         var text = entity.OracleText ?? string.Empty;
 
-        var mMill = MillTarget.Match(text);
-        if (mMill.Success) return MillTargetSpell(WordToInt(mMill.Groups["n"].Value), resolver);
-
-        var mMillSelf = MillSelf.Match(text);
-        if (mMillSelf.Success) return MillSelfSpell(caster, WordToInt(mMillSelf.Groups["n"].Value));
-
-        var mSurveil = SurveilSelf.Match(text);
-        if (mSurveil.Success) return SurveilSelfSpell(caster, WordToInt(mSurveil.Groups["n"].Value));
-
-        var mScrySelf = ScrySelf.Match(text);
-        if (mScrySelf.Success) return ScryNSpell(caster, text, WordToInt(mScrySelf.Groups["n"].Value));
-
-        var mScryN = ScryN.Match(text);
-        if (mScryN.Success) return ScryNSpell(caster, text, WordToInt(mScryN.Groups["n"].Value));
-
-        var mEachOpp = EachOpponentMills.Match(text);
-        if (mEachOpp.Success) return EachOpponentMillsSpell(caster, WordToInt(mEachOpp.Groups["n"].Value));
-
-        var mEachPl = EachPlayerMills.Match(text);
-        if (mEachPl.Success) return EachPlayerMillsSpell(caster, WordToInt(mEachPl.Groups["n"].Value));
-
         if (CreaturesGetPlusCounter.IsMatch(text))
             return CreaturesGetPlusCounterSpell(caster);
 
@@ -296,14 +247,6 @@ public static class OracleSpellBinder
 
         m = BounceTarget.Match(text);
         if (m.Success) return BounceTargetSpell(resolver, $"target {m.Groups[1].Value}");
-
-        m = ReanimateFromGraveyard.Match(text);
-        if (m.Success) return ReanimateSpell(resolver, m.Groups["kind"].Value);
-
-        // ExileFromGraveyard before ExileTarget — "exile target creature card from a graveyard"
-        // would otherwise match ExileTarget's creature alternative first.
-        var mEgy = ExileFromGraveyard.Match(text);
-        if (mEgy.Success) return ExileFromGraveyardSpell(resolver, mEgy.Groups["kind"].Value.Trim());
 
         m = ExileTarget.Match(text);
         if (m.Success) return ExileTargetSpell(resolver, $"target {m.Groups[1].Value}");
@@ -451,142 +394,6 @@ public static class OracleSpellBinder
             foreach (var c in caster.Zones.Battlefield.GetCards().OfType<Creature>())
             {
                 c.Counters.Add(Majik.Core.Counters.CounterType.PlusOnePlusOne, 1);
-            }
-        }) });
-
-    private static SpellDefinition ReanimateSpell(Func<object, object> resolver, string kindRaw) => new(
-        Modes: Array.Empty<string>(), HasVariableX: false,
-        TargetRequests: new[] { new TargetRequest(
-            string.IsNullOrEmpty(kindRaw) ? "target card in graveyard" : $"target {kindRaw} card in graveyard",
-            1, 1, Array.Empty<object>()) },
-        EffectFactory: p =>
-        {
-            var target = resolver(p.Targets[0][0]);
-            return new IEffect[] { new Effect("return from gy", () =>
-            {
-                if (target is not ICard card) return;
-                var owner = card.Owner;
-                if (owner == null) return;
-                if (card.Zone == ZoneType.Graveyard) owner.Zones.Graveyard.RemoveCard(card);
-                owner.Zones.Hand.AddCard(card);
-                card.SetZone(ZoneType.Hand);
-            }) };
-        });
-
-    private static SpellDefinition MillTargetSpell(int n, Func<object, object> resolver) => new(
-        Modes: Array.Empty<string>(), HasVariableX: false,
-        TargetRequests: new[] { new TargetRequest("target player", 1, 1, Array.Empty<object>()) },
-        EffectFactory: p =>
-        {
-            var target = resolver(p.Targets[0][0]);
-            return new IEffect[] { new Effect($"mill {n}", () =>
-            {
-                if (target is not Player pl) return;
-                MillAction.Apply(pl, n);
-            }) };
-        });
-
-    private static SpellDefinition MillSelfSpell(Player caster, int n) => new(
-        Modes: Array.Empty<string>(), HasVariableX: false,
-        TargetRequests: Array.Empty<TargetRequest>(),
-        EffectFactory: _ => new IEffect[] { new Effect($"mill self {n}", () =>
-        {
-            MillAction.Apply(caster, n);
-        }) });
-
-    private static SpellDefinition SurveilSelfSpell(Player caster, int n) => new(
-        Modes: Array.Empty<string>(), HasVariableX: false,
-        TargetRequests: Array.Empty<TargetRequest>(),
-        EffectFactory: _ => new IEffect[] { new Effect($"surveil {n}", () =>
-        {
-            var peeked = SurveilAction.Peek(caster, n);
-            if (peeked.Count == 0) return;
-
-            // Consult the registered agent when available; fall back to the
-            // pre-agent default (all-to-graveyard) when none is registered.
-            // TODO: remove sync-over-async once IEffect.Execute becomes async.
-            var agent = AgentRegistry.Get(caster);
-            SurveilAction.SurveilDecision decision;
-            if (agent != null)
-            {
-                decision = agent.ChooseSurveilDecisionAsync(null, peeked)
-                    .GetAwaiter().GetResult();
-            }
-            else
-            {
-                decision = new SurveilAction.SurveilDecision(
-                    ToGraveyard: peeked.ToList(),
-                    TopOrder: Array.Empty<ICard>());
-            }
-            SurveilAction.Apply(caster, n, decision);
-        }) });
-
-    // "Preordain"-style: scry happens (default-all-bottom decision), then "draw a card"
-    // tail clause fires. Cantrip portion is the substantive effect.
-    private static readonly Regex ScryThenDrawTail = new(
-        @"scry\s+\d+[^.]*[,.]?\s*then\s+draw\s+(?<n>a|an|\d+|one|two|three|four|five|six|seven)\s+cards?",
-        RegexOptions.IgnoreCase);
-
-    private static SpellDefinition ScryNSpell(Player caster, string oracleText, int n) => new(
-        Modes: Array.Empty<string>(), HasVariableX: false,
-        TargetRequests: Array.Empty<TargetRequest>(),
-        EffectFactory: _ => new IEffect[] { new Effect("scry+draw", () =>
-        {
-            var peeked = ScryAction.Peek(caster, n);
-            if (peeked.Count > 0)
-            {
-                // Consult the registered agent when available; fall back to the
-                // pre-agent default (all-to-bottom) when none is registered.
-                // TODO: remove sync-over-async once IEffect.Execute becomes async.
-                var agent = AgentRegistry.Get(caster);
-                ScryAction.ScryDecision decision;
-                if (agent != null)
-                {
-                    decision = agent.ChooseScryDecisionAsync(null, peeked)
-                        .GetAwaiter().GetResult();
-                }
-                else
-                {
-                    decision = new ScryAction.ScryDecision(
-                        ToBottom: peeked.ToList(),
-                        TopOrder: Array.Empty<ICard>());
-                }
-                ScryAction.Apply(caster, n, decision);
-            }
-
-            var tail = ScryThenDrawTail.Match(oracleText);
-            if (tail.Success)
-            {
-                DrawCards_(caster, WordToInt(tail.Groups["n"].Value));
-            }
-        }) });
-
-    private static SpellDefinition EachOpponentMillsSpell(Player caster, int n) => new(
-        Modes: Array.Empty<string>(), HasVariableX: false,
-        TargetRequests: Array.Empty<TargetRequest>(),
-        EffectFactory: p => new IEffect[] { new Effect($"each opponent mills {n}", () =>
-        {
-            // Opponents are resolved via ChosenSpellParams.AllPlayers when
-            // SpellCastFlow is updated to pass the full player list.
-            // Until then, tests can supply players via the params.
-            if (p.AllPlayers != null)
-            {
-                foreach (var pl in p.AllPlayers.Where(pl => !ReferenceEquals(pl, caster)))
-                    MillAction.Apply(pl, n);
-            }
-        }) });
-
-    private static SpellDefinition EachPlayerMillsSpell(Player caster, int n) => new(
-        Modes: Array.Empty<string>(), HasVariableX: false,
-        TargetRequests: Array.Empty<TargetRequest>(),
-        EffectFactory: p => new IEffect[] { new Effect($"each player mills {n}", () =>
-        {
-            // All players are resolved via ChosenSpellParams.AllPlayers when
-            // SpellCastFlow is updated to pass the full player list.
-            if (p.AllPlayers != null)
-            {
-                foreach (var pl in p.AllPlayers)
-                    MillAction.Apply(pl, n);
             }
         }) });
 
@@ -894,21 +701,6 @@ public static class OracleSpellBinder
                 {
                     c.ActiveEffects.Register(new GrantKeywordUntilEndOfTurnEffect(c, keyword));
                 }
-            }) };
-        });
-
-    private static SpellDefinition ExileFromGraveyardSpell(Func<object, object> resolver, string kindRaw) => new(
-        Modes: Array.Empty<string>(), HasVariableX: false,
-        TargetRequests: new[] { new TargetRequest(
-            string.IsNullOrEmpty(kindRaw) ? "target card in graveyard" : $"target {kindRaw} card in graveyard",
-            1, 1, Array.Empty<object>()) },
-        EffectFactory: p =>
-        {
-            var target = resolver(p.Targets[0][0]);
-            return new IEffect[] { new Effect("exile from gy", () =>
-            {
-                if (target is ICard card && card.Zone == ZoneType.Graveyard)
-                    MoveToExile(card);
             }) };
         });
 
