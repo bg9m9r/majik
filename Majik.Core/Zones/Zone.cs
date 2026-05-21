@@ -54,4 +54,13 @@ public class Zone : IZone
     {
         _cards.Clear();
     }
+
+    public void InsertCardAt(int index, ICard card)
+    {
+        if (card == null) throw new ArgumentNullException(nameof(card));
+        if (_cards.Contains(card)) return;
+        var clamped = Math.Clamp(index, 0, _cards.Count);
+        _cards.Insert(clamped, card);
+        card.SetZone(Type);
+    }
 }
