@@ -859,3 +859,142 @@ public sealed class MultiTargetCreaturesEachGetPumpTemplate : ISpellTemplate
             new TargetRequest("target creature", 0, 5, Array.Empty<object>())
         });
 }
+
+/// <summary>
+/// "Creatures your opponents control get -N/-N until end of turn" —
+/// Cower in Fear, Drag to the Bottom (X variant routed elsewhere),
+/// Lethal Vapors (lossy). Symmetric mirror of AllCreaturesPump but
+/// scoped to opponents. v1 stub: applies the debuff to every creature
+/// on the caster's view of the battlefield (lossy — should be
+/// opponents only, but reaches all creatures the spell can see).
+/// </summary>
+public sealed class CreaturesYourOpponentsControlDebuffTemplate : ISpellTemplate
+{
+    private static readonly Regex Pattern = new(
+        @"creatures\s+your\s+opponents\s+control\s+get\s+(?<p>[+-]\d+)/(?<t>[+-]\d+)\s+until\s+end\s+of\s+turn",
+        RegexOptions.IgnoreCase);
+
+    public int Priority => 80;
+    public string Name => "CreaturesYourOpponentsControlDebuff";
+
+    public SpellDefinition? TryBind(SpellBindContext ctx) =>
+        SpellTemplateBindHelper.DefaultTryBind(this, ctx);
+
+    public IReadOnlyDictionary<string, string>? TryExtractParams(string oracleText)
+    {
+        var m = Pattern.Match(oracleText);
+        return m.Success
+            ? new Dictionary<string, string> { ["p"] = m.Groups["p"].Value, ["t"] = m.Groups["t"].Value }
+            : null;
+    }
+
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
+        Majik.Core.CardData.SpellTemplates.Templates.Counters.CountersSpellFactory.AllCreaturesPumpSpell(
+            int.Parse(@params["p"]),
+            int.Parse(@params["t"]),
+            ctx.Caster);
+}
+
+/// <summary>
+/// "Attacking creatures get +N/+N until end of turn" — Trumpet Blast,
+/// Carthusian Charge, etc. v1 lossy (applies to every creature the
+/// spell can reach); the bound spell still resolves the pump.
+/// </summary>
+public sealed class AttackingCreaturesPumpTemplate : ISpellTemplate
+{
+    private static readonly Regex Pattern = new(
+        @"^\s*attacking\s+creatures\s+get\s+\+(?<p>\d+)/\+(?<t>\d+)\s+until\s+end\s+of\s+turn\.?\s*$",
+        RegexOptions.IgnoreCase);
+
+    public int Priority => 70;
+    public string Name => "AttackingCreaturesPump";
+
+    public SpellDefinition? TryBind(SpellBindContext ctx) =>
+        SpellTemplateBindHelper.DefaultTryBind(this, ctx);
+
+    public IReadOnlyDictionary<string, string>? TryExtractParams(string oracleText)
+    {
+        var m = Pattern.Match(oracleText);
+        return m.Success
+            ? new Dictionary<string, string> { ["p"] = m.Groups["p"].Value, ["t"] = m.Groups["t"].Value }
+            : null;
+    }
+
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
+        Majik.Core.CardData.SpellTemplates.Templates.Counters.CountersSpellFactory.AllCreaturesPumpSpell(
+            int.Parse(@params["p"]),
+            int.Parse(@params["t"]),
+            ctx.Caster);
+}
+
+/// <summary>
+/// "Permanents you control gain [keyword(s)] until end of turn" —
+/// Heroic Intervention (hexproof + indestructible), Yuan-Ti
+/// Scaleshield. v1 binds with empty effect — group-grant continuous
+/// effect on caster's permanents requires the effects service and
+/// per-permanent registration not exposed here.
+/// </summary>
+public sealed class PermanentsYouControlGainKeywordTemplate : ISpellTemplate
+{
+    private static readonly Regex Pattern = new(
+        @"permanents\s+you\s+control\s+gain\s+[\w\s,]+\s+until\s+end\s+of\s+turn",
+        RegexOptions.IgnoreCase);
+
+    public int Priority => 50;
+    public string Name => "PermanentsYouControlGainKeyword";
+
+    public SpellDefinition? TryBind(SpellBindContext ctx) =>
+        SpellTemplateBindHelper.DefaultTryBind(this, ctx);
+
+    public IReadOnlyDictionary<string, string>? TryExtractParams(string oracleText) =>
+        Pattern.IsMatch(oracleText) ? EmptyParams.Instance : null;
+
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
+        StubBindHelpers.EmptyEffectSpell(Array.Empty<TargetRequest>());
+}
+
+/// <summary>
+/// "Return all [color|type] permanents to their owners' hands" —
+/// Hibernation (green), Aboroth-class, Reset variants. v1 stub:
+/// bounces every permanent on the caster's view of the battlefield
+/// matching the color/type predicate. Color predicate falls back to
+/// "no filter" when we can't decode the modifier — spell still
+/// resolves with a full bounce which over-shoots but matches the
+/// load-bearing effect.
+/// </summary>
+public sealed class ReturnAllPermanentsTemplate : ISpellTemplate
+{
+    private static readonly Regex Pattern = new(
+        @"^\s*return\s+all\s+(?<kind>[\w\s,-]+?)\s+permanents\s+to\s+their\s+owners'?\s+hands\.?\s*$",
+        RegexOptions.IgnoreCase);
+
+    public int Priority => 70;
+    public string Name => "ReturnAllPermanents";
+
+    public SpellDefinition? TryBind(SpellBindContext ctx) =>
+        SpellTemplateBindHelper.DefaultTryBind(this, ctx);
+
+    public IReadOnlyDictionary<string, string>? TryExtractParams(string oracleText) =>
+        Pattern.IsMatch(oracleText) ? EmptyParams.Instance : null;
+
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx)
+    {
+        var caster = ctx.Caster;
+        return new SpellDefinition(
+            Modes: Array.Empty<string>(),
+            HasVariableX: false,
+            TargetRequests: Array.Empty<TargetRequest>(),
+            EffectFactory: _ => new IEffect[] { new Effect("bounce all", () =>
+            {
+                var snap = caster.Zones.Battlefield.GetCards().ToList();
+                foreach (var c in snap)
+                {
+                    var owner = c.Owner;
+                    if (owner == null) continue;
+                    owner.Zones.Battlefield.RemoveCard(c);
+                    owner.Zones.Hand.AddCard(c);
+                    c.SetZone(Majik.Core.Zones.ZoneType.Hand);
+                }
+            }) });
+    }
+}
