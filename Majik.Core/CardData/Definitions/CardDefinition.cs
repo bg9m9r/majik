@@ -61,6 +61,7 @@ public sealed class CardDefinition
 /// </summary>
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "kind")]
 [JsonDerivedType(typeof(ManaAbilityDefinition), "mana")]
+[JsonDerivedType(typeof(ActivatedAbilityDefinition), "activated")]
 public abstract class AbilityDefinition { }
 
 /// <summary>
@@ -76,4 +77,22 @@ public abstract class AbilityDefinition { }
 public sealed class ManaAbilityDefinition : AbilityDefinition
 {
     public string Produces { get; set; } = "";
+}
+
+/// <summary>
+/// Non-mana activated ability — pay all <see cref="Costs"/>, then
+/// resolve every entry in <see cref="Effects"/> in order. Uses the
+/// stack (mana abilities do not — CR 605.1). Cost / effect variants
+/// live under <see cref="CostDefinition"/> + <see cref="EffectDefinition"/>.
+///
+/// <see cref="SorcerySpeed"/>: per CR 307.4 / 606.4, an "Activate only
+/// as a sorcery" rider. Currently informational — the runtime activator
+/// doesn't yet gate on it; the JSON faithfully records the intent so
+/// the gate lands cleanly when the activator learns the flag.
+/// </summary>
+public sealed class ActivatedAbilityDefinition : AbilityDefinition
+{
+    public List<CostDefinition> Costs { get; set; } = new();
+    public List<EffectDefinition> Effects { get; set; } = new();
+    public bool SorcerySpeed { get; set; } = false;
 }
