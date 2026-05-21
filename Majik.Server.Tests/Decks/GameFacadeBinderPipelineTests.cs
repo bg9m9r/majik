@@ -5,7 +5,9 @@ using Majik.Core.CardData;
 using Majik.Core.CardData.Database;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Effects;
 using Majik.Core.Players;
+using Majik.Core.Zones;
 using Xunit;
 
 namespace Majik.Server.Tests.Decks;
@@ -197,5 +199,109 @@ public class GameFacadeBinderPipelineTests
 
         // No mana ability added to a creature — just verifying no exception.
         mystery.Abilities.OfType<IManaAbility>().Should().BeEmpty();
+    }
+
+    // -----------------------------------------------------------------------
+    // With repo + shock land: ShockLandBinder registers onto facade.Replacements
+    // so the ETB replacement fires when the card moves to the battlefield.
+    // CR 614 — replacement effects modify how events would occur.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void GameFacade_Create_AttachesShockLandReplacement_WhenRepoAndShockEntityPresent()
+    {
+        var repo = new FakeCardRepo();
+        const string ShockOracleText =
+            "({T}: Add {B} or {G}.)\n" +
+            "As this land enters, you may pay 2 life. If you don't, it enters tapped.";
+        repo.Add("Overgrown Tomb", "Land — Swamp Forest", oracleText: ShockOracleText);
+        repo.Add("Forest", "Basic Land — Forest");
+
+        // Alice starts at 20 life — above the "pay 2" threshold so the
+        // replacement should elect to pay 2 life and let the land enter untapped.
+        var tomb = new Land("Overgrown Tomb",
+            supertypes: Array.Empty<CardSupertype>(),
+            subtypes: new[] { CardSubtype.Swamp, CardSubtype.Forest });
+
+        var deck = new List<ICard> { tomb };
+        for (var i = 1; i < 60; i++)
+            deck.Add(new Land("Forest", new[] { CardSupertype.Basic }, new[] { CardSubtype.Forest }));
+
+        var facade = GameFacade.Create("Alice", "Bob", deck, new List<ICard>(), cardRepo: repo);
+
+        // Verify the replacement is wired: push a ZoneMoveIntent for Overgrown
+        // Tomb moving from Hand → Battlefield through facade.Replacements and
+        // check that the replacement fires (life deducted or EntersTapped flag set).
+        // ShockLandReplacement.Applies checks the intent zones, not card.Zone,
+        // so we don't need internal Zone access here.
+        var alice = new Player("Alice", 20);
+        tomb.ChangeOwner(alice);
+
+        var intent = new ZoneMoveIntent(tomb, ZoneType.Hand, ZoneType.Battlefield, Controller: alice);
+        var result = facade.Replacements.Apply(intent);
+
+        // With 20 life (> 2), policy pays 2 life and lets land enter untapped.
+        result.Should().NotBeNull("the replacement should not cancel the move");
+        alice.LifeTotal.Should().Be(18, "shock land pays 2 life when controller has > 2 life (CR 702.18)");
+        result!.EntersTapped.Should().BeFalse("land enters untapped when life was paid");
+    }
+
+    [Fact]
+    public void GameFacade_Create_AttachesShockLandReplacement_EntersTapped_WhenControllerAtLowLife()
+    {
+        var repo = new FakeCardRepo();
+        const string ShockOracleText =
+            "({T}: Add {U} or {R}.)\n" +
+            "As this land enters, you may pay 2 life. If you don't, it enters tapped.";
+        repo.Add("Steam Vents", "Land — Island Mountain", oracleText: ShockOracleText);
+        repo.Add("Forest", "Basic Land — Forest");
+
+        var steamVents = new Land("Steam Vents",
+            supertypes: Array.Empty<CardSupertype>(),
+            subtypes: new[] { CardSubtype.Island, CardSubtype.Mountain });
+
+        var deck = new List<ICard> { steamVents };
+        for (var i = 1; i < 60; i++)
+            deck.Add(new Land("Forest", new[] { CardSupertype.Basic }, new[] { CardSubtype.Forest }));
+
+        var facade = GameFacade.Create("Alice", "Bob", deck, new List<ICard>(), cardRepo: repo);
+
+        // Controller at exactly 2 life — policy skips paying and enters tapped.
+        var alice = new Player("Alice", 2);
+        steamVents.ChangeOwner(alice);
+
+        var intent = new ZoneMoveIntent(steamVents, ZoneType.Hand, ZoneType.Battlefield, Controller: alice);
+        var result = facade.Replacements.Apply(intent);
+
+        result.Should().NotBeNull();
+        alice.LifeTotal.Should().Be(2, "no life paid when controller is at 2 or below");
+        result!.EntersTapped.Should().BeTrue("land enters tapped when life was not paid");
+    }
+
+    [Fact]
+    public void GameFacade_Create_WithCardRepo_NonShockLand_NoReplacementRegistered()
+    {
+        var repo = new FakeCardRepo();
+        repo.Add("Forest", "Basic Land — Forest",
+            oracleText: "({T}: Add {G}.)",
+            keywordsJson: "[]");
+
+        var forest = new Land("Forest", new[] { CardSupertype.Basic }, new[] { CardSubtype.Forest });
+        var deck = new List<ICard> { forest };
+        for (var i = 1; i < 60; i++)
+            deck.Add(new Land("Forest", new[] { CardSupertype.Basic }, new[] { CardSubtype.Forest }));
+
+        var facade = GameFacade.Create("Alice", "Bob", deck, new List<ICard>(), cardRepo: repo);
+
+        // A basic Forest has no shock clause — intent passes through unchanged.
+        var alice = new Player("Alice", 20);
+        forest.ChangeOwner(alice);
+
+        var intent = new ZoneMoveIntent(forest, ZoneType.Hand, ZoneType.Battlefield, Controller: alice);
+        var result = facade.Replacements.Apply(intent);
+
+        result.Should().NotBeNull();
+        alice.LifeTotal.Should().Be(20, "no life paid for a basic land");
+        result!.EntersTapped.Should().BeFalse("basic land enters untapped");
     }
 }

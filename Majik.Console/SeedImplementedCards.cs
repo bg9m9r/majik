@@ -14,5 +14,7 @@ public static class SeedImplementedCards
         "Grizzly Bears", "Hill Giant", "Bear Cub", "Savannah Lions",
         "Goblin Piker", "Walking Corpse", "Phantom Warrior",
         "Llanowar Elves", "Runeclaw Bear", "Centaur Courser",
+        // Shock lands (CR 614 replacement effect — ShockLandBinder)
+        "Overgrown Tomb",
     };
 }

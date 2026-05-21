@@ -56,6 +56,13 @@ public sealed class GameFacade
 
     public bool IsRoundComplete => _loopTask?.IsCompleted ?? false;
 
+    /// <summary>
+    /// The game's replacement-effect bus. Binders (e.g. ShockLandBinder)
+    /// register handlers here during deck load; ZoneService reads from it on
+    /// every card move so replacements fire correctly at the table.
+    /// </summary>
+    public ReplacementBus Replacements { get; } = new();
+
     private GameFacade(Player alice, Player bob)
     {
         _alice = alice;
@@ -63,7 +70,7 @@ public sealed class GameFacade
 
         _stack = new Majik.Core.Stack.Stack(_bus);
         _triggers = new TriggerManager(_stack, _bus);
-        _zones = new ZoneService(_bus);
+        _zones = new ZoneService(_bus, Replacements);
         _sba = new StateBasedActions(_bus, _zones, _triggers);
         _resolver = new StackResolver(_bus, _zones, _sba);
         _priority = new PriorityManager(new List<Player> { alice, bob }, _stack, _bus, _triggers);
@@ -103,20 +110,26 @@ public sealed class GameFacade
         var alice = new Player(aliceName, 20);
         var bob = new Player(bobName, 20);
 
+        // Construct the facade first so its internal ReplacementBus is available.
+        // Any externally-supplied bus is ignored — binders register onto the
+        // facade's own bus, which ZoneService already holds a reference to.
+        var facade = new GameFacade(alice, bob);
+        var bus = facade.Replacements;
+
         foreach (var card in aliceDeck)
         {
             card.SetOwner(alice);
-            BindCardAbilities(card, alice, cardRepo, replacements);
+            BindCardAbilities(card, alice, cardRepo, bus);
             alice.Zones.GetZone(ZoneType.Library).AddCard(card);
         }
         foreach (var card in bobDeck)
         {
             card.SetOwner(bob);
-            BindCardAbilities(card, bob, cardRepo, replacements);
+            BindCardAbilities(card, bob, cardRepo, bus);
             bob.Zones.GetZone(ZoneType.Library).AddCard(card);
         }
 
-        return new GameFacade(alice, bob);
+        return facade;
     }
 
     /// <summary>
@@ -125,12 +138,17 @@ public sealed class GameFacade
     /// runs (KeywordBinder, OracleManaBinder, AffinityBinder, SagaBinder,
     /// OracleTriggeredAbilityBinder, ShockLandBinder). Without a repo only
     /// the basic-land mana path fires — preserving pre-existing behaviour.
+    ///
+    /// <paramref name="replacements"/> is the game's own ReplacementBus and
+    /// is always non-null when called from <see cref="Create"/>; ShockLandBinder
+    /// registers onto it unconditionally whenever the repo returns a matching
+    /// shock-land entity (CR 614).
     /// </summary>
     private static void BindCardAbilities(
         ICard card,
         Player controller,
         ICardRepository? cardRepo,
-        ReplacementBus? replacements)
+        ReplacementBus replacements)
     {
         if (cardRepo != null)
         {
@@ -145,10 +163,7 @@ public sealed class GameFacade
                 {
                     card.AddAbility(trig);
                 }
-                if (replacements != null)
-                {
-                    ShockLandBinder.Bind(card, entity, replacements);
-                }
+                ShockLandBinder.Bind(card, entity, replacements);
                 return;
             }
         }
