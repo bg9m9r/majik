@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Majik.Core.Cards;
+using Majik.Core.Cards.Types;
 using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Rules;
@@ -62,5 +63,17 @@ public class TokenFactoryTests
         _sba.CheckStateBasedActions(new[] { _alice }, new ICard[] { bear });
 
         _alice.Zones.Graveyard.GetCards().Should().Contain(bear);
+    }
+
+    [Fact]
+    public void CreateFood_PutsArtifactTokenOnBattlefield_WithFoodSubtype()
+    {
+        var food = TokenFactory.CreateFood(_alice, _zones);
+
+        food.Should().NotBeNull();
+        food.IsToken.Should().BeTrue();
+        food.Subtypes.Should().Contain(CardSubtype.Food);
+        food.Zone.Should().Be(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.GetCards().Should().Contain(food);
     }
 }

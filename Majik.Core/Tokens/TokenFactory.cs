@@ -105,6 +105,24 @@ public static class TokenFactory
         return token;
     }
 
+    /// <summary>Food (CR 111.10): colorless artifact token. The
+    /// "{2}, {T}, Sacrifice this artifact: You gain 3 life." activated
+    /// ability is wired by the activated-ability binder; this factory
+    /// produces the bare token.</summary>
+    public static Artifact CreateFood(Player controller, ZoneService? zones = null)
+    {
+        if (controller == null) throw new ArgumentNullException(nameof(controller));
+        var token = new Artifact("Food", "",
+            subtypes: new[] { CardSubtype.Food })
+        {
+            Owner = controller,
+            Controller = controller,
+            IsToken = true,
+        };
+        PutOnBattlefield(token, controller, zones);
+        return token;
+    }
+
     private static void PutOnBattlefield(Artifact token, Player controller, ZoneService? zones)
     {
         token.SetZone(ZoneType.Library); // sentinel; ZoneService validates from-zone
