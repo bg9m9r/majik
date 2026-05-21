@@ -36,6 +36,7 @@ public static class OracleSpellBinder
             new SpellTemplates.Templates.Damage.DealsXDamageEachCreatureTemplate(),
             new SpellTemplates.Templates.Damage.DealsDamageEachCreatureTemplate(),
             new SpellTemplates.Templates.Damage.EachOpponentLosesLifeTemplate(),
+            new SpellTemplates.Templates.Destroy.DestroyAllCreaturesTemplate(),
             new SpellTemplates.Templates.Destroy.DestroyCreatureCmcLimitTemplate(),
             new SpellTemplates.Templates.Destroy.DestroyUpToArtifactEnchantmentTemplate(),
             new SpellTemplates.Templates.Destroy.DestroyNonlandPermanentTemplate(),

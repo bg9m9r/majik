@@ -89,6 +89,24 @@ internal static class DestroySpellFactory
             }) };
         });
 
+    // Wrath-style sweep — destroys every creature on the caster's view of
+    // the battlefield. v1 ignores indestructible and "can't be regenerated"
+    // riders; the spell still binds and resolves with the load-bearing
+    // effect (creatures into graveyard).
+    internal static SpellDefinition DestroyAllCreaturesSpell(
+        Majik.Core.Players.Player caster) => new(
+        Modes: Array.Empty<string>(), HasVariableX: false,
+        TargetRequests: Array.Empty<TargetRequest>(),
+        EffectFactory: _ => new IEffect[] { new Effect("destroy all creatures", () =>
+        {
+            // Snapshot the list — we're about to mutate the zone.
+            var creatures = caster.Zones.Battlefield.GetCards().OfType<Creature>().ToList();
+            foreach (var c in creatures)
+            {
+                OracleSpellBinder.MoveToGraveyard(c);
+            }
+        }) });
+
     internal static SpellDefinition DestroyTargetSpell(
         Func<object, object> resolver, string label, Func<ICard, bool> filter) => new(
         Modes: Array.Empty<string>(), HasVariableX: false,
