@@ -82,4 +82,17 @@ internal static class DamageSpellFactory
             var x = p.X ?? 0;
             return new IEffect[] { new Effect($"deal X={x}", () => OracleSpellBinder.DealDamage(target, x)) };
         });
+
+    internal static SpellDefinition DealsXCreatureSpell(Func<object, object> resolver) => new(
+        Modes: Array.Empty<string>(), HasVariableX: true,
+        TargetRequests: new[] { new TargetRequest("target creature", 1, 1, Array.Empty<object>()) },
+        EffectFactory: p =>
+        {
+            var target = resolver(p.Targets[0][0]);
+            var x = p.X ?? 0;
+            return new IEffect[] { new Effect($"deal X={x} to creature", () =>
+            {
+                if (target is Creature creature) creature.TakeDamage(x);
+            }) };
+        });
 }
