@@ -22,8 +22,9 @@ namespace Majik.Core.CardData.SpellTemplates.Templates.Damage;
 /// </summary>
 public sealed class DealsXDamageEachCreatureTemplate : ISpellTemplate
 {
+    // Same modifier-chain broadening as the fixed-numeric template.
     private static readonly Regex Pattern = new(
-        @"deals?\s+x\s+damage\s+to\s+each\s+creature",
+        @"deals?\s+x\s+damage\s+to\s+each\s+(?:(?:[\w-]+|or|and|and/or)\s*,?\s*){0,4}creature(?:\s+(?:you\s+control|your\s+opponents\s+control|an\s+opponent\s+controls))?",
         RegexOptions.IgnoreCase);
 
     public int Priority => 100;
