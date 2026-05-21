@@ -23,6 +23,14 @@ services:
     dockerContext: .
     healthCheckPath: /healthz
     autoDeploy: true
+    disk:
+      # Cards SQLite seed. Image is too large to bake (~550 MB) and
+      # repo is too large to track. Disk persists across deploys; the
+      # file is uploaded once via Render Shell from a GitHub Release.
+      # See docs/RENDER_CARDS_SEED.md.
+      name: cards-data
+      mountPath: /root/.config/Majik
+      sizeGB: 1
     envVars:
       - key: ASPNETCORE_ENVIRONMENT
         value: Production
