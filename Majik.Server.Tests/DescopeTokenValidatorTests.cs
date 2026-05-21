@@ -4,6 +4,7 @@ using Majik.Server.Auth;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace Majik.Server.Tests;
@@ -103,6 +104,9 @@ public class DescopeTokenValidatorTests
         var identity = new ClaimsIdentity(claims, "TestAuth");
         var principal = new ClaimsPrincipal(identity);
         var httpContext = new DefaultHttpContext();
+        var services = new ServiceCollection();
+        services.AddLogging();
+        httpContext.RequestServices = services.BuildServiceProvider();
         var scheme = new AuthenticationScheme(
             JwtBearerDefaults.AuthenticationScheme,
             null,
