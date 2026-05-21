@@ -46,23 +46,15 @@ public static class OracleSpellBinder
             new SpellTemplates.Templates.Damage.DamagePlayerTemplate(),
             new SpellTemplates.Templates.Damage.DealsDamageEachCreatureTemplate(),
             new SpellTemplates.Templates.Damage.EachOpponentLosesLifeTemplate(),
+            new SpellTemplates.Templates.Destroy.DestroyCreatureCmcLimitTemplate(),
+            new SpellTemplates.Templates.Destroy.DestroyUpToArtifactEnchantmentTemplate(),
+            new SpellTemplates.Templates.Destroy.DestroyNonlandPermanentTemplate(),
+            new SpellTemplates.Templates.Destroy.DestroyArtifactEnchantmentTemplate(),
+            new SpellTemplates.Templates.Destroy.DestroyCreatureTemplate(),
+            new SpellTemplates.Templates.Destroy.DestroyLandTemplate(),
+            new SpellTemplates.Templates.Destroy.DestroyPermanentTemplate(),
         });
 
-    // "Destroy target creature if its mana value is N or less." — more specific than DestroyCreature.
-    private static readonly Regex DestroyCreatureCmcLimit = new(
-        @"destroy\s+target\s+(?:nonland\s+)?creature\s+if\s+its\s+mana\s+value\s+is\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+or\s+less",
-        RegexOptions.IgnoreCase);
-    private static readonly Regex DestroyCreature = new(
-        @"destroy\s+target\s+(non\w+\s+)?creature",
-        RegexOptions.IgnoreCase);
-    private static readonly Regex DestroyArtifactEnchantment = new(
-        @"destroy\s+target\s+(artifact|enchantment)(\s+or\s+(artifact|enchantment))?",
-        RegexOptions.IgnoreCase);
-    // "Destroy up to N target artifacts and/or enchantments." — Force of Vigor
-    // style. More specific than DestroyArtifactEnchantment; dispatched first.
-    private static readonly Regex DestroyUpToArtifactEnchantment = new(
-        @"destroy\s+up\s+to\s+(?<n>\d+|one|two|three|four|five)\s+target\s+artifacts?\s+and(?:/or)?\s+enchantments?",
-        RegexOptions.IgnoreCase);
     private static readonly Regex DrawCards = new(
         @"draw\s+(?<n>\d+|a|one|two|three|four|five|six|seven)\s+cards?",
         RegexOptions.IgnoreCase);
@@ -92,17 +84,6 @@ public static class OracleSpellBinder
     // doesn't match.
     private static readonly Regex TapTarget = new(
         @"\btap\s+target\s+(permanent|creature|artifact|land|enchantment|planeswalker)",
-        RegexOptions.IgnoreCase);
-    // "Destroy target land." / "Destroy target nonland permanent." /
-    // "Destroy target permanent."
-    private static readonly Regex DestroyLand = new(
-        @"destroy\s+target\s+land\b",
-        RegexOptions.IgnoreCase);
-    private static readonly Regex DestroyNonlandPermanent = new(
-        @"destroy\s+target\s+nonland\s+permanent",
-        RegexOptions.IgnoreCase);
-    private static readonly Regex DestroyPermanent = new(
-        @"destroy\s+target\s+permanent",
         RegexOptions.IgnoreCase);
     // "Return target {creature|permanent|...} to its owner's hand."
     private static readonly Regex BounceTarget = new(
@@ -316,17 +297,6 @@ public static class OracleSpellBinder
         if (mGrantAll.Success && effects != null) return CreaturesYouControlGainKeywordSpell(
             NormaliseKeyword(mGrantAll.Groups["kw"].Value), caster, effects);
 
-        // CMC-limited destroy (Fatal Push) — must precede generic DestroyCreature.
-        var mFp = DestroyCreatureCmcLimit.Match(text);
-        if (mFp.Success) return DestroyCreatureCmcLimitSpell(resolver, WordToInt(mFp.Groups["n"].Value));
-
-        if (DestroyCreature.IsMatch(text)) return DestroyCreatureSpell(resolver);
-        // "Destroy up to N target artifacts and/or enchantments." — must precede
-        // the single-target DestroyArtifactEnchantment so Force of Vigor wins.
-        var mDestUp = DestroyUpToArtifactEnchantment.Match(text);
-        if (mDestUp.Success) return DestroyUpToArtifactEnchantmentSpell(resolver, WordToInt(mDestUp.Groups["n"].Value));
-        if (DestroyArtifactEnchantment.IsMatch(text)) return DestroyArtifactOrEnchantmentSpell(resolver);
-
         var m = DrawCards.Match(text);
         if (m.Success) return DrawNSpell(WordToInt(m.Groups["n"].Value), caster);
 
@@ -356,16 +326,6 @@ public static class OracleSpellBinder
 
         var mTpl = TargetPlayerLosesLife.Match(text);
         if (mTpl.Success) return TargetPlayerLosesLifeSpell(WordToInt(mTpl.Groups["n"].Value), resolver);
-
-        // More-specific destroys before generic — nonland before permanent before land.
-        if (DestroyNonlandPermanent.IsMatch(text)) return DestroyTargetSpell(
-            resolver, "target nonland permanent",
-            c => !c.HasType(Majik.Core.Cards.Types.CardType.Land));
-        if (DestroyPermanent.IsMatch(text)) return DestroyTargetSpell(
-            resolver, "target permanent", _ => true);
-        if (DestroyLand.IsMatch(text)) return DestroyTargetSpell(
-            resolver, "target land",
-            c => c.HasType(Majik.Core.Cards.Types.CardType.Land));
 
         m = TapTarget.Match(text);
         if (m.Success) return TapTargetSpell(resolver, $"target {m.Groups[1].Value}");
@@ -912,19 +872,6 @@ public static class OracleSpellBinder
             }) };
         });
 
-    private static SpellDefinition DestroyTargetSpell(
-        Func<object, object> resolver, string label, Func<ICard, bool> filter) => new(
-        Modes: Array.Empty<string>(), HasVariableX: false,
-        TargetRequests: new[] { new TargetRequest(label, 1, 1, Array.Empty<object>()) },
-        EffectFactory: p =>
-        {
-            var target = resolver(p.Targets[0][0]);
-            return new IEffect[] { new Effect("destroy target", () =>
-            {
-                if (target is ICard card && filter(card)) MoveToGraveyard(card);
-            }) };
-        });
-
     private static SpellDefinition BounceTargetSpell(
         Func<object, object> resolver, string label) => new(
         Modes: Array.Empty<string>(), HasVariableX: false,
@@ -1071,39 +1018,6 @@ public static class OracleSpellBinder
             }) };
         });
 
-    private static SpellDefinition DestroyCreatureSpell(Func<object, object> resolver) => new(
-        Modes: Array.Empty<string>(), HasVariableX: false,
-        TargetRequests: new[] { new TargetRequest("target creature", 1, 1, Array.Empty<object>()) },
-        EffectFactory: p =>
-        {
-            var target = resolver(p.Targets[0][0]);
-            return new IEffect[] { new Effect("destroy creature", () =>
-            {
-                if (target is Creature c) MoveToGraveyard(c);
-            }) };
-        });
-
-    /// <summary>
-    /// Fatal Push template (v1 — base clause only, revolt deferred).
-    /// Destroys target creature only if its mana value is ≤ maxCmc.
-    /// The card's <see cref="Card.ManaCostValue"/> drives the CMC check (Rule 202.3).
-    /// </summary>
-    private static SpellDefinition DestroyCreatureCmcLimitSpell(Func<object, object> resolver, int maxCmc) => new(
-        Modes: Array.Empty<string>(), HasVariableX: false,
-        TargetRequests: new[] { new TargetRequest("target creature", 1, 1, Array.Empty<object>()) },
-        EffectFactory: p =>
-        {
-            var target = resolver(p.Targets[0][0]);
-            return new IEffect[] { new Effect($"destroy if cmc<={maxCmc}", () =>
-            {
-                if (target is Creature crt)
-                {
-                    var cmc = crt.ManaCostValue.TotalValue;
-                    if (cmc <= maxCmc) MoveToGraveyard(crt);
-                }
-            }) };
-        });
-
     /// <summary>
     /// Thoughtseize template (v1 — deterministic pick: first non-land card in target's hand).
     /// Real Thoughtseize lets the caster choose; v1 simplification picks deterministically.
@@ -1128,54 +1042,6 @@ public static class OracleSpellBinder
                     pick.SetZone(ZoneType.Graveyard);
                 }
                 caster.LoseLife(lifeLoss);
-            }) };
-        });
-
-    private static SpellDefinition DestroyArtifactOrEnchantmentSpell(Func<object, object> resolver) => new(
-        Modes: Array.Empty<string>(), HasVariableX: false,
-        TargetRequests: new[] { new TargetRequest("target artifact or enchantment", 1, 1, Array.Empty<object>()) },
-        EffectFactory: p =>
-        {
-            var target = resolver(p.Targets[0][0]);
-            return new IEffect[] { new Effect("destroy artifact/enchantment", () =>
-            {
-                if (target is ICard card) MoveToGraveyard(card);
-            }) };
-        });
-
-    /// <summary>
-    /// "Destroy up to N target artifacts and/or enchantments." (Force of Vigor
-    /// template). MinTargets = 0 so the spell is legal with no targets chosen.
-    /// CR 601.2c — "up to N" allows 0 through N legal targets.
-    /// </summary>
-    private static SpellDefinition DestroyUpToArtifactEnchantmentSpell(
-        Func<object, object> resolver, int maxN) => new(
-        Modes: Array.Empty<string>(), HasVariableX: false,
-        TargetRequests: new[]
-        {
-            new TargetRequest(
-                $"up to {maxN} target artifacts and/or enchantments",
-                MinTargets: 0,
-                MaxTargets: maxN,
-                LegalCandidates: Array.Empty<object>()),
-        },
-        EffectFactory: p =>
-        {
-            // Resolve all target references eagerly before returning the effect.
-            var targets = p.Targets[0]
-                .Select(t => resolver(t))
-                .ToList();
-            return new IEffect[] { new Effect($"destroy up to {maxN} artifact/enchantment", () =>
-            {
-                foreach (var resolved in targets)
-                {
-                    if (resolved is ICard card
-                        && (card.HasType(Majik.Core.Cards.Types.CardType.Artifact)
-                            || card.HasType(Majik.Core.Cards.Types.CardType.Enchantment)))
-                    {
-                        MoveToGraveyard(card);
-                    }
-                }
             }) };
         });
 
@@ -1207,7 +1073,7 @@ public static class OracleSpellBinder
         }
     }
 
-    private static void MoveToGraveyard(ICard card)
+    internal static void MoveToGraveyard(ICard card)
     {
         var owner = card.Owner;
         if (owner != null)
