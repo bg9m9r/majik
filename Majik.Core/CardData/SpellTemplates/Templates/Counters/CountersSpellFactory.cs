@@ -77,6 +77,26 @@ internal static class CountersSpellFactory
             }) };
         });
 
+    // "All creatures get +P/+T (or -P/-T) until end of turn" — symmetrical
+    // pump/debuff. v1 stub registers per-creature PumpUntilEndOfTurnEffect
+    // for every creature on the caster's view of the battlefield. Sign-agnostic.
+    // Opponents' creatures are out of reach until SpellCastFlow exposes
+    // AllPlayers (same TODO as the wrath templates).
+    internal static SpellDefinition AllCreaturesPumpSpell(
+        int p, int t, Player caster) => new(
+        Modes: Array.Empty<string>(), HasVariableX: false,
+        TargetRequests: Array.Empty<TargetRequest>(),
+        EffectFactory: _ => new IEffect[] { new Effect($"all creatures {p:+#;-#;0}/{t:+#;-#;0} EOT", () =>
+        {
+            foreach (var c in caster.Zones.Battlefield.GetCards().OfType<Creature>())
+            {
+                if (c.ActiveEffects != null)
+                {
+                    c.ActiveEffects.Register(new PumpUntilEndOfTurnEffect(c, p, t));
+                }
+            }
+        }) });
+
     internal static SpellDefinition CreaturesYouControlPumpSpell(
         int p, int t, Player caster,
         ContinuousEffectsService effects) => new(
