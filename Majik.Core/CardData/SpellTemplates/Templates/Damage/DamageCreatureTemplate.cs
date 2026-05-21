@@ -21,8 +21,14 @@ namespace Majik.Core.CardData.SpellTemplates.Templates.Damage;
 /// </summary>
 public sealed class DamageCreatureTemplate : ISpellTemplate
 {
+    // Accepts an optional modifier chain between "target" and "creature":
+    // combat-state ("attacking", "blocking", "attacking or blocking",
+    // "tapped"), color ("nonwhite", "nonred", "white or blue", "Treefolk"
+    // tribe, "non-Elemental"), etc. The runtime stub deals N damage to
+    // whatever creature is chosen — modifier informs target legality, not
+    // the resolved effect, which keeps the stub faithful.
     private static readonly Regex Pattern = new(
-        @"deals?\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+damage\s+to\s+target\s+creature\b",
+        @"deals?\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+damage\s+to\s+target\s+(?:(?:[\w-]+|or)\s*,?\s*){0,5}creature\b",
         RegexOptions.IgnoreCase);
 
     public int Priority => 60;
