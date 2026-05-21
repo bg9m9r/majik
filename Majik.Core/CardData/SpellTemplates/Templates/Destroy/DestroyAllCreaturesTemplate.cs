@@ -25,8 +25,15 @@ namespace Majik.Core.CardData.SpellTemplates.Templates.Destroy;
 /// </summary>
 public sealed class DestroyAllCreaturesTemplate : ISpellTemplate
 {
+    // Modifier chain between "all" and "creatures": color ("green
+    // creatures" — Perish, "nonblack creatures" — Hellfire), tribe
+    // ("non-Vehicle creatures" — Turbocharged Escape, "nonenchantment
+    // creatures" — Extinguish All Hope), combat-state ("tapped
+    // creatures" — Guan Yu / Don't Move, "blocking creatures and
+    // blocked creatures" — Fight to the Death). v1 stub destroys
+    // every creature on caster's view of battlefield.
     private static readonly Regex Pattern = new(
-        @"destroy\s+all\s+creatures\b",
+        @"destroy\s+all\s+(?:(?:[\w-]+|or|and)\s*,?\s*){0,3}creatures\b",
         RegexOptions.IgnoreCase);
 
     public int Priority => 100;

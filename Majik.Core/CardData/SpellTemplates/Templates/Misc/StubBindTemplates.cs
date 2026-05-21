@@ -569,3 +569,175 @@ public sealed class CounterUpToNTargetSpellsTemplate : ISpellTemplate
         Majik.Core.CardData.SpellTemplates.Templates.Counter.CounterSpellFactory.CounterTargetSpell(
             ctx.Resolver, ctx.Stack);
 }
+
+/// <summary>
+/// "Take an extra turn after this one" / "Target player takes N extra
+/// turns after this one." — Time Walk, Temporal Manipulation, Time
+/// Warp, Time Stretch. v1 binds with empty effect; TurnManager hook
+/// for extra-turn insertion isn't reachable from spell-effect scope
+/// yet, so the spell resolves as a no-op castable.
+/// </summary>
+public sealed class TakeExtraTurnTemplate : ISpellTemplate
+{
+    private static readonly Regex Pattern = new(
+        @"(?:take\s+an\s+extra\s+turn|takes?\s+(?:an\s+extra\s+turn|two\s+extra\s+turns|three\s+extra\s+turns))\s+after\s+this\s+(?:one|turn)",
+        RegexOptions.IgnoreCase);
+
+    public int Priority => 60;
+    public string Name => "TakeExtraTurn";
+
+    public SpellDefinition? TryBind(SpellBindContext ctx) =>
+        SpellTemplateBindHelper.DefaultTryBind(this, ctx);
+
+    public IReadOnlyDictionary<string, string>? TryExtractParams(string oracleText) =>
+        Pattern.IsMatch(oracleText) ? EmptyParams.Instance : null;
+
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
+        StubBindHelpers.EmptyEffectSpell(Array.Empty<TargetRequest>());
+}
+
+/// <summary>
+/// "Target player shuffles their graveyard into their library" /
+/// "Target player shuffles up to N target cards from their graveyard
+/// into their library." — Reminisce, Stream of Consciousness,
+/// Krosan Reclamation-tail. v1 real-ish effect: moves every card
+/// from the target's graveyard back to library (the "up to N
+/// targets" choice is lossy; the bound spell moves the whole pile
+/// which is a v1 over-shoot but at least removes the cards from the
+/// graveyard).
+/// </summary>
+public sealed class ShuffleGraveyardIntoLibraryTemplate : ISpellTemplate
+{
+    private static readonly Regex Pattern = new(
+        @"target\s+player\s+shuffles(?:\s+up\s+to\s+\w+\s+target\s+cards?\s+from)?\s+(?:their\s+graveyard|(?:cards?\s+)?(?:from\s+)?their\s+graveyard)\s+into\s+their\s+library",
+        RegexOptions.IgnoreCase);
+
+    public int Priority => 60;
+    public string Name => "ShuffleGraveyardIntoLibrary";
+
+    public SpellDefinition? TryBind(SpellBindContext ctx) =>
+        SpellTemplateBindHelper.DefaultTryBind(this, ctx);
+
+    public IReadOnlyDictionary<string, string>? TryExtractParams(string oracleText) =>
+        Pattern.IsMatch(oracleText) ? EmptyParams.Instance : null;
+
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx)
+    {
+        var resolver = ctx.Resolver;
+        return new SpellDefinition(
+            Modes: Array.Empty<string>(),
+            HasVariableX: false,
+            TargetRequests: new[] { new TargetRequest("target player", 1, 1, Array.Empty<object>()) },
+            EffectFactory: p =>
+            {
+                var target = resolver(p.Targets[0][0]);
+                return new IEffect[] { new Effect("shuffle gy to library", () =>
+                {
+                    if (target is not Player pl) return;
+                    var cards = pl.Zones.Graveyard.GetCards().ToList();
+                    foreach (var c in cards)
+                    {
+                        pl.Zones.Graveyard.RemoveCard(c);
+                        pl.Zones.Library.AddCard(c);
+                        c.SetZone(Majik.Core.Zones.ZoneType.Library);
+                    }
+                }) };
+            });
+    }
+}
+
+/// <summary>
+/// "Each opponent sacrifices a [creature|permanent|artifact|
+/// enchantment|...]" — Tribute to the Wild, Soul Shatter,
+/// Diabolic Edict's "each opponent" variant. v1 stub: deterministic
+/// pick (first creature each opponent controls). Iterates only the
+/// caster's reachable opponents (TODO: ChosenSpellParams.AllPlayers
+/// once wired).
+/// </summary>
+public sealed class EachOpponentSacrificesCreatureTemplate : ISpellTemplate
+{
+    private static readonly Regex Pattern = new(
+        @"each\s+opponent\s+sacrifices\s+a\s+creature",
+        RegexOptions.IgnoreCase);
+
+    public int Priority => 60;
+    public string Name => "EachOpponentSacrificesCreature";
+
+    public SpellDefinition? TryBind(SpellBindContext ctx) =>
+        SpellTemplateBindHelper.DefaultTryBind(this, ctx);
+
+    public IReadOnlyDictionary<string, string>? TryExtractParams(string oracleText) =>
+        Pattern.IsMatch(oracleText) ? EmptyParams.Instance : null;
+
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx)
+    {
+        var caster = ctx.Caster;
+        return new SpellDefinition(
+            Modes: Array.Empty<string>(),
+            HasVariableX: false,
+            TargetRequests: Array.Empty<TargetRequest>(),
+            EffectFactory: p =>
+            {
+                var allPlayers = p.AllPlayers;
+                return new IEffect[] { new Effect("each opp sac creature", () =>
+                {
+                    if (allPlayers == null) return;
+                    foreach (var pl in allPlayers)
+                    {
+                        if (ReferenceEquals(pl, caster)) continue;
+                        var pick = pl.Zones.Battlefield.GetCards()
+                            .OfType<Creature>()
+                            .FirstOrDefault();
+                        if (pick != null) OracleSpellBinder.MoveToGraveyard(pick);
+                    }
+                }) };
+            });
+    }
+}
+
+/// <summary>
+/// "Destroy all [Plains|Islands|Swamps|Mountains|Forests]." — Boiling
+/// Seas, Flashfires, Acid Rain, Tsunami, Anarchy (basic-land sweep).
+/// Uses DestroyAllPermanentsSpell with a basic-land-type predicate.
+/// </summary>
+public sealed class DestroyAllBasicLandTypeTemplate : ISpellTemplate
+{
+    private static readonly Regex Pattern = new(
+        @"^\s*destroy\s+all\s+(?<basic>plains|islands|swamps|mountains|forests)\.?\s*$",
+        RegexOptions.IgnoreCase);
+
+    public int Priority => 90;
+    public string Name => "DestroyAllBasicLandType";
+
+    public SpellDefinition? TryBind(SpellBindContext ctx) =>
+        SpellTemplateBindHelper.DefaultTryBind(this, ctx);
+
+    public IReadOnlyDictionary<string, string>? TryExtractParams(string oracleText)
+    {
+        var m = Pattern.Match(oracleText);
+        return m.Success
+            ? new Dictionary<string, string> { ["basic"] = m.Groups["basic"].Value.ToLowerInvariant() }
+            : null;
+    }
+
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx)
+    {
+        var basic = @params["basic"];
+        // Match by card name (basic land naming convention) or by subtype.
+        var singular = basic switch
+        {
+            "plains" => "Plains",
+            "islands" => "Island",
+            "swamps" => "Swamp",
+            "mountains" => "Mountain",
+            "forests" => "Forest",
+            _ => string.Empty,
+        };
+        return Majik.Core.CardData.SpellTemplates.Templates.Destroy.DestroySpellFactory
+            .DestroyAllPermanentsSpell(
+                ctx.Caster,
+                card => card.HasType(Majik.Core.Cards.Types.CardType.Land) &&
+                        string.Equals(card.Name, singular, StringComparison.OrdinalIgnoreCase),
+                $"all {basic}");
+    }
+}
