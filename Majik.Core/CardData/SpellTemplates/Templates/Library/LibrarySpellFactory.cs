@@ -186,6 +186,43 @@ internal static class LibrarySpellFactory
             }) };
         });
 
+    // Impulse-style: look at top N, put one of those N into hand,
+    // remaining N-1 go to <restDestination> (bottom of library or graveyard).
+    // v1 stub: pick the top card of those N for the hand-card slot; preserve
+    // order for the rest going to bottom; graveyard order doesn't matter.
+    internal static SpellDefinition LookAtTopPutOneInHandSpell(
+        Player caster, int n, ZoneType restDestination) => new(
+        Modes: Array.Empty<string>(), HasVariableX: false,
+        TargetRequests: Array.Empty<TargetRequest>(),
+        EffectFactory: _ => new IEffect[] { new Effect($"impulse {n} -> {restDestination}", () =>
+        {
+            // Take up to N cards off the top of the library.
+            var library = caster.Zones.Library.GetCards().Take(n).ToList();
+            if (library.Count == 0) return;
+            var keep = library[0];
+            caster.Zones.Library.RemoveCard(keep);
+            caster.Zones.Hand.AddCard(keep);
+            keep.SetZone(ZoneType.Hand);
+            // The rest: remove from library and re-place.
+            // For "bottom" we let the natural order push them to the back;
+            // for "graveyard" we move them to graveyard.
+            for (var i = 1; i < library.Count; i++)
+            {
+                var c = library[i];
+                caster.Zones.Library.RemoveCard(c);
+                if (restDestination == ZoneType.Graveyard)
+                {
+                    caster.Zones.Graveyard.AddCard(c);
+                    c.SetZone(ZoneType.Graveyard);
+                }
+                else
+                {
+                    caster.Zones.Library.AddCard(c);
+                    c.SetZone(ZoneType.Library);
+                }
+            }
+        }) });
+
     // ---------- Primitives ----------
 
     private static void DrawCards_(Player player, int n)
