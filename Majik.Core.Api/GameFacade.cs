@@ -48,6 +48,24 @@ public sealed class GameFacade
     private Task<GameDriver.GameResult>? _fullGameTask;
     private readonly List<Action<EventDto>> _subscribers = new();
     private readonly ActionLog _log = new();
+
+    // Synchronization signal that pulses every time an agent registers a
+    // new prompt. StartAsync / SubmitAsync capture this BEFORE poking the
+    // engine, then await it — so they return only once the engine has
+    // settled at its next prompt (or the round/game has finished). This
+    // replaces the previous `Task.Delay(1)` magic sleep, which was racy
+    // on slow CI runners and produced flaky "Agent has no pending prompt"
+    // failures on subsequent submits.
+    private TaskCompletionSource<bool> _nextPromptSignal = NewSignal();
+
+    private static TaskCompletionSource<bool> NewSignal()
+        => new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    private void PulsePromptSignal()
+    {
+        var prev = Interlocked.Exchange(ref _nextPromptSignal, NewSignal());
+        prev.TrySetResult(true);
+    }
     private int _currentTurn = 1;
     private PhaseStateType _currentPhase = PhaseStateType.Main;
     private Player? _currentActivePlayer;
@@ -78,6 +96,8 @@ public sealed class GameFacade
 
         _aliceAgent = new RemoteAgent(alice, LookupCard);
         _bobAgent = new RemoteAgent(bob, LookupCard);
+        _aliceAgent.PromptRequested += _ => PulsePromptSignal();
+        _bobAgent.PromptRequested += _ => PulsePromptSignal();
 
         _loop = new PriorityLoop(
             players: new[] { alice, bob },
@@ -179,17 +199,19 @@ public sealed class GameFacade
     /// the first player's agent. Submit commands via <see cref="SubmitAsync"/>
     /// to advance.
     /// </summary>
-    public Task StartAsync(CancellationToken ct = default)
+    public async Task StartAsync(CancellationToken ct = default)
     {
         if (_loopTask != null)
         {
             throw new InvalidOperationException("Game already started.");
         }
 
+        // Capture the signal BEFORE kicking the loop. The loop runs
+        // synchronously up to its first agent.Prompt<T> call, which fires
+        // PromptRequested → PulsePromptSignal completes the captured TCS.
+        var settled = _nextPromptSignal.Task;
         _loopTask = _loop.RunUntilRoundEndsAsync(_alice, ct);
-
-        // Yield once so the loop hits its first await.
-        return Task.Delay(1, ct);
+        await WaitForPromptOrLoopAsync(settled, _loopTask, ct).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -232,8 +254,9 @@ public sealed class GameFacade
             combatFlow: _combatFlow,
             eventBus: _bus);
 
+        var settled = _nextPromptSignal.Task;
         _fullGameTask = driver.RunGameAsync(maxTurns, ct);
-        return Task.Delay(1, ct);
+        return WaitForPromptOrLoopAsync(settled, _fullGameTask, ct);
     }
 
     /// <summary>Task representing the in-flight full-game run, or null
@@ -245,7 +268,7 @@ public sealed class GameFacade
     /// (which may include resolving stack objects and reaching the next
     /// prompt).
     /// </summary>
-    public Task SubmitAsync(GameCommand command, CancellationToken ct = default)
+    public async Task SubmitAsync(GameCommand command, CancellationToken ct = default)
     {
         if (command == null) throw new ArgumentNullException(nameof(command));
 
@@ -253,11 +276,41 @@ public sealed class GameFacade
                   : command.PlayerId == _bob.Id ? _bobAgent
                   : throw new InvalidOperationException($"Unknown player {command.PlayerId}.");
 
+        // Capture the signal BEFORE submitting. agent.Submit resolves the
+        // TCS the engine is awaiting; the engine then resumes on the
+        // threadpool and (typically) reaches the next agent prompt, which
+        // pulses our signal. Awaiting here guarantees the next SubmitAsync
+        // sees a registered prompt instead of "Agent has no pending prompt".
+        var settled = _nextPromptSignal.Task;
+
         agent.Submit(command);
         _log.Append(command);
 
-        // Give the loop a tick to consume the result.
-        return Task.Delay(1, ct);
+        var loop = _loopTask ?? _fullGameTask;
+        await WaitForPromptOrLoopAsync(settled, loop, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Waits for either the next-prompt signal to fire or the active
+    /// engine task to complete (whichever comes first). Re-throws if the
+    /// engine task ended in a faulted state so the test/HTTP caller sees
+    /// the real exception instead of a silent hang on the next submit.
+    /// </summary>
+    private static async Task WaitForPromptOrLoopAsync(
+        Task settled,
+        Task? loop,
+        CancellationToken ct)
+    {
+        if (loop == null)
+        {
+            await settled.WaitAsync(ct).ConfigureAwait(false);
+            return;
+        }
+        var done = await Task.WhenAny(settled, loop).ConfigureAwait(false);
+        if (done == loop && loop.IsFaulted)
+        {
+            await loop.ConfigureAwait(false); // surface the exception
+        }
     }
 
     /// <summary>Append-only log of every command submitted via SubmitAsync.</summary>
