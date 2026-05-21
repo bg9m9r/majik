@@ -14,6 +14,7 @@ public class Permanent : Card
     private bool _isTapped;
     private bool _hasSummoningSickness;
     private DateTime? _enteredBattlefieldTimestamp;
+    private readonly List<ICard> _imprintedCards = new();
 
     /// <summary>
     /// Counters on this permanent (CR 122). +1/+1 and -1/-1 modify P/T
@@ -36,6 +37,28 @@ public class Permanent : Card
     /// <summary>Mark this permanent as a token (CR 111). Tokens are
     /// removed off-battlefield by SBA 704.5d.</summary>
     public void MarkAsToken() => IsToken = true;
+
+    // -----------------------------------------------------------------------
+    // CR 702.49 — Imprint
+    // -----------------------------------------------------------------------
+
+    /// <summary>CR 702.49 — cards exiled "with" this permanent via an
+    /// imprint ability. Other abilities (e.g. Isochron Scepter, Chrome Mox,
+    /// Agatha's Soul Cauldron) reference these exiled cards.</summary>
+    public IReadOnlyList<ICard> ImprintedCards => _imprintedCards.AsReadOnly();
+
+    /// <summary>Record <paramref name="card"/> as imprinted on this permanent
+    /// (CR 702.49). Called by the exile effect when the imprint keyword or an
+    /// equivalent ability moves a card to exile "with" this permanent.</summary>
+    public void AddImprinted(ICard card)
+    {
+        ArgumentNullException.ThrowIfNull(card);
+        _imprintedCards.Add(card);
+    }
+
+    /// <summary>Remove all imprinted cards from this permanent. Used when the
+    /// permanent leaves the battlefield or its imprint state is reset.</summary>
+    public void ClearImprinted() => _imprintedCards.Clear();
 
     /// <summary>Attach a Battle tracker (CR 310) to this permanent.</summary>
     public void AttachBattleState(Majik.Core.CardData.Battles.BattleState state)

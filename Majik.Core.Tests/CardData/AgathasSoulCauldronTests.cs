@@ -191,4 +191,72 @@ public class AgathasSoulCauldronTests
 
         act.Should().NotThrow("no creature to buff is silently handled");
     }
+
+    // -----------------------------------------------------------------------
+    // CR 702.49 — Imprint storage
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void AgathasSoulCauldron_ExilingCreatureCard_ImprintsItOnCauldron()
+    {
+        var alice = new Player("Alice", 20);
+        var bear = new Creature("Dead Bear", "1G", 2, 2);
+        bear.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(bear);
+        bear.SetZone(ZoneType.Graveyard);
+
+        var cauldron = AgathasSoulCauldronFactory.Create(alice);
+        var ability = cauldron.Abilities.OfType<ActivatedAbility>().Single();
+        foreach (var effect in ability.Effects) effect.Execute();
+
+        cauldron.ImprintedCards.Should().Contain(bear,
+            "exiling a creature card via the Cauldron imprints it (CR 702.49)");
+    }
+
+    [Fact]
+    public void AgathasSoulCauldron_ExilingNonCreatureCard_DoesNotImprintIt()
+    {
+        var alice = new Player("Alice", 20);
+        var land = new Land("Forest");
+        land.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(land);
+        land.SetZone(ZoneType.Graveyard);
+
+        var cauldron = AgathasSoulCauldronFactory.Create(alice);
+        var ability = cauldron.Abilities.OfType<ActivatedAbility>().Single();
+        foreach (var effect in ability.Effects) effect.Execute();
+
+        cauldron.ImprintedCards.Should().NotContain(land,
+            "only creature cards are imprinted; non-creature cards are not");
+    }
+
+    [Fact]
+    public void AgathasSoulCauldron_ExilingMultipleCreatures_ImprintsAll()
+    {
+        var alice = new Player("Alice", 20);
+
+        var bear1 = new Creature("Bear 1", "1G", 2, 2);
+        bear1.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(bear1);
+        bear1.SetZone(ZoneType.Graveyard);
+
+        var cauldron = AgathasSoulCauldronFactory.Create(alice);
+        var ability = cauldron.Abilities.OfType<ActivatedAbility>().Single();
+
+        // First activation.
+        foreach (var effect in ability.Effects) effect.Execute();
+
+        var bear2 = new Creature("Bear 2", "1G", 2, 2);
+        bear2.SetOwner(alice);
+        alice.Zones.Graveyard.AddCard(bear2);
+        bear2.SetZone(ZoneType.Graveyard);
+
+        // Second activation.
+        foreach (var effect in ability.Effects) effect.Execute();
+
+        cauldron.ImprintedCards.Should().HaveCount(2)
+            .And.Contain(bear1)
+            .And.Contain(bear2,
+                "each creature card exiled via the Cauldron is independently imprinted");
+    }
 }

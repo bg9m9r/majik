@@ -41,9 +41,11 @@ namespace Majik.Core.CardData.Factories;
 ///   Deferred until the mana-payment replacement infrastructure is in place.
 /// - <b>Static: ability-grant via imprint</b>: "creatures you control with
 ///   +1/+1 counters … have all activated abilities of all creature cards
-///   exiled" requires tracking exiled creature cards and a layer-6 ability-
-///   granting continuous effect. Deferred until the imprint / exile-tracker
-///   subsystem and layer-6 ability-grant are implemented.
+///   exiled" — imprint <em>storage</em> is wired (CR 702.49;
+///   <see cref="Majik.Core.Cards.Permanent.ImprintedCards"/>). The layer-6
+///   continuous effect that actually grants those abilities to battlefield
+///   creatures is deferred until the layer-6 ability-grant subsystem is in
+///   place.
 /// </summary>
 public static class AgathasSoulCauldronFactory
 {
@@ -82,6 +84,11 @@ public static class AgathasSoulCauldronFactory
 
                 if (target.HasType(CardType.Creature))
                 {
+                    // CR 702.49 — imprint: record this creature card on the
+                    // Cauldron so the ability-grant static ability can reference
+                    // it later (layer-6 grant deferred; storage wired here).
+                    cauldron.AddImprinted(target);
+
                     // Put a +1/+1 counter on target creature you control.
                     // v1: auto-picks the first creature on the battlefield.
                     var creatureToBuff = owner.Zones.Battlefield

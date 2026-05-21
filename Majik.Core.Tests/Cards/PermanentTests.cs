@@ -86,4 +86,64 @@ public class PermanentTests
         // Assert
         permanent.HasSummoningSickness.Should().BeFalse();
     }
+
+    // -----------------------------------------------------------------------
+    // CR 702.49 — Imprint storage
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void Permanent_ImprintedCards_StartsEmpty()
+    {
+        var artifact = new Permanent("Test Artifact", "{2}", new[] { CardType.Artifact });
+
+        artifact.ImprintedCards.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Permanent_AddImprinted_StoresCard()
+    {
+        var artifact = new Permanent("Test Artifact", "{2}", new[] { CardType.Artifact });
+        var bear = new Creature("Bear", "1G", 2, 2);
+
+        artifact.AddImprinted(bear);
+
+        artifact.ImprintedCards.Should().ContainSingle()
+            .Which.Should().BeSameAs(bear);
+    }
+
+    [Fact]
+    public void Permanent_AddImprinted_NullCard_Throws()
+    {
+        var artifact = new Permanent("Test Artifact", "{2}", new[] { CardType.Artifact });
+
+        artifact.Invoking(p => p.AddImprinted(null!))
+            .Should().Throw<ArgumentNullException>();
+    }
+
+    [Fact]
+    public void Permanent_AddImprinted_MultipleCards_PreservesOrder()
+    {
+        var artifact = new Permanent("Test Artifact", "{2}", new[] { CardType.Artifact });
+        var cardX = new Card("X", "");
+        var cardY = new Card("Y", "");
+
+        artifact.AddImprinted(cardX);
+        artifact.AddImprinted(cardY);
+
+        artifact.ImprintedCards.Should().HaveCount(2);
+        artifact.ImprintedCards[0].Should().BeSameAs(cardX);
+        artifact.ImprintedCards[1].Should().BeSameAs(cardY);
+    }
+
+    [Fact]
+    public void Permanent_ClearImprinted_RemovesAll()
+    {
+        var artifact = new Permanent("Test Artifact", "{2}", new[] { CardType.Artifact });
+        artifact.AddImprinted(new Card("X", ""));
+        artifact.AddImprinted(new Card("Y", ""));
+
+        artifact.ClearImprinted();
+
+        artifact.ImprintedCards.Should().BeEmpty();
+    }
 }
