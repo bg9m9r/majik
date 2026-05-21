@@ -1,6 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Majik.Core\Majik.Core.csproj" />
     <ProjectReference Include="..\Majik.Core.Api\Majik.Core.Api.csproj" />
   </ItemGroup>
