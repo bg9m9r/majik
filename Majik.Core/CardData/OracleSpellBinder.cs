@@ -69,6 +69,11 @@ public static class OracleSpellBinder
             new SpellTemplates.Templates.Library.ScryNTemplate(),
             new SpellTemplates.Templates.Library.ReanimateFromGraveyardTemplate(),
             new SpellTemplates.Templates.Library.ExileFromGraveyardTemplate(),
+            new SpellTemplates.Templates.Control.TapTargetTemplate(),
+            new SpellTemplates.Templates.Control.UntapTargetTemplate(),
+            new SpellTemplates.Templates.Control.BounceTargetTemplate(),
+            new SpellTemplates.Templates.Control.ExileTargetTemplate(),
+            new SpellTemplates.Templates.Control.GainControlTemplate(),
         });
 
     // "Target creature gets +N/+N until end of turn."
@@ -78,15 +83,6 @@ public static class OracleSpellBinder
     // "Target creature gains <keyword> until end of turn."
     private static readonly Regex GrantKeywordTilEot = new(
         @"target\s+creature\s+gains?\s+(?<kw>flying|trample|first\s+strike|double\s+strike|deathtouch|lifelink|vigilance|haste|reach|menace|indestructible)\s+until\s+end\s+of\s+turn",
-        RegexOptions.IgnoreCase);
-    // "Tap target {permanent|creature|artifact|land|...}." — \b so "untap"
-    // doesn't match.
-    private static readonly Regex TapTarget = new(
-        @"\btap\s+target\s+(permanent|creature|artifact|land|enchantment|planeswalker)",
-        RegexOptions.IgnoreCase);
-    // "Return target {creature|permanent|...} to its owner's hand."
-    private static readonly Regex BounceTarget = new(
-        @"return\s+target\s+(permanent|creature|artifact|enchantment|nonland\s+permanent|land)\s+to\s+(its|their)\s+owner'?s?\s+hand",
         RegexOptions.IgnoreCase);
     // "Search your library for a {basic land|land|creature|artifact|...} card..."
     private static readonly Regex SearchLibrary = new(
@@ -104,14 +100,6 @@ public static class OracleSpellBinder
     private static readonly Regex SearchLandToBattlefield = new(
         @"search\s+your\s+library\s+for\s+a\s+(?<kind>basic\s+land|land)\s+card[^.]*put\s+(?:it|that\s+card)\s+onto\s+the\s+battlefield",
         RegexOptions.IgnoreCase);
-    // "Exile target {creature|permanent|artifact|enchantment|land|nonland permanent}."
-    private static readonly Regex ExileTarget = new(
-        @"exile\s+target\s+(creature|permanent|artifact|enchantment|land|nonland\s+permanent)",
-        RegexOptions.IgnoreCase);
-    // "Untap target {permanent|creature|artifact|land|...}."
-    private static readonly Regex UntapTarget = new(
-        @"untap\s+target\s+(permanent|creature|artifact|land|enchantment)",
-        RegexOptions.IgnoreCase);
     // "Put N +1/+1 counters on target creature."
     private static readonly Regex PutPlusCounter = new(
         @"put\s+(?<n>a|an|\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+\+1/\+1\s+counters?\s+on\s+target\s+creature",
@@ -123,10 +111,6 @@ public static class OracleSpellBinder
     // "Put N -1/-1 counters on target creature."
     private static readonly Regex PutMinusCounter = new(
         @"put\s+(?<n>a|an|\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+-1/-1\s+counters?\s+on\s+target\s+creature",
-        RegexOptions.IgnoreCase);
-    // "Gain control of target creature."
-    private static readonly Regex GainControl = new(
-        @"gain\s+control\s+of\s+target\s+creature",
         RegexOptions.IgnoreCase);
     // "Creatures you control get +P/+T until end of turn."
     private static readonly Regex CreaturesYouControlPump = new(
@@ -217,9 +201,6 @@ public static class OracleSpellBinder
         if (mPlus.Success) return PutPlusOnePlusOneSpell(
             WordToInt(mPlus.Groups["n"].Value), resolver);
 
-        if (GainControl.IsMatch(text) && effects != null)
-            return GainControlSpell(resolver, caster, effects);
-
         var mGlobal = CreaturesYouControlPump.Match(text);
         if (mGlobal.Success && effects != null) return CreaturesYouControlPumpSpell(
             int.Parse(mGlobal.Groups["p"].Value),
@@ -242,15 +223,6 @@ public static class OracleSpellBinder
         if (m.Success) return GrantKeywordSpell(
             NormaliseKeyword(m.Groups["kw"].Value), resolver);
 
-        m = TapTarget.Match(text);
-        if (m.Success) return TapTargetSpell(resolver, $"target {m.Groups[1].Value}");
-
-        m = BounceTarget.Match(text);
-        if (m.Success) return BounceTargetSpell(resolver, $"target {m.Groups[1].Value}");
-
-        m = ExileTarget.Match(text);
-        if (m.Success) return ExileTargetSpell(resolver, $"target {m.Groups[1].Value}");
-
         // GreenSunsZenithPattern must come before SearchLibrary / SearchLandToBattlefield
         // because its oracle text also contains "search your library for a … creature card"
         // and would otherwise be caught by those generic regexes.
@@ -268,9 +240,6 @@ public static class OracleSpellBinder
 
         m = SearchLibrary.Match(text);
         if (m.Success) return SearchLibrarySpell(caster, m.Groups["kind"].Value);
-
-        m = UntapTarget.Match(text);
-        if (m.Success) return UntapTargetSpell(resolver, $"target {m.Groups[1].Value}");
 
         // Investigate keyword action (CR 701.30) — checked before CreateClueTokens "create" pattern.
         var mInvN = InvestigateNTimes.Match(text);
@@ -304,21 +273,6 @@ public static class OracleSpellBinder
 
         return null;
     }
-
-    private static SpellDefinition GainControlSpell(
-        Func<object, object> resolver, Player caster,
-        Majik.Core.Effects.ContinuousEffectsService effects) => new(
-        Modes: Array.Empty<string>(), HasVariableX: false,
-        TargetRequests: new[] { new TargetRequest("target creature", 1, 1, Array.Empty<object>()) },
-        EffectFactory: p =>
-        {
-            var target = resolver(p.Targets[0][0]);
-            return new IEffect[] { new Effect("gain control", () =>
-            {
-                if (target is Permanent perm)
-                    effects.Register(new Majik.Core.Effects.ControlChangeEffect(perm, caster));
-            }) };
-        });
 
     private static SpellDefinition CreaturesYouControlPumpSpell(
         int p, int t, Player caster,
@@ -396,18 +350,6 @@ public static class OracleSpellBinder
                 c.Counters.Add(Majik.Core.Counters.CounterType.PlusOnePlusOne, 1);
             }
         }) });
-
-    private static SpellDefinition UntapTargetSpell(Func<object, object> resolver, string label) => new(
-        Modes: Array.Empty<string>(), HasVariableX: false,
-        TargetRequests: new[] { new TargetRequest(label, 1, 1, Array.Empty<object>()) },
-        EffectFactory: p =>
-        {
-            var target = resolver(p.Targets[0][0]);
-            return new IEffect[] { new Effect("untap target", () =>
-            {
-                if (target is Permanent perm && perm.IsTapped) perm.Untap();
-            }) };
-        });
 
     private static IReadOnlyList<string> ParseKeywordList(string raw)
     {
@@ -487,18 +429,6 @@ public static class OracleSpellBinder
             for (var i = 0; i < count; i++)
                 TokenFactory.CreateOnBattlefield(spec, caster);
         }) });
-
-    private static SpellDefinition ExileTargetSpell(Func<object, object> resolver, string label) => new(
-        Modes: Array.Empty<string>(), HasVariableX: false,
-        TargetRequests: new[] { new TargetRequest(label, 1, 1, Array.Empty<object>()) },
-        EffectFactory: p =>
-        {
-            var target = resolver(p.Targets[0][0]);
-            return new IEffect[] { new Effect("exile target", () =>
-            {
-                if (target is ICard card) MoveToExile(card);
-            }) };
-        });
 
     private static SpellDefinition SearchLibrarySpell(Player caster, string kindRaw) => new(
         Modes: Array.Empty<string>(), HasVariableX: false,
@@ -609,7 +539,7 @@ public static class OracleSpellBinder
             }) };
         });
 
-    private static void MoveToExile(ICard card)
+    internal static void MoveToExile(ICard card)
     {
         var owner = card.Owner;
         if (owner != null)
@@ -621,47 +551,6 @@ public static class OracleSpellBinder
             owner.Zones.Exile.AddCard(card);
         }
         card.SetZone(ZoneType.Exile);
-    }
-
-    private static SpellDefinition TapTargetSpell(Func<object, object> resolver, string label) => new(
-        Modes: Array.Empty<string>(), HasVariableX: false,
-        TargetRequests: new[] { new TargetRequest(label, 1, 1, Array.Empty<object>()) },
-        EffectFactory: p =>
-        {
-            var target = resolver(p.Targets[0][0]);
-            return new IEffect[] { new Effect("tap target", () =>
-            {
-                if (target is Permanent perm && !perm.IsTapped) perm.Tap();
-            }) };
-        });
-
-    private static SpellDefinition BounceTargetSpell(
-        Func<object, object> resolver, string label) => new(
-        Modes: Array.Empty<string>(), HasVariableX: false,
-        TargetRequests: new[] { new TargetRequest(label, 1, 1, Array.Empty<object>()) },
-        EffectFactory: p =>
-        {
-            var target = resolver(p.Targets[0][0]);
-            return new IEffect[] { new Effect("bounce", () =>
-            {
-                if (target is ICard card) ReturnToOwnersHand(card);
-            }) };
-        });
-
-    private static void ReturnToOwnersHand(ICard card)
-    {
-        var owner = card.Owner;
-        if (owner != null)
-        {
-            if (card.Zone == ZoneType.Battlefield)
-                owner.Zones.Battlefield.RemoveCard(card);
-            else if (card.Zone == ZoneType.Graveyard)
-                owner.Zones.Graveyard.RemoveCard(card);
-            else if (card.Zone == ZoneType.Exile)
-                owner.Zones.Exile.RemoveCard(card);
-            owner.Zones.Hand.AddCard(card);
-        }
-        card.SetZone(ZoneType.Hand);
     }
 
     private static string NormaliseKeyword(string raw) =>
