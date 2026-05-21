@@ -130,6 +130,14 @@ public static class OracleSpellBinder
     private static readonly Regex PutPlusCounter = new(
         @"put\s+(?<n>a|an|\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+\+1/\+1\s+counters?\s+on\s+target\s+creature",
         RegexOptions.IgnoreCase);
+    // "Each creature you control gets a +1/+1 counter on it."
+    private static readonly Regex CreaturesGetPlusCounter = new(
+        @"each\s+creature\s+you\s+control\s+gets\s+a\s+\+1/\+1\s+counter\s+on\s+it",
+        RegexOptions.IgnoreCase);
+    // "Put N -1/-1 counters on target creature."
+    private static readonly Regex PutMinusCounter = new(
+        @"put\s+(?<n>a|an|\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+-1/-1\s+counters?\s+on\s+target\s+creature",
+        RegexOptions.IgnoreCase);
     // "Gain control of target creature."
     private static readonly Regex GainControl = new(
         @"gain\s+control\s+of\s+target\s+creature",
@@ -247,6 +255,13 @@ public static class OracleSpellBinder
         var mSweep = DealsDamageEachCreature.Match(text);
         if (mSweep.Success) return DealsDamageEachCreatureSpell(
             WordToInt(mSweep.Groups["n"].Value), caster);
+
+        if (CreaturesGetPlusCounter.IsMatch(text))
+            return CreaturesGetPlusCounterSpell(caster);
+
+        var mMinus = PutMinusCounter.Match(text);
+        if (mMinus.Success) return PutMinusOneMinusOneSpell(
+            WordToInt(mMinus.Groups["n"].Value), resolver);
 
         var mPlus = PutPlusCounter.Match(text);
         if (mPlus.Success) return PutPlusOnePlusOneSpell(
@@ -444,6 +459,30 @@ public static class OracleSpellBinder
                     perm.Counters.Add(Majik.Core.Counters.CounterType.PlusOnePlusOne, n);
             }) };
         });
+
+    private static SpellDefinition PutMinusOneMinusOneSpell(int n, Func<object, object> resolver) => new(
+        Modes: Array.Empty<string>(), HasVariableX: false,
+        TargetRequests: new[] { new TargetRequest("target creature", 1, 1, Array.Empty<object>()) },
+        EffectFactory: p =>
+        {
+            var target = resolver(p.Targets[0][0]);
+            return new IEffect[] { new Effect($"-{n} counters", () =>
+            {
+                if (target is Permanent perm)
+                    perm.Counters.Add(Majik.Core.Counters.CounterType.MinusOneMinusOne, n);
+            }) };
+        });
+
+    private static SpellDefinition CreaturesGetPlusCounterSpell(Player caster) => new(
+        Modes: Array.Empty<string>(), HasVariableX: false,
+        TargetRequests: Array.Empty<TargetRequest>(),
+        EffectFactory: _ => new IEffect[] { new Effect("+1/+1 counter to each", () =>
+        {
+            foreach (var c in caster.Zones.Battlefield.GetCards().OfType<Creature>())
+            {
+                c.Counters.Add(Majik.Core.Counters.CounterType.PlusOnePlusOne, 1);
+            }
+        }) });
 
     private static SpellDefinition ReanimateSpell(Func<object, object> resolver, string kindRaw) => new(
         Modes: Array.Empty<string>(), HasVariableX: false,
