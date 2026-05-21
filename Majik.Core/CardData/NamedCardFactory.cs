@@ -45,6 +45,10 @@ public static class NamedCardFactory
             "Walking Ballista" => WalkingBallistaFactory.Create(owner),
             "Yawgmoth, Thran Physician" => YawgmothFactory.Create(owner),
             "Boseiju, Who Endures" => BoseijuFactory.Create(owner),
+            // Artifact — {2}. Static suppression wired via TorporOrbFactory.Create(owner,
+            // triggerManager, eventBus) when runtime services are available; this path
+            // produces the correct card shape without live suppression (test/vanilla use).
+            "Torpor Orb" => TorporOrbFactory.Create(owner),
 
             _ => new Card(name, ""),
         };

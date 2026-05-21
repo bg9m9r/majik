@@ -1,4 +1,5 @@
 using Majik.Core.Cards;
+using Majik.Core.Cards.Types;
 using Majik.Core.Domain.DomainEvents;
 using Majik.Core.Events;
 using Majik.Core.Game;
@@ -34,6 +35,15 @@ public class TriggerManager
     private readonly Majik.Core.Stack.Stack _stack;
     private readonly IEventBus? _eventBus;
     private readonly Action<GameEvent>? _globalHandler;
+
+    /// <summary>
+    /// Number of active Torpor Orb-like effects suppressing creature ETB triggers.
+    /// CR 603.3 — when &gt; 0, triggered abilities whose trigger event is a
+    /// creature entering the battlefield are not added to the pending queue.
+    /// Increment when such a permanent enters the battlefield;
+    /// decrement when it leaves. See <see cref="Effects.TorporOrbStaticEffect"/>.
+    /// </summary>
+    public int CreatureEtbTriggerSuppressionCount { get; set; }
 
     public TriggerManager(Majik.Core.Stack.Stack stack, IEventBus? eventBus = null)
     {
@@ -133,6 +143,17 @@ public class TriggerManager
         foreach (var ability in _abilities.ToList())
         {
             if (!ability.IsTriggered(gameEvent))
+            {
+                continue;
+            }
+
+            // CR 614 / Torpor Orb — while CreatureEtbTriggerSuppressionCount > 0,
+            // triggered abilities whose trigger event is a creature entering the
+            // battlefield are suppressed (Rule 603.3).
+            if (CreatureEtbTriggerSuppressionCount > 0
+                && gameEvent is CardMovedEvent moved
+                && moved.ToZone == ZoneType.Battlefield
+                && moved.Card.HasType(CardType.Creature))
             {
                 continue;
             }

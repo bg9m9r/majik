@@ -58,5 +58,10 @@ public static class SeedImplementedCards
         // Channel — {1}{G}, Discard ~: Destroy target artifact/enchantment/nonbasic land — costs wired,
         // destroy effect deferred (no targeting). ETB-tapped restriction + basic-land-search follow-up deferred.
         "Boseiju, Who Endures",
+        // Artifact — {2} (TorporOrbFactory). Static effect suppresses creature ETB triggers
+        // (CR 614 / CR 603.3). TorporOrbStaticEffect increments TriggerManager.CreatureEtbTriggerSuppressionCount
+        // while the Orb is on the battlefield; TriggerManager.EvaluateTriggers gates creature-ETB events.
+        // Multiple simultaneous Orbs stack correctly. Common sideboard hate vs. CiP creatures.
+        "Torpor Orb",
     };
 }
