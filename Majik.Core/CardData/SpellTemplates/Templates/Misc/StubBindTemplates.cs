@@ -508,3 +508,64 @@ public sealed class AddFixedManaTemplate : ISpellTemplate
             }) });
     }
 }
+
+/// <summary>
+/// "Destroy [N] target [modifier]? creatures." — multi-target destroy
+/// (Hex: 6, Twinstrike: 2 with rider, Reckless Spite: 2, etc).
+/// v1 stub destroys ONE chosen target (the first); multi-target
+/// resolution requires per-target picks the agent layer doesn't
+/// model yet. Lossy but binds the spell.
+/// </summary>
+public sealed class DestroyNTargetCreaturesTemplate : ISpellTemplate
+{
+    private static readonly Regex Pattern = new(
+        @"destroy\s+(?<n>two|three|four|five|six|seven|\d+)\s+target\s+(?:[\w-]+\s+)?creatures?\b",
+        RegexOptions.IgnoreCase);
+
+    public int Priority => 70; // beats DestroyCreature (30) on the multi-target form
+    public string Name => "DestroyNTargetCreatures";
+
+    public SpellDefinition? TryBind(SpellBindContext ctx) =>
+        SpellTemplateBindHelper.DefaultTryBind(this, ctx);
+
+    public IReadOnlyDictionary<string, string>? TryExtractParams(string oracleText)
+    {
+        var m = Pattern.Match(oracleText);
+        return m.Success
+            ? new Dictionary<string, string> { ["n"] = m.Groups["n"].Value }
+            : null;
+    }
+
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
+        Majik.Core.CardData.SpellTemplates.Templates.Destroy.DestroySpellFactory.DestroyCreatureSpell(ctx.Resolver);
+}
+
+/// <summary>
+/// "Counter up to N target spells" — Double Negative-class. Routes
+/// through the existing CounterTargetSpell factory for the one-target
+/// stub at v1; the multi-target choice is lossy.
+/// </summary>
+public sealed class CounterUpToNTargetSpellsTemplate : ISpellTemplate
+{
+    private static readonly Regex Pattern = new(
+        @"counter\s+up\s+to\s+(?<n>two|three|four|five|\d+)\s+target\s+spells?",
+        RegexOptions.IgnoreCase);
+
+    public int Priority => 70;
+    public string Name => "CounterUpToNTargetSpells";
+
+    public SpellDefinition? TryBind(SpellBindContext ctx) =>
+        SpellTemplateBindHelper.DefaultTryBind(this, ctx);
+
+    public IReadOnlyDictionary<string, string>? TryExtractParams(string oracleText)
+    {
+        var m = Pattern.Match(oracleText);
+        return m.Success
+            ? new Dictionary<string, string> { ["n"] = m.Groups["n"].Value }
+            : null;
+    }
+
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
+        Majik.Core.CardData.SpellTemplates.Templates.Counter.CounterSpellFactory.CounterTargetSpell(
+            ctx.Resolver, ctx.Stack);
+}
