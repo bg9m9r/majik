@@ -60,4 +60,58 @@ public class CardDataSchemaPatcherTests
         var value = Convert.ToInt32(await check.ExecuteScalarAsync());
         value.Should().Be(0);
     }
+
+    [Fact]
+    public async Task PatchAsync_CreatesCompiledSpellTemplatesTable_OnFirstRun()
+    {
+        await using var conn = NewConnection();
+
+        await CardDataSchemaPatcher.PatchAsync(conn, CancellationToken.None);
+
+        await using var check = conn.CreateCommand();
+        check.CommandText =
+            "SELECT COUNT(*) FROM sqlite_master " +
+            "WHERE type='table' AND name='CompiledSpellTemplates'";
+        var count = Convert.ToInt32(await check.ExecuteScalarAsync());
+        count.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task PatchAsync_CompiledSpellTemplatesIndex_IsCreated()
+    {
+        await using var conn = NewConnection();
+
+        await CardDataSchemaPatcher.PatchAsync(conn, CancellationToken.None);
+
+        await using var check = conn.CreateCommand();
+        check.CommandText =
+            "SELECT COUNT(*) FROM sqlite_master " +
+            "WHERE type='index' AND name='IX_CompiledSpellTemplates_TemplateName'";
+        var count = Convert.ToInt32(await check.ExecuteScalarAsync());
+        count.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task PatchAsync_CompiledSpellTemplatesIsIdempotent()
+    {
+        await using var conn = NewConnection();
+
+        await CardDataSchemaPatcher.PatchAsync(conn, CancellationToken.None);
+        // Pre-seed a row so we can confirm the second patch doesn't recreate
+        // the table (which would drop data).
+        await using (var seed = conn.CreateCommand())
+        {
+            seed.CommandText =
+                "INSERT INTO CompiledSpellTemplates (CardName, TemplateName, Priority, ParamsJson, CompiledAt) " +
+                "VALUES ('Bolt', 'DamageAnyTarget', 50, '{\"n\":\"3\"}', 1700000000)";
+            await seed.ExecuteNonQueryAsync();
+        }
+
+        await CardDataSchemaPatcher.PatchAsync(conn, CancellationToken.None);
+
+        await using var check = conn.CreateCommand();
+        check.CommandText = "SELECT COUNT(*) FROM CompiledSpellTemplates WHERE CardName='Bolt'";
+        var count = Convert.ToInt32(await check.ExecuteScalarAsync());
+        count.Should().Be(1, "second patch run must not drop or recreate the table");
+    }
 }
