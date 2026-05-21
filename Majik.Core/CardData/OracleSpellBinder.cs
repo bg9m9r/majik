@@ -21,8 +21,20 @@ namespace Majik.Core.CardData;
 /// </summary>
 public static class OracleSpellBinder
 {
-    internal static SpellTemplateRegistry Registry { get; } =
-        new SpellTemplateRegistry(new ISpellTemplate[]
+    private static readonly SpellTemplates.ClauseCompositionTemplate _composer =
+        new SpellTemplates.ClauseCompositionTemplate();
+
+    internal static SpellTemplateRegistry Registry { get; } = BuildRegistry();
+
+    private static SpellTemplateRegistry BuildRegistry()
+    {
+        var reg = new SpellTemplateRegistry(BuildTemplateList());
+        _composer.SetRegistry(reg);
+        return reg;
+    }
+
+    private static ISpellTemplate[] BuildTemplateList() =>
+        new ISpellTemplate[]
         {
             new SpellTemplates.Templates.Counter.CounterUnlessPayTemplate(),
             new SpellTemplates.Templates.Counter.CounterNoncreatureTemplate(),
@@ -90,7 +102,8 @@ public static class OracleSpellBinder
             new SpellTemplates.Templates.Tokens.CreateTokensTemplate(),
             new SpellTemplates.Templates.Bespoke.ThoughtseizePatternTemplate(),
             new SpellTemplates.Templates.Bespoke.MalevolentRumblePatternTemplate(),
-        });
+            _composer,
+        };
 
     public static SpellDefinition? Bind(
         CardEntity entity,
