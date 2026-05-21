@@ -30,7 +30,10 @@ services:
       # See docs/RENDER_CARDS_SEED.md.
       name: cards-data
       mountPath: /root/.config/Majik
-      sizeGB: 1
+      # 2 GB so the entrypoint can hold both old (~546 MB) and new
+      # (~546 MB) seed simultaneously during atomic-mv. At 1 GB the
+      # download fails partway with ENOSPC + falls back to stale seed.
+      sizeGB: 2
     envVars:
       - key: ASPNETCORE_ENVIRONMENT
         value: Production
