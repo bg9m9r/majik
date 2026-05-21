@@ -78,32 +78,15 @@ public static class OracleSpellBinder
             new SpellTemplates.Templates.Search.SearchLandToBattlefieldTemplate(),
             new SpellTemplates.Templates.Search.GreenSunsZenithPatternTemplate(),
             new SpellTemplates.Templates.Search.SearchLibraryTemplate(),
+            new SpellTemplates.Templates.Counters.PutPlusCounterTemplate(),
+            new SpellTemplates.Templates.Counters.PutMinusCounterTemplate(),
+            new SpellTemplates.Templates.Counters.CreaturesGetPlusCounterTemplate(),
+            new SpellTemplates.Templates.Counters.PumpCreatureTemplate(),
+            new SpellTemplates.Templates.Counters.GrantKeywordTilEotTemplate(),
+            new SpellTemplates.Templates.Counters.CreaturesYouControlPumpTemplate(),
+            new SpellTemplates.Templates.Counters.CreaturesYouControlGainKeywordTemplate(),
         });
 
-    // "Target creature gets +N/+N until end of turn."
-    private static readonly Regex PumpCreature = new(
-        @"target\s+creature\s+gets\s+\+(?<p>\d+)/\+(?<t>\d+)\s+until\s+end\s+of\s+turn",
-        RegexOptions.IgnoreCase);
-    // "Target creature gains <keyword> until end of turn."
-    private static readonly Regex GrantKeywordTilEot = new(
-        @"target\s+creature\s+gains?\s+(?<kw>flying|trample|first\s+strike|double\s+strike|deathtouch|lifelink|vigilance|haste|reach|menace|indestructible)\s+until\s+end\s+of\s+turn",
-        RegexOptions.IgnoreCase);
-    // "Put N +1/+1 counters on target creature."
-    private static readonly Regex PutPlusCounter = new(
-        @"put\s+(?<n>a|an|\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+\+1/\+1\s+counters?\s+on\s+target\s+creature",
-        RegexOptions.IgnoreCase);
-    // "Each creature you control gets a +1/+1 counter on it."
-    private static readonly Regex CreaturesGetPlusCounter = new(
-        @"each\s+creature\s+you\s+control\s+gets\s+a\s+\+1/\+1\s+counter\s+on\s+it",
-        RegexOptions.IgnoreCase);
-    // "Put N -1/-1 counters on target creature."
-    private static readonly Regex PutMinusCounter = new(
-        @"put\s+(?<n>a|an|\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+-1/-1\s+counters?\s+on\s+target\s+creature",
-        RegexOptions.IgnoreCase);
-    // "Creatures you control get +P/+T until end of turn."
-    private static readonly Regex CreaturesYouControlPump = new(
-        @"creatures\s+you\s+control\s+get\s+\+(?<p>\d+)/\+(?<t>\d+)\s+until\s+end\s+of\s+turn",
-        RegexOptions.IgnoreCase);
     // "Create [a|N] Treasure token(s)." — predefined artifact, no P/T text.
     private static readonly Regex CreateTreasureTokens = new(
         @"create\s+(?<n>a|an|\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+treasure\s+tokens?\b",
@@ -128,11 +111,6 @@ public static class OracleSpellBinder
     // Captures: count, P, T, optional colour, subtype, optional keyword list.
     private static readonly Regex CreateTokens = new(
         @"create\s+(?<n>a|an|\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?<p>\d+)/(?<t>\d+)\s+(?<colour>white|blue|black|red|green|colorless)?\s*(?<subtype>[A-Za-z]+)\s+creature\s+tokens?(?:\s+with\s+(?<keywords>[A-Za-z, ]+))?",
-        RegexOptions.IgnoreCase);
-    // "Creatures you control gain KEYWORD until end of turn." — global
-    // keyword grant; companion to CreaturesYouControlPump's +P/+T grant.
-    private static readonly Regex CreaturesYouControlGain = new(
-        @"creatures\s+you\s+control\s+gain\s+(?<kw>flying|trample|first\s+strike|double\s+strike|deathtouch|lifelink|vigilance|haste|reach|menace|indestructible)\s+until\s+end\s+of\s+turn",
         RegexOptions.IgnoreCase);
     // "Target player reveals their hand. You choose a nonland card from it.
     //  That player discards that card. You lose N life." (Thoughtseize template)
@@ -171,38 +149,9 @@ public static class OracleSpellBinder
 
         var text = entity.OracleText ?? string.Empty;
 
-        if (CreaturesGetPlusCounter.IsMatch(text))
-            return CreaturesGetPlusCounterSpell(caster);
-
-        var mMinus = PutMinusCounter.Match(text);
-        if (mMinus.Success) return PutMinusOneMinusOneSpell(
-            WordToInt(mMinus.Groups["n"].Value), resolver);
-
-        var mPlus = PutPlusCounter.Match(text);
-        if (mPlus.Success) return PutPlusOnePlusOneSpell(
-            WordToInt(mPlus.Groups["n"].Value), resolver);
-
-        var mGlobal = CreaturesYouControlPump.Match(text);
-        if (mGlobal.Success && effects != null) return CreaturesYouControlPumpSpell(
-            int.Parse(mGlobal.Groups["p"].Value),
-            int.Parse(mGlobal.Groups["t"].Value),
-            caster, effects);
-
-        var mGrantAll = CreaturesYouControlGain.Match(text);
-        if (mGrantAll.Success && effects != null) return CreaturesYouControlGainKeywordSpell(
-            NormaliseKeyword(mGrantAll.Groups["kw"].Value), caster, effects);
-
         // Thoughtseize (reveal-choose-discard + caster loses life) — before generic Discard.
         var mTs = ThoughtseizePattern.Match(text);
         if (mTs.Success) return ThoughtseizeSpell(caster, resolver, WordToInt(mTs.Groups["life"].Value));
-
-        var m = PumpCreature.Match(text);
-        if (m.Success) return PumpSpell(
-            int.Parse(m.Groups["p"].Value), int.Parse(m.Groups["t"].Value), resolver);
-
-        m = GrantKeywordTilEot.Match(text);
-        if (m.Success) return GrantKeywordSpell(
-            NormaliseKeyword(m.Groups["kw"].Value), resolver);
 
         // Investigate keyword action (CR 701.30) — checked before CreateClueTokens "create" pattern.
         var mInvN = InvestigateNTimes.Match(text);
@@ -212,7 +161,7 @@ public static class OracleSpellBinder
             return InvestigateNTimesSpell(caster, 1);
 
         // Predefined artifact tokens — checked before creature-token regex (more specific).
-        m = CreateTreasureTokens.Match(text);
+        var m = CreateTreasureTokens.Match(text);
         if (m.Success) return CreateTreasureTokensSpell(caster, WordToInt(m.Groups["n"].Value));
 
         m = CreateFoodTokens.Match(text);
@@ -237,89 +186,12 @@ public static class OracleSpellBinder
         return null;
     }
 
-    private static SpellDefinition CreaturesYouControlPumpSpell(
-        int p, int t, Player caster,
-        Majik.Core.Effects.ContinuousEffectsService effects) => new(
-        Modes: Array.Empty<string>(), HasVariableX: false,
-        TargetRequests: Array.Empty<TargetRequest>(),
-        EffectFactory: _ => new IEffect[] { new Effect($"creatures +{p}/+{t} EOT", () =>
-        {
-            foreach (var c in caster.Zones.Battlefield.GetCards().OfType<Creature>())
-            {
-                effects.Register(new GlobalPumpEffect(c, p, t));
-            }
-        }) });
-
-    private static SpellDefinition CreaturesYouControlGainKeywordSpell(
-        string keyword, Player caster,
-        Majik.Core.Effects.ContinuousEffectsService effects) => new(
-        Modes: Array.Empty<string>(), HasVariableX: false,
-        TargetRequests: Array.Empty<TargetRequest>(),
-        EffectFactory: _ => new IEffect[] { new Effect($"creatures gain {keyword} EOT", () =>
-        {
-            foreach (var c in caster.Zones.Battlefield.GetCards().OfType<Creature>())
-            {
-                effects.Register(new GrantKeywordUntilEndOfTurnEffect(c, keyword));
-            }
-        }) });
-
-    /// <summary>Layer 7c pump-this-creature effect, EOT.</summary>
-    private sealed class GlobalPumpEffect : Majik.Core.Effects.ContinuousEffect
-    {
-        private readonly Creature _target;
-        private readonly int _p, _t;
-        public GlobalPumpEffect(Creature target, int p, int t)
-        { _target = target; _p = p; _t = t; }
-        public override Majik.Core.Effects.Layer Layer => Majik.Core.Effects.Layer.PT_Modify;
-        public override bool ExpiresAtEndOfTurn => true;
-        public override bool AppliesTo(Creature c) => ReferenceEquals(c, _target);
-        public override void Apply(Majik.Core.Effects.CreatureCharacteristics chars)
-        { chars.Power += _p; chars.Toughness += _t; }
-    }
-
-    private static SpellDefinition PutPlusOnePlusOneSpell(int n, Func<object, object> resolver) => new(
-        Modes: Array.Empty<string>(), HasVariableX: false,
-        TargetRequests: new[] { new TargetRequest("target creature", 1, 1, Array.Empty<object>()) },
-        EffectFactory: p =>
-        {
-            var target = resolver(p.Targets[0][0]);
-            return new IEffect[] { new Effect($"+{n} counters", () =>
-            {
-                if (target is Permanent perm)
-                    perm.Counters.Add(Majik.Core.Counters.CounterType.PlusOnePlusOne, n);
-            }) };
-        });
-
-    private static SpellDefinition PutMinusOneMinusOneSpell(int n, Func<object, object> resolver) => new(
-        Modes: Array.Empty<string>(), HasVariableX: false,
-        TargetRequests: new[] { new TargetRequest("target creature", 1, 1, Array.Empty<object>()) },
-        EffectFactory: p =>
-        {
-            var target = resolver(p.Targets[0][0]);
-            return new IEffect[] { new Effect($"-{n} counters", () =>
-            {
-                if (target is Permanent perm)
-                    perm.Counters.Add(Majik.Core.Counters.CounterType.MinusOneMinusOne, n);
-            }) };
-        });
-
-    private static SpellDefinition CreaturesGetPlusCounterSpell(Player caster) => new(
-        Modes: Array.Empty<string>(), HasVariableX: false,
-        TargetRequests: Array.Empty<TargetRequest>(),
-        EffectFactory: _ => new IEffect[] { new Effect("+1/+1 counter to each", () =>
-        {
-            foreach (var c in caster.Zones.Battlefield.GetCards().OfType<Creature>())
-            {
-                c.Counters.Add(Majik.Core.Counters.CounterType.PlusOnePlusOne, 1);
-            }
-        }) });
-
     private static IReadOnlyList<string> ParseKeywordList(string raw)
     {
         if (string.IsNullOrWhiteSpace(raw)) return Array.Empty<string>();
         // Split on commas / "and"; trim; canonicalise via NormaliseKeyword.
         return raw.Replace(" and ", ",").Split(',', StringSplitOptions.RemoveEmptyEntries)
-            .Select(s => NormaliseKeyword(s.Trim()))
+            .Select(s => SpellTemplates.Templates.Counters.CountersSpellFactory.NormaliseKeyword(s.Trim()))
             .Where(s => !string.IsNullOrWhiteSpace(s))
             .ToList();
     }
@@ -405,74 +277,6 @@ public static class OracleSpellBinder
             owner.Zones.Exile.AddCard(card);
         }
         card.SetZone(ZoneType.Exile);
-    }
-
-    private static string NormaliseKeyword(string raw) =>
-        // Collapse multi-word "first strike" / "double strike"; preserve casing
-        // canonical to engine ("First strike" matches CombatAbilities check).
-        raw.ToLowerInvariant() switch
-        {
-            "first strike" => "First strike",
-            "double strike" => "Double strike",
-            _ => char.ToUpperInvariant(raw[0]) + raw[1..].ToLowerInvariant(),
-        };
-
-    private static SpellDefinition PumpSpell(int p, int t, Func<object, object> resolver) => new(
-        Modes: Array.Empty<string>(), HasVariableX: false,
-        TargetRequests: new[] { new TargetRequest("target creature", 1, 1, Array.Empty<object>()) },
-        EffectFactory: param =>
-        {
-            var target = resolver(param.Targets[0][0]);
-            return new IEffect[] { new Effect($"+{p}/+{t} EOT", () =>
-            {
-                if (target is Creature c && c.ActiveEffects != null)
-                {
-                    c.ActiveEffects.Register(new PumpUntilEndOfTurnEffect(c, p, t));
-                }
-            }) };
-        });
-
-    private static SpellDefinition GrantKeywordSpell(string keyword, Func<object, object> resolver) => new(
-        Modes: Array.Empty<string>(), HasVariableX: false,
-        TargetRequests: new[] { new TargetRequest("target creature", 1, 1, Array.Empty<object>()) },
-        EffectFactory: param =>
-        {
-            var target = resolver(param.Targets[0][0]);
-            return new IEffect[] { new Effect($"grants {keyword} EOT", () =>
-            {
-                if (target is Creature c && c.ActiveEffects != null)
-                {
-                    c.ActiveEffects.Register(new GrantKeywordUntilEndOfTurnEffect(c, keyword));
-                }
-            }) };
-        });
-
-    /// <summary>Layer 7c +P/+T effect with end-of-turn expiry.</summary>
-    private sealed class PumpUntilEndOfTurnEffect : Majik.Core.Effects.ContinuousEffect
-    {
-        private readonly Creature _target;
-        private readonly int _p, _t;
-        public PumpUntilEndOfTurnEffect(Creature target, int p, int t)
-        { _target = target; _p = p; _t = t; }
-        public override Majik.Core.Effects.Layer Layer => Majik.Core.Effects.Layer.PT_Modify;
-        public override bool ExpiresAtEndOfTurn => true;
-        public override bool AppliesTo(Creature c) => ReferenceEquals(c, _target);
-        public override void Apply(Majik.Core.Effects.CreatureCharacteristics chars)
-        { chars.Power += _p; chars.Toughness += _t; }
-    }
-
-    /// <summary>Layer 6 keyword grant with end-of-turn expiry.</summary>
-    private sealed class GrantKeywordUntilEndOfTurnEffect : Majik.Core.Effects.ContinuousEffect
-    {
-        private readonly Creature _target;
-        private readonly string _kw;
-        public GrantKeywordUntilEndOfTurnEffect(Creature target, string kw)
-        { _target = target; _kw = kw; }
-        public override Majik.Core.Effects.Layer Layer => Majik.Core.Effects.Layer.Abilities;
-        public override bool ExpiresAtEndOfTurn => true;
-        public override bool AppliesTo(Creature c) => ReferenceEquals(c, _target);
-        public override void Apply(Majik.Core.Effects.CreatureCharacteristics chars)
-        { chars.Keywords.Add(_kw); }
     }
 
     /// <summary>
