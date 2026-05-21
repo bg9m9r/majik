@@ -41,14 +41,13 @@ public static class OracleSpellBinder
             new SpellTemplates.Templates.Counter.CounterNoncreatureTemplate(),
             new SpellTemplates.Templates.Counter.CounterCreatureTemplate(),
             new SpellTemplates.Templates.Counter.CounterTargetSpellTemplate(),
+            new SpellTemplates.Templates.Damage.DealsXDamageAnyTemplate(),
+            new SpellTemplates.Templates.Damage.DamageAnyTargetTemplate(),
+            new SpellTemplates.Templates.Damage.DamagePlayerTemplate(),
+            new SpellTemplates.Templates.Damage.DealsDamageEachCreatureTemplate(),
+            new SpellTemplates.Templates.Damage.EachOpponentLosesLifeTemplate(),
         });
 
-    private static readonly Regex DamageAnyTarget = new(
-        @"deals?\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+damage\s+to\s+any\s+target",
-        RegexOptions.IgnoreCase);
-    private static readonly Regex DamagePlayer = new(
-        @"deals?\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+damage\s+to\s+target\s+player",
-        RegexOptions.IgnoreCase);
     // "Destroy target creature if its mana value is N or less." — more specific than DestroyCreature.
     private static readonly Regex DestroyCreatureCmcLimit = new(
         @"destroy\s+target\s+(?:nonland\s+)?creature\s+if\s+its\s+mana\s+value\s+is\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+or\s+less",
@@ -80,10 +79,6 @@ public static class OracleSpellBinder
     // "Target creature gains <keyword> until end of turn."
     private static readonly Regex GrantKeywordTilEot = new(
         @"target\s+creature\s+gains?\s+(?<kw>flying|trample|first\s+strike|double\s+strike|deathtouch|lifelink|vigilance|haste|reach|menace|indestructible)\s+until\s+end\s+of\s+turn",
-        RegexOptions.IgnoreCase);
-    // "Each opponent loses N life."
-    private static readonly Regex EachOpponentLosesLife = new(
-        @"each\s+opponent\s+loses\s+(?<n>\d+|one|two|three|four|five|six|seven)\s+life",
         RegexOptions.IgnoreCase);
     // "Each player draws N cards."
     private static readonly Regex EachPlayerDraws = new(
@@ -129,10 +124,6 @@ public static class OracleSpellBinder
     private static readonly Regex SearchLandToBattlefield = new(
         @"search\s+your\s+library\s+for\s+a\s+(?<kind>basic\s+land|land)\s+card[^.]*put\s+(?:it|that\s+card)\s+onto\s+the\s+battlefield",
         RegexOptions.IgnoreCase);
-    // "[Name] deals X damage to any target." — variable X damage spell.
-    private static readonly Regex DealsXDamageAny = new(
-        @"deals?\s+x\s+damage\s+to\s+any\s+target",
-        RegexOptions.IgnoreCase);
     // "Exile target {creature|permanent|artifact|enchantment|land|nonland permanent}."
     private static readonly Regex ExileTarget = new(
         @"exile\s+target\s+(creature|permanent|artifact|enchantment|land|nonland\s+permanent)",
@@ -144,10 +135,6 @@ public static class OracleSpellBinder
     // "You gain N life."
     private static readonly Regex YouGainLife = new(
         @"you\s+gain\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+life",
-        RegexOptions.IgnoreCase);
-    // "<Name> deals N damage to each creature."
-    private static readonly Regex DealsDamageEachCreature = new(
-        @"deals?\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+damage\s+to\s+each\s+creature",
         RegexOptions.IgnoreCase);
     // "Put N +1/+1 counters on target creature."
     private static readonly Regex PutPlusCounter = new(
@@ -305,10 +292,6 @@ public static class OracleSpellBinder
         var mEachPl = EachPlayerMills.Match(text);
         if (mEachPl.Success) return EachPlayerMillsSpell(caster, WordToInt(mEachPl.Groups["n"].Value));
 
-        var mSweep = DealsDamageEachCreature.Match(text);
-        if (mSweep.Success) return DealsDamageEachCreatureSpell(
-            WordToInt(mSweep.Groups["n"].Value), caster);
-
         if (CreaturesGetPlusCounter.IsMatch(text))
             return CreaturesGetPlusCounterSpell(caster);
 
@@ -333,12 +316,6 @@ public static class OracleSpellBinder
         if (mGrantAll.Success && effects != null) return CreaturesYouControlGainKeywordSpell(
             NormaliseKeyword(mGrantAll.Groups["kw"].Value), caster, effects);
 
-        var m = DamageAnyTarget.Match(text);
-        if (m.Success) return DamageAnySpell(WordToInt(m.Groups["n"].Value), resolver);
-
-        m = DamagePlayer.Match(text);
-        if (m.Success) return DamagePlayerSpell(WordToInt(m.Groups["n"].Value), resolver);
-
         // CMC-limited destroy (Fatal Push) — must precede generic DestroyCreature.
         var mFp = DestroyCreatureCmcLimit.Match(text);
         if (mFp.Success) return DestroyCreatureCmcLimitSpell(resolver, WordToInt(mFp.Groups["n"].Value));
@@ -350,7 +327,7 @@ public static class OracleSpellBinder
         if (mDestUp.Success) return DestroyUpToArtifactEnchantmentSpell(resolver, WordToInt(mDestUp.Groups["n"].Value));
         if (DestroyArtifactEnchantment.IsMatch(text)) return DestroyArtifactOrEnchantmentSpell(resolver);
 
-        m = DrawCards.Match(text);
+        var m = DrawCards.Match(text);
         if (m.Success) return DrawNSpell(WordToInt(m.Groups["n"].Value), caster);
 
         // Thoughtseize (reveal-choose-discard + caster loses life) — before generic Discard.
@@ -370,9 +347,6 @@ public static class OracleSpellBinder
         m = GrantKeywordTilEot.Match(text);
         if (m.Success) return GrantKeywordSpell(
             NormaliseKeyword(m.Groups["kw"].Value), resolver);
-
-        m = EachOpponentLosesLife.Match(text);
-        if (m.Success) return EachOpponentLosesLifeSpell(WordToInt(m.Groups["n"].Value), caster);
 
         m = EachPlayerDraws.Match(text);
         if (m.Success) return EachPlayerDrawsSpell(WordToInt(m.Groups["n"].Value));
@@ -427,8 +401,6 @@ public static class OracleSpellBinder
 
         m = SearchLibrary.Match(text);
         if (m.Success) return SearchLibrarySpell(caster, m.Groups["kind"].Value);
-
-        if (DealsXDamageAny.IsMatch(text)) return DealsXAnyTargetSpell(resolver);
 
         m = UntapTarget.Match(text);
         if (m.Success) return UntapTargetSpell(resolver, $"target {m.Groups[1].Value}");
@@ -523,28 +495,6 @@ public static class OracleSpellBinder
         public override void Apply(Majik.Core.Effects.CreatureCharacteristics chars)
         { chars.Power += _p; chars.Toughness += _t; }
     }
-
-    private static SpellDefinition DealsDamageEachCreatureSpell(int n, Player caster) => new(
-        Modes: Array.Empty<string>(), HasVariableX: false,
-        TargetRequests: Array.Empty<TargetRequest>(),
-        EffectFactory: _ => new IEffect[] { new Effect($"deal {n} to each creature", () =>
-        {
-            // CR 109 — sweep enumerates every creature on the battlefield.
-            // Reach via the caster's GameContext.AllPlayers in production;
-            // here we look at every player accessible from the caster's
-            // perspective. Each player tracks their own battlefield.
-            var seen = new HashSet<Creature>();
-            foreach (var c in caster.Zones.Battlefield.GetCards().OfType<Creature>())
-            {
-                if (seen.Add(c)) c.TakeDamage(n);
-            }
-            // To cover opponent creatures, the binder needs a way to
-            // enumerate them. MVP: walk Permanent.Controller from caster's
-            // creatures' controllers — but if no shared registry exists,
-            // opponent creatures are unreachable here. The sweep effect
-            // signature accepts ChosenSpellParams which can carry an
-            // AllPlayers reference once SpellCastFlow is updated.
-        }) });
 
     private static SpellDefinition PutPlusOnePlusOneSpell(int n, Func<object, object> resolver) => new(
         Modes: Array.Empty<string>(), HasVariableX: false,
@@ -936,16 +886,6 @@ public static class OracleSpellBinder
             }) };
         });
 
-    private static SpellDefinition DealsXAnyTargetSpell(Func<object, object> resolver) => new(
-        Modes: Array.Empty<string>(), HasVariableX: true,
-        TargetRequests: new[] { new TargetRequest("any target", 1, 1, Array.Empty<object>()) },
-        EffectFactory: p =>
-        {
-            var target = resolver(p.Targets[0][0]);
-            var x = p.X ?? 0;
-            return new IEffect[] { new Effect($"deal X={x}", () => DealDamage(target, x)) };
-        });
-
     private static void MoveToExile(ICard card)
     {
         var owner = card.Owner;
@@ -1054,16 +994,6 @@ public static class OracleSpellBinder
             }) };
         });
 
-    private static SpellDefinition EachOpponentLosesLifeSpell(int n, Player caster) => new(
-        Modes: Array.Empty<string>(), HasVariableX: false,
-        TargetRequests: Array.Empty<TargetRequest>(),
-        EffectFactory: _ => new IEffect[] { new Effect($"each opp loses {n}", () =>
-        {
-            // Caller may not have the player list inside binder scope; tests verify
-            // single-opponent case where caster.OpponentsForTests is implied.
-            // Real wiring: GameContext.AllPlayers iterates and applies.
-        }) });
-
     private static SpellDefinition EachPlayerDrawsSpell(int n) => new(
         Modes: Array.Empty<string>(), HasVariableX: false,
         TargetRequests: Array.Empty<TargetRequest>(),
@@ -1138,29 +1068,6 @@ public static class OracleSpellBinder
             return new IEffect[] { new Effect($"gain {n} life", () =>
             {
                 if (target is Player player) player.GainLife(n);
-            }) };
-        });
-
-    // ---------- Spell templates ----------
-
-    private static SpellDefinition DamageAnySpell(int n, Func<object, object> resolver) => new(
-        Modes: Array.Empty<string>(), HasVariableX: false,
-        TargetRequests: new[] { new TargetRequest("any target", 1, 1, Array.Empty<object>()) },
-        EffectFactory: p =>
-        {
-            var target = resolver(p.Targets[0][0]);
-            return new IEffect[] { new Effect($"deal {n}", () => DealDamage(target, n)) };
-        });
-
-    private static SpellDefinition DamagePlayerSpell(int n, Func<object, object> resolver) => new(
-        Modes: Array.Empty<string>(), HasVariableX: false,
-        TargetRequests: new[] { new TargetRequest("target player", 1, 1, Array.Empty<object>()) },
-        EffectFactory: p =>
-        {
-            var target = resolver(p.Targets[0][0]);
-            return new IEffect[] { new Effect($"deal {n} to player", () =>
-            {
-                if (target is Player player) player.LoseLife(n);
             }) };
         });
 
@@ -1291,7 +1198,7 @@ public static class OracleSpellBinder
 
     // ---------- Primitives ----------
 
-    private static void DealDamage(object target, int n)
+    internal static void DealDamage(object target, int n)
     {
         switch (target)
         {
