@@ -1,6 +1,7 @@
 using Majik.Core.Costs;
 using Majik.Core.Domain.ValueObjects;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
 using Majik.Core.Stack;
 using Majik.Core.Targeting;
 
@@ -16,6 +17,12 @@ public class ActivatedAbility : IActivatedAbility
     private readonly List<ICost> _costs = new();
     private readonly List<IEffect> _effects = new();
 
+    // Deferred targeting (Rule 602.2b): target requests are declared at
+    // construction time; chosen targets are stored after the activating
+    // player's agent responds during AbilityActivationFlow.ActivateAsync.
+    private IReadOnlyList<IReadOnlyList<object>> _chosenTargets =
+        Array.Empty<IReadOnlyList<object>>();
+
     public Guid Id { get; }
     public Player Controller { get; }
     public DateTime Timestamp { get; }
@@ -25,7 +32,29 @@ public class ActivatedAbility : IActivatedAbility
     public IReadOnlyList<IEffect> Effects => _effects.AsReadOnly();
     public bool IsResolving => _resolutionState.IsResolving;
 
-    public ActivatedAbility(object source, Player controller, IEnumerable<ITarget>? targets = null, IEnumerable<ICost>? costs = null, IEnumerable<IEffect>? effects = null)
+    /// <summary>
+    /// Targeting requests the activating player's agent must satisfy during
+    /// <see cref="AbilityActivationFlow.ActivateAsync"/> (Rule 602.2b).
+    /// Empty when the ability needs no targets.
+    /// </summary>
+    public IReadOnlyList<TargetRequest> TargetRequests { get; }
+
+    /// <summary>
+    /// The targets chosen by the activating player's agent (parallel
+    /// list-of-lists matching <see cref="TargetRequests"/>). Populated by
+    /// <see cref="SetChosenTargets"/> after the agent responds. Effects
+    /// should read from here, not from the legacy <see cref="Targets"/>
+    /// collection.
+    /// </summary>
+    public IReadOnlyList<IReadOnlyList<object>> ChosenTargets => _chosenTargets;
+
+    public ActivatedAbility(
+        object source,
+        Player controller,
+        IEnumerable<ITarget>? targets = null,
+        IEnumerable<ICost>? costs = null,
+        IEnumerable<IEffect>? effects = null,
+        IEnumerable<TargetRequest>? targetRequests = null)
     {
         if (source == null)
         {
@@ -43,6 +72,10 @@ public class ActivatedAbility : IActivatedAbility
         Timestamp = DateTime.UtcNow;
         _resolutionState = ResolutionState.NotResolving();
 
+        TargetRequests = targetRequests is null
+            ? Array.Empty<TargetRequest>()
+            : targetRequests.ToList().AsReadOnly();
+
         if (targets != null)
         {
             _targets.AddRange(targets);
@@ -57,6 +90,16 @@ public class ActivatedAbility : IActivatedAbility
         {
             _effects.AddRange(effects);
         }
+    }
+
+    /// <summary>
+    /// Store the targets chosen by the activating player's agent. Called by
+    /// <see cref="AbilityActivationFlow.ActivateAsync"/> after the agent
+    /// responds to each <see cref="TargetRequest"/>.
+    /// </summary>
+    public void SetChosenTargets(IReadOnlyList<IReadOnlyList<object>> chosen)
+    {
+        _chosenTargets = chosen ?? Array.Empty<IReadOnlyList<object>>();
     }
 
     public void Resolve()

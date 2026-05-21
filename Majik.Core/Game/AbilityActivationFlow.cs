@@ -44,10 +44,18 @@ public sealed class AbilityActivationFlow
         if (ability == null) throw new ArgumentNullException(nameof(ability));
         if (agent == null) throw new ArgumentNullException(nameof(agent));
 
-        // Targets (if any).
+        // Targets (if any) — Rule 602.2b. Collect and store on the ability so
+        // effects at resolution time can read ability.ChosenTargets[n][0] etc.
+        var collected = new List<IReadOnlyList<object>>();
         foreach (var req in targetRequests ?? Array.Empty<TargetRequest>())
         {
-            _ = await agent.ChooseTargetsAsync(ctx, req, ct);
+            var picked = await agent.ChooseTargetsAsync(ctx, req, ct);
+            collected.Add(picked);
+        }
+
+        if (ability is ActivatedAbility aa)
+        {
+            aa.SetChosenTargets(collected);
         }
 
         // Mana payment (if cost supplied).

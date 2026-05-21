@@ -231,7 +231,9 @@ public class TriggerManager
     /// <summary>
     /// Async variant of <see cref="PutPendingTriggersOnStack"/>. Within each
     /// controller's group, the player's agent decides order (Rule 603.3b);
-    /// across controllers, APNAP order is preserved.
+    /// across controllers, APNAP order is preserved. For triggers that declare
+    /// <see cref="TriggeredAbility.TargetRequests"/>, the controller's agent is
+    /// prompted for targets before the ability is pushed (Rule 603.3).
     /// </summary>
     public async Task PutPendingTriggersOnStackAsync(
         Player activePlayer,
@@ -272,6 +274,22 @@ public class TriggerManager
 
             foreach (var ability in mine)
             {
+                // Prompt for targets if the concrete ability has declared any
+                // TargetRequests (Rule 603.3). Abilities without requests skip
+                // straight to the push.
+                if (ability is TriggeredAbility ta && ta.TargetRequests.Count > 0)
+                {
+                    var collected = new List<IReadOnlyList<object>>();
+                    foreach (var req in ta.TargetRequests)
+                    {
+                        var picked = agent != null
+                            ? await agent.ChooseTargetsAsync(ctx, req, ct)
+                            : Array.Empty<object>();
+                        collected.Add(picked);
+                    }
+                    ta.SetChosenTargets(collected);
+                }
+
                 _stack.Push(ability);
             }
         }
