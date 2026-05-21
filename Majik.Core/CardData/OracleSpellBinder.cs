@@ -67,6 +67,7 @@ public static class OracleSpellBinder
             new SpellTemplates.Templates.Search.SearchLandToBattlefieldTemplate(),
             new SpellTemplates.Templates.Search.GreenSunsZenithPatternTemplate(),
             new SpellTemplates.Templates.Search.SearchLibraryTemplate(),
+            new SpellTemplates.Templates.Search.GenericTutorTemplate(),
             new SpellTemplates.Templates.Counters.PutPlusCounterTemplate(),
             new SpellTemplates.Templates.Counters.PutMinusCounterTemplate(),
             new SpellTemplates.Templates.Counters.CreaturesGetPlusCounterTemplate(),

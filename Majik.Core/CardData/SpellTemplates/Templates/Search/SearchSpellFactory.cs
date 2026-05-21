@@ -29,6 +29,10 @@ internal static class SearchSpellFactory
                 "instant" => c.HasType(CardType.Instant),
                 "sorcery" => c.HasType(CardType.Sorcery),
                 "planeswalker" => c.HasType(CardType.Planeswalker),
+                // Empty / "card" = generic tutor (Demonic Tutor, Vampiric
+                // Tutor, etc) — any library card qualifies. Deterministic
+                // first-match pick pending agent prompts.
+                "" or "card" => true,
                 _ => false,
             };
             var pick = caster.Zones.Library.GetCards().FirstOrDefault(Pred);
