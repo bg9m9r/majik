@@ -1,8 +1,6 @@
-using Majik.Core.Abilities;
+using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
-using Majik.Core.Cards.Types;
 using Majik.Core.Players;
-using Majik.Core.ValueObjects;
 
 namespace Majik.Core.CardData.Factories;
 
@@ -15,47 +13,27 @@ namespace Majik.Core.CardData.Factories;
 ///   "{T}: Add one mana of any color. Spend this mana only to cast a legendary
 ///    spell. That spell can't be countered."
 ///
-/// ## Implemented (v1)
-/// - Legendary Creature — Halfling Citizen 1/2.
-/// - {T}: Add one mana of any colour — implemented as five <see cref="ManaAbility"/>
-///   instances (one per WUBRG), mirroring the Treasure token pattern in
-///   <see cref="Majik.Core.Tokens.TokenFactory"/>.
+/// Now a thin wrapper that loads
+/// <c>Majik.Core/CardData/Cards/delighted-halfling.json</c> and lets
+/// <see cref="CardDefinitionFactory"/> build the runtime card. The
+/// "any color" mana ability is modeled as five <see cref="Abilities.ManaAbility"/>
+/// instances (one per WUBRG) — mirrors the Treasure-token pattern; the
+/// mana picker can satisfy any single colour pip via this creature.
 ///
 /// ## Deferred (v1 gaps)
-/// - <b>Usage restriction</b>: "Spend this mana only to cast a legendary spell."
-///   Enforcement requires per-mana-pool entry tagging and a spend-restriction check
-///   in the cast-payment flow. Not yet retrofitted.
-/// - <b>Can't-be-countered rider</b>: "That spell can't be countered." Requires
-///   flagging the spell object at cast time and gating counter-spells in
-///   <see cref="Majik.Core.Services.StackResolver"/>. Deferred.
+/// - <b>Usage restriction</b>: "Spend this mana only to cast a legendary
+///   spell." Enforcement requires per-mana-pool entry tagging and a
+///   spend-restriction check in the cast-payment flow. Not yet retrofitted.
+/// - <b>Can't-be-countered rider</b>: "That spell can't be countered."
+///   Requires flagging the spell object at cast time and gating
+///   counter-spells in <see cref="Majik.Core.Services.StackResolver"/>.
+///   Deferred.
 /// </summary>
 public static class DelightedHalflingFactory
 {
-    public static Creature Create(Player owner)
-    {
-        ArgumentNullException.ThrowIfNull(owner);
+    private static readonly CardDefinition Definition =
+        CardDefinitionLoader.FromEmbeddedResource("delighted-halfling");
 
-        var halfling = new Creature(
-            "Delighted Halfling",
-            manaCost: "{G}",
-            power: 1, toughness: 2,
-            supertypes: new[] { CardSupertype.Legendary },
-            subtypes: new[] { CardSubtype.Halfling, CardSubtype.Citizen });
-
-        halfling.SetOwner(owner);
-        halfling.SetController(owner);
-
-        // {T}: Add one mana of any color (CR 605).
-        // Implemented as 5 ManaAbility instances so the mana picker can satisfy
-        // any single colour pip using this creature — mirrors Treasure token
-        // pattern (TokenFactory.CreateTreasure).
-        // Usage restriction (legendary-only) deferred — see class xmldoc.
-        foreach (var color in new[] { "W", "U", "B", "R", "G" })
-        {
-            halfling.AddAbility(new ManaAbility(
-                halfling, owner, ManaCost.Parse(color)));
-        }
-
-        return halfling;
-    }
+    public static Creature Create(Player owner) =>
+        (Creature)CardDefinitionFactory.Build(Definition, owner);
 }

@@ -1,0 +1,7 @@
+{
+  "name": "Spymaster's Vault",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "B" }
+  ]
+}

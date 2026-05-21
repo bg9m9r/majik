@@ -35,7 +35,8 @@ public static class CardDefinitionFactory
         var supertypes = definition.Supertypes.Select(ParseSupertype).ToArray();
         var subtypes = definition.Subtypes.Select(ParseSubtype).ToArray();
         var primary = ParseType(definition.Types[0]);
-        var manaCost = StripBraces(definition.ManaCost);
+        // ManaCost passed verbatim — JSON authors decide bracketing.
+        var manaCost = definition.ManaCost;
 
         ICard card = primary switch
         {
@@ -199,9 +200,6 @@ public static class CardDefinitionFactory
         Enum.TryParse<CardSubtype>(raw, ignoreCase: true, out var s)
             ? s
             : throw new ArgumentException($"Unknown card subtype '{raw}'.", nameof(raw));
-
-    private static string StripBraces(string s) =>
-        string.IsNullOrEmpty(s) ? s : s.Replace("{", "").Replace("}", "");
 
     private static ArgumentException MissingStat(string cardName, string stat) =>
         new($"Card '{cardName}' is missing required '{stat}'.");

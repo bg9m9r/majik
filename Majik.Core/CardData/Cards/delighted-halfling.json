@@ -1,0 +1,16 @@
+{
+  "name": "Delighted Halfling",
+  "types": ["Creature"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Halfling", "Citizen"],
+  "manaCost": "{G}",
+  "power": 1,
+  "toughness": 2,
+  "abilities": [
+    { "kind": "mana", "produces": "W" },
+    { "kind": "mana", "produces": "U" },
+    { "kind": "mana", "produces": "B" },
+    { "kind": "mana", "produces": "R" },
+    { "kind": "mana", "produces": "G" }
+  ]
+}
