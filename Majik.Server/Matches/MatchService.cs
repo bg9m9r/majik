@@ -1,8 +1,10 @@
+using Majik.Core.Api;
 using Majik.Core.Api.Commands;
 using Majik.Core.Api.Dtos;
 using Majik.Server.Composition;
 using Majik.Server.Decks;
 using Majik.Server.Profiles;
+using Microsoft.Extensions.Logging;
 using MongoDB.Driver;
 
 namespace Majik.Server.Matches;
@@ -41,6 +43,7 @@ public sealed class MatchService
     private readonly ServerGameFactory? _gameFactory;
     private readonly DeckRepository? _deckRepo;
     private readonly DeckValidationService? _deckValidator;
+    private readonly ILogger<MatchService>? _logger;
 
     public MatchService(
         MatchRepository matches,
@@ -52,7 +55,8 @@ public sealed class MatchService
         MatchTimeoutScheduler? timeoutScheduler,
         ServerGameFactory? gameFactory,
         DeckRepository? deckRepo = null,
-        DeckValidationService? deckValidator = null)
+        DeckValidationService? deckValidator = null,
+        ILogger<MatchService>? logger = null)
     {
         _matches = matches;
         _profiles = profiles;
@@ -64,6 +68,7 @@ public sealed class MatchService
         _gameFactory = gameFactory;
         _deckRepo = deckRepo;
         _deckValidator = deckValidator;
+        _logger = logger;
     }
 
     // -----------------------------------------------------------------------
@@ -209,6 +214,26 @@ public sealed class MatchService
             DeckSnapshot = botSnapshot,
         };
 
+        // 1) Load decks + create facade BEFORE any DB write so a
+        //    DeckLoadException cannot leave an orphan Match document.
+        GameFacade? facade = null;
+        if (_gameFactory != null)
+        {
+            try
+            {
+                var creatorDeck = await _decks.LoadAsync(creator.DeckId, ct);
+                var botDeck = await _decks.LoadFromCardNamesAsync(botSnapshot, ct);
+                facade = _gameFactory.Create(
+                    creator.Handle, botPlayer.Handle,
+                    creatorDeck, botDeck,
+                    botSeatArchetype: bot.Archetype);
+            }
+            catch (DeckLoadException ex)
+            {
+                return Result.Fail<MatchDto>(new MatchError("deck-invalid", ex.Message));
+            }
+        }
+
         var matchId = Guid.NewGuid();
         var match = new Match
         {
@@ -222,6 +247,9 @@ public sealed class MatchService
             ClockMinutes = clockMinutes,
             Creator = creator,
             Opponent = botPlayer,
+            // GameId is set up-front now that the facade is created first;
+            // this eliminates a separate post-Insert CAS round-trip.
+            GameId = facade?.GameId,
             CreatorMillisRemaining = initialBalance,
             OpponentMillisRemaining = initialBalance,
             PriorityHolderSub = null,
@@ -229,56 +257,95 @@ public sealed class MatchService
             CreatedAt = now,
             UpdatedAt = now,
         };
-        await _matches.InsertAsync(match, ct);
 
-        // Spin up the engine game with a BotPlayerAgent on the Bob seat.
-        // First-player choice for vs-Bot v1: creator (slot 0) plays first.
-        if (_gameFactory != null)
+        // 2) Insert + transitions are wrapped so any CAS conflict or
+        //    Mongo failure cleans up both the match doc and the facade.
+        Match fresh;
+        try
         {
+            await _matches.InsertAsync(match, ct);
+
+            // Open → Joined → Starting → Playing. Skip Rolling: the bot doesn't
+            // roll and the creator always plays first.
+            if (!await TryTransitionStateAsync(matchId, MatchState.Open, MatchState.Joined, now, ct))
+                throw new InvalidOperationException("CAS conflict during bot match setup (Open→Joined).");
+            if (!await TryTransitionStateAsync(matchId, MatchState.Joined, MatchState.Starting, now, ct))
+                throw new InvalidOperationException("CAS conflict during bot match setup (Joined→Starting).");
+
+            // Mirror PlayDrawAsync's into-Playing transition: set priority holder
+            // + start clock for the creator, then kick the engine.
+            var setPlaying = Builders<Match>.Update
+                .Set(m => m.FirstChoice, "play")
+                .Set(m => m.State, MatchState.Playing)
+                .Set(m => m.PriorityHolderSub, creator.Sub)
+                .Set(m => m.PriorityStartedAt, now)
+                .Set(m => m.UpdatedAt, now);
+            if (!await _matches.TryAtomicUpdateAsync(matchId, MatchState.Starting, setPlaying, ct))
+                throw new InvalidOperationException("CAS conflict during bot match setup (Starting→Playing).");
+
+            fresh = (await _matches.GetByIdAsync(matchId, ct))!;
+        }
+        catch (Exception ex)
+        {
+            // Best-effort cleanup: delete the match doc and the facade so we
+            // don't leave a partial-state record behind.
             try
             {
-                var creatorDeck = await _decks.LoadAsync(creator.DeckId, ct);
-                var botDeck = await _decks.LoadFromCardNamesAsync(botSnapshot, ct);
-                var facade = _gameFactory.Create(
-                    creator.Handle, botPlayer.Handle,
-                    creatorDeck, botDeck,
-                    botSeatArchetype: bot.Archetype);
-                await _matches.TryAtomicUpdateAsync(matchId, MatchState.Open,
-                    Builders<Match>.Update.Set(m => m.GameId, facade.GameId),
-                    ct);
+                await _matches.DeleteByIdAsync(matchId, ct);
             }
-            catch (DeckLoadException ex)
+            catch (Exception delEx)
             {
-                return Result.Fail<MatchDto>(new MatchError("deck-invalid", ex.Message));
+                _logger?.LogError(delEx,
+                    "Failed to delete match doc during bot-match setup cleanup. MatchId={MatchId}",
+                    matchId);
             }
+            if (_gameFactory != null && facade != null)
+            {
+                _gameFactory.Delete(facade.GameId);
+            }
+            _logger?.LogError(ex,
+                "Bot match setup failed; rolled back. MatchId={MatchId}", matchId);
+            return Result.Fail<MatchDto>(new MatchError("internal",
+                "Bot match setup failed."));
         }
 
-        // Open → Joined → Starting → Playing. Skip Rolling: the bot doesn't
-        // roll and the creator always plays first.
-        await TransitionStateAsync(matchId, MatchState.Open, MatchState.Joined, now, ct);
-        await TransitionStateAsync(matchId, MatchState.Joined, MatchState.Starting, now, ct);
-
-        // Mirror PlayDrawAsync's into-Playing transition: set priority holder
-        // + start clock for the creator, then kick the engine.
-        var setPlaying = Builders<Match>.Update
-            .Set(m => m.FirstChoice, "play")
-            .Set(m => m.State, MatchState.Playing)
-            .Set(m => m.PriorityHolderSub, creator.Sub)
-            .Set(m => m.PriorityStartedAt, now)
-            .Set(m => m.UpdatedAt, now);
-        await _matches.TryAtomicUpdateAsync(matchId, MatchState.Starting, setPlaying, ct);
-
-        var fresh = (await _matches.GetByIdAsync(matchId, ct))!;
-        if (_gameFactory != null && fresh.GameId is Guid gid)
+        // 3) Fire-and-forget the engine startup, but log faults instead of
+        //    swallowing them so a dead engine doesn't masquerade as Playing.
+        if (facade != null)
         {
-            var facade = _gameFactory.Get(gid);
-            facade?.StartFullGameAsync(firstPlayerSlot: 0);
+            _ = facade.StartFullGameAsync(firstPlayerSlot: 0)
+                .ContinueWith(t =>
+                {
+                    if (t.IsFaulted)
+                        _logger?.LogError(t.Exception,
+                            "Bot match engine faulted at startup. MatchId={MatchId}", matchId);
+                    else if (t.IsCanceled)
+                        _logger?.LogWarning(
+                            "Bot match engine canceled at startup. MatchId={MatchId}", matchId);
+                }, TaskScheduler.Default);
         }
         _timeoutScheduler?.Schedule(matchId, creator.Sub, clockMinutes * 60_000L);
         _hub?.Publish(matchId, "match.state-changed",
             new { matchId, state = "Playing", transitionedAt = now });
 
         return Result.Ok(ToDto(fresh));
+    }
+
+    // Variant of TransitionStateAsync that surfaces the CAS result so callers
+    // can fail loudly instead of silently proceeding on a missed transition.
+    private async Task<bool> TryTransitionStateAsync(
+        Guid id, MatchState from, MatchState to, DateTime now, CancellationToken ct)
+    {
+        var update = Builders<Match>.Update
+            .Set(m => m.State, to)
+            .Set(m => m.UpdatedAt, now);
+        var moved = await _matches.TryAtomicUpdateAsync(id, from, update, ct);
+        if (moved)
+        {
+            _hub?.Publish(id, "match.state-changed",
+                new { matchId = id, state = to.ToString(), transitionedAt = now });
+        }
+        return moved;
     }
 
     // -----------------------------------------------------------------------
