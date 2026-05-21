@@ -110,6 +110,23 @@ public class Player
         Commander = state;
     }
 
+    // ── Emblems (CR 114) ────────────────────────────────────────────────────
+
+    private readonly List<Majik.Core.Cards.Emblem> _emblems = new();
+
+    /// <summary>Emblems controlled by this player, living in the command zone
+    /// for the rest of the game (CR 114).</summary>
+    public IReadOnlyList<Majik.Core.Cards.Emblem> Emblems => _emblems.AsReadOnly();
+
+    /// <summary>Add an emblem to this player's command zone (CR 114).
+    /// Callers are responsible for registering any triggered abilities on the
+    /// emblem with <c>TriggerManager</c> before or after this call.</summary>
+    public void AddEmblem(Majik.Core.Cards.Emblem emblem)
+    {
+        ArgumentNullException.ThrowIfNull(emblem);
+        _emblems.Add(emblem);
+    }
+
     public Player(string name, int startingLife = 20, ZoneManager? zoneManager = null)
     {
         if (string.IsNullOrWhiteSpace(name))
