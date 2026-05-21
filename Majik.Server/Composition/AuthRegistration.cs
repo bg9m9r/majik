@@ -1,5 +1,6 @@
 using Majik.Server.Auth;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 
 namespace Majik.Server.Composition;
@@ -70,6 +71,34 @@ public static class AuthRegistration
                 options.Events = new JwtBearerEvents
                 {
                     OnTokenValidated = DescopeTokenValidator.ValidateAsync,
+                    // Default log level masks JwtBearer auth events. Surface
+                    // failures + challenges at Warning so they're visible in
+                    // production hosting (Render etc) without flipping the
+                    // global Microsoft.AspNetCore level.
+                    OnAuthenticationFailed = ctx =>
+                    {
+                        var logger = ctx.HttpContext.RequestServices
+                            .GetRequiredService<ILoggerFactory>()
+                            .CreateLogger("Majik.Auth");
+                        logger.LogWarning(ctx.Exception,
+                            "JwtBearer authentication failed: {Message}",
+                            ctx.Exception.Message);
+                        return Task.CompletedTask;
+                    },
+                    OnChallenge = ctx =>
+                    {
+                        if (!string.IsNullOrEmpty(ctx.Error) ||
+                            !string.IsNullOrEmpty(ctx.ErrorDescription))
+                        {
+                            var logger = ctx.HttpContext.RequestServices
+                                .GetRequiredService<ILoggerFactory>()
+                                .CreateLogger("Majik.Auth");
+                            logger.LogWarning(
+                                "JwtBearer challenge: error={Error} description={Description}",
+                                ctx.Error, ctx.ErrorDescription);
+                        }
+                        return Task.CompletedTask;
+                    },
                 };
             });
         }
