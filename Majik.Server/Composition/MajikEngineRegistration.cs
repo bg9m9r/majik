@@ -20,13 +20,20 @@ public static class MajikEngineRegistration
     public static IServiceCollection AddMajikEngine(this IServiceCollection services)
     {
         services.AddSingleton<GameRegistry>();
-        services.AddSingleton<ServerGameFactory>();
 
         // Card data: singleton DbContext (uses default on-disk path) wrapped
         // in a caching decorator. Tests override these via ConfigureTestServices.
         services.AddSingleton<CardDbContext>();
         services.AddSingleton<ICardRepository>(sp =>
             new CachingCardRepository(new DbCardRepository(sp.GetRequiredService<CardDbContext>())));
+
+        // ServerGameFactory takes ICardRepository so it can run the full binder
+        // pipeline at game-start. Registered after ICardRepository so the DI
+        // container can satisfy the constructor dependency.
+        services.AddSingleton<ServerGameFactory>(sp =>
+            new ServerGameFactory(
+                sp.GetRequiredService<GameRegistry>(),
+                sp.GetRequiredService<ICardRepository>()));
 
         return services;
     }

@@ -1,5 +1,7 @@
 using System.Collections.Concurrent;
+using Majik.Core.CardData;
 using Majik.Core.Cards;
+using Majik.Core.Effects;
 
 namespace Majik.Core.Api;
 
@@ -16,9 +18,11 @@ public sealed class GameRegistry
         string aliceName,
         string bobName,
         IReadOnlyList<ICard> aliceDeck,
-        IReadOnlyList<ICard> bobDeck)
+        IReadOnlyList<ICard> bobDeck,
+        ICardRepository? cardRepo = null,
+        ReplacementBus? replacements = null)
     {
-        var facade = GameFacade.Create(aliceName, bobName, aliceDeck, bobDeck);
+        var facade = GameFacade.Create(aliceName, bobName, aliceDeck, bobDeck, cardRepo, replacements);
 
         if (!_games.TryAdd(facade.GameId, facade))
         {

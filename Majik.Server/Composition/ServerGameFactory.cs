@@ -1,5 +1,7 @@
 using Majik.Core.Api;
+using Majik.Core.CardData;
 using Majik.Core.Cards;
+using Majik.Core.Effects;
 
 namespace Majik.Server.Composition;
 
@@ -11,15 +13,17 @@ namespace Majik.Server.Composition;
 public sealed class ServerGameFactory
 {
     private readonly GameRegistry _registry;
+    private readonly ICardRepository? _cardRepo;
 
-    public ServerGameFactory(GameRegistry registry)
+    public ServerGameFactory(GameRegistry registry, ICardRepository? cardRepo = null)
     {
         _registry = registry;
+        _cardRepo = cardRepo;
     }
 
     public GameFacade Create(string aliceName, string bobName, IReadOnlyList<ICard> aliceDeck, IReadOnlyList<ICard> bobDeck)
     {
-        return _registry.Create(aliceName, bobName, aliceDeck, bobDeck);
+        return _registry.Create(aliceName, bobName, aliceDeck, bobDeck, _cardRepo);
     }
 
     public GameFacade? Get(Guid id) => _registry.Get(id);

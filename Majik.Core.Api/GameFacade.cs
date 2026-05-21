@@ -5,6 +5,7 @@ using Majik.Core.Api.Dtos;
 using Majik.Core.CardData;
 using Majik.Core.Cards;
 using Majik.Core.Combat;
+using Majik.Core.Effects;
 using Majik.Core.Events;
 using Majik.Core.Game;
 using Majik.Core.Players;
@@ -95,7 +96,9 @@ public sealed class GameFacade
         string aliceName,
         string bobName,
         IReadOnlyList<ICard> aliceDeck,
-        IReadOnlyList<ICard> bobDeck)
+        IReadOnlyList<ICard> bobDeck,
+        ICardRepository? cardRepo = null,
+        ReplacementBus? replacements = null)
     {
         var alice = new Player(aliceName, 20);
         var bob = new Player(bobName, 20);
@@ -103,17 +106,55 @@ public sealed class GameFacade
         foreach (var card in aliceDeck)
         {
             card.SetOwner(alice);
-            OracleManaBinder.BindBasicLandMana(card, alice);
+            BindCardAbilities(card, alice, cardRepo, replacements);
             alice.Zones.GetZone(ZoneType.Library).AddCard(card);
         }
         foreach (var card in bobDeck)
         {
             card.SetOwner(bob);
-            OracleManaBinder.BindBasicLandMana(card, bob);
+            BindCardAbilities(card, bob, cardRepo, replacements);
             bob.Zones.GetZone(ZoneType.Library).AddCard(card);
         }
 
         return new GameFacade(alice, bob);
+    }
+
+    /// <summary>
+    /// Attaches abilities to a card after its owner is set. When
+    /// <paramref name="cardRepo"/> is provided the full binder pipeline
+    /// runs (KeywordBinder, OracleManaBinder, AffinityBinder, SagaBinder,
+    /// OracleTriggeredAbilityBinder, ShockLandBinder). Without a repo only
+    /// the basic-land mana path fires — preserving pre-existing behaviour.
+    /// </summary>
+    private static void BindCardAbilities(
+        ICard card,
+        Player controller,
+        ICardRepository? cardRepo,
+        ReplacementBus? replacements)
+    {
+        if (cardRepo != null)
+        {
+            var entity = cardRepo.GetByName(card.Name);
+            if (entity != null)
+            {
+                KeywordBinder.Bind(card, entity, controller);
+                OracleManaBinder.Bind(card, entity, controller);
+                AffinityBinder.Bind(card, entity);
+                SagaBinder.Bind(card, entity);
+                foreach (var trig in OracleTriggeredAbilityBinder.Bind(card, entity, controller))
+                {
+                    card.AddAbility(trig);
+                }
+                if (replacements != null)
+                {
+                    ShockLandBinder.Bind(card, entity, replacements);
+                }
+                return;
+            }
+        }
+
+        // Fallback: no repo or unknown card — attach basic-land mana only.
+        OracleManaBinder.BindBasicLandMana(card, controller);
     }
 
     /// <summary>
