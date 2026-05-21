@@ -54,6 +54,14 @@ public static class AuthRegistration
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
                     ValidateIssuer = true,
+                    // Descope stamps different `iss` claims depending on
+                    // which auth surface mints the token:
+                    //   - direct flow:    https://api.descope.com/<PID>
+                    //   - OIDC app flow:  https://api.descope.com/v1/apps/<PID>
+                    // Both are signed by the same JWKS at the project root,
+                    // so we keep `Authority` pointed there for key discovery
+                    // and accept either issuer here.
+                    ValidIssuers = BuildValidIssuers(authority!),
                     ValidateAudience = !string.IsNullOrWhiteSpace(audience),
                     ValidateLifetime = true,
                     ValidateIssuerSigningKey = true,
@@ -83,5 +91,23 @@ public static class AuthRegistration
         });
 
         return services;
+    }
+
+    private static string[] BuildValidIssuers(string authority)
+    {
+        var trimmed = authority.TrimEnd('/');
+        var lastSlash = trimmed.LastIndexOf('/');
+        if (lastSlash <= "https://".Length)
+        {
+            return new[] { trimmed };
+        }
+
+        var baseUrl = trimmed[..lastSlash];
+        var projectId = trimmed[(lastSlash + 1)..];
+        return new[]
+        {
+            trimmed,
+            $"{baseUrl}/v1/apps/{projectId}",
+        };
     }
 }
