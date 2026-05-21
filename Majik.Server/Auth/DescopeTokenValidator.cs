@@ -1,6 +1,8 @@
 using System.Security.Claims;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Majik.Server.Auth;
 
@@ -33,11 +35,23 @@ public static class DescopeTokenValidator
 
     public static Task ValidateAsync(TokenValidatedContext context)
     {
+        var logger = context.HttpContext.RequestServices
+            .GetRequiredService<ILoggerFactory>()
+            .CreateLogger("Majik.Auth");
+
         var identity = context.Principal?.Identity as ClaimsIdentity;
-        var sub = context.Principal?.FindFirst("sub")?.Value;
+        var sub = context.Principal?.FindFirst("sub")?.Value
+            ?? context.Principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
         if (string.IsNullOrEmpty(sub))
         {
+            var claimSummary = context.Principal is null
+                ? "<no principal>"
+                : string.Join(", ",
+                    context.Principal.Claims.Select(c => $"{c.Type}={c.Value}"));
+            logger.LogWarning(
+                "DescopeTokenValidator: sub missing. Claims: {Claims}",
+                claimSummary);
             context.Fail("Token missing 'sub' claim.");
             return Task.CompletedTask;
         }
@@ -47,11 +61,23 @@ public static class DescopeTokenValidator
             return Task.CompletedTask;
         }
 
+        // If `sub` came in under a mapped claim type (older JwtSecurityTokenHandler
+        // remaps it to ClaimTypes.NameIdentifier), add it back as "sub" so the
+        // AsPlayer policy's RequireClaim("sub") finds it.
+        if (!identity.HasClaim(c => c.Type == "sub"))
+        {
+            identity.AddClaim(new Claim("sub", sub));
+        }
+
         var discordId = ExtractDiscordUserId(context.Principal!);
         if (!string.IsNullOrEmpty(discordId) && !identity.HasClaim(c => c.Type == DiscordUserIdClaim))
         {
             identity.AddClaim(new Claim(DiscordUserIdClaim, discordId));
         }
+
+        logger.LogInformation(
+            "DescopeTokenValidator: validated sub={Sub} discordUserId={Discord}",
+            sub, discordId ?? "<none>");
 
         return Task.CompletedTask;
     }
