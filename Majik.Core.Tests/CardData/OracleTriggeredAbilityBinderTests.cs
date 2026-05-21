@@ -177,6 +177,88 @@ public class OracleTriggeredAbilityBinderTests
     }
 
     [Fact]
+    public void Bind_Endurance_EtbTargetsOpponent_GraveyardToLibraryBottom()
+    {
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+        var zones = new ZoneService(_bus);
+
+        // Put two cards in Bob's graveyard.
+        var cardA = new Creature("Ragavan", "R", 2, 1) { Owner = _bob, Controller = _bob };
+        var cardB = new Creature("Dragon's Rage Channeler", "R", 3, 3) { Owner = _bob, Controller = _bob };
+        cardA.SetZone(ZoneType.Graveyard);
+        cardB.SetZone(ZoneType.Graveyard);
+        _bob.Zones.Graveyard.AddCard(cardA);
+        _bob.Zones.Graveyard.AddCard(cardB);
+
+        var allPlayers = new List<Player> { _alice, _bob };
+
+        var endurance = new Creature("Endurance", "1GG", 3, 4) { Owner = _alice, Controller = _alice };
+        endurance.SetZone(ZoneType.Hand);
+        _alice.Zones.Hand.AddCard(endurance);
+
+        var entity = new CardEntity
+        {
+            Name = "Endurance",
+            TypeLine = "Creature — Elemental Incarnation",
+            OracleText = "Flash\nReach\nWhen Endurance enters the battlefield, target player puts all the cards from their graveyard on the bottom of their library in a random order.",
+        };
+        foreach (var ab in OracleTriggeredAbilityBinder.Bind(endurance, entity, _alice, allPlayers))
+        {
+            endurance.AddAbility(ab);
+        }
+        triggers.BindCard(endurance);
+
+        zones.MoveCardTo(endurance, ZoneType.Battlefield, controller: _alice);
+        triggers.PutPendingTriggersOnStack(_alice);
+        stack.Pop()!.Resolve();
+
+        _bob.Zones.Graveyard.GetCards().Should().BeEmpty(
+            "all graveyard cards should have moved to Bob's library");
+        _bob.Zones.Library.GetCards().Should().Contain(new[] { cardA, cardB },
+            "graveyard cards go to the bottom of the target player's library");
+    }
+
+    [Fact]
+    public void Bind_Endurance_Etb_FallsBackToController_WhenNoOpponents()
+    {
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+        var zones = new ZoneService(_bus);
+
+        // Card in Alice's own graveyard; allPlayers only contains Alice.
+        var cardA = new Creature("Ragavan", "R", 2, 1) { Owner = _alice, Controller = _alice };
+        cardA.SetZone(ZoneType.Graveyard);
+        _alice.Zones.Graveyard.AddCard(cardA);
+
+        var allPlayers = new List<Player> { _alice };
+
+        var endurance = new Creature("Endurance", "1GG", 3, 4) { Owner = _alice, Controller = _alice };
+        endurance.SetZone(ZoneType.Hand);
+        _alice.Zones.Hand.AddCard(endurance);
+
+        var entity = new CardEntity
+        {
+            Name = "Endurance",
+            TypeLine = "Creature — Elemental Incarnation",
+            OracleText = "Flash\nReach\nWhen Endurance enters the battlefield, target player puts all the cards from their graveyard on the bottom of their library in a random order.",
+        };
+        foreach (var ab in OracleTriggeredAbilityBinder.Bind(endurance, entity, _alice, allPlayers))
+        {
+            endurance.AddAbility(ab);
+        }
+        triggers.BindCard(endurance);
+
+        zones.MoveCardTo(endurance, ZoneType.Battlefield, controller: _alice);
+        triggers.PutPendingTriggersOnStack(_alice);
+        stack.Pop()!.Resolve();
+
+        _alice.Zones.Graveyard.GetCards().Should().BeEmpty(
+            "with no opponents, the controller's own graveyard is the fallback target");
+        _alice.Zones.Library.GetCards().Should().Contain(cardA);
+    }
+
+    [Fact]
     public void Dies_DestroyTargetLand_NoOp_WhenNoOpponents()
     {
         var stack = new Majik.Core.Stack.Stack(_bus);

@@ -25,5 +25,7 @@ public static class SeedImplementedCards
         "Fatal Push", "Thoughtseize",
         // Dies-trigger land destruction (OracleTriggeredAbilityBinder — dies-destroy-land)
         "Fulminator Mage",
+        // ETB graveyard-to-library trigger (OracleTriggeredAbilityBinder); Flash+Reach via KeywordBinder
+        "Endurance",
     };
 }

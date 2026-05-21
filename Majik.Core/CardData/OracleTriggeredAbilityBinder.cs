@@ -63,6 +63,11 @@ public static class OracleTriggeredAbilityBinder
     private static readonly Regex DestroyTargetLand = new(
         @"(?:you\s+may\s+)?destroy\s+target\s+land",
         RegexOptions.IgnoreCase);
+    // "Target player puts all the cards from their graveyard on the bottom
+    // of their library in a random order." — Endurance (MH2).
+    private static readonly Regex EtbGraveyardToLibraryBottom = new(
+        @"target\s+player\s+puts\s+all\s+the\s+cards\s+from\s+their\s+graveyard\s+on\s+the\s+bottom\s+of\s+their\s+library\s+in\s+a\s+random\s+order",
+        RegexOptions.IgnoreCase);
     private static readonly Regex AnotherCreatureEnters = new(
         @"whenever another creature you control enters\s*,\s*(?<effect>[^.]+)\.",
         RegexOptions.IgnoreCase);
@@ -105,7 +110,7 @@ public static class OracleTriggeredAbilityBinder
 
         foreach (Match m in EtbLine.Matches(text))
         {
-            var effects = BuildEffects(m.Groups["effect"].Value, ctrl, source).ToList();
+            var effects = BuildEffects(m.Groups["effect"].Value, ctrl, source, allPlayers).ToList();
             if (effects.Count == 0) continue;
             yield return new TriggeredAbility(
                 source, ctrl,
@@ -296,6 +301,34 @@ public static class OracleTriggeredAbilityBinder
                     land.SetZone(ZoneType.Graveyard);
                     break; // destroy only one land (CR 701.7)
                 }
+            });
+        }
+
+        // "target player puts all the cards from their graveyard on the bottom
+        // of their library in a random order" — Endurance (MH2).
+        // CR 701.19c: random order = shuffle. v1 simplification: target is the
+        // first opponent found in allPlayers; falls back to controller when no
+        // opponent is available (e.g. factory path without game context).
+        // Real player-choice targeting awaits the agent prompt system.
+        if (EtbGraveyardToLibraryBottom.IsMatch(effectText))
+        {
+            var players = allPlayers;
+            yield return new Effect("graveyard to library bottom", () =>
+            {
+                Player? target = null;
+                if (players != null)
+                    target = players.FirstOrDefault(p => !ReferenceEquals(p, controller));
+                target ??= controller;
+
+                var gyCards = target.Zones.Graveyard.GetCards().ToList();
+                foreach (var c in gyCards)
+                {
+                    target.Zones.Graveyard.RemoveCard(c);
+                    // AddCard sets zone to Library automatically (Zone.AddCard).
+                    target.Zones.Library.AddCard(c);
+                }
+                // TODO: shuffle for true random order once ZoneService exposes
+                // a Shuffle method (CR 701.19c).
             });
         }
 
