@@ -15,6 +15,7 @@ namespace Majik.Core.CardData.Definitions;
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "type")]
 [JsonDerivedType(typeof(PutCounterEffectDef), "put_counter")]
 [JsonDerivedType(typeof(DealDamageStubEffectDef), "deal_damage_stub")]
+[JsonDerivedType(typeof(DrawCardEffectDef), "draw_card")]
 public abstract class EffectDefinition { }
 
 /// <summary>Add N counters of the given type to a target permanent.
@@ -39,4 +40,15 @@ public sealed class DealDamageStubEffectDef : EffectDefinition
 {
     public int Amount { get; set; } = 1;
     public string Target { get; set; } = "any";
+}
+
+/// <summary>
+/// "Controller draws N cards." Default <see cref="Amount"/> is 1.
+/// At resolution time the effect closure removes the top N cards from
+/// the controller's library and moves them to hand. Empty library is a
+/// silent no-op here; state-based-action loss handling is elsewhere.
+/// </summary>
+public sealed class DrawCardEffectDef : EffectDefinition
+{
+    public int Amount { get; set; } = 1;
 }
