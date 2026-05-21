@@ -134,6 +134,7 @@ public static class CardDefinitionFactory
             RemoveCounterCostDef rc => BuildRemoveCounterCost(rc, card),
             TapSelfCostDef => BuildTapSelfCost(card),
             SacrificeSelfCostDef => BuildSacrificeSelfCost(card),
+            DiscardSelfCostDef => new DiscardSelfCost(card),
             _ => throw new NotSupportedException(
                 $"Cost '{definition.GetType().Name}' is not yet supported by CardDefinitionFactory."),
         };
@@ -185,9 +186,20 @@ public static class CardDefinitionFactory
             DealDamageStubEffectDef stub => BuildDealDamageStubEffect(stub, card),
             DrawCardEffectDef draw => BuildDrawCardEffect(draw, card, controller),
             SurveilSelfEffectDef surveil => BuildSurveilSelfEffect(surveil, card, controller),
+            DestroyTargetStubEffectDef destroy => BuildDestroyTargetStubEffect(destroy, card),
             _ => throw new NotSupportedException(
                 $"Effect '{definition.GetType().Name}' is not yet supported by CardDefinitionFactory."),
         };
+
+    private static IEffect BuildDestroyTargetStubEffect(DestroyTargetStubEffectDef def, ICard card)
+    {
+        // Stub: matches the existing C# Boseiju Channel-effect deferred
+        // behavior. Effect runs (resolution proceeds), but doesn't
+        // actually destroy anything — needs the targeting system.
+        return new Effect(
+            $"{card.Name}: destroy target {def.TargetFilter} (stub — no targeting yet)",
+            () => { /* destroy deferred */ });
+    }
 
     private static IEffect BuildSurveilSelfEffect(SurveilSelfEffectDef def, ICard card, Player controller)
     {

@@ -17,6 +17,7 @@ namespace Majik.Core.CardData.Definitions;
 [JsonDerivedType(typeof(DealDamageStubEffectDef), "deal_damage_stub")]
 [JsonDerivedType(typeof(DrawCardEffectDef), "draw_card")]
 [JsonDerivedType(typeof(SurveilSelfEffectDef), "surveil_self")]
+[JsonDerivedType(typeof(DestroyTargetStubEffectDef), "destroy_target_stub")]
 public abstract class EffectDefinition { }
 
 /// <summary>Add N counters of the given type to a target permanent.
@@ -65,4 +66,20 @@ public sealed class DrawCardEffectDef : EffectDefinition
 public sealed class SurveilSelfEffectDef : EffectDefinition
 {
     public int Amount { get; set; } = 1;
+}
+
+/// <summary>
+/// "Destroy target [filter]" — stub effect. Records the target filter
+/// describing what's destructible but resolves as a no-op because the
+/// targeting system isn't wired yet (matches the existing C# Boseiju's
+/// Channel-effect deferred behavior). When the targeting prompt lands,
+/// this type upgrades to a real <c>destroy_target</c> effect without
+/// breaking JSON files.
+///
+/// <see cref="TargetFilter"/> is a free-form string the future
+/// targeting layer will translate (e.g. <c>"artifact_enchantment_nonbasic_land"</c>).
+/// </summary>
+public sealed class DestroyTargetStubEffectDef : EffectDefinition
+{
+    public string TargetFilter { get; set; } = "permanent";
 }
