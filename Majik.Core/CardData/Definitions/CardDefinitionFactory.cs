@@ -107,9 +107,27 @@ public static class CardDefinitionFactory
         definition switch
         {
             EnterBattlefieldSelfTriggerDef => Majik.Core.Abilities.Triggers.OnEnterBattlefieldSelf(card),
+            CardLeavesYourGraveyardTriggerDef gy => BuildCardLeavesYourGraveyardTrigger(gy, card),
             _ => throw new NotSupportedException(
                 $"Trigger '{definition.GetType().Name}' is not yet supported by CardDefinitionFactory."),
         };
+
+    private static Majik.Core.Abilities.ITriggerCondition BuildCardLeavesYourGraveyardTrigger(
+        CardLeavesYourGraveyardTriggerDef def, ICard card)
+    {
+        var types = def.CardTypes.Select(ParseType).ToArray();
+        return new Majik.Core.Abilities.EventTriggerCondition<Majik.Core.Events.CardMovedEvent>((e, _) =>
+        {
+            if (e.FromZone != Majik.Core.Zones.ZoneType.Graveyard) return false;
+            // "Your" graveyard — the controller of this trigger's source card.
+            var triggerController = card.Controller;
+            if (triggerController is null || !ReferenceEquals(e.Card.Owner, triggerController))
+            {
+                return false;
+            }
+            return types.Length == 0 || types.Any(t => e.Card.HasType(t));
+        });
+    }
 
     private static ActivatedAbility BuildActivatedAbility(
         ActivatedAbilityDefinition definition, ICard card, Player controller)
@@ -187,9 +205,43 @@ public static class CardDefinitionFactory
             DrawCardEffectDef draw => BuildDrawCardEffect(draw, card, controller),
             SurveilSelfEffectDef surveil => BuildSurveilSelfEffect(surveil, card, controller),
             DestroyTargetStubEffectDef destroy => BuildDestroyTargetStubEffect(destroy, card),
+            GainLifeSelfEffectDef gain => BuildGainLifeSelfEffect(gain, card, controller),
+            MillThenPickFirstMatchingToHandEffectDef mp => BuildMillThenPickEffect(mp, card, controller),
             _ => throw new NotSupportedException(
                 $"Effect '{definition.GetType().Name}' is not yet supported by CardDefinitionFactory."),
         };
+
+    private static IEffect BuildGainLifeSelfEffect(GainLifeSelfEffectDef def, ICard card, Player controller)
+    {
+        var amount = def.Amount;
+        return new Effect(
+            $"{card.Name}: gain {amount} life",
+            () => controller.GainLife(amount));
+    }
+
+    private static IEffect BuildMillThenPickEffect(
+        MillThenPickFirstMatchingToHandEffectDef def, ICard card, Player controller)
+    {
+        var amount = def.Amount;
+        var types = def.MatchingTypes.Select(ParseType).ToArray();
+        return new Effect(
+            $"{card.Name}: mill {amount}, pick first matching",
+            () =>
+            {
+                var milled = Majik.Core.Keywords.MillAction.Apply(controller, amount);
+                if (types.Length == 0) return;
+                var pick = milled.FirstOrDefault(c => types.Any(t => c.HasType(t)));
+                if (pick != null)
+                {
+                    // Move from graveyard to hand. Matches the existing
+                    // C# Dredger's Insight behavior — auto-pick (the
+                    // "may" opt-out awaits the agent prompt system).
+                    controller.Zones.Graveyard.RemoveCard(pick);
+                    controller.Zones.Hand.AddCard(pick);
+                    pick.SetZone(Majik.Core.Zones.ZoneType.Hand);
+                }
+            });
+    }
 
     private static IEffect BuildDestroyTargetStubEffect(DestroyTargetStubEffectDef def, ICard card)
     {

@@ -18,6 +18,8 @@ namespace Majik.Core.CardData.Definitions;
 [JsonDerivedType(typeof(DrawCardEffectDef), "draw_card")]
 [JsonDerivedType(typeof(SurveilSelfEffectDef), "surveil_self")]
 [JsonDerivedType(typeof(DestroyTargetStubEffectDef), "destroy_target_stub")]
+[JsonDerivedType(typeof(GainLifeSelfEffectDef), "gain_life_self")]
+[JsonDerivedType(typeof(MillThenPickFirstMatchingToHandEffectDef), "mill_then_pick_first_matching_to_hand")]
 public abstract class EffectDefinition { }
 
 /// <summary>Add N counters of the given type to a target permanent.
@@ -82,4 +84,25 @@ public sealed class SurveilSelfEffectDef : EffectDefinition
 public sealed class DestroyTargetStubEffectDef : EffectDefinition
 {
     public string TargetFilter { get; set; } = "permanent";
+}
+
+/// <summary>"Controller gains N life." Default <see cref="Amount"/> = 1.</summary>
+public sealed class GainLifeSelfEffectDef : EffectDefinition
+{
+    public int Amount { get; set; } = 1;
+}
+
+/// <summary>
+/// "Mill N cards. You may put a card with one of the given types from
+/// among the milled cards into your hand." Auto-picks the first
+/// qualifying milled card in v1 (the "may" opt-out awaits agent
+/// prompting). Matches the Dredger's Insight ETB effect.
+///
+/// <see cref="MatchingTypes"/> are parsed as
+/// <see cref="Majik.Core.Cards.Types.CardType"/>; OR-matched.
+/// </summary>
+public sealed class MillThenPickFirstMatchingToHandEffectDef : EffectDefinition
+{
+    public int Amount { get; set; } = 1;
+    public List<string> MatchingTypes { get; set; } = new();
 }
