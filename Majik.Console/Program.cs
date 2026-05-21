@@ -89,6 +89,11 @@ class Program
                 await HandleCompareSetsCommandAsync(args);
                 return;
             }
+            else if (args[0].Equals("coverage-report", StringComparison.OrdinalIgnoreCase))
+            {
+                await CoverageReportCommand.RunAsync();
+                return;
+            }
         }
 
         System.Console.WriteLine("Usage:");
@@ -99,6 +104,7 @@ class Program
         System.Console.WriteLine("  Majik.Console analyze-keywords <path-to-csv-file>");
         System.Console.WriteLine("  Majik.Console ingest-claude-results <path-to-jsonl-file>");
         System.Console.WriteLine("  Majik.Console play-triggers [etb|apnap|intervening-if|delayed|all]");
+        System.Console.WriteLine("  Majik.Console coverage-report");
         System.Console.WriteLine();
         TriggerPlayground.PrintScenarios();
     }
