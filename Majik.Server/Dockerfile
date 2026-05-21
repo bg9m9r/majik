@@ -5,6 +5,7 @@ WORKDIR /src
 COPY global.json Directory.Build.props Directory.Packages.props ./
 COPY Majik.Core/ ./Majik.Core/
 COPY Majik.Core.Api/ ./Majik.Core.Api/
+COPY Majik.Bot/ ./Majik.Bot/
 COPY Majik.Server/ ./Majik.Server/
 
 RUN dotnet restore Majik.Server/Majik.Server.csproj
