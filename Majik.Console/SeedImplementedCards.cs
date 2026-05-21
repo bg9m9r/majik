@@ -53,5 +53,10 @@ public static class SeedImplementedCards
         // −7: Exile up to four target cards from graveyards — deferred (targeting + exile-from-graveyard).
         // Static: "Players who don't control Ashiok can't search libraries" — deferred (replacement effect).
         "Ashiok, Dream Render",
+        // Legendary Land — Kamigawa: Neon Dynasty (BoseijuFactory).
+        // {T}: Add {G} — wired.
+        // Channel — {1}{G}, Discard ~: Destroy target artifact/enchantment/nonbasic land — costs wired,
+        // destroy effect deferred (no targeting). ETB-tapped restriction + basic-land-search follow-up deferred.
+        "Boseiju, Who Endures",
     };
 }
