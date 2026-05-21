@@ -6,8 +6,18 @@ namespace Majik.Core.CardData.SpellTemplates.Templates.Control;
 
 public sealed class GainControlTemplate : ISpellTemplate
 {
+    // Accepts an optional modifier chain (color / state / type-prefix) and
+    // a broader noun set: creature, artifact, enchantment, permanent, land,
+    // planeswalker, spell, Aura. Multi-noun unions also caught — "artifact
+    // or creature", "artifact, creature, or enchantment" (Threads of
+    // Disloyalty, Hijack, Kefnet's Last Word).
+    //
+    // Runtime stub installs a continuous control-change on the chosen
+    // target — extra wording like "until end of turn" or "untap it. It
+    // gains haste until end of turn" is lossy at v1, but the bound spell
+    // resolves with the load-bearing effect.
     private static readonly Regex Pattern = new(
-        @"gain\s+control\s+of\s+target\s+creature",
+        @"gain\s+control\s+of\s+target\s+(?:(?:[\w-]+|or|and)\s*,?\s*){0,4}(?:creature|artifact|enchantment|permanent|land|planeswalker|spell|aura)\b",
         RegexOptions.IgnoreCase);
 
     public int Priority => 50;
