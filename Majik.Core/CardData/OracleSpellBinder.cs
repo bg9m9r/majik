@@ -157,9 +157,21 @@ public static class OracleSpellBinder
     private static readonly Regex ReanimateFromGraveyard = new(
         @"return\s+target\s+(?<kind>card|creature|instant|sorcery|artifact|enchantment|planeswalker|land)?\s*card\s+from\s+your\s+graveyard\s+to\s+your\s+hand",
         RegexOptions.IgnoreCase);
-    // "Scry N" — placeholder bind (effect deferred until agent prompt wired).
+    // "Scry N." — standalone (no draw tail; must not match "scry N, then draw").
+    private static readonly Regex ScrySelf = new(
+        @"^\s*scry\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b",
+        RegexOptions.IgnoreCase | RegexOptions.Multiline);
+    // "Scry N" — generic (catches "Scry N, then draw …" and any other scry variant).
     private static readonly Regex ScryN = new(
         @"\bscry\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b",
+        RegexOptions.IgnoreCase);
+    // "Each opponent mills N cards."
+    private static readonly Regex EachOpponentMills = new(
+        @"each\s+opponent\s+mills\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+cards?",
+        RegexOptions.IgnoreCase);
+    // "Each player mills N cards."
+    private static readonly Regex EachPlayerMills = new(
+        @"each\s+player\s+mills\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+cards?",
         RegexOptions.IgnoreCase);
     // "Create [a|N] [P]/[T] [colour] [subtype] creature token[s] [with KW (and KW)]."
     // Captures: count, P, T, optional colour, subtype, optional keyword list.
@@ -207,7 +219,17 @@ public static class OracleSpellBinder
         var mSurveil = SurveilSelf.Match(text);
         if (mSurveil.Success) return SurveilSelfSpell(caster, WordToInt(mSurveil.Groups["n"].Value));
 
-        if (ScryN.IsMatch(text)) return ScryNSpell(caster, text);
+        var mScrySelf = ScrySelf.Match(text);
+        if (mScrySelf.Success) return ScryNSpell(caster, text, WordToInt(mScrySelf.Groups["n"].Value));
+
+        var mScryN = ScryN.Match(text);
+        if (mScryN.Success) return ScryNSpell(caster, text, WordToInt(mScryN.Groups["n"].Value));
+
+        var mEachOpp = EachOpponentMills.Match(text);
+        if (mEachOpp.Success) return EachOpponentMillsSpell(caster, WordToInt(mEachOpp.Groups["n"].Value));
+
+        var mEachPl = EachPlayerMills.Match(text);
+        if (mEachPl.Success) return EachPlayerMillsSpell(caster, WordToInt(mEachPl.Groups["n"].Value));
 
         var mSweep = DealsDamageEachCreature.Match(text);
         if (mSweep.Success) return DealsDamageEachCreatureSpell(
@@ -454,24 +476,60 @@ public static class OracleSpellBinder
                 TopOrder: Array.Empty<ICard>()));
         }) });
 
-    // "Preordain"-style: scry happens (no-op for now), then "draw a card"
+    // "Preordain"-style: scry happens (default-all-bottom decision), then "draw a card"
     // tail clause fires. Cantrip portion is the substantive effect.
     private static readonly Regex ScryThenDrawTail = new(
         @"scry\s+\d+[^.]*[,.]?\s*then\s+draw\s+(?<n>a|an|\d+|one|two|three|four|five|six|seven)\s+cards?",
         RegexOptions.IgnoreCase);
 
-    private static SpellDefinition ScryNSpell(Player caster, string oracleText) => new(
+    private static SpellDefinition ScryNSpell(Player caster, string oracleText, int n) => new(
         Modes: Array.Empty<string>(), HasVariableX: false,
         TargetRequests: Array.Empty<TargetRequest>(),
         EffectFactory: _ => new IEffect[] { new Effect("scry+draw", () =>
         {
-            // Scry portion deferred: needs agent prompt for which cards to
-            // put on bottom. Wires when SpellCastFlow gains library-top
-            // inspection.
+            // Default decision: everything peeked goes to bottom of library.
+            // Agent-driven choice awaits prompt system.
+            var peeked = ScryAction.Peek(caster, n);
+            if (peeked.Count > 0)
+            {
+                ScryAction.Apply(caster, n, new ScryAction.ScryDecision(
+                    ToBottom: peeked.ToList(),
+                    TopOrder: Array.Empty<ICard>()));
+            }
+
             var tail = ScryThenDrawTail.Match(oracleText);
             if (tail.Success)
             {
                 DrawCards_(caster, WordToInt(tail.Groups["n"].Value));
+            }
+        }) });
+
+    private static SpellDefinition EachOpponentMillsSpell(Player caster, int n) => new(
+        Modes: Array.Empty<string>(), HasVariableX: false,
+        TargetRequests: Array.Empty<TargetRequest>(),
+        EffectFactory: p => new IEffect[] { new Effect($"each opponent mills {n}", () =>
+        {
+            // Opponents are resolved via ChosenSpellParams.AllPlayers when
+            // SpellCastFlow is updated to pass the full player list.
+            // Until then, tests can supply players via the params.
+            if (p.AllPlayers != null)
+            {
+                foreach (var pl in p.AllPlayers.Where(pl => !ReferenceEquals(pl, caster)))
+                    MillAction.Apply(pl, n);
+            }
+        }) });
+
+    private static SpellDefinition EachPlayerMillsSpell(Player caster, int n) => new(
+        Modes: Array.Empty<string>(), HasVariableX: false,
+        TargetRequests: Array.Empty<TargetRequest>(),
+        EffectFactory: p => new IEffect[] { new Effect($"each player mills {n}", () =>
+        {
+            // All players are resolved via ChosenSpellParams.AllPlayers when
+            // SpellCastFlow is updated to pass the full player list.
+            if (p.AllPlayers != null)
+            {
+                foreach (var pl in p.AllPlayers)
+                    MillAction.Apply(pl, n);
             }
         }) });
 

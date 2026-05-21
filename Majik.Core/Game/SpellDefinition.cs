@@ -1,4 +1,5 @@
 using Majik.Core.Abilities;
+using Majik.Core.Players;
 using Majik.Core.Players.Agents;
 
 namespace Majik.Core.Game;
@@ -28,4 +29,5 @@ public sealed record ChosenSpellParams(
     int? ModeIndex,
     int? X,
     IReadOnlyList<IReadOnlyList<object>> Targets,
-    ManaPayment Mana);
+    ManaPayment Mana,
+    IReadOnlyList<Player>? AllPlayers = null);
