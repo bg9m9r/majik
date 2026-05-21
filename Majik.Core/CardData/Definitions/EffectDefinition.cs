@@ -16,6 +16,7 @@ namespace Majik.Core.CardData.Definitions;
 [JsonDerivedType(typeof(PutCounterEffectDef), "put_counter")]
 [JsonDerivedType(typeof(DealDamageStubEffectDef), "deal_damage_stub")]
 [JsonDerivedType(typeof(DrawCardEffectDef), "draw_card")]
+[JsonDerivedType(typeof(SurveilSelfEffectDef), "surveil_self")]
 public abstract class EffectDefinition { }
 
 /// <summary>Add N counters of the given type to a target permanent.
@@ -49,6 +50,19 @@ public sealed class DealDamageStubEffectDef : EffectDefinition
 /// silent no-op here; state-based-action loss handling is elsewhere.
 /// </summary>
 public sealed class DrawCardEffectDef : EffectDefinition
+{
+    public int Amount { get; set; } = 1;
+}
+
+/// <summary>
+/// "Surveil N" — controller looks at the top N cards of their library
+/// and may put any number of them into their graveyard, leaving the
+/// rest in any order on top (CR 701.42). Consults the registered agent
+/// for the player's decision; falls back to the all-to-graveyard
+/// default when no agent is registered (matches the existing C#
+/// Underground Mortuary path).
+/// </summary>
+public sealed class SurveilSelfEffectDef : EffectDefinition
 {
     public int Amount { get; set; } = 1;
 }
