@@ -28,19 +28,36 @@ else
 
     if [ "$current" = "$SEED_TAG" ] && [ -s "$SEED_FILE" ]; then
         echo "[cards-seed] tag=$SEED_TAG already on disk — skipping." >&2
+        # Even when tag matches, sweep any orphan cards* files in the
+        # seed dir (leftover tmp files, backups, old versions) so the
+        # disk doesn't accumulate cruft across deploys.
+        for f in "$SEED_DIR"/cards*; do
+            [ -e "$f" ] || continue
+            case "$f" in
+                "$SEED_FILE"|"$TAG_FILE") continue ;;
+            esac
+            size="$(stat -c%s "$f" 2>/dev/null || echo '?')"
+            echo "[cards-seed] sweep: removing orphan $f ($size bytes)" >&2
+            rm -f "$f"
+        done
     else
         url="https://github.com/${SEED_REPO}/releases/download/${SEED_TAG}/cards.db"
         echo "[cards-seed] downloading $url" >&2
 
-        # Delete the existing seed + tag BEFORE downloading so the new
-        # file doesn't have to coexist with the old one on disk during
-        # the download (avoids ENOSPC on small persistent disks).
-        # Also clean up any leftover tmp files from previous failed
-        # attempts so they don't accumulate.
-        if [ -s "$SEED_FILE" ]; then
-            echo "[cards-seed] removing stale seed ($(stat -c%s "$SEED_FILE" 2>/dev/null || echo '?') bytes)" >&2
-        fi
-        rm -f "$SEED_FILE" "$TAG_FILE" "$SEED_DIR"/cards.db.* 2>/dev/null || true
+        # Sweep EVERY cards* file in the seed dir (the current seed,
+        # any tmp files from previous failed attempts, any orphan
+        # backups, etc.) before downloading. Frees disk + prevents
+        # ENOSPC on small persistent disks. We're about to replace
+        # the seed anyway, so nothing is worth preserving — if the
+        # download fails the entrypoint aborts boot and Render
+        # auto-retries.
+        for f in "$SEED_DIR"/cards*; do
+            [ -e "$f" ] || continue
+            size="$(stat -c%s "$f" 2>/dev/null || echo '?')"
+            echo "[cards-seed] sweep: removing $f ($size bytes)" >&2
+            rm -f "$f"
+        done
+        rm -f "$TAG_FILE"
 
         tmp="$(mktemp -p "$SEED_DIR" cards.db.XXXXXX)"
         if curl -fL --retry 3 --retry-delay 5 "$url" -o "$tmp"; then
