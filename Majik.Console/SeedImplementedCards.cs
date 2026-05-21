@@ -30,5 +30,9 @@ public static class SeedImplementedCards
         // X-cost green creature tutor; puts target directly onto battlefield (OracleSpellBinder)
         // Note: post-resolution self-return-to-library deferred (v1 goes to graveyard instead).
         "Green Sun's Zenith",
+        // Pitch spell — exile a green card to destroy up to 2 artifacts/enchantments
+        // (OracleSpellBinder: DestroyUpToArtifactEnchantmentSpell + ExileColoredCardAlternativeCost).
+        // v1: "if it's not your turn" timing restriction not enforced.
+        "Force of Vigor",
     };
 }

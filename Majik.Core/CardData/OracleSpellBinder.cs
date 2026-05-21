@@ -52,6 +52,11 @@ public static class OracleSpellBinder
     private static readonly Regex DestroyArtifactEnchantment = new(
         @"destroy\s+target\s+(artifact|enchantment)(\s+or\s+(artifact|enchantment))?",
         RegexOptions.IgnoreCase);
+    // "Destroy up to N target artifacts and/or enchantments." — Force of Vigor
+    // style. More specific than DestroyArtifactEnchantment; dispatched first.
+    private static readonly Regex DestroyUpToArtifactEnchantment = new(
+        @"destroy\s+up\s+to\s+(?<n>\d+|one|two|three|four|five)\s+target\s+artifacts?\s+and(?:/or)?\s+enchantments?",
+        RegexOptions.IgnoreCase);
     private static readonly Regex DrawCards = new(
         @"draw\s+(?<n>\d+|a|one|two|three|four|five|six|seven)\s+cards?",
         RegexOptions.IgnoreCase);
@@ -337,6 +342,10 @@ public static class OracleSpellBinder
         if (mFp.Success) return DestroyCreatureCmcLimitSpell(resolver, WordToInt(mFp.Groups["n"].Value));
 
         if (DestroyCreature.IsMatch(text)) return DestroyCreatureSpell(resolver);
+        // "Destroy up to N target artifacts and/or enchantments." — must precede
+        // the single-target DestroyArtifactEnchantment so Force of Vigor wins.
+        var mDestUp = DestroyUpToArtifactEnchantment.Match(text);
+        if (mDestUp.Success) return DestroyUpToArtifactEnchantmentSpell(resolver, WordToInt(mDestUp.Groups["n"].Value));
         if (DestroyArtifactEnchantment.IsMatch(text)) return DestroyArtifactOrEnchantmentSpell(resolver);
 
         m = DrawCards.Match(text);
@@ -1228,6 +1237,42 @@ public static class OracleSpellBinder
             return new IEffect[] { new Effect("destroy artifact/enchantment", () =>
             {
                 if (target is ICard card) MoveToGraveyard(card);
+            }) };
+        });
+
+    /// <summary>
+    /// "Destroy up to N target artifacts and/or enchantments." (Force of Vigor
+    /// template). MinTargets = 0 so the spell is legal with no targets chosen.
+    /// CR 601.2c — "up to N" allows 0 through N legal targets.
+    /// </summary>
+    private static SpellDefinition DestroyUpToArtifactEnchantmentSpell(
+        Func<object, object> resolver, int maxN) => new(
+        Modes: Array.Empty<string>(), HasVariableX: false,
+        TargetRequests: new[]
+        {
+            new TargetRequest(
+                $"up to {maxN} target artifacts and/or enchantments",
+                MinTargets: 0,
+                MaxTargets: maxN,
+                LegalCandidates: Array.Empty<object>()),
+        },
+        EffectFactory: p =>
+        {
+            // Resolve all target references eagerly before returning the effect.
+            var targets = p.Targets[0]
+                .Select(t => resolver(t))
+                .ToList();
+            return new IEffect[] { new Effect($"destroy up to {maxN} artifact/enchantment", () =>
+            {
+                foreach (var resolved in targets)
+                {
+                    if (resolved is ICard card
+                        && (card.HasType(Majik.Core.Cards.Types.CardType.Artifact)
+                            || card.HasType(Majik.Core.Cards.Types.CardType.Enchantment)))
+                    {
+                        MoveToGraveyard(card);
+                    }
+                }
             }) };
         });
 
