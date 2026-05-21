@@ -61,6 +61,18 @@ internal static class DamageSpellFactory
             // Real wiring: GameContext.AllPlayers iterates and applies.
         }) });
 
+    internal static SpellDefinition DamageCreatureSpell(int n, Func<object, object> resolver) => new(
+        Modes: Array.Empty<string>(), HasVariableX: false,
+        TargetRequests: new[] { new TargetRequest("target creature", 1, 1, Array.Empty<object>()) },
+        EffectFactory: p =>
+        {
+            var target = resolver(p.Targets[0][0]);
+            return new IEffect[] { new Effect($"deal {n} to creature", () =>
+            {
+                if (target is Creature creature) creature.TakeDamage(n);
+            }) };
+        });
+
     internal static SpellDefinition DealsXAnyTargetSpell(Func<object, object> resolver) => new(
         Modes: Array.Empty<string>(), HasVariableX: true,
         TargetRequests: new[] { new TargetRequest("any target", 1, 1, Array.Empty<object>()) },
