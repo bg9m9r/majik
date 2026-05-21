@@ -17,8 +17,16 @@ namespace Majik.Core.CardData.SpellTemplates.Templates.Library;
 /// </summary>
 public sealed class ReanimateToBattlefieldTemplate : ISpellTemplate
 {
+    // Mirrors the broadening done on ReanimateFromGraveyardTemplate. Accepts
+    // "up to N", "X target", "any number of target", plural "cards",
+    // multi-token kinds (artifact or enchantment, creature or Vehicle,
+    // permanent, non-Aura enchantment, etc), and trailing inline filters
+    // (mana value clauses, "with different names", "with total power N or
+    // less", etc). Runtime stub reanimates ONE chosen target — v1
+    // simplification for multi-target wordings. Mana-value / power / name
+    // restrictions are lossy at v1.
     private static readonly Regex Pattern = new(
-        @"return\s+target\s+(?<kind>card|creature|instant|sorcery|artifact|enchantment|planeswalker|land)?\s*card\s+from\s+your\s+graveyard\s+to\s+the\s+battlefield",
+        @"return\s+(?:(?:up\s+to\s+|any\s+number\s+of\s+)?(?:one|two|three|four|five|six|seven|eight|nine|ten|x)\s+)?target\s+(?<kind>(?:[\w-]+(?:\s+(?:or|and)\s+[\w-]+)*)?)\s*cards?\s+(?:[\w\s,-]*?\s+)?from\s+(?:your|a|an\s+opponent'?s?)\s+graveyard\s+to\s+the\s+battlefield",
         RegexOptions.IgnoreCase);
 
     public int Priority => 50;
