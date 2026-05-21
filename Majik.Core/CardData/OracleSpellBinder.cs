@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using Majik.Core.Abilities;
 using Majik.Core.CardData.Database;
+using Majik.Core.CardData.SpellTemplates;
 using Majik.Core.Cards;
 using Majik.Core.Game;
 using Majik.Core.Keywords;
@@ -33,6 +34,9 @@ namespace Majik.Core.CardData;
 /// </summary>
 public static class OracleSpellBinder
 {
+    internal static SpellTemplateRegistry Registry { get; } =
+        new SpellTemplateRegistry(new List<ISpellTemplate>());
+
     private static readonly Regex DamageAnyTarget = new(
         @"deals?\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+damage\s+to\s+any\s+target",
         RegexOptions.IgnoreCase);
@@ -279,6 +283,11 @@ public static class OracleSpellBinder
         if (entity == null) throw new ArgumentNullException(nameof(entity));
         if (caster == null) throw new ArgumentNullException(nameof(caster));
         if (resolver == null) throw new ArgumentNullException(nameof(resolver));
+
+        // New path: try the template registry first. Empty today, populated
+        // task-by-task. Null result falls through to the legacy chain below.
+        var ctx = new SpellBindContext(entity, caster, resolver, effects, stack);
+        if (Registry.TryBind(ctx) is { } fromRegistry) return fromRegistry;
 
         var text = entity.OracleText ?? string.Empty;
 
