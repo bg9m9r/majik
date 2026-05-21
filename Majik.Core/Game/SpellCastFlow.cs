@@ -124,7 +124,7 @@ public sealed class SpellCastFlow
 
         var mana = await agent.ChooseManaSourcesAsync(ctx, totalCost, ct);
 
-        var chosen = new ChosenSpellParams(mode, xValue, collectedTargets, mana);
+        var chosen = new ChosenSpellParams(mode, xValue, collectedTargets, mana, ctx.AllPlayers);
         var effects = definition.EffectFactory(chosen);
 
         // If casting via alternative cost (e.g. Flashback), card may not be in

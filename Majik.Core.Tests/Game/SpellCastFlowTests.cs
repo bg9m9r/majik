@@ -123,6 +123,26 @@ public class SpellCastFlowTests
         capturedMode.Should().Be(1);
     }
 
+    [Fact]
+    public async Task CastAsync_ForwardsAllPlayersIntoChosenParams()
+    {
+        var spell = new Instant("AOE", "1B") { Owner = _alice, Zone = ZoneType.Hand };
+        var agent = new ScriptedAgent();
+        agent.QueueMana(ManaPayment.Empty);
+
+        IReadOnlyList<Player>? capturedAllPlayers = null;
+        var def = SpellDefinition.Vanilla(p =>
+        {
+            capturedAllPlayers = p.AllPlayers;
+            return Array.Empty<IEffect>();
+        });
+
+        await _flow.CastAsync(_alice, spell, def, agent, NewContext());
+
+        capturedAllPlayers.Should().NotBeNull();
+        capturedAllPlayers!.Should().BeEquivalentTo(new[] { _alice, _bob });
+    }
+
     private GameContext NewContext() =>
         new(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
 }
