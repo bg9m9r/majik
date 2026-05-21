@@ -1,6 +1,7 @@
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Costs;
 using Majik.Core.Players;
 using Majik.Core.Services;
 using Majik.Core.Zones;
@@ -89,8 +90,8 @@ public static class TokenFactory
         return token;
     }
 
-    /// <summary>Clue token. Sac+draw is the canonical effect; activated
-    /// ability binder will wire {2}, Sacrifice: Draw a card later.</summary>
+    /// <summary>Clue token (CR 111.10): colourless artifact with
+    /// "{2}, Sacrifice this artifact: Draw a card."</summary>
     public static Artifact CreateClue(Player controller, ZoneService? zones = null)
     {
         if (controller == null) throw new ArgumentNullException(nameof(controller));
@@ -101,14 +102,16 @@ public static class TokenFactory
             Controller = controller,
             IsToken = true,
         };
+
+        // {2}, Sacrifice this artifact: Draw a card.
+        token.AddAbility(BuildClueDrawAbility(token, controller));
+
         PutOnBattlefield(token, controller, zones);
         return token;
     }
 
-    /// <summary>Food (CR 111.10): colorless artifact token. The
-    /// "{2}, {T}, Sacrifice this artifact: You gain 3 life." activated
-    /// ability is wired by the activated-ability binder; this factory
-    /// produces the bare token.</summary>
+    /// <summary>Food (CR 111.10): colorless artifact token with
+    /// "{2}, {T}, Sacrifice this artifact: You gain 3 life."</summary>
     public static Artifact CreateFood(Player controller, ZoneService? zones = null)
     {
         if (controller == null) throw new ArgumentNullException(nameof(controller));
@@ -119,8 +122,55 @@ public static class TokenFactory
             Controller = controller,
             IsToken = true,
         };
+
+        // {2}, {T}, Sacrifice this artifact: You gain 3 life.
+        token.AddAbility(BuildFoodGainLifeAbility(token, controller));
+
         PutOnBattlefield(token, controller, zones);
         return token;
+    }
+
+    /// <summary>"{2}, Sacrifice this artifact: Draw a card." — Clue ability.</summary>
+    private static ActivatedAbility BuildClueDrawAbility(Artifact source, Player controller)
+    {
+        var costs = new ICost[]
+        {
+            new ManaCostCost(ValueObjects.ManaCost.Parse("2")),
+            AdditionalCost.Sacrifice(source),
+        };
+        var effects = new IEffect[]
+        {
+            new Effect("draw 1 from Clue", () => DrawOneCard(controller)),
+        };
+        return new ActivatedAbility(source, controller, costs: costs, effects: effects);
+    }
+
+    /// <summary>"{2}, {T}, Sacrifice this artifact: You gain 3 life." — Food ability.</summary>
+    private static ActivatedAbility BuildFoodGainLifeAbility(Artifact source, Player controller)
+    {
+        var costs = new ICost[]
+        {
+            new ManaCostCost(ValueObjects.ManaCost.Parse("2")),
+            AdditionalCost.Tap(source),
+            AdditionalCost.Sacrifice(source),
+        };
+        var effects = new IEffect[]
+        {
+            new Effect("Food: gain 3 life", () => controller.GainLife(3)),
+        };
+        return new ActivatedAbility(source, controller, costs: costs, effects: effects);
+    }
+
+    /// <summary>Move the top card of <paramref name="player"/>'s library to
+    /// their hand (CR 121.2). No-ops silently if the library is empty
+    /// (empty-library state-loss is handled by SBAs, not here).</summary>
+    private static void DrawOneCard(Player player)
+    {
+        var top = player.Zones.Library.GetCards().FirstOrDefault();
+        if (top == null) return;
+        player.Zones.Library.RemoveCard(top);
+        player.Zones.Hand.AddCard(top);
+        top.SetZone(ZoneType.Hand);
     }
 
     private static void PutOnBattlefield(Artifact token, Player controller, ZoneService? zones)

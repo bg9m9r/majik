@@ -7,7 +7,7 @@ namespace Majik.Core.Abilities;
 /// <summary>
 /// Interface for activated abilities on the stack.
 /// </summary>
-public interface IActivatedAbility : IStackObject
+public interface IActivatedAbility : IStackObject, IAbility
 {
     /// <summary>
     /// The source of this ability (card or permanent).

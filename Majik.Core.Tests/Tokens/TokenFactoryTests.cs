@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Events;
@@ -75,5 +76,63 @@ public class TokenFactoryTests
         food.Subtypes.Should().Contain(CardSubtype.Food);
         food.Zone.Should().Be(ZoneType.Battlefield);
         _alice.Zones.Battlefield.GetCards().Should().Contain(food);
+    }
+
+    // ── Clue activated ability ────────────────────────────────────────────────
+
+    [Fact]
+    public void CreateClue_HasSacForDrawAbility()
+    {
+        var alice = new Player("Alice", 20);
+        var clue = TokenFactory.CreateClue(alice);
+
+        clue.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1);
+        var ability = clue.Abilities.OfType<ActivatedAbility>().Single();
+        ability.Costs.Should().HaveCount(2);   // {2} mana + sacrifice
+        ability.Effects.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public void CreateClue_DrawAbility_ResolvesDrawsACard()
+    {
+        var alice = new Player("Alice", 20);
+        var topCard = new Card("Top Card", "");
+        alice.Zones.Library.AddCard(topCard);
+        topCard.SetZone(ZoneType.Library);
+
+        var clue = TokenFactory.CreateClue(alice);
+        var ability = clue.Abilities.OfType<ActivatedAbility>().Single();
+
+        // Execute effects only — skip cost payment to keep the test pure.
+        foreach (var e in ability.Effects) e.Execute();
+
+        alice.Zones.Hand.GetCards().Should().Contain(topCard);
+        alice.Zones.Library.GetCards().Should().NotContain(topCard);
+    }
+
+    // ── Food activated ability ────────────────────────────────────────────────
+
+    [Fact]
+    public void CreateFood_HasTapManaSacForLifeAbility()
+    {
+        var alice = new Player("Alice", 20);
+        var food = TokenFactory.CreateFood(alice);
+
+        food.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1);
+        var ability = food.Abilities.OfType<ActivatedAbility>().Single();
+        ability.Costs.Should().HaveCount(3);   // {2} mana + tap + sacrifice
+        ability.Effects.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public void CreateFood_GainLifeAbility_GainsThreeLifeOnResolution()
+    {
+        var alice = new Player("Alice", 20);
+        var food = TokenFactory.CreateFood(alice);
+
+        var ability = food.Abilities.OfType<ActivatedAbility>().Single();
+        foreach (var e in ability.Effects) e.Execute();
+
+        alice.LifeTotal.Should().Be(23);
     }
 }
