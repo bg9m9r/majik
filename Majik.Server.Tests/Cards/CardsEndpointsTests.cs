@@ -125,13 +125,15 @@ public class CardsEndpointsTests : IDisposable
     }
 
     [Fact]
-    public async Task GetCards_WithQuery_FiltersSubstring()
+    public async Task GetCards_WithQuery_FiltersByNamePrefix()
     {
+        // Prefix-only LIKE so the IX_Cards_Name_NoCase index applies. Matches
+        // "Bear Cub" but not "Grizzly Bears" — see DbCardRepository.Search.
         using var f = Factory();
         var resp = await Authed(f, "stub-alice").GetAsync("/cards?q=bear");
         var body = await resp.Content.ReadFromJsonAsync<IReadOnlyList<CardDto>>();
         body!.Select(c => c.Name)
-             .Should().BeEquivalentTo(new[] { "Bear Cub", "Grizzly Bears" });
+             .Should().BeEquivalentTo(new[] { "Bear Cub" });
     }
 
     [Fact]

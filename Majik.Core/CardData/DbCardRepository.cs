@@ -97,7 +97,14 @@ public sealed class DbCardRepository : ICardRepository
             if (!string.IsNullOrWhiteSpace(q))
             {
                 var needle = q.Trim();
-                query = query.Where(c => EF.Functions.Like(c.Name, $"%{needle}%"));
+                // Prefix-only match so SQLite can use IX_Cards_Name_NoCase
+                // (created at server startup). Leading-wildcard LIKE forces
+                // a full table scan over 522k rows — measured at 2.4s cold
+                // on Render Starter. Prefix LIKE with a NOCASE index drops
+                // the same query to single-digit milliseconds. Users typing
+                // mid-name substrings is rare enough that the UX hit is
+                // acceptable; the alternative is FTS5 (more work).
+                query = query.Where(c => EF.Functions.Like(c.Name, $"{needle}%"));
             }
             if (implementedOnly)
                 query = query.Where(c => c.IsImplemented);

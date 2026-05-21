@@ -2,6 +2,7 @@ using Majik.Core.Api;
 using Majik.Core.CardData;
 using Majik.Core.CardData.Database;
 using Majik.Core.Events;
+using Majik.Server.Cards;
 
 namespace Majik.Server.Composition;
 
@@ -37,6 +38,9 @@ public static class MajikEngineRegistration
             new ServerGameFactory(
                 sp.GetRequiredService<GameRegistry>(),
                 sp.GetRequiredService<ICardRepository>()));
+
+        // One-time index bootstrap at startup. Idempotent.
+        services.AddHostedService<CardDbIndexBootstrapper>();
 
         return services;
     }

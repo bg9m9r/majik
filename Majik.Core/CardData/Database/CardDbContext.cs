@@ -26,6 +26,9 @@ public class CardDbContext : DbContext
             var dbPath = GetDatabasePath();
             optionsBuilder.UseSqlite($"Data Source={dbPath}");
         }
+        // Always install the pragma interceptor — applies to test fixtures
+        // and production alike. See SqlitePragmaInterceptor for rationale.
+        optionsBuilder.AddInterceptors(new SqlitePragmaInterceptor());
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
