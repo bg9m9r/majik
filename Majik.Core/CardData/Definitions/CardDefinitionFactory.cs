@@ -110,9 +110,31 @@ public static class CardDefinitionFactory
         {
             ManaCostDef mana => new ManaCostCost(mana.Amount),
             RemoveCounterCostDef rc => BuildRemoveCounterCost(rc, card),
+            TapSelfCostDef => BuildTapSelfCost(card),
+            SacrificeSelfCostDef => BuildSacrificeSelfCost(card),
             _ => throw new NotSupportedException(
                 $"Cost '{definition.GetType().Name}' is not yet supported by CardDefinitionFactory."),
         };
+
+    private static ICost BuildTapSelfCost(ICard card)
+    {
+        if (card is not Permanent permanent)
+        {
+            throw new InvalidOperationException(
+                $"Card '{card.Name}' is not a Permanent — cannot pay {{T}} as a cost.");
+        }
+        return AdditionalCost.Tap(permanent);
+    }
+
+    private static ICost BuildSacrificeSelfCost(ICard card)
+    {
+        if (card is not Permanent permanent)
+        {
+            throw new InvalidOperationException(
+                $"Card '{card.Name}' is not a Permanent — cannot pay 'sacrifice this' as a cost.");
+        }
+        return AdditionalCost.Sacrifice(permanent);
+    }
 
     private static ICost BuildRemoveCounterCost(RemoveCounterCostDef def, ICard card)
     {
@@ -139,9 +161,28 @@ public static class CardDefinitionFactory
         {
             PutCounterEffectDef put => BuildPutCounterEffect(put, card),
             DealDamageStubEffectDef stub => BuildDealDamageStubEffect(stub, card),
+            DrawCardEffectDef draw => BuildDrawCardEffect(draw, card, controller),
             _ => throw new NotSupportedException(
                 $"Effect '{definition.GetType().Name}' is not yet supported by CardDefinitionFactory."),
         };
+
+    private static IEffect BuildDrawCardEffect(DrawCardEffectDef def, ICard card, Player controller)
+    {
+        var amount = def.Amount;
+        return new Effect(
+            $"{card.Name}: draw {amount} card(s)",
+            () =>
+            {
+                for (var i = 0; i < amount; i++)
+                {
+                    var top = controller.Zones.Library.GetCards().FirstOrDefault();
+                    if (top == null) return; // empty library — SBAs handle loss elsewhere
+                    controller.Zones.Library.RemoveCard(top);
+                    controller.Zones.Hand.AddCard(top);
+                    top.SetZone(Majik.Core.Zones.ZoneType.Hand);
+                }
+            });
+    }
 
     private static IEffect BuildPutCounterEffect(PutCounterEffectDef def, ICard card)
     {

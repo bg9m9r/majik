@@ -11,6 +11,8 @@ namespace Majik.Core.CardData.Definitions;
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "type")]
 [JsonDerivedType(typeof(ManaCostDef), "mana")]
 [JsonDerivedType(typeof(RemoveCounterCostDef), "remove_counter")]
+[JsonDerivedType(typeof(TapSelfCostDef), "tap_self")]
+[JsonDerivedType(typeof(SacrificeSelfCostDef), "sacrifice_self")]
 public abstract class CostDefinition { }
 
 /// <summary>Mana cost — parsed via <see cref="Majik.Core.ValueObjects.ManaCost.Parse"/>.
@@ -33,3 +35,12 @@ public sealed class RemoveCounterCostDef : CostDefinition
     public int Amount { get; set; } = 1;
     public string From { get; set; } = "self";
 }
+
+/// <summary>Tap this permanent ({T}) — CR 605 standard ability cost.
+/// No additional fields because the cost always targets the activating
+/// permanent itself.</summary>
+public sealed class TapSelfCostDef : CostDefinition { }
+
+/// <summary>Sacrifice this permanent — CR 701.16. No additional fields;
+/// the cost always targets the activating permanent itself.</summary>
+public sealed class SacrificeSelfCostDef : CostDefinition { }
