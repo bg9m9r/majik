@@ -38,11 +38,118 @@ public sealed class ClauseCompositionTemplate : ISpellTemplate
 
     private static readonly Regex[] NoopClauses = new[]
     {
+        // Regeneration / prevention bypass riders (creature kill spells).
         new Regex(@"^(it|they|that\s+creature|those\s+creatures)\s+can'?t\s+be\s+regenerated$",
             RegexOptions.IgnoreCase | RegexOptions.Compiled),
         new Regex(@"^this\s+damage\s+can'?t\s+be\s+prevented",
             RegexOptions.IgnoreCase | RegexOptions.Compiled),
         new Regex(@"^the\s+damage\s+can'?t\s+be\s+prevented",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        new Regex(@"^this\s+spell\s+can'?t\s+be\s+countered\b",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled),
+
+        // Keyword-ability declarations on instants / sorceries. The cast-time
+        // mechanics (alternate costs, recurrence, copy hooks) are evaluated
+        // by the keyword pipeline elsewhere; the appearance of the keyword
+        // as a clause inside oracle text doesn't add a resolution-time effect.
+        new Regex(@"^cycling\s+\{",       RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        new Regex(@"^flashback\s+\{",     RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        new Regex(@"^retrace$",           RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        new Regex(@"^rebound$",           RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        new Regex(@"^storm$",             RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        new Regex(@"^cipher$",            RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        new Regex(@"^jump-start$",        RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        new Regex(@"^conspire$",          RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        new Regex(@"^learn$",             RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        new Regex(@"^entwine\s+\{",       RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        new Regex(@"^buyback\s+\{",       RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        new Regex(@"^madness\s+\{",       RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        new Regex(@"^kicker\s+\{",        RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        new Regex(@"^multikicker\s+\{",   RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        new Regex(@"^splice\s+",          RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        new Regex(@"^suspend\s+",         RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        new Regex(@"^foretell\s+\{",      RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        new Regex(@"^the\s+ring\s+tempts\s+you$", RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        new Regex(@"^spell\s+mastery",    RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        new Regex(@"^domain\b",           RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        new Regex(@"^morbid\b",           RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        new Regex(@"^delirium\b",         RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        new Regex(@"^revolt\b",           RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        new Regex(@"^delve\b",            RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        new Regex(@"^convoke\b",          RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        new Regex(@"^awaken\s+\d+",       RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        new Regex(@"^bargain\b",          RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        new Regex(@"^escalate\s*[—\{]",   RegexOptions.IgnoreCase | RegexOptions.Compiled),
+
+        // Copy-spell pickers — riders that don't add a resolution effect.
+        new Regex(@"^you\s+may\s+choose\s+new\s+targets?\s+for\s+the\s+(?:copy|copies)",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        new Regex(@"^you\s+may\s+choose\s+the\s+same\s+mode\s+more\s+than\s+once",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled),
+
+        // Search/library plumbing bundled with tutoring effects.
+        new Regex(@"^then\s+shuffle$",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        new Regex(@"^then\s+that\s+player\s+shuffles$",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        new Regex(@"^if\s+you\s+search\s+your\s+library\s+this\s+way,?\s*shuffle$",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled),
+
+        // Pile-tail clauses from look-at-top variants.
+        new Regex(@"^put\s+the\s+rest\s+(?:on\s+the\s+bottom\s+of\s+your\s+library|into\s+your\s+graveyard)",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled),
+
+        // Exile-on-death/counter replacement riders (Pillar of Flame style).
+        // Lossy at v1 — main effect still resolves; replacement effect
+        // does not register.
+        new Regex(@"^if\s+(?:that\s+creature|a\s+creature\s+dealt\s+damage\s+this\s+way)\s+would\s+die\s+this\s+turn,?\s+exile\s+it\s+instead",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        new Regex(@"^if\s+that\s+spell\s+is\s+countered\s+this\s+way,?\s+exile\s+it\s+instead",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled),
+
+        // Anaphoric riders referencing the previous clause's target.
+        new Regex(@"^untap\s+(?:it|that\s+creature|that\s+permanent|those\s+creatures|that\s+artifact)$",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        new Regex(@"^(?:it|they|that\s+creature|those\s+creatures)\s+gains?\s+haste\s+until\s+end\s+of\s+turn",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        new Regex(@"^exile\s+(?:it|that\s+creature|that\s+permanent)\s+at\s+the\s+beginning\s+of\s+the\s+next\s+end\s+step",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled),
+
+        // Choose-mode preamble. Per-mode bullets still bind separately.
+        new Regex(@"^choose\s+(?:one|two|three|one\s+or\s+more)(?:\s*—)?$",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled),
+
+        // Cast-time additional-cost riders. Cost enforced at cast, not
+        // at resolution.
+        new Regex(@"^as\s+an\s+additional\s+cost\s+to\s+cast\s+this\s+spell",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled),
+
+        // Combat-damage prevention riders.
+        new Regex(@"^prevent\s+all\s+combat\s+damage\s+that\s+would\s+be\s+dealt\s+this\s+turn",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled),
+
+        // "Look at the top N cards of your library" as a bare clause —
+        // when the head of an Impulse-style sequence already binds via
+        // LookAtTopPutOneInHand, the bare look-clause that some cards
+        // emit (e.g. Telling Time's secondary clauses) is a no-op
+        // because the actual pile manipulation lives in a later clause
+        // we can't safely model yet.
+        new Regex(@"^look\s+at\s+the\s+top\s+(?:\d+|x|one|two|three|four|five|six|seven|eight|nine|ten)\s+cards?\s+of\s+your\s+library$",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled),
+
+        // "Then ..." continuation clauses (search-tutor closure phrases
+        // bundled with library searches we already bind).
+        new Regex(@"^then\s+shuffle\s+your\s+library$",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled),
+
+        // Clash mechanic — affects nothing at resolution v1.
+        new Regex(@"^clash\s+with\s+an\s+opponent$",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled),
+
+        // Cast-time-only restrictions and self-referential preambles.
+        new Regex(@"^cast\s+this\s+spell\s+only\s+",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        new Regex(@"^you\s+may\s+cast\s+this\s+(?:spell|card)\s+",
             RegexOptions.IgnoreCase | RegexOptions.Compiled),
     };
 

@@ -10,8 +10,14 @@ public sealed class PumpCreatureTemplate : ISpellTemplate
     // "and gains <X>" is dropped at runtime — v1 stub only applies the
     // numeric pump. Granting a keyword until eot is a separate concern
     // (future: compose with a GrantKeywordTilEot effect in the resolved spell).
+    // Optional control modifier between "creature" and "gets"
+    // ("target creature you control gets +N/+N..." — Shore Up,
+    // Ranger's Guile; rarer "you don't control" / "an opponent controls"
+    // variants). v1 stub applies the pump regardless of control
+    // predicate; the modifier is informational at this layer (target
+    // legality lives in the predicate).
     private static readonly Regex Pattern = new(
-        @"target\s+creature\s+gets\s+\+(?<p>\d+)/\+(?<t>\d+)(?:\s+and\s+gains?\s+[\w\s,-]+?)?\s+until\s+end\s+of\s+turn",
+        @"target\s+creature(?:\s+(?:you\s+control|an\s+opponent\s+controls|you\s+don'?t\s+control))?\s+gets\s+\+(?<p>\d+)/\+(?<t>\d+)(?:\s+and\s+gains?\s+[\w\s,-]+?)?\s+until\s+end\s+of\s+turn",
         RegexOptions.IgnoreCase);
 
     public int Priority => 50;
