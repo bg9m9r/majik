@@ -67,6 +67,49 @@ public static class TokenFactory
         return token;
     }
 
+    /// <summary>Amass token (CR 701.49). Creates a 0/0 black [tribe] Army
+    /// creature token and puts it onto the battlefield.
+    /// Caller then adds +1/+1 counters via AmassAction.</summary>
+    public static Creature CreateArmy(
+        Player controller,
+        CardSubtype tribe,
+        ZoneService? zones = null)
+    {
+        if (controller == null) throw new ArgumentNullException(nameof(controller));
+
+        var subtypes = tribe == CardSubtype.Army
+            ? new[] { CardSubtype.Army }
+            : new[] { tribe, CardSubtype.Army };
+
+        var token = new Creature(
+            $"{tribe} Army", manaCost: "",
+            power: 0, toughness: 0,
+            subtypes: subtypes)
+        {
+            Owner = controller,
+            Controller = controller,
+            IsToken = true,
+            HasSummoningSickness = true,
+        };
+
+        // Use sentinel-library pattern so CardMovedEvent fires correctly.
+        token.SetZone(ZoneType.Library);
+        controller.Zones.Library.AddCard(token);
+
+        if (zones != null)
+        {
+            zones.MoveCardTo(token, ZoneType.Battlefield, controller);
+        }
+        else
+        {
+            controller.Zones.Library.RemoveCard(token);
+            token.SetZone(ZoneType.Battlefield);
+            controller.Zones.Battlefield.AddCard(token);
+        }
+
+        return token;
+    }
+
     /// <summary>Treasure (CR 111.10): colourless artifact token with
     /// "{T}, Sacrifice this artifact: Add one mana of any color." Bound as
     /// five ManaAbility options so the bot's mana picker can use a

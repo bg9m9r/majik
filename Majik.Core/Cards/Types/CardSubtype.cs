@@ -36,6 +36,7 @@ public enum CardSubtype
     Citizen,
     Orc,
     Archer,
+    Army,
 
     // Land subtypes (examples)
     Forest,
