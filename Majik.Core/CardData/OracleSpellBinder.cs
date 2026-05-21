@@ -111,6 +111,8 @@ public static class OracleSpellBinder
             new SpellTemplates.Templates.Misc.PutTargetOnBottomOfLibraryTemplate(),
             new SpellTemplates.Templates.Misc.TargetPlayerDrawsXTemplate(),
             new SpellTemplates.Templates.Misc.MixedSignPumpTemplate(),
+            new SpellTemplates.Templates.Misc.VarXPumpTemplate(),
+            new SpellTemplates.Templates.Misc.AddFixedManaTemplate(),
             new SpellTemplates.Templates.Bespoke.ThoughtseizePatternTemplate(),
             new SpellTemplates.Templates.Bespoke.MalevolentRumblePatternTemplate(),
             _composer,
