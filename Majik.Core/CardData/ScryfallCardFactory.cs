@@ -75,7 +75,13 @@ public sealed class ScryfallCardFactory
         }
         if (_replacements != null)
         {
-            ShockLandBinder.Bind(card, entity, _replacements);
+            // Shock-land first so its conditional ETB-tapped wins over the
+            // unconditional binder. EntersTappedBinder also short-circuits
+            // when "may pay" / "unless" / "if you don't" appear in the text.
+            if (!ShockLandBinder.Bind(card, entity, _replacements))
+            {
+                EntersTappedBinder.Bind(card, entity, _replacements);
+            }
         }
 
         return card;
