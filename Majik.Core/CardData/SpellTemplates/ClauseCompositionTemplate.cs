@@ -151,6 +151,27 @@ public sealed class ClauseCompositionTemplate : ISpellTemplate
             RegexOptions.IgnoreCase | RegexOptions.Compiled),
         new Regex(@"^you\s+may\s+cast\s+this\s+(?:spell|card)\s+",
             RegexOptions.IgnoreCase | RegexOptions.Compiled),
+
+        // Coercion-trio clauses (reveal + pick + discard) — anaphoric;
+        // each clause individually is information-only at v1.
+        new Regex(@"^target\s+(?:opponent|player)\s+reveals\s+their\s+hand$",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        new Regex(@"^you\s+choose\s+(?:a|an)\s+[\w\s,-]+\s+from\s+(?:it|that\s+player'?s?\s+hand)$",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        new Regex(@"^that\s+player\s+discards\s+that\s+card$",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled),
+
+        // Anaphoric riders on direct-damage spells.
+        new Regex(@"^its\s+controller\s+loses\s+\d+\s+life$",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled),
+
+        // Choice / preamble clauses that bind nothing on their own.
+        new Regex(@"^choose\s+(?:a\s+)?creature\s+type$",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        new Regex(@"^choose\s+target\s+creature$",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        new Regex(@"^choose\s+a\s+color$",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled),
     };
 
     // Late-bound to break the chicken-and-egg with the registry's

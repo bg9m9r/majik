@@ -8,11 +8,10 @@ using SysConsole = System.Console;
 namespace Majik.Console.Commands;
 
 /// <summary>
-/// One-off diagnostic — walks every instant/sorcery card, splits its
-/// oracle text into clauses (same split rules as
-/// <see cref="ClauseCompositionTemplate"/>), and reports the top
-/// unmatched clauses (no template's TryExtractParams accepts them).
-/// Use the output to pick the next high-yield template to add.
+/// Walks every instant/sorcery card. For cards composer fails on with
+/// 2+ clauses, groups the unmatched clause(s) and reports the top
+/// shapes — focusing on cards where exactly ONE clause is unmatched
+/// (i.e. adding one template/noop unlocks the whole card via composer).
 /// </summary>
 internal static class DiagnoseClausesCommand
 {
@@ -32,46 +31,72 @@ internal static class DiagnoseClausesCommand
             .Select(g => g.First()).ToList();
 
         var registry = OracleSpellBinder.Registry;
-        var unmatched = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var composer = registry.OrderedTemplates.First(t => t.Name == "ClauseComposition");
+
+        var failedCards = new List<(string name, List<string> unmatched, List<string> matched)>();
 
         foreach (var e in entities)
         {
             var oracle = e.OracleText ?? "";
+            if (composer.TryExtractParams(oracle) is not null) continue; // composer binds — skip
+
+            // Also skip cards that any single-template already binds —
+            // they're already counted in coverage; what we want is cards
+            // that bind via NOTHING today but are one clause away.
+            bool anySingleMatch = false;
+            foreach (var t in registry.OrderedTemplates)
+            {
+                if (t.Name == "ClauseComposition") continue;
+                if (t.TryExtractParams(oracle) is not null) { anySingleMatch = true; break; }
+            }
+            if (anySingleMatch) continue;
+
             var cleaned = ReminderText.Replace(oracle, " ");
             cleaned = cleaned.Replace('\n', ' ');
             cleaned = Whitespace.Replace(cleaned, " ").Trim();
             var clauses = cleaned.Split('.', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
             if (clauses.Length < 2) continue;
 
-            foreach (var raw in clauses)
+            var unmatched = new List<string>();
+            var matched = new List<string>();
+            foreach (var c in clauses)
             {
-                var c = raw.Trim();
-                if (c.Length < 4) continue;
-
-                bool matched = false;
+                var clause = c.Trim();
+                if (clause.Length < 3) continue;
+                bool ok = false;
                 foreach (var t in registry.OrderedTemplates)
                 {
                     if (t.Name == "ClauseComposition") continue;
-                    if (t.TryExtractParams(c + ".") is not null) { matched = true; break; }
+                    if (t.TryExtractParams(clause + ".") is not null) { ok = true; matched.Add(t.Name); break; }
                 }
-                if (matched) continue;
-
-                // Normalize for grouping — keep only the first 80 chars,
-                // collapse numbers/specific tokens to placeholders.
-                var key = Normalize(c);
-                unmatched[key] = unmatched.GetValueOrDefault(key) + 1;
+                if (!ok) unmatched.Add(clause);
             }
+
+            failedCards.Add((e.Name, unmatched, matched));
         }
 
-        SysConsole.WriteLine($"Distinct unmatched clause forms: {unmatched.Count}");
-        SysConsole.WriteLine($"Top {top} by frequency:");
-        foreach (var kv in unmatched.OrderByDescending(k => k.Value).Take(top))
+        var oneOff = failedCards
+            .Where(t => t.unmatched.Count == 1 && t.matched.Count >= 1)
+            .ToList();
+
+        SysConsole.WriteLine($"Total cards composer fails (2+ clauses): {failedCards.Count}");
+        SysConsole.WriteLine($"One-clause-away cards: {oneOff.Count}");
+        SysConsole.WriteLine();
+
+        var byKey = oneOff
+            .GroupBy(t => Normalize(t.unmatched[0]), StringComparer.OrdinalIgnoreCase)
+            .OrderByDescending(g => g.Count())
+            .Take(top);
+
+        SysConsole.WriteLine($"Top {top} unmatched clauses where one template would unlock the card:");
+        foreach (var g in byKey)
         {
-            SysConsole.WriteLine($"  {kv.Value,5}  {kv.Key}");
+            var sample = g.First();
+            SysConsole.WriteLine($"  {g.Count(),5}  {g.Key}");
+            SysConsole.WriteLine($"        e.g. {sample.name}");
         }
     }
 
-    // Collapse numerics and quoted card names so similar clauses group.
     private static readonly Regex NumberRx = new(@"\b\d+\b", RegexOptions.Compiled);
     private static string Normalize(string clause)
     {
