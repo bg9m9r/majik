@@ -22,6 +22,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Majik.Bot\Majik.Bot.csproj" />
+    <ProjectReference Include="..\Majik.Bot.Tests\Majik.Bot.Tests.csproj" />
     <ProjectReference Include="..\Majik.Core\Majik.Core.csproj" />
     <ProjectReference Include="..\Majik.Core.Api\Majik.Core.Api.csproj" />
   </ItemGroup>
