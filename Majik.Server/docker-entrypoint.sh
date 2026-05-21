@@ -31,6 +31,17 @@ else
     else
         url="https://github.com/${SEED_REPO}/releases/download/${SEED_TAG}/cards.db"
         echo "[cards-seed] downloading $url" >&2
+
+        # Delete the existing seed + tag BEFORE downloading so the new
+        # file doesn't have to coexist with the old one on disk during
+        # the download (avoids ENOSPC on small persistent disks).
+        # Also clean up any leftover tmp files from previous failed
+        # attempts so they don't accumulate.
+        if [ -s "$SEED_FILE" ]; then
+            echo "[cards-seed] removing stale seed ($(stat -c%s "$SEED_FILE" 2>/dev/null || echo '?') bytes)" >&2
+        fi
+        rm -f "$SEED_FILE" "$TAG_FILE" "$SEED_DIR"/cards.db.* 2>/dev/null || true
+
         tmp="$(mktemp -p "$SEED_DIR" cards.db.XXXXXX)"
         if curl -fL --retry 3 --retry-delay 5 "$url" -o "$tmp"; then
             mv "$tmp" "$SEED_FILE"
@@ -38,10 +49,8 @@ else
             echo "[cards-seed] installed tag=$SEED_TAG ($(stat -c%s "$SEED_FILE" 2>/dev/null || echo '?') bytes)" >&2
         else
             rm -f "$tmp"
-            echo "[cards-seed] download failed — leaving existing seed in place." >&2
-            # Don't kill boot if download fails and we already have *some* seed.
-            # Card endpoints will just serve stale data until the next deploy.
-            [ -s "$SEED_FILE" ] || { echo "[cards-seed] no usable seed; aborting." >&2; exit 1; }
+            echo "[cards-seed] download failed AND old seed was already removed — aborting boot." >&2
+            exit 1
         fi
     fi
 fi
