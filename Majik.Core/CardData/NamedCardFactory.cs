@@ -32,6 +32,7 @@ public static class NamedCardFactory
             "Plains"   => Land(name, CardSubtype.Plains),
             "Island"   => Land(name, CardSubtype.Island),
             "Swamp"    => Land(name, CardSubtype.Swamp),
+            "Wastes"   => Land(name, CardSubtype.Wastes),
 
             // A few common vanilla creatures the test suite relies on.
             "Grizzly Bears"   => new Creature(name, "1G", 2, 2),
@@ -61,6 +62,7 @@ public static class NamedCardFactory
                   : land.HasSubtype(CardSubtype.Plains)   ? "W"
                   : land.HasSubtype(CardSubtype.Island)   ? "U"
                   : land.HasSubtype(CardSubtype.Swamp)    ? "B"
+                  : land.HasSubtype(CardSubtype.Wastes)   ? "C"
                   : null;
 
         if (color != null)

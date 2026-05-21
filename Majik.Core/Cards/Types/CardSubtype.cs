@@ -35,6 +35,7 @@ public enum CardSubtype
     Mountain,
     Plains,
     Swamp,
+    Wastes,
     Desert,
     Gate,
     Lair,

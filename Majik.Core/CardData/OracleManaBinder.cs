@@ -29,6 +29,7 @@ public static class OracleManaBinder
         [CardSubtype.Plains] = "W",
         [CardSubtype.Island] = "U",
         [CardSubtype.Swamp] = "B",
+        [CardSubtype.Wastes] = "C",
     };
 
     // {T}: Add {R}.  or  {T}: Add {R}{R}.  or  {T}: Add one {G}.
@@ -48,6 +49,18 @@ public static class OracleManaBinder
     private static readonly Regex TapForAnyColorRegex = new(
         @"\{T\}\s*:\s*Add\s+one\s+mana\s+of\s+any\s+color",
         RegexOptions.IgnoreCase);
+
+    /// <summary>
+    /// Attaches the correct <see cref="ManaAbility"/> to a basic land that
+    /// already has its controller set. Idempotent — if the card is not a
+    /// Basic land with a known subtype, nothing is added.
+    /// </summary>
+    public static bool BindBasicLandMana(ICard card, Player controller)
+    {
+        if (card == null) throw new ArgumentNullException(nameof(card));
+        if (controller == null) throw new ArgumentNullException(nameof(controller));
+        return TryBindBasicLand(card, controller);
+    }
 
     public static void Bind(ICard card, CardEntity entity, Player controller)
     {

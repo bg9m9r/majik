@@ -2,6 +2,7 @@ using System.Text.Json;
 using Majik.Core.Abilities;
 using Majik.Core.Api.Commands;
 using Majik.Core.Api.Dtos;
+using Majik.Core.CardData;
 using Majik.Core.Cards;
 using Majik.Core.Combat;
 using Majik.Core.Events;
@@ -101,10 +102,14 @@ public sealed class GameFacade
 
         foreach (var card in aliceDeck)
         {
+            card.SetOwner(alice);
+            OracleManaBinder.BindBasicLandMana(card, alice);
             alice.Zones.GetZone(ZoneType.Library).AddCard(card);
         }
         foreach (var card in bobDeck)
         {
+            card.SetOwner(bob);
+            OracleManaBinder.BindBasicLandMana(card, bob);
             bob.Zones.GetZone(ZoneType.Library).AddCard(card);
         }
 

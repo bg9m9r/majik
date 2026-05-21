@@ -9,7 +9,7 @@ public static class SeedImplementedCards
     public static readonly IReadOnlyList<string> Names = new[]
     {
         // Basic lands
-        "Plains", "Island", "Swamp", "Mountain", "Forest",
+        "Plains", "Island", "Swamp", "Mountain", "Forest", "Wastes",
         // Vanilla creatures
         "Grizzly Bears", "Hill Giant", "Bear Cub", "Savannah Lions",
         "Goblin Piker", "Walking Corpse", "Phantom Warrior",
