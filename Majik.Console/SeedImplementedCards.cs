@@ -91,5 +91,17 @@ public static class SeedImplementedCards
         // {1}, {T}, Sacrifice: Draw a card — wired.
         // "Counter free spells" triggered ability deferred.
         "Vexing Bauble",
+
+        // Sorcery — {1}{G} (OracleSpellBinder: MalevolentRumblePattern).
+        // Reveal top 4, auto-pick first permanent → hand, rest → graveyard,
+        // create 1 Eldrazi Spawn 0/1 token (ManaAbility {C}).
+        // "You may" opt-out + real player choice deferred.
+        "Malevolent Rumble",
+
+        // Enchantment — {1}{G} (DredgersInsightFactory).
+        // ETB: mill 4, auto-pick first artifact/creature/land → hand.
+        // Lifegain trigger: artifact/creature leaves controller's graveyard → gain 1 life.
+        // "You may" opt-out + batched simultaneous-leavers deferred.
+        "Dredger's Insight",
     };
 }

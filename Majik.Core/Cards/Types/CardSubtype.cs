@@ -65,6 +65,11 @@ public enum CardSubtype
     Blood,
     Powerstone,
 
+    // Eldrazi creature subtypes (CR 205.3m)
+    Eldrazi,
+    Spawn,
+    Scion,
+
     // Planeswalker subtypes (examples)
     Ajani,
     Ashiok,

@@ -77,6 +77,12 @@ public static class NamedCardFactory
             // "Counter free spells" triggered ability deferred.
             "Vexing Bauble" => VexingBaubleFactory.Create(owner),
 
+            // Enchantment — {1}{G} (DredgersInsightFactory).
+            // ETB: mill 4, auto-pick first artifact/creature/land → hand.
+            // Lifegain trigger: artifact/creature leaves controller's graveyard → gain 1 life.
+            // "You may put …" opt-out + batched simultaneous-leavers deferred.
+            "Dredger's Insight" => DredgersInsightFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 

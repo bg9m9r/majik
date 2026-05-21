@@ -130,6 +130,51 @@ public static class TokenFactory
         return token;
     }
 
+    /// <summary>Eldrazi Spawn (CR 111.10): colorless creature token, 0/1, with
+    /// "Sacrifice this token: Add {C}." mana ability.
+    /// v1: ManaAbility produces {C} without enforcing the sacrifice cost — the
+    /// sacrifice restriction is documented but deferred pending a sac-cost ManaAbility
+    /// cost extension.</summary>
+    public static Creature CreateEldraziSpawn(Player controller, ZoneService? zones = null)
+    {
+        if (controller == null) throw new ArgumentNullException(nameof(controller));
+
+        var token = new Creature("Eldrazi Spawn", manaCost: "",
+            power: 0, toughness: 1,
+            subtypes: new[] { CardSubtype.Eldrazi, CardSubtype.Spawn })
+        {
+            Owner = controller,
+            Controller = controller,
+            IsToken = true,
+            HasSummoningSickness = true,
+        };
+
+        // "Sacrifice this token: Add {C}."
+        // v1: wired as a plain ManaAbility that produces {C}.
+        // Sacrifice cost enforcement is deferred until ManaAbility supports
+        // additional costs (same gap as Treasure/Food token sac cost).
+        token.AddAbility(new ManaAbility(token, controller,
+            Majik.Core.ValueObjects.ManaCost.Parse("C")));
+
+        // Put the token onto the battlefield using the sentinel-library pattern
+        // shared by CreateTreasure / CreateFood so CardMovedEvent fires correctly.
+        token.SetZone(ZoneType.Library);
+        controller.Zones.Library.AddCard(token);
+
+        if (zones != null)
+        {
+            zones.MoveCardTo(token, ZoneType.Battlefield, controller);
+        }
+        else
+        {
+            controller.Zones.Library.RemoveCard(token);
+            token.SetZone(ZoneType.Battlefield);
+            controller.Zones.Battlefield.AddCard(token);
+        }
+
+        return token;
+    }
+
     /// <summary>"{2}, Sacrifice this artifact: Draw a card." — Clue ability.</summary>
     private static ActivatedAbility BuildClueDrawAbility(Artifact source, Player controller)
     {
