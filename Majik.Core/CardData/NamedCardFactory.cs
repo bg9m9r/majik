@@ -43,6 +43,7 @@ public static class NamedCardFactory
 
             // Named-card factories — fully-wired cards with real abilities.
             "Walking Ballista" => WalkingBallistaFactory.Create(owner),
+            "Yawgmoth, Thran Physician" => YawgmothFactory.Create(owner),
 
             _ => new Card(name, ""),
         };

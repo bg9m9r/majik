@@ -37,5 +37,9 @@ public static class SeedImplementedCards
         // Artifact Creature — Construct 0/0 (WalkingBallistaFactory).
         // {4} grow and counter-removal ping wired; ETB X counters + sorcery-speed + ping targeting deferred.
         "Walking Ballista",
+        // Legendary Creature — Phyrexian Human Cleric 2/4 (YawgmothFactory).
+        // Pay 1 life + sacrifice another creature; effects 1+2+4 wired (lose life, discard, draw).
+        // Protection from Humans, sacrifice target prompt, -1/-1 counter (effect 3) deferred.
+        "Yawgmoth, Thran Physician",
     };
 }
