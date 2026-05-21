@@ -1,0 +1,108 @@
+using Majik.Core.Abilities;
+using Majik.Core.Cards;
+using Majik.Core.Cards.Types;
+using Majik.Core.Players;
+using Majik.Core.ValueObjects;
+
+namespace Majik.Core.CardData.Definitions;
+
+/// <summary>
+/// Builds a runtime <see cref="ICard"/> from a <see cref="CardDefinition"/>.
+/// Bridges the data-only schema with the engine's hand-rolled card
+/// hierarchy. Phase-3 scope: card-type dispatch, P/T + cost wiring,
+/// supertype/subtype attachment, and mana abilities. Activated/triggered/
+/// static abilities will land in follow-up PRs as
+/// <see cref="AbilityDefinition"/> grows.
+/// </summary>
+public static class CardDefinitionFactory
+{
+    /// <summary>
+    /// Materialize a card for the supplied owner. The first listed
+    /// <see cref="CardDefinition.Types"/> dictates the runtime C# class
+    /// (Land / Creature / Instant / …); additional types are added via
+    /// <see cref="Card.AddCardType"/> so multi-type cards (Artifact
+    /// Creature, …) work correctly.
+    /// </summary>
+    public static ICard Build(CardDefinition definition, Player owner)
+    {
+        ArgumentNullException.ThrowIfNull(definition);
+        ArgumentNullException.ThrowIfNull(owner);
+        if (definition.Types.Count == 0)
+            throw new ArgumentException($"Card '{definition.Name}' has no types.", nameof(definition));
+
+        var supertypes = definition.Supertypes.Select(ParseSupertype).ToArray();
+        var subtypes = definition.Subtypes.Select(ParseSubtype).ToArray();
+        var primary = ParseType(definition.Types[0]);
+        var manaCost = StripBraces(definition.ManaCost);
+
+        ICard card = primary switch
+        {
+            CardType.Land => new Land(definition.Name, supertypes, subtypes),
+            CardType.Creature => new Creature(
+                definition.Name, manaCost,
+                definition.Power ?? throw MissingStat(definition.Name, "power"),
+                definition.Toughness ?? throw MissingStat(definition.Name, "toughness"),
+                supertypes, subtypes),
+            CardType.Artifact => new Artifact(definition.Name, manaCost, supertypes, subtypes),
+            CardType.Enchantment => new Enchantment(definition.Name, manaCost, supertypes, subtypes),
+            CardType.Instant => new Instant(definition.Name, manaCost, supertypes, subtypes),
+            CardType.Sorcery => new Sorcery(definition.Name, manaCost, supertypes, subtypes),
+            CardType.Planeswalker => new Planeswalker(
+                definition.Name, manaCost,
+                definition.Loyalty ?? throw MissingStat(definition.Name, "loyalty"),
+                supertypes, subtypes),
+            _ => throw new NotSupportedException(
+                $"Card '{definition.Name}' primary type '{definition.Types[0]}' is not supported by CardDefinitionFactory."),
+        };
+
+        // Multi-type cards (e.g. Artifact Creature) — apply secondary types
+        // via the AddCardType seam on the concrete Card base class
+        // (the method is internal on Card, not exposed on ICard).
+        if (card is Card concrete)
+        {
+            for (var i = 1; i < definition.Types.Count; i++)
+            {
+                concrete.AddCardType(ParseType(definition.Types[i]));
+            }
+        }
+
+        card.SetOwner(owner);
+        card.SetController(owner);
+
+        foreach (var ability in definition.Abilities)
+        {
+            card.AddAbility(BuildAbility(ability, card, owner));
+        }
+
+        return card;
+    }
+
+    private static IAbility BuildAbility(AbilityDefinition definition, ICard card, Player controller) =>
+        definition switch
+        {
+            ManaAbilityDefinition mana => new ManaAbility(card, controller, ManaCost.Parse(mana.Produces)),
+            _ => throw new NotSupportedException(
+                $"Ability '{definition.GetType().Name}' is not yet supported by CardDefinitionFactory."),
+        };
+
+    private static CardType ParseType(string raw) =>
+        Enum.TryParse<CardType>(raw, ignoreCase: true, out var t)
+            ? t
+            : throw new ArgumentException($"Unknown card type '{raw}'.", nameof(raw));
+
+    private static CardSupertype ParseSupertype(string raw) =>
+        Enum.TryParse<CardSupertype>(raw, ignoreCase: true, out var s)
+            ? s
+            : throw new ArgumentException($"Unknown card supertype '{raw}'.", nameof(raw));
+
+    private static CardSubtype ParseSubtype(string raw) =>
+        Enum.TryParse<CardSubtype>(raw, ignoreCase: true, out var s)
+            ? s
+            : throw new ArgumentException($"Unknown card subtype '{raw}'.", nameof(raw));
+
+    private static string StripBraces(string s) =>
+        string.IsNullOrEmpty(s) ? s : s.Replace("{", "").Replace("}", "");
+
+    private static ArgumentException MissingStat(string cardName, string stat) =>
+        new($"Card '{cardName}' is missing required '{stat}'.");
+}
