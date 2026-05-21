@@ -79,5 +79,17 @@ public static class SeedImplementedCards
         // {T}: Add one mana of any color — 5 ManaAbility instances (one per WUBRG) wired.
         // Usage restriction (legendary-only mana) + "spell can't be countered" rider deferred.
         "Delighted Halfling",
+        // Land — Bloomburrow (WastewoodVergeFactory).
+        // {T}: Add {G} and {T}: Add {B} — two ManaAbility instances wired.
+        // {B} activation restriction ("if you control a Swamp or Forest") deferred.
+        "Wastewood Verge",
+        // Land — Bloomburrow (SpymastersVaultFactory).
+        // {T}: Add {B} — wired.
+        // ETB-tapped restriction + connive activated ability deferred.
+        "Spymaster's Vault",
+        // Artifact — {1} (VexingBaubleFactory).
+        // {1}, {T}, Sacrifice: Draw a card — wired.
+        // "Counter free spells" triggered ability deferred.
+        "Vexing Bauble",
     };
 }

@@ -62,6 +62,21 @@ public static class NamedCardFactory
             // Usage restriction (legendary-only mana) + "spell can't be countered" rider deferred.
             "Delighted Halfling" => DelightedHalflingFactory.Create(owner),
 
+            // G/B dual land — Bloomburrow (WastewoodVergeFactory).
+            // {T}: Add {G} and {T}: Add {B} — two ManaAbility instances wired.
+            // {B} activation restriction ("if you control a Swamp or Forest") deferred.
+            "Wastewood Verge" => WastewoodVergeFactory.Create(owner),
+
+            // Land — Bloomburrow (SpymastersVaultFactory).
+            // {T}: Add {B} — wired.
+            // ETB-tapped restriction + connive activated ability deferred.
+            "Spymaster's Vault" => SpymastersVaultFactory.Create(owner),
+
+            // Artifact — {1} (VexingBaubleFactory).
+            // {1}, {T}, Sacrifice: Draw a card — wired.
+            // "Counter free spells" triggered ability deferred.
+            "Vexing Bauble" => VexingBaubleFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
