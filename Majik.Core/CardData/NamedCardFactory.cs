@@ -105,6 +105,12 @@ public static class NamedCardFactory
             // Static mana-color-substitute + ability-grant via imprint deferred.
             "Agatha's Soul Cauldron" => AgathasSoulCauldronFactory.Create(owner),
 
+            // Legendary Planeswalker — Grist {1}{B}{G} loyalty 3 (GristFactory).
+            // Creature type + Insect subtype added unconditionally (v1 simplification).
+            // "Only when not on battlefield" conditional layer-4 effect deferred.
+            // Loyalty abilities (+1, -2, -5) wired by OracleLoyaltyAbilityBinder.
+            "Grist, the Hunger Tide" => GristFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
