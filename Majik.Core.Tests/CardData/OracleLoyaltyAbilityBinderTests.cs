@@ -223,4 +223,142 @@ public class OracleLoyaltyAbilityBinderTests
 
         pw.Abilities.OfType<LoyaltyAbility>().Should().BeEmpty();
     }
+
+    // ---------------------------------------------------------------
+    // each-opponent-mills effect (Ashiok, Dream Render −1)
+    // ---------------------------------------------------------------
+
+    [Fact]
+    public void Bind_EachOpponentMillsN_MillsOpponents()
+    {
+        var alice = new Player("Alice", 20);
+        var bob   = new Player("Bob",   20);
+
+        var c1 = new Card("c1"); var c2 = new Card("c2");
+        bob.Zones.Library.AddCard(c1);
+        bob.Zones.Library.AddCard(c2);
+
+        var pw = new Planeswalker("Ashiok, Dream Render", "{1}{U}{B}", startingLoyalty: 3)
+        { Owner = alice, Controller = alice, Zone = ZoneType.Battlefield };
+        var entity = new CardEntity
+        {
+            Name     = "Ashiok, Dream Render",
+            TypeLine = "Legendary Planeswalker — Ashiok",
+            OracleText = "−1: Each opponent mills four cards.",
+        };
+
+        OracleLoyaltyAbilityBinder.Bind(pw, entity, alice, allPlayers: new[] { alice, bob });
+        pw.Abilities.OfType<LoyaltyAbility>().Single().Activate();
+
+        // Bob had only 2 cards so mills all 2
+        bob.Zones.Graveyard.GetCards().Should().HaveCount(2);
+        bob.Zones.Library.GetCards().Should().BeEmpty();
+        // Alice (controller) is not milled
+        alice.Zones.Graveyard.GetCards().Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Bind_EachOpponentMillsN_NoOpWhenAllPlayersNull()
+    {
+        var alice = new Player("Alice", 20);
+        var bob   = new Player("Bob",   20);
+        bob.Zones.Library.AddCard(new Card("Filler"));
+
+        var pw = new Planeswalker("Ashiok, Dream Render", "{1}{U}{B}", startingLoyalty: 3)
+        { Owner = alice, Controller = alice, Zone = ZoneType.Battlefield };
+        var entity = new CardEntity
+        {
+            Name     = "Ashiok, Dream Render",
+            TypeLine = "Legendary Planeswalker — Ashiok",
+            OracleText = "−1: Each opponent mills four cards.",
+        };
+
+        // allPlayers not supplied — effect should be a silent no-op
+        OracleLoyaltyAbilityBinder.Bind(pw, entity, alice);
+        var ability = pw.Abilities.OfType<LoyaltyAbility>().Single();
+        var act = () => ability.Activate();
+        act.Should().NotThrow();
+        bob.Zones.Graveyard.GetCards().Should().BeEmpty();
+        pw.Loyalty.Should().Be(2); // 3 - 1
+    }
+
+    // ---------------------------------------------------------------
+    // return-creature-from-graveyard effect (Grist −2)
+    // ---------------------------------------------------------------
+
+    [Fact]
+    public void Bind_ReturnCreatureFromGraveyard_Reanimates()
+    {
+        var alice = new Player("Alice", 20);
+        var bear = new Creature("Bear", "{1}{G}", 2, 2)
+        { Owner = alice, Controller = alice, Zone = ZoneType.Graveyard };
+        alice.Zones.Graveyard.AddCard(bear);
+
+        var pw = new Planeswalker("Grist, the Hunger Tide", "{1}{B}{G}", startingLoyalty: 3)
+        { Owner = alice, Controller = alice, Zone = ZoneType.Battlefield };
+        var entity = new CardEntity
+        {
+            Name     = "Grist, the Hunger Tide",
+            TypeLine = "Legendary Planeswalker — Grist",
+            OracleText = "−2: Return target creature card from a graveyard to the battlefield.",
+        };
+
+        OracleLoyaltyAbilityBinder.Bind(pw, entity, alice);
+        pw.Abilities.OfType<LoyaltyAbility>().Single().Activate();
+
+        alice.Zones.Battlefield.GetCards().Should().Contain(bear);
+        bear.Zone.Should().Be(ZoneType.Battlefield);
+        alice.Zones.Graveyard.GetCards().Should().NotContain(bear);
+        pw.Loyalty.Should().Be(1); // 3 - 2
+    }
+
+    [Fact]
+    public void Bind_ReturnCreatureFromGraveyard_NoOpWhenGraveyardEmpty()
+    {
+        var alice = new Player("Alice", 20);
+        var pw = new Planeswalker("Grist, the Hunger Tide", "{1}{B}{G}", startingLoyalty: 3)
+        { Owner = alice, Controller = alice, Zone = ZoneType.Battlefield };
+        var entity = new CardEntity
+        {
+            Name     = "Grist, the Hunger Tide",
+            TypeLine = "Legendary Planeswalker — Grist",
+            OracleText = "−2: Return target creature card from a graveyard to the battlefield.",
+        };
+
+        OracleLoyaltyAbilityBinder.Bind(pw, entity, alice);
+        var ability = pw.Abilities.OfType<LoyaltyAbility>().Single();
+        var act = () => ability.Activate();
+        act.Should().NotThrow();
+        alice.Zones.Battlefield.GetCards().Should().BeEmpty();
+    }
+
+    // ---------------------------------------------------------------
+    // create Insect token effect (Grist +1)
+    // ---------------------------------------------------------------
+
+    [Fact]
+    public void Bind_CreateInsectToken_PutsTokenOnBattlefield()
+    {
+        var alice = new Player("Alice", 20);
+        var pw = new Planeswalker("Grist, the Hunger Tide", "{1}{B}{G}", startingLoyalty: 3)
+        { Owner = alice, Controller = alice, Zone = ZoneType.Battlefield };
+        var entity = new CardEntity
+        {
+            Name     = "Grist, the Hunger Tide",
+            TypeLine = "Legendary Planeswalker — Grist",
+            OracleText = "+1: Create a 1/1 black and green Insect creature token.",
+        };
+
+        OracleLoyaltyAbilityBinder.Bind(pw, entity, alice);
+        pw.Abilities.OfType<LoyaltyAbility>().Single().Activate();
+
+        var tokens = alice.Zones.Battlefield.GetCards()
+            .OfType<Creature>()
+            .Where(c => c.IsToken && c.Subtypes.Contains(Majik.Core.Cards.Types.CardSubtype.Insect))
+            .ToList();
+        tokens.Should().HaveCount(1);
+        tokens[0].BasePower.Should().Be(1);
+        tokens[0].BaseToughness.Should().Be(1);
+        pw.Loyalty.Should().Be(4); // 3 + 1
+    }
 }

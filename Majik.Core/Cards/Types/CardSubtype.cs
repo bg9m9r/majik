@@ -21,6 +21,7 @@ public enum CardSubtype
     Cat,
     Dog,
     Elemental,
+    Insect,
     Spirit,
     Warrior,
     Wizard,
@@ -63,7 +64,9 @@ public enum CardSubtype
 
     // Planeswalker subtypes (examples)
     Ajani,
+    Ashiok,
     Chandra,
+    Grist,
     Jace,
     Liliana,
     Garruk,
