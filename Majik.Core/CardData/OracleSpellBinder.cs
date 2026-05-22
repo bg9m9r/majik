@@ -86,6 +86,7 @@ public static class OracleSpellBinder
             new SpellTemplates.Templates.Library.ScryNTemplate(),
             new SpellTemplates.Templates.Library.ReanimateToBattlefieldTemplate(),
             new SpellTemplates.Templates.Library.ReanimateFromGraveyardTemplate(),
+            new SpellTemplates.Templates.Library.WheelTemplate(),
             new SpellTemplates.Templates.Library.ReturnAllFromGraveyardTemplate(),
             new SpellTemplates.Templates.Library.ExileFromGraveyardTemplate(),
             new SpellTemplates.Templates.Control.TapTargetTemplate(),
