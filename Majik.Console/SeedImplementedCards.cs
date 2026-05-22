@@ -176,6 +176,31 @@ public static class SeedImplementedCards
         // (variable damage by creature count, exile graveyards) no-op.
         "Thraben Charm",
 
+        // Creature — Goblin Scout {R} 2/2 (KeywordBinder + OracleTriggeredAbilityBinder).
+        // Haste — wired via KeywordBinder.
+        // Attack trigger — "defending player reveals top of library; if it's a
+        // land, that player puts it into their hand" — wired via
+        // OracleTriggeredAbilityBinder.GoblinGuideFullPattern; defender is
+        // captured from CreatureAttacksEvent at trigger time.
+        // Deferred: explicit CardRevealedEvent for the reveal half (current
+        // v1 only emits the move-to-hand on the land branch).
+        "Goblin Guide",
+
+        // Legendary Creature — Monkey Pirate {R} 2/1 (OracleTriggeredAbilityBinder).
+        // Combat-damage trigger: "create a Treasure token and exile the top
+        // card of that player's library" — Treasure handled by
+        // CreateTreasure regex; exile handled by ExileTopOfThatPlayersLibrary
+        // inline effect that captures the damaged player from
+        // CombatDamageDealtEvent.
+        // Deferred:
+        //  - "Until end of turn, you may cast that card" — no
+        //    temporary-cast-permission/alt-zone-casting system in v1.
+        //  - Dash {1}{R} — alt-cost framework + EOT bounce trigger
+        //    (returns from battlefield to hand at next end step) not wired.
+        //  - Treasure token's "sacrifice for one mana of any color" already
+        //    wired via TokenFactory.CreateTreasure (5 ManaAbility options).
+        "Ragavan, Nimble Pilferer",
+
         // Enchantment Creature — Spirit {R}{R} 2/2 (OracleTriggeredAbilityBinder).
         // "Whenever a player casts a spell with mana value 3 or less, ~ deals
         // 2 damage to that player." Wired via PlayerCastsCheapSpellLine
