@@ -72,6 +72,15 @@ public static class AuthRegistration
                 options.Authority = authority;
                 options.Audience = audience;
                 options.RequireHttpsMetadata = true;
+                // ASP.NET defaults to rewriting JWT claim names into legacy
+                // WS-Federation / SOAP XML schema URIs (`sub` →
+                // `http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier`,
+                // `email` → `…/emailaddress`, etc.). DescopeTokenValidator
+                // looks up the raw `sub` and the AsPlayer policy requires
+                // a literal "sub" claim — both fail silently when mapping
+                // is on, producing 401s with "sub missing" warnings even
+                // though the JWT itself has a perfectly good sub.
+                options.MapInboundClaims = false;
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
                     ValidateIssuer = true,
