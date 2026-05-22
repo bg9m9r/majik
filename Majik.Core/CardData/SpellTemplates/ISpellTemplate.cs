@@ -107,6 +107,15 @@ public sealed record SpellBindContext(
     Majik.Core.Services.ZoneService? Zones = null)
 {
     public string Text => OracleTextNormalizer.Normalize(Entity.OracleText ?? string.Empty);
+
+    /// <summary>
+    /// Raw oracle text BEFORE <see cref="OracleTextNormalizer"/> strips
+    /// any leading passive-keyword / additional-cost prefixes. Bespoke
+    /// templates that need to detect those stripped prefixes (e.g.
+    /// "As an additional cost to cast this spell, sacrifice a creature.")
+    /// match against this rather than <see cref="Text"/>.
+    /// </summary>
+    public string RawText => Entity.OracleText ?? string.Empty;
 }
 
 /// <summary>Shared parsing helpers used across templates.</summary>

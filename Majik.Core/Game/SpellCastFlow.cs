@@ -72,15 +72,38 @@ public sealed class SpellCastFlow
         }
 
         // CR 601.2f — additional costs first, before mana payment.
+        // Merge the caller-supplied list with any costs the card itself
+        // declares via SpellDefinition.AdditionalCosts (template-bound
+        // "As an additional cost to cast this spell, sacrifice …" cards).
+        var mergedAdditional = new List<IAdditionalCost>();
+        if (definition.AdditionalCosts is { Count: > 0 } defCosts)
+        {
+            mergedAdditional.AddRange(defCosts);
+        }
         if (additionalCosts != null)
         {
-            foreach (var addCost in additionalCosts)
+            mergedAdditional.AddRange(additionalCosts);
+        }
+
+        // Pre-check legality so we fail BEFORE mutating any zone — CR
+        // 601.2g requires that if any cost can't be paid the cast is
+        // illegal and the game is rewound. v1 short-circuit: if any cost
+        // refuses, throw, no partial payment.
+        foreach (var pre in mergedAdditional)
+        {
+            if (!pre.CanPay(caster))
             {
-                if (!addCost.Pay(caster))
-                {
-                    throw new InvalidOperationException(
-                        $"Failed to pay additional cost: {addCost.Description}");
-                }
+                throw new InvalidOperationException(
+                    $"Cannot pay additional cost: {pre.Description}");
+            }
+        }
+
+        foreach (var addCost in mergedAdditional)
+        {
+            if (!addCost.Pay(caster))
+            {
+                throw new InvalidOperationException(
+                    $"Failed to pay additional cost: {addCost.Description}");
             }
         }
 
@@ -124,7 +147,10 @@ public sealed class SpellCastFlow
 
         var mana = await agent.ChooseManaSourcesAsync(ctx, totalCost, ct);
 
-        var chosen = new ChosenSpellParams(mode, xValue, collectedTargets, mana, ctx.AllPlayers);
+        var chosen = new ChosenSpellParams(
+            mode, xValue, collectedTargets, mana, ctx.AllPlayers,
+            ModeIndexes: null,
+            AdditionalCostPayments: mergedAdditional.Count > 0 ? mergedAdditional : null);
         var effects = definition.EffectFactory(chosen);
 
         // If casting via alternative cost (e.g. Flashback), card may not be in
