@@ -33,7 +33,7 @@ public sealed class RevealHandThenDiscardTemplate : ISpellTemplate
     //   "Target opponent reveals their hand. You choose a creature or planeswalker card from it. That player discards that card."
     //   "Target opponent reveals their hand. You choose a card from it. That player discards that card."
     private static readonly Regex Pattern = new(
-        @"^target\s+opponent\s+reveals\s+their\s+hand\.\s*you\s+choose\s+(?:a|an)\s+(?<filter>[a-z][a-z0-9\s,\-]{0,80}?\s+)?card\s+from\s+it\.\s*that\s+player\s+discards\s+that\s+card\.",
+        @"^target\s+(?:opponent|player)\s+reveals\s+their\s+hand\.\s*you\s+choose\s+(?:a|an)\s+(?<filter>[a-z][a-z0-9\s,\-]{0,80}?\s+)?card\s+from\s+it(?:\s+[^.]{0,80}?)?\.\s*that\s+player\s+discards\s+that\s+card\.",
         RegexOptions.IgnoreCase);
 
     public int Priority => 95;
