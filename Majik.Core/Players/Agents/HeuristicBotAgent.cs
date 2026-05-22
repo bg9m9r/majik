@@ -405,7 +405,15 @@ public sealed class HeuristicBotAgent : IPlayerAgent
     {
         var label = (request.Description ?? "").ToLowerInvariant();
         var opponent = ctx.AllPlayers.FirstOrDefault(p => !ReferenceEquals(p, ctx.Self));
-        var preferSelf = LabelIsBuff(label);
+        // Prefer self-side targets when the request's BotIntent flags a
+        // self-favoring effect (Buff/Heal/Protection/Draw/Cantrip). Fall back
+        // to the legacy label-sniff when no intent was stamped (e.g. older
+        // templates or compiled rows from pre-classifier DBs).
+        var preferSelf = request.Intent.HasAny(
+                             BotIntent.Buff | BotIntent.Heal
+                             | BotIntent.Protection | BotIntent.Draw
+                             | BotIntent.Cantrip)
+                         || (request.Intent == BotIntent.None && LabelIsBuff(label));
 
         // Engine-supplied candidate list takes precedence. Rank them so the
         // "first N" pick is actually the most-impactful N, not the first N
@@ -461,9 +469,16 @@ public sealed class HeuristicBotAgent : IPlayerAgent
         switch (candidate)
         {
             case Player p:
-                // Lethal face if any candidate is opponent at low life.
+                if (preferSelf)
+                {
+                    // Self-favoring effect (Heal, Draw-to-target-player, etc.) —
+                    // self beats opponent regardless of life total.
+                    return ReferenceEquals(p, self) ? 1000 : 0;
+                }
+                // Adversarial effect (Burn/Removal-on-player) — pick the
+                // closest-to-lethal opponent. Lower life = higher score.
                 if (ReferenceEquals(p, opponent)) return 1000 - p.LifeTotal;
-                return preferSelf && ReferenceEquals(p, self) ? 500 : 0;
+                return 0;
 
             case Creature c:
                 var bigThreat = c.Power * 10 + c.Toughness;

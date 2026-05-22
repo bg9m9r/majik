@@ -111,4 +111,75 @@ public class HeuristicBotAgentIntentTests
             modeIntents: Array.Empty<BotIntent>());
         idx.Should().Be(0);
     }
+
+    [Fact]
+    public async Task ChooseTargets_BuffIntent_PicksOwnBestCreature()
+    {
+        var mine = AddCreature(_self, "MyBear", 2, 2);
+        var theirs = AddCreature(_opp, "OppBear", 2, 2);
+        var bot = new HeuristicBotAgent();
+
+        var req = new TargetRequest(
+            Description: "target creature",
+            MinTargets: 1,
+            MaxTargets: 1,
+            LegalCandidates: new object[] { theirs, mine },
+            Intent: BotIntent.Buff);
+
+        var picked = await bot.ChooseTargetsAsync(NewCtx(), req);
+        picked.Should().ContainSingle().Which.Should().BeSameAs(mine);
+    }
+
+    [Fact]
+    public async Task ChooseTargets_RemovalIntent_PicksOpponentBiggest()
+    {
+        var small = AddCreature(_opp, "Goblin", 1, 1);
+        var big = AddCreature(_opp, "Wurm", 6, 6);
+        var bot = new HeuristicBotAgent();
+
+        var req = new TargetRequest(
+            Description: "target creature",
+            MinTargets: 1,
+            MaxTargets: 1,
+            LegalCandidates: new object[] { small, big },
+            Intent: BotIntent.Removal);
+
+        var picked = await bot.ChooseTargetsAsync(NewCtx(), req);
+        picked.Should().ContainSingle().Which.Should().BeSameAs(big);
+    }
+
+    [Fact]
+    public async Task ChooseTargets_HealIntent_PrefersSelfPlayer()
+    {
+        var bot = new HeuristicBotAgent();
+        var req = new TargetRequest(
+            Description: "target player",
+            MinTargets: 1,
+            MaxTargets: 1,
+            LegalCandidates: new object[] { _opp, _self },
+            Intent: BotIntent.Heal);
+
+        var picked = await bot.ChooseTargetsAsync(NewCtx(), req);
+        picked.Should().ContainSingle().Which.Should().BeSameAs(_self);
+    }
+
+    [Fact]
+    public async Task ChooseTargets_LegacyLabelFallback_WhenIntentNone()
+    {
+        // Intent None + "you control" label — exercises the legacy
+        // LabelIsBuff path that older templates rely on.
+        var mine = AddCreature(_self, "MyBear", 2, 2);
+        var theirs = AddCreature(_opp, "OppBear", 2, 2);
+        var bot = new HeuristicBotAgent();
+
+        var req = new TargetRequest(
+            Description: "target creature you control",
+            MinTargets: 1,
+            MaxTargets: 1,
+            LegalCandidates: new object[] { theirs, mine },
+            Intent: BotIntent.None);
+
+        var picked = await bot.ChooseTargetsAsync(NewCtx(), req);
+        picked.Should().ContainSingle().Which.Should().BeSameAs(mine);
+    }
 }
