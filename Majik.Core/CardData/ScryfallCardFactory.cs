@@ -18,14 +18,17 @@ public sealed class ScryfallCardFactory
 {
     private readonly ICardRepository _repo;
     private readonly Majik.Core.Effects.ReplacementBus? _replacements;
+    private readonly Majik.Core.Effects.ContinuousEffectsService? _effects;
     private readonly ICompiledSpellTemplateRepository? _compiledRepo;
 
     public ScryfallCardFactory(ICardRepository repo,
         Majik.Core.Effects.ReplacementBus? replacements = null,
-        ICompiledSpellTemplateRepository? compiledSpellRepo = null)
+        ICompiledSpellTemplateRepository? compiledSpellRepo = null,
+        Majik.Core.Effects.ContinuousEffectsService? effects = null)
     {
         _repo = repo ?? throw new ArgumentNullException(nameof(repo));
         _replacements = replacements;
+        _effects = effects;
         _compiledRepo = compiledSpellRepo;
     }
 
@@ -90,6 +93,14 @@ public sealed class ScryfallCardFactory
             // co-exist with any tapped-clause (e.g. a hypothetical Stoke the
             // Flames). Register unconditionally.
             EntersWithCountersBinder.Bind(card, entity, _replacements);
+
+            // ETB-as-copy (CR 706.10) — Clone family. Requires the
+            // continuous-effects service since the replacement registers a
+            // CopyEffect on resolve.
+            if (_effects != null)
+            {
+                EntersAsCopyBinder.Bind(card, entity, _replacements, _effects);
+            }
         }
 
         return card;
