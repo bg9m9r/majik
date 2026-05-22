@@ -1,16 +1,24 @@
-# Render Blueprint — Majik backend (API + MongoDB)
+# Render Blueprint — Majik backend (API + Cards + MongoDB)
 # Deploy: connect this repo (github.com/bg9m9r/majik) as a Blueprint on Render.
 #
-# Secrets to set after first sync (Render dashboard → service → Environment):
+# Secrets to set after first sync (Render dashboard or `render env set`):
 #   majik-api:
 #     Auth__Authority           e.g. https://api.descope.com/<DESCOPE_PROJECT_ID>
 #     Auth__Audience            <DESCOPE_PROJECT_ID>
 #     Mongo__ConnectionString   mongodb://<user>:<pass>@majik-mongo:27017/?authSource=admin
-#                               (user/pass = the MONGO_INITDB_ROOT_* values on majik-mongo)
 #     Cors__AllowedOrigins__0   https://majik-portal.onrender.com  (or custom domain)
+#     Cards__BaseUrl            http://majik-cards:10000           (intra-Render DNS)
+#     Cards__InternalToken      must match majik-cards' Cards__InternalToken
+#   majik-cards:
+#     Cards__InternalToken      shared secret with majik-api (any high-entropy string)
 #   majik-mongo:
 #     MONGO_INITDB_ROOT_USERNAME  pick one (e.g. majik)
 #     MONGO_INITDB_ROOT_PASSWORD  auto-generated below
+#
+# Cards-extraction rollout: this Blueprint adds the majik-cards private service
+# but keeps the SQLite disk attached to majik-api as well, so the old SQLite
+# code path is still a viable rollback target. The next PR removes the disk
+# from majik-api after this one has burned in.
 
 services:
   - type: web
@@ -24,15 +32,10 @@ services:
     healthCheckPath: /healthz
     autoDeploy: true
     disk:
-      # Cards SQLite seed. Image is too large to bake (~550 MB) and
-      # repo is too large to track. Disk persists across deploys; the
-      # file is uploaded once via Render Shell from a GitHub Release.
-      # See docs/RENDER_CARDS_SEED.md.
+      # Kept attached during the cards-extraction rollout as a safe rollback.
+      # The next PR removes this block once majik-cards is verified healthy.
       name: cards-data
       mountPath: /root/.config/Majik
-      # 2 GB so the entrypoint can hold both old (~546 MB) and new
-      # (~546 MB) seed simultaneously during atomic-mv. At 1 GB the
-      # download fails partway with ENOSPC + falls back to stale seed.
       sizeGB: 2
     envVars:
       - key: ASPNETCORE_ENVIRONMENT
@@ -42,8 +45,6 @@ services:
       - key: Mongo__Database
         value: majik
       - key: CARDS_SEED_TAG
-        # Bump this to a new release tag (e.g. cards-seed-2026-06-01)
-        # to trigger a fresh download on next deploy. See docs/RENDER_CARDS_SEED.md.
         value: cards-seed-2026-05-21
       - key: Auth__Authority
         sync: false
@@ -52,6 +53,44 @@ services:
       - key: Mongo__ConnectionString
         sync: false
       - key: Cors__AllowedOrigins__0
+        sync: false
+      # When set, MajikEngineRegistration swaps DbCardRepository for
+      # HttpCardRepository pointing at majik-cards. Leave unset on first
+      # rollout to keep the SQLite path live; set via `render env set`
+      # after majik-cards is verified up.
+      - key: Cards__BaseUrl
+        sync: false
+      - key: Cards__InternalToken
+        sync: false
+
+  - type: pserv
+    name: majik-cards
+    runtime: docker
+    plan: starter
+    region: oregon
+    rootDir: .
+    dockerfilePath: ./Majik.CardsServer/Dockerfile
+    dockerContext: .
+    autoDeploy: true
+    disk:
+      # Same shape as the original majik-api disk so the seed-tag download
+      # logic in docker-entrypoint.sh works unchanged. Owns the SQLite file
+      # for cards going forward. Distinct name from majik-api's `cards-data`
+      # disk so both can coexist during the rollout.
+      name: cards-server-data
+      mountPath: /root/.config/Majik
+      sizeGB: 2
+    envVars:
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production
+      - key: ASPNETCORE_URLS
+        value: http://0.0.0.0:10000
+      - key: CARDS_SEED_TAG
+        # Same release tag as majik-api during the transition. Bump to a new
+        # release tag in lock-step on both services until the disk is removed
+        # from majik-api.
+        value: cards-seed-2026-05-21
+      - key: Cards__InternalToken
         sync: false
 
   - type: pserv
