@@ -381,6 +381,85 @@ public class HeuristicBotAgentTests
     }
 
     [Fact]
+    public async Task ChooseX_LethalFace_PicksOpponentLifeTotal()
+    {
+        // Opp at 5 life. Bot has 8 untapped lands (after printed {2}{R}{R}
+        // = 4 generic accounted for elsewhere). Bot should pick X = opp
+        // life (5) for exact lethal.
+        for (var i = 0; i < 10; i++)
+        {
+            var mtn = NamedCardFactory.Create("Mountain", _alice);
+            mtn.SetZone(ZoneType.Battlefield);
+            _alice.Zones.Battlefield.AddCard(mtn);
+        }
+        _bob.LifeTotal = 5;
+        var devilsPlay = new Instant("Devil's Play", "RR");
+        devilsPlay.SetOwner(_alice);
+
+        var bot = new HeuristicBotAgent();
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice,
+            1, PhaseStateType.Main, new Majik.Core.Stack.Stack());
+
+        var x = await bot.ChooseXAsync(ctx, devilsPlay);
+        x.Should().Be(5);
+    }
+
+    [Fact]
+    public async Task ChooseX_NotLethalFace_PicksMaxAffordable()
+    {
+        // Opp at 20 life. Bot has 5 untapped lands. Pick X=5 (max
+        // affordable above no-X-printed-cost).
+        for (var i = 0; i < 5; i++)
+        {
+            var mtn = NamedCardFactory.Create("Mountain", _alice);
+            mtn.SetZone(ZoneType.Battlefield);
+            _alice.Zones.Battlefield.AddCard(mtn);
+        }
+        var fireball = new Instant("Fireball", "R");
+        fireball.SetOwner(_alice);
+
+        var bot = new HeuristicBotAgent();
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice,
+            1, PhaseStateType.Main, new Majik.Core.Stack.Stack());
+
+        var x = await bot.ChooseXAsync(ctx, fireball);
+        x.Should().Be(4); // 5 untapped - 1 generic printed
+    }
+
+    [Fact]
+    public async Task ChooseMode_OppHasCreature_PrefersRemoval()
+    {
+        // Opp has a creature; modes include "Destroy target creature" vs
+        // "Draw a card". Bot should pick destroy (removal).
+        var bear = new Creature("Bear", "G", 2, 2) { Owner = _bob, Controller = _bob };
+        _bob.Zones.Battlefield.AddCard(bear);
+        bear.SetZone(ZoneType.Battlefield);
+
+        var modes = new[] { "Draw a card.", "Destroy target creature." };
+        var bot = new HeuristicBotAgent();
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice,
+            1, PhaseStateType.Main, new Majik.Core.Stack.Stack());
+
+        var idx = await bot.ChooseModeAsync(ctx, modes);
+        idx.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task ChooseMode_BoardLight_PrefersTokenCreation()
+    {
+        // Our battlefield empty; modes include "Create a creature token"
+        // vs "Counter target spell". With empty board + no opp threats,
+        // board-build wins.
+        var modes = new[] { "Counter target spell.", "Create a 2/2 creature token." };
+        var bot = new HeuristicBotAgent();
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice,
+            1, PhaseStateType.Main, new Majik.Core.Stack.Stack());
+
+        var idx = await bot.ChooseModeAsync(ctx, modes);
+        idx.Should().Be(1);
+    }
+
+    [Fact]
     public async Task ChooseTargets_BuffLabel_FlipsToCasterSide()
     {
         // "target creature you control" label flags as buff — bot should
