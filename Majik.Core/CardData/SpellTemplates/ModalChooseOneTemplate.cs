@@ -55,17 +55,25 @@ public sealed class ModalChooseOneTemplate : ISpellTemplate
         _registry = registry ?? throw new ArgumentNullException(nameof(registry));
     }
 
-    public SpellDefinition? TryBind(SpellBindContext ctx)
-    {
-        ArgumentNullException.ThrowIfNull(ctx);
-        if (_registry == null) return null;
+    public SpellDefinition? TryBind(SpellBindContext ctx) =>
+        SpellTemplateBindHelper.DefaultTryBind(this, ctx);
 
-        var text = ctx.Text;
-        var header = HeaderRegex.Match(text);
+    public bool CanBind(SpellBindContext ctx) => _registry is not null;
+
+    /// <summary>
+    /// Pure-parse path: serialize each bullet body as its own oracle string
+    /// in a JSON array under the "modes" key. Rehydrate later rebinds each
+    /// mode against the live registry — this keeps the live-binding tree
+    /// intact while letting compile-templates record the modal card as
+    /// bound (rather than being invisible to the pure-parse compile loop).
+    /// </summary>
+    public IReadOnlyDictionary<string, string>? TryExtractParams(string oracleText)
+    {
+        if (string.IsNullOrWhiteSpace(oracleText)) return null;
+        var header = HeaderRegex.Match(oracleText);
         if (!header.Success) return null;
 
-        // Tail after the "Choose one —" marker; bullets are the per-mode bodies.
-        var tail = text.Substring(header.Index + header.Length);
+        var tail = oracleText.Substring(header.Index + header.Length);
         var clauses = BulletSplit.Split(tail)
             .Select(c => ReminderText.Replace(c, "").Trim().TrimEnd('.').Trim())
             .Where(c => c.Length > 0)
@@ -73,10 +81,25 @@ public sealed class ModalChooseOneTemplate : ISpellTemplate
 
         if (clauses.Count < 2) return null;
 
-        // Bind each clause as its own oracle text — synthesize a sub-context
-        // by cloning the entity with the clause text. Drops sub-defs that
-        // fail to bind, but requires at least one mode binds, else the
-        // composer aborts so the card falls back to a vanilla shell.
+        return new Dictionary<string, string>
+        {
+            ["modes"] = JsonSerializer.Serialize(clauses),
+        };
+    }
+
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx)
+    {
+        if (_registry == null)
+            throw new InvalidOperationException(
+                "ModalChooseOne.Rehydrate called before SetRegistry.");
+        if (!@params.TryGetValue("modes", out var json) || string.IsNullOrEmpty(json))
+            throw new InvalidOperationException(
+                "ModalChooseOne params missing 'modes' key.");
+
+        var clauses = JsonSerializer.Deserialize<List<string>>(json)
+            ?? throw new InvalidOperationException(
+                "ModalChooseOne: failed to deserialize 'modes' payload.");
+
         var modeDefs = new List<SpellDefinition?>();
         foreach (var clause in clauses)
         {
@@ -93,14 +116,9 @@ public sealed class ModalChooseOneTemplate : ISpellTemplate
             modeDefs.Add(def);
         }
 
-        if (modeDefs.All(d => d is null)) return null;
-
         return new SpellDefinition(
             Modes: clauses,
             HasVariableX: modeDefs.Any(d => d?.HasVariableX == true),
-            // v1: union all sub-target-requests so cast-flow collects targets
-            // for every mode. Refinement: scope target collection to chosen
-            // mode (needs cast-flow restructure).
             TargetRequests: modeDefs.Where(d => d != null)
                 .SelectMany(d => d!.TargetRequests).ToList(),
             EffectFactory: p =>
