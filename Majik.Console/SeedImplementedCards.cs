@@ -178,5 +178,31 @@ public static class SeedImplementedCards
         // non-controller player (correct for 2-player; multiplayer
         // "that player" accuracy deferred).
         "Eidolon of the Great Revel",
+
+        // ---- Sagas (SagaBinder per-card chapter effects) ----
+
+        // Enchantment — Saga {2}{R} // Enchantment Creature — Goblin Shaman
+        // (Kamigawa: Neon Dynasty). DFC stored under its full composite name.
+        // I  — Create a 2/2 red Goblin Shaman token (embedded
+        //      "Whenever this token attacks, create a Treasure token"
+        //      trigger DEFERRED — no attack-trigger wiring for token
+        //      abilities yet).
+        // II — Discard up to two, draw that many — wired; "you may" opt-out
+        //      and per-card choice DEFERRED (v1 discards the first two cards
+        //      in hand deterministically).
+        // III— Exile + return transformed to Reflection of Kiki-Jiki —
+        //      DEFERRED (no saga-transform infrastructure).
+        "Fable of the Mirror-Breaker // Reflection of Kiki-Jiki",
+
+        // Enchantment — Saga {2}{R}{R} // Legendary Creature — Avatar
+        // (Avatar: The Last Airbender). DFC stored under its full composite name.
+        // I  — Exile top 3 of library — wired; "you may play those cards
+        //      until end of your next turn" rider DEFERRED (needs alt-play /
+        //      turn-scoped permission framework).
+        // II — Add one mana of any color — wired as {R} deterministically;
+        //      real mana-color prompt DEFERRED.
+        // III— Exile + return transformed to Avatar Roku — DEFERRED (no
+        //      saga-transform infrastructure).
+        "The Legend of Roku // Avatar Roku",
     };
 }
