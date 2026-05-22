@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Majik.Core.Cards;
 using Majik.Core.CardData.SpellTemplates;
+using Majik.Core.CardData.SpellTemplates.Templates.Control;
 using Majik.Core.CardData.SpellTemplates.Templates.Counter;
 using Majik.Core.CardData.SpellTemplates.Templates.Counters;
 using Majik.Core.CardData.SpellTemplates.Templates.Damage;
@@ -186,5 +187,28 @@ public class BotIntentPerTemplateTests
         [Fact]
         public void CreaturesYouControlGainKeyword_Buff() =>
             IntentOf(new CreaturesYouControlGainKeywordTemplate()).Should().Be(BotIntent.Buff);
+    }
+
+    public class Control
+    {
+        [Fact]
+        public void BounceTarget_Bounce() =>
+            IntentOf(new BounceTargetTemplate()).Should().Be(BotIntent.Bounce);
+
+        [Fact]
+        public void ExileTarget_Removal() =>
+            IntentOf(new ExileTargetTemplate()).Should().Be(BotIntent.Removal);
+
+        [Fact]
+        public void GainControl_Removal() =>
+            IntentOf(new GainControlTemplate()).Should().Be(BotIntent.Removal);
+
+        [Fact]
+        public void TapTarget_Removal() =>
+            IntentOf(new TapTargetTemplate()).Should().Be(BotIntent.Removal);
+
+        [Fact]
+        public void UntapTarget_Buff() =>
+            IntentOf(new UntapTargetTemplate()).Should().Be(BotIntent.Buff);
     }
 }
