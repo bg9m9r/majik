@@ -9,6 +9,7 @@ using Majik.Core.CardData.SpellTemplates.Templates.Destroy;
 using Majik.Core.CardData.SpellTemplates.Templates.Library;
 using Majik.Core.CardData.SpellTemplates.Templates.Resource;
 using Majik.Core.CardData.SpellTemplates.Templates.Search;
+using Majik.Core.CardData.SpellTemplates.Templates.Tokens;
 using Xunit;
 
 namespace Majik.Core.Tests.CardData.SpellTemplates;
@@ -334,5 +335,44 @@ public class BotIntentPerTemplateTests
         [Fact]
         public void ExileFromGraveyard_Removal() =>
             IntentOf(new ExileFromGraveyardTemplate()).Should().Be(BotIntent.Removal);
+    }
+
+    public class Tokens
+    {
+        [Fact]
+        public void CreateTokens_Token() =>
+            IntentOf(new CreateTokensTemplate()).Should().Be(BotIntent.Token);
+
+        [Fact]
+        public void CreateClueTokens_Token() =>
+            IntentOf(new CreateClueTokensTemplate()).Should().Be(BotIntent.Token);
+
+        [Fact]
+        public void CreateTreasureTokens_Token() =>
+            IntentOf(new CreateTreasureTokensTemplate()).Should().Be(BotIntent.Token);
+
+        [Fact]
+        public void CreateFoodTokens_TokenHeal() =>
+            IntentOf(new CreateFoodTokensTemplate()).Should().Be(BotIntent.Token | BotIntent.Heal);
+
+        [Fact]
+        public void InvestigateNTimes_Token() =>
+            IntentOf(new InvestigateNTimesTemplate()).Should().Be(BotIntent.Token);
+
+        [Fact]
+        public void InvestigateSingle_Token() =>
+            IntentOf(new InvestigateSingleTemplate()).Should().Be(BotIntent.Token);
+
+        [Fact]
+        public void CreateCopyToken_Token() =>
+            IntentOf(new CreateCopyTokenTemplate()).Should().Be(BotIntent.Token);
+
+        [Fact]
+        public void MultiTargetCopyToken_Token() =>
+            IntentOf(new MultiTargetCopyTokenTemplate()).Should().Be(BotIntent.Token);
+
+        [Fact]
+        public void Populate_Token() =>
+            IntentOf(new PopulateTemplate()).Should().Be(BotIntent.Token);
     }
 }

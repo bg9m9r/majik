@@ -37,6 +37,7 @@ public sealed class CreateCopyTokenTemplate : ISpellTemplate
 
     public int Priority => 80;
     public string Name => "CreateCopyToken";
+    public BotIntent Intent => BotIntent.Token;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);
