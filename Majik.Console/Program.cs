@@ -91,7 +91,7 @@ class Program
             }
             else if (args[0].Equals("coverage-report", StringComparison.OrdinalIgnoreCase))
             {
-                await CoverageReportCommand.RunAsync();
+                await CoverageReportCommand.RunAsync(args);
                 return;
             }
             else if (args[0].Equals("compile-templates", StringComparison.OrdinalIgnoreCase))
@@ -115,7 +115,7 @@ class Program
         System.Console.WriteLine("  Majik.Console analyze-keywords <path-to-csv-file>");
         System.Console.WriteLine("  Majik.Console ingest-claude-results <path-to-jsonl-file>");
         System.Console.WriteLine("  Majik.Console play-triggers [etb|apnap|intervening-if|delayed|all]");
-        System.Console.WriteLine("  Majik.Console coverage-report");
+        System.Console.WriteLine("  Majik.Console coverage-report [--format <fmt>]   # fmt: modern|standard|pioneer|… (omit for full pool)");
         System.Console.WriteLine("  Majik.Console compile-templates");
         System.Console.WriteLine();
         TriggerPlayground.PrintScenarios();
