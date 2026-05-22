@@ -12,4 +12,5 @@ public sealed record TargetRequest(
     string Description,
     int MinTargets,
     int MaxTargets,
-    IReadOnlyList<object> LegalCandidates);
+    IReadOnlyList<object> LegalCandidates,
+    BotIntent Intent = BotIntent.None);

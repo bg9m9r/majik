@@ -115,7 +115,11 @@ public sealed class ModalChooseOneTemplate : ISpellTemplate
             {
                 if (t is ModalChooseOneTemplate) continue; // avoid recursion
                 def = t.TryBind(subCtx);
-                if (def != null) break;
+                if (def != null)
+                {
+                    def = def.WithIntentStamp(t.Intent);
+                    break;
+                }
             }
             modeDefs.Add(def);
         }
