@@ -259,6 +259,139 @@ public class OracleTriggeredAbilityBinderTests
     }
 
     [Fact]
+    public void GoblinGuide_Attack_RevealsTop_LandToDefenderHand()
+    {
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+
+        // Top of Bob's library is a land — should move to Bob's hand on attack.
+        var topLand = new Majik.Core.Cards.Land("Mountain");
+        topLand.SetOwner(_bob);
+        topLand.SetZone(ZoneType.Library);
+        _bob.Zones.Library.AddCard(topLand);
+
+        var gg = new Creature("Goblin Guide", "R", 2, 2)
+        {
+            Owner = _alice, Controller = _alice, Zone = ZoneType.Battlefield,
+        };
+        _alice.Zones.Battlefield.AddCard(gg);
+
+        var entity = new CardEntity
+        {
+            Name = "Goblin Guide",
+            TypeLine = "Creature — Goblin Scout",
+            OracleText = "Haste\nWhenever Goblin Guide attacks, defending player reveals the top card of their library. If it's a land card, that player puts it into their hand.",
+        };
+        var bindings = OracleTriggeredAbilityBinder.Bind(gg, entity, _alice).ToList();
+        bindings.Should().HaveCount(1, "exactly one attack trigger should bind");
+        foreach (var ab in bindings)
+        {
+            gg.AddAbility(ab);
+        }
+        triggers.BindCard(gg);
+
+        // Fire the per-attacker event with Bob as defender.
+        _bus.Publish(new Majik.Core.Domain.DomainEvents.CreatureAttacksEvent(gg, _bob));
+
+        triggers.PutPendingTriggersOnStack(_alice);
+        stack.Pop()!.Resolve();
+
+        _bob.Zones.Hand.GetCards().Should().Contain(topLand,
+            "top of defender's library was a land — moves to hand");
+        _bob.Zones.Library.GetCards().Should().NotContain(topLand);
+    }
+
+    [Fact]
+    public void GoblinGuide_Attack_NonLandTop_StaysInLibrary()
+    {
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+
+        // Top of Bob's library is a creature — stays in library.
+        var topCreature = new Creature("Grizzly Bears", "1G", 2, 2)
+        {
+            Owner = _bob, Controller = _bob, Zone = ZoneType.Library,
+        };
+        _bob.Zones.Library.AddCard(topCreature);
+
+        var gg = new Creature("Goblin Guide", "R", 2, 2)
+        {
+            Owner = _alice, Controller = _alice, Zone = ZoneType.Battlefield,
+        };
+        _alice.Zones.Battlefield.AddCard(gg);
+
+        var entity = new CardEntity
+        {
+            Name = "Goblin Guide",
+            TypeLine = "Creature — Goblin Scout",
+            OracleText = "Haste\nWhenever Goblin Guide attacks, defending player reveals the top card of their library. If it's a land card, that player puts it into their hand.",
+        };
+        foreach (var ab in OracleTriggeredAbilityBinder.Bind(gg, entity, _alice))
+        {
+            gg.AddAbility(ab);
+        }
+        triggers.BindCard(gg);
+
+        _bus.Publish(new Majik.Core.Domain.DomainEvents.CreatureAttacksEvent(gg, _bob));
+        triggers.PutPendingTriggersOnStack(_alice);
+        stack.Pop()!.Resolve();
+
+        _bob.Zones.Library.GetCards().Should().Contain(topCreature,
+            "non-land top card stays in the library");
+        _bob.Zones.Hand.GetCards().Should().NotContain(topCreature);
+    }
+
+    [Fact]
+    public void Ragavan_CombatDamage_CreatesTreasure_AndExilesDefenderTop()
+    {
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+
+        var topCard = new Creature("Llanowar Elves", "G", 1, 1)
+        {
+            Owner = _bob, Controller = _bob, Zone = ZoneType.Library,
+        };
+        _bob.Zones.Library.AddCard(topCard);
+
+        var rag = new Creature("Ragavan", "R", 2, 1)
+        {
+            Owner = _alice, Controller = _alice, Zone = ZoneType.Battlefield,
+        };
+        _alice.Zones.Battlefield.AddCard(rag);
+
+        var entity = new CardEntity
+        {
+            Name = "Ragavan, Nimble Pilferer",
+            TypeLine = "Legendary Creature — Monkey Pirate",
+            OracleText = "Whenever Ragavan deals combat damage to a player, create a Treasure token and exile the top card of that player's library. Until end of turn, you may cast that card.\nDash {1}{R}",
+        };
+        var bindings = OracleTriggeredAbilityBinder.Bind(rag, entity, _alice).ToList();
+        bindings.Should().HaveCount(1, "one combat-damage trigger should bind");
+        foreach (var ab in bindings)
+        {
+            rag.AddAbility(ab);
+        }
+        triggers.BindCard(rag);
+
+        // Fire combat damage to Bob.
+        _bus.Publish(new Majik.Core.Domain.DomainEvents.CombatDamageDealtEvent(rag, _bob, 2));
+
+        triggers.PutPendingTriggersOnStack(_alice);
+        stack.Pop()!.Resolve();
+
+        // Treasure token under Alice's control.
+        _alice.Zones.Battlefield.GetCards()
+            .OfType<Majik.Core.Cards.Artifact>()
+            .Should().Contain(c => c.Name == "Treasure",
+                "controller gets a Treasure token");
+
+        // Bob's library top exiled.
+        _bob.Zones.Exile.GetCards().Should().Contain(topCard,
+            "top of damaged player's library is exiled");
+        _bob.Zones.Library.GetCards().Should().NotContain(topCard);
+    }
+
+    [Fact]
     public void Dies_DestroyTargetLand_NoOp_WhenNoOpponents()
     {
         var stack = new Majik.Core.Stack.Stack(_bus);
