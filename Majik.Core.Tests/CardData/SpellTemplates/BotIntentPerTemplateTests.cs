@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Majik.Core.Cards;
 using Majik.Core.CardData.SpellTemplates;
+using Majik.Core.CardData.SpellTemplates.Templates.Counter;
 using Majik.Core.CardData.SpellTemplates.Templates.Damage;
 using Majik.Core.CardData.SpellTemplates.Templates.Destroy;
 using Xunit;
@@ -110,5 +111,24 @@ public class BotIntentPerTemplateTests
         [Fact]
         public void DestroyUpToArtifactEnchantment_Removal() =>
             IntentOf(new DestroyUpToArtifactEnchantmentTemplate()).Should().Be(BotIntent.Removal);
+    }
+
+    public class Counter
+    {
+        [Fact]
+        public void CounterTargetSpell_Counter() =>
+            IntentOf(new CounterTargetSpellTemplate()).Should().Be(BotIntent.Counter);
+
+        [Fact]
+        public void CounterCreature_Counter() =>
+            IntentOf(new CounterCreatureTemplate()).Should().Be(BotIntent.Counter);
+
+        [Fact]
+        public void CounterNoncreature_Counter() =>
+            IntentOf(new CounterNoncreatureTemplate()).Should().Be(BotIntent.Counter);
+
+        [Fact]
+        public void CounterUnlessPay_Counter() =>
+            IntentOf(new CounterUnlessPayTemplate()).Should().Be(BotIntent.Counter);
     }
 }
