@@ -18,6 +18,7 @@ public class CardDbContext : DbContext
     public DbSet<KeywordMetadataEntity> KeywordMetadata { get; set; } = null!;
     public DbSet<ClaudeRequestCacheEntity> ClaudeRequestCache { get; set; } = null!;
     public DbSet<CompiledSpellTemplateEntity> CompiledSpellTemplates { get; set; } = null!;
+    public DbSet<CardLegalityEntity> CardLegalities { get; set; } = null!;
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
@@ -224,6 +225,27 @@ public class CardDbContext : DbContext
 
             entity.Property(e => e.CompiledAt)
                 .IsRequired();
+        });
+
+        // Configure CardLegalityEntity — normalized per-format legality.
+        modelBuilder.Entity<CardLegalityEntity>(entity =>
+        {
+            entity.HasKey(e => new { e.CardId, e.Format });
+
+            entity.HasIndex(e => new { e.Format, e.Status });
+
+            entity.Property(e => e.Format)
+                .IsRequired()
+                .HasMaxLength(50);
+
+            entity.Property(e => e.Status)
+                .IsRequired()
+                .HasMaxLength(20);
+
+            entity.HasOne(e => e.Card)
+                .WithMany(c => c.FormatLegalities)
+                .HasForeignKey(e => e.CardId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 
