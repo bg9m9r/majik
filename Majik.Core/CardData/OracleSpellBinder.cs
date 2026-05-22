@@ -146,6 +146,7 @@ public static class OracleSpellBinder
             new SpellTemplates.Templates.Bespoke.RevealHandMayChooseTemplate(),
             new SpellTemplates.Templates.Bespoke.RevealHandThenDiscardTemplate(),
             new SpellTemplates.Templates.Bespoke.RevealHandThenExileTemplate(),
+            new SpellTemplates.Templates.Bespoke.RevealHandGraveOrHandExileTemplate(),
             new SpellTemplates.Templates.Bespoke.MalevolentRumblePatternTemplate(),
             new SpellTemplates.Templates.Bespoke.ExpressiveIterationTemplate(),
             _composer,
