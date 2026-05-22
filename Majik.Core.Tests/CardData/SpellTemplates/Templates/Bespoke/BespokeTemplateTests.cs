@@ -62,4 +62,36 @@ public class BespokeTemplateTests
         new RevealHandThenDiscardTemplate().TryBind(Ctx(oracle))
             .Should().BeNull();
     }
+
+    [Theory]
+    [InlineData("Target opponent reveals their hand. You choose a nonland card from it and exile that card.")]
+    [InlineData("Target opponent reveals their hand. You choose a nonland card from it. Exile that card.")]
+    [InlineData("Target opponent reveals their hand. You choose an artifact or creature card from it. Exile that card.")]
+    [InlineData("Target opponent reveals their hand. You choose a card from it with mana value 4 or greater and exile that card.")]
+    public void RevealHandThenExileTemplate_MatchesCastigateFamily(string oracle)
+    {
+        new RevealHandThenExileTemplate().TryBind(Ctx(oracle))
+            .Should().NotBeNull();
+    }
+
+    [Theory]
+    // Trailing rider clauses — bind succeeds, rider dropped at resolution.
+    [InlineData("Target opponent reveals their hand. You choose a nonland card from it and exile that card. Put a +1/+1 counter on up to one target creature you control.")]
+    [InlineData("Target opponent reveals their hand. You choose a nonland card from it. Exile that card. If the card's mana value is 1 or less, create a 1/1 white and black Spirit creature token with flying.")]
+    public void RevealHandThenExileTemplate_AcceptsTrailingRiders(string oracle)
+    {
+        new RevealHandThenExileTemplate().TryBind(Ctx(oracle))
+            .Should().NotBeNull();
+    }
+
+    [Theory]
+    // Should NOT match: discard variant — RevealHandThenDiscard owns that shape.
+    [InlineData("Target opponent reveals their hand. You choose a nonland card from it. That player discards that card.")]
+    // Should NOT match: graveyard-alt source (Agonizing Remorse / Psychic Intrusion etc).
+    [InlineData("Target opponent reveals their hand. You choose a nonland card from that player's graveyard or hand and exile it.")]
+    public void RevealHandThenExileTemplate_DoesNotMatchOutOfFamily(string oracle)
+    {
+        new RevealHandThenExileTemplate().TryBind(Ctx(oracle))
+            .Should().BeNull();
+    }
 }
