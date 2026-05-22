@@ -36,6 +36,11 @@ public static class OracleTextNormalizer
         // Cipher reminder — Brought back as a placeholder; Cipher itself parsed
         // elsewhere. Cosmetic strip only.
         new(@"^\s*cipher\s*\([^)]*\)\s*", RegexOptions.IgnoreCase),
+        // "As an additional cost to cast this spell, sacrifice/discard/exile X."
+        // Drops the cost sentence — v1 stub doesn't enforce the additional
+        // cost. Lossy: caster doesn't actually sacrifice anything but the
+        // main effect still resolves.
+        new(@"^\s*as\s+an\s+additional\s+cost\s+to\s+cast\s+this\s+spell,\s+[^.]+\.\s*", RegexOptions.IgnoreCase),
     };
 
     /// <summary>Strip recognised leading prefixes from <paramref name="text"/>.</summary>
