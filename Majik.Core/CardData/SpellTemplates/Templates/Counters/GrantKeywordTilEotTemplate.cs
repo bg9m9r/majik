@@ -6,8 +6,13 @@ namespace Majik.Core.CardData.SpellTemplates.Templates.Counters;
 
 public sealed class GrantKeywordTilEotTemplate : ISpellTemplate
 {
+    // Accepts optional control qualifier after "creature" — "target creature
+    // you control", "target creature an opponent controls", etc. Runtime stub
+    // ignores the qualifier (target legality is enforced earlier in the cast
+    // flow). Also accepts hexproof + shroud — keywords recognised as markers
+    // even when their full semantics aren't wired.
     private static readonly Regex Pattern = new(
-        @"target\s+creature\s+gains?\s+(?<kw>flying|trample|first\s+strike|double\s+strike|deathtouch|lifelink|vigilance|haste|reach|menace|indestructible)\s+until\s+end\s+of\s+turn",
+        @"target\s+creature(?:\s+(?:you\s+control|an\s+opponent\s+controls|you\s+don'?t\s+control))?\s+gains?\s+(?<kw>flying|trample|first\s+strike|double\s+strike|deathtouch|lifelink|vigilance|haste|reach|menace|indestructible|hexproof|shroud)\s+until\s+end\s+of\s+turn",
         RegexOptions.IgnoreCase);
 
     public int Priority => 50;
