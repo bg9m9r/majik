@@ -25,8 +25,12 @@ public sealed class ReanimateToBattlefieldTemplate : ISpellTemplate
     // less", etc). Runtime stub reanimates ONE chosen target — v1
     // simplification for multi-target wordings. Mana-value / power / name
     // restrictions are lossy at v1.
+    // Accepts both wordings:
+    //   "Return target [kind] card from [scope] graveyard to the battlefield…"
+    //   "Put target [kind] card from a graveyard onto the battlefield…"
+    // (Necromantic Summons, Rise from the Grave, Vat Emergence use "put…onto".)
     private static readonly Regex Pattern = new(
-        @"return\s+(?:(?:up\s+to\s+|any\s+number\s+of\s+)?(?:one|two|three|four|five|six|seven|eight|nine|ten|x)\s+)?target\s+(?<kind>(?:[\w-]+(?:\s+(?:or|and)\s+[\w-]+)*)?)\s*cards?\s+(?:[\w\s,-]*?\s+)?from\s+(?:your|a|an\s+opponent'?s?)\s+graveyard\s+to\s+the\s+battlefield",
+        @"(?:return|put)\s+(?:(?:up\s+to\s+|any\s+number\s+of\s+)?(?:one|two|three|four|five|six|seven|eight|nine|ten|x)\s+)?target\s+(?<kind>(?:[\w-]+(?:\s+(?:or|and)\s+[\w-]+)*)?)\s*cards?\s+(?:[\w\s,-]*?\s+)?from\s+(?:your|a|an\s+opponent'?s?)\s+graveyard\s+(?:to|onto)\s+the\s+battlefield",
         RegexOptions.IgnoreCase);
 
     public int Priority => 50;
