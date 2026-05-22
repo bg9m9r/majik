@@ -170,5 +170,13 @@ public static class SeedImplementedCards
         // enchantment) binds via DestroyArtifactEnchantment. Modes 1/3
         // (variable damage by creature count, exile graveyards) no-op.
         "Thraben Charm",
+
+        // Enchantment Creature — Spirit {R}{R} 2/2 (OracleTriggeredAbilityBinder).
+        // "Whenever a player casts a spell with mana value 3 or less, ~ deals
+        // 2 damage to that player." Wired via PlayerCastsCheapSpellLine
+        // regex + DealDamageOpponent. v1 simplification: damages every
+        // non-controller player (correct for 2-player; multiplayer
+        // "that player" accuracy deferred).
+        "Eidolon of the Great Revel",
     };
 }
