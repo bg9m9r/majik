@@ -1,5 +1,6 @@
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
+using Majik.Core.Costs;
 
 namespace Majik.Core.Players.Agents;
 
@@ -20,8 +21,26 @@ public abstract record PriorityAction
     /// <summary>Pass priority — no action this window.</summary>
     public sealed record PassAction : PriorityAction;
 
-    /// <summary>Cast a spell from hand. Targets are pre-chosen (engine will validate).</summary>
-    public sealed record CastSpell(ICard Card, IReadOnlyList<object> Targets, bool HoldPriority = false) : PriorityAction;
+    /// <summary>
+    /// Cast a spell. Targets are pre-chosen (engine will validate).
+    ///
+    /// Optional <paramref name="AlternativeCost"/> elects an alternative
+    /// cost (CR 118.9 — flashback, spectacle, evoke, pitch, madness, etc.).
+    /// When non-null, the dispatcher forwards it to
+    /// <see cref="Majik.Core.Game.SpellCastFlow.CastAsync"/> which uses the
+    /// alt cost's mana cost instead of the printed cost, runs its zone
+    /// gate, and fires its post-resolution side-effect.
+    ///
+    /// Optional <paramref name="AdditionalCosts"/> are CR 601.2f additional
+    /// costs (sacrifice/discard riders). Default null on both keeps every
+    /// existing call site source-compatible.
+    /// </summary>
+    public sealed record CastSpell(
+        ICard Card,
+        IReadOnlyList<object> Targets,
+        bool HoldPriority = false,
+        IAlternativeCost? AlternativeCost = null,
+        IReadOnlyList<IAdditionalCost>? AdditionalCosts = null) : PriorityAction;
 
     /// <summary>Activate an ability of a permanent the player controls.</summary>
     public sealed record ActivateAbility(IActivatedAbility Ability, IReadOnlyList<object> Targets, bool HoldPriority = false) : PriorityAction;

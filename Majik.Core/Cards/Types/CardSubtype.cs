@@ -37,6 +37,9 @@ public enum CardSubtype
     Orc,
     Archer,
     Army,
+    /// <summary>Modern Horizons 2 incarnation cycle (Solitude, Endurance,
+    /// Fury, Grief, Subtlety). CR 205.3m — creature subtype.</summary>
+    Incarnation,
 
     // Land subtypes (examples)
     Forest,

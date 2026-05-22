@@ -105,11 +105,65 @@ public static class NamedCardFactory
             // Static mana-color-substitute + ability-grant via imprint deferred.
             "Agatha's Soul Cauldron" => AgathasSoulCauldronFactory.Create(owner),
 
+            // Artifact — {0} (MishrasBaubleFactory).
+            // {T}, Sacrifice this artifact: Look at top of target player's library;
+            // draw a card at the beginning of the next turn's upkeep — wired.
+            // The single-arg overload omits TriggerManager wiring so the delayed
+            // draw is no-op (suitable for shape tests). Use the 2-arg overload
+            // for fully-wired behavior. Real targeting prompt for "target
+            // player's library" deferred.
+            "Mishra's Bauble" => MishrasBaubleFactory.Create(owner),
+
+            // Enchantment — {1}{R} (GoblinBombardmentFactory).
+            // Sacrifice a creature: This enchantment deals 1 damage to any
+            // target — wired. The shell uses Create(owner) (no pre-bound
+            // ping); BuildPingAbility / CreateForBot wire a concrete
+            // sacrifice+target activation. Real prompt-driven targeting +
+            // ad-hoc cost composition deferred.
+            "Goblin Bombardment" => GoblinBombardmentFactory.Create(owner),
+
             // Legendary Planeswalker — Grist {1}{B}{G} loyalty 3 (GristFactory).
             // Creature type + Insect subtype added unconditionally (v1 simplification).
             // "Only when not on battlefield" conditional layer-4 effect deferred.
             // Loyalty abilities (+1, -2, -5) wired by OracleLoyaltyAbilityBinder.
             "Grist, the Hunger Tide" => GristFactory.Create(owner),
+
+            // Creature — Elemental Incarnation {3}{W}{W} 3/2 (SolitudeFactory).
+            // Flash + Lifelink + Evoke keyword markers wired. ETB exile-target-
+            // creature trigger wired (lifegain to target's controller equal to
+            // exiled creature's power). Evoke alt-cost = "exile a white card
+            // from hand" via EvokeAlternativeCost; printed evoke-sacrifice
+            // trigger fires when Solitude enters if evoke was paid (CR 702.74b).
+            // Opponent pitch-back ("controller may exile a non-Elemental,
+            // non-Incarnation white card from their hand to return") deferred.
+            "Solitude" => SolitudeFactory.Create(owner),
+
+            // U/R Horizon Canopy painless dual — Modern Horizons (FieryIsletFactory).
+            // {T}, Pay 1 life: Add {U} or {R} — two ManaAbility instances, each with
+            // a life-cost activation gate (CR 119.4) and a LoseLife side-effect.
+            // {1}, {T}, Sacrifice this land: Draw a card — wired.
+            // Sacrifice-cost zone movement deferred (see HorizonLandBinder.AttachSacDraw).
+            "Fiery Islet" => FieryIsletFactory.Create(owner),
+
+            // R/W Horizon Canopy painless dual — Modern Horizons (SunbakedCanyonFactory).
+            // Same shape as Fiery Islet; only colour differs.
+            "Sunbaked Canyon" => SunbakedCanyonFactory.Create(owner),
+
+            // U/R surveil land — Foundations (ThunderingFallsFactory).
+            // {T}: Add {U} or {R} — two ManaAbility instances wired.
+            // ETB trigger: surveil 1 — default-all-graveyard decision wired.
+            // ETB-tapped + surveil player prompt deferred (mirrors Underground Mortuary).
+            "Thundering Falls" => ThunderingFallsFactory.Create(owner),
+
+            // R/W surveil land — Foundations (ElegantParlorFactory).
+            // Same shape as Thundering Falls; only colour differs.
+            "Elegant Parlor" => ElegantParlorFactory.Create(owner),
+
+            // R/W fastland — Kaladesh (InspiringVantageFactory).
+            // {T}: Add {R} or {W} — two ManaAbility instances wired.
+            // ETB-tapped-unless-two-or-fewer-other-lands handled via
+            // ConditionalEntersTappedBinder in the production load path.
+            "Inspiring Vantage" => InspiringVantageFactory.Create(owner),
 
             _ => new Card(name, ""),
         };

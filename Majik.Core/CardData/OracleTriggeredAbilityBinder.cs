@@ -89,6 +89,28 @@ public static class OracleTriggeredAbilityBinder
         @"whenever\s+(?:a|each)\s+player\s+casts\s+a\s+spell\s+with\s+mana\s+value\s+(?<cmc>\d+|one|two|three|four|five|six|seven)\s+or\s+less\s*,\s*(?<effect>[^.]+)\.",
         RegexOptions.IgnoreCase);
 
+    // Goblin Guide attack pattern: "Whenever ~ attacks, defending player
+    // reveals the top card of their library. If it's a land card, that
+    // player puts it into their hand." Two sentences — the AttackLine
+    // regex only captures up to the first period, so this whole-text
+    // pattern is matched separately and emits its own TriggeredAbility.
+    // The predicate captures the defending player from
+    // CreatureAttacksEvent so the effect resolves against the correct
+    // library at resolution time (CR 508.1f, CR 506.2).
+    private static readonly Regex GoblinGuideFullPattern = new(
+        @"whenever\s+(?:~|this\s+creature)\s+attacks\s*,\s*defending\s+player\s+reveals\s+the\s+top\s+card\s+of\s+(?:their|that\s+player'?s)\s+library\.?\s*if\s+it'?s\s+a\s+land(?:\s+card)?\s*,\s*(?:that\s+player|they)\s+puts?\s+it\s+into\s+(?:their|that\s+player'?s)\s+hand",
+        RegexOptions.IgnoreCase);
+
+    // Ragavan-style combat-damage rider: "exile the top card of that player's
+    // library" (Scryfall phrasing) or "that player exiles the top card of
+    // their library" (per-card-text phrasing). Matched inside the
+    // CombatDamagePlayer block; the predicate captures the damaged player
+    // from CombatDamageDealtEvent so the effect closure exiles from the
+    // correct library.
+    private static readonly Regex ExileTopOfThatPlayersLibrary = new(
+        @"(?:(?:that\s+player|they)\s+exiles?\s+the\s+top\s+card\s+of\s+(?:their|that\s+player'?s)\s+library|exile\s+the\s+top\s+card\s+of\s+that\s+player'?s\s+library)",
+        RegexOptions.IgnoreCase);
+
     public static IEnumerable<TriggeredAbility> Bind(
         ICard source, CardEntity entity, Player? controller = null,
         IReadOnlyList<Player>? allPlayers = null)
@@ -147,12 +169,43 @@ public static class OracleTriggeredAbilityBinder
 
         foreach (Match m in CombatDamagePlayer.Matches(text))
         {
-            var effects = BuildEffects(m.Groups["effect"].Value, ctrl, source).ToList();
+            var effectText = m.Groups["effect"].Value;
+            var effects = BuildEffects(effectText, ctrl, source).ToList();
+
+            // Ragavan-style "that player exiles the top card of their library"
+            // rider — needs the *damaged* player resolved at fire-time. We
+            // capture them via a per-ability shared field set by the
+            // predicate (CombatDamageDealtEvent.TargetPlayer) so the effect
+            // closure exiles from the correct library at resolution time.
+            // (CR 603.3 — trigger condition evaluation runs before stack
+            // push, so the capture is fresh when the ability resolves.)
+            var wantsExileTop = ExileTopOfThatPlayersLibrary.IsMatch(effectText);
+            Player? capturedDamaged = null;
+
+            if (wantsExileTop)
+            {
+                effects.Add(new Effect("exile top of damaged player's library", () =>
+                {
+                    var victim = capturedDamaged;
+                    if (victim == null) return;
+                    var top = victim.Zones.Library.GetCards().FirstOrDefault();
+                    if (top == null) return;
+                    victim.Zones.Library.RemoveCard(top);
+                    victim.Zones.Exile.AddCard(top);
+                    top.SetZone(ZoneType.Exile);
+                }));
+            }
+
             if (effects.Count == 0) continue;
             yield return new TriggeredAbility(
                 source, ctrl,
                 new EventTriggerCondition<CombatDamageDealtEvent>((e, _) =>
-                    ReferenceEquals(e.Source, source) && e.TargetPlayer != null),
+                {
+                    if (!ReferenceEquals(e.Source, source)) return false;
+                    if (e.TargetPlayer == null) return false;
+                    capturedDamaged = e.TargetPlayer;
+                    return true;
+                }),
                 effects: effects);
         }
 
@@ -165,6 +218,43 @@ public static class OracleTriggeredAbilityBinder
                 source, ctrl,
                 Triggers.OnAttackSelf(source),
                 effects: effects);
+        }
+
+        // Goblin Guide attack pattern (CR 508.1f). Whole-text match because
+        // the effect spans two sentences ("reveals … library. If it's a
+        // land …"), which the single-sentence AttackLine regex truncates.
+        // Predicate captures the defending player from CreatureAttacksEvent
+        // so the effect closure resolves against the correct library.
+        foreach (Match _gg in GoblinGuideFullPattern.Matches(text))
+        {
+            Player? capturedDefender = null;
+            var effect = new Effect("Goblin Guide: defender reveals top; land → hand", () =>
+            {
+                var def = capturedDefender;
+                if (def == null) return;
+                var top = def.Zones.Library.GetCards().FirstOrDefault();
+                if (top == null) return;
+                // v1: reveal is event-only (no explicit CardRevealedEvent;
+                // a future iteration can emit one for log subscribers). The
+                // observable side-effect is the land move.
+                if (!top.HasType(CardType.Land)) return;
+                def.Zones.Library.RemoveCard(top);
+                def.Zones.Hand.AddCard(top);
+                top.SetZone(ZoneType.Hand);
+            });
+
+            yield return new TriggeredAbility(
+                source, ctrl,
+                new EventTriggerCondition<CreatureAttacksEvent>((e, _) =>
+                {
+                    if (!ReferenceEquals(e.Attacker, source)) return false;
+                    capturedDefender = e.DefendingPlayerOrPlaneswalker as Player;
+                    return true;
+                }),
+                effects: new IEffect[] { effect });
+            // Only one Goblin Guide trigger per card; break after the first
+            // match to avoid double-binding if the regex matches twice.
+            break;
         }
 
         // "Whenever a player casts a spell with mana value N or less, ~ deals

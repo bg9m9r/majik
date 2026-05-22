@@ -128,12 +128,17 @@ public static class SeedImplementedCards
         "Lightning Bolt",
         // Sorcery — {R}. DamagePlayerTemplate ("target player or planeswalker").
         "Lava Spike",
-        // Instant — {R}. DamageAnyTargetTemplate. Flashback (sac Mountain to
-        // recast from graveyard) deferred — flashback infra missing.
+        // Instant — {R}. DamageAnyTargetTemplate.
+        // Flashback—Sacrifice a Mountain (CR 702.34) wired via
+        // FlashbackAlternativeCost + SacrificeBasicLandCost + FlashbackOracleParser.
+        // Production bot doesn't yet auto-elect flashback (PriorityAction
+        // can't carry alt-cost) — same status as Force of Vigor's pitch.
         "Lava Dart",
         // Sorcery — {2}{R} (spectacle {R}). DamageAnyTargetTemplate handles
         // the 3-damage body. Spectacle alt-cost ("if an opponent lost life
-        // this turn") deferred — needs alt-cost framework.
+        // this turn") wired via SpectacleBinder + SpectacleAlternativeCost
+        // (CR 702.118) — dispatcher offers the {R} alt-cost when any
+        // opponent's Player.LifeLostThisTurn > 0 at announce time.
         "Skewer the Critics",
         // Instant — {G/P}. PumpCreatureTemplate applies +2/+2 EOT. Phyrexian
         // alt-cost (2 life instead of {G}) deferred.
@@ -171,6 +176,55 @@ public static class SeedImplementedCards
         // (variable damage by creature count, exile graveyards) no-op.
         "Thraben Charm",
 
+        // Creature — Goblin Scout {R} 2/2 (KeywordBinder + OracleTriggeredAbilityBinder).
+        // Haste — wired via KeywordBinder.
+        // Attack trigger — "defending player reveals top of library; if it's a
+        // land, that player puts it into their hand" — wired via
+        // OracleTriggeredAbilityBinder.GoblinGuideFullPattern; defender is
+        // captured from CreatureAttacksEvent at trigger time.
+        // Deferred: explicit CardRevealedEvent for the reveal half (current
+        // v1 only emits the move-to-hand on the land branch).
+        "Goblin Guide",
+
+        // Legendary Creature — Monkey Pirate {R} 2/1 (OracleTriggeredAbilityBinder).
+        // Combat-damage trigger: "create a Treasure token and exile the top
+        // card of that player's library" — Treasure handled by
+        // CreateTreasure regex; exile handled by ExileTopOfThatPlayersLibrary
+        // inline effect that captures the damaged player from
+        // CombatDamageDealtEvent.
+        // Deferred:
+        //  - "Until end of turn, you may cast that card" — no
+        //    temporary-cast-permission/alt-zone-casting system in v1.
+        //  - Dash {1}{R} — alt-cost framework + EOT bounce trigger
+        //    (returns from battlefield to hand at next end step) not wired.
+        //  - Treasure token's "sacrifice for one mana of any color" already
+        //    wired via TokenFactory.CreateTreasure (5 ManaAbility options).
+        "Ragavan, Nimble Pilferer",
+
+        // Artifact — {0} (MishrasBaubleFactory).
+        // {T}, Sacrifice this artifact: Look at top of target player's library;
+        // draw a card at the beginning of the next turn's upkeep.
+        // Look-at-top + sacrifice wired; delayed upkeep draw wired via
+        // DelayedTriggeredAbility registered with TriggerManager (CR 603.7).
+        // v1 auto-targets the controller (real player-targeting prompt deferred).
+        "Mishra's Bauble",
+
+        // Enchantment — {1}{R} (GoblinBombardmentFactory).
+        // Sacrifice a creature: This enchantment deals 1 damage to any target.
+        // Activation cost (SacrificeCreatureCost) + 1 damage wired via
+        // OracleSpellBinder.DealDamage. v1 picks target via BuildPingAbility's
+        // explicit parameters (bot pick-first-legal heuristic). Real prompt
+        // system deferred.
+        "Goblin Bombardment",
+
+        // Sorcery — {U}{R} (OracleSpellBinder: ExpressiveIterationTemplate).
+        // Look at top 3 of your library — first → hand, second → bottom of
+        // library, third → exile (deterministic v1 distribution; real
+        // player choice deferred).
+        // "You may play the exiled card this turn" rider deferred — no
+        // temporary cast-from-exile permission system yet.
+        "Expressive Iteration",
+
         // Enchantment Creature — Spirit {R}{R} 2/2 (OracleTriggeredAbilityBinder).
         // "Whenever a player casts a spell with mana value 3 or less, ~ deals
         // 2 damage to that player." Wired via PlayerCastsCheapSpellLine
@@ -178,5 +232,81 @@ public static class SeedImplementedCards
         // non-controller player (correct for 2-player; multiplayer
         // "that player" accuracy deferred).
         "Eidolon of the Great Revel",
+
+        // ---- Sagas (SagaBinder per-card chapter effects) ----
+
+        // Enchantment — Saga {2}{R} // Enchantment Creature — Goblin Shaman
+        // (Kamigawa: Neon Dynasty). DFC stored under its full composite name.
+        // I  — Create a 2/2 red Goblin Shaman token (embedded
+        //      "Whenever this token attacks, create a Treasure token"
+        //      trigger DEFERRED — no attack-trigger wiring for token
+        //      abilities yet).
+        // II — Discard up to two, draw that many — wired; "you may" opt-out
+        //      and per-card choice DEFERRED (v1 discards the first two cards
+        //      in hand deterministically).
+        // III— Exile + return transformed to Reflection of Kiki-Jiki —
+        //      DEFERRED (no saga-transform infrastructure).
+        "Fable of the Mirror-Breaker // Reflection of Kiki-Jiki",
+
+        // Enchantment — Saga {2}{R}{R} // Legendary Creature — Avatar
+        // (Avatar: The Last Airbender). DFC stored under its full composite name.
+        // I  — Exile top 3 of library — wired; "you may play those cards
+        //      until end of your next turn" rider DEFERRED (needs alt-play /
+        //      turn-scoped permission framework).
+        // II — Add one mana of any color — wired as {R} deterministically;
+        //      real mana-color prompt DEFERRED.
+        // III— Exile + return transformed to Avatar Roku — DEFERRED (no
+        //      saga-transform infrastructure).
+        "The Legend of Roku // Avatar Roku",
+
+        // Creature — Elemental Incarnation {3}{W}{W} 3/2 (SolitudeFactory).
+        // Modern Horizons 2 incarnation. Flash + Lifelink + Evoke keyword
+        // markers via KeywordBinder; KeywordBinder also attaches the printed
+        // evoke sacrifice trigger (EvokeFactory) automatically. ETB
+        // exile-target-creature + lifegain wired via SolitudeFactory.
+        // Evoke alt-cost — "exile a white card from your hand" — via
+        // EvokeAlternativeCost.
+        // Deferred: opponent pitch-back ("controller may exile a
+        // non-Elemental, non-Incarnation white card to return the exiled
+        // creature").
+        "Solitude",
+
+        // U/R Horizon Canopy painless dual — Modern Horizons (FieryIsletFactory).
+        // {T}, Pay 1 life: Add {U} or {R} — two ManaAbility instances with a
+        // life-cost activation gate (CR 119.4) + LoseLife side-effect wired
+        // via HorizonLandBinder.
+        // {1}, {T}, Sacrifice this land: Draw a card — wired (Vexing Bauble shape).
+        // Sacrifice cost doesn't yet move the land to the graveyard (zone-
+        // service plumbing TODO on AdditionalCost.Sacrifice).
+        // "Pay life as a 'you may' prompt" is moot — bot's source-picker uses
+        // the ability transparently when paying mana costs.
+        "Fiery Islet",
+
+        // R/W Horizon Canopy painless dual — Modern Horizons (SunbakedCanyonFactory).
+        // Same shape as Fiery Islet — Pay 1 life mana abilities + sac-draw.
+        // Same deferred notes apply (sacrifice zone movement).
+        "Sunbaked Canyon",
+
+        // U/R surveil land — Foundations (ThunderingFallsFactory).
+        // {T}: Add {U} or {R} — two ManaAbility instances, player selects at activation.
+        // ETB trigger: surveil 1 — default-all-graveyard decision wired.
+        // ETB-tapped handled by EntersTappedBinder in production path.
+        // Surveil player prompt + life-loss replacement effects out of scope here.
+        // Same pattern reusable for the rest of the Foundations surveil cycle.
+        "Thundering Falls",
+
+        // R/W surveil land — Foundations (ElegantParlorFactory).
+        // Same shape as Thundering Falls; only colour differs. Same deferred notes.
+        "Elegant Parlor",
+
+        // R/W fastland — Kaladesh (InspiringVantageFactory).
+        // {T}: Add {R} or {W} — two ManaAbility instances wired.
+        // Conditional ETB-tapped ("unless you control two or fewer other lands")
+        // handled by ConditionalEntersTappedBinder in production path
+        // (regex already matches the "N or fewer / more other lands" form
+        // shared with Kamigawa channel lands).
+        // Same pattern reusable for the rest of the Kaladesh fastland cycle:
+        // Concealed Courtyard, Spirebluff Canal, Botanical Sanctum, Blooming Marsh.
+        "Inspiring Vantage",
     };
 }

@@ -136,6 +136,15 @@ public sealed class TurnDriver
         // CR 305.2 — land drops reset at turn start.
         _landDropTracker?.ResetTurn();
 
+        // CR 119.3 — per-player life-loss counters reset at turn start.
+        // Consulted by Spectacle alt-cost, Revolt, "if you lost life this
+        // turn" triggers, etc. Reset before TurnState.Reset to keep
+        // turn-start zeroing of all per-turn trackers in one block.
+        foreach (var p in _players)
+        {
+            p.ResetTurnTrackers();
+        }
+
         // Reset per-turn event tally (revolt, connive X, draw watchers).
         TurnState.Reset();
 
@@ -290,8 +299,12 @@ public sealed class TurnDriver
 
             // Pay mana up front. SpellCastFlow doesn't enforce payment;
             // it just collects ManaPayment for downstream metadata.
-            // Apply cost-reduction (CR 117.7 — Affinity / cost-reducers).
-            var cost = Majik.Core.Costs.CostReduction.GetEffectiveCost(cast.Card, actor);
+            // When the agent elected an alternative cost (CR 118.9 —
+            // flashback / spectacle / evoke / pitch), it REPLACES the
+            // printed cost and bypasses cost-reduction; otherwise apply
+            // CR 117.7 Affinity / cost-reducers on the printed cost.
+            var cost = cast.AlternativeCost?.AlternativeManaCost
+                ?? Majik.Core.Costs.CostReduction.GetEffectiveCost(cast.Card, actor);
             var payment = await _agents[actor].ChooseManaSourcesAsync(ctx, cost, ct);
             if (!manaResolver.Pay(actor, cost, payment))
             {
@@ -301,7 +314,10 @@ public sealed class TurnDriver
 
             try
             {
-                await castFlow.CastAsync(actor, cast.Card, def, _agents[actor], ctx, ct);
+                await castFlow.CastAsync(
+                    actor, cast.Card, def, _agents[actor], ctx, ct,
+                    additionalCosts: cast.AdditionalCosts,
+                    alternativeCost: cast.AlternativeCost);
             }
             catch (InvalidOperationException ex)
             {

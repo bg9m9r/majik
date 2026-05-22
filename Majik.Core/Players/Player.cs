@@ -69,6 +69,25 @@ public class Player
     /// <summary>Record an attempted draw from an empty library (CR 704.5b).</summary>
     public void MarkTriedToDrawFromEmptyLibrary() => TriedToDrawFromEmptyLibrary = true;
 
+    /// <summary>
+    /// CR 119.3 / 702.118 — total life lost this turn from any source. Reset
+    /// at turn start by <see cref="ResetTurnTrackers"/>. Consulted by
+    /// alt-costs like Spectacle ("if an opponent lost life this turn") and
+    /// by Revolt-style effects that key on life loss. Incremented inside
+    /// <see cref="LoseLife"/> so every life-loss path (combat damage,
+    /// direct-damage spells, shock lands, drain effects, etc.) is captured
+    /// automatically.
+    /// </summary>
+    public int LifeLostThisTurn { get; private set; }
+
+    /// <summary>Reset per-turn life-loss tracker (and any future per-turn
+    /// per-player counters). Called by <see cref="Game.TurnDriver"/> at
+    /// turn start so the prior turn's loss doesn't bleed forward.</summary>
+    public void ResetTurnTrackers()
+    {
+        LifeLostThisTurn = 0;
+    }
+
     /// <summary>CR 704.5c — poison counters; 10+ → lose.</summary>
     public int PoisonCounters { get; internal set; }
 
@@ -175,6 +194,14 @@ public class Player
         }
 
         _lifeTotal = _lifeTotal.Subtract(amount);
+
+        // CR 119.3 — track life lost this turn for alt-costs/triggers
+        // (Spectacle, Revolt, etc.). amount==0 doesn't count as "losing
+        // life" per CR 119.4, so guard before bumping.
+        if (amount > 0)
+        {
+            LifeLostThisTurn += amount;
+        }
 
         // Check if player has lost
         if (_lifeTotal.HasLost)
