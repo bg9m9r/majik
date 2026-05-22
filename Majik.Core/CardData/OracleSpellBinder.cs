@@ -171,6 +171,7 @@ public static class OracleSpellBinder
             new SpellTemplates.Templates.Bespoke.LifesLegacyTemplate(),
             new SpellTemplates.Templates.Bespoke.TormentedThoughtsTemplate(),
             new SpellTemplates.Templates.Bespoke.HatredTemplate(),
+            new SpellTemplates.Templates.Bespoke.RedirectTemplate(),
             _composer,
         };
 
