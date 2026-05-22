@@ -81,4 +81,23 @@ public class LibraryTemplateTests
             Ctx("Exile target card from a graveyard."))
             .Should().NotBeNull();
     }
+
+    [Theory]
+    [InlineData("Return all enchantment cards from your graveyard to the battlefield.")]
+    [InlineData("Return all artifact and enchantment cards from your graveyard to the battlefield.")]
+    [InlineData("Return all artifact, enchantment, and planeswalker cards from your graveyard to the battlefield.")]
+    [InlineData("Return all land cards from your graveyard to the battlefield tapped.")]
+    [InlineData("Return all creature cards from your graveyard to the battlefield.")]
+    public void ReturnAllFromGraveyardTemplate_MatchesMassReanimation(string oracle)
+    {
+        new ReturnAllFromGraveyardTemplate().TryBind(Ctx(oracle)).Should().NotBeNull();
+    }
+
+    [Fact]
+    public void ReturnAllFromGraveyardTemplate_DoesNotMatch_TargetSingleReanimation()
+    {
+        new ReturnAllFromGraveyardTemplate().TryBind(
+            Ctx("Return target creature card from your graveyard to the battlefield."))
+            .Should().BeNull();
+    }
 }

@@ -171,6 +171,28 @@ internal static class LibrarySpellFactory
             }) };
         });
 
+    internal static SpellDefinition ReturnAllFromGraveyardSpell(Player caster, string kindRaw) => new(
+        Modes: Array.Empty<string>(), HasVariableX: false,
+        TargetRequests: Array.Empty<TargetRequest>(),
+        EffectFactory: _ => new IEffect[] { new Effect($"return all {kindRaw} from gy", () =>
+        {
+            // Lossy v1: every card in the caster's graveyard returns to the
+            // caster's battlefield. Type/subtype/supertype filter from the
+            // oracle text is ignored — the resolver does not enforce it and
+            // non-permanent cards in the graveyard will move too. Acceptable
+            // because cards without a matching template have no behavior at
+            // all; mass-reanimating a graveyard's worth of cards is a closer
+            // approximation than nothing.
+            var snapshot = caster.Zones.Graveyard.GetCards().ToList();
+            foreach (var card in snapshot)
+            {
+                caster.Zones.Graveyard.RemoveCard(card);
+                caster.Zones.Battlefield.AddCard(card);
+                card.SetZone(ZoneType.Battlefield);
+                card.SetController(caster);
+            }
+        }) });
+
     internal static SpellDefinition ExileFromGraveyardSpell(Func<object, object> resolver, string kindRaw) => new(
         Modes: Array.Empty<string>(), HasVariableX: false,
         TargetRequests: new[] { new TargetRequest(
