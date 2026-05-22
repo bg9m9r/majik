@@ -1,4 +1,5 @@
 using Majik.Bot.Evaluation;
+using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Game;
@@ -21,10 +22,35 @@ public class PriorityPolicy
 {
     protected readonly ArchetypeWeights _weights;
 
+    /// <summary>Tracks activated-ability IDs we've already fired this turn so
+    /// the priority pump doesn't infinite-loop on the same activation. Reset
+    /// on turn boundary.</summary>
+    private readonly HashSet<Guid> _abilityFiredThisTurn = new();
+    private int _abilityMemoTurn = -1;
+    private Guid? _lastAbilityProposed;
+
     public PriorityPolicy(ArchetypeWeights weights) { _weights = weights; }
 
     public virtual PriorityAction Pick(GameContext ctx, Player self)
     {
+        // Turn-boundary reset for the activated-ability memo.
+        if (ctx.TurnNumber != _abilityMemoTurn)
+        {
+            _abilityFiredThisTurn.Clear();
+            _lastAbilityProposed = null;
+            _abilityMemoTurn = ctx.TurnNumber;
+        }
+        // If our previous proposal hasn't left the activation stream (e.g.
+        // dispatcher rejected it or it resolved silently), mark it fired so
+        // we don't re-propose. The engine's PriorityLoop only calls us after
+        // the action committed, so the conservative path is to flag whichever
+        // we last suggested.
+        if (_lastAbilityProposed is Guid prev)
+        {
+            _abilityFiredThisTurn.Add(prev);
+            _lastAbilityProposed = null;
+        }
+
         var current = BoardEval.Score(ctx, self, _weights);
 
         PriorityAction best = PriorityAction.Pass;
@@ -39,6 +65,10 @@ public class PriorityPolicy
             }
         }
 
+        if (best is PriorityAction.ActivateAbility act)
+        {
+            _lastAbilityProposed = act.Ability.Id;
+        }
         return best;
     }
 
@@ -87,6 +117,37 @@ public class PriorityPolicy
 
                 var projected = current + ProjectCastDelta(card);
                 yield return (new PriorityAction.CastSpell(card, Array.Empty<object>()), projected);
+            }
+        }
+
+        // Activated abilities of permanents we control (CR 602). Mana
+        // abilities are excluded — they aren't priority actions; the
+        // ManaPaymentResolver fires them as part of paying a cost. The
+        // ActivatedAbilityPolicy projects an EV delta per ability;
+        // negative-delta activations stay below `current` and the outer
+        // argmax falls through to Pass.
+        foreach (var (action, projected) in EnumerateActivatedAbilities(ctx, self, current))
+        {
+            yield return (action, projected);
+        }
+    }
+
+    private IEnumerable<(PriorityAction action, double projected)>
+        EnumerateActivatedAbilities(GameContext ctx, Player self, double current)
+    {
+        foreach (var card in self.Zones.Battlefield.GetCards())
+        {
+            foreach (var ability in card.Abilities.OfType<IActivatedAbility>())
+            {
+                if (ability is IManaAbility) continue;
+                if (_abilityFiredThisTurn.Contains(ability.Id)) continue;
+                if (!ability.Costs.All(cost => cost.CanPay(self))) continue;
+
+                var delta = ActivatedAbilityPolicy.ProjectActivateDelta(
+                    ability, ctx, self, _weights);
+                yield return (
+                    new PriorityAction.ActivateAbility(ability, Array.Empty<object>()),
+                    current + delta);
             }
         }
     }
