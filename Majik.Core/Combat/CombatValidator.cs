@@ -1,5 +1,6 @@
 using Majik.Core.Cards;
 using Majik.Core.Domain.Exceptions;
+using Majik.Core.Effects;
 using Majik.Core.Players;
 using Majik.Core.Zones;
 
@@ -10,6 +11,13 @@ namespace Majik.Core.Combat;
 /// </summary>
 public class CombatValidator
 {
+    private readonly ContinuousEffectsService? _effects;
+
+    public CombatValidator(ContinuousEffectsService? effects = null)
+    {
+        _effects = effects;
+    }
+
     /// <summary>
     /// Check if a creature can attack.
     /// </summary>
@@ -40,6 +48,13 @@ public class CombatValidator
 
         // Creature must not have summoning sickness (unless has haste) (Rule 302.6)
         if (creature.HasSummoningSickness && !CombatAbilities.HasHaste(creature))
+        {
+            return false;
+        }
+
+        // Per-turn CannotAttack restriction (CR 508.1c) — installed by
+        // spells like Orim's Chant / "<X> creatures can't attack this turn".
+        if (_effects?.HasRestriction(creature, CombatRestriction.CannotAttack) == true)
         {
             return false;
         }
@@ -88,6 +103,22 @@ public class CombatValidator
         // for the block declaration; here we enforce only the attacker
         // side, which is the canonical "can't be blocked" interaction).
         if (AttackerProtectedFromBlocker(attacker.Creature, creature))
+        {
+            return false;
+        }
+
+        // Per-turn CannotBlock restriction (CR 509.1c) — installed by Falter,
+        // Magmatic Chasm, "<modifier> creatures can't block this turn", and
+        // the target-creature single-creature variants.
+        if (_effects?.HasRestriction(creature, CombatRestriction.CannotBlock) == true)
+        {
+            return false;
+        }
+
+        // Per-turn CannotBeBlocked restriction on the attacker (CR 702.x) —
+        // installed by Slip Through Space / Trailblazer evasion grants. The
+        // attacker is the creature inside the Attacker wrapper.
+        if (_effects?.HasRestriction(attacker.Creature, CombatRestriction.CannotBeBlocked) == true)
         {
             return false;
         }

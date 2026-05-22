@@ -1,6 +1,7 @@
 using Majik.Core.Cards;
 using Majik.Core.Domain.DomainEvents;
 using Majik.Core.Domain.Exceptions;
+using Majik.Core.Effects;
 using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Rules;
@@ -33,10 +34,14 @@ public class CombatManager
     /// </summary>
     public bool IsInCombat => _currentCombat != null && !_currentCombat.IsEnded;
 
-    public CombatManager(IEventBus? eventBus = null, StateBasedActions? stateBasedActions = null, ZoneService? zoneService = null)
+    public CombatManager(
+        IEventBus? eventBus = null,
+        StateBasedActions? stateBasedActions = null,
+        ZoneService? zoneService = null,
+        ContinuousEffectsService? continuousEffects = null)
     {
         _eventBus = eventBus;
-        _validator = new CombatValidator();
+        _validator = new CombatValidator(continuousEffects);
         _stateBasedActions = stateBasedActions;
         _zoneService = zoneService;
         _damageAssigner = new CombatDamageAssigner(eventBus);
