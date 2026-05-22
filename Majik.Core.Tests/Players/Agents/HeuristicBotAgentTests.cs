@@ -320,6 +320,67 @@ public class HeuristicBotAgentTests
     }
 
     [Fact]
+    public async Task DeclareAttackers_LethalReach_SwingsWithEverythingDespiteSuicidal()
+    {
+        // Alice attack power exceeds opp's life: race won. Swing with
+        // everything even though each creature would die in combat — the
+        // damage gets through before SBAs kill our attackers (and we win).
+        _bob.LifeTotal = 3;
+        var bear = new Creature("Bear", "1G", 2, 2) { Owner = _alice, Controller = _alice };
+        var spirit = new Creature("Spirit", "U", 1, 1) { Owner = _alice, Controller = _alice };
+        var wall = new Creature("Wall", "3", 4, 4) { Owner = _bob, Controller = _bob };
+        _bob.Zones.Battlefield.AddCard(wall);
+        wall.SetZone(ZoneType.Battlefield);
+
+        var bot = new HeuristicBotAgent();
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice,
+            1, PhaseStateType.DeclareAttackers, new Majik.Core.Stack.Stack());
+
+        var plan = await bot.DeclareAttackersAsync(ctx, new[] { bear, spirit });
+
+        plan.Attackers.Should().HaveCount(2, "reach lethal — race win overrides suicidal-attack guard");
+    }
+
+    [Fact]
+    public async Task DeclareAttackers_SuicidalAttack_Skipped()
+    {
+        // Our 1/1 vs their 4/4 untapped. The 4/4 safely kills the 1/1.
+        // Bot should not attack unless lethal-this-turn.
+        var our1_1 = new Creature("Bear", "G", 1, 1) { Owner = _alice, Controller = _alice };
+        var their4_4 = new Creature("Wall", "3", 4, 4) { Owner = _bob, Controller = _bob };
+        _bob.Zones.Battlefield.AddCard(their4_4);
+        their4_4.SetZone(ZoneType.Battlefield);
+
+        var bot = new HeuristicBotAgent();
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice,
+            1, PhaseStateType.DeclareAttackers, new Majik.Core.Stack.Stack());
+
+        var plan = await bot.DeclareAttackersAsync(ctx, new[] { our1_1 });
+
+        plan.Attackers.Should().BeEmpty("opp's 4/4 safely kills our 1/1 — no reason to attack");
+    }
+
+    [Fact]
+    public async Task DeclareAttackers_FlyingUnblockable_AlwaysAttacks()
+    {
+        // Our 2/2 flier vs opp's 4/4 ground. Flier is unblockable —
+        // attack even though it'd die to the 4/4 in a fight.
+        var ourFlier = new Creature("Flier", "1U", 2, 2) { Owner = _alice, Controller = _alice };
+        ourFlier.AddAbility(new Majik.Core.Abilities.KeywordAbility("Flying", ourFlier, _alice));
+        var theirWall = new Creature("Wall", "3", 4, 4) { Owner = _bob, Controller = _bob };
+        _bob.Zones.Battlefield.AddCard(theirWall);
+        theirWall.SetZone(ZoneType.Battlefield);
+
+        var bot = new HeuristicBotAgent();
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice,
+            1, PhaseStateType.DeclareAttackers, new Majik.Core.Stack.Stack());
+
+        var plan = await bot.DeclareAttackersAsync(ctx, new[] { ourFlier });
+
+        plan.Attackers.Should().HaveCount(1);
+    }
+
+    [Fact]
     public async Task ChooseTargets_BuffLabel_FlipsToCasterSide()
     {
         // "target creature you control" label flags as buff — bot should

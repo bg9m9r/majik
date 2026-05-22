@@ -417,21 +417,98 @@ public sealed class HeuristicBotAgent : IPlayerAgent
         var defender = ctx.AllPlayers.First(p => !ReferenceEquals(p, ctx.Self));
         var defenderCreatures = defender.Zones.Battlefield.GetCards()
             .OfType<Creature>().Where(c => !c.IsTapped).ToList();
+        var ourBattlefield = ctx.Self.Zones.Battlefield.GetCards()
+            .OfType<Creature>().ToList();
 
-        // Skip suicidal attacks: don't swing with a creature smaller than
-        // every untapped opposing creature unless the defender's life is
-        // dangerously low (lethal reach this turn).
-        var totalAttackPower = eligibleAttackers.Sum(c => c.Power);
+        // 1) Lethal this turn? Total attack power vs defender life. If we
+        //    can kill them now (assuming worst-case blocks absorb just
+        //    enough to keep them alive), swing with everything — race won.
+        var totalAttackPower = eligibleAttackers.Sum(c => EffectivePower(c));
         var reach = totalAttackPower >= defender.LifeTotal;
+
+        // 2) Are we under threat of lethal next turn? Sum opp's untapped
+        //    power against our life (worst case: they untap + attack with
+        //    everything next turn). When true, we want defenders home.
+        var oppThreat = defender.Zones.Battlefield.GetCards()
+            .OfType<Creature>().Sum(c => c.Power);
+        var threatenedNextTurn = oppThreat >= ctx.Self.LifeTotal;
+
+        // 3) Compute the set of attackers to hold back as blockers when
+        //    threatened. Greedy: pick the smallest set whose collective
+        //    toughness can survive opp's biggest attackers. If not
+        //    threatened, hold back nothing.
+        var holdBack = new HashSet<Creature>();
+        if (threatenedNextTurn && !reach)
+        {
+            // Need at least one blocker per opp attacker that we can't
+            // afford to let through. Greedy: pair our biggest survivors
+            // with their biggest attackers.
+            var theirAttackersBySize = defenderCreatures
+                .OrderByDescending(c => c.Power).ToList();
+            var ourSurvivorsBySize = eligibleAttackers
+                .Concat(ourBattlefield.Where(c => c.IsTapped))
+                .Distinct()
+                .OrderByDescending(c => c.Toughness)
+                .ToList();
+            foreach (var oppAtk in theirAttackersBySize)
+            {
+                var blocker = ourSurvivorsBySize
+                    .Where(c => !holdBack.Contains(c))
+                    .Where(c => !c.IsTapped) // tapped already can't block
+                    .FirstOrDefault(c => c.Toughness > oppAtk.Power);
+                if (blocker != null) holdBack.Add(blocker);
+            }
+        }
+
         var attacks = new List<AttackerDeclaration>();
         foreach (var atk in eligibleAttackers)
         {
-            var willDieFromAll = defenderCreatures.All(d => d.Power >= atk.Toughness)
-                                 && defenderCreatures.Count > 0;
-            if (willDieFromAll && !reach) continue;
+            if (holdBack.Contains(atk)) continue;
+
+            // Suicidal-attack guard: if every defender creature can
+            // profitably kill the attacker (and attacker doesn't trade or
+            // race), skip. Reach (lethal this turn) overrides.
+            if (!reach && IsSuicidalAttack(atk, defenderCreatures)) continue;
+
             attacks.Add(new AttackerDeclaration(atk, defender));
         }
         return Task.FromResult(new CombatPlan(attacks));
+    }
+
+    private static int EffectivePower(Creature c)
+    {
+        var p = c.Power;
+        if (Majik.Core.Combat.CombatAbilities.HasDoubleStrike(c)) p *= 2;
+        return p;
+    }
+
+    /// <summary>True when EVERY untapped opposing creature can profitably
+    /// block this attacker (kill it without dying). Reach honored (defender
+    /// flier counts as a potential blocker for our flier).</summary>
+    private static bool IsSuicidalAttack(Creature atk, IReadOnlyList<Creature> defenders)
+    {
+        if (defenders.Count == 0) return false;
+        // Unblockable shortcut: flying with no flying/reach defenders.
+        var hasFlying = Majik.Core.Combat.CombatAbilities.HasFlying(atk);
+        if (hasFlying)
+        {
+            var blockers = defenders.Where(d =>
+                Majik.Core.Combat.CombatAbilities.HasFlying(d)
+                || Majik.Core.Combat.CombatAbilities.HasReach(d)).ToList();
+            if (blockers.Count == 0) return false;
+            return blockers.All(b => DefenderWinsTrade(atk, b));
+        }
+        return defenders.All(b => DefenderWinsTrade(atk, b));
+    }
+
+    private static bool DefenderWinsTrade(Creature atk, Creature blocker)
+    {
+        // Defender "wins": blocker survives AND kills attacker.
+        var atkDt = Majik.Core.Combat.CombatAbilities.HasDeathtouch(atk);
+        var bDt = Majik.Core.Combat.CombatAbilities.HasDeathtouch(blocker);
+        var atkKillsBlocker = atkDt || atk.Power >= blocker.Toughness;
+        var blockerKillsAtk = bDt ? blocker.Power > 0 : blocker.Power >= atk.Toughness;
+        return blockerKillsAtk && !atkKillsBlocker;
     }
 
     public Task<BlockPlan> DeclareBlockersAsync(GameContext ctx, IReadOnlyList<Creature> attackers, IReadOnlyList<Creature> eligibleBlockers, CancellationToken ct = default)
