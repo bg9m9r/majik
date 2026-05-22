@@ -243,30 +243,36 @@ public sealed class HeuristicBotAgent : IPlayerAgent
 
     public Task<IReadOnlyList<object>> ChooseTargetsAsync(GameContext ctx, TargetRequest request, CancellationToken ct = default)
     {
+        var label = (request.Description ?? "").ToLowerInvariant();
+        var opponent = ctx.AllPlayers.FirstOrDefault(p => !ReferenceEquals(p, ctx.Self));
+        var preferSelf = LabelIsBuff(label);
+
+        // Engine-supplied candidate list takes precedence. Rank them so the
+        // "first N" pick is actually the most-impactful N, not the first N
+        // by insertion order. Buff-style effects (label hints like "you
+        // control", "you may", or no-opponent-context) flip the ranking to
+        // prefer caster-side targets.
         if (request.LegalCandidates.Count > 0)
         {
+            var ordered = RankCandidates(request.LegalCandidates, ctx, opponent, preferSelf, label);
             return Task.FromResult<IReadOnlyList<object>>(
-                request.LegalCandidates.Take(request.MinTargets).ToList());
+                ordered.Take(request.MinTargets).ToList());
         }
 
         // Empty candidate list — fall back to engine-side picks. Card
         // binders that lack a candidate-gathering pass (e.g. damage-any
         // templates) get sensible defaults so the cast doesn't crash.
-        var opponent = ctx.AllPlayers.FirstOrDefault(p => !ReferenceEquals(p, ctx.Self));
         var picked = new List<object>();
-        var label = (request.Description ?? "").ToLowerInvariant();
-
         for (var i = 0; i < request.MinTargets; i++)
         {
             object? choice = label switch
             {
                 _ when label.Contains("player") || label.Contains("any target")
-                    => opponent,
+                    => PickPlayerTarget(ctx, opponent, preferSelf),
                 _ when label.Contains("creature")
-                    => opponent?.Zones.Battlefield.GetCards()
-                        .OfType<Creature>().FirstOrDefault(),
+                    => PickCreatureTarget(ctx, opponent, preferSelf),
                 _ when label.Contains("permanent")
-                    => opponent?.Zones.Battlefield.GetCards().FirstOrDefault(),
+                    => PickPermanentTarget(ctx, opponent, preferSelf),
                 _ when label.Contains("spell")
                     => ctx.Stack.Top,
                 _ => opponent,
@@ -274,6 +280,83 @@ public sealed class HeuristicBotAgent : IPlayerAgent
             if (choice != null) picked.Add(choice);
         }
         return Task.FromResult<IReadOnlyList<object>>(picked);
+    }
+
+    // ----- target-selection helpers -----
+
+    /// <summary>Heuristic: rank candidates so high-impact picks come first.
+    /// Removal/burn defaults to opponent's biggest threat. Buff defaults to
+    /// caster's best attacker. Players: lethal-face when opponent low, else
+    /// damage opponent.</summary>
+    private static IEnumerable<object> RankCandidates(
+        IReadOnlyList<object> candidates, GameContext ctx, Player? opponent,
+        bool preferSelf, string label)
+    {
+        var self = ctx.Self;
+        return candidates.OrderByDescending(c => Score(c, self, opponent, preferSelf, label));
+    }
+
+    private static int Score(object candidate, Player self, Player? opponent, bool preferSelf, string label)
+    {
+        switch (candidate)
+        {
+            case Player p:
+                // Lethal face if any candidate is opponent at low life.
+                if (ReferenceEquals(p, opponent)) return 1000 - p.LifeTotal;
+                return preferSelf && ReferenceEquals(p, self) ? 500 : 0;
+
+            case Creature c:
+                var bigThreat = c.Power * 10 + c.Toughness;
+                if (Majik.Core.Combat.CombatAbilities.HasFlying(c)) bigThreat += 5;
+                if (Majik.Core.Combat.CombatAbilities.HasTrample(c)) bigThreat += 5;
+                if (Majik.Core.Combat.CombatAbilities.HasLifelink(c)) bigThreat += 8;
+                if (Majik.Core.Combat.CombatAbilities.HasDeathtouch(c)) bigThreat += 3;
+                // For removal: opponent's biggest is BEST; ours is WORST.
+                // For buff: ours is BEST; opponent's is WORST.
+                var ownership = ReferenceEquals(c.Controller, self) ? 1 : -1;
+                return preferSelf ? bigThreat * ownership : bigThreat * -ownership;
+
+            case Cards.ICard card:
+                // Generic non-creature permanent / card target. Score by
+                // mana value as a "spend" proxy — bigger mana value = more
+                // valuable target. Ownership flip same as creature.
+                var cmc = ValueObjects.ManaCost.Parse(card.ManaCost ?? "").TotalValue;
+                var own = ReferenceEquals(card.Controller, self) ? 1 : -1;
+                return preferSelf ? cmc * own : cmc * -own;
+
+            default:
+                return 0;
+        }
+    }
+
+    private static bool LabelIsBuff(string label) =>
+        label.Contains("you control")
+        || label.Contains(" yours")
+        || label.Contains("gains")
+        || label.Contains("gain life")
+        || label.Contains("draws")
+        || label.Contains("you own");
+
+    private static object? PickPlayerTarget(GameContext ctx, Player? opponent, bool preferSelf)
+        => preferSelf ? (object?)ctx.Self : opponent;
+
+    private static object? PickCreatureTarget(GameContext ctx, Player? opponent, bool preferSelf)
+    {
+        var pool = (preferSelf ? ctx.Self : opponent)?.Zones.Battlefield
+            .GetCards().OfType<Creature>();
+        if (pool == null) return null;
+        return pool
+            .OrderByDescending(c => c.Power * 10 + c.Toughness)
+            .FirstOrDefault();
+    }
+
+    private static object? PickPermanentTarget(GameContext ctx, Player? opponent, bool preferSelf)
+    {
+        var pool = (preferSelf ? ctx.Self : opponent)?.Zones.Battlefield.GetCards();
+        if (pool == null) return null;
+        return pool
+            .OrderByDescending(c => ValueObjects.ManaCost.Parse(c.ManaCost ?? "").TotalValue)
+            .FirstOrDefault();
     }
 
     public Task<int> ChooseXAsync(GameContext ctx, ICard source, CancellationToken ct = default)
