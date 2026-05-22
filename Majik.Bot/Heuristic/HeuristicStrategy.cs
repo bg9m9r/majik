@@ -48,7 +48,7 @@ internal sealed class HeuristicStrategy : IBotStrategy
         => _combat.PickBlockers(ctx, self, attackers, eligible);
 
     public IReadOnlyList<ITriggeredAbility> OrderTriggers(GameContext ctx, IReadOnlyList<ITriggeredAbility> mine)
-        => mine;
+        => TriggerOrderPolicy.Order(ctx, mine);
 
     public Majik.Core.Keywords.ScryAction.ScryDecision PickScry(GameContext? ctx, Player self, IReadOnlyList<ICard> peeked)
         => ctx == null
