@@ -23,6 +23,8 @@ public static class OracleSpellBinder
 {
     private static readonly SpellTemplates.ClauseCompositionTemplate _composer =
         new SpellTemplates.ClauseCompositionTemplate();
+    private static readonly SpellTemplates.ModalChooseOneTemplate _modal =
+        new SpellTemplates.ModalChooseOneTemplate();
 
     public static SpellTemplateRegistry Registry { get; } = BuildRegistry();
 
@@ -30,12 +32,14 @@ public static class OracleSpellBinder
     {
         var reg = new SpellTemplateRegistry(BuildTemplateList());
         _composer.SetRegistry(reg);
+        _modal.SetRegistry(reg);
         return reg;
     }
 
     private static ISpellTemplate[] BuildTemplateList() =>
         new ISpellTemplate[]
         {
+            _modal,
             new SpellTemplates.Templates.Counter.CounterUnlessPayTemplate(),
             new SpellTemplates.Templates.Counter.CounterNoncreatureTemplate(),
             new SpellTemplates.Templates.Counter.CounterCreatureTemplate(),
