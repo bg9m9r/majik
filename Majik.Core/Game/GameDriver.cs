@@ -48,7 +48,8 @@ public sealed class GameDriver
         CombatFlow combatFlow,
         Majik.Core.Random.GameRandom? rng = null,
         Majik.Core.Events.IEventBus? eventBus = null,
-        Func<Majik.Core.Cards.ICard, Player, Majik.Core.Stack.Stack?, SpellDefinition?>? spellDefinitionResolver = null)
+        Func<Majik.Core.Cards.ICard, Player, Majik.Core.Stack.Stack?, SpellDefinition?>? spellDefinitionResolver = null,
+        Majik.Core.Effects.ContinuousEffectsService? continuousEffects = null)
     {
         _players = players ?? throw new ArgumentNullException(nameof(players));
         _agents = agents ?? throw new ArgumentNullException(nameof(agents));
@@ -59,7 +60,8 @@ public sealed class GameDriver
             players, agents, stack, zoneService, triggerManager,
             stackResolver, stateBasedActions, priorityManager, combatFlow,
             eventBus: eventBus,
-            spellDefinitionResolver: spellDefinitionResolver);
+            spellDefinitionResolver: spellDefinitionResolver,
+            continuousEffects: continuousEffects);
     }
 
     public async Task<GameResult> RunGameAsync(int maxTurns = 30, CancellationToken ct = default)
