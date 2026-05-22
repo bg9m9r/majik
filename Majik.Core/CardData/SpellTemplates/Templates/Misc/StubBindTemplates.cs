@@ -962,6 +962,45 @@ public sealed class PermanentsYouControlGainKeywordTemplate : ISpellTemplate
 /// resolves with a full bounce which over-shoots but matches the
 /// load-bearing effect.
 /// </summary>
+/// <summary>
+/// Single-clause "&lt;modifier&gt; creatures can't block this turn" lockout
+/// (Falter, Magmatic Chasm, Seismic Stomp, Awe for the Guilds, Ruthless
+/// Invasion, Flash of Defiance, Threshold clause, etc). The modifier can be
+/// empty, a color/keyword chain ("green creatures and white creatures"), a
+/// negation ("nonartifact creatures", "creatures without flying"), or a
+/// supertype ("monocolored creatures").
+///
+/// v1 lossy stub: empty-effect spell, like <see cref="FogTemplate"/> — the
+/// per-turn blocking-restriction service doesn't exist yet, so the spell
+/// resolves without changing combat. Cast/cost machinery still works and the
+/// card no longer falls through to the vanilla shell.
+/// </summary>
+public sealed class CreaturesCantBlockTemplate : ISpellTemplate
+{
+    // Whole-sentence anchor so multi-clause variants (Wrap in Flames, Trial
+    // of Agony) stay unmatched and reach the composer instead. Negative
+    // lookahead rejects target/up-to-N/X-target shapes (those are handled by
+    // TargetCantBeBlockedTemplate and UpToNCantBlockTemplate). The interior
+    // allows any prefix before "creatures" (color, supertype, "Nonartifact",
+    // "Monocolored", "Green creatures and white") plus a "without flying"
+    // postfix or a second "creatures" half.
+    private static readonly Regex Pattern = new(
+        @"^\s*(?!(?:target|up\s+to|any\s+number|\d+\s+target|x\s+target)\b)[^.]*?\bcreatures?\b[^.]*?\bcan'?t\s+block\s+this\s+turn\.?\s*$",
+        RegexOptions.IgnoreCase);
+
+    public int Priority => 50;
+    public string Name => "CreaturesCantBlock";
+
+    public SpellDefinition? TryBind(SpellBindContext ctx) =>
+        SpellTemplateBindHelper.DefaultTryBind(this, ctx);
+
+    public IReadOnlyDictionary<string, string>? TryExtractParams(string oracleText) =>
+        Pattern.IsMatch(oracleText) ? EmptyParams.Instance : null;
+
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
+        StubBindHelpers.EmptyEffectSpell(Array.Empty<TargetRequest>());
+}
+
 public sealed class ReturnAllPermanentsTemplate : ISpellTemplate
 {
     private static readonly Regex Pattern = new(

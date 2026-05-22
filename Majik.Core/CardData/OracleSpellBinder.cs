@@ -127,6 +127,7 @@ public static class OracleSpellBinder
             new SpellTemplates.Templates.Misc.CreaturesYourOpponentsControlDebuffTemplate(),
             new SpellTemplates.Templates.Misc.AttackingCreaturesPumpTemplate(),
             new SpellTemplates.Templates.Misc.PermanentsYouControlGainKeywordTemplate(),
+            new SpellTemplates.Templates.Misc.CreaturesCantBlockTemplate(),
             new SpellTemplates.Templates.Misc.ReturnAllPermanentsTemplate(),
             new SpellTemplates.Templates.Bespoke.ThoughtseizePatternTemplate(),
             new SpellTemplates.Templates.Bespoke.MalevolentRumblePatternTemplate(),
