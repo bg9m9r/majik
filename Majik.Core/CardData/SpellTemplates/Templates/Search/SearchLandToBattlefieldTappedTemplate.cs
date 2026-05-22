@@ -14,11 +14,18 @@ public sealed class SearchLandToBattlefieldTappedTemplate : ISpellTemplate
     // Vegetation, Nissa's Expedition, Boundless Realms, Reshape the
     // Earth, etc).
     //
+    // Also accepts the Cultivate / Kodama's Reach shape — "put one onto
+    // the battlefield tapped and the other into your hand" — by extending
+    // the put-subject alternation to include "one". v1 stub still fetches
+    // a single land; modelling "the other into your hand" as a second
+    // ramp step is deferred (the first tapped land covers the common-case
+    // ramp signal which is what the binder is checked for).
+    //
     // v1 stub fetches ONE land regardless of "up to N" wording — a
     // simplification, but the bound spell resolves correctly for ramping
     // the first land which is the common-case relevance check.
     private static readonly Regex Pattern = new(
-        @"search\s+your\s+library\s+for\s+(?:a|(?:up\s+to\s+)?(?:one|two|three|four|five|six|seven|eight|nine|ten|x)|any\s+number\s+of)\s+(?<kind>basic\s+land|land|basic\s+land[s]?\s+and(?:/or)?\s+[\w-]+)\s+cards?\b[^.]*put\s+(?:it|that\s+card|them|those\s+cards)\s+onto\s+the\s+battlefield\s+tapped",
+        @"search\s+your\s+library\s+for\s+(?:a|(?:up\s+to\s+)?(?:one|two|three|four|five|six|seven|eight|nine|ten|x)|any\s+number\s+of)\s+(?<kind>basic\s+land|land|basic\s+land[s]?\s+and(?:/or)?\s+[\w-]+)\s+cards?\b[^.]*put\s+(?:it|that\s+card|them|those\s+cards|one)\s+onto\s+the\s+battlefield\s+tapped",
         RegexOptions.IgnoreCase);
 
     public int Priority => 100;

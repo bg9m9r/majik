@@ -84,4 +84,25 @@ public class SearchTemplateTests
             Ctx("Search your library for a basic land card, put it onto the battlefield tapped, then shuffle."))
             .Should().BeNull();
     }
+
+    [Theory]
+    // Cultivate / Kodama's Reach — "put one onto the battlefield tapped and the
+    // other into your hand". v1 binds the first land's tapped-ramp step; the
+    // hand-bound second land is approximated away (see template comment).
+    [InlineData("Search your library for up to two basic land cards, reveal those cards, put one onto the battlefield tapped and the other into your hand, then shuffle.")]
+    public void SearchLandToBattlefieldTappedTemplate_MatchesCultivateShape(string oracle)
+    {
+        new SearchLandToBattlefieldTappedTemplate().TryBind(Ctx(oracle))
+            .Should().NotBeNull();
+    }
+
+    [Fact]
+    public void SearchLandToBattlefieldTappedTemplate_DoesNotMatch_PureTutorToHand()
+    {
+        // Regression guard — extending the put-subject to include "one"
+        // must not pull in pure tutor-to-hand shapes.
+        new SearchLandToBattlefieldTappedTemplate().TryBind(
+            Ctx("Search your library for a basic land card, reveal it, put it into your hand, then shuffle."))
+            .Should().BeNull();
+    }
 }
