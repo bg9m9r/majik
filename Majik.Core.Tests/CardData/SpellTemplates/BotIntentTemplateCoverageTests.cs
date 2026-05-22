@@ -24,6 +24,12 @@ public class BotIntentTemplateCoverageTests
 
         // Self-mill — no graveyard archetype yet. Revisit when one ships.
         "MillSelf",
+
+        // Misc utility templates with no clean intent classification.
+        // Bot strategy falls back to legacy label-sniffing for these.
+        "Fog",
+        "TakeExtraTurn",
+        "ShuffleGraveyardIntoLibrary",
     };
 
     [Fact]

@@ -88,6 +88,7 @@ public sealed class TargetCantBeBlockedTemplate : ISpellTemplate
 
     public int Priority => 50;
     public string Name => "TargetCantBeBlocked";
+    public BotIntent Intent => BotIntent.Buff;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);
@@ -130,6 +131,7 @@ public sealed class UpToNCantBlockTemplate : ISpellTemplate
 
     public int Priority => 50;
     public string Name => "UpToNCantBlock";
+    public BotIntent Intent => BotIntent.Removal;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);
@@ -182,6 +184,7 @@ public sealed class UntapAllYourCreaturesTemplate : ISpellTemplate
 
     public int Priority => 50;
     public string Name => "UntapAllYourCreatures";
+    public BotIntent Intent => BotIntent.Buff;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);
@@ -220,6 +223,7 @@ public sealed class TargetPlayerSacrificesCreatureTemplate : ISpellTemplate
 
     public int Priority => 60;
     public string Name => "TargetPlayerSacrificesCreature";
+    public BotIntent Intent => BotIntent.Removal;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);
@@ -261,6 +265,7 @@ public sealed class PlusOneCounterEachYouControlTemplate : ISpellTemplate
 
     public int Priority => 50;
     public string Name => "PlusOneCounterEachYouControl";
+    public BotIntent Intent => BotIntent.Buff;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);
@@ -299,6 +304,7 @@ public sealed class RegenerateTargetTemplate : ISpellTemplate
 
     public int Priority => 50;
     public string Name => "RegenerateTarget";
+    public BotIntent Intent => BotIntent.Protection;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);
@@ -327,6 +333,7 @@ public sealed class PutTargetOnTopOfLibraryTemplate : ISpellTemplate
 
     public int Priority => 60;
     public string Name => "PutTargetOnTopOfLibrary";
+    public BotIntent Intent => BotIntent.Removal;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);
@@ -372,6 +379,7 @@ public sealed class PutTargetOnBottomOfLibraryTemplate : ISpellTemplate
 
     public int Priority => 60;
     public string Name => "PutTargetOnBottomOfLibrary";
+    public BotIntent Intent => BotIntent.Removal;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);
@@ -417,6 +425,7 @@ public sealed class TargetPlayerDrawsXTemplate : ISpellTemplate
 
     public int Priority => 80;
     public string Name => "TargetPlayerDrawsX";
+    public BotIntent Intent => BotIntent.Draw;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);
@@ -465,6 +474,7 @@ public sealed class MixedSignPumpTemplate : ISpellTemplate
 
     public int Priority => 40;
     public string Name => "MixedSignPump";
+    public BotIntent Intent => BotIntent.Buff | BotIntent.CombatTrick;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);
@@ -501,6 +511,7 @@ public sealed class VarXPumpTemplate : ISpellTemplate
 
     public int Priority => 70; // beats fixed PumpCreature (50) when X is in either axis
     public string Name => "VarXPump";
+    public BotIntent Intent => BotIntent.Buff | BotIntent.CombatTrick;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);
@@ -540,6 +551,7 @@ public sealed class AddFixedManaTemplate : ISpellTemplate
 
     public int Priority => 60;
     public string Name => "AddFixedMana";
+    public BotIntent Intent => BotIntent.Ramp;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);
@@ -586,6 +598,7 @@ public sealed class DestroyNTargetCreaturesTemplate : ISpellTemplate
 
     public int Priority => 70; // beats DestroyCreature (30) on the multi-target form
     public string Name => "DestroyNTargetCreatures";
+    public BotIntent Intent => BotIntent.Removal;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);
@@ -615,6 +628,7 @@ public sealed class CounterUpToNTargetSpellsTemplate : ISpellTemplate
 
     public int Priority => 70;
     public string Name => "CounterUpToNTargetSpells";
+    public BotIntent Intent => BotIntent.Counter;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);
@@ -724,6 +738,7 @@ public sealed class EachOpponentSacrificesCreatureTemplate : ISpellTemplate
 
     public int Priority => 60;
     public string Name => "EachOpponentSacrificesCreature";
+    public BotIntent Intent => BotIntent.Removal;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);
@@ -770,6 +785,7 @@ public sealed class DestroyAllBasicLandTypeTemplate : ISpellTemplate
 
     public int Priority => 90;
     public string Name => "DestroyAllBasicLandType";
+    public BotIntent Intent => BotIntent.Wrath;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);
@@ -817,6 +833,7 @@ public sealed class TargetPlayerDrawsNTemplate : ISpellTemplate
 
     public int Priority => 60;
     public string Name => "TargetPlayerDrawsN";
+    public BotIntent Intent => BotIntent.Draw;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);
@@ -871,6 +888,7 @@ public sealed class MultiTargetCreaturesGainKeywordTemplate : ISpellTemplate
 
     public int Priority => 35; // below GrantKeywordTilEot (single target)
     public string Name => "MultiTargetCreaturesGainKeyword";
+    public BotIntent Intent => BotIntent.Buff;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);
@@ -908,6 +926,7 @@ public sealed class MultiTargetCreaturesEachGetPumpTemplate : ISpellTemplate
 
     public int Priority => 40;
     public string Name => "MultiTargetCreaturesEachGetPump";
+    public BotIntent Intent => BotIntent.Buff;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);
@@ -938,6 +957,7 @@ public sealed class CreaturesYourOpponentsControlDebuffTemplate : ISpellTemplate
 
     public int Priority => 80;
     public string Name => "CreaturesYourOpponentsControlDebuff";
+    public BotIntent Intent => BotIntent.Removal;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);
@@ -970,6 +990,7 @@ public sealed class AttackingCreaturesPumpTemplate : ISpellTemplate
 
     public int Priority => 70;
     public string Name => "AttackingCreaturesPump";
+    public BotIntent Intent => BotIntent.Buff | BotIntent.CombatTrick;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);
@@ -1004,6 +1025,7 @@ public sealed class PermanentsYouControlGainKeywordTemplate : ISpellTemplate
 
     public int Priority => 50;
     public string Name => "PermanentsYouControlGainKeyword";
+    public BotIntent Intent => BotIntent.Buff;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);
@@ -1052,6 +1074,7 @@ public sealed class CreaturesCantBlockTemplate : ISpellTemplate
 
     public int Priority => 50;
     public string Name => "CreaturesCantBlock";
+    public BotIntent Intent => BotIntent.Removal;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);
@@ -1087,6 +1110,7 @@ public sealed class ReturnAllPermanentsTemplate : ISpellTemplate
 
     public int Priority => 70;
     public string Name => "ReturnAllPermanents";
+    public BotIntent Intent => BotIntent.Bounce | BotIntent.Wrath;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);

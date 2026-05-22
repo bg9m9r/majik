@@ -38,6 +38,7 @@ public sealed class RevealHandThenDiscardTemplate : ISpellTemplate
 
     public int Priority => 95;
     public string Name => "RevealHandThenDiscard";
+    public BotIntent Intent => BotIntent.Discard;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);

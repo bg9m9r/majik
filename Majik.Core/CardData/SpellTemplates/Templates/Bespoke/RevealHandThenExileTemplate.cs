@@ -42,6 +42,7 @@ public sealed class RevealHandThenExileTemplate : ISpellTemplate
 
     public int Priority => 95;
     public string Name => "RevealHandThenExile";
+    public BotIntent Intent => BotIntent.Discard;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);

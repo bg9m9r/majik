@@ -9,6 +9,8 @@ using Majik.Core.CardData.SpellTemplates.Templates.Destroy;
 using Majik.Core.CardData.SpellTemplates.Templates.Library;
 using Majik.Core.CardData.SpellTemplates.Templates.Resource;
 using Majik.Core.CardData.SpellTemplates.Templates.Search;
+using Majik.Core.CardData.SpellTemplates.Templates.Bespoke;
+using Majik.Core.CardData.SpellTemplates.Templates.Misc;
 using Majik.Core.CardData.SpellTemplates.Templates.Tokens;
 using Xunit;
 
@@ -374,5 +376,147 @@ public class BotIntentPerTemplateTests
         [Fact]
         public void Populate_Token() =>
             IntentOf(new PopulateTemplate()).Should().Be(BotIntent.Token);
+    }
+
+    public class Bespoke
+    {
+        [Fact]
+        public void ThoughtseizePattern_Discard() =>
+            IntentOf(new ThoughtseizePatternTemplate()).Should().Be(BotIntent.Discard);
+
+        [Fact]
+        public void RevealHandThenDiscard_Discard() =>
+            IntentOf(new RevealHandThenDiscardTemplate()).Should().Be(BotIntent.Discard);
+
+        [Fact]
+        public void RevealHandThenExile_Discard() =>
+            IntentOf(new RevealHandThenExileTemplate()).Should().Be(BotIntent.Discard);
+
+        [Fact]
+        public void RevealHandMayChoose_DiscardRemoval() =>
+            IntentOf(new RevealHandMayChooseTemplate()).Should().Be(BotIntent.Discard | BotIntent.Removal);
+
+        [Fact]
+        public void RevealHandGraveOrHandExile_DiscardRemoval() =>
+            IntentOf(new RevealHandGraveOrHandExileTemplate()).Should().Be(BotIntent.Discard | BotIntent.Removal);
+
+        [Fact]
+        public void MalevolentRumblePattern_CantripDraw() =>
+            IntentOf(new MalevolentRumblePatternTemplate()).Should().Be(BotIntent.Cantrip | BotIntent.Draw);
+
+        [Fact]
+        public void ExpressiveIteration_CantripDraw() =>
+            IntentOf(new ExpressiveIterationTemplate()).Should().Be(BotIntent.Cantrip | BotIntent.Draw);
+    }
+
+    public class Misc
+    {
+        [Fact]
+        public void Fog_None_AllowedListed() =>
+            IntentOf(new FogTemplate()).Should().Be(BotIntent.None);
+
+        [Fact]
+        public void TargetCantBeBlocked_Buff() =>
+            IntentOf(new TargetCantBeBlockedTemplate()).Should().Be(BotIntent.Buff);
+
+        [Fact]
+        public void UpToNCantBlock_Removal() =>
+            IntentOf(new UpToNCantBlockTemplate()).Should().Be(BotIntent.Removal);
+
+        [Fact]
+        public void UntapAllYourCreatures_Buff() =>
+            IntentOf(new UntapAllYourCreaturesTemplate()).Should().Be(BotIntent.Buff);
+
+        [Fact]
+        public void TargetPlayerSacrificesCreature_Removal() =>
+            IntentOf(new TargetPlayerSacrificesCreatureTemplate()).Should().Be(BotIntent.Removal);
+
+        [Fact]
+        public void PlusOneCounterEachYouControl_Buff() =>
+            IntentOf(new PlusOneCounterEachYouControlTemplate()).Should().Be(BotIntent.Buff);
+
+        [Fact]
+        public void RegenerateTarget_Protection() =>
+            IntentOf(new RegenerateTargetTemplate()).Should().Be(BotIntent.Protection);
+
+        [Fact]
+        public void PutTargetOnTopOfLibrary_Removal() =>
+            IntentOf(new PutTargetOnTopOfLibraryTemplate()).Should().Be(BotIntent.Removal);
+
+        [Fact]
+        public void PutTargetOnBottomOfLibrary_Removal() =>
+            IntentOf(new PutTargetOnBottomOfLibraryTemplate()).Should().Be(BotIntent.Removal);
+
+        [Fact]
+        public void TargetPlayerDrawsX_Draw() =>
+            IntentOf(new TargetPlayerDrawsXTemplate()).Should().Be(BotIntent.Draw);
+
+        [Fact]
+        public void MixedSignPump_BuffCombatTrick() =>
+            IntentOf(new MixedSignPumpTemplate()).Should().Be(BotIntent.Buff | BotIntent.CombatTrick);
+
+        [Fact]
+        public void VarXPump_BuffCombatTrick() =>
+            IntentOf(new VarXPumpTemplate()).Should().Be(BotIntent.Buff | BotIntent.CombatTrick);
+
+        [Fact]
+        public void AddFixedMana_Ramp() =>
+            IntentOf(new AddFixedManaTemplate()).Should().Be(BotIntent.Ramp);
+
+        [Fact]
+        public void DestroyNTargetCreatures_Removal() =>
+            IntentOf(new DestroyNTargetCreaturesTemplate()).Should().Be(BotIntent.Removal);
+
+        [Fact]
+        public void CounterUpToNTargetSpells_Counter() =>
+            IntentOf(new CounterUpToNTargetSpellsTemplate()).Should().Be(BotIntent.Counter);
+
+        [Fact]
+        public void TakeExtraTurn_None_AllowedListed() =>
+            IntentOf(new TakeExtraTurnTemplate()).Should().Be(BotIntent.None);
+
+        [Fact]
+        public void ShuffleGraveyardIntoLibrary_None_AllowedListed() =>
+            IntentOf(new ShuffleGraveyardIntoLibraryTemplate()).Should().Be(BotIntent.None);
+
+        [Fact]
+        public void EachOpponentSacrificesCreature_Removal() =>
+            IntentOf(new EachOpponentSacrificesCreatureTemplate()).Should().Be(BotIntent.Removal);
+
+        [Fact]
+        public void DestroyAllBasicLandType_Wrath() =>
+            IntentOf(new DestroyAllBasicLandTypeTemplate()).Should().Be(BotIntent.Wrath);
+
+        [Fact]
+        public void TargetPlayerDrawsN_Draw() =>
+            IntentOf(new TargetPlayerDrawsNTemplate()).Should().Be(BotIntent.Draw);
+
+        [Fact]
+        public void MultiTargetCreaturesGainKeyword_Buff() =>
+            IntentOf(new MultiTargetCreaturesGainKeywordTemplate()).Should().Be(BotIntent.Buff);
+
+        [Fact]
+        public void MultiTargetCreaturesEachGetPump_Buff() =>
+            IntentOf(new MultiTargetCreaturesEachGetPumpTemplate()).Should().Be(BotIntent.Buff);
+
+        [Fact]
+        public void CreaturesYourOpponentsControlDebuff_Removal() =>
+            IntentOf(new CreaturesYourOpponentsControlDebuffTemplate()).Should().Be(BotIntent.Removal);
+
+        [Fact]
+        public void AttackingCreaturesPump_BuffCombatTrick() =>
+            IntentOf(new AttackingCreaturesPumpTemplate()).Should().Be(BotIntent.Buff | BotIntent.CombatTrick);
+
+        [Fact]
+        public void PermanentsYouControlGainKeyword_Buff() =>
+            IntentOf(new PermanentsYouControlGainKeywordTemplate()).Should().Be(BotIntent.Buff);
+
+        [Fact]
+        public void CreaturesCantBlock_Removal() =>
+            IntentOf(new CreaturesCantBlockTemplate()).Should().Be(BotIntent.Removal);
+
+        [Fact]
+        public void ReturnAllPermanents_BounceWrath() =>
+            IntentOf(new ReturnAllPermanentsTemplate()).Should().Be(BotIntent.Bounce | BotIntent.Wrath);
     }
 }

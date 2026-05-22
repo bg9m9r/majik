@@ -30,6 +30,7 @@ public sealed class RevealHandGraveOrHandExileTemplate : ISpellTemplate
 
     public int Priority => 95;
     public string Name => "RevealHandGraveOrHandExile";
+    public BotIntent Intent => BotIntent.Discard | BotIntent.Removal;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);
