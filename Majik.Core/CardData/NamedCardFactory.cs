@@ -105,6 +105,23 @@ public static class NamedCardFactory
             // Static mana-color-substitute + ability-grant via imprint deferred.
             "Agatha's Soul Cauldron" => AgathasSoulCauldronFactory.Create(owner),
 
+            // Artifact — {0} (MishrasBaubleFactory).
+            // {T}, Sacrifice this artifact: Look at top of target player's library;
+            // draw a card at the beginning of the next turn's upkeep — wired.
+            // The single-arg overload omits TriggerManager wiring so the delayed
+            // draw is no-op (suitable for shape tests). Use the 2-arg overload
+            // for fully-wired behavior. Real targeting prompt for "target
+            // player's library" deferred.
+            "Mishra's Bauble" => MishrasBaubleFactory.Create(owner),
+
+            // Enchantment — {1}{R} (GoblinBombardmentFactory).
+            // Sacrifice a creature: This enchantment deals 1 damage to any
+            // target — wired. The shell uses Create(owner) (no pre-bound
+            // ping); BuildPingAbility / CreateForBot wire a concrete
+            // sacrifice+target activation. Real prompt-driven targeting +
+            // ad-hoc cost composition deferred.
+            "Goblin Bombardment" => GoblinBombardmentFactory.Create(owner),
+
             // Legendary Planeswalker — Grist {1}{B}{G} loyalty 3 (GristFactory).
             // Creature type + Insect subtype added unconditionally (v1 simplification).
             // "Only when not on battlefield" conditional layer-4 effect deferred.

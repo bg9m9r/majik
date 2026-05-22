@@ -171,6 +171,30 @@ public static class SeedImplementedCards
         // (variable damage by creature count, exile graveyards) no-op.
         "Thraben Charm",
 
+        // Artifact — {0} (MishrasBaubleFactory).
+        // {T}, Sacrifice this artifact: Look at top of target player's library;
+        // draw a card at the beginning of the next turn's upkeep.
+        // Look-at-top + sacrifice wired; delayed upkeep draw wired via
+        // DelayedTriggeredAbility registered with TriggerManager (CR 603.7).
+        // v1 auto-targets the controller (real player-targeting prompt deferred).
+        "Mishra's Bauble",
+
+        // Enchantment — {1}{R} (GoblinBombardmentFactory).
+        // Sacrifice a creature: This enchantment deals 1 damage to any target.
+        // Activation cost (SacrificeCreatureCost) + 1 damage wired via
+        // OracleSpellBinder.DealDamage. v1 picks target via BuildPingAbility's
+        // explicit parameters (bot pick-first-legal heuristic). Real prompt
+        // system deferred.
+        "Goblin Bombardment",
+
+        // Sorcery — {U}{R} (OracleSpellBinder: ExpressiveIterationTemplate).
+        // Look at top 3 of your library — first → hand, second → bottom of
+        // library, third → exile (deterministic v1 distribution; real
+        // player choice deferred).
+        // "You may play the exiled card this turn" rider deferred — no
+        // temporary cast-from-exile permission system yet.
+        "Expressive Iteration",
+
         // Enchantment Creature — Spirit {R}{R} 2/2 (OracleTriggeredAbilityBinder).
         // "Whenever a player casts a spell with mana value 3 or less, ~ deals
         // 2 damage to that player." Wired via PlayerCastsCheapSpellLine
