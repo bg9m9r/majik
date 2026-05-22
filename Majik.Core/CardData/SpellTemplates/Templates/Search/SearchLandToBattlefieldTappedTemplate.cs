@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using Majik.Core.CardData.SpellTemplates;
 using Majik.Core.Game;
 
+using Majik.Core.Cards;
 namespace Majik.Core.CardData.SpellTemplates.Templates.Search;
 
 public sealed class SearchLandToBattlefieldTappedTemplate : ISpellTemplate
@@ -22,6 +23,7 @@ public sealed class SearchLandToBattlefieldTappedTemplate : ISpellTemplate
 
     public int Priority => 100;
     public string Name => "SearchLandToBattlefieldTapped";
+    public BotIntent Intent => BotIntent.Ramp;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);

@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using Majik.Core.CardData.SpellTemplates;
 using Majik.Core.Game;
 
+using Majik.Core.Cards;
 namespace Majik.Core.CardData.SpellTemplates.Templates.Search;
 
 public sealed class GreenSunsZenithPatternTemplate : ISpellTemplate
@@ -12,6 +13,7 @@ public sealed class GreenSunsZenithPatternTemplate : ISpellTemplate
 
     public int Priority => 100;
     public string Name => "GreenSunsZenithPattern";
+    public BotIntent Intent => BotIntent.Tutor;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);

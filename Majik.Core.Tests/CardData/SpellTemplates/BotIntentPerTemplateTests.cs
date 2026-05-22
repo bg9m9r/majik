@@ -7,6 +7,7 @@ using Majik.Core.CardData.SpellTemplates.Templates.Counters;
 using Majik.Core.CardData.SpellTemplates.Templates.Damage;
 using Majik.Core.CardData.SpellTemplates.Templates.Destroy;
 using Majik.Core.CardData.SpellTemplates.Templates.Resource;
+using Majik.Core.CardData.SpellTemplates.Templates.Search;
 using Xunit;
 
 namespace Majik.Core.Tests.CardData.SpellTemplates;
@@ -242,5 +243,32 @@ public class BotIntentPerTemplateTests
         [Fact]
         public void YouLoseLife_None() =>
             IntentOf(new YouLoseLifeTemplate()).Should().Be(BotIntent.None);
+    }
+
+    public class Search
+    {
+        [Fact]
+        public void SearchLandToBattlefield_Ramp() =>
+            IntentOf(new SearchLandToBattlefieldTemplate()).Should().Be(BotIntent.Ramp);
+
+        [Fact]
+        public void SearchLandToBattlefieldTapped_Ramp() =>
+            IntentOf(new SearchLandToBattlefieldTappedTemplate()).Should().Be(BotIntent.Ramp);
+
+        [Fact]
+        public void SearchLibrary_Tutor() =>
+            IntentOf(new SearchLibraryTemplate()).Should().Be(BotIntent.Tutor);
+
+        [Fact]
+        public void GenericTutor_Tutor() =>
+            IntentOf(new GenericTutorTemplate()).Should().Be(BotIntent.Tutor);
+
+        [Fact]
+        public void KindedTutor_Tutor() =>
+            IntentOf(new KindedTutorTemplate()).Should().Be(BotIntent.Tutor);
+
+        [Fact]
+        public void GreenSunsZenithPattern_Tutor() =>
+            IntentOf(new GreenSunsZenithPatternTemplate()).Should().Be(BotIntent.Tutor);
     }
 }
