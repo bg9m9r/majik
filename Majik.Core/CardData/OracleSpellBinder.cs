@@ -129,6 +129,7 @@ public static class OracleSpellBinder
             new SpellTemplates.Templates.Misc.TargetPlayerSacrificesCreatureTemplate(),
             new SpellTemplates.Templates.Misc.PlusOneCounterEachYouControlTemplate(),
             new SpellTemplates.Templates.Misc.RegenerateTargetTemplate(),
+            new SpellTemplates.Templates.Misc.PutTargetSecondFromTopTemplate(),
             new SpellTemplates.Templates.Misc.PutTargetOnTopOfLibraryTemplate(),
             new SpellTemplates.Templates.Misc.PutTargetOnBottomOfLibraryTemplate(),
             new SpellTemplates.Templates.Misc.TargetPlayerDrawsXTemplate(),
