@@ -98,6 +98,10 @@ public sealed class ScriptedAgent : IPlayerAgent
             TopOrder: Array.Empty<ICard>()));
     }
 
+    public Task<ICard?> ChooseLibraryPickAsync(
+        GameContext? ctx, IReadOnlyList<ICard> candidates, string kindLabel, CancellationToken ct = default)
+        => Task.FromResult<ICard?>(candidates.Count > 0 ? candidates[0] : null);
+
     private static T Pop<T>(Queue<T> q, string what)
     {
         if (q.Count == 0)

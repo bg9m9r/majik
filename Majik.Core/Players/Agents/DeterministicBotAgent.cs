@@ -65,4 +65,13 @@ public sealed class DeterministicBotAgent : IPlayerAgent
         => Task.FromResult(new SurveilAction.SurveilDecision(
             ToGraveyard: peeked.ToList(),
             TopOrder: Array.Empty<ICard>()));
+
+    /// <summary>
+    /// Deterministic library pick: first candidate, or null when the
+    /// candidate list is empty. Matches the pre-agent default behavior of
+    /// <c>SearchSpellFactory.SearchLibrarySpell</c>.
+    /// </summary>
+    public Task<ICard?> ChooseLibraryPickAsync(
+        GameContext? ctx, IReadOnlyList<ICard> candidates, string kindLabel, CancellationToken ct = default)
+        => Task.FromResult<ICard?>(candidates.FirstOrDefault());
 }
