@@ -16,7 +16,9 @@ namespace Majik.Core.CardData.SpellTemplates.Templates.Library;
 /// Cards: Ancient Stirrings, Commune with Nature, Commune with Dinosaurs,
 /// Peer Through Depths, Board the Weatherlight, Adventurous Impulse + the
 /// Reveal-and-rest-to-graveyard sub-family (Gather the Pack, Benefaction of
-/// Rhonas, Tapping at the Window, etc.).
+/// Rhonas, Tapping at the Window, etc.) + the dual-filter "and/or" variants
+/// (In the Presence of Ages, Relentless Pursuit, Benefaction of Rhonas:
+/// "may put a creature card and/or a land card from among them...").
 ///
 /// Distinct from <see cref="LookAtTopPutOneInHandTemplate"/>: that one is
 /// "put one of them" (mandatory pick, no filter). This pattern is "may reveal
@@ -28,7 +30,7 @@ namespace Majik.Core.CardData.SpellTemplates.Templates.Library;
 public sealed class ImpulseMayRevealFilterTemplate : ISpellTemplate
 {
     private static readonly Regex Pattern = new(
-        @"(?:look\s+at|reveal)\s+the\s+top\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten|x)\s+cards\s+of\s+your\s+library\.\s*you\s+may\s+(?:reveal|put)\s+(?:a|an)\s+(?<filter>[a-z][a-z0-9\s,'\-]{0,80}?\s+)?card(?:\s+and(?:/|\s+or)\s+(?:a|an)\s+[a-z][a-z0-9\s,'\-]{0,80}?\s+card)?\s+from\s+among\s+them\s+(?:and\s+put\s+it\s+)?into\s+your\s+hand\.\s*(?:then\s+)?put\s+the\s+rest\s+(?<dest>on\s+the\s+bottom\s+of\s+your\s+library|into\s+your\s+graveyard)",
+        @"(?:look\s+at|reveal)\s+the\s+top\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten|x)\s+cards\s+of\s+your\s+library\.\s*you\s+may\s+(?:reveal|put)\s+(?:a|an)\s+(?<filter>[a-z][a-z0-9\s,'\-]{0,80}?\s+)?card(?:\s+and(?:/or|\s+or)\s+(?:a|an)\s+[a-z][a-z0-9\s,'\-]{0,80}?\s+card)?\s+from\s+among\s+them\s+(?:and\s+put\s+it\s+)?into\s+your\s+hand\.\s*(?:then\s+)?put\s+the\s+rest\s+(?<dest>on\s+the\s+bottom\s+of\s+your\s+library|into\s+your\s+graveyard)",
         RegexOptions.IgnoreCase);
 
     public int Priority => 52;
