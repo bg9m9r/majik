@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using Majik.Core.Cards;
 using Majik.Core.CardData.SpellTemplates;
 using Majik.Core.Game;
 
@@ -12,6 +13,7 @@ public sealed class DamageAnyTargetTemplate : ISpellTemplate
 
     public int Priority => 50;
     public string Name => "DamageAnyTarget";
+    public BotIntent Intent => BotIntent.Burn | BotIntent.Reach;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);

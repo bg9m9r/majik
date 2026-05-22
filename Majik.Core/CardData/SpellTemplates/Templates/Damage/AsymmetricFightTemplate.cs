@@ -36,6 +36,7 @@ public sealed class AsymmetricFightTemplate : ISpellTemplate
 
     public int Priority => 65;
     public string Name => "AsymmetricFight";
+    public BotIntent Intent => BotIntent.Burn;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);

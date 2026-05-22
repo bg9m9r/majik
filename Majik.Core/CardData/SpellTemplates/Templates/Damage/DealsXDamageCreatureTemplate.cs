@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using Majik.Core.CardData.SpellTemplates;
 using Majik.Core.Game;
 
+using Majik.Core.Cards;
 namespace Majik.Core.CardData.SpellTemplates.Templates.Damage;
 
 /// <summary>
@@ -22,6 +23,7 @@ public sealed class DealsXDamageCreatureTemplate : ISpellTemplate
 
     public int Priority => 100;
     public string Name => "DealsXDamageCreature";
+    public BotIntent Intent => BotIntent.Burn;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);
