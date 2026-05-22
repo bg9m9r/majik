@@ -20,5 +20,5 @@ public sealed class DealsXDamageAnyTemplate : ISpellTemplate
         Pattern.IsMatch(oracleText) ? EmptyParams.Instance : null;
 
     public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
-        DamageSpellFactory.DealsXAnyTargetSpell(ctx.Resolver);
+        DamageSpellFactory.DealsXAnyTargetSpell(ctx.Resolver, ctx.Replacements, ctx.Caster);
 }

@@ -49,6 +49,7 @@ public static class OracleSpellBinder
             new SpellTemplates.Templates.Damage.DealsDamageEachCreatureTemplate(),
             new SpellTemplates.Templates.Damage.FightTemplate(),
             new SpellTemplates.Templates.Damage.EachOpponentLosesLifeTemplate(),
+            new SpellTemplates.Templates.Damage.DealsNDamageEachOpponentTemplate(),
             new SpellTemplates.Templates.Counters.AllCreaturesPumpTemplate(),
             new SpellTemplates.Templates.Destroy.DestroyAllCreaturesTemplate(),
             new SpellTemplates.Templates.Destroy.DestroyAllPermanentsTemplate(),

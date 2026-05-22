@@ -116,14 +116,29 @@ internal static class DamageSpellFactory
     internal static SpellDefinition EachOpponentLosesLifeSpell(int n, Player caster) => new(
         Modes: Array.Empty<string>(), HasVariableX: false,
         TargetRequests: Array.Empty<TargetRequest>(),
-        EffectFactory: _ => new IEffect[] { new Effect($"each opp loses {n}", () =>
+        EffectFactory: p => new IEffect[] { new Effect($"each opp loses {n}", () =>
         {
-            // Caller may not have the player list inside binder scope; tests verify
-            // single-opponent case where caster.OpponentsForTests is implied.
-            // Real wiring: GameContext.AllPlayers iterates and applies.
+            // CR 109 — iterate every non-caster player from the chosen params'
+            // AllPlayers snapshot (plumbed in via SpellCastFlow). Without it
+            // (legacy callers that build ChosenSpellParams manually) the
+            // effect is a no-op rather than throwing — preserves prior
+            // behaviour while the production cast path now does the right
+            // thing. Used by Boltwave, Pyrohemia, etc.
+            var allPlayers = p.AllPlayers;
+            if (allPlayers == null) return;
+            foreach (var pl in allPlayers)
+            {
+                if (ReferenceEquals(pl, caster)) continue;
+                pl.LoseLife(n);
+            }
         }) });
 
-    internal static SpellDefinition DamageCreatureSpell(int n, Func<object, object> resolver) => new(
+    internal static SpellDefinition DamageCreatureSpell(int n, Func<object, object> resolver) =>
+        DamageCreatureSpell(n, resolver, replacements: null, caster: null);
+
+    internal static SpellDefinition DamageCreatureSpell(
+        int n, Func<object, object> resolver,
+        ReplacementBus? replacements, Player? caster) => new(
         Modes: Array.Empty<string>(), HasVariableX: false,
         TargetRequests: new[] { new TargetRequest("target creature", 1, 1, Array.Empty<object>()) },
         EffectFactory: p =>
@@ -131,21 +146,37 @@ internal static class DamageSpellFactory
             var target = resolver(p.Targets[0][0]);
             return new IEffect[] { new Effect($"deal {n} to creature", () =>
             {
-                if (target is Creature creature) creature.TakeDamage(n);
+                if (target is not Creature creature) return;
+                var amount = Filter(replacements, (object?)caster ?? creature, creature, n);
+                if (amount > 0) creature.TakeDamage(amount);
             }) };
         });
 
-    internal static SpellDefinition DealsXAnyTargetSpell(Func<object, object> resolver) => new(
+    internal static SpellDefinition DealsXAnyTargetSpell(Func<object, object> resolver) =>
+        DealsXAnyTargetSpell(resolver, replacements: null, caster: null);
+
+    internal static SpellDefinition DealsXAnyTargetSpell(
+        Func<object, object> resolver,
+        ReplacementBus? replacements, Player? caster) => new(
         Modes: Array.Empty<string>(), HasVariableX: true,
         TargetRequests: new[] { new TargetRequest("any target", 1, 1, Array.Empty<object>()) },
         EffectFactory: p =>
         {
             var target = resolver(p.Targets[0][0]);
             var x = p.X ?? 0;
-            return new IEffect[] { new Effect($"deal X={x}", () => OracleSpellBinder.DealDamage(target, x)) };
+            return new IEffect[] { new Effect($"deal X={x}", () =>
+            {
+                var amount = Filter(replacements, (object?)caster ?? target, target, x);
+                if (amount > 0) OracleSpellBinder.DealDamage(target, amount);
+            }) };
         });
 
-    internal static SpellDefinition DealsXCreatureSpell(Func<object, object> resolver) => new(
+    internal static SpellDefinition DealsXCreatureSpell(Func<object, object> resolver) =>
+        DealsXCreatureSpell(resolver, replacements: null, caster: null);
+
+    internal static SpellDefinition DealsXCreatureSpell(
+        Func<object, object> resolver,
+        ReplacementBus? replacements, Player? caster) => new(
         Modes: Array.Empty<string>(), HasVariableX: true,
         TargetRequests: new[] { new TargetRequest("target creature", 1, 1, Array.Empty<object>()) },
         EffectFactory: p =>
@@ -154,7 +185,9 @@ internal static class DamageSpellFactory
             var x = p.X ?? 0;
             return new IEffect[] { new Effect($"deal X={x} to creature", () =>
             {
-                if (target is Creature creature) creature.TakeDamage(x);
+                if (target is not Creature creature) return;
+                var amount = Filter(replacements, (object?)caster ?? creature, creature, x);
+                if (amount > 0) creature.TakeDamage(amount);
             }) };
         });
 }
