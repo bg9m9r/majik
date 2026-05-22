@@ -154,4 +154,16 @@ public class Creature : Permanent
     /// commander. Combat damage from a commander is tracked per-opponent
     /// for the 21-damage loss condition (CR 903.10a).</summary>
     public bool IsCommander { get; set; }
+
+    /// <summary>
+    /// CR 702.74b — set by <see cref="Majik.Core.Costs.EvokeAlternativeCost"/>
+    /// when the spell was cast for its evoke cost. The "sacrifice this
+    /// creature" ETB trigger added to evoke creatures (CR 702.74c) reads
+    /// this as an intervening-if to decide whether to fire. Tagged on the
+    /// Creature object so it survives the Stack → Battlefield transition
+    /// (we set it during the alt-cost's <c>OnResolved</c>, which runs
+    /// before <see cref="Majik.Core.Services.StackResolver"/> moves the
+    /// card to the battlefield and fires the ETB <see cref="CardMovedEvent"/>).
+    /// </summary>
+    public bool EvokeWasPaid { get; set; }
 }
