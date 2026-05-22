@@ -11,6 +11,7 @@ builder.Services.AddMajikEngine(builder.Configuration);
 builder.Services.AddMajikAuth(builder.Configuration);
 builder.Services.AddMajikCors(builder.Configuration);
 builder.Services.AddMajikMongo(builder.Configuration);
+builder.Services.AddMajikRedis(builder.Configuration);
 builder.Services.AddMajikMatches(builder.Configuration);
 builder.Services.AddMajikDecks(builder.Configuration);
 builder.Services.AddMajikSignalR(builder.Configuration);
