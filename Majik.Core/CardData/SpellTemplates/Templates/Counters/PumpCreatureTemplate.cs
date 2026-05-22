@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using Majik.Core.CardData.SpellTemplates;
 using Majik.Core.Game;
 
+using Majik.Core.Cards;
 namespace Majik.Core.CardData.SpellTemplates.Templates.Counters;
 
 public sealed class PumpCreatureTemplate : ISpellTemplate
@@ -22,6 +23,7 @@ public sealed class PumpCreatureTemplate : ISpellTemplate
 
     public int Priority => 50;
     public string Name => "PumpCreature";
+    public BotIntent Intent => BotIntent.Buff | BotIntent.CombatTrick;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);

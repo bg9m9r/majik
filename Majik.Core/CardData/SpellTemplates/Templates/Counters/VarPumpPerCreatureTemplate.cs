@@ -33,6 +33,7 @@ public sealed class VarPumpPerCreatureTemplate : ISpellTemplate
 
     public int Priority => 55;
     public string Name => "VarPumpPerCreature";
+    public BotIntent Intent => BotIntent.Buff;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);

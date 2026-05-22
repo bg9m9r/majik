@@ -25,6 +25,7 @@ public sealed class GrantProtectionFromColorTemplate : ISpellTemplate
 
     public int Priority => 55;
     public string Name => "GrantProtectionFromColor";
+    public BotIntent Intent => BotIntent.Protection;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);

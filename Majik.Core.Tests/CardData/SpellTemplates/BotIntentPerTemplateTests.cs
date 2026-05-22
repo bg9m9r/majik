@@ -2,6 +2,7 @@ using FluentAssertions;
 using Majik.Core.Cards;
 using Majik.Core.CardData.SpellTemplates;
 using Majik.Core.CardData.SpellTemplates.Templates.Counter;
+using Majik.Core.CardData.SpellTemplates.Templates.Counters;
 using Majik.Core.CardData.SpellTemplates.Templates.Damage;
 using Majik.Core.CardData.SpellTemplates.Templates.Destroy;
 using Xunit;
@@ -130,5 +131,60 @@ public class BotIntentPerTemplateTests
         [Fact]
         public void CounterUnlessPay_Counter() =>
             IntentOf(new CounterUnlessPayTemplate()).Should().Be(BotIntent.Counter);
+    }
+
+    public class Counters
+    {
+        [Fact]
+        public void PumpCreature_BuffCombatTrick() =>
+            IntentOf(new PumpCreatureTemplate()).Should().Be(BotIntent.Buff | BotIntent.CombatTrick);
+
+        [Fact]
+        public void PutPlusCounter_Buff() =>
+            IntentOf(new PutPlusCounterTemplate()).Should().Be(BotIntent.Buff);
+
+        [Fact]
+        public void PutMinusCounter_Removal() =>
+            IntentOf(new PutMinusCounterTemplate()).Should().Be(BotIntent.Removal);
+
+        [Fact]
+        public void DebuffCreature_Removal() =>
+            IntentOf(new DebuffCreatureTemplate()).Should().Be(BotIntent.Removal);
+
+        [Fact]
+        public void AllCreaturesPump_Buff() =>
+            IntentOf(new AllCreaturesPumpTemplate()).Should().Be(BotIntent.Buff);
+
+        [Fact]
+        public void CreaturesYouControlPump_Buff() =>
+            IntentOf(new CreaturesYouControlPumpTemplate()).Should().Be(BotIntent.Buff);
+
+        [Fact]
+        public void CreaturesGetPlusCounter_Buff() =>
+            IntentOf(new CreaturesGetPlusCounterTemplate()).Should().Be(BotIntent.Buff);
+
+        [Fact]
+        public void SameNamePump_Buff() =>
+            IntentOf(new SameNamePumpTemplate()).Should().Be(BotIntent.Buff);
+
+        [Fact]
+        public void VarPumpPerCreature_Buff() =>
+            IntentOf(new VarPumpPerCreatureTemplate()).Should().Be(BotIntent.Buff);
+
+        [Fact]
+        public void GrantKeywordTilEot_CombatTrickBuff() =>
+            IntentOf(new GrantKeywordTilEotTemplate()).Should().Be(BotIntent.CombatTrick | BotIntent.Buff);
+
+        [Fact]
+        public void MultiKeywordGrantTilEot_CombatTrickBuff() =>
+            IntentOf(new MultiKeywordGrantTilEotTemplate()).Should().Be(BotIntent.CombatTrick | BotIntent.Buff);
+
+        [Fact]
+        public void GrantProtectionFromColor_Protection() =>
+            IntentOf(new GrantProtectionFromColorTemplate()).Should().Be(BotIntent.Protection);
+
+        [Fact]
+        public void CreaturesYouControlGainKeyword_Buff() =>
+            IntentOf(new CreaturesYouControlGainKeywordTemplate()).Should().Be(BotIntent.Buff);
     }
 }

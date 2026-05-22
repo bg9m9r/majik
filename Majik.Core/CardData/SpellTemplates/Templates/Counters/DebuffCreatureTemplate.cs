@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using Majik.Core.CardData.SpellTemplates;
 using Majik.Core.Game;
 
+using Majik.Core.Cards;
 namespace Majik.Core.CardData.SpellTemplates.Templates.Counters;
 
 /// <summary>
@@ -23,6 +24,7 @@ public sealed class DebuffCreatureTemplate : ISpellTemplate
 
     public int Priority => 50;
     public string Name => "DebuffCreature";
+    public BotIntent Intent => BotIntent.Removal;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);
