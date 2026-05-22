@@ -122,5 +122,31 @@ public static class SeedImplementedCards
         // on first creature on controller's battlefield — wired (v1 auto-pick).
         // Static mana-color-substitute + ability-grant via imprint deferred.
         "Agatha's Soul Cauldron",
+
+        // ---- Bot-deck spell coverage (template-bound) ----
+        // Instant — {R}. DamageAnyTargetTemplate.
+        "Lightning Bolt",
+        // Sorcery — {R}. DamagePlayerTemplate ("target player or planeswalker").
+        "Lava Spike",
+        // Instant — {R}. DamageAnyTargetTemplate. Flashback (sac Mountain to
+        // recast from graveyard) deferred — flashback infra missing.
+        "Lava Dart",
+        // Sorcery — {2}{R} (spectacle {R}). DamageAnyTargetTemplate handles
+        // the 3-damage body. Spectacle alt-cost ("if an opponent lost life
+        // this turn") deferred — needs alt-cost framework.
+        "Skewer the Critics",
+        // Instant — {G/P}. PumpCreatureTemplate applies +2/+2 EOT. Phyrexian
+        // alt-cost (2 life instead of {G}) deferred.
+        "Mutagenic Growth",
+        // Instant — {W}. CounterUnlessPayTemplate ({1} to keep).
+        "Mana Tithe",
+
+        // ---- Bot-deck land coverage (ShockLandBinder + OracleManaBinder) ----
+        // Land — Mountain Plains. Shock-land replacement (pay 2 life or ETB
+        // tapped) via ShockLandBinder. {T}: Add {R} or {W} via OracleManaBinder
+        // dual-modal pattern.
+        "Sacred Foundry",
+        // Land — Island Mountain. Same shock pattern: {T}: Add {U} or {R}.
+        "Steam Vents",
     };
 }
