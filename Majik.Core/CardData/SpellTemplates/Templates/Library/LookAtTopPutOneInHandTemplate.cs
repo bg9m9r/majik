@@ -3,6 +3,7 @@ using Majik.Core.CardData.SpellTemplates;
 using Majik.Core.Game;
 using Majik.Core.Zones;
 
+using Majik.Core.Cards;
 namespace Majik.Core.CardData.SpellTemplates.Templates.Library;
 
 /// <summary>
@@ -29,6 +30,7 @@ public sealed class LookAtTopPutOneInHandTemplate : ISpellTemplate
 
     public int Priority => 50;
     public string Name => "LookAtTopPutOneInHand";
+    public BotIntent Intent => BotIntent.Cantrip;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);

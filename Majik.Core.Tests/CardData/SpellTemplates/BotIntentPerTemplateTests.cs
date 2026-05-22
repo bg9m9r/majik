@@ -6,6 +6,7 @@ using Majik.Core.CardData.SpellTemplates.Templates.Counter;
 using Majik.Core.CardData.SpellTemplates.Templates.Counters;
 using Majik.Core.CardData.SpellTemplates.Templates.Damage;
 using Majik.Core.CardData.SpellTemplates.Templates.Destroy;
+using Majik.Core.CardData.SpellTemplates.Templates.Library;
 using Majik.Core.CardData.SpellTemplates.Templates.Resource;
 using Majik.Core.CardData.SpellTemplates.Templates.Search;
 using Xunit;
@@ -270,5 +271,68 @@ public class BotIntentPerTemplateTests
         [Fact]
         public void GreenSunsZenithPattern_Tutor() =>
             IntentOf(new GreenSunsZenithPatternTemplate()).Should().Be(BotIntent.Tutor);
+    }
+
+    public class Library
+    {
+        [Fact]
+        public void MillTarget_Mill() =>
+            IntentOf(new MillTargetTemplate()).Should().Be(BotIntent.Mill);
+
+        [Fact]
+        public void EachOpponentMills_Mill() =>
+            IntentOf(new EachOpponentMillsTemplate()).Should().Be(BotIntent.Mill);
+
+        [Fact]
+        public void EachPlayerMills_Mill() =>
+            IntentOf(new EachPlayerMillsTemplate()).Should().Be(BotIntent.Mill);
+
+        [Fact]
+        public void MillSelf_None() =>
+            IntentOf(new MillSelfTemplate()).Should().Be(BotIntent.None);
+
+        [Fact]
+        public void ReanimateFromGraveyard_Reanimate() =>
+            IntentOf(new ReanimateFromGraveyardTemplate()).Should().Be(BotIntent.Reanimate);
+
+        [Fact]
+        public void ReanimateToBattlefield_Reanimate() =>
+            IntentOf(new ReanimateToBattlefieldTemplate()).Should().Be(BotIntent.Reanimate);
+
+        [Fact]
+        public void ReturnAllFromGraveyard_Reanimate() =>
+            IntentOf(new ReturnAllFromGraveyardTemplate()).Should().Be(BotIntent.Reanimate);
+
+        [Fact]
+        public void ScryN_Cantrip() =>
+            IntentOf(new ScryNTemplate()).Should().Be(BotIntent.Cantrip);
+
+        [Fact]
+        public void ScrySelf_Cantrip() =>
+            IntentOf(new ScrySelfTemplate()).Should().Be(BotIntent.Cantrip);
+
+        [Fact]
+        public void SurveilSelf_Cantrip() =>
+            IntentOf(new SurveilSelfTemplate()).Should().Be(BotIntent.Cantrip);
+
+        [Fact]
+        public void LookAtTopPutOneInHand_Cantrip() =>
+            IntentOf(new LookAtTopPutOneInHandTemplate()).Should().Be(BotIntent.Cantrip);
+
+        [Fact]
+        public void LookAtTopPutKInHand_Cantrip() =>
+            IntentOf(new LookAtTopPutKInHandTemplate()).Should().Be(BotIntent.Cantrip);
+
+        [Fact]
+        public void Wheel_DrawDiscard() =>
+            IntentOf(new WheelTemplate()).Should().Be(BotIntent.Draw | BotIntent.Discard);
+
+        [Fact]
+        public void ImpulseMayRevealFilter_TutorCantrip() =>
+            IntentOf(new ImpulseMayRevealFilterTemplate()).Should().Be(BotIntent.Tutor | BotIntent.Cantrip);
+
+        [Fact]
+        public void ExileFromGraveyard_Removal() =>
+            IntentOf(new ExileFromGraveyardTemplate()).Should().Be(BotIntent.Removal);
     }
 }

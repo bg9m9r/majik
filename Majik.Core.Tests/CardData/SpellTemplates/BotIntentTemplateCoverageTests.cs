@@ -21,6 +21,9 @@ public class BotIntentTemplateCoverageTests
 
         // Bot's own life loss — bot won't cast this. Intentionally None.
         "YouLoseLife",
+
+        // Self-mill — no graveyard archetype yet. Revisit when one ships.
+        "MillSelf",
     };
 
     [Fact]

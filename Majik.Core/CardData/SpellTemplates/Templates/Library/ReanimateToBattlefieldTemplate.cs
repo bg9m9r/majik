@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using Majik.Core.CardData.SpellTemplates;
 using Majik.Core.Game;
 
+using Majik.Core.Cards;
 namespace Majik.Core.CardData.SpellTemplates.Templates.Library;
 
 /// <summary>
@@ -35,6 +36,7 @@ public sealed class ReanimateToBattlefieldTemplate : ISpellTemplate
 
     public int Priority => 50;
     public string Name => "ReanimateToBattlefield";
+    public BotIntent Intent => BotIntent.Reanimate;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);

@@ -3,6 +3,7 @@ using Majik.Core.CardData.SpellTemplates;
 using Majik.Core.Game;
 using Majik.Core.Zones;
 
+using Majik.Core.Cards;
 namespace Majik.Core.CardData.SpellTemplates.Templates.Library;
 
 /// <summary>
@@ -32,6 +33,7 @@ public sealed class ImpulseMayRevealFilterTemplate : ISpellTemplate
 
     public int Priority => 52;
     public string Name => "ImpulseMayRevealFilter";
+    public BotIntent Intent => BotIntent.Tutor | BotIntent.Cantrip;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);
