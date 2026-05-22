@@ -137,4 +137,83 @@ public class HeuristicBotAgentTests
 
         plan.Blockers.Should().BeEmpty();
     }
+
+    private static Creature WithKeyword(Creature c, string keyword)
+    {
+        c.AddAbility(new Majik.Core.Abilities.KeywordAbility(keyword, c, c.Controller!));
+        return c;
+    }
+
+    [Fact]
+    public async Task DeclareBlockers_DeathtoucherKillsBigAttacker()
+    {
+        // 1/1 deathtouch can profitably block a 5/5 — sacrifice 1 CMC to
+        // kill a 4 CMC creature. Bot prefers it over a 4/4 safe-kill.
+        var atk = new Creature("Big", "3GG", 5, 5) { Owner = _bob, Controller = _bob };
+        var dt = WithKeyword(new Creature("DT", "B", 1, 1) { Owner = _alice, Controller = _alice }, "Deathtouch");
+        var safe = new Creature("Wall", "3", 4, 5) { Owner = _alice, Controller = _alice };
+        var bot = new HeuristicBotAgent();
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _bob,
+            1, PhaseStateType.DeclareBlockers, new Majik.Core.Stack.Stack());
+
+        var plan = await bot.DeclareBlockersAsync(ctx, new[] { atk }, new[] { dt, safe });
+
+        plan.Blockers.Should().HaveCount(1);
+        plan.Blockers[0].Blocker.Should().BeSameAs(dt);
+    }
+
+    [Fact]
+    public async Task DeclareBlockers_FirstStrikeAttacker_BlockerDoesNotTrade()
+    {
+        // Attacker first strike 2/2; blocker no FS 2/2. Attacker kills
+        // blocker BEFORE blocker damages — not a trade. Bot should NOT
+        // block (no benefit) unless lethal.
+        var atk = WithKeyword(new Creature("FS", "1W", 2, 2) { Owner = _bob, Controller = _bob }, "First strike");
+        var bear = new Creature("Bear", "1G", 2, 2) { Owner = _alice, Controller = _alice };
+        var bot = new HeuristicBotAgent();
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _bob,
+            1, PhaseStateType.DeclareBlockers, new Majik.Core.Stack.Stack());
+
+        var plan = await bot.DeclareBlockersAsync(ctx, new[] { atk }, new[] { bear });
+
+        plan.Blockers.Should().BeEmpty("first strike means bear dies before dealing damage — no trade");
+    }
+
+    [Fact]
+    public async Task DeclareBlockers_Menace_GangBlocksWithTwo()
+    {
+        // Menace 3/3 — requires 2+ blockers. Two 2/2s gang up.
+        var atk = WithKeyword(new Creature("MenaceCreature", "2R", 3, 3) { Owner = _bob, Controller = _bob }, "Menace");
+        var b1 = new Creature("B1", "1W", 2, 2) { Owner = _alice, Controller = _alice };
+        var b2 = new Creature("B2", "1W", 2, 2) { Owner = _alice, Controller = _alice };
+        var bot = new HeuristicBotAgent();
+        _alice.LifeTotal = 5; // make lethal so the gang is justified
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _bob,
+            1, PhaseStateType.DeclareBlockers, new Majik.Core.Stack.Stack());
+
+        var plan = await bot.DeclareBlockersAsync(ctx, new[] { atk }, new[] { b1, b2 });
+
+        plan.Blockers.Should().HaveCount(2);
+        plan.Blockers.Select(b => b.Attacker).Should().AllBeEquivalentTo(atk);
+    }
+
+    [Fact]
+    public async Task DeclareBlockers_SortsByThreatScore_BigGetsBestBlocker()
+    {
+        // Two attackers: 5/5 tramplelifelink vs 2/2 vanilla. Best blocker
+        // is a 5/5 safe-kill — should go on the 5/5, NOT the 2/2.
+        var bigAtk = WithKeyword(WithKeyword(
+            new Creature("Big", "3GG", 5, 5) { Owner = _bob, Controller = _bob },
+            "Trample"), "Lifelink");
+        var smallAtk = new Creature("Small", "1G", 2, 2) { Owner = _bob, Controller = _bob };
+        var bigBlocker = new Creature("BigBlocker", "3WW", 5, 5) { Owner = _alice, Controller = _alice };
+        var smallBlocker = new Creature("SmallBlocker", "1W", 2, 2) { Owner = _alice, Controller = _alice };
+        var bot = new HeuristicBotAgent();
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _bob,
+            1, PhaseStateType.DeclareBlockers, new Majik.Core.Stack.Stack());
+
+        var plan = await bot.DeclareBlockersAsync(ctx, new[] { bigAtk, smallAtk }, new[] { bigBlocker, smallBlocker });
+
+        plan.Blockers.Should().Contain(b => b.Blocker == bigBlocker && b.Attacker == bigAtk);
+    }
 }
