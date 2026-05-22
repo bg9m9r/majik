@@ -165,15 +165,11 @@ public sealed class ClauseCompositionTemplate : ISpellTemplate
         new Regex(@"^its\s+controller\s+loses\s+\d+\s+life$",
             RegexOptions.IgnoreCase | RegexOptions.Compiled),
 
-        // Anaphoric pump / keyword grants ("Those creatures gain haste until
-        // end of turn", "Each of them gets +1/+1 until end of turn"). The
-        // rider attaches to the previous clause's target via anaphora; v1
-        // has no anaphora layer, so the rider is dropped as a noop. Primary
-        // clause still resolves correctly. Lossy: pump/keyword grant is lost.
-        new Regex(@"^(?:each\s+of\s+them|those\s+creatures|those\s+permanents|they|it)\s+gain[s]?\s+[\w\s,'-]+?\s+until\s+end\s+of\s+turn$",
-            RegexOptions.IgnoreCase | RegexOptions.Compiled),
-        new Regex(@"^(?:each\s+of\s+them|those\s+creatures|those\s+permanents|they|it)\s+gets?\s+[+\-]\d+/[+\-]\d+(?:\s+and\s+gains?\s+[\w\s,'-]+?)?\s+until\s+end\s+of\s+turn$",
-            RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        // Anaphoric pump / keyword grants are NO LONGER noops — see
+        // AnaphoricPump / AnaphoricKeyword handling below in TryExtractParams.
+        // The regexes are matched before single-template binding so the
+        // rider becomes a real pump/keyword grant on every creature target
+        // the composed spell pulled in.
 
         // Choice / preamble clauses that bind nothing on their own.
         new Regex(@"^choose\s+(?:a\s+)?creature\s+type$",
@@ -207,6 +203,22 @@ public sealed class ClauseCompositionTemplate : ISpellTemplate
     // TryExtractParams against each clause; if every non-noop clause has
     // a winner, returns a dict with a single "clauses" key holding the
     // JSON-encoded sequence.
+    // Anaphoric pump rider — "Each of them gets +1/+1 until end of turn".
+    // Captures p/t (signed). Composer emits a synthetic __AnaphoricPump sub
+    // that walks every chosen target in the composed spell and pumps each
+    // Creature on resolve.
+    private static readonly Regex AnaphoricPump = new(
+        @"^(?:each\s+of\s+them|those\s+creatures|those\s+permanents|they|it)\s+gets?\s+(?<p>[+\-]\d+)/(?<t>[+\-]\d+)(?:\s+and\s+gains?\s+[\w\s,'-]+?)?\s+until\s+end\s+of\s+turn$",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    // Anaphoric keyword grant — "Those creatures gain haste until end of turn".
+    // Captures the keyword phrase. v1 grants the FIRST recognized keyword in
+    // the phrase to each chosen target; multi-keyword chains ("haste and
+    // trample") apply only the first.
+    private static readonly Regex AnaphoricKeyword = new(
+        @"^(?:each\s+of\s+them|those\s+creatures|those\s+permanents|they|it)\s+gain[s]?\s+(?<kw>[\w\s,'-]+?)\s+until\s+end\s+of\s+turn$",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
     public IReadOnlyDictionary<string, string>? TryExtractParams(string oracleText)
     {
         if (_registry is null) return null;
@@ -230,6 +242,34 @@ public sealed class ClauseCompositionTemplate : ISpellTemplate
             // would fail the all-bind check — handle it in TryBind only.
             // For pre-compile, just use the textual noop patterns.
             if (IsTextualNoop(c)) continue;
+
+            // Anaphoric rider detection — synthetic sub-clauses that
+            // reference the previous clause's target list rather than
+            // binding their own template.
+            var pumpMatch = AnaphoricPump.Match(c);
+            if (pumpMatch.Success)
+            {
+                encoded.Add(new EncodedClause
+                {
+                    t = "__AnaphoricPump",
+                    p = new Dictionary<string, string>
+                    {
+                        ["p"] = pumpMatch.Groups["p"].Value,
+                        ["t"] = pumpMatch.Groups["t"].Value,
+                    },
+                });
+                continue;
+            }
+            var kwMatch = AnaphoricKeyword.Match(c);
+            if (kwMatch.Success)
+            {
+                encoded.Add(new EncodedClause
+                {
+                    t = "__AnaphoricKeyword",
+                    p = new Dictionary<string, string> { ["kw"] = kwMatch.Groups["kw"].Value },
+                });
+                continue;
+            }
 
             var winner = FindWinningTemplate(c);
             if (winner is null) return null;
@@ -255,9 +295,27 @@ public sealed class ClauseCompositionTemplate : ISpellTemplate
             ?? throw new InvalidOperationException(
                 "ClauseComposition: failed to deserialize 'clauses' payload.");
 
-        var subs = new List<SpellDefinition>(encoded.Count);
+        // Distinguish real sub-template clauses from synthetic anaphoric
+        // riders. Real clauses get a SpellDefinition; anaphoric clauses get
+        // a "tag" we propagate to Compose so it can route the full target
+        // list (not a sliced one) at resolution time.
+        var subs = new List<ComposedSub>(encoded.Count);
         foreach (var ec in encoded)
         {
+            if (string.Equals(ec.t, "__AnaphoricPump", StringComparison.Ordinal))
+            {
+                var pp = int.Parse(ec.p?["p"] ?? "0");
+                var tt = int.Parse(ec.p?["t"] ?? "0");
+                subs.Add(ComposedSub.AnaphoricPump(pp, tt, ctx.Effects));
+                continue;
+            }
+            if (string.Equals(ec.t, "__AnaphoricKeyword", StringComparison.Ordinal))
+            {
+                var kw = ec.p?["kw"] ?? string.Empty;
+                subs.Add(ComposedSub.AnaphoricKeyword(kw, ctx.Effects));
+                continue;
+            }
+
             var template = _registry.OrderedTemplates
                 .FirstOrDefault(t => string.Equals(t.Name, ec.t, StringComparison.Ordinal));
             if (template is null)
@@ -269,7 +327,7 @@ public sealed class ClauseCompositionTemplate : ISpellTemplate
             }
             IReadOnlyDictionary<string, string> subParams = ec.p ?? new Dictionary<string, string>();
             if (!template.CanBind(ctx)) continue;
-            subs.Add(template.Rehydrate(subParams, ctx));
+            subs.Add(ComposedSub.OfDefinition(template.Rehydrate(subParams, ctx)));
         }
 
         return Compose(subs);
@@ -314,16 +372,17 @@ public sealed class ClauseCompositionTemplate : ISpellTemplate
         return false;
     }
 
-    private static SpellDefinition Compose(IReadOnlyList<SpellDefinition> subs)
+    private static SpellDefinition Compose(IReadOnlyList<ComposedSub> subs)
     {
         var allReqs = new List<TargetRequest>();
         var offsets = new int[subs.Count];
         for (var i = 0; i < subs.Count; i++)
         {
             offsets[i] = allReqs.Count;
-            allReqs.AddRange(subs[i].TargetRequests);
+            if (subs[i].Definition is { } d)
+                allReqs.AddRange(d.TargetRequests);
         }
-        var hasX = subs.Any(s => s.HasVariableX);
+        var hasX = subs.Any(s => s.Definition?.HasVariableX == true);
 
         return new SpellDefinition(
             Modes: Array.Empty<string>(),
@@ -335,34 +394,109 @@ public sealed class ClauseCompositionTemplate : ISpellTemplate
                 for (var i = 0; i < subs.Count; i++)
                 {
                     var sub = subs[i];
-                    var start = offsets[i];
-                    var count = sub.TargetRequests.Count;
-                    IReadOnlyList<IReadOnlyList<object>> slice;
-                    if (count == 0)
+                    if (sub.Definition is { } d)
                     {
-                        slice = Array.Empty<IReadOnlyList<object>>();
-                    }
-                    else
-                    {
-                        var arr = new IReadOnlyList<object>[count];
-                        for (var k = 0; k < count; k++)
+                        var start = offsets[i];
+                        var count = d.TargetRequests.Count;
+                        IReadOnlyList<IReadOnlyList<object>> slice;
+                        if (count == 0)
                         {
-                            arr[k] = (start + k) < p.Targets.Count
-                                ? p.Targets[start + k]
-                                : Array.Empty<object>();
+                            slice = Array.Empty<IReadOnlyList<object>>();
                         }
-                        slice = arr;
+                        else
+                        {
+                            var arr = new IReadOnlyList<object>[count];
+                            for (var k = 0; k < count; k++)
+                            {
+                                arr[k] = (start + k) < p.Targets.Count
+                                    ? p.Targets[start + k]
+                                    : Array.Empty<object>();
+                            }
+                            slice = arr;
+                        }
+                        var subParams = new ChosenSpellParams(
+                            ModeIndex: null,
+                            X: p.X,
+                            Targets: slice,
+                            Mana: p.Mana,
+                            AllPlayers: p.AllPlayers);
+                        effects.AddRange(d.EffectFactory(subParams));
                     }
-                    var subParams = new ChosenSpellParams(
-                        ModeIndex: null,
-                        X: p.X,
-                        Targets: slice,
-                        Mana: p.Mana,
-                        AllPlayers: p.AllPlayers);
-                    effects.AddRange(sub.EffectFactory(subParams));
+                    else if (sub.AnaphoricEffect is { } anaphoric)
+                    {
+                        // Anaphoric sub — receives the FULL composed target
+                        // list, not a slice. The effect walks it for any
+                        // Creature targets and applies the pump/keyword.
+                        effects.Add(anaphoric(p));
+                    }
                 }
                 return effects;
             });
+    }
+
+    private readonly record struct ComposedSub(
+        SpellDefinition? Definition,
+        Func<ChosenSpellParams, Abilities.IEffect>? AnaphoricEffect)
+    {
+        public static ComposedSub OfDefinition(SpellDefinition d) => new(d, null);
+
+        public static ComposedSub AnaphoricPump(int p, int t, Majik.Core.Effects.ContinuousEffectsService? effects) =>
+            new(null, _params => new Abilities.Effect(
+                $"anaphoric pump {p:+#;-#;0}/{t:+#;-#;0} EOT",
+                () =>
+                {
+                    // No effects service → silently skip (lossy v1 fallback).
+                    if (effects == null) return;
+                    foreach (var slot in _params.Targets)
+                    {
+                        foreach (var obj in slot)
+                        {
+                            if (obj is Cards.Creature c)
+                            {
+                                effects.Register(new Majik.Core.Effects.PumpUntilEndOfTurnEffect(c, p, t));
+                            }
+                        }
+                    }
+                }));
+
+        public static ComposedSub AnaphoricKeyword(string kwPhrase, Majik.Core.Effects.ContinuousEffectsService? effects) =>
+            new(null, _params => new Abilities.Effect(
+                $"anaphoric grant {kwPhrase} EOT",
+                () =>
+                {
+                    if (effects == null) return;
+                    var kw = ExtractFirstKeyword(kwPhrase);
+                    if (string.IsNullOrEmpty(kw)) return;
+                    foreach (var slot in _params.Targets)
+                    {
+                        foreach (var obj in slot)
+                        {
+                            if (obj is Cards.Creature c)
+                            {
+                                effects.Register(new Majik.Core.Effects.GrantKeywordUntilEndOfTurnEffect(c, kw));
+                            }
+                        }
+                    }
+                }));
+    }
+
+    // Known evergreen keywords; first match in the phrase wins. Multi-keyword
+    // chains ("haste and trample") apply only the first at v1.
+    private static readonly string[] _knownKeywords = new[]
+    {
+        "flying", "first strike", "double strike", "deathtouch", "lifelink",
+        "trample", "haste", "vigilance", "reach", "menace", "indestructible",
+        "hexproof", "flash", "defender", "protection",
+    };
+
+    private static string ExtractFirstKeyword(string phrase)
+    {
+        var lower = phrase.ToLowerInvariant();
+        foreach (var kw in _knownKeywords)
+        {
+            if (lower.Contains(kw, StringComparison.Ordinal)) return kw;
+        }
+        return string.Empty;
     }
 
     // System.Text.Json shape — short property names keep the

@@ -10,7 +10,6 @@ public static class BotDeckCatalog
         ["Burn"]        = BurnDeck.Cards,
         ["Prowess"]     = ProwessDeck.Cards,
         ["BorosEnergy"] = BorosEnergyDeck.Cards,
-        ["Yawg"]        = YawgDeck.Cards,
     };
 
     public static IReadOnlyCollection<string> Archetypes => _decks.Keys;
@@ -25,7 +24,6 @@ public static class BotDeckCatalog
         "Burn"        => "Bot — Burn",
         "Prowess"     => "Bot — Prowess",
         "BorosEnergy" => "Bot — Boros Energy",
-        "Yawg"        => "Bot — Yawgmoth",
         _ => $"Bot — {archetype}",
     };
 }
