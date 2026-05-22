@@ -43,6 +43,7 @@ public sealed class MatchService
     private readonly ServerGameFactory? _gameFactory;
     private readonly DeckRepository? _deckRepo;
     private readonly DeckValidationService? _deckValidator;
+    private readonly IMatchOwnership? _ownership;
     private readonly ILogger<MatchService>? _logger;
 
     public MatchService(
@@ -56,6 +57,7 @@ public sealed class MatchService
         ServerGameFactory? gameFactory,
         DeckRepository? deckRepo = null,
         DeckValidationService? deckValidator = null,
+        IMatchOwnership? ownership = null,
         ILogger<MatchService>? logger = null)
     {
         _matches = matches;
@@ -68,6 +70,7 @@ public sealed class MatchService
         _gameFactory = gameFactory;
         _deckRepo = deckRepo;
         _deckValidator = deckValidator;
+        _ownership = ownership;
         _logger = logger;
     }
 
@@ -240,6 +243,7 @@ public sealed class MatchService
                     creatorDeck, botDeck,
                     botSeatArchetype: bot.Archetype,
                     onBotThinking: onBotThinking);
+                if (_ownership != null) await _ownership.TryClaimAsync(matchId, ct);
             }
             catch (DeckLoadException ex)
             {
@@ -316,6 +320,7 @@ public sealed class MatchService
                 try
                 {
                     _gameFactory.Delete(facade.GameId);
+                    if (_ownership != null) await _ownership.ReleaseAsync(matchId, ct);
                 }
                 catch (Exception facEx)
                 {
@@ -426,6 +431,7 @@ public sealed class MatchService
                 await _matches.TryAtomicUpdateAsync(matchId, MatchState.Joined,
                     Builders<Match>.Update.Set(m => m.GameId, facade.GameId),
                     ct);
+                if (_ownership != null) await _ownership.TryClaimAsync(matchId, ct);
             }
             catch (DeckLoadException ex)
             {
@@ -633,6 +639,7 @@ public sealed class MatchService
         {
             _gameFactory.Delete(gid);
         }
+        if (_ownership != null) await _ownership.ReleaseAsync(matchId, ct);
         _hub?.Publish(matchId, "match.state-changed",
             new { matchId, state = "Abandoned", transitionedAt = now });
         return Result.Ok(true);

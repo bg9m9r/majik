@@ -22,6 +22,8 @@ public static class MatchRegistration
                 var svc = scope.ServiceProvider.GetRequiredService<MatchService>();
                 await svc.OnTimeoutAsync(matchId, holder, ct);
             }));
+        services.AddSingleton<IMatchOwnership, MatchOwnership>();
+        services.AddHostedService<MatchOwnershipHeartbeat>();
         services.AddScoped<MatchService>();
         services.AddHostedService<MatchIndexInitializer>();
         services.AddHostedService<MatchCleanupService>();
