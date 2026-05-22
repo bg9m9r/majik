@@ -106,4 +106,27 @@ public interface IPlayerAgent
         GameContext? ctx,
         IReadOnlyList<ICard> peeked,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// CR 701.19a — library search. The engine pre-filters
+    /// <paramref name="candidates"/> down to the cards that satisfy the
+    /// search predicate (kind, color, mana value, etc.); the agent picks
+    /// zero or one. Returning <see langword="null"/> models "find nothing"
+    /// (legal under CR 701.19a — searches are an action a player may
+    /// decline to resolve to a chosen card).
+    /// <para>
+    /// <paramref name="ctx"/> may be <see langword="null"/> in v1 effect
+    /// closures (same sync-over-async wart as <see cref="ChooseScryDecisionAsync"/>).
+    /// </para>
+    /// <paramref name="kindLabel"/> is human-readable ("creature",
+    /// "instant or sorcery card", "basic land card") for prompt UIs.
+    /// </summary>
+    Task<ICard?> ChooseLibraryPickAsync(
+        GameContext? ctx,
+        IReadOnlyList<ICard> candidates,
+        string kindLabel,
+        CancellationToken ct = default)
+        // Default: pick the first candidate (legacy pre-agent behavior).
+        // Smart bots override with heuristics; remote agents prompt the UI.
+        => Task.FromResult<ICard?>(candidates.Count > 0 ? candidates[0] : null);
 }

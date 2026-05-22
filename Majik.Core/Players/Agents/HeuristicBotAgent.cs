@@ -341,4 +341,8 @@ public sealed class HeuristicBotAgent : IPlayerAgent
         => Task.FromResult(new SurveilAction.SurveilDecision(
             ToGraveyard: peeked.ToList(),
             TopOrder: Array.Empty<ICard>()));
+
+    public Task<ICard?> ChooseLibraryPickAsync(
+        GameContext? ctx, IReadOnlyList<ICard> candidates, string kindLabel, CancellationToken ct = default)
+        => Task.FromResult<ICard?>(candidates.Count > 0 ? candidates[0] : null);
 }

@@ -16,9 +16,9 @@ internal static class SearchSpellFactory
         TargetRequests: Array.Empty<TargetRequest>(),
         EffectFactory: _ => new IEffect[] { new Effect($"tutor {kindRaw}", () =>
         {
-            // MVP tutor: deterministic — first library card matching predicate.
-            // Real implementation: prompt agent for choice; this default keeps
-            // tests deterministic until SpellCastFlow learns library-target prompts.
+            // CR 701.19a — searches consult the agent. The kind predicate
+            // pre-filters the candidate list; the agent picks zero or one.
+            // Returning null = decline to find (legal under 701.19a).
             bool Pred(ICard c) => kindRaw.ToLowerInvariant() switch
             {
                 "basic land" => c.HasType(CardType.Land),
@@ -29,13 +29,20 @@ internal static class SearchSpellFactory
                 "instant" => c.HasType(CardType.Instant),
                 "sorcery" => c.HasType(CardType.Sorcery),
                 "planeswalker" => c.HasType(CardType.Planeswalker),
-                // Empty / "card" = generic tutor (Demonic Tutor, Vampiric
-                // Tutor, etc) — any library card qualifies. Deterministic
-                // first-match pick pending agent prompts.
+                // Empty / "card" = generic tutor — any library card qualifies.
                 "" or "card" => true,
                 _ => false,
             };
-            var pick = caster.Zones.Library.GetCards().FirstOrDefault(Pred);
+            var candidates = caster.Zones.Library.GetCards().Where(Pred).ToList();
+            if (candidates.Count == 0) return;
+
+            // TODO: remove sync-over-async once IEffect.Execute becomes async.
+            var agent = AgentRegistry.Get(caster);
+            ICard? pick = agent != null
+                ? agent.ChooseLibraryPickAsync(null, candidates,
+                    string.IsNullOrEmpty(kindRaw) ? "card" : kindRaw + " card")
+                    .GetAwaiter().GetResult()
+                : candidates[0];
             if (pick == null) return;
             caster.Zones.Library.RemoveCard(pick);
             caster.Zones.Hand.AddCard(pick);
@@ -63,7 +70,16 @@ internal static class SearchSpellFactory
                 return true;
             }
 
-            var pick = caster.Zones.Library.GetCards().FirstOrDefault(Pred);
+            var candidates = caster.Zones.Library.GetCards().Where(Pred).ToList();
+            if (candidates.Count == 0) return;
+
+            var agent = AgentRegistry.Get(caster);
+            ICard? pick = agent != null
+                ? agent.ChooseLibraryPickAsync(null, candidates,
+                    kindRaw.Contains("basic", StringComparison.OrdinalIgnoreCase)
+                        ? "basic land card" : "land card")
+                    .GetAwaiter().GetResult()
+                : candidates[0];
             if (pick == null) return;
             caster.Zones.Library.RemoveCard(pick);
             caster.Zones.Battlefield.AddCard(pick);
@@ -106,19 +122,24 @@ internal static class SearchSpellFactory
             };
             return new IEffect[] { new Effect($"GSZ x={x}", () =>
             {
-                // CR 701.19a — search is a library action; pick the first qualifying card.
-                // Real implementation would prompt the agent; v1 is deterministic (first match).
-                var pick = caster.Zones.Library.GetCards()
-                    .FirstOrDefault(c =>
+                var candidates = caster.Zones.Library.GetCards()
+                    .Where(c =>
                         c.HasType(CardType.Creature) &&
                         CardColors.GetColors(c).Contains(targetColor) &&
-                        ManaCost.Parse(c.ManaCost).TotalValue <= x);
-                if (pick != null)
-                {
-                    caster.Zones.Library.RemoveCard(pick);
-                    caster.Zones.Battlefield.AddCard(pick);
-                    pick.SetZone(ZoneType.Battlefield);
-                }
+                        ManaCost.Parse(c.ManaCost).TotalValue <= x)
+                    .ToList();
+                if (candidates.Count == 0) return;
+
+                var agent = AgentRegistry.Get(caster);
+                ICard? pick = agent != null
+                    ? agent.ChooseLibraryPickAsync(null, candidates,
+                        $"{colorRaw} creature card with mana value {x} or less")
+                        .GetAwaiter().GetResult()
+                    : candidates[0];
+                if (pick == null) return;
+                caster.Zones.Library.RemoveCard(pick);
+                caster.Zones.Battlefield.AddCard(pick);
+                pick.SetZone(ZoneType.Battlefield);
                 // CR 701.19c — shuffle after a search effect (deferred, same rationale
                 // as other search spells in this binder).
             }) };
