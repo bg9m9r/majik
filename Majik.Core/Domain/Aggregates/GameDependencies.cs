@@ -1,4 +1,5 @@
 using Majik.Core.Combat;
+using Majik.Core.Effects;
 using Majik.Core.Events;
 using Majik.Core.Game;
 using Majik.Core.Rules;
@@ -25,6 +26,7 @@ public sealed class GameDependencies
     public StateBasedActions StateBasedActions { get; }
     public StackResolver StackResolver { get; }
     public CombatManager CombatManager { get; }
+    public ContinuousEffectsService ContinuousEffects { get; }
 
     public GameDependencies(
         IEventBus eventBus,
@@ -35,7 +37,8 @@ public sealed class GameDependencies
         PhaseManager phaseManager,
         StateBasedActions stateBasedActions,
         StackResolver stackResolver,
-        CombatManager combatManager)
+        CombatManager combatManager,
+        ContinuousEffectsService continuousEffects)
     {
         EventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
         StateMachine = stateMachine ?? throw new ArgumentNullException(nameof(stateMachine));
@@ -46,6 +49,7 @@ public sealed class GameDependencies
         StateBasedActions = stateBasedActions ?? throw new ArgumentNullException(nameof(stateBasedActions));
         StackResolver = stackResolver ?? throw new ArgumentNullException(nameof(stackResolver));
         CombatManager = combatManager ?? throw new ArgumentNullException(nameof(combatManager));
+        ContinuousEffects = continuousEffects ?? throw new ArgumentNullException(nameof(continuousEffects));
 
         PhaseManager.SetCombatManager(CombatManager);
     }
@@ -60,7 +64,8 @@ public sealed class GameDependencies
         var bus = eventBus ?? new EventBus();
         var zoneService = new ZoneService(bus);
         var stateBasedActions = new StateBasedActions(bus, zoneService);
-        var combatManager = new CombatManager(bus, stateBasedActions, zoneService);
+        var continuousEffects = new ContinuousEffectsService();
+        var combatManager = new CombatManager(bus, stateBasedActions, zoneService, continuousEffects);
 
         return new GameDependencies(
             eventBus: bus,
@@ -71,6 +76,7 @@ public sealed class GameDependencies
             phaseManager: new PhaseManager(bus),
             stateBasedActions: stateBasedActions,
             stackResolver: new StackResolver(bus, zoneService, stateBasedActions),
-            combatManager: combatManager);
+            combatManager: combatManager,
+            continuousEffects: continuousEffects);
     }
 }

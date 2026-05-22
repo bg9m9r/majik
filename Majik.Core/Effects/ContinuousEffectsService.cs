@@ -84,6 +84,26 @@ public sealed class ContinuousEffectsService
     }
 
     /// <summary>
+    /// True iff any registered <see cref="CombatRestrictionEffect"/> matches
+    /// <paramref name="restriction"/> and either targets
+    /// <paramref name="creature"/> directly or has no target (a mass effect
+    /// applying to every creature). Consulted by the combat validator
+    /// before accepting an attack / block declaration.
+    /// </summary>
+    public bool HasRestriction(Creature creature, CombatRestriction restriction)
+    {
+        if (creature == null) throw new ArgumentNullException(nameof(creature));
+        foreach (var e in _effects)
+        {
+            if (e is not CombatRestrictionEffect r) continue;
+            if (!r.IsActive()) continue;
+            if (r.Restriction != restriction) continue;
+            if (r.Target == null || ReferenceEquals(r.Target, creature)) return true;
+        }
+        return false;
+    }
+
+    /// <summary>
     /// CR 613.2 — current controller of a permanent after applying any
     /// active Layer 2 control-change effects (latest-timestamp wins). Falls
     /// back to <see cref="Permanent.Controller"/> when no override is active.
