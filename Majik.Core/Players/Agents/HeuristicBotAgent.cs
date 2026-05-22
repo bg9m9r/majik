@@ -1,6 +1,7 @@
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Costs;
 using Majik.Core.Game;
 using Majik.Core.Keywords;
 using Majik.Core.ValueObjects;
@@ -33,6 +34,18 @@ public sealed class HeuristicBotAgent : IPlayerAgent
     private readonly HashSet<Guid> _failedThisTurn = new();
     private int _failedTurnNumber = -1;
     private Guid? _lastProposed;
+
+    /// <summary>
+    /// Optional probe that surfaces alternative-cost candidates per card
+    /// (CR 118.9 — flashback, spectacle, evoke, pitch). When null, the bot
+    /// only casts spells for their printed cost.
+    /// </summary>
+    private readonly IAlternativeCostProbe? _altCostProbe;
+
+    public HeuristicBotAgent(IAlternativeCostProbe? altCostProbe = null)
+    {
+        _altCostProbe = altCostProbe;
+    }
 
     public Task<PriorityAction> ChoosePriorityActionAsync(GameContext ctx, CancellationToken ct = default)
     {
@@ -72,26 +85,88 @@ public sealed class HeuristicBotAgent : IPlayerAgent
         //    SpellDefinition) plus instants/sorceries (caller's
         //    SpellDefinitionResolver may bind effects; if not, the dispatcher
         //    rotates the card on fail so we don't waste it).
+        //
+        //    Enumerated set covers both hand (printed-cost path) AND
+        //    graveyard (alt-cost-only paths like flashback) so a probe
+        //    can elect e.g. Lava Dart from the yard.
         var hand = ctx.Self.Zones.Hand.GetCards();
-        var candidates = hand
+        var graveyard = ctx.Self.Zones.Graveyard.GetCards();
+        var pool = hand.Concat(graveyard)
             .Where(c => !c.HasType(CardType.Land))
             .Where(IsCastableSpell)
             .Where(c => !_failedThisTurn.Contains(c.InstanceId))
-            // Effective cost (CR 117.7 — Affinity / cost-reducers) so
-            // discounted spells are correctly judged affordable.
-            .Select(c => new { Card = c, Cost = Majik.Core.Costs.CostReduction.GetEffectiveCost(c, ctx.Self) })
-            .OrderByDescending(x => x.Cost.TotalValue)
             .ToList();
 
-        foreach (var cand in candidates)
+        // Each candidate yields one or more (cost, alt) bids; the bot then
+        // picks the highest-CMC affordable bid across the pool. "Cost" is
+        // the mana the bot must produce — alt cost replaces printed cost
+        // when supplied (CR 118.9). Bids from a graveyard card REQUIRE an
+        // alt cost (printed cost from graveyard is illegal).
+        var bids = new List<(ICard Card, ManaCost Cost, IAlternativeCost? Alt, int Priority)>();
+        foreach (var card in pool)
         {
-            if (TryPickManaSources(ctx.Self, cand.Cost) != null)
+            var printedCost = Majik.Core.Costs.CostReduction.GetEffectiveCost(card, ctx.Self);
+            var inHand = card.Zone == ZoneType.Hand;
+
+            // Alt-cost bids (probe may yield 0..N candidates per card).
+            var altBids = new List<(ManaCost Cost, IAlternativeCost Alt)>();
+            if (_altCostProbe != null)
             {
-                _lastProposed = cand.Card.InstanceId;
-                return Task.FromResult<PriorityAction>(
-                    new PriorityAction.CastSpell(cand.Card,
-                        Array.Empty<object>()));
+                foreach (var alt in _altCostProbe.CandidatesFor(card, ctx.Self, ctx))
+                {
+                    if (!alt.CanCastFor(card, ctx.Self)) continue;
+                    if (TryPickManaSources(ctx.Self, alt.AlternativeManaCost) == null) continue;
+                    altBids.Add((alt.AlternativeManaCost, alt));
+                }
             }
+
+            if (inHand)
+            {
+                // Printed-cost bid (affordable check).
+                if (TryPickManaSources(ctx.Self, printedCost) != null)
+                {
+                    bids.Add((card, printedCost, null, printedCost.TotalValue));
+                }
+                // Alt-cost bids prefer the cheapest alt that is strictly
+                // cheaper than the printed cost (else stick with printed
+                // because alt usually has a downside — pitch a card, etc.).
+                var cheapestAlt = altBids
+                    .Where(b => b.Cost.TotalValue < printedCost.TotalValue)
+                    .OrderBy(b => b.Cost.TotalValue)
+                    .Cast<(ManaCost Cost, IAlternativeCost Alt)?>()
+                    .FirstOrDefault();
+                if (cheapestAlt is { } chosen)
+                {
+                    // Bid priority uses the PRINTED cost so a $1 spectacle
+                    // on a {2}{R} card still ranks as a {2}{R}-priority bid,
+                    // i.e. the bot picks it over a vanilla 1-drop.
+                    bids.Add((card, chosen.Cost, chosen.Alt, printedCost.TotalValue));
+                }
+            }
+            else
+            {
+                // Graveyard (or other off-hand zone) — alt cost is the
+                // ONLY legal path. Pick the cheapest alt.
+                var cheapestAlt = altBids
+                    .OrderBy(b => b.Cost.TotalValue)
+                    .Cast<(ManaCost Cost, IAlternativeCost Alt)?>()
+                    .FirstOrDefault();
+                if (cheapestAlt is { } chosen)
+                {
+                    bids.Add((card, chosen.Cost, chosen.Alt, printedCost.TotalValue));
+                }
+            }
+        }
+
+        var best = bids.OrderByDescending(b => b.Priority).FirstOrDefault();
+        if (best.Card != null)
+        {
+            _lastProposed = best.Card.InstanceId;
+            return Task.FromResult<PriorityAction>(
+                new PriorityAction.CastSpell(
+                    best.Card,
+                    Array.Empty<object>(),
+                    AlternativeCost: best.Alt));
         }
 
         return Task.FromResult(PriorityAction.Pass);
