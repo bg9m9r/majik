@@ -108,6 +108,8 @@ public static class OracleSpellBinder
             new SpellTemplates.Templates.Tokens.CreateFoodTokensTemplate(),
             new SpellTemplates.Templates.Tokens.CreateClueTokensTemplate(),
             new SpellTemplates.Templates.Tokens.CreateCopyTokenTemplate(),
+            new SpellTemplates.Templates.Tokens.MultiTargetCopyTokenTemplate(),
+            new SpellTemplates.Templates.Tokens.PopulateTemplate(),
             new SpellTemplates.Templates.Tokens.CreateTokensTemplate(),
             new SpellTemplates.Templates.Misc.FogTemplate(),
             new SpellTemplates.Templates.Misc.TargetCantBeBlockedTemplate(),
