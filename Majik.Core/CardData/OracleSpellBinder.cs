@@ -179,12 +179,32 @@ public static class OracleSpellBinder
         Func<object, object> resolver,
         Majik.Core.Effects.ContinuousEffectsService? effects,
         Majik.Core.Stack.Stack? stack,
-        Majik.Core.Effects.ReplacementBus? replacements)
+        Majik.Core.Effects.ReplacementBus? replacements) =>
+        Bind(entity, caster, resolver, effects, stack, replacements, triggers: null, eventBus: null, zones: null);
+
+    /// <summary>
+    /// Full Bind overload — accepts the runtime managers that delayed-trigger
+    /// and replacement-shield templates depend on. Existing callers pass
+    /// nullable; templates gate themselves via <see cref="ISpellTemplate.CanBind"/>
+    /// when a required manager is missing.
+    /// </summary>
+    public static SpellDefinition? Bind(
+        CardEntity entity,
+        Player caster,
+        Func<object, object> resolver,
+        Majik.Core.Effects.ContinuousEffectsService? effects,
+        Majik.Core.Stack.Stack? stack,
+        Majik.Core.Effects.ReplacementBus? replacements,
+        Majik.Core.Abilities.TriggerManager? triggers,
+        Majik.Core.Events.IEventBus? eventBus,
+        Majik.Core.Services.ZoneService? zones)
     {
         ArgumentNullException.ThrowIfNull(entity);
         ArgumentNullException.ThrowIfNull(caster);
         ArgumentNullException.ThrowIfNull(resolver);
-        return Registry.TryBind(new SpellBindContext(entity, caster, resolver, effects, stack, replacements));
+        return Registry.TryBind(new SpellBindContext(
+            entity, caster, resolver, effects, stack, replacements,
+            triggers, eventBus, zones));
     }
 
     /// <summary>
