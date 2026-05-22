@@ -225,6 +225,10 @@ public class CardDbContext : DbContext
 
             entity.Property(e => e.CompiledAt)
                 .IsRequired();
+
+            entity.Property(e => e.Intent)
+                .IsRequired()
+                .HasDefaultValue(0UL);
         });
 
         // Configure CardLegalityEntity — normalized per-format legality.

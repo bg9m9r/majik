@@ -32,4 +32,14 @@ public class CompiledSpellTemplateEntity
 
     /// <summary>Unix-seconds timestamp when this row was written.</summary>
     public long CompiledAt { get; set; }
+
+    /// <summary>
+    /// Bitmask of <c>Majik.Core.Cards.BotIntent</c> flags inherited from
+    /// the matched template's <see cref="Majik.Core.CardData.SpellTemplates.ISpellTemplate.Intent"/>
+    /// at compile time. Stored as a non-negative integer (sqlite INTEGER)
+    /// so older DBs default to 0 (= <c>BotIntent.None</c>) and the bot
+    /// falls back to legacy label sniffing for rows compiled before the
+    /// intent classifier shipped.
+    /// </summary>
+    public ulong Intent { get; set; }
 }
