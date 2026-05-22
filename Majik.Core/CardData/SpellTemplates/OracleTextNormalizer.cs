@@ -41,6 +41,12 @@ public static class OracleTextNormalizer
         // cost. Lossy: caster doesn't actually sacrifice anything but the
         // main effect still resolves.
         new(@"^\s*as\s+an\s+additional\s+cost\s+to\s+cast\s+this\s+spell,\s+[^.]+\.\s*", RegexOptions.IgnoreCase),
+        // Generic leading parenthesized reminder text — Scryfall renders
+        // some reminder paragraphs ahead of the real spell text (e.g.
+        // Legendary sorcery's "(You may cast a legendary sorcery only if
+        // you control a legendary creature or planeswalker.)"). Strip any
+        // leading "(...)" reminder so the binder anchors on the effect.
+        new(@"^\s*\([^)]*\)\s*", RegexOptions.IgnoreCase),
     };
 
     /// <summary>Strip recognised leading prefixes from <paramref name="text"/>.</summary>
