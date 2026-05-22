@@ -31,7 +31,7 @@ public sealed class AsymmetricFightTemplate : ISpellTemplate
     // Hunger) and "any target" (Soul's Fire) in front of the second-target
     // anchor — same effect tree as plain "target".
     private static readonly Regex Pattern = new(
-        @"^target\s+creature\s+you\s+control\s+deals\s+damage\s+equal\s+to\s+its\s+power\s+to\s+(?:another\s+|any\s+)?target\s+(?<targetKind>[a-z][a-z0-9\s,'\-]{0,80}?)\.",
+        @"^target\s+creature\s+you\s+control\s+deals\s+damage\s+equal\s+to\s+its\s+power\s+to\s+(?:another\s+|any\s+)?target(?:\s+(?<targetKind>[a-z][a-z0-9\s,'\-]{0,80}?))?\.",
         RegexOptions.IgnoreCase);
 
     public int Priority => 65;
