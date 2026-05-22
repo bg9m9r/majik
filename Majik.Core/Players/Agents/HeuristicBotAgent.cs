@@ -35,6 +35,11 @@ public sealed class HeuristicBotAgent : IPlayerAgent
     private int _failedTurnNumber = -1;
     private Guid? _lastProposed;
 
+    // Activated abilities the bot has already fired this turn. Prevents
+    // infinite-activation loops in the priority pump.
+    private readonly HashSet<Guid> _abilityFiredThisTurn = new();
+    private Guid? _lastAbilityProposed;
+
     /// <summary>
     /// Optional probe that surfaces alternative-cost candidates per card
     /// (CR 118.9 — flashback, spectacle, evoke, pitch). When null, the bot
@@ -53,9 +58,18 @@ public sealed class HeuristicBotAgent : IPlayerAgent
         if (ctx.TurnNumber != _failedTurnNumber)
         {
             _failedThisTurn.Clear();
+            _abilityFiredThisTurn.Clear();
             _failedTurnNumber = ctx.TurnNumber;
             _lastProposed = null;
+            _lastAbilityProposed = null;
         }
+        // Memo previous activation proposals that didn't fire (dispatcher
+        // rejected them — bad targets, can't pay, etc.).
+        if (_lastAbilityProposed is Guid prevAbil)
+        {
+            _abilityFiredThisTurn.Add(prevAbil);
+        }
+        _lastAbilityProposed = null;
         // If our previous proposal is still in hand, the dispatcher rotated
         // it on failure — mark it dead for this turn.
         if (_lastProposed is Guid prev
@@ -177,7 +191,41 @@ public sealed class HeuristicBotAgent : IPlayerAgent
                     AlternativeCost: best.Alt));
         }
 
+        // 3. Activated-ability hook (CR 602). After exhausting castable
+        //    spells, see if any non-mana activated ability on our permanents
+        //    is affordable + hasn't fired this turn. Skips abilities that
+        //    need targets (target threading through PriorityAction.Activate
+        //    + ChooseTargetsAsync is future work). Mana abilities aren't
+        //    actions — they're handled by the mana-payment resolver.
+        var fired = PickActivatedAbility(ctx);
+        if (fired != null)
+        {
+            _lastAbilityProposed = fired.Id;
+            return Task.FromResult<PriorityAction>(
+                new PriorityAction.ActivateAbility(fired, Array.Empty<object>()));
+        }
+
         return Task.FromResult(PriorityAction.Pass);
+    }
+
+    private IActivatedAbility? PickActivatedAbility(GameContext ctx)
+    {
+        var self = ctx.Self;
+        var candidates = self.Zones.Battlefield.GetCards()
+            .SelectMany(c => c.Abilities.OfType<IActivatedAbility>())
+            // Mana abilities are excluded — they don't fire as priority
+            // actions; the mana-payment path consumes them.
+            .Where(a => a is not IManaAbility)
+            // No-target abilities only at v1 — targeting through
+            // PriorityAction needs deferred-target plumbing in the
+            // priority dispatcher (future work).
+            .Where(a => a is ActivatedAbility aa && aa.TargetRequests.Count == 0)
+            .Where(a => !_abilityFiredThisTurn.Contains(a.Id))
+            .Where(a => a.Costs.All(cost => cost.CanPay(self)))
+            .ToList();
+        // Prefer abilities sourced from permanents whose oracle text the bot
+        // hasn't otherwise leveraged. Simple "first affordable" works at v1.
+        return candidates.FirstOrDefault();
     }
 
     private static bool IsCastableSpell(ICard c) =>
