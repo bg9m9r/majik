@@ -1,3 +1,4 @@
+using Majik.Bot.Diagnostics;
 using Majik.Bot.Evaluation;
 using Majik.Core.Cards;
 using Majik.Core.Game;
@@ -10,17 +11,19 @@ public sealed class CombatPolicy
 {
     private readonly ArchetypeWeights _weights;
     private readonly int _budgetMs;
+    private readonly IBotDecisionSink _sink;
 
-    public CombatPolicy(ArchetypeWeights weights, int budgetMs = 800)
+    public CombatPolicy(ArchetypeWeights weights, int budgetMs = 800, IBotDecisionSink? sink = null)
     {
         _weights = weights;
         _budgetMs = budgetMs;
+        _sink = sink ?? NullBotDecisionSink.Instance;
     }
 
     public CombatPlan PickAttackers(GameContext ctx, Player self, IReadOnlyList<Creature> eligible)
     {
         if (eligible.Count == 0) return CombatPlan.None;
-        var (plan, _) = CombatSearch.FindBestAttackPlan(ctx, self, eligible, _weights, _budgetMs);
+        var (plan, _) = CombatSearch.FindBestAttackPlan(ctx, self, eligible, _weights, _budgetMs, _sink);
         return plan;
     }
 

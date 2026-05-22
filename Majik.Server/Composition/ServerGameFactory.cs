@@ -1,3 +1,4 @@
+using Majik.Bot.Diagnostics;
 using Majik.Core.Api;
 using Majik.Core.CardData;
 using Majik.Core.Cards;
@@ -14,11 +15,16 @@ public sealed class ServerGameFactory
 {
     private readonly GameRegistry _registry;
     private readonly ICardRepository? _cardRepo;
+    private readonly IBotDecisionSink? _botDecisionSink;
 
-    public ServerGameFactory(GameRegistry registry, ICardRepository? cardRepo = null)
+    public ServerGameFactory(
+        GameRegistry registry,
+        ICardRepository? cardRepo = null,
+        IBotDecisionSink? botDecisionSink = null)
     {
         _registry = registry;
         _cardRepo = cardRepo;
+        _botDecisionSink = botDecisionSink;
     }
 
     public GameFacade Create(
@@ -36,7 +42,10 @@ public sealed class ServerGameFactory
             // onBotThinking lets the caller (MatchService) bridge the
             // engine-internal callback to the SignalR hub without making
             // Majik.Bot depend on Majik.Server.
-            var botCfg = new Majik.Bot.BotConfig(botSeatArchetype);
+            // _botDecisionSink is null when decision logging is disabled
+            // (the BotConfig field defaults to null → NullBotDecisionSink
+            // in HeuristicStrategy, zero overhead).
+            var botCfg = new Majik.Bot.BotConfig(botSeatArchetype, DecisionSink: _botDecisionSink);
             facade.ReplaceBobAgent(new Majik.Bot.BotPlayerAgent(facade.Bob, botCfg, onBotThinking));
         }
         return facade;

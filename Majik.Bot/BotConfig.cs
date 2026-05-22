@@ -1,3 +1,5 @@
+using Majik.Bot.Diagnostics;
+
 namespace Majik.Bot;
 
 /// <summary>
@@ -16,9 +18,16 @@ namespace Majik.Bot;
 ///
 /// <para><c>Strategy</c> selects the <see cref="IBotStrategy"/> implementation:
 /// <c>"heuristic"</c> in v1; <c>"mcts"</c> reserved for v2.</para>
+///
+/// <para><c>DecisionSink</c> optional. When non-null, EV-scored policies
+/// (PriorityPolicy, ActivatedAbilityPolicy via priority pump, CombatSearch)
+/// emit a structured <see cref="BotDecision"/> for each choice. Defaults to
+/// no-op so prod takes zero overhead unless the server flips the
+/// <c>Bot:DecisionLogging:Enabled</c> flag.</para>
 /// </summary>
 public sealed record BotConfig(
     string ArchetypeName,
     int SearchDepth = 2,
     int RandomSeed = 0,
-    string Strategy = "heuristic");
+    string Strategy = "heuristic",
+    IBotDecisionSink? DecisionSink = null);

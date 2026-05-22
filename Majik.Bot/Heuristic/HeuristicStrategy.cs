@@ -1,4 +1,5 @@
 using Majik.Bot.Combat;
+using Majik.Bot.Diagnostics;
 using Majik.Bot.Evaluation;
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
@@ -14,12 +15,14 @@ internal sealed class HeuristicStrategy : IBotStrategy
     private readonly ArchetypeWeights _weights;
     private readonly PriorityPolicy _priority;
     private readonly CombatPolicy _combat;
+    private readonly IBotDecisionSink _sink;
 
     public HeuristicStrategy(BotConfig config)
     {
         _weights = ArchetypeWeights.ForArchetype(config.ArchetypeName);
-        _priority = new PriorityPolicy(_weights);
-        _combat = new CombatPolicy(_weights);
+        _sink = config.DecisionSink ?? NullBotDecisionSink.Instance;
+        _priority = new PriorityPolicy(_weights, _sink);
+        _combat = new CombatPolicy(_weights, sink: _sink);
     }
 
     public PriorityAction PickPriorityAction(GameContext ctx, Player self) => _priority.Pick(ctx, self);
