@@ -1,5 +1,6 @@
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
+using Majik.Core.Costs;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
 
@@ -27,7 +28,8 @@ public sealed record SpellDefinition(
     bool HasVariableX,
     IReadOnlyList<TargetRequest> TargetRequests,
     Func<ChosenSpellParams, IReadOnlyList<IEffect>> EffectFactory,
-    IReadOnlyList<BotIntent>? ModeIntents = null)
+    IReadOnlyList<BotIntent>? ModeIntents = null,
+    IReadOnlyList<IAdditionalCost>? AdditionalCosts = null)
 {
     /// <summary>
     /// Non-null view of <see cref="ModeIntents"/> — empty when no per-mode
@@ -36,6 +38,15 @@ public sealed record SpellDefinition(
     /// </summary>
     public IReadOnlyList<BotIntent> ModeIntentsOrEmpty =>
         ModeIntents ?? Array.Empty<BotIntent>();
+
+    /// <summary>
+    /// Non-null view of <see cref="AdditionalCosts"/> — empty when the
+    /// card carries no spell-intrinsic additional costs. CR 601.2f.
+    /// <see cref="SpellCastFlow"/> merges these with any caller-supplied
+    /// additional costs at cast time.
+    /// </summary>
+    public IReadOnlyList<IAdditionalCost> AdditionalCostsOrEmpty =>
+        AdditionalCosts ?? Array.Empty<IAdditionalCost>();
 
     public static SpellDefinition Vanilla(
         Func<ChosenSpellParams, IReadOnlyList<IEffect>> effectFactory) =>
@@ -58,4 +69,15 @@ public sealed record ChosenSpellParams(
     IReadOnlyList<IReadOnlyList<object>> Targets,
     ManaPayment Mana,
     IReadOnlyList<Player>? AllPlayers = null,
-    IReadOnlyList<int>? ModeIndexes = null);
+    IReadOnlyList<int>? ModeIndexes = null,
+    IReadOnlyList<IAdditionalCost>? AdditionalCostPayments = null)
+{
+    /// <summary>
+    /// Non-null view of <see cref="AdditionalCostPayments"/> — empty when
+    /// no additional cost was paid for this spell. EffectFactory closures
+    /// inspect this to wire effects to the cost's paid reference
+    /// (e.g. <c>SacrificeCreatureCost.Sacrificed</c> for Fling-style cards).
+    /// </summary>
+    public IReadOnlyList<IAdditionalCost> AdditionalCostPaymentsOrEmpty =>
+        AdditionalCostPayments ?? Array.Empty<IAdditionalCost>();
+}

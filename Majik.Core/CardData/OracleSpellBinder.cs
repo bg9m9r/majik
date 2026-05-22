@@ -164,6 +164,13 @@ public static class OracleSpellBinder
             new SpellTemplates.Templates.Bespoke.RevealUntilArtifactToBattlefieldTemplate(),
             new SpellTemplates.Templates.Bespoke.RevealUntilLandToBattlefieldTemplate(),
             new SpellTemplates.Templates.Bespoke.RevealUntilNonlandToHandTemplate(),
+            new SpellTemplates.Templates.Bespoke.BloodForBonesTemplate(),
+            new SpellTemplates.Templates.Bespoke.InfernalPlungeTemplate(),
+            new SpellTemplates.Templates.Bespoke.FlingLikeTemplate(),
+            new SpellTemplates.Templates.Bespoke.IchorExplosionTemplate(),
+            new SpellTemplates.Templates.Bespoke.LifesLegacyTemplate(),
+            new SpellTemplates.Templates.Bespoke.TormentedThoughtsTemplate(),
+            new SpellTemplates.Templates.Bespoke.HatredTemplate(),
             _composer,
         };
 

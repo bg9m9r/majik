@@ -1,7 +1,10 @@
 using FluentAssertions;
 using Majik.Core.Abilities;
+using Majik.Core.CardData;
+using Majik.Core.CardData.Database;
 using Majik.Core.Cards;
 using Majik.Core.Costs;
+using Majik.Core.Effects;
 using Majik.Core.Events;
 using Majik.Core.Game;
 using Majik.Core.Players;
@@ -81,5 +84,158 @@ public class SpellCastFlowCostsTests
         _bob.LifeTotal.Should().Be(17);
         // Flashback cleanup effect runs as part of Resolve.
         firebolt.Zone.Should().Be(ZoneType.Exile);
+    }
+
+    // -----------------------------------------------------------------
+    // New: enforced additional costs declared on SpellDefinition itself
+    // (template-bound "As an additional cost to cast this spell, …")
+    // -----------------------------------------------------------------
+
+    [Fact]
+    public async Task DefinitionAdditionalCost_PaidAlongsideCallerCosts()
+    {
+        var bear = new Creature("Bear", "1G", 2, 2)
+        { Owner = _alice, Controller = _alice, Zone = ZoneType.Battlefield };
+        _alice.Zones.Battlefield.AddCard(bear);
+
+        var spell = new Sorcery("Stub Spell", "B") { Owner = _alice, Zone = ZoneType.Hand };
+        _alice.Zones.Hand.AddCard(spell);
+
+        var agent = new ScriptedAgent();
+        agent.QueueMana(ManaPayment.Empty);
+
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+
+        var def = new SpellDefinition(
+            Modes: System.Array.Empty<string>(), HasVariableX: false,
+            TargetRequests: System.Array.Empty<TargetRequest>(),
+            EffectFactory: _ => System.Array.Empty<IEffect>(),
+            ModeIntents: null,
+            AdditionalCosts: new IAdditionalCost[] { new SacrificeACreatureAdditionalCost() });
+
+        await _flow.CastAsync(_alice, spell, def, agent, ctx);
+
+        bear.Zone.Should().Be(ZoneType.Graveyard);
+        _stack.Count.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task DefinitionAdditionalCost_FailsWhenCostUnpayable()
+    {
+        // No creatures on battlefield → SacrificeACreatureAdditionalCost
+        // can't pay. SpellCastFlow must throw before the card hits the
+        // stack and before the (already-paid) mana is consumed.
+        var spell = new Sorcery("Stub Spell", "B") { Owner = _alice, Zone = ZoneType.Hand };
+        _alice.Zones.Hand.AddCard(spell);
+
+        var agent = new ScriptedAgent();
+        agent.QueueMana(ManaPayment.Empty);
+
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+
+        var def = new SpellDefinition(
+            Modes: System.Array.Empty<string>(), HasVariableX: false,
+            TargetRequests: System.Array.Empty<TargetRequest>(),
+            EffectFactory: _ => System.Array.Empty<IEffect>(),
+            ModeIntents: null,
+            AdditionalCosts: new IAdditionalCost[] { new SacrificeACreatureAdditionalCost() });
+
+        var act = async () => await _flow.CastAsync(_alice, spell, def, agent, ctx);
+
+        await act.Should().ThrowAsync<System.InvalidOperationException>()
+            .WithMessage("*sacrifice a creature*");
+        _stack.Count.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task DefinitionAdditionalCost_SacrificedRefAvailableInEffect()
+    {
+        // Fling-style: effect resolves against the sacrificed creature's
+        // power. The cost object's Sacrificed reference must be available
+        // via ChosenSpellParams.AdditionalCostPayments inside EffectFactory.
+        var bigCreature = new Creature("Giant", "4G", 5, 5)
+        { Owner = _alice, Controller = _alice, Zone = ZoneType.Battlefield };
+        _alice.Zones.Battlefield.AddCard(bigCreature);
+
+        var fling = new Instant("Fling", "1R") { Owner = _alice, Zone = ZoneType.Hand };
+        _alice.Zones.Hand.AddCard(fling);
+
+        var agent = new ScriptedAgent();
+        agent.QueueTargets(new object[] { _bob });
+        agent.QueueMana(ManaPayment.Empty);
+
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+
+        var def = new SpellDefinition(
+            Modes: System.Array.Empty<string>(), HasVariableX: false,
+            TargetRequests: new[] { new TargetRequest("any target", 1, 1, System.Array.Empty<object>()) },
+            EffectFactory: p =>
+            {
+                Creature? sacrificed = null;
+                foreach (var cost in p.AdditionalCostPaymentsOrEmpty)
+                {
+                    if (cost is SacrificeACreatureAdditionalCost sac && sac.Sacrificed is Creature c)
+                    {
+                        sacrificed = c;
+                        break;
+                    }
+                }
+                return new IEffect[]
+                {
+                    new Effect("fling damage", () =>
+                    {
+                        if (sacrificed == null) return;
+                        _bob.LoseLife(sacrificed.Power);
+                    }),
+                };
+            },
+            ModeIntents: null,
+            AdditionalCosts: new IAdditionalCost[] { new SacrificeACreatureAdditionalCost() });
+
+        var castSpell = await _flow.CastAsync(_alice, fling, def, agent, ctx);
+        castSpell.Resolve();
+
+        bigCreature.Zone.Should().Be(ZoneType.Graveyard);
+        _bob.LifeTotal.Should().Be(15);
+    }
+
+    [Fact]
+    public async Task Fling_EndToEnd_ViaOracleSpellBinder()
+    {
+        // Cast Fling through the real OracleSpellBinder registry, paying
+        // its template-declared sacrifice cost and verifying the
+        // sacrificed creature's power feeds the damage effect.
+        var bear = new Creature("Bear", "1G", 4, 2)
+        { Owner = _alice, Controller = _alice, Zone = ZoneType.Battlefield };
+        _alice.Zones.Battlefield.AddCard(bear);
+
+        var fling = new Instant("Fling", "1R") { Owner = _alice, Zone = ZoneType.Hand };
+        _alice.Zones.Hand.AddCard(fling);
+
+        var entity = new CardEntity
+        {
+            Name = "Fling",
+            OracleText = "As an additional cost to cast this spell, sacrifice a creature. " +
+                "Fling deals damage equal to the sacrificed creature's power to any target.",
+        };
+
+        var def = OracleSpellBinder.Bind(
+            entity, _alice, o => o,
+            effects: new ContinuousEffectsService(),
+            stack: _stack);
+        def.Should().NotBeNull("Fling oracle text should bind through FlingLikeTemplate");
+        def!.AdditionalCostsOrEmpty.Should().HaveCount(1);
+
+        var agent = new ScriptedAgent();
+        agent.QueueTargets(new object[] { _bob });
+        agent.QueueMana(ManaPayment.Empty);
+
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+
+        var spell = await _flow.CastAsync(_alice, fling, def, agent, ctx);
+        spell.Resolve();
+
+        bear.Zone.Should().Be(ZoneType.Graveyard);
+        _bob.LifeTotal.Should().Be(16); // 20 - 4 (bear's power)
     }
 }
