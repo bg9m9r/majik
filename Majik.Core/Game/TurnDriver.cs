@@ -325,6 +325,32 @@ public sealed class TurnDriver
             }
         }
 
+        async Task DispatchActivate(Player actor, PriorityAction.ActivateAbility activate, GameContext ctx)
+        {
+            // CR 602.2 — activate an ability via AbilityActivator. Targets
+            // are passed pre-chosen; AbilityActivator currently treats
+            // targets as opaque ITarget refs. For the v1 zero-target case,
+            // an empty target list is correct. Future: when the bot
+            // proposes a targeted activation, the agent's
+            // ChooseTargetsAsync should already have populated activate.Targets
+            // — but our PriorityAction.ActivateAbility.Targets is an
+            // IReadOnlyList<object>, not ITarget. The mapping is left as
+            // a follow-up; for now we wire the dispatcher so the loop
+            // doesn't throw on a bot-proposed activation, and zero-target
+            // abilities go through cleanly.
+            var activator = new Majik.Core.Services.AbilityActivator(_stack, _eventBus);
+            try
+            {
+                activator.ActivateAbility(activate.Ability, actor);
+            }
+            catch (InvalidOperationException)
+            {
+                // Cost-payment or zone-gate failed — swallow and let the
+                // priority pump move on. Bot's per-turn memo prevents
+                // re-proposing this same ability.
+            }
+        }
+
         var loop = new PriorityLoop(
             players: _players,
             priority: _priorityManager,
@@ -334,7 +360,8 @@ public sealed class TurnDriver
             agents: _agents,
             turnNumberAccessor: () => _currentTurnNumber,
             phaseAccessor: () => _currentPhase,
-            castDispatcher: DispatchCast);
+            castDispatcher: DispatchCast,
+            activateDispatcher: DispatchActivate);
 
         await loop.RunUntilRoundEndsAsync(activePlayer, ct);
     }
