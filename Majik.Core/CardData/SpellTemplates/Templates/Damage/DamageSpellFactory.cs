@@ -1,5 +1,6 @@
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
+using Majik.Core.Effects;
 using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
@@ -8,16 +9,59 @@ namespace Majik.Core.CardData.SpellTemplates.Templates.Damage;
 
 internal static class DamageSpellFactory
 {
-    internal static SpellDefinition DamageAnySpell(int n, Func<object, object> resolver) => new(
+    /// <summary>
+    /// Push a spell-source damage intent through the ReplacementBus (when
+    /// available) before committing it. Returns the final amount; 0 means
+    /// the intent was cancelled or zeroed and the caller should skip the
+    /// state mutation entirely.
+    ///
+    /// Source for the intent is the casting <see cref="Player"/> — direct
+    /// damage spells don't carry an ICard reference into the effect closure
+    /// today. The PreventAllCombatDamageShield filters on Creature source so
+    /// Fog stays combat-only; redirection / mass prevention effects can hook
+    /// here once they exist. Fully card-aware source threading is a
+    /// follow-up.
+    /// </summary>
+    private static int Filter(ReplacementBus? bus, object source, object target, int n)
+    {
+        if (bus == null) return n;
+        var intent = target switch
+        {
+            Creature c => new DamageIntent(source, n, TargetCreature: c),
+            Planeswalker pw => new DamageIntent(source, n, TargetPlaneswalker: pw),
+            Player pl => new DamageIntent(source, n, TargetPlayer: pl),
+            _ => null,
+        };
+        if (intent == null) return n;
+        var replaced = bus.Apply(intent);
+        return replaced?.Amount ?? 0;
+    }
+
+    internal static SpellDefinition DamageAnySpell(int n, Func<object, object> resolver) =>
+        DamageAnySpell(n, resolver, replacements: null, caster: null);
+
+    internal static SpellDefinition DamageAnySpell(
+        int n, Func<object, object> resolver,
+        ReplacementBus? replacements, Player? caster) => new(
         Modes: Array.Empty<string>(), HasVariableX: false,
         TargetRequests: new[] { new TargetRequest("any target", 1, 1, Array.Empty<object>()) },
         EffectFactory: p =>
         {
             var target = resolver(p.Targets[0][0]);
-            return new IEffect[] { new Effect($"deal {n}", () => OracleSpellBinder.DealDamage(target, n)) };
+            return new IEffect[] { new Effect($"deal {n}", () =>
+            {
+                var amount = Filter(replacements, (object?)caster ?? target, target, n);
+                if (amount <= 0) return;
+                OracleSpellBinder.DealDamage(target, amount);
+            }) };
         });
 
-    internal static SpellDefinition DamagePlayerSpell(int n, Func<object, object> resolver) => new(
+    internal static SpellDefinition DamagePlayerSpell(int n, Func<object, object> resolver) =>
+        DamagePlayerSpell(n, resolver, replacements: null, caster: null);
+
+    internal static SpellDefinition DamagePlayerSpell(
+        int n, Func<object, object> resolver,
+        ReplacementBus? replacements, Player? caster) => new(
         Modes: Array.Empty<string>(), HasVariableX: false,
         TargetRequests: new[] { new TargetRequest("target player", 1, 1, Array.Empty<object>()) },
         EffectFactory: p =>
@@ -25,7 +69,9 @@ internal static class DamageSpellFactory
             var target = resolver(p.Targets[0][0]);
             return new IEffect[] { new Effect($"deal {n} to player", () =>
             {
-                if (target is Player player) player.LoseLife(n);
+                if (target is not Player player) return;
+                var amount = Filter(replacements, (object?)caster ?? target, player, n);
+                if (amount > 0) player.LoseLife(amount);
             }) };
         });
 

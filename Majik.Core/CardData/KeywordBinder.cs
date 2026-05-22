@@ -2,6 +2,7 @@ using System.Text.Json;
 using Majik.Core.Abilities;
 using Majik.Core.CardData.Database;
 using Majik.Core.Cards;
+using Majik.Core.Effects;
 using Majik.Core.Keywords;
 using Majik.Core.Players;
 
@@ -10,9 +11,9 @@ namespace Majik.Core.CardData;
 /// <summary>
 /// Reads the Scryfall <see cref="CardEntity.Keywords"/> JSON array and
 /// attaches a <see cref="KeywordAbility"/> for each evergreen keyword the
-/// engine knows how to act on (currently: combat-relevant + Flash + Undying).
-/// Non-evergreen / mechanically-complex keywords (Storm, Suspend, Kicker, …)
-/// are ignored here and would need bespoke binders.
+/// engine knows how to act on (currently: combat-relevant + Flash + Undying
+/// + Prowess). Non-evergreen / mechanically-complex keywords (Storm,
+/// Suspend, Kicker, …) are ignored here and would need bespoke binders.
 /// </summary>
 public static class KeywordBinder
 {
@@ -29,9 +30,14 @@ public static class KeywordBinder
         "Defender", "Indestructible", "Flash",
         // Death-triggered keywords
         "Undying",
+        // Cast-noncreature-spell triggered keyword (CR 702.108). Requires a
+        // ContinuousEffectsService — when none is supplied the marker is
+        // attached but the pump won't fire.
+        "Prowess",
     };
 
-    public static void Bind(ICard card, CardEntity entity, Player controller)
+    public static void Bind(ICard card, CardEntity entity, Player controller,
+        ContinuousEffectsService? effects = null)
     {
         if (card == null) throw new ArgumentNullException(nameof(card));
         if (entity == null) throw new ArgumentNullException(nameof(entity));
@@ -54,6 +60,14 @@ public static class KeywordBinder
                 if (undyingCreature.Controller == null)
                     undyingCreature.SetController(controller);
                 card.AddAbility(UndyingFactory.Build(undyingCreature));
+            }
+            else if (kw.Equals("Prowess", StringComparison.OrdinalIgnoreCase)
+                && card is Creature prowessCreature
+                && effects != null)
+            {
+                if (prowessCreature.Controller == null)
+                    prowessCreature.SetController(controller);
+                card.AddAbility(ProwessFactory.Build(prowessCreature, effects));
             }
         }
     }

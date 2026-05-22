@@ -7,9 +7,9 @@ namespace Majik.Bot.Tests;
 public class BotDeckCatalogTests
 {
     [Fact]
-    public void Catalog_ContainsAllThreeArchetypes()
+    public void Catalog_ContainsAllArchetypes()
     {
-        BotDeckCatalog.Archetypes.Should().BeEquivalentTo(new[] { "Burn", "Prowess", "BorosEnergy" });
+        BotDeckCatalog.Archetypes.Should().BeEquivalentTo(new[] { "Burn", "Prowess", "BorosEnergy", "Yawg" });
     }
 
     [Fact]

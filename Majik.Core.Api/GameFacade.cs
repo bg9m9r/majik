@@ -91,6 +91,16 @@ public sealed class GameFacade
     /// </summary>
     public ReplacementBus Replacements { get; } = new();
 
+    /// <summary>
+    /// CR 613 layer-system executor for this game. Binders that produce
+    /// keyword-style continuous effects (Prowess pump, until-end-of-turn
+    /// buffs/debuffs, combat restrictions) register onto this instance;
+    /// creatures consult it via <see cref="Majik.Core.Cards.Creature.ActiveEffects"/>
+    /// to compute current characteristics. TurnDriver expires EOT effects
+    /// during the cleanup step.
+    /// </summary>
+    public ContinuousEffectsService ContinuousEffects { get; } = new();
+
     private GameFacade(Player alice, Player bob)
     {
         _alice = alice;
@@ -176,13 +186,13 @@ public sealed class GameFacade
         foreach (var card in aliceDeck)
         {
             card.SetOwner(alice);
-            BindCardAbilities(card, alice, cardRepo, bus);
+            BindCardAbilities(card, alice, cardRepo, bus, facade.ContinuousEffects);
             alice.Zones.GetZone(ZoneType.Library).AddCard(card);
         }
         foreach (var card in bobDeck)
         {
             card.SetOwner(bob);
-            BindCardAbilities(card, bob, cardRepo, bus);
+            BindCardAbilities(card, bob, cardRepo, bus, facade.ContinuousEffects);
             bob.Zones.GetZone(ZoneType.Library).AddCard(card);
         }
 
@@ -205,14 +215,23 @@ public sealed class GameFacade
         ICard card,
         Player controller,
         ICardRepository? cardRepo,
-        ReplacementBus replacements)
+        ReplacementBus replacements,
+        ContinuousEffectsService effects)
     {
+        // Every creature consults the game's CES for current P/T and keywords
+        // (CR 613). Hook it up regardless of repo presence so vanilla creatures
+        // still get layer-system computation when other effects target them.
+        if (card is Majik.Core.Cards.Creature creature)
+        {
+            creature.ActiveEffects = effects;
+        }
+
         if (cardRepo != null)
         {
             var entity = cardRepo.GetByName(card.Name);
             if (entity != null)
             {
-                KeywordBinder.Bind(card, entity, controller);
+                KeywordBinder.Bind(card, entity, controller, effects);
                 OracleManaBinder.Bind(card, entity, controller);
                 AffinityBinder.Bind(card, entity);
                 SagaBinder.Bind(card, entity);
@@ -289,7 +308,8 @@ public sealed class GameFacade
             stateBasedActions: _sba,
             priorityManager: _priority,
             combatFlow: _combatFlow,
-            eventBus: _bus);
+            eventBus: _bus,
+            continuousEffects: ContinuousEffects);
 
         var settled = _nextPromptSignal.Task;
         _fullGameTask = driver.RunGameAsync(maxTurns, ct);

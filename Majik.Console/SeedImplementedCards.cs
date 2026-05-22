@@ -148,5 +148,11 @@ public static class SeedImplementedCards
         "Sacred Foundry",
         // Land — Island Mountain. Same shock pattern: {T}: Add {U} or {R}.
         "Steam Vents",
+
+        // Creature — Human Monk {R} 1/2 (KeywordBinder).
+        // Haste + Prowess — both wire via KeywordBinder once the game's
+        // ContinuousEffectsService is plumbed through (CR 613).
+        // Prowess: whenever you cast a noncreature spell, +1/+1 EOT.
+        "Monastery Swiftspear",
     };
 }
