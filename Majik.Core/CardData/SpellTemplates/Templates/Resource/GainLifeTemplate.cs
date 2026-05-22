@@ -7,7 +7,7 @@ namespace Majik.Core.CardData.SpellTemplates.Templates.Resource;
 public sealed class GainLifeTemplate : ISpellTemplate
 {
     private static readonly Regex Pattern = new(
-        @"target\s+player\s+gains?\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+li(?:fe|ves)",
+        @"target\s+(?:player|opponent)\s+gains?\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+li(?:fe|ves)",
         RegexOptions.IgnoreCase);
 
     public int Priority => 50;

@@ -7,7 +7,7 @@ namespace Majik.Core.CardData.SpellTemplates.Templates.Resource;
 public sealed class DiscardTemplate : ISpellTemplate
 {
     private static readonly Regex Pattern = new(
-        @"target\s+player\s+discards?\s+(?<n>\d+|one|two|three|four|five|six|seven)\s+cards?",
+        @"target\s+(?:player|opponent)\s+discards?\s+(?<n>\d+|one|two|three|four|five|six|seven|a)\s+cards?",
         RegexOptions.IgnoreCase);
 
     public int Priority => 50;
