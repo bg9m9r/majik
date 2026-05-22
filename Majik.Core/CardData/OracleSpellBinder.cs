@@ -25,6 +25,8 @@ public static class OracleSpellBinder
         new SpellTemplates.ClauseCompositionTemplate();
     private static readonly SpellTemplates.ModalChooseOneTemplate _modal =
         new SpellTemplates.ModalChooseOneTemplate();
+    private static readonly SpellTemplates.Templates.Bespoke.StriveTemplate _strive =
+        new SpellTemplates.Templates.Bespoke.StriveTemplate();
 
     public static SpellTemplateRegistry Registry { get; } = BuildRegistry();
 
@@ -33,6 +35,7 @@ public static class OracleSpellBinder
         var reg = new SpellTemplateRegistry(BuildTemplateList());
         _composer.SetRegistry(reg);
         _modal.SetRegistry(reg);
+        _strive.SetRegistry(reg);
         return reg;
     }
 
@@ -172,6 +175,7 @@ public static class OracleSpellBinder
             new SpellTemplates.Templates.Bespoke.TormentedThoughtsTemplate(),
             new SpellTemplates.Templates.Bespoke.HatredTemplate(),
             new SpellTemplates.Templates.Bespoke.RedirectTemplate(),
+            _strive,
             _composer,
         };
 

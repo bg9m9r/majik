@@ -18,6 +18,7 @@ public class BotIntentTemplateCoverageTests
         // Composers synthesize intent from sub-templates at bind time.
         "ModalChooseOne",
         "ClauseComposition",
+        "Strive",
 
         // Bot's own life loss — bot won't cast this. Intentionally None.
         "YouLoseLife",
