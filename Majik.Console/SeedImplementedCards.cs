@@ -128,8 +128,11 @@ public static class SeedImplementedCards
         "Lightning Bolt",
         // Sorcery — {R}. DamagePlayerTemplate ("target player or planeswalker").
         "Lava Spike",
-        // Instant — {R}. DamageAnyTargetTemplate. Flashback (sac Mountain to
-        // recast from graveyard) deferred — flashback infra missing.
+        // Instant — {R}. DamageAnyTargetTemplate.
+        // Flashback—Sacrifice a Mountain (CR 702.34) wired via
+        // FlashbackAlternativeCost + SacrificeBasicLandCost + FlashbackOracleParser.
+        // Production bot doesn't yet auto-elect flashback (PriorityAction
+        // can't carry alt-cost) — same status as Force of Vigor's pitch.
         "Lava Dart",
         // Sorcery — {2}{R} (spectacle {R}). DamageAnyTargetTemplate handles
         // the 3-damage body. Spectacle alt-cost ("if an opponent lost life
