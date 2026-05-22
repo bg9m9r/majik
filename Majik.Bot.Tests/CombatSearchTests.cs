@@ -56,4 +56,48 @@ public class CombatSearchTests
         plan.Should().NotBeNull();
         sw.ElapsedMilliseconds.Should().BeLessThan(500);
     }
+
+    /// <summary>
+    /// Greedy block projection picks the wrong blockers, making a bad
+    /// attack look profitable. With small boards the deeper pass enumerates
+    /// every opponent block assignment (pessimistic for bot), exposing the
+    /// trap. Bot A1=4/4 + A2=2/2 vs opp B1=2/2 + B2=3/3:
+    ///   Greedy: A1 unblocked (+4 dmg), A2 hard-blocked by B2 → +4 score.
+    ///   Optimal opp: trade B2 into A1 (kill 4/4 for 3/3), unblock A2 → bot
+    ///   loses its best creature for a small one. Negative score.
+    /// The 2-ply minimax must decline this attack.
+    /// </summary>
+    [Fact]
+    public void IterativeDeepening_DeclinesAttack_WhenOptimalOppBlockMakesItBad()
+    {
+        var s = new BotTestScenario();
+        var a1 = s.AddCreatureToBattlefield(s.Self, "BigGuy", 4, 4);
+        var a2 = s.AddCreatureToBattlefield(s.Self, "SmallGuy", 2, 2);
+        s.AddCreatureToBattlefield(s.Opponent, "Bear", 2, 2);
+        s.AddCreatureToBattlefield(s.Opponent, "Hill Giant", 3, 3);
+        var policy = new CombatPolicy(ArchetypeWeights.Prowess);
+
+        var plan = policy.PickAttackers(s.Context, s.Self, new Creature[] { a1, a2 });
+
+        // Should NOT attack with the 4/4 — opp would trade it for a 3/3.
+        plan.Attackers.Select(a => a.Attacker).Should().NotContain(a1);
+    }
+
+    /// <summary>
+    /// Sanity: deepening must not regress no-blocker cases — full swing
+    /// remains correct.
+    /// </summary>
+    [Fact]
+    public void IterativeDeepening_StillSwingsWide_WhenNoBlockers()
+    {
+        var s = new BotTestScenario();
+        var a1 = s.AddCreatureToBattlefield(s.Self, "Goblin", 2, 1);
+        var a2 = s.AddCreatureToBattlefield(s.Self, "Bear",   2, 2);
+        var a3 = s.AddCreatureToBattlefield(s.Self, "Knight", 3, 3);
+        var policy = new CombatPolicy(ArchetypeWeights.Burn);
+
+        var plan = policy.PickAttackers(s.Context, s.Self, new Creature[] { a1, a2, a3 });
+
+        plan.Attackers.Should().HaveCount(3);
+    }
 }
