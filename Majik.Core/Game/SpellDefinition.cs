@@ -25,9 +25,19 @@ public sealed record SpellDefinition(
 }
 
 /// <summary>What the caster chose during the cast flow.</summary>
+/// <remarks>
+/// <see cref="ModeIndex"/> is the legacy single-mode pick (set by Choose-one
+/// modal spells). <see cref="ModeIndexes"/> is the multi-mode list (set by
+/// Choose-two / Choose-one-or-both / Choose-one-or-more spells). When both
+/// are non-null, multi-mode consumers should prefer the list; legacy
+/// consumers that only read <see cref="ModeIndex"/> still see the first
+/// chosen mode (the cast flow keeps the scalar field in sync with the
+/// first list entry).
+/// </remarks>
 public sealed record ChosenSpellParams(
     int? ModeIndex,
     int? X,
     IReadOnlyList<IReadOnlyList<object>> Targets,
     ManaPayment Mana,
-    IReadOnlyList<Player>? AllPlayers = null);
+    IReadOnlyList<Player>? AllPlayers = null,
+    IReadOnlyList<int>? ModeIndexes = null);
