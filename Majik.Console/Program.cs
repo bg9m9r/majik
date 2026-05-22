@@ -115,7 +115,7 @@ class Program
         System.Console.WriteLine("  Majik.Console analyze-keywords <path-to-csv-file>");
         System.Console.WriteLine("  Majik.Console ingest-claude-results <path-to-jsonl-file>");
         System.Console.WriteLine("  Majik.Console play-triggers [etb|apnap|intervening-if|delayed|all]");
-        System.Console.WriteLine("  Majik.Console coverage-report [--format <fmt>]   # fmt: modern|standard|pioneer|… (omit for full pool)");
+        System.Console.WriteLine("  Majik.Console coverage-report [--format <fmt>] [--dedup-by-name] [--dump-unmatched <path>]");
         System.Console.WriteLine("  Majik.Console compile-templates");
         System.Console.WriteLine();
         TriggerPlayground.PrintScenarios();
