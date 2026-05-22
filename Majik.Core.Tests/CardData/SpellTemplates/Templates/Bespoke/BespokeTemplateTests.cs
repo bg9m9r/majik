@@ -106,4 +106,47 @@ public class BespokeTemplateTests
         new RevealHandThenExileTemplate().TryBind(Ctx(oracle))
             .Should().BeNull();
     }
+
+    [Fact]
+    public void RevealUntilNonlandDamageTemplate_MatchesCalibratedBlastOracle()
+    {
+        new RevealUntilNonlandDamageTemplate().TryBind(
+            Ctx("Reveal cards from the top of your library until you reveal a nonland card. Put the revealed cards on the bottom of your library in a random order. When you reveal a nonland card this way, Calibrated Blast deals damage equal to that card's mana value to any target."))
+            .Should().NotBeNull();
+    }
+
+    [Fact]
+    public void RevealUntilArtifactToBattlefieldTemplate_MatchesMadcapExperimentOracle()
+    {
+        new RevealUntilArtifactToBattlefieldTemplate().TryBind(
+            Ctx("Reveal cards from the top of your library until you reveal an artifact card. Put that card onto the battlefield and the rest on the bottom of your library in a random order. Madcap Experiment deals damage to you equal to the number of cards revealed this way."))
+            .Should().NotBeNull();
+    }
+
+    [Fact]
+    public void RevealUntilLandToBattlefieldTemplate_MatchesRecrossThePathsOracle()
+    {
+        new RevealUntilLandToBattlefieldTemplate().TryBind(
+            Ctx("Reveal cards from the top of your library until you reveal a land card. Put that card onto the battlefield and the rest on the bottom of your library in any order. Clash with an opponent. If you win, return Recross the Paths to its owner's hand."))
+            .Should().NotBeNull();
+    }
+
+    [Fact]
+    public void RevealUntilNonlandToHandTemplate_MatchesTreasureHuntOracle()
+    {
+        new RevealUntilNonlandToHandTemplate().TryBind(
+            Ctx("Reveal cards from the top of your library until you reveal a nonland card, then put all cards revealed this way into your hand."))
+            .Should().NotBeNull();
+    }
+
+    [Fact]
+    public void RevealUntilFamily_DoesNotCrossMatch()
+    {
+        var treasure = "Reveal cards from the top of your library until you reveal a nonland card, then put all cards revealed this way into your hand.";
+        var calibrated = "Reveal cards from the top of your library until you reveal a nonland card. Put the revealed cards on the bottom of your library in a random order. When you reveal a nonland card this way, Calibrated Blast deals damage equal to that card's mana value to any target.";
+
+        // Treasure Hunt should not match the Calibrated Blast template, and vice versa.
+        new RevealUntilNonlandToHandTemplate().TryBind(Ctx(calibrated)).Should().BeNull();
+        new RevealUntilNonlandDamageTemplate().TryBind(Ctx(treasure)).Should().BeNull();
+    }
 }
