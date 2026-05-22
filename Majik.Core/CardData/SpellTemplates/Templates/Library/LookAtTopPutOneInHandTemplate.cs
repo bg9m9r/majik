@@ -21,8 +21,10 @@ namespace Majik.Core.CardData.SpellTemplates.Templates.Library;
 /// </summary>
 public sealed class LookAtTopPutOneInHandTemplate : ISpellTemplate
 {
+    // Accept both "one of them" (Impulse, Anticipate) and "one of those cards"
+    // (Accumulate Wisdom, See the Truth) — same effect, two oracle wordings.
     private static readonly Regex Pattern = new(
-        @"look\s+at\s+the\s+top\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten|x)\s+cards\s+of\s+your\s+library\.\s*put\s+one\s+of\s+them\s+into\s+your\s+hand\s+and\s+the\s+rest\s+(?<dest>on\s+the\s+bottom\s+of\s+your\s+library|into\s+your\s+graveyard)",
+        @"look\s+at\s+the\s+top\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten|x)\s+cards\s+of\s+your\s+library\.\s*put\s+one\s+of\s+(?:them|those\s+cards)\s+into\s+your\s+hand\s+and\s+the\s+rest\s+(?<dest>on\s+the\s+bottom\s+of\s+your\s+library|into\s+your\s+graveyard)",
         RegexOptions.IgnoreCase);
 
     public int Priority => 50;
