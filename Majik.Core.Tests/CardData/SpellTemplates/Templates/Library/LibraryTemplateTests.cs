@@ -100,4 +100,17 @@ public class LibraryTemplateTests
             Ctx("Return target creature card from your graveyard to the battlefield."))
             .Should().BeNull();
     }
+
+    // ImpulseMayRevealFilterTemplate — dual-filter "and/or" variants (no space
+    // around the slash). Cards: In the Presence of Ages, Relentless Pursuit,
+    // Benefaction of Rhonas. Before the broaden the regex required either "/"
+    // (with no "or") or "\s+or", so "and/or" — slash glued to "or" — failed.
+    [Theory]
+    [InlineData("Reveal the top four cards of your library. You may put a creature card and/or a land card from among them into your hand. Put the rest into your graveyard.")]
+    [InlineData("Reveal the top five cards of your library. You may put a creature card and/or an enchantment card from among them into your hand. Put the rest into your graveyard.")]
+    public void ImpulseMayRevealFilterTemplate_MatchesAndOrDualFilter(string oracle)
+    {
+        new ImpulseMayRevealFilterTemplate().TryBind(Ctx(oracle))
+            .Should().NotBeNull();
+    }
 }
