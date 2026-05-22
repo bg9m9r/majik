@@ -246,5 +246,43 @@ public static class SeedImplementedCards
         // non-Elemental, non-Incarnation white card to return the exiled
         // creature").
         "Solitude",
+
+        // U/R Horizon Canopy painless dual — Modern Horizons (FieryIsletFactory).
+        // {T}, Pay 1 life: Add {U} or {R} — two ManaAbility instances with a
+        // life-cost activation gate (CR 119.4) + LoseLife side-effect wired
+        // via HorizonLandBinder.
+        // {1}, {T}, Sacrifice this land: Draw a card — wired (Vexing Bauble shape).
+        // Sacrifice cost doesn't yet move the land to the graveyard (zone-
+        // service plumbing TODO on AdditionalCost.Sacrifice).
+        // "Pay life as a 'you may' prompt" is moot — bot's source-picker uses
+        // the ability transparently when paying mana costs.
+        "Fiery Islet",
+
+        // R/W Horizon Canopy painless dual — Modern Horizons (SunbakedCanyonFactory).
+        // Same shape as Fiery Islet — Pay 1 life mana abilities + sac-draw.
+        // Same deferred notes apply (sacrifice zone movement).
+        "Sunbaked Canyon",
+
+        // U/R surveil land — Foundations (ThunderingFallsFactory).
+        // {T}: Add {U} or {R} — two ManaAbility instances, player selects at activation.
+        // ETB trigger: surveil 1 — default-all-graveyard decision wired.
+        // ETB-tapped handled by EntersTappedBinder in production path.
+        // Surveil player prompt + life-loss replacement effects out of scope here.
+        // Same pattern reusable for the rest of the Foundations surveil cycle.
+        "Thundering Falls",
+
+        // R/W surveil land — Foundations (ElegantParlorFactory).
+        // Same shape as Thundering Falls; only colour differs. Same deferred notes.
+        "Elegant Parlor",
+
+        // R/W fastland — Kaladesh (InspiringVantageFactory).
+        // {T}: Add {R} or {W} — two ManaAbility instances wired.
+        // Conditional ETB-tapped ("unless you control two or fewer other lands")
+        // handled by ConditionalEntersTappedBinder in production path
+        // (regex already matches the "N or fewer / more other lands" form
+        // shared with Kamigawa channel lands).
+        // Same pattern reusable for the rest of the Kaladesh fastland cycle:
+        // Concealed Courtyard, Spirebluff Canal, Botanical Sanctum, Blooming Marsh.
+        "Inspiring Vantage",
     };
 }

@@ -35,8 +35,11 @@ namespace Majik.Core.CardData.SpellTemplates;
 /// </summary>
 public sealed class ModalChooseOneTemplate : ISpellTemplate
 {
+    // Header captures the "pick word" so Rehydrate can decide single-mode
+    // vs multi-mode evaluation. Compile-templates stashes the parsed pick
+    // alongside the modes JSON; Rehydrate restores it.
     private static readonly Regex HeaderRegex = new(
-        @"choose\s+(?:one|two|one\s+or\s+both)\s*[—-]\s*",
+        @"choose\s+(?<pick>one\s+or\s+more|one\s+or\s+both|one|two|three)\s*[—-]\s*",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     private static readonly Regex BulletSplit = new(
@@ -84,6 +87,7 @@ public sealed class ModalChooseOneTemplate : ISpellTemplate
         return new Dictionary<string, string>
         {
             ["modes"] = JsonSerializer.Serialize(clauses),
+            ["pick"] = header.Groups["pick"].Value.ToLowerInvariant().Replace("  ", " "),
         };
     }
 
@@ -116,6 +120,9 @@ public sealed class ModalChooseOneTemplate : ISpellTemplate
             modeDefs.Add(def);
         }
 
+        var pick = @params.TryGetValue("pick", out var pk) ? pk : "one";
+        var pickCount = PickCount(pick);
+
         return new SpellDefinition(
             Modes: clauses,
             HasVariableX: modeDefs.Any(d => d?.HasVariableX == true),
@@ -123,10 +130,38 @@ public sealed class ModalChooseOneTemplate : ISpellTemplate
                 .SelectMany(d => d!.TargetRequests).ToList(),
             EffectFactory: p =>
             {
-                var idx = p.ModeIndex ?? 0;
-                if (idx < 0 || idx >= modeDefs.Count) return Array.Empty<Majik.Core.Abilities.IEffect>();
-                var picked = modeDefs[idx];
-                return picked?.EffectFactory(p) ?? Array.Empty<Majik.Core.Abilities.IEffect>();
+                // Multi-mode: prefer ModeIndexes when set. Caller supplies a
+                // list of distinct mode indices; each chosen mode's effects
+                // run in declaration order (CR 700.2d). Falls back to
+                // scalar ModeIndex for legacy single-mode callers and for
+                // Choose-one cards (pickCount == 1).
+                var indices = p.ModeIndexes is { Count: > 0 } list
+                    ? list
+                    : new[] { p.ModeIndex ?? 0 };
+                var effects = new List<Majik.Core.Abilities.IEffect>();
+                var seen = new HashSet<int>();
+                foreach (var idx in indices)
+                {
+                    if (idx < 0 || idx >= modeDefs.Count) continue;
+                    if (!seen.Add(idx)) continue; // CR 700.2d — each mode at most once
+                    if (seen.Count > pickCount) break; // honor printed pick count
+                    var picked = modeDefs[idx];
+                    if (picked != null) effects.AddRange(picked.EffectFactory(p));
+                }
+                return effects;
             });
     }
+
+    // Maps the header pick word to the max distinct mode count.
+    // "one or more" caps at modeDefs.Count at the caller; here treat as
+    // "all" by returning int.MaxValue so the runtime list bounds it.
+    private static int PickCount(string pick) => pick switch
+    {
+        "one" => 1,
+        "two" => 2,
+        "three" => 3,
+        "one or both" => 2,
+        "one or more" => int.MaxValue,
+        _ => 1,
+    };
 }

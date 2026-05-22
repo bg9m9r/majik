@@ -106,4 +106,14 @@ public class CardEntity
     /// Flag indicating whether the card's abilities have been implemented in the engine.
     /// </summary>
     public bool IsImplemented { get; set; }
+
+    /// <summary>
+    /// Per-format legality rows. One entry per format key Scryfall reports
+    /// (<c>modern</c>, <c>standard</c>, <c>pioneer</c>, …) with the raw status
+    /// string (<c>legal | not_legal | banned | restricted</c>). Source of truth
+    /// is the <see cref="Legalities"/> JSON blob; this navigation property is
+    /// the denormalized index populated at import time so coverage queries can
+    /// filter by format without scanning JSON.
+    /// </summary>
+    public List<CardLegalityEntity> FormatLegalities { get; set; } = new();
 }
