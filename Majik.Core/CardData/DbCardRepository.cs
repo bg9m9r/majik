@@ -1,3 +1,4 @@
+using Majik.Core.Cards;
 using Majik.Core.CardData.Database;
 using Microsoft.EntityFrameworkCore;
 
@@ -226,6 +227,22 @@ public sealed class DbCardRepository : ICardRepository
                 throw new ArgumentException($"Card not found: {name}", nameof(name));
             card.IsImplemented = value;
             db.SaveChanges();
+        }
+        finally
+        {
+            Dispose(db);
+        }
+    }
+
+    public BotIntent IntentFor(string cardName)
+    {
+        if (string.IsNullOrWhiteSpace(cardName)) return BotIntent.None;
+        var db = _contextFactory();
+        try
+        {
+            var row = db.CompiledSpellTemplates.AsNoTracking()
+                .FirstOrDefault(r => r.CardName == cardName);
+            return row == null ? BotIntent.None : (BotIntent)row.Intent;
         }
         finally
         {

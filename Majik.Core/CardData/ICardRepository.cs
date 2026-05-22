@@ -1,3 +1,4 @@
+using Majik.Core.Cards;
 using Majik.Core.CardData.Database;
 
 namespace Majik.Core.CardData;
@@ -43,4 +44,13 @@ public interface ICardRepository
     /// card. Throws <see cref="ArgumentException"/> when the name has no
     /// row in the DB.</summary>
     void SetImplemented(string name, bool value);
+
+    /// <summary>
+    /// Reads the persisted <see cref="BotIntent"/> for a card from its
+    /// compiled-template row. Returns <see cref="BotIntent.None"/> when
+    /// the card has no compiled row (unknown card, or unmigrated DB).
+    /// Default implementation returns <see cref="BotIntent.None"/> for
+    /// stub repositories — production lookups override this.
+    /// </summary>
+    BotIntent IntentFor(string cardName) => BotIntent.None;
 }
