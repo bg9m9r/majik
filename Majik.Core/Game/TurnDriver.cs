@@ -290,8 +290,12 @@ public sealed class TurnDriver
 
             // Pay mana up front. SpellCastFlow doesn't enforce payment;
             // it just collects ManaPayment for downstream metadata.
-            // Apply cost-reduction (CR 117.7 — Affinity / cost-reducers).
-            var cost = Majik.Core.Costs.CostReduction.GetEffectiveCost(cast.Card, actor);
+            // When the agent elected an alternative cost (CR 118.9 —
+            // flashback / spectacle / evoke / pitch), it REPLACES the
+            // printed cost and bypasses cost-reduction; otherwise apply
+            // CR 117.7 Affinity / cost-reducers on the printed cost.
+            var cost = cast.AlternativeCost?.AlternativeManaCost
+                ?? Majik.Core.Costs.CostReduction.GetEffectiveCost(cast.Card, actor);
             var payment = await _agents[actor].ChooseManaSourcesAsync(ctx, cost, ct);
             if (!manaResolver.Pay(actor, cost, payment))
             {
@@ -301,7 +305,10 @@ public sealed class TurnDriver
 
             try
             {
-                await castFlow.CastAsync(actor, cast.Card, def, _agents[actor], ctx, ct);
+                await castFlow.CastAsync(
+                    actor, cast.Card, def, _agents[actor], ctx, ct,
+                    additionalCosts: cast.AdditionalCosts,
+                    alternativeCost: cast.AlternativeCost);
             }
             catch (InvalidOperationException ex)
             {
