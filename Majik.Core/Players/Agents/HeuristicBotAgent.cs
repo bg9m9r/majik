@@ -64,21 +64,28 @@ public sealed class HeuristicBotAgent : IPlayerAgent
             _failedThisTurn.Add(prev);
         }
         _lastProposed = null;
-        // Only attempt during a Main phase on our own turn with an empty
-        // stack — land drops + sorcery-speed casts are illegal elsewhere.
+        // Sorcery window: own main phase, empty stack — full hand + land
+        // drop available. Instant window: any other priority opportunity
+        // when there's something worth reacting to (opponent's combat phase,
+        // a spell on the stack, opponent's end step). Outside both → pass.
         var phase = ctx.CurrentPhase;
         var sorceryWindow = phase == Majik.Core.StateMachine.PhaseStateType.Main
             && ReferenceEquals(ctx.Self, ctx.ActivePlayer)
             && ctx.Stack.IsEmpty;
+        var instantWindow = !sorceryWindow && IsReactiveWindow(ctx);
 
-        if (!sorceryWindow) return Task.FromResult(PriorityAction.Pass);
+        if (!sorceryWindow && !instantWindow) return Task.FromResult(PriorityAction.Pass);
 
         // 1. Land drop, if we have one and haven't dropped this turn.
-        var land = ctx.Self.Zones.Hand.GetCards()
-            .FirstOrDefault(c => c.HasType(CardType.Land));
-        if (land != null)
+        //    Land drops are sorcery-speed only.
+        if (sorceryWindow)
         {
-            return Task.FromResult<PriorityAction>(new PriorityAction.PlayLand(land));
+            var land = ctx.Self.Zones.Hand.GetCards()
+                .FirstOrDefault(c => c.HasType(CardType.Land));
+            if (land != null)
+            {
+                return Task.FromResult<PriorityAction>(new PriorityAction.PlayLand(land));
+            }
         }
 
         // 2. Highest-CMC affordable spell — permanents (resolve via vanilla
@@ -94,6 +101,7 @@ public sealed class HeuristicBotAgent : IPlayerAgent
         var pool = hand.Concat(graveyard)
             .Where(c => !c.HasType(CardType.Land))
             .Where(IsCastableSpell)
+            .Where(c => sorceryWindow || IsInstantSpeed(c))
             .Where(c => !_failedThisTurn.Contains(c.InstanceId))
             .ToList();
 
@@ -179,6 +187,36 @@ public sealed class HeuristicBotAgent : IPlayerAgent
         || c.HasType(CardType.Planeswalker)
         || c.HasType(CardType.Instant)
         || c.HasType(CardType.Sorcery);
+
+    /// <summary>Castable at instant speed: Instants, or permanents with the
+    /// Flash keyword (CR 702.8). Sorcery-speed cards (sorceries, vanilla
+    /// creatures, etc.) are filtered out during instant windows.</summary>
+    private static bool IsInstantSpeed(ICard c)
+    {
+        if (c.HasType(CardType.Instant)) return true;
+        return c.Abilities.OfType<KeywordAbility>().Any(k =>
+            string.Equals(k.Keyword, "Flash", StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>True when we have something to react to — opponent's combat
+    /// phases (attackers/blockers windows), a non-empty stack (a spell or
+    /// ability we might want to counter / piggy-back on), or opponent's
+    /// end step (Brainstorm window). Conservative: outside these phases
+    /// the bot still passes to avoid wasting mana on speculative casts.</summary>
+    private static bool IsReactiveWindow(GameContext ctx)
+    {
+        if (!ctx.Stack.IsEmpty) return true;
+        // Opponent's turn — react during combat or end step.
+        if (!ReferenceEquals(ctx.Self, ctx.ActivePlayer))
+        {
+            var p = ctx.CurrentPhase;
+            return p == Majik.Core.StateMachine.PhaseStateType.DeclareAttackers
+                || p == Majik.Core.StateMachine.PhaseStateType.DeclareBlockers
+                || p == Majik.Core.StateMachine.PhaseStateType.CombatDamage
+                || p == Majik.Core.StateMachine.PhaseStateType.End;
+        }
+        return false;
+    }
 
     /// <summary>Greedy pick of untapped mana sources to cover <paramref name="cost"/>.
     /// Returns null when the cost can't be paid from current untapped lands.

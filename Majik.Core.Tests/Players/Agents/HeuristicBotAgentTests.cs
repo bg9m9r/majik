@@ -258,6 +258,68 @@ public class HeuristicBotAgentTests
     }
 
     [Fact]
+    public async Task Priority_OpponentTurn_DeclareAttackers_CastsInstant()
+    {
+        // Bot has an Instant + Mountain. Opponent declaring attackers —
+        // instant window. Bot should cast, not pass.
+        var mountain = NamedCardFactory.Create("Mountain", _alice);
+        mountain.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(mountain);
+        var bolt = new Instant("Lightning Bolt", "R");
+        bolt.SetOwner(_alice);
+        bolt.SetZone(ZoneType.Hand);
+        _alice.Zones.Hand.AddCard(bolt);
+
+        var bot = new HeuristicBotAgent();
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _bob,
+            1, PhaseStateType.DeclareAttackers, new Majik.Core.Stack.Stack());
+
+        var action = await bot.ChoosePriorityActionAsync(ctx);
+
+        action.Should().BeOfType<PriorityAction.CastSpell>()
+            .Which.Card.Should().BeSameAs(bolt);
+    }
+
+    [Fact]
+    public async Task Priority_OpponentTurn_UntapStep_PassesEvenWithInstant()
+    {
+        // Untap step has no reactive opportunity. Bot should pass.
+        var mountain = NamedCardFactory.Create("Mountain", _alice);
+        mountain.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(mountain);
+        var bolt = new Instant("Lightning Bolt", "R");
+        bolt.SetOwner(_alice);
+        bolt.SetZone(ZoneType.Hand);
+        _alice.Zones.Hand.AddCard(bolt);
+
+        var bot = new HeuristicBotAgent();
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _bob,
+            1, PhaseStateType.Untap, new Majik.Core.Stack.Stack());
+
+        (await bot.ChoosePriorityActionAsync(ctx)).Should().Be(PriorityAction.Pass);
+    }
+
+    [Fact]
+    public async Task Priority_OpponentTurn_SorceryInHand_DoesNotCast()
+    {
+        // Sorcery is sorcery-speed — even during opp's combat phase the
+        // bot can't legally cast it. Should pass.
+        var mountain = NamedCardFactory.Create("Mountain", _alice);
+        mountain.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(mountain);
+        var lavaSpike = new Sorcery("Lava Spike", "R");
+        lavaSpike.SetOwner(_alice);
+        lavaSpike.SetZone(ZoneType.Hand);
+        _alice.Zones.Hand.AddCard(lavaSpike);
+
+        var bot = new HeuristicBotAgent();
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _bob,
+            1, PhaseStateType.DeclareAttackers, new Majik.Core.Stack.Stack());
+
+        (await bot.ChoosePriorityActionAsync(ctx)).Should().Be(PriorityAction.Pass);
+    }
+
+    [Fact]
     public async Task ChooseTargets_BuffLabel_FlipsToCasterSide()
     {
         // "target creature you control" label flags as buff — bot should
