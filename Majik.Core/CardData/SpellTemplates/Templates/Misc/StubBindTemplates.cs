@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using Majik.Core.Abilities;
 using Majik.Core.CardData.SpellTemplates;
 using Majik.Core.Cards;
+using Majik.Core.Effects;
 using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
@@ -70,14 +71,29 @@ public sealed class TargetCantBeBlockedTemplate : ISpellTemplate
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);
 
+    public bool CanBind(SpellBindContext ctx) => ctx.Effects != null;
+
     public IReadOnlyDictionary<string, string>? TryExtractParams(string oracleText) =>
         Pattern.IsMatch(oracleText) ? EmptyParams.Instance : null;
 
-    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
-        StubBindHelpers.EmptyEffectSpell(new[]
-        {
-            new TargetRequest("target creature", 1, 1, Array.Empty<object>())
-        });
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx)
+    {
+        var effects = ctx.Effects!;
+        var resolver = ctx.Resolver;
+        return new SpellDefinition(
+            Modes: Array.Empty<string>(),
+            HasVariableX: false,
+            TargetRequests: new[] { new TargetRequest("target creature", 1, 1, Array.Empty<object>()) },
+            EffectFactory: p =>
+            {
+                var target = resolver(p.Targets[0][0]);
+                return new IEffect[] { new Effect("cant-be-blocked EOT", () =>
+                {
+                    if (target is Creature c)
+                        effects.Register(new CombatRestrictionEffect(CombatRestriction.CannotBeBlocked, c));
+                }) };
+            });
+    }
 }
 
 /// <summary>
@@ -97,14 +113,39 @@ public sealed class UpToNCantBlockTemplate : ISpellTemplate
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);
 
-    public IReadOnlyDictionary<string, string>? TryExtractParams(string oracleText) =>
-        Pattern.IsMatch(oracleText) ? EmptyParams.Instance : null;
+    public bool CanBind(SpellBindContext ctx) => ctx.Effects != null;
 
-    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
-        StubBindHelpers.EmptyEffectSpell(new[]
-        {
-            new TargetRequest("target creature", 0, 3, Array.Empty<object>())
-        });
+    public IReadOnlyDictionary<string, string>? TryExtractParams(string oracleText)
+    {
+        var m = Pattern.Match(oracleText);
+        return m.Success
+            ? new Dictionary<string, string> { ["n"] = m.Groups["n"].Value }
+            : null;
+    }
+
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx)
+    {
+        var n = SpellTemplateHelpers.WordToInt(@params.TryGetValue("n", out var v) ? v : "1");
+        if (n < 1) n = 1;
+        var effects = ctx.Effects!;
+        var resolver = ctx.Resolver;
+        return new SpellDefinition(
+            Modes: Array.Empty<string>(),
+            HasVariableX: false,
+            TargetRequests: new[] { new TargetRequest("target creature", 0, n, Array.Empty<object>()) },
+            EffectFactory: p =>
+            {
+                // p.Targets[0] is the list of chosen creature targets (0..n).
+                // Each becomes a per-target CannotBlock restriction.
+                var slots = p.Targets.Count > 0 ? p.Targets[0] : Array.Empty<object>();
+                var resolved = slots.Select(s => resolver(s)).OfType<Creature>().ToList();
+                return new IEffect[] { new Effect($"cant-block up to {n} EOT", () =>
+                {
+                    foreach (var c in resolved)
+                        effects.Register(new CombatRestrictionEffect(CombatRestriction.CannotBlock, c));
+                }) };
+            });
+    }
 }
 
 /// <summary>
@@ -994,11 +1035,27 @@ public sealed class CreaturesCantBlockTemplate : ISpellTemplate
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);
 
+    public bool CanBind(SpellBindContext ctx) => ctx.Effects != null;
+
     public IReadOnlyDictionary<string, string>? TryExtractParams(string oracleText) =>
         Pattern.IsMatch(oracleText) ? EmptyParams.Instance : null;
 
-    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
-        StubBindHelpers.EmptyEffectSpell(Array.Empty<TargetRequest>());
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx)
+    {
+        var effects = ctx.Effects!;
+        return new SpellDefinition(
+            Modes: Array.Empty<string>(),
+            HasVariableX: false,
+            TargetRequests: Array.Empty<TargetRequest>(),
+            EffectFactory: _ => new IEffect[] { new Effect("mass cant-block EOT", () =>
+            {
+                // Null target = mass effect. CombatValidator.CanBlock will
+                // see the mass restriction match every creature this turn.
+                // Modifier filter ("without flying", "Nonartifact") is lossy
+                // at v1; the future per-creature predicate goes here.
+                effects.Register(new CombatRestrictionEffect(CombatRestriction.CannotBlock, target: null));
+            }) });
+    }
 }
 
 public sealed class ReturnAllPermanentsTemplate : ISpellTemplate
