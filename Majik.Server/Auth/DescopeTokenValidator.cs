@@ -40,18 +40,25 @@ public static class DescopeTokenValidator
             .CreateLogger("Majik.Auth");
 
         var identity = context.Principal?.Identity as ClaimsIdentity;
-        var sub = context.Principal?.FindFirst("sub")?.Value
-            ?? context.Principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        // Strict: require the "sub" claim. Previously fell back to
+        // ClaimTypes.NameIdentifier, which can be populated by ASP.NET's
+        // claim-mapping pass even when the JWT itself has no sub —
+        // an attacker who can mint a token without sub shouldn't have
+        // their NameIdentifier silently promoted.
+        var sub = context.Principal?.FindFirst("sub")?.Value;
 
         if (string.IsNullOrEmpty(sub))
         {
-            var claimSummary = context.Principal is null
+            // Log only claim TYPES (never values) — claim values may carry
+            // PII (email, Discord ID) that has no business in operational
+            // logs. Type list is sufficient to debug a misconfigured IdP.
+            var claimTypes = context.Principal is null
                 ? "<no principal>"
                 : string.Join(", ",
-                    context.Principal.Claims.Select(c => $"{c.Type}={c.Value}"));
+                    context.Principal.Claims.Select(c => c.Type).Distinct());
             logger.LogWarning(
-                "DescopeTokenValidator: sub missing. Claims: {Claims}",
-                claimSummary);
+                "DescopeTokenValidator: sub missing. Claim types: {ClaimTypes}",
+                claimTypes);
             context.Fail("Token missing 'sub' claim.");
             return Task.CompletedTask;
         }
@@ -75,9 +82,12 @@ public static class DescopeTokenValidator
             identity.AddClaim(new Claim(DiscordUserIdClaim, discordId));
         }
 
-        logger.LogInformation(
-            "DescopeTokenValidator: validated sub={Sub} discordUserId={Discord}",
-            sub, discordId ?? "<none>");
+        // Demoted from Information to Debug + dropped the discordUserId
+        // value entirely (PII). The Discord ID is still lifted onto the
+        // principal above; we just don't log it on every request.
+        logger.LogDebug(
+            "DescopeTokenValidator: validated sub={Sub} discordPresent={DiscordPresent}",
+            sub, !string.IsNullOrEmpty(discordId));
 
         return Task.CompletedTask;
     }

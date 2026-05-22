@@ -58,7 +58,8 @@ public sealed class MatchService
         DeckRepository? deckRepo = null,
         DeckValidationService? deckValidator = null,
         IMatchOwnership? ownership = null,
-        ILogger<MatchService>? logger = null)
+        ILogger<MatchService>? logger = null,
+        IDeckOwnershipPolicy? deckOwnershipPolicy = null)
     {
         _matches = matches;
         _profiles = profiles;
@@ -72,6 +73,22 @@ public sealed class MatchService
         _deckValidator = deckValidator;
         _ownership = ownership;
         _logger = logger;
+
+        // Strict by default: refuse construction without a real
+        // DeckRepository + DeckValidationService. The legacy stub path
+        // skipped the per-owner check in ResolveDeckSnapshotAsync, which
+        // let any caller quote any deck id and have the match service
+        // treat it as theirs. Tests that genuinely use StubDeckLoader
+        // inject AllowStubDeckOwnershipPolicy to opt back into the
+        // unchecked path.
+        var policy = deckOwnershipPolicy ?? new StrictDeckOwnershipPolicy();
+        if ((_deckRepo == null || _deckValidator == null) && !policy.AllowMissingDeckPlumbing)
+        {
+            throw new InvalidOperationException(
+                "MatchService requires DeckRepository and DeckValidationService " +
+                "(strict deck-ownership policy). Inject AllowStubDeckOwnershipPolicy " +
+                "in tests that intentionally use the stub deck loader.");
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -178,7 +195,7 @@ public sealed class MatchService
 
         await _matches.InsertAsync(match, ct);
 
-        return Result.Ok(ToDto(match));
+        return Result.Ok(ToDto(match, viewerSub: callerSub));
     }
 
     // -----------------------------------------------------------------------
@@ -354,7 +371,7 @@ public sealed class MatchService
         _hub?.Publish(matchId, "match.state-changed",
             new { matchId, state = "Playing", transitionedAt = now });
 
-        return Result.Ok(ToDto(fresh));
+        return Result.Ok(ToDto(fresh, viewerSub: creator.Sub));
     }
 
     // Variant of TransitionStateAsync that surfaces the CAS result so callers
@@ -450,7 +467,7 @@ public sealed class MatchService
         await _matches.TryAtomicUpdateAsync(matchId, MatchState.Rolling, setRoll, ct);
 
         var fresh = (await _matches.GetByIdAsync(matchId, ct))!;
-        return Result.Ok(ToDto(fresh));
+        return Result.Ok(ToDto(fresh, viewerSub: callerSub));
     }
 
     private async Task TransitionStateAsync(Guid id, MatchState from, MatchState to, DateTime now, CancellationToken ct)
@@ -512,7 +529,7 @@ public sealed class MatchService
             new { matchId, creatorMs = match.CreatorMillisRemaining, opponentMs = match.OpponentMillisRemaining, holder = firstPlayerSub, startedAt = now });
 
         var fresh = (await _matches.GetByIdAsync(matchId, ct))!;
-        return Result.Ok(ToDto(fresh));
+        return Result.Ok(ToDto(fresh, viewerSub: callerSub));
     }
 
     // -----------------------------------------------------------------------
@@ -537,7 +554,7 @@ public sealed class MatchService
         var callerSlotFilled = isCreator ? roll.CreatorRoll.HasValue : roll.OpponentRoll.HasValue;
         if (callerSlotFilled)
         {
-            return Result.Ok(ToDto(match));
+            return Result.Ok(ToDto(match, viewerSub: callerSub));
         }
 
         // Generate this player's roll
@@ -578,7 +595,7 @@ public sealed class MatchService
         }
 
         var fresh = (await _matches.GetByIdAsync(matchId, ct))!;
-        return Result.Ok(ToDto(fresh));
+        return Result.Ok(ToDto(fresh, viewerSub: callerSub));
     }
 
     // -----------------------------------------------------------------------
@@ -609,7 +626,7 @@ public sealed class MatchService
             new { matchId, state = "Completed", transitionedAt = now });
 
         var fresh = (await _matches.GetByIdAsync(matchId, ct))!;
-        return Result.Ok(ToDto(fresh));
+        return Result.Ok(ToDto(fresh, viewerSub: callerSub));
     }
 
     // -----------------------------------------------------------------------
@@ -734,7 +751,7 @@ public sealed class MatchService
             if (!isParty) return Result.Fail<MatchDto>(new MatchError("private-match"));
         }
 
-        return Result.Ok(ToDto(match));
+        return Result.Ok(ToDto(match, viewerSub: callerSub));
     }
 
     // -----------------------------------------------------------------------
@@ -744,7 +761,10 @@ public sealed class MatchService
     public async Task<IReadOnlyList<MatchDto>> ListOpenPublicAsync(CancellationToken ct)
     {
         var matches = await _matches.ListOpenPublicAsync(50, ct);
-        return matches.Select(ToDto).ToList();
+        // Lobby listings strip every DeckSnapshot: a creator's full
+        // decklist is the creator's own data and was never meant to be
+        // visible to lobby browsers (which are arbitrary authed users).
+        return matches.Select(m => ToDto(m, viewerSub: null)).ToList();
     }
 
     // -----------------------------------------------------------------------
@@ -805,8 +825,14 @@ public sealed class MatchService
     /// balances: the priority holder's remaining time is decremented by the
     /// elapsed wall time since <see cref="Match.PriorityStartedAt"/> (clamped
     /// to zero). The non-holder's balance is returned as-is.
+    ///
+    /// <paramref name="viewerSub"/> scopes the player <c>DeckSnapshot</c>
+    /// field: only the deck's owner sees the full card list. Everyone else
+    /// (opponent in-match, lobby browsers, future spectators) gets an
+    /// empty list. Pass null for "no viewer" (lobby listings) — both
+    /// snapshots are stripped.
     /// </summary>
-    public MatchDto ToDto(Match m)
+    public MatchDto ToDto(Match m, string? viewerSub)
     {
         var now = _clock.UtcNow;
 
@@ -824,16 +850,26 @@ public sealed class MatchService
                 opponentRemaining = Math.Max(0, opponentRemaining - elapsedMs);
         }
 
+        // CR 706-adjacent: a player's decklist is private to that player.
+        // Lobby browsers and the opposing seat should never see the full
+        // mainboard — only the deck's owner gets DeckSnapshot.
+        IReadOnlyList<string> creatorSnapshot = (viewerSub != null && viewerSub == m.Creator.Sub)
+            ? m.Creator.DeckSnapshot
+            : Array.Empty<string>();
+        IReadOnlyList<string> opponentSnapshot = (m.Opponent != null && viewerSub != null && viewerSub == m.Opponent.Sub)
+            ? m.Opponent.DeckSnapshot
+            : Array.Empty<string>();
+
         return new MatchDto(
             Id: m.Id,
             State: m.State.ToString(),
             Visibility: m.Visibility.ToString(),
             Format: m.Format,
             ClockMinutes: m.ClockMinutes,
-            Creator: new MatchPlayerDto(m.Creator.Sub, m.Creator.Handle, m.Creator.DeckId, m.Creator.DeckSnapshot),
+            Creator: new MatchPlayerDto(m.Creator.Sub, m.Creator.Handle, m.Creator.DeckId, creatorSnapshot),
             Opponent: m.Opponent is null
                 ? null
-                : new MatchPlayerDto(m.Opponent.Sub, m.Opponent.Handle, m.Opponent.DeckId, m.Opponent.DeckSnapshot),
+                : new MatchPlayerDto(m.Opponent.Sub, m.Opponent.Handle, m.Opponent.DeckId, opponentSnapshot),
             Roll: m.Roll is null
                 ? null
                 : new MatchRollDto(m.Roll.CreatorRoll, m.Roll.OpponentRoll, m.Roll.WinnerSub),
