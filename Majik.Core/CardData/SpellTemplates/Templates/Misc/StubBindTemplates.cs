@@ -37,8 +37,13 @@ internal static class StubBindHelpers
 /// </summary>
 public sealed class FogTemplate : ISpellTemplate
 {
+    // Plain Fog: "Prevent all combat damage that would be dealt this turn."
+    // Filtered variants: trailing " by creatures [filter]." (Encircling
+    // Fissure, Hindervines, Moonmist, Tanglesap, Vine Snare). v1 stub
+    // prevents ALL combat damage regardless of filter — lossy, but the core
+    // fog effect still fires.
     private static readonly Regex Pattern = new(
-        @"^\s*prevent\s+all\s+combat\s+damage\s+that\s+would\s+be\s+dealt\s+this\s+turn\.?\s*$",
+        @"^\s*prevent\s+all\s+combat\s+damage\s+that\s+would\s+be\s+dealt\s+this\s+turn(?:\s+by\s+creatures[^.]*)?\.?\s*$",
         RegexOptions.IgnoreCase);
 
     public int Priority => 50;
