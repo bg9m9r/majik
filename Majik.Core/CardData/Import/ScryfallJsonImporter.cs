@@ -168,7 +168,7 @@ public class ScryfallJsonImporter
     /// </summary>
     private CardEntity MapJsonToEntity(ScryfallCardJson json)
     {
-        return new CardEntity
+        var entity = new CardEntity
         {
             ScryfallId = json.Id ?? Guid.NewGuid().ToString(),
             Name = json.Name ?? "",
@@ -189,6 +189,25 @@ public class ScryfallJsonImporter
             Legalities = JsonSerializer.Serialize(json.Legalities ?? new Dictionary<string, string>()),
             ImportedAt = DateTime.UtcNow
         };
+        entity.FormatLegalities = BuildLegalityRows(json.Legalities);
+        return entity;
+    }
+
+    /// <summary>
+    /// Materializes the per-format <see cref="CardLegalityEntity"/> rows from
+    /// the Scryfall <c>legalities</c> dict. <see cref="CardLegalityEntity.CardId"/>
+    /// is left at 0 so EF Core fills it from the parent on insert.
+    /// </summary>
+    private static List<CardLegalityEntity> BuildLegalityRows(Dictionary<string, string>? legalities)
+    {
+        if (legalities is null || legalities.Count == 0) return new();
+        var rows = new List<CardLegalityEntity>(legalities.Count);
+        foreach (var kv in legalities)
+        {
+            if (string.IsNullOrEmpty(kv.Key) || string.IsNullOrEmpty(kv.Value)) continue;
+            rows.Add(new CardLegalityEntity { Format = kv.Key, Status = kv.Value });
+        }
+        return rows;
     }
 
     /// <summary>
@@ -213,5 +232,16 @@ public class ScryfallJsonImporter
         existing.ImageUri = updated.ImageUri;
         existing.Legalities = updated.Legalities;
         existing.UpdatedAt = DateTime.UtcNow;
+        // Replace per-format rows so formats that disappeared from Scryfall
+        // don't linger on the existing entity.
+        existing.FormatLegalities.Clear();
+        foreach (var row in updated.FormatLegalities)
+        {
+            existing.FormatLegalities.Add(new CardLegalityEntity
+            {
+                Format = row.Format,
+                Status = row.Status,
+            });
+        }
     }
 }
