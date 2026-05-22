@@ -2,6 +2,7 @@ using Majik.Core.CardData;
 using Majik.Core.CardData.Database;
 using Majik.Server.Composition;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Majik.Server.Cards;
 
@@ -9,6 +10,8 @@ namespace Majik.Server.Cards;
 /// Auth: <see cref="AuthRegistration.AsPlayerPolicy"/>.</summary>
 public static class CardsEndpoints
 {
+    public const string RateLimitPolicy = "authed-60-per-min";
+
     private const int DefaultLimit = 50;
     private const int MaxLimit = 200;
 
@@ -16,6 +19,7 @@ public static class CardsEndpoints
     {
         var group = routes.MapGroup("/cards")
             .RequireAuthorization(AuthRegistration.AsPlayerPolicy)
+            .RequireRateLimiting(RateLimitPolicy)
             .WithTags("Cards");
 
         group.MapGet("/", Search)
@@ -59,7 +63,9 @@ public static class CardsEndpoints
         catch (Exception ex)
         {
             logger.LogError(ex, "GetByNames failed. count={Count}", body.Names.Count);
-            return Results.Json(new CardsError("by-name-failed", ex.Message), statusCode: 500);
+            // Don't surface ex.Message to the client — internal errors can
+            // leak stack trace fragments, connection strings, or DB schema.
+            return Results.Json(new CardsError("by-name-failed", "Internal error"), statusCode: 500);
         }
     }
 
@@ -96,7 +102,9 @@ public static class CardsEndpoints
                 colors == null ? "" : string.Join(",", colors),
                 types == null ? "" : string.Join(",", types),
                 cmc == null ? "" : string.Join(",", cmc));
-            return Results.Json(new CardsError("search-failed", ex.Message), statusCode: 500);
+            // Don't surface ex.Message to the client — internal errors can
+            // leak stack trace fragments, connection strings, or DB schema.
+            return Results.Json(new CardsError("search-failed", "Internal error"), statusCode: 500);
         }
 
         var dtos = new List<CardDto>(cards.Count);

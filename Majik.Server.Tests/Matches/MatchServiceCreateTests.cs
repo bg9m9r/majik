@@ -34,7 +34,8 @@ public class MatchServiceCreateTests : IClassFixture<TestMongoFixture>
             new SystemClock(),
             hub: null,
             timeoutScheduler: null,
-            gameFactory: null);
+            gameFactory: null,
+            deckOwnershipPolicy: new AllowStubDeckOwnershipPolicy());
     }
 
     [Fact]

@@ -1,15 +1,19 @@
 using System.Security.Claims;
 using Majik.Server.Composition;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Majik.Server.Decks;
 
 public static class DeckEndpoints
 {
+    public const string RateLimitPolicy = "authed-60-per-min";
+
     public static IEndpointRouteBuilder MapDeckEndpoints(this IEndpointRouteBuilder routes)
     {
         var group = routes.MapGroup("/decks")
             .RequireAuthorization(AuthRegistration.AsPlayerPolicy)
+            .RequireRateLimiting(RateLimitPolicy)
             .WithTags("Decks");
 
         group.MapGet("/", List).WithName("ListDecks")
@@ -109,7 +113,22 @@ public static class DeckEndpoints
         if (body is null || string.IsNullOrWhiteSpace(body.Text))
             return Results.BadRequest(new DeckError("empty-text"));
         if (body.Text.Length > 100_000)
-            return Results.BadRequest(new DeckError("too-large"));
+            return Results.Json(new DeckError("too-large"),
+                statusCode: StatusCodes.Status413PayloadTooLarge);
+        // Pathological inputs (e.g. 100k newlines) can blow up parser
+        // memory without tripping the byte cap. Cheap defensive cap.
+        const int MaxLines = 5000;
+        var lineCount = 1;
+        for (int i = 0; i < body.Text.Length; i++)
+        {
+            if (body.Text[i] == '\n')
+            {
+                lineCount++;
+                if (lineCount > MaxLines)
+                    return Results.Json(new DeckError("too-many-lines"),
+                        statusCode: StatusCodes.Status413PayloadTooLarge);
+            }
+        }
 
         var result = await parser.ParseAsync(body.Text, ct);
         var dto = new ParseDeckResultDto(

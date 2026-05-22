@@ -55,7 +55,7 @@ public static class ProfileEndpoints
     }
 
     private static async Task<IResult> PutMe(
-        PutHandleRequest body,
+        PutHandleRequest? body,
         ClaimsPrincipal user,
         [FromServices] UserProfileRepository? repo,
         CancellationToken ct)
@@ -63,6 +63,13 @@ public static class ProfileEndpoints
         if (repo == null) return MongoUnavailable();
         var sub = user.FindFirst("sub")?.Value;
         if (sub == null) return Results.Unauthorized();
+
+        // Defensive: a totally empty body or one with no/blank handle used
+        // to dereference body.Handle and NRE up the pipeline. Return 400
+        // with a typed error code instead.
+        if (body is null || string.IsNullOrWhiteSpace(body.Handle))
+            return Results.BadRequest(new ProfileError(
+                "invalid-handle", "3-20 chars, letters digits _ -"));
 
         var validation = HandleValidator.Validate(body.Handle);
         switch (validation.Outcome)

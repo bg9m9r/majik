@@ -97,7 +97,8 @@ public class MatchServiceClockTests : IClassFixture<TestMongoFixture>
             clock,
             pub,
             scheduler,
-            gameFactory: null);
+            gameFactory: null,
+            deckOwnershipPolicy: new AllowStubDeckOwnershipPolicy());
 
         var startedAt = priorityStartedAt ?? clock.UtcNow;
         var match = new Match

@@ -43,7 +43,8 @@ public class MatchServiceSubmitRollTests : IClassFixture<TestMongoFixture>
         var pub = new CapturePublisher();
         var svc = new MatchService(matchRepo, profileRepo,
             new DiceRoller(rng), new StubDeckLoader(), new SystemClock(),
-            pub, timeoutScheduler: new MatchTimeoutScheduler((_, _, _) => Task.CompletedTask), gameFactory: null);
+            pub, timeoutScheduler: new MatchTimeoutScheduler((_, _, _) => Task.CompletedTask), gameFactory: null,
+            deckOwnershipPolicy: new AllowStubDeckOwnershipPolicy());
 
         var created = await svc.CreateAsync(creatorSub,
             new CreateMatchRequest("constructed", "public", "starter", 20),

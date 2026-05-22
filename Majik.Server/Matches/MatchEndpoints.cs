@@ -4,15 +4,19 @@ using Majik.Core.Api.Commands;
 using Majik.Core.Api.Dtos;
 using Majik.Server.Composition;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Majik.Server.Matches;
 
 public static class MatchEndpoints
 {
+    public const string RateLimitPolicy = "authed-60-per-min";
+
     public static IEndpointRouteBuilder MapMatchEndpoints(this IEndpointRouteBuilder routes)
     {
         var group = routes.MapGroup("/matches")
             .RequireAuthorization(AuthRegistration.AsPlayerPolicy)
+            .RequireRateLimiting(RateLimitPolicy)
             .WithTags("Matches");
 
         group.MapPost("/", Create).WithName("CreateMatch");

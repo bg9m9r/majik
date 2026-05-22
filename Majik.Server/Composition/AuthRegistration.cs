@@ -39,13 +39,33 @@ public static class AuthRegistration
         var audience = config["Auth:Audience"];
         var enabled = !string.IsNullOrWhiteSpace(authority);
 
+        // When auth is disabled (Auth:Authority empty), do NOT register a
+        // default scheme. The previous "register no-op JwtBearer" path
+        // accepted requests with no token at all on some pipelines because
+        // the default handler returned NoResult and the policy short-circuited
+        // to 401 only sometimes. With no default scheme registered,
+        // [Authorize] consistently emits 401 — the behavior production
+        // wants when Descope hasn't been provisioned yet.
+        if (!enabled)
+        {
+            services.AddAuthentication();
+            services.AddAuthorization(options =>
+            {
+                options.AddPolicy(AsPlayerPolicy, policy =>
+                {
+                    policy.RequireAuthenticatedUser();
+                    policy.RequireClaim("sub");
+                });
+            });
+            return services;
+        }
+
         var authBuilder = services.AddAuthentication(options =>
         {
             options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
             options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
         });
 
-        if (enabled)
         {
             authBuilder.AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
             {
@@ -67,6 +87,10 @@ public static class AuthRegistration
                     ValidateLifetime = true,
                     ValidateIssuerSigningKey = true,
                     NameClaimType = "sub",
+                    // Default ClockSkew is 5 minutes — far too generous for
+                    // short-lived Descope JWTs. Tighten so expired tokens
+                    // are rejected within the 30s NTP drift budget.
+                    ClockSkew = TimeSpan.FromSeconds(30),
                 };
                 options.Events = new JwtBearerEvents
                 {
@@ -101,13 +125,6 @@ public static class AuthRegistration
                     },
                 };
             });
-        }
-        else
-        {
-            // Register the scheme with no-op handler so [Authorize]
-            // endpoints return 401 instead of throwing
-            // "No authenticationScheme was specified".
-            authBuilder.AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, _ => { });
         }
 
         services.AddAuthorization(options =>

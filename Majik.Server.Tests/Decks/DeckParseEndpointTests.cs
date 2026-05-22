@@ -126,7 +126,7 @@ public class DeckParseEndpointTests : IClassFixture<TestMongoFixture>
     }
 
     [Fact]
-    public async Task Parse_TooLarge_Returns400TooLarge()
+    public async Task Parse_TooLarge_Returns413TooLarge()
     {
         using var factory = Factory();
         var client = ClientFor(factory, "alice");
@@ -134,9 +134,27 @@ public class DeckParseEndpointTests : IClassFixture<TestMongoFixture>
         var text = new string('x', 100_001);
         var response = await client.PostAsJsonAsync("/decks/parse", new { text });
 
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        // 413 Payload Too Large is the semantic match for a byte-cap reject.
+        response.StatusCode.Should().Be(HttpStatusCode.RequestEntityTooLarge);
         var raw = await response.Content.ReadAsStringAsync();
         raw.Should().Contain("too-large");
+    }
+
+    [Fact]
+    public async Task Parse_TooManyLines_Returns413TooManyLines()
+    {
+        using var factory = Factory();
+        var client = ClientFor(factory, "alice");
+
+        // 5001 newline-separated short lines: under the 100k byte cap but
+        // past the new 5000-line cap. Defensive defense against pathological
+        // parser inputs.
+        var text = string.Join('\n', Enumerable.Range(0, 5001).Select(_ => "x"));
+        var response = await client.PostAsJsonAsync("/decks/parse", new { text });
+
+        response.StatusCode.Should().Be(HttpStatusCode.RequestEntityTooLarge);
+        var raw = await response.Content.ReadAsStringAsync();
+        raw.Should().Contain("too-many-lines");
     }
 }
 

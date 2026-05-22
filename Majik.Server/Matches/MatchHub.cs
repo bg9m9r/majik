@@ -19,11 +19,15 @@ public sealed class MatchHub : Hub
         var sub = Context.User?.FindFirst("sub")?.Value;
         if (sub == null) throw new HubException("Connection has no sub claim.");
 
-        // Public matches: anyone authed can subscribe (for read-only future).
-        // Invite matches: must be creator or opponent.
+        // Only the seated players (creator + opponent) may subscribe to the
+        // match group. Previously public matches let any authenticated user
+        // join the group, which — combined with hub broadcasts that include
+        // per-player hidden zones (CR 706 hand + library) — leaked god-view
+        // state to third parties. No spectators for now; revisit when the
+        // broadcast payloads are routed through PublishPerRecipient.
         var isParty = match.Creator.Sub == sub || match.Opponent?.Sub == sub;
-        if (match.Visibility == MatchVisibility.Invite && !isParty)
-            throw new HubException("Private match — not a participant.");
+        if (!isParty)
+            throw new HubException("Not a participant in this match.");
 
         await Groups.AddToGroupAsync(Context.ConnectionId, GroupName(matchId));
     }

@@ -1,9 +1,12 @@
+using System.Threading.RateLimiting;
 using Majik.Server.Cards;
 using Majik.Server.Composition;
 using Majik.Server.Decks;
 using Majik.Server.Matches;
 using Majik.Server.Profiles;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,10 +18,52 @@ builder.Services.AddMajikRedis(builder.Configuration);
 builder.Services.AddMajikMatches(builder.Configuration);
 builder.Services.AddMajikDecks(builder.Configuration);
 builder.Services.AddMajikSignalR(builder.Configuration);
+// SignalR Clients.User(...) keys on the "sub" claim. See
+// SubUserIdProvider for rationale; needed for the hub publisher's
+// per-recipient fan-out which carries CR 706 hidden info.
+builder.Services.AddSingleton<Microsoft.AspNetCore.SignalR.IUserIdProvider, Majik.Server.Matches.SubUserIdProvider>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi();
 
+// Per-user (fall back to per-IP) rate limit. 60 req/min on the expensive
+// or write-heavy endpoints: deck CRUD, match creation/join, card search.
+// Health, whoami, OpenAPI, and the SignalR negotiate are unpartitioned
+// (no policy attached on their endpoints).
+const string AuthedRateLimitPolicy = "authed-60-per-min";
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy(AuthedRateLimitPolicy, httpContext =>
+    {
+        var key = httpContext.User?.FindFirst("sub")?.Value
+            ?? httpContext.Connection.RemoteIpAddress?.ToString()
+            ?? "anonymous";
+        return RateLimitPartition.GetFixedWindowLimiter(key, _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 60,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0,
+            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+            AutoReplenishment = true,
+        });
+    });
+});
+
 var app = builder.Build();
+
+// Forwarded headers FIRST so downstream auth/log/limiter see the real
+// client IP and scheme behind Render's load balancer. KnownNetworks/
+// KnownProxies cleared because Render's proxy IPs aren't fixed — accept
+// the headers from any hop. (Acceptable for our threat model: the
+// rate-limit key prefers sub claim and only falls back to IP for
+// unauthed callers.)
+var forwardedOptions = new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
+};
+forwardedOptions.KnownIPNetworks.Clear();
+forwardedOptions.KnownProxies.Clear();
+app.UseForwardedHeaders(forwardedOptions);
 
 // OpenAPI is always exposed — the portal's CI build fetches /openapi/v1.json
 // from the deployed API to regenerate its typed client during `ng build`.
@@ -32,6 +77,7 @@ if (CorsRegistration.HasAnyOrigins(builder.Configuration))
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 
 app.MapGet("/healthz", () => Results.Ok(new { status = "ok" }))
    .WithName("HealthCheck")
