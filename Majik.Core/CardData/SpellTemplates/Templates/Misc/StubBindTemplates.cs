@@ -210,7 +210,7 @@ public sealed class UntapAllYourCreaturesTemplate : ISpellTemplate
 public sealed class TargetPlayerSacrificesCreatureTemplate : ISpellTemplate
 {
     private static readonly Regex Pattern = new(
-        @"target\s+player\s+sacrifices\s+a\s+creature(?:\s+of\s+their\s+choice)?",
+        @"target\s+(?:player|opponent)\s+sacrifices\s+a\s+creature(?:\s+of\s+their\s+choice)?",
         RegexOptions.IgnoreCase);
 
     public int Priority => 60;
@@ -407,7 +407,7 @@ public sealed class PutTargetOnBottomOfLibraryTemplate : ISpellTemplate
 public sealed class TargetPlayerDrawsXTemplate : ISpellTemplate
 {
     private static readonly Regex Pattern = new(
-        @"target\s+player\s+draws\s+x\s+cards?",
+        @"target\s+(?:player|opponent)\s+draws\s+x\s+cards?",
         RegexOptions.IgnoreCase);
 
     public int Priority => 80;
@@ -666,7 +666,7 @@ public sealed class TakeExtraTurnTemplate : ISpellTemplate
 public sealed class ShuffleGraveyardIntoLibraryTemplate : ISpellTemplate
 {
     private static readonly Regex Pattern = new(
-        @"target\s+player\s+shuffles(?:\s+up\s+to\s+\w+\s+target\s+cards?\s+from)?\s+(?:their\s+graveyard|(?:cards?\s+)?(?:from\s+)?their\s+graveyard)\s+into\s+their\s+library",
+        @"target\s+(?:player|opponent)\s+shuffles(?:\s+up\s+to\s+\w+\s+target\s+cards?\s+from)?\s+(?:their\s+graveyard|(?:cards?\s+)?(?:from\s+)?their\s+graveyard)\s+into\s+their\s+library",
         RegexOptions.IgnoreCase);
 
     public int Priority => 60;
@@ -807,7 +807,7 @@ public sealed class DestroyAllBasicLandTypeTemplate : ISpellTemplate
 public sealed class TargetPlayerDrawsNTemplate : ISpellTemplate
 {
     private static readonly Regex Pattern = new(
-        @"target\s+player\s+draws\s+(?<n>\d+|one|two|three|four|five|six|seven)\s+cards?",
+        @"target\s+(?:player|opponent)\s+draws\s+(?<n>\d+|one|two|three|four|five|six|seven)\s+cards?",
         RegexOptions.IgnoreCase);
 
     public int Priority => 60;

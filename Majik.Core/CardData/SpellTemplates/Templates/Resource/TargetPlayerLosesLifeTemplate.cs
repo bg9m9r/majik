@@ -7,7 +7,7 @@ namespace Majik.Core.CardData.SpellTemplates.Templates.Resource;
 public sealed class TargetPlayerLosesLifeTemplate : ISpellTemplate
 {
     private static readonly Regex Pattern = new(
-        @"target\s+player\s+loses?\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+life",
+        @"target\s+(?:player|opponent)\s+loses?\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+life",
         RegexOptions.IgnoreCase);
 
     public int Priority => 50;

@@ -7,7 +7,7 @@ namespace Majik.Core.CardData.SpellTemplates.Templates.Library;
 public sealed class MillTargetTemplate : ISpellTemplate
 {
     private static readonly Regex Pattern = new(
-        @"target\s+player\s+mills\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+cards?",
+        @"target\s+(?:player|opponent)\s+mills\s+(?<n>\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+cards?",
         RegexOptions.IgnoreCase);
 
     public int Priority => 50;
