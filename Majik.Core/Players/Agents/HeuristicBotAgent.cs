@@ -150,7 +150,15 @@ public sealed class HeuristicBotAgent : IPlayerAgent
                 // before casting reactive spells). Instants get a small
                 // saved-for-instant-window penalty during sorcery windows
                 // since they'd usually be saved for opp's turn.
-                if (TryPickManaSources(ctx.Self, printedCost) != null)
+                //
+                // Mana-holding gate: during sorcery windows, when we have
+                // an instant in hand and opp has potential threats, hold
+                // back the cheapest-instant's worth of mana so we can
+                // actually respond. Skipped when this bid IS the held-
+                // instant (we're casting our reactive card, which is fine).
+                var reserve = sorceryWindow && !IsInstantSpeed(card)
+                    ? ManaHoldReserve(ctx) : 0;
+                if (CanAffordWithReserve(ctx.Self, printedCost, reserve))
                 {
                     bids.Add((card, printedCost, null, printedCost.TotalValue
                         + SequencingBonus(card, ctx, sorceryWindow)));
@@ -212,6 +220,45 @@ public sealed class HeuristicBotAgent : IPlayerAgent
         }
 
         return Task.FromResult(PriorityAction.Pass);
+    }
+
+    /// <summary>Mana to reserve for reactive instants during a sorcery
+    /// window. Returns the cheapest instant's CMC when we have one in hand
+    /// AND opp has an untapped creature that could attack next turn. Zero
+    /// otherwise — when opp has no offense or we have no responsive cards
+    /// to hold up, all mana is free for sorcery-speed play.</summary>
+    private int ManaHoldReserve(GameContext ctx)
+    {
+        var instants = ctx.Self.Zones.Hand.GetCards()
+            .Where(c => c.HasType(CardType.Instant))
+            .Where(c => !_failedThisTurn.Contains(c.InstanceId))
+            .OrderBy(c => Majik.Core.ValueObjects.ManaCost.Parse(c.ManaCost ?? "").TotalValue)
+            .ToList();
+        if (instants.Count == 0) return 0;
+
+        var opp = ctx.AllPlayers.FirstOrDefault(p => !ReferenceEquals(p, ctx.Self));
+        if (opp == null) return 0;
+        var oppHasOffense = opp.Zones.Battlefield.GetCards()
+            .OfType<Creature>().Any(c => !c.IsTapped);
+        if (!oppHasOffense) return 0;
+
+        return Majik.Core.ValueObjects.ManaCost.Parse(instants[0].ManaCost ?? "").TotalValue;
+    }
+
+    /// <summary>True iff the supplied cost can be paid AND we'd still have
+    /// <paramref name="reserve"/> untapped sources left over. Reserve is
+    /// generic-only for the simple model (refinements can extend to
+    /// color-specific reserves).</summary>
+    private static bool CanAffordWithReserve(Player self, Majik.Core.ValueObjects.ManaCost cost, int reserve)
+    {
+        if (reserve <= 0) return TryPickManaSources(self, cost) != null;
+        var untapped = self.Zones.Battlefield.GetCards()
+            .OfType<Permanent>()
+            .Where(p => !p.IsTapped)
+            .Where(p => p.Abilities.OfType<IManaAbility>().Any())
+            .Count();
+        if (untapped < cost.TotalValue + reserve) return false;
+        return TryPickManaSources(self, cost) != null;
     }
 
     /// <summary>Sequencing bonus to break CMC ties:
