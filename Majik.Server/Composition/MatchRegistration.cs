@@ -24,6 +24,12 @@ public static class MatchRegistration
             }));
         services.AddSingleton<IMatchOwnership, MatchOwnership>();
         services.AddHostedService<MatchOwnershipHeartbeat>();
+        // Forwarder doubles as a hosted service so its per-process reply
+        // channel gets subscribed at startup. The same singleton instance
+        // satisfies both registrations.
+        services.AddSingleton<MatchCommandForwarder>();
+        services.AddSingleton<IMatchCommandForwarder>(sp => sp.GetRequiredService<MatchCommandForwarder>());
+        services.AddHostedService(sp => sp.GetRequiredService<MatchCommandForwarder>());
         services.AddScoped<MatchService>();
         services.AddHostedService<MatchIndexInitializer>();
         services.AddHostedService<MatchCleanupService>();
