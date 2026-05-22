@@ -557,12 +557,24 @@ public sealed class HeuristicBotAgent : IPlayerAgent
             .OfType<Creature>().Sum(c => c.Power);
         var threatenedNextTurn = oppThreat >= ctx.Self.LifeTotal;
 
+        // 2a) Two-ply race lookahead. We can deal `totalAttackPower` this
+        //     turn + same again on our next turn (back-of-envelope; ignores
+        //     blocked attackers that die this turn). When 2× our reach >=
+        //     opp's life AND opp's race-back (their 2× threat) < our life,
+        //     we WIN the race even though it looks tight. Override the
+        //     hold-back gate and swing with everything — race math beats
+        //     defensive caution.
+        var ourTwoTurnDamage = totalAttackPower * 2;
+        var oppTwoTurnDamage = oppThreat * 2;
+        var raceWonLookahead = ourTwoTurnDamage >= defender.LifeTotal
+            && oppTwoTurnDamage < ctx.Self.LifeTotal;
+
         // 3) Compute the set of attackers to hold back as blockers when
         //    threatened. Greedy: pick the smallest set whose collective
         //    toughness can survive opp's biggest attackers. If not
         //    threatened, hold back nothing.
         var holdBack = new HashSet<Creature>();
-        if (threatenedNextTurn && !reach)
+        if (threatenedNextTurn && !reach && !raceWonLookahead)
         {
             // Need at least one blocker per opp attacker that we can't
             // afford to let through. Greedy: pair our biggest survivors
@@ -591,8 +603,10 @@ public sealed class HeuristicBotAgent : IPlayerAgent
 
             // Suicidal-attack guard: if every defender creature can
             // profitably kill the attacker (and attacker doesn't trade or
-            // race), skip. Reach (lethal this turn) overrides.
-            if (!reach && IsSuicidalAttack(atk, defenderCreatures)) continue;
+            // race), skip. Reach (lethal this turn) overrides. Two-ply
+            // race-won also overrides — committing to the race is more
+            // valuable than the trade we'd avoid.
+            if (!reach && !raceWonLookahead && IsSuicidalAttack(atk, defenderCreatures)) continue;
 
             attacks.Add(new AttackerDeclaration(atk, defender));
         }
