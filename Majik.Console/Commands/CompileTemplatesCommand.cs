@@ -3,6 +3,7 @@ using Majik.Core.CardData;
 using Majik.Core.CardData.Database;
 using Majik.Core.CardData.SpellTemplates;
 using Majik.Core.Game;
+using Majik.Core.Players;
 using Microsoft.EntityFrameworkCore;
 using SysConsole = System.Console;
 
@@ -62,15 +63,40 @@ public static class CompileTemplatesCommand
         const int chunkSize = 1000;
         var pending = new List<CompiledSpellTemplateEntity>(chunkSize);
 
+        // Synthetic Player/Resolver for the offline ctx. Templates whose
+        // TryExtractParams overload reads ctx.RawText / ctx.Text only need
+        // the entity field; the caster + resolver are stub placeholders to
+        // satisfy SpellBindContext's non-null requirements. Templates that
+        // actually touch engine state in TryExtractParams would be wrong
+        // per the contract — TryExtractParams must be a pure parse.
+        var stubCaster = new Player("__compile_templates_stub__", 20);
+        Func<object, object> stubResolver = static o => o;
+
         foreach (var entity in entities)
         {
-            var oracle = OracleTextNormalizer.Normalize(entity.OracleText ?? string.Empty);
+            // Pass the RAW oracle text into the context — SpellBindContext.Text
+            // re-runs OracleTextNormalizer.Normalize, so the default
+            // TryExtractParams(ctx) overload (which delegates to
+            // TryExtractParams(ctx.Text)) sees exactly the same normalized
+            // string the legacy path produced. Templates that override the
+            // ctx overload get the raw text via ctx.RawText.
+            var syntheticEntity = new CardEntity
+            {
+                Name = entity.Name,
+                OracleText = entity.OracleText ?? string.Empty,
+                ManaCost = entity.ManaCost,
+                TypeLine = entity.TypeLine,
+            };
+            var ctx = new SpellBindContext(
+                syntheticEntity, stubCaster, stubResolver,
+                Effects: null, Stack: null);
+
             ISpellTemplate? winner = null;
             IReadOnlyDictionary<string, string>? winningParams = null;
 
             foreach (var t in registry.OrderedTemplates)
             {
-                var p = t.TryExtractParams(oracle);
+                var p = t.TryExtractParams(ctx);
                 if (p is null) continue;
                 winner = t;
                 winningParams = p;
