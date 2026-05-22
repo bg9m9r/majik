@@ -53,14 +53,26 @@ public class BespokeTemplateTests
     }
 
     [Theory]
-    // Should NOT match: original Thoughtseize wording ("Target player", trailing life loss)
-    [InlineData("Target player reveals their hand. You choose a nonland card from it. That player discards that card. You lose 2 life.")]
     // Should NOT match: exile resolution (Duress family is discard, not exile)
     [InlineData("Target opponent reveals their hand. You choose a nonland card from it and exile that card.")]
+    // Should NOT match: graveyard-or-hand source (separate template)
+    [InlineData("Target opponent reveals their hand. You choose a nonland card from that player's graveyard or hand and exile it.")]
     public void RevealHandThenDiscardTemplate_DoesNotMatchOutOfFamily(string oracle)
     {
         new RevealHandThenDiscardTemplate().TryBind(Ctx(oracle))
             .Should().BeNull();
+    }
+
+    [Theory]
+    // "Target player" variant now binds — Distress, Inquisition of Kozilek.
+    // (Thoughtseize itself still binds via ThoughtseizePatternTemplate which
+    // has higher priority in the live registry.)
+    [InlineData("Target player reveals their hand. You choose a nonland card from it. That player discards that card.")]
+    [InlineData("Target player reveals their hand. You choose a nonland card from it with mana value 3 or less. That player discards that card.")]
+    public void RevealHandThenDiscardTemplate_AcceptsTargetPlayerVariant(string oracle)
+    {
+        new RevealHandThenDiscardTemplate().TryBind(Ctx(oracle))
+            .Should().NotBeNull();
     }
 
     [Theory]

@@ -37,7 +37,7 @@ public sealed class RevealHandThenExileTemplate : ISpellTemplate
     // — accept up to a sentence boundary so Appetite for Brains and friends
     // bind. The captured filter is informational; runtime ignores it.
     private static readonly Regex Pattern = new(
-        @"^target\s+opponent\s+reveals\s+their\s+hand\.\s*you\s+choose\s+(?:a|an)\s+(?<filter>[a-z][a-z0-9\s,\-]{0,80}?\s+)?card\s+from\s+it(?:\s+[^.]{0,80}?)?(?:\s+and\s+exile\s+that\s+card|\.\s*exile\s+that\s+card)\.",
+        @"^target\s+(?:opponent|player)\s+reveals\s+their\s+hand\.\s*you\s+choose\s+(?:a|an)\s+(?<filter>[a-z][a-z0-9\s,\-]{0,80}?\s+)?card\s+from\s+it(?:\s+[^.]{0,80}?)?(?:\s+and\s+exile\s+that\s+card|\.\s*exile\s+that\s+card)\.",
         RegexOptions.IgnoreCase);
 
     public int Priority => 95;
