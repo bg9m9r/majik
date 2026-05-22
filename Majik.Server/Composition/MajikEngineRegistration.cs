@@ -15,21 +15,56 @@ namespace Majik.Server.Composition;
 /// - GameRegistry singleton: one process, many games, in-memory only.
 /// - EventBus is per-game (a facade owns its own bus), so no global bus
 ///   is registered here.
+///
+/// Cards backing store:
+/// - If <c>Cards:BaseUrl</c> is configured (e.g. <c>http://majik-cards:10000</c>),
+///   the repository is <see cref="HttpCardRepository"/> talking to the
+///   majik-cards private service. This is the production path once the
+///   cards extraction is fully rolled out and the SQLite disk is detached.
+/// - Otherwise, falls back to the in-process <see cref="DbCardRepository"/>
+///   against the local SQLite file. Lets local dev and existing prod boots
+///   work unchanged until <c>Cards:BaseUrl</c> is set.
+/// Both modes wear the same <see cref="CachingCardRepository"/> decorator
+/// so callers see identical lookup semantics either way.
 /// </summary>
 public static class MajikEngineRegistration
 {
-    public static IServiceCollection AddMajikEngine(this IServiceCollection services)
+    public static IServiceCollection AddMajikEngine(this IServiceCollection services, IConfiguration configuration)
     {
         services.AddSingleton<GameRegistry>();
 
-        // Card data: factory-per-call DbContext (EF Core DbContext is NOT
-        // thread-safe — a shared singleton would race under concurrent
-        // requests). DbCardRepository creates a fresh CardDbContext via the
-        // factory delegate inside each public method. Wrapped in a caching
-        // decorator that itself remains singleton-safe.
-        // Tests override these via ConfigureTestServices.
-        services.AddSingleton<ICardRepository>(_ =>
-            new CachingCardRepository(new DbCardRepository(() => new CardDbContext())));
+        var cardsBaseUrl = configuration["Cards:BaseUrl"];
+        var cardsToken = configuration["Cards:InternalToken"];
+
+        if (!string.IsNullOrWhiteSpace(cardsBaseUrl))
+        {
+            services.AddHttpClient<HttpCardRepository>(client =>
+            {
+                client.BaseAddress = new Uri(cardsBaseUrl);
+                client.Timeout = TimeSpan.FromSeconds(15);
+                if (!string.IsNullOrEmpty(cardsToken))
+                {
+                    client.DefaultRequestHeaders.Add(InternalTokenHeader.Name, cardsToken);
+                }
+            });
+
+            services.AddSingleton<ICardRepository>(sp =>
+                new CachingCardRepository(sp.GetRequiredService<HttpCardRepository>()));
+        }
+        else
+        {
+            // Local SQLite path — kept for backwards compatibility until the
+            // render.yaml change cuts the disk off this service. Factory-per-call
+            // DbContext (EF Core DbContext is NOT thread-safe — a shared singleton
+            // would race under concurrent requests). DbCardRepository creates a
+            // fresh CardDbContext via the factory delegate inside each public
+            // method. Tests override this via ConfigureTestServices.
+            services.AddSingleton<ICardRepository>(_ =>
+                new CachingCardRepository(new DbCardRepository(() => new CardDbContext())));
+
+            // Index bootstrap only matters when this process owns the SQLite file.
+            services.AddHostedService<CardDbIndexBootstrapper>();
+        }
 
         // ServerGameFactory takes ICardRepository so it can run the full binder
         // pipeline at game-start. Registered after ICardRepository so the DI
@@ -39,9 +74,6 @@ public static class MajikEngineRegistration
                 sp.GetRequiredService<GameRegistry>(),
                 sp.GetRequiredService<ICardRepository>()));
 
-        // One-time index bootstrap at startup. Idempotent.
-        services.AddHostedService<CardDbIndexBootstrapper>();
-
         // Validate bot decks against ICardRepository at startup. Logs only;
         // never throws — keeps the server bootable even if a single bot
         // archetype references an unimplemented card.
@@ -49,4 +81,10 @@ public static class MajikEngineRegistration
 
         return services;
     }
+}
+
+/// <summary>Header name shared between Majik.Server and Majik.CardsServer.</summary>
+internal static class InternalTokenHeader
+{
+    public const string Name = "X-Internal-Token";
 }
