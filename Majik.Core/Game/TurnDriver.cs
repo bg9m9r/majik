@@ -327,21 +327,39 @@ public sealed class TurnDriver
 
         async Task DispatchActivate(Player actor, PriorityAction.ActivateAbility activate, GameContext ctx)
         {
-            // CR 602.2 — activate an ability via AbilityActivator. Targets
-            // are passed pre-chosen; AbilityActivator currently treats
-            // targets as opaque ITarget refs. For the v1 zero-target case,
-            // an empty target list is correct. Future: when the bot
-            // proposes a targeted activation, the agent's
-            // ChooseTargetsAsync should already have populated activate.Targets
-            // — but our PriorityAction.ActivateAbility.Targets is an
-            // IReadOnlyList<object>, not ITarget. The mapping is left as
-            // a follow-up; for now we wire the dispatcher so the loop
-            // doesn't throw on a bot-proposed activation, and zero-target
-            // abilities go through cleanly.
+            // CR 602.2 — activate an ability via AbilityActivator. For each
+            // TargetRequest on the ability, ask the agent to choose targets
+            // (the bot's ChooseTargetsAsync ranks intelligently); wrap each
+            // chosen object as an ITarget so AbilityActivator can consume
+            // it. v1 picks the first chosen per request — multi-target
+            // requests beyond MinTargets=1 are supported but currently
+            // collapsed to one wrapper per chosen object.
+            var targets = new List<Majik.Core.Targeting.ITarget>();
+            if (activate.Ability is Majik.Core.Abilities.ActivatedAbility aa)
+            {
+                foreach (var req in aa.TargetRequests)
+                {
+                    var chosen = await _agents[actor].ChooseTargetsAsync(ctx, req, ct: default);
+                    foreach (var obj in chosen)
+                    {
+                        var wrapper = obj switch
+                        {
+                            Majik.Core.Cards.Permanent perm => Majik.Core.Targeting.Target.Permanent(perm),
+                            Majik.Core.Cards.ICard card => Majik.Core.Targeting.Target.Card(card),
+                            Player p => Majik.Core.Targeting.Target.Player(p),
+                            Majik.Core.Spells.ISpell spell => Majik.Core.Targeting.Target.Spell(spell),
+                            Majik.Core.Abilities.IActivatedAbility ab => Majik.Core.Targeting.Target.Ability(ab),
+                            _ => null,
+                        };
+                        if (wrapper != null) targets.Add(wrapper);
+                    }
+                }
+            }
+
             var activator = new Majik.Core.Services.AbilityActivator(_stack, _eventBus);
             try
             {
-                activator.ActivateAbility(activate.Ability, actor);
+                activator.ActivateAbility(activate.Ability, actor, targets, activate.Ability.Costs);
             }
             catch (InvalidOperationException)
             {

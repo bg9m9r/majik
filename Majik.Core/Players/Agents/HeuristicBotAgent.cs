@@ -292,15 +292,13 @@ public sealed class HeuristicBotAgent : IPlayerAgent
             // Mana abilities are excluded — they don't fire as priority
             // actions; the mana-payment path consumes them.
             .Where(a => a is not IManaAbility)
-            // No-target abilities only at v1 — targeting through
-            // PriorityAction needs deferred-target plumbing in the
-            // priority dispatcher (future work).
-            .Where(a => a is ActivatedAbility aa && aa.TargetRequests.Count == 0)
             .Where(a => !_abilityFiredThisTurn.Contains(a.Id))
             .Where(a => a.Costs.All(cost => cost.CanPay(self)))
             .ToList();
-        // Prefer abilities sourced from permanents whose oracle text the bot
-        // hasn't otherwise leveraged. Simple "first affordable" works at v1.
+        // Prefer abilities whose TargetRequests resolve cleanly (we have
+        // an opponent / creature / etc. to point at). Simple "first
+        // affordable" works at v1; better scoring (Walking Ballista
+        // damage first, draw second, etc.) is future work.
         return candidates.FirstOrDefault();
     }
 
