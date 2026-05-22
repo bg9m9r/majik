@@ -74,4 +74,24 @@ public class BotIntentBindStampTests
         var def = Bind("Destroy all creatures.", typeLine: "Sorcery");
         def.TargetRequests.Should().BeEmpty();
     }
+
+    [Fact]
+    public void ModalSpell_ModeIntents_MapsPerClauseIntent()
+    {
+        // Bullet-prefixed mode bodies — mirrors real MTG oracle formatting
+        // (e.g. Boros Charm) that ModalChooseOneTemplate splits on.
+        var def = Bind(
+            "Choose one —\n• Destroy target creature.\n• Draw two cards.");
+        def.Modes.Should().HaveCount(2);
+        def.ModeIntentsOrEmpty.Should().HaveCount(2);
+        def.ModeIntentsOrEmpty[0].Should().Be(BotIntent.Removal);
+        def.ModeIntentsOrEmpty[1].Should().Be(BotIntent.Draw);
+    }
+
+    [Fact]
+    public void NonModalSpell_ModeIntents_Empty()
+    {
+        var def = Bind("Destroy target creature.");
+        def.ModeIntentsOrEmpty.Should().BeEmpty();
+    }
 }
