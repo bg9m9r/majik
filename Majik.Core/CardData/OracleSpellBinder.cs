@@ -170,6 +170,8 @@ public static class OracleSpellBinder
             new SpellTemplates.Templates.Bespoke.RevealUntilArtifactToBattlefieldTemplate(),
             new SpellTemplates.Templates.Bespoke.RevealUntilLandToBattlefieldTemplate(),
             new SpellTemplates.Templates.Bespoke.RevealUntilNonlandToHandTemplate(),
+            new SpellTemplates.Templates.Bespoke.RevealNPutOneCreatureOntoBattlefieldTemplate(),
+            new SpellTemplates.Templates.Bespoke.RevealNPutAnyNumberOntoBattlefieldTemplate(),
             new SpellTemplates.Templates.Bespoke.BloodForBonesTemplate(),
             new SpellTemplates.Templates.Bespoke.InfernalPlungeTemplate(),
             new SpellTemplates.Templates.Bespoke.FlingLikeTemplate(),
