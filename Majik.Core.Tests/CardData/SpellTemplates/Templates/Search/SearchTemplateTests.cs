@@ -58,4 +58,30 @@ public class SearchTemplateTests
         new GreenSunsZenithPatternTemplate().Priority
             .Should().BeGreaterThan(new SearchLibraryTemplate().Priority);
     }
+
+    [Theory]
+    [InlineData("Search your library for a Demon card, reveal it, put it into your hand, then shuffle.")]
+    [InlineData("Search your library for an Arcane card, reveal that card, put it into your hand, then shuffle.")]
+    [InlineData("Search your library for a Mercenary card, reveal that card, put it into your hand, then shuffle.")]
+    [InlineData("Search your library for a Vehicle card, reveal it, and put it into your hand. Then shuffle.")]
+    [InlineData("Search your library for up to two Forest cards, reveal those cards, put them into your hand, then shuffle.")]
+    public void KindedTutorTemplate_MatchesKindedTutorOracle(string oracle)
+    {
+        new KindedTutorTemplate().TryBind(Ctx(oracle)).Should().NotBeNull();
+    }
+
+    [Fact]
+    public void KindedTutorTemplate_PriorityLowerThan_SearchLibraryTemplate()
+    {
+        new KindedTutorTemplate().Priority
+            .Should().BeLessThan(new SearchLibraryTemplate().Priority);
+    }
+
+    [Fact]
+    public void KindedTutorTemplate_DoesNotMatch_LandToBattlefield()
+    {
+        new KindedTutorTemplate().TryBind(
+            Ctx("Search your library for a basic land card, put it onto the battlefield tapped, then shuffle."))
+            .Should().BeNull();
+    }
 }
