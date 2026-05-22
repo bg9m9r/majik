@@ -6,6 +6,7 @@ using Majik.Core.CardData.SpellTemplates.Templates.Counter;
 using Majik.Core.CardData.SpellTemplates.Templates.Counters;
 using Majik.Core.CardData.SpellTemplates.Templates.Damage;
 using Majik.Core.CardData.SpellTemplates.Templates.Destroy;
+using Majik.Core.CardData.SpellTemplates.Templates.Resource;
 using Xunit;
 
 namespace Majik.Core.Tests.CardData.SpellTemplates;
@@ -210,5 +211,36 @@ public class BotIntentPerTemplateTests
         [Fact]
         public void UntapTarget_Buff() =>
             IntentOf(new UntapTargetTemplate()).Should().Be(BotIntent.Buff);
+    }
+
+    public class Resource
+    {
+        [Fact]
+        public void DrawCards_Draw() =>
+            IntentOf(new DrawCardsTemplate()).Should().Be(BotIntent.Draw);
+
+        [Fact]
+        public void EachPlayerDraws_Draw() =>
+            IntentOf(new EachPlayerDrawsTemplate()).Should().Be(BotIntent.Draw);
+
+        [Fact]
+        public void Discard_Discard() =>
+            IntentOf(new DiscardTemplate()).Should().Be(BotIntent.Discard);
+
+        [Fact]
+        public void GainLife_Heal() =>
+            IntentOf(new GainLifeTemplate()).Should().Be(BotIntent.Heal);
+
+        [Fact]
+        public void YouGainLife_Heal() =>
+            IntentOf(new YouGainLifeTemplate()).Should().Be(BotIntent.Heal);
+
+        [Fact]
+        public void TargetPlayerLosesLife_Burn() =>
+            IntentOf(new TargetPlayerLosesLifeTemplate()).Should().Be(BotIntent.Burn);
+
+        [Fact]
+        public void YouLoseLife_None() =>
+            IntentOf(new YouLoseLifeTemplate()).Should().Be(BotIntent.None);
     }
 }
