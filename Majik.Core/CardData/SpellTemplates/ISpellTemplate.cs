@@ -92,7 +92,7 @@ public sealed record SpellBindContext(
     Majik.Core.Stack.Stack? Stack,
     Majik.Core.Effects.ReplacementBus? Replacements = null)
 {
-    public string Text => Entity.OracleText ?? string.Empty;
+    public string Text => OracleTextNormalizer.Normalize(Entity.OracleText ?? string.Empty);
 }
 
 /// <summary>Shared parsing helpers used across templates.</summary>

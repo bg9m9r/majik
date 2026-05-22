@@ -64,7 +64,7 @@ public static class CompileTemplatesCommand
 
         foreach (var entity in entities)
         {
-            var oracle = entity.OracleText ?? string.Empty;
+            var oracle = OracleTextNormalizer.Normalize(entity.OracleText ?? string.Empty);
             ISpellTemplate? winner = null;
             IReadOnlyDictionary<string, string>? winningParams = null;
 

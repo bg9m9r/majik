@@ -292,15 +292,13 @@ public sealed class HeuristicBotAgent : IPlayerAgent
             // Mana abilities are excluded — they don't fire as priority
             // actions; the mana-payment path consumes them.
             .Where(a => a is not IManaAbility)
-            // No-target abilities only at v1 — targeting through
-            // PriorityAction needs deferred-target plumbing in the
-            // priority dispatcher (future work).
-            .Where(a => a is ActivatedAbility aa && aa.TargetRequests.Count == 0)
             .Where(a => !_abilityFiredThisTurn.Contains(a.Id))
             .Where(a => a.Costs.All(cost => cost.CanPay(self)))
             .ToList();
-        // Prefer abilities sourced from permanents whose oracle text the bot
-        // hasn't otherwise leveraged. Simple "first affordable" works at v1.
+        // Prefer abilities whose TargetRequests resolve cleanly (we have
+        // an opponent / creature / etc. to point at). Simple "first
+        // affordable" works at v1; better scoring (Walking Ballista
+        // damage first, draw second, etc.) is future work.
         return candidates.FirstOrDefault();
     }
 
@@ -521,11 +519,78 @@ public sealed class HeuristicBotAgent : IPlayerAgent
             .FirstOrDefault();
     }
 
+    /// <summary>Pick X = the largest value affordable from untapped mana
+    /// after subtracting the printed non-X cost. Caps at 10 to avoid
+    /// pathological "20-mana Hydroid Krasis on turn 6" type slow-thinking;
+    /// the engine still validates legality.
+    ///
+    /// When the bot can lethal-face by spending more (e.g. Devil's Play
+    /// {X}{R}: deals X damage to any target), pick the opponent's life
+    /// total when that's >= 1 and we can pay it.</summary>
     public Task<int> ChooseXAsync(GameContext ctx, ICard source, CancellationToken ct = default)
-        => Task.FromResult(0);
+    {
+        var untapped = ctx.Self.Zones.Battlefield.GetCards()
+            .OfType<Permanent>()
+            .Where(p => !p.IsTapped)
+            .Where(p => p.Abilities.OfType<IManaAbility>().Any())
+            .Count();
+        // Subtract the printed non-X portion of the cost — the engine has
+        // already required printed cost paid; X mana sits on top.
+        var printed = ManaCost.Parse(source.ManaCost ?? "").TotalValue;
+        var available = Math.Max(0, untapped - printed);
 
+        // Lethal-face heuristic: if there's an opponent at low life and the
+        // card likely deals X damage, aim for exact-lethal.
+        var opp = ctx.AllPlayers.FirstOrDefault(p => !ReferenceEquals(p, ctx.Self));
+        if (opp != null && opp.LifeTotal > 0 && opp.LifeTotal <= available)
+        {
+            return Task.FromResult(opp.LifeTotal);
+        }
+
+        // Otherwise just spend everything we have on X (within sanity cap).
+        return Task.FromResult(Math.Min(available, 10));
+    }
+
+    /// <summary>Modal-spell mode pick. Without per-card semantics, score
+    /// each mode label by simple keyword sniffing:
+    ///   + damage / destroy / counter — high value when opponent has board
+    ///   + draw / scry / search       — always useful (utility)
+    ///   + gain life / prevent        — value when our life is low
+    ///   + create / put — board-build, valuable when our board is light
+    /// Highest-scored index wins. Tie-break: first.</summary>
     public Task<int> ChooseModeAsync(GameContext ctx, IReadOnlyList<string> modes, CancellationToken ct = default)
-        => Task.FromResult(0);
+    {
+        if (modes.Count == 0) return Task.FromResult(0);
+        var opp = ctx.AllPlayers.FirstOrDefault(p => !ReferenceEquals(p, ctx.Self));
+        var oppHasCreature = opp != null
+            && opp.Zones.Battlefield.GetCards().OfType<Creature>().Any();
+        var ourCreatureCount = ctx.Self.Zones.Battlefield.GetCards()
+            .OfType<Creature>().Count();
+        var ourLifeLow = ctx.Self.LifeTotal <= 8;
+
+        var bestIdx = 0;
+        var bestScore = int.MinValue;
+        for (var i = 0; i < modes.Count; i++)
+        {
+            var label = modes[i].ToLowerInvariant();
+            var score = 0;
+            if (oppHasCreature && (label.Contains("destroy")
+                || label.Contains("damage") || label.Contains("exile target creature")
+                || label.Contains("return target creature"))) score += 30;
+            if (label.Contains("counter")) score += oppHasCreature ? 20 : 10;
+            if (label.Contains("draw") || label.Contains("scry")) score += 15;
+            if (label.Contains("search")) score += 12;
+            if (ourLifeLow && (label.Contains("gain") && label.Contains("life")
+                || label.Contains("prevent"))) score += 25;
+            if (ourCreatureCount < 2 && (label.Contains("create")
+                || label.Contains("put") && label.Contains("counter"))) score += 18;
+            // Tiny bias toward earlier modes to break ties (printed order
+            // often represents "default" choice).
+            score += (modes.Count - i);
+            if (score > bestScore) { bestScore = score; bestIdx = i; }
+        }
+        return Task.FromResult(bestIdx);
+    }
 
     public Task<IReadOnlyList<ITriggeredAbility>> OrderTriggersAsync(GameContext ctx, IReadOnlyList<ITriggeredAbility> mine, CancellationToken ct = default)
         => Task.FromResult<IReadOnlyList<ITriggeredAbility>>(mine.ToList());
