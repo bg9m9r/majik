@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using Majik.Core.CardData.SpellTemplates;
 using Majik.Core.Game;
 
+using Majik.Core.Cards;
 namespace Majik.Core.CardData.SpellTemplates.Templates.Destroy;
 
 public sealed class DestroyPermanentTemplate : ISpellTemplate
@@ -12,6 +13,7 @@ public sealed class DestroyPermanentTemplate : ISpellTemplate
 
     public int Priority => 10;
     public string Name => "DestroyPermanent";
+    public BotIntent Intent => BotIntent.Removal;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);

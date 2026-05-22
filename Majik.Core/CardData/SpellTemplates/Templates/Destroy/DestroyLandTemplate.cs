@@ -14,6 +14,7 @@ public sealed class DestroyLandTemplate : ISpellTemplate
 
     public int Priority => 30;
     public string Name => "DestroyLand";
+    public BotIntent Intent => BotIntent.Removal;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);

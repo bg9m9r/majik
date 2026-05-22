@@ -2,6 +2,7 @@ using FluentAssertions;
 using Majik.Core.Cards;
 using Majik.Core.CardData.SpellTemplates;
 using Majik.Core.CardData.SpellTemplates.Templates.Damage;
+using Majik.Core.CardData.SpellTemplates.Templates.Destroy;
 using Xunit;
 
 namespace Majik.Core.Tests.CardData.SpellTemplates;
@@ -70,5 +71,44 @@ public class BotIntentPerTemplateTests
         [Fact]
         public void ChooseAndFight_Burn() =>
             IntentOf(new ChooseAndFightTemplate()).Should().Be(BotIntent.Burn);
+    }
+
+    public class Destroy
+    {
+        [Fact]
+        public void DestroyAllCreatures_Wrath() =>
+            IntentOf(new DestroyAllCreaturesTemplate()).Should().Be(BotIntent.Wrath);
+
+        [Fact]
+        public void DestroyAllPermanents_Wrath() =>
+            IntentOf(new DestroyAllPermanentsTemplate()).Should().Be(BotIntent.Wrath);
+
+        [Fact]
+        public void DestroyCreature_Removal() =>
+            IntentOf(new DestroyCreatureTemplate()).Should().Be(BotIntent.Removal);
+
+        [Fact]
+        public void DestroyCreatureCmcLimit_Removal() =>
+            IntentOf(new DestroyCreatureCmcLimitTemplate()).Should().Be(BotIntent.Removal);
+
+        [Fact]
+        public void DestroyArtifactEnchantment_Removal() =>
+            IntentOf(new DestroyArtifactEnchantmentTemplate()).Should().Be(BotIntent.Removal);
+
+        [Fact]
+        public void DestroyLand_Removal() =>
+            IntentOf(new DestroyLandTemplate()).Should().Be(BotIntent.Removal);
+
+        [Fact]
+        public void DestroyNonlandPermanent_Removal() =>
+            IntentOf(new DestroyNonlandPermanentTemplate()).Should().Be(BotIntent.Removal);
+
+        [Fact]
+        public void DestroyPermanent_Removal() =>
+            IntentOf(new DestroyPermanentTemplate()).Should().Be(BotIntent.Removal);
+
+        [Fact]
+        public void DestroyUpToArtifactEnchantment_Removal() =>
+            IntentOf(new DestroyUpToArtifactEnchantmentTemplate()).Should().Be(BotIntent.Removal);
     }
 }

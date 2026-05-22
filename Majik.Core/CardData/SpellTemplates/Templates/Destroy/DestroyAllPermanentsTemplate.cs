@@ -35,6 +35,7 @@ public sealed class DestroyAllPermanentsTemplate : ISpellTemplate
 
     public int Priority => 80;
     public string Name => "DestroyAllPermanents";
+    public BotIntent Intent => BotIntent.Wrath;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);
