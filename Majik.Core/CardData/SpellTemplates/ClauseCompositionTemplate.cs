@@ -165,6 +165,16 @@ public sealed class ClauseCompositionTemplate : ISpellTemplate
         new Regex(@"^its\s+controller\s+loses\s+\d+\s+life$",
             RegexOptions.IgnoreCase | RegexOptions.Compiled),
 
+        // Anaphoric pump / keyword grants ("Those creatures gain haste until
+        // end of turn", "Each of them gets +1/+1 until end of turn"). The
+        // rider attaches to the previous clause's target via anaphora; v1
+        // has no anaphora layer, so the rider is dropped as a noop. Primary
+        // clause still resolves correctly. Lossy: pump/keyword grant is lost.
+        new Regex(@"^(?:each\s+of\s+them|those\s+creatures|those\s+permanents|they|it)\s+gain[s]?\s+[\w\s,'-]+?\s+until\s+end\s+of\s+turn$",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled),
+        new Regex(@"^(?:each\s+of\s+them|those\s+creatures|those\s+permanents|they|it)\s+gets?\s+[+\-]\d+/[+\-]\d+(?:\s+and\s+gains?\s+[\w\s,'-]+?)?\s+until\s+end\s+of\s+turn$",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled),
+
         // Choice / preamble clauses that bind nothing on their own.
         new Regex(@"^choose\s+(?:a\s+)?creature\s+type$",
             RegexOptions.IgnoreCase | RegexOptions.Compiled),

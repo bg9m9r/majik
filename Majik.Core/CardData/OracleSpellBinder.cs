@@ -24,7 +24,7 @@ public static class OracleSpellBinder
     private static readonly SpellTemplates.ClauseCompositionTemplate _composer =
         new SpellTemplates.ClauseCompositionTemplate();
 
-    internal static SpellTemplateRegistry Registry { get; } = BuildRegistry();
+    public static SpellTemplateRegistry Registry { get; } = BuildRegistry();
 
     private static SpellTemplateRegistry BuildRegistry()
     {
@@ -47,6 +47,7 @@ public static class OracleSpellBinder
             new SpellTemplates.Templates.Damage.DamagePlayerTemplate(),
             new SpellTemplates.Templates.Damage.DealsXDamageEachCreatureTemplate(),
             new SpellTemplates.Templates.Damage.DealsDamageEachCreatureTemplate(),
+            new SpellTemplates.Templates.Damage.FightTemplate(),
             new SpellTemplates.Templates.Damage.EachOpponentLosesLifeTemplate(),
             new SpellTemplates.Templates.Counters.AllCreaturesPumpTemplate(),
             new SpellTemplates.Templates.Destroy.DestroyAllCreaturesTemplate(),
