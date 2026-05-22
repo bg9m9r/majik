@@ -1,7 +1,7 @@
 # Render Blueprint — Majik backend (API + Cards + MongoDB)
 # Deploy: connect this repo (github.com/bg9m9r/majik) as a Blueprint on Render.
 #
-# Secrets to set after first sync (Render dashboard or `render env set`):
+# Secrets to set after first sync (Render dashboard or REST API):
 #   majik-api:
 #     Auth__Authority           e.g. https://api.descope.com/<DESCOPE_PROJECT_ID>
 #     Auth__Audience            <DESCOPE_PROJECT_ID>
@@ -15,28 +15,29 @@
 #     MONGO_INITDB_ROOT_USERNAME  pick one (e.g. majik)
 #     MONGO_INITDB_ROOT_PASSWORD  auto-generated below
 #
-# Cards-extraction rollout: this Blueprint adds the majik-cards private service
-# but keeps the SQLite disk attached to majik-api as well, so the old SQLite
-# code path is still a viable rollback target. The next PR removes the disk
-# from majik-api after this one has burned in.
+# Cards-extraction rollout status: majik-cards owns the SQLite disk, majik-api
+# is diskless and talks to it over HTTP. The old SQLite fallback path in
+# MajikEngineRegistration still exists in code (kicks in when Cards:BaseUrl is
+# unset), but in prod it never runs because the env var is always set.
 
 services:
   - type: web
     name: majik-api
     runtime: docker
-    plan: starter
+    # Standard required to scale numInstances > 1 later (the Redis-backplane
+    # PR enables that). Also gives headroom for in-process GameFacade state +
+    # SignalR connections; Starter's 512 MB is borderline above ~10 concurrent
+    # games.
+    plan: standard
     region: oregon
     rootDir: .
     dockerfilePath: ./Majik.Server/Dockerfile
     dockerContext: .
     healthCheckPath: /healthz
     autoDeploy: true
-    disk:
-      # Kept attached during the cards-extraction rollout as a safe rollback.
-      # The next PR removes this block once majik-cards is verified healthy.
-      name: cards-data
-      mountPath: /root/.config/Majik
-      sizeGB: 2
+    # No `disk:` — majik-api is fully diskless after the cards extraction.
+    # Card lookups happen over HTTP via Cards__BaseUrl. Removing the disk is
+    # what unblocks horizontal scaling (Render disks are single-instance).
     envVars:
       - key: ASPNETCORE_ENVIRONMENT
         value: Production
@@ -44,8 +45,6 @@ services:
         value: http://0.0.0.0:10000
       - key: Mongo__Database
         value: majik
-      - key: CARDS_SEED_TAG
-        value: cards-seed-2026-05-21
       - key: Auth__Authority
         sync: false
       - key: Auth__Audience
@@ -54,10 +53,6 @@ services:
         sync: false
       - key: Cors__AllowedOrigins__0
         sync: false
-      # When set, MajikEngineRegistration swaps DbCardRepository for
-      # HttpCardRepository pointing at majik-cards. Leave unset on first
-      # rollout to keep the SQLite path live; set via `render env set`
-      # after majik-cards is verified up.
       - key: Cards__BaseUrl
         sync: false
       - key: Cards__InternalToken
@@ -73,10 +68,9 @@ services:
     dockerContext: .
     autoDeploy: true
     disk:
-      # Same shape as the original majik-api disk so the seed-tag download
-      # logic in docker-entrypoint.sh works unchanged. Owns the SQLite file
-      # for cards going forward. Distinct name from majik-api's `cards-data`
-      # disk so both can coexist during the rollout.
+      # Owns the SQLite cards.db file. Single-instance by Render policy; this
+      # is fine because reads are cacheable on the majik-api side via the
+      # in-process CachingCardRepository decorator.
       name: cards-server-data
       mountPath: /root/.config/Majik
       sizeGB: 2
@@ -86,9 +80,7 @@ services:
       - key: ASPNETCORE_URLS
         value: http://0.0.0.0:10000
       - key: CARDS_SEED_TAG
-        # Same release tag as majik-api during the transition. Bump to a new
-        # release tag in lock-step on both services until the disk is removed
-        # from majik-api.
+        # Bump to a new release tag to trigger a fresh download on next deploy.
         value: cards-seed-2026-05-21
       - key: Cards__InternalToken
         sync: false
