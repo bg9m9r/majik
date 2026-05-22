@@ -1,3 +1,4 @@
+using Majik.Bot.Diagnostics;
 using Majik.Bot.Evaluation;
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
@@ -21,6 +22,7 @@ namespace Majik.Bot.Heuristic;
 public class PriorityPolicy
 {
     protected readonly ArchetypeWeights _weights;
+    private readonly IBotDecisionSink _sink;
 
     /// <summary>Tracks activated-ability IDs we've already fired this turn so
     /// the priority pump doesn't infinite-loop on the same activation. Reset
@@ -29,7 +31,14 @@ public class PriorityPolicy
     private int _abilityMemoTurn = -1;
     private Guid? _lastAbilityProposed;
 
-    public PriorityPolicy(ArchetypeWeights weights) { _weights = weights; }
+    public PriorityPolicy(ArchetypeWeights weights)
+        : this(weights, NullBotDecisionSink.Instance) { }
+
+    public PriorityPolicy(ArchetypeWeights weights, IBotDecisionSink sink)
+    {
+        _weights = weights;
+        _sink = sink ?? NullBotDecisionSink.Instance;
+    }
 
     public virtual PriorityAction Pick(GameContext ctx, Player self)
     {
@@ -56,8 +65,14 @@ public class PriorityPolicy
         PriorityAction best = PriorityAction.Pass;
         double bestScore = current;
 
+        // Collect candidates so we can emit alternatives, not just the winner.
+        // Materializing the enumerator is cheap — main-phase candidate set is
+        // typically <20 items even on huge boards.
+        var candidates = new List<(PriorityAction action, double projected, string label)>();
+        candidates.Add((PriorityAction.Pass, current, "Pass"));
         foreach (var (action, projected) in EnumerateCandidates(ctx, self, current))
         {
+            candidates.Add((action, projected, LabelFor(action)));
             if (projected > bestScore)
             {
                 bestScore = projected;
@@ -69,8 +84,64 @@ public class PriorityPolicy
         {
             _lastAbilityProposed = act.Ability.Id;
         }
+
+        EmitDecision(ctx, self, best, bestScore, candidates);
         return best;
     }
+
+    private void EmitDecision(
+        GameContext ctx, Player self,
+        PriorityAction chosen, double chosenScore,
+        List<(PriorityAction action, double projected, string label)> candidates)
+    {
+        if (ReferenceEquals(_sink, NullBotDecisionSink.Instance)) return;
+
+        var chosenLabel = LabelFor(chosen);
+        var alts = candidates
+            .Where(c => !ReferenceEquals(c.action, chosen) && c.label != chosenLabel)
+            .OrderByDescending(c => c.projected)
+            .Take(3)
+            .Select(c => new BotDecisionAlternative(c.label, c.projected))
+            .ToList();
+
+        var manaAvailable = UntappedManaSources(self);
+        var handSize = self.Zones.Hand.GetCards().Count();
+        var ctxFlags = new Dictionary<string, string>
+        {
+            ["turn"] = ctx.TurnNumber.ToString(),
+            ["phase"] = ctx.CurrentPhase?.ToString() ?? "null",
+            ["activeIsSelf"] = (ctx.ActivePlayer == self).ToString(),
+            ["life"] = self.LifeTotal.ToString(),
+            ["hand"] = handSize.ToString(),
+            ["manaAvailable"] = manaAvailable.ToString(),
+            ["stackSize"] = ctx.Stack.Count.ToString(),
+        };
+        if (manaAvailable == 0 && handSize > 0
+            && self.Zones.Hand.GetCards().Any(c => c is not Land))
+        {
+            ctxFlags["manaScrew"] = "true";
+        }
+
+        try
+        {
+            _sink.Record(new BotDecision(
+                DecisionType: "Priority",
+                Chosen: chosenLabel,
+                ChosenScore: chosenScore,
+                Alternatives: alts,
+                Context: ctxFlags));
+        }
+        catch { /* observer fault must not abort engine */ }
+    }
+
+    private static string LabelFor(PriorityAction action) => action switch
+    {
+        PriorityAction.PassAction _ => "Pass",
+        PriorityAction.PlayLand pl => $"PlayLand:{pl.Land.Name}",
+        PriorityAction.CastSpell cs => $"CastSpell:{cs.Card.Name}",
+        PriorityAction.ActivateAbility aa => $"Activate:{(aa.Ability.Source is ICard c ? c.Name : "?")}",
+        _ => action.GetType().Name,
+    };
 
     /// <summary>
     /// Enumerate legal main-phase priority actions paired with the

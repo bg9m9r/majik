@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Majik.Bot.Diagnostics;
 using Majik.Bot.Evaluation;
 using Majik.Core.Cards;
 using Majik.Core.Game;
@@ -31,8 +32,10 @@ internal static class CombatSearch
 
     public static (CombatPlan plan, double score) FindBestAttackPlan(
         GameContext ctx, Player self, IReadOnlyList<Creature> eligible,
-        ArchetypeWeights weights, int budgetMs)
+        ArchetypeWeights weights, int budgetMs,
+        IBotDecisionSink? sink = null)
     {
+        sink ??= NullBotDecisionSink.Instance;
         var sw = Stopwatch.StartNew();
         var usable = eligible.Where(c => c.Power > 0).ToList();
         if (usable.Count > TopKAttackers)
@@ -41,11 +44,17 @@ internal static class CombatSearch
         var opp = ctx.AllPlayers.First(p => !ReferenceEquals(p, self));
         var oppBlockers = opp.Zones.Battlefield.GetCards().OfType<Creature>().ToList();
 
+        // Track all scored subsets so we can surface alternatives. List is
+        // bounded by 2^TopKAttackers = 256 in the worst case — cheap.
+        var scored = new List<(IReadOnlyList<Creature> subset, double score, bool deep)>();
+
         // Pass 1: greedy block projection over all attacker subsets.
         var (best, bestScore) = SearchSubsets(
             usable, oppBlockers, opp, weights, sw, budgetMs,
-            (subset, blockers) => ScoreSubsetGreedy(subset, blockers, weights));
+            (subset, blockers) => ScoreSubsetGreedy(subset, blockers, weights),
+            scored, deep: false);
 
+        bool usedDeep = false;
         // Pass 2 (iterative deepening): if board is small and we still have
         // time, redo with true opponent-block enumeration. This is strictly
         // more accurate; replace best plan only when the deeper score
@@ -54,12 +63,17 @@ internal static class CombatSearch
             && oppBlockers.Count <= DeepBlockerCap
             && sw.ElapsedMilliseconds < budgetMs)
         {
+            scored.Clear();
             var (deepBest, deepScore) = SearchSubsets(
                 usable, oppBlockers, opp, weights, sw, budgetMs,
-                (subset, blockers) => ScoreSubsetMinimax(subset, blockers, weights));
-            return (deepBest, deepScore);
+                (subset, blockers) => ScoreSubsetMinimax(subset, blockers, weights),
+                scored, deep: true);
+            best = deepBest;
+            bestScore = deepScore;
+            usedDeep = true;
         }
 
+        EmitDecision(self, opp, best, bestScore, scored, oppBlockers, usedDeep, sink);
         return (best, bestScore);
     }
 
@@ -69,10 +83,14 @@ internal static class CombatSearch
         Player opp,
         ArchetypeWeights weights,
         Stopwatch sw, int budgetMs,
-        Func<IReadOnlyList<Creature>, IReadOnlyList<Creature>, double> scorer)
+        Func<IReadOnlyList<Creature>, IReadOnlyList<Creature>, double> scorer,
+        List<(IReadOnlyList<Creature> subset, double score, bool deep)> scored,
+        bool deep)
     {
+        var noAttackScore = scorer(Array.Empty<Creature>(), oppBlockers);
         CombatPlan best = CombatPlan.None;
-        double bestScore = scorer(Array.Empty<Creature>(), oppBlockers);
+        double bestScore = noAttackScore;
+        scored.Add((Array.Empty<Creature>(), noAttackScore, deep));
 
         var n = usable.Count;
         for (long mask = 1; mask < (1L << n); mask++)
@@ -83,6 +101,7 @@ internal static class CombatSearch
                 if ((mask & (1L << i)) != 0) subset.Add(usable[i]);
 
             var score = scorer(subset, oppBlockers);
+            scored.Add((subset, score, deep));
             if (score > bestScore)
             {
                 bestScore = score;
@@ -91,6 +110,61 @@ internal static class CombatSearch
             }
         }
         return (best, bestScore);
+    }
+
+    private static void EmitDecision(
+        Player self, Player opp,
+        CombatPlan chosen, double chosenScore,
+        IReadOnlyList<(IReadOnlyList<Creature> subset, double score, bool deep)> scored,
+        IReadOnlyList<Creature> oppBlockers,
+        bool usedDeep,
+        IBotDecisionSink sink)
+    {
+        if (ReferenceEquals(sink, NullBotDecisionSink.Instance)) return;
+
+        var chosenLabel = LabelFor(chosen);
+        var alts = scored
+            .Select(s => (label: LabelForSubset(s.subset), score: s.score))
+            .Where(s => s.label != chosenLabel)
+            .OrderByDescending(s => s.score)
+            .Take(3)
+            .Select(s => new BotDecisionAlternative(s.label, s.score))
+            .ToList();
+
+        var ctxFlags = new Dictionary<string, string>
+        {
+            ["selfLife"] = self.LifeTotal.ToString(),
+            ["oppLife"] = opp.LifeTotal.ToString(),
+            ["oppBlockers"] = oppBlockers.Count.ToString(),
+            ["search"] = usedDeep ? "minimax" : "greedy",
+            ["subsetsEvaluated"] = scored.Count.ToString(),
+        };
+        if (oppBlockers.Count == 0) ctxFlags["oppNoBlockers"] = "true";
+        if (chosen.Attackers.Count == 0) ctxFlags["holdBack"] = "true";
+
+        try
+        {
+            sink.Record(new BotDecision(
+                DecisionType: "Combat.Attackers",
+                Chosen: chosenLabel,
+                ChosenScore: chosenScore,
+                Alternatives: alts,
+                Context: ctxFlags));
+        }
+        catch { /* observer fault must not abort engine */ }
+    }
+
+    private static string LabelFor(CombatPlan plan)
+    {
+        if (plan.Attackers.Count == 0) return "Attack:{}";
+        var names = string.Join(",", plan.Attackers.Select(a => a.Attacker.Name));
+        return $"Attack:{{{names}}}";
+    }
+
+    private static string LabelForSubset(IReadOnlyList<Creature> subset)
+    {
+        if (subset.Count == 0) return "Attack:{}";
+        return $"Attack:{{{string.Join(",", subset.Select(c => c.Name))}}}";
     }
 
     private static double ScoreSubsetGreedy(
