@@ -28,6 +28,18 @@ public sealed class ReplacementBus
     }
 
     /// <summary>
+    /// Drop all replacement effects flagged as expiring at end of turn —
+    /// per-turn shields like Fog ("prevent all combat damage this turn")
+    /// and one-shot "prevent the next N damage this turn" effects.
+    /// Called from <c>TurnDriver</c> during the cleanup step so the
+    /// shield list parallels <see cref="ContinuousEffectsService.ExpireEndOfTurn"/>.
+    /// </summary>
+    public void ExpireEndOfTurn()
+    {
+        _effects.RemoveAll(e => e is IEndOfTurnExpirable eot && eot.ExpiresAtEndOfTurn);
+    }
+
+    /// <summary>
     /// Push an intent through the bus. Returns transformed intent, or null
     /// if any replacement cancelled it. Each registered effect fires at
     /// most once per Apply call (CR 616.1c — self-replacement).

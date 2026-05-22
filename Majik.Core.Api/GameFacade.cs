@@ -102,7 +102,7 @@ public sealed class GameFacade
         _sba = new StateBasedActions(_bus, _zones, _triggers);
         _resolver = new StackResolver(_bus, _zones, _sba);
         _priority = new PriorityManager(new List<Player> { alice, bob }, _stack, _bus, _triggers);
-        _combatFlow = new CombatFlow(_bus, _sba);
+        _combatFlow = new CombatFlow(_bus, _sba, Replacements);
 
         _aliceAgent = new RemoteAgent(alice, LookupCard);
         _bobAgent = new RemoteAgent(bob, LookupCard);

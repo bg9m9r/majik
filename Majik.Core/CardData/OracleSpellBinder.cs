@@ -147,12 +147,21 @@ public static class OracleSpellBinder
         Player caster,
         Func<object, object> resolver,
         Majik.Core.Effects.ContinuousEffectsService? effects,
-        Majik.Core.Stack.Stack? stack)
+        Majik.Core.Stack.Stack? stack) =>
+        Bind(entity, caster, resolver, effects, stack, replacements: null);
+
+    public static SpellDefinition? Bind(
+        CardEntity entity,
+        Player caster,
+        Func<object, object> resolver,
+        Majik.Core.Effects.ContinuousEffectsService? effects,
+        Majik.Core.Stack.Stack? stack,
+        Majik.Core.Effects.ReplacementBus? replacements)
     {
         ArgumentNullException.ThrowIfNull(entity);
         ArgumentNullException.ThrowIfNull(caster);
         ArgumentNullException.ThrowIfNull(resolver);
-        return Registry.TryBind(new SpellBindContext(entity, caster, resolver, effects, stack));
+        return Registry.TryBind(new SpellBindContext(entity, caster, resolver, effects, stack, replacements));
     }
 
     /// <summary>
@@ -177,14 +186,15 @@ public static class OracleSpellBinder
         Player caster,
         Func<object, object> resolver,
         Majik.Core.Effects.ContinuousEffectsService? effects,
-        Majik.Core.Stack.Stack? stack)
+        Majik.Core.Stack.Stack? stack,
+        Majik.Core.Effects.ReplacementBus? replacements = null)
     {
         ArgumentNullException.ThrowIfNull(templateName);
         ArgumentNullException.ThrowIfNull(entity);
         ArgumentNullException.ThrowIfNull(caster);
         ArgumentNullException.ThrowIfNull(resolver);
 
-        var ctx = new SpellBindContext(entity, caster, resolver, effects, stack);
+        var ctx = new SpellBindContext(entity, caster, resolver, effects, stack, replacements);
 
         var template = Registry.OrderedTemplates
             .FirstOrDefault(t => string.Equals(t.Name, templateName, StringComparison.Ordinal));
