@@ -34,6 +34,13 @@ public static class KeywordBinder
         // ContinuousEffectsService — when none is supplied the marker is
         // attached but the pump won't fire.
         "Prowess",
+        // Alternative-cost keyword (CR 702.74). The KeywordAbility marker is
+        // attached so downstream code (UI, action validator) can introspect
+        // "this creature has evoke". The evoke alt-cost path itself is wired
+        // bespoke per-card (see EvokeAlternativeCost + EvokeFactory and the
+        // incarnation card factories) — Scryfall does not encode the evoke
+        // cost in a way KeywordBinder can parse generically.
+        "Evoke",
     };
 
     public static void Bind(ICard card, CardEntity entity, Player controller,
@@ -68,6 +75,19 @@ public static class KeywordBinder
                 if (prowessCreature.Controller == null)
                     prowessCreature.SetController(controller);
                 card.AddAbility(ProwessFactory.Build(prowessCreature, effects));
+            }
+            else if (kw.Equals("Evoke", StringComparison.OrdinalIgnoreCase)
+                && card is Creature evokeCreature)
+            {
+                // CR 702.74b — every evoke creature has the printed trigger
+                // "When this creature enters, if its evoke cost was paid,
+                // sacrifice it." Wire it generically here. The intervening-if
+                // gates on Creature.EvokeWasPaid, which is set only when the
+                // EvokeAlternativeCost was used; a normal cast leaves it false
+                // and the trigger is harmless.
+                if (evokeCreature.Controller == null)
+                    evokeCreature.SetController(controller);
+                card.AddAbility(Majik.Core.Keywords.EvokeFactory.Build(evokeCreature));
             }
         }
     }

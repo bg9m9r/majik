@@ -209,5 +209,17 @@ public static class SeedImplementedCards
         // III— Exile + return transformed to Avatar Roku — DEFERRED (no
         //      saga-transform infrastructure).
         "The Legend of Roku // Avatar Roku",
+
+        // Creature — Elemental Incarnation {3}{W}{W} 3/2 (SolitudeFactory).
+        // Modern Horizons 2 incarnation. Flash + Lifelink + Evoke keyword
+        // markers via KeywordBinder; KeywordBinder also attaches the printed
+        // evoke sacrifice trigger (EvokeFactory) automatically. ETB
+        // exile-target-creature + lifegain wired via SolitudeFactory.
+        // Evoke alt-cost — "exile a white card from your hand" — via
+        // EvokeAlternativeCost.
+        // Deferred: opponent pitch-back ("controller may exile a
+        // non-Elemental, non-Incarnation white card to return the exiled
+        // creature").
+        "Solitude",
     };
 }

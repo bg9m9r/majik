@@ -111,6 +111,16 @@ public static class NamedCardFactory
             // Loyalty abilities (+1, -2, -5) wired by OracleLoyaltyAbilityBinder.
             "Grist, the Hunger Tide" => GristFactory.Create(owner),
 
+            // Creature — Elemental Incarnation {3}{W}{W} 3/2 (SolitudeFactory).
+            // Flash + Lifelink + Evoke keyword markers wired. ETB exile-target-
+            // creature trigger wired (lifegain to target's controller equal to
+            // exiled creature's power). Evoke alt-cost = "exile a white card
+            // from hand" via EvokeAlternativeCost; printed evoke-sacrifice
+            // trigger fires when Solitude enters if evoke was paid (CR 702.74b).
+            // Opponent pitch-back ("controller may exile a non-Elemental,
+            // non-Incarnation white card from their hand to return") deferred.
+            "Solitude" => SolitudeFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
