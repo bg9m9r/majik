@@ -44,6 +44,8 @@ public sealed class MatchService
     private readonly DeckRepository? _deckRepo;
     private readonly DeckValidationService? _deckValidator;
     private readonly IMatchOwnership? _ownership;
+    private readonly IMatchCommandForwarder? _forwarder;
+    private readonly IInstanceIdProvider? _instanceIds;
     private readonly ILogger<MatchService>? _logger;
 
     public MatchService(
@@ -58,6 +60,8 @@ public sealed class MatchService
         DeckRepository? deckRepo = null,
         DeckValidationService? deckValidator = null,
         IMatchOwnership? ownership = null,
+        IMatchCommandForwarder? forwarder = null,
+        IInstanceIdProvider? instanceIds = null,
         ILogger<MatchService>? logger = null)
     {
         _matches = matches;
@@ -71,6 +75,8 @@ public sealed class MatchService
         _deckRepo = deckRepo;
         _deckValidator = deckValidator;
         _ownership = ownership;
+        _forwarder = forwarder;
+        _instanceIds = instanceIds;
         _logger = logger;
     }
 
@@ -244,6 +250,7 @@ public sealed class MatchService
                     botSeatArchetype: bot.Archetype,
                     onBotThinking: onBotThinking);
                 if (_ownership != null) await _ownership.TryClaimAsync(matchId, ct);
+                if (_forwarder != null) await _forwarder.OnClaimedAsync(matchId, ct);
             }
             catch (DeckLoadException ex)
             {
@@ -321,6 +328,7 @@ public sealed class MatchService
                 {
                     _gameFactory.Delete(facade.GameId);
                     if (_ownership != null) await _ownership.ReleaseAsync(matchId, ct);
+                    if (_forwarder != null) await _forwarder.OnReleasedAsync(matchId, ct);
                 }
                 catch (Exception facEx)
                 {
@@ -432,6 +440,7 @@ public sealed class MatchService
                     Builders<Match>.Update.Set(m => m.GameId, facade.GameId),
                     ct);
                 if (_ownership != null) await _ownership.TryClaimAsync(matchId, ct);
+                if (_forwarder != null) await _forwarder.OnClaimedAsync(matchId, ct);
             }
             catch (DeckLoadException ex)
             {
@@ -640,6 +649,7 @@ public sealed class MatchService
             _gameFactory.Delete(gid);
         }
         if (_ownership != null) await _ownership.ReleaseAsync(matchId, ct);
+        if (_forwarder != null) await _forwarder.OnReleasedAsync(matchId, ct);
         _hub?.Publish(matchId, "match.state-changed",
             new { matchId, state = "Abandoned", transitionedAt = now });
         return Result.Ok(true);
@@ -763,11 +773,33 @@ public sealed class MatchService
         if (match.GameId is not Guid gid) return Result.Fail<bool>(new MatchError("game-not-started"));
         if (_gameFactory == null) return Result.Fail<bool>(new MatchError("game-not-started"));
 
+        // Fast path: this replica owns the facade in-process.
         var facade = _gameFactory.Get(gid);
-        if (facade == null) return Result.Fail<bool>(new MatchError("game-not-started"));
+        if (facade != null)
+        {
+            await facade.SubmitAsync(command, ct);
+            return Result.Ok(true);
+        }
 
-        await facade.SubmitAsync(command, ct);
-        return Result.Ok(true);
+        // Cross-replica fallback: another replica owns the facade. Look up
+        // ownership in Redis and forward the command via pub/sub. The
+        // ownership check is best-effort — if it returns our own instance
+        // id (stale claim) the forward will still time out and we'll fall
+        // back to game-not-started, which the client retries.
+        if (_ownership != null && _forwarder != null && _instanceIds != null)
+        {
+            var owner = await _ownership.GetOwnerAsync(matchId, ct);
+            if (owner != null && owner != _instanceIds.Value)
+            {
+                var delivered = await _forwarder.SendAsync(matchId, callerSub, command, ct);
+                if (delivered) return Result.Ok(true);
+                _logger?.LogWarning(
+                    "Forwarded command to remote owner failed/timed-out. MatchId={MatchId} Owner={Owner}",
+                    matchId, owner);
+            }
+        }
+
+        return Result.Fail<bool>(new MatchError("game-not-started"));
     }
 
     // -----------------------------------------------------------------------
