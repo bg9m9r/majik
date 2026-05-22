@@ -91,4 +91,7 @@ public sealed class BotPlayerAgent : IPlayerAgent
 
     public Task<Majik.Core.Keywords.SurveilAction.SurveilDecision> ChooseSurveilDecisionAsync(GameContext? ctx, IReadOnlyList<ICard> peeked, CancellationToken ct = default)
         => WrapAsync(() => _strategy.PickSurveil(ctx, _self, peeked), ct);
+
+    public Task<ICard?> ChooseLibraryPickAsync(GameContext? ctx, IReadOnlyList<ICard> candidates, string kindLabel, CancellationToken ct = default)
+        => WrapAsync(() => _strategy.PickLibraryCard(ctx, _self, candidates, kindLabel), ct);
 }
