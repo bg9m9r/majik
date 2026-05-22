@@ -86,6 +86,10 @@ public sealed class ScryfallCardFactory
             {
                 EntersTappedBinder.Bind(card, entity, _replacements);
             }
+            // Independent of the tapped chain: ETB +1/+1 counters can
+            // co-exist with any tapped-clause (e.g. a hypothetical Stoke the
+            // Flames). Register unconditionally.
+            EntersWithCountersBinder.Bind(card, entity, _replacements);
         }
 
         return card;
