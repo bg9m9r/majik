@@ -136,6 +136,15 @@ public sealed class TurnDriver
         // CR 305.2 — land drops reset at turn start.
         _landDropTracker?.ResetTurn();
 
+        // CR 119.3 — per-player life-loss counters reset at turn start.
+        // Consulted by Spectacle alt-cost, Revolt, "if you lost life this
+        // turn" triggers, etc. Reset before TurnState.Reset to keep
+        // turn-start zeroing of all per-turn trackers in one block.
+        foreach (var p in _players)
+        {
+            p.ResetTurnTrackers();
+        }
+
         // Reset per-turn event tally (revolt, connive X, draw watchers).
         TurnState.Reset();
 

@@ -133,7 +133,9 @@ public static class SeedImplementedCards
         "Lava Dart",
         // Sorcery — {2}{R} (spectacle {R}). DamageAnyTargetTemplate handles
         // the 3-damage body. Spectacle alt-cost ("if an opponent lost life
-        // this turn") deferred — needs alt-cost framework.
+        // this turn") wired via SpectacleBinder + SpectacleAlternativeCost
+        // (CR 702.118) — dispatcher offers the {R} alt-cost when any
+        // opponent's Player.LifeLostThisTurn > 0 at announce time.
         "Skewer the Critics",
         // Instant — {G/P}. PumpCreatureTemplate applies +2/+2 EOT. Phyrexian
         // alt-cost (2 life instead of {G}) deferred.
