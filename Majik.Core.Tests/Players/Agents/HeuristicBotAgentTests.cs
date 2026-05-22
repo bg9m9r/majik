@@ -216,4 +216,64 @@ public class HeuristicBotAgentTests
 
         plan.Blockers.Should().Contain(b => b.Blocker == bigBlocker && b.Attacker == bigAtk);
     }
+
+    [Fact]
+    public async Task ChooseTargets_PrefersBiggestThreat_ForCreatureRemoval()
+    {
+        // Opponent has 1/1 and 4/4 on battlefield. "target creature"
+        // request lists both — bot should pick the 4/4.
+        var small = new Creature("Small", "1", 1, 1) { Owner = _bob, Controller = _bob };
+        var big = new Creature("Big", "3", 4, 4) { Owner = _bob, Controller = _bob };
+        var bot = new HeuristicBotAgent();
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice,
+            1, PhaseStateType.Main, new Majik.Core.Stack.Stack());
+
+        var req = new Majik.Core.Players.Agents.TargetRequest(
+            "target creature", 1, 1, new object[] { small, big });
+
+        var picked = await bot.ChooseTargetsAsync(ctx, req);
+
+        picked.Should().HaveCount(1);
+        picked[0].Should().BeSameAs(big);
+    }
+
+    [Fact]
+    public async Task ChooseTargets_PrefersOpponent_WhenAnyTargetIncludesPlayers()
+    {
+        // "any target" with both players + a creature in candidates →
+        // pick opponent at low life (lethal-face heuristic).
+        _bob.LifeTotal = 3;
+        var ourBear = new Creature("OurBear", "1G", 2, 2) { Owner = _alice, Controller = _alice };
+        var bot = new HeuristicBotAgent();
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice,
+            1, PhaseStateType.Main, new Majik.Core.Stack.Stack());
+
+        var req = new Majik.Core.Players.Agents.TargetRequest(
+            "any target", 1, 1, new object[] { _alice, _bob, ourBear });
+
+        var picked = await bot.ChooseTargetsAsync(ctx, req);
+
+        picked.Should().HaveCount(1);
+        picked[0].Should().BeSameAs(_bob);
+    }
+
+    [Fact]
+    public async Task ChooseTargets_BuffLabel_FlipsToCasterSide()
+    {
+        // "target creature you control" label flags as buff — bot should
+        // pick ITS OWN biggest creature, not opponent's.
+        var ourBig = new Creature("OurBig", "3G", 4, 4) { Owner = _alice, Controller = _alice };
+        var theirBig = new Creature("TheirBig", "3G", 4, 4) { Owner = _bob, Controller = _bob };
+        var bot = new HeuristicBotAgent();
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice,
+            1, PhaseStateType.Main, new Majik.Core.Stack.Stack());
+
+        var req = new Majik.Core.Players.Agents.TargetRequest(
+            "target creature you control", 1, 1, new object[] { ourBig, theirBig });
+
+        var picked = await bot.ChooseTargetsAsync(ctx, req);
+
+        picked.Should().HaveCount(1);
+        picked[0].Should().BeSameAs(ourBig);
+    }
 }
