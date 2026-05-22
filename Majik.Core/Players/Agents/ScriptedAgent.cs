@@ -61,7 +61,11 @@ public sealed class ScriptedAgent : IPlayerAgent
     public Task<int> ChooseXAsync(GameContext ctx, ICard source, CancellationToken ct = default)
         => Task.FromResult(Pop(_xValues, "X"));
 
-    public Task<int> ChooseModeAsync(GameContext ctx, IReadOnlyList<string> modes, CancellationToken ct = default)
+    public Task<int> ChooseModeAsync(
+        GameContext ctx,
+        IReadOnlyList<string> modes,
+        IReadOnlyList<BotIntent>? modeIntents = null,
+        CancellationToken ct = default)
         => Task.FromResult(Pop(_modes, "mode"));
 
     public Task<IReadOnlyList<ITriggeredAbility>> OrderTriggersAsync(GameContext ctx, IReadOnlyList<ITriggeredAbility> mine, CancellationToken ct = default)

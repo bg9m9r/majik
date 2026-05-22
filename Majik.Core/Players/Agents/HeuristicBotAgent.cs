@@ -558,9 +558,28 @@ public sealed class HeuristicBotAgent : IPlayerAgent
     ///   + gain life / prevent        — value when our life is low
     ///   + create / put — board-build, valuable when our board is light
     /// Highest-scored index wins. Tie-break: first.</summary>
-    public Task<int> ChooseModeAsync(GameContext ctx, IReadOnlyList<string> modes, CancellationToken ct = default)
+    public Task<int> ChooseModeAsync(
+        GameContext ctx,
+        IReadOnlyList<string> modes,
+        IReadOnlyList<BotIntent>? modeIntents = null,
+        CancellationToken ct = default)
     {
         if (modes.Count == 0) return Task.FromResult(0);
+
+        // Intent-aware path: when the bound SpellDefinition carried a
+        // ModeIntents list parallel to modes, score by intent flags
+        // against the live board / life state. The list may be shorter
+        // than modes when a clause didn't bind to any known template —
+        // we fall back to legacy label sniffing for those entries.
+        var intents = modeIntents;
+        var allIntentsNone = intents == null
+            || intents.Count == 0
+            || intents.All(i => i == BotIntent.None);
+        if (allIntentsNone)
+        {
+            return Task.FromResult(LegacyChooseMode(ctx, modes));
+        }
+
         var opp = ctx.AllPlayers.FirstOrDefault(p => !ReferenceEquals(p, ctx.Self));
         var oppHasCreature = opp != null
             && opp.Zones.Battlefield.GetCards().OfType<Creature>().Any();
@@ -572,24 +591,79 @@ public sealed class HeuristicBotAgent : IPlayerAgent
         var bestScore = int.MinValue;
         for (var i = 0; i < modes.Count; i++)
         {
-            var label = modes[i].ToLowerInvariant();
-            var score = 0;
-            if (oppHasCreature && (label.Contains("destroy")
-                || label.Contains("damage") || label.Contains("exile target creature")
-                || label.Contains("return target creature"))) score += 30;
-            if (label.Contains("counter")) score += oppHasCreature ? 20 : 10;
-            if (label.Contains("draw") || label.Contains("scry")) score += 15;
-            if (label.Contains("search")) score += 12;
-            if (ourLifeLow && (label.Contains("gain") && label.Contains("life")
-                || label.Contains("prevent"))) score += 25;
-            if (ourCreatureCount < 2 && (label.Contains("create")
-                || label.Contains("put") && label.Contains("counter"))) score += 18;
+            var intent = i < intents!.Count ? intents[i] : BotIntent.None;
+            int score;
+            if (intent == BotIntent.None)
+            {
+                // Per-mode fallback: this clause didn't classify; reuse
+                // the legacy label-sniff score so the bot still has
+                // signal even when neighboring modes are intent-tagged.
+                score = LegacyScoreLabel(modes[i], oppHasCreature, ourCreatureCount, ourLifeLow);
+            }
+            else
+            {
+                score = ScoreIntentForState(intent, oppHasCreature, ourCreatureCount, ourLifeLow);
+            }
             // Tiny bias toward earlier modes to break ties (printed order
             // often represents "default" choice).
             score += (modes.Count - i);
             if (score > bestScore) { bestScore = score; bestIdx = i; }
         }
         return Task.FromResult(bestIdx);
+    }
+
+    private int LegacyChooseMode(GameContext ctx, IReadOnlyList<string> modes)
+    {
+        var opp = ctx.AllPlayers.FirstOrDefault(p => !ReferenceEquals(p, ctx.Self));
+        var oppHasCreature = opp != null
+            && opp.Zones.Battlefield.GetCards().OfType<Creature>().Any();
+        var ourCreatureCount = ctx.Self.Zones.Battlefield.GetCards()
+            .OfType<Creature>().Count();
+        var ourLifeLow = ctx.Self.LifeTotal <= 8;
+
+        var bestIdx = 0;
+        var bestScore = int.MinValue;
+        for (var i = 0; i < modes.Count; i++)
+        {
+            var score = LegacyScoreLabel(modes[i], oppHasCreature, ourCreatureCount, ourLifeLow);
+            score += (modes.Count - i);
+            if (score > bestScore) { bestScore = score; bestIdx = i; }
+        }
+        return bestIdx;
+    }
+
+    private static int LegacyScoreLabel(
+        string mode, bool oppHasCreature, int ourCreatureCount, bool ourLifeLow)
+    {
+        var label = mode.ToLowerInvariant();
+        var score = 0;
+        if (oppHasCreature && (label.Contains("destroy")
+            || label.Contains("damage") || label.Contains("exile target creature")
+            || label.Contains("return target creature"))) score += 30;
+        if (label.Contains("counter")) score += oppHasCreature ? 20 : 10;
+        if (label.Contains("draw") || label.Contains("scry")) score += 15;
+        if (label.Contains("search")) score += 12;
+        if (ourLifeLow && (label.Contains("gain") && label.Contains("life")
+            || label.Contains("prevent"))) score += 25;
+        if (ourCreatureCount < 2 && (label.Contains("create")
+            || label.Contains("put") && label.Contains("counter"))) score += 18;
+        return score;
+    }
+
+    private static int ScoreIntentForState(
+        BotIntent intent, bool oppHasCreature, int ourCreatureCount, bool ourLifeLow)
+    {
+        var score = 0;
+        if (intent.HasAny(BotIntent.Removal | BotIntent.Burn | BotIntent.Bounce) && oppHasCreature) score += 30;
+        if (intent.HasAny(BotIntent.Counter)) score += oppHasCreature ? 20 : 10;
+        if (intent.HasAny(BotIntent.Wrath)) score += oppHasCreature ? 35 : -10;
+        if (intent.HasAny(BotIntent.Draw | BotIntent.Cantrip)) score += 15;
+        if (intent.HasAny(BotIntent.Tutor)) score += 12;
+        if (intent.HasAny(BotIntent.Heal) && ourLifeLow) score += 25;
+        if (intent.HasAny(BotIntent.Token) && ourCreatureCount < 2) score += 18;
+        if (intent.HasAny(BotIntent.Ramp)) score += 10;
+        if (intent.HasAny(BotIntent.Reanimate)) score += 12;
+        return score;
     }
 
     public Task<IReadOnlyList<ITriggeredAbility>> OrderTriggersAsync(GameContext ctx, IReadOnlyList<ITriggeredAbility> mine, CancellationToken ct = default)

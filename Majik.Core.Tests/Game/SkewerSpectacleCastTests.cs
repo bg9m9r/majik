@@ -63,8 +63,8 @@ public class SkewerSpectacleCastTests
             => _inner.ChooseTargetsAsync(c, r, ct);
         public Task<int> ChooseXAsync(GameContext c, ICard s, CancellationToken ct = default)
             => _inner.ChooseXAsync(c, s, ct);
-        public Task<int> ChooseModeAsync(GameContext c, IReadOnlyList<string> m, CancellationToken ct = default)
-            => _inner.ChooseModeAsync(c, m, ct);
+        public Task<int> ChooseModeAsync(GameContext c, IReadOnlyList<string> m, IReadOnlyList<Majik.Core.Cards.BotIntent>? mi = null, CancellationToken ct = default)
+            => _inner.ChooseModeAsync(c, m, mi, ct);
         public Task<IReadOnlyList<ITriggeredAbility>> OrderTriggersAsync(GameContext c, IReadOnlyList<ITriggeredAbility> m, CancellationToken ct = default)
             => _inner.OrderTriggersAsync(c, m, ct);
         public Task<CombatPlan> DeclareAttackersAsync(GameContext c, IReadOnlyList<Majik.Core.Cards.Creature> e, CancellationToken ct = default)

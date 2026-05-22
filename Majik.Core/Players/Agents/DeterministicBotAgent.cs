@@ -31,7 +31,11 @@ public sealed class DeterministicBotAgent : IPlayerAgent
     public Task<int> ChooseXAsync(GameContext ctx, ICard source, CancellationToken ct = default)
         => Task.FromResult(0);
 
-    public Task<int> ChooseModeAsync(GameContext ctx, IReadOnlyList<string> modes, CancellationToken ct = default)
+    public Task<int> ChooseModeAsync(
+        GameContext ctx,
+        IReadOnlyList<string> modes,
+        IReadOnlyList<BotIntent>? modeIntents = null,
+        CancellationToken ct = default)
         => Task.FromResult(0);
 
     public Task<IReadOnlyList<ITriggeredAbility>> OrderTriggersAsync(GameContext ctx, IReadOnlyList<ITriggeredAbility> mine, CancellationToken ct = default)

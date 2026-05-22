@@ -87,7 +87,7 @@ public sealed class SpellCastFlow
         int? mode = null;
         if (definition.Modes.Count > 0)
         {
-            mode = await agent.ChooseModeAsync(ctx, definition.Modes, ct);
+            mode = await agent.ChooseModeAsync(ctx, definition.Modes, definition.ModeIntents, ct);
         }
 
         int? xValue = null;

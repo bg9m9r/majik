@@ -67,7 +67,11 @@ public sealed class BotPlayerAgent : IPlayerAgent
     public Task<int> ChooseXAsync(GameContext ctx, ICard source, CancellationToken ct = default)
         => WrapAsync(() => _strategy.PickX(ctx, _self), ct);
 
-    public Task<int> ChooseModeAsync(GameContext ctx, IReadOnlyList<string> modes, CancellationToken ct = default)
+    public Task<int> ChooseModeAsync(
+        GameContext ctx,
+        IReadOnlyList<string> modes,
+        IReadOnlyList<BotIntent>? modeIntents = null,
+        CancellationToken ct = default)
         => WrapAsync(() => _strategy.PickMode(ctx, _self, modes), ct);
 
     public Task<IReadOnlyList<ITriggeredAbility>> OrderTriggersAsync(GameContext ctx, IReadOnlyList<ITriggeredAbility> mine, CancellationToken ct = default)

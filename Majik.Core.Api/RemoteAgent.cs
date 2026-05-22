@@ -142,7 +142,11 @@ public sealed class RemoteAgent : IPlayerAgent
     public Task<int> ChooseXAsync(GameContext ctx, ICard source, CancellationToken ct = default)
         => Prompt<int>(ct, typeof(ChooseXCommand));
 
-    public Task<int> ChooseModeAsync(GameContext ctx, IReadOnlyList<string> modes, CancellationToken ct = default)
+    public Task<int> ChooseModeAsync(
+        GameContext ctx,
+        IReadOnlyList<string> modes,
+        IReadOnlyList<Majik.Core.Cards.BotIntent>? modeIntents = null,
+        CancellationToken ct = default)
         => Prompt<int>(ct, typeof(ChooseModeCommand));
 
     public Task<IReadOnlyList<ITriggeredAbility>> OrderTriggersAsync(GameContext ctx, IReadOnlyList<ITriggeredAbility> mine, CancellationToken ct = default)
