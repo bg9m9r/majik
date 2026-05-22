@@ -47,9 +47,20 @@ public sealed class HeuristicBotAgent : IPlayerAgent
     /// </summary>
     private readonly IAlternativeCostProbe? _altCostProbe;
 
-    public HeuristicBotAgent(IAlternativeCostProbe? altCostProbe = null)
+    /// <summary>
+    /// Optional card-data lookup used to read per-card
+    /// <see cref="BotIntent"/> for mana-hold + sequencing decisions. When
+    /// null, the bot falls back to today's heuristics (every instant
+    /// counts as reactive, no intent bias in priority sequencing).
+    /// </summary>
+    private readonly Majik.Core.CardData.ICardRepository? _cardRepository;
+
+    public HeuristicBotAgent(
+        IAlternativeCostProbe? altCostProbe = null,
+        Majik.Core.CardData.ICardRepository? cardRepository = null)
     {
         _altCostProbe = altCostProbe;
+        _cardRepository = cardRepository;
     }
 
     public Task<PriorityAction> ChoosePriorityActionAsync(GameContext ctx, CancellationToken ct = default)
@@ -227,11 +238,26 @@ public sealed class HeuristicBotAgent : IPlayerAgent
     /// AND opp has an untapped creature that could attack next turn. Zero
     /// otherwise — when opp has no offense or we have no responsive cards
     /// to hold up, all mana is free for sorcery-speed play.</summary>
+    /// <summary>Test-only entry point. Use the public priority loop in
+    /// production — direct invocation is only needed to assert intent-aware
+    /// hold logic in isolation.</summary>
+    internal int ManaHoldReserveForTests(GameContext ctx) => ManaHoldReserve(ctx);
+
     private int ManaHoldReserve(GameContext ctx)
     {
+        // Reactive intent classes — instants worth holding mana for during
+        // a sorcery window. Cantrip / Draw / Ramp instants don't need a
+        // reservation (we'd rather spend the mana now).
+        const BotIntent reactiveMask =
+            BotIntent.Burn | BotIntent.Removal | BotIntent.Counter
+            | BotIntent.CombatTrick | BotIntent.Protection | BotIntent.Bounce;
+
         var instants = ctx.Self.Zones.Hand.GetCards()
             .Where(c => c.HasType(CardType.Instant))
             .Where(c => !_failedThisTurn.Contains(c.InstanceId))
+            .Where(c =>
+                _cardRepository == null
+                || _cardRepository.IntentFor(c.Name).HasAny(reactiveMask))
             .OrderBy(c => Majik.Core.ValueObjects.ManaCost.Parse(c.ManaCost ?? "").TotalValue)
             .ToList();
         if (instants.Count == 0) return 0;

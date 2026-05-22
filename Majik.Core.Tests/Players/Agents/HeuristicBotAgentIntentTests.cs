@@ -1,12 +1,16 @@
 using FluentAssertions;
 using Majik.Core.Cards;
+using Majik.Core.CardData;
 using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
 using Majik.Core.StateMachine;
 using Majik.Core.Zones;
+using Moq;
 using Xunit;
 using Creature = Majik.Core.Cards.Creature;
+using Instant = Majik.Core.Cards.Instant;
+using Land = Majik.Core.Cards.Land;
 
 namespace Majik.Core.Tests.Players.Agents;
 
@@ -181,5 +185,62 @@ public class HeuristicBotAgentIntentTests
 
         var picked = await bot.ChooseTargetsAsync(NewCtx(), req);
         picked.Should().ContainSingle().Which.Should().BeSameAs(mine);
+    }
+
+    // ----- ManaHoldReserve (Task 10) -----
+
+    [Fact]
+    public void ManaHold_OnlyReservesForReactiveInstants()
+    {
+        var repo = new Mock<ICardRepository>();
+        repo.Setup(r => r.IntentFor("Lava Spike")).Returns(BotIntent.Burn | BotIntent.Reach);
+        repo.Setup(r => r.IntentFor("Ponder")).Returns(BotIntent.Cantrip);
+
+        // Opp has an untapped creature → "oppHasOffense" is true, eligible for hold.
+        AddCreature(_opp, "Goblin", 1, 1);
+
+        var bot = new HeuristicBotAgent(altCostProbe: null, cardRepository: repo.Object);
+
+        // Hand: Ponder (Cantrip — not reactive) only. Expect 0 reserve.
+        var ponder = new Instant("Ponder", "{U}") { Owner = _self, Controller = _self };
+        ponder.SetZone(ZoneType.Hand);
+        _self.Zones.Hand.AddCard(ponder);
+        bot.ManaHoldReserveForTests(NewCtx()).Should().Be(0);
+
+        // Add Lava Spike (Burn — reactive). Expect reserve = its CMC (1).
+        var bolt = new Instant("Lava Spike", "{R}") { Owner = _self, Controller = _self };
+        bolt.SetZone(ZoneType.Hand);
+        _self.Zones.Hand.AddCard(bolt);
+        bot.ManaHoldReserveForTests(NewCtx()).Should().Be(1);
+    }
+
+    [Fact]
+    public void ManaHold_LegacyPath_NoRepository_AnyInstantCounts()
+    {
+        // No repository — falls back to today's behaviour (every instant
+        // counts as reactive). Backstops the legacy code path.
+        AddCreature(_opp, "Goblin", 1, 1);
+
+        var bot = new HeuristicBotAgent();
+        var ponder = new Instant("Ponder", "{U}") { Owner = _self, Controller = _self };
+        ponder.SetZone(ZoneType.Hand);
+        _self.Zones.Hand.AddCard(ponder);
+
+        bot.ManaHoldReserveForTests(NewCtx()).Should().Be(1);
+    }
+
+    [Fact]
+    public void ManaHold_NoOpponentOffense_NoReserve()
+    {
+        // Opp has no creatures → no offense → don't reserve.
+        var repo = new Mock<ICardRepository>();
+        repo.Setup(r => r.IntentFor("Lava Spike")).Returns(BotIntent.Burn);
+
+        var bot = new HeuristicBotAgent(altCostProbe: null, cardRepository: repo.Object);
+        var bolt = new Instant("Lava Spike", "{R}") { Owner = _self, Controller = _self };
+        bolt.SetZone(ZoneType.Hand);
+        _self.Zones.Hand.AddCard(bolt);
+
+        bot.ManaHoldReserveForTests(NewCtx()).Should().Be(0);
     }
 }
