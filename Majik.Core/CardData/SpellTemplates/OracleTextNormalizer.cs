@@ -36,6 +36,24 @@ public static class OracleTextNormalizer
         // Cipher reminder — Brought back as a placeholder; Cipher itself parsed
         // elsewhere. Cosmetic strip only.
         new(@"^\s*cipher\s*\([^)]*\)\s*", RegexOptions.IgnoreCase),
+        // Delve (Each card you exile from your graveyard while casting this
+        // spell pays for {1}.) — alt-cost keyword; v1 doesn't enforce, just
+        // strips the reminder so the binder anchors on the effect.
+        new(@"^\s*delve\s*\([^)]*\)\s*", RegexOptions.IgnoreCase),
+        // Bargain (You may sacrifice an artifact, enchantment, or token as
+        // you cast this spell.) — Wilds of Eldraine cost-modifier keyword.
+        // v1 stub: reminder stripped, "If this spell was bargained" clauses
+        // (when present later in the text) are out of scope.
+        new(@"^\s*bargain\s*\([^)]*\)\s*", RegexOptions.IgnoreCase),
+        // Affinity for X (This spell costs {1} less to cast for each X you
+        // control.) — cost reduction keyword. Lossy: cost isn't reduced.
+        // X is any word (artifacts, Allies, Frogs, …).
+        new(@"^\s*affinity\s+for\s+\w+\s*\([^)]*\)\s*", RegexOptions.IgnoreCase),
+        // Suspend N—{cost} optionally followed by a (...) reminder. Time-
+        // counter alt-cast keyword; v1 doesn't enforce exile/upkeep, the
+        // effect just binds for normal casting. The em-dash is the Scryfall
+        // canonical form; "{cost}" is one or more {…} groups.
+        new(@"^\s*suspend\s+\d+\s*—\s*(?:\{[^}]+\}\s*)+(?:\([^)]*\)\s*)?", RegexOptions.IgnoreCase),
         // "As an additional cost to cast this spell, sacrifice/discard/exile X."
         // Drops the cost sentence — v1 stub doesn't enforce the additional
         // cost. Lossy: caster doesn't actually sacrifice anything but the
