@@ -160,5 +160,15 @@ public static class SeedImplementedCards
         // minus the caster and applies LoseLife. Works in production now that
         // SpellCastFlow plumbs AllPlayers through.
         "Boltwave",
+
+        // Instant — {R}{W} (ModalChooseOneTemplate). Mode 1 (4 damage to
+        // player/walker) binds via DamagePlayer. Modes 2/3 (mass
+        // indestructible, target double strike) no-op until templates exist.
+        "Boros Charm",
+
+        // Instant — {W}{W} (ModalChooseOneTemplate). Mode 2 (destroy target
+        // enchantment) binds via DestroyArtifactEnchantment. Modes 1/3
+        // (variable damage by creature count, exile graveyards) no-op.
+        "Thraben Charm",
     };
 }
