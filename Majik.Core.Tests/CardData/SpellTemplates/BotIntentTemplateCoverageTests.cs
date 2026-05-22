@@ -20,6 +20,11 @@ public class BotIntentTemplateCoverageTests
         "ClauseComposition",
         "Strive",
 
+        // Convoke is a cost modifier (CR 702.51), not an effect category.
+        // Its template recursively rebinds the body; the inner template's
+        // intent is what stamps the SpellDefinition.
+        "Convoke",
+
         // Bot's own life loss — bot won't cast this. Intentionally None.
         "YouLoseLife",
 
