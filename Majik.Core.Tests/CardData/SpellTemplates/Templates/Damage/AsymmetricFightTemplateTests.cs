@@ -40,11 +40,19 @@ public class AsymmetricFightTemplateTests
     [InlineData("Target creature you control fights target creature you don't control.")]
     // Self-fight — SelfFightTemplate owns this.
     [InlineData("Target creature deals damage to itself equal to its power.")]
-    // Source isn't "you control".
-    [InlineData("Target creature an opponent controls deals damage equal to its power to target creature.")]
     public void DoesNotMatch_OutOfFamily(string oracle)
     {
         new AsymmetricFightTemplate().TryBind(Ctx(oracle))
             .Should().BeNull();
+    }
+
+    [Theory]
+    // Mutiny family — opponent's creature deals damage to another of their
+    // creatures. Broadened to match.
+    [InlineData("Target creature an opponent controls deals damage equal to its power to another target creature that player controls.")]
+    public void Matches_MutinyFamily(string oracle)
+    {
+        new AsymmetricFightTemplate().TryBind(Ctx(oracle))
+            .Should().NotBeNull();
     }
 }
