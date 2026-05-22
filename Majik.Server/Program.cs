@@ -13,7 +13,7 @@ builder.Services.AddMajikCors(builder.Configuration);
 builder.Services.AddMajikMongo(builder.Configuration);
 builder.Services.AddMajikMatches(builder.Configuration);
 builder.Services.AddMajikDecks(builder.Configuration);
-builder.Services.AddSignalR();
+builder.Services.AddMajikSignalR(builder.Configuration);
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi();
 
