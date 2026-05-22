@@ -55,16 +55,19 @@ public sealed class DbCardRepository : ICardRepository
         var db = _contextFactory();
         try
         {
+            // Reprint-name aliasing (Secret Lair / Universes Beyond renames).
+            var lookup = CardNameAliases.Resolve(name);
+
             // Scryfall stores one row per printing. Prefer the implemented
             // representative if any exists; otherwise fall back to any row.
             var exact = db.Cards.AsNoTracking()
-                .Where(c => c.Name == name)
+                .Where(c => c.Name == lookup)
                 .OrderByDescending(c => c.IsImplemented)
                 .FirstOrDefault();
             if (exact != null) return exact;
 
             // Double-faced cards (CR 712) stored as "Front // Back" — match prefix.
-            var prefix = name + " // ";
+            var prefix = lookup + " // ";
             return db.Cards.AsNoTracking()
                 .Where(c => c.Name.StartsWith(prefix))
                 .OrderByDescending(c => c.IsImplemented)
@@ -170,7 +173,10 @@ public sealed class DbCardRepository : ICardRepository
     public IReadOnlyList<CardEntity> GetByNames(IEnumerable<string> names)
     {
         if (names == null) return Array.Empty<CardEntity>();
-        var set = names.Distinct().ToList();
+        // Resolve reprint aliases before hitting the DB so the canonical
+        // implemented row is returned regardless of which printing's name
+        // the caller used.
+        var set = names.Select(CardNameAliases.Resolve).Distinct().ToList();
         if (set.Count == 0) return Array.Empty<CardEntity>();
 
         var db = _contextFactory();
