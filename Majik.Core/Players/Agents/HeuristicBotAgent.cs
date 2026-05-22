@@ -318,64 +318,126 @@ public sealed class HeuristicBotAgent : IPlayerAgent
         var assignments = new List<BlockerDeclaration>();
         var available = eligibleBlockers.ToList();
 
-        // Defender's life vs incoming raw damage — chump-block only when
-        // unblocked damage would otherwise be lethal.
+        // Sort attackers biggest-threat-first so best blockers get used on
+        // the most dangerous creatures. Trample + lifelink + raw power
+        // weighted into the threat score; ties broken by mana value
+        // (proxy for "what the spend is").
+        var sorted = attackers
+            .OrderByDescending(a => ThreatScore(a))
+            .ThenByDescending(a => Cmc(a))
+            .ToList();
+
         var incomingDamage = attackers.Sum(a => a.Power);
         var lethalIncoming = incomingDamage >= ctx.Self.LifeTotal;
 
-        foreach (var atk in attackers)
+        foreach (var atk in sorted)
         {
-            // 1. Safe block that ALSO kills attacker — best outcome (one-sided).
-            var safeKill = available
-                .Where(b => b.Toughness > atk.Power && b.Power >= atk.Toughness)
-                .OrderBy(b => b.Power) // preserve bigger blockers
+            var atkFirstStrike = Majik.Core.Combat.CombatAbilities.HasFirstStrike(atk)
+                                  || Majik.Core.Combat.CombatAbilities.HasDoubleStrike(atk);
+            var atkTrample = Majik.Core.Combat.CombatAbilities.HasTrample(atk);
+            var atkDeathtouch = Majik.Core.Combat.CombatAbilities.HasDeathtouch(atk);
+            var atkMenace = Majik.Core.Combat.CombatAbilities.HasMenace(atk);
+
+            // 1. Deathtouch blocker (any toughness ≥ 1) profitably kills any
+            //    attacker, except when first-strike would kill the blocker
+            //    before its damage applies.
+            var dtBlocker = available
+                .Where(b => Majik.Core.Combat.CombatAbilities.HasDeathtouch(b))
+                .Where(b => !atkFirstStrike
+                    || Majik.Core.Combat.CombatAbilities.HasFirstStrike(b)
+                    || b.Toughness > atk.Power)
+                .OrderBy(b => Cmc(b))            // sacrifice cheapest deathtoucher
                 .FirstOrDefault();
-            if (safeKill != null)
+
+            // 2. Safe block that ALSO kills attacker — survives + kills.
+            //    First-strike asymmetry: attacker FS without our FS kills
+            //    blocker before its damage applies (blocker doesn't kill).
+            var safeKill = available
+                .Where(b => CanSurvive(b, atk, atkFirstStrike) && CanKill(b, atk, atkDeathtouch))
+                .OrderBy(b => b.Power)            // preserve bigger blockers
+                .FirstOrDefault();
+
+            // Prefer deathtouch when both options exist and trade-cost is
+            // similar (deathtoucher is usually the cheaper sacrifice).
+            var preferDt = dtBlocker != null && (safeKill == null || Cmc(dtBlocker) < Cmc(safeKill));
+            if (atkMenace) preferDt = false;      // menace requires 2 blockers
+
+            if (preferDt)
+            {
+                assignments.Add(new BlockerDeclaration(dtBlocker!, atk));
+                available.Remove(dtBlocker!);
+                continue;
+            }
+            if (safeKill != null && !atkMenace)
             {
                 assignments.Add(new BlockerDeclaration(safeKill, atk));
                 available.Remove(safeKill);
                 continue;
             }
 
-            // 2. Profitable trade — both die, attacker's CMC ≥ blocker's.
+            // 3. Profitable trade — both die, attacker's CMC ≥ blocker's.
             var trade = available
-                .Where(b => b.Power >= atk.Toughness && atk.Power >= b.Toughness)
-                .Where(b => ManaCost.Parse(atk.ManaCost ?? "").TotalValue
-                            >= ManaCost.Parse(b.ManaCost ?? "").TotalValue)
-                .OrderBy(b => ManaCost.Parse(b.ManaCost ?? "").TotalValue)
+                .Where(b => CanKill(b, atk, atkDeathtouch) && !CanSurvive(b, atk, atkFirstStrike))
+                .Where(b => Cmc(atk) >= Cmc(b))
+                .OrderBy(b => Cmc(b))
                 .FirstOrDefault();
-            if (trade != null)
+            if (trade != null && !atkMenace)
             {
                 assignments.Add(new BlockerDeclaration(trade, atk));
                 available.Remove(trade);
                 continue;
             }
 
-            // 3. Safe-but-doesn't-kill — smallest tough that survives.
-            //    (Existing behaviour, preserved for test continuity.)
+            // 4. Multi-blocker gang kill — pile two or more blockers if
+            //    combined power kills attacker AND it's a profitable trade
+            //    (we trade ≤ attacker's CMC worth of creatures). Mandatory
+            //    when attacker has menace (CR 702.110a — needs ≥ 2).
+            var gangSize = atkMenace ? 2 : 2;
+            var gang = PickGangBlock(available, atk, atkFirstStrike, atkDeathtouch, gangSize, ctx.Self.LifeTotal, incomingDamage);
+            if (gang != null && (atkMenace || ShouldGang(atk, gang, atkTrample, lethalIncoming)))
+            {
+                foreach (var b in gang)
+                {
+                    assignments.Add(new BlockerDeclaration(b, atk));
+                    available.Remove(b);
+                }
+                if (atkTrample)
+                {
+                    // Trample still deals leftover, but reduce by gang toughness.
+                    incomingDamage -= Math.Min(atk.Power, gang.Sum(b => b.Toughness));
+                }
+                else
+                {
+                    incomingDamage -= atk.Power;
+                }
+                lethalIncoming = incomingDamage >= ctx.Self.LifeTotal;
+                continue;
+            }
+
+            // 5. Safe-but-doesn't-kill — smallest tough that survives.
             var safe = available
-                .Where(b => b.Toughness > atk.Power)
+                .Where(b => CanSurvive(b, atk, atkFirstStrike))
                 .OrderBy(b => b.Toughness)
                 .FirstOrDefault();
-            if (safe != null)
+            if (safe != null && !atkMenace)
             {
                 assignments.Add(new BlockerDeclaration(safe, atk));
                 available.Remove(safe);
                 continue;
             }
 
-            // 4. Chump — blocker dies, attacker lives. Only when otherwise
+            // 6. Chump — blocker dies, attacker lives. Only when otherwise
             //    lethal this combat step.
-            if (lethalIncoming)
+            if (lethalIncoming && !atkMenace)
             {
                 var chump = available
-                    .OrderBy(b => ManaCost.Parse(b.ManaCost ?? "").TotalValue)
+                    .OrderBy(b => Cmc(b))
                     .FirstOrDefault();
                 if (chump != null)
                 {
                     assignments.Add(new BlockerDeclaration(chump, atk));
                     available.Remove(chump);
-                    incomingDamage -= atk.Power;
+                    incomingDamage -= atkTrample ? Math.Max(0, atk.Power - chump.Toughness) : atk.Power;
                     lethalIncoming = incomingDamage >= ctx.Self.LifeTotal;
                     continue;
                 }
@@ -383,6 +445,107 @@ public sealed class HeuristicBotAgent : IPlayerAgent
         }
 
         return Task.FromResult(new BlockPlan(assignments));
+    }
+
+    // ----- combat-block helpers -----
+
+    /// <summary>Effective threat used to prioritise blocking order. Power is
+    /// the dominant axis; trample + lifelink scale up to reflect the urgency
+    /// of stopping them.</summary>
+    private static int ThreatScore(Creature c)
+    {
+        var p = c.Power;
+        var score = p;
+        if (Majik.Core.Combat.CombatAbilities.HasTrample(c)) score += 2;
+        if (Majik.Core.Combat.CombatAbilities.HasLifelink(c)) score += 2;
+        if (Majik.Core.Combat.CombatAbilities.HasDoubleStrike(c)) score += p;
+        if (Majik.Core.Combat.CombatAbilities.HasDeathtouch(c)) score += 1;
+        return score;
+    }
+
+    private static int Cmc(Creature c) => ManaCost.Parse(c.ManaCost ?? "").TotalValue;
+
+    /// <summary>True when blocker survives combat damage. Honors first-strike
+    /// asymmetry: if attacker first-strikes and blocker doesn't, attacker
+    /// damage applies before blocker can return fire — blocker dies unless
+    /// its toughness exceeds attacker's power, since it dies before its own
+    /// damage step. (Indestructible short-circuits this.)</summary>
+    private static bool CanSurvive(Creature blocker, Creature attacker, bool attackerFirstStrike)
+    {
+        if (Majik.Core.Combat.CombatAbilities.HasIndestructible(blocker)) return true;
+        var atkLethal = Majik.Core.Combat.CombatAbilities.HasDeathtouch(attacker)
+                        || attacker.Power >= blocker.Toughness;
+        if (attackerFirstStrike
+            && !Majik.Core.Combat.CombatAbilities.HasFirstStrike(blocker)
+            && !Majik.Core.Combat.CombatAbilities.HasDoubleStrike(blocker)
+            && atkLethal)
+        {
+            return false;
+        }
+        return blocker.Toughness > attacker.Power
+            && !Majik.Core.Combat.CombatAbilities.HasDeathtouch(attacker);
+    }
+
+    /// <summary>True when blocker's damage step kills attacker. Deathtouch
+    /// shortcuts to any non-zero damage. First-strike asymmetry: if attacker
+    /// first-strikes and blocker doesn't, attacker's FS damage step happens
+    /// first; if it would kill the blocker, the blocker never reaches the
+    /// regular damage step and can't deal damage at all.</summary>
+    private static bool CanKill(Creature blocker, Creature attacker, bool attackerDeathtouch)
+    {
+        if (Majik.Core.Combat.CombatAbilities.HasIndestructible(attacker)) return false;
+
+        var atkFirstStrike = Majik.Core.Combat.CombatAbilities.HasFirstStrike(attacker)
+                              || Majik.Core.Combat.CombatAbilities.HasDoubleStrike(attacker);
+        var blockerFirstStrike = Majik.Core.Combat.CombatAbilities.HasFirstStrike(blocker)
+                                  || Majik.Core.Combat.CombatAbilities.HasDoubleStrike(blocker);
+        if (atkFirstStrike && !blockerFirstStrike)
+        {
+            // Attacker damages blocker first; if lethal, blocker never deals damage.
+            var atkDealsLethal = attackerDeathtouch || attacker.Power >= blocker.Toughness;
+            if (atkDealsLethal && !Majik.Core.Combat.CombatAbilities.HasIndestructible(blocker)) return false;
+        }
+
+        if (Majik.Core.Combat.CombatAbilities.HasDeathtouch(blocker) && blocker.Power > 0) return true;
+        return blocker.Power >= attacker.Toughness;
+    }
+
+    /// <summary>Picks the smallest set of blockers whose combined power kills
+    /// the attacker. Returns null when no legal gang exists.</summary>
+    private static List<Creature>? PickGangBlock(
+        List<Creature> available, Creature atk,
+        bool atkFirstStrike, bool atkDeathtouch,
+        int minSize, int defenderLife, int incomingDamage)
+    {
+        var pool = available
+            .OrderBy(b => Cmc(b))       // cheapest first — minimise loss
+            .ThenBy(b => b.Power)
+            .ToList();
+        if (pool.Count < minSize) return null;
+
+        // Deathtouch on attacker means ANY damage from attacker kills its
+        // blocker. So all gang blockers die regardless of their toughness.
+        // Greedy: take smallest blockers whose combined power ≥ attacker
+        // toughness.
+        var picked = new List<Creature>();
+        var combinedPower = 0;
+        foreach (var b in pool)
+        {
+            picked.Add(b);
+            combinedPower += b.Power;
+            if (combinedPower >= atk.Toughness && picked.Count >= minSize) break;
+        }
+        return combinedPower >= atk.Toughness && picked.Count >= minSize ? picked : null;
+    }
+
+    /// <summary>Gang-block is worth it if the lost blockers' combined CMC is
+    /// less than the attacker's CMC, OR if we'd otherwise die.</summary>
+    private static bool ShouldGang(Creature atk, List<Creature> gang, bool atkTrample, bool lethalIncoming)
+    {
+        if (lethalIncoming) return true;
+        if (atkTrample) return false;     // trample punishes gang-blocks
+        var gangCmc = gang.Sum(b => Cmc(b));
+        return gangCmc <= Cmc(atk);
     }
 
     public Task<IReadOnlyList<ICard>> ChooseCardsToBottomAsync(
