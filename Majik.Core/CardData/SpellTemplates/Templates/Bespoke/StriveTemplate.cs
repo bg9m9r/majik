@@ -100,12 +100,38 @@ public sealed class StriveTemplate : ISpellTemplate
         // Compile-time path: TryExtractParams takes the NORMALIZED text
         // (Strive prefix already stripped). We can't detect Strive from
         // post-strip text alone — that signal lives on RawText. The
-        // pre-compile pipeline therefore can't precompile Strive cards;
-        // they bind via the live registry walk in TryBind above. Returning
-        // null here keeps Strive cards out of the compiled-template table
-        // (the live path is fast enough at this volume).
+        // string overload returns null; the SpellBindContext overload
+        // below sees ctx.RawText and produces an EmptyParams hit so the
+        // compiled-template table records Strive cards.
         return null;
     }
+
+    /// <summary>
+    /// Context-aware compile-time detection. Reads
+    /// <see cref="SpellBindContext.RawText"/> (pre-normalize) so the Strive
+    /// prefix is visible — the string overload above sees only the
+    /// post-normalize text, which already has the prefix stripped.
+    ///
+    /// Returns <see cref="EmptyParams.Instance"/> on match: the inner
+    /// effect binding happens at <see cref="Rehydrate"/> time, where the
+    /// live registry walk requires <see cref="SpellBindContext.Caster"/>
+    /// and other runtime services that aren't available at compile time.
+    /// </summary>
+    public IReadOnlyDictionary<string, string>? TryExtractParams(SpellBindContext ctx)
+    {
+        ArgumentNullException.ThrowIfNull(ctx);
+        return StrivePrefix.IsMatch(ctx.RawText) ? EmptyParams.Instance : null;
+    }
+
+    /// <summary>
+    /// Rehydrate from the compiled-template fast path. Strive's inner
+    /// binding depends on the live registry + caster, so we delegate to
+    /// <see cref="TryBind"/>. Throws when TryBind fails so a mis-wired
+    /// fast-path is loud rather than silent.
+    /// </summary>
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
+        TryBind(ctx) ?? throw new InvalidOperationException(
+            $"Strive Rehydrate could not bind '{ctx.Entity.Name}' — TryBind returned null.");
 
     /// <summary>
     /// Walk the registry against the post-strip text. The current

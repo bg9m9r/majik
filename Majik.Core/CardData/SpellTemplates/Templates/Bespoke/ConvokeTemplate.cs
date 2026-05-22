@@ -104,4 +104,27 @@ public sealed class ConvokeTemplate : ISpellTemplate
         // bot to never try this card.
         return SpellDefinition.Vanilla(_ => Array.Empty<IEffect>());
     }
+
+    /// <summary>
+    /// Context-aware compile-time detection — anchors on
+    /// <see cref="SpellBindContext.RawText"/> because the
+    /// <see cref="OracleTextNormalizer"/> strips the Convoke reminder from
+    /// <see cref="SpellBindContext.Text"/>. The string overload (default
+    /// null) keeps the legacy path unchanged.
+    /// </summary>
+    public IReadOnlyDictionary<string, string>? TryExtractParams(SpellBindContext ctx)
+    {
+        ArgumentNullException.ThrowIfNull(ctx);
+        return ConvokePrefix.IsMatch(ctx.RawText) ? EmptyParams.Instance : null;
+    }
+
+    /// <summary>
+    /// Rehydrate from the compiled-template fast path. Inner binding
+    /// requires the live registry + caster, so we delegate to
+    /// <see cref="TryBind"/>. Throws when TryBind returns null so a
+    /// mis-wired fast path surfaces immediately.
+    /// </summary>
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
+        TryBind(ctx) ?? throw new InvalidOperationException(
+            $"Convoke Rehydrate could not bind '{ctx.Entity.Name}' — TryBind returned null.");
 }

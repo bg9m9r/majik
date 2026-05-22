@@ -80,17 +80,28 @@ public sealed class BloodForBonesTemplate : ISpellTemplate
     public string Name => "BloodForBones";
     public BotIntent Intent => BotIntent.Reanimate;
 
+    private static bool Detect(string raw, string text) =>
+        SacrificeCostHelpers.SacCreaturePrefix.IsMatch(raw) &&
+        Regex.IsMatch(text,
+            @"return\s+a\s+creature\s+card\s+from\s+your\s+graveyard\s+to\s+the\s+battlefield",
+            RegexOptions.IgnoreCase) &&
+        Regex.IsMatch(text,
+            @"return\s+another\s+creature\s+card\s+from\s+your\s+graveyard\s+to\s+your\s+hand",
+            RegexOptions.IgnoreCase);
+
+    public IReadOnlyDictionary<string, string>? TryExtractParams(SpellBindContext ctx)
+    {
+        ArgumentNullException.ThrowIfNull(ctx);
+        return Detect(ctx.RawText, ctx.Text) ? EmptyParams.Instance : null;
+    }
+
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
+        TryBind(ctx) ?? throw new InvalidOperationException(
+            $"BloodForBones Rehydrate could not bind '{ctx.Entity.Name}'.");
+
     public SpellDefinition? TryBind(SpellBindContext ctx)
     {
-        if (!SacrificeCostHelpers.SacCreaturePrefix.IsMatch(ctx.RawText)) return null;
-        if (!Regex.IsMatch(ctx.Text,
-            @"return\s+a\s+creature\s+card\s+from\s+your\s+graveyard\s+to\s+the\s+battlefield",
-            RegexOptions.IgnoreCase))
-            return null;
-        if (!Regex.IsMatch(ctx.Text,
-            @"return\s+another\s+creature\s+card\s+from\s+your\s+graveyard\s+to\s+your\s+hand",
-            RegexOptions.IgnoreCase))
-            return null;
+        if (!Detect(ctx.RawText, ctx.Text)) return null;
 
         var caster = ctx.Caster;
         return new SpellDefinition(
@@ -127,12 +138,24 @@ public sealed class InfernalPlungeTemplate : ISpellTemplate
     public string Name => "InfernalPlunge";
     public BotIntent Intent => BotIntent.Ramp;
 
+    // Strict "Add {R}{R}{R}." match — Infernal Plunge is uniquely 3 red.
+    private static bool Detect(string raw, string text) =>
+        SacrificeCostHelpers.SacCreaturePrefix.IsMatch(raw) &&
+        Regex.IsMatch(text, @"^\s*add\s+\{r\}\{r\}\{r\}\.\s*$", RegexOptions.IgnoreCase);
+
+    public IReadOnlyDictionary<string, string>? TryExtractParams(SpellBindContext ctx)
+    {
+        ArgumentNullException.ThrowIfNull(ctx);
+        return Detect(ctx.RawText, ctx.Text) ? EmptyParams.Instance : null;
+    }
+
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
+        TryBind(ctx) ?? throw new InvalidOperationException(
+            $"InfernalPlunge Rehydrate could not bind '{ctx.Entity.Name}'.");
+
     public SpellDefinition? TryBind(SpellBindContext ctx)
     {
-        if (!SacrificeCostHelpers.SacCreaturePrefix.IsMatch(ctx.RawText)) return null;
-        // Strict "Add {R}{R}{R}." match — Infernal Plunge is uniquely 3 red.
-        if (!Regex.IsMatch(ctx.Text, @"^\s*add\s+\{r\}\{r\}\{r\}\.\s*$", RegexOptions.IgnoreCase))
-            return null;
+        if (!Detect(ctx.RawText, ctx.Text)) return null;
 
         var caster = ctx.Caster;
         return new SpellDefinition(
@@ -164,6 +187,20 @@ public sealed class FlingLikeTemplate : ISpellTemplate
     public int Priority => 95;
     public string Name => "FlingLike";
     public BotIntent Intent => BotIntent.Burn | BotIntent.Reach;
+
+    private static bool Detect(string raw, string text) =>
+        SacrificeCostHelpers.SacCreaturePrefix.IsMatch(raw) &&
+        (DamageAnyTargetPattern.IsMatch(text) || DamageTargetPlayerOrPwPattern.IsMatch(text));
+
+    public IReadOnlyDictionary<string, string>? TryExtractParams(SpellBindContext ctx)
+    {
+        ArgumentNullException.ThrowIfNull(ctx);
+        return Detect(ctx.RawText, ctx.Text) ? EmptyParams.Instance : null;
+    }
+
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
+        TryBind(ctx) ?? throw new InvalidOperationException(
+            $"FlingLike Rehydrate could not bind '{ctx.Entity.Name}'.");
 
     public SpellDefinition? TryBind(SpellBindContext ctx)
     {
@@ -210,13 +247,32 @@ public sealed class IchorExplosionTemplate : ISpellTemplate
     public string Name => "IchorExplosion";
     public BotIntent Intent => BotIntent.Removal;
 
+    // NOTE: Detect intentionally does NOT require ctx.Effects (offline
+    // compile has no Effects service). The Effects gate is enforced in
+    // CanBind below, which both the live TryBind and the compiled fast
+    // path consult — so a row gets persisted even though Rehydrate at a
+    // vanilla-cast site would be rejected.
+    private static bool Detect(string raw, string text) =>
+        SacrificeCostHelpers.SacCreaturePrefix.IsMatch(raw) &&
+        Regex.IsMatch(text,
+            @"all\s+creatures\s+get\s+-x/-x\s+until\s+end\s+of\s+turn,\s+where\s+x\s+is\s+the\s+sacrificed\s+creature'?s\s+power",
+            RegexOptions.IgnoreCase);
+
+    public bool CanBind(SpellBindContext ctx) => ctx.Effects is not null;
+
+    public IReadOnlyDictionary<string, string>? TryExtractParams(SpellBindContext ctx)
+    {
+        ArgumentNullException.ThrowIfNull(ctx);
+        return Detect(ctx.RawText, ctx.Text) ? EmptyParams.Instance : null;
+    }
+
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
+        TryBind(ctx) ?? throw new InvalidOperationException(
+            $"IchorExplosion Rehydrate could not bind '{ctx.Entity.Name}'.");
+
     public SpellDefinition? TryBind(SpellBindContext ctx)
     {
-        if (!SacrificeCostHelpers.SacCreaturePrefix.IsMatch(ctx.RawText)) return null;
-        if (!Regex.IsMatch(ctx.Text,
-            @"all\s+creatures\s+get\s+-x/-x\s+until\s+end\s+of\s+turn,\s+where\s+x\s+is\s+the\s+sacrificed\s+creature'?s\s+power",
-            RegexOptions.IgnoreCase))
-            return null;
+        if (!Detect(ctx.RawText, ctx.Text)) return null;
         if (ctx.Effects is null) return null;
 
         var effects = ctx.Effects;
@@ -259,16 +315,32 @@ public sealed class LifesLegacyTemplate : ISpellTemplate
     public string Name => "LifesLegacy";
     public BotIntent Intent => BotIntent.Draw;
 
-    public SpellDefinition? TryBind(SpellBindContext ctx)
+    private static (bool drawOnly, bool drawAndGain) Detect(string raw, string text)
     {
-        if (!SacrificeCostHelpers.SacCreaturePrefix.IsMatch(ctx.RawText)) return null;
-
-        bool drawOnly = Regex.IsMatch(ctx.Text,
+        if (!SacrificeCostHelpers.SacCreaturePrefix.IsMatch(raw)) return (false, false);
+        var drawOnly = Regex.IsMatch(text,
             @"^\s*draw\s+cards\s+equal\s+to\s+the\s+sacrificed\s+creature'?s\s+power\.\s*$",
             RegexOptions.IgnoreCase);
-        bool drawAndGain = Regex.IsMatch(ctx.Text,
+        var drawAndGain = Regex.IsMatch(text,
             @"you\s+draw\s+cards\s+equal\s+to\s+the\s+sacrificed\s+creature'?s\s+power,\s+then\s+you\s+gain\s+life\s+equal\s+to\s+its\s+toughness",
             RegexOptions.IgnoreCase);
+        return (drawOnly, drawAndGain);
+    }
+
+    public IReadOnlyDictionary<string, string>? TryExtractParams(SpellBindContext ctx)
+    {
+        ArgumentNullException.ThrowIfNull(ctx);
+        var (a, b) = Detect(ctx.RawText, ctx.Text);
+        return a || b ? EmptyParams.Instance : null;
+    }
+
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
+        TryBind(ctx) ?? throw new InvalidOperationException(
+            $"LifesLegacy Rehydrate could not bind '{ctx.Entity.Name}'.");
+
+    public SpellDefinition? TryBind(SpellBindContext ctx)
+    {
+        var (drawOnly, drawAndGain) = Detect(ctx.RawText, ctx.Text);
         if (!drawOnly && !drawAndGain) return null;
 
         var caster = ctx.Caster;
@@ -311,13 +383,25 @@ public sealed class TormentedThoughtsTemplate : ISpellTemplate
     public string Name => "TormentedThoughts";
     public BotIntent Intent => BotIntent.Discard;
 
+    private static bool Detect(string raw, string text) =>
+        SacrificeCostHelpers.SacCreaturePrefix.IsMatch(raw) &&
+        Regex.IsMatch(text,
+            @"target\s+player\s+discards\s+a\s+number\s+of\s+cards\s+equal\s+to\s+the\s+sacrificed\s+creature'?s\s+power",
+            RegexOptions.IgnoreCase);
+
+    public IReadOnlyDictionary<string, string>? TryExtractParams(SpellBindContext ctx)
+    {
+        ArgumentNullException.ThrowIfNull(ctx);
+        return Detect(ctx.RawText, ctx.Text) ? EmptyParams.Instance : null;
+    }
+
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
+        TryBind(ctx) ?? throw new InvalidOperationException(
+            $"TormentedThoughts Rehydrate could not bind '{ctx.Entity.Name}'.");
+
     public SpellDefinition? TryBind(SpellBindContext ctx)
     {
-        if (!SacrificeCostHelpers.SacCreaturePrefix.IsMatch(ctx.RawText)) return null;
-        if (!Regex.IsMatch(ctx.Text,
-            @"target\s+player\s+discards\s+a\s+number\s+of\s+cards\s+equal\s+to\s+the\s+sacrificed\s+creature'?s\s+power",
-            RegexOptions.IgnoreCase))
-            return null;
+        if (!Detect(ctx.RawText, ctx.Text)) return null;
 
         var resolver = ctx.Resolver;
         return new SpellDefinition(
@@ -358,13 +442,29 @@ public sealed class HatredTemplate : ISpellTemplate
     public string Name => "Hatred";
     public BotIntent Intent => BotIntent.Buff;
 
+    // Detect doesn't require ctx.Effects so the offline compile can
+    // persist a row; live-bind / Rehydrate still gate on Effects.
+    private static bool Detect(string raw, string text) =>
+        SacrificeCostHelpers.PayXLifePrefix.IsMatch(raw) &&
+        Regex.IsMatch(text,
+            @"target\s+creature\s+gets\s+\+x/\+0\s+until\s+end\s+of\s+turn",
+            RegexOptions.IgnoreCase);
+
+    public bool CanBind(SpellBindContext ctx) => ctx.Effects is not null;
+
+    public IReadOnlyDictionary<string, string>? TryExtractParams(SpellBindContext ctx)
+    {
+        ArgumentNullException.ThrowIfNull(ctx);
+        return Detect(ctx.RawText, ctx.Text) ? EmptyParams.Instance : null;
+    }
+
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
+        TryBind(ctx) ?? throw new InvalidOperationException(
+            $"Hatred Rehydrate could not bind '{ctx.Entity.Name}'.");
+
     public SpellDefinition? TryBind(SpellBindContext ctx)
     {
-        if (!SacrificeCostHelpers.PayXLifePrefix.IsMatch(ctx.RawText)) return null;
-        if (!Regex.IsMatch(ctx.Text,
-            @"target\s+creature\s+gets\s+\+x/\+0\s+until\s+end\s+of\s+turn",
-            RegexOptions.IgnoreCase))
-            return null;
+        if (!Detect(ctx.RawText, ctx.Text)) return null;
         if (ctx.Effects is null) return null;
 
         var resolver = ctx.Resolver;

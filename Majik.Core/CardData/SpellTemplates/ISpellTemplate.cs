@@ -79,6 +79,25 @@ public interface ISpellTemplate
     IReadOnlyDictionary<string, string>? TryExtractParams(string oracleText) => null;
 
     /// <summary>
+    /// Context-aware overload of <see cref="TryExtractParams(string)"/>.
+    /// Default impl delegates to the string overload using
+    /// <see cref="SpellBindContext.Text"/> (post-<see cref="OracleTextNormalizer"/>),
+    /// preserving the existing contract for every template that only
+    /// looks at the normalized effect text.
+    ///
+    /// Templates whose detection needs the un-normalized
+    /// <see cref="SpellBindContext.RawText"/> — e.g. leading-keyword
+    /// detectors like Strive / Convoke or additional-cost prefixes —
+    /// override this overload so the offline compile pipeline can see
+    /// the same signal as the live binder.
+    /// </summary>
+    IReadOnlyDictionary<string, string>? TryExtractParams(SpellBindContext ctx)
+    {
+        ArgumentNullException.ThrowIfNull(ctx);
+        return TryExtractParams(ctx.Text);
+    }
+
+    /// <summary>
     /// Given parameters previously produced by
     /// <see cref="TryExtractParams"/> (possibly round-tripped through
     /// JSON storage) and a live <see cref="SpellBindContext"/>, build the
