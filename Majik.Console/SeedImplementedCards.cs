@@ -154,5 +154,11 @@ public static class SeedImplementedCards
         // ContinuousEffectsService is plumbed through (CR 613).
         // Prowess: whenever you cast a noncreature spell, +1/+1 EOT.
         "Monastery Swiftspear",
+
+        // Sorcery — {R} (DealsNDamageEachOpponentTemplate).
+        // "~ deals 3 damage to each opponent" loops ChosenSpellParams.AllPlayers
+        // minus the caster and applies LoseLife. Works in production now that
+        // SpellCastFlow plumbs AllPlayers through.
+        "Boltwave",
     };
 }
