@@ -18,4 +18,5 @@ public sealed record ZoneMoveIntent(
     ZoneType FromZone,
     ZoneType ToZone,
     Player? Controller = null,
-    bool EntersTapped = false);
+    bool EntersTapped = false,
+    int PlusOneCountersOnEnter = 0);

@@ -72,6 +72,15 @@ public class ZoneService
             {
                 permanent.Tap();
             }
+            // CR 614.1d — ETB-counter replacement effects accumulated their
+            // amount onto the intent; apply now after the permanent has
+            // landed so SBAs (Rule 704.5f) see the correct power/toughness.
+            if (intent.PlusOneCountersOnEnter > 0)
+            {
+                permanent.Counters.Add(
+                    Majik.Core.Counters.CounterType.PlusOnePlusOne,
+                    intent.PlusOneCountersOnEnter);
+            }
         }
         else if (finalToZone is ZoneType.Hand or ZoneType.Library
                  or ZoneType.Graveyard or ZoneType.Exile)
