@@ -243,4 +243,107 @@ public class HeuristicBotAgentIntentTests
 
         bot.ManaHoldReserveForTests(NewCtx()).Should().Be(0);
     }
+
+    // ----- SequencingBonus intent bias (Task 11) -----
+
+    [Fact]
+    public void Sequencing_Ramp_AcceleratedWhenManaLight()
+    {
+        // 2 lands in play (< 4) → Ramp gets +4 bonus.
+        _self.Zones.Battlefield.AddCard(new Land("Forest") { Owner = _self, Controller = _self });
+        _self.Zones.Battlefield.AddCard(new Land("Forest") { Owner = _self, Controller = _self });
+
+        var sorcery = new Majik.Core.Cards.Sorcery("Rampant Growth", "{1}{G}")
+        { Owner = _self, Controller = _self };
+
+        var bonusRamp = HeuristicBotAgent.SequencingBonusForTests(
+            sorcery, NewCtx(), sorceryWindow: true, BotIntent.Ramp);
+        var bonusNone = HeuristicBotAgent.SequencingBonusForTests(
+            sorcery, NewCtx(), sorceryWindow: true, BotIntent.None);
+
+        (bonusRamp - bonusNone).Should().Be(4);
+    }
+
+    [Fact]
+    public void Sequencing_Ramp_NoBonusWhenManaPlenty()
+    {
+        // 4+ lands in play → Ramp bonus does NOT apply.
+        for (var i = 0; i < 5; i++)
+            _self.Zones.Battlefield.AddCard(new Land($"Forest{i}") { Owner = _self, Controller = _self });
+
+        var sorcery = new Majik.Core.Cards.Sorcery("Rampant Growth", "{1}{G}")
+        { Owner = _self, Controller = _self };
+
+        var bonusRamp = HeuristicBotAgent.SequencingBonusForTests(
+            sorcery, NewCtx(), sorceryWindow: true, BotIntent.Ramp);
+        var bonusNone = HeuristicBotAgent.SequencingBonusForTests(
+            sorcery, NewCtx(), sorceryWindow: true, BotIntent.None);
+
+        bonusRamp.Should().Be(bonusNone);
+    }
+
+    [Fact]
+    public void Sequencing_Removal_PreferredVsFinisher()
+    {
+        // Opp has a 6/6 (Power >= 5) → Removal +5.
+        AddCreature(_opp, "Wurm", 6, 6);
+        var sorcery = new Majik.Core.Cards.Sorcery("Doom Blade", "{1}{B}")
+        { Owner = _self, Controller = _self };
+
+        var bonusRemoval = HeuristicBotAgent.SequencingBonusForTests(
+            sorcery, NewCtx(), sorceryWindow: true, BotIntent.Removal);
+        var bonusNone = HeuristicBotAgent.SequencingBonusForTests(
+            sorcery, NewCtx(), sorceryWindow: true, BotIntent.None);
+
+        (bonusRemoval - bonusNone).Should().Be(5);
+    }
+
+    [Fact]
+    public void Sequencing_Heal_BoostedWhenLifeLow()
+    {
+        var lowSelf = new Player("Self", 4);
+        var ctx = new GameContext(lowSelf, new[] { lowSelf, _opp }, lowSelf,
+            1, PhaseStateType.Main, new Majik.Core.Stack.Stack());
+
+        var sorcery = new Majik.Core.Cards.Sorcery("Healing Salve", "{W}")
+        { Owner = lowSelf, Controller = lowSelf };
+
+        var bonusHeal = HeuristicBotAgent.SequencingBonusForTests(
+            sorcery, ctx, sorceryWindow: true, BotIntent.Heal);
+        var bonusNone = HeuristicBotAgent.SequencingBonusForTests(
+            sorcery, ctx, sorceryWindow: true, BotIntent.None);
+
+        (bonusHeal - bonusNone).Should().Be(4);
+    }
+
+    [Fact]
+    public void Sequencing_Wrath_SuppressedOnEmptyBoard()
+    {
+        // Bot's battlefield has no creatures → Wrath -10 penalty.
+        var sorcery = new Majik.Core.Cards.Sorcery("Wrath of God", "{2}{W}{W}")
+        { Owner = _self, Controller = _self };
+
+        var bonusWrath = HeuristicBotAgent.SequencingBonusForTests(
+            sorcery, NewCtx(), sorceryWindow: true, BotIntent.Wrath);
+        var bonusNone = HeuristicBotAgent.SequencingBonusForTests(
+            sorcery, NewCtx(), sorceryWindow: true, BotIntent.None);
+
+        (bonusWrath - bonusNone).Should().Be(-10);
+    }
+
+    [Fact]
+    public void Sequencing_NoIntent_LegacyBonusUnchanged()
+    {
+        // No intent → bonus path matches today's behaviour: creature with
+        // light board gets +3, sorcery in sorcery-window gets +1, etc.
+        var sorcery = new Majik.Core.Cards.Sorcery("Some Sorcery", "{2}")
+        { Owner = _self, Controller = _self };
+
+        // Empty board → no Creature board-build bonus (this card isn't a creature),
+        // sorcery in sorcery window → +1.
+        var bonus = HeuristicBotAgent.SequencingBonusForTests(
+            sorcery, NewCtx(), sorceryWindow: true, BotIntent.None);
+
+        bonus.Should().Be(1);
+    }
 }

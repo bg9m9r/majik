@@ -171,8 +171,9 @@ public sealed class HeuristicBotAgent : IPlayerAgent
                     ? ManaHoldReserve(ctx) : 0;
                 if (CanAffordWithReserve(ctx.Self, printedCost, reserve))
                 {
+                    var intent = _cardRepository?.IntentFor(card.Name) ?? BotIntent.None;
                     bids.Add((card, printedCost, null, printedCost.TotalValue
-                        + SequencingBonus(card, ctx, sorceryWindow)));
+                        + SequencingBonus(card, ctx, sorceryWindow, intent)));
                 }
                 // Alt-cost bids prefer the cheapest alt that is strictly
                 // cheaper than the printed cost (else stick with printed
@@ -296,17 +297,37 @@ public sealed class HeuristicBotAgent : IPlayerAgent
     ///   can't cast them later this turn).
     /// Net effect: highest-CMC affordable still wins most ties; the
     /// bonuses kick in for same-CMC pairs.</summary>
-    private static int SequencingBonus(ICard card, GameContext ctx, bool sorceryWindow)
+    /// <summary>Test-only entry point. Production callers go through the
+    /// priority bid loop; this surface exists so intent-bias rules can be
+    /// asserted in isolation.</summary>
+    internal static int SequencingBonusForTests(ICard card, GameContext ctx, bool sorceryWindow, BotIntent intent)
+        => SequencingBonus(card, ctx, sorceryWindow, intent);
+
+    private static int SequencingBonus(ICard card, GameContext ctx, bool sorceryWindow, BotIntent intent)
     {
         var bonus = 0;
         var ourCreatures = ctx.Self.Zones.Battlefield.GetCards()
             .OfType<Creature>().Count();
+        var ourLands = ctx.Self.Zones.Battlefield.GetCards()
+            .OfType<Land>().Count();
+        var opp = ctx.AllPlayers.FirstOrDefault(p => !ReferenceEquals(p, ctx.Self));
+        var oppHasFinisher = opp != null && opp.Zones.Battlefield.GetCards()
+            .OfType<Creature>().Any(c => c.Power >= 5);
+
         if (card.HasType(CardType.Creature) && ourCreatures < 2) bonus += 3;
         if (sorceryWindow)
         {
             if (card.HasType(CardType.Sorcery)) bonus += 1;
             if (card.HasType(CardType.Instant)) bonus -= 1;
         }
+
+        // Intent bias. No-ops when intent is None — legacy bonus shape preserved
+        // for unannotated / pre-classifier cards.
+        if (intent.HasAny(BotIntent.Ramp) && ourLands < 4) bonus += 4;
+        if (intent.HasAny(BotIntent.Removal) && oppHasFinisher) bonus += 5;
+        if (intent.HasAny(BotIntent.Heal) && ctx.Self.LifeTotal <= 8) bonus += 4;
+        if (intent.HasAny(BotIntent.Wrath) && ourCreatures == 0) bonus -= 10;
+
         return bonus;
     }
 
