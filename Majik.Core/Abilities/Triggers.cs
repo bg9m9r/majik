@@ -39,6 +39,22 @@ public static class Triggers
     }
 
     /// <summary>
+    /// "Whenever another creature you control enters" — fires on a creature
+    /// other than <paramref name="self"/> entering the battlefield under
+    /// <paramref name="controller"/>. Models the Soul Warden / Guide of
+    /// Souls / Soul Attendant family.
+    /// </summary>
+    public static ITriggerCondition OnAnotherCreatureYouControlEnters(
+        Player controller, ICard self)
+    {
+        return new EventTriggerCondition<CardMovedEvent>(
+            (e, _) => e.ToZone == ZoneType.Battlefield
+                   && e.Card.HasType(CardType.Creature)
+                   && !ReferenceEquals(e.Card, self)
+                   && ReferenceEquals(e.Card.Controller, controller));
+    }
+
+    /// <summary>
     /// "When ~ dies" — creature moving from battlefield to graveyard (Rule 700.4).
     /// </summary>
     public static ITriggerCondition OnDies(ICard source)

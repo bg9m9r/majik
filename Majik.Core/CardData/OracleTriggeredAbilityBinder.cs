@@ -255,7 +255,7 @@ public static class OracleTriggeredAbilityBinder
             if (effects.Count == 0) continue;
             yield return new TriggeredAbility(
                 source, ctrl,
-                Triggers.OnAnyCreatureEntersBattlefield(),
+                Triggers.OnAnotherCreatureYouControlEnters(ctrl, source),
                 effects: effects);
         }
     }
