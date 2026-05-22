@@ -111,6 +111,33 @@ public static class NamedCardFactory
             // Loyalty abilities (+1, -2, -5) wired by OracleLoyaltyAbilityBinder.
             "Grist, the Hunger Tide" => GristFactory.Create(owner),
 
+            // U/R Horizon Canopy painless dual — Modern Horizons (FieryIsletFactory).
+            // {T}, Pay 1 life: Add {U} or {R} — two ManaAbility instances, each with
+            // a life-cost activation gate (CR 119.4) and a LoseLife side-effect.
+            // {1}, {T}, Sacrifice this land: Draw a card — wired.
+            // Sacrifice-cost zone movement deferred (see HorizonLandBinder.AttachSacDraw).
+            "Fiery Islet" => FieryIsletFactory.Create(owner),
+
+            // R/W Horizon Canopy painless dual — Modern Horizons (SunbakedCanyonFactory).
+            // Same shape as Fiery Islet; only colour differs.
+            "Sunbaked Canyon" => SunbakedCanyonFactory.Create(owner),
+
+            // U/R surveil land — Foundations (ThunderingFallsFactory).
+            // {T}: Add {U} or {R} — two ManaAbility instances wired.
+            // ETB trigger: surveil 1 — default-all-graveyard decision wired.
+            // ETB-tapped + surveil player prompt deferred (mirrors Underground Mortuary).
+            "Thundering Falls" => ThunderingFallsFactory.Create(owner),
+
+            // R/W surveil land — Foundations (ElegantParlorFactory).
+            // Same shape as Thundering Falls; only colour differs.
+            "Elegant Parlor" => ElegantParlorFactory.Create(owner),
+
+            // R/W fastland — Kaladesh (InspiringVantageFactory).
+            // {T}: Add {R} or {W} — two ManaAbility instances wired.
+            // ETB-tapped-unless-two-or-fewer-other-lands handled via
+            // ConditionalEntersTappedBinder in the production load path.
+            "Inspiring Vantage" => InspiringVantageFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
