@@ -33,6 +33,7 @@ public sealed class PopulateTemplate : ISpellTemplate
 
     public int Priority => 60;
     public string Name => "Populate";
+    public BotIntent Intent => BotIntent.Token;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);

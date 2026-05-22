@@ -29,6 +29,7 @@ public sealed class SameNamePumpTemplate : ISpellTemplate
 
     public int Priority => 60;
     public string Name => "SameNamePump";
+    public BotIntent Intent => BotIntent.Buff;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);

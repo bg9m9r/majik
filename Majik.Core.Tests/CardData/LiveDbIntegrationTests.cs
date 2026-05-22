@@ -19,7 +19,32 @@ public class LiveDbIntegrationTests
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "Majik", "cards.db");
 
-    private static bool DbAvailable() => File.Exists(DbPath);
+    /// <summary>
+    /// True only when a real Scryfall import lives at <see cref="DbPath"/>.
+    /// File-existence alone isn't enough: other tests (and the test host
+    /// itself when it spins up Majik.Server / CardDbIndexBootstrapper) can
+    /// touch the path and leave an empty SQLite file with no Cards table.
+    /// On CI that empty file fooled the old <c>File.Exists</c> guard into
+    /// running these tests, which then crashed on "no such table: Cards".
+    /// </summary>
+    private static bool DbAvailable()
+    {
+        if (!File.Exists(DbPath)) return false;
+        try
+        {
+            using var conn = new Microsoft.Data.Sqlite.SqliteConnection(
+                $"Data Source={DbPath};Mode=ReadOnly");
+            conn.Open();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText =
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='Cards'";
+            return Convert.ToInt32(cmd.ExecuteScalar()) == 1;
+        }
+        catch
+        {
+            return false;
+        }
+    }
 
     [Fact]
     public void Create_LightningBolt_FromRealDb_HasInstantType()

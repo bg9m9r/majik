@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using Majik.Core.CardData.SpellTemplates;
 using Majik.Core.Game;
 
+using Majik.Core.Cards;
 namespace Majik.Core.CardData.SpellTemplates.Templates.Tokens;
 
 public sealed class CreateFoodTokensTemplate : ISpellTemplate
@@ -12,6 +13,7 @@ public sealed class CreateFoodTokensTemplate : ISpellTemplate
 
     public int Priority => 50;
     public string Name => "CreateFoodTokens";
+    public BotIntent Intent => BotIntent.Token | BotIntent.Heal;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);

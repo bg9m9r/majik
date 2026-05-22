@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using Majik.Core.CardData.SpellTemplates;
 using Majik.Core.Game;
 
+using Majik.Core.Cards;
 namespace Majik.Core.CardData.SpellTemplates.Templates.Resource;
 
 public sealed class YouGainLifeTemplate : ISpellTemplate
@@ -12,6 +13,7 @@ public sealed class YouGainLifeTemplate : ISpellTemplate
 
     public int Priority => 50;
     public string Name => "YouGainLife";
+    public BotIntent Intent => BotIntent.Heal;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);

@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using Majik.Core.Game;
 
+using Majik.Core.Cards;
 namespace Majik.Core.CardData.SpellTemplates.Templates.Counter;
 
 public sealed class CounterUnlessPayTemplate : ISpellTemplate
@@ -11,6 +12,7 @@ public sealed class CounterUnlessPayTemplate : ISpellTemplate
 
     public int Priority => 100;
     public string Name => "CounterUnlessPay";
+    public BotIntent Intent => BotIntent.Counter;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);

@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using Majik.Core.CardData.SpellTemplates;
 using Majik.Core.Game;
 
+using Majik.Core.Cards;
 namespace Majik.Core.CardData.SpellTemplates.Templates.Counters;
 
 public sealed class GrantKeywordTilEotTemplate : ISpellTemplate
@@ -17,6 +18,7 @@ public sealed class GrantKeywordTilEotTemplate : ISpellTemplate
 
     public int Priority => 50;
     public string Name => "GrantKeywordTilEot";
+    public BotIntent Intent => BotIntent.CombatTrick | BotIntent.Buff;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);

@@ -42,6 +42,15 @@ public class DeckBindingAuditTests
             }
         }
 
+        // File-existence alone isn't enough: other tests / the test host can
+        // leave an empty SQLite file at this path with no Cards table. Skip
+        // when the schema isn't populated.
+        if (!HasCardsTable(dbPath))
+        {
+            _out.WriteLine($"cards.db at {dbPath} has no Cards table — skipping audit");
+            return;
+        }
+
         using var db = new CardDbContext();
         var repo = new DbCardRepository(db);
         var synth = new Player("Synth", 20);
@@ -83,5 +92,23 @@ public class DeckBindingAuditTests
             .Distinct()
             .ToList();
         missing.Should().BeEmpty("every bot-deck card must resolve to a DB row");
+    }
+
+    private static bool HasCardsTable(string dbPath)
+    {
+        try
+        {
+            using var conn = new Microsoft.Data.Sqlite.SqliteConnection(
+                $"Data Source={dbPath};Mode=ReadOnly");
+            conn.Open();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText =
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='Cards'";
+            return Convert.ToInt32(cmd.ExecuteScalar()) == 1;
+        }
+        catch
+        {
+            return false;
+        }
     }
 }

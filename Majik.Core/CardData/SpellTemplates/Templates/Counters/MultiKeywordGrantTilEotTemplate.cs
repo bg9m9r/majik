@@ -31,6 +31,7 @@ public sealed class MultiKeywordGrantTilEotTemplate : ISpellTemplate
 
     public int Priority => 55;
     public string Name => "MultiKeywordGrantTilEot";
+    public BotIntent Intent => BotIntent.CombatTrick | BotIntent.Buff;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);

@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using Majik.Core.CardData.SpellTemplates;
 using Majik.Core.Game;
 
+using Majik.Core.Cards;
 namespace Majik.Core.CardData.SpellTemplates.Templates.Resource;
 
 public sealed class EachPlayerDrawsTemplate : ISpellTemplate
@@ -12,6 +13,7 @@ public sealed class EachPlayerDrawsTemplate : ISpellTemplate
 
     public int Priority => 50;
     public string Name => "EachPlayerDraws";
+    public BotIntent Intent => BotIntent.Draw;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);

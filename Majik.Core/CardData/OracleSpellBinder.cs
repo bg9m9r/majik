@@ -235,7 +235,7 @@ public static class OracleSpellBinder
             : JsonSerializer.Deserialize<Dictionary<string, string>>(paramsJson)
               ?? new Dictionary<string, string>();
 
-        return template.Rehydrate(@params, ctx);
+        return template.Rehydrate(@params, ctx).WithIntentStamp(template.Intent);
     }
 
     internal static void MoveToExile(ICard card)

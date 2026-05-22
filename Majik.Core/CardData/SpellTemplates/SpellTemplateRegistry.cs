@@ -24,7 +24,7 @@ public sealed class SpellTemplateRegistry
     {
         foreach (var t in OrderedTemplates)
         {
-            if (t.TryBind(ctx) is { } def) return def;
+            if (t.TryBind(ctx) is { } def) return def.WithIntentStamp(t.Intent);
         }
         return null;
     }

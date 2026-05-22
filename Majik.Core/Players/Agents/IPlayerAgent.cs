@@ -47,9 +47,18 @@ public interface IPlayerAgent
 
     /// <summary>
     /// Pick a mode index for a modal spell or ability.
+    /// <paramref name="modeIntents"/> is parallel to <paramref name="modes"/>
+    /// when populated, carrying each mode's
+    /// <see cref="Majik.Core.Cards.BotIntent"/> from the bound
+    /// <c>SpellDefinition</c>. Empty / mismatched length means the binder
+    /// did not classify per-mode intent; intent-aware agents fall back to
+    /// legacy label scoring in that case.
     /// </summary>
     Task<int> ChooseModeAsync(
-        GameContext ctx, IReadOnlyList<string> modes, CancellationToken ct = default);
+        GameContext ctx,
+        IReadOnlyList<string> modes,
+        IReadOnlyList<BotIntent>? modeIntents = null,
+        CancellationToken ct = default);
 
     /// <summary>
     /// Sub-order the player's own triggers when multiple fired at once

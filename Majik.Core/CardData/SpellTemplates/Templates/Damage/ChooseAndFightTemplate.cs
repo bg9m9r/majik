@@ -30,6 +30,7 @@ public sealed class ChooseAndFightTemplate : ISpellTemplate
 
     public int Priority => 60;
     public string Name => "ChooseAndFight";
+    public BotIntent Intent => BotIntent.Burn;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);

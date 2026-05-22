@@ -29,6 +29,7 @@ public sealed class SelfFightTemplate : ISpellTemplate
 
     public int Priority => 60;
     public string Name => "SelfFight";
+    public BotIntent Intent => BotIntent.Burn;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);

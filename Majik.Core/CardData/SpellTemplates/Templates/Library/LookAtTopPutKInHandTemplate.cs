@@ -3,6 +3,7 @@ using Majik.Core.CardData.SpellTemplates;
 using Majik.Core.Game;
 using Majik.Core.Zones;
 
+using Majik.Core.Cards;
 namespace Majik.Core.CardData.SpellTemplates.Templates.Library;
 
 /// <summary>
@@ -25,6 +26,7 @@ public sealed class LookAtTopPutKInHandTemplate : ISpellTemplate
     // Priority above the single-keep template so the K-keep wording binds first.
     public int Priority => 52;
     public string Name => "LookAtTopPutKInHand";
+    public BotIntent Intent => BotIntent.Cantrip;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);

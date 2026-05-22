@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using Majik.Core.CardData.SpellTemplates;
 using Majik.Core.Game;
 
+using Majik.Core.Cards;
 namespace Majik.Core.CardData.SpellTemplates.Templates.Library;
 
 public sealed class ScrySelfTemplate : ISpellTemplate
@@ -12,6 +13,7 @@ public sealed class ScrySelfTemplate : ISpellTemplate
 
     public int Priority => 60;
     public string Name => "ScrySelf";
+    public BotIntent Intent => BotIntent.Cantrip;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);

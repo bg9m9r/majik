@@ -32,6 +32,7 @@ public sealed class WheelTemplate : ISpellTemplate
 
     public int Priority => 70;
     public string Name => "Wheel";
+    public BotIntent Intent => BotIntent.Draw | BotIntent.Discard;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);

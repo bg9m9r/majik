@@ -171,7 +171,8 @@ public static class CardDataSchemaPatcher
                     TemplateName TEXT NOT NULL,
                     Priority     INTEGER NOT NULL DEFAULT 0,
                     ParamsJson   TEXT NOT NULL DEFAULT '{}',
-                    CompiledAt   INTEGER NOT NULL DEFAULT 0
+                    CompiledAt   INTEGER NOT NULL DEFAULT 0,
+                    Intent       INTEGER NOT NULL DEFAULT 0
                 );";
             await create.ExecuteNonQueryAsync(ct);
         }
@@ -182,6 +183,14 @@ public static class CardDataSchemaPatcher
                 "CREATE INDEX IF NOT EXISTS IX_CompiledSpellTemplates_TemplateName " +
                 "ON CompiledSpellTemplates(TemplateName);";
             await index.ExecuteNonQueryAsync(ct);
+        }
+
+        if (!await ColumnExistsAsync(conn, "CompiledSpellTemplates", "Intent", ct))
+        {
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText =
+                "ALTER TABLE CompiledSpellTemplates ADD COLUMN Intent INTEGER NOT NULL DEFAULT 0";
+            await cmd.ExecuteNonQueryAsync(ct);
         }
     }
 

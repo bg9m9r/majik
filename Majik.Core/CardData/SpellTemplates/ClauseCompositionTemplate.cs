@@ -327,7 +327,8 @@ public sealed class ClauseCompositionTemplate : ISpellTemplate
             }
             IReadOnlyDictionary<string, string> subParams = ec.p ?? new Dictionary<string, string>();
             if (!template.CanBind(ctx)) continue;
-            subs.Add(ComposedSub.OfDefinition(template.Rehydrate(subParams, ctx)));
+            subs.Add(ComposedSub.OfDefinition(
+                template.Rehydrate(subParams, ctx).WithIntentStamp(template.Intent)));
         }
 
         return Compose(subs);

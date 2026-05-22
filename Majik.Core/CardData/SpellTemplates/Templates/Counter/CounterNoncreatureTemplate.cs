@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using Majik.Core.Game;
 
+using Majik.Core.Cards;
 namespace Majik.Core.CardData.SpellTemplates.Templates.Counter;
 
 public sealed class CounterNoncreatureTemplate : ISpellTemplate
@@ -10,6 +11,7 @@ public sealed class CounterNoncreatureTemplate : ISpellTemplate
 
     public int Priority => 50;
     public string Name => "CounterNoncreature";
+    public BotIntent Intent => BotIntent.Counter;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);

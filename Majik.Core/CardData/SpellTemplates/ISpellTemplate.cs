@@ -1,5 +1,6 @@
 // Majik.Core/CardData/SpellTemplates/ISpellTemplate.cs
 using Majik.Core.CardData.Database;
+using Majik.Core.Cards;
 using Majik.Core.Game;
 using Majik.Core.Players;
 
@@ -26,6 +27,16 @@ public interface ISpellTemplate
 
     /// <summary>Stable identifier used in coverage reports and logs.</summary>
     string Name { get; }
+
+    /// <summary>
+    /// Strategic intent for the bot. Templates declare what kind of
+    /// effect they produce; <c>HeuristicBotAgent</c> reads this to pick
+    /// modes / targets / mana-hold decisions without parsing oracle text.
+    /// Default <see cref="BotIntent.None"/> for templates not yet annotated
+    /// — the bot falls back to legacy label sniffing for those cases.
+    /// See <c>docs/superpowers/specs/2026-05-22-bot-intent-classifier-design.md</c>.
+    /// </summary>
+    BotIntent Intent => BotIntent.None;
 
     /// <summary>Return null if this template doesn't match.</summary>
     SpellDefinition? TryBind(SpellBindContext ctx);

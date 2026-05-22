@@ -30,6 +30,7 @@ public sealed class FightTemplate : ISpellTemplate
 
     public int Priority => 60;
     public string Name => "Fight";
+    public BotIntent Intent => BotIntent.Burn;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);

@@ -45,6 +45,7 @@ public sealed class ExpressiveIterationTemplate : ISpellTemplate
 
     public int Priority => 100;
     public string Name => "ExpressiveIteration";
+    public BotIntent Intent => BotIntent.Cantrip | BotIntent.Draw;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);

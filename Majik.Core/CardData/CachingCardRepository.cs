@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using Majik.Core.Cards;
 using Majik.Core.CardData.Database;
 
 namespace Majik.Core.CardData;
@@ -20,6 +21,7 @@ public sealed class CachingCardRepository : ICardRepository
     // when many threads race on the same key. Important for cold-cache
     // bursts (e.g. validator pre-fetching a deck's 60 names in parallel).
     private readonly ConcurrentDictionary<string, Lazy<CardEntity?>> _cache = new();
+    private readonly ConcurrentDictionary<string, Lazy<BotIntent>> _intentCache = new();
 
     public CachingCardRepository(ICardRepository inner)
     {
@@ -67,6 +69,14 @@ public sealed class CachingCardRepository : ICardRepository
         _inner.SetImplemented(name, value);
         // Invalidate the cache entry so subsequent GetByName reflects new flag.
         _cache.TryRemove(name, out _);
+    }
+
+    public BotIntent IntentFor(string cardName)
+    {
+        if (string.IsNullOrWhiteSpace(cardName)) return BotIntent.None;
+        return _intentCache.GetOrAdd(cardName, n => new Lazy<BotIntent>(
+            () => _inner.IntentFor(n),
+            LazyThreadSafetyMode.ExecutionAndPublication)).Value;
     }
 
     /// <summary>For tests/diagnostics: number of distinct keys cached.</summary>

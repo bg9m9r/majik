@@ -31,6 +31,7 @@ public sealed class RevealHandMayChooseTemplate : ISpellTemplate
 
     public int Priority => 95;
     public string Name => "RevealHandMayChoose";
+    public BotIntent Intent => BotIntent.Discard | BotIntent.Removal;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);

@@ -19,6 +19,7 @@ public sealed class ThoughtseizePatternTemplate : ISpellTemplate
 
     public int Priority => 100;
     public string Name => "ThoughtseizePattern";
+    public BotIntent Intent => BotIntent.Discard;
 
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);

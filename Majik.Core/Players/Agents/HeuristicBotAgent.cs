@@ -47,9 +47,20 @@ public sealed class HeuristicBotAgent : IPlayerAgent
     /// </summary>
     private readonly IAlternativeCostProbe? _altCostProbe;
 
-    public HeuristicBotAgent(IAlternativeCostProbe? altCostProbe = null)
+    /// <summary>
+    /// Optional card-data lookup used to read per-card
+    /// <see cref="BotIntent"/> for mana-hold + sequencing decisions. When
+    /// null, the bot falls back to today's heuristics (every instant
+    /// counts as reactive, no intent bias in priority sequencing).
+    /// </summary>
+    private readonly Majik.Core.CardData.ICardRepository? _cardRepository;
+
+    public HeuristicBotAgent(
+        IAlternativeCostProbe? altCostProbe = null,
+        Majik.Core.CardData.ICardRepository? cardRepository = null)
     {
         _altCostProbe = altCostProbe;
+        _cardRepository = cardRepository;
     }
 
     public Task<PriorityAction> ChoosePriorityActionAsync(GameContext ctx, CancellationToken ct = default)
@@ -160,8 +171,9 @@ public sealed class HeuristicBotAgent : IPlayerAgent
                     ? ManaHoldReserve(ctx) : 0;
                 if (CanAffordWithReserve(ctx.Self, printedCost, reserve))
                 {
+                    var intent = _cardRepository?.IntentFor(card.Name) ?? BotIntent.None;
                     bids.Add((card, printedCost, null, printedCost.TotalValue
-                        + SequencingBonus(card, ctx, sorceryWindow)));
+                        + SequencingBonus(card, ctx, sorceryWindow, intent)));
                 }
                 // Alt-cost bids prefer the cheapest alt that is strictly
                 // cheaper than the printed cost (else stick with printed
@@ -227,11 +239,26 @@ public sealed class HeuristicBotAgent : IPlayerAgent
     /// AND opp has an untapped creature that could attack next turn. Zero
     /// otherwise — when opp has no offense or we have no responsive cards
     /// to hold up, all mana is free for sorcery-speed play.</summary>
+    /// <summary>Test-only entry point. Use the public priority loop in
+    /// production — direct invocation is only needed to assert intent-aware
+    /// hold logic in isolation.</summary>
+    internal int ManaHoldReserveForTests(GameContext ctx) => ManaHoldReserve(ctx);
+
     private int ManaHoldReserve(GameContext ctx)
     {
+        // Reactive intent classes — instants worth holding mana for during
+        // a sorcery window. Cantrip / Draw / Ramp instants don't need a
+        // reservation (we'd rather spend the mana now).
+        const BotIntent reactiveMask =
+            BotIntent.Burn | BotIntent.Removal | BotIntent.Counter
+            | BotIntent.CombatTrick | BotIntent.Protection | BotIntent.Bounce;
+
         var instants = ctx.Self.Zones.Hand.GetCards()
             .Where(c => c.HasType(CardType.Instant))
             .Where(c => !_failedThisTurn.Contains(c.InstanceId))
+            .Where(c =>
+                _cardRepository == null
+                || _cardRepository.IntentFor(c.Name).HasAny(reactiveMask))
             .OrderBy(c => Majik.Core.ValueObjects.ManaCost.Parse(c.ManaCost ?? "").TotalValue)
             .ToList();
         if (instants.Count == 0) return 0;
@@ -270,17 +297,37 @@ public sealed class HeuristicBotAgent : IPlayerAgent
     ///   can't cast them later this turn).
     /// Net effect: highest-CMC affordable still wins most ties; the
     /// bonuses kick in for same-CMC pairs.</summary>
-    private static int SequencingBonus(ICard card, GameContext ctx, bool sorceryWindow)
+    /// <summary>Test-only entry point. Production callers go through the
+    /// priority bid loop; this surface exists so intent-bias rules can be
+    /// asserted in isolation.</summary>
+    internal static int SequencingBonusForTests(ICard card, GameContext ctx, bool sorceryWindow, BotIntent intent)
+        => SequencingBonus(card, ctx, sorceryWindow, intent);
+
+    private static int SequencingBonus(ICard card, GameContext ctx, bool sorceryWindow, BotIntent intent)
     {
         var bonus = 0;
         var ourCreatures = ctx.Self.Zones.Battlefield.GetCards()
             .OfType<Creature>().Count();
+        var ourLands = ctx.Self.Zones.Battlefield.GetCards()
+            .OfType<Land>().Count();
+        var opp = ctx.AllPlayers.FirstOrDefault(p => !ReferenceEquals(p, ctx.Self));
+        var oppHasFinisher = opp != null && opp.Zones.Battlefield.GetCards()
+            .OfType<Creature>().Any(c => c.Power >= 5);
+
         if (card.HasType(CardType.Creature) && ourCreatures < 2) bonus += 3;
         if (sorceryWindow)
         {
             if (card.HasType(CardType.Sorcery)) bonus += 1;
             if (card.HasType(CardType.Instant)) bonus -= 1;
         }
+
+        // Intent bias. No-ops when intent is None — legacy bonus shape preserved
+        // for unannotated / pre-classifier cards.
+        if (intent.HasAny(BotIntent.Ramp) && ourLands < 4) bonus += 4;
+        if (intent.HasAny(BotIntent.Removal) && oppHasFinisher) bonus += 5;
+        if (intent.HasAny(BotIntent.Heal) && ctx.Self.LifeTotal <= 8) bonus += 4;
+        if (intent.HasAny(BotIntent.Wrath) && ourCreatures == 0) bonus -= 10;
+
         return bonus;
     }
 
@@ -405,7 +452,15 @@ public sealed class HeuristicBotAgent : IPlayerAgent
     {
         var label = (request.Description ?? "").ToLowerInvariant();
         var opponent = ctx.AllPlayers.FirstOrDefault(p => !ReferenceEquals(p, ctx.Self));
-        var preferSelf = LabelIsBuff(label);
+        // Prefer self-side targets when the request's BotIntent flags a
+        // self-favoring effect (Buff/Heal/Protection/Draw/Cantrip). Fall back
+        // to the legacy label-sniff when no intent was stamped (e.g. older
+        // templates or compiled rows from pre-classifier DBs).
+        var preferSelf = request.Intent.HasAny(
+                             BotIntent.Buff | BotIntent.Heal
+                             | BotIntent.Protection | BotIntent.Draw
+                             | BotIntent.Cantrip)
+                         || (request.Intent == BotIntent.None && LabelIsBuff(label));
 
         // Engine-supplied candidate list takes precedence. Rank them so the
         // "first N" pick is actually the most-impactful N, not the first N
@@ -461,9 +516,16 @@ public sealed class HeuristicBotAgent : IPlayerAgent
         switch (candidate)
         {
             case Player p:
-                // Lethal face if any candidate is opponent at low life.
+                if (preferSelf)
+                {
+                    // Self-favoring effect (Heal, Draw-to-target-player, etc.) —
+                    // self beats opponent regardless of life total.
+                    return ReferenceEquals(p, self) ? 1000 : 0;
+                }
+                // Adversarial effect (Burn/Removal-on-player) — pick the
+                // closest-to-lethal opponent. Lower life = higher score.
                 if (ReferenceEquals(p, opponent)) return 1000 - p.LifeTotal;
-                return preferSelf && ReferenceEquals(p, self) ? 500 : 0;
+                return 0;
 
             case Creature c:
                 var bigThreat = c.Power * 10 + c.Toughness;
@@ -558,9 +620,28 @@ public sealed class HeuristicBotAgent : IPlayerAgent
     ///   + gain life / prevent        — value when our life is low
     ///   + create / put — board-build, valuable when our board is light
     /// Highest-scored index wins. Tie-break: first.</summary>
-    public Task<int> ChooseModeAsync(GameContext ctx, IReadOnlyList<string> modes, CancellationToken ct = default)
+    public Task<int> ChooseModeAsync(
+        GameContext ctx,
+        IReadOnlyList<string> modes,
+        IReadOnlyList<BotIntent>? modeIntents = null,
+        CancellationToken ct = default)
     {
         if (modes.Count == 0) return Task.FromResult(0);
+
+        // Intent-aware path: when the bound SpellDefinition carried a
+        // ModeIntents list parallel to modes, score by intent flags
+        // against the live board / life state. The list may be shorter
+        // than modes when a clause didn't bind to any known template —
+        // we fall back to legacy label sniffing for those entries.
+        var intents = modeIntents;
+        var allIntentsNone = intents == null
+            || intents.Count == 0
+            || intents.All(i => i == BotIntent.None);
+        if (allIntentsNone)
+        {
+            return Task.FromResult(LegacyChooseMode(ctx, modes));
+        }
+
         var opp = ctx.AllPlayers.FirstOrDefault(p => !ReferenceEquals(p, ctx.Self));
         var oppHasCreature = opp != null
             && opp.Zones.Battlefield.GetCards().OfType<Creature>().Any();
@@ -572,24 +653,79 @@ public sealed class HeuristicBotAgent : IPlayerAgent
         var bestScore = int.MinValue;
         for (var i = 0; i < modes.Count; i++)
         {
-            var label = modes[i].ToLowerInvariant();
-            var score = 0;
-            if (oppHasCreature && (label.Contains("destroy")
-                || label.Contains("damage") || label.Contains("exile target creature")
-                || label.Contains("return target creature"))) score += 30;
-            if (label.Contains("counter")) score += oppHasCreature ? 20 : 10;
-            if (label.Contains("draw") || label.Contains("scry")) score += 15;
-            if (label.Contains("search")) score += 12;
-            if (ourLifeLow && (label.Contains("gain") && label.Contains("life")
-                || label.Contains("prevent"))) score += 25;
-            if (ourCreatureCount < 2 && (label.Contains("create")
-                || label.Contains("put") && label.Contains("counter"))) score += 18;
+            var intent = i < intents!.Count ? intents[i] : BotIntent.None;
+            int score;
+            if (intent == BotIntent.None)
+            {
+                // Per-mode fallback: this clause didn't classify; reuse
+                // the legacy label-sniff score so the bot still has
+                // signal even when neighboring modes are intent-tagged.
+                score = LegacyScoreLabel(modes[i], oppHasCreature, ourCreatureCount, ourLifeLow);
+            }
+            else
+            {
+                score = ScoreIntentForState(intent, oppHasCreature, ourCreatureCount, ourLifeLow);
+            }
             // Tiny bias toward earlier modes to break ties (printed order
             // often represents "default" choice).
             score += (modes.Count - i);
             if (score > bestScore) { bestScore = score; bestIdx = i; }
         }
         return Task.FromResult(bestIdx);
+    }
+
+    private int LegacyChooseMode(GameContext ctx, IReadOnlyList<string> modes)
+    {
+        var opp = ctx.AllPlayers.FirstOrDefault(p => !ReferenceEquals(p, ctx.Self));
+        var oppHasCreature = opp != null
+            && opp.Zones.Battlefield.GetCards().OfType<Creature>().Any();
+        var ourCreatureCount = ctx.Self.Zones.Battlefield.GetCards()
+            .OfType<Creature>().Count();
+        var ourLifeLow = ctx.Self.LifeTotal <= 8;
+
+        var bestIdx = 0;
+        var bestScore = int.MinValue;
+        for (var i = 0; i < modes.Count; i++)
+        {
+            var score = LegacyScoreLabel(modes[i], oppHasCreature, ourCreatureCount, ourLifeLow);
+            score += (modes.Count - i);
+            if (score > bestScore) { bestScore = score; bestIdx = i; }
+        }
+        return bestIdx;
+    }
+
+    private static int LegacyScoreLabel(
+        string mode, bool oppHasCreature, int ourCreatureCount, bool ourLifeLow)
+    {
+        var label = mode.ToLowerInvariant();
+        var score = 0;
+        if (oppHasCreature && (label.Contains("destroy")
+            || label.Contains("damage") || label.Contains("exile target creature")
+            || label.Contains("return target creature"))) score += 30;
+        if (label.Contains("counter")) score += oppHasCreature ? 20 : 10;
+        if (label.Contains("draw") || label.Contains("scry")) score += 15;
+        if (label.Contains("search")) score += 12;
+        if (ourLifeLow && (label.Contains("gain") && label.Contains("life")
+            || label.Contains("prevent"))) score += 25;
+        if (ourCreatureCount < 2 && (label.Contains("create")
+            || label.Contains("put") && label.Contains("counter"))) score += 18;
+        return score;
+    }
+
+    private static int ScoreIntentForState(
+        BotIntent intent, bool oppHasCreature, int ourCreatureCount, bool ourLifeLow)
+    {
+        var score = 0;
+        if (intent.HasAny(BotIntent.Removal | BotIntent.Burn | BotIntent.Bounce) && oppHasCreature) score += 30;
+        if (intent.HasAny(BotIntent.Counter)) score += oppHasCreature ? 20 : 10;
+        if (intent.HasAny(BotIntent.Wrath)) score += oppHasCreature ? 35 : -10;
+        if (intent.HasAny(BotIntent.Draw | BotIntent.Cantrip)) score += 15;
+        if (intent.HasAny(BotIntent.Tutor)) score += 12;
+        if (intent.HasAny(BotIntent.Heal) && ourLifeLow) score += 25;
+        if (intent.HasAny(BotIntent.Token) && ourCreatureCount < 2) score += 18;
+        if (intent.HasAny(BotIntent.Ramp)) score += 10;
+        if (intent.HasAny(BotIntent.Reanimate)) score += 12;
+        return score;
     }
 
     public Task<IReadOnlyList<ITriggeredAbility>> OrderTriggersAsync(GameContext ctx, IReadOnlyList<ITriggeredAbility> mine, CancellationToken ct = default)

@@ -93,6 +93,7 @@ public static class CompileTemplatesCommand
                 Priority = winner.Priority,
                 ParamsJson = JsonSerializer.Serialize(winningParams, jsonOpts),
                 CompiledAt = now,
+                Intent = (ulong)winner.Intent,
             });
 
             if (pending.Count >= chunkSize)

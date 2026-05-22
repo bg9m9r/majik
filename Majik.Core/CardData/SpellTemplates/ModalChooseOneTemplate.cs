@@ -105,19 +105,37 @@ public sealed class ModalChooseOneTemplate : ISpellTemplate
                 "ModalChooseOne: failed to deserialize 'modes' payload.");
 
         var modeDefs = new List<SpellDefinition?>();
+        var modeIntents = new List<Majik.Core.Cards.BotIntent>();
         foreach (var clause in clauses)
         {
             var sub = new CardEntity { Name = ctx.Entity.Name, OracleText = clause };
             var subCtx = new SpellBindContext(sub, ctx.Caster, ctx.Resolver,
                 ctx.Effects, ctx.Stack, ctx.Replacements);
             SpellDefinition? def = null;
+            var clauseIntent = Majik.Core.Cards.BotIntent.None;
             foreach (var t in _registry.OrderedTemplates)
             {
                 if (t is ModalChooseOneTemplate) continue; // avoid recursion
                 def = t.TryBind(subCtx);
-                if (def != null) break;
+                if (def != null)
+                {
+                    def = def.WithIntentStamp(t.Intent);
+                    clauseIntent = t.Intent;
+                    // Composer matched: its own Intent is None by design, but
+                    // each composed sub-template stamped its Intent onto the
+                    // sub-clause's TargetRequests. Mode intent = union of
+                    // those, so the modal's per-mode signal reflects the
+                    // full clause's effect set.
+                    if (clauseIntent == Majik.Core.Cards.BotIntent.None)
+                    {
+                        foreach (var req in def.TargetRequests)
+                            clauseIntent |= req.Intent;
+                    }
+                    break;
+                }
             }
             modeDefs.Add(def);
+            modeIntents.Add(clauseIntent);
         }
 
         var pick = @params.TryGetValue("pick", out var pk) ? pk : "one";
@@ -128,6 +146,7 @@ public sealed class ModalChooseOneTemplate : ISpellTemplate
             HasVariableX: modeDefs.Any(d => d?.HasVariableX == true),
             TargetRequests: modeDefs.Where(d => d != null)
                 .SelectMany(d => d!.TargetRequests).ToList(),
+            ModeIntents: modeIntents,
             EffectFactory: p =>
             {
                 // Multi-mode: prefer ModeIndexes when set. Caller supplies a
