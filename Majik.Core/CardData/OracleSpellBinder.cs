@@ -103,6 +103,7 @@ public static class OracleSpellBinder
             new SpellTemplates.Templates.Counters.CreaturesGetPlusCounterTemplate(),
             new SpellTemplates.Templates.Counters.PumpCreatureTemplate(),
             new SpellTemplates.Templates.Counters.DebuffCreatureTemplate(),
+            new SpellTemplates.Templates.Counters.GrantProtectionFromColorTemplate(),
             new SpellTemplates.Templates.Counters.MultiKeywordGrantTilEotTemplate(),
             new SpellTemplates.Templates.Counters.GrantKeywordTilEotTemplate(),
             new SpellTemplates.Templates.Counters.CreaturesYouControlPumpTemplate(),
