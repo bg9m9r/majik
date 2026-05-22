@@ -37,6 +37,7 @@ public sealed class TurnDriver
     private readonly PriorityManager _priorityManager;
     private readonly CombatFlow _combatFlow;
     private readonly Majik.Core.Effects.ContinuousEffectsService? _continuousEffects;
+    private readonly Majik.Core.Effects.ReplacementBus? _replacements;
     private readonly LandDropTracker? _landDropTracker;
     private readonly AdditionalCombatQueue _additionalCombats = new();
     private PhaseStateType _currentPhase;
@@ -70,9 +71,11 @@ public sealed class TurnDriver
         Majik.Core.Effects.ContinuousEffectsService? continuousEffects = null,
         LandDropTracker? landDropTracker = null,
         Majik.Core.Events.IEventBus? eventBus = null,
-        Func<ICard, Player, Majik.Core.Stack.Stack?, Majik.Core.Game.SpellDefinition?>? spellDefinitionResolver = null)
+        Func<ICard, Player, Majik.Core.Stack.Stack?, Majik.Core.Game.SpellDefinition?>? spellDefinitionResolver = null,
+        Majik.Core.Effects.ReplacementBus? replacements = null)
     {
         _continuousEffects = continuousEffects;
+        _replacements = replacements;
         _landDropTracker = landDropTracker;
         _eventBus = eventBus;
         _spellDefResolver = spellDefinitionResolver;
@@ -371,5 +374,9 @@ public sealed class TurnDriver
 
         // 4. "Until end of turn" continuous effects expire (CR 514.2).
         _continuousEffects?.ExpireEndOfTurn();
+
+        // 5. Per-turn replacement shields (Fog, "prevent next N damage")
+        // expire alongside the continuous-effect layer.
+        _replacements?.ExpireEndOfTurn();
     }
 }

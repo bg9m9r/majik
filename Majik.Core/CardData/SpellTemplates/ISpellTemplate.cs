@@ -89,7 +89,8 @@ public sealed record SpellBindContext(
     Player Caster,
     Func<object, object> Resolver,
     Majik.Core.Effects.ContinuousEffectsService? Effects,
-    Majik.Core.Stack.Stack? Stack)
+    Majik.Core.Stack.Stack? Stack,
+    Majik.Core.Effects.ReplacementBus? Replacements = null)
 {
     public string Text => Entity.OracleText ?? string.Empty;
 }

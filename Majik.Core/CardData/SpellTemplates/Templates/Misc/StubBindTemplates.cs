@@ -47,11 +47,27 @@ public sealed class FogTemplate : ISpellTemplate
     public SpellDefinition? TryBind(SpellBindContext ctx) =>
         SpellTemplateBindHelper.DefaultTryBind(this, ctx);
 
+    public bool CanBind(SpellBindContext ctx) => ctx.Replacements != null;
+
     public IReadOnlyDictionary<string, string>? TryExtractParams(string oracleText) =>
         Pattern.IsMatch(oracleText) ? EmptyParams.Instance : null;
 
-    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
-        StubBindHelpers.EmptyEffectSpell(Array.Empty<TargetRequest>());
+    public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx)
+    {
+        var bus = ctx.Replacements!;
+        return new SpellDefinition(
+            Modes: Array.Empty<string>(),
+            HasVariableX: false,
+            TargetRequests: Array.Empty<TargetRequest>(),
+            EffectFactory: _ => new IEffect[] { new Effect("fog", () =>
+            {
+                // CR 615 — register a Layer-7 prevention shield that cancels
+                // every combat damage intent for the rest of the turn. The
+                // shield auto-expires in the cleanup step via
+                // ReplacementBus.ExpireEndOfTurn (IEndOfTurnExpirable hook).
+                bus.Register(new PreventAllCombatDamageShield());
+            }) });
+    }
 }
 
 /// <summary>
