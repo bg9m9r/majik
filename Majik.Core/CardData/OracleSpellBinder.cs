@@ -74,6 +74,7 @@ public static class OracleSpellBinder
             new SpellTemplates.Templates.Resource.YouLoseLifeTemplate(),
             new SpellTemplates.Templates.Resource.EachPlayerDrawsTemplate(),
             new SpellTemplates.Templates.Resource.TargetPlayerLosesLifeTemplate(),
+            new SpellTemplates.Templates.Library.LookAtTopPutKInHandTemplate(),
             new SpellTemplates.Templates.Library.LookAtTopPutOneInHandTemplate(),
             new SpellTemplates.Templates.Library.MillTargetTemplate(),
             new SpellTemplates.Templates.Library.MillSelfTemplate(),

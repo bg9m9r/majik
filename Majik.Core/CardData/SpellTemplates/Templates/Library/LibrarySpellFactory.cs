@@ -245,6 +245,44 @@ internal static class LibrarySpellFactory
             }
         }) });
 
+    /// <summary>
+    /// Generalization of <see cref="LookAtTopPutOneInHandSpell"/> — keep K of
+    /// the top N for the hand instead of 1. v1 stub keeps the topmost K
+    /// deterministically; rest goes to the indicated destination.
+    /// </summary>
+    internal static SpellDefinition LookAtTopPutKInHandSpell(
+        Player caster, int n, int k, ZoneType restDestination) => new(
+        Modes: Array.Empty<string>(), HasVariableX: false,
+        TargetRequests: Array.Empty<TargetRequest>(),
+        EffectFactory: _ => new IEffect[] { new Effect($"impulse {k}/{n} -> {restDestination}", () =>
+        {
+            var library = caster.Zones.Library.GetCards().Take(n).ToList();
+            if (library.Count == 0) return;
+            var kept = Math.Min(k, library.Count);
+            for (var i = 0; i < kept; i++)
+            {
+                var keep = library[i];
+                caster.Zones.Library.RemoveCard(keep);
+                caster.Zones.Hand.AddCard(keep);
+                keep.SetZone(ZoneType.Hand);
+            }
+            for (var i = kept; i < library.Count; i++)
+            {
+                var c = library[i];
+                caster.Zones.Library.RemoveCard(c);
+                if (restDestination == ZoneType.Graveyard)
+                {
+                    caster.Zones.Graveyard.AddCard(c);
+                    c.SetZone(ZoneType.Graveyard);
+                }
+                else
+                {
+                    caster.Zones.Library.AddCard(c);
+                    c.SetZone(ZoneType.Library);
+                }
+            }
+        }) });
+
     // ---------- Primitives ----------
 
     private static void DrawCards_(Player player, int n)
