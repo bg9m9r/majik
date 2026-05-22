@@ -85,7 +85,7 @@ public class HeuristicBotAgentAltCostTests
         var probe = new FixedAltCostProbe(card => card.Name == "Skewer the Critics"
             ? new[] { (IAlternativeCost)new SpectacleAlternativeCost(
                 ManaCost.Parse("R"),
-                caster => _bob.LifeTotal < 20) }
+                new[] { _bob }) }
             : System.Array.Empty<IAlternativeCost>());
 
         var bot = new HeuristicBotAgent(probe);
