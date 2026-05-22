@@ -144,10 +144,16 @@ public sealed class HeuristicBotAgent : IPlayerAgent
 
             if (inHand)
             {
-                // Printed-cost bid (affordable check).
+                // Printed-cost bid (affordable check). Priority is CMC plus
+                // sequencing bonuses: creatures get a board-building bonus
+                // when our battlefield is light on creatures (stabilise
+                // before casting reactive spells). Instants get a small
+                // saved-for-instant-window penalty during sorcery windows
+                // since they'd usually be saved for opp's turn.
                 if (TryPickManaSources(ctx.Self, printedCost) != null)
                 {
-                    bids.Add((card, printedCost, null, printedCost.TotalValue));
+                    bids.Add((card, printedCost, null, printedCost.TotalValue
+                        + SequencingBonus(card, ctx, sorceryWindow)));
                 }
                 // Alt-cost bids prefer the cheapest alt that is strictly
                 // cheaper than the printed cost (else stick with printed
@@ -206,6 +212,29 @@ public sealed class HeuristicBotAgent : IPlayerAgent
         }
 
         return Task.FromResult(PriorityAction.Pass);
+    }
+
+    /// <summary>Sequencing bonus to break CMC ties:
+    /// + Creatures get +3 when our battlefield has &lt; 2 creatures (build
+    ///   board before doing other things).
+    /// + Instants get -1 during sorcery windows (save for opp's turn —
+    ///   the instant-window cast path can fire them reactively).
+    /// + Sorceries get +1 during sorcery windows (use-it-or-lose-it; we
+    ///   can't cast them later this turn).
+    /// Net effect: highest-CMC affordable still wins most ties; the
+    /// bonuses kick in for same-CMC pairs.</summary>
+    private static int SequencingBonus(ICard card, GameContext ctx, bool sorceryWindow)
+    {
+        var bonus = 0;
+        var ourCreatures = ctx.Self.Zones.Battlefield.GetCards()
+            .OfType<Creature>().Count();
+        if (card.HasType(CardType.Creature) && ourCreatures < 2) bonus += 3;
+        if (sorceryWindow)
+        {
+            if (card.HasType(CardType.Sorcery)) bonus += 1;
+            if (card.HasType(CardType.Instant)) bonus -= 1;
+        }
+        return bonus;
     }
 
     private IActivatedAbility? PickActivatedAbility(GameContext ctx)
