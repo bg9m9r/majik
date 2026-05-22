@@ -20,16 +20,25 @@ public sealed class ScryfallCardFactory
     private readonly Majik.Core.Effects.ReplacementBus? _replacements;
     private readonly Majik.Core.Effects.ContinuousEffectsService? _effects;
     private readonly ICompiledSpellTemplateRepository? _compiledRepo;
+    private readonly Majik.Core.Abilities.TriggerManager? _triggers;
+    private readonly Majik.Core.Events.IEventBus? _eventBus;
+    private readonly Majik.Core.Services.ZoneService? _zones;
 
     public ScryfallCardFactory(ICardRepository repo,
         Majik.Core.Effects.ReplacementBus? replacements = null,
         ICompiledSpellTemplateRepository? compiledSpellRepo = null,
-        Majik.Core.Effects.ContinuousEffectsService? effects = null)
+        Majik.Core.Effects.ContinuousEffectsService? effects = null,
+        Majik.Core.Abilities.TriggerManager? triggers = null,
+        Majik.Core.Events.IEventBus? eventBus = null,
+        Majik.Core.Services.ZoneService? zones = null)
     {
         _repo = repo ?? throw new ArgumentNullException(nameof(repo));
         _replacements = replacements;
         _effects = effects;
         _compiledRepo = compiledSpellRepo;
+        _triggers = triggers;
+        _eventBus = eventBus;
+        _zones = zones;
     }
 
     public ICard Create(string name, Player owner)
@@ -135,7 +144,10 @@ public sealed class ScryfallCardFactory
             if (fast is not null) return fast;
         }
 
-        return OracleSpellBinder.Bind(entity, caster, targetResolver, stack);
+        return OracleSpellBinder.Bind(
+            entity, caster, targetResolver,
+            effects: _effects, stack, replacements: _replacements,
+            triggers: _triggers, eventBus: _eventBus, zones: _zones);
     }
 
     private static CardType PickPrimaryType(IReadOnlyList<CardType> types)

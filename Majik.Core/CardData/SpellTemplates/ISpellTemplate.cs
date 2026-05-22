@@ -101,7 +101,10 @@ public sealed record SpellBindContext(
     Func<object, object> Resolver,
     Majik.Core.Effects.ContinuousEffectsService? Effects,
     Majik.Core.Stack.Stack? Stack,
-    Majik.Core.Effects.ReplacementBus? Replacements = null)
+    Majik.Core.Effects.ReplacementBus? Replacements = null,
+    Majik.Core.Abilities.TriggerManager? Triggers = null,
+    Majik.Core.Events.IEventBus? EventBus = null,
+    Majik.Core.Services.ZoneService? Zones = null)
 {
     public string Text => OracleTextNormalizer.Normalize(Entity.OracleText ?? string.Empty);
 }
