@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using FluentAssertions;
+using Majik.Bot.Decks;
 using Majik.Core.CardData;
 using Majik.Core.CardData.Database;
 using Majik.Server.Decks;
@@ -57,8 +58,11 @@ public class MatchEndpointsBotTests : IClassFixture<TestMongoFixture>
         });
 
     /// <summary>Card repo pre-loaded with every card that appears in any
-    /// archetype shipped by <see cref="Majik.Bot.Decks.BotDeckCatalog"/>, plus
-    /// the basic-deck cards used to seed the human creator's deck.</summary>
+    /// archetype shipped by <see cref="BotDeckCatalog"/>, plus the basic-deck
+    /// cards used to seed the human creator's deck. The bot-archetype union
+    /// is derived from <see cref="BotDeckCatalog"/> at fixture build so deck
+    /// list updates don't silently regress this test — adding a card to a
+    /// deck file automatically seeds it here.</summary>
     private static ICardRepository BotTestCardRepo()
     {
         var repo = new FakeCardRepoForMatchTests();
@@ -67,11 +71,19 @@ public class MatchEndpointsBotTests : IClassFixture<TestMongoFixture>
         repo.Add("Mountain", "Basic Land — Mountain");
         repo.Add("Grizzly Bears", "Creature — Bear");
         repo.Add("Hill Giant", "Creature — Giant");
-        // Bot-archetype cards (union across Burn / Prowess / BorosEnergy).
-        repo.Add("Lightning Bolt", "Instant");
-        repo.Add("Monastery Swiftspear", "Creature — Human Monk");
-        repo.Add("Plains", "Basic Land — Plains");
-        repo.Add("Sacred Foundry", "Land — Mountain Plains");
+        foreach (var archetype in BotDeckCatalog.Archetypes)
+        {
+            foreach (var card in BotDeckCatalog.Get(archetype)
+                .Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                if (repo.GetByName(card) != null) continue;
+                // Type-line is opaque to RealDeckLoader's lookup path: it
+                // only checks GetByName presence. A placeholder keeps the
+                // fake repo from synthesizing wrong gameplay shape; real
+                // card data lives in cards.db for production.
+                repo.Add(card, "Card");
+            }
+        }
         return repo;
     }
 
