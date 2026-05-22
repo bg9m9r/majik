@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Authorization;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddMajikEngine();
+builder.Services.AddMajikEngine(builder.Configuration);
 builder.Services.AddMajikAuth(builder.Configuration);
 builder.Services.AddMajikCors(builder.Configuration);
 builder.Services.AddMajikMongo(builder.Configuration);
