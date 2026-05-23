@@ -98,6 +98,96 @@ public class LibraryPickPolicyTests
     }
 
     [Fact]
+    public void Pick_OppHasBigThreat_PrefersRemoval_WhenCtxPassed()
+    {
+        // Opp has a 4/4 in play. Library pick between a vanilla creature
+        // and a removal-shaped instant should snap to removal once we
+        // thread the GameContext (which exposes AllPlayers) through.
+        var scn = new BotTestScenario();
+        for (int i = 0; i < 3; i++) scn.AddLandToBattlefield(scn.Self, "Mountain");
+        scn.AddCreatureToBattlefield(scn.Opponent, "Ogre", power: 4, toughness: 4);
+
+        var bystander = new Creature("Goblin", "{R}", power: 2, toughness: 2);
+        var removal = MakeInstant("Bolt", "{R}", "Destroy");
+
+        var pick = LibraryPickPolicy.Pick(
+            scn.Self,
+            new ICard[] { bystander, removal },
+            "card", ArchetypeWeights.Burn,
+            ctx: scn.Context);
+        pick.Should().BeSameAs(removal);
+    }
+
+    [Fact]
+    public void Pick_NoOppThreat_PrefersDrawWhenLowHand_WhenCtxPassed()
+    {
+        // Opp board empty + own hand size 1 (just the BotTestScenario
+        // default — Self has no cards in hand). Policy should reach for
+        // the card-draw spell over a vanilla creature when LowHand fires.
+        var scn = new BotTestScenario();
+        for (int i = 0; i < 3; i++) scn.AddLandToBattlefield(scn.Self, "Mountain");
+        // Opponent has nothing in play -> OppHasBigThreat = false.
+
+        var bystander = new Creature("Goblin", "{R}", power: 2, toughness: 2);
+        var draw = MakeInstant("Brainstorm", "{U}", "Draw");
+
+        var pick = LibraryPickPolicy.Pick(
+            scn.Self,
+            new ICard[] { bystander, draw },
+            "card", ArchetypeWeights.BorosEnergy,
+            ctx: scn.Context);
+        pick.Should().BeSameAs(draw);
+    }
+
+    [Fact]
+    public void Pick_OppHasBigThreat_AndCtxNull_FallsBackToNeutral()
+    {
+        // Same opp board, but ctx == null -> policy can't read opponent
+        // state and shouldn't snap to removal. Verifies the legacy
+        // call path (LibrarySpellFactory before this PR) still gets the
+        // pre-ctx neutral pick.
+        var scn = new BotTestScenario();
+        for (int i = 0; i < 3; i++) scn.AddLandToBattlefield(scn.Self, "Mountain");
+        scn.AddCreatureToBattlefield(scn.Opponent, "Ogre", power: 4, toughness: 4);
+
+        var creature = new Creature("Cub", "{G}", power: 2, toughness: 2);
+        var removal = MakeInstant("Bolt", "{R}", "Destroy");
+
+        // ctx == null -> ProbeOpponent returns (0, false) -> the OppHasBigThreat
+        // bonus does NOT fire; Burn weights still rate the removal spell
+        // ahead of the creature because of its archetype bias, so we use
+        // BorosEnergy here where the bias is more even.
+        var pick = LibraryPickPolicy.Pick(
+            scn.Self,
+            new ICard[] { creature, removal },
+            "card", ArchetypeWeights.BorosEnergy,
+            ctx: null);
+        // Without opp signal, BorosEnergy weights pick the 2/2 creature
+        // over a single-target removal instant.
+        pick.Should().BeSameAs(creature);
+    }
+
+    [Fact]
+    public void Pick_BoardBehind_PrefersStrongCreature_WhenCtxPassed()
+    {
+        // Self has no creatures; opp has a 3/3. Board-behind + ctx-aware
+        // policy should pick the strong creature over a vanilla 1/1.
+        var scn = new BotTestScenario();
+        for (int i = 0; i < 4; i++) scn.AddLandToBattlefield(scn.Self, "Mountain");
+        scn.AddCreatureToBattlefield(scn.Opponent, "Knight", power: 3, toughness: 3);
+
+        var chump = new Creature("Squire", "{W}", power: 1, toughness: 1);
+        var beater = new Creature("Ogre", "{2}{R}", power: 4, toughness: 4);
+
+        var pick = LibraryPickPolicy.Pick(
+            scn.Self,
+            new ICard[] { chump, beater },
+            "creature card", ArchetypeWeights.BorosEnergy,
+            ctx: scn.Context);
+        pick.Should().BeSameAs(beater);
+    }
+
+    [Fact]
     public void Pick_TieBreaks_ReturnsFirstCandidate()
     {
         // Two identical creatures -> stable tie-break to first.

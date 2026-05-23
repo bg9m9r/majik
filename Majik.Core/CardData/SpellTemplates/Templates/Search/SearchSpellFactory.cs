@@ -14,7 +14,7 @@ internal static class SearchSpellFactory
     internal static SpellDefinition SearchLibrarySpell(Player caster, string kindRaw) => new(
         Modes: Array.Empty<string>(), HasVariableX: false,
         TargetRequests: Array.Empty<TargetRequest>(),
-        EffectFactory: _ => new IEffect[] { new Effect($"tutor {kindRaw}", () =>
+        EffectFactory: p => new IEffect[] { new Effect($"tutor {kindRaw}", () =>
         {
             // CR 701.19a — searches consult the agent. The kind predicate
             // pre-filters the candidate list; the agent picks zero or one.
@@ -38,8 +38,12 @@ internal static class SearchSpellFactory
 
             // TODO: remove sync-over-async once IEffect.Execute becomes async.
             var agent = AgentRegistry.Get(caster);
+            // Thread a GameContext built from ChosenSpellParams.AllPlayers so
+            // LibraryPickPolicy can score against opp board state (4/4 in
+            // play -> prefer removal, board-behind -> prefer creatures).
+            var pickCtx = BuildPickContext(caster, p);
             ICard? pick = agent != null
-                ? agent.ChooseLibraryPickAsync(null, candidates,
+                ? agent.ChooseLibraryPickAsync(pickCtx, candidates,
                     string.IsNullOrEmpty(kindRaw) ? "card" : kindRaw + " card")
                     .GetAwaiter().GetResult()
                 : candidates[0];
@@ -60,7 +64,7 @@ internal static class SearchSpellFactory
         Player caster, string kindRaw, bool tapped) => new(
         Modes: Array.Empty<string>(), HasVariableX: false,
         TargetRequests: Array.Empty<TargetRequest>(),
-        EffectFactory: _ => new IEffect[] { new Effect($"tutor land -> battlefield{(tapped ? " tapped" : "")}", () =>
+        EffectFactory: p => new IEffect[] { new Effect($"tutor land -> battlefield{(tapped ? " tapped" : "")}", () =>
         {
             bool Pred(ICard c)
             {
@@ -74,8 +78,9 @@ internal static class SearchSpellFactory
             if (candidates.Count == 0) return;
 
             var agent = AgentRegistry.Get(caster);
+            var pickCtx = BuildPickContext(caster, p);
             ICard? pick = agent != null
-                ? agent.ChooseLibraryPickAsync(null, candidates,
+                ? agent.ChooseLibraryPickAsync(pickCtx, candidates,
                     kindRaw.Contains("basic", StringComparison.OrdinalIgnoreCase)
                         ? "basic land card" : "land card")
                     .GetAwaiter().GetResult()
@@ -131,8 +136,9 @@ internal static class SearchSpellFactory
                 if (candidates.Count == 0) return;
 
                 var agent = AgentRegistry.Get(caster);
+                var pickCtx = BuildPickContext(caster, p);
                 ICard? pick = agent != null
-                    ? agent.ChooseLibraryPickAsync(null, candidates,
+                    ? agent.ChooseLibraryPickAsync(pickCtx, candidates,
                         $"{colorRaw} creature card with mana value {x} or less")
                         .GetAwaiter().GetResult()
                     : candidates[0];
@@ -144,4 +150,29 @@ internal static class SearchSpellFactory
                 // as other search spells in this binder).
             }) };
         });
+
+    /// <summary>
+    /// Build a best-effort <see cref="GameContext"/> for a tutor closure so
+    /// the agent's <c>ChooseLibraryPickAsync</c> can see opponent board
+    /// state. The closure model is sync-over-async — at execution time we
+    /// only have <see cref="ChosenSpellParams.AllPlayers"/> from the cast
+    /// flow plus the caster; we don't have the live priority window, turn
+    /// number, phase, or stack reference. Fill those with neutral
+    /// placeholders (caster as active player, fresh empty stack, no phase)
+    /// — <see cref="Majik.Bot.Heuristic.LibraryPickPolicy"/> only consumes
+    /// <c>AllPlayers</c>, so the placeholders are inert in v2. Returns null
+    /// when the roster is unavailable so the policy falls back to its
+    /// pre-ctx neutral defaults instead of seeing a single-player game.
+    /// </summary>
+    private static GameContext? BuildPickContext(Player caster, ChosenSpellParams p)
+    {
+        if (p.AllPlayers is null || p.AllPlayers.Count == 0) return null;
+        return new GameContext(
+            self: caster,
+            allPlayers: p.AllPlayers,
+            activePlayer: caster,
+            turnNumber: 0,
+            currentPhase: null,
+            stack: new Majik.Core.Stack.Stack());
+    }
 }

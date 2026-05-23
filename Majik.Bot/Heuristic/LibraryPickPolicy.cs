@@ -2,6 +2,7 @@ using Majik.Bot.Evaluation;
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.ValueObjects;
 
@@ -14,10 +15,15 @@ namespace Majik.Bot.Heuristic;
 /// the caster's current board/hand state and the configured
 /// <see cref="ArchetypeWeights"/>, then returns the highest-EV pick.
 ///
-/// Inputs are intentionally narrow — tutor effects in v1 call into the
-/// agent with <c>ctx == null</c>, so all scoring derives from
-/// <paramref name="self"/>'s zones (hand, battlefield, library) plus the
-/// candidate card's printed attributes. Scoring rewards:
+/// Scoring derives from <paramref name="self"/>'s zones (hand,
+/// battlefield, library), the candidate card's printed attributes, and —
+/// when a <see cref="GameContext"/> is threaded through (v2,
+/// <c>SearchSpellFactory</c> builds one from
+/// <see cref="Majik.Core.Game.ChosenSpellParams.AllPlayers"/>) — the
+/// opponent's board state. Call sites that still pass <c>ctx == null</c>
+/// (e.g. tests, older effect closures) degrade gracefully: the
+/// opp-driven heuristics no-op, archetype + curve-fit signals still
+/// drive the pick. Scoring rewards:
 /// <list type="bullet">
 ///   <item>Lands when the caster is mana-screwed (curve gap).</item>
 ///   <item>Threats when the opponent has a heavier board.</item>
@@ -36,13 +42,14 @@ public static class LibraryPickPolicy
         Player self,
         IReadOnlyList<ICard> candidates,
         string kindLabel,
-        ArchetypeWeights weights)
+        ArchetypeWeights weights,
+        GameContext? ctx = null)
     {
         if (candidates.Count == 0) return null;
         if (candidates.Count == 1) return candidates[0];
 
         // Snapshot caller-side state once; reused across scoring passes.
-        var ctxs = BuildContext(self);
+        var ctxs = BuildContext(self, ctx);
 
         ICard? best = null;
         double bestScore = double.NegativeInfinity;
@@ -77,7 +84,7 @@ public static class LibraryPickPolicy
         bool BoardBehind,
         bool OppHasBigThreat);
 
-    private static PickContext BuildContext(Player self)
+    private static PickContext BuildContext(Player self, GameContext? ctx)
     {
         var battlefield = self.Zones.Battlefield.GetCards().ToList();
         var hand = self.Zones.Hand.GetCards().ToList();
@@ -85,13 +92,13 @@ public static class LibraryPickPolicy
         var landsInHand = hand.Count(c => c is Land);
         var ownPower = battlefield.OfType<Creature>().Sum(c => Math.Max(0, c.Power));
 
-        // "Opponent" inspection: not always reachable here (ctx is null in
-        // tutor closures, see SearchSpellFactory). Approximate via the
-        // shared engine-level player roster — Player exposes no opponent
-        // accessor on its own, so we fall back to "no observable opponent"
-        // and skip opp-driven adjustments. This is conservative: archetype
-        // + curve-fit signals still pick a reasonable card.
-        var (oppMaxPower, oppHasBig) = ProbeOpponent(self);
+        // Opponent inspection: when a GameContext is threaded through
+        // (SearchSpellFactory builds one from ChosenSpellParams.AllPlayers),
+        // enumerate every non-self player's battlefield and snapshot their
+        // biggest creature. Older call paths still pass ctx == null —
+        // ProbeOpponent returns neutral defaults so archetype + curve-fit
+        // signals still drive the pick.
+        var (oppMaxPower, oppHasBig) = ProbeOpponent(self, ctx);
 
         var manaScrewed = lands <= 2 && landsInHand == 0;
         var lowHand = hand.Count <= 1;
@@ -110,17 +117,31 @@ public static class LibraryPickPolicy
     }
 
     /// <summary>
-    /// Best-effort opponent probe without a GameContext. v1 tutor effects
-    /// pass <c>ctx == null</c>, so we can't enumerate AllPlayers. v2 should
-    /// thread a GameContext through ChooseLibraryPickAsync so we can score
-    /// against opp board state. For now return neutral defaults — opp-driven
-    /// heuristics no-op gracefully, archetype + curve-fit signals drive the
-    /// pick.
+    /// Opponent probe. When <paramref name="ctx"/> is non-null the policy
+    /// walks every non-self player on the roster and snapshots the biggest
+    /// creature in play — that's enough signal to bias toward removal /
+    /// blockers when an opp threat is on the battlefield. When ctx is
+    /// null (legacy call paths that don't yet pass one) return neutral
+    /// defaults so opp-driven heuristics no-op gracefully.
     /// </summary>
-    private static (int oppMaxPower, bool oppHasBig) ProbeOpponent(Player self)
+    private static (int oppMaxPower, bool oppHasBig) ProbeOpponent(Player self, GameContext? ctx)
     {
-        _ = self;
-        return (0, false);
+        if (ctx == null) return (0, false);
+
+        int maxPower = 0;
+        foreach (var p in ctx.AllPlayers)
+        {
+            if (ReferenceEquals(p, self)) continue;
+            foreach (var c in p.Zones.Battlefield.GetCards())
+            {
+                if (c is Creature crt && crt.Power > maxPower)
+                    maxPower = crt.Power;
+            }
+        }
+        // "Big" = 4-power creature (canonical "must-answer" threshold —
+        // matches the same 4-power cutoff used as the KeyCardInPlay bump
+        // in Score below).
+        return (maxPower, maxPower >= 4);
     }
 
     /// <summary>

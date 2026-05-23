@@ -64,5 +64,5 @@ internal sealed class HeuristicStrategy : IBotStrategy
             : ScrySurveilPolicy.Surveil(ctx, self, peeked);
 
     public ICard? PickLibraryCard(GameContext? ctx, Player self, IReadOnlyList<ICard> candidates, string kindLabel)
-        => LibraryPickPolicy.Pick(self, candidates, kindLabel, _weights);
+        => LibraryPickPolicy.Pick(self, candidates, kindLabel, _weights, ctx);
 }
