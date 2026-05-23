@@ -6,8 +6,11 @@ using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Effects;
 using Majik.Core.Events;
+using Majik.Core.Game;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
 using Majik.Core.Services;
+using Majik.Core.StateMachine;
 using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
 using Xunit;
@@ -169,5 +172,175 @@ public class SpreadingSeasTests
         _zones.MoveCard(ss, ZoneType.Library, ZoneType.Battlefield, _alice);
         var etb = new CardMovedEvent(ss, ZoneType.Library, ZoneType.Battlefield);
         trigger.IsTriggered(etb).Should().BeTrue();
+    }
+
+    // -----------------------------------------------------------------------
+    // Cast-time targeting + auto-attach on resolution (CR 303.4f / 601.2c)
+    // -----------------------------------------------------------------------
+
+    /// <summary>
+    /// End-to-end cast flow: agent picks the target Forest at cast time;
+    /// on resolution, the aura attaches to the Forest BEFORE the engine
+    /// moves it to the battlefield. The Layer 4 retype then activates as
+    /// the aura ETBs, so the Forest taps for {U}.
+    /// </summary>
+    [Fact]
+    public async Task SpreadingSeas_CastFlow_AutoAttachesToTargetLand_AndRetypes()
+    {
+        // Arrange: Forest on battlefield, Spreading Seas in hand.
+        var forest = new Land(
+            "Forest",
+            supertypes: new[] { CardSupertype.Basic },
+            subtypes: new[] { CardSubtype.Forest });
+        forest.SetOwner(_alice);
+        forest.SetController(_alice);
+        OracleManaBinder.BindBasicLandMana(forest, _alice);
+        _zones.MoveCard(forest, ZoneType.Library, ZoneType.Battlefield, _alice);
+
+        var ss = SpreadingSeasFactory.Create(_alice, _effects, _bus);
+        _alice.Zones.Library.RemoveCard(ss);
+        _alice.Zones.Hand.AddCard(ss);
+        ss.SetZone(ZoneType.Hand);
+
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var castFlow = new SpellCastFlow(stack, _zones, _bus);
+        var resolver = new StackResolver(_bus, _zones);
+        var agent = new ScriptedAgent();
+        agent.QueueTargets(new object[] { forest });
+        agent.QueueMana(ManaPayment.Empty);
+
+        var def = SpreadingSeasFactory.BuildSpellDefinition(
+            ss, _alice.Zones.Battlefield.GetCards().OfType<Permanent>());
+        var ctx = new GameContext(_alice, new[] { _alice }, _alice, 1,
+            PhaseStateType.Main, stack);
+
+        // Act: cast (push to stack) + resolve (auto-attach + ETB move).
+        var spell = await castFlow.CastAsync(_alice, ss, def, agent, ctx);
+        resolver.ResolveTop(stack);
+
+        // Assert: aura attached + on battlefield + Forest taps for {U}.
+        ss.Zone.Should().Be(ZoneType.Battlefield,
+            "StackResolver moves the permanent to the battlefield on resolution");
+        ss.AttachedTo.Should().BeSameAs(forest,
+            "CR 303.4f — Aura enters the battlefield attached to its chosen target");
+        forest.Attachments.Should().Contain(ss);
+
+        var attached = EffectiveManaAbilities.For(forest, _effects, _alice);
+        attached.Should().HaveCount(1,
+            "CR 305.6 — Forest's printed {G} dropped; new Island subtype derives {U}");
+        attached[0].ManaGenerated.Blue.Should().Be(1);
+        attached[0].ManaGenerated.Green.Should().Be(0);
+    }
+
+    /// <summary>
+    /// No legal target → cast aborts. With no Lands on the battlefield,
+    /// the candidate pool is empty; the scripted agent returns an empty
+    /// target list, which violates the MinTargets=1 contract and
+    /// SpellCastFlow throws an InvalidOperationException (CR 601.2c).
+    /// </summary>
+    [Fact]
+    public async Task SpreadingSeas_NoLegalTarget_CannotBeCast()
+    {
+        // Arrange: no lands in play.
+        var ss = SpreadingSeasFactory.Create(_alice, _effects, _bus);
+        _alice.Zones.Library.RemoveCard(ss);
+        _alice.Zones.Hand.AddCard(ss);
+        ss.SetZone(ZoneType.Hand);
+
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var castFlow = new SpellCastFlow(stack, _zones, _bus);
+        var agent = new ScriptedAgent();
+        // Agent has no land to pick → returns an empty list when prompted.
+        agent.QueueTargets(Array.Empty<object>());
+        agent.QueueMana(ManaPayment.Empty);
+
+        var def = SpreadingSeasFactory.BuildSpellDefinition(
+            ss, _alice.Zones.Battlefield.GetCards().OfType<Permanent>());
+        var ctx = new GameContext(_alice, new[] { _alice }, _alice, 1,
+            PhaseStateType.Main, stack);
+
+        // Act & Assert: cast is rejected; nothing reaches the stack.
+        Func<Task> cast = async () =>
+            await castFlow.CastAsync(_alice, ss, def, agent, ctx);
+
+        await cast.Should().ThrowAsync<InvalidOperationException>(
+                "no legal target → CR 601.2c illegal cast")
+            .WithMessage("*target*");
+        stack.Count.Should().Be(0);
+        ss.Zone.Should().Be(ZoneType.Hand,
+            "rejected cast must not mutate the card's zone");
+    }
+
+    /// <summary>
+    /// Bonus: end-to-end ETB-draw assertion. Cast Spreading Seas via the
+    /// real cast flow with a live TriggerManager + StackResolver loop; the
+    /// ETB trigger should fire when the aura enters the battlefield, and
+    /// the controller's hand size should go up by one (net effect after
+    /// paying the Spreading Seas card itself out of hand).
+    /// </summary>
+    [Fact]
+    public async Task SpreadingSeas_CastFlow_TriggersEtbDraw_HandSizePlusOne()
+    {
+        // Arrange: Forest on battlefield, Spreading Seas in hand, a stub
+        // card in the library to draw.
+        var forest = new Land(
+            "Forest",
+            supertypes: new[] { CardSupertype.Basic },
+            subtypes: new[] { CardSubtype.Forest });
+        forest.SetOwner(_alice);
+        forest.SetController(_alice);
+        OracleManaBinder.BindBasicLandMana(forest, _alice);
+        _zones.MoveCard(forest, ZoneType.Library, ZoneType.Battlefield, _alice);
+
+        var ss = SpreadingSeasFactory.Create(_alice, _effects, _bus);
+        _alice.Zones.Library.RemoveCard(ss);
+        _alice.Zones.Hand.AddCard(ss);
+        ss.SetZone(ZoneType.Hand);
+
+        var libraryCard = new Card("Mox Pearl", "");
+        libraryCard.SetOwner(_alice);
+        libraryCard.SetController(_alice);
+        _alice.Zones.Library.AddCard(libraryCard);
+        libraryCard.SetZone(ZoneType.Library);
+
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        // Live TriggerManager wired to the bus — without it the ETB draw
+        // trigger never gets put on the stack. Construction auto-subscribes
+        // to the bus; CardMovedEvent → auto-bind + EvaluateTriggers.
+        var triggerManager = new TriggerManager(stack, _bus);
+        triggerManager.BindCard(ss);
+
+        var castFlow = new SpellCastFlow(stack, _zones, _bus);
+        var resolver = new StackResolver(_bus, _zones);
+        var agent = new ScriptedAgent();
+        agent.QueueTargets(new object[] { forest });
+        agent.QueueMana(ManaPayment.Empty);
+
+        var def = SpreadingSeasFactory.BuildSpellDefinition(
+            ss, _alice.Zones.Battlefield.GetCards().OfType<Permanent>());
+        var ctx = new GameContext(_alice, new[] { _alice }, _alice, 1,
+            PhaseStateType.Main, stack);
+
+        var handCountBeforeResolve = _alice.Zones.Hand.GetCards().Count();
+
+        // Act: cast (push spell to stack) + resolve loop.
+        await castFlow.CastAsync(_alice, ss, def, agent, ctx);
+        resolver.ResolveTop(stack); // resolves the Spreading Seas spell
+        // ETB-fired trigger is now in TriggerManager's pending queue —
+        // drain to stack (CR 603.3b) and resolve.
+        triggerManager.PutPendingTriggersOnStack(_alice);
+        while (!stack.IsEmpty)
+        {
+            resolver.ResolveTop(stack);
+        }
+
+        // Assert: aura attached, ETB draw fired, stub card now in hand.
+        ss.AttachedTo.Should().BeSameAs(forest);
+        _alice.Zones.Hand.GetCards().Should().Contain(libraryCard,
+            "ETB-on-aura trigger drew the top of library");
+        // Hand started with 0 (Spreading Seas was in hand and got cast,
+        // i.e. moved to stack pre-resolution), then we drew 1 → hand has 1.
+        _alice.Zones.Hand.GetCards().Count().Should().Be(handCountBeforeResolve,
+            "Spreading Seas left hand on cast; ETB draw replaced it");
     }
 }

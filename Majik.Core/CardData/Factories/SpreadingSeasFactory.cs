@@ -3,6 +3,7 @@ using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Effects;
 using Majik.Core.Events;
+using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Zones;
 
@@ -118,5 +119,32 @@ public static class SpreadingSeasFactory
         card.AddAbility(drawTrigger);
 
         return card;
+    }
+
+    /// <summary>
+    /// Build the cast-time <see cref="SpellDefinition"/> for Spreading
+    /// Seas — "Enchant land" → single <see cref="Land"/> target. The
+    /// effect attaches the aura to the chosen land on resolution so that
+    /// when <see cref="Majik.Core.Services.StackResolver"/> moves the
+    /// aura to the battlefield, <see cref="AttachedAuraRetypeStaticEffect"/>
+    /// already sees a populated <see cref="Permanent.AttachedTo"/> slot.
+    ///
+    /// CR 303.4f — Auras enter the battlefield attached to their target.
+    /// </summary>
+    /// <param name="aura">The Spreading Seas permanent being cast.</param>
+    /// <param name="battlefield">Current battlefield permanents — the
+    /// candidate pool is filtered to those that are Lands.</param>
+    public static SpellDefinition BuildSpellDefinition(
+        Enchantment aura,
+        IEnumerable<Permanent> battlefield)
+    {
+        ArgumentNullException.ThrowIfNull(aura);
+        ArgumentNullException.ThrowIfNull(battlefield);
+
+        return AuraSpellDefinitionBuilder.ForAura(
+            aura,
+            "target land",
+            battlefield,
+            p => p.HasType(CardType.Land));
     }
 }
