@@ -922,5 +922,67 @@ public static class SeedImplementedCards
         // Exile the top card of your library face down. Put that card into
         // your hand at the beginning of your next end step.
         "Necrodominance",
+
+        // ---- Modern staples shipped in the 2026-05-23j bump ----
+
+        // Legendary Planeswalker — Karn {4} loyalty 5 (KarnScionOfUrzaFactory).
+        // Aether Revolt. +1: reveal-pile choose-one-to-hand pile builder.
+        // -1: Construct artifact creature token whose P/T equals the number
+        // of artifacts you control.
+        "Karn, Scion of Urza",
+        // Legendary Creature — Elder Giant {1}{R}{W} 4/4 (PhlageFactory).
+        // Modern Horizons 3. Trample. When ~ enters or attacks, it deals 3
+        // damage to any target and you gain 3 life. Escape — {2}{R}{W},
+        // exile five other cards from your graveyard (escape deferred).
+        "Phlage, Titan of Fire's Fury",
+        // Sorcery — {2}{W}{W} (WrathOfGodFactory). Limited Edition Alpha.
+        // Destroy all creatures. They can't be regenerated.
+        "Wrath of God",
+        // Sorcery — {2}{B}{B} (DamnationFactory). Planar Chaos.
+        // Black functional reprint of Wrath of God — destroy all creatures.
+        "Damnation",
+        // Artifact Creature — Horror {2} 0/4 (SpellskiteFactory). New Phyrexia.
+        // {Phyrexian/U}: Change the target of target spell or ability to ~
+        // (CR 702.59 — phyrexian-mana redirect activation).
+        "Spellskite",
+        // Sorcery — {1}{R} (PyroclasmFactory). Many reprints.
+        // ~ deals 2 damage to each creature.
+        "Pyroclasm",
+        // Sorcery — {2}{R} (AngerOfTheGodsFactory). Theros.
+        // ~ deals 3 damage to each creature. If a creature dealt damage this
+        // way would die this turn, exile it instead.
+        "Anger of the Gods",
+        // Creature — Phoenix {3}{R} 3/2 (ArclightPhoenixFactory). Guilds of
+        // Ravnica. Flying, haste. At the beginning of combat on your turn,
+        // if you've cast three or more instant and/or sorcery spells this
+        // turn, you may return ~ from your graveyard to the battlefield.
+        "Arclight Phoenix",
+        // Instant — {U}{B} (DrownInTheLochFactory). Throne of Eldraine.
+        // Modal — counter target spell with mana value X or less; or destroy
+        // target creature or planeswalker with mana value X or less, where X
+        // is the number of cards in target opponent's graveyard.
+        "Drown in the Loch",
+        // Sorcery — {2}{G}{G} (ScapeshiftFactory). Morningtide.
+        // Sacrifice any number of lands. Search your library for that many
+        // land cards, put them onto the battlefield tapped, then shuffle.
+        "Scapeshift",
+        // Creature — Goblin {1}{R} 2/2 (GoblinChieftainFactory). Magic 2010.
+        // Other Goblin creatures you control get +1/+1 and have haste.
+        "Goblin Chieftain",
+        // Creature — Goblin {1}{R}{R} 2/2 (GoblinWarchiefFactory). Onslaught /
+        // Scourge / Modern Horizons. Goblin spells you cast cost {1} less to
+        // cast. Goblin creatures you control have haste.
+        "Goblin Warchief",
+        // Creature — Goblin Warrior {1}{R} 1/2 (GoblinPiledriverFactory).
+        // Onslaught / Modern Horizons. Protection from blue. Whenever ~
+        // attacks, it gets +2/+0 until end of turn for each other attacking
+        // Goblin.
+        "Goblin Piledriver",
+        // Creature — Zombie Knight {1}{B}{B} 2/3 // Instant — Adventure (MurderousRiderFactory).
+        // Throne of Eldraine. DFC stored under composite name. Lifelink on
+        // the creature face. Adventure half "Swift End" — {1}{B}{B}, destroy
+        // target creature or planeswalker, you lose 2 life — exposed via
+        // MurderousRiderFactory.BuildAdventureSpell.
+        "Murderous Rider // Swift End",
     };
 }
