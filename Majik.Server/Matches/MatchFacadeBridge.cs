@@ -51,6 +51,7 @@ public sealed class MatchFacadeBridge
 {
     private readonly IMatchHubPublisher _hub;
     private readonly ILogger<MatchFacadeBridge> _logger;
+    private readonly MatchReplayBuffer? _replay;
     private readonly ConcurrentDictionary<Guid, Attachment> _attachments = new();
 
     // Per-recipient prompt buffer. Solves the race where the engine
@@ -67,10 +68,14 @@ public sealed class MatchFacadeBridge
     // bot-skip.
     private readonly ConcurrentDictionary<(Guid MatchId, string Sub), PromptDto> _bufferedPrompts = new();
 
-    public MatchFacadeBridge(IMatchHubPublisher hub, ILogger<MatchFacadeBridge> logger)
+    public MatchFacadeBridge(
+        IMatchHubPublisher hub,
+        ILogger<MatchFacadeBridge> logger,
+        MatchReplayBuffer? replay = null)
     {
         _hub = hub;
         _logger = logger;
+        _replay = replay;
     }
 
     /// <summary>Visible for tests.</summary>
@@ -152,6 +157,13 @@ public sealed class MatchFacadeBridge
                 _bufferedPrompts.TryRemove(key, out _);
             }
         }
+
+        // Seal the replay buffer — match is over (concede / abandon /
+        // timeout / completion all funnel through Detach), so no further
+        // events should append to the replay log. The buffer itself is
+        // retained for download until LRU evicts it; see
+        // MatchReplayBuffer for the retention contract.
+        _replay?.Seal(matchId);
     }
 
     /// <summary>
@@ -217,6 +229,12 @@ public sealed class MatchFacadeBridge
     // publish.
     internal void ForwardEvent(Guid matchId, EventDto evt)
     {
+        // Capture BEFORE publish so a hub-publish fault doesn't lose the
+        // record from the replay log. Capture is best-effort — the buffer
+        // swallows its own exceptions, so the live broadcast can't be
+        // perturbed by a replay-side failure.
+        _replay?.RecordEvent(matchId, evt);
+
         try
         {
             _hub.Publish(matchId, "event", evt);

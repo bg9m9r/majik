@@ -15,6 +15,12 @@ public static class MatchRegistration
         services.AddSingleton<IRandomSource, SystemRandomSource>();
         services.AddSingleton<DiceRoller>();
         services.AddSingleton<IMatchHubPublisher, MatchHubPublisher>();
+        // Per-process replay buffer. In-memory only — no persistence in
+        // MVP; finished-match buffers are retained under an LRU cap
+        // (MatchReplayBuffer.MaxRetainedMatches) so a server restart
+        // wipes history. Promote to Mongo if real games push past the
+        // per-match entry cap on a regular basis.
+        services.AddSingleton<MatchReplayBuffer>();
         // Engine → SignalR bridge. Singleton so the same instance holds
         // subscriptions across the request lifetime of MatchService
         // (scoped) — every match attaches once at facade-create and
