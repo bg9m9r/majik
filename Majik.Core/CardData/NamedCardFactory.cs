@@ -819,6 +819,18 @@ public static class NamedCardFactory
             // DEFERRED — no DashAlternativeCost / DashReturnRegistry yet.
             "Ragavan, Nimble Pilferer" => RagavanNimblePilfererFactory.Create(owner),
 
+            // Land — Cavern of Souls (Avacyn Restored, CavernOfSoulsFactory).
+            // ETB: choose a creature type (resolved eagerly via a Func<Player,
+            // CardSubtype> typeChooser on the 2-arg overload; the single-arg
+            // dispatcher path leaves the chosen-type slot empty).
+            // {T}: Add {C} — wired.
+            // {T}: Add one mana of any color — five ManaAbility instances
+            // (one per WUBRG) wired (mirrors Delighted Halfling).
+            // Spend-restriction ("creature spell of the chosen type") +
+            // uncounterable rider deferred — engine has no per-mana provenance
+            // ledger yet (see CavernOfSoulsFactory xmldoc).
+            "Cavern of Souls" => CavernOfSoulsFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
