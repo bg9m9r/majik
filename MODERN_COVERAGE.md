@@ -3,13 +3,13 @@
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
 **Last updated:** 2026-05-23
-**Latest origin/main:** b3ec4a8 (Sylvan Scrying + Fury + Endurance) + Up the Beanstalk (this PR)
+**Latest origin/main:** 0ce5d1f (Up the Beanstalk) + Primeval Titan (this PR)
 
 ## Headline numbers
 
 | Metric | Count |
 |---|---|
-| Named factories | 65 |
+| Named factories | 66 |
 | Bespoke templates | 26 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
@@ -63,6 +63,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Orcish Bowmasters | Creature | — | reactive ping shell |
 | Pithing Needle | Artifact | #189 | name-targeted activated suppression |
 | Priest of Fell Rites | Creature | #196 | ETB reanimate + grave-unearth |
+| Primeval Titan | Creature | TBD | Trample + ETB/attack tutor up to 2 lands tapped |
 | Rift Bolt | Sorcery | #183 | suspend → 3 damage |
 | Scavenging Ooze | Creature | #188 | exile-graveyard + counter + life |
 | Sea's Claim | Aura | #160 | enchanted land becomes Island |
@@ -280,7 +281,7 @@ Per-keyword action helpers under `Majik.Core/Keywords/`:
 - **Rakdos Scam** — Mid. Grief done (#205, mirrors Solitude evoke + ETB pattern). Dauthi Voidwalker absent. Fury absent. Liliana of the Veil done, Fatal Push done, Thoughtseize done. ~40%.
 - **Yawgmoth combo** — Mid. Yawgmoth done. Undying creatures (Young Wolf, Strangleroot Geist, Geralf's Messenger) done. Chord of Calling, Eldritch Evolution absent. ~50%.
 - **Domain Zoo** — Low-mid. Boros Charm done, fetches done, shocks done. Scion of Draco, Territorial Kavu, Tribal Flames absent. ~25%.
-- **Amulet Titan** — Very low. No Amulet of Vigor, no Primeval Titan, no bounce lands. ~0%.
+- **Amulet Titan** — Low. Primeval Titan done (ETB + attack land-tutor for up to 2, tapped). No Amulet of Vigor, no bounce lands. ~15%.
 - **Hammer Time / Equipment** — Low-mid. Stoneforge Mystic done. Sigarda's Aid, Colossus Hammer, Puresteel Paladin absent. ~20%.
 
 ## Top 20 Modern staples NOT yet implemented
@@ -296,8 +297,7 @@ Sorted by build priority (small infra lift × high meta share).
 | 5 | Crashing Footfalls | High | Suspend done (#183), but cascade trigger on suspend-cast missing |
 | 6 | Living End | High | Cascade + mass-exile-grave + simultaneous mass-reanimate (#174 ready for the latter) |
 | 7 | Cascade keyword | High | Triggered "cast for free from top reveal" — alt-cast-from-library framework |
-| 8 | Primeval Titan | Mid | Attack/ETB triggers + land tutor; tutor template exists |
-| 9 | Amulet of Vigor | Mid | Replacement on enters-tapped → untap; needs ETB replacement composition |
+| 8 | Amulet of Vigor | Mid | Replacement on enters-tapped → untap; needs ETB replacement composition |
 
 ## How to update this doc
 
