@@ -9,7 +9,7 @@ Living tracker for Modern-format card + mechanic implementation in the Majik eng
 
 | Metric | Count |
 |---|---|
-| Named factories | 72 |
+| Named factories | 73 |
 | Bespoke templates | 26 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
@@ -60,6 +60,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Ledger Shredder | Creature | #193 | second-spell surveil + counter |
 | Library Surveyor | Creature | — | ETB tutor shell |
 | Liliana of the Veil | Planeswalker | #178 | +1 discard, -2 discard |
+| Living End | Sorcery | TBD | each-player mass-exile-grave + sac-creatures + mass-reanimate (Cascade trigger pending) |
 | Magus of the Moon | Creature | #157 | nonbasic-to-Mountain |
 | Mishra's Bauble | Artifact | — | sac → look + delayed draw |
 | Murktide Regent | Creature | #194 | delve cost + ETB X counters |
@@ -285,7 +286,7 @@ Per-keyword action helpers under `Majik.Core/Keywords/`:
 - **Death's Shadow** — Mid-high. Thoughtseize, Fatal Push, Snapcaster Mage, Stubborn Denial, Death's Shadow itself (CDA P/T scaled by controller life — Layer 7a) all in. Mishra's Bauble in. Temur Battle Rage absent. ~60%.
 - **Murktide / Izzet Tempo** — High. Murktide Regent done, Counterspell done, Snapcaster Mage done, Lightning Bolt done, Expressive Iteration done, Ledger Shredder done, Consider done, Spell Pierce done, Subtlety done. Missing: Demilich absent. ~75%.
 - **Mono-Green Tron** — High. Ancient Stirrings, Sylvan Scrying, Wurmcoil Engine done. Karn Liberated done. Karn, the Great Creator done. Tron lands (Urza's Mine + Tower + Power-Plant) done with the conditional {2} mana ability. ~70%.
-- **Living End / Crashing Footfalls cascade** — Blocked. Cascade keyword + Suspend-trigger end-of-suspend exile-and-cast TODO. Suspend itself is done (#183), so partial groundwork. ~15%.
+- **Living End / Crashing Footfalls cascade** — Mid. Living End resolve effect shipped (per-player mass-exile-grave + sacrifice-creatures + mass-reanimate, ETB triggers fire on reanimated permanents). Cascade keyword + Suspend-trigger end-of-suspend exile-and-cast still TODO — Living End is a 5-mana sorcery without Cascade today. Suspend itself is done (#183). ~40%.
 - **Rakdos Scam** — Mid-high. Grief done (#205, mirrors Solitude evoke + ETB pattern). Fury done (mirrors Solitude/Grief). Dauthi Voidwalker absent. Liliana of the Veil done, Fatal Push done, Thoughtseize done. ~55%.
 - **Yawgmoth combo** — Mid. Yawgmoth done. Undying creatures (Young Wolf, Strangleroot Geist, Geralf's Messenger) done. Chord of Calling, Eldritch Evolution absent. ~50%.
 - **Domain Zoo** — Mid. Boros Charm done, fetches done, shocks done, Tribal Flames done. Scion of Draco + Territorial Kavu absent. ~35%.
@@ -299,8 +300,7 @@ Sorted by build priority (small infra lift × high meta share).
 | # | Card | Difficulty | Blocker |
 |---|---|---|---|
 | 1 | Crashing Footfalls | High | Suspend done (#183), but cascade trigger on suspend-cast missing |
-| 2 | Living End | High | Cascade + mass-exile-grave + simultaneous mass-reanimate (#174 ready for the latter) |
-| 3 | Cascade keyword | High | Triggered "cast for free from top reveal" — alt-cast-from-library framework |
+| 2 | Cascade keyword | High | Triggered "cast for free from top reveal" — alt-cast-from-library framework |
 
 ## How to update this doc
 

@@ -682,6 +682,19 @@ public static class NamedCardFactory
             // (PowerPlant).
             "Urza's Power-Plant" => UrzasPowerPlantFactory.Create(owner),
 
+            // Sorcery — {2}{B}{B}{B} (LivingEndFactory). Time Spiral.
+            // "Cascade. Each player exiles all creature cards from their
+            //  graveyard, then sacrifices all creatures they control, then
+            //  puts all cards they exiled this way onto the battlefield."
+            // Card shape only here; the resolve-time SpellDefinition is
+            // built on demand via LivingEndFactory.BuildSpellDefinition,
+            // which routes each reanimate move through ZoneService so ETB
+            // triggers fire on every reanimated permanent (CR 603.6a /
+            // PR #165, #174 plumbing). Cascade (CR 702.85) is NOT wired
+            // here — it will pick up Living End via the keyword's on-cast
+            // trigger when the Cascade implementation lands.
+            "Living End" => LivingEndFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
