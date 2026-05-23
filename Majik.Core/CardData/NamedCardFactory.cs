@@ -495,6 +495,15 @@ public static class NamedCardFactory
             // wiring on the reanimated creature.
             "Priest of Fell Rites" => PriestOfFellRitesFactory.Create(owner),
 
+            // Creature — Avatar {B} 13/13 (DeathsShadowFactory).
+            // CR 604.3 / 613.2 — Layer 7a characteristic-defining P/T.
+            // P/T = clamp(13 - controller life, 0, 13). Wired via
+            // DeathsShadowFactory.Create(owner, effects, eventBus) when
+            // runtime services are available; the single-arg dispatcher
+            // path here produces the correct card shape only (printed 13/13
+            // seed, no live CDA).
+            "Death's Shadow" => DeathsShadowFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 

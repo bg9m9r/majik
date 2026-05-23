@@ -49,6 +49,8 @@ public enum CardSubtype
     Artificer,
     /// <summary>Ooze creature subtype — Scavenging Ooze, Acidic Slime. CR 205.3m.</summary>
     Ooze,
+    /// <summary>Avatar creature subtype — Death's Shadow, Akroma. CR 205.3m.</summary>
+    Avatar,
 
     // Land subtypes (examples)
     Forest,
