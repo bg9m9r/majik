@@ -26,6 +26,12 @@ public sealed class RemoteAgent : IPlayerAgent
     private readonly Func<Guid, Player?>? _playerLookup;
     private object? _pending;           // TaskCompletionSource<T> for currently-awaited prompt
     private Type[]? _pendingKinds;      // allowed command types (multi for priority)
+    // Snapshot of the triggered-ability list the engine handed us at the
+    // most recent OrderTriggersAsync prompt. The wire command transports
+    // only the StackObjectIds the client picked, so Resolve needs the
+    // original list to map IDs back to abilities. Cleared once the prompt
+    // resolves (in Submit), or replaced on the next OrderTriggersAsync.
+    private IReadOnlyList<ITriggeredAbility>? _pendingTriggerOrder;
 
     public RemoteAgent(
         Player player,
@@ -76,12 +82,14 @@ public sealed class RemoteAgent : IPlayerAgent
         }
 
         var pending = _pending;
+        var triggerOrder = _pendingTriggerOrder;
         _pending = null;
         _pendingKinds = null;
-        Resolve(pending, command);
+        _pendingTriggerOrder = null;
+        Resolve(pending, command, triggerOrder);
     }
 
-    private void Resolve(object tcs, GameCommand command)
+    private void Resolve(object tcs, GameCommand command, IReadOnlyList<ITriggeredAbility>? triggerOrder)
     {
         switch (command)
         {
@@ -128,8 +136,38 @@ public sealed class RemoteAgent : IPlayerAgent
                 ((TaskCompletionSource<ManaPayment>)tcs).SetResult(
                     new ManaPayment(mp.SourceInstanceIds.Select(ResolveCard).ToList()));
                 break;
-            case OrderTriggersCommand:
-                throw new NotImplementedException("OrderTriggers resolution wired in P9.7.");
+            case OrderTriggersCommand ot:
+                // CR 603.3b — APNAP-controller orders their own simultaneous
+                // triggers onto the stack. The wire command carries only
+                // stack-object IDs; map each back to the ability handed to
+                // us by the engine at prompt time. Same shape as
+                // DeclareAttackersCommand (PR #154) and MulliganCommand
+                // (PR #147): translate the wire DTO into the engine's
+                // expected payload (here IReadOnlyList<ITriggeredAbility>).
+                if (triggerOrder == null)
+                {
+                    throw new InvalidOperationException(
+                        "OrderTriggersCommand resolved without a pending trigger order.");
+                }
+                var byId = triggerOrder.ToDictionary(t => t.Id);
+                var orderedTriggers = new List<ITriggeredAbility>(ot.StackObjectIdsInOrder.Count);
+                foreach (var id in ot.StackObjectIdsInOrder)
+                {
+                    if (!byId.TryGetValue(id, out var ability))
+                    {
+                        throw new InvalidOperationException(
+                            $"OrderTriggersCommand referenced unknown stack object {id}.");
+                    }
+                    orderedTriggers.Add(ability);
+                }
+                if (orderedTriggers.Count != triggerOrder.Count)
+                {
+                    throw new InvalidOperationException(
+                        $"OrderTriggersCommand listed {orderedTriggers.Count} triggers " +
+                        $"but engine expected {triggerOrder.Count}.");
+                }
+                ((TaskCompletionSource<IReadOnlyList<ITriggeredAbility>>)tcs).SetResult(orderedTriggers);
+                break;
             case DeclareAttackersCommand atk:
                 ((TaskCompletionSource<CombatPlan>)tcs).SetResult(BuildCombatPlan(atk));
                 break;
@@ -177,7 +215,25 @@ public sealed class RemoteAgent : IPlayerAgent
         => Prompt<int>(ct, typeof(ChooseModeCommand));
 
     public Task<IReadOnlyList<ITriggeredAbility>> OrderTriggersAsync(GameContext ctx, IReadOnlyList<ITriggeredAbility> mine, CancellationToken ct = default)
-        => throw new NotImplementedException("OrderTriggers wired in P9.7.");
+    {
+        // Stash the engine-provided list so the eventual
+        // OrderTriggersCommand can translate its StackObjectIds back into
+        // the matching ability instances. Replaced on each prompt; cleared
+        // in Submit when the prompt resolves. Only commit the field if
+        // Prompt actually accepts the registration (it throws if another
+        // prompt is already outstanding).
+        try
+        {
+            var task = Prompt<IReadOnlyList<ITriggeredAbility>>(ct, typeof(OrderTriggersCommand));
+            _pendingTriggerOrder = mine;
+            return task;
+        }
+        catch
+        {
+            _pendingTriggerOrder = null;
+            throw;
+        }
+    }
 
     public Task<ManaPayment> ChooseManaSourcesAsync(GameContext ctx, ManaCost cost, CancellationToken ct = default)
         => Prompt<ManaPayment>(ct, typeof(ChooseManaCommand));

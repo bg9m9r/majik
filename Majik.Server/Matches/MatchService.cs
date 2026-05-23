@@ -861,6 +861,19 @@ public sealed class MatchService
         var facade = _gameFactory.Get(gid);
         if (facade != null)
         {
+            // Stamp PlayerId from the caller's seat mapping. The portal's
+            // generated OpenAPI client treats GameCommand.PlayerId as
+            // optional and its command builders omit it, so commands arrive
+            // here with Guid.Empty. GameFacade.SubmitAsync routes by
+            // PlayerId and throws "Unknown player {Guid.Empty}" otherwise.
+            // Stamping here also prevents seat-impersonation: even if a
+            // malicious client sets PlayerId to the opponent's Guid, we
+            // overwrite it with the seat derived from the authed sub.
+            // Mapping convention matches GetGameStateAsync: Creator → Alice,
+            // Opponent → Bob.
+            var seatId = callerSub == match.Creator.Sub ? facade.Alice.Id : facade.Bob.Id;
+            command = command with { PlayerId = seatId };
+
             await facade.SubmitAsync(command, ct);
             // The submitted command resolved the engine's pending TCS for
             // this seat, so any prompt previously buffered for the caller

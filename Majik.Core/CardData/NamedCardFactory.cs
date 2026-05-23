@@ -479,6 +479,17 @@ public static class NamedCardFactory
             // the engine has no Yes/No agent prompt yet — default is "no".
             "Stubborn Denial" => StubbornDenialFactory.Create(owner),
 
+            // Instant — {U} (ConsiderFactory). Innistrad: Midnight Hunt.
+            // "Look at the top card of your library. You may put that card
+            // into your graveyard. Then draw a card." Effectively Surveil 1
+            // (CR 701.42) + draw 1. Card shape only here; the resolve effect
+            // is built on demand via ConsiderFactory.BuildResolveEffect and
+            // splices into a SpellDefinition.EffectFactory. The surveil
+            // decision is sourced from the registered IPlayerAgent (via
+            // AgentRegistry) when available; the default fall-back sends the
+            // peeked card to the graveyard.
+            "Consider" => ConsiderFactory.Create(owner),
+
             // Creature — Human Cleric {W}{B} 2/1 (PriestOfFellRitesFactory).
             // ETB triggered ability: reanimate target creature card with
             // mana value 3 or less from controller's graveyard
@@ -492,6 +503,15 @@ public static class NamedCardFactory
             // eventBus, triggers) overload for ETB-trigger / ZoneService
             // wiring on the reanimated creature.
             "Priest of Fell Rites" => PriestOfFellRitesFactory.Create(owner),
+
+            // Creature — Avatar {B} 13/13 (DeathsShadowFactory).
+            // CR 604.3 / 613.2 — Layer 7a characteristic-defining P/T.
+            // P/T = clamp(13 - controller life, 0, 13). Wired via
+            // DeathsShadowFactory.Create(owner, effects, eventBus) when
+            // runtime services are available; the single-arg dispatcher
+            // path here produces the correct card shape only (printed 13/13
+            // seed, no live CDA).
+            "Death's Shadow" => DeathsShadowFactory.Create(owner),
 
             _ => new Card(name, ""),
         };
