@@ -344,6 +344,25 @@ public static class NamedCardFactory
             // the controller has no Army, then places a +1/+1 counter on it.
             "Lazotep Recruit" => LazotepRecruitFactory.Create(owner),
 
+            // Instant — {3}{U}{U} (ForceOfWillFactory).
+            // "You may pay 1 life and exile a blue card from your hand
+            //  rather than pay this spell's mana cost. Counter target spell."
+            // Card shape only here; the counter-target SpellDefinition is
+            // attached via ForceOfWillFactory.BuildDefinition at the
+            // SpellCastFlow resolver wire-up site. Pitch alt-cost (CR 118.9)
+            // = exile a blue card from hand + 1 life when it's not your
+            // turn (PitchAlternativeCost). Bot probe via PitchAltCostProbe.
+            "Force of Will" => ForceOfWillFactory.Create(owner),
+
+            // Instant — {1}{U}{U} (ForceOfNegationFactory).
+            // "If it's not your turn, you may exile a blue card from your
+            //  hand rather than pay this spell's mana cost. Counter target
+            //  noncreature spell."
+            // Same shape as Force of Will minus the life rider, and the
+            // counter is gated to noncreature spells (CR 608.2b illegal-
+            // target check at resolution).
+            "Force of Negation" => ForceOfNegationFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
