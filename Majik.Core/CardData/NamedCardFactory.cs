@@ -1813,6 +1813,32 @@ public static class NamedCardFactory
             //  primitive ("copy that spell") + new-targets prompt all deferred.
             "Pyromancer's Goggles" => PyromancersGogglesFactory.Create(owner),
 
+            // Sorcery — {1}{R} (PyroclasmFactory). Portal Second Age and
+            // many reprints. "Pyroclasm deals 2 damage to each creature."
+            // Card shape only here; the resolve effect (2 damage to every
+            // creature on every supplied player's battlefield via
+            // Creature.TakeDamage — CR 109.5) is built on demand via
+            // PyroclasmFactory.BuildResolveEffect(allPlayers). Distinct
+            // from the shared DealsDamageEachCreatureTemplate stub, which
+            // scans only the caster's battlefield.
+            "Pyroclasm" => PyroclasmFactory.Create(owner),
+
+            // Sorcery — {2}{R} (AngerOfTheGodsFactory). Theros.
+            // "Anger of the Gods deals 3 damage to each creature. If a
+            //  creature dealt damage this way would die this turn, exile
+            //  it instead." Card shape only here; the resolve effect
+            // (sweep 3 dmg + EOT-expirable ZoneMoveIntent replacement
+            // rewriting tagged creature graveyard moves to exile via
+            // AngerOfTheGodsExileInsteadReplacement on the supplied
+            // ReplacementBus) is built on demand via
+            // AngerOfTheGodsFactory.BuildResolveEffect(allPlayers,
+            // replacements?). The rider tracks "damaged this way" by
+            // reference identity on the sweep's hit set (CR 700.3) and
+            // expires on the cleanup step (CR 514.2) via the bus's
+            // ExpireEndOfTurn sweep. The single-arg dispatcher path
+            // produces the correct card shape only.
+            "Anger of the Gods" => AngerOfTheGodsFactory.Create(owner),
+
             // Instant — {1}{U} (DazeFactory). Nemesis.
             // "You may return an Island you control to its owner's hand
             //  rather than pay this spell's mana cost. Counter target spell
@@ -2204,6 +2230,27 @@ public static class NamedCardFactory
             // CrypticCommandFactory for the modal shape and
             // WishclawTalismanFactory for the control-change registration.
             "Archmage's Charm" => ArchmagesCharmFactory.Create(owner),
+
+            // Creature — Phoenix {3}{R} 3/2 (ArclightPhoenixFactory).
+            // Guilds of Ravnica. Flying + Haste keyword markers (CR 702.9 /
+            // CR 702.10). Graveyard-resident triggered ability scoped to
+            // activeZones = {Graveyard} (CR 603.6d): at the beginning of
+            // combat on the controller's turn, if the controller has cast
+            // three or more instant and/or sorcery spells this turn, return
+            // Arclight Phoenix from graveyard to battlefield. Per-turn
+            // instant+sorcery count is held in a closure private to the
+            // card instance, incremented on every SpellCastEvent owned by
+            // the controller whose card has CardType.Instant or Sorcery,
+            // and reset on TurnStartedEvent when an event bus is supplied
+            // (CR 500.1) — mirrors LedgerShredderFactory's per-turn-counter
+            // pattern. CR 603.10 intervening "if" re-checks both the
+            // ≥3-cast gate and the from-graveyard zone constraint at
+            // resolution. "May" auto-accepted at v1 (same simplification
+            // as Sneak Attack / Through the Breach). Single-arg dispatcher
+            // path attaches the trigger to the card without bus-driven
+            // count tracking or TriggerManager registration; use the
+            // (owner, bus, triggers) overload for fully-wired behavior.
+            "Arclight Phoenix" => ArclightPhoenixFactory.Create(owner),
 
             // Sorcery — {W} (PrismaticEndingFactory). Modern Horizons 2.
             // "Exile target nonland permanent with mana value less than
