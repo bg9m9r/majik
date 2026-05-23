@@ -1907,6 +1907,20 @@ public static class NamedCardFactory
             // bus-driven trigger firing.
             "The One Ring" => TheOneRingFactory.Create(owner),
 
+            // Instant — {U}{U}{U} (ArchmagesCharmFactory). Modern Horizons.
+            // CR 700.2d — modal "Choose one —" with 3 printed modes
+            // (counter spell / target player draws two / gain control of
+            // nonland permanent with mv ≤ 1). The single-arg dispatcher
+            // path produces the correct card shape; the bound
+            // SpellDefinition is built on demand via
+            // ArchmagesCharmFactory.BuildDefinition(caster, targetResolver,
+            // stack[, effects]). Mode 2's ControlChangeEffect (CR 613.2,
+            // Layer 2) is no-op without a live ContinuousEffectsService —
+            // counter / draw modes still resolve fully. Mirrors
+            // CrypticCommandFactory for the modal shape and
+            // WishclawTalismanFactory for the control-change registration.
+            "Archmage's Charm" => ArchmagesCharmFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
