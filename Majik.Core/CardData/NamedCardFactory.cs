@@ -215,6 +215,23 @@ public static class NamedCardFactory
             // deferred — same queue as Connive / Liliana / Yawgmoth.
             "Faithless Looting" => FaithlessLootingFactory.Create(owner),
 
+            // Sorcery — {1}{R} (FaithlessSalvagingFactory). Phyrexia: All
+            // Will Be One. "Discard a card, then draw a card. Flashback—
+            // Discard a creature card." Card shape only here; the resolve
+            // effect (discard 1 + draw 1 via deterministic first-card-in-
+            // hand pick) is built on demand via
+            // FaithlessSalvagingFactory.BuildResolveEffect. Flashback alt-
+            // cost is non-mana — printed cost is "Discard a creature card"
+            // — so v1 splits it (mirrors Cabal Therapy): the
+            // FlashbackAlternativeCost carries ManaCost.Zero and the
+            // discard rider rides as a paired
+            // DiscardACreatureCardAdditionalCost via
+            // FaithlessSalvagingFactory.BuildFlashbackAdditionalCosts.
+            // Real agent-driven "choose a card to discard" prompt deferred
+            // — same queue as Faithless Looting / Liliana / Connive /
+            // Psychic Frog.
+            "Faithless Salvaging" => FaithlessSalvagingFactory.Create(owner),
+
             // U/R Horizon Canopy painless dual — Modern Horizons (FieryIsletFactory).
             // {T}, Pay 1 life: Add {U} or {R} — two ManaAbility instances, each with
             // a life-cost activation gate (CR 119.4) and a LoseLife side-effect.

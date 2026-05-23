@@ -559,6 +559,9 @@ public static class SeedImplementedCards
         // Sorcery — {R} (FaithlessLootingFactory).
         // Draw 2, discard 2; Flashback {2}{R}.
         "Faithless Looting",
+        // Sorcery — {1}{R} (FaithlessSalvagingFactory).
+        // Discard 1, then draw 1; Flashback—Discard a creature card.
+        "Faithless Salvaging",
         // Instant — {G} (VeilOfSummerFactory).
         // Conditional draw + uncounterable + hexproof from UB this turn.
         "Veil of Summer",
