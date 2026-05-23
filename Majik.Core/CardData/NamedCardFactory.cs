@@ -498,6 +498,34 @@ public static class NamedCardFactory
             // back to MarkLost() on failure (CR 104.3 / CR 118.3).
             "Pact of Negation" => PactOfNegationFactory.Create(owner),
 
+            // Instant — {0} (SlaughterPactFactory). Future Sight.
+            // "Destroy target nonblack creature.
+            //  At the beginning of your next upkeep, pay {2}{B}.
+            //  If you don't, you lose the game."
+            // Card shape only here; the resolve-time SpellDefinition is
+            // built on demand via SlaughterPactFactory.BuildDefinition,
+            // which destroys the target nonblack creature (CR 701.7 +
+            // CR 105 color check via CardColors) and — when a
+            // TriggerManager is supplied — registers a delayed upkeep
+            // trigger (CR 603.7) that calls PayMana({2}{B}) and falls
+            // back to MarkLost() on failure (CR 104.3 / CR 118.3).
+            "Slaughter Pact" => SlaughterPactFactory.Create(owner),
+
+            // Instant — {0} (PactOfTheTitanFactory). Future Sight.
+            // "Create a 4/4 red Giant creature token.
+            //  At the beginning of your next upkeep, pay {4}{R}.
+            //  If you don't, you lose the game."
+            // Card shape only here; the resolve-time SpellDefinition is
+            // built on demand via PactOfTheTitanFactory.BuildDefinition,
+            // which creates the 4/4 Giant token under the caster
+            // (CR 111 / CR 111.6) and — when a TriggerManager is
+            // supplied — registers a delayed upkeep trigger (CR 603.7)
+            // that calls PayMana({4}{R}) and falls back to MarkLost()
+            // on failure (CR 104.3 / CR 118.3). Token "red" colour
+            // identity deferred — same gap as Crashing Footfalls'
+            // "green" tokens.
+            "Pact of the Titan" => PactOfTheTitanFactory.Create(owner),
+
             // Instant — {B/P} (SurgicalExtractionFactory).
             // "Choose target card in a graveyard other than a basic land
             //  card. Search its owner's graveyard, hand, and library for
@@ -539,6 +567,19 @@ public static class NamedCardFactory
             // via UnholyHeatFactory.BuildSpellDefinition. Reuses
             // TarmogoyfFactory.CountDistinctCardTypes for the type count.
             "Unholy Heat" => UnholyHeatFactory.Create(owner),
+
+            // Instant — {R} (BurstLightningFactory). Zendikar / Modern Masters.
+            // "Kicker {4}. Burst Lightning deals 2 damage to any target. If
+            //  Burst Lightning was kicked, it deals 4 damage to that target
+            //  instead." CR 702.33. Card shape only here; the resolve-time
+            // SpellDefinition is built on demand via
+            // BurstLightningFactory.BuildSpellDefinition(resolver, wasKicked).
+            // Kicker primitive is DEFERRED (see factory xmldoc) — no
+            // IAdditionalCost shape for Kicker yet, no "was kicked" bit
+            // plumbed through SpellCastFlow, and no OracleSpellBinder /
+            // KeywordAnalyzer awareness. Production casts ship as
+            // not-kicked (2 damage); the wasKicked branch is structural.
+            "Burst Lightning" => BurstLightningFactory.Create(owner),
 
             // Instant — {R}{W} (LightningHelixFactory). Ravnica: City of Guilds /
             // Modern Horizons. "Lightning Helix deals 3 damage to any target and
@@ -832,6 +873,19 @@ public static class NamedCardFactory
             // (no IZone.Shuffle entry point yet — same rationale as the
             // rest of SearchSpellFactory).
             "Mystical Tutor" => MysticalTutorFactory.Create(owner),
+
+            // Instant — {B} (VampiricTutorFactory). Visions and reprinted.
+            // "Search your library for a card, then shuffle. Put that card
+            //  on top. You lose 2 life." (CR 701.19a / 701.19c / 119.3).
+            // Sibling of MysticalTutorFactory: no type predicate (any card
+            // is a legal pick), pick destination is top-of-library (index 0)
+            // via IZone.InsertCardAt, and a 2-life loss fires
+            // unconditionally after the (optional) tutor step. The
+            // resolve-time SpellDefinition is built on demand via
+            // VampiricTutorFactory.BuildSpellDefinition. Shuffle deferred
+            // (no IZone.Shuffle entry point yet — same rationale as the
+            // rest of SearchSpellFactory / MysticalTutorFactory).
+            "Vampiric Tutor" => VampiricTutorFactory.Create(owner),
 
             // Sorcery — {1}{R}{G}{W} (CrashingFootfallsFactory). Modern Horizons.
             // CR 702.85 — Cascade. On-cast triggered ability fires
@@ -1577,6 +1631,25 @@ public static class NamedCardFactory
             // drive the resolution directly via
             // GoblinWelderFactory.WeldResolve(players).
             "Goblin Welder" => GoblinWelderFactory.Create(owner),
+
+            // Creature — Goblin Artificer {1}{R} 1/2 (GoblinEngineerFactory).
+            // Modern Horizons. "When Goblin Engineer enters, you may search
+            // your library for an artifact card, then put that card into
+            // your graveyard. If you do, shuffle." +
+            // "{R}, {T}, Sacrifice an artifact: Return target artifact card
+            // from your graveyard to the battlefield." (CR 603.1 / CR 608).
+            // The ETB tutor sends the picked artifact to the graveyard
+            // (NOT hand) — distinguishes from TrinketMage / GoblinMatron.
+            // The activated ability declares structural {R} + {T} costs;
+            // "Sacrifice an artifact" is performed by the effect body
+            // (generic permanent-class cost, no engine primitive yet).
+            // Both sacrifice and reanimate picks are deterministic v1
+            // (first-match). The single-arg dispatcher path here produces
+            // the correct card shape with raw zone moves; use the
+            // (owner, zoneService, eventBus, triggers) overload for
+            // bus-driven ETB-trigger registration and ZoneService-routed
+            // moves so ETB triggers on the reanimated artifact fire.
+            "Goblin Engineer" => GoblinEngineerFactory.Create(owner),
 
             // Creature — Human Shaman {R} 1/1 (DragonsRageChannelerFactory).
             // Modern Horizons 2. "Whenever you cast a noncreature spell,
