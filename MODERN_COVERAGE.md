@@ -112,6 +112,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Walking Ballista | Artifact Creature | — | grow + ping |
 | Wastewood Verge | Land | — | B/G activation-gate land |
 | Wrenn and Six | Planeswalker | #178 | +1 land return, -1 ping |
+| Wrenn and Realmbreaker | Planeswalker | TBD | +1 mill 3 + may-return-land, -2 reanimate nonland permanent, -7 structural emblem |
 | Wurmcoil Engine | Artifact Creature | TBD | deathtouch + lifelink + dies-trigger twin tokens |
 | Yavimaya, Cradle of Growth | Land | #158 | grant Forest to all lands |
 | Yawgmoth, Thran Physician | Creature | — | pay life + sac → discard/draw |

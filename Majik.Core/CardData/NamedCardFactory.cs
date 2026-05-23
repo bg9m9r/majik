@@ -324,6 +324,17 @@ public static class NamedCardFactory
             // retrace emblem (structural shell).
             "Wrenn and Six" => WrennAndSixFactory.Create(owner),
 
+            // Legendary Planeswalker — Wrenn {3}{G} loyalty 4
+            // (WrennAndRealmbreakerFactory). +1 mill 3 + may-return-
+            // land-from-graveyard (auto-pick), -2 reanimate target
+            // nonland permanent card from a graveyard (auto-pick,
+            // controller's graveyard via the single-arg dispatcher
+            // path; multi-graveyard scan via the (owner, zoneService,
+            // allPlayersResolver) overload), -7 mints a structural
+            // emblem (the basic-land tutor rider on the emblem is
+            // deferred — see factory xmldoc).
+            "Wrenn and Realmbreaker" => WrennAndRealmbreakerFactory.Create(owner),
+
             // Legendary Planeswalker — Karn {7} loyalty 6
             // (KarnLiberatedFactory). +4 target-player-exiles-a-card-from-
             // hand (auto-pick first opponent + first card), -3 exile-
