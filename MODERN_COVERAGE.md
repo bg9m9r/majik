@@ -2,8 +2,8 @@
 
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
-**Last updated:** 2026-05-24
-**Latest origin/main:** 6aeb85c (… + Primeval Titan) + Karn, the Great Creator + Crashing Footfalls / Cascade
+**Last updated:** 2026-05-25
+**Latest origin/main:** 6aeb85c (… + Primeval Titan + Karn, the Great Creator + Crashing Footfalls / Cascade) + Lurrus of the Dream-Den (this PR)
 
 ## Headline numbers
 
@@ -32,6 +32,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Badgermole Cub | Creature | — | earthbend shell |
 | Blood Moon | Enchantment | #156 | nonbasic-to-Mountain Layer 4 |
 | Boseiju, Who Endures | Land | — | channel destroy stub |
+| Colossus Hammer | Artifact | TBD | Equipment {1}: +10/+0 + lose flying + equip {8} |
 | Conversion | Enchantment | #157 | Mountains-are-Plains retype |
 | Consider | Instant | — | surveil 1 + draw |
 | Crashing Footfalls | Sorcery | TBD | cascade trigger + 2x 4/4 Rhino warrior tokens with trample |
@@ -61,16 +62,20 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Ledger Shredder | Creature | #193 | second-spell surveil + counter |
 | Library Surveyor | Creature | — | ETB tutor shell |
 | Liliana of the Veil | Planeswalker | #178 | +1 discard, -2 discard |
+| Living End | Sorcery | TBD | Cascade + each-player mass-exile-grave + sac-creatures + mass-reanimate |
+| Lurrus of the Dream-Den | Creature | TBD | Lifelink + cast-permanent-mv≤2-from-graveyard once per your turn (companion deck-rule deferred) |
 | Magus of the Moon | Creature | #157 | nonbasic-to-Mountain |
 | Mishra's Bauble | Artifact | — | sac → look + delayed draw |
 | Murktide Regent | Creature | #194 | delve cost + ETB X counters |
 | Orcish Bowmasters | Creature | — | reactive ping shell |
 | Pithing Needle | Artifact | #189 | name-targeted activated suppression |
+| Phyrexian Tower | Land | — | {T}: {C} + {T}, sac creature: {B}{B} (Legendary) |
 | Priest of Fell Rites | Creature | #196 | ETB reanimate + grave-unearth |
 | Primeval Titan | Creature | TBD | Trample + ETB/attack tutor up to 2 lands tapped |
 | Rift Bolt | Sorcery | #183 | suspend → 3 damage |
 | Scavenging Ooze | Creature | #188 | exile-graveyard + counter + life |
 | Sea's Claim | Aura | #160 | enchanted land becomes Island |
+| Sigarda's Aid | Enchantment | TBD | flash-grant equipment/aura + ETB auto-attach |
 | Snapcaster Mage | Creature | #170 | flash + ETB flashback grant |
 | Solitude | Creature | — | evoke pitch + ETB exile |
 | Spreading Seas | Aura | #160 | retype land + draw |
@@ -178,6 +183,7 @@ Cards under `Majik.Core/CardData/Cards/*.json`:
 | Spectacle | Stub | `Costs/SpectacleAlternativeCost.cs` |
 | Overload | Stub | `Costs/OverloadAlternativeCost.cs` |
 | Cast-from-exile | Done | `Costs/CastFromExileAlternativeCost.cs` (suspend resolution) |
+| Cast-from-graveyard (Lurrus) | Done (TBD PR) | `Costs/GraveyardCastAlternativeCost.cs` + `CardData/Factories/LurrusOfTheDreamDenFactory.cs` (per-turn gate, mv ≤ 2, permanent-only) |
 | Sacrifice-self | Done | `Costs/SacrificeAnotherCreatureCost.cs`, `SacrificeCreatureCost.cs`, `SacrificeBasicLandCost.cs` |
 | Discard-self | Done | `Costs/DiscardSelfCost.cs` |
 | Remove-counter | Done | `Costs/RemovePlusOnePlusOneCounterCost.cs` |
@@ -286,12 +292,13 @@ Per-keyword action helpers under `Majik.Core/Keywords/`:
 - **Death's Shadow** — Mid-high. Thoughtseize, Fatal Push, Snapcaster Mage, Stubborn Denial, Death's Shadow itself (CDA P/T scaled by controller life — Layer 7a) all in. Mishra's Bauble in. Temur Battle Rage absent. ~60%.
 - **Murktide / Izzet Tempo** — High. Murktide Regent done, Counterspell done, Snapcaster Mage done, Lightning Bolt done, Expressive Iteration done, Ledger Shredder done, Consider done, Spell Pierce done, Subtlety done. Missing: Demilich absent. ~75%.
 - **Mono-Green Tron** — High. Ancient Stirrings, Sylvan Scrying, Wurmcoil Engine done. Karn Liberated done. Karn, the Great Creator done. Tron lands (Urza's Mine + Tower + Power-Plant) done with the conditional {2} mana ability. ~70%.
-- **Living End / Crashing Footfalls cascade** — Mid. Cascade keyword done (`Keywords/CascadeAction.cs`) + Crashing Footfalls shipped. Suspend (#183) + Cascade now both online; Living End still needs the mass-exile-grave-then-mass-reanimate effect chain. ~40%.
+- **Living End / Crashing Footfalls cascade** — High. Cascade keyword done (`Keywords/CascadeAction.cs`) + Crashing Footfalls shipped (#219). Living End shipped (this PR) with both the Cascade trigger and the resolve chain (per-player mass-exile-grave + sacrifice-creatures + mass-reanimate; ETB triggers fire on reanimated permanents via PR #174 plumbing). Suspend itself is done (#183). ~75%.
 - **Rakdos Scam** — Mid-high. Grief done (#205, mirrors Solitude evoke + ETB pattern). Fury done (mirrors Solitude/Grief). Dauthi Voidwalker absent. Liliana of the Veil done, Fatal Push done, Thoughtseize done. ~55%.
 - **Yawgmoth combo** — Mid. Yawgmoth done. Undying creatures (Young Wolf, Strangleroot Geist, Geralf's Messenger) done. Chord of Calling, Eldritch Evolution absent. ~50%.
 - **Domain Zoo** — Mid. Boros Charm done, fetches done, shocks done, Tribal Flames done. Scion of Draco + Territorial Kavu absent. ~35%.
 - **Amulet Titan** — Mid. Amulet of Vigor done (untap-on-enters-tapped trigger) + Primeval Titan done (ETB + attack land-tutor for up to 2, tapped). No bounce lands. ~30%.
-- **Hammer Time / Equipment** — Low-mid. Stoneforge Mystic done. Puresteel Paladin done (Equipment-ETB draw trigger + zero-equip lifecycle binder that gates on ≥3 artifacts; equip-cost consumer wires up when an `EquipActivatedAbility` primitive lands). Sigarda's Aid, Colossus Hammer absent. ~30%.
+- **Lurrus Companion** — Low-mid. Lurrus of the Dream-Den done (Lifelink + once-per-turn cast-permanent-mv≤2-from-graveyard; companion deck-construction rule deferred). Pairs with the existing low-mv permanent suite (Mishra's Bauble, Dryad Arbor, Stoneforge Mystic, Walking Ballista, Dark Confidant, etc.). Deck-construction enforcement absent. ~30%.
+- **Hammer Time / Equipment** — Mid-high. Stoneforge Mystic done. Colossus Hammer done (+10/+0 + lose flying via AttachedBoostEffect + new LoseKeywordEffect). Sigarda's Aid done (flash-grant on Equipment/Aura via FlashGrantRegistry + ETB-attach rider). Puresteel Paladin done (Equipment-ETB draw trigger + zero-equip-cost lifecycle binder that gates on ≥3 artifacts; equip-cost consumer wires up when an `EquipActivatedAbility` primitive lands). ~50%.
 
 ## Top 20 Modern staples NOT yet implemented
 
@@ -299,7 +306,7 @@ Sorted by build priority (small infra lift × high meta share).
 
 | # | Card | Difficulty | Blocker |
 |---|---|---|---|
-| 1 | Living End | Mid | Cascade done; still needs mass-exile-grave + simultaneous mass-reanimate (#174 ready for the latter) |
+| 1 | (open) | — | Living End, Crashing Footfalls, and Cascade all landed; backlog needs a refresh against the next archetype-coverage pass. |
 
 ## How to update this doc
 

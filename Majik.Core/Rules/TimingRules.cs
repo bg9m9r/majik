@@ -10,6 +10,11 @@ namespace Majik.Core.Rules;
 /// / enchantments / artifacts may only be cast at sorcery speed (active
 /// player's main phase, empty stack); instants and any card with Flash
 /// (CR 702.8) can be cast at instant speed.
+///
+/// External flash grants — e.g. Sigarda's Aid: "Equipment and Auras you
+/// control have flash." — are consulted via <see cref="FlashGrantRegistry"/>
+/// so the grant applies even while the card is in hand (i.e. at the moment
+/// of the sorcery-speed gate).
 /// </summary>
 public static class TimingRules
 {
@@ -17,7 +22,12 @@ public static class TimingRules
     {
         if (card == null) throw new ArgumentNullException(nameof(card));
         if (card.HasType(CardType.Instant)) return true;
-        return card.Abilities.OfType<KeywordAbility>().Any(k =>
-            string.Equals(k.Keyword, "Flash", StringComparison.OrdinalIgnoreCase));
+        if (card.Abilities.OfType<KeywordAbility>().Any(k =>
+            string.Equals(k.Keyword, "Flash", StringComparison.OrdinalIgnoreCase)))
+        {
+            return true;
+        }
+        // CR 702.8 — flash granted by an external object (Sigarda's Aid).
+        return FlashGrantRegistry.HasGrantedFlash(card);
     }
 }

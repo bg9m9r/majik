@@ -638,6 +638,20 @@ public static class NamedCardFactory
             // (no live static, +1 no-ops without effects/board).
             "Karn, the Great Creator" => KarnTheGreatCreatorFactory.Create(owner),
 
+            // Enchantment — {1}{W} (SigardasAidFactory). Eldritch Moon.
+            // "Equipment and Auras you control have flash." +
+            // "Whenever an Equipment enters under your control, you may
+            //  attach it to target creature you control."
+            // Flash-grant lifecycle wired via FlashGrantStaticEffect (a new
+            // FlashGrantRegistry mirrors CastingRestrictions — TimingRules
+            // consults it after the printed Instant/Flash check). The
+            // ETB-attach trigger is attached for shape; pass an event bus +
+            // TriggerManager via the overload for fully-wired lifecycle and
+            // bus-driven trigger firing. v1 auto-picks the first
+            // controller-side creature as the attach target (CR 701.3a
+            // prompt deferred — same as Stoneforge Mystic).
+            "Sigarda's Aid" => SigardasAidFactory.Create(owner),
+
             // Artifact — {1} (AmuletOfVigorFactory). Worldwake.
             // "Whenever a permanent enters tapped under your control,
             //  untap it." Triggered ability over CardMovedEvent →
@@ -705,6 +719,55 @@ public static class NamedCardFactory
             // Urza's Mine — only the printed subtype differs
             // (PowerPlant).
             "Urza's Power-Plant" => UrzasPowerPlantFactory.Create(owner),
+
+            // Sorcery — {2}{B}{B}{B} (LivingEndFactory). Time Spiral.
+            // "Cascade. Each player exiles all creature cards from their
+            //  graveyard, then sacrifices all creatures they control, then
+            //  puts all cards they exiled this way onto the battlefield."
+            // Card shape only here; the resolve-time SpellDefinition is
+            // built on demand via LivingEndFactory.BuildSpellDefinition,
+            // which routes each reanimate move through ZoneService so ETB
+            // triggers fire on every reanimated permanent (CR 603.6a —
+            // PR #165, #174 plumbing). The single-arg dispatcher path
+            // attaches the Cascade (CR 702.85) on-cast trigger for shape
+            // inspection but does not register it with a TriggerManager;
+            // use the LivingEndFactory.Create(owner, triggers, willCast,
+            // onCascadeResolved) overload for fully-wired bus firing
+            // (mirrors CrashingFootfallsFactory).
+            "Living End" => LivingEndFactory.Create(owner),
+
+            // Legendary Creature — Cat Nightmare {W}{B} 3/2 (LurrusOfTheDreamDenFactory).
+            // Lifelink keyword wired. Static ability surfaced with description
+            // "During each of your turns, you may cast one permanent spell
+            // with mana value 2 or less from your graveyard." Companion deck-
+            // construction rule (CR 702.139) deferred — that is a deck-builder
+            // foundational concern, not a runtime gameplay one. The runtime
+            // grave-cast gate (per-turn budget, mv ≤ 2, permanent-only,
+            // controller's-turn-only) is exposed via
+            // LurrusOfTheDreamDenFactory.GetGate(card); callers compose it
+            // with a GraveyardCastAlternativeCost via BuildAlternativeCost.
+            // The single-arg dispatcher path here produces the correct card
+            // shape without bus-driven turn-boundary reset wiring (suitable
+            // for shape tests). Use the (owner, eventBus) overload to enable
+            // automatic per-turn budget reset on TurnStartedEvent.
+            "Lurrus of the Dream-Den" => LurrusOfTheDreamDenFactory.Create(owner),
+
+            // Artifact — Equipment {1} (ColossusHammerFactory).
+            // Static "equipped creature gets +10/+0 and loses flying" via
+            // AttachedBoostEffect (Layer 7c) + LoseKeywordEffect("Flying")
+            // (Layer 6). Equip {8} activated ability wired (sorcery-speed
+            // restriction enforced via action-validator, deferred at this
+            // ability level). The single-arg dispatcher path produces the
+            // correct card shape only; use the (owner, continuousEffects)
+            // overload for live boost / lose-flying registration.
+            "Colossus Hammer" => ColossusHammerFactory.Create(owner),
+
+            // Legendary Land — Phyrexian Tower (PhyrexianTowerFactory).
+            // {T}: Add {C} and {T}, Sacrifice a creature: Add {B}{B} — wired.
+            // The sacrifice cost uses SacrificeAnotherCreatureCost; callers can
+            // pre-set the sacrifice target on the second ability's
+            // SacrificeChoice for deterministic test/bot behavior.
+            "Phyrexian Tower" => PhyrexianTowerFactory.Create(owner),
 
             _ => new Card(name, ""),
         };

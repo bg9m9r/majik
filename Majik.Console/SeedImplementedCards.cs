@@ -424,5 +424,29 @@ public static class SeedImplementedCards
         // Flash + Menace + ETB target opponent discards a card. Evoke alt-cost:
         // exile a black card from your hand. Companion to Solitude.
         "Grief",
+        // Enchantment — {2}{G} (UpTheBeanstalkFactory).
+        // ETB draw a card; whenever you cast a spell with mana value 5+, draw a card.
+        "Up the Beanstalk",
+        // Legendary Planeswalker — Karn {7} loyalty 6 (KarnLiberatedFactory).
+        // +4: target player exiles a card from hand; -3: exile target permanent;
+        // -14: restart game with exiled non-Aura permanents (deferred).
+        "Karn Liberated",
+        // Land — Urza Tron piece (UrzaTronLandFactory: Mine).
+        // {T}: Add {C}. If you control Urza's Mine, Urza's Power-Plant, and
+        // Urza's Tower, add {2} instead.
+        "Urza's Mine",
+        // Land — Urza Tron piece (UrzaTronLandFactory: Tower).
+        // {T}: Add {C}. If you control all three Urza lands, add {3} instead.
+        "Urza's Tower",
+        // Land — Urza Tron piece (UrzaTronLandFactory: Power-Plant).
+        // {T}: Add {C}. If you control all three Urza lands, add {2} instead.
+        "Urza's Power Plant",
+        // Artifact — {1} (AmuletOfVigorFactory).
+        // Whenever a permanent enters tapped under your control, untap it.
+        "Amulet of Vigor",
+        // Creature — Giant {4}{G}{G} 6/6 (PrimevalTitanFactory).
+        // ETB + attack trigger: search library for up to two land cards, put
+        // them onto the battlefield tapped.
+        "Primeval Titan",
     };
 }
