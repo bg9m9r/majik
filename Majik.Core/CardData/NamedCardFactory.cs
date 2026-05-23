@@ -750,6 +750,13 @@ public static class NamedCardFactory
             // overload for live boost / lose-flying registration.
             "Colossus Hammer" => ColossusHammerFactory.Create(owner),
 
+            // Legendary Land — Phyrexian Tower (PhyrexianTowerFactory).
+            // {T}: Add {C} and {T}, Sacrifice a creature: Add {B}{B} — wired.
+            // The sacrifice cost uses SacrificeAnotherCreatureCost; callers can
+            // pre-set the sacrifice target on the second ability's
+            // SacrificeChoice for deterministic test/bot behavior.
+            "Phyrexian Tower" => PhyrexianTowerFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
