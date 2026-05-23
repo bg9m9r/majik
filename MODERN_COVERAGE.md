@@ -10,10 +10,10 @@ Living tracker for Modern-format card + mechanic implementation in the Majik eng
 | Metric | Count |
 |---|---|
 | Named factories | 117 |
-| Bespoke templates | 26 |
+| Bespoke templates | 27 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
-| Seeded cards | 59 |
+| Seeded cards | 60 |
 | Estimated Modern meta coverage | ~15% |
 
 (Coverage estimate is rough: counts top-25 archetype staples present in the engine vs. total. Many ancillary archetype pieces remain unimplemented.)
@@ -168,6 +168,7 @@ Cards implemented through generic or bespoke templates without a named factory. 
 - Thoughtseize — `Bespoke/ThoughtseizePatternTemplate`
 - Inquisition of Kozilek — `Bespoke/InquisitionOfKozilekPatternTemplate` (nonland + mv ≤ 3 cap; no life cost)
 - Expressive Iteration — `Bespoke/ExpressiveIterationTemplate`
+- Brainstorm — `Bespoke/BrainstormTemplate` (draw 3, put 2 from hand on top of library; v1 deterministic return order)
 - Malevolent Rumble — `Bespoke/MalevolentRumblePatternTemplate`
 - Fetch lands cycle (10 of them) — `OracleLandActivatedAbilityBinder`
 - Shock lands (Overgrown Tomb + cycle starts) — `Effects/ShockLandReplacement`
