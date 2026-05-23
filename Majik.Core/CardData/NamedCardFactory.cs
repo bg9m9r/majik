@@ -982,6 +982,18 @@ public static class NamedCardFactory
             // DelightedHalflingFactory.
             "Mox Opal" => MoxOpalFactory.Create(owner),
 
+            // Sorcery — {R} (RecklessChargeFactory). Odyssey / Modern Horizons.
+            // "Target creature gets +3/+0 and gains haste until end of turn.
+            //  Flashback {2}{R}." Card shape only here; the resolve-time
+            // SpellDefinition (target creature → +3/+0 + Haste EOT, both
+            // expiring at cleanup per CR 514.2) is built on demand via
+            // RecklessChargeFactory.BuildSpellDefinition. Flashback alt-cost
+            // ({2}{R}) is exposed via RecklessChargeFactory.BuildFlashbackCost
+            // (parsed by FlashbackOracleParser — same pattern as Faithless
+            // Looting). Illegal-target / no-ActiveEffects fallbacks no-op
+            // cleanly.
+            "Reckless Charge" => RecklessChargeFactory.Create(owner),
+
             // Legendary Creature — Monkey Pirate {R} 2/1 (RagavanNimblePilfererFactory).
             // Modern Horizons 2 staple. Combat-damage-to-a-player trigger
             // wired: creates a Treasure token under the Ragavan controller,
