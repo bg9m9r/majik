@@ -16,6 +16,15 @@ namespace Majik.Core.CardData.SpellTemplates.Templates.Library;
 /// cards — type/subtype/supertype filters are ignored. "tapped" is also
 /// ignored. Multi-clause variants ("Return all … . Then destroy all …")
 /// require composer support and are intentionally skipped here.
+///
+/// Routes each graveyard→battlefield move through
+/// <see cref="Majik.Core.Services.ZoneService"/> when one is wired into
+/// the bind context, so ETB triggers fire on every reanimated permanent
+/// (CR 603.6a) and ETB replacement effects (CR 614) are consulted.
+/// Falls back to direct zone mutation (no ETB triggers / replacements)
+/// when no ZoneService is available — preserves legacy callers that
+/// build a SpellBindContext without one. Mirrors the single-target
+/// ReanimateToBattlefieldTemplate wiring.
 /// </summary>
 public sealed class ReturnAllFromGraveyardTemplate : ISpellTemplate
 {
@@ -43,5 +52,5 @@ public sealed class ReturnAllFromGraveyardTemplate : ISpellTemplate
 
     public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
         LibrarySpellFactory.ReturnAllFromGraveyardSpell(
-            ctx.Caster, @params.TryGetValue("kind", out var k) ? k : "");
+            ctx.Caster, @params.TryGetValue("kind", out var k) ? k : "", ctx.Zones);
 }

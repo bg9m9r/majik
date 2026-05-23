@@ -187,7 +187,10 @@ internal static class LibrarySpellFactory
             }) };
         });
 
-    internal static SpellDefinition ReturnAllFromGraveyardSpell(Player caster, string kindRaw) => new(
+    internal static SpellDefinition ReturnAllFromGraveyardSpell(
+        Player caster,
+        string kindRaw,
+        Majik.Core.Services.ZoneService? zones = null) => new(
         Modes: Array.Empty<string>(), HasVariableX: false,
         TargetRequests: Array.Empty<TargetRequest>(),
         EffectFactory: _ => new IEffect[] { new Effect($"return all {kindRaw} from gy", () =>
@@ -199,13 +202,26 @@ internal static class LibrarySpellFactory
             // because cards without a matching template have no behavior at
             // all; mass-reanimating a graveyard's worth of cards is a closer
             // approximation than nothing.
+            //
+            // CR 603.6a — route each move through ZoneService when available
+            // so ETB triggers fire on every reanimated permanent. Direct
+            // zone mutation (the fallback below) bypasses CardMovedEvent and
+            // TriggerManager never observes the moves. Mirrors the single-
+            // target ReanimateToBattlefieldSpell fix from PR #165.
             var snapshot = caster.Zones.Graveyard.GetCards().ToList();
             foreach (var card in snapshot)
             {
-                caster.Zones.Graveyard.RemoveCard(card);
-                caster.Zones.Battlefield.AddCard(card);
-                card.SetZone(ZoneType.Battlefield);
-                card.SetController(caster);
+                if (zones != null)
+                {
+                    zones.MoveCard(card, ZoneType.Graveyard, ZoneType.Battlefield, caster);
+                }
+                else
+                {
+                    caster.Zones.Graveyard.RemoveCard(card);
+                    caster.Zones.Battlefield.AddCard(card);
+                    card.SetZone(ZoneType.Battlefield);
+                    card.SetController(caster);
+                }
             }
         }) });
 
