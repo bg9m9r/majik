@@ -292,6 +292,22 @@ public static class NamedCardFactory
             // retrace emblem (structural shell).
             "Wrenn and Six" => WrennAndSixFactory.Create(owner),
 
+            // Sorcery — {7}{U} (TreasureCruiseFactory).
+            // CR 702.66 — Delve. "Delve" marker keyword wired; the cost
+            // mechanic itself lives in DelveCost + SpellCastFlow. Resolve
+            // effect ("Draw three cards") is built on demand via
+            // TreasureCruiseFactory.BuildResolveEffect — the shell here
+            // omits it so the dispatcher path produces a shape-only card.
+            "Treasure Cruise" => TreasureCruiseFactory.Create(owner),
+
+            // Instant — {6}{U}{U} (DigThroughTimeFactory).
+            // Same Delve marker pattern as Treasure Cruise. Resolve
+            // effect ("Look at 7, hand 2, bottom 5") wired via
+            // DigThroughTimeFactory.BuildResolveEffect with a deterministic
+            // default selector (first-two-to-hand); production code can
+            // supply a custom selector when agent-driven choose-2 ships.
+            "Dig Through Time" => DigThroughTimeFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
