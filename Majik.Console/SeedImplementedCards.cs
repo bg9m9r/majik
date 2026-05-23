@@ -759,5 +759,101 @@ public static class SeedImplementedCards
         // graveyard. {T}, Sacrifice an artifact: return target artifact card
         // with mana value 3 or less from your graveyard to the battlefield.
         "Goblin Engineer",
+
+        // ---- Modern staples shipped in the 2026-05-23h bump ----
+
+        // Instant — {R} (BurstLightningFactory). Zendikar.
+        // ~ deals 2 damage to any target. Kicker {4} — if kicked, ~ deals
+        // 4 damage to that permanent or player instead (kicker deferred).
+        "Burst Lightning",
+        // Instant — {B} (DarkRitualFactory). Limited Edition Alpha.
+        // Add {B}{B}{B}.
+        "Dark Ritual",
+        // Artifact — {0} (LotusPetalFactory). Tempest.
+        // {T}, Sacrifice ~: Add one mana of any color.
+        "Lotus Petal",
+        // Artifact — {1} (SolRingFactory). Limited Edition Alpha.
+        // {T}: Add {C}{C}.
+        "Sol Ring",
+        // Artifact — {1} (ManaVaultFactory). Limited Edition Alpha.
+        // ~ doesn't untap during your untap step. At the beginning of your
+        // upkeep, if ~ is tapped, you lose 1 life. {4}: untap ~.
+        // {T}: Add {C}{C}{C}.
+        "Mana Vault",
+        // Sorcery — {B} (CabalTherapyFactory). Judgment.
+        // Name a nonland card. Target player reveals their hand and discards
+        // all copies of that card. Flashback — Sacrifice a creature.
+        "Cabal Therapy",
+        // Sorcery — {B} (ReanimateFactory). Urza's Saga.
+        // Put target creature card from a graveyard onto the battlefield
+        // under your control. You lose life equal to its mana value.
+        "Reanimate",
+        // Enchantment — Aura {1}{B} (AnimateDeadFactory). Limited Edition Alpha.
+        // Enchant creature card in a graveyard. When ~ enters, if it's on
+        // the battlefield, it loses "enchant creature card in a graveyard"
+        // and gains "enchant creature put onto the battlefield with ~."
+        // Return enchanted creature card to the battlefield under your
+        // control and attach ~ to it. Enchanted creature gets -1/-0.
+        "Animate Dead",
+        // Sorcery — {2}{U}{U} (ShowAndTellFactory). Urza's Saga.
+        // Each player may put an artifact, creature, enchantment, or land
+        // card from their hand onto the battlefield.
+        "Show and Tell",
+        // Sorcery — {2}{R}{R} (ThroughTheBreachFactory). Champions of
+        // Kamigawa. You may put a creature card from your hand onto the
+        // battlefield. That creature gains haste until end of turn.
+        // Sacrifice it at the beginning of the next end step. Splice onto
+        // Arcane — Sacrifice a Mountain (splice deferred).
+        "Through the Breach",
+        // Enchantment — {2}{R}{R} (SneakAttackFactory). Urza's Saga.
+        // {R}: You may put a creature card from your hand onto the
+        // battlefield. That creature gains haste. Sacrifice it at the
+        // beginning of the next end step.
+        "Sneak Attack",
+        // Legendary Creature — Phyrexian Praetor {2}{B}{B} 4/5
+        // (SheoldredTheApocalypseFactory). Dominaria United.
+        // Whenever you draw a card, you gain 1 life. Whenever an opponent
+        // draws a card, they lose 1 life. Wired via OracleTriggeredAbilityBinder.
+        "Sheoldred, the Apocalypse",
+        // Legendary Artifact — {4} (TheOneRingFactory). The Lord of the Rings:
+        // Tales of Middle-earth. Indestructible (cosmetic, deferred).
+        // When ~ enters, if you cast it, you gain protection from everything
+        // until your next turn. At the beginning of your upkeep, you put a
+        // burden counter on ~. Whenever you put one or more burden counters
+        // on ~, you lose that much life. {T}: draw a card for each burden
+        // counter on ~.
+        "The One Ring",
+        // Legendary Creature — Phyrexian Angel {3}{G}{W}{U}{B} 7/7
+        // (AtraxaGrandUnifierFactory). Phyrexia: All Will Be One.
+        // Flying, vigilance, deathtouch, lifelink. When ~ enters, reveal
+        // the top 10 cards of your library. Put one of each card type
+        // (artifact, battle, creature, enchantment, instant, land,
+        // planeswalker, sorcery) from among them into your hand. Put the
+        // rest on the bottom of your library in a random order.
+        "Atraxa, Grand Unifier",
+        // Instant — {U}{B}{R} (ArchmagesCharmFactory). Modern Horizons.
+        // Choose one — Target player draws two cards; or destroy target
+        // nonland permanent with mana value 1 or less; or gain control of
+        // target creature with mana value 2 or less.
+        "Archmage's Charm",
+        // Legendary Creature — Elder Giant {1}{G}{U} 6/6 (UroTitanFactory).
+        // Theros Beyond Death. When ~ enters, sacrifice it unless it
+        // escapes. Whenever ~ enters or attacks, you gain 3 life and draw
+        // a card, then you may put a land card from your hand onto the
+        // battlefield. Escape — {G}{G}{U}{U}, exile five other cards from
+        // your graveyard (escape deferred).
+        "Uro, Titan of Nature's Wrath",
+        // Creature — Avatar Horror {7} */* (HogaakFactory). Modern Horizons.
+        // ~ can't be cast. Convoke. Delve. You may cast ~ from your
+        // graveyard by paying {G}{G}{B}{B} rather than paying its mana cost.
+        // Trample. ~'s power and toughness are each equal to the number of
+        // creature cards in your graveyard.
+        "Hogaak, Arisen Necropolis",
+        // Tribal Enchantment — Zombie {1}{B} (BridgeFromBelowFactory).
+        // Future Sight. Whenever a nontoken creature is put into your
+        // graveyard from the battlefield, if ~ is in your graveyard, create
+        // a 2/2 black Zombie creature token. When a creature is put into an
+        // opponent's graveyard from the battlefield, exile ~.
+        "Bridge from Below",
     };
 }

@@ -337,6 +337,23 @@ public static class NamedCardFactory
             // multi-player effects.
             "Liliana of the Veil" => LilianaOfTheVeilFactory.Create(owner),
 
+            // Legendary Planeswalker — Oko {1}{G}{U} loyalty 4
+            // (OkoThiefOfCrownsFactory). +2 create-Food-token, +1
+            // target-artifact-or-creature-becomes-3/3-Elk + lose-all-
+            // abilities (Layer 4 type-set to Elk Creature + Layer 6 strip
+            // + Layer 7b 3/3; v1 colour-set-to-green deferred — no
+            // Layer 5 colour-changing primitive yet), -5 exchange-control
+            // of target opp-permanent + target your-creature (counter
+            // removal deferred — no CR 611 counter surface on Permanent
+            // yet). Single-arg dispatcher path attaches all three loyalty
+            // bodies; +1/-5 effect bodies gate on the (effects /
+            // battlefieldResolver / allPlayersResolver) wiring and no-op
+            // when the resolvers aren't supplied (loyalty changes still
+            // apply per CR 606.3). The +2 still spawns a Food token even
+            // on the single-arg path because TokenFactory operates on
+            // controller zones directly.
+            "Oko, Thief of Crowns" => OkoThiefOfCrownsFactory.Create(owner),
+
             // Legendary Planeswalker — Wrenn {R}{G} loyalty 3
             // (WrennAndSixFactory). +1 return land card from graveyard
             // to hand (auto-pick), -1 lands-ping (deferred no-op), -7
@@ -1022,6 +1039,26 @@ public static class NamedCardFactory
             // eventBus, triggers) overload for ZoneService-routed moves so
             // ETB triggers on the reanimated permanent fire (CR 603.6a).
             "Sun Titan" => SunTitanFactory.Create(owner),
+
+            // Legendary Creature — Elder Giant {1}{G}{U} 6/6 (UroTitanFactory).
+            // Theros Beyond Death. Three triggered abilities surfaced on the
+            // card: (1) "When Uro enters, sacrifice it unless it escaped" —
+            // Escape (CR 702.143) is not wired in v1, so the rider is
+            // structurally collapsed to "always sacrifice on ETB" faithful
+            // to the printed hardcast case (CR 603.1 + CR 701.16); (2)/(3)
+            // ETB + attack — gain 3 life (CR 119.3), draw a card (CR 121.1),
+            // then may put a land card from hand onto the battlefield (CR
+            // 113.6c). v1 deterministic first-land-in-hand pick (auto-accepts
+            // the "may" when a candidate exists — same shape as Aether Vial
+            // / Sneak Attack / Through the Breach). The single-arg dispatcher
+            // path uses raw zone moves; use the (owner, zoneService, eventBus,
+            // triggers) overload for ZoneService routing on the played land
+            // (so ETB triggers fire — CR 603.6a) and TriggerManager-driven
+            // stack placement. Escape alt-cost (cast from graveyard + exile
+            // five other graveyard cards) is deferred — no graveyard cast
+            // alt-cost + multi-card-exile additional-cost primitive yet.
+            // "Elder" subtype not in CardSubtype — Giant is wired.
+            "Uro, Titan of Nature's Wrath" => UroTitanFactory.Create(owner),
 
             // Land — Urza's Mine (Antiquities, Urza Tron cycle).
             // {T}: Add {C}. If controller controls an Urza's Mine, an
@@ -1861,6 +1898,45 @@ public static class NamedCardFactory
             // shape; use the (owner, triggers) overload to register it with
             // a live TriggerManager.
             "Mana Vault" => ManaVaultFactory.Create(owner),
+
+            // Legendary Creature — Avatar {B}{B}{G}{G} 8/8 (HogaakFactory).
+            // Modern Horizons. Trample + Convoke keyword markers wired.
+            // Additional cost (exile two creature cards from controller's
+            // graveyard — CR 601.2f) surfaced via
+            // HogaakFactory.BuildExileTwoCreaturesAdditionalCost
+            // (ExileCreaturesFromGraveyardAdditionalCost — generic shape so
+            // other graveyard-exile additional costs can reuse it). Convoke
+            // cost surfaced via HogaakFactory.BuildAlternativeCost — v1
+            // returns printed cost unchanged (same gap as Chord of Calling).
+            // "Can't be cast from hand" + "Hogaak's mana value is 8" are
+            // documented but unenforced — no legal-cast-zones predicate on
+            // SpellDefinition and no name-keyed mana-value override surface
+            // exist yet. The dispatcher path here produces the correct card
+            // shape (Trample + Convoke keyword markers attached); the
+            // additional cost + Convoke alt cost are exposed via the
+            // factory's Build* statics so callers can compose them into
+            // the cast flow.
+            "Hogaak, Arisen Necropolis" => HogaakFactory.Create(owner),
+
+            // Enchantment — {B} (BridgeFromBelowFactory). Future Sight.
+            // Two graveyard-resident triggered abilities (CR 603.6d,
+            // activeZones = {Graveyard}). (1) "Whenever a nontoken creature
+            // is put into your graveyard from the battlefield, if Bridge
+            // from Below is in your graveyard, create a 2/2 black Zombie
+            // creature token" — CardMovedEvent Battlefield → Graveyard
+            // gated on Creature + !IsToken + owner == Bridge's controller,
+            // with an interveningIf checking Bridge is in its controller's
+            // graveyard (CR 603.4). (2) "When a creature is put into an
+            // opponent's graveyard from the battlefield, exile Bridge from
+            // Below" — CardMovedEvent Battlefield → Graveyard gated on
+            // Creature landing in an opponent's graveyard, moves Bridge
+            // graveyard → exile via raw zone mutation. Zombie token created
+            // via TokenFactory.CreateOnBattlefield; routes through
+            // ZoneService when the (owner, zoneService, eventBus, triggers)
+            // overload is used so the spawned token publishes CardMovedEvent.
+            // Token-colour identity (black) deferred — same gap as Crashing
+            // Footfalls' green Rhinos and Wurmcoil's colourless Wurms.
+            "Bridge from Below" => BridgeFromBelowFactory.Create(owner),
 
             // Legendary Creature — Phyrexian Angel {3}{W}{U}{B}{R}{G}
             // (AtraxaGrandUnifierFactory). Phyrexia: All Will Be One.
