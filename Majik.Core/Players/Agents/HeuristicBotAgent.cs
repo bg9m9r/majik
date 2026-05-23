@@ -282,7 +282,12 @@ public sealed class HeuristicBotAgent : IPlayerAgent
         var untapped = self.Zones.Battlefield.GetCards()
             .OfType<Permanent>()
             .Where(p => !p.IsTapped)
-            .Where(p => p.Abilities.OfType<IManaAbility>().Any())
+            // CR 305.6 — route through EffectiveManaAbilities for parity
+            // with the mana-payment side. Null layers here ⇒ printed-
+            // abilities path (bot has no path to ContinuousEffectsService
+            // via GameContext yet); identical behaviour to the prior
+            // .OfType<IManaAbility>() enumeration.
+            .Where(p => Majik.Core.Effects.EffectiveManaAbilities.For(p, layers: null).Count > 0)
             .Count();
         if (untapped < cost.TotalValue + reserve) return false;
         return TryPickManaSources(self, cost) != null;
@@ -393,10 +398,14 @@ public sealed class HeuristicBotAgent : IPlayerAgent
     /// actual tapping once the payment commits.</summary>
     private static List<ICard>? TryPickManaSources(Player self, ManaCost cost)
     {
+        // CR 305.6 — same null-layers fallback as CanAffordWithReserve.
+        // When the bot is wired with a ContinuousEffectsService accessor
+        // in the future, switch from null to the real service here so
+        // Blood-Moon-retyped lands are picked by their NEW mana profile.
         var pool = self.Zones.Battlefield.GetCards()
             .OfType<Permanent>()
             .Where(p => !p.IsTapped)
-            .Where(p => p.Abilities.OfType<IManaAbility>().Any())
+            .Where(p => Majik.Core.Effects.EffectiveManaAbilities.For(p, layers: null).Count > 0)
             .ToList();
 
         var picked = new List<ICard>();
@@ -404,7 +413,9 @@ public sealed class HeuristicBotAgent : IPlayerAgent
 
         bool Produces(Permanent p, Func<ManaCost, int> selector)
         {
-            var mana = p.Abilities.OfType<IManaAbility>().First().ManaGenerated;
+            var abilities = Majik.Core.Effects.EffectiveManaAbilities.For(p, layers: null);
+            if (abilities.Count == 0) return false;
+            var mana = abilities[0].ManaGenerated;
             return selector(mana) > 0;
         }
 
@@ -594,7 +605,9 @@ public sealed class HeuristicBotAgent : IPlayerAgent
         var untapped = ctx.Self.Zones.Battlefield.GetCards()
             .OfType<Permanent>()
             .Where(p => !p.IsTapped)
-            .Where(p => p.Abilities.OfType<IManaAbility>().Any())
+            // CR 305.6 — null layers ⇒ printed-abilities fallback; same
+            // rationale as CanAffordWithReserve.
+            .Where(p => Majik.Core.Effects.EffectiveManaAbilities.For(p, layers: null).Count > 0)
             .Count();
         // Subtract the printed non-X portion of the cost — the engine has
         // already required printed cost paid; X mana sits on top.

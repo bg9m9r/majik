@@ -261,7 +261,11 @@ public sealed class TurnDriver
         // (events not externally visible — preserves prior behaviour).
         var castBus = _eventBus ?? new Majik.Core.Events.EventBus();
         var castFlow = new SpellCastFlow(_stack, _zoneService, castBus);
-        var manaResolver = new Majik.Core.Costs.ManaPaymentResolver();
+        // Pass the layer service so CR 305.6 retyping (Blood Moon, etc.)
+        // reshapes mana sources at payment time. Null when the driver
+        // was constructed without a continuous-effects service — the
+        // resolver falls back to printed mana abilities.
+        var manaResolver = new Majik.Core.Costs.ManaPaymentResolver(_continuousEffects);
 
         async Task DispatchCast(Player actor, PriorityAction.CastSpell cast, GameContext ctx)
         {
