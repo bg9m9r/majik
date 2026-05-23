@@ -1075,6 +1075,20 @@ public static class NamedCardFactory
             // "Elder" subtype not in CardSubtype — Giant is wired.
             "Uro, Titan of Nature's Wrath" => UroTitanFactory.Create(owner),
 
+            // Legendary Creature — Elemental Incarnation {2}{R}{W} 4/4
+            // (PhlageFactory). Modern Horizons 3. "When Phlage enters, it
+            // deals 3 damage to any target and you gain 3 life. Escape—
+            // {2}{R}{W}, Exile three other cards from your graveyard."
+            // ETB triggered ability declares a 1..1 "any target"
+            // TargetRequest; on resolution deals 3 damage (Player /
+            // Creature / Planeswalker via DealDamageWithPlaneswalker) and
+            // the controller gains 3 life (CR 119 / CR 119.3). Same shape
+            // as Lightning Helix's resolve, lifted onto a creature ETB.
+            // Escape alt-cost deferred (same gap as Uro — no cast-from-
+            // graveyard alt-cost + multi-card-exile additional-cost
+            // primitive yet).
+            "Phlage, Titan of Fire's Fury" => PhlageFactory.Create(owner),
+
             // Land — Urza's Mine (Antiquities, Urza Tron cycle).
             // {T}: Add {C}. If controller controls an Urza's Mine, an
             // Urza's Power-Plant, AND an Urza's Tower, add {2} instead.
