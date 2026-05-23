@@ -91,6 +91,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Sigarda's Aid | Enchantment | TBD | flash-grant equipment/aura + ETB auto-attach |
 | Snapcaster Mage | Creature | #170 | flash + ETB flashback grant |
 | Solitude | Creature | — | evoke pitch + ETB exile |
+| Spell Snare | Instant | TBD | counter target spell with mana value 2 (resolution-time MV sample, CR 202.3 / 608.2b) |
 | Spreading Seas | Aura | #160 | retype land + draw |
 | Spymaster's Vault | Land | — | B-source shell |
 | Stoneforge Mystic | Creature | #184 | ETB tutor + activated put |

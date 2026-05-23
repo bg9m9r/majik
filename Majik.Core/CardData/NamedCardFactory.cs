@@ -969,6 +969,14 @@ public static class NamedCardFactory
             // is deferred — no Adventure cast surface in the engine yet.
             "Bonecrusher Giant" => BonecrusherGiantFactory.Create(owner),
 
+            // Instant — {U} (SpellSnareFactory). Coldsnap.
+            // "Counter target spell with mana value 2." Card shape only
+            // here; the resolve-time SpellDefinition is built on demand via
+            // SpellSnareFactory.BuildDefinition(targetResolver, stack). MV
+            // is sampled at resolution time (CR 202.3) — printed + PendingCastX,
+            // mirroring Chalice of the Void. Illegal-mv target → no-op (CR 608.2b).
+            "Spell Snare" => SpellSnareFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
