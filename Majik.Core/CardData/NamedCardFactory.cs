@@ -498,6 +498,34 @@ public static class NamedCardFactory
             // back to MarkLost() on failure (CR 104.3 / CR 118.3).
             "Pact of Negation" => PactOfNegationFactory.Create(owner),
 
+            // Instant — {0} (SlaughterPactFactory). Future Sight.
+            // "Destroy target nonblack creature.
+            //  At the beginning of your next upkeep, pay {2}{B}.
+            //  If you don't, you lose the game."
+            // Card shape only here; the resolve-time SpellDefinition is
+            // built on demand via SlaughterPactFactory.BuildDefinition,
+            // which destroys the target nonblack creature (CR 701.7 +
+            // CR 105 color check via CardColors) and — when a
+            // TriggerManager is supplied — registers a delayed upkeep
+            // trigger (CR 603.7) that calls PayMana({2}{B}) and falls
+            // back to MarkLost() on failure (CR 104.3 / CR 118.3).
+            "Slaughter Pact" => SlaughterPactFactory.Create(owner),
+
+            // Instant — {0} (PactOfTheTitanFactory). Future Sight.
+            // "Create a 4/4 red Giant creature token.
+            //  At the beginning of your next upkeep, pay {4}{R}.
+            //  If you don't, you lose the game."
+            // Card shape only here; the resolve-time SpellDefinition is
+            // built on demand via PactOfTheTitanFactory.BuildDefinition,
+            // which creates the 4/4 Giant token under the caster
+            // (CR 111 / CR 111.6) and — when a TriggerManager is
+            // supplied — registers a delayed upkeep trigger (CR 603.7)
+            // that calls PayMana({4}{R}) and falls back to MarkLost()
+            // on failure (CR 104.3 / CR 118.3). Token "red" colour
+            // identity deferred — same gap as Crashing Footfalls'
+            // "green" tokens.
+            "Pact of the Titan" => PactOfTheTitanFactory.Create(owner),
+
             // Instant — {B/P} (SurgicalExtractionFactory).
             // "Choose target card in a graveyard other than a basic land
             //  card. Search its owner's graveyard, hand, and library for
