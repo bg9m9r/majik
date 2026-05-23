@@ -35,6 +35,14 @@ public sealed class TurnState
     // turn") reads this.
     private readonly Dictionary<Guid, int> _spellsCastByPlayer = new();
 
+    // Per-player count of lands that have entered the battlefield under
+    // their control this turn. Read by landfall-conditional spells
+    // (Searing Blaze — CR 702.142 / "Whenever a land you control enters")
+    // that need to ask the question "did a land enter under this player's
+    // control this turn?" at spell resolution rather than via a printed
+    // landfall trigger.
+    private readonly Dictionary<Guid, int> _landsEnteredByController = new();
+
     /// <summary>
     /// How many creatures controlled by <paramref name="player"/> died this turn.
     /// </summary>
@@ -118,6 +126,37 @@ public sealed class TurnState
     }
 
     /// <summary>
+    /// Called when a land enters the battlefield under
+    /// <paramref name="controller"/>'s control. Increments the per-controller
+    /// landfall tally. Read by Searing Blaze and other "if you had a land
+    /// enter the battlefield under your control this turn" gates.
+    /// </summary>
+    public void RecordLandEnteredBattlefield(Player? controller)
+    {
+        if (controller == null) return;
+        _landsEnteredByController[controller.Id] =
+            _landsEnteredByController.GetValueOrDefault(controller.Id) + 1;
+    }
+
+    /// <summary>
+    /// How many lands have entered under <paramref name="player"/>'s control
+    /// this turn. Returns 0 if <paramref name="player"/> is null or has not
+    /// had any lands enter this turn.
+    /// </summary>
+    public int LandsEnteredByController(Player player) =>
+        player == null
+            ? 0
+            : _landsEnteredByController.TryGetValue(player.Id, out var v) ? v : 0;
+
+    /// <summary>
+    /// Convenience predicate: "did <paramref name="player"/> have a land
+    /// enter the battlefield under their control this turn?" Read by
+    /// Searing Blaze's landfall gate at resolution.
+    /// </summary>
+    public bool LandEnteredThisTurn(Player player) =>
+        LandsEnteredByController(player) > 0;
+
+    /// <summary>
     /// Number of spells <paramref name="player"/> has cast this turn (CR 700.6
     /// per-turn tally). Read by Damping Sphere's "+{1} per other spell cast
     /// this turn" rider — cost calculation runs before the rider increments
@@ -161,5 +200,6 @@ public sealed class TurnState
         _cardsDrawnByPlayer.Clear();
         _spellColorsCastByPlayer.Clear();
         _spellsCastByPlayer.Clear();
+        _landsEnteredByController.Clear();
     }
 }
