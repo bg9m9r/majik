@@ -9,7 +9,7 @@ Living tracker for Modern-format card + mechanic implementation in the Majik eng
 
 | Metric | Count |
 |---|---|
-| Named factories | 84 |
+| Named factories | 85 |
 | Bespoke templates | 26 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
@@ -51,6 +51,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Force of Negation | Instant | #185 | pitch counter (non-creature) |
 | Force of Will | Instant | #185 | pitch counter (universal) |
 | Fury | Creature | — | evoke pitch + ETB X-damage divided |
+| Galvanic Discharge | Instant | TBD | 1 + charge counters on artifacts/lands you control damage |
 | Goblin Bombardment | Enchantment | — | sac-creature → 1 damage |
 | Grief | Creature | #205 | evoke pitch + ETB discard |
 | Grist, the Hunger Tide | Planeswalker | — | +1 token, -2 reanimate |
