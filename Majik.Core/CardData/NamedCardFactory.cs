@@ -1403,6 +1403,19 @@ public static class NamedCardFactory
             // for fully-wired behaviour.
             "Spell Queller" => SpellQuellerFactory.Create(owner),
 
+            // Land — Mirrodin Besieged (InkmothNexusFactory). Manland.
+            // {T}: Add {C} mana ability + {1} activated ability registering
+            // an InkmothAnimateLandEffect (Layer 4 type/subtype/keyword grant
+            // for 1/1 Phyrexian Insect artifact creature with Flying + Infect,
+            // "still a land", EOT). Single-arg dispatcher path produces the
+            // correct card shape without ContinuousEffectsService wiring (the
+            // animate {1} cost still resolves, the effect is just not
+            // registered); use the (owner, continuousEffects) overload for
+            // the fully-wired animate-on-resolve behaviour. Infect mechanic
+            // (poison counters + creature damage as -1/-1 counters) is a
+            // keyword marker only in v1 — see InkmothNexusFactory xmldoc.
+            "Inkmoth Nexus" => InkmothNexusFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
