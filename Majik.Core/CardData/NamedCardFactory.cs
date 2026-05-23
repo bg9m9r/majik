@@ -2467,6 +2467,21 @@ public static class NamedCardFactory
             // ChosenTargets and auto-accepts the may).
             "Valakut, the Molten Pinnacle" => ValakutTheMoltenPinnacleFactory.Create(owner),
 
+            // Sorcery — {1}{R} (MizziumMortarsFactory). Return to Ravnica.
+            // CR 702.96 — Overload. Default printed cast deals 4 damage to
+            // target creature; the overload alt-cost {4}{R}{R} rewrites
+            // "target" to "each" (CR 702.96b), yielding "4 damage to each
+            // creature you don't control". OverloadAlternativeCost stub in
+            // Costs/ gates the alt-cost from-hand and carries an
+            // IsOverloaded flag, but the alt-cost is not yet plumbed
+            // through SpellCastFlow to the resolving stack object — so v1
+            // ships the structural overloaded branch as a wasOverloaded
+            // toggle on MizziumMortarsFactory.BuildSpellDefinition (same
+            // posture as Burst Lightning's wasKicked toggle). Production
+            // casts at the single-arg dispatcher path ship as
+            // not-overloaded — 4 damage to one target creature.
+            "Mizzium Mortars" => MizziumMortarsFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
