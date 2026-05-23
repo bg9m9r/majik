@@ -3,13 +3,13 @@
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
 **Last updated:** 2026-05-23
-**Latest origin/main:** Dragon's Rage Channeler (Creature — Human Shaman {R} 1/1 — noncreature-cast `SpellCastEvent` trigger with surveil 1 effect routed through `IPlayerAgent.ChooseSurveilDecisionAsync` with all-to-graveyard fallback (CR 603.1 / 701.42); delirium static registers two `ContinuousEffect`s — Layer 7c +2/+2 and Layer 6 Flying — both gated on DRC being on the battlefield AND `TarmogoyfFactory.CountDistinctCardTypes(controller.Graveyard) >= 4` (CR 702.105 / 613.1f); ETB/LTB lifecycle mirrors Tarmogoyf's `CardMovedEvent` Sync) on top of Wheel of Fortune + Brain Freeze + Lightning Helix + Sword of Feast and Famine + Boros Reckoner + Mishra's Workshop + Goblin Welder + Sword of Fire and Ice + Reckless Charge + Trinket Mage + Sun Titan + Sensei's Divining Top + Inkmoth Nexus + Spell Queller + Goblin Matron + Mutavault + Skullclamp + Umezawa's Jitte + Wasteland + Swords to Plowshares + Mystical Tutor + Path to Exile + Daze + Ponder + Preordain + Splinter Twin + Sythis, Harvest's Hand + Pyromancer's Goggles + Plague Engineer + Manabarbs + Yawgmoth's Will + Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere.
+**Latest origin/main:** Pernicious Deed (Enchantment {1}{B}{G} — {X}, Sacrifice: destroy each artifact, creature, and enchantment with mv ≤ X across all battlefields; mirrors Engineered Explosives' v1 X-provider + sacrifice-stub pattern) on top of Dragon's Rage Channeler + Wheel of Fortune + Brain Freeze + Lightning Helix + Sword of Feast and Famine + Boros Reckoner + Mishra's Workshop + Goblin Welder + Sword of Fire and Ice + Reckless Charge + Trinket Mage + Sun Titan + Sensei's Divining Top + Inkmoth Nexus + Spell Queller + Goblin Matron + Mutavault + Skullclamp + Umezawa's Jitte + Wasteland + Swords to Plowshares + Mystical Tutor + Path to Exile + Daze + Ponder + Preordain + Splinter Twin + Sythis, Harvest's Hand + Pyromancer's Goggles + Plague Engineer + Manabarbs + Yawgmoth's Will + Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere.
 
 ## Headline numbers
 
 | Metric | Count |
 |---|---|
-| Named factories | 135 |
+| Named factories | 136 |
 | Bespoke templates | 27 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
@@ -100,6 +100,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Orcish Bowmasters | Creature | — | reactive ping shell |
 | Pact of Negation | Instant | TBD | {0} — counter target spell + delayed upkeep DelayedTriggeredAbility (CR 603.7) that tries PayMana({3}{U}{U}); on failure MarkLost() (CR 104.3 / 118.3); upkeep agent prompt deferred |
 | Path to Exile | Instant | TBD | {W} — exile target creature + exiled creature's controller may tutor basic land tapped (CR 701.21 + CR 701.19a); library shuffle deferred (no IZone.Shuffle) |
+| Pernicious Deed | Enchantment | TBD | {1}{B}{G} — {X}, Sacrifice: destroy each artifact, creature, and enchantment with mv ≤ X across all battlefields; mirrors Engineered Explosives' v1 shape (ManaCostCost {X} + AdditionalCost.Sacrifice + caller-supplied X provider + allPlayersResolver). Sacrifice payment stub at AdditionalCost.Pay; effect closure performs the zone move (CR 701.16) |
 | Phantasmal Image | Creature | TBD | 0/0 Illusion {1}{U} + EntersAsCopyReplacement (AnyBattlefield) + Layer 4 Illusion subtype rider + targeted-by-spell-or-ability self-sacrifice trigger |
 | Pithing Needle | Artifact | #189 | name-targeted activated suppression |
 | Plague Engineer | Creature | TBD | 2/2 Human Rogue {2}{B} + Deathtouch + ETB choose-creature-type + Layer 7c -1/-1 to opponents' creatures of chosen type (LordStaticEffect opponentsOnly) |
