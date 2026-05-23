@@ -1233,6 +1233,20 @@ public static class NamedCardFactory
             //  primitive ("copy that spell") + new-targets prompt all deferred.
             "Pyromancer's Goggles" => PyromancersGogglesFactory.Create(owner),
 
+            // Instant — {1}{U} (DazeFactory). Nemesis.
+            // "You may return an Island you control to its owner's hand
+            //  rather than pay this spell's mana cost. Counter target spell
+            //  unless its controller pays {1}."
+            // Card shape only here; the resolve-time SpellDefinition
+            // (counter-target-spell-unless-pay-{1}) is built on demand via
+            // DazeFactory.BuildDefinition. Bounce-land pitch alt-cost (CR
+            // 118.9) is surfaced via BounceLandPitchAlternativeCost
+            // (Island predicate) — payment moves the chosen Island from
+            // battlefield to its owner's hand on resolution. No timing
+            // gate (Daze prints none, unlike the Force-of-Will pitch
+            // cycle's "if it's not your turn" rider).
+            "Daze" => DazeFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
