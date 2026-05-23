@@ -51,6 +51,8 @@ public enum CardSubtype
     Ooze,
     /// <summary>Avatar creature subtype — Death's Shadow, Akroma. CR 205.3m.</summary>
     Avatar,
+    /// <summary>Wurm creature subtype — Wurmcoil Engine, Penumbra Wurm. CR 205.3m.</summary>
+    Wurm,
 
     // Land subtypes (examples)
     Forest,
