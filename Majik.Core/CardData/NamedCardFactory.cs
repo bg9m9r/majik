@@ -916,6 +916,22 @@ public static class NamedCardFactory
             // matches CR 701.16 (same trick as Mishra's Bauble).
             "Engineered Explosives" => EngineeredExplosivesFactory.Create(owner),
 
+            // Creature — Human Scout {2}{G} 3/2 (TirelessTrackerFactory).
+            // Shadows over Innistrad. Landfall-style triggered ability:
+            // "Whenever a land enters under your control, create a Clue
+            // token." Wired over CardMovedEvent → battlefield with a Land +
+            // controller-match predicate; Clue creation routes through
+            // TokenFactory.CreateClue. Activated ability: "{2}, Sacrifice
+            // a Clue: Put a +1/+1 counter on Tireless Tracker." The
+            // sacrifice cost is a SacrificeAClueCost surfaced on the
+            // returned card via TirelessTrackerActivatedAbility.SacrificeChoice
+            // so a caller can pre-set the Clue to sac (mirrors Phyrexian
+            // Tower's SacrificeChoice pattern). The single-arg dispatcher
+            // path here attaches the trigger to the card shape without
+            // TriggerManager / ZoneService wiring; use the (owner,
+            // zoneService, triggers) overload for fully-wired bus firing.
+            "Tireless Tracker" => TirelessTrackerFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 

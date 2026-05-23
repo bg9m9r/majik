@@ -3,13 +3,13 @@
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
 **Last updated:** 2026-05-23
-**Latest origin/main:** 6b29e01 (… + Lurrus of the Dream-Den + Colossus Hammer + Sigarda's Aid + Living End + Phyrexian Tower + Puresteel Paladin + Aether Vial + Mox Opal + Scion of Draco + Ragavan, Nimble Pilferer + Cavern of Souls + Galvanic Discharge + Dauthi Voidwalker + Chord of Calling) + Eldritch Evolution (this PR)
+**Latest origin/main:** 6b29e01 (… + Lurrus of the Dream-Den + Colossus Hammer + Sigarda's Aid + Living End + Phyrexian Tower + Puresteel Paladin + Aether Vial + Mox Opal + Scion of Draco + Ragavan, Nimble Pilferer + Cavern of Souls + Galvanic Discharge + Dauthi Voidwalker + Chord of Calling + Eldritch Evolution) + Tireless Tracker (this PR)
 
 ## Headline numbers
 
 | Metric | Count |
 |---|---|
-| Named factories | 89 |
+| Named factories | 90 |
 | Bespoke templates | 26 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
@@ -101,6 +101,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Teferi, Time Raveler | Planeswalker | #182 | sorcery-speed restriction emblem |
 | Test Conniver | Creature | — | connive-keyword test card |
 | Thundering Falls | Land | — | U/R surveil dual |
+| Tireless Tracker | Creature | TBD | Human Scout 3/2: landfall-style Clue trigger + {2}, sac Clue: +1/+1 counter |
 | Torpor Orb | Artifact | — | ETB-trigger suppression |
 | Treasure Cruise | Sorcery | #181 | delve draw 3 |
 | Tribal Flames | Sorcery | TBD | Domain X damage = distinct basic land types you control (CR 702.16) |
