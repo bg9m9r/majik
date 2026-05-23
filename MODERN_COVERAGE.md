@@ -3,13 +3,13 @@
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
 **Last updated:** 2026-05-23
-**Latest origin/main:** Tendrils of Agony (Sorcery {2}{B}{B} — target opponent loses 2 life + you gain 2 life + Storm trigger (CR 702.40) reusing `StormHelper`; second storm spell after Brain Freeze, sharing the same copy-via-`SpellCopier` v1 semantics) on top of Pernicious Deed (Enchantment {1}{B}{G} — {X}, Sacrifice: destroy each artifact, creature, and enchantment with mv ≤ X across all battlefields; mirrors Engineered Explosives' v1 X-provider + sacrifice-stub pattern) on top of Dragon's Rage Channeler + Wheel of Fortune + Brain Freeze + Lightning Helix + Sword of Feast and Famine + Boros Reckoner + Mishra's Workshop + Goblin Welder + Sword of Fire and Ice + Reckless Charge + Trinket Mage + Sun Titan + Sensei's Divining Top + Inkmoth Nexus + Spell Queller + Goblin Matron + Mutavault + Skullclamp + Umezawa's Jitte + Wasteland + Swords to Plowshares + Mystical Tutor + Path to Exile + Daze + Ponder + Preordain + Splinter Twin + Sythis, Harvest's Hand + Pyromancer's Goggles + Plague Engineer + Manabarbs + Yawgmoth's Will + Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere.
+**Latest origin/main:** Vampiric Tutor (Instant {B} — search library for ANY card → top of library + lose 2 life; sibling of Mystical Tutor with no type predicate and an unconditional 2-life payment via `Player.LoseLife`; shuffle deferred — same rationale as the rest of the tutor surface) on top of Tendrils of Agony (Sorcery {2}{B}{B} — target opponent loses 2 life + you gain 2 life + Storm trigger (CR 702.40) reusing `StormHelper`; second storm spell after Brain Freeze, sharing the same copy-via-`SpellCopier` v1 semantics) on top of Pernicious Deed (Enchantment {1}{B}{G} — {X}, Sacrifice: destroy each artifact, creature, and enchantment with mv ≤ X across all battlefields; mirrors Engineered Explosives' v1 X-provider + sacrifice-stub pattern) on top of Dragon's Rage Channeler + Wheel of Fortune + Brain Freeze + Lightning Helix + Sword of Feast and Famine + Boros Reckoner + Mishra's Workshop + Goblin Welder + Sword of Fire and Ice + Reckless Charge + Trinket Mage + Sun Titan + Sensei's Divining Top + Inkmoth Nexus + Spell Queller + Goblin Matron + Mutavault + Skullclamp + Umezawa's Jitte + Wasteland + Swords to Plowshares + Mystical Tutor + Path to Exile + Daze + Ponder + Preordain + Splinter Twin + Sythis, Harvest's Hand + Pyromancer's Goggles + Plague Engineer + Manabarbs + Yawgmoth's Will + Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere.
 
 ## Headline numbers
 
 | Metric | Count |
 |---|---|
-| Named factories | 137 |
+| Named factories | 138 |
 | Bespoke templates | 27 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
@@ -158,6 +158,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Urza's Mine | Land | TBD | Tron — {T}: {C}, {2} if all 3 Urza lands controlled |
 | Urza's Power-Plant | Land | TBD | Tron — {T}: {C}, {2} if all 3 Urza lands controlled |
 | Urza's Tower | Land | TBD | Tron — {T}: {C}, {2} if all 3 Urza lands controlled |
+| Vampiric Tutor | Instant | TBD | {B} — search library for any card → top of library + controller loses 2 life. Sibling of Mystical Tutor: no predicate (unrestricted pick), pick destination is library index 0 via IZone.InsertCardAt, deterministic first-match fallback when no agent is registered. CR 701.19a decline path supported (agent returns null → no tutor); 2-life payment fires unconditionally via Player.LoseLife. Shuffle deferred (no IZone.Shuffle — same rationale as the rest of the tutor surface) |
 | Veil of Summer | Instant | TBD | conditional draw on opp UB cast + uncounterable rider (structural) + Hexproof-from-Blue/Black grant on controller's creatures (structural — TargetLegality only checks bare Hexproof; player-side hexproof deferred) |
 | Vexing Bauble | Artifact | — | sac-draw shell |
 | Walking Ballista | Artifact Creature | — | grow + ping |

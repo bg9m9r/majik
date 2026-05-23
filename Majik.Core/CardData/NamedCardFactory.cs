@@ -833,6 +833,19 @@ public static class NamedCardFactory
             // rest of SearchSpellFactory).
             "Mystical Tutor" => MysticalTutorFactory.Create(owner),
 
+            // Instant — {B} (VampiricTutorFactory). Visions and reprinted.
+            // "Search your library for a card, then shuffle. Put that card
+            //  on top. You lose 2 life." (CR 701.19a / 701.19c / 119.3).
+            // Sibling of MysticalTutorFactory: no type predicate (any card
+            // is a legal pick), pick destination is top-of-library (index 0)
+            // via IZone.InsertCardAt, and a 2-life loss fires
+            // unconditionally after the (optional) tutor step. The
+            // resolve-time SpellDefinition is built on demand via
+            // VampiricTutorFactory.BuildSpellDefinition. Shuffle deferred
+            // (no IZone.Shuffle entry point yet — same rationale as the
+            // rest of SearchSpellFactory / MysticalTutorFactory).
+            "Vampiric Tutor" => VampiricTutorFactory.Create(owner),
+
             // Sorcery — {1}{R}{G}{W} (CrashingFootfallsFactory). Modern Horizons.
             // CR 702.85 — Cascade. On-cast triggered ability fires
             // CascadeAction.Cascade with sourceManaValue = 4 (exile from top
