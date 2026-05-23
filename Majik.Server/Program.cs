@@ -74,18 +74,29 @@ app.UseForwardedHeaders(forwardedOptions);
 app.UseExceptionHandler(eh => eh.Run(async ctx =>
 {
     var feature = ctx.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>();
+    string? exceptionType = null;
     if (feature?.Error != null)
     {
+        exceptionType = feature.Error.GetType().Name;
         var logger = ctx.RequestServices.GetRequiredService<ILoggerFactory>()
             .CreateLogger("Majik.Server.UnhandledException");
         logger.LogError(
             feature.Error,
-            "Unhandled exception on {Method} {Path}",
-            ctx.Request.Method, ctx.Request.Path);
+            "Unhandled exception on {Method} {Path} (traceId={TraceId})",
+            ctx.Request.Method, ctx.Request.Path, ctx.TraceIdentifier);
     }
     ctx.Response.StatusCode = StatusCodes.Status500InternalServerError;
     ctx.Response.ContentType = "application/json";
-    await ctx.Response.WriteAsync("{\"error\":\"internal\"}");
+    // Body includes the request trace id (for cross-referencing server logs)
+    // and the exception TYPE NAME (not message — message can leak secrets).
+    // Full message + stack stays in the log only.
+    var body = System.Text.Json.JsonSerializer.Serialize(new
+    {
+        error = "internal",
+        traceId = ctx.TraceIdentifier,
+        type = exceptionType,
+    });
+    await ctx.Response.WriteAsync(body);
 }));
 
 // OpenAPI is always exposed — the portal's CI build fetches /openapi/v1.json
