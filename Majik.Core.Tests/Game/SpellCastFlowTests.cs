@@ -143,6 +143,84 @@ public class SpellCastFlowTests
         capturedAllPlayers!.Should().BeEquivalentTo(new[] { _alice, _bob });
     }
 
+    [Fact]
+    public async Task PreChosenMana_SkipsAgentPrompt_NoDoubleSourcePick()
+    {
+        // Regression: TurnDriver.DispatchCast prompts the agent for mana
+        // sources before invoking SpellCastFlow.CastAsync. CastAsync used
+        // to unconditionally prompt again — the player would see two
+        // mana selection prompts per cast. When the caller supplies
+        // preChosenMana the prompt is skipped.
+        var bolt = new Instant("Bolt", "R") { Owner = _alice, Zone = ZoneType.Hand };
+        var agent = new CountingManaAgent();
+
+        await _flow.CastAsync(
+            _alice, bolt,
+            SpellDefinition.Vanilla(_ => Array.Empty<IEffect>()),
+            agent, NewContext(),
+            preChosenMana: ManaPayment.Empty);
+
+        agent.ManaPromptCount.Should().Be(0,
+            "preChosenMana supplied — SpellCastFlow must not re-prompt");
+    }
+
+    [Fact]
+    public async Task NoPreChosenMana_PromptsAgentExactlyOnce()
+    {
+        // Mirror of the above: when no payment is forwarded, SpellCastFlow
+        // remains the canonical caster and prompts once (CR 601.2g).
+        var bolt = new Instant("Bolt", "R") { Owner = _alice, Zone = ZoneType.Hand };
+        var agent = new CountingManaAgent();
+
+        await _flow.CastAsync(
+            _alice, bolt,
+            SpellDefinition.Vanilla(_ => Array.Empty<IEffect>()),
+            agent, NewContext());
+
+        agent.ManaPromptCount.Should().Be(1,
+            "no preChosenMana — SpellCastFlow prompts exactly once");
+    }
+
     private GameContext NewContext() =>
         new(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+
+    /// <summary>
+    /// Test agent that tallies how many times ChooseManaSourcesAsync is
+    /// invoked. All other prompts return defaults; ManaPayment.Empty is
+    /// returned for mana so SpellCastFlow's payment metadata is well-formed.
+    /// </summary>
+    private sealed class CountingManaAgent : IPlayerAgent
+    {
+        public int ManaPromptCount { get; private set; }
+
+        public Task<Majik.Core.Players.Agents.ManaPayment> ChooseManaSourcesAsync(
+            GameContext ctx, Majik.Core.ValueObjects.ManaCost cost, CancellationToken ct = default)
+        {
+            ManaPromptCount++;
+            return Task.FromResult(Majik.Core.Players.Agents.ManaPayment.Empty);
+        }
+
+        public Task<PriorityAction> ChoosePriorityActionAsync(GameContext ctx, CancellationToken ct = default)
+            => Task.FromResult(PriorityAction.Pass);
+        public Task<MulliganDecision> ChooseMulliganAsync(GameContext ctx, IReadOnlyList<ICard> hand, int mulligansTaken, CancellationToken ct = default)
+            => Task.FromResult(MulliganDecision.Keep);
+        public Task<IReadOnlyList<ICard>> ChooseCardsToBottomAsync(GameContext ctx, IReadOnlyList<ICard> hand, int countToBottom, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<ICard>>(Array.Empty<ICard>());
+        public Task<IReadOnlyList<object>> ChooseTargetsAsync(GameContext ctx, TargetRequest request, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<object>>(Array.Empty<object>());
+        public Task<int> ChooseXAsync(GameContext ctx, ICard source, CancellationToken ct = default)
+            => Task.FromResult(0);
+        public Task<int> ChooseModeAsync(GameContext ctx, IReadOnlyList<string> modes, IReadOnlyList<Majik.Core.Cards.BotIntent>? modeIntents = null, CancellationToken ct = default)
+            => Task.FromResult(0);
+        public Task<IReadOnlyList<ITriggeredAbility>> OrderTriggersAsync(GameContext ctx, IReadOnlyList<ITriggeredAbility> mine, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<ITriggeredAbility>>(mine);
+        public Task<Majik.Core.Players.Agents.CombatPlan> DeclareAttackersAsync(GameContext ctx, IReadOnlyList<Creature> eligibleAttackers, CancellationToken ct = default)
+            => Task.FromResult(Majik.Core.Players.Agents.CombatPlan.None);
+        public Task<Majik.Core.Players.Agents.BlockPlan> DeclareBlockersAsync(GameContext ctx, IReadOnlyList<Creature> attackers, IReadOnlyList<Creature> eligibleBlockers, CancellationToken ct = default)
+            => Task.FromResult(Majik.Core.Players.Agents.BlockPlan.None);
+        public Task<Majik.Core.Keywords.ScryAction.ScryDecision> ChooseScryDecisionAsync(GameContext? ctx, IReadOnlyList<ICard> peeked, CancellationToken ct = default)
+            => Task.FromResult(new Majik.Core.Keywords.ScryAction.ScryDecision(ToBottom: peeked.ToList(), TopOrder: Array.Empty<ICard>()));
+        public Task<Majik.Core.Keywords.SurveilAction.SurveilDecision> ChooseSurveilDecisionAsync(GameContext? ctx, IReadOnlyList<ICard> peeked, CancellationToken ct = default)
+            => Task.FromResult(new Majik.Core.Keywords.SurveilAction.SurveilDecision(ToGraveyard: peeked.ToList(), TopOrder: Array.Empty<ICard>()));
+    }
 }

@@ -314,10 +314,13 @@ public sealed class TurnDriver
 
             try
             {
+                // Forward the already-prompted mana payment so SpellCastFlow
+                // doesn't re-prompt (CR 601.2g — one mana selection per cast).
                 await castFlow.CastAsync(
                     actor, cast.Card, def, _agents[actor], ctx, ct,
                     additionalCosts: cast.AdditionalCosts,
-                    alternativeCost: cast.AlternativeCost);
+                    alternativeCost: cast.AlternativeCost,
+                    preChosenMana: payment);
             }
             catch (InvalidOperationException ex)
             {
