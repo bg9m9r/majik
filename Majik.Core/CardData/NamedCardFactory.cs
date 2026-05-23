@@ -471,6 +471,18 @@ public static class NamedCardFactory
             // TarmogoyfFactory.CountDistinctCardTypes for the type count.
             "Unholy Heat" => UnholyHeatFactory.Create(owner),
 
+            // Instant — {R} (GalvanicDischargeFactory). Modern Horizons 3.
+            // "Galvanic Discharge deals X damage to any target, where X is
+            //  1 plus the number of charge counters on artifacts and/or
+            //  lands you control." Card shape only here; the resolve-time
+            // SpellDefinition is built on demand via
+            // GalvanicDischargeFactory.BuildSpellDefinition. Counts charge
+            // counters on every Permanent the controller controls whose
+            // type set includes Artifact or Land (artifact creatures +
+            // artifact lands both count); opponent permanents and non-
+            // artifact/land creatures are excluded.
+            "Galvanic Discharge" => GalvanicDischargeFactory.Create(owner),
+
             // Sorcery — {1}{R} (TribalFlamesFactory). Onslaught / Modern Horizons 2.
             // "Tribal Flames deals X damage to any target, where X is the
             //  number of basic land types among lands you control." CR 702.16
