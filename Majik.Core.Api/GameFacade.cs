@@ -114,8 +114,8 @@ public sealed class GameFacade
         _priority = new PriorityManager(new List<Player> { alice, bob }, _stack, _bus, _triggers);
         _combatFlow = new CombatFlow(_bus, _sba, Replacements);
 
-        _aliceAgent = new RemoteAgent(alice, LookupCard);
-        _bobAgent = new RemoteAgent(bob, LookupCard);
+        _aliceAgent = new RemoteAgent(alice, LookupCard, LookupPlayer);
+        _bobAgent = new RemoteAgent(bob, LookupCard, LookupPlayer);
         _aliceAgent.PromptRequested += _ => PulsePromptSignal();
         _bobAgent.PromptRequested += _ => PulsePromptSignal();
 
@@ -471,6 +471,13 @@ public sealed class GameFacade
         {
             sub(dto);
         }
+    }
+
+    private Player? LookupPlayer(Guid playerId)
+    {
+        if (_alice.Id == playerId) return _alice;
+        if (_bob.Id == playerId) return _bob;
+        return null;
     }
 
     private ICard? LookupCard(Guid instanceId)
