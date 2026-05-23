@@ -146,6 +146,7 @@ Cards implemented through generic or bespoke templates without a named factory. 
 - Force of Vigor — `Destroy/DestroyUpToArtifactEnchantmentTemplate` + pitch cost
 - Fatal Push — `Destroy/DestroyCreatureCmcLimitTemplate`
 - Thoughtseize — `Bespoke/ThoughtseizePatternTemplate`
+- Inquisition of Kozilek — `Bespoke/InquisitionOfKozilekPatternTemplate` (nonland + mv ≤ 3 cap; no life cost)
 - Expressive Iteration — `Bespoke/ExpressiveIterationTemplate`
 - Malevolent Rumble — `Bespoke/MalevolentRumblePatternTemplate`
 - Fetch lands cycle (10 of them) — `OracleLandActivatedAbilityBinder`
