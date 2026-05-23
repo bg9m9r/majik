@@ -291,7 +291,7 @@ Per-keyword action helpers under `Majik.Core/Keywords/`:
 - **Yawgmoth combo** — Mid. Yawgmoth done. Undying creatures (Young Wolf, Strangleroot Geist, Geralf's Messenger) done. Chord of Calling, Eldritch Evolution absent. ~50%.
 - **Domain Zoo** — Mid. Boros Charm done, fetches done, shocks done, Tribal Flames done. Scion of Draco + Territorial Kavu absent. ~35%.
 - **Amulet Titan** — Mid. Amulet of Vigor done (untap-on-enters-tapped trigger) + Primeval Titan done (ETB + attack land-tutor for up to 2, tapped). No bounce lands. ~30%.
-- **Hammer Time / Equipment** — Low-mid. Stoneforge Mystic done. Sigarda's Aid, Colossus Hammer, Puresteel Paladin absent. ~20%.
+- **Hammer Time / Equipment** — Low-mid. Stoneforge Mystic done. Puresteel Paladin done (Equipment-ETB draw trigger + zero-equip lifecycle binder that gates on ≥3 artifacts; equip-cost consumer wires up when an `EquipActivatedAbility` primitive lands). Sigarda's Aid, Colossus Hammer absent. ~30%.
 
 ## Top 20 Modern staples NOT yet implemented
 
