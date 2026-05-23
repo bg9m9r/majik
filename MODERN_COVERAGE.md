@@ -3,13 +3,13 @@
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
 **Last updated:** 2026-05-23
-**Latest origin/main:** Damping Sphere (#257) merged on top of 54a8d82 (… + Stony Silence + Aether Gust + Pact of Negation).
+**Latest origin/main:** Damping Sphere (#257) merged on top of 54a8d82 (… + Stony Silence + Aether Gust + Pact of Negation); Goblin Lackey added in this PR.
 
 ## Headline numbers
 
 | Metric | Count |
 |---|---|
-| Named factories | 109 |
+| Named factories | 110 |
 | Bespoke templates | 26 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
@@ -64,6 +64,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Fury | Creature | — | evoke pitch + ETB X-damage divided |
 | Galvanic Discharge | Instant | TBD | 1 + charge counters on artifacts/lands you control damage |
 | Goblin Bombardment | Enchantment | — | sac-creature → 1 damage |
+| Goblin Lackey | Creature | TBD | {R} 1/1 Goblin + combat-damage-to-player trigger cheats first Goblin creature card from hand onto the battlefield (ZoneService-routed for ETB triggers) |
 | Grief | Creature | #205 | evoke pitch + ETB discard |
 | Grist, the Hunger Tide | Planeswalker | — | +1 token, -2 reanimate |
 | Harbinger of the Seas | Creature | #157 | nonbasic-to-Island |
@@ -338,13 +339,12 @@ Sorted roughly by build priority (small infra lift × high meta share). Refreshe
 |---|---|---|---|
 | 1 | Plague Engineer | medium | ETB: choose a creature type → opponents' creatures of that type get -1/-1. Needs chosen-subtype state on permanents + opponent-only lord-style boost. |
 | 2 | Splinter Twin | medium | Aura grants `{T}: create a token copy with haste`. `CopyEffect` exists, but ability-grant-on-attach (aura adds an activated ability to enchanted creature) does not. |
-| 3 | Goblin Lackey | medium | Combat-damage trigger reuses `Ragavan`-style shape, but needs "put nonland card from hand onto battlefield" effect (cheat-into-play from hand, distinct from cast). |
-| 4 | Wishclaw Talisman | medium | Tutor-any-card + give-control-of-this trigger after activation; mid-turn permanent control-swap primitive absent (only Layer 1 control-change static exists today). |
-| 5 | Sythis, Harvest's Hand | medium | Constellation (cast-an-enchantment trigger) primitive absent; needs a cast-event-typed-card trigger surface comparable to landfall. |
-| 6 | Yawgmoth's Will | high | "Play cards from your graveyard this turn" — turn-scoped global cast-from-graveyard permission + EOT exile-instead-of-grave replacement chain. `GraveyardCastAlternativeCost` is per-card, not zone-wide. |
-| 7 | Manabarbs | high | Triggered ability on every land-tap event globally; tap-event subscription per-permanent works, but a global "whenever a player taps a land for mana" hook is unwired. |
-| 8 | Pyromancer's Goggles | high | Legendary {0} mana ability + replacement: "when you tap it for {R} to cast an instant/sorcery, copy that spell once". Needs cast-time mana-source tracking + spell-copy hook keyed off that source. |
-| 9 | Searing Blaze | low | Landfall-gated dual damage (player + creature) on an instant; landfall trigger exists, but "if landfall, do X else do Y" alternative-mode template on instants is absent. |
+| 3 | Wishclaw Talisman | medium | Tutor-any-card + give-control-of-this trigger after activation; mid-turn permanent control-swap primitive absent (only Layer 1 control-change static exists today). |
+| 4 | Sythis, Harvest's Hand | medium | Constellation (cast-an-enchantment trigger) primitive absent; needs a cast-event-typed-card trigger surface comparable to landfall. |
+| 5 | Yawgmoth's Will | high | "Play cards from your graveyard this turn" — turn-scoped global cast-from-graveyard permission + EOT exile-instead-of-grave replacement chain. `GraveyardCastAlternativeCost` is per-card, not zone-wide. |
+| 6 | Manabarbs | high | Triggered ability on every land-tap event globally; tap-event subscription per-permanent works, but a global "whenever a player taps a land for mana" hook is unwired. |
+| 7 | Pyromancer's Goggles | high | Legendary {0} mana ability + replacement: "when you tap it for {R} to cast an instant/sorcery, copy that spell once". Needs cast-time mana-source tracking + spell-copy hook keyed off that source. |
+| 8 | Searing Blaze | low | Landfall-gated dual damage (player + creature) on an instant; landfall trigger exists, but "if landfall, do X else do Y" alternative-mode template on instants is absent. |
 
 ## How to update this doc
 
