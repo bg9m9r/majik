@@ -9,10 +9,11 @@ namespace Majik.Core.Effects;
 /// creature's CURRENT power/toughness/keywords after every continuous
 /// effect has been applied in layer order.
 ///
-/// MVP supports layers 6 (Abilities) and 7c (PT_Modify). Other layers
-/// can register effects today; they'll apply in numeric order. Full
-/// dependency-ordering (CR 613.8) is a Phase 16.x task — current
-/// implementation uses simple Timestamp tie-break inside each layer.
+/// Within each layer/sublayer effects are ordered per CR 613.8: if
+/// effect A depends on effect B (applying B first would change A's
+/// existence, what it does, or the set of objects it applies to), B
+/// applies before A regardless of timestamp. Independent effects use
+/// timestamp order; dependency cycles fall back to timestamp order.
 /// </summary>
 public sealed class ContinuousEffectsService
 {
@@ -56,12 +57,19 @@ public sealed class ContinuousEffectsService
 
         var applicable = _effects
             .Where(e => e.IsActive() && e.AppliesTo(creature))
-            .OrderBy(e => (int)e.Layer)
-            .ThenBy(e => e.Timestamp);
+            .ToList();
 
-        foreach (var effect in applicable)
+        // CR 613.8 — group by layer, then dependency-sort within each group.
+        var byLayer = applicable
+            .GroupBy(e => (int)e.Layer)
+            .OrderBy(g => g.Key);
+
+        foreach (var group in byLayer)
         {
-            effect.Apply(chars);
+            foreach (var effect in TopoSortByDependencies(group.ToList()))
+            {
+                effect.Apply(chars);
+            }
         }
 
         // Layer 7c — +1/+1 and -1/-1 counter P/T adjustment (CR 122.1g).
@@ -75,6 +83,86 @@ public sealed class ContinuousEffectsService
         }
 
         return chars;
+    }
+
+    /// <summary>
+    /// CR 613.8 — Kahn's topological sort within a single layer/sublayer.
+    /// Edge: A depends on B (<c>A.DependsOn(B)</c>) ⇒ B must apply before A,
+    /// so B has an outgoing edge to A and A's in-degree counts B. Ties broken
+    /// by earliest timestamp; same-tick collisions broken by original index
+    /// in the group for determinism. If a cycle remains after Kahn drains,
+    /// the cycle's members are emitted in timestamp order (then index).
+    /// </summary>
+    private static IEnumerable<ContinuousEffect> TopoSortByDependencies(IList<ContinuousEffect> group)
+    {
+        var n = group.Count;
+        if (n <= 1)
+        {
+            foreach (var e in group) yield return e;
+            yield break;
+        }
+
+        // inDegree[i] = number of effects j in group such that group[i].DependsOn(group[j])
+        // (i.e. number of prerequisites of i still unsatisfied).
+        var inDegree = new int[n];
+        // edges[j] = list of i for which group[i].DependsOn(group[j]) — j unblocks i.
+        var edges = new List<int>[n];
+        for (var k = 0; k < n; k++) edges[k] = new List<int>();
+
+        for (var i = 0; i < n; i++)
+        {
+            for (var j = 0; j < n; j++)
+            {
+                if (i == j) continue;
+                if (group[i].DependsOn(group[j]))
+                {
+                    edges[j].Add(i);
+                    inDegree[i]++;
+                }
+            }
+        }
+
+        // Tie-break: earliest timestamp first; same tick → lowest original index.
+        int Compare(int a, int b)
+        {
+            var c = group[a].Timestamp.CompareTo(group[b].Timestamp);
+            return c != 0 ? c : a.CompareTo(b);
+        }
+
+        var ready = new List<int>();
+        for (var i = 0; i < n; i++)
+        {
+            if (inDegree[i] == 0) ready.Add(i);
+        }
+
+        var emitted = new bool[n];
+        var emittedCount = 0;
+
+        while (ready.Count > 0)
+        {
+            ready.Sort(Compare);
+            var next = ready[0];
+            ready.RemoveAt(0);
+            yield return group[next];
+            emitted[next] = true;
+            emittedCount++;
+            foreach (var dependent in edges[next])
+            {
+                if (--inDegree[dependent] == 0) ready.Add(dependent);
+            }
+        }
+
+        if (emittedCount == n) yield break;
+
+        // Cycle fallback — remaining nodes form one or more cycles. CR 613.8
+        // says fall back to timestamp order for the cycle members.
+        var remaining = new List<int>();
+        for (var i = 0; i < n; i++)
+        {
+            if (!emitted[i]) remaining.Add(i);
+        }
+        remaining.Sort(Compare);
+        foreach (var idx in remaining) yield return group[idx];
     }
 
     /// <summary>Expire and drop all effects whose duration is "until end of turn".</summary>
