@@ -9,7 +9,7 @@ Living tracker for Modern-format card + mechanic implementation in the Majik eng
 
 | Metric | Count |
 |---|---|
-| Named factories | 71 |
+| Named factories | 72 |
 | Bespoke templates | 26 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
@@ -85,6 +85,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Thundering Falls | Land | — | U/R surveil dual |
 | Torpor Orb | Artifact | — | ETB-trigger suppression |
 | Treasure Cruise | Sorcery | #181 | delve draw 3 |
+| Tribal Flames | Sorcery | TBD | Domain X damage = distinct basic land types you control (CR 702.16) |
 | Underground Mortuary | Land | — | U/B surveil dual |
 | Unholy Heat | Instant | #190 | delirium variable damage |
 | Up the Beanstalk | Enchantment | TBD | ETB draw + cast-MV-5+ draw |
@@ -286,7 +287,7 @@ Per-keyword action helpers under `Majik.Core/Keywords/`:
 - **Living End / Crashing Footfalls cascade** — Blocked. Cascade keyword + Suspend-trigger end-of-suspend exile-and-cast TODO. Suspend itself is done (#183), so partial groundwork. ~15%.
 - **Rakdos Scam** — Mid-high. Grief done (#205, mirrors Solitude evoke + ETB pattern). Fury done (mirrors Solitude/Grief). Dauthi Voidwalker absent. Liliana of the Veil done, Fatal Push done, Thoughtseize done. ~55%.
 - **Yawgmoth combo** — Mid. Yawgmoth done. Undying creatures (Young Wolf, Strangleroot Geist, Geralf's Messenger) done. Chord of Calling, Eldritch Evolution absent. ~50%.
-- **Domain Zoo** — Low-mid. Boros Charm done, fetches done, shocks done. Scion of Draco, Territorial Kavu, Tribal Flames absent. ~25%.
+- **Domain Zoo** — Mid. Boros Charm done, fetches done, shocks done, Tribal Flames done. Scion of Draco + Territorial Kavu absent. ~35%.
 - **Amulet Titan** — Mid. Amulet of Vigor done (untap-on-enters-tapped trigger) + Primeval Titan done (ETB + attack land-tutor for up to 2, tapped). No bounce lands. ~30%.
 - **Hammer Time / Equipment** — Low-mid. Stoneforge Mystic done. Sigarda's Aid, Colossus Hammer, Puresteel Paladin absent. ~20%.
 
