@@ -1023,6 +1023,26 @@ public static class NamedCardFactory
             // ETB triggers on the reanimated permanent fire (CR 603.6a).
             "Sun Titan" => SunTitanFactory.Create(owner),
 
+            // Legendary Creature — Elder Giant {1}{G}{U} 6/6 (UroTitanFactory).
+            // Theros Beyond Death. Three triggered abilities surfaced on the
+            // card: (1) "When Uro enters, sacrifice it unless it escaped" —
+            // Escape (CR 702.143) is not wired in v1, so the rider is
+            // structurally collapsed to "always sacrifice on ETB" faithful
+            // to the printed hardcast case (CR 603.1 + CR 701.16); (2)/(3)
+            // ETB + attack — gain 3 life (CR 119.3), draw a card (CR 121.1),
+            // then may put a land card from hand onto the battlefield (CR
+            // 113.6c). v1 deterministic first-land-in-hand pick (auto-accepts
+            // the "may" when a candidate exists — same shape as Aether Vial
+            // / Sneak Attack / Through the Breach). The single-arg dispatcher
+            // path uses raw zone moves; use the (owner, zoneService, eventBus,
+            // triggers) overload for ZoneService routing on the played land
+            // (so ETB triggers fire — CR 603.6a) and TriggerManager-driven
+            // stack placement. Escape alt-cost (cast from graveyard + exile
+            // five other graveyard cards) is deferred — no graveyard cast
+            // alt-cost + multi-card-exile additional-cost primitive yet.
+            // "Elder" subtype not in CardSubtype — Giant is wired.
+            "Uro, Titan of Nature's Wrath" => UroTitanFactory.Create(owner),
+
             // Land — Urza's Mine (Antiquities, Urza Tron cycle).
             // {T}: Add {C}. If controller controls an Urza's Mine, an
             // Urza's Power-Plant, AND an Urza's Tower, add {2} instead.
