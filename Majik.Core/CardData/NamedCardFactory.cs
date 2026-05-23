@@ -363,6 +363,13 @@ public static class NamedCardFactory
             // target check at resolution).
             "Force of Negation" => ForceOfNegationFactory.Create(owner),
 
+            // Sorcery — {2}{R} (RiftBoltFactory). 3 damage to any target;
+            // Suspend 1—{R} (CR 702.62). Spell-def and suspend alt cost
+            // built on demand via RiftBoltFactory.BuildSpellDefinition /
+            // BuildSuspendCost — caller wires them through SpellCastFlow
+            // and SuspendedCardRegistry.
+            "Rift Bolt" => RiftBoltFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
