@@ -505,5 +505,72 @@ public static class SeedImplementedCards
         // Multicolored creatures you control have flying, first strike,
         // vigilance, trample, and lifelink (subset wired per factory).
         "Scion of Draco",
+
+        // ---- Modern staples shipped in the 2026-05-23d bump ----
+
+        // Legendary Planeswalker — Wrenn {1}{R}{G} loyalty 3 (WrennAndRealmbreakerFactory).
+        // +1 mill+land; -2 grave-reanimate; -7 emblem-tutor.
+        "Wrenn and Realmbreaker",
+        // Creature — Dauthi Rogue {B} 1/1 (DauthiVoidwalkerFactory).
+        // Opponent-graveyard replace-with-exile + cast-from-exile.
+        "Dauthi Voidwalker",
+        // Instant — {R} (GalvanicDischargeFactory).
+        // 1 damage + charge-counter scaling damage to any target.
+        "Galvanic Discharge",
+        // Land — (CavernOfSoulsFactory).
+        // Choose-type ETB; {T}: Add {C} or any-color for chosen-type spells;
+        // those spells can't be countered (CR 614).
+        "Cavern of Souls",
+        // Instant — {X}{G}{G}{G} (ChordOfCallingFactory).
+        // Flash + convoke + creature tutor onto the battlefield (mv ≤ X).
+        "Chord of Calling",
+        // Sorcery — {2}{G} (EldritchEvolutionFactory).
+        // Sac-creature additional cost; tutor creature of mv up to sacrificed +2.
+        "Eldritch Evolution",
+        // Artifact — {X}{X} (ChaliceOfTheVoidFactory).
+        // ETB with X charge counters; symmetric counter-spell-of-MV-X (CR 614).
+        "Chalice of the Void",
+        // Creature — Human Scout {1}{G} 1/2 (TirelessTrackerFactory).
+        // Landfall create Clue; sac-Clue draw + +1/+1 counter on ~.
+        "Tireless Tracker",
+        // Artifact — {X} (EngineeredExplosivesFactory).
+        // ETB with X charge counters; {2}, Sac: destroy all nonland permanents
+        // with MV equal to charge-counter count.
+        "Engineered Explosives",
+        // Sorcery — {R} (WrennsResolveFactory).
+        // Draw 2; exile-EOT rider on the drawn cards.
+        "Wrenn's Resolve",
+        // Creature — Giant {2}{R} 4/3 (BonecrusherGiantFactory).
+        // Targeted-by-spell trigger deals 2 damage to spell's controller.
+        // Adventure deferred. DFC stored under composite name.
+        "Bonecrusher Giant // Stomp",
+        // Instant — {U} (SpellSnareFactory).
+        // Counter target spell with mana value 2.
+        "Spell Snare",
+        // Instant — {(r/g)}{(r/g)} (ManamorphoseFactory).
+        // Add 2 mana of any color combination; cantrip.
+        "Manamorphose",
+        // Creature — Illusion {U} 0/0 (PhantasmalImageFactory).
+        // ETB as copy of any creature; sac trigger when targeted (Illusion).
+        "Phantasmal Image",
+        // Instant — {B} (CabalRitualFactory).
+        // Add {B}{B}{B}; Threshold — adds {B}{B}{B}{B}{B} instead.
+        "Cabal Ritual",
+        // Sorcery — {R} (FaithlessLootingFactory).
+        // Draw 2, discard 2; Flashback {2}{R}.
+        "Faithless Looting",
+        // Instant — {G} (VeilOfSummerFactory).
+        // Conditional draw + uncounterable + hexproof from UB this turn.
+        "Veil of Summer",
+        // Enchantment — {B}{B}{B} (NecropotenceFactory).
+        // Skip draw step; end-of-turn discard-exile; pay 1 life set-aside-then-draw.
+        "Necropotence",
+        // Legendary Land — (KarakasFactory).
+        // {T}: Add {W}; {T}: Bounce target legendary creature to owner's hand.
+        "Karakas",
+        // Enchantment — {1}{W} (StonySilenceFactory).
+        // Global static — activated abilities of artifacts can't be activated
+        // (mana abilities exempt, CR 605).
+        "Stony Silence",
     };
 }
