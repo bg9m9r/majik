@@ -1814,6 +1814,21 @@ public static class NamedCardFactory
             // a live TriggerManager.
             "Mana Vault" => ManaVaultFactory.Create(owner),
 
+            // Legendary Creature — Phyrexian Angel {3}{W}{U}{B}{R}{G}
+            // (AtraxaGrandUnifierFactory). Phyrexia: All Will Be One.
+            // Flying + Vigilance + Deathtouch + Lifelink keyword markers
+            // wired (CR 702.9 / 702.20 / 702.2 / 702.15). ETB triggered
+            // ability: reveal the top ten cards of your library, put one
+            // card of each card type into your hand, then place the rest
+            // on the bottom of your library in a random order (CR 603.6a,
+            // CR 701.20a). The single-arg dispatcher path attaches the
+            // ETB trigger to the card shape without TriggerManager
+            // wiring; callers can invoke AtraxaGrandUnifierFactory.ResolveEtb
+            // directly to drive the reveal-and-pick. The Battle card
+            // type (MoM+) is iterated transparently when added to the
+            // CardType enum — no factory change needed.
+            "Atraxa, Grand Unifier" => AtraxaGrandUnifierFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
