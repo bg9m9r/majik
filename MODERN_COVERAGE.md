@@ -3,13 +3,13 @@
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
 **Last updated:** 2026-05-24
-**Latest origin/main:** 6aeb85c (… + Primeval Titan) + Karn, the Great Creator
+**Latest origin/main:** 6aeb85c (… + Primeval Titan) + Karn, the Great Creator + Crashing Footfalls / Cascade
 
 ## Headline numbers
 
 | Metric | Count |
 |---|---|
-| Named factories | 72 |
+| Named factories | 73 |
 | Bespoke templates | 26 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
@@ -34,6 +34,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Boseiju, Who Endures | Land | — | channel destroy stub |
 | Conversion | Enchantment | #157 | Mountains-are-Plains retype |
 | Consider | Instant | — | surveil 1 + draw |
+| Crashing Footfalls | Sorcery | TBD | cascade trigger + 2x 4/4 Rhino warrior tokens with trample |
 | Cryptic Command | Instant | #191 | modal choose-2 |
 | Dark Confidant | Creature | #178 | upkeep reveal + life loss |
 | Death's Shadow | Creature | TBD | Layer 7a CDA P/T scaled by controller life |
@@ -241,7 +242,7 @@ Per-keyword action helpers under `Majik.Core/Keywords/`:
 | Delirium | Done (#190) | (in `UnholyHeatFactory`; no shared helper yet) | Unholy Heat |
 | Plot | TODO | — | — |
 | Mobilize | TODO | — | — |
-| Cascade | TODO | — | blocks Crashing Footfalls, Living End |
+| Cascade | Done (TBD) | `Keywords/CascadeAction.cs` | Crashing Footfalls |
 | Storm | TODO | — | — |
 | Affinity | TODO | — | — |
 | Bloodthirst / Echo / Buyback | TODO | — | — |
@@ -285,7 +286,7 @@ Per-keyword action helpers under `Majik.Core/Keywords/`:
 - **Death's Shadow** — Mid-high. Thoughtseize, Fatal Push, Snapcaster Mage, Stubborn Denial, Death's Shadow itself (CDA P/T scaled by controller life — Layer 7a) all in. Mishra's Bauble in. Temur Battle Rage absent. ~60%.
 - **Murktide / Izzet Tempo** — High. Murktide Regent done, Counterspell done, Snapcaster Mage done, Lightning Bolt done, Expressive Iteration done, Ledger Shredder done, Consider done, Spell Pierce done, Subtlety done. Missing: Demilich absent. ~75%.
 - **Mono-Green Tron** — High. Ancient Stirrings, Sylvan Scrying, Wurmcoil Engine done. Karn Liberated done. Karn, the Great Creator done. Tron lands (Urza's Mine + Tower + Power-Plant) done with the conditional {2} mana ability. ~70%.
-- **Living End / Crashing Footfalls cascade** — Blocked. Cascade keyword + Suspend-trigger end-of-suspend exile-and-cast TODO. Suspend itself is done (#183), so partial groundwork. ~15%.
+- **Living End / Crashing Footfalls cascade** — Mid. Cascade keyword done (`Keywords/CascadeAction.cs`) + Crashing Footfalls shipped. Suspend (#183) + Cascade now both online; Living End still needs the mass-exile-grave-then-mass-reanimate effect chain. ~40%.
 - **Rakdos Scam** — Mid-high. Grief done (#205, mirrors Solitude evoke + ETB pattern). Fury done (mirrors Solitude/Grief). Dauthi Voidwalker absent. Liliana of the Veil done, Fatal Push done, Thoughtseize done. ~55%.
 - **Yawgmoth combo** — Mid. Yawgmoth done. Undying creatures (Young Wolf, Strangleroot Geist, Geralf's Messenger) done. Chord of Calling, Eldritch Evolution absent. ~50%.
 - **Domain Zoo** — Mid. Boros Charm done, fetches done, shocks done, Tribal Flames done. Scion of Draco + Territorial Kavu absent. ~35%.
@@ -298,9 +299,7 @@ Sorted by build priority (small infra lift × high meta share).
 
 | # | Card | Difficulty | Blocker |
 |---|---|---|---|
-| 1 | Crashing Footfalls | High | Suspend done (#183), but cascade trigger on suspend-cast missing |
-| 2 | Living End | High | Cascade + mass-exile-grave + simultaneous mass-reanimate (#174 ready for the latter) |
-| 3 | Cascade keyword | High | Triggered "cast for free from top reveal" — alt-cast-from-library framework |
+| 1 | Living End | Mid | Cascade done; still needs mass-exile-grave + simultaneous mass-reanimate (#174 ready for the latter) |
 
 ## How to update this doc
 
