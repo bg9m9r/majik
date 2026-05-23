@@ -40,6 +40,8 @@ public enum CardSubtype
     /// <summary>Modern Horizons 2 incarnation cycle (Solitude, Endurance,
     /// Fury, Grief, Subtlety). CR 205.3m — creature subtype.</summary>
     Incarnation,
+    /// <summary>Lhurgoyf creature subtype — Tarmogoyf, Mortivore. CR 205.3m.</summary>
+    Lhurgoyf,
 
     // Land subtypes (examples)
     Forest,
