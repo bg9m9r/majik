@@ -3,13 +3,13 @@
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
 **Last updated:** 2026-05-23
-**Latest origin/main:** Swords to Plowshares on top of Mystical Tutor + Path to Exile + Daze (bounce-Island pitch + counter-unless-pay-1) + Ponder + Preordain + Splinter Twin + Sythis, Harvest's Hand + Pyromancer's Goggles + Plague Engineer + Manabarbs + Yawgmoth's Will + Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere.
+**Latest origin/main:** Wasteland (Land {T}: {C} + {T}, sac: destroy target nonbasic land) on top of Swords to Plowshares + Mystical Tutor + Path to Exile + Daze + Ponder + Preordain + Splinter Twin + Sythis, Harvest's Hand + Pyromancer's Goggles + Plague Engineer + Manabarbs + Yawgmoth's Will + Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere.
 
 ## Headline numbers
 
 | Metric | Count |
 |---|---|
-| Named factories | 120 |
+| Named factories | 121 |
 | Bespoke templates | 27 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
@@ -139,6 +139,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Veil of Summer | Instant | TBD | conditional draw on opp UB cast + uncounterable rider (structural) + Hexproof-from-Blue/Black grant on controller's creatures (structural — TargetLegality only checks bare Hexproof; player-side hexproof deferred) |
 | Vexing Bauble | Artifact | — | sac-draw shell |
 | Walking Ballista | Artifact Creature | — | grow + ping |
+| Wasteland | Land | TBD | {T}: {C} + {T}, sac: destroy target nonbasic land (ActivatedAbility with TargetRequest; self-sacrifice inline at resolution while AdditionalCost.Sacrifice is stubbed — mirrors Karakas's bounce shape) |
 | Wastewood Verge | Land | — | B/G activation-gate land |
 | Wishclaw Talisman | Artifact | TBD | {1}{B} ETB tapped + {T}, Pay 3 life: tutor any card → hand + ControlChangeEffect (CR 613.2) swaps control to a caller-chosen opponent; sorcery-speed gate + shuffle + opponent-prompt deferred |
 | Wrenn and Six | Planeswalker | #178 | +1 land return, -1 ping |
@@ -360,7 +361,7 @@ Sorted roughly by build priority (small infra lift × high meta share). Refreshe
 | 9 | Skullclamp | medium | Equipment {1}: +1/-1 + equipped-dies → draw 2. Needs the dies-trigger keyed to a different permanent (the equipped creature, not Skullclamp itself); ties to equipment-lifecycle which Sigarda's Aid + Puresteel Paladin already exercise. |
 | 10 | Umezawa's Jitte | medium | Legendary equipment + combat-damage trigger gains 2 charge counters + three activated abilities (pump, lifegain/damage-to-creature, lifegain). Needs charge-counter resource on equipment + modal activation; multi-activation pattern similar to Engineered Explosives but per-ability. |
 | 11 | Sword of Fire and Ice | medium | Equipment with two-color protection + combat-damage trigger (deal 2 + draw 1). Needs protection-from-color shell (Layer 6 grant) + paired combat-damage trigger; mirrors any future Sword cycle. |
-| 12 | Wasteland | low | Land {T}: {C} + {1},{T},sac: destroy target nonbasic land. DestroyLand primitive exists for Boseiju channel; needs the activated-ability shell on a land with sac cost. |
+| ~~12~~ | ~~Wasteland~~ | ~~low~~ | Shipped via `WastelandFactory` — {T}: Add {C} (vanilla ManaAbility) + {T}, Sacrifice Wasteland: destroy target nonbasic land (ActivatedAbility with TargetRequest, self-sacrifice inline at resolution while AdditionalCost.Sacrifice is stubbed — mirrors Karakas's destroy/bounce shape). |
 | 13 | Mutavault | medium | Land {T}: {C} + {1}: until EOT, becomes 2/2 creature with all creature types (still a land). Needs Layer 4/7 land-becomes-creature primitive + "all creature types" inclusion. |
 | 14 | Inkmoth Nexus | medium | Land {T}: {C} + {1}: until EOT, becomes 1/1 Blinkmoth artifact creature with flying + infect (still a land). Builds on Mutavault primitive + needs Infect keyword (poison counters + damage replacement). |
 | 15 | Goblin Matron | low | Creature ETB — search library for a Goblin, reveal, hand. Tutor-to-hand by subtype primitive; mirrors Stoneforge Mystic's ETB but filtered by subtype, not card type. |
