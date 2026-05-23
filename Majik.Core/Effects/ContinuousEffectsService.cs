@@ -40,20 +40,46 @@ public sealed class ContinuousEffectsService
     /// </summary>
     public CreatureCharacteristics Compute(Creature creature)
     {
-        var chars = new CreatureCharacteristics
-        {
-            Power = creature.BasePower,
-            Toughness = creature.BaseToughness,
-        };
+        return (CreatureCharacteristics)Compute((Permanent)creature);
+    }
 
+    /// <summary>
+    /// CR 613 — compute the current characteristics of any permanent by
+    /// applying all matching effects in layer order. For creatures this
+    /// returns a <see cref="CreatureCharacteristics"/> (so existing
+    /// creature-side mutators keep working via the
+    /// <see cref="ContinuousEffect.Apply(PermanentCharacteristics)"/>
+    /// default dispatch); for non-creature permanents it returns a plain
+    /// <see cref="PermanentCharacteristics"/>.
+    /// </summary>
+    public PermanentCharacteristics Compute(Permanent permanent)
+    {
+        if (permanent == null) throw new ArgumentNullException(nameof(permanent));
+
+        PermanentCharacteristics chars;
+        if (permanent is Creature creature)
+        {
+            chars = new CreatureCharacteristics
+            {
+                Power = creature.BasePower,
+                Toughness = creature.BaseToughness,
+            };
+        }
+        else
+        {
+            chars = new PermanentCharacteristics();
+        }
+
+        // Seed printed types; Layer 4 effects add/remove on top.
+        foreach (var t in permanent.CardTypes) chars.Types.Add(t);
+        // Seed printed subtypes; Layer 4 effects add/remove on top.
+        foreach (var st in permanent.Subtypes) chars.Subtypes.Add(st);
         // Bake in keywords already attached as KeywordAbility markers
         // (printed evergreens like Flying on Air Elemental).
-        foreach (var kw in creature.Abilities.OfType<KeywordAbility>())
+        foreach (var kw in permanent.Abilities.OfType<KeywordAbility>())
         {
             chars.Keywords.Add(kw.Keyword);
         }
-        // Seed printed subtypes; Layer 4 effects add/remove on top.
-        foreach (var st in creature.Subtypes) chars.Subtypes.Add(st);
 
         // CR 613.6 — pre-compute the set of creatures whose abilities have been
         // stripped by an active Layer 6 ability-removing effect. We then drop
@@ -65,12 +91,12 @@ public sealed class ContinuousEffectsService
         //
         // Source-suppression here is limited to creature sources: Source is
         // typed as Permanent? but the stripped-set is HashSet<Creature>.
-        // Broader stripped-source tracking (e.g. type-changing-to-creature
-        // permanents) would require widening the typing of the stripped-set.
+        // Broader stripped-source tracking keyed by Permanent (e.g. for
+        // type-changing-to-creature permanents) is a follow-up.
         var stripped = ComputeStrippedSet();
 
         var applicable = _effects
-            .Where(e => e.IsActive() && e.AppliesTo(creature))
+            .Where(e => e.IsActive() && e.AppliesTo(permanent))
             .Where(e => e is LoseAllAbilitiesEffect
                         || e.Source is not Creature src
                         || !stripped.Contains(src))
@@ -91,12 +117,13 @@ public sealed class ContinuousEffectsService
 
         // Layer 7c — +1/+1 and -1/-1 counter P/T adjustment (CR 122.1g).
         // Applied after other 7c effects per CR 613.7 (counters last).
-        if (creature is Majik.Core.Cards.Permanent perm)
+        // Only meaningful for creatures.
+        if (chars is CreatureCharacteristics cc && permanent is Permanent perm)
         {
             var plus = perm.Counters.Count(Majik.Core.Counters.CounterType.PlusOnePlusOne);
             var minus = perm.Counters.Count(Majik.Core.Counters.CounterType.MinusOneMinusOne);
-            chars.Power += plus - minus;
-            chars.Toughness += plus - minus;
+            cc.Power += plus - minus;
+            cc.Toughness += plus - minus;
         }
 
         return chars;
@@ -108,6 +135,10 @@ public sealed class ContinuousEffectsService
     /// suppress effects sourced from stripped creatures WITHOUT re-entering
     /// Compute (which would recurse indefinitely). Short-circuits to an empty
     /// set when no LoseAllAbilitiesEffect is registered.
+    ///
+    /// Stripped-set remains keyed by <see cref="Creature"/> for now. A broader
+    /// Permanent-keyed stripped-set (needed once non-creature permanents can
+    /// have their abilities removed) is a follow-up.
     /// </summary>
     private HashSet<Creature> ComputeStrippedSet()
     {
