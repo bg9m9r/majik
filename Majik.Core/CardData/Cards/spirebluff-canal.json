@@ -1,0 +1,8 @@
+{
+  "name": "Spirebluff Canal",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "U" },
+    { "kind": "mana", "produces": "R" }
+  ]
+}
