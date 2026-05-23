@@ -471,6 +471,16 @@ public static class NamedCardFactory
             // TarmogoyfFactory.CountDistinctCardTypes for the type count.
             "Unholy Heat" => UnholyHeatFactory.Create(owner),
 
+            // Sorcery — {1}{R} (TribalFlamesFactory). Onslaught / Modern Horizons 2.
+            // "Tribal Flames deals X damage to any target, where X is the
+            //  number of basic land types among lands you control." CR 702.16
+            //  (Domain). Card shape only here; the resolve-time SpellDefinition
+            //  is built on demand via TribalFlamesFactory.BuildSpellDefinition,
+            //  which uses ContinuousEffectsService.Compute(land).Subtypes when
+            //  a live layers service is supplied so layer-4 retypes (Blood
+            //  Moon, Spreading Seas, Urborg, Yavimaya) feed through.
+            "Tribal Flames" => TribalFlamesFactory.Create(owner),
+
             // Artifact — {1} (PithingNeedleFactory).
             // "As Pithing Needle enters, choose a card name. Activated
             //  abilities of sources with the chosen name can't be
