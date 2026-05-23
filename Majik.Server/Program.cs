@@ -65,6 +65,29 @@ forwardedOptions.KnownIPNetworks.Clear();
 forwardedOptions.KnownProxies.Clear();
 app.UseForwardedHeaders(forwardedOptions);
 
+// Global exception handler — sits BEFORE CORS so the 500 response is
+// re-run through the downstream middleware chain, ensuring the
+// Access-Control-Allow-Origin header is attached. Without this the
+// browser blocks the body of any unhandled-exception response and the
+// SPA surfaces an opaque "fetch failed" instead of a meaningful 500.
+// Stack traces are logged server-side, never leaked in the body.
+app.UseExceptionHandler(eh => eh.Run(async ctx =>
+{
+    var feature = ctx.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerFeature>();
+    if (feature?.Error != null)
+    {
+        var logger = ctx.RequestServices.GetRequiredService<ILoggerFactory>()
+            .CreateLogger("Majik.Server.UnhandledException");
+        logger.LogError(
+            feature.Error,
+            "Unhandled exception on {Method} {Path}",
+            ctx.Request.Method, ctx.Request.Path);
+    }
+    ctx.Response.StatusCode = StatusCodes.Status500InternalServerError;
+    ctx.Response.ContentType = "application/json";
+    await ctx.Response.WriteAsync("{\"error\":\"internal\"}");
+}));
+
 // OpenAPI is always exposed — the portal's CI build fetches /openapi/v1.json
 // from the deployed API to regenerate its typed client during `ng build`.
 // This is an open-source MTG rules engine; the schema is not sensitive.
