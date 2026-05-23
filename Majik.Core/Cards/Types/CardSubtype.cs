@@ -91,6 +91,9 @@ public enum CardSubtype
     /// <summary>Mutant creature subtype — Psychic Frog, Mutavault's
     /// changeling base type. CR 205.3m.</summary>
     Mutant,
+    /// <summary>Horror creature subtype — Spellskite (New Phyrexia),
+    /// Phyrexian Obliterator. CR 205.3m.</summary>
+    Horror,
 
     // Land subtypes (examples)
     Forest,

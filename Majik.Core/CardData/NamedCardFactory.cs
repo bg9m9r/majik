@@ -616,6 +616,16 @@ public static class NamedCardFactory
             // SpellCastFlow resolver wire-up site.
             "Surgical Extraction" => SurgicalExtractionFactory.Create(owner),
 
+            // Artifact Creature — Horror {2} 0/4 (SpellskiteFactory).
+            // "{U/P}: Change the target of target spell or ability with a
+            //  single target to Spellskite."
+            // CR 107.4f / 118.8 — Phyrexian pip ({U/P}) modelled as two
+            // parallel ActivatedAbilities: pay {U} (ManaCostCost) or pay
+            // 2 life (AdditionalCost.PayLife). v1 redirects only spells
+            // (single-target), rewriting Spell.ChosenTargets — ability-
+            // target redirect deferred (same gap as RedirectTemplate).
+            "Spellskite" => SpellskiteFactory.Create(owner),
+
             // Sorcery — {2}{R} (RiftBoltFactory). 3 damage to any target;
             // Suspend 1—{R} (CR 702.62). Spell-def and suspend alt cost
             // built on demand via RiftBoltFactory.BuildSpellDefinition /
@@ -2228,6 +2238,20 @@ public static class NamedCardFactory
             // is auto-taken; routing the land ETB through ZoneService is
             // deferred to fully-wired callers — see factory xmldoc.
             "Nadu, Winged Wisdom" => NaduWingedWisdomFactory.Create(owner),
+
+            // Sorcery — {2}{W}{W} (WrathOfGodFactory). Limited Edition Alpha
+            // and many reprints. "Destroy all creatures. They can't be
+            // regenerated." Card shape only at the dispatcher; the resolve
+            // effect (every player's battlefield → graveyard sweep for every
+            // Creature) is built on demand via WrathOfGodFactory.BuildResolveEffect.
+            // The "can't be regenerated" rider and indestructible bypass are
+            // lossy at v1 — same gap as DestroyAllCreaturesTemplate's sweep.
+            "Wrath of God" => WrathOfGodFactory.Create(owner),
+
+            // Sorcery — {2}{B}{B} (DamnationFactory). Planar Chaos.
+            // Functional reprint of Wrath of God in black; resolve effect
+            // delegates to WrathOfGodFactory.BuildResolveEffect.
+            "Damnation" => DamnationFactory.Create(owner),
 
             _ => new Card(name, ""),
         };
