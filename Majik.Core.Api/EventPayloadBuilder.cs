@@ -127,6 +127,20 @@ public static class EventPayloadBuilder
             kind = StackKind(x.StackObject),
             description = StackDescription(x.StackObject),
         }),
+        // Per-creature / per-player damage payload (CR 119, CR 510).
+        // Frontend needs source + target Guids so it can draw a damage
+        // animation from the attacker (or spell) to the victim — life
+        // flash alone isn't enough at the per-creature level. We map
+        // every DamageDealtEvent subclass (Combat / Spell / Ability)
+        // to a single wire shape so the portal can render uniformly.
+        DamageDealtEvent x => Serialize(new
+        {
+            sourceInstanceId = x.SourceInstanceId,
+            targetInstanceId = x.TargetInstanceId,
+            targetIsPlayer = x.TargetIsPlayer,
+            amount = x.Amount,
+            damageType = x.DamageType.ToString(),
+        }),
         GameStartedEvent => Empty(),
         _ => Empty(),
     };

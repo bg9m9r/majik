@@ -1,6 +1,8 @@
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
+using Majik.Core.Domain.DomainEvents;
 using Majik.Core.Effects;
+using Majik.Core.Events;
 using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
@@ -9,6 +11,40 @@ namespace Majik.Core.CardData.SpellTemplates.Templates.Damage;
 
 internal static class DamageSpellFactory
 {
+    /// <summary>
+    /// Publish a generic <see cref="DamageDealtEvent"/> for spell-source
+    /// damage (CR 119) so the portal can animate per-target damage
+    /// pings. <paramref name="caster"/> is used as the source identity
+    /// today — full ICard threading lands when the spell pipeline
+    /// surfaces the resolving card to the effect closure.
+    /// </summary>
+    private static void EmitDamageDealt(
+        IEventBus? bus, Player? caster, object target, int amount)
+    {
+        if (bus == null || caster == null || amount <= 0) return;
+        switch (target)
+        {
+            case Creature c:
+                bus.Publish(new DamageDealtEvent(
+                    sourceCard: null, sourcePlayer: caster,
+                    targetCard: c, targetPlayer: null,
+                    amount: amount, damageType: DamageType.Spell));
+                break;
+            case Planeswalker pw:
+                bus.Publish(new DamageDealtEvent(
+                    sourceCard: null, sourcePlayer: caster,
+                    targetCard: pw, targetPlayer: null,
+                    amount: amount, damageType: DamageType.Spell));
+                break;
+            case Player p:
+                bus.Publish(new DamageDealtEvent(
+                    sourceCard: null, sourcePlayer: caster,
+                    targetCard: null, targetPlayer: p,
+                    amount: amount, damageType: DamageType.Spell));
+                break;
+        }
+    }
+
     /// <summary>
     /// Push a spell-source damage intent through the ReplacementBus (when
     /// available) before committing it. Returns the final amount; 0 means
@@ -38,11 +74,16 @@ internal static class DamageSpellFactory
     }
 
     internal static SpellDefinition DamageAnySpell(int n, Func<object, object> resolver) =>
-        DamageAnySpell(n, resolver, replacements: null, caster: null);
+        DamageAnySpell(n, resolver, replacements: null, caster: null, bus: null);
 
     internal static SpellDefinition DamageAnySpell(
         int n, Func<object, object> resolver,
-        ReplacementBus? replacements, Player? caster) => new(
+        ReplacementBus? replacements, Player? caster) =>
+        DamageAnySpell(n, resolver, replacements, caster, bus: null);
+
+    internal static SpellDefinition DamageAnySpell(
+        int n, Func<object, object> resolver,
+        ReplacementBus? replacements, Player? caster, IEventBus? bus) => new(
         Modes: Array.Empty<string>(), HasVariableX: false,
         TargetRequests: new[] { new TargetRequest("any target", 1, 1, Array.Empty<object>()) },
         EffectFactory: p =>
@@ -53,15 +94,21 @@ internal static class DamageSpellFactory
                 var amount = Filter(replacements, (object?)caster ?? target, target, n);
                 if (amount <= 0) return;
                 OracleSpellBinder.DealDamage(target, amount);
+                EmitDamageDealt(bus, caster, target, amount);
             }) };
         });
 
     internal static SpellDefinition DamagePlayerSpell(int n, Func<object, object> resolver) =>
-        DamagePlayerSpell(n, resolver, replacements: null, caster: null);
+        DamagePlayerSpell(n, resolver, replacements: null, caster: null, bus: null);
 
     internal static SpellDefinition DamagePlayerSpell(
         int n, Func<object, object> resolver,
-        ReplacementBus? replacements, Player? caster) => new(
+        ReplacementBus? replacements, Player? caster) =>
+        DamagePlayerSpell(n, resolver, replacements, caster, bus: null);
+
+    internal static SpellDefinition DamagePlayerSpell(
+        int n, Func<object, object> resolver,
+        ReplacementBus? replacements, Player? caster, IEventBus? bus) => new(
         Modes: Array.Empty<string>(), HasVariableX: false,
         TargetRequests: new[] { new TargetRequest("target player", 1, 1, Array.Empty<object>()) },
         EffectFactory: p =>
@@ -71,7 +118,9 @@ internal static class DamageSpellFactory
             {
                 if (target is not Player player) return;
                 var amount = Filter(replacements, (object?)caster ?? target, player, n);
-                if (amount > 0) player.LoseLife(amount);
+                if (amount <= 0) return;
+                player.LoseLife(amount);
+                EmitDamageDealt(bus, caster, player, amount);
             }) };
         });
 
@@ -134,11 +183,16 @@ internal static class DamageSpellFactory
         }) });
 
     internal static SpellDefinition DamageCreatureSpell(int n, Func<object, object> resolver) =>
-        DamageCreatureSpell(n, resolver, replacements: null, caster: null);
+        DamageCreatureSpell(n, resolver, replacements: null, caster: null, bus: null);
 
     internal static SpellDefinition DamageCreatureSpell(
         int n, Func<object, object> resolver,
-        ReplacementBus? replacements, Player? caster) => new(
+        ReplacementBus? replacements, Player? caster) =>
+        DamageCreatureSpell(n, resolver, replacements, caster, bus: null);
+
+    internal static SpellDefinition DamageCreatureSpell(
+        int n, Func<object, object> resolver,
+        ReplacementBus? replacements, Player? caster, IEventBus? bus) => new(
         Modes: Array.Empty<string>(), HasVariableX: false,
         TargetRequests: new[] { new TargetRequest("target creature", 1, 1, Array.Empty<object>()) },
         EffectFactory: p =>
@@ -148,16 +202,23 @@ internal static class DamageSpellFactory
             {
                 if (target is not Creature creature) return;
                 var amount = Filter(replacements, (object?)caster ?? creature, creature, n);
-                if (amount > 0) creature.TakeDamage(amount);
+                if (amount <= 0) return;
+                creature.TakeDamage(amount);
+                EmitDamageDealt(bus, caster, creature, amount);
             }) };
         });
 
     internal static SpellDefinition DealsXAnyTargetSpell(Func<object, object> resolver) =>
-        DealsXAnyTargetSpell(resolver, replacements: null, caster: null);
+        DealsXAnyTargetSpell(resolver, replacements: null, caster: null, bus: null);
 
     internal static SpellDefinition DealsXAnyTargetSpell(
         Func<object, object> resolver,
-        ReplacementBus? replacements, Player? caster) => new(
+        ReplacementBus? replacements, Player? caster) =>
+        DealsXAnyTargetSpell(resolver, replacements, caster, bus: null);
+
+    internal static SpellDefinition DealsXAnyTargetSpell(
+        Func<object, object> resolver,
+        ReplacementBus? replacements, Player? caster, IEventBus? bus) => new(
         Modes: Array.Empty<string>(), HasVariableX: true,
         TargetRequests: new[] { new TargetRequest("any target", 1, 1, Array.Empty<object>()) },
         EffectFactory: p =>
@@ -167,16 +228,23 @@ internal static class DamageSpellFactory
             return new IEffect[] { new Effect($"deal X={x}", () =>
             {
                 var amount = Filter(replacements, (object?)caster ?? target, target, x);
-                if (amount > 0) OracleSpellBinder.DealDamage(target, amount);
+                if (amount <= 0) return;
+                OracleSpellBinder.DealDamage(target, amount);
+                EmitDamageDealt(bus, caster, target, amount);
             }) };
         });
 
     internal static SpellDefinition DealsXCreatureSpell(Func<object, object> resolver) =>
-        DealsXCreatureSpell(resolver, replacements: null, caster: null);
+        DealsXCreatureSpell(resolver, replacements: null, caster: null, bus: null);
 
     internal static SpellDefinition DealsXCreatureSpell(
         Func<object, object> resolver,
-        ReplacementBus? replacements, Player? caster) => new(
+        ReplacementBus? replacements, Player? caster) =>
+        DealsXCreatureSpell(resolver, replacements, caster, bus: null);
+
+    internal static SpellDefinition DealsXCreatureSpell(
+        Func<object, object> resolver,
+        ReplacementBus? replacements, Player? caster, IEventBus? bus) => new(
         Modes: Array.Empty<string>(), HasVariableX: true,
         TargetRequests: new[] { new TargetRequest("target creature", 1, 1, Array.Empty<object>()) },
         EffectFactory: p =>
@@ -187,7 +255,9 @@ internal static class DamageSpellFactory
             {
                 if (target is not Creature creature) return;
                 var amount = Filter(replacements, (object?)caster ?? creature, creature, x);
-                if (amount > 0) creature.TakeDamage(amount);
+                if (amount <= 0) return;
+                creature.TakeDamage(amount);
+                EmitDamageDealt(bus, caster, creature, amount);
             }) };
         });
 }

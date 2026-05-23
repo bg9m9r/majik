@@ -29,5 +29,5 @@ public sealed class DamagePlayerTemplate : ISpellTemplate
     public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
         DamageSpellFactory.DamagePlayerSpell(
             SpellTemplateHelpers.WordToInt(@params["n"]), ctx.Resolver,
-            ctx.Replacements, ctx.Caster);
+            ctx.Replacements, ctx.Caster, ctx.EventBus);
 }
