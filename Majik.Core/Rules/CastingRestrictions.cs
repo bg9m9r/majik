@@ -35,6 +35,11 @@ public static class CastingRestrictions
     // (Veil of Summer). Stored as a flat set of player IDs; cleared at
     // end of turn by the caller (or via <see cref="Clear"/> in tests).
     private static readonly HashSet<Guid> _uncounterableControllers = new();
+    // CR 113.6 — "<player> can't cast spells from anywhere other than
+    // their hand" (Drannith Magistrate, Aven Mindcensor, Ethersworn
+    // Canonist's cousin). Same (token, player) shape as the sorcery-
+    // speed list so multiple sources can stack without trampling.
+    private static readonly List<(object Token, Player Player)> _castFromHandOnly = new();
     private static readonly object _gate = new();
 
     /// <summary>
@@ -124,6 +129,62 @@ public static class CastingRestrictions
         lock (_gate) _uncounterableControllers.Clear();
     }
 
+    /// <summary>
+    /// Register a "<paramref name="player"/> can't cast spells from
+    /// anywhere other than their hand" restriction (CR 113.6 — Drannith
+    /// Magistrate et al.), keyed by <paramref name="token"/>. Idempotent
+    /// for the same (token, player) pair.
+    /// </summary>
+    public static void AddCastFromHandOnlyRestriction(object token, Player player)
+    {
+        ArgumentNullException.ThrowIfNull(token);
+        ArgumentNullException.ThrowIfNull(player);
+        lock (_gate)
+        {
+            foreach (var entry in _castFromHandOnly)
+            {
+                if (ReferenceEquals(entry.Token, token)
+                    && ReferenceEquals(entry.Player, player))
+                {
+                    return;
+                }
+            }
+            _castFromHandOnly.Add((token, player));
+        }
+    }
+
+    /// <summary>
+    /// Remove every cast-from-hand-only restriction registered under
+    /// <paramref name="token"/>. Used when a source permanent leaves the
+    /// battlefield.
+    /// </summary>
+    public static void RemoveCastFromHandOnlyRestriction(object token)
+    {
+        ArgumentNullException.ThrowIfNull(token);
+        lock (_gate)
+        {
+            _castFromHandOnly.RemoveAll(e => ReferenceEquals(e.Token, token));
+        }
+    }
+
+    /// <summary>
+    /// True if at least one registered restriction currently confines
+    /// <paramref name="player"/> to casting spells only from their hand
+    /// (CR 113.6).
+    /// </summary>
+    public static bool MustCastFromHand(Player player)
+    {
+        if (player == null) return false;
+        lock (_gate)
+        {
+            foreach (var entry in _castFromHandOnly)
+            {
+                if (ReferenceEquals(entry.Player, player)) return true;
+            }
+            return false;
+        }
+    }
+
     /// <summary>Reset the registry. Test-only.</summary>
     public static void Clear()
     {
@@ -131,6 +192,7 @@ public static class CastingRestrictions
         {
             _sorcerySpeed.Clear();
             _uncounterableControllers.Clear();
+            _castFromHandOnly.Clear();
         }
     }
 }
