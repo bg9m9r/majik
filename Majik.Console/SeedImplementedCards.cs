@@ -640,5 +640,81 @@ public static class SeedImplementedCards
         // Umezawa's Jitte: Choose one — Jitte deals 2 damage to any target /
         // target creature gets -1/-1 EOT / you gain 2 life. Equip {2}.
         "Umezawa's Jitte",
+
+        // ---- Modern staples shipped in the 2026-05-23f bump ----
+
+        // Instant — {W} (SwordsToPlowsharesFactory). Alpha.
+        // Exile target creature. Its controller gains life equal to its power.
+        "Swords to Plowshares",
+        // Instant — {U} (MysticalTutorFactory). Mirage.
+        // Search your library for an instant or sorcery card, put it on top.
+        "Mystical Tutor",
+        // Land — (WastelandFactory). Tempest.
+        // {T}: Add {C}. {T}, Sacrifice ~: Destroy target nonbasic land.
+        "Wasteland",
+        // Land — (MutavaultFactory). Morningtide.
+        // {T}: Add {C}. {1}: ~ becomes a 2/2 creature with all creature types
+        // until end of turn. It's still a land.
+        "Mutavault",
+        // Creature — Goblin {1}{R} 1/1 (GoblinMatronFactory). Urza's Saga.
+        // ETB: search your library for a Goblin card, reveal it, put in hand.
+        "Goblin Matron",
+        // Land — (InkmothNexusFactory). Mirrodin Besieged.
+        // {T}: Add {C}. {1}: ~ becomes a 1/1 Phyrexian Insect Artifact creature
+        // with flying and infect until end of turn. It's still a land.
+        "Inkmoth Nexus",
+        // Creature — Spirit {1}{W}{U} 2/3 (SpellQuellerFactory). Eldritch Moon.
+        // Flash + Flying. ETB exile target spell with mana value 4 or less.
+        // When ~ leaves the battlefield, owner of exiled card may cast it
+        // without paying its mana cost.
+        "Spell Queller",
+        // Legendary Artifact — {1} (SenseisDiviningTopFactory). Champions of
+        // Kamigawa. {1}: look at top 3 of library, put back in any order.
+        // {T}: Draw a card, then put ~ on top of owner's library.
+        "Sensei's Divining Top",
+        // Creature — Giant {4}{W}{W} 6/6 (SunTitanFactory). Magic 2011.
+        // Vigilance. ETB and attack trigger: return target permanent card with
+        // mana value 3 or less from your graveyard to the battlefield.
+        "Sun Titan",
+        // Creature — Human Wizard {2}{U} 2/2 (TrinketMageFactory). Fifth Dawn.
+        // ETB: search library for an artifact card with mana value 1 or less,
+        // reveal it, put in hand.
+        "Trinket Mage",
+        // Sorcery — {R} (RecklessChargeFactory). Odyssey.
+        // Target creature gets +3/+0 and gains haste until end of turn.
+        // Flashback {2}{R}.
+        "Reckless Charge",
+        // Artifact — Equipment {3} (SwordOfFireAndIceFactory). Darksteel.
+        // Equipped creature gets +2/+2 and has protection from red and from
+        // blue. Whenever equipped creature deals combat damage to a player,
+        // ~ deals 2 damage to any target and you draw a card. Equip {2}.
+        "Sword of Fire and Ice",
+        // Creature — Human Artificer {1}{R} 1/1 (GoblinWelderFactory). Urza's
+        // Legacy. {T}: Choose target artifact card in a graveyard and target
+        // artifact a player controls. If both targets are still legal, that
+        // player sacrifices the artifact they control, then returns the
+        // artifact card from their graveyard to the battlefield.
+        "Goblin Welder",
+        // Land — (MishrasWorkshopFactory). Antiquities.
+        // {T}: Add {C}{C}{C}. Spend this mana only to cast artifact spells.
+        "Mishra's Workshop",
+        // Creature — Human Warrior {R}{R}{W} 3/3 (BorosReckonerFactory).
+        // Damage-redirect trigger (CR 614) — whenever ~ is dealt damage,
+        // ~ deals that much damage to any target. Wired via
+        // OracleTriggeredAbilityBinder + DealDamage; auto-targets defender.
+        "Boros Reckoner",
+        // Artifact — Equipment {3} (SwordOfFeastAndFamineFactory). Mirrodin.
+        // Equipped creature gets +2/+2 and has protection from black and from
+        // green. Whenever equipped creature deals combat damage to a player,
+        // that player discards a card and you untap all lands you control.
+        // Equip {2}.
+        "Sword of Feast and Famine",
+        // Instant — {R}{W} (LightningHelixFactory). Ravnica: City of Guilds.
+        // ~ deals 3 damage to any target and you gain 3 life.
+        "Lightning Helix",
+        // Instant — {U} (BrainFreezeFactory). Scourge.
+        // Storm (CR 702.40). Target player puts the top three cards of their
+        // library into their graveyard.
+        "Brain Freeze",
     };
 }
