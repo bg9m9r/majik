@@ -305,6 +305,153 @@ public class MatchEndpointsBotTests : IClassFixture<TestMongoFixture>
     }
 
     // -----------------------------------------------------------------------
+    // Recently-added cards smoke test
+    //
+    // PR added catch(Exception) in CreateBotMatchAsync so a card-factory
+    // binder NRE no longer escapes to the global UseExceptionHandler and
+    // returns opaque `{"error":"internal"}`. This test exercises the
+    // bot-match create path with a user deck containing a sampling of the
+    // recently-added cards (Phantasmal Image, Living End, Wrenn and
+    // Realmbreaker, Engineered Explosives, Cabal Ritual). If a binder /
+    // factory crashes, the response should now be a 500 with
+    // type/message in the body (visible in test output), NOT a hidden
+    // engine fault.
+    //
+    // This test deliberately does NOT fix any binder bug it uncovers —
+    // its purpose is to make a crash *visible*. If the test reveals a
+    // real card-factory bug, it should be triaged in a follow-up PR.
+    // -----------------------------------------------------------------------
+
+    /// <summary>Card repo that mirrors BotTestCardRepo and additionally
+    /// seeds the recently-added cards we want the bot-match smoke test to
+    /// exercise.</summary>
+    private static ICardRepository BotTestCardRepoWithRecentCards()
+    {
+        var repo = (FakeCardRepoForMatchTests)BotTestCardRepo();
+        // Use realistic type lines so RealDeckLoader instantiates the
+        // correct typed ICard shell; binders inspect entity.TypeLine /
+        // ManaCost when binding abilities.
+        repo.Add("Phantasmal Image", "Creature — Illusion");
+        repo.Add("Living End", "Sorcery");
+        repo.Add("Wrenn and Realmbreaker", "Legendary Planeswalker — Wrenn");
+        repo.Add("Engineered Explosives", "Artifact");
+        repo.Add("Cabal Ritual", "Instant");
+        return repo;
+    }
+
+    private WebApplicationFactory<Program> FactoryWithRecentCards(IMongoDatabase db) =>
+        new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("Mongo:ConnectionString", _fixture.ConnectionString);
+            builder.UseSetting("Mongo:Database", db.DatabaseNamespace.DatabaseName);
+            builder.ConfigureServices(services =>
+            {
+                services.RemoveAll(typeof(IHostedService));
+                services.PostConfigure<AuthenticationOptions>(opts =>
+                {
+                    opts.DefaultAuthenticateScheme = MatchTestAuthHandler.SchemeName;
+                    opts.DefaultChallengeScheme = MatchTestAuthHandler.SchemeName;
+                });
+                services.AddAuthentication(MatchTestAuthHandler.SchemeName)
+                    .AddScheme<AuthenticationSchemeOptions, MatchTestAuthHandler>(
+                        MatchTestAuthHandler.SchemeName, _ => { });
+
+                services.RemoveAll<ICardRepository>();
+                services.AddSingleton<ICardRepository>(BotTestCardRepoWithRecentCards());
+            });
+        });
+
+    private static async Task<Guid> SeedDeckWithRecentCardsAsync(
+        IMongoDatabase db, string ownerSub, string name, CancellationToken ct = default)
+    {
+        var deckRepo = new DeckRepository(db);
+        await deckRepo.EnsureIndexesAsync(ct);
+        var id = Guid.NewGuid();
+        await deckRepo.InsertAsync(new Deck
+        {
+            Id = id,
+            OwnerSub = ownerSub,
+            Name = name,
+            // Sprinkle the recently-added cards through a 60-card deck. Counts
+            // chosen to stay within deck-validation rules (≤4 of any non-basic);
+            // basics fill the rest.
+            Mainboard = new List<DeckCardEntry>
+            {
+                new() { Name = "Forest", Count = 18 },
+                new() { Name = "Mountain", Count = 18 },
+                new() { Name = "Grizzly Bears", Count = 4 },
+                new() { Name = "Hill Giant", Count = 4 },
+                new() { Name = "Phantasmal Image", Count = 4 },
+                new() { Name = "Living End", Count = 2 },
+                new() { Name = "Wrenn and Realmbreaker", Count = 2 },
+                new() { Name = "Engineered Explosives", Count = 4 },
+                new() { Name = "Cabal Ritual", Count = 4 },
+            },
+            Sideboard = new List<DeckCardEntry>(),
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+        }, ct);
+        return id;
+    }
+
+    [Fact]
+    public async Task CreateMatch_WithBotOpponentAndRecentCardsInUserDeck_DoesNotReturnOpaqueInternal()
+    {
+        var db = await FreshDb();
+        await SeedProfile(db, "alice", "Alice");
+        var aliceDeckId = await SeedDeckWithRecentCardsAsync(db, "alice", "Alice Recent Cards");
+        using var factory = FactoryWithRecentCards(db);
+        var client = Authed(factory, "alice");
+
+        var resp = await client.PostAsJsonAsync("/matches", new
+        {
+            format = "constructed",
+            visibility = "invite",
+            deckId = aliceDeckId.ToString(),
+            clockMinutes = 20,
+            botOpponent = new { archetype = "Burn" },
+        });
+
+        // If the call succeeded, the binder pipeline is happy for these
+        // cards — match should be in Playing with a live facade.
+        if (resp.StatusCode == HttpStatusCode.Created)
+        {
+            var body = await resp.Content.ReadFromJsonAsync<MatchDto>();
+            body.Should().NotBeNull();
+            body!.State.Should().Be("Playing");
+            body.GameId.Should().NotBeNull();
+
+            // Verify the match landed in Mongo.
+            var matchRepo = new MatchRepository(db);
+            var stored = await matchRepo.GetByIdAsync(body.Id, CancellationToken.None);
+            stored.Should().NotBeNull();
+            stored!.GameId.Should().NotBeNull();
+            return;
+        }
+
+        // Otherwise the response MUST surface a structured MatchError with
+        // a non-empty Detail (exception type + message), NOT a generic
+        // 500 body from the global UseExceptionHandler. This is the
+        // regression-prevention assertion for this PR.
+        var errBody = await resp.Content.ReadAsStringAsync();
+        resp.StatusCode.Should().Be(HttpStatusCode.InternalServerError,
+            $"non-success must be 500 with surfaced detail. Body was: {errBody}");
+        var err = System.Text.Json.JsonSerializer.Deserialize<MatchError>(errBody,
+            new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        err.Should().NotBeNull($"500 must carry a MatchError JSON body. Raw: {errBody}");
+        err!.Error.Should().Be("internal");
+        err.Detail.Should().NotBeNullOrWhiteSpace(
+            "the broadened catch(Exception) in CreateBotMatchAsync must surface " +
+            "the exception type + message so the user can see WHICH card factory " +
+            $"crashed — not the opaque global-handler body. Raw: {errBody}");
+        // Detail should look like "<TypeName>: <message>" — at minimum it
+        // must contain a colon and a non-whitespace type name. Failing here
+        // means the catch fell through to the global handler.
+        err.Detail!.Should().Contain(":",
+            $"Detail should be `<ExceptionType>: <message>`. Raw: {errBody}");
+    }
+
+    // -----------------------------------------------------------------------
     // Lobby leak guard: a bot match must NOT appear in the public list
     // -----------------------------------------------------------------------
 
