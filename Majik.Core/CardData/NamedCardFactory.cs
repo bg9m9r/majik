@@ -138,6 +138,18 @@ public static class NamedCardFactory
             // non-Incarnation white card from their hand to return") deferred.
             "Solitude" => SolitudeFactory.Create(owner),
 
+            // Creature — Elemental Incarnation {2}{B} 3/2 (GriefFactory).
+            // Menace + Evoke keyword markers wired. ETB reveal-and-discard
+            // trigger wired ("target opponent reveals their hand; you choose
+            // a nonland card from it; that player discards it" — v1
+            // deterministic first-nonland pick). Evoke alt-cost = "exile a
+            // black card from hand" via EvokeAlternativeCost; printed
+            // evoke-sacrifice trigger fires when Grief enters if evoke was
+            // paid (CR 702.74b). Opponent pitch-back ("counter this triggered
+            // ability by exiling a non-Elemental, non-Incarnation black
+            // card") deferred.
+            "Grief" => GriefFactory.Create(owner),
+
             // U/R Horizon Canopy painless dual — Modern Horizons (FieryIsletFactory).
             // {T}, Pay 1 life: Add {U} or {R} — two ManaAbility instances, each with
             // a life-cost activation gate (CR 119.4) and a LoseLife side-effect.
