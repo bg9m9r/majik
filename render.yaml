@@ -16,9 +16,9 @@
 #     MONGO_INITDB_ROOT_PASSWORD  auto-generated below
 #
 # Cards-extraction rollout status: majik-cards owns the SQLite disk, majik-api
-# is diskless and talks to it over HTTP. The old SQLite fallback path in
-# MajikEngineRegistration still exists in code (kicks in when Cards:BaseUrl is
-# unset), but in prod it never runs because the env var is always set.
+# is diskless and talks to it over HTTP. MajikEngineRegistration requires
+# Cards:BaseUrl at startup — no in-process SQLite fallback. Local dev points
+# at a locally-running majik-cards (see appsettings.Development.json).
 
 services:
   - type: web

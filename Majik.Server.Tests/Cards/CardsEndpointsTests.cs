@@ -71,6 +71,9 @@ public class CardsEndpointsTests : IDisposable
             // Disable external dependencies so the test server starts cleanly.
             builder.UseSetting("Mongo:ConnectionString", "");
             builder.UseSetting("Auth:Authority", "");
+            // Required by MajikEngineRegistration. ICardRepository is replaced
+            // below; the stub URL only satisfies the HttpClient registration.
+            builder.UseSetting("Cards:BaseUrl", "http://test.invalid");
 
             builder.ConfigureTestServices(services =>
             {
