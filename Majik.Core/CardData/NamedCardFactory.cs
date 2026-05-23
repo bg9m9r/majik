@@ -626,6 +626,20 @@ public static class NamedCardFactory
             // (no live static, +1 no-ops without effects/board).
             "Karn, the Great Creator" => KarnTheGreatCreatorFactory.Create(owner),
 
+            // Enchantment — {1}{W} (SigardasAidFactory). Eldritch Moon.
+            // "Equipment and Auras you control have flash." +
+            // "Whenever an Equipment enters under your control, you may
+            //  attach it to target creature you control."
+            // Flash-grant lifecycle wired via FlashGrantStaticEffect (a new
+            // FlashGrantRegistry mirrors CastingRestrictions — TimingRules
+            // consults it after the printed Instant/Flash check). The
+            // ETB-attach trigger is attached for shape; pass an event bus +
+            // TriggerManager via the overload for fully-wired lifecycle and
+            // bus-driven trigger firing. v1 auto-picks the first
+            // controller-side creature as the attach target (CR 701.3a
+            // prompt deferred — same as Stoneforge Mystic).
+            "Sigarda's Aid" => SigardasAidFactory.Create(owner),
+
             // Artifact — {1} (AmuletOfVigorFactory). Worldwake.
             // "Whenever a permanent enters tapped under your control,
             //  untap it." Triggered ability over CardMovedEvent →
