@@ -170,7 +170,7 @@ public static class NamedCardFactory
             // SetSubtypesEffect scoped to every nonbasic Land on the
             // battlefield (PR #151) — combined with EffectiveManaAbilities
             // (PR #155) the affected lands lose their printed abilities and
-            // tap for {R}. Lifecycle wiring (BloodMoonStaticEffect ↔
+            // tap for {R}. Lifecycle wiring (RetypeLandsStaticEffect ↔
             // CardMovedEvent) requires the live ContinuousEffectsService +
             // EventBus and goes through
             // BloodMoonFactory.Create(owner, effects, eventBus). The
@@ -178,6 +178,33 @@ public static class NamedCardFactory
             // shape without a live Layer 4 effect (suitable for test /
             // shape-only use).
             "Blood Moon" => BloodMoonFactory.Create(owner),
+
+            // Creature — Human Wizard {2}{R} 2/2 (MagusOfTheMoonFactory).
+            // Same "Nonbasic lands are Mountains" Layer 4 effect as Blood
+            // Moon (CR 305.6 / 613.1d), wired via the shared
+            // RetypeLandsStaticEffect binder. Lifecycle requires the live
+            // ContinuousEffectsService + EventBus via
+            // MagusOfTheMoonFactory.Create(owner, effects, eventBus); the
+            // single-arg dispatcher path here produces the correct card
+            // shape only.
+            "Magus of the Moon" => MagusOfTheMoonFactory.Create(owner),
+
+            // Creature — Wizard {1}{U} 2/2 (HarbingerOfTheSeasFactory).
+            // "Nonbasic lands are Islands" — same scope as Blood Moon,
+            // retypes to {Island} instead of {Mountain}. Printed creature
+            // type "Merfolk Wizard" — Merfolk not yet in CardSubtype, so
+            // only Wizard is assigned. Full lifecycle via
+            // HarbingerOfTheSeasFactory.Create(owner, effects, eventBus).
+            "Harbinger of the Seas" => HarbingerOfTheSeasFactory.Create(owner),
+
+            // Enchantment — {2}{W}{W} (ConversionFactory).
+            // "All Mountains are Plains." Scope: any Land whose subtype
+            // set contains Mountain (basic or nonbasic). Retypes to
+            // {Plains}. The original card's upkeep "sacrifice unless you
+            // pay {W}{W}" clause is deferred — only the Layer 4
+            // type-change ships here. Full lifecycle via
+            // ConversionFactory.Create(owner, effects, eventBus).
+            "Conversion" => ConversionFactory.Create(owner),
 
             _ => new Card(name, ""),
         };

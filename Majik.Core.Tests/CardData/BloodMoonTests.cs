@@ -24,7 +24,7 @@ namespace Majik.Core.Tests.CardData;
 ///   PR #155 — <see cref="EffectiveManaAbilities"/> CR 305.6 mana-ability
 ///             derivation.
 ///   PR #1xx (this one) — <see cref="BloodMoonFactory"/> +
-///             <see cref="BloodMoonStaticEffect"/> ETB/LTB lifecycle that
+///             <see cref="RetypeLandsStaticEffect"/> ETB/LTB lifecycle that
 ///             registers/unregisters the Layer 4 effect on the live
 ///             <see cref="ContinuousEffectsService"/>.
 ///
@@ -105,7 +105,7 @@ public class BloodMoonTests
         baseline.Should().Contain(a => a.ManaGenerated.Black == 1);
 
         // Bring Blood Moon onto the battlefield — fully wired so its
-        // BloodMoonStaticEffect attaches to the bus and registers the
+        // RetypeLandsStaticEffect attaches to the bus and registers the
         // SetSubtypesEffect when Blood Moon's CardMovedEvent fires.
         var bloodMoon = BloodMoonFactory.Create(_alice, _effects, _bus);
         _zones.MoveCard(bloodMoon, ZoneType.Library, ZoneType.Battlefield, _alice);
@@ -172,7 +172,7 @@ public class BloodMoonTests
         EffectiveManaAbilities.For(bayou, _effects, _alice)
             .Should().ContainSingle().Which.ManaGenerated.Red.Should().Be(1);
 
-        // Send Blood Moon to the graveyard — the BloodMoonStaticEffect
+        // Send Blood Moon to the graveyard — the RetypeLandsStaticEffect
         // lifecycle should unregister the Layer 4 effect on the
         // CardMovedEvent.
         _zones.MoveCard(bloodMoon, ZoneType.Battlefield, ZoneType.Graveyard);
