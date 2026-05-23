@@ -101,6 +101,15 @@ public sealed class TurnDriver
 
     private void OnCardMoved(CardMovedEvent e)
     {
+        // Track lands entering under a player's control this turn (CR 702.142
+        // landfall + landfall-conditional spells like Searing Blaze). This
+        // fires off the same CardMovedEvent funnel as the leavers below; the
+        // entering branch must run BEFORE the early-return for non-leavers.
+        if (e.ToZone == ZoneType.Battlefield && e.Card.HasType(CardType.Land))
+        {
+            TurnState.RecordLandEnteredBattlefield(e.Card.Controller);
+        }
+
         // Only track permanents leaving the battlefield (Rule 702.104).
         if (e.FromZone != ZoneType.Battlefield) return;
 

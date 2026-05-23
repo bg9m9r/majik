@@ -3,13 +3,13 @@
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
 **Last updated:** 2026-05-23
-**Latest origin/main:** Damping Sphere (#257) merged on top of 54a8d82 (… + Stony Silence + Aether Gust + Pact of Negation); Goblin Lackey added in this PR.
+**Latest origin/main:** Damping Sphere (#257) + Goblin Lackey on top of 54a8d82 (… + Stony Silence + Aether Gust + Pact of Negation); Searing Blaze added in this PR.
 
 ## Headline numbers
 
 | Metric | Count |
 |---|---|
-| Named factories | 110 |
+| Named factories | 111 |
 | Bespoke templates | 26 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
@@ -98,6 +98,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Scavenging Ooze | Creature | #188 | exile-graveyard + counter + life |
 | Scion of Draco | Artifact Creature | TBD | Domain cost-reduction {10} → {0} at 5 basic types (CR 702.16); keyword-grant rider deferred |
 | Sea's Claim | Aura | #160 | enchanted land becomes Island |
+| Searing Blaze | Instant | TBD | 1 damage to player/planeswalker + 1 to a creature they control; landfall → 3 each instead (resolution-time TurnState.LandEnteredThisTurn gate) |
 | Sigarda's Aid | Enchantment | TBD | flash-grant equipment/aura + ETB auto-attach |
 | Snapcaster Mage | Creature | #170 | flash + ETB flashback grant |
 | Solitude | Creature | — | evoke pitch + ETB exile |
@@ -317,7 +318,7 @@ Per-keyword action helpers under `Majik.Core/Keywords/`:
 
 ## Coverage by archetype
 
-- **Burn** — Strong. Lightning Bolt, Lava Spike, Lava Dart, Skewer the Critics, Boros Charm, Eidolon of the Great Revel, Goblin Guide, Monastery Swiftspear, Rift Bolt all in. Missing: Searing Blaze (landfall conditional), Roiling Vortex, Sunscorched Desert. ~75%.
+- **Burn** — Strong. Lightning Bolt, Lava Spike, Lava Dart, Skewer the Critics, Boros Charm, Eidolon of the Great Revel, Goblin Guide, Monastery Swiftspear, Rift Bolt, Searing Blaze all in. Missing: Roiling Vortex, Sunscorched Desert. ~80%.
 - **Death's Shadow** — Mid-high. Thoughtseize, Fatal Push, Snapcaster Mage, Stubborn Denial, Death's Shadow itself (CDA P/T scaled by controller life — Layer 7a) all in. Mishra's Bauble in. Temur Battle Rage absent. ~60%.
 - **Murktide / Izzet Tempo** — High. Murktide Regent done, Counterspell done, Snapcaster Mage done, Lightning Bolt done, Expressive Iteration done, Ledger Shredder done, Consider done, Spell Pierce done, Subtlety done. Missing: Demilich absent. ~75%.
 - **Mono-Green Tron** — High. Ancient Stirrings, Sylvan Scrying, Wurmcoil Engine done. Karn Liberated done. Karn, the Great Creator done. Tron lands (Urza's Mine + Tower + Power-Plant) done with the conditional {2} mana ability. ~70%.
@@ -344,7 +345,6 @@ Sorted roughly by build priority (small infra lift × high meta share). Refreshe
 | 5 | Yawgmoth's Will | high | "Play cards from your graveyard this turn" — turn-scoped global cast-from-graveyard permission + EOT exile-instead-of-grave replacement chain. `GraveyardCastAlternativeCost` is per-card, not zone-wide. |
 | 6 | Manabarbs | high | Triggered ability on every land-tap event globally; tap-event subscription per-permanent works, but a global "whenever a player taps a land for mana" hook is unwired. |
 | 7 | Pyromancer's Goggles | high | Legendary {0} mana ability + replacement: "when you tap it for {R} to cast an instant/sorcery, copy that spell once". Needs cast-time mana-source tracking + spell-copy hook keyed off that source. |
-| 8 | Searing Blaze | low | Landfall-gated dual damage (player + creature) on an instant; landfall trigger exists, but "if landfall, do X else do Y" alternative-mode template on instants is absent. |
 
 ## How to update this doc
 

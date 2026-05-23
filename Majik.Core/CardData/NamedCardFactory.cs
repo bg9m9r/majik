@@ -520,6 +520,21 @@ public static class NamedCardFactory
             // TarmogoyfFactory.CountDistinctCardTypes for the type count.
             "Unholy Heat" => UnholyHeatFactory.Create(owner),
 
+            // Instant — {R}{R} (SearingBlazeFactory). Worldwake / Modern Horizons.
+            // "Searing Blaze deals 1 damage to target player or planeswalker
+            //  and 1 damage to target creature that player or that
+            //  planeswalker's controller controls. Landfall — If you had a
+            //  land enter the battlefield under your control this turn,
+            //  Searing Blaze deals 3 damage to that player or planeswalker
+            //  and 3 damage to that creature instead." CR 702.142. Card
+            // shape only here; the resolve-time SpellDefinition (with the
+            // landfall gate sampling the controller's TurnState) is built
+            // on demand via SearingBlazeFactory.BuildSpellDefinition.
+            // The 2nd target's "controlled by" relationship is V1-relaxed
+            // (declared as "target creature") — the engine's targeting
+            // prompt can't yet express "controlled by the previous target".
+            "Searing Blaze" => SearingBlazeFactory.Create(owner),
+
             // Instant — {R} (GalvanicDischargeFactory). Modern Horizons 3.
             // "Galvanic Discharge deals X damage to any target, where X is
             //  1 plus the number of charge counters on artifacts and/or
