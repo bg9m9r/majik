@@ -324,6 +324,18 @@ public static class NamedCardFactory
             // retrace emblem (structural shell).
             "Wrenn and Six" => WrennAndSixFactory.Create(owner),
 
+            // Legendary Planeswalker — Karn {7} loyalty 6
+            // (KarnLiberatedFactory). +4 target-player-exiles-a-card-from-
+            // hand (auto-pick first opponent + first card), -3 exile-
+            // target-permanent (auto-pick first candidate). -14 restart-
+            // the-game ultimate is DEFERRED as a no-op — CR 720 game
+            // restart is engine-foundational. The single-arg dispatcher
+            // path here passes no resolvers so +4/-3 no-op; loyalty
+            // changes still apply (CR 606.3). Use the (owner,
+            // allPlayersResolver, targetResolver) overload to enable the
+            // full +4/-3 effects.
+            "Karn Liberated" => KarnLiberatedFactory.Create(owner),
+
             // Sorcery — {7}{U} (TreasureCruiseFactory).
             // CR 702.66 — Delve. "Delve" marker keyword wired; the cost
             // mechanic itself lives in DelveCost + SpellCastFlow. Resolve

@@ -3,7 +3,7 @@
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
 **Last updated:** 2026-05-23
-**Latest origin/main:** 0ce5d1f (#211 — Up the Beanstalk)
+**Latest origin/main:** 2b02e05 (#212 — Subtlety) + Karn Liberated
 
 ## Headline numbers
 
@@ -52,6 +52,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Grist, the Hunger Tide | Planeswalker | — | +1 token, -2 reanimate |
 | Harbinger of the Seas | Creature | #157 | nonbasic-to-Island |
 | Inspiring Vantage | Land | — | R/W fastland |
+| Karn Liberated | Planeswalker | TBD | +4 exile-from-hand, -3 exile-permanent; -14 restart deferred |
 | Kraul Harpooner | Creature | — | fight-flyer shell |
 | Lazotep Recruit | Creature | — | amass-keyword shell |
 | Ledger Shredder | Creature | #193 | second-spell surveil + counter |
@@ -291,13 +292,12 @@ Sorted by build priority (small infra lift × high meta share).
 | # | Card | Difficulty | Blocker |
 |---|---|---|---|
 | 1 | Karn, the Great Creator | Mid | Sideboard-from-anywhere -2 ability needs wishboard concept |
-| 2 | Karn Liberated | Mid | Exile target, restart-game ultimate (game-restart deferred) |
-| 3 | Urza's Tron pieces (Mine/Tower/Power Plant) | Mid | "Tap: add 1; if you control all three, add 3" — conditional mana ability |
-| 4 | Crashing Footfalls | High | Suspend done (#183), but cascade trigger on suspend-cast missing |
-| 5 | Living End | High | Cascade + mass-exile-grave + simultaneous mass-reanimate (#174 ready for the latter) |
-| 6 | Cascade keyword | High | Triggered "cast for free from top reveal" — alt-cast-from-library framework |
-| 7 | Primeval Titan | Mid | Attack/ETB triggers + land tutor; tutor template exists |
-| 8 | Amulet of Vigor | Mid | Replacement on enters-tapped → untap; needs ETB replacement composition |
+| 2 | Urza's Tron pieces (Mine/Tower/Power Plant) | Mid | "Tap: add 1; if you control all three, add 3" — conditional mana ability |
+| 3 | Crashing Footfalls | High | Suspend done (#183), but cascade trigger on suspend-cast missing |
+| 4 | Living End | High | Cascade + mass-exile-grave + simultaneous mass-reanimate (#174 ready for the latter) |
+| 5 | Cascade keyword | High | Triggered "cast for free from top reveal" — alt-cast-from-library framework |
+| 6 | Primeval Titan | Mid | Attack/ETB triggers + land tutor; tutor template exists |
+| 7 | Amulet of Vigor | Mid | Replacement on enters-tapped → untap; needs ETB replacement composition |
 
 ## How to update this doc
 
