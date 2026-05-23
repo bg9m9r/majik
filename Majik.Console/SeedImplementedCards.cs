@@ -855,5 +855,69 @@ public static class SeedImplementedCards
         // a 2/2 black Zombie creature token. When a creature is put into an
         // opponent's graveyard from the battlefield, exile ~.
         "Bridge from Below",
+
+        // ---- Modern staples shipped in the 2026-05-23i bump ----
+
+        // Legendary Planeswalker — Oko {1}{G}{U} loyalty 4 (OkoThiefOfCrownsFactory).
+        // Throne of Eldraine. +2: create a Food token. +1: target artifact
+        // or creature becomes a 3/3 green Elk creature with no abilities.
+        // -5: exchange control of target artifact/creature with a Food.
+        "Oko, Thief of Crowns",
+        // Sorcery — {X}{W} (PrismaticEndingFactory). Modern Horizons 2.
+        // Exile target nonland permanent with mana value X or less. X can't
+        // be greater than the number of colors of mana spent to cast this
+        // spell (CR 107.4 + 700.2 — colors-spent cap).
+        "Prismatic Ending",
+        // Sorcery — {R} (HidetsugusSecondRiteFactory). Champions of
+        // Kamigawa. ~ deals 10 damage to target opponent if that player has
+        // exactly 10 life.
+        "Hidetsugu's Second Rite",
+        // Creature — Human Wizard {U}{R} 2/2 (GoblinElectromancerFactory).
+        // Return to Ravnica. Instant and sorcery spells you cast cost {1}
+        // less to cast (cost-reduction static).
+        "Goblin Electromancer",
+        // Artifact — {0} (ManaCryptFactory). Mirage / Eternal Masters.
+        // At the beginning of your upkeep, flip a coin. If you lose the
+        // flip, ~ deals 3 damage to you. {T}: Add {C}{C}.
+        "Mana Crypt",
+        // Legendary Artifact — {0} (MoxAmberFactory). Dominaria.
+        // {T}: Add one mana of any color among legendary creatures and
+        // legendary planeswalkers you control.
+        "Mox Amber",
+        // Creature — Frog {U}{B} 1/3 (PsychicFrogFactory). Modern Horizons 3.
+        // Flying. Whenever ~ deals combat damage to a player, draw that many
+        // cards, then discard a card. Discard a card: ~ gets +1/+1 until
+        // end of turn.
+        "Psychic Frog",
+        // Legendary Artifact — Vehicle {2}{G}{G} 4/4 (EsikasChariotFactory).
+        // Kaldheim. When ~ enters, create two 2/2 green Cat creature tokens.
+        // Whenever ~ attacks, create a token that's a copy of a target token
+        // you control. Crew 4.
+        "Esika's Chariot",
+        // Legendary Creature — Bird Spirit {1}{G}{U} 3/4 (NaduWingedWisdomFactory).
+        // Modern Horizons 3. Flying. Whenever a creature you control becomes
+        // the target of a spell or ability, that creature's controller
+        // reveals the top card of their library. If it's a land, they put it
+        // onto the battlefield; otherwise, into hand. Cap 2 reveals per
+        // creature per turn.
+        "Nadu, Winged Wisdom",
+        // Legendary Creature — Cat Warrior {1}{W} 2/2 // Legendary Planeswalker
+        // — Ajani (AjaniNacatlPariahFactory). DFC front face. Modern Horizons 3.
+        // Whenever one or more other creatures you control die, you may
+        // exile ~. If you do, transform ~. (Back-face Nacatl Avenger
+        // planeswalker loyalty abilities deferred — no per-face cardpool.)
+        "Ajani, Nacatl Pariah // Ajani, Nacatl Avenger",
+        // Enchantment — {2}{B}{B} (TheMeathookMassacreFactory). Innistrad:
+        // Midnight Hunt. When ~ enters, all creatures get -X/-X until end of
+        // turn, where X is the number of mana spent to cast ~. Whenever a
+        // creature dies, each opponent loses 1 life and you gain 1 life.
+        "The Meathook Massacre",
+        // Enchantment — {B}{B}{B} (NecrodominanceFactory). Modern Horizons 3.
+        // Necropotence variant. If you would draw a card, skip that draw
+        // instead. Skip your draw step. At the beginning of your end step,
+        // discard the cards in your hand in excess of five. Pay 1 life:
+        // Exile the top card of your library face down. Put that card into
+        // your hand at the beginning of your next end step.
+        "Necrodominance",
     };
 }
