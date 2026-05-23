@@ -481,6 +481,17 @@ public static class NamedCardFactory
             // named factory carries the predicate locally.
             "Ancient Stirrings" => AncientStirringsFactory.Create(owner),
 
+            // Instant — {U} (ConsiderFactory). Innistrad: Midnight Hunt.
+            // "Look at the top card of your library. You may put that card
+            // into your graveyard. Then draw a card." Effectively Surveil 1
+            // (CR 701.42) + draw 1. Card shape only here; the resolve effect
+            // is built on demand via ConsiderFactory.BuildResolveEffect and
+            // splices into a SpellDefinition.EffectFactory. The surveil
+            // decision is sourced from the registered IPlayerAgent (via
+            // AgentRegistry) when available; the default fall-back sends the
+            // peeked card to the graveyard.
+            "Consider" => ConsiderFactory.Create(owner),
+
             // Creature — Human Cleric {W}{B} 2/1 (PriestOfFellRitesFactory).
             // ETB triggered ability: reanimate target creature card with
             // mana value 3 or less from controller's graveyard
