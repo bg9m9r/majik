@@ -3,13 +3,13 @@
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
 **Last updated:** 2026-05-23
-**Latest origin/main:** 2a73105 (… + Lurrus of the Dream-Den + Colossus Hammer + Sigarda's Aid + Living End + Phyrexian Tower + Puresteel Paladin + Aether Vial + Mox Opal + Scion of Draco + Ragavan) + Dauthi Voidwalker (this PR)
+**Latest origin/main:** 6b29e01 (… + Lurrus of the Dream-Den + Colossus Hammer + Sigarda's Aid + Living End + Phyrexian Tower + Puresteel Paladin + Aether Vial + Mox Opal + Scion of Draco + Ragavan, Nimble Pilferer + Cavern of Souls + Galvanic Discharge) + Dauthi Voidwalker (this PR)
 
 ## Headline numbers
 
 | Metric | Count |
 |---|---|
-| Named factories | 85 |
+| Named factories | 87 |
 | Bespoke templates | 26 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
@@ -33,6 +33,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Badgermole Cub | Creature | — | earthbend shell |
 | Blood Moon | Enchantment | #156 | nonbasic-to-Mountain Layer 4 |
 | Boseiju, Who Endures | Land | — | channel destroy stub |
+| Cavern of Souls | Land | TBD | ETB choose-creature-type + {T}: {C} + {T}: any color (spend-restriction + uncounterable rider deferred) |
 | Colossus Hammer | Artifact | TBD | Equipment {1}: +10/+0 + lose flying + equip {8} |
 | Conversion | Enchantment | #157 | Mountains-are-Plains retype |
 | Consider | Instant | — | surveil 1 + draw |
@@ -52,6 +53,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Force of Negation | Instant | #185 | pitch counter (non-creature) |
 | Force of Will | Instant | #185 | pitch counter (universal) |
 | Fury | Creature | — | evoke pitch + ETB X-damage divided |
+| Galvanic Discharge | Instant | TBD | 1 + charge counters on artifacts/lands you control damage |
 | Goblin Bombardment | Enchantment | — | sac-creature → 1 damage |
 | Grief | Creature | #205 | evoke pitch + ETB discard |
 | Grist, the Hunger Tide | Planeswalker | — | +1 token, -2 reanimate |
