@@ -308,6 +308,18 @@ public static class NamedCardFactory
             // supply a custom selector when agent-driven choose-2 ships.
             "Dig Through Time" => DigThroughTimeFactory.Create(owner),
 
+            // Legendary Planeswalker — Teferi {1}{W}{U} loyalty 4
+            // (TeferiTimeRavelerFactory). Printed static "Each opponent
+            // can cast spells only any time they could cast a sorcery"
+            // (CR 117.1a) — wired via SorcerySpeedRestrictionEffect when
+            // the runtime (owner, opponentResolver, targetResolver,
+            // effects, eventBus) overload is used. -3 bounce target
+            // artifact/creature/enchantment + draw a card (v1 auto-pick).
+            // +1 cast-sorceries-as-flash deferred (no controller-keyed
+            // cast-time speed modifier yet). The single-arg dispatcher
+            // path here produces the correct card shape only.
+            "Teferi, Time Raveler" => TeferiTimeRavelerFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
