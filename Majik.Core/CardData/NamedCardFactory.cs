@@ -1509,6 +1509,26 @@ public static class NamedCardFactory
             // deferred — engine has no face-down flag.
             "Necropotence" => NecropotenceFactory.Create(owner),
 
+            // Enchantment — {B}{B}{B} (NecrodominanceFactory). Modern Horizons 3.
+            // "If you would draw a card except for the first card you draw in
+            //  each of your draw steps, skip that draw. Skip your draw step.
+            //  Pay 1 life: Exile the top card of your library face down. Look
+            //  at it any time. You may cast that card from exile until end
+            //  of turn." Necropotence variant — same skip-your-draw-step
+            //  hook (SkipDrawRegistry), plus an additional-draw-skip clause
+            //  surfaced as a static marker (engine has no CardDrawIntent on
+            //  the ReplacementBus in v1), and an activated ability that
+            //  swaps Necropotence's delayed end-step return-to-hand for a
+            //  cast-from-exile alternative cost (CR 118.9) revoked at the
+            //  next Cleanup step (CR 514.2). The single-arg dispatcher
+            //  path produces the correct card shape (Enchantment + two
+            //  Static markers + ActivatedAbility) without bus-driven EOT
+            //  revocation; use the (owner, eventBus) overload for fully-
+            //  wired behaviour. Face-down exile + live additional-draw
+            //  skip + sorcery-speed cast restrictions deferred — same
+            //  v1 gaps as Necropotence / Dauthi Voidwalker.
+            "Necrodominance" => NecrodominanceFactory.Create(owner),
+
             // Enchantment — {1}{W} (StonySilenceFactory). Return to Ravnica.
             // "Activated abilities of artifacts can't be activated unless
             //  they're mana abilities." (CR 602.5c / 605.) Symmetric global
