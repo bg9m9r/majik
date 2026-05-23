@@ -53,6 +53,20 @@ public sealed class MatchFacadeBridge
     private readonly ILogger<MatchFacadeBridge> _logger;
     private readonly ConcurrentDictionary<Guid, Attachment> _attachments = new();
 
+    // Per-recipient prompt buffer. Solves the race where the engine
+    // publishes a prompt to the match group BEFORE the targeted player's
+    // SignalR connection has joined (most acute on vs-Bot matches where
+    // StartFullGameAsync runs synchronously to the first agent prompt
+    // inside the CreateBotMatchAsync HTTP handler, well before the client
+    // has navigated to /match/:id and called JoinMatch). The buffer is
+    // keyed by (matchId, recipientSub) — never by PlayerId — so the same
+    // recipient is overwritten when a fresh prompt for them arrives, and
+    // a NULL/unknown PlayerId entry can't be addressed by mistake. Bot
+    // recipients ("bot:*") are skipped at insert time, both to save space
+    // and to make AckPrompt's contract symmetric with ForwardPrompt's
+    // bot-skip.
+    private readonly ConcurrentDictionary<(Guid MatchId, string Sub), PromptDto> _bufferedPrompts = new();
+
     public MatchFacadeBridge(IMatchHubPublisher hub, ILogger<MatchFacadeBridge> logger)
     {
         _hub = hub;
@@ -65,6 +79,17 @@ public sealed class MatchFacadeBridge
     /// <summary>Visible for tests — true iff this matchId currently has
     /// live subscriptions held by the bridge.</summary>
     internal bool IsAttached(Guid matchId) => _attachments.ContainsKey(matchId);
+
+    /// <summary>Visible for tests — current size of the per-recipient
+    /// prompt buffer. Exposed so tests can assert Detach clears the
+    /// buffer without reaching through reflection.</summary>
+    internal int BufferedPromptCount => _bufferedPrompts.Count;
+
+    /// <summary>Visible for tests — peek the buffered prompt for a given
+    /// (matchId, recipient sub) tuple. Returns null when there is no
+    /// buffered prompt for that recipient.</summary>
+    internal PromptDto? PeekBufferedPrompt(Guid matchId, string recipientSub) =>
+        _bufferedPrompts.TryGetValue((matchId, recipientSub), out var prompt) ? prompt : null;
 
     /// <summary>
     /// Subscribe the bridge to <paramref name="facade"/> on behalf of
@@ -102,12 +127,86 @@ public sealed class MatchFacadeBridge
     /// Safe to call multiple times — terminal-state callers (concede,
     /// abandon, timeout, completion sweep) all funnel through here and
     /// it must remain idempotent for that reason.
+    ///
+    /// Also clears any per-recipient prompt buffers held for this match.
+    /// A terminal state means no further commands can be submitted, so
+    /// replaying an unacked prompt to a late-joining connection after
+    /// teardown would just confuse the client.
     /// </summary>
     public void Detach(Guid matchId)
     {
         if (_attachments.TryRemove(matchId, out var attachment))
         {
             attachment.Dispose();
+        }
+
+        // Sweep buffered prompts for this match. ConcurrentDictionary
+        // doesn't have a bulk-remove-by-prefix, but the cardinality is
+        // bounded (≤ 2 entries per active match — one per seat) so a
+        // full key scan is cheap and stays correct under concurrent
+        // forwards/acks happening on other matches.
+        foreach (var key in _bufferedPrompts.Keys)
+        {
+            if (key.MatchId == matchId)
+            {
+                _bufferedPrompts.TryRemove(key, out _);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Drop the buffered prompt (if any) for the given recipient on the
+    /// given match. Called from <c>MatchService.SubmitCommandAsync</c>
+    /// after the engine has accepted a command — that command resolves
+    /// the TCS the engine is waiting on, so the previously-published
+    /// prompt is no longer authoritative. If the engine then emits a
+    /// fresh prompt for the same recipient, <see cref="ForwardPrompt"/>
+    /// will rebuffer it.
+    ///
+    /// No-ops on bot recipients (no buffer to clear) and on
+    /// unrecognized (matchId, sub) pairs (concurrent Detach can race).
+    /// </summary>
+    public void AckPrompt(Guid matchId, string recipientSub)
+    {
+        if (string.IsNullOrEmpty(recipientSub)) return;
+        if (recipientSub.StartsWith("bot:", StringComparison.Ordinal)) return;
+        _bufferedPrompts.TryRemove((matchId, recipientSub), out _);
+    }
+
+    /// <summary>
+    /// If a prompt is currently buffered for <paramref name="recipientSub"/>
+    /// on <paramref name="matchId"/>, push it to the single SignalR
+    /// connection identified by <paramref name="connectionId"/>. Called
+    /// from <c>MatchHub.JoinMatch</c> immediately after the connection
+    /// is added to the match group, so a client that navigates to the
+    /// match page AFTER the engine has already published an early prompt
+    /// (the bot-match opening-mulligan race) still receives it.
+    ///
+    /// Group-fanout is intentionally avoided here: if both seats have
+    /// already joined when one of them refreshes, the OTHER seat's
+    /// buffered prompt must not be re-fanned to the refreshing player.
+    /// </summary>
+    public void ReplayPromptIfAny(Guid matchId, string recipientSub, string connectionId)
+    {
+        if (string.IsNullOrEmpty(recipientSub)) return;
+        if (string.IsNullOrEmpty(connectionId)) return;
+        if (recipientSub.StartsWith("bot:", StringComparison.Ordinal)) return;
+
+        if (!_bufferedPrompts.TryGetValue((matchId, recipientSub), out var prompt))
+        {
+            return;
+        }
+
+        try
+        {
+            _hub.SendToConnection(connectionId, "prompt", prompt);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "MatchFacadeBridge: failed to replay buffered prompt. " +
+                "MatchId={MatchId} RecipientSub={RecipientSub} ConnectionId={ConnectionId}",
+                matchId, recipientSub, connectionId);
         }
     }
 
@@ -151,11 +250,20 @@ public sealed class MatchFacadeBridge
             // Bot seats (sub starts with "bot:") have no SignalR
             // connection; sending to that user channel is a no-op, not
             // an error — skip the hop entirely so we don't burn a
-            // per-recipient send for nothing.
+            // per-recipient send for nothing. Also skip the per-recipient
+            // buffer: an in-process bot agent has no late-join story.
             if (recipient.StartsWith("bot:", StringComparison.Ordinal))
             {
                 return;
             }
+
+            // Buffer BEFORE publishing so a connection that joins the
+            // match group between this AddOrUpdate and the PublishPerRecipient
+            // call still finds the prompt on its replay-lookup. The
+            // entry replaces any prior buffered prompt for this
+            // recipient — a stale prompt for a player who never acked
+            // it would otherwise survive across the new one.
+            _bufferedPrompts[(matchId, recipient)] = prompt;
 
             _hub.PublishPerRecipient(
                 matchId,
