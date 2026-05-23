@@ -630,5 +630,15 @@ public static class SeedImplementedCards
         // Exile target creature; that player may search library for a basic
         // land card and put it onto the battlefield tapped, then shuffle.
         "Path to Exile",
+        // Artifact — Equipment {1} (SkullclampFactory). Darksteel.
+        // Equipped creature gets +1/-1. Whenever equipped creature dies, draw
+        // two cards. Equip {1}.
+        "Skullclamp",
+        // Legendary Artifact — Equipment {2} (UmezawasJitteFactory). Betrayers
+        // of Kamigawa. Whenever equipped creature deals combat damage, put two
+        // charge counters on Umezawa's Jitte. Remove a charge counter from
+        // Umezawa's Jitte: Choose one — Jitte deals 2 damage to any target /
+        // target creature gets -1/-1 EOT / you gain 2 life. Equip {2}.
+        "Umezawa's Jitte",
     };
 }

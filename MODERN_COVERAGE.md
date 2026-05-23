@@ -3,7 +3,7 @@
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
 **Last updated:** 2026-05-23
-**Latest origin/main:** Wasteland (Land {T}: {C} + {T}, sac: destroy target nonbasic land) on top of Swords to Plowshares + Mystical Tutor + Path to Exile + Daze + Ponder + Preordain + Splinter Twin + Sythis, Harvest's Hand + Pyromancer's Goggles + Plague Engineer + Manabarbs + Yawgmoth's Will + Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere.
+**Latest origin/main:** Skullclamp + Umezawa's Jitte (Equipment dies-draw-2 trigger + Equipment combat-damage charge-counter trigger with three fanned modal activated abilities; new RemoveChargeCounterCost) on top of Wasteland + Swords to Plowshares + Mystical Tutor + Path to Exile + Daze + Ponder + Preordain + Splinter Twin + Sythis, Harvest's Hand + Pyromancer's Goggles + Plague Engineer + Manabarbs + Yawgmoth's Will + Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere.
 
 ## Headline numbers
 
@@ -106,6 +106,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Sea's Claim | Aura | #160 | enchanted land becomes Island |
 | Searing Blaze | Instant | TBD | 1 damage to player/planeswalker + 1 to a creature they control; landfall → 3 each instead (resolution-time TurnState.LandEnteredThisTurn gate) |
 | Sigarda's Aid | Enchantment | TBD | flash-grant equipment/aura + ETB auto-attach |
+| Skullclamp | Artifact | TBD | Equipment {1} — AttachedBoostEffect(+1, -1) at Layer 7c; dies trigger (CR 603.6c) matches the currently-equipped creature's Battlefield→Graveyard CardMovedEvent and draws 2 cards; Equip {1}. Sorcery-speed gate + attach-target prompt deferred (same as Colossus Hammer) |
 | Snapcaster Mage | Creature | #170 | flash + ETB flashback grant |
 | Solitude | Creature | — | evoke pitch + ETB exile |
 | Spell Snare | Instant | TBD | counter target spell with mana value 2 (resolution-time MV sample, CR 202.3 / 608.2b) |
@@ -129,6 +130,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Torpor Orb | Artifact | — | ETB-trigger suppression |
 | Treasure Cruise | Sorcery | #181 | delve draw 3 |
 | Tribal Flames | Sorcery | TBD | Domain X damage = distinct basic land types you control (CR 702.16) |
+| Umezawa's Jitte | Artifact | TBD | Legendary Equipment {2} — combat-damage trigger by equipped creature (CR 510) adds 2 charge counters; three modal activated abilities, each paid by new RemoveChargeCounterCost: (1) 2 damage to any target via OracleSpellBinder.DealDamage, (2) -1/-1 EOT via PumpUntilEndOfTurnEffect, (3) you gain 2 life; Equip {2}. Modes fanned out into separate abilities — native modal-activated infra deferred |
 | Underground Mortuary | Land | — | U/B surveil dual |
 | Unholy Heat | Instant | #190 | delirium variable damage |
 | Up the Beanstalk | Enchantment | TBD | ETB draw + cast-MV-5+ draw |
@@ -358,8 +360,8 @@ Sorted roughly by build priority (small infra lift × high meta share). Refreshe
 | ~~5~~ | ~~Swords to Plowshares~~ | ~~low~~ | Shipped via `SwordsToPlowsharesFactory` — exile target creature + lifegain by power read via `Creature.Power` (live `Compute` feeds through). Snapshot before zone move (CR 112.7a); negative power floors to zero (CR 119.3); illegal-target → no-op (CR 608.2b). |
 | 6 | Spell Queller | medium | Flash creature: ETB exile target spell mv ≤ 4; LTB return the exiled card to owner's hand (or cast it for free per current oracle). Needs paired ETB-exile-from-stack + LTB-return primitive with a tracked exile zone. |
 | 8 | Sun Titan | medium | ETB + attacks trigger — return permanent mv ≤ 3 from graveyard to battlefield. Reanimation primitive exists (Priest of Fell Rites); needs attack-trigger + mv-3-permanent filter. |
-| 9 | Skullclamp | medium | Equipment {1}: +1/-1 + equipped-dies → draw 2. Needs the dies-trigger keyed to a different permanent (the equipped creature, not Skullclamp itself); ties to equipment-lifecycle which Sigarda's Aid + Puresteel Paladin already exercise. |
-| 10 | Umezawa's Jitte | medium | Legendary equipment + combat-damage trigger gains 2 charge counters + three activated abilities (pump, lifegain/damage-to-creature, lifegain). Needs charge-counter resource on equipment + modal activation; multi-activation pattern similar to Engineered Explosives but per-ability. |
+| ~~9~~ | ~~Skullclamp~~ | ~~medium~~ | Shipped via `SkullclampFactory` — Equipment {1} with `AttachedBoostEffect(+1, -1)` at Layer 7c; dies trigger (CR 603.6c) keyed via `CardMovedEvent` to the source's current `AttachedTo` and draws 2 cards; Equip {1}. Sorcery-speed gate + attach-target prompt deferred (same as Colossus Hammer). |
+| ~~10~~ | ~~Umezawa's Jitte~~ | ~~medium~~ | Shipped via `UmezawasJitteFactory` — Legendary Equipment {2} + combat-damage trigger by equipped creature adds 2 charge counters via new `CounterType.Charge` on the equipment + three modal activated abilities, each paid by new `RemoveChargeCounterCost`: (1) 2 damage to any target, (2) -1/-1 EOT via `PumpUntilEndOfTurnEffect`, (3) gain 2 life; Equip {2}. Modes fanned out into three separate activated abilities — native modal-activated infra deferred. |
 | 11 | Sword of Fire and Ice | medium | Equipment with two-color protection + combat-damage trigger (deal 2 + draw 1). Needs protection-from-color shell (Layer 6 grant) + paired combat-damage trigger; mirrors any future Sword cycle. |
 | ~~12~~ | ~~Wasteland~~ | ~~low~~ | Shipped via `WastelandFactory` — {T}: Add {C} (vanilla ManaAbility) + {T}, Sacrifice Wasteland: destroy target nonbasic land (ActivatedAbility with TargetRequest, self-sacrifice inline at resolution while AdditionalCost.Sacrifice is stubbed — mirrors Karakas's destroy/bounce shape). |
 | 13 | Mutavault | medium | Land {T}: {C} + {1}: until EOT, becomes 2/2 creature with all creature types (still a land). Needs Layer 4/7 land-becomes-creature primitive + "all creature types" inclusion. |
