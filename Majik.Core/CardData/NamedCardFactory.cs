@@ -136,6 +136,17 @@ public static class NamedCardFactory
             // Loyalty abilities (+1, -2, -5) wired by OracleLoyaltyAbilityBinder.
             "Grist, the Hunger Tide" => GristFactory.Create(owner),
 
+            // DFC front face — Creature — Cat {1}{W} 1/1 (AjaniNacatlPariahFactory).
+            // Vigilance keyword marker wired. End-step "may sacrifice another
+            // creature, transform" trigger wired against an attached MdfcState
+            // (CR 711 / CR 701.28). The single-arg dispatcher path attaches
+            // the trigger to the card shape without TriggerManager wiring.
+            // Use the (owner, triggers) overload for live trigger firing.
+            // Back face (Ajani, Nacatl Avenger PW loyalty 3) tracked via
+            // MdfcState.BackFaceName only — back-face loyalty abilities
+            // and Layer 0 per-face hot-swap are deferred.
+            "Ajani, Nacatl Pariah" => AjaniNacatlPariahFactory.Create(owner),
+
             // Creature — Elemental Incarnation {3}{W}{W} 3/2 (SolitudeFactory).
             // Flash + Lifelink + Evoke keyword markers wired. ETB exile-target-
             // creature trigger wired (lifegain to target's controller equal to
