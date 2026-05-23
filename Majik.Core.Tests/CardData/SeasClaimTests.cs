@@ -6,8 +6,11 @@ using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Effects;
 using Majik.Core.Events;
+using Majik.Core.Game;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
 using Majik.Core.Services;
+using Majik.Core.StateMachine;
 using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
 using Xunit;
@@ -85,6 +88,59 @@ public class SeasClaimTests
 
         var attached = EffectiveManaAbilities.For(mountain, _effects, _alice);
         attached.Should().HaveCount(1, "CR 305.6 strips printed {R} and adds {U}");
+        attached[0].ManaGenerated.Blue.Should().Be(1);
+        attached[0].ManaGenerated.Red.Should().Be(0);
+    }
+
+    // -----------------------------------------------------------------------
+    // Cast-time targeting + auto-attach on resolution (CR 303.4f / 601.2c)
+    // -----------------------------------------------------------------------
+
+    /// <summary>
+    /// End-to-end cast flow: agent picks the target Mountain at cast time;
+    /// on resolution, the aura attaches to the Mountain BEFORE the engine
+    /// moves it to the battlefield. The Layer 4 retype then activates as
+    /// the aura ETBs, so the Mountain taps for {U}.
+    /// </summary>
+    [Fact]
+    public async Task SeasClaim_CastFlow_AutoAttaches()
+    {
+        var mountain = new Land(
+            "Mountain",
+            supertypes: new[] { CardSupertype.Basic },
+            subtypes: new[] { CardSubtype.Mountain });
+        mountain.SetOwner(_alice);
+        mountain.SetController(_alice);
+        OracleManaBinder.BindBasicLandMana(mountain, _alice);
+        _zones.MoveCard(mountain, ZoneType.Library, ZoneType.Battlefield, _alice);
+
+        var sc = SeasClaimFactory.Create(_alice, _effects, _bus);
+        _alice.Zones.Library.RemoveCard(sc);
+        _alice.Zones.Hand.AddCard(sc);
+        sc.SetZone(ZoneType.Hand);
+
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var castFlow = new SpellCastFlow(stack, _zones, _bus);
+        var resolver = new StackResolver(_bus, _zones);
+        var agent = new ScriptedAgent();
+        agent.QueueTargets(new object[] { mountain });
+        agent.QueueMana(ManaPayment.Empty);
+
+        var def = SeasClaimFactory.BuildSpellDefinition(
+            sc, _alice.Zones.Battlefield.GetCards().OfType<Permanent>());
+        var ctx = new GameContext(_alice, new[] { _alice }, _alice, 1,
+            PhaseStateType.Main, stack);
+
+        await castFlow.CastAsync(_alice, sc, def, agent, ctx);
+        resolver.ResolveTop(stack);
+
+        sc.Zone.Should().Be(ZoneType.Battlefield);
+        sc.AttachedTo.Should().BeSameAs(mountain,
+            "CR 303.4f — Aura enters the battlefield attached to its chosen target");
+        mountain.Attachments.Should().Contain(sc);
+
+        var attached = EffectiveManaAbilities.For(mountain, _effects, _alice);
+        attached.Should().HaveCount(1);
         attached[0].ManaGenerated.Blue.Should().Be(1);
         attached[0].ManaGenerated.Red.Should().Be(0);
     }
