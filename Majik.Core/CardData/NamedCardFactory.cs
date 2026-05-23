@@ -1281,6 +1281,18 @@ public static class NamedCardFactory
             // shape only (no live suppression).
             "Stony Silence" => StonySilenceFactory.Create(owner),
 
+            // Artifact — {2} (CursedTotemFactory). Mirage.
+            // "Activated abilities of creatures can't be activated unless
+            //  they're mana abilities." (CR 602.5c / 605.) Creature-side
+            // analogue of Stony Silence's global artifact suppression.
+            // Wired via CursedTotemStaticEffect when the (owner, eventBus)
+            // overload is used — a predicate restriction is registered into
+            // ActivatedAbilityRestrictions matching any non-mana activated
+            // ability whose source is an on-battlefield creature. The
+            // single-arg dispatcher path here produces the correct card
+            // shape only (no live suppression).
+            "Cursed Totem" => CursedTotemFactory.Create(owner),
+
             // Instant — {G} (VeilOfSummerFactory). Core Set 2020.
             // "Draw a card if an opponent has cast a blue or black spell this
             // turn. Spells you control can't be countered this turn, and you
