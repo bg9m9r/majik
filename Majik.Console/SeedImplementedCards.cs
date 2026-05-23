@@ -572,5 +572,11 @@ public static class SeedImplementedCards
         // Global static — activated abilities of artifacts can't be activated
         // (mana abilities exempt, CR 605).
         "Stony Silence",
+
+        // Instant — {U} (BrainstormTemplate, Bespoke).
+        // "Draw three cards, then put two cards from your hand on top of
+        // your library in any order." v1 deterministically returns the last
+        // two hand cards; real "any order" player choice deferred.
+        "Brainstorm",
     };
 }
