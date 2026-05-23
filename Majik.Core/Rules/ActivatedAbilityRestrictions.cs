@@ -4,29 +4,42 @@ using Majik.Core.Cards;
 namespace Majik.Core.Rules;
 
 /// <summary>
-/// CR 602.5c — process-level registry for name-targeted activated-ability
-/// suppression imposed by other game objects (Pithing Needle, Phyrexian
-/// Revoker, Sorcerous Spyglass, …).
+/// CR 602.5c — process-level registry for activated-ability suppression
+/// imposed by other game objects (Pithing Needle, Phyrexian Revoker,
+/// Sorcerous Spyglass, Karn the Great Creator, …).
 ///
-/// Entries are tracked per (chosen-name, suppressor-token) so multiple
-/// sources can stack without trampling each other; activation of an
-/// activated ability whose source's name matches at least one registered
-/// entry is rejected — unless the ability is a mana ability (CR 605, the
-/// printed Pithing-Needle exception).
+/// Two registration shapes are supported:
+/// <list type="bullet">
+///   <item><b>Name-targeted</b> (Pithing Needle, Phyrexian Revoker) —
+///         <see cref="AddNameRestriction"/>. The chosen name is compared
+///         against the ability's source card name.</item>
+///   <item><b>Predicate-driven</b> (Karn the Great Creator, Drannith
+///         Magistrate, etc.) — <see cref="AddPredicateRestriction"/>.
+///         A user-supplied <see cref="Predicate{IActivatedAbility}"/>
+///         decides per ability whether it is suppressed. Use this for
+///         "all opponent artifact activated abilities" / "creature
+///         abilities" / source-properties-based filters.</item>
+/// </list>
 ///
-/// Reference equality on the suppressor token keeps source lifecycles
-/// independent: Pithing Needle's <see cref="Majik.Core.Effects.PithingNeedleStaticEffect"/>
-/// is the canonical caller — it registers as the Needle enters the
-/// battlefield and unregisters as it leaves via
-/// <see cref="Majik.Core.Events.CardMovedEvent"/>.
+/// Entries are tracked per suppressor-token so multiple sources stack
+/// without trampling each other; reference equality on the token keeps
+/// source lifecycles independent. Each lifecycle binder (e.g.
+/// <see cref="Majik.Core.Effects.PithingNeedleStaticEffect"/>,
+/// <see cref="Majik.Core.Effects.OpponentArtifactActivatedSuppressionEffect"/>)
+/// registers as its source enters the battlefield and unregisters as it
+/// leaves via <see cref="Majik.Core.Events.CardMovedEvent"/>.
 ///
 /// <see cref="ActionValidator"/> consults
 /// <see cref="IsActivatedAbilityRestricted(IActivatedAbility)"/> during
 /// <c>ValidateActivateAbility</c>. The check pulls the source name from
 /// the ability's <c>Source</c> when it implements <see cref="ICard"/>; if
 /// the source is not a card (custom test fixtures, emblem-style sources),
-/// the restriction is treated as not applicable — name-targeting requires
-/// a named source object.
+/// only predicate restrictions can apply — name-targeting requires a
+/// named source object.
+///
+/// Mana abilities (CR 605) are always exempt — both lookup paths short-
+/// circuit for <see cref="IManaAbility"/>. ManaAbilityActivator further
+/// routes mana abilities around <see cref="ActionValidator"/> entirely.
 ///
 /// Tests that mutate the registry should call <see cref="Clear"/> in a
 /// fixture/dispose path to avoid leakage across cases.
@@ -37,6 +50,10 @@ public static class ActivatedAbilityRestrictions
     // one chosen name in practice (one Needle = one chosen name) but the
     // structure tolerates re-registration without enforcing uniqueness.
     private static readonly List<(object Token, string Name)> _byName = new();
+    // Each entry: (token, predicate). Predicate returns true when the
+    // ability should be suppressed. Mana-ability exemption applies before
+    // predicates are consulted (see IsActivatedAbilityRestricted).
+    private static readonly List<(object Token, Predicate<IActivatedAbility> Match)> _byPredicate = new();
     private static readonly object _gate = new();
 
     /// <summary>
@@ -101,27 +118,87 @@ public static class ActivatedAbilityRestrictions
     }
 
     /// <summary>
+    /// Register a predicate-driven activated-ability suppression under
+    /// <paramref name="token"/>. <paramref name="match"/> is invoked at
+    /// validation time with each candidate <see cref="IActivatedAbility"/>;
+    /// returning true rejects the activation (subject to the CR 605 mana-
+    /// ability exemption applied by
+    /// <see cref="IsActivatedAbilityRestricted(IActivatedAbility)"/>).
+    ///
+    /// Idempotent for the same (token, match) pair — re-registering does
+    /// not add a duplicate entry. Multiple predicates may share a token.
+    /// Used by Karn the Great Creator's "activated abilities of artifacts
+    /// your opponents control can't be activated" static.
+    /// </summary>
+    public static void AddPredicateRestriction(object token, Predicate<IActivatedAbility> match)
+    {
+        ArgumentNullException.ThrowIfNull(token);
+        ArgumentNullException.ThrowIfNull(match);
+        lock (_gate)
+        {
+            foreach (var entry in _byPredicate)
+            {
+                if (ReferenceEquals(entry.Token, token) && ReferenceEquals(entry.Match, match))
+                {
+                    return;
+                }
+            }
+            _byPredicate.Add((token, match));
+        }
+    }
+
+    /// <summary>
+    /// Remove every predicate-restriction registered under
+    /// <paramref name="token"/>. Used when the suppressing source leaves
+    /// the battlefield.
+    /// </summary>
+    public static void RemovePredicateRestriction(object token)
+    {
+        ArgumentNullException.ThrowIfNull(token);
+        lock (_gate)
+        {
+            _byPredicate.RemoveAll(e => ReferenceEquals(e.Token, token));
+        }
+    }
+
+    /// <summary>
     /// Decide whether activation of <paramref name="ability"/> should be
-    /// rejected by name-targeted suppression. Returns true iff:
+    /// rejected by any registered suppression (name or predicate). Returns
+    /// true iff:
     /// <list type="bullet">
-    ///   <item>The ability's <c>Source</c> is an <see cref="ICard"/> with
-    ///         a non-empty <c>Name</c>, AND</item>
-    ///   <item>That name has at least one registered entry, AND</item>
-    ///   <item>The ability is not also a mana ability (CR 605 exemption —
-    ///         Pithing Needle's printed rider).</item>
+    ///   <item>The ability is not a mana ability (CR 605 exemption —
+    ///         applied first so it short-circuits both lookup paths), AND</item>
+    ///   <item>Either (a) the ability's <c>Source</c> is an
+    ///         <see cref="ICard"/> whose name matches a registered name
+    ///         restriction, OR (b) at least one registered predicate
+    ///         returns true for the ability.</item>
     /// </list>
     /// </summary>
     public static bool IsActivatedAbilityRestricted(IActivatedAbility ability)
     {
         if (ability == null) return false;
-        // CR 605 — mana abilities are exempt from Pithing Needle. Mana
-        // abilities live on a separate activator path (they don't reach
-        // ActionValidator.ValidateActivateAbility), but defend in depth
-        // in case a caller routes one through here.
+        // CR 605 — mana abilities are exempt from Pithing-Needle-style
+        // suppression. Mana abilities take ManaAbilityActivator path and
+        // don't reach ActionValidator.ValidateActivateAbility, but defend
+        // in depth in case a caller routes one through here. Karn the
+        // Great Creator's printed text similarly exempts mana abilities
+        // implicitly — "activated abilities" excludes mana abilities
+        // under CR 605.1a.
         if (ability is IManaAbility) return false;
 
-        if (ability.Source is not ICard card) return false;
-        return IsNameRestricted(card.Name);
+        if (ability.Source is ICard card && IsNameRestricted(card.Name))
+        {
+            return true;
+        }
+
+        lock (_gate)
+        {
+            foreach (var entry in _byPredicate)
+            {
+                if (entry.Match(ability)) return true;
+            }
+            return false;
+        }
     }
 
     /// <summary>Reset the registry. Test-only.</summary>
@@ -130,6 +207,7 @@ public static class ActivatedAbilityRestrictions
         lock (_gate)
         {
             _byName.Clear();
+            _byPredicate.Clear();
         }
     }
 }

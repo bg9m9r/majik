@@ -13,13 +13,23 @@ namespace Majik.Core.Tests.Rules;
 /// <summary>
 /// Unit tests for ActionValidator service.
 /// Tests action validation and validation results.
+///
+/// Shares the <see cref="ActivatedAbilityRestrictionsCollection"/> non-
+/// parallel xUnit collection because the activated-ability paths consult
+/// the process-global <see cref="ActivatedAbilityRestrictions"/> registry,
+/// which can otherwise be polluted by concurrently-running suppression
+/// tests (Pithing Needle, Karn the Great Creator).
 /// </summary>
+[Collection(nameof(ActivatedAbilityRestrictionsCollection))]
 public class ActionValidatorTests
 {
     private readonly ActionValidator _validator;
 
     public ActionValidatorTests()
     {
+        // Defensive — clear the suppression registry so a prior test's
+        // leaked entries can't fail a validator-only assertion.
+        ActivatedAbilityRestrictions.Clear();
         _validator = new ActionValidator();
     }
 

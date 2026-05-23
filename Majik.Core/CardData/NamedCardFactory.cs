@@ -471,6 +471,16 @@ public static class NamedCardFactory
             // TarmogoyfFactory.CountDistinctCardTypes for the type count.
             "Unholy Heat" => UnholyHeatFactory.Create(owner),
 
+            // Sorcery — {1}{R} (TribalFlamesFactory). Onslaught / Modern Horizons 2.
+            // "Tribal Flames deals X damage to any target, where X is the
+            //  number of basic land types among lands you control." CR 702.16
+            //  (Domain). Card shape only here; the resolve-time SpellDefinition
+            //  is built on demand via TribalFlamesFactory.BuildSpellDefinition,
+            //  which uses ContinuousEffectsService.Compute(land).Subtypes when
+            //  a live layers service is supplied so layer-4 retypes (Blood
+            //  Moon, Spreading Seas, Urborg, Yavimaya) feed through.
+            "Tribal Flames" => TribalFlamesFactory.Create(owner),
+
             // Artifact — {1} (PithingNeedleFactory).
             // "As Pithing Needle enters, choose a card name. Activated
             //  abilities of sources with the chosen name can't be
@@ -602,6 +612,31 @@ public static class NamedCardFactory
             // eventBus, triggers) overload for fully-wired behavior.
             "Wurmcoil Engine" => WurmcoilEngineFactory.Create(owner),
 
+            // Legendary Planeswalker — Karn {4} loyalty 5
+            // (KarnTheGreatCreatorFactory). Printed static "Activated
+            // abilities of artifacts your opponents control can't be
+            // activated" wired via OpponentArtifactActivatedSuppressionEffect
+            // when the (owner, effects, eventBus, battlefieldResolver,
+            // wishSelector) overload is used. +1 animate-noncreature-artifact
+            // registers Layer 4 type-add + Layer 7b BecomesPTEffect (or
+            // shim for non-Creature C# targets); -2 wishboard accepts a
+            // Func<Player, ICard?> selector returning an artifact "outside
+            // the game" or face-up exiled artifact owned by Karn's
+            // controller. Single-arg dispatcher path produces shape only
+            // (no live static, +1 no-ops without effects/board).
+            "Karn, the Great Creator" => KarnTheGreatCreatorFactory.Create(owner),
+
+            // Artifact — {1} (AmuletOfVigorFactory). Worldwake.
+            // "Whenever a permanent enters tapped under your control,
+            //  untap it." Triggered ability over CardMovedEvent →
+            // Battlefield; condition gates on controller + Permanent +
+            // IsTapped (ZoneService taps before publishing, so IsTapped
+            // is already true at trigger-evaluation time per CR 614.6).
+            // Single-arg dispatcher path attaches the ability for shape
+            // tests; use the (owner, triggers) overload to wire up
+            // bus-driven firing.
+            "Amulet of Vigor" => AmuletOfVigorFactory.Create(owner),
+
             // Sorcery — {1}{G} (SylvanScryingFactory). "Search your library
             // for a land card, reveal it, put it into your hand, then
             // shuffle." (CR 701.19a). Tutors ANY land — basic or nonbasic —
@@ -626,6 +661,38 @@ public static class NamedCardFactory
             // shape without TriggerManager wiring; use the (owner, triggers,
             // willCast, onCascadeResolved) overload to drive the free cast.
             "Crashing Footfalls" => CrashingFootfallsFactory.Create(owner),
+
+            // Creature — Giant {4}{G}{G} 6/6 (PrimevalTitanFactory).
+            // Trample keyword wired. ETB + attack triggered abilities both
+            // tutor up to two lands → battlefield tapped (CR 603.1, CR
+            // 508.1f, CR 701.19a). "Up to two" composes the existing single-
+            // land tutor primitive twice — the agent picks zero or one land
+            // per slot (decline returns null, CR 701.19a). The single-arg
+            // dispatcher path uses the agent-driven default selector and
+            // does NOT register the triggers with a TriggerManager. Use the
+            // (owner, triggers, selector) overload for fully-wired trigger
+            // registration or deterministic test selectors. Library shuffle
+            // deferred (no IZone.Shuffle entry point yet — same rationale
+            // as SearchSpellFactory).
+            "Primeval Titan" => PrimevalTitanFactory.Create(owner),
+
+            // Land — Urza's Mine (Antiquities, Urza Tron cycle).
+            // {T}: Add {C}. If controller controls an Urza's Mine, an
+            // Urza's Power-Plant, AND an Urza's Tower, add {2} instead.
+            // Wired via TronLandHelper.ComputeManaAddition (controller-
+            // only battlefield scan) plumbed through the Func<ManaCost>
+            // ManaAbility overload, so the amount is decided at
+            // activation time against live battlefield state.
+            "Urza's Mine" => UrzasMineFactory.Create(owner),
+
+            // Land — Urza's Tower (Antiquities). Same shape as Urza's
+            // Mine — only the printed subtype differs (Tower).
+            "Urza's Tower" => UrzasTowerFactory.Create(owner),
+
+            // Land — Urza's Power-Plant (Antiquities). Same shape as
+            // Urza's Mine — only the printed subtype differs
+            // (PowerPlant).
+            "Urza's Power-Plant" => UrzasPowerPlantFactory.Create(owner),
 
             _ => new Card(name, ""),
         };

@@ -2,14 +2,14 @@
 
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
-**Last updated:** 2026-05-23
-**Latest origin/main:** 2b02e05 (#212 — Subtlety) + Karn Liberated + Crashing Footfalls / Cascade
+**Last updated:** 2026-05-24
+**Latest origin/main:** 6aeb85c (… + Primeval Titan) + Karn, the Great Creator + Crashing Footfalls / Cascade
 
 ## Headline numbers
 
 | Metric | Count |
 |---|---|
-| Named factories | 67 |
+| Named factories | 73 |
 | Bespoke templates | 26 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
@@ -27,6 +27,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Card | Type | PR | Note |
 |---|---|---|---|
 | Agatha's Soul Cauldron | Artifact | — | activated counter-share |
+| Amulet of Vigor | Artifact | TBD | untap-on-enters-tapped trigger |
 | Ancient Stirrings | Sorcery | #201 | top-5 colorless reveal + random-bottom |
 | Badgermole Cub | Creature | — | earthbend shell |
 | Blood Moon | Enchantment | #156 | nonbasic-to-Mountain Layer 4 |
@@ -53,6 +54,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Grist, the Hunger Tide | Planeswalker | — | +1 token, -2 reanimate |
 | Harbinger of the Seas | Creature | #157 | nonbasic-to-Island |
 | Inspiring Vantage | Land | — | R/W fastland |
+| Karn, the Great Creator | Planeswalker | TBD | opponent-artifact static + +1 animate + -2 wishboard |
 | Karn Liberated | Planeswalker | TBD | +4 exile-from-hand, -3 exile-permanent; -14 restart deferred |
 | Kraul Harpooner | Creature | — | fight-flyer shell |
 | Lazotep Recruit | Creature | — | amass-keyword shell |
@@ -65,6 +67,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Orcish Bowmasters | Creature | — | reactive ping shell |
 | Pithing Needle | Artifact | #189 | name-targeted activated suppression |
 | Priest of Fell Rites | Creature | #196 | ETB reanimate + grave-unearth |
+| Primeval Titan | Creature | TBD | Trample + ETB/attack tutor up to 2 lands tapped |
 | Rift Bolt | Sorcery | #183 | suspend → 3 damage |
 | Scavenging Ooze | Creature | #188 | exile-graveyard + counter + life |
 | Sea's Claim | Aura | #160 | enchanted land becomes Island |
@@ -84,10 +87,14 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Thundering Falls | Land | — | U/R surveil dual |
 | Torpor Orb | Artifact | — | ETB-trigger suppression |
 | Treasure Cruise | Sorcery | #181 | delve draw 3 |
+| Tribal Flames | Sorcery | TBD | Domain X damage = distinct basic land types you control (CR 702.16) |
 | Underground Mortuary | Land | — | U/B surveil dual |
 | Unholy Heat | Instant | #190 | delirium variable damage |
 | Up the Beanstalk | Enchantment | TBD | ETB draw + cast-MV-5+ draw |
 | Urborg, Tomb of Yawgmoth | Land | #158 | grant Swamp to all lands |
+| Urza's Mine | Land | TBD | Tron — {T}: {C}, {2} if all 3 Urza lands controlled |
+| Urza's Power-Plant | Land | TBD | Tron — {T}: {C}, {2} if all 3 Urza lands controlled |
+| Urza's Tower | Land | TBD | Tron — {T}: {C}, {2} if all 3 Urza lands controlled |
 | Vexing Bauble | Artifact | — | sac-draw shell |
 | Walking Ballista | Artifact Creature | — | grow + ping |
 | Wastewood Verge | Land | — | B/G activation-gate land |
@@ -278,12 +285,12 @@ Per-keyword action helpers under `Majik.Core/Keywords/`:
 - **Burn** — Strong. Lightning Bolt, Lava Spike, Lava Dart, Skewer the Critics, Boros Charm, Eidolon of the Great Revel, Goblin Guide, Monastery Swiftspear, Rift Bolt all in. Missing: Searing Blaze (landfall conditional), Roiling Vortex, Sunscorched Desert. ~75%.
 - **Death's Shadow** — Mid-high. Thoughtseize, Fatal Push, Snapcaster Mage, Stubborn Denial, Death's Shadow itself (CDA P/T scaled by controller life — Layer 7a) all in. Mishra's Bauble in. Temur Battle Rage absent. ~60%.
 - **Murktide / Izzet Tempo** — High. Murktide Regent done, Counterspell done, Snapcaster Mage done, Lightning Bolt done, Expressive Iteration done, Ledger Shredder done, Consider done, Spell Pierce done, Subtlety done. Missing: Demilich absent. ~75%.
-- **Mono-Green Tron** — Mid-low. Ancient Stirrings, Sylvan Scrying, Wurmcoil Engine done. No Karn Liberated, no Tron lands. ~20%.
+- **Mono-Green Tron** — High. Ancient Stirrings, Sylvan Scrying, Wurmcoil Engine done. Karn Liberated done. Karn, the Great Creator done. Tron lands (Urza's Mine + Tower + Power-Plant) done with the conditional {2} mana ability. ~70%.
 - **Living End / Crashing Footfalls cascade** — Mid. Cascade keyword done (`Keywords/CascadeAction.cs`) + Crashing Footfalls shipped. Suspend (#183) + Cascade now both online; Living End still needs the mass-exile-grave-then-mass-reanimate effect chain. ~40%.
 - **Rakdos Scam** — Mid-high. Grief done (#205, mirrors Solitude evoke + ETB pattern). Fury done (mirrors Solitude/Grief). Dauthi Voidwalker absent. Liliana of the Veil done, Fatal Push done, Thoughtseize done. ~55%.
 - **Yawgmoth combo** — Mid. Yawgmoth done. Undying creatures (Young Wolf, Strangleroot Geist, Geralf's Messenger) done. Chord of Calling, Eldritch Evolution absent. ~50%.
-- **Domain Zoo** — Low-mid. Boros Charm done, fetches done, shocks done. Scion of Draco, Territorial Kavu, Tribal Flames absent. ~25%.
-- **Amulet Titan** — Very low. No Amulet of Vigor, no Primeval Titan, no bounce lands. ~0%.
+- **Domain Zoo** — Mid. Boros Charm done, fetches done, shocks done, Tribal Flames done. Scion of Draco + Territorial Kavu absent. ~35%.
+- **Amulet Titan** — Mid. Amulet of Vigor done (untap-on-enters-tapped trigger) + Primeval Titan done (ETB + attack land-tutor for up to 2, tapped). No bounce lands. ~30%.
 - **Hammer Time / Equipment** — Low-mid. Stoneforge Mystic done. Sigarda's Aid, Colossus Hammer, Puresteel Paladin absent. ~20%.
 
 ## Top 20 Modern staples NOT yet implemented
@@ -292,11 +299,7 @@ Sorted by build priority (small infra lift × high meta share).
 
 | # | Card | Difficulty | Blocker |
 |---|---|---|---|
-| 1 | Karn, the Great Creator | Mid | Sideboard-from-anywhere -2 ability needs wishboard concept |
-| 2 | Urza's Tron pieces (Mine/Tower/Power Plant) | Mid | "Tap: add 1; if you control all three, add 3" — conditional mana ability |
-| 3 | Living End | Mid | Cascade done; still needs mass-exile-grave + simultaneous mass-reanimate (#174 ready for the latter) |
-| 4 | Primeval Titan | Mid | Attack/ETB triggers + land tutor; tutor template exists |
-| 5 | Amulet of Vigor | Mid | Replacement on enters-tapped → untap; needs ETB replacement composition |
+| 1 | Living End | Mid | Cascade done; still needs mass-exile-grave + simultaneous mass-reanimate (#174 ready for the latter) |
 
 ## How to update this doc
 
