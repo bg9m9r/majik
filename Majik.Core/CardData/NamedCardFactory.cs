@@ -1013,6 +1013,18 @@ public static class NamedCardFactory
             // (CR 106.11b) deferred — no mana-provenance ledger.
             "Manamorphose" => ManamorphoseFactory.Create(owner),
 
+            // Legendary Land — Karakas (Legends / reprints, KarakasFactory).
+            // {T}: Add {W} — vanilla ManaAbility wired.
+            // {T}: Return target legendary creature to its owner's hand —
+            // ActivatedAbility with AdditionalCost.Tap + TargetRequest for
+            // "target legendary creature". Resolution-time gate checks the
+            // chosen target is a legendary creature (CR 608.2b illegal-
+            // target → effect does nothing). v1 uses raw zone moves (no
+            // ZoneService routing — mirrors Teferi -3 bounce). ActionValidator
+            // doesn't yet filter the agent's target list by "legendary"
+            // (resolution-time guard catches illegal picks).
+            "Karakas" => KarakasFactory.Create(owner),
+
             // Creature — Illusion {1}{U} 0/0 (PhantasmalImageFactory).
             // CR 706.10 — "You may have this enter as a copy of any creature
             // on the battlefield, except it's an Illusion in addition to its

@@ -9,7 +9,7 @@ Living tracker for Modern-format card + mechanic implementation in the Majik eng
 
 | Metric | Count |
 |---|---|
-| Named factories | 103 |
+| Named factories | 104 |
 | Bespoke templates | 26 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
@@ -68,6 +68,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Inspiring Vantage | Land | — | R/W fastland |
 | Karn, the Great Creator | Planeswalker | TBD | opponent-artifact static + +1 animate + -2 wishboard |
 | Karn Liberated | Planeswalker | TBD | +4 exile-from-hand, -3 exile-permanent; -14 restart deferred |
+| Karakas | Land | TBD | {T}: {W} + {T}: bounce target legendary creature (Legendary) |
 | Kraul Harpooner | Creature | — | fight-flyer shell |
 | Lazotep Recruit | Creature | — | amass-keyword shell |
 | Ledger Shredder | Creature | #193 | second-spell surveil + counter |
