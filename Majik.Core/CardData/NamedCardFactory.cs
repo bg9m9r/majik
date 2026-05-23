@@ -1619,6 +1619,25 @@ public static class NamedCardFactory
             // GoblinWelderFactory.WeldResolve(players).
             "Goblin Welder" => GoblinWelderFactory.Create(owner),
 
+            // Creature — Goblin Artificer {1}{R} 1/2 (GoblinEngineerFactory).
+            // Modern Horizons. "When Goblin Engineer enters, you may search
+            // your library for an artifact card, then put that card into
+            // your graveyard. If you do, shuffle." +
+            // "{R}, {T}, Sacrifice an artifact: Return target artifact card
+            // from your graveyard to the battlefield." (CR 603.1 / CR 608).
+            // The ETB tutor sends the picked artifact to the graveyard
+            // (NOT hand) — distinguishes from TrinketMage / GoblinMatron.
+            // The activated ability declares structural {R} + {T} costs;
+            // "Sacrifice an artifact" is performed by the effect body
+            // (generic permanent-class cost, no engine primitive yet).
+            // Both sacrifice and reanimate picks are deterministic v1
+            // (first-match). The single-arg dispatcher path here produces
+            // the correct card shape with raw zone moves; use the
+            // (owner, zoneService, eventBus, triggers) overload for
+            // bus-driven ETB-trigger registration and ZoneService-routed
+            // moves so ETB triggers on the reanimated artifact fire.
+            "Goblin Engineer" => GoblinEngineerFactory.Create(owner),
+
             // Creature — Human Shaman {R} 1/1 (DragonsRageChannelerFactory).
             // Modern Horizons 2. "Whenever you cast a noncreature spell,
             // surveil 1. Delirium — Dragon's Rage Channeler gets +2/+2 and
