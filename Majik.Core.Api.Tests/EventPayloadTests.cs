@@ -1,6 +1,8 @@
 using FluentAssertions;
 using Majik.Core.Api;
 using Majik.Core.Cards;
+using Majik.Core.Cards.Types;
+using Majik.Core.Domain.DomainEvents;
 using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Zones;
@@ -38,6 +40,62 @@ public class EventPayloadTests
         payload.GetProperty("playerId").GetGuid().Should().Be(alice.Id);
         payload.GetProperty("previous").GetInt32().Should().Be(20);
         payload.GetProperty("current").GetInt32().Should().Be(17);
+    }
+
+    [Fact]
+    public void SpellCastEvent_PayloadCarriesStackItemFields()
+    {
+        // Spell payload must carry enough for the frontend to append a
+        // StackItem entry to its snapshot without refetching: stack id,
+        // controller, kind discriminator + display description.
+        var alice = new Player("Alice");
+        var bolt = new Instant("Lightning Bolt", "R") { Owner = alice };
+        var spell = new Majik.Core.Spells.Spell(bolt, alice);
+        var e = new SpellCastEvent(spell);
+
+        var payload = EventPayloadBuilder.Build(e);
+
+        payload.GetProperty("stackId").GetGuid().Should().Be(spell.Id);
+        payload.GetProperty("controllerId").GetGuid().Should().Be(alice.Id);
+        payload.GetProperty("cardId").GetGuid().Should().Be(bolt.InstanceId);
+        payload.GetProperty("cardName").GetString().Should().Be("Lightning Bolt");
+        payload.GetProperty("kind").GetString().Should().Be("Spell");
+        payload.GetProperty("description").GetString().Should().Be("Lightning Bolt");
+    }
+
+    [Fact]
+    public void StackObjectAddedEvent_SpellPayloadMirrorsStackObjectDto()
+    {
+        // The payload `kind` + `description` strings must match
+        // StateSnapshotter.SnapshotStackObject so the portal can patch
+        // state.stack directly from the event delta.
+        var alice = new Player("Alice");
+        var bolt = new Instant("Bolt", "R") { Owner = alice };
+        var spell = new Majik.Core.Spells.Spell(bolt, alice);
+        var e = new StackObjectAddedEvent(spell);
+
+        var payload = EventPayloadBuilder.Build(e);
+
+        payload.GetProperty("stackId").GetGuid().Should().Be(spell.Id);
+        payload.GetProperty("controllerId").GetGuid().Should().Be(alice.Id);
+        payload.GetProperty("kind").GetString().Should().Be("Spell");
+        payload.GetProperty("description").GetString().Should().Be("Bolt");
+    }
+
+    [Fact]
+    public void StackObjectResolvedEvent_SpellPayloadMirrorsStackObjectDto()
+    {
+        var alice = new Player("Alice");
+        var bolt = new Instant("Bolt", "R") { Owner = alice };
+        var spell = new Majik.Core.Spells.Spell(bolt, alice);
+        var e = new StackObjectResolvedEvent(spell);
+
+        var payload = EventPayloadBuilder.Build(e);
+
+        payload.GetProperty("stackId").GetGuid().Should().Be(spell.Id);
+        payload.GetProperty("controllerId").GetGuid().Should().Be(alice.Id);
+        payload.GetProperty("kind").GetString().Should().Be("Spell");
+        payload.GetProperty("description").GetString().Should().Be("Bolt");
     }
 
     [Fact]
