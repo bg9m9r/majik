@@ -1335,6 +1335,24 @@ public static class NamedCardFactory
             // sacrifice path is a stub (mirrors Mishra's Bauble).
             "Aether Spellbomb" => AetherSpellbombFactory.Create(owner),
 
+            // Land — Aether Hub (Kaladesh, AetherHubFactory).
+            // Oracle: "Aether Hub enters with an energy counter on it.
+            // {T}: Add {C}. {T}, Pay {E}: Add one mana of any color."
+            // ETB trigger (CR 603.6a) grants the controller one energy
+            // (CR 106.13 — player-scoped resource via Player.GainEnergy)
+            // AND stamps a CounterType.Energy marker on the land for
+            // shape inspection. {T}: Add {C} wired as a ManaAbility.
+            // {T}, Pay {E}: Add one mana of any color modelled as 5
+            // ManaAbility instances (one per WUBRG) carrying the
+            // additional-cost overload — gated on
+            // controller.EnergyCounters >= 1 (CR 119.4) and the
+            // additionalCostPayer spends one energy via PayEnergy(1)
+            // after the {T} tap pays out. Single-arg dispatcher path
+            // attaches the ETB trigger without TriggerManager
+            // registration; (owner, eventBus, triggers) overload wires
+            // bus-driven firing. See factory xmldoc.
+            "Aether Hub" => AetherHubFactory.Create(owner),
+
             // Artifact — Equipment {1} (ColossusHammerFactory).
             // Static "equipped creature gets +10/+0 and loses flying" via
             // AttachedBoostEffect (Layer 7c) + LoseKeywordEffect("Flying")

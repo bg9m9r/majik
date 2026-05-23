@@ -42,4 +42,17 @@ public sealed record CounterType(string Name)
     /// draws a card for each burden counter on it.
     /// </summary>
     public static readonly CounterType Burden = new("Burden");
+
+    /// <summary>
+    /// CR 122 / CR 106.13 — Energy counter marker for the printed
+    /// "Aether Hub enters with an energy counter on it" oracle text
+    /// (Kaladesh). Energy as a spendable resource is player-scoped on
+    /// <see cref="Majik.Core.Players.Player.EnergyCounters"/>; this
+    /// permanent-scoped marker exists only so the on-card counter is
+    /// observable on Aether Hub's <see cref="CounterCollection"/> for
+    /// inspection / shape tests. The gameplay-relevant gain (controller
+    /// gets {E}) happens via <see cref="Majik.Core.Players.Player.GainEnergy"/>
+    /// in the ETB effect — the on-card counter is bookkeeping only.
+    /// </summary>
+    public static readonly CounterType Energy = new("Energy");
 }
