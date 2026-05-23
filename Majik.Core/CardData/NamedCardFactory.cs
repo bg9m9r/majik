@@ -1174,6 +1174,22 @@ public static class NamedCardFactory
             // opponentChooser) overload for the full effect).
             "Wishclaw Talisman" => WishclawTalismanFactory.Create(owner),
 
+            // Sorcery — {2}{B} (YawgmothsWillFactory). Urza's Saga.
+            // "Until end of turn, you may play cards from your graveyard.
+            //  If a card would be put into your graveyard from anywhere
+            //  this turn, exile it instead." Card shape only here; the
+            // resolve effect (stamp Card.GrantRuntimeGraveyardCast on every
+            // card in the controller's graveyard + register an
+            // EOT-expirable YawgmothsWillGraveToExileReplacement on the
+            // supplied ReplacementBus) is built on demand via
+            // YawgmothsWillFactory.BuildResolveEffect(caster, replacements?).
+            // Mirrors LurrusOfTheDreamDenFactory's grave-cast plumbing
+            // (per-card alt cost via Costs/GraveyardCastAlternativeCost)
+            // and DauthiVoidwalkerFactory's grave→exile replacement
+            // pattern. The single-arg dispatcher path produces a bare
+            // Sorcery shell — the resolve effect is wired by callers.
+            "Yawgmoth's Will" => YawgmothsWillFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 

@@ -3,13 +3,13 @@
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
 **Last updated:** 2026-05-23
-**Latest origin/main:** Wishclaw Talisman on top of Searing Blaze + Goblin Lackey + Damping Sphere (#257).
+**Latest origin/main:** Yawgmoth's Will on top of Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere (#257).
 
 ## Headline numbers
 
 | Metric | Count |
 |---|---|
-| Named factories | 112 |
+| Named factories | 113 |
 | Bespoke templates | 26 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
@@ -138,6 +138,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Wurmcoil Engine | Artifact Creature | TBD | deathtouch + lifelink + dies-trigger twin tokens |
 | Yavimaya, Cradle of Growth | Land | #158 | grant Forest to all lands |
 | Yawgmoth, Thran Physician | Creature | — | pay life + sac → discard/draw |
+| Yawgmoth's Will | Sorcery | TBD | {2}{B} — until EOT, play cards from your graveyard (stamp Card.RuntimeGraveyardCastCost on every card in controller's graveyard) + EOT-expirable controller-grave→exile ZoneMoveIntent replacement (CR 614) |
 
 ### Template-covered (notable)
 
@@ -325,7 +326,7 @@ Per-keyword action helpers under `Majik.Core/Keywords/`:
 - **Mono-Green Tron** — High. Ancient Stirrings, Sylvan Scrying, Wurmcoil Engine done. Karn Liberated done. Karn, the Great Creator done. Tron lands (Urza's Mine + Tower + Power-Plant) done with the conditional {2} mana ability. ~70%.
 - **Living End / Crashing Footfalls cascade** — High. Cascade keyword done (`Keywords/CascadeAction.cs`) + Crashing Footfalls shipped (#219). Living End shipped (this PR) with both the Cascade trigger and the resolve chain (per-player mass-exile-grave + sacrifice-creatures + mass-reanimate; ETB triggers fire on reanimated permanents via PR #174 plumbing). Suspend itself is done (#183). ~75%.
 - **Rakdos Scam** — High. Grief done (#205, mirrors Solitude evoke + ETB pattern). Fury done (mirrors Solitude/Grief). Ragavan, Nimble Pilferer done (combat-damage Treasure + exile + may-cast EOT grant; Dash deferred). Dauthi Voidwalker done (Shadow + opponent-grave→exile-with-void-counter replacement effect + {2},{T},remove-void-counter activated cast-from-exile via CastFromExileAlternativeCost; EOT "this turn" timing on the cast permission deferred). Liliana of the Veil done, Fatal Push done, Thoughtseize done. ~75%.
-- **Yawgmoth combo** — High. Yawgmoth done. Undying creatures (Young Wolf, Strangleroot Geist, Geralf's Messenger) done. Chord of Calling done. Eldritch Evolution done — tutor-with-sac is a primary engine starter for the deck. ~70%.
+- **Yawgmoth combo** — High. Yawgmoth done. Yawgmoth's Will done (Sorcery {2}{B} — stamps Card.RuntimeGraveyardCastCost on every card in controller's graveyard + EOT-expirable grave→exile ZoneMoveIntent replacement; covers the "play cards from your graveyard" + "exile instead of graveyard" oracle clauses). Undying creatures (Young Wolf, Strangleroot Geist, Geralf's Messenger) done. Chord of Calling done. Eldritch Evolution done — tutor-with-sac is a primary engine starter for the deck. ~75%.
 - **Domain Zoo** — Mid. Boros Charm done, fetches done, shocks done, Tribal Flames done, Scion of Draco's domain cost-reduction done (keyword-grant rider deferred). Territorial Kavu absent. ~45%.
 - **Amulet Titan** — Mid. Amulet of Vigor done (untap-on-enters-tapped trigger) + Primeval Titan done (ETB + attack land-tutor for up to 2, tapped). No bounce lands. ~30%.
 - **Lurrus Companion** — Low-mid. Lurrus of the Dream-Den done (Lifelink + once-per-turn cast-permanent-mv≤2-from-graveyard; companion deck-construction rule deferred). Pairs with the existing low-mv permanent suite (Mishra's Bauble, Dryad Arbor, Stoneforge Mystic, Walking Ballista, Dark Confidant, etc.). Deck-construction enforcement absent. ~30%.
@@ -342,9 +343,8 @@ Sorted roughly by build priority (small infra lift × high meta share). Refreshe
 | 1 | Plague Engineer | medium | ETB: choose a creature type → opponents' creatures of that type get -1/-1. Needs chosen-subtype state on permanents + opponent-only lord-style boost. |
 | 2 | Splinter Twin | medium | Aura grants `{T}: create a token copy with haste`. `CopyEffect` exists, but ability-grant-on-attach (aura adds an activated ability to enchanted creature) does not. |
 | 3 | Sythis, Harvest's Hand | medium | Constellation (cast-an-enchantment trigger) primitive absent; needs a cast-event-typed-card trigger surface comparable to landfall. |
-| 4 | Yawgmoth's Will | high | "Play cards from your graveyard this turn" — turn-scoped global cast-from-graveyard permission + EOT exile-instead-of-grave replacement chain. `GraveyardCastAlternativeCost` is per-card, not zone-wide. |
-| 5 | Manabarbs | high | Triggered ability on every land-tap event globally; tap-event subscription per-permanent works, but a global "whenever a player taps a land for mana" hook is unwired. |
-| 6 | Pyromancer's Goggles | high | Legendary {0} mana ability + replacement: "when you tap it for {R} to cast an instant/sorcery, copy that spell once". Needs cast-time mana-source tracking + spell-copy hook keyed off that source. |
+| 4 | Manabarbs | high | Triggered ability on every land-tap event globally; tap-event subscription per-permanent works, but a global "whenever a player taps a land for mana" hook is unwired. |
+| 5 | Pyromancer's Goggles | high | Legendary {0} mana ability + replacement: "when you tap it for {R} to cast an instant/sorcery, copy that spell once". Needs cast-time mana-source tracking + spell-copy hook keyed off that source. |
 
 ## How to update this doc
 
