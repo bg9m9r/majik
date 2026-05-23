@@ -2,14 +2,14 @@
 
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
-**Last updated:** 2026-05-25
-**Latest origin/main:** 6aeb85c (… + Primeval Titan + Karn, the Great Creator + Crashing Footfalls / Cascade) + Lurrus of the Dream-Den (this PR)
+**Last updated:** 2026-05-23
+**Latest origin/main:** 93295ac (… + Primeval Titan + Karn, the Great Creator + Crashing Footfalls / Cascade + Lurrus of the Dream-Den) + Dauthi Voidwalker (this PR)
 
 ## Headline numbers
 
 | Metric | Count |
 |---|---|
-| Named factories | 73 |
+| Named factories | 74 |
 | Bespoke templates | 26 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
@@ -38,6 +38,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Crashing Footfalls | Sorcery | TBD | cascade trigger + 2x 4/4 Rhino warrior tokens with trample |
 | Cryptic Command | Instant | #191 | modal choose-2 |
 | Dark Confidant | Creature | #178 | upkeep reveal + life loss |
+| Dauthi Voidwalker | Creature | TBD | Shadow + opponent-grave→exile-with-void-counter replacement + {2},{T},remove counter: cast-for-free from exile |
 | Death's Shadow | Creature | TBD | Layer 7a CDA P/T scaled by controller life |
 | Delighted Halfling | Creature | — | any-color mana ability |
 | Dig Through Time | Sorcery | #181 | delve top-7 to hand |
@@ -293,7 +294,7 @@ Per-keyword action helpers under `Majik.Core/Keywords/`:
 - **Murktide / Izzet Tempo** — High. Murktide Regent done, Counterspell done, Snapcaster Mage done, Lightning Bolt done, Expressive Iteration done, Ledger Shredder done, Consider done, Spell Pierce done, Subtlety done. Missing: Demilich absent. ~75%.
 - **Mono-Green Tron** — High. Ancient Stirrings, Sylvan Scrying, Wurmcoil Engine done. Karn Liberated done. Karn, the Great Creator done. Tron lands (Urza's Mine + Tower + Power-Plant) done with the conditional {2} mana ability. ~70%.
 - **Living End / Crashing Footfalls cascade** — High. Cascade keyword done (`Keywords/CascadeAction.cs`) + Crashing Footfalls shipped (#219). Living End shipped (this PR) with both the Cascade trigger and the resolve chain (per-player mass-exile-grave + sacrifice-creatures + mass-reanimate; ETB triggers fire on reanimated permanents via PR #174 plumbing). Suspend itself is done (#183). ~75%.
-- **Rakdos Scam** — Mid-high. Grief done (#205, mirrors Solitude evoke + ETB pattern). Fury done (mirrors Solitude/Grief). Dauthi Voidwalker absent. Liliana of the Veil done, Fatal Push done, Thoughtseize done. ~55%.
+- **Rakdos Scam** — High. Grief done (#205, mirrors Solitude evoke + ETB pattern). Fury done (mirrors Solitude/Grief). Dauthi Voidwalker done (Shadow + opponent-grave→exile-with-void-counter replacement effect + {2},{T},remove-void-counter activated cast-from-exile via CastFromExileAlternativeCost; EOT "this turn" timing on the cast permission deferred). Liliana of the Veil done, Fatal Push done, Thoughtseize done. ~70%.
 - **Yawgmoth combo** — Mid. Yawgmoth done. Undying creatures (Young Wolf, Strangleroot Geist, Geralf's Messenger) done. Chord of Calling, Eldritch Evolution absent. ~50%.
 - **Domain Zoo** — Mid. Boros Charm done, fetches done, shocks done, Tribal Flames done. Scion of Draco + Territorial Kavu absent. ~35%.
 - **Amulet Titan** — Mid. Amulet of Vigor done (untap-on-enters-tapped trigger) + Primeval Titan done (ETB + attack land-tutor for up to 2, tapped). No bounce lands. ~30%.
