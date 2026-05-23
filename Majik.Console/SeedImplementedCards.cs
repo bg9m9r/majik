@@ -716,5 +716,48 @@ public static class SeedImplementedCards
         // Storm (CR 702.40). Target player puts the top three cards of their
         // library into their graveyard.
         "Brain Freeze",
+
+        // ---- Modern staples shipped in the 2026-05-23g bump ----
+
+        // Sorcery — {2}{R} (WheelOfFortuneFactory). Limited Edition Alpha.
+        // Each player discards their hand, then draws seven cards.
+        "Wheel of Fortune",
+        // Enchantment — {X}{B}{G} (PerniciousDeedFactory). Apocalypse.
+        // Sacrifice ~: Destroy each artifact, creature, and enchantment with
+        // mana value X or less. Mv-bounded sweeper.
+        "Pernicious Deed",
+        // Creature — Human Shaman {R} 1/1 (DragonsRageChannelerFactory).
+        // Modern Horizons 2. Whenever you cast a noncreature spell, surveil 1.
+        // Delirium — ~ gets +2/+2 and has flying as long as four or more card
+        // types are among cards in your graveyard.
+        "Dragon's Rage Channeler",
+        // Sorcery — {B}{B} (TendrilsOfAgonyFactory). Scourge.
+        // Storm (CR 702.40). Target opponent loses 2 life and you gain 2 life.
+        "Tendrils of Agony",
+        // Artifact — {1} (AetherSpellbombFactory). Mirrodin.
+        // {U}, Sacrifice ~: Return target creature to its owner's hand.
+        // {1}, Sacrifice ~: Draw a card.
+        "Aether Spellbomb",
+        // Artifact — {2} (CursedTotemFactory). Mirage.
+        // Static (CR 605): Activated abilities of creatures can't be activated
+        // unless they're mana abilities.
+        "Cursed Totem",
+        // Instant — {B} (VampiricTutorFactory). Visions.
+        // Search your library for a card, put it on top of your library, then
+        // shuffle. You lose 2 life.
+        "Vampiric Tutor",
+        // Instant — 0 (SlaughterPactFactory). Future Sight.
+        // Destroy target nonblack creature. At the beginning of your next
+        // upkeep, pay {2}{B}{B}. If you don't, you lose the game.
+        "Slaughter Pact",
+        // Instant — 0 (PactOfTheTitanFactory). Future Sight.
+        // Create a 4/4 red Giant creature token. At the beginning of your
+        // next upkeep, pay {4}{R}. If you don't, you lose the game.
+        "Pact of the Titan",
+        // Creature — Goblin Artificer {1}{R} 1/2 (GoblinEngineerFactory).
+        // Modern Horizons. ETB tutor an artifact card from library to
+        // graveyard. {T}, Sacrifice an artifact: return target artifact card
+        // with mana value 3 or less from your graveyard to the battlefield.
+        "Goblin Engineer",
     };
 }
