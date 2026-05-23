@@ -1601,6 +1601,21 @@ public static class NamedCardFactory
             // SpellCopier xmldocs).
             "Brain Freeze" => BrainFreezeFactory.Create(owner),
 
+            // Enchantment — {1}{B}{G} (PerniciousDeedFactory). Apocalypse.
+            // "{X}, Sacrifice Pernicious Deed: Destroy each artifact,
+            //  creature, and enchantment with mana value X or less."
+            // Mirrors Engineered Explosives' v1 shape: ManaCostCost("{X}")
+            // + AdditionalCost.Sacrifice on the activation; the effect
+            // closure samples X from a caller-supplied Func<int>
+            // (single-arg path uses X = 0) and scans every resolver-
+            // supplied battlefield (controller-only when no resolver) for
+            // Artifact / Creature / Enchantment cards with mv ≤ X.
+            // Sacrifice payment is a no-op stub at AdditionalCost.Pay; the
+            // effect closure moves Pernicious Deed to its owner's
+            // graveyard so visible state matches CR 701.16 (same trick as
+            // Engineered Explosives + Mishra's Bauble).
+            "Pernicious Deed" => PerniciousDeedFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
