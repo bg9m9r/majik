@@ -3,7 +3,7 @@
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
 **Last updated:** 2026-05-23
-**Latest origin/main:** e0cef4d (#207 — Sylvan Scrying) + Fury
+**Latest origin/main:** e0cef4d (#207 — Sylvan Scrying) + Fury + Endurance (this PR)
 
 ## Headline numbers
 
@@ -42,6 +42,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Dress Down | Enchantment | #195 | lose-abilities + 1/1 base PT |
 | Dryad Arbor | Land Creature | — | 1/1 Forest creature, no cost |
 | Elegant Parlor | Land | — | R/W surveil dual |
+| Endurance | Creature | TBD | MH2 incarnation: Flash + Reach + evoke pitch + ETB shuffle-graveyard-to-library |
 | Fiery Islet | Land | — | pay-1-life U/R + sac-draw |
 | Force of Negation | Instant | #185 | pitch counter (non-creature) |
 | Force of Will | Instant | #185 | pitch counter (universal) |
@@ -108,7 +109,6 @@ Cards implemented through generic or bespoke templates without a named factory. 
 - Goblin Guide — vanilla keyword binding (Haste + reveal-trigger TBD)
 - Eidolon of the Great Revel — triggered-ability binder (cheap-spell pattern)
 - Monastery Swiftspear — Prowess keyword (`Keywords/ProwessFactory`)
-- Endurance — keyword bindings (Flash + Reach); ETB graveyard-to-library trigger
 - Fulminator Mage — dies-destroy-land trigger
 - Green Sun's Zenith — `Search/GreenSunsZenithPatternTemplate`
 - Force of Vigor — `Destroy/DestroyUpToArtifactEnchantmentTemplate` + pitch cost
@@ -292,13 +292,12 @@ Sorted by build priority (small infra lift × high meta share).
 | 2 | Karn Liberated | Mid | Exile target, restart-game ultimate (game-restart deferred) |
 | 3 | Urza's Tron pieces (Mine/Tower/Power Plant) | Mid | "Tap: add 1; if you control all three, add 3" — conditional mana ability |
 | 4 | Subtlety | Low | Evoke + ETB bounce-and-look — Solitude/Grief/Fury pattern + bounce template |
-| 5 | Endurance ETB targeting | Low | Keyword bindings exist; ETB graveyard-to-library not wired through targeting |
-| 6 | Crashing Footfalls | High | Suspend done (#183), but cascade trigger on suspend-cast missing |
-| 7 | Living End | High | Cascade + mass-exile-grave + simultaneous mass-reanimate (#174 ready for the latter) |
-| 8 | Cascade keyword | High | Triggered "cast for free from top reveal" — alt-cast-from-library framework |
-| 9 | Primeval Titan | Mid | Attack/ETB triggers + land tutor; tutor template exists |
-| 10 | Amulet of Vigor | Mid | Replacement on enters-tapped → untap; needs ETB replacement composition |
-| 11 | Up the Beanstalk | Low | Cast-trigger by CMC threshold — trigger-by-CMC pattern |
+| 5 | Crashing Footfalls | High | Suspend done (#183), but cascade trigger on suspend-cast missing |
+| 6 | Living End | High | Cascade + mass-exile-grave + simultaneous mass-reanimate (#174 ready for the latter) |
+| 7 | Cascade keyword | High | Triggered "cast for free from top reveal" — alt-cast-from-library framework |
+| 8 | Primeval Titan | Mid | Attack/ETB triggers + land tutor; tutor template exists |
+| 9 | Amulet of Vigor | Mid | Replacement on enters-tapped → untap; needs ETB replacement composition |
+| 10 | Up the Beanstalk | Low | Cast-trigger by CMC threshold — trigger-by-CMC pattern |
 
 ## How to update this doc
 
