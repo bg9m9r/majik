@@ -214,8 +214,8 @@ internal static class TriggerPlayground
             new[] { alice, bob },
             new Dictionary<Player, IPlayerAgent>
             {
-                [alice] = new HeuristicBotAgent(),
-                [bob] = new HeuristicBotAgent(),
+                [alice] = new HeuristicBotAgent(new RuntimeFlashbackAltCostProbe()),
+                [bob] = new HeuristicBotAgent(new RuntimeFlashbackAltCostProbe()),
             },
             stack, zones, triggers, resolver, sba, priority, combat, rng);
 
@@ -522,8 +522,8 @@ internal static class TriggerPlayground
             players: new[] { alice, bob },
             agents: new Dictionary<Player, IPlayerAgent>
             {
-                [alice] = new HeuristicBotAgent(),
-                [bob] = new HeuristicBotAgent(),
+                [alice] = new HeuristicBotAgent(new RuntimeFlashbackAltCostProbe()),
+                [bob] = new HeuristicBotAgent(new RuntimeFlashbackAltCostProbe()),
             },
             stack: stack,
             zoneService: zones,

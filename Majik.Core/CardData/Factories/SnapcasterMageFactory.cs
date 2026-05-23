@@ -46,16 +46,15 @@ namespace Majik.Core.CardData.Factories;
 /// exile-on-resolution side effect (CR 702.33b). No new spell-cast plumbing
 /// was introduced.
 ///
+/// ## Bot-side discovery
+/// <see cref="Majik.Core.Players.Agents.RuntimeFlashbackAltCostProbe"/>
+/// reads <see cref="Card.RuntimeFlashbackCost"/> and yields a
+/// <see cref="Majik.Core.Costs.FlashbackAlternativeCost"/> for the stamped
+/// cost. A <see cref="Majik.Core.Players.Agents.HeuristicBotAgent"/>
+/// constructed with that probe will bid the Snapcaster-granted flashback
+/// alongside any printed alt costs.
+///
 /// ## Deferred (v1 gaps)
-/// - <b>Bot-side alt-cost discovery</b>: the heuristic bot's
-///   <see cref="Majik.Core.Players.Agents.IAlternativeCostProbe"/> doesn't
-///   yet read <see cref="Card.RuntimeFlashbackCost"/>; only the printed
-///   "Flashback {cost}" oracle line is probed. A bot considering a
-///   Snapcaster-granted Lightning Bolt would currently see no alt-cost
-///   bid and skip it. Wiring runtime grants into the probe is straight-
-///   forward (one more candidate yielded when the flag is set) but
-///   out-of-scope for this slice — Snapcaster is castable via the
-///   scripted/test path today.
 /// - <b>"Up to one" wording</b>: actual oracle is "target instant or sorcery
 ///   card" — mandatory single target. If no legal target exists, the
 ///   trigger is illegal-on-resolution per CR 603.10b and is removed from
