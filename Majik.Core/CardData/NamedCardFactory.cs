@@ -1317,6 +1317,17 @@ public static class NamedCardFactory
             // for fully-wired behaviour.
             "Splinter Twin" => SplinterTwinFactory.Create(owner),
 
+            // Instant — {W} (SwordsToPlowsharesFactory). Alpha.
+            // "Exile target creature. Its controller gains life equal to its
+            //  power." Card shape only here; the resolve-time SpellDefinition
+            // (exile + power-snapshot lifegain) is built on demand via
+            // SwordsToPlowsharesFactory.BuildDefinition(targetResolver).
+            // Power is sampled BEFORE the zone move via Creature.Power, which
+            // routes through ContinuousEffectsService.Compute when the creature
+            // has ActiveEffects attached (Tarmogoyf CDA / anthems / pump all
+            // feed through). Negative power floors to zero per CR 119.3.
+            "Swords to Plowshares" => SwordsToPlowsharesFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
