@@ -842,6 +842,14 @@ public sealed class MatchService
         if (facade != null)
         {
             await facade.SubmitAsync(command, ct);
+            // The submitted command resolved the engine's pending TCS for
+            // this seat, so any prompt previously buffered for the caller
+            // is no longer authoritative. If the engine emits a fresh
+            // prompt for the same seat next, MatchFacadeBridge.ForwardPrompt
+            // will rebuffer it; if the next prompt is for the OTHER seat
+            // (or the game ends), the buffered entry must be cleared so a
+            // late JoinMatch from the caller doesn't replay a stale prompt.
+            _facadeBridge?.AckPrompt(matchId, callerSub);
             return Result.Ok(true);
         }
 

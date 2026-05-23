@@ -8,8 +8,16 @@ namespace Majik.Server.Matches;
 public sealed class MatchHub : Hub
 {
     private readonly MatchRepository _matches;
+    private readonly MatchFacadeBridge? _bridge;
 
-    public MatchHub(MatchRepository matches) { _matches = matches; }
+    // MatchFacadeBridge is nullable so test wiring that doesn't register
+    // the bridge (in-memory hub harnesses) still constructs. Production
+    // composition always provides one (see MatchRegistration).
+    public MatchHub(MatchRepository matches, MatchFacadeBridge? bridge = null)
+    {
+        _matches = matches;
+        _bridge = bridge;
+    }
 
     public async Task JoinMatch(Guid matchId)
     {
@@ -30,6 +38,15 @@ public sealed class MatchHub : Hub
             throw new HubException("Not a participant in this match.");
 
         await Groups.AddToGroupAsync(Context.ConnectionId, GroupName(matchId));
+
+        // Replay any prompt the engine published BEFORE this connection
+        // joined the match group. Most acute on vs-Bot matches: the
+        // engine reaches the user's opening-hand mulligan inside
+        // CreateBotMatchAsync's HTTP handler, well before the client
+        // navigates to /match/:id and calls JoinMatch. Without this
+        // replay the prompt is published to an empty group and lost,
+        // leaving the UI stuck on "no active prompt".
+        _bridge?.ReplayPromptIfAny(matchId, sub, Context.ConnectionId);
     }
 
     public Task LeaveMatch(Guid matchId) =>

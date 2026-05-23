@@ -39,4 +39,21 @@ public interface IMatchHubPublisher
     /// <see cref="Publish"/> so existing fakes don't need updating.</summary>
     void PublishBotThinking(Guid matchId, bool thinking)
         => Publish(matchId, "match.bot-thinking", new { matchId, thinking });
+
+    /// <summary>
+    /// Send a payload to a single SignalR connection — used by the
+    /// <c>MatchFacadeBridge</c> prompt-replay path: when a client joins a
+    /// match AFTER the engine has already broadcast a prompt to the
+    /// (then-empty) match group, we replay the buffered prompt to JUST
+    /// that connection so the player isn't stuck staring at "no active
+    /// prompt" forever.
+    ///
+    /// Default impl is a no-op so existing test fakes don't need to
+    /// implement it. Production wiring overrides this via
+    /// <c>IHubContext&lt;MatchHub&gt;.Clients.Client(connectionId)</c>.
+    /// </summary>
+    void SendToConnection(string connectionId, string @event, object payload)
+    {
+        // no-op default; production override does the real send.
+    }
 }
