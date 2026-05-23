@@ -903,6 +903,26 @@ public static class NamedCardFactory
             // overload for live boost / lose-flying registration.
             "Colossus Hammer" => ColossusHammerFactory.Create(owner),
 
+            // Artifact — Equipment {1} (SkullclampFactory). Darksteel.
+            // Static "equipped creature gets +1/-1" + dies trigger (CR 603.6c /
+            // CR 700.4): "Whenever equipped creature dies, draw two cards."
+            // Equip {1} activated ability wired. The single-arg dispatcher
+            // path here produces the correct card shape; use the (owner,
+            // continuousEffects, triggers) overload for live boost +
+            // bus-driven dies-trigger wiring.
+            "Skullclamp" => SkullclampFactory.Create(owner),
+
+            // Legendary Artifact — Equipment {2} (UmezawasJitteFactory).
+            // Betrayers of Kamigawa. Combat-damage trigger places two charge
+            // counters on Jitte. Three modal activated abilities, each
+            // {Remove a charge counter}: (1) +2/+2 EOT to equipped creature;
+            // (2) target creature gets -1/-1 EOT; (3) controller gains 2
+            // life. Equip {2} activated ability wired. The single-arg
+            // dispatcher path produces the correct card shape; use the
+            // (owner, continuousEffects, triggers) overload for live
+            // boost / bus-driven combat-damage trigger wiring.
+            "Umezawa's Jitte" => UmezawasJitteFactory.Create(owner),
+
             // Legendary Land — Phyrexian Tower (PhyrexianTowerFactory).
             // {T}: Add {C} and {T}, Sacrifice a creature: Add {B}{B} — wired.
             // The sacrifice cost uses SacrificeAnotherCreatureCost; callers can
