@@ -612,6 +612,20 @@ public static class NamedCardFactory
             // eventBus, triggers) overload for fully-wired behavior.
             "Wurmcoil Engine" => WurmcoilEngineFactory.Create(owner),
 
+            // Legendary Planeswalker — Karn {4} loyalty 5
+            // (KarnTheGreatCreatorFactory). Printed static "Activated
+            // abilities of artifacts your opponents control can't be
+            // activated" wired via OpponentArtifactActivatedSuppressionEffect
+            // when the (owner, effects, eventBus, battlefieldResolver,
+            // wishSelector) overload is used. +1 animate-noncreature-artifact
+            // registers Layer 4 type-add + Layer 7b BecomesPTEffect (or
+            // shim for non-Creature C# targets); -2 wishboard accepts a
+            // Func<Player, ICard?> selector returning an artifact "outside
+            // the game" or face-up exiled artifact owned by Karn's
+            // controller. Single-arg dispatcher path produces shape only
+            // (no live static, +1 no-ops without effects/board).
+            "Karn, the Great Creator" => KarnTheGreatCreatorFactory.Create(owner),
+
             // Artifact — {1} (AmuletOfVigorFactory). Worldwake.
             // "Whenever a permanent enters tapped under your control,
             //  untap it." Triggered ability over CardMovedEvent →

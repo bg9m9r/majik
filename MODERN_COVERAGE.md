@@ -3,7 +3,7 @@
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
 **Last updated:** 2026-05-24
-**Latest origin/main:** 6d87f59 (Subtlety + Karn Liberated + Up the Beanstalk + Urza Tron + Amulet of Vigor) + Primeval Titan (this PR)
+**Latest origin/main:** 6aeb85c (… + Primeval Titan) + Karn, the Great Creator
 
 ## Headline numbers
 
@@ -53,6 +53,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Grist, the Hunger Tide | Planeswalker | — | +1 token, -2 reanimate |
 | Harbinger of the Seas | Creature | #157 | nonbasic-to-Island |
 | Inspiring Vantage | Land | — | R/W fastland |
+| Karn, the Great Creator | Planeswalker | TBD | opponent-artifact static + +1 animate + -2 wishboard |
 | Karn Liberated | Planeswalker | TBD | +4 exile-from-hand, -3 exile-permanent; -14 restart deferred |
 | Kraul Harpooner | Creature | — | fight-flyer shell |
 | Lazotep Recruit | Creature | — | amass-keyword shell |
@@ -283,7 +284,7 @@ Per-keyword action helpers under `Majik.Core/Keywords/`:
 - **Burn** — Strong. Lightning Bolt, Lava Spike, Lava Dart, Skewer the Critics, Boros Charm, Eidolon of the Great Revel, Goblin Guide, Monastery Swiftspear, Rift Bolt all in. Missing: Searing Blaze (landfall conditional), Roiling Vortex, Sunscorched Desert. ~75%.
 - **Death's Shadow** — Mid-high. Thoughtseize, Fatal Push, Snapcaster Mage, Stubborn Denial, Death's Shadow itself (CDA P/T scaled by controller life — Layer 7a) all in. Mishra's Bauble in. Temur Battle Rage absent. ~60%.
 - **Murktide / Izzet Tempo** — High. Murktide Regent done, Counterspell done, Snapcaster Mage done, Lightning Bolt done, Expressive Iteration done, Ledger Shredder done, Consider done, Spell Pierce done, Subtlety done. Missing: Demilich absent. ~75%.
-- **Mono-Green Tron** — Mid-high. Ancient Stirrings, Sylvan Scrying, Wurmcoil Engine done. Karn Liberated done. Tron lands (Urza's Mine + Tower + Power-Plant) done with the conditional {2} mana ability. Karn the Great Creator absent. ~60%.
+- **Mono-Green Tron** — High. Ancient Stirrings, Sylvan Scrying, Wurmcoil Engine done. Karn Liberated done. Karn, the Great Creator done. Tron lands (Urza's Mine + Tower + Power-Plant) done with the conditional {2} mana ability. ~70%.
 - **Living End / Crashing Footfalls cascade** — Blocked. Cascade keyword + Suspend-trigger end-of-suspend exile-and-cast TODO. Suspend itself is done (#183), so partial groundwork. ~15%.
 - **Rakdos Scam** — Mid-high. Grief done (#205, mirrors Solitude evoke + ETB pattern). Fury done (mirrors Solitude/Grief). Dauthi Voidwalker absent. Liliana of the Veil done, Fatal Push done, Thoughtseize done. ~55%.
 - **Yawgmoth combo** — Mid. Yawgmoth done. Undying creatures (Young Wolf, Strangleroot Geist, Geralf's Messenger) done. Chord of Calling, Eldritch Evolution absent. ~50%.
@@ -297,10 +298,9 @@ Sorted by build priority (small infra lift × high meta share).
 
 | # | Card | Difficulty | Blocker |
 |---|---|---|---|
-| 1 | Karn, the Great Creator | Mid | Sideboard-from-anywhere -2 ability needs wishboard concept |
-| 2 | Crashing Footfalls | High | Suspend done (#183), but cascade trigger on suspend-cast missing |
-| 3 | Living End | High | Cascade + mass-exile-grave + simultaneous mass-reanimate (#174 ready for the latter) |
-| 4 | Cascade keyword | High | Triggered "cast for free from top reveal" — alt-cast-from-library framework |
+| 1 | Crashing Footfalls | High | Suspend done (#183), but cascade trigger on suspend-cast missing |
+| 2 | Living End | High | Cascade + mass-exile-grave + simultaneous mass-reanimate (#174 ready for the latter) |
+| 3 | Cascade keyword | High | Triggered "cast for free from top reveal" — alt-cast-from-library framework |
 
 ## How to update this doc
 
