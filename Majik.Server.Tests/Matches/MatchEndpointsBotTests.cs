@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using FluentAssertions;
 using Majik.Bot.Decks;
+using Majik.Core.Api.Dtos;
 using Majik.Core.CardData;
 using Majik.Core.CardData.Database;
 using Majik.Server.Decks;
@@ -174,6 +175,53 @@ public class MatchEndpointsBotTests : IClassFixture<TestMongoFixture>
         // Invite is forced — bot matches must not surface in the public lobby.
         body.Visibility.Should().Be("Invite");
         body.GameId.Should().NotBeNull();
+    }
+
+    // -----------------------------------------------------------------------
+    // GetState after bot match create returns 200 (regression guard)
+    //
+    // PR #168 switched GetGameStateAsync to facade.GetStateFor(viewer) for
+    // CR 706 masking, and the new null branches return 409 "game-not-started".
+    // The bot-match end-to-end flow tripped one of those branches in prod
+    // (portal rendered "No game state.") even though the match document was
+    // already in state=Playing with a non-null GameId. This test pins the
+    // contract that immediately after POST /matches with a bot opponent,
+    // GET /matches/{id}/state returns 200 with a populated GameStateDto.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task GetState_AfterBotMatchCreate_Returns200WithPopulatedDto()
+    {
+        var db = await FreshDb();
+        await SeedProfile(db, "alice", "Alice");
+        var aliceDeckId = await SeedDeckAsync(db, "alice", "Alice Deck");
+        using var factory = Factory(db);
+        var client = Authed(factory, "alice");
+
+        var createResp = await client.PostAsJsonAsync("/matches", new
+        {
+            format = "constructed",
+            visibility = "invite",
+            deckId = aliceDeckId.ToString(),
+            clockMinutes = 20,
+            botOpponent = new { archetype = "Burn" },
+        });
+        createResp.StatusCode.Should().Be(HttpStatusCode.Created);
+        var match = await createResp.Content.ReadFromJsonAsync<MatchDto>();
+        match.Should().NotBeNull();
+        match!.GameId.Should().NotBeNull();
+
+        // GET /state must succeed — this is the call the portal makes
+        // immediately after match creation. Failing here is what produced
+        // the "No game state." regression.
+        var stateResp = await client.GetAsync($"/matches/{match.Id}/state");
+        stateResp.StatusCode.Should().Be(HttpStatusCode.OK,
+            "bot match landed in Playing with a live facade — /state must " +
+            "return the snapshot, not 409 game-not-started");
+
+        var state = await stateResp.Content.ReadFromJsonAsync<GameStateDto>();
+        state.Should().NotBeNull();
+        state!.Players.Should().HaveCount(2);
     }
 
     // -----------------------------------------------------------------------

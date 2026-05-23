@@ -914,7 +914,19 @@ public sealed class MatchService
         if (_gameFactory == null) return Result.Fail<GameStateDto>(new MatchError("game-not-started"));
 
         var facade = _gameFactory.Get(gid);
-        if (facade == null) return Result.Fail<GameStateDto>(new MatchError("game-not-started"));
+        if (facade == null)
+        {
+            // Facade entirely missing on this replica. Legitimately
+            // game-not-started from this node's perspective — could be a
+            // cross-replica request where the owner is another instance,
+            // or the engine simply hasn't been booted yet. Log so the
+            // bot-match "No game state." regression (PR #168 follow-up)
+            // is observable in prod instead of silently dead.
+            _logger?.LogWarning(
+                "GetGameStateAsync: facade missing on this replica. MatchId={MatchId} GameId={GameId} CallerSub={CallerSub}",
+                matchId, gid, callerSub);
+            return Result.Fail<GameStateDto>(new MatchError("game-not-started"));
+        }
 
         // CR 706 — return the per-viewer snapshot so the opponent's hand
         // is masked (each card surfaces as a "(hidden)" placeholder, count
@@ -926,8 +938,30 @@ public sealed class MatchService
             ? facade.Alice.Id
             : facade.Bob.Id;
         var state = facade.GetStateFor(viewerPlayerId);
-        if (state == null) return Result.Fail<GameStateDto>(new MatchError("game-not-started"));
-        return Result.Ok(state);
+        if (state != null) return Result.Ok(state);
+
+        // GetStateFor returned null — the viewerPlayerId didn't resolve to
+        // either seat in the facade. Theoretically unreachable (Player.Id
+        // is a stable Guid set at construction and we just derived viewer
+        // from facade.Alice.Id / facade.Bob.Id), but the bot-match flow
+        // showed this branch firing in prod, which collapsed the portal
+        // to "No game state." and bricked the game. Fall back to the
+        // spectator view so the match stays playable. This regresses CR
+        // 706 masking for this specific failure mode (opponent hand
+        // visible), but the alternative is a dead game — and the masking
+        // story is still enforced on the wire-event channel via
+        // MatchFacadeBridge per-recipient publishes (PR #169). Loud
+        // warning lets us investigate the root cause without users
+        // bouncing off a broken match.
+        _logger?.LogWarning(
+            "GetGameStateAsync: GetStateFor returned null; falling back to spectator view. " +
+            "MatchId={MatchId} GameId={GameId} CallerSub={CallerSub} " +
+            "ViewerPlayerId={ViewerPlayerId} AliceId={AliceId} BobId={BobId} " +
+            "IsCreator={IsCreator}",
+            matchId, gid, callerSub,
+            viewerPlayerId, facade.Alice.Id, facade.Bob.Id,
+            callerSub == match.Creator.Sub);
+        return Result.Ok(facade.GetState());
     }
 
     // -----------------------------------------------------------------------
