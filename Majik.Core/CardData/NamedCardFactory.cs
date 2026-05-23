@@ -269,6 +269,29 @@ public static class NamedCardFactory
             // seed, no live CDA).
             "Tarmogoyf" => TarmogoyfFactory.Create(owner),
 
+            // Creature — Human Wizard {1}{B} 2/1 (DarkConfidantFactory).
+            // Upkeep trigger: reveal top of controller's library, put it
+            // into hand, lose life equal to its mana value. The single-arg
+            // path produces the correct card shape without bus-driven
+            // trigger registration (suitable for shape tests). Use the
+            // (owner, bus, triggers) overload for fully-wired behavior.
+            "Dark Confidant" => DarkConfidantFactory.Create(owner),
+
+            // Legendary Planeswalker — Liliana {1}{B}{B} loyalty 3
+            // (LilianaOfTheVeilFactory). +1 each-player-discards-a-card,
+            // -2 target-player-sacs-a-creature, -6 ultimate (deferred).
+            // The single-arg path uses no allPlayersResolver so the +1/-2
+            // effects no-op (loyalty change still applies); use the
+            // (owner, allPlayersResolver) overload to enable full
+            // multi-player effects.
+            "Liliana of the Veil" => LilianaOfTheVeilFactory.Create(owner),
+
+            // Legendary Planeswalker — Wrenn {R}{G} loyalty 3
+            // (WrennAndSixFactory). +1 return land card from graveyard
+            // to hand (auto-pick), -1 lands-ping (deferred no-op), -7
+            // retrace emblem (structural shell).
+            "Wrenn and Six" => WrennAndSixFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
