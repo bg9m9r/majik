@@ -56,13 +56,15 @@ public sealed class RevealHandThenExileTemplate : ISpellTemplate
     }
 
     public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
-        CastigateSpell(ctx.Resolver);
+        CastigateSpell(ctx.Resolver, ctx.EventBus);
 
     /// <summary>
     /// v1 stub: deterministic pick — first non-land card in opponent's hand
     /// goes to exile. Card-type filter is ignored (lossy semantic).
     /// </summary>
-    private static SpellDefinition CastigateSpell(Func<object, object> resolver) => new(
+    private static SpellDefinition CastigateSpell(
+        Func<object, object> resolver,
+        Majik.Core.Events.IEventBus? eventBus) => new(
         Modes: Array.Empty<string>(), HasVariableX: false,
         TargetRequests: new[] { new TargetRequest("target opponent", 1, 1, Array.Empty<object>()) },
         EffectFactory: p =>
@@ -71,6 +73,9 @@ public sealed class RevealHandThenExileTemplate : ISpellTemplate
             return new IEffect[] { new Effect("reveal-hand-then-exile", () =>
             {
                 if (target is not Player tp) return;
+                // CR 701.16 — "Target opponent reveals their hand": one
+                // CardRevealedEvent per card before the exile fires.
+                RevealHelper.RevealHand(eventBus, tp, "RevealHandThenExile");
                 var pick = tp.Zones.Hand.GetCards()
                     .FirstOrDefault(c => !c.HasType(Majik.Core.Cards.Types.CardType.Land));
                 if (pick is null) return;

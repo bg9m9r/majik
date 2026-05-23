@@ -99,6 +99,26 @@ public class EventPayloadTests
     }
 
     [Fact]
+    public void CardRevealedEvent_PayloadCarriesCardPlayerSourceAndReason()
+    {
+        // CR 701.16 reveals — payload must let the portal flash the opponent's
+        // card briefly: cardId for animation continuity, cardName for the
+        // tooltip, playerId so the right hand is highlighted, from so the
+        // client can sanity-check the source zone, reason for UI affordance.
+        var bob = new Player("Bob");
+        var bolt = new Instant("Lightning Bolt", "R") { Owner = bob };
+        var e = new CardRevealedEvent(bolt, bob, ZoneType.Hand, "Thoughtseize");
+
+        var payload = EventPayloadBuilder.Build(e);
+
+        payload.GetProperty("cardId").GetGuid().Should().Be(bolt.InstanceId);
+        payload.GetProperty("cardName").GetString().Should().Be("Lightning Bolt");
+        payload.GetProperty("playerId").GetGuid().Should().Be(bob.Id);
+        payload.GetProperty("from").GetString().Should().Be("Hand");
+        payload.GetProperty("reason").GetString().Should().Be("Thoughtseize");
+    }
+
+    [Fact]
     public void UnknownEvent_FallsBackToEmptyPayload()
     {
         // GameStartedEvent is the only known no-fields event but still

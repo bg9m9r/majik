@@ -51,6 +51,7 @@ public sealed class RevealHandMayChooseTemplate : ISpellTemplate
         var verb = @params.GetValueOrDefault("verb", "discard");
         var toExile = verb == "exile";
         var resolver = ctx.Resolver;
+        var eventBus = ctx.EventBus;
         return new SpellDefinition(
             Modes: Array.Empty<string>(), HasVariableX: false,
             TargetRequests: new[] { new TargetRequest("target opponent", 1, 1, Array.Empty<object>()) },
@@ -60,6 +61,9 @@ public sealed class RevealHandMayChooseTemplate : ISpellTemplate
                 return new IEffect[] { new Effect($"reveal-hand-may-choose-{verb}", () =>
                 {
                     if (target is not Player tp) return;
+                    // CR 701.16 — opponent reveals their hand before the
+                    // caster makes their "may choose" decision.
+                    RevealHelper.RevealHand(eventBus, tp, "RevealHandMayChoose");
                     var pick = tp.Zones.Hand.GetCards()
                         .FirstOrDefault(c => !c.HasType(Majik.Core.Cards.Types.CardType.Land));
                     if (pick is null) return;

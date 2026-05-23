@@ -40,6 +40,14 @@ public static class EventPayloadBuilder
             cardName = x.Card.Name,
             playerId = x.Player.Id,
         }),
+        CardRevealedEvent x => Serialize(new
+        {
+            cardId = x.Card.InstanceId,
+            cardName = x.Card.Name,
+            playerId = x.Player.Id,
+            from = x.From.ToString(),
+            reason = x.Reason,
+        }),
         LifeChangedEvent x => Serialize(new
         {
             playerId = x.Player.Id,

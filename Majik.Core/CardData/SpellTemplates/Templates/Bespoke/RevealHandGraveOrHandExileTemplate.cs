@@ -46,6 +46,7 @@ public sealed class RevealHandGraveOrHandExileTemplate : ISpellTemplate
     public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx)
     {
         var resolver = ctx.Resolver;
+        var eventBus = ctx.EventBus;
         return new SpellDefinition(
             Modes: Array.Empty<string>(), HasVariableX: false,
             TargetRequests: new[] { new TargetRequest("target opponent", 1, 1, Array.Empty<object>()) },
@@ -55,6 +56,9 @@ public sealed class RevealHandGraveOrHandExileTemplate : ISpellTemplate
                 return new IEffect[] { new Effect("reveal-hand-grave-or-hand-exile", () =>
                 {
                     if (target is not Player tp) return;
+                    // CR 701.16 — opponent reveals their hand even though the
+                    // alt source (graveyard) is already public.
+                    RevealHelper.RevealHand(eventBus, tp, "RevealHandGraveOrHandExile");
                     var pick = tp.Zones.Hand.GetCards()
                         .FirstOrDefault(c => !c.HasType(Majik.Core.Cards.Types.CardType.Land));
                     if (pick is null) return;
