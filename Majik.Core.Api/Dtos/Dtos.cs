@@ -53,6 +53,28 @@ public sealed record ManaPoolDto(int Generic, int White, int Blue, int Black, in
 public sealed record EventDto(Guid EventId, string Type, DateTime At, JsonElement Payload);
 
 /// <summary>
+/// Per-emission envelope grouping a public <see cref="EventDto"/> with
+/// optional per-player variants. <see cref="PerPlayer"/> is null for
+/// events whose payload is identical for every viewer (the common case);
+/// non-null for CR 706 hidden-information events
+/// (<see cref="Majik.Core.Events.CardMovedEvent"/>,
+/// <see cref="Majik.Core.Events.CardDrawnEvent"/> when both zones are
+/// hidden — e.g. a draw, or a return-to-library effect) so the bridge
+/// can route a per-recipient broadcast instead of a group fan-out. Keys
+/// in <see cref="PerPlayer"/> are engine <c>Player.Id</c> guids; values
+/// are pre-masked <see cref="EventDto"/>s scoped to that viewer.
+///
+/// <see cref="Public"/> is the spectator / debug variant (full reveal)
+/// and is always populated. The <see cref="GameFacade.Subscribe(Action{EventDto})"/>
+/// legacy subscription hands subscribers <see cref="Public"/>; bridge
+/// code uses <see cref="GameFacade.SubscribeEnvelopes"/> to access the
+/// per-player dictionary.
+/// </summary>
+public sealed record EventEnvelope(
+    EventDto Public,
+    IReadOnlyDictionary<Guid, EventDto>? PerPlayer);
+
+/// <summary>
 /// Server → client envelope signalling that the engine is awaiting a
 /// command from <see cref="PlayerId"/>. The client renders the
 /// appropriate UI and responds via POST /games/{id}/commands with a
