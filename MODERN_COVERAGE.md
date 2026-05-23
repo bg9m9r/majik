@@ -3,13 +3,13 @@
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
 **Last updated:** 2026-05-23
-**Latest origin/main:** 2ba57f7 (… + Cabal Ritual + Manamorphose + Faithless Looting); Veil of Summer added in this PR.
+**Latest origin/main:** 425b763 (… + Necropotence); Pact of Negation added in this PR.
 
 ## Headline numbers
 
 | Metric | Count |
 |---|---|
-| Named factories | 105 |
+| Named factories | 106 |
 | Bespoke templates | 26 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
@@ -83,6 +83,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Murktide Regent | Creature | #194 | delve cost + ETB X counters |
 | Necropotence | Enchantment | TBD | {B}{B}{B} — skip-draw via SkipDrawRegistry + discard→exile ZoneMoveIntent replacement + Pay 1 life: exile top of library + delayed end-step return-to-hand (face-down exile deferred) |
 | Orcish Bowmasters | Creature | — | reactive ping shell |
+| Pact of Negation | Instant | TBD | {0} — counter target spell + delayed upkeep DelayedTriggeredAbility (CR 603.7) that tries PayMana({3}{U}{U}); on failure MarkLost() (CR 104.3 / 118.3); upkeep agent prompt deferred |
 | Phantasmal Image | Creature | TBD | 0/0 Illusion {1}{U} + EntersAsCopyReplacement (AnyBattlefield) + Layer 4 Illusion subtype rider + targeted-by-spell-or-ability self-sacrifice trigger |
 | Pithing Needle | Artifact | #189 | name-targeted activated suppression |
 | Phyrexian Tower | Land | — | {T}: {C} + {T}, sac creature: {B}{B} (Legendary) |
@@ -333,8 +334,7 @@ Sorted roughly by build priority (small infra lift × high meta share). Refreshe
 | # | Card | Difficulty | Blocker |
 |---|---|---|---|
 | 1 | Aether Gust | low | Counter-or-bounce-to-library modal targeting a single spell/permanent of a color; modal `CounterOrBounce` template absent (colour predicate already exists for `CounterUnlessPay`). |
-| 2 | Pact of Negation | low | Counter-target-spell at {0} plus upkeep "pay {3}{U}{U} or lose the game" delayed trigger; lose-the-game effect primitive absent. |
-| 3 | Stony Silence | low | Static "activated abilities of artifacts can't be activated" — needs an artifact-scoped variant of `PithingNeedleStaticEffect` (suppress-by-card-type instead of name); mana abilities exempt. |
+| 2 | Stony Silence | low | Static "activated abilities of artifacts can't be activated" — needs an artifact-scoped variant of `PithingNeedleStaticEffect` (suppress-by-card-type instead of name); mana abilities exempt. |
 | 4 | Damping Sphere | low | Two static clauses (each land taps for `{C}`, and each spell after the first each turn costs `{1}` more) — neither the spell-count-per-turn additional-cost effect nor the land-mana-override effect is shared infrastructure. |
 | 5 | Plague Engineer | medium | ETB: choose a creature type → opponents' creatures of that type get -1/-1. Needs chosen-subtype state on permanents + opponent-only lord-style boost. |
 | 6 | Splinter Twin | medium | Aura grants `{T}: create a token copy with haste`. `CopyEffect` exists, but ability-grant-on-attach (aura adds an activated ability to enchanted creature) does not. |

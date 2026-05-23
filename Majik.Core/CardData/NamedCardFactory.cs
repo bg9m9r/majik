@@ -478,6 +478,18 @@ public static class NamedCardFactory
             // target check at resolution).
             "Force of Negation" => ForceOfNegationFactory.Create(owner),
 
+            // Instant — {0} (PactOfNegationFactory). Future Sight.
+            // "Counter target spell.
+            //  At the beginning of your next upkeep, pay {3}{U}{U}.
+            //  If you don't, you lose the game."
+            // Card shape only here; the resolve-time SpellDefinition is
+            // built on demand via PactOfNegationFactory.BuildDefinition,
+            // which counters the target spell (CR 701.5) and — when a
+            // TriggerManager is supplied — registers a delayed upkeep
+            // trigger (CR 603.7) that calls PayMana({3}{U}{U}) and falls
+            // back to MarkLost() on failure (CR 104.3 / CR 118.3).
+            "Pact of Negation" => PactOfNegationFactory.Create(owner),
+
             // Instant — {B/P} (SurgicalExtractionFactory).
             // "Choose target card in a graveyard other than a basic land
             //  card. Search its owner's graveyard, hand, and library for
