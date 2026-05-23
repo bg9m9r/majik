@@ -877,6 +877,14 @@ public static class NamedCardFactory
             // by the ETB effect.
             "Murktide Regent" => MurktideRegentFactory.Create(owner),
 
+            // Creature — Zombie Fish {7}{B} 5/5 (GurmagAnglerFactory). Khans of Tarkir.
+            // Delve marker keyword only — no printed triggers or activated abilities.
+            // The delve mechanic itself lives in DelveCost + SpellCastFlow; cast via
+            // the cast-flow's delveCost parameter to substitute exiled graveyard cards
+            // for generic mana (CR 702.66). Bot-side delve discovery deferred — same
+            // gap as Treasure Cruise / Murktide Regent.
+            "Gurmag Angler" => GurmagAnglerFactory.Create(owner),
+
             // Enchantment — {1}{U} (DressDownFactory). Flash. CR 613.6 + 613.7b:
             // "Creatures lose all abilities and have base power and toughness
             // 1/1." End-step sacrifice trigger wired (CR 500.4 / CR 603.1).
