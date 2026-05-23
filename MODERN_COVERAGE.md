@@ -3,13 +3,13 @@
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
 **Last updated:** 2026-05-23
-**Latest origin/main:** 6b29e01 (… + Lurrus of the Dream-Den + Colossus Hammer + Sigarda's Aid + Living End + Phyrexian Tower + Puresteel Paladin + Aether Vial + Mox Opal + Scion of Draco + Ragavan, Nimble Pilferer + Cavern of Souls + Galvanic Discharge + Dauthi Voidwalker + Chord of Calling + Eldritch Evolution + Tireless Tracker) + Wrenn's Resolve (this PR)
+**Latest origin/main:** 4a8d76a (… + Tireless Tracker + Chalice of the Void + Wrenn's Resolve) + Bonecrusher Giant (this PR)
 
 ## Headline numbers
 
 | Metric | Count |
 |---|---|
-| Named factories | 91 |
+| Named factories | 92 |
 | Bespoke templates | 26 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
@@ -32,6 +32,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Ancient Stirrings | Sorcery | #201 | top-5 colorless reveal + random-bottom |
 | Badgermole Cub | Creature | — | earthbend shell |
 | Blood Moon | Enchantment | #156 | nonbasic-to-Mountain Layer 4 |
+| Bonecrusher Giant | Creature | TBD | 4/3 Giant {2}{R} + targeted-by-spell trigger deals 2 to spell's controller (Adventure / Stomp half deferred) |
 | Boseiju, Who Endures | Land | — | channel destroy stub |
 | Cavern of Souls | Land | TBD | ETB choose-creature-type + {T}: {C} + {T}: any color (spend-restriction + uncounterable rider deferred) |
 | Chalice of the Void | Artifact | TBD | {X}{X} — ETB with X charge counters (via PendingCastX) + symmetric "counter spell of MV = counters" trigger |

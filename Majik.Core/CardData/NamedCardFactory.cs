@@ -962,6 +962,13 @@ public static class NamedCardFactory
             // zoneService, triggers) overload for fully-wired bus firing.
             "Tireless Tracker" => TirelessTrackerFactory.Create(owner),
 
+            // Creature — Giant {2}{R} 4/3 (BonecrusherGiantFactory). Throne
+            // of Eldraine Adventure card. v1 ships the creature side +
+            // targeted-by-spell trigger (deal 2 to spell's controller).
+            // The Stomp Adventure half + cast-from-exile pipeline (CR 715)
+            // is deferred — no Adventure cast surface in the engine yet.
+            "Bonecrusher Giant" => BonecrusherGiantFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
