@@ -23,6 +23,25 @@ public abstract class ContinuousEffect
 
     public abstract void Apply(CreatureCharacteristics chars);
 
+    /// <summary>
+    /// CR 613 — does this effect apply to <paramref name="permanent"/>?
+    /// Default routes to the creature overload when the permanent IS a
+    /// creature, otherwise returns false. Permanent-level effects (e.g.
+    /// land type-changers like Blood Moon) override.
+    /// </summary>
+    public virtual bool AppliesTo(Permanent permanent) =>
+        permanent is Creature c && AppliesTo(c);
+
+    /// <summary>
+    /// CR 613 — mutate the working-set for a permanent. Default dispatches
+    /// to <see cref="Apply(CreatureCharacteristics)"/> when the chars are a
+    /// creature row; otherwise no-op. Permanent-level effects override.
+    /// </summary>
+    public virtual void Apply(PermanentCharacteristics chars)
+    {
+        if (chars is CreatureCharacteristics cc) Apply(cc);
+    }
+
     public DateTime Timestamp { get; } = DateTime.UtcNow;
 
     /// <summary>
@@ -47,10 +66,8 @@ public abstract class ContinuousEffect
 /// printed values; each layer mutates in turn. The service hands the final
 /// result back to <see cref="Creature.Power"/> / Toughness / keyword checks.
 /// </summary>
-public sealed class CreatureCharacteristics
+public sealed class CreatureCharacteristics : PermanentCharacteristics
 {
     public int Power { get; set; }
     public int Toughness { get; set; }
-    public HashSet<string> Keywords { get; } = new(StringComparer.OrdinalIgnoreCase);
-    public HashSet<Majik.Core.Cards.Types.CardSubtype> Subtypes { get; } = new();
 }
