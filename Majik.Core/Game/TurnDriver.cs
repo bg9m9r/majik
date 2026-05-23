@@ -92,6 +92,7 @@ public sealed class TurnDriver
         // Subscribe to zone-move and draw events to keep TurnState current.
         _eventBus?.Subscribe<CardMovedEvent>(OnCardMoved);
         _eventBus?.Subscribe<CardDrawnEvent>(OnCardDrawn);
+        _eventBus?.Subscribe<Majik.Core.Domain.DomainEvents.SpellCastEvent>(OnSpellCast);
     }
 
     // -----------------------------------------------------------------
@@ -123,6 +124,17 @@ public sealed class TurnDriver
     private void OnCardDrawn(CardDrawnEvent e)
     {
         TurnState.RecordCardDrawn(e.Player);
+    }
+
+    private void OnSpellCast(Majik.Core.Domain.DomainEvents.SpellCastEvent e)
+    {
+        // CR 105 — record the colours of every spell cast this turn so
+        // "opponent has cast a [colour] spell this turn" predicates (Veil
+        // of Summer) can read them at resolution.
+        if (e.Spell?.Controller is { } caster && e.Spell.Card is { } card)
+        {
+            TurnState.RecordSpellCast(caster, Majik.Core.Cards.CardColors.GetColors(card));
+        }
     }
 
     public async Task RunTurnAsync(Player activePlayer, int turnNumber, CancellationToken ct = default)

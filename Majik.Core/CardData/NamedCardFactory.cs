@@ -1013,6 +1013,18 @@ public static class NamedCardFactory
             // (CR 106.11b) deferred — no mana-provenance ledger.
             "Manamorphose" => ManamorphoseFactory.Create(owner),
 
+            // Legendary Land — Karakas (Legends / reprints, KarakasFactory).
+            // {T}: Add {W} — vanilla ManaAbility wired.
+            // {T}: Return target legendary creature to its owner's hand —
+            // ActivatedAbility with AdditionalCost.Tap + TargetRequest for
+            // "target legendary creature". Resolution-time gate checks the
+            // chosen target is a legendary creature (CR 608.2b illegal-
+            // target → effect does nothing). v1 uses raw zone moves (no
+            // ZoneService routing — mirrors Teferi -3 bounce). ActionValidator
+            // doesn't yet filter the agent's target list by "legendary"
+            // (resolution-time guard catches illegal picks).
+            "Karakas" => KarakasFactory.Create(owner),
+
             // Creature — Illusion {1}{U} 0/0 (PhantasmalImageFactory).
             // CR 706.10 — "You may have this enter as a copy of any creature
             // on the battlefield, except it's an Illusion in addition to its
@@ -1043,6 +1055,18 @@ public static class NamedCardFactory
             // overload for fully-wired behaviour. Face-down exile is
             // deferred — engine has no face-down flag.
             "Necropotence" => NecropotenceFactory.Create(owner),
+
+            // Instant — {G} (VeilOfSummerFactory). Core Set 2020.
+            // "Draw a card if an opponent has cast a blue or black spell this
+            // turn. Spells you control can't be countered this turn, and you
+            // and permanents you control gain hexproof from blue and from
+            // black until end of turn."
+            // Card shape only here; the resolve-time SpellDefinition is built
+            // on demand via VeilOfSummerFactory.BuildDefinition(caster,
+            // turnState, continuousEffects). Conditional draw consults
+            // TurnState.OpponentCastSpellOfColor; uncounterable + hexproof
+            // riders are structural in v1 (see factory doc).
+            "Veil of Summer" => VeilOfSummerFactory.Create(owner),
 
             _ => new Card(name, ""),
         };

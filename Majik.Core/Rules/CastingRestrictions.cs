@@ -31,6 +31,10 @@ public static class CastingRestrictions
     // Each entry: (token, player). A player is restricted while at least
     // one entry targeting them exists.
     private static readonly List<(object Token, Player Player)> _sorcerySpeed = new();
+    // "Spells <player> controls can't be countered" turn-scoped rider
+    // (Veil of Summer). Stored as a flat set of player IDs; cleared at
+    // end of turn by the caller (or via <see cref="Clear"/> in tests).
+    private static readonly HashSet<Guid> _uncounterableControllers = new();
     private static readonly object _gate = new();
 
     /// <summary>
@@ -87,12 +91,46 @@ public static class CastingRestrictions
         }
     }
 
+    /// <summary>
+    /// Register a turn-scoped "spells <paramref name="player"/> controls
+    /// can't be countered" rider (Veil of Summer, Vexing Shusher, etc.).
+    /// Structural for v1 — sets a flag that counter-effect resolvers can
+    /// consult via <see cref="SpellsCannotBeCountered"/>. Wiring the flag
+    /// into every counter primitive is a follow-up. Cleared by
+    /// <see cref="ClearUncounterableForTurn"/> at end of turn.
+    /// </summary>
+    public static void AddUncounterableForTurn(Player player)
+    {
+        ArgumentNullException.ThrowIfNull(player);
+        lock (_gate) _uncounterableControllers.Add(player.Id);
+    }
+
+    /// <summary>
+    /// True if a turn-scoped "spells this player controls can't be
+    /// countered" rider is active for <paramref name="player"/>.
+    /// </summary>
+    public static bool SpellsCannotBeCountered(Player player)
+    {
+        if (player == null) return false;
+        lock (_gate) return _uncounterableControllers.Contains(player.Id);
+    }
+
+    /// <summary>
+    /// Clear the turn-scoped uncounterable set. Called at end of turn /
+    /// cleanup; tests may also call this directly via <see cref="Clear"/>.
+    /// </summary>
+    public static void ClearUncounterableForTurn()
+    {
+        lock (_gate) _uncounterableControllers.Clear();
+    }
+
     /// <summary>Reset the registry. Test-only.</summary>
     public static void Clear()
     {
         lock (_gate)
         {
             _sorcerySpeed.Clear();
+            _uncounterableControllers.Clear();
         }
     }
 }

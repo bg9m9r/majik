@@ -316,6 +316,47 @@ public sealed class MatchService
             {
                 return Result.Fail<MatchDto>(new MatchError("deck-invalid", ex.Message));
             }
+            catch (Exception ex)
+            {
+                // Any other exception (card-factory binder throwing, engine
+                // construction failure, etc.) used to escape to the global
+                // UseExceptionHandler, which returned an opaque
+                // `{"error":"internal"}`. Surface the exception type + message
+                // here so the portal can show e.g.
+                // `internal: NullReferenceException: …` and the user has a
+                // breadcrumb for which card crashed the factory. Full stack
+                // trace stays in the server log via ILogger; the wire body
+                // intentionally omits it to avoid leaking internals.
+                _logger?.LogError(ex,
+                    "Bot match create failed during deck-load/facade-create. " +
+                    "MatchId={MatchId} CreatorSub={CreatorSub} Archetype={Archetype}",
+                    matchId, creator.Sub, bot.Archetype);
+
+                // Best-effort cleanup of any partial facade/ownership state
+                // before we bail. The Match doc has not been inserted yet at
+                // this point, so we only need to unwind the facade + bridge
+                // + ownership claim if they got created.
+                if (_gameFactory != null && facade != null)
+                {
+                    try
+                    {
+                        _facadeBridge?.Detach(matchId);
+                        _gameFactory.Delete(facade.GameId);
+                        if (_ownership != null) await _ownership.ReleaseAsync(matchId, ct);
+                        if (_forwarder != null) await _forwarder.OnReleasedAsync(matchId, ct);
+                    }
+                    catch (Exception cleanupEx)
+                    {
+                        _logger?.LogError(cleanupEx,
+                            "Cleanup after bot-match facade failure also threw. " +
+                            "MatchId={MatchId}", matchId);
+                    }
+                }
+
+                return Result.Fail<MatchDto>(new MatchError(
+                    "internal",
+                    $"{ex.GetType().Name}: {ex.Message}"));
+            }
         }
 
         var match = new Match
@@ -403,8 +444,9 @@ public sealed class MatchService
             }
             _logger?.LogError(ex,
                 "Bot match setup failed; rolled back. MatchId={MatchId}", matchId);
-            return Result.Fail<MatchDto>(new MatchError("internal",
-                "Bot match setup failed."));
+            return Result.Fail<MatchDto>(new MatchError(
+                "internal",
+                $"Bot match setup failed: {ex.GetType().Name}: {ex.Message}"));
         }
 
         // 3) Fire-and-forget the engine startup, but log faults instead of
@@ -516,6 +558,21 @@ public sealed class MatchService
             catch (DeckLoadException ex)
             {
                 return Result.Fail<MatchDto>(new MatchError("deck-invalid", ex.Message));
+            }
+            catch (Exception ex)
+            {
+                // Mirror the bot-match branch: surface the exception type +
+                // message so a card-factory or engine-construction failure
+                // doesn't silently fall through to the global handler and
+                // come back as opaque `{"error":"internal"}`. Stack stays
+                // in the log only.
+                _logger?.LogError(ex,
+                    "Join match failed during deck-load/facade-create. " +
+                    "MatchId={MatchId} CallerSub={CallerSub}",
+                    matchId, callerSub);
+                return Result.Fail<MatchDto>(new MatchError(
+                    "internal",
+                    $"{ex.GetType().Name}: {ex.Message}"));
             }
         }
 
