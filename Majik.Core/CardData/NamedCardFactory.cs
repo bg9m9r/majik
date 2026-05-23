@@ -831,6 +831,21 @@ public static class NamedCardFactory
             // as SearchSpellFactory).
             "Primeval Titan" => PrimevalTitanFactory.Create(owner),
 
+            // Creature — Giant {4}{W}{W} 6/6 (SunTitanFactory). Magic 2011
+            // mythic cycle counterpart to Primeval Titan. Vigilance keyword
+            // wired (CR 702.20). ETB + attack triggered abilities both
+            // reanimate target permanent card with mana value 3 or less from
+            // controller's graveyard to the battlefield (CR 603.1, CR 508.1f).
+            // v1 picks the first eligible permanent card deterministically;
+            // "you may" defaults to taking the action when an eligible
+            // candidate exists. "Permanent card" (CR 110.4) accepts any
+            // artifact / creature / enchantment / land / planeswalker; it
+            // excludes instant and sorcery cards. The single-arg dispatcher
+            // path uses raw zone moves; use the (owner, zoneService,
+            // eventBus, triggers) overload for ZoneService-routed moves so
+            // ETB triggers on the reanimated permanent fire (CR 603.6a).
+            "Sun Titan" => SunTitanFactory.Create(owner),
+
             // Land — Urza's Mine (Antiquities, Urza Tron cycle).
             // {T}: Add {C}. If controller controls an Urza's Mine, an
             // Urza's Power-Plant, AND an Urza's Tower, add {2} instead.

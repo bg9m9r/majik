@@ -3,13 +3,13 @@
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
 **Last updated:** 2026-05-23
-**Latest origin/main:** Sensei's Divining Top (Artifact {1} with two activated abilities — {T}: peek top 3 + agent-driven reorder; {1}, {T}: draw + self-return to library top) on top of Goblin Matron + Mutavault + Skullclamp + Umezawa's Jitte + Wasteland + Swords to Plowshares + Mystical Tutor + Path to Exile + Daze + Ponder + Preordain + Splinter Twin + Sythis, Harvest's Hand + Pyromancer's Goggles + Plague Engineer + Manabarbs + Yawgmoth's Will + Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere.
+**Latest origin/main:** Sun Titan ({4}{W}{W} 6/6 Giant — Vigilance + ETB/attack reanimate target permanent card with mana value ≤ 3 from controller's graveyard; shared `ReanimatePermanentPick` widens Priest of Fell Rites' creature-only pick to any `Permanent`; ZoneService-routed move so ETB triggers fire on the reanimated permanent per CR 603.6a) on top of Sensei's Divining Top + Goblin Matron + Mutavault + Skullclamp + Umezawa's Jitte + Wasteland + Swords to Plowshares + Mystical Tutor + Path to Exile + Daze + Ponder + Preordain + Splinter Twin + Sythis, Harvest's Hand + Pyromancer's Goggles + Plague Engineer + Manabarbs + Yawgmoth's Will + Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere.
 
 ## Headline numbers
 
 | Metric | Count |
 |---|---|
-| Named factories | 123 |
+| Named factories | 124 |
 | Bespoke templates | 27 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
@@ -122,6 +122,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Stony Silence | Enchantment | TBD | global artifact-activated suppression (mana exempt; CR 605) |
 | Stubborn Denial | Instant | — | ferocious-conditional counter |
 | Subtlety | Creature | TBD | evoke pitch + ETB bounce + look-and-bottom |
+| Sun Titan | Creature | TBD | {4}{W}{W} 6/6 Giant — Vigilance + ETB/attack reanimate target permanent card with mv ≤ 3 from controller's graveyard to battlefield. ReanimatePermanentPick scans `Permanent` (any artifact/creature/enchantment/land/planeswalker — CR 110.4) and routes graveyard→battlefield through ZoneService when supplied so ETB triggers on the reanimated permanent fire (CR 603.6a). Deterministic first-match v1 ("you may" + target prompt deferred, same as Priest of Fell Rites) |
 | Sunbaked Canyon | Land | — | pay-1-life R/W + sac-draw |
 | Surgical Extraction | Instant | #192 | phyrexian global name exile |
 | Swords to Plowshares | Instant | TBD | Instant {W} — exile target creature; its controller gains life equal to its (live Compute) power; power floored at zero |
@@ -364,7 +365,7 @@ Sorted roughly by build priority (small infra lift × high meta share). Refreshe
 | ~~4~~ | ~~Mystical Tutor~~ | ~~low~~ | Shipped via `MysticalTutorFactory` — Instant {U}, predicate filters library to `CardType.Instant`/`Sorcery`, agent-driven pick (deterministic first-match fallback) inserted at library index 0 via `IZone.InsertCardAt`. Shuffle deferred (no `IZone.Shuffle` entry point yet — same rationale as the rest of `SearchSpellFactory`). |
 | ~~5~~ | ~~Swords to Plowshares~~ | ~~low~~ | Shipped via `SwordsToPlowsharesFactory` — exile target creature + lifegain by power read via `Creature.Power` (live `Compute` feeds through). Snapshot before zone move (CR 112.7a); negative power floors to zero (CR 119.3); illegal-target → no-op (CR 608.2b). |
 | ~~6~~ | ~~Spell Queller~~ | ~~medium~~ | Shipped via `SpellQuellerFactory` — Creature — Spirit {1}{W}{U} 2/3 Flash. ETB: target-spell request (Snapcaster-style `SetChosenTargets`), validates mv ≤ 4 at resolution (CR 202.3b incl. PendingCastX), removes the spell from the stack via `OracleSpellBinder.RemoveFromStack`, places the underlying card into its owner's exile zone (closure-captured for LTB). LTB: `CardMovedEvent.FromZone == Battlefield` trigger fires `onExiledCardReleased` callback; host drives the free-cast via `CastFromExileAlternativeCost` against the original owner (factory exposes `BuildFreeCastCost`). |
-| 8 | Sun Titan | medium | ETB + attacks trigger — return permanent mv ≤ 3 from graveyard to battlefield. Reanimation primitive exists (Priest of Fell Rites); needs attack-trigger + mv-3-permanent filter. |
+| ~~8~~ | ~~Sun Titan~~ | ~~medium~~ | Shipped via `SunTitanFactory` — {4}{W}{W} 6/6 Giant with Vigilance + ETB/attack triggers that reanimate target permanent card (any of artifact/creature/enchantment/land/planeswalker — CR 110.4) with mana value ≤ 3 from controller's graveyard. Shared `ReanimatePermanentPick` mirrors `PriestOfFellRitesFactory.ReanimatePick` but widens from `Creature` to `Permanent`; routes graveyard→battlefield through ZoneService when supplied so ETB triggers fire on the reanimated permanent (CR 603.6a). Deterministic first-match v1; "you may" + target prompt deferred (same as Priest of Fell Rites / Primeval Titan). |
 | ~~9~~ | ~~Skullclamp~~ | ~~medium~~ | Shipped via `SkullclampFactory` — Equipment {1} with `AttachedBoostEffect(+1, -1)` at Layer 7c; dies trigger (CR 603.6c) keyed via `CardMovedEvent` to the source's current `AttachedTo` and draws 2 cards; Equip {1}. Sorcery-speed gate + attach-target prompt deferred (same as Colossus Hammer). |
 | ~~10~~ | ~~Umezawa's Jitte~~ | ~~medium~~ | Shipped via `UmezawasJitteFactory` — Legendary Equipment {2} + combat-damage trigger by equipped creature adds 2 charge counters via new `CounterType.Charge` on the equipment + three modal activated abilities, each paid by new `RemoveChargeCounterCost`: (1) 2 damage to any target, (2) -1/-1 EOT via `PumpUntilEndOfTurnEffect`, (3) gain 2 life; Equip {2}. Modes fanned out into three separate activated abilities — native modal-activated infra deferred. |
 | 11 | Sword of Fire and Ice | medium | Equipment with two-color protection + combat-damage trigger (deal 2 + draw 1). Needs protection-from-color shell (Layer 6 grant) + paired combat-damage trigger; mirrors any future Sword cycle. |
