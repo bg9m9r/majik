@@ -62,6 +62,10 @@ public enum CardSubtype
     /// <summary>Dauthi creature subtype — Tempest shadow creatures (Dauthi
     /// Voidwalker, Dauthi Slayer, Dauthi Horror). CR 205.3m.</summary>
     Dauthi,
+    /// <summary>Monkey creature subtype — Ragavan, Nimble Pilferer. CR 205.3m.</summary>
+    Monkey,
+    /// <summary>Pirate creature subtype — Ragavan, Nimble Pilferer; Captain Lannery Storm. CR 205.3m.</summary>
+    Pirate,
 
     // Land subtypes (examples)
     Forest,

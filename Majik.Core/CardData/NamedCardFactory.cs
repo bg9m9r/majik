@@ -503,6 +503,18 @@ public static class NamedCardFactory
             // for full ETB-replacement / trigger-firing wiring.
             "Stoneforge Mystic" => StoneforgeMysticFactory.Create(owner),
 
+            // Creature — Human Soldier {1}{W} 2/2 (PuresteelPaladinFactory).
+            // ETB-draw trigger: whenever an Equipment enters under controller's
+            // control, draw a card (CR 603.1 — "you may" simplified to a
+            // forced draw in v1). Conditional static: while controller has
+            // ≥3 artifacts on battlefield, Equipment they control have
+            // equip {0}; tracked via ZeroEquipCostEffect lifecycle and read
+            // back through IsZeroEquipActiveFor(player). The single-arg
+            // dispatcher path here produces card shape + ETB trigger; the
+            // (owner, eventBus, triggers) overload also attaches the
+            // zero-equip-cost lifecycle.
+            "Puresteel Paladin" => PuresteelPaladinFactory.Create(owner),
+
             // Creature — Ooze {1}{G} 2/2 (ScavengingOozeFactory).
             // Activated {G}: exile target creature card from a graveyard;
             // if you do, put a +1/+1 counter on Scavenging Ooze and gain
@@ -740,6 +752,18 @@ public static class NamedCardFactory
             // automatic per-turn budget reset on TurnStartedEvent.
             "Lurrus of the Dream-Den" => LurrusOfTheDreamDenFactory.Create(owner),
 
+            // Artifact — {1} (AetherVialFactory). Darksteel.
+            // Upkeep trigger: add a charge counter (v1 auto-accept). {T}:
+            // put a creature card from hand with mv = charge counters
+            // onto the battlefield (v1 deterministic first match,
+            // auto-accept on "you may"). The single-arg dispatcher path
+            // attaches both abilities to the card shape without
+            // TriggerManager registration or ZoneService routing; use
+            // the (owner, zoneService, eventBus, triggers) overload for
+            // bus-driven upkeep firing and ETB-trigger routing on the
+            // placed creature (CR 603.6a).
+            "Aether Vial" => AetherVialFactory.Create(owner),
+
             // Artifact — Equipment {1} (ColossusHammerFactory).
             // Static "equipped creature gets +10/+0 and loses flying" via
             // AttachedBoostEffect (Layer 7c) + LoseKeywordEffect("Flying")
@@ -769,6 +793,44 @@ public static class NamedCardFactory
             // DauthiVoidwalkerFactory.BuildAlternativeCost. EOT timing on
             // the cast permission deferred.
             "Dauthi Voidwalker" => DauthiVoidwalkerFactory.Create(owner),
+
+            // Artifact Creature — Dragon {10} 4/4 (ScionOfDracoFactory).
+            // Modern Horizons 2. Domain cost reduction (CR 702.16 / CR 117.7):
+            // "This spell costs {2} less to cast for each basic land type
+            //  among lands you control." Wired via the whole-reducer shape
+            // on CostReductionAbility, delegating to
+            // TribalFlamesFactory.CountDomain for the distinct-basic-type
+            // count (printed-subtypes mode at cost-calc time; floor-at-zero
+            // in CostReduction.GetEffectiveCost). Keyword-grant rider
+            // ("creatures you control of each creature type have first
+            // strike, vigilance, trample, lifelink, and hexproof") deferred
+            // — needs per-permanent shared-creature-type Layer 6 grants.
+            "Scion of Draco" => ScionOfDracoFactory.Create(owner),
+
+            // Legendary Artifact — {0} (MoxOpalFactory). Scars of Mirrodin.
+            // "Metalcraft — {T}: Add one mana of any color. Activate only if
+            //  you control three or more artifacts." CR 702.95. Five
+            // ManaAbility instances (one per WUBRG), each gated on
+            // !IsTapped AND controller's artifact count >= 3 (Mox Opal
+            // itself counts when on the battlefield). Opponent artifacts
+            // do not contribute. Single modal-colour ability shape is not
+            // in the engine yet — same five-ability fan-out used by
+            // DelightedHalflingFactory.
+            "Mox Opal" => MoxOpalFactory.Create(owner),
+
+            // Legendary Creature — Monkey Pirate {R} 2/1 (RagavanNimblePilfererFactory).
+            // Modern Horizons 2 staple. Combat-damage-to-a-player trigger
+            // wired: creates a Treasure token under the Ragavan controller,
+            // exiles the damaged player's library top, and stamps a
+            // runtime exile-cast grant via Card.GrantRuntimeExileCast so
+            // the Ragavan controller may cast that exiled card via
+            // ExileCastAlternativeCost until end of turn (CR 118.9).
+            // Single-arg dispatcher path produces the correct card shape
+            // without bus-driven trigger registration / EOT-clear hook.
+            // Use the (owner, zoneService, eventBus, triggers) overload
+            // for fully-wired behaviour. Dash {1}{R} (CR 702.108) is
+            // DEFERRED — no DashAlternativeCost / DashReturnRegistry yet.
+            "Ragavan, Nimble Pilferer" => RagavanNimblePilfererFactory.Create(owner),
 
             _ => new Card(name, ""),
         };

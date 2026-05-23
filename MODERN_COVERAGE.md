@@ -3,13 +3,13 @@
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
 **Last updated:** 2026-05-23
-**Latest origin/main:** 93295ac (… + Primeval Titan + Karn, the Great Creator + Crashing Footfalls / Cascade + Lurrus of the Dream-Den) + Dauthi Voidwalker (this PR)
+**Latest origin/main:** 2a73105 (… + Lurrus of the Dream-Den + Colossus Hammer + Sigarda's Aid + Living End + Phyrexian Tower + Puresteel Paladin + Aether Vial + Mox Opal + Scion of Draco + Ragavan) + Dauthi Voidwalker (this PR)
 
 ## Headline numbers
 
 | Metric | Count |
 |---|---|
-| Named factories | 74 |
+| Named factories | 85 |
 | Bespoke templates | 26 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
@@ -26,6 +26,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 
 | Card | Type | PR | Note |
 |---|---|---|---|
+| Aether Vial | Artifact | TBD | upkeep charge counter + {T} put creature from hand with mv = counters |
 | Agatha's Soul Cauldron | Artifact | — | activated counter-share |
 | Amulet of Vigor | Artifact | TBD | untap-on-enters-tapped trigger |
 | Ancient Stirrings | Sorcery | #201 | top-5 colorless reveal + random-bottom |
@@ -67,14 +68,18 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Lurrus of the Dream-Den | Creature | TBD | Lifelink + cast-permanent-mv≤2-from-graveyard once per your turn (companion deck-rule deferred) |
 | Magus of the Moon | Creature | #157 | nonbasic-to-Mountain |
 | Mishra's Bauble | Artifact | — | sac → look + delayed draw |
+| Mox Opal | Artifact | TBD | Legendary {0}: Metalcraft-gated any-color mana (CR 702.95) |
 | Murktide Regent | Creature | #194 | delve cost + ETB X counters |
 | Orcish Bowmasters | Creature | — | reactive ping shell |
 | Pithing Needle | Artifact | #189 | name-targeted activated suppression |
 | Phyrexian Tower | Land | — | {T}: {C} + {T}, sac creature: {B}{B} (Legendary) |
 | Priest of Fell Rites | Creature | #196 | ETB reanimate + grave-unearth |
 | Primeval Titan | Creature | TBD | Trample + ETB/attack tutor up to 2 lands tapped |
+| Puresteel Paladin | Creature | TBD | Equipment-ETB draw trigger + zero-equip-cost on ≥3 artifacts |
+| Ragavan, Nimble Pilferer | Creature | TBD | combat-damage Treasure + exile + may-cast EOT (CR 118.9 grant + ExileCastAlternativeCost); Dash deferred |
 | Rift Bolt | Sorcery | #183 | suspend → 3 damage |
 | Scavenging Ooze | Creature | #188 | exile-graveyard + counter + life |
+| Scion of Draco | Artifact Creature | TBD | Domain cost-reduction {10} → {0} at 5 basic types (CR 702.16); keyword-grant rider deferred |
 | Sea's Claim | Aura | #160 | enchanted land becomes Island |
 | Sigarda's Aid | Enchantment | TBD | flash-grant equipment/aura + ETB auto-attach |
 | Snapcaster Mage | Creature | #170 | flash + ETB flashback grant |
@@ -133,7 +138,6 @@ Cards implemented through generic or bespoke templates without a named factory. 
 - Thoughtseize — `Bespoke/ThoughtseizePatternTemplate`
 - Expressive Iteration — `Bespoke/ExpressiveIterationTemplate`
 - Malevolent Rumble — `Bespoke/MalevolentRumblePatternTemplate`
-- Ragavan, Nimble Pilferer — combat-damage trigger (Treasure + exile-from-top); Dash deferred
 - Fetch lands cycle (10 of them) — `OracleLandActivatedAbilityBinder`
 - Shock lands (Overgrown Tomb + cycle starts) — `Effects/ShockLandReplacement`
 - Sacred Foundry, Steam Vents — shock-land binding
@@ -294,12 +298,14 @@ Per-keyword action helpers under `Majik.Core/Keywords/`:
 - **Murktide / Izzet Tempo** — High. Murktide Regent done, Counterspell done, Snapcaster Mage done, Lightning Bolt done, Expressive Iteration done, Ledger Shredder done, Consider done, Spell Pierce done, Subtlety done. Missing: Demilich absent. ~75%.
 - **Mono-Green Tron** — High. Ancient Stirrings, Sylvan Scrying, Wurmcoil Engine done. Karn Liberated done. Karn, the Great Creator done. Tron lands (Urza's Mine + Tower + Power-Plant) done with the conditional {2} mana ability. ~70%.
 - **Living End / Crashing Footfalls cascade** — High. Cascade keyword done (`Keywords/CascadeAction.cs`) + Crashing Footfalls shipped (#219). Living End shipped (this PR) with both the Cascade trigger and the resolve chain (per-player mass-exile-grave + sacrifice-creatures + mass-reanimate; ETB triggers fire on reanimated permanents via PR #174 plumbing). Suspend itself is done (#183). ~75%.
-- **Rakdos Scam** — High. Grief done (#205, mirrors Solitude evoke + ETB pattern). Fury done (mirrors Solitude/Grief). Dauthi Voidwalker done (Shadow + opponent-grave→exile-with-void-counter replacement effect + {2},{T},remove-void-counter activated cast-from-exile via CastFromExileAlternativeCost; EOT "this turn" timing on the cast permission deferred). Liliana of the Veil done, Fatal Push done, Thoughtseize done. ~70%.
+- **Rakdos Scam** — High. Grief done (#205, mirrors Solitude evoke + ETB pattern). Fury done (mirrors Solitude/Grief). Ragavan, Nimble Pilferer done (combat-damage Treasure + exile + may-cast EOT grant; Dash deferred). Dauthi Voidwalker done (Shadow + opponent-grave→exile-with-void-counter replacement effect + {2},{T},remove-void-counter activated cast-from-exile via CastFromExileAlternativeCost; EOT "this turn" timing on the cast permission deferred). Liliana of the Veil done, Fatal Push done, Thoughtseize done. ~75%.
 - **Yawgmoth combo** — Mid. Yawgmoth done. Undying creatures (Young Wolf, Strangleroot Geist, Geralf's Messenger) done. Chord of Calling, Eldritch Evolution absent. ~50%.
-- **Domain Zoo** — Mid. Boros Charm done, fetches done, shocks done, Tribal Flames done. Scion of Draco + Territorial Kavu absent. ~35%.
+- **Domain Zoo** — Mid. Boros Charm done, fetches done, shocks done, Tribal Flames done, Scion of Draco's domain cost-reduction done (keyword-grant rider deferred). Territorial Kavu absent. ~45%.
 - **Amulet Titan** — Mid. Amulet of Vigor done (untap-on-enters-tapped trigger) + Primeval Titan done (ETB + attack land-tutor for up to 2, tapped). No bounce lands. ~30%.
 - **Lurrus Companion** — Low-mid. Lurrus of the Dream-Den done (Lifelink + once-per-turn cast-permanent-mv≤2-from-graveyard; companion deck-construction rule deferred). Pairs with the existing low-mv permanent suite (Mishra's Bauble, Dryad Arbor, Stoneforge Mystic, Walking Ballista, Dark Confidant, etc.). Deck-construction enforcement absent. ~30%.
-- **Hammer Time / Equipment** — Mid. Stoneforge Mystic done. Colossus Hammer done (+10/+0 + lose flying via AttachedBoostEffect + new LoseKeywordEffect). Sigarda's Aid done (flash-grant on Equipment/Aura via FlashGrantRegistry + ETB-attach rider). Puresteel Paladin absent. ~40%.
+- **Hammer Time / Equipment** — Mid-high. Stoneforge Mystic done. Colossus Hammer done (+10/+0 + lose flying via AttachedBoostEffect + new LoseKeywordEffect). Sigarda's Aid done (flash-grant on Equipment/Aura via FlashGrantRegistry + ETB-attach rider). Puresteel Paladin done (Equipment-ETB draw trigger + zero-equip-cost lifecycle binder that gates on ≥3 artifacts; equip-cost consumer wires up when an `EquipActivatedAbility` primitive lands). ~50%.
+- **Merfolk** — Low. Aether Vial done (mana-free creature-cheater that's the deck's engine). Spreading Seas done. Lord of Atlantis, Master of the Pearl Trident, Silvergill Adept, Cursecatcher, Merfolk Trickster absent. ~20%.
+- **Death and Taxes** — Low-mid. Aether Vial done (mana-free creature drop — the deck's signature). Stoneforge Mystic done. Solitude done. Thalia, Guardian of Thraben + Skyclave Apparition + Leonin Arbiter absent. ~30%.
 
 ## Top 20 Modern staples NOT yet implemented
 

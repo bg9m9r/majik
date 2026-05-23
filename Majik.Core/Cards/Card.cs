@@ -134,6 +134,49 @@ public class Card : ICard
     }
 
     /// <summary>
+    /// CR 118.9 — runtime "you may cast this card from exile until end of
+    /// turn" grant. Stamped by effects such as Ragavan, Nimble Pilferer's
+    /// combat-damage trigger ("Until end of turn, you may cast that card").
+    /// When non-null, the named player may cast the card from the Exile
+    /// zone via a <see cref="Majik.Core.Costs.ExileCastAlternativeCost"/>
+    /// built from the printed mana cost; unlike Suspend / Cascade, the
+    /// allowed caster is NOT the card's owner (Ragavan exiles from the
+    /// damaged player's library — the granted permission lets the
+    /// Ragavan controller cast the opponent's card). Cleared at end of
+    /// turn by the granting effect's bus subscription.
+    /// </summary>
+    public Player? RuntimeExileCastAllowedCaster { get; private set; }
+
+    /// <summary>
+    /// The mana cost the <see cref="RuntimeExileCastAllowedCaster"/> pays
+    /// to cast this card from exile under the runtime grant. Typically the
+    /// card's printed mana cost (per Ragavan's "you may cast that card").
+    /// </summary>
+    public ValueObjects.ManaCost? RuntimeExileCastCost { get; private set; }
+
+    /// <summary>
+    /// Stamp an exile-cast grant on this card. <paramref name="allowedCaster"/>
+    /// is the player who may cast (need not be the owner); <paramref name="cost"/>
+    /// is the mana cost they pay (typically the card's printed cost).
+    /// Idempotent — later grants overwrite earlier ones. Cleared at EOT by
+    /// the granting effect's bookkeeping.
+    /// </summary>
+    public void GrantRuntimeExileCast(Player allowedCaster, ValueObjects.ManaCost cost)
+    {
+        if (allowedCaster == null) throw new ArgumentNullException(nameof(allowedCaster));
+        if (cost == null) throw new ArgumentNullException(nameof(cost));
+        RuntimeExileCastAllowedCaster = allowedCaster;
+        RuntimeExileCastCost = cost;
+    }
+
+    /// <summary>Clear any runtime exile-cast grant on this card.</summary>
+    public void ClearRuntimeExileCast()
+    {
+        RuntimeExileCastAllowedCaster = null;
+        RuntimeExileCastCost = null;
+    }
+
+    /// <summary>
     /// CR 702.66 — when this card was cast paying delve, the number of cards
     /// that were exiled from its caster's graveyard as part of the delve
     /// payment. Set by <see cref="Majik.Core.Game.SpellCastFlow"/> right after
