@@ -1940,6 +1940,31 @@ public static class NamedCardFactory
             // a live TriggerManager.
             "Mana Vault" => ManaVaultFactory.Create(owner),
 
+            // Artifact — {0} (ManaCryptFactory). Mercadian Masques media
+            // insert / Eternal Masters. "At the beginning of your upkeep,
+            //  flip a coin. If you lose the flip, Mana Crypt deals 3 damage
+            //  to you. {T}: Add {C}{C}." Upkeep TriggeredAbility (CR 603.1
+            //  / CR 500.4) samples an injectable coin-flip seam and routes
+            //  the 3 damage through Player.LoseLife — same v1 damage
+            //  simplification as Mana Vault / Manabarbs / Dark Confidant
+            //  (no DamageDealtEvent route). The single-arg dispatcher path
+            //  uses System.Random.Shared as the flip source; use the
+            //  (owner, triggers, coinLoses) overload for deterministic
+            //  testing or live TriggerManager wiring.
+            "Mana Crypt" => ManaCryptFactory.Create(owner),
+
+            // Legendary Artifact — {0} (MoxAmberFactory). Dominaria.
+            // "{T}: Add one mana of any color among legendary creatures
+            //  and planeswalkers you control." Five WUBRG ManaAbility
+            //  instances each gated on !IsTapped + a live scan of the
+            //  controller's battlefield for a legendary creature or
+            //  planeswalker whose printed colour (CR 105 via CardColors)
+            //  includes the ability's colour. Opponent legendaries do
+            //  NOT count — same scoping as MoxOpalFactory's metalcraft
+            //  gate. Modal single-ability "any colour" shape deferred
+            //  (same gap as Mox Opal / Delighted Halfling / City of Brass).
+            "Mox Amber" => MoxAmberFactory.Create(owner),
+
             // Legendary Creature — Avatar {B}{B}{G}{G} 8/8 (HogaakFactory).
             // Modern Horizons. Trample + Convoke keyword markers wired.
             // Additional cost (exile two creature cards from controller's
