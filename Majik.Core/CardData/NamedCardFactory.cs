@@ -1882,6 +1882,45 @@ public static class NamedCardFactory
             // a live TriggerManager.
             "Mana Vault" => ManaVaultFactory.Create(owner),
 
+            // Legendary Creature — Avatar {B}{B}{G}{G} 8/8 (HogaakFactory).
+            // Modern Horizons. Trample + Convoke keyword markers wired.
+            // Additional cost (exile two creature cards from controller's
+            // graveyard — CR 601.2f) surfaced via
+            // HogaakFactory.BuildExileTwoCreaturesAdditionalCost
+            // (ExileCreaturesFromGraveyardAdditionalCost — generic shape so
+            // other graveyard-exile additional costs can reuse it). Convoke
+            // cost surfaced via HogaakFactory.BuildAlternativeCost — v1
+            // returns printed cost unchanged (same gap as Chord of Calling).
+            // "Can't be cast from hand" + "Hogaak's mana value is 8" are
+            // documented but unenforced — no legal-cast-zones predicate on
+            // SpellDefinition and no name-keyed mana-value override surface
+            // exist yet. The dispatcher path here produces the correct card
+            // shape (Trample + Convoke keyword markers attached); the
+            // additional cost + Convoke alt cost are exposed via the
+            // factory's Build* statics so callers can compose them into
+            // the cast flow.
+            "Hogaak, Arisen Necropolis" => HogaakFactory.Create(owner),
+
+            // Enchantment — {B} (BridgeFromBelowFactory). Future Sight.
+            // Two graveyard-resident triggered abilities (CR 603.6d,
+            // activeZones = {Graveyard}). (1) "Whenever a nontoken creature
+            // is put into your graveyard from the battlefield, if Bridge
+            // from Below is in your graveyard, create a 2/2 black Zombie
+            // creature token" — CardMovedEvent Battlefield → Graveyard
+            // gated on Creature + !IsToken + owner == Bridge's controller,
+            // with an interveningIf checking Bridge is in its controller's
+            // graveyard (CR 603.4). (2) "When a creature is put into an
+            // opponent's graveyard from the battlefield, exile Bridge from
+            // Below" — CardMovedEvent Battlefield → Graveyard gated on
+            // Creature landing in an opponent's graveyard, moves Bridge
+            // graveyard → exile via raw zone mutation. Zombie token created
+            // via TokenFactory.CreateOnBattlefield; routes through
+            // ZoneService when the (owner, zoneService, eventBus, triggers)
+            // overload is used so the spawned token publishes CardMovedEvent.
+            // Token-colour identity (black) deferred — same gap as Crashing
+            // Footfalls' green Rhinos and Wurmcoil's colourless Wurms.
+            "Bridge from Below" => BridgeFromBelowFactory.Create(owner),
+
             // Legendary Creature — Phyrexian Angel {3}{W}{U}{B}{R}{G}
             // (AtraxaGrandUnifierFactory). Phyrexia: All Will Be One.
             // Flying + Vigilance + Deathtouch + Lifelink keyword markers
