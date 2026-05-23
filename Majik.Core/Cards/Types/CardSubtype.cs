@@ -53,6 +53,8 @@ public enum CardSubtype
     Avatar,
     /// <summary>Wurm creature subtype — Wurmcoil Engine, Penumbra Wurm. CR 205.3m.</summary>
     Wurm,
+    /// <summary>Rhino creature subtype — Crashing Footfalls Rhino tokens, Siege Rhino. CR 205.3m.</summary>
+    Rhino,
 
     // Land subtypes (examples)
     Forest,

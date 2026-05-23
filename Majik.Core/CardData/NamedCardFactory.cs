@@ -615,6 +615,18 @@ public static class NamedCardFactory
             // of SearchSpellFactory).
             "Sylvan Scrying" => SylvanScryingFactory.Create(owner),
 
+            // Sorcery — {1}{R}{G}{W} (CrashingFootfallsFactory). Modern Horizons.
+            // CR 702.85 — Cascade. On-cast triggered ability fires
+            // CascadeAction.Cascade with sourceManaValue = 4 (exile from top
+            // until a nonland with MV < 4 is found, bottom the rest in random
+            // order, leave the eligible card in exile so the caller can drive
+            // a CastFromExileAlternativeCost cast). Resolve effect creates
+            // two 4/4 green Rhino Warrior creature tokens with Trample. The
+            // single-arg dispatcher path attaches the trigger to the card
+            // shape without TriggerManager wiring; use the (owner, triggers,
+            // willCast, onCascadeResolved) overload to drive the free cast.
+            "Crashing Footfalls" => CrashingFootfallsFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
