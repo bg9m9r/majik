@@ -1785,6 +1785,32 @@ public static class NamedCardFactory
             //  primitive ("copy that spell") + new-targets prompt all deferred.
             "Pyromancer's Goggles" => PyromancersGogglesFactory.Create(owner),
 
+            // Sorcery — {1}{R} (PyroclasmFactory). Portal Second Age and
+            // many reprints. "Pyroclasm deals 2 damage to each creature."
+            // Card shape only here; the resolve effect (2 damage to every
+            // creature on every supplied player's battlefield via
+            // Creature.TakeDamage — CR 109.5) is built on demand via
+            // PyroclasmFactory.BuildResolveEffect(allPlayers). Distinct
+            // from the shared DealsDamageEachCreatureTemplate stub, which
+            // scans only the caster's battlefield.
+            "Pyroclasm" => PyroclasmFactory.Create(owner),
+
+            // Sorcery — {2}{R} (AngerOfTheGodsFactory). Theros.
+            // "Anger of the Gods deals 3 damage to each creature. If a
+            //  creature dealt damage this way would die this turn, exile
+            //  it instead." Card shape only here; the resolve effect
+            // (sweep 3 dmg + EOT-expirable ZoneMoveIntent replacement
+            // rewriting tagged creature graveyard moves to exile via
+            // AngerOfTheGodsExileInsteadReplacement on the supplied
+            // ReplacementBus) is built on demand via
+            // AngerOfTheGodsFactory.BuildResolveEffect(allPlayers,
+            // replacements?). The rider tracks "damaged this way" by
+            // reference identity on the sweep's hit set (CR 700.3) and
+            // expires on the cleanup step (CR 514.2) via the bus's
+            // ExpireEndOfTurn sweep. The single-arg dispatcher path
+            // produces the correct card shape only.
+            "Anger of the Gods" => AngerOfTheGodsFactory.Create(owner),
+
             // Instant — {1}{U} (DazeFactory). Nemesis.
             // "You may return an Island you control to its owner's hand
             //  rather than pay this spell's mana cost. Counter target spell
