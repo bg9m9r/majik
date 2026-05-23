@@ -1559,6 +1559,19 @@ public static class NamedCardFactory
             // the redirect as a non-combat DamageDealtEvent (CR 119.2c).
             "Boros Reckoner" => BorosReckonerFactory.Create(owner),
 
+            // Instant — {U}{U} (BrainFreezeFactory). Scourge.
+            // "Target player mills three cards. Storm (When you cast this
+            // spell, copy it for each spell cast before it this turn. You
+            // may choose new targets for the copies.)" CR 702.40 + CR 701.13.
+            // Card shape only here; the resolve-time mill SpellDefinition is
+            // built on demand via BrainFreezeFactory.BuildDefinition(targetResolver).
+            // The structural Storm trigger is attached for shape inspection;
+            // use the (owner, triggers, stack, turnState) overload for fully-
+            // wired Storm copy semantics — copies share the original chosen
+            // target (CR 702.40a retargeting deferred — see StormHelper +
+            // SpellCopier xmldocs).
+            "Brain Freeze" => BrainFreezeFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
