@@ -656,6 +656,23 @@ public static class NamedCardFactory
             // peeked card to the graveyard.
             "Consider" => ConsiderFactory.Create(owner),
 
+            // Sorcery — {U} (PonderFactory). Lorwyn / Modern Horizons 3.
+            // "Look at the top three cards of your library, then put them
+            //  back in any order. You may shuffle your library. Draw a card."
+            // Card shape only here; the resolve effect is built on demand
+            // via PonderFactory.BuildResolveEffect. Reuses ScryAction with
+            // ToBottom = [] for the reorder. "May shuffle" rider deferred
+            // (no IZone.Shuffle entry point yet).
+            "Ponder" => PonderFactory.Create(owner),
+
+            // Sorcery — {U} (PreordainFactory). Magic 2011 / Modern Horizons 3.
+            // "Scry 2, then draw a card." Card shape only here; the resolve
+            // effect is built on demand via PreordainFactory.BuildResolveEffect.
+            // The data-driven oracle binder's ScryNSpell already covers this
+            // shape via tail detection — this named factory exists for direct
+            // construction in tests / dispatch parity with other cantrips.
+            "Preordain" => PreordainFactory.Create(owner),
+
             // Instant — {B} (CabalRitualFactory). Torment / Modern Horizons 2.
             // "Add {B}{B}{B}. Threshold — Add {C}{C}{C}{C}{C} instead if seven
             // or more cards are in your graveyard." Card shape only here; the
