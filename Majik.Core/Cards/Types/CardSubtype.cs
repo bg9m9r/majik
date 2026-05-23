@@ -91,5 +91,6 @@ public enum CardSubtype
     Teferi,
     Karn,
     Ugin,
-    Bolas
+    Bolas,
+    Wrenn
 }
