@@ -12,9 +12,14 @@ namespace Majik.Core.CardData.SpellTemplates.Templates.Library;
 /// returns to <em>hand</em> (Raise Dead style); this template returns
 /// to <em>battlefield</em>.
 ///
-/// v1 reanimation skips ETB triggers and just moves the card +
-/// transfers control to the caster (CR 110.2). Full ETB-trigger
-/// support requires routing through ZoneService — deferred.
+/// Routes the graveyard→battlefield move through
+/// <see cref="Majik.Core.Services.ZoneService"/> when one is wired into
+/// the bind context, so ETB triggers fire on the reanimated permanent
+/// (CR 603.6a) and ETB replacement effects (CR 614) are consulted.
+/// Falls back to direct zone mutation (no ETB triggers / replacements)
+/// when no ZoneService is available — preserves legacy callers that
+/// build a SpellBindContext without one. Caster takes control of the
+/// reanimated permanent per CR 110.2; owner is unchanged.
 /// </summary>
 public sealed class ReanimateToBattlefieldTemplate : ISpellTemplate
 {
@@ -51,5 +56,5 @@ public sealed class ReanimateToBattlefieldTemplate : ISpellTemplate
 
     public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
         LibrarySpellFactory.ReanimateToBattlefieldSpell(
-            ctx.Caster, ctx.Resolver, @params.TryGetValue("kind", out var k) ? k : "");
+            ctx.Caster, ctx.Resolver, @params.TryGetValue("kind", out var k) ? k : "", ctx.Zones);
 }

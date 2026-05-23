@@ -148,7 +148,10 @@ internal static class LibrarySpellFactory
         });
 
     internal static SpellDefinition ReanimateToBattlefieldSpell(
-        Player caster, Func<object, object> resolver, string kindRaw) => new(
+        Player caster,
+        Func<object, object> resolver,
+        string kindRaw,
+        Majik.Core.Services.ZoneService? zones = null) => new(
         Modes: Array.Empty<string>(), HasVariableX: false,
         TargetRequests: new[] { new TargetRequest(
             string.IsNullOrEmpty(kindRaw) ? "target card in graveyard" : $"target {kindRaw} card in graveyard",
@@ -161,13 +164,26 @@ internal static class LibrarySpellFactory
                 if (target is not ICard card) return;
                 var owner = card.Owner;
                 if (owner == null) return;
-                if (card.Zone == ZoneType.Graveyard) owner.Zones.Graveyard.RemoveCard(card);
+                if (card.Zone != ZoneType.Graveyard) return;
                 // Reanimated permanent enters under the caster's control
                 // (CR 110.2) — the caster of the reanimation spell, not the
                 // graveyard's owner. Owner is unchanged.
-                caster.Zones.Battlefield.AddCard(card);
-                card.SetZone(ZoneType.Battlefield);
-                card.SetController(caster);
+                //
+                // CR 603.6a — route through ZoneService when available so
+                // ETB triggers fire on the reanimated permanent. Direct
+                // zone mutation (the fallback below) bypasses CardMovedEvent
+                // and the trigger manager never observes the move.
+                if (zones != null)
+                {
+                    zones.MoveCard(card, ZoneType.Graveyard, ZoneType.Battlefield, caster);
+                }
+                else
+                {
+                    owner.Zones.Graveyard.RemoveCard(card);
+                    caster.Zones.Battlefield.AddCard(card);
+                    card.SetZone(ZoneType.Battlefield);
+                    card.SetController(caster);
+                }
             }) };
         });
 
