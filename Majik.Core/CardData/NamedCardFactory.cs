@@ -161,6 +161,15 @@ public static class NamedCardFactory
             // card") deferred.
             "Grief" => GriefFactory.Create(owner),
 
+            // Creature — Elemental Incarnation {1}{G}{G} 3/4 (EnduranceFactory).
+            // Flash + Reach + Evoke keyword markers wired. ETB graveyard-to-
+            // library trigger wired ("target player shuffles their graveyard
+            // into their library" — CR 701.19c). Evoke alt-cost = "exile a
+            // green card from hand" via EvokeAlternativeCost; printed evoke-
+            // sacrifice trigger fires when Endurance enters if evoke was paid
+            // (CR 702.74b).
+            "Endurance" => EnduranceFactory.Create(owner),
+
             // U/R Horizon Canopy painless dual — Modern Horizons (FieryIsletFactory).
             // {T}, Pay 1 life: Add {U} or {R} — two ManaAbility instances, each with
             // a life-cost activation gate (CR 119.4) and a LoseLife side-effect.
