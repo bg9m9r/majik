@@ -1092,6 +1092,22 @@ public static class NamedCardFactory
             // to bottom (mirrors Manamorphose's deterministic v1 fallback).
             "Aether Gust" => AetherGustFactory.Create(owner),
 
+            // Creature — Goblin {R} 1/1 (GoblinLackeyFactory). Urza's Destiny.
+            // "Whenever Goblin Lackey deals combat damage to a player, you may
+            //  put a Goblin creature card from your hand onto the battlefield."
+            // Combat-damage-to-a-player trigger mirrors the Ragavan, Nimble
+            // Pilferer shape (CombatDamageDealtEvent filtered to source + non-
+            // null TargetPlayer). v1 deterministically picks the first Goblin
+            // creature card in hand and routes the hand → battlefield move
+            // through ZoneService when supplied so ETB triggers fire on the
+            // cheated-in Goblin (CR 603.6a). The single-arg dispatcher path
+            // here produces the correct card shape without TriggerManager
+            // registration / ZoneService routing. Use the (owner, zoneService,
+            // eventBus, triggers) overload for fully-wired behaviour.
+            // Agent-driven "you may" decline + multi-candidate selection
+            // deferred (mirrors Aether Vial + Stoneforge Mystic).
+            "Goblin Lackey" => GoblinLackeyFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
