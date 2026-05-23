@@ -864,6 +864,25 @@ public static class NamedCardFactory
             // Splice card).
             "Through the Breach" => ThroughTheBreachFactory.Create(owner),
 
+            // Legendary Enchantment — {X}{B}{B} (TheMeathookMassacreFactory).
+            // Innistrad: Midnight Hunt. "When The Meathook Massacre enters,
+            // all creatures get -X/-X until end of turn. Whenever a creature
+            // an opponent controls dies, you gain 1 life. Whenever a creature
+            // you control dies, each opponent loses 1 life." Three triggered
+            // abilities wired: (1) ETB sweep reads X from Card.PendingCastX
+            // (stamped by SpellCastFlow at cast time) and registers a
+            // PumpUntilEndOfTurnEffect(-X, -X) on every creature on every
+            // player's battlefield (via the optional allPlayersResolver;
+            // falls back to controller-only without it — same convention as
+            // Pernicious Deed); (2) opponent-creature dies → controller
+            // gains 1 life; (3) own-creature dies → each opponent supplied
+            // by the optional opponentResolver loses 1 life (resolver shape
+            // mirrors Sheoldred, the Apocalypse). Single-arg dispatcher
+            // path attaches all three triggers for shape and resolves the
+            // ETB sweep against the controller's battlefield only; own-dies
+            // drain silently no-ops without a resolver.
+            "The Meathook Massacre" => TheMeathookMassacreFactory.Create(owner),
+
             // Artifact — {0} (LotusPetalFactory). Tempest and many reprints.
             // "{T}, Sacrifice Lotus Petal: Add one mana of any color."
             // Five ManaAbility instances (one per WUBRG), each gated on
