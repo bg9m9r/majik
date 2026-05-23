@@ -3,13 +3,13 @@
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
 **Last updated:** 2026-05-23
-**Latest origin/main:** Goblin Welder (Creature — Goblin Artificer {R} 1/1 — {T} activated ability that pairs a same-player (battlefield artifact, graveyard artifact card) and sac-then-reanimates; ZoneService-routed when supplied so dies / ETB triggers fire, raw zone fallback for shape tests; target prompt + on-stack legality check deferred) on top of Sword of Fire and Ice + Reckless Charge + Trinket Mage + Sun Titan + Sensei's Divining Top + Inkmoth Nexus + Spell Queller + Goblin Matron + Mutavault + Skullclamp + Umezawa's Jitte + Wasteland + Swords to Plowshares + Mystical Tutor + Path to Exile + Daze + Ponder + Preordain + Splinter Twin + Sythis, Harvest's Hand + Pyromancer's Goggles + Plague Engineer + Manabarbs + Yawgmoth's Will + Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere.
+**Latest origin/main:** Mishra's Workshop (Land — {T}: Add {C}{C}{C}; printed "spend only to cast artifact spells" restriction is structural-only — enforcement deferred until a per-mana provenance ledger exists, CR 106.4) on top of Goblin Welder + Sword of Fire and Ice + Reckless Charge + Trinket Mage + Sun Titan + Sensei's Divining Top + Inkmoth Nexus + Spell Queller + Goblin Matron + Mutavault + Skullclamp + Umezawa's Jitte + Wasteland + Swords to Plowshares + Mystical Tutor + Path to Exile + Daze + Ponder + Preordain + Splinter Twin + Sythis, Harvest's Hand + Pyromancer's Goggles + Plague Engineer + Manabarbs + Yawgmoth's Will + Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere.
 
 ## Headline numbers
 
 | Metric | Count |
 |---|---|
-| Named factories | 128 |
+| Named factories | 129 |
 | Bespoke templates | 27 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
@@ -87,6 +87,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Manabarbs | Enchantment | TBD | {2}{R}{R} — symmetric "whenever a player taps a land for mana, deal 1" triggered ability over ManaAbilityActivatedEvent (CR 605); source gate matches Land via printed type; Mox Opal / Black Lotus / other non-land mana abilities publish the same event but are rejected by the source predicate |
 | Manamorphose | Instant | TBD | {1}{R/G} hybrid + add two mana any combo (caller-picked pair, default {R}{G}) + cantrip |
 | Mishra's Bauble | Artifact | — | sac → look + delayed draw |
+| Mishra's Workshop | Land | TBD | {T}: Add {C}{C}{C}; artifact-only spend restriction structural-only — provenance ledger deferred (CR 106.4) |
 | Mox Opal | Artifact | TBD | Legendary {0}: Metalcraft-gated any-color mana (CR 702.95) |
 | Murktide Regent | Creature | #194 | delve cost + ETB X counters |
 | Mutavault | Land | TBD | {T}: Add {C} + {1}: until EOT becomes 2/2 every-creature-type creature, still a land (Layer 4 add-Creature + every-modelled-creature-subtype + Layer 7b set-base PT 2/2, both ExpireAtEndOfTurn; non-Creature runtime instance — PT recorded as shim until Compute(Permanent) upgrades chars row) |
