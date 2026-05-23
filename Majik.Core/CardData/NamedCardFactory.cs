@@ -363,6 +363,23 @@ public static class NamedCardFactory
             // seed, no live CDA).
             "Tarmogoyf" => TarmogoyfFactory.Create(owner),
 
+            // Legendary Creature — Human Shaman {4}{B/G} 4/5
+            // (TasigurTheGoldenFangFactory). Khans of Tarkir.
+            // Delve marker keyword wired (CR 702.66 — mechanic lives in
+            // DelveCost + SpellCastFlow, same as Treasure Cruise / Dig
+            // Through Time / Murktide Regent). Activated ability
+            // {B}{G}{U}: target opponent picks a card in controller's
+            // graveyard → controller's hand. Opponent's IPlayerAgent is
+            // consulted via ChooseLibraryPickAsync; first-card fallback
+            // when no agent is registered (mirrors Wishclaw Talisman).
+            // Single-arg dispatcher path leaves the opponent-choose path
+            // as a no-op (no allPlayersResolver); use the
+            // (owner, allPlayersResolver, opponentChooser) overload for
+            // fully-wired behavior. "Activate only as a sorcery" gate
+            // deferred — same gap as Wishclaw Talisman / Priest of Fell
+            // Rites (no per-activated-ability sorcery-speed gate yet).
+            "Tasigur, the Golden Fang" => TasigurTheGoldenFangFactory.Create(owner),
+
             // Creature — Human Wizard {1}{B} 2/1 (DarkConfidantFactory).
             // Upkeep trigger: reveal top of controller's library, put it
             // into hand, lose life equal to its mana value. The single-arg
