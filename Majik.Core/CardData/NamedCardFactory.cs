@@ -1842,6 +1842,20 @@ public static class NamedCardFactory
             // a live TriggerManager.
             "Mana Vault" => ManaVaultFactory.Create(owner),
 
+            // Legendary Creature — Phyrexian Praetor {2}{B}{B} 4/5
+            // (SheoldredTheApocalypseFactory). Dominaria United. Deathtouch
+            // wired as a KeywordAbility marker. Draw trigger (CR 603.1):
+            // "Whenever you draw a card, you gain 2 life and each opponent
+            // loses 2 life" wired via Triggers.OnCardDrawnByPlayer filtered
+            // to the controller — only the controller's draws fire it. The
+            // single-arg dispatcher path here produces the correct card
+            // shape and gains 2 life for the controller on execute; the
+            // "each opponent loses 2" clause silently no-ops without an
+            // opponent resolver (mirrors Liliana of the Veil's player-list-
+            // resolver pattern). Use the (owner, opponentResolver, eventBus,
+            // triggers) overload to wire full drain + bus-driven firing.
+            "Sheoldred, the Apocalypse" => SheoldredTheApocalypseFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
