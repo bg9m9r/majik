@@ -1780,6 +1780,26 @@ public static class NamedCardFactory
             // Whack pillar.
             "Goblin Piledriver" => GoblinPiledriverFactory.Create(owner),
 
+            // Creature — Goblin Warrior {2}{R} 2/2 (GoblinRabblemasterFactory).
+            // Magic 2015 / many reprints. "Other Goblin creatures you control
+            // have haste. Whenever Goblin Rabblemaster attacks, create a 1/1
+            // red Goblin creature token, then it gets +1/+0 until end of turn
+            // for each attacking Goblin you control." Lord-style Haste grant
+            // wired via LordStaticEffect (Goblin Chieftain shape with
+            // power/toughness 0 — keyword-only). Attack trigger wired via
+            // Triggers.OnAttackSelf against CreatureAttacksEvent; the body
+            // creates a 1/1 Goblin token via TokenFactory.CreateOnBattlefield
+            // and then registers a PumpUntilEndOfTurnEffect on Rabblemaster
+            // for +N/+0 EOT, where N = count of attacking Goblins the
+            // controller controls (no "other" qualifier — Rabblemaster itself
+            // counts). The attackers list is read from an injected closure
+            // (attackingCreaturesSource); the single-arg dispatcher path
+            // produces the card shape with the attack trigger attached but
+            // no live pump body and no lord-static registration (no layers
+            // service / no attackers source). Modern Goblins / 8-Whack
+            // pillar.
+            "Goblin Rabblemaster" => GoblinRabblemasterFactory.Create(owner),
+
             // Creature — Goblin {2}{R} 1/1 (GoblinMatronFactory). Urza's Legacy.
             // "When Goblin Matron enters, you may search your library for a
             //  Goblin card, reveal that card, and put it into your hand.
@@ -2406,6 +2426,23 @@ public static class NamedCardFactory
             // at resolution (CR 608.2b) since the engine's target prompt
             // doesn't yet express "mana value X or less".
             "Drown in the Loch" => DrownInTheLochFactory.Create(owner),
+
+            // Land — Zendikar / Modern reprints (ValakutTheMoltenPinnacleFactory).
+            // "Valakut, the Molten Pinnacle enters tapped unless you control
+            //  five or more other Mountains. Whenever a Mountain enters under
+            //  your control, if you control at least five other Mountains,
+            //  you may have Valakut, the Molten Pinnacle deal 3 damage to
+            //  any target. {T}: Add {R}." CR 614.1c (conditional ETB-tapped)
+            //  + CR 603.1 / 603.4 (intervening-if landfall-style trigger).
+            // The single-arg dispatcher path here attaches the {T}: Add {R}
+            // mana ability + landfall-style trigger for shape; the
+            // conditional ETB-tapped replacement is omitted (no
+            // ReplacementBus available at dispatch). Use
+            // ValakutTheMoltenPinnacleFactory.Create(owner, replacements,
+            // triggers) for fully-wired behaviour. "You may" prompt +
+            // agent-driven "any target" pick deferred (v1 honours pre-set
+            // ChosenTargets and auto-accepts the may).
+            "Valakut, the Molten Pinnacle" => ValakutTheMoltenPinnacleFactory.Create(owner),
 
             _ => new Card(name, ""),
         };
