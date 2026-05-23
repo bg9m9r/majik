@@ -468,6 +468,17 @@ public static class NamedCardFactory
             // not scoped by v1.
             "Dress Down" => DressDownFactory.Create(owner),
 
+            // Instant — {U} (StubbornDenialFactory). Khans of Tarkir.
+            // "Choose one — Counter target noncreature spell unless its
+            //  controller pays {1}. Ferocious — Counter that spell if you
+            //  control a creature with power 4 or greater." CR 702.114.
+            // Card shape only here; the resolve-time SpellDefinition (with
+            // the ferocious gate and the unless-pay fallback) is built on
+            // demand via StubbornDenialFactory.BuildSpellDefinition. The
+            // unless-pay rider is surfaced as a Func<bool> callback because
+            // the engine has no Yes/No agent prompt yet — default is "no".
+            "Stubborn Denial" => StubbornDenialFactory.Create(owner),
+
             // Instant — {U} (ConsiderFactory). Innistrad: Midnight Hunt.
             // "Look at the top card of your library. You may put that card
             // into your graveyard. Then draw a card." Effectively Surveil 1
