@@ -10,13 +10,24 @@ namespace Majik.Core.Effects;
 /// CR 305.6 / 305.7 — derives the effective mana abilities for a permanent
 /// after the CR 613 layer system has run.
 ///
-/// For lands whose effective (Layer 4) subtypes contain a basic-land
-/// subtype NOT on the printed card, this returns one synthesized basic
-/// mana ability per such acquired basic subtype, IN PLACE OF the
-/// permanent's printed mana abilities — the land "loses any abilities
-/// printed on the card and gains the appropriate mana ability for each
-/// new basic land type." Otherwise returns the printed mana abilities
-/// unchanged.
+/// Two shapes of land subtype change must be distinguished here:
+///
+///   * REPLACEMENT (CR 305.6) — a Layer 4 effect overwrites the land
+///     subtype slot (Blood Moon, Spreading Seas, Conversion). The land
+///     "loses any abilities printed on the card and gains the
+///     appropriate mana ability for each new basic land type." Return
+///     ONLY the synthesized basic mana abilities for the newly acquired
+///     basic subtypes — the printed abilities are dropped.
+///
+///   * ADDITIVE (CR 305.7) — a Layer 4 effect grants a basic land
+///     subtype IN ADDITION to existing subtypes (Urborg, Yavimaya). The
+///     printed abilities stay; the land additionally gains the mana
+///     ability for each newly acquired basic land subtype.
+///
+/// Detection: if every printed subtype of the land is still present in
+/// the effective subtype set, the Layer 4 effect was additive — keep
+/// printed AND add new. If any printed subtype has been removed, the
+/// Layer 4 effect was a replacement — return new only.
 ///
 /// Non-land permanents and missing-layer-service callers fall through to
 /// the printed-abilities path: the layer system here only reshapes the
@@ -68,17 +79,36 @@ public static class EffectiveManaAbilities
         if (newlyAcquiredBasics.Count == 0)
             return permanent.Abilities.OfType<IManaAbility>().ToList();
 
-        // CR 305.6 — printed abilities lost, basic mana gained per new
-        // basic land subtype. Synthesized on demand (not stored on the
-        // card); the ability's controller is the land's current
-        // controller, or an explicitly supplied override.
+        // CR 305.6 vs 305.7 — additive (Urborg/Yavimaya) keeps printed
+        // abilities and adds new basic mana; replacement (Blood Moon /
+        // Spreading Seas) drops printed and returns only new basic mana.
+        // Detection: if every printed subtype is still in the effective
+        // subtype set, the Layer 4 effect was additive. Otherwise a
+        // printed subtype was dropped → replacement.
+        var isAdditive = printedSubtypes.All(effective.Contains);
+
+        // Synthesized on demand (not stored on the card); the ability's
+        // controller is the land's current controller, or an explicitly
+        // supplied override.
         var owner = controller ?? land.Controller
             ?? throw new InvalidOperationException(
                 $"Cannot synthesize basic mana ability for {land.Name}: no controller set.");
 
-        return newlyAcquiredBasics
-            .Select(st => (IManaAbility)BuildBasicMana(land, owner, st))
-            .ToList();
+        var synthesized = newlyAcquiredBasics
+            .Select(st => (IManaAbility)BuildBasicMana(land, owner, st));
+
+        if (isAdditive)
+        {
+            // CR 305.7 — printed abilities preserved, basic mana for the
+            // newly granted subtype added on top.
+            return permanent.Abilities.OfType<IManaAbility>()
+                .Concat(synthesized)
+                .ToList();
+        }
+
+        // CR 305.6 — printed abilities lost, basic mana gained per new
+        // basic land subtype.
+        return synthesized.ToList();
     }
 
     private static ManaAbility BuildBasicMana(Land source, Player controller, CardSubtype basic)

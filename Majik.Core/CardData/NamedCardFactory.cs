@@ -206,6 +206,30 @@ public static class NamedCardFactory
             // ConversionFactory.Create(owner, effects, eventBus).
             "Conversion" => ConversionFactory.Create(owner),
 
+            // Legendary Land — Planar Chaos (UrborgTombOfYawgmothFactory).
+            // "Each land is a Swamp in addition to its other types."
+            // CR 305.7 / 613.1d. Implemented as a Layer 4
+            // AddSubtypeToPermanentsEffect scoped to every Land on the
+            // battlefield, additively granting {Swamp}. Combined with
+            // EffectiveManaAbilities' additive-vs-replacement detection,
+            // each affected land keeps its printed mana ability AND gains
+            // a {T}: Add {B}. Urborg self-applies (no printed mana →
+            // taps for {B} via the granted Swamp subtype). Lifecycle
+            // wiring (GrantLandSubtypeStaticEffect ↔ CardMovedEvent)
+            // requires the live ContinuousEffectsService + EventBus via
+            // UrborgTombOfYawgmothFactory.Create(owner, effects,
+            // eventBus). The single-arg dispatcher path here produces
+            // the correct card shape only.
+            "Urborg, Tomb of Yawgmoth" => UrborgTombOfYawgmothFactory.Create(owner),
+
+            // Legendary Land — Dominaria United (YavimayaCradleOfGrowthFactory).
+            // "Each land is a Forest in addition to its other types."
+            // Same Layer 4 additive grant machinery as Urborg, only the
+            // granted subtype differs ({Forest} instead of {Swamp}).
+            // Full lifecycle via
+            // YavimayaCradleOfGrowthFactory.Create(owner, effects, eventBus).
+            "Yavimaya, Cradle of Growth" => YavimayaCradleOfGrowthFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
