@@ -230,6 +230,25 @@ public static class NamedCardFactory
             // YavimayaCradleOfGrowthFactory.Create(owner, effects, eventBus).
             "Yavimaya, Cradle of Growth" => YavimayaCradleOfGrowthFactory.Create(owner),
 
+            // Enchantment — Aura {1}{U} (SpreadingSeasFactory).
+            // "Enchant land. When Spreading Seas enters, draw a card.
+            //  Enchanted land is an Island and has '{T}: Add {U}'."
+            // CR 303.4 / 305.6 / 613.1d — Layer 4 retype scoped to the
+            // aura's single attachment target, via
+            // AttachedAuraRetypeStaticEffect. PR #155's
+            // EffectiveManaAbilities derives {T}: Add {U} from the granted
+            // Island subtype. Full lifecycle via
+            // SpreadingSeasFactory.Create(owner, effects, eventBus). The
+            // single-arg dispatcher path here produces the correct card
+            // shape only. Cast-time targeting + attach flow is deferred —
+            // tests manually AttachTo() the bearer.
+            "Spreading Seas" => SpreadingSeasFactory.Create(owner),
+
+            // Enchantment — Aura {U} (SeasClaimFactory).
+            // "Enchant land. Enchanted land is an Island."
+            // Same retype machinery as Spreading Seas, no ETB draw.
+            "Sea's Claim" => SeasClaimFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
