@@ -382,6 +382,16 @@ public static class NamedCardFactory
             // for full ETB-replacement / trigger-firing wiring.
             "Stoneforge Mystic" => StoneforgeMysticFactory.Create(owner),
 
+            // Creature — Ooze {1}{G} 2/2 (ScavengingOozeFactory).
+            // Activated {G}: exile target creature card from a graveyard;
+            // if you do, put a +1/+1 counter on Scavenging Ooze and gain
+            // 1 life. The single-arg dispatcher path scans only the
+            // controller's graveyard; use the (owner, allPlayersResolver)
+            // overload to scan every player's graveyard. Real "target
+            // creature card from a graveyard" prompt deferred — v1 picks
+            // the first creature card deterministically.
+            "Scavenging Ooze" => ScavengingOozeFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
