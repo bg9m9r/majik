@@ -55,6 +55,8 @@ public enum CardSubtype
     Wurm,
     /// <summary>Nightmare creature subtype — Lurrus of the Dream-Den, Nightmare Lash. CR 205.3m.</summary>
     Nightmare,
+    /// <summary>Giant creature subtype — Primeval Titan, Hill Giant. CR 205.3m.</summary>
+    Giant,
 
     // Land subtypes (examples)
     Forest,
