@@ -58,6 +58,20 @@ public class ActionValidator
                 $"{action.Card.Name} requires sorcery speed",
                 new RuleViolation("117.1", "non-instant cast at non-sorcery speed"));
         }
+
+        // CR 601.3 / 117.1a — external sorcery-speed restrictions (e.g.
+        // Teferi, Time Raveler: "Each opponent can cast spells only any
+        // time they could cast a sorcery."). Even an instant or
+        // Flash-bearing card is forced to sorcery speed when the casting
+        // player is restricted.
+        if (!action.SorcerySpeedAvailable
+            && action.Player != null
+            && CastingRestrictions.MustCastAtSorcerySpeed(action.Player))
+        {
+            return ValidationResult.Invalid(
+                $"{action.Player.Name} can cast spells only at sorcery speed",
+                new RuleViolation("117.1a", "external sorcery-speed restriction"));
+        }
         return ValidationResult.Valid();
     }
 
