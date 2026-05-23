@@ -170,6 +170,17 @@ public static class NamedCardFactory
             // (CR 702.74b).
             "Endurance" => EnduranceFactory.Create(owner),
 
+            // Sorcery — {R} (FaithlessLootingFactory). Innistrad / Modern
+            // Horizons. "Draw two cards, then discard two cards. Flashback
+            // {2}{R}." Card shape only here; the resolve effect (draw 2 +
+            // discard 2 via deterministic last-2-in-hand) is built on
+            // demand via FaithlessLootingFactory.BuildResolveEffect, and
+            // the flashback alt-cost (parsed by FlashbackOracleParser) is
+            // exposed via FaithlessLootingFactory.BuildFlashbackCost.
+            // Real agent-driven "choose 2 cards to discard" prompt
+            // deferred — same queue as Connive / Liliana / Yawgmoth.
+            "Faithless Looting" => FaithlessLootingFactory.Create(owner),
+
             // U/R Horizon Canopy painless dual — Modern Horizons (FieryIsletFactory).
             // {T}, Pay 1 life: Add {U} or {R} — two ManaAbility instances, each with
             // a life-cost activation gate (CR 119.4) and a LoseLife side-effect.
@@ -1026,6 +1037,18 @@ public static class NamedCardFactory
             // replacements, effects) overload for fully-wired enters-as-copy
             // + Layer 4 Illusion rider + bus-driven trigger firing.
             "Phantasmal Image" => PhantasmalImageFactory.Create(owner),
+
+            // Instant — {G} (VeilOfSummerFactory). Core Set 2020.
+            // "Draw a card if an opponent has cast a blue or black spell this
+            // turn. Spells you control can't be countered this turn, and you
+            // and permanents you control gain hexproof from blue and from
+            // black until end of turn."
+            // Card shape only here; the resolve-time SpellDefinition is built
+            // on demand via VeilOfSummerFactory.BuildDefinition(caster,
+            // turnState, continuousEffects). Conditional draw consults
+            // TurnState.OpponentCastSpellOfColor; uncounterable + hexproof
+            // riders are structural in v1 (see factory doc).
+            "Veil of Summer" => VeilOfSummerFactory.Create(owner),
 
             _ => new Card(name, ""),
         };

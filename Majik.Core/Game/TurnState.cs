@@ -1,4 +1,5 @@
 using Majik.Core.Players;
+using Majik.Core.ValueObjects;
 
 namespace Majik.Core.Game;
 
@@ -22,6 +23,11 @@ public sealed class TurnState
     private readonly Dictionary<Guid, int> _creaturesDiedByController = new();
     private readonly Dictionary<Guid, int> _permanentsLeftByController = new();
     private readonly Dictionary<Guid, int> _cardsDrawnByPlayer = new();
+
+    // Per-player set of colours of spells they have cast this turn (CR 105).
+    // Veil of Summer + similar "opponent has cast a {colour} spell this turn"
+    // riders read this. A colourless spell (no entry) contributes no colours.
+    private readonly Dictionary<Guid, HashSet<ManaColor>> _spellColorsCastByPlayer = new();
 
     /// <summary>
     /// How many creatures controlled by <paramref name="player"/> died this turn.
@@ -87,6 +93,42 @@ public sealed class TurnState
     }
 
     /// <summary>
+    /// Called when <paramref name="caster"/> casts a spell with the given
+    /// <paramref name="colors"/> (CR 105). Read by "opponent cast a [colour]
+    /// spell this turn" riders such as Veil of Summer.
+    /// </summary>
+    public void RecordSpellCast(Player caster, IReadOnlySet<ManaColor> colors)
+    {
+        if (caster == null) return;
+        if (colors == null || colors.Count == 0) return;
+        if (!_spellColorsCastByPlayer.TryGetValue(caster.Id, out var set))
+        {
+            set = new HashSet<ManaColor>();
+            _spellColorsCastByPlayer[caster.Id] = set;
+        }
+        foreach (var c in colors) set.Add(c);
+    }
+
+    /// <summary>
+    /// True if any player other than <paramref name="viewer"/> has cast a
+    /// spell of at least one of the given <paramref name="colors"/> this
+    /// turn. Used by Veil of Summer's conditional draw clause.
+    /// </summary>
+    public bool OpponentCastSpellOfColor(Player viewer, params ManaColor[] colors)
+    {
+        if (viewer == null || colors == null || colors.Length == 0) return false;
+        foreach (var kvp in _spellColorsCastByPlayer)
+        {
+            if (kvp.Key == viewer.Id) continue;
+            foreach (var c in colors)
+            {
+                if (kvp.Value.Contains(c)) return true;
+            }
+        }
+        return false;
+    }
+
+    /// <summary>
     /// Reset all counters at the start of each turn (called by
     /// <see cref="TurnDriver"/> before the untap step).
     /// </summary>
@@ -97,5 +139,6 @@ public sealed class TurnState
         _creaturesDiedByController.Clear();
         _permanentsLeftByController.Clear();
         _cardsDrawnByPlayer.Clear();
+        _spellColorsCastByPlayer.Clear();
     }
 }
