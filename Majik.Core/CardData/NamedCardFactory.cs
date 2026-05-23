@@ -1701,6 +1701,55 @@ public static class NamedCardFactory
             // pips are untouched (CR 117.7c).
             "Goblin Electromancer" => GoblinElectromancerFactory.Create(owner),
 
+            // Creature — Goblin Warrior {1}{R}{R} 2/2 (GoblinChieftainFactory).
+            // Magic 2010 / many reprints. "Haste. Other Goblin creatures you
+            // control have haste and get +1/+1." Printed Haste keyword on
+            // Chieftain itself wired via KeywordAbility. The lord-style static
+            // ("Other Goblins +1/+1 + Haste") is wired via LordStaticEffect
+            // (Plague Engineer shape, sign-flipped to +1/+1, includeSelf:
+            // false, scoped to controller's creatures via the default filter)
+            // when the (owner, ContinuousEffectsService) overload is used.
+            // The single-arg dispatcher path here produces the correct card
+            // shape with the Haste keyword only — no lord static is
+            // registered (no layers service available). Modern Goblins / 8-
+            // Whack pillar.
+            "Goblin Chieftain" => GoblinChieftainFactory.Create(owner),
+
+            // Creature — Goblin Warrior {1}{R}{R} 2/2 (GoblinWarchiefFactory).
+            // Scourge / many reprints. "Goblin spells you cast cost {1} less
+            // to cast. Goblins you control have haste." Cost-reduction rider
+            // wired via SpellCostReductionAbility (Goblin Electromancer
+            // shape, predicate filtered to spells carrying CardSubtype.Goblin
+            // — "Goblin spells" covers Goblin creature spells AND any non-
+            // creature spells with Goblin in the subtype line). Haste-grant
+            // static wired via LordStaticEffect (Goblin Chieftain shape with
+            // power/toughness = 0, grantedKeywords = ["Haste"], includeSelf:
+            // true — the oracle text says "Goblins you control" with no
+            // "other" rider, so Warchief grants Haste to itself too) when
+            // the (owner, ContinuousEffectsService) overload is used. The
+            // single-arg dispatcher path produces the card shape with the
+            // cost-reduction rider only — no live haste grant. Modern
+            // Goblins / 8-Whack pillar.
+            "Goblin Warchief" => GoblinWarchiefFactory.Create(owner),
+
+            // Creature — Goblin Warrior {1}{R} 1/2 (GoblinPiledriverFactory).
+            // Onslaught / many reprints. "Protection from blue. Whenever
+            // Goblin Piledriver attacks, it gets +2/+0 until end of turn for
+            // each other attacking Goblin." Protection from blue wired via
+            // ProtectionAbility (same shape as Sword of Fire and Ice's two
+            // protection riders). Attack trigger wired via Triggers.
+            // OnAttackSelf against CreatureAttacksEvent; the pump-per-other-
+            // attacking-Goblin body reads the attackers list from an injected
+            // closure (attackingCreaturesSource) and registers a
+            // PumpUntilEndOfTurnEffect for +2X/+0 EOT against
+            // Creature.ActiveEffects when the (owner, triggers,
+            // attackingCreaturesSource) overload is used. The single-arg
+            // dispatcher path produces the card shape with protection from
+            // blue + the attack trigger attached, but no live pump body
+            // (no attackers source means zero pump). Modern Goblins / 8-
+            // Whack pillar.
+            "Goblin Piledriver" => GoblinPiledriverFactory.Create(owner),
+
             // Creature — Goblin {2}{R} 1/1 (GoblinMatronFactory). Urza's Legacy.
             // "When Goblin Matron enters, you may search your library for a
             //  Goblin card, reveal that card, and put it into your hand.
