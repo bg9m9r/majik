@@ -1056,6 +1056,18 @@ public static class NamedCardFactory
             // deferred — engine has no face-down flag.
             "Necropotence" => NecropotenceFactory.Create(owner),
 
+            // Enchantment — {1}{W} (StonySilenceFactory). Return to Ravnica.
+            // "Activated abilities of artifacts can't be activated unless
+            //  they're mana abilities." (CR 602.5c / 605.) Symmetric global
+            // variant of Karn the Great Creator's opponent-only static.
+            // Wired via StonySilenceStaticEffect when the (owner, eventBus)
+            // overload is used — a predicate restriction is registered into
+            // ActivatedAbilityRestrictions matching any non-mana activated
+            // ability whose source is an on-battlefield artifact. The
+            // single-arg dispatcher path here produces the correct card
+            // shape only (no live suppression).
+            "Stony Silence" => StonySilenceFactory.Create(owner),
+
             // Instant — {G} (VeilOfSummerFactory). Core Set 2020.
             // "Draw a card if an opponent has cast a blue or black spell this
             // turn. Spells you control can't be countered this turn, and you

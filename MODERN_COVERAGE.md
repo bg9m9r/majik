@@ -3,13 +3,13 @@
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
 **Last updated:** 2026-05-23
-**Latest origin/main:** 2ba57f7 (… + Cabal Ritual + Manamorphose + Faithless Looting); Veil of Summer added in this PR.
+**Latest origin/main:** 425b763 (… + Veil of Summer + Karakas + Necropotence); Stony Silence added in this PR.
 
 ## Headline numbers
 
 | Metric | Count |
 |---|---|
-| Named factories | 105 |
+| Named factories | 106 |
 | Bespoke templates | 26 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
@@ -101,6 +101,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Spreading Seas | Aura | #160 | retype land + draw |
 | Spymaster's Vault | Land | — | B-source shell |
 | Stoneforge Mystic | Creature | #184 | ETB tutor + activated put |
+| Stony Silence | Enchantment | TBD | global artifact-activated suppression (mana exempt; CR 605) |
 | Stubborn Denial | Instant | — | ferocious-conditional counter |
 | Subtlety | Creature | TBD | evoke pitch + ETB bounce + look-and-bottom |
 | Sunbaked Canyon | Land | — | pay-1-life R/W + sac-draw |
@@ -334,17 +335,16 @@ Sorted roughly by build priority (small infra lift × high meta share). Refreshe
 |---|---|---|---|
 | 1 | Aether Gust | low | Counter-or-bounce-to-library modal targeting a single spell/permanent of a color; modal `CounterOrBounce` template absent (colour predicate already exists for `CounterUnlessPay`). |
 | 2 | Pact of Negation | low | Counter-target-spell at {0} plus upkeep "pay {3}{U}{U} or lose the game" delayed trigger; lose-the-game effect primitive absent. |
-| 3 | Stony Silence | low | Static "activated abilities of artifacts can't be activated" — needs an artifact-scoped variant of `PithingNeedleStaticEffect` (suppress-by-card-type instead of name); mana abilities exempt. |
-| 4 | Damping Sphere | low | Two static clauses (each land taps for `{C}`, and each spell after the first each turn costs `{1}` more) — neither the spell-count-per-turn additional-cost effect nor the land-mana-override effect is shared infrastructure. |
-| 5 | Plague Engineer | medium | ETB: choose a creature type → opponents' creatures of that type get -1/-1. Needs chosen-subtype state on permanents + opponent-only lord-style boost. |
-| 6 | Splinter Twin | medium | Aura grants `{T}: create a token copy with haste`. `CopyEffect` exists, but ability-grant-on-attach (aura adds an activated ability to enchanted creature) does not. |
-| 7 | Goblin Lackey | medium | Combat-damage trigger reuses `Ragavan`-style shape, but needs "put nonland card from hand onto battlefield" effect (cheat-into-play from hand, distinct from cast). |
-| 8 | Wishclaw Talisman | medium | Tutor-any-card + give-control-of-this trigger after activation; mid-turn permanent control-swap primitive absent (only Layer 1 control-change static exists today). |
-| 9 | Sythis, Harvest's Hand | medium | Constellation (cast-an-enchantment trigger) primitive absent; needs a cast-event-typed-card trigger surface comparable to landfall. |
-| 10 | Yawgmoth's Will | high | "Play cards from your graveyard this turn" — turn-scoped global cast-from-graveyard permission + EOT exile-instead-of-grave replacement chain. `GraveyardCastAlternativeCost` is per-card, not zone-wide. |
-| 11 | Manabarbs | high | Triggered ability on every land-tap event globally; tap-event subscription per-permanent works, but a global "whenever a player taps a land for mana" hook is unwired. |
-| 12 | Pyromancer's Goggles | high | Legendary {0} mana ability + replacement: "when you tap it for {R} to cast an instant/sorcery, copy that spell once". Needs cast-time mana-source tracking + spell-copy hook keyed off that source. |
-| 13 | Searing Blaze | low | Landfall-gated dual damage (player + creature) on an instant; landfall trigger exists, but "if landfall, do X else do Y" alternative-mode template on instants is absent. |
+| 3 | Damping Sphere | low | Two static clauses (each land taps for `{C}`, and each spell after the first each turn costs `{1}` more) — neither the spell-count-per-turn additional-cost effect nor the land-mana-override effect is shared infrastructure. |
+| 4 | Plague Engineer | medium | ETB: choose a creature type → opponents' creatures of that type get -1/-1. Needs chosen-subtype state on permanents + opponent-only lord-style boost. |
+| 5 | Splinter Twin | medium | Aura grants `{T}: create a token copy with haste`. `CopyEffect` exists, but ability-grant-on-attach (aura adds an activated ability to enchanted creature) does not. |
+| 6 | Goblin Lackey | medium | Combat-damage trigger reuses `Ragavan`-style shape, but needs "put nonland card from hand onto battlefield" effect (cheat-into-play from hand, distinct from cast). |
+| 7 | Wishclaw Talisman | medium | Tutor-any-card + give-control-of-this trigger after activation; mid-turn permanent control-swap primitive absent (only Layer 1 control-change static exists today). |
+| 8 | Sythis, Harvest's Hand | medium | Constellation (cast-an-enchantment trigger) primitive absent; needs a cast-event-typed-card trigger surface comparable to landfall. |
+| 9 | Yawgmoth's Will | high | "Play cards from your graveyard this turn" — turn-scoped global cast-from-graveyard permission + EOT exile-instead-of-grave replacement chain. `GraveyardCastAlternativeCost` is per-card, not zone-wide. |
+| 10 | Manabarbs | high | Triggered ability on every land-tap event globally; tap-event subscription per-permanent works, but a global "whenever a player taps a land for mana" hook is unwired. |
+| 11 | Pyromancer's Goggles | high | Legendary {0} mana ability + replacement: "when you tap it for {R} to cast an instant/sorcery, copy that spell once". Needs cast-time mana-source tracking + spell-copy hook keyed off that source. |
+| 12 | Searing Blaze | low | Landfall-gated dual damage (player + creature) on an instant; landfall trigger exists, but "if landfall, do X else do Y" alternative-mode template on instants is absent. |
 
 ## How to update this doc
 
