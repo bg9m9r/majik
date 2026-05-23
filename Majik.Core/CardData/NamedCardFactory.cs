@@ -114,6 +114,14 @@ public static class NamedCardFactory
             // player's library" deferred.
             "Mishra's Bauble" => MishrasBaubleFactory.Create(owner),
 
+            // Land — Mishra's Workshop (Antiquities, MishrasWorkshopFactory).
+            // Printed: "{T}: Add {C}{C}{C}. Spend this mana only to cast
+            // artifact spells." v1 ships the 3-colourless tap ability;
+            // the "spend only on artifact spells" restriction is
+            // structural-only — enforcement deferred until a per-mana
+            // provenance ledger exists (CR 106.4). See factory xmldoc.
+            "Mishra's Workshop" => MishrasWorkshopFactory.Create(owner),
+
             // Enchantment — {1}{R} (GoblinBombardmentFactory).
             // Sacrifice a creature: This enchantment deals 1 damage to any
             // target — wired. The shell uses Create(owner) (no pre-bound
