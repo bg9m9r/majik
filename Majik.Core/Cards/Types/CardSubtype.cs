@@ -66,6 +66,8 @@ public enum CardSubtype
     Monkey,
     /// <summary>Pirate creature subtype — Ragavan, Nimble Pilferer; Captain Lannery Storm. CR 205.3m.</summary>
     Pirate,
+    /// <summary>Scout creature subtype — Tireless Tracker, Joraga Treespeaker. CR 205.3m.</summary>
+    Scout,
 
     // Land subtypes (examples)
     Forest,
