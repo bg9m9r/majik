@@ -938,6 +938,24 @@ public static class NamedCardFactory
             // boost / bus-driven combat-damage trigger wiring.
             "Umezawa's Jitte" => UmezawasJitteFactory.Create(owner),
 
+            // Artifact — Equipment {3} (SwordOfFireAndIceFactory). Darksteel.
+            // Static "+2/+2 and has protection from red and from blue" — the
+            // boost ships via AttachedBoostEffect (Layer 7c); protection-from-
+            // colour rides as two ProtectionAbility markers on the equipment
+            // card itself (full DEBT-A enforcement deferred — no attachment-
+            // aware Layer 6 grant for protection yet). Combat-damage-to-a-
+            // player trigger (CR 510 / CR 603.1) deals 2 damage to any target
+            // + draws a card — TargetRequest("any target") attached for shape;
+            // damage no-ops without a chosen target while the paired draw
+            // still resolves (CR 608.2b "do as much as possible"). Equip {2}
+            // activated ability wired (sorcery-speed restriction + attach-
+            // target prompt deferred — same gaps as the Colossus Hammer /
+            // Skullclamp equipment cycle). Single-arg dispatcher path
+            // produces the correct card shape only; use the (owner,
+            // continuousEffects, triggers) overload for live boost +
+            // bus-driven trigger firing.
+            "Sword of Fire and Ice" => SwordOfFireAndIceFactory.Create(owner),
+
             // Legendary Land — Phyrexian Tower (PhyrexianTowerFactory).
             // {T}: Add {C} and {T}, Sacrifice a creature: Add {B}{B} — wired.
             // The sacrifice cost uses SacrificeAnotherCreatureCost; callers can
