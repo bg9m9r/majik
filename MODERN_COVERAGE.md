@@ -3,13 +3,13 @@
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
 **Last updated:** 2026-05-23
-**Latest origin/main:** `3a16c24` — Splinter Twin on top of Pyromancer's Goggles + Plague Engineer + Manabarbs + Sythis, Harvest's Hand + Yawgmoth's Will + Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere. Top 20 list refreshed (round 2).
+**Latest origin/main:** Daze (bounce-Island pitch + counter-unless-pay-1) on top of Ponder + Preordain + Splinter Twin + Sythis, Harvest's Hand + Pyromancer's Goggles + Plague Engineer + Manabarbs + Yawgmoth's Will + Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere.
 
 ## Headline numbers
 
 | Metric | Count |
 |---|---|
-| Named factories | 118 |
+| Named factories | 119 |
 | Bespoke templates | 27 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
@@ -46,6 +46,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Cryptic Command | Instant | #191 | modal choose-2 |
 | Damping Sphere | Artifact | #257 | {2} — symmetric land-mana cap to {C} on ≥2-mana taps (DampingSphereCappedManaAbility) + per-spell +{1} for each prior spell this turn (SpellCostIncreaseAbility scanned via CostReduction.GetEffectiveCost). Live-wiring of ManaPaymentResolver / SpellCastFlow / TurnDriver deferred — semantics locked via helpers + tests |
 | Dark Confidant | Creature | #178 | upkeep reveal + life loss |
+| Daze | Instant | TBD | bounce-Island pitch alt cost + counter target spell unless its controller pays {1} (CR 118.9 / 118.4) |
 | Dauthi Voidwalker | Creature | TBD | Shadow + opponent-grave→exile-with-void-counter replacement + {2},{T},remove counter: cast-for-free from exile |
 | Death's Shadow | Creature | TBD | Layer 7a CDA P/T scaled by controller life |
 | Delighted Halfling | Creature | — | any-color mana ability |
