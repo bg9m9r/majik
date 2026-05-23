@@ -3,13 +3,13 @@
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
 **Last updated:** 2026-05-23
-**Latest origin/main:** Daze (bounce-Island pitch + counter-unless-pay-1) on top of Ponder + Preordain + Splinter Twin + Sythis, Harvest's Hand + Pyromancer's Goggles + Plague Engineer + Manabarbs + Yawgmoth's Will + Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere.
+**Latest origin/main:** Swords to Plowshares on top of Mystical Tutor + Path to Exile + Daze (bounce-Island pitch + counter-unless-pay-1) + Ponder + Preordain + Splinter Twin + Sythis, Harvest's Hand + Pyromancer's Goggles + Plague Engineer + Manabarbs + Yawgmoth's Will + Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere.
 
 ## Headline numbers
 
 | Metric | Count |
 |---|---|
-| Named factories | 119 |
+| Named factories | 120 |
 | Bespoke templates | 27 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
@@ -118,6 +118,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Subtlety | Creature | TBD | evoke pitch + ETB bounce + look-and-bottom |
 | Sunbaked Canyon | Land | — | pay-1-life R/W + sac-draw |
 | Surgical Extraction | Instant | #192 | phyrexian global name exile |
+| Swords to Plowshares | Instant | TBD | Instant {W} — exile target creature; its controller gains life equal to its (live Compute) power; power floored at zero |
 | Sylvan Scrying | Sorcery | TBD | any-land tutor to hand (Tron enabler) |
 | Sythis, Harvest's Hand | Creature | TBD | Legendary Nymph 1/2 {G}{W} — Constellation: enchantment-ETB-under-controller → gain 1 life + draw 1 (covers plain enchantments AND Auras via CardType.Enchantment predicate) |
 | Tarmogoyf | Creature | #173 | CDA P/T from grave types |
@@ -353,7 +354,7 @@ Sorted roughly by build priority (small infra lift × high meta share). Refreshe
 | 2 | Brainstorm | low | Instant {U} — draw 3, put 2 back in any order. Existing `LookAtTopPutKInHand` doesn't cover the post-draw-replace shape; needs draw-then-return-N-to-top template. |
 | ~~3~~ | ~~Preordain~~ | ~~low~~ | Shipped via `PreordainFactory` — scry 2 + draw 1 (delegates to standard `ScryAction` pipeline). The `LibrarySpellFactory.ScryNSpell` tail-detection path covers the same shape via the data-driven binder. |
 | ~~4~~ | ~~Mystical Tutor~~ | ~~low~~ | Shipped via `MysticalTutorFactory` — Instant {U}, predicate filters library to `CardType.Instant`/`Sorcery`, agent-driven pick (deterministic first-match fallback) inserted at library index 0 via `IZone.InsertCardAt`. Shuffle deferred (no `IZone.Shuffle` entry point yet — same rationale as the rest of `SearchSpellFactory`). |
-| 5 | Swords to Plowshares | low | Instant {W} — exile target creature, controller gains life equal to its power. ExileCreature + life-gain-by-power primitive missing the "by power" variable. |
+| ~~5~~ | ~~Swords to Plowshares~~ | ~~low~~ | Shipped via `SwordsToPlowsharesFactory` — exile target creature + lifegain by power read via `Creature.Power` (live `Compute` feeds through). Snapshot before zone move (CR 112.7a); negative power floors to zero (CR 119.3); illegal-target → no-op (CR 608.2b). |
 | 6 | Spell Queller | medium | Flash creature: ETB exile target spell mv ≤ 4; LTB return the exiled card to owner's hand (or cast it for free per current oracle). Needs paired ETB-exile-from-stack + LTB-return primitive with a tracked exile zone. |
 | 8 | Sun Titan | medium | ETB + attacks trigger — return permanent mv ≤ 3 from graveyard to battlefield. Reanimation primitive exists (Priest of Fell Rites); needs attack-trigger + mv-3-permanent filter. |
 | 9 | Skullclamp | medium | Equipment {1}: +1/-1 + equipped-dies → draw 2. Needs the dies-trigger keyed to a different permanent (the equipped creature, not Skullclamp itself); ties to equipment-lifecycle which Sigarda's Aid + Puresteel Paladin already exercise. |
