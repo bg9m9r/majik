@@ -1521,6 +1521,17 @@ public static class NamedCardFactory
             // is deferred — no Adventure cast surface in the engine yet.
             "Bonecrusher Giant" => BonecrusherGiantFactory.Create(owner),
 
+            // Creature — Human Knight {1}{R} 2/1 (EmberethShieldbreakerFactory).
+            // Throne of Eldraine Adventure card. v1 ships the vanilla
+            // creature side (no printed keywords / triggers) + a Battle
+            // Display helper exposed via
+            // EmberethShieldbreakerFactory.BuildAdventureSpell that returns
+            // a destroy-target-artifact SpellDefinition (CR 701.7). The
+            // Adventure cast-from-hand-to-exile pipeline (CR 715) is
+            // deferred — same gap as BonecrusherGiantFactory /
+            // MurderousRiderFactory.
+            "Embereth Shieldbreaker" => EmberethShieldbreakerFactory.Create(owner),
+
             // Instant — {U} (SpellSnareFactory). Coldsnap.
             // "Counter target spell with mana value 2." Card shape only
             // here; the resolve-time SpellDefinition is built on demand via
