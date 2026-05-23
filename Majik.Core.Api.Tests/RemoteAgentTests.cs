@@ -45,6 +45,57 @@ public class RemoteAgentTests
     }
 
     [Fact]
+    public async Task CastSpell_Submitted_ResolvesToActionWithEmptyTargets()
+    {
+        // Portal hand-click sends CastSpellCommand with empty targets/X/mode.
+        // RemoteAgent must resolve that to PriorityAction.CastSpell so the
+        // engine's cast dispatcher (TurnDriver -> SpellCastFlow) can then
+        // prompt the agent for ChooseTargets / ChooseX / ChooseMode in
+        // separate envelopes (CR 601.2b/c/d).
+        var bolt = new Instant("Lightning Bolt", "R") { Owner = _alice };
+        var agent = new RemoteAgent(_alice, cardLookup: id => id == bolt.InstanceId ? bolt : null);
+        var ctx = NewContext();
+
+        var task = agent.ChoosePriorityActionAsync(ctx);
+        agent.Submit(new CastSpellCommand(
+            CardInstanceId: bolt.InstanceId,
+            TargetInstanceIds: Array.Empty<Guid>(),
+            XValue: null,
+            ModeIndex: null) { PlayerId = _alice.Id });
+
+        var action = await task;
+        var cast = action.Should().BeOfType<PriorityAction.CastSpell>().Subject;
+        cast.Card.Should().BeSameAs(bolt);
+        cast.Targets.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task CastSpell_Submitted_WithPrechosenTargets_PreservesThem()
+    {
+        // Optional path: a client could pre-resolve targets at the cast
+        // command. We don't currently rely on this (SpellCastFlow re-prompts
+        // anyway), but the resolution must still produce a valid action so
+        // future "smart bot" agents that pre-plan targets aren't blocked.
+        var bolt = new Instant("Lightning Bolt", "R") { Owner = _alice };
+        var goblin = new Creature("Goblin", "R", 1, 1) { Owner = _alice };
+        var agent = new RemoteAgent(_alice, cardLookup: id =>
+            id == bolt.InstanceId ? bolt : id == goblin.InstanceId ? goblin : null);
+        var ctx = NewContext();
+
+        var task = agent.ChoosePriorityActionAsync(ctx);
+        agent.Submit(new CastSpellCommand(
+            CardInstanceId: bolt.InstanceId,
+            TargetInstanceIds: new[] { goblin.InstanceId },
+            XValue: null,
+            ModeIndex: null) { PlayerId = _alice.Id });
+
+        var action = await task;
+        var cast = action.Should().BeOfType<PriorityAction.CastSpell>().Subject;
+        cast.Card.Should().BeSameAs(bolt);
+        cast.Targets.Should().ContainSingle().Which.Should().BeSameAs(goblin);
+    }
+
+    [Fact]
     public async Task Submit_WrongPlayer_Throws()
     {
         var agent = new RemoteAgent(_alice);

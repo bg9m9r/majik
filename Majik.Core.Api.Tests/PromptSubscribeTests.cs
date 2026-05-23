@@ -42,6 +42,24 @@ public class PromptSubscribeTests
     }
 
     [Fact]
+    public async Task SubscribePrompts_PriorityPromptAdvertisesCastSpellCommand()
+    {
+        // Defence in depth: hand-click cast on the portal sends a
+        // CastSpellCommand. The first prompt the facade ships when priority
+        // opens must include CastSpellCommand in ExpectedKinds, otherwise
+        // the client has no way to know that path is valid AND the bridge
+        // ends up dropping the only chance to cast.
+        var facade = GameFacade.Create("Alice", "Bob", Array.Empty<ICard>(), Array.Empty<ICard>());
+        var prompts = new List<PromptDto>();
+        using var subscription = facade.SubscribePrompts(prompts.Add);
+
+        await facade.StartAsync();
+
+        prompts.Should().NotBeEmpty();
+        prompts[0].ExpectedKinds.Should().Contain(nameof(CastSpellCommand));
+    }
+
+    [Fact]
     public async Task SubscribePrompts_NextPromptFiresAfterCommandSubmitted()
     {
         var facade = GameFacade.Create("Alice", "Bob", Array.Empty<ICard>(), Array.Empty<ICard>());

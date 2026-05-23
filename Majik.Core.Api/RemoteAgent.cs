@@ -87,6 +87,24 @@ public sealed class RemoteAgent : IPlayerAgent
                 var land = ResolveCard(pl.LandInstanceId);
                 ((TaskCompletionSource<PriorityAction>)tcs).SetResult(new PriorityAction.PlayLand(land));
                 break;
+            case CastSpellCommand cs:
+                // Resolve the card from any zone (hand is the typical case;
+                // graveyard for flashback etc.). TargetInstanceIds / XValue /
+                // ModeIndex carried in the priority command are NOT consumed
+                // by the engine here — SpellCastFlow prompts the agent for
+                // those choices via ChooseTargetsAsync / ChooseXAsync /
+                // ChooseModeAsync as a separate envelope (CR 601.2b/c/d).
+                // Surface them as PriorityAction.CastSpell.Targets anyway so
+                // a future opt-in path that pre-resolves targets (kept for
+                // bot agents that already build full plans) can use the
+                // metadata if needed.
+                var card = ResolveCard(cs.CardInstanceId);
+                var resolvedTargets = cs.TargetInstanceIds.Count == 0
+                    ? (IReadOnlyList<object>)Array.Empty<object>()
+                    : cs.TargetInstanceIds.Select(id => (object)ResolveCard(id)).ToList();
+                ((TaskCompletionSource<PriorityAction>)tcs).SetResult(
+                    new PriorityAction.CastSpell(card, resolvedTargets));
+                break;
             case MulliganCommand m:
                 ((TaskCompletionSource<MulliganDecision>)tcs).SetResult(
                     m.Keep ? MulliganDecision.Keep : MulliganDecision.Mulligan);
