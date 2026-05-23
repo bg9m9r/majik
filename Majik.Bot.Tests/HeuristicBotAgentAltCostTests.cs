@@ -111,4 +111,101 @@ public class HeuristicBotAgentAltCostTests
         public IEnumerable<IAlternativeCost> CandidatesFor(ICard card, Player caster, GameContext ctx)
             => _lookup(card);
     }
+
+    /// <summary>
+    /// Snapcaster-Mage path: bot uses <see cref="RuntimeFlashbackAltCostProbe"/>
+    /// to spot a graveyard card carrying <see cref="Card.RuntimeFlashbackCost"/>
+    /// (set by Snapcaster's ETB) and bid it as a flashback cast at the
+    /// stamped cost. Lightning Bolt is the canonical Snapcaster target:
+    /// printed {R}, granted flashback cost = its mana cost ({R}).
+    /// </summary>
+    [Fact]
+    public async Task ElectsFlashback_WhenRuntimeFlashbackCostGranted_FromGraveyard()
+    {
+        var bolt = new Instant("Lightning Bolt", "R");
+        bolt.ChangeOwner(_alice);
+        _alice.Zones.Graveyard.AddCard(bolt);
+
+        // Snapcaster Mage's ETB normally stamps this — short-circuit the
+        // trigger and grant directly so the probe is the only thing under
+        // test.
+        bolt.GrantRuntimeFlashback(ManaCost.Parse("R"));
+
+        // {R} source so the bid is affordable.
+        var mountain = (Land)NamedCardFactory.Create("Mountain", _alice);
+        _alice.Zones.Battlefield.AddCard(mountain);
+
+        var bot = new HeuristicBotAgent(new RuntimeFlashbackAltCostProbe());
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice,
+            1, PhaseStateType.Main, new Majik.Core.Stack.Stack());
+
+        var action = await bot.ChoosePriorityActionAsync(ctx);
+
+        var cast = action.Should().BeOfType<PriorityAction.CastSpell>().Subject;
+        cast.Card.Should().BeSameAs(bolt);
+        cast.AlternativeCost.Should().BeOfType<FlashbackAlternativeCost>();
+        cast.AlternativeCost!.AlternativeManaCost.Should().Be(ManaCost.Parse("R"));
+    }
+
+    /// <summary>
+    /// Regression — without a runtime grant, the same Bolt in the graveyard
+    /// is NOT castable. The probe must yield zero candidates so the bot
+    /// doesn't bid a printed-cost cast from the graveyard (which is
+    /// illegal — there's no flashback on Lightning Bolt's printed text).
+    /// Expected outcome: the bot passes priority.
+    /// </summary>
+    [Fact]
+    public async Task DoesNotElectFlashback_WhenNoRuntimeGrant_OnGraveyardCard()
+    {
+        var bolt = new Instant("Lightning Bolt", "R");
+        bolt.ChangeOwner(_alice);
+        _alice.Zones.Graveyard.AddCard(bolt);
+        // Deliberately NO RuntimeFlashbackCost grant.
+
+        var mountain = (Land)NamedCardFactory.Create("Mountain", _alice);
+        _alice.Zones.Battlefield.AddCard(mountain);
+
+        var bot = new HeuristicBotAgent(new RuntimeFlashbackAltCostProbe());
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice,
+            1, PhaseStateType.Main, new Majik.Core.Stack.Stack());
+
+        var action = await bot.ChoosePriorityActionAsync(ctx);
+
+        // No alt cost bid; no other castable spell in hand → bot passes.
+        action.Should().Be(PriorityAction.Pass);
+    }
+
+    /// <summary>
+    /// End-to-end: even when the Bolt is also held in hand (so a printed-cost
+    /// bid would normally win), a runtime grant on the GRAVEYARD copy must
+    /// still surface as a flashback candidate for the yard card. Verifies
+    /// the probe doesn't accidentally suppress emission when other copies of
+    /// the same card name exist elsewhere — the probe keys on the card
+    /// instance's flag, not the name.
+    /// </summary>
+    [Fact]
+    public async Task RuntimeFlashbackProbe_KeysOnInstance_NotName()
+    {
+        var boltInYard = new Instant("Lightning Bolt", "R");
+        boltInYard.ChangeOwner(_alice);
+        _alice.Zones.Graveyard.AddCard(boltInYard);
+        boltInYard.GrantRuntimeFlashback(ManaCost.Parse("R"));
+
+        var probe = new RuntimeFlashbackAltCostProbe();
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice,
+            1, PhaseStateType.Main, new Majik.Core.Stack.Stack());
+
+        var grantedCandidates = probe.CandidatesFor(boltInYard, _alice, ctx).ToList();
+        grantedCandidates.Should().ContainSingle().Which
+            .Should().BeOfType<FlashbackAlternativeCost>()
+            .Which.AlternativeManaCost.Should().Be(ManaCost.Parse("R"));
+
+        // Another Bolt instance with NO grant — probe yields nothing for it
+        // even though it shares the same name.
+        var ungrantedBolt = new Instant("Lightning Bolt", "R");
+        ungrantedBolt.ChangeOwner(_alice);
+        _alice.Zones.Graveyard.AddCard(ungrantedBolt);
+
+        probe.CandidatesFor(ungrantedBolt, _alice, ctx).Should().BeEmpty();
+    }
 }
