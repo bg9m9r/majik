@@ -1997,6 +1997,19 @@ public static class NamedCardFactory
             // WishclawTalismanFactory for the control-change registration.
             "Archmage's Charm" => ArchmagesCharmFactory.Create(owner),
 
+            // Sorcery — {W} (PrismaticEndingFactory). Modern Horizons 2.
+            // "Exile target nonland permanent with mana value less than
+            //  or equal to the number of colors of mana spent to cast
+            //  Prismatic Ending." Card shape only here; the resolve-time
+            // SpellDefinition (single target-nonland-permanent request +
+            // exile gated on mv ≤ colours-spent cap) is built on demand
+            // via PrismaticEndingFactory.BuildSpellDefinition. Mana
+            // provenance ledger is DEFERRED — callers supply a
+            // Func<int> colors-spent provider; the single-arg path
+            // defaults to PrismaticEndingFactory.DefaultColorsSpent = 1
+            // (the printed {W} pip).
+            "Prismatic Ending" => PrismaticEndingFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
