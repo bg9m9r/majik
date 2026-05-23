@@ -249,6 +249,16 @@ public static class NamedCardFactory
             // Same retype machinery as Spreading Seas, no ETB draw.
             "Sea's Claim" => SeasClaimFactory.Create(owner),
 
+            // Creature — Human Wizard {1}{U} 2/1 (SnapcasterMageFactory).
+            // Flash keyword + ETB trigger that grants flashback (CR 702.33)
+            // to target instant/sorcery in controller's graveyard until EOT;
+            // granted cost = the target's printed mana cost. The single-arg
+            // dispatcher path here produces the correct card shape without
+            // bus-driven EOT-cleanup wiring (suitable for test / shape-only
+            // use). Use the (owner, eventBus) overload to enable automatic
+            // grant expiration on the next Cleanup step.
+            "Snapcaster Mage" => SnapcasterMageFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
