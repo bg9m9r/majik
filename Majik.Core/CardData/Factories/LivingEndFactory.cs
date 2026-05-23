@@ -1,7 +1,10 @@
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Domain.DomainEvents;
+using Majik.Core.Events;
 using Majik.Core.Game;
+using Majik.Core.Keywords;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
 using Majik.Core.Zones;
@@ -38,26 +41,22 @@ namespace Majik.Core.CardData.Factories;
 ///         publishes and ETB triggers fire (CR 603.6a). Without a
 ///         ZoneService the moves still happen but no events publish
 ///         (matches the fallback contract of
-///         <see cref="LibrarySpellFactory.ReanimateToBattlefieldSpell"/>
-///         and <see cref="LibrarySpellFactory.ReturnAllFromGraveyardSpell"/>).</item>
+///         <c>LibrarySpellFactory.ReanimateToBattlefieldSpell</c> and
+///         <c>LibrarySpellFactory.ReturnAllFromGraveyardSpell</c>).</item>
 /// </list>
 ///
-/// ## Cascade
+/// ## Cascade (CR 702.85)
 ///
-/// CR 702.85 — Cascade. This printed Cascade ability ("When you cast
-/// this spell, exile cards from the top of your library until you
-/// exile a nonland card with lesser mana value; you may cast it
-/// without paying its mana cost; put the exiled cards on the bottom of
-/// your library in a random order") is intentionally NOT wired here.
-/// Cascade as a keyword and its on-cast triggered ability live outside
-/// this PR — when the Cascade implementation lands, it will pick up
-/// Living End via the keyword's data-driven cast-trigger registration
-/// (or via a small additional triggered-ability wiring here at that
-/// time). For now, Living End ships with the resolve effect only and
-/// no Cascade trigger.
-///
-/// Card-shape only here; the resolve-time spell definition is built
-/// on demand via <see cref="BuildSpellDefinition"/>.
+/// The printed Cascade ability is wired here on-cast: a triggered
+/// ability over <see cref="SpellCastEvent"/> for this card invokes
+/// <see cref="CascadeAction.Cascade"/> with sourceManaValue = 5 (the
+/// printed mana value of Living End). The eligible nonland-with-MV-&lt;-5
+/// card sits in exile so the caller can drive the optional free-cast
+/// via <see cref="Costs.CastFromExileAlternativeCost"/> + <see cref="SpellCastFlow"/>
+/// (CR 702.85a — "you may cast that spell without paying its mana
+/// cost"). The trigger's active zone is <see cref="ZoneType.Stack"/>
+/// — Living End needs to be on the stack when its cast event fires.
+/// Mirrors <c>CrashingFootfallsFactory</c>.
 /// </summary>
 public static class LivingEndFactory
 {
@@ -65,17 +64,81 @@ public static class LivingEndFactory
     public const string PrintedManaCost = "{2}{B}{B}{B}";
 
     /// <summary>
-    /// Build a Living End sorcery owned by <paramref name="owner"/>.
-    /// Card shape only — see <see cref="BuildSpellDefinition"/> for the
-    /// resolve-time mass-exile + sacrifice + mass-reanimate effect.
+    /// CR 202.3 — mana value of <c>{2}{B}{B}{B}</c> = 5. Used as the
+    /// cascade source-MV cap (eligible cards have MV &lt; 5).
     /// </summary>
-    public static Sorcery Create(Player owner)
+    public const int CascadeSourceManaValue = 5;
+
+    /// <summary>
+    /// Build a Living End sorcery with no runtime services. The cascade
+    /// trigger is attached to the card's ability list for shape inspection
+    /// but is not registered with a TriggerManager. Suitable for
+    /// dispatcher / shape-only tests.
+    /// </summary>
+    public static Sorcery Create(Player owner) =>
+        Create(owner, triggers: null, willCast: null, onCascadeResolved: null);
+
+    /// <summary>
+    /// Build a Living End sorcery with optional trigger-manager wiring
+    /// and "you may cast" decision predicate for cascade.
+    /// </summary>
+    /// <param name="owner">Card owner / controller.</param>
+    /// <param name="triggers">When supplied, the cascade trigger is
+    /// registered so a <see cref="SpellCastEvent"/> for this card lands
+    /// on the stack automatically.</param>
+    /// <param name="willCast">Forwarded to <see cref="CascadeAction.Cascade"/>
+    /// — the controller's "you may" decision for the eligible card.
+    /// Default = always cast.</param>
+    /// <param name="onCascadeResolved">Optional callback invoked with the
+    /// <see cref="CascadeAction.CascadeResult"/> when the cascade trigger
+    /// resolves. Production callers use this to drive the free-cast of
+    /// <see cref="CascadeAction.CascadeResult.Eligible"/> via
+    /// <see cref="Costs.CastFromExileAlternativeCost"/> + <see cref="SpellCastFlow"/>
+    /// (CR 702.85a). Tests use it to observe trigger firing.</param>
+    public static Sorcery Create(
+        Player owner,
+        TriggerManager? triggers,
+        Func<ICard, bool>? willCast = null,
+        Action<CascadeAction.CascadeResult>? onCascadeResolved = null)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
         var card = new Sorcery(CardName, PrintedManaCost);
         card.SetOwner(owner);
         card.SetController(owner);
+
+        // CR 702.85 — Cascade. "When you cast this spell, exile cards from
+        // the top of your library until you exile a nonland card whose
+        // mana value is less than this spell's mana value …"
+        // Trigger fires off the SpellCastEvent for THIS card.
+        var cascadeCondition = new EventTriggerCondition<SpellCastEvent>(
+            (e, _) => ReferenceEquals(e.Spell.Card, card));
+
+        var cascadeEffect = new Effect(
+            "Living End — Cascade (CR 702.85)",
+            () =>
+            {
+                var result = CascadeAction.Cascade(
+                    controller: owner,
+                    sourceManaValue: CascadeSourceManaValue,
+                    willCast: willCast);
+                onCascadeResolved?.Invoke(result);
+            });
+
+        var cascadeTrigger = new TriggeredAbility(
+            source: card,
+            controller: owner,
+            condition: cascadeCondition,
+            effects: new IEffect[] { cascadeEffect },
+            // Cascade fires while the spell is on the stack (the cast
+            // event is published as the spell moves to the stack), so the
+            // ability needs to be active in the Stack zone — mirrors
+            // CrashingFootfallsFactory.
+            activeZones: new[] { ZoneType.Stack });
+
+        card.AddAbility(cascadeTrigger);
+        triggers?.RegisterTriggeredAbility(cascadeTrigger);
+
         return card;
     }
 

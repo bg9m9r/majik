@@ -6,6 +6,7 @@ using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Events;
 using Majik.Core.Game;
+using Majik.Core.Keywords;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
 using Majik.Core.Services;
@@ -29,9 +30,8 @@ namespace Majik.Core.Tests.CardData;
 ///     plumbing — ZoneService publishes CardMovedEvent for each move).
 ///   - Empty graveyard on one side: only sac happens for that player.
 ///   - No creatures anywhere: no-op (no exceptions, no state change).
-///
-/// Cascade (CR 702.85) is intentionally NOT exercised here — that
-/// keyword/trigger is not in this PR.
+///   - Cascade (CR 702.85) trigger fires on cast and routes through
+///     <see cref="CascadeAction.Cascade"/> with sourceManaValue = 5.
 /// </summary>
 public class LivingEndTests
 {
@@ -74,6 +74,92 @@ public class LivingEndTests
         card.Name.Should().Be("Living End");
         card.HasType(CardType.Sorcery).Should().BeTrue();
         card.Owner.Should().BeSameAs(_alice);
+    }
+
+    // -----------------------------------------------------------------------
+    // Cascade trigger (CR 702.85)
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void LivingEnd_PrintsOneCascadeTriggeredAbility()
+    {
+        var card = LivingEndFactory.Create(_alice);
+
+        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1,
+            "Living End prints one triggered ability — Cascade.");
+    }
+
+    [Fact]
+    public void Cascade_ExilesUntilNonlandWithLowerMV_AndKeepsEligibleInExile()
+    {
+        // Library top → bottom: Mountain, Forest, Lava Spike ({R}, MV 1),
+        // Big Spell ({5}, MV 5 = NOT eligible, must be MV < 5).
+        // Cascade walks: Mountain (land → skip), Forest (land → skip),
+        // Lava Spike (nonland, MV 1 < 5 → eligible, stop).
+        var mountain = NamedCardFactory.Create("Mountain", _alice);
+        var forest = NamedCardFactory.Create("Forest", _alice);
+        var spike = new Sorcery("Lava Spike", "{R}") { Owner = _alice };
+        spike.SetOwner(_alice);
+        foreach (var c in new ICard[] { mountain, forest, spike })
+        {
+            _alice.Zones.Library.AddCard(c);
+            c.SetZone(ZoneType.Library);
+        }
+
+        CascadeAction.CascadeResult? captured = null;
+        var card = LivingEndFactory.Create(
+            _alice,
+            triggers: null,
+            willCast: _ => true,
+            onCascadeResolved: r => captured = r);
+
+        var cascadeTrigger = card.Abilities.OfType<TriggeredAbility>().Single();
+        foreach (var e in cascadeTrigger.Effects) e.Execute();
+
+        captured.Should().NotBeNull();
+        captured!.Eligible.Should().BeSameAs(spike);
+        captured.Exiled.Should().Equal(new ICard[] { mountain, forest, spike });
+        // The two lands are bottomed in random order; the eligible spike
+        // stays in exile awaiting CastFromExileAlternativeCost.
+        captured.Bottomed.Should().BeEquivalentTo(new ICard[] { mountain, forest });
+        spike.Zone.Should().Be(ZoneType.Exile);
+        mountain.Zone.Should().Be(ZoneType.Library);
+        forest.Zone.Should().Be(ZoneType.Library);
+    }
+
+    [Fact]
+    public void Cascade_NoEligibleCard_BottomsEverything()
+    {
+        // Library has only lands + a heavy spell at exactly MV 5 (NOT < 5).
+        // Cascade finds nothing eligible (MV must be strictly less than 5).
+        var m = NamedCardFactory.Create("Mountain", _alice);
+        var heavy = new Sorcery("Big Spell", "{5}") { Owner = _alice };
+        heavy.SetOwner(_alice);
+
+        foreach (var c in new ICard[] { m, heavy })
+        {
+            _alice.Zones.Library.AddCard(c);
+            c.SetZone(ZoneType.Library);
+        }
+
+        CascadeAction.CascadeResult? captured = null;
+        var card = LivingEndFactory.Create(
+            _alice,
+            triggers: null,
+            willCast: _ => true,
+            onCascadeResolved: r => captured = r);
+
+        var cascadeTrigger = card.Abilities.OfType<TriggeredAbility>().Single();
+        foreach (var e in cascadeTrigger.Effects) e.Execute();
+
+        // Heavy has MV 5 == sourceManaValue, so NOT eligible (CR 702.85a —
+        // "less than"). Mountain is a land → skip. Library exhausts with
+        // no eligible card; both bottom.
+        captured.Should().NotBeNull();
+        captured!.Eligible.Should().BeNull();
+        captured.Bottomed.Should().BeEquivalentTo(new ICard[] { m, heavy });
+        m.Zone.Should().Be(ZoneType.Library);
+        heavy.Zone.Should().Be(ZoneType.Library);
     }
 
     // -----------------------------------------------------------------------

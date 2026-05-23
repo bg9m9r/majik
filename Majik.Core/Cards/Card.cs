@@ -104,6 +104,36 @@ public class Card : ICard
     }
 
     /// <summary>
+    /// CR 118.9 — runtime "may cast from graveyard" grant. Used by static
+    /// abilities such as Lurrus of the Dream-Den that allow casting a
+    /// permanent card from the graveyard for its printed mana cost. When
+    /// non-null, the card may be cast from the graveyard via a
+    /// <see cref="Majik.Core.Costs.GraveyardCastAlternativeCost"/> built
+    /// from this cost. Unlike <see cref="RuntimeFlashbackCost"/>, the
+    /// resolved card returns to its default destination (battlefield for
+    /// permanents) — there is no post-resolution exile.
+    /// </summary>
+    public ValueObjects.ManaCost? RuntimeGraveyardCastCost { get; private set; }
+
+    /// <summary>
+    /// Stamp a graveyard-cast grant on this card. Used by Lurrus of the
+    /// Dream-Den's static ability while it is on the battlefield, scoped
+    /// to permanent cards in its controller's graveyard with mana value
+    /// 2 or less. Idempotent — later grants overwrite earlier ones.
+    /// </summary>
+    public void GrantRuntimeGraveyardCast(ValueObjects.ManaCost cost)
+    {
+        if (cost == null) throw new ArgumentNullException(nameof(cost));
+        RuntimeGraveyardCastCost = cost;
+    }
+
+    /// <summary>Clear any runtime graveyard-cast grant on this card.</summary>
+    public void ClearRuntimeGraveyardCast()
+    {
+        RuntimeGraveyardCastCost = null;
+    }
+
+    /// <summary>
     /// CR 702.66 — when this card was cast paying delve, the number of cards
     /// that were exiled from its caster's graveyard as part of the delve
     /// payment. Set by <see cref="Majik.Core.Game.SpellCastFlow"/> right after

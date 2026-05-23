@@ -650,6 +650,18 @@ public static class NamedCardFactory
             // of SearchSpellFactory).
             "Sylvan Scrying" => SylvanScryingFactory.Create(owner),
 
+            // Sorcery — {1}{R}{G}{W} (CrashingFootfallsFactory). Modern Horizons.
+            // CR 702.85 — Cascade. On-cast triggered ability fires
+            // CascadeAction.Cascade with sourceManaValue = 4 (exile from top
+            // until a nonland with MV < 4 is found, bottom the rest in random
+            // order, leave the eligible card in exile so the caller can drive
+            // a CastFromExileAlternativeCost cast). Resolve effect creates
+            // two 4/4 green Rhino Warrior creature tokens with Trample. The
+            // single-arg dispatcher path attaches the trigger to the card
+            // shape without TriggerManager wiring; use the (owner, triggers,
+            // willCast, onCascadeResolved) overload to drive the free cast.
+            "Crashing Footfalls" => CrashingFootfallsFactory.Create(owner),
+
             // Creature — Giant {4}{G}{G} 6/6 (PrimevalTitanFactory).
             // Trample keyword wired. ETB + attack triggered abilities both
             // tutor up to two lands → battlefield tapped (CR 603.1, CR
@@ -689,11 +701,40 @@ public static class NamedCardFactory
             // Card shape only here; the resolve-time SpellDefinition is
             // built on demand via LivingEndFactory.BuildSpellDefinition,
             // which routes each reanimate move through ZoneService so ETB
-            // triggers fire on every reanimated permanent (CR 603.6a /
-            // PR #165, #174 plumbing). Cascade (CR 702.85) is NOT wired
-            // here — it will pick up Living End via the keyword's on-cast
-            // trigger when the Cascade implementation lands.
+            // triggers fire on every reanimated permanent (CR 603.6a —
+            // PR #165, #174 plumbing). The single-arg dispatcher path
+            // attaches the Cascade (CR 702.85) on-cast trigger for shape
+            // inspection but does not register it with a TriggerManager;
+            // use the LivingEndFactory.Create(owner, triggers, willCast,
+            // onCascadeResolved) overload for fully-wired bus firing
+            // (mirrors CrashingFootfallsFactory).
             "Living End" => LivingEndFactory.Create(owner),
+
+            // Legendary Creature — Cat Nightmare {W}{B} 3/2 (LurrusOfTheDreamDenFactory).
+            // Lifelink keyword wired. Static ability surfaced with description
+            // "During each of your turns, you may cast one permanent spell
+            // with mana value 2 or less from your graveyard." Companion deck-
+            // construction rule (CR 702.139) deferred — that is a deck-builder
+            // foundational concern, not a runtime gameplay one. The runtime
+            // grave-cast gate (per-turn budget, mv ≤ 2, permanent-only,
+            // controller's-turn-only) is exposed via
+            // LurrusOfTheDreamDenFactory.GetGate(card); callers compose it
+            // with a GraveyardCastAlternativeCost via BuildAlternativeCost.
+            // The single-arg dispatcher path here produces the correct card
+            // shape without bus-driven turn-boundary reset wiring (suitable
+            // for shape tests). Use the (owner, eventBus) overload to enable
+            // automatic per-turn budget reset on TurnStartedEvent.
+            "Lurrus of the Dream-Den" => LurrusOfTheDreamDenFactory.Create(owner),
+
+            // Artifact — Equipment {1} (ColossusHammerFactory).
+            // Static "equipped creature gets +10/+0 and loses flying" via
+            // AttachedBoostEffect (Layer 7c) + LoseKeywordEffect("Flying")
+            // (Layer 6). Equip {8} activated ability wired (sorcery-speed
+            // restriction enforced via action-validator, deferred at this
+            // ability level). The single-arg dispatcher path produces the
+            // correct card shape only; use the (owner, continuousEffects)
+            // overload for live boost / lose-flying registration.
+            "Colossus Hammer" => ColossusHammerFactory.Create(owner),
 
             _ => new Card(name, ""),
         };
