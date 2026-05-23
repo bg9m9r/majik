@@ -766,6 +766,24 @@ public static class NamedCardFactory
             // (CR 107.4c).
             "Cabal Ritual" => CabalRitualFactory.Create(owner),
 
+            // Instant — {B} (DarkRitualFactory). Alpha and many reprints.
+            // "Add {B}{B}{B}." Card shape only here; the resolve effect is
+            // built on demand via DarkRitualFactory.BuildResolveEffect and
+            // splices into a SpellDefinition.EffectFactory. Sibling of
+            // Cabal Ritual minus the threshold clause.
+            "Dark Ritual" => DarkRitualFactory.Create(owner),
+
+            // Artifact — {0} (LotusPetalFactory). Tempest and many reprints.
+            // "{T}, Sacrifice Lotus Petal: Add one mana of any color."
+            // Five ManaAbility instances (one per WUBRG), each gated on
+            // !IsTapped + Zone == Battlefield and carrying an inline
+            // additionalCostPayer that performs the CR 701.16 sacrifice
+            // (controller's battlefield → owner's graveyard). CR 605.1 —
+            // the activation remains a mana ability (no stack). Modal
+            // single-ability "any colour" shape deferred (same gap as
+            // Mox Opal / Delighted Halfling / City of Brass).
+            "Lotus Petal" => LotusPetalFactory.Create(owner),
+
             // Creature — Human Cleric {W}{B} 2/1 (PriestOfFellRitesFactory).
             // ETB triggered ability: reanimate target creature card with
             // mana value 3 or less from controller's graveyard
