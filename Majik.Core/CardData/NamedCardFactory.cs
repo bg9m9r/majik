@@ -329,6 +329,18 @@ public static class NamedCardFactory
             // Falls / Elegant Parlor surveil-lands.
             "Library Surveyor" => LibrarySurveyorFactory.Create(owner),
 
+            // Creature — Bird Advisor {1}{U} 1/3 (LedgerShredderFactory).
+            // Flying keyword wired. Two triggered abilities surfaced on the
+            // card for shape: (1) "whenever you cast the second spell each
+            // turn, surveil 1" — predicate increments a per-turn closure
+            // counter and matches on the exact 2nd cast; (2) "whenever
+            // Ledger Shredder surveils, put a +1/+1 counter on it" — chained
+            // inline off trigger 1's effect (no SurveilEvent on the bus yet).
+            // The single-arg dispatcher path here produces the correct card
+            // shape without bus-driven turn reset or trigger-manager wiring.
+            // Use the (owner, bus, triggers) overload for fully-wired behavior.
+            "Ledger Shredder" => LedgerShredderFactory.Create(owner),
+
             // Creature — Human Rogue {1}{U} 1/1 (TestConniverFactory).
             // Synthetic Connive keyword fixture. ETB: connive (CR 701.50).
             // Draws + discards + +1/+1 counter if nonland was discarded.
