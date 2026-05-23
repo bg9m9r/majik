@@ -3,13 +3,13 @@
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
 **Last updated:** 2026-05-23
-**Latest origin/main:** Sword of Feast and Famine (Artifact Equipment {3} — `AttachedBoostEffect(+2,+2)` at Layer 7c + two `AttachedAuraAbilityGrantStaticEffect` lifecycles granting `ProtectionAbility("black")` + `ProtectionAbility("green")` to the equipped creature so `Rules.Protection.HasProtectionFromColor` surfaces CR 702.16 on the bearer; combat-damage-to-a-player trigger has damaged player discard a card (v1 first-card-in-hand pick) + untaps every `Land` the Sword's controller controls (CR 510 / 603.1 / 701.16a / 701.20); Equip {2}) on top of Boros Reckoner + Mishra's Workshop + Goblin Welder + Sword of Fire and Ice + Reckless Charge + Trinket Mage + Sun Titan + Sensei's Divining Top + Inkmoth Nexus + Spell Queller + Goblin Matron + Mutavault + Skullclamp + Umezawa's Jitte + Wasteland + Swords to Plowshares + Mystical Tutor + Path to Exile + Daze + Ponder + Preordain + Splinter Twin + Sythis, Harvest's Hand + Pyromancer's Goggles + Plague Engineer + Manabarbs + Yawgmoth's Will + Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere.
+**Latest origin/main:** Lightning Helix (Instant {R}{W} — 3 damage to any target + controller gains 3 life; single any-target request; Planeswalker damage routed via shared `SearingBlazeFactory.DealDamageWithPlaneswalker`) on top of Sword of Feast and Famine + Boros Reckoner + Mishra's Workshop + Goblin Welder + Sword of Fire and Ice + Reckless Charge + Trinket Mage + Sun Titan + Sensei's Divining Top + Inkmoth Nexus + Spell Queller + Goblin Matron + Mutavault + Skullclamp + Umezawa's Jitte + Wasteland + Swords to Plowshares + Mystical Tutor + Path to Exile + Daze + Ponder + Preordain + Splinter Twin + Sythis, Harvest's Hand + Pyromancer's Goggles + Plague Engineer + Manabarbs + Yawgmoth's Will + Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere.
 
 ## Headline numbers
 
 | Metric | Count |
 |---|---|
-| Named factories | 131 |
+| Named factories | 132 |
 | Bespoke templates | 27 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
@@ -81,6 +81,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Lazotep Recruit | Creature | — | amass-keyword shell |
 | Ledger Shredder | Creature | #193 | second-spell surveil + counter |
 | Library Surveyor | Creature | — | ETB tutor shell |
+| Lightning Helix | Instant | TBD | {R}{W} — 3 damage to any target (Player / Creature / Planeswalker via shared `SearingBlazeFactory.DealDamageWithPlaneswalker`) + controller gains 3 life; single any-target request |
 | Liliana of the Veil | Planeswalker | #178 | +1 discard, -2 discard |
 | Living End | Sorcery | TBD | Cascade + each-player mass-exile-grave + sac-creatures + mass-reanimate |
 | Lurrus of the Dream-Den | Creature | TBD | Lifelink + cast-permanent-mv≤2-from-graveyard once per your turn (companion deck-rule deferred) |
@@ -346,7 +347,7 @@ Per-keyword action helpers under `Majik.Core/Keywords/`:
 
 ## Coverage by archetype
 
-- **Burn** — Strong. Lightning Bolt, Lava Spike, Lava Dart, Skewer the Critics, Boros Charm, Eidolon of the Great Revel, Goblin Guide, Monastery Swiftspear, Rift Bolt, Searing Blaze all in. Missing: Roiling Vortex, Sunscorched Desert. ~80%.
+- **Burn** — Strong. Lightning Bolt, Lava Spike, Lava Dart, Skewer the Critics, Boros Charm, Eidolon of the Great Revel, Goblin Guide, Monastery Swiftspear, Rift Bolt, Searing Blaze, Lightning Helix all in. Missing: Roiling Vortex, Sunscorched Desert. ~85%.
 - **Death's Shadow** — Mid-high. Thoughtseize, Fatal Push, Snapcaster Mage, Stubborn Denial, Death's Shadow itself (CDA P/T scaled by controller life — Layer 7a) all in. Mishra's Bauble in. Temur Battle Rage absent. ~60%.
 - **Murktide / Izzet Tempo** — High. Murktide Regent done, Counterspell done, Snapcaster Mage done, Lightning Bolt done, Expressive Iteration done, Ledger Shredder done, Consider done, Spell Pierce done, Subtlety done. Missing: Demilich absent. ~75%.
 - **Mono-Green Tron** — High. Ancient Stirrings, Sylvan Scrying, Wurmcoil Engine done. Karn Liberated done. Karn, the Great Creator done. Tron lands (Urza's Mine + Tower + Power-Plant) done with the conditional {2} mana ability. ~70%.
