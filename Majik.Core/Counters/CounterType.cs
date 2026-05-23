@@ -33,4 +33,13 @@ public sealed record CounterType(string Name)
     /// paying its mana cost.
     /// </summary>
     public static readonly CounterType Void = new("Void");
+
+    /// <summary>
+    /// CR 122 — Burden counters. Card-specific marker used by The One Ring
+    /// (Tales of Middle-earth). At the beginning of its controller's upkeep
+    /// The One Ring's controller loses life equal to the number of burden
+    /// counters on it; activating its {T} adds a burden counter and then
+    /// draws a card for each burden counter on it.
+    /// </summary>
+    public static readonly CounterType Burden = new("Burden");
 }
