@@ -1363,6 +1363,22 @@ public static class NamedCardFactory
             // for fully-wired behaviour.
             "Splinter Twin" => SplinterTwinFactory.Create(owner),
 
+            // Artifact — {1} (SenseisDiviningTopFactory). Champions of Kamigawa.
+            // "{T}: Look at the top three cards of your library, then put them
+            //  back in any order."
+            // "{1}, {T}: Draw a card, then put Sensei's Divining Top on top of
+            //  its owner's library."
+            // Two activated abilities wired: a tap-only peek-3-and-reorder
+            // (mirrors Ponder's agent-driven reorder via ScryAction with
+            // ToBottom=[], default-preserves order), and a {1}+{T} draw-then-
+            // self-return that draws a card via raw zone moves (empty-library
+            // flags MarkTriedToDrawFromEmptyLibrary per CR 704.5b) and
+            // moves Top from the battlefield onto the top of its owner's
+            // library via IZone.InsertCardAt(0). Agent-driven "you may"
+            // prompts are not relevant — Top has no opt-out clauses.
+            // Printed Legendary supertype omitted in v1 (task scope).
+            "Sensei's Divining Top" => SenseisDiviningTopFactory.Create(owner),
+
             // Instant — {W} (SwordsToPlowsharesFactory). Alpha.
             // "Exile target creature. Its controller gains life equal to its
             //  power." Card shape only here; the resolve-time SpellDefinition
