@@ -618,6 +618,18 @@ public static class NamedCardFactory
             // peeked card to the graveyard.
             "Consider" => ConsiderFactory.Create(owner),
 
+            // Instant — {B} (CabalRitualFactory). Torment / Modern Horizons 2.
+            // "Add {B}{B}{B}. Threshold — Add {C}{C}{C}{C}{C} instead if seven
+            // or more cards are in your graveyard." Card shape only here; the
+            // resolve effect is built on demand via
+            // CabalRitualFactory.BuildResolveEffect and splices into a
+            // SpellDefinition.EffectFactory. Threshold (CR 702.50) is sampled
+            // against the controller's graveyard at resolution; produced mana
+            // is added to the controller's mana pool via AddManaToPool, with
+            // {C} routed into the generic bucket per ManaCost.Parse
+            // (CR 107.4c).
+            "Cabal Ritual" => CabalRitualFactory.Create(owner),
+
             // Creature — Human Cleric {W}{B} 2/1 (PriestOfFellRitesFactory).
             // ETB triggered ability: reanimate target creature card with
             // mana value 3 or less from controller's graveyard
