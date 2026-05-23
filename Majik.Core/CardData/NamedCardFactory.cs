@@ -468,6 +468,30 @@ public static class NamedCardFactory
             // not scoped by v1.
             "Dress Down" => DressDownFactory.Create(owner),
 
+            // Sorcery — {G} (AncientStirringsFactory). Rise of the Eldrazi.
+            // "Look at the top five cards of your library. You may reveal a
+            //  colorless card from among them and put it into your hand. Then
+            //  put the rest on the bottom of your library in a random order."
+            // Card shape only here; the resolve effect is built on demand via
+            // AncientStirringsFactory.BuildResolveEffect with a default
+            // selector that picks the first colourless peeked card (CR 105)
+            // and shuffles the remainder for the random-order bottom placement
+            // (CR 701.20a). The ImpulseMayRevealFilterTemplate also matches
+            // the oracle text by shape, but drops the colour filter — the
+            // named factory carries the predicate locally.
+            "Ancient Stirrings" => AncientStirringsFactory.Create(owner),
+
+            // Instant — {U} (StubbornDenialFactory). Khans of Tarkir.
+            // "Choose one — Counter target noncreature spell unless its
+            //  controller pays {1}. Ferocious — Counter that spell if you
+            //  control a creature with power 4 or greater." CR 702.114.
+            // Card shape only here; the resolve-time SpellDefinition (with
+            // the ferocious gate and the unless-pay fallback) is built on
+            // demand via StubbornDenialFactory.BuildSpellDefinition. The
+            // unless-pay rider is surfaced as a Func<bool> callback because
+            // the engine has no Yes/No agent prompt yet — default is "no".
+            "Stubborn Denial" => StubbornDenialFactory.Create(owner),
+
             // Instant — {U} (ConsiderFactory). Innistrad: Midnight Hunt.
             // "Look at the top card of your library. You may put that card
             // into your graveyard. Then draw a card." Effectively Surveil 1

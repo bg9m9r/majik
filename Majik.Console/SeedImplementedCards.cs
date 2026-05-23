@@ -145,6 +145,11 @@ public static class SeedImplementedCards
         "Mutagenic Growth",
         // Instant — {W}. CounterUnlessPayTemplate ({1} to keep).
         "Mana Tithe",
+        // Instant — {U}. CounterUnlessPayTemplate now recognizes the
+        // "noncreature" type qualifier and routes to the typed factory,
+        // so Spell Pierce ("Counter target noncreature spell unless its
+        // controller pays {2}.") binds + resolves without a new template.
+        "Spell Pierce",
         // Instant — {U}{U}. CounterTargetSpellTemplate ("Counter target spell.").
         // The canonical hard counter; binds via the existing template registry
         // with no new factory.
