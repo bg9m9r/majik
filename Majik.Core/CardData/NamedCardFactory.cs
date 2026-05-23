@@ -509,6 +509,18 @@ public static class NamedCardFactory
             // and SuspendedCardRegistry.
             "Rift Bolt" => RiftBoltFactory.Create(owner),
 
+            // Instant — {W} (PathToExileFactory). Conflux. "Exile target
+            // creature. Its controller may search their library for a
+            // basic land card, put that card onto the battlefield
+            // tapped, then shuffle their library." CR 701.21 (exile) +
+            // CR 701.19a (search). Card shape only here; the resolve-
+            // time SpellDefinition (target-creature request + exile +
+            // basic-land tutor offered to the exiled creature's
+            // controller) is built on demand via
+            // PathToExileFactory.BuildSpellDefinition. Shuffle deferred
+            // — same MVP gap as every other tutor (no IZone.Shuffle).
+            "Path to Exile" => PathToExileFactory.Create(owner),
+
             // Instant — {R} (UnholyHeatFactory). Modern Horizons 2.
             // "Unholy Heat deals 2 damage to any target. Delirium —
             //  Unholy Heat deals 4 damage to that target instead if

@@ -89,6 +89,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Necropotence | Enchantment | TBD | {B}{B}{B} — skip-draw via SkipDrawRegistry + discard→exile ZoneMoveIntent replacement + Pay 1 life: exile top of library + delayed end-step return-to-hand (face-down exile deferred) |
 | Orcish Bowmasters | Creature | — | reactive ping shell |
 | Pact of Negation | Instant | TBD | {0} — counter target spell + delayed upkeep DelayedTriggeredAbility (CR 603.7) that tries PayMana({3}{U}{U}); on failure MarkLost() (CR 104.3 / 118.3); upkeep agent prompt deferred |
+| Path to Exile | Instant | TBD | {W} — exile target creature + exiled creature's controller may tutor basic land tapped (CR 701.21 + CR 701.19a); library shuffle deferred (no IZone.Shuffle) |
 | Phantasmal Image | Creature | TBD | 0/0 Illusion {1}{U} + EntersAsCopyReplacement (AnyBattlefield) + Layer 4 Illusion subtype rider + targeted-by-spell-or-ability self-sacrifice trigger |
 | Pithing Needle | Artifact | #189 | name-targeted activated suppression |
 | Plague Engineer | Creature | TBD | 2/2 Human Rogue {2}{B} + Deathtouch + ETB choose-creature-type + Layer 7c -1/-1 to opponents' creatures of chosen type (LordStaticEffect opponentsOnly) |
@@ -352,8 +353,7 @@ Sorted roughly by build priority (small infra lift × high meta share). Refreshe
 | ~~3~~ | ~~Preordain~~ | ~~low~~ | Shipped via `PreordainFactory` — scry 2 + draw 1 (delegates to standard `ScryAction` pipeline). The `LibrarySpellFactory.ScryNSpell` tail-detection path covers the same shape via the data-driven binder. |
 | 4 | Mystical Tutor | low | Instant {U} — search library for instant/sorcery, reveal, top. Tutor-to-top family exists in templates; needs filter-by-card-type restriction. |
 | 5 | Swords to Plowshares | low | Instant {W} — exile target creature, controller gains life equal to its power. ExileCreature + life-gain-by-power primitive missing the "by power" variable. |
-| 6 | Path to Exile | low | Instant {W} — exile target creature, controller may search for basic land tapped. ExileCreature exists; need conditional-search-basic-tapped rider on a different controller. |
-| 7 | Spell Queller | medium | Flash creature: ETB exile target spell mv ≤ 4; LTB return the exiled card to owner's hand (or cast it for free per current oracle). Needs paired ETB-exile-from-stack + LTB-return primitive with a tracked exile zone. |
+| 6 | Spell Queller | medium | Flash creature: ETB exile target spell mv ≤ 4; LTB return the exiled card to owner's hand (or cast it for free per current oracle). Needs paired ETB-exile-from-stack + LTB-return primitive with a tracked exile zone. |
 | 8 | Sun Titan | medium | ETB + attacks trigger — return permanent mv ≤ 3 from graveyard to battlefield. Reanimation primitive exists (Priest of Fell Rites); needs attack-trigger + mv-3-permanent filter. |
 | 9 | Skullclamp | medium | Equipment {1}: +1/-1 + equipped-dies → draw 2. Needs the dies-trigger keyed to a different permanent (the equipped creature, not Skullclamp itself); ties to equipment-lifecycle which Sigarda's Aid + Puresteel Paladin already exercise. |
 | 10 | Umezawa's Jitte | medium | Legendary equipment + combat-damage trigger gains 2 charge counters + three activated abilities (pump, lifegain/damage-to-creature, lifegain). Needs charge-counter resource on equipment + modal activation; multi-activation pattern similar to Engineered Explosives but per-ability. |
