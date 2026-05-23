@@ -605,6 +605,16 @@ public static class NamedCardFactory
             // target check at resolution).
             "Force of Negation" => ForceOfNegationFactory.Create(owner),
 
+            // Instant — {2}{G}{G} (ForceOfVigorFactory).
+            // "If it's not your turn, you may exile a green card from your
+            //  hand rather than pay this spell's mana cost. Destroy up to
+            //  two target artifacts and/or enchantments."
+            // Same pitch pattern as Force of Negation but green-flavoured
+            // (no life rider). Resolve effect delegates to the shared
+            // DestroyUpToArtifactEnchantmentSpell — identical behaviour to
+            // the data-driven oracle-template binding.
+            "Force of Vigor" => ForceOfVigorFactory.Create(owner),
+
             // Instant — {0} (PactOfNegationFactory). Future Sight.
             // "Counter target spell.
             //  At the beginning of your next upkeep, pay {3}{U}{U}.
