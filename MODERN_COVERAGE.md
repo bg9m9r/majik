@@ -2,14 +2,14 @@
 
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
-**Last updated:** 2026-05-23
-**Latest origin/main:** e0cef4d (#207 — Sylvan Scrying) + Karn, the Great Creator
+**Last updated:** 2026-05-24
+**Latest origin/main:** 6d87f59 (Subtlety + Karn Liberated + Up the Beanstalk) + Karn, the Great Creator
 
 ## Headline numbers
 
 | Metric | Count |
 |---|---|
-| Named factories | 63 |
+| Named factories | 70 |
 | Bespoke templates | 26 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
@@ -42,15 +42,18 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Dress Down | Enchantment | #195 | lose-abilities + 1/1 base PT |
 | Dryad Arbor | Land Creature | — | 1/1 Forest creature, no cost |
 | Elegant Parlor | Land | — | R/W surveil dual |
+| Endurance | Creature | TBD | MH2 incarnation: Flash + Reach + evoke pitch + ETB shuffle-graveyard-to-library |
 | Fiery Islet | Land | — | pay-1-life U/R + sac-draw |
 | Force of Negation | Instant | #185 | pitch counter (non-creature) |
 | Force of Will | Instant | #185 | pitch counter (universal) |
+| Fury | Creature | — | evoke pitch + ETB X-damage divided |
 | Goblin Bombardment | Enchantment | — | sac-creature → 1 damage |
 | Grief | Creature | #205 | evoke pitch + ETB discard |
 | Grist, the Hunger Tide | Planeswalker | — | +1 token, -2 reanimate |
 | Harbinger of the Seas | Creature | #157 | nonbasic-to-Island |
 | Inspiring Vantage | Land | — | R/W fastland |
 | Karn, the Great Creator | Planeswalker | TBD | opponent-artifact static + +1 animate + -2 wishboard |
+| Karn Liberated | Planeswalker | TBD | +4 exile-from-hand, -3 exile-permanent; -14 restart deferred |
 | Kraul Harpooner | Creature | — | fight-flyer shell |
 | Lazotep Recruit | Creature | — | amass-keyword shell |
 | Ledger Shredder | Creature | #193 | second-spell surveil + counter |
@@ -71,6 +74,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Spymaster's Vault | Land | — | B-source shell |
 | Stoneforge Mystic | Creature | #184 | ETB tutor + activated put |
 | Stubborn Denial | Instant | — | ferocious-conditional counter |
+| Subtlety | Creature | TBD | evoke pitch + ETB bounce + look-and-bottom |
 | Sunbaked Canyon | Land | — | pay-1-life R/W + sac-draw |
 | Surgical Extraction | Instant | #192 | phyrexian global name exile |
 | Sylvan Scrying | Sorcery | TBD | any-land tutor to hand (Tron enabler) |
@@ -82,7 +86,11 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Treasure Cruise | Sorcery | #181 | delve draw 3 |
 | Underground Mortuary | Land | — | U/B surveil dual |
 | Unholy Heat | Instant | #190 | delirium variable damage |
+| Up the Beanstalk | Enchantment | TBD | ETB draw + cast-MV-5+ draw |
 | Urborg, Tomb of Yawgmoth | Land | #158 | grant Swamp to all lands |
+| Urza's Mine | Land | TBD | Tron — {T}: {C}, {2} if all 3 Urza lands controlled |
+| Urza's Power-Plant | Land | TBD | Tron — {T}: {C}, {2} if all 3 Urza lands controlled |
+| Urza's Tower | Land | TBD | Tron — {T}: {C}, {2} if all 3 Urza lands controlled |
 | Vexing Bauble | Artifact | — | sac-draw shell |
 | Walking Ballista | Artifact Creature | — | grow + ping |
 | Wastewood Verge | Land | — | B/G activation-gate land |
@@ -108,7 +116,6 @@ Cards implemented through generic or bespoke templates without a named factory. 
 - Goblin Guide — vanilla keyword binding (Haste + reveal-trigger TBD)
 - Eidolon of the Great Revel — triggered-ability binder (cheap-spell pattern)
 - Monastery Swiftspear — Prowess keyword (`Keywords/ProwessFactory`)
-- Endurance — keyword bindings (Flash + Reach); ETB graveyard-to-library trigger
 - Fulminator Mage — dies-destroy-land trigger
 - Green Sun's Zenith — `Search/GreenSunsZenithPatternTemplate`
 - Force of Vigor — `Destroy/DestroyUpToArtifactEnchantmentTemplate` + pitch cost
@@ -273,10 +280,10 @@ Per-keyword action helpers under `Majik.Core/Keywords/`:
 
 - **Burn** — Strong. Lightning Bolt, Lava Spike, Lava Dart, Skewer the Critics, Boros Charm, Eidolon of the Great Revel, Goblin Guide, Monastery Swiftspear, Rift Bolt all in. Missing: Searing Blaze (landfall conditional), Roiling Vortex, Sunscorched Desert. ~75%.
 - **Death's Shadow** — Mid-high. Thoughtseize, Fatal Push, Snapcaster Mage, Stubborn Denial, Death's Shadow itself (CDA P/T scaled by controller life — Layer 7a) all in. Mishra's Bauble in. Temur Battle Rage absent. ~60%.
-- **Murktide / Izzet Tempo** — High. Murktide Regent done, Counterspell done, Snapcaster Mage done, Lightning Bolt done, Expressive Iteration done, Ledger Shredder done, Consider done, Spell Pierce done. Missing: Unholy Heat is done but Demilich/Subtlety absent. ~70%.
-- **Mono-Green Tron** — Mid. Ancient Stirrings, Sylvan Scrying, Wurmcoil Engine, Karn the Great Creator done. No Karn Liberated, no Tron lands. ~30%.
+- **Murktide / Izzet Tempo** — High. Murktide Regent done, Counterspell done, Snapcaster Mage done, Lightning Bolt done, Expressive Iteration done, Ledger Shredder done, Consider done, Spell Pierce done, Subtlety done. Missing: Demilich absent. ~75%.
+- **Mono-Green Tron** — High. Ancient Stirrings, Sylvan Scrying, Wurmcoil Engine done. Karn Liberated done. Karn, the Great Creator done. Tron lands (Urza's Mine + Tower + Power-Plant) done with the conditional {2} mana ability. ~70%.
 - **Living End / Crashing Footfalls cascade** — Blocked. Cascade keyword + Suspend-trigger end-of-suspend exile-and-cast TODO. Suspend itself is done (#183), so partial groundwork. ~15%.
-- **Rakdos Scam** — Mid. Grief done (#205, mirrors Solitude evoke + ETB pattern). Dauthi Voidwalker absent. Fury absent. Liliana of the Veil done, Fatal Push done, Thoughtseize done. ~40%.
+- **Rakdos Scam** — Mid-high. Grief done (#205, mirrors Solitude evoke + ETB pattern). Fury done (mirrors Solitude/Grief). Dauthi Voidwalker absent. Liliana of the Veil done, Fatal Push done, Thoughtseize done. ~55%.
 - **Yawgmoth combo** — Mid. Yawgmoth done. Undying creatures (Young Wolf, Strangleroot Geist, Geralf's Messenger) done. Chord of Calling, Eldritch Evolution absent. ~50%.
 - **Domain Zoo** — Low-mid. Boros Charm done, fetches done, shocks done. Scion of Draco, Territorial Kavu, Tribal Flames absent. ~25%.
 - **Amulet Titan** — Very low. No Amulet of Vigor, no Primeval Titan, no bounce lands. ~0%.
@@ -288,17 +295,11 @@ Sorted by build priority (small infra lift × high meta share).
 
 | # | Card | Difficulty | Blocker |
 |---|---|---|---|
-| 1 | Karn Liberated | Mid | Exile target, restart-game ultimate (game-restart deferred) |
-| 2 | Urza's Tron pieces (Mine/Tower/Power Plant) | Mid | "Tap: add 1; if you control all three, add 3" — conditional mana ability |
-| 3 | Fury | Low | Evoke + ETB damage split — Solitude/Grief pattern + damage-distribution prompt |
-| 4 | Subtlety | Low | Evoke + ETB bounce-and-look — Solitude/Grief pattern + bounce template |
-| 5 | Endurance ETB targeting | Low | Keyword bindings exist; ETB graveyard-to-library not wired through targeting |
-| 6 | Crashing Footfalls | High | Suspend done (#183), but cascade trigger on suspend-cast missing |
-| 7 | Living End | High | Cascade + mass-exile-grave + simultaneous mass-reanimate (#174 ready for the latter) |
-| 8 | Cascade keyword | High | Triggered "cast for free from top reveal" — alt-cast-from-library framework |
-| 9 | Primeval Titan | Mid | Attack/ETB triggers + land tutor; tutor template exists |
-| 10 | Amulet of Vigor | Mid | Replacement on enters-tapped → untap; needs ETB replacement composition |
-| 11 | Up the Beanstalk | Low | Cast-trigger by CMC threshold — trigger-by-CMC pattern |
+| 1 | Crashing Footfalls | High | Suspend done (#183), but cascade trigger on suspend-cast missing |
+| 2 | Living End | High | Cascade + mass-exile-grave + simultaneous mass-reanimate (#174 ready for the latter) |
+| 3 | Cascade keyword | High | Triggered "cast for free from top reveal" — alt-cast-from-library framework |
+| 4 | Primeval Titan | Mid | Attack/ETB triggers + land tutor; tutor template exists |
+| 5 | Amulet of Vigor | Mid | Replacement on enters-tapped → untap; needs ETB replacement composition |
 
 ## How to update this doc
 

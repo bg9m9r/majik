@@ -280,6 +280,17 @@ public static class SeedImplementedCards
         // creature").
         "Solitude",
 
+        // Creature — Elemental Incarnation {3}{U} 3/3 (SubtletyFactory).
+        // Modern Horizons 2 incarnation — blue counterpart to Solitude.
+        // Flash + Evoke keyword markers via KeywordBinder; KeywordBinder
+        // attaches the printed evoke sacrifice trigger (EvokeFactory)
+        // automatically. ETB bounce-and-look trigger wired via SubtletyFactory:
+        // return target opponent's creature/planeswalker to its owner's hand,
+        // then that owner does a 1-card "look + may bottom" scry decision
+        // sourced from their registered IPlayerAgent. Evoke alt-cost —
+        // "exile a blue card from your hand" — via EvokeAlternativeCost.
+        "Subtlety",
+
         // U/R Horizon Canopy painless dual — Modern Horizons (FieryIsletFactory).
         // {T}, Pay 1 life: Add {U} or {R} — two ManaAbility instances with a
         // life-cost activation gate (CR 119.4) + LoseLife side-effect wired
@@ -317,5 +328,101 @@ public static class SeedImplementedCards
         // Same pattern reusable for the rest of the Kaladesh fastland cycle:
         // Concealed Courtyard, Spirebluff Canal, Botanical Sanctum, Blooming Marsh.
         "Inspiring Vantage",
+
+        // ---- Modern staples shipped in the 2026-05-23 bump ----
+
+        // Enchantment — {2}{R} (CR 305.6). Nonbasic lands lose all land types,
+        // abilities, and are Mountains. Wired via BloodMoonStaticEffect +
+        // generalized SubtypeReplaceStaticEffect (also reused by Magus of the
+        // Moon, Harbinger of the Seas, Conversion).
+        "Blood Moon",
+        // Creature — Human Wizard {2}{R} 2/2 — same static effect as Blood Moon.
+        "Magus of the Moon",
+        // Creature — Merfolk Wizard {2}{U} 2/2 — Islands variant of Blood Moon.
+        "Harbinger of the Seas",
+        // Enchantment — {2}{W}{W} — Mountains become Plains static effect.
+        "Conversion",
+        // Land — Legendary. Each Swamp on the battlefield is also a Swamp in
+        // addition to its other types; additive subtype grant (CR 305.7).
+        "Urborg, Tomb of Yawgmoth",
+        // Land — Legendary. Each land is also a Forest in addition to its other types.
+        "Yavimaya, Cradle of Growth",
+        // Enchantment — Aura {1}{U}. Enchanted land is an Island (CR 303.4 +
+        // 305.7) and loses other land types. Wired via SpreadingSeasFactory.
+        "Spreading Seas",
+        // Enchantment — Aura {U}. Same retyping pattern as Spreading Seas
+        // without the cantrip.
+        "Sea's Claim",
+        // Creature — Human Wizard {U}{R} 2/1 (SnapcasterMageFactory).
+        // Flash + ETB grants flashback to target instant/sorcery in graveyard
+        // (CR 702.33). Cost = card's mana cost (no replacement of {X}).
+        "Snapcaster Mage",
+        // Legendary Planeswalker — Teferi {1}{W}{U} loyalty 4 (TeferiTimeRavelerFactory).
+        // +1: Sorcery-speed lockout for opponents until your next turn.
+        // −3: Return target nonland permanent to its owner's hand + draw 1.
+        // Static: cast sorceries any time you could cast an instant — wired via
+        // emblem-with-static infrastructure.
+        "Teferi, Time Raveler",
+        // Creature — Human Wizard {1}{B} 2/1 (DarkConfidantFactory).
+        // Upkeep trigger: reveal top, put into hand, lose life equal to MV.
+        "Dark Confidant",
+        // Legendary Planeswalker — Liliana {1}{B}{B} loyalty 3 (LilianaOfTheVeilFactory).
+        // +1 each-discard, −2 raise dead, −6 partition permanents.
+        "Liliana of the Veil",
+        // Legendary Planeswalker — Wrenn {R}{G} loyalty 3 (WrennAndSixFactory).
+        // +1 land-from-grave, −1 1-damage-to-any-target, −7 emblem retrace.
+        "Wrenn and Six",
+        // Creature — Human Cleric {1}{G} 2/1 (ScavengingOozeFactory).
+        // {G}: Exile target card from a graveyard; if creature, put a +1/+1
+        // counter on ~ and you gain 1 life.
+        "Scavenging Ooze",
+        // Artifact — {1} (PithingNeedleFactory).
+        // As ~ enters, name a card. Activated abilities of sources with the
+        // chosen name can't be activated unless they're mana abilities
+        // (CR 605 / 614 suppression).
+        "Pithing Needle",
+        // Instant — {R} (UnholyHeatFactory).
+        // ~ deals 2 damage to any target. Delirium — deals 6 instead if four
+        // or more card types among cards in your graveyard.
+        "Unholy Heat",
+        // Instant — {1}{U}{U}{U} (CR 700.2d modal choose-N template).
+        // Choose two: counter target spell; return target permanent to hand;
+        // tap all creatures your opponents control; draw a card.
+        "Cryptic Command",
+        // Instant — {Phyrexian/B} (SurgicalExtractionFactory).
+        // Phyrexian-cost global name-exile of graveyard + library + hand copies.
+        "Surgical Extraction",
+        // Creature — Bird Advisor {1}{U} 1/3 (LedgerShredderFactory).
+        // Flying + "whenever you cast your second spell each turn, surveil 2".
+        "Ledger Shredder",
+        // Creature — Dragon {U}{U}{R} */* (MurktideRegentFactory).
+        // Delve + ETB X-counters (CR 122.1g) based on instants/sorceries exiled.
+        "Murktide Regent",
+        // Enchantment Creature — Human {1}{U} 1/1 (DressDownFactory).
+        // Flash + creatures lose all abilities and base power/toughness become
+        // 1/1 (CR 613.6 + 613.7b).
+        "Dress Down",
+        // Creature — Cleric {W}{B}{B} 3/2 (PriestOfFellRitesFactory).
+        // ETB reanimate target creature card with MV ≤ 3 from graveyard;
+        // graveyard-activated unearth for a one-shot battlefield return.
+        "Priest of Fell Rites",
+        // Creature — Avatar {3}{B}{B}{B} */* (DeathsShadowFactory).
+        // CDA — base P/T equals (13 − controller's life total) / same (CR 613.2,
+        // Layer 7a). Wired via DeathsShadowCharacteristicDefinition.
+        "Death's Shadow",
+        // Instant — {U} (ConsiderFactory).
+        // Look at top card of your library, then mill it if you want, then draw.
+        "Consider",
+        // Instant — {U} (StubbornDenialFactory).
+        // Counter target noncreature spell. Ferocious — if you control a 4-power
+        // or greater creature, counter that spell unless its controller pays {3}.
+        "Stubborn Denial",
+        // Sorcery — {G} (AncientStirringsFactory).
+        // Look at top 5 of library; reveal a colorless card → hand, rest → bottom.
+        "Ancient Stirrings",
+        // Creature — Elemental Incarnation {3}{B}{B} 3/2 (GriefFactory).
+        // Flash + Menace + ETB target opponent discards a card. Evoke alt-cost:
+        // exile a black card from your hand. Companion to Solitude.
+        "Grief",
     };
 }
