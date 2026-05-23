@@ -94,6 +94,9 @@ public enum CardSubtype
     /// <summary>Horror creature subtype — Spellskite (New Phyrexia),
     /// Phyrexian Obliterator. CR 205.3m.</summary>
     Horror,
+    /// <summary>Phoenix creature subtype — Arclight Phoenix, Rekindling
+    /// Phoenix, Skarrgan Pit-Skulk-adjacent. CR 205.3m.</summary>
+    Phoenix,
 
     // Land subtypes (examples)
     Forest,
