@@ -329,6 +329,18 @@ public static class NamedCardFactory
             // Falls / Elegant Parlor surveil-lands.
             "Library Surveyor" => LibrarySurveyorFactory.Create(owner),
 
+            // Creature — Bird Advisor {1}{U} 1/3 (LedgerShredderFactory).
+            // Flying keyword wired. Two triggered abilities surfaced on the
+            // card for shape: (1) "whenever you cast the second spell each
+            // turn, surveil 1" — predicate increments a per-turn closure
+            // counter and matches on the exact 2nd cast; (2) "whenever
+            // Ledger Shredder surveils, put a +1/+1 counter on it" — chained
+            // inline off trigger 1's effect (no SurveilEvent on the bus yet).
+            // The single-arg dispatcher path here produces the correct card
+            // shape without bus-driven turn reset or trigger-manager wiring.
+            // Use the (owner, bus, triggers) overload for fully-wired behavior.
+            "Ledger Shredder" => LedgerShredderFactory.Create(owner),
+
             // Creature — Human Rogue {1}{U} 1/1 (TestConniverFactory).
             // Synthetic Connive keyword fixture. ETB: connive (CR 701.50).
             // Draws + discards + +1/+1 counter if nonland was discarded.
@@ -354,6 +366,17 @@ public static class NamedCardFactory
             // turn (PitchAlternativeCost). Bot probe via PitchAltCostProbe.
             "Force of Will" => ForceOfWillFactory.Create(owner),
 
+            // Instant — {1}{U}{U}{U} (CrypticCommandFactory).
+            // CR 700.2d — modal "Choose two —" with 4 printed modes
+            // (counter spell / bounce permanent / tap-all-opponents-creatures /
+            // draw a card). The single-arg dispatcher path produces the
+            // correct card shape; the bound SpellDefinition is built on
+            // demand via CrypticCommandFactory.BuildDefinition(caster,
+            // targetResolver, stack). Multi-pick relies on the caller
+            // populating ChosenSpellParams.ModeIndexes — the runtime
+            // honours either the list or the scalar ModeIndex shape.
+            "Cryptic Command" => CrypticCommandFactory.Create(owner),
+
             // Instant — {1}{U}{U} (ForceOfNegationFactory).
             // "If it's not your turn, you may exile a blue card from your
             //  hand rather than pay this spell's mana cost. Counter target
@@ -363,12 +386,45 @@ public static class NamedCardFactory
             // target check at resolution).
             "Force of Negation" => ForceOfNegationFactory.Create(owner),
 
+            // Instant — {B/P} (SurgicalExtractionFactory).
+            // "Choose target card in a graveyard other than a basic land
+            //  card. Search its owner's graveyard, hand, and library for
+            //  any number of cards with the same name as that card and
+            //  exile them. Then that player shuffles."
+            // Phyrexian-mana alt cost (2 life) via
+            // PhyrexianManaAlternativeCost. Card shape only here; the
+            // resolve effect is built on demand via
+            // SurgicalExtractionFactory.BuildDefinition at the
+            // SpellCastFlow resolver wire-up site.
+            "Surgical Extraction" => SurgicalExtractionFactory.Create(owner),
+
             // Sorcery — {2}{R} (RiftBoltFactory). 3 damage to any target;
             // Suspend 1—{R} (CR 702.62). Spell-def and suspend alt cost
             // built on demand via RiftBoltFactory.BuildSpellDefinition /
             // BuildSuspendCost — caller wires them through SpellCastFlow
             // and SuspendedCardRegistry.
             "Rift Bolt" => RiftBoltFactory.Create(owner),
+
+            // Instant — {R} (UnholyHeatFactory). Modern Horizons 2.
+            // "Unholy Heat deals 2 damage to any target. Delirium —
+            //  Unholy Heat deals 4 damage to that target instead if
+            //  there are four or more card types among cards in your
+            //  graveyard." CR 702.105. Card shape only here; the
+            // resolve-time SpellDefinition (with the delirium gate
+            // sampling the controller's graveyard) is built on demand
+            // via UnholyHeatFactory.BuildSpellDefinition. Reuses
+            // TarmogoyfFactory.CountDistinctCardTypes for the type count.
+            "Unholy Heat" => UnholyHeatFactory.Create(owner),
+
+            // Artifact — {1} (PithingNeedleFactory).
+            // "As Pithing Needle enters, choose a card name. Activated
+            //  abilities of sources with the chosen name can't be
+            //  activated unless they're mana abilities." (CR 602.5c / 605.)
+            // Wired via PithingNeedleStaticEffect when the runtime
+            // (owner, nameSelector, eventBus) overload is used. The
+            // single-arg dispatcher path here produces the correct card
+            // shape only.
+            "Pithing Needle" => PithingNeedleFactory.Create(owner),
 
             // Creature — Kor Artificer {1}{W} 1/2 (StoneforgeMysticFactory).
             // ETB tutor: search library for an Equipment card → hand
@@ -381,6 +437,16 @@ public static class NamedCardFactory
             // Use the (owner, zoneService, eventBus, triggers) overload
             // for full ETB-replacement / trigger-firing wiring.
             "Stoneforge Mystic" => StoneforgeMysticFactory.Create(owner),
+
+            // Creature — Ooze {1}{G} 2/2 (ScavengingOozeFactory).
+            // Activated {G}: exile target creature card from a graveyard;
+            // if you do, put a +1/+1 counter on Scavenging Ooze and gain
+            // 1 life. The single-arg dispatcher path scans only the
+            // controller's graveyard; use the (owner, allPlayersResolver)
+            // overload to scan every player's graveyard. Real "target
+            // creature card from a graveyard" prompt deferred — v1 picks
+            // the first creature card deterministically.
+            "Scavenging Ooze" => ScavengingOozeFactory.Create(owner),
 
             // Creature — Dragon {3}{U}{U} 3/3 (MurktideRegentFactory).
             // Flying + Delve marker keywords wired. ETB trigger: exile target

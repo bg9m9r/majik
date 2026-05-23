@@ -37,6 +37,7 @@ public enum CardSubtype
     Orc,
     Archer,
     Army,
+    Advisor,
     /// <summary>Modern Horizons 2 incarnation cycle (Solitude, Endurance,
     /// Fury, Grief, Subtlety). CR 205.3m — creature subtype.</summary>
     Incarnation,
@@ -46,6 +47,8 @@ public enum CardSubtype
     Kor,
     /// <summary>Artificer creature subtype — Stoneforge Mystic, Goblin Engineer. CR 205.3m.</summary>
     Artificer,
+    /// <summary>Ooze creature subtype — Scavenging Ooze, Acidic Slime. CR 205.3m.</summary>
+    Ooze,
 
     // Land subtypes (examples)
     Forest,
