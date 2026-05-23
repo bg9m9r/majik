@@ -660,6 +660,19 @@ public static class NamedCardFactory
             // for full ETB-replacement / trigger-firing wiring.
             "Stoneforge Mystic" => StoneforgeMysticFactory.Create(owner),
 
+            // Sorcery — {2}{U} (ShowAndTellFactory). Urza's Saga.
+            // "Each player may put an artifact, creature, enchantment, or
+            //  land card from their hand onto the battlefield."
+            // Card shape only at the dispatcher; the per-player resolve
+            // effect (iterate allPlayers, deterministic first-permanent
+            // pick + optional ZoneService routing so ETB triggers /
+            // replacements on the put-in permanent fire — CR 603.6a /
+            // CR 614) is built on demand via
+            // ShowAndTellFactory.BuildResolveEffect(allPlayers, zoneService,
+            // picker). Real "may"-decline + per-player permanent-choice
+            // prompt deferred (same queue as Stoneforge Mystic / Sun Titan).
+            "Show and Tell" => ShowAndTellFactory.Create(owner),
+
             // Creature — Human Soldier {1}{W} 2/2 (PuresteelPaladinFactory).
             // ETB-draw trigger: whenever an Equipment enters under controller's
             // control, draw a card (CR 603.1 — "you may" simplified to a
@@ -772,6 +785,21 @@ public static class NamedCardFactory
             // splices into a SpellDefinition.EffectFactory. Sibling of
             // Cabal Ritual minus the threshold clause.
             "Dark Ritual" => DarkRitualFactory.Create(owner),
+
+            // Instant — {2}{R}{R} (ThroughTheBreachFactory). Champions of
+            // Kamigawa. "You may put a creature card from your hand onto
+            // the battlefield. That creature gains haste until end of
+            // turn. Sacrifice that creature at the beginning of the next
+            // end step. Splice onto Arcane {1}{R}{R}{R}." Card shape only
+            // here; the resolve effect (put first-creature-in-hand →
+            // battlefield, grant Haste EOT via
+            // GrantKeywordUntilEndOfTurnEffect, and register a delayed
+            // end-step sacrifice DelayedTriggeredAbility — CR 603.7) is
+            // built on demand via ThroughTheBreachFactory.BuildResolveEffect.
+            // Splice onto Arcane (CR 702.46) is DEFERRED — no splice alt-
+            // cost primitive in the engine yet (same gap as every other
+            // Splice card).
+            "Through the Breach" => ThroughTheBreachFactory.Create(owner),
 
             // Artifact — {0} (LotusPetalFactory). Tempest and many reprints.
             // "{T}, Sacrifice Lotus Petal: Add one mana of any color."
