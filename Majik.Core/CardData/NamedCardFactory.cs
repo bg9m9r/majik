@@ -149,6 +149,18 @@ public static class NamedCardFactory
             // int, IReadOnlyDictionary<Permanent, int>> via the 2-arg overload.
             "Fury" => FuryFactory.Create(owner),
 
+            // Creature — Elemental Incarnation {2}{B} 3/2 (GriefFactory).
+            // Menace + Evoke keyword markers wired. ETB reveal-and-discard
+            // trigger wired ("target opponent reveals their hand; you choose
+            // a nonland card from it; that player discards it" — v1
+            // deterministic first-nonland pick). Evoke alt-cost = "exile a
+            // black card from hand" via EvokeAlternativeCost; printed
+            // evoke-sacrifice trigger fires when Grief enters if evoke was
+            // paid (CR 702.74b). Opponent pitch-back ("counter this triggered
+            // ability by exiling a non-Elemental, non-Incarnation black
+            // card") deferred.
+            "Grief" => GriefFactory.Create(owner),
+
             // U/R Horizon Canopy painless dual — Modern Horizons (FieryIsletFactory).
             // {T}, Pay 1 life: Add {U} or {R} — two ManaAbility instances, each with
             // a life-cost activation gate (CR 119.4) and a LoseLife side-effect.
@@ -479,6 +491,19 @@ public static class NamedCardFactory
             // not scoped by v1.
             "Dress Down" => DressDownFactory.Create(owner),
 
+            // Sorcery — {G} (AncientStirringsFactory). Rise of the Eldrazi.
+            // "Look at the top five cards of your library. You may reveal a
+            //  colorless card from among them and put it into your hand. Then
+            //  put the rest on the bottom of your library in a random order."
+            // Card shape only here; the resolve effect is built on demand via
+            // AncientStirringsFactory.BuildResolveEffect with a default
+            // selector that picks the first colourless peeked card (CR 105)
+            // and shuffles the remainder for the random-order bottom placement
+            // (CR 701.20a). The ImpulseMayRevealFilterTemplate also matches
+            // the oracle text by shape, but drops the colour filter — the
+            // named factory carries the predicate locally.
+            "Ancient Stirrings" => AncientStirringsFactory.Create(owner),
+
             // Instant — {U} (StubbornDenialFactory). Khans of Tarkir.
             // "Choose one — Counter target noncreature spell unless its
             //  controller pays {1}. Ferocious — Counter that spell if you
@@ -523,6 +548,16 @@ public static class NamedCardFactory
             // path here produces the correct card shape only (printed 13/13
             // seed, no live CDA).
             "Death's Shadow" => DeathsShadowFactory.Create(owner),
+
+            // Artifact Creature — Phyrexian Wurm {6} 6/6 (WurmcoilEngineFactory).
+            // Deathtouch + Lifelink keyword markers wired. Dies trigger
+            // (CR 603.6c / 700.4) creates two 3/3 Phyrexian Wurm artifact
+            // creature tokens — one with Deathtouch and one with Lifelink.
+            // The single-arg dispatcher path here produces the correct
+            // card shape without TriggerManager registration / ZoneService
+            // wiring on the spawned tokens. Use the (owner, zoneService,
+            // eventBus, triggers) overload for fully-wired behavior.
+            "Wurmcoil Engine" => WurmcoilEngineFactory.Create(owner),
 
             _ => new Card(name, ""),
         };
