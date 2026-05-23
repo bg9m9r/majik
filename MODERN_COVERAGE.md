@@ -77,6 +77,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Fury | Creature | — | evoke pitch + ETB X-damage divided |
 | Galvanic Discharge | Instant | TBD | 1 + charge counters on artifacts/lands you control damage |
 | Goblin Bombardment | Enchantment | — | sac-creature → 1 damage |
+| Goblin Electromancer | Creature | TBD | {U}{R} 2/2 Goblin Wizard + static "Instant and sorcery spells you cast cost {1} less to cast" — wired via new `SpellCostReductionAbility` (sibling of `SpellCostIncreaseAbility`) scanned by `CostReduction.GetEffectiveCost` on the caster's battlefield. Predicate gates on `CardType.Instant`/`Sorcery`; floor-at-zero + coloured-pip-untouched preserved. Two Electromancers stack. Opposing Electromancers don't discount your spells (scoped to controller — "spells YOU cast") |
 | Goblin Engineer | Creature | TBD | {1}{R} 1/2 Goblin Artificer + ETB tutor first artifact card from library → graveyard (NOT hand — distinguishes from Trinket Mage / Goblin Matron) + {R}, {T}, Sacrifice an artifact: reanimate target artifact card from your graveyard. Sacrifice cost performed by effect body (no "sacrifice any one of N" cost primitive yet); shuffle + reveal event deferred (same as rest of tutor surface) |
 | Goblin Lackey | Creature | TBD | {R} 1/1 Goblin + combat-damage-to-player trigger cheats first Goblin creature card from hand onto the battlefield (ZoneService-routed for ETB triggers) |
 | Goblin Matron | Creature | TBD | {2}{R} 1/1 Goblin + ETB tutor a Goblin card from library to hand (agent-driven pick with deterministic first-match fallback; shuffle deferred) |
@@ -258,7 +259,7 @@ Cards under `Majik.Core/CardData/Cards/*.json`:
 | Mechanic | Status | File |
 |---|---|---|
 | Mana cost | Done | `Costs/ManaCost.cs` |
-| Mana cost reduction | Done | `Costs/CostReductionAbility.cs`, `CostReductionStaticEffect.cs` |
+| Mana cost reduction | Done | `Costs/CostReductionAbility.cs` (printed reducers on the spell — Affinity / Domain), `Costs/CostReductionAbility.cs::SpellCostReductionAbility` (battlefield-permanent reducer — Goblin Electromancer family), `CostReductionStaticEffect.cs` |
 | Phyrexian mana | Done (#192) | `Costs/PhyrexianManaAlternativeCost.cs` |
 | Flashback | Done | `Costs/FlashbackAlternativeCost.cs` |
 | Runtime flashback grant | Done (#177) | `Card.RuntimeFlashbackCost` (probe in `Costs/FlashbackAlternativeCost.cs`) |
@@ -412,7 +413,6 @@ Vintage / Legacy-only cards (Power Nine, original dual lands, Mind's Desire, Yaw
 | 10 | Ajani, Nacatl Pariah | medium | Creature — Cat Warrior {1}{W} 1/2 (MH3) — sacrifice → flip to Ajani, Nacatl Avenger PW with 3 loyalty + create two 1/1 Cat tokens. Needs first MDFC-style flip-on-sacrifice plumbing; planeswalker side already covered by existing PW infrastructure. Modern Boros / Naya staple. |
 | 11 | Archmage's Charm | low | Instant {U}{U}{U} (MH1) — modal: counter target spell / target player draws 2 / gain control of nonland with mv ≤ 1. Modal-choose-one composed from existing `CounterTargetSpellTemplate` + draw-N + `ControlChangeEffect` (Wishclaw Talisman / Splinter Twin both already use it). Modern Tron / control staple. |
 | 12 | Prismatic Ending | medium | Sorcery {W} (MH2) — Converge: exile target nonland permanent with mana value ≤ X (X = number of colors of mana spent on this spell). Needs Converge accounting (color-count from mana-pool spend) wired into the existing X-provider plumbing (Engineered Explosives / Pernicious Deed). Multi-color Modern removal staple. |
-| 13 | Goblin Electromancer | low | Creature — Goblin Wizard {U}{R} 2/2 (RTR) — instant/sorcery spells cost {1} less. Reuses existing `CostReductionAbility` / `CostReductionStaticEffect`; predicate-filtered to types Instant/Sorcery. Storm / Izzet Prowess enabler. |
 | 14 | Mox Amber | medium | Legendary Artifact {0} (DOM) — {T}: Add one mana of any color among legendary creatures and planeswalkers you control. Legendary-conditional any-color mana ability; parallels `MoxOpalFactory`'s gated-any-color pattern with a different state predicate. Modern affinity / artifact staple. |
 | 15 | Karn, Scion of Urza | medium | Planeswalker — Karn {4} 5 loyalty (DOM) — +1 reveal-2-and-rival-picks-1, -1 token Construct */* equal to artifacts you control, -2 mill 2 and pick artifact. Needs the "rival picks" hidden-zone choice + CDA Construct PT (parallels `CdaPowerToughnessEffect` / Tarmogoyf). Modern affinity / Tron threat. |
 | 16 | Esika's Chariot | medium | Legendary Artifact — Vehicle {3}{G} 4/4 Crew 4 (KHM) — ETB creates two 2/2 Green Cat tokens + attack trigger creates a copy of a target token you control. Reuses `VehicleCrewEffect` + a token-copy attack trigger (Splinter Twin's `CopyEffect`-snapshot path is the closest analogue). Modern Yawgmoth / Amulet sideboard. |

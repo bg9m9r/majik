@@ -116,6 +116,52 @@ public sealed class SpellCostIncreaseAbility : IAbility
 }
 
 /// <summary>
+/// CR 117.7 — subtractive sibling to <see cref="SpellCostIncreaseAbility"/>.
+/// "&lt;Spell-shape&gt; spells you cast cost {N} less to cast" (Goblin
+/// Electromancer, Baral Chief of Compliance, Goblin Anarchomancer family).
+/// Lives on a permanent that's already on the battlefield rather than on
+/// the spell being cast — <see cref="CostReduction.GetEffectiveCost(ICard,
+/// Player, IEnumerable{Player}?)"/> scans the controller's battlefield for
+/// these abilities at cost-calculation time and sums their per-cast deltas
+/// into the spell's generic-mana reduction.
+///
+/// The reducer owns the spell-eligibility check via <see cref="Predicate"/>
+/// — "instant and sorcery spells you cast" maps to a predicate that returns
+/// true only when the spell being cast has CardType.Instant or
+/// CardType.Sorcery. Coloured pips are untouched (CR 117.7c); the reduction
+/// is layered into the same floor-at-zero clamp as
+/// <see cref="CostReductionAbility"/>, before <see cref="SpellCostIncreaseAbility"/>
+/// riders are layered back on. Scoped to the CONTROLLER's battlefield —
+/// "spells YOU cast" means the controller of the reducer permanent (no
+/// opponent-affecting global cost reducers in v1).
+/// </summary>
+public sealed class SpellCostReductionAbility : IAbility
+{
+    /// <summary>Predicate matching spells (the card being cast) that this
+    /// ability reduces the cost of. "Instant and sorcery spells you cast"
+    /// returns true when <c>card.HasType(CardType.Instant) ||
+    /// card.HasType(CardType.Sorcery)</c>.</summary>
+    public Func<ICard, bool> Predicate { get; }
+
+    /// <summary>Per-cast generic-mana reduction. Inputs are the card being
+    /// cast and the caster. Returning zero is fine — emits no reduction for
+    /// that cast.</summary>
+    public Func<ICard, Player, int> Reduction { get; }
+
+    public string Description { get; }
+
+    public SpellCostReductionAbility(
+        Func<ICard, bool> predicate,
+        Func<ICard, Player, int> reduction,
+        string description)
+    {
+        Predicate = predicate ?? throw new ArgumentNullException(nameof(predicate));
+        Reduction = reduction ?? throw new ArgumentNullException(nameof(reduction));
+        Description = description ?? string.Empty;
+    }
+}
+
+/// <summary>
 /// Cost-calculation entry point. Pure function — no side effects. Called
 /// by <see cref="Majik.Core.Game.SpellCastFlow"/> for the actual payment
 /// cost and by HeuristicBotAgent's mana picker for affordability.
@@ -129,7 +175,13 @@ public static class CostReduction
     /// CR 117.7 / 601.2f cost calculation. Applies (in order):
     ///   1. Printed cost reductions on the card itself
     ///      (<see cref="CostReductionAbility"/> — Affinity, Domain, …).
-    ///   2. Additive riders from battlefield permanents under any player
+    ///   2. Subtractive riders from battlefield permanents under the caster
+    ///      (<see cref="SpellCostReductionAbility"/> — Goblin Electromancer,
+    ///      Baral, …) — "&lt;X&gt; spells you cast cost {N} less". Always
+    ///      scanned against the caster's battlefield (no
+    ///      <paramref name="allPlayers"/> needed since the rider is scoped
+    ///      to the controller).
+    ///   3. Additive riders from battlefield permanents under any player
     ///      (<see cref="SpellCostIncreaseAbility"/> — Damping Sphere, Thalia,
     ///      …) — only scanned when <paramref name="allPlayers"/> is supplied.
     ///      Callers without a game-graph reference pass null and the
@@ -174,6 +226,22 @@ public static class CostReduction
                 var count = battlefield.Count(c =>
                     c.InstanceId != card.InstanceId && r.Predicate(c));
                 totalReduction += count * r.PerInstance;
+            }
+        }
+
+        // SpellCostReductionAbility — "<X> spells you cast cost {N} less"
+        // (Goblin Electromancer family). Scoped to the caster's battlefield
+        // since the printed text says "you cast"; no allPlayers scan needed.
+        // Reducer permanent itself doesn't need to exclude — the spell being
+        // cast is on the stack, not the battlefield. Folds into the same
+        // floor-at-zero bucket as the printed reducers below.
+        foreach (var perm in caster.Zones.Battlefield.GetCards())
+        {
+            foreach (var red in perm.Abilities.OfType<SpellCostReductionAbility>())
+            {
+                if (!red.Predicate(card)) continue;
+                var delta = red.Reduction(card, caster);
+                if (delta > 0) totalReduction += delta;
             }
         }
 
