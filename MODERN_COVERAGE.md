@@ -62,6 +62,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Ledger Shredder | Creature | #193 | second-spell surveil + counter |
 | Library Surveyor | Creature | — | ETB tutor shell |
 | Liliana of the Veil | Planeswalker | #178 | +1 discard, -2 discard |
+| Living End | Sorcery | TBD | Cascade + each-player mass-exile-grave + sac-creatures + mass-reanimate |
 | Lurrus of the Dream-Den | Creature | TBD | Lifelink + cast-permanent-mv≤2-from-graveyard once per your turn (companion deck-rule deferred) |
 | Magus of the Moon | Creature | #157 | nonbasic-to-Mountain |
 | Mishra's Bauble | Artifact | — | sac → look + delayed draw |
@@ -290,7 +291,7 @@ Per-keyword action helpers under `Majik.Core/Keywords/`:
 - **Death's Shadow** — Mid-high. Thoughtseize, Fatal Push, Snapcaster Mage, Stubborn Denial, Death's Shadow itself (CDA P/T scaled by controller life — Layer 7a) all in. Mishra's Bauble in. Temur Battle Rage absent. ~60%.
 - **Murktide / Izzet Tempo** — High. Murktide Regent done, Counterspell done, Snapcaster Mage done, Lightning Bolt done, Expressive Iteration done, Ledger Shredder done, Consider done, Spell Pierce done, Subtlety done. Missing: Demilich absent. ~75%.
 - **Mono-Green Tron** — High. Ancient Stirrings, Sylvan Scrying, Wurmcoil Engine done. Karn Liberated done. Karn, the Great Creator done. Tron lands (Urza's Mine + Tower + Power-Plant) done with the conditional {2} mana ability. ~70%.
-- **Living End / Crashing Footfalls cascade** — Mid. Cascade keyword done (`Keywords/CascadeAction.cs`) + Crashing Footfalls shipped. Suspend (#183) + Cascade now both online; Living End still needs the mass-exile-grave-then-mass-reanimate effect chain. ~40%.
+- **Living End / Crashing Footfalls cascade** — High. Cascade keyword done (`Keywords/CascadeAction.cs`) + Crashing Footfalls shipped (#219). Living End shipped (this PR) with both the Cascade trigger and the resolve chain (per-player mass-exile-grave + sacrifice-creatures + mass-reanimate; ETB triggers fire on reanimated permanents via PR #174 plumbing). Suspend itself is done (#183). ~75%.
 - **Rakdos Scam** — Mid-high. Grief done (#205, mirrors Solitude evoke + ETB pattern). Fury done (mirrors Solitude/Grief). Dauthi Voidwalker absent. Liliana of the Veil done, Fatal Push done, Thoughtseize done. ~55%.
 - **Yawgmoth combo** — Mid. Yawgmoth done. Undying creatures (Young Wolf, Strangleroot Geist, Geralf's Messenger) done. Chord of Calling, Eldritch Evolution absent. ~50%.
 - **Domain Zoo** — Mid. Boros Charm done, fetches done, shocks done, Tribal Flames done. Scion of Draco + Territorial Kavu absent. ~35%.
@@ -304,7 +305,7 @@ Sorted by build priority (small infra lift × high meta share).
 
 | # | Card | Difficulty | Blocker |
 |---|---|---|---|
-| 1 | Living End | Mid | Cascade done; still needs mass-exile-grave + simultaneous mass-reanimate (#174 ready for the latter) |
+| 1 | (open) | — | Living End, Crashing Footfalls, and Cascade all landed; backlog needs a refresh against the next archetype-coverage pass. |
 
 ## How to update this doc
 
