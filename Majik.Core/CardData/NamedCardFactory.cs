@@ -726,6 +726,24 @@ public static class NamedCardFactory
             //  Moon, Spreading Seas, Urborg, Yavimaya) feed through.
             "Tribal Flames" => TribalFlamesFactory.Create(owner),
 
+            // Instant — {R} (TibaltsTrickeryFactory). Kaldheim.
+            // "Counter target spell. Its controller mills three cards, then
+            //  exiles cards from the top of their library until they exile
+            //  a nonland card that shares a card type with it. They may
+            //  cast that card without paying its mana cost. Then they put
+            //  all cards exiled this way that weren't cast on the bottom
+            //  of their library in a random order." CR 701.5 (counter) +
+            //  CR 701.13 (mill) + CR 308.2 (shared card type). Card shape
+            //  only here; the resolve-time SpellDefinition is built on
+            //  demand via TibaltsTrickeryFactory.BuildSpellDefinition.
+            //  The optional "may cast for free" rider is delivered through
+            //  an onResolved callback (mirrors CrashingFootfallsFactory's
+            //  cascade-resolved hook) — production callers wire a
+            //  CastFromExileAlternativeCost + SpellCastFlow path; the
+            //  default leaves the eligible card in exile until the bottom
+            //  step sweeps it into the random-order pile.
+            "Tibalt's Trickery" => TibaltsTrickeryFactory.Create(owner),
+
             // Artifact — {1} (PithingNeedleFactory).
             // "As Pithing Needle enters, choose a card name. Activated
             //  abilities of sources with the chosen name can't be
