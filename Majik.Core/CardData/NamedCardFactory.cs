@@ -694,6 +694,22 @@ public static class NamedCardFactory
             // (PowerPlant).
             "Urza's Power-Plant" => UrzasPowerPlantFactory.Create(owner),
 
+            // Legendary Creature — Cat Nightmare {W}{B} 3/2 (LurrusOfTheDreamDenFactory).
+            // Lifelink keyword wired. Static ability surfaced with description
+            // "During each of your turns, you may cast one permanent spell
+            // with mana value 2 or less from your graveyard." Companion deck-
+            // construction rule (CR 702.139) deferred — that is a deck-builder
+            // foundational concern, not a runtime gameplay one. The runtime
+            // grave-cast gate (per-turn budget, mv ≤ 2, permanent-only,
+            // controller's-turn-only) is exposed via
+            // LurrusOfTheDreamDenFactory.GetGate(card); callers compose it
+            // with a GraveyardCastAlternativeCost via BuildAlternativeCost.
+            // The single-arg dispatcher path here produces the correct card
+            // shape without bus-driven turn-boundary reset wiring (suitable
+            // for shape tests). Use the (owner, eventBus) overload to enable
+            // automatic per-turn budget reset on TurnStartedEvent.
+            "Lurrus of the Dream-Den" => LurrusOfTheDreamDenFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 

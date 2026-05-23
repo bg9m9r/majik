@@ -2,8 +2,8 @@
 
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
-**Last updated:** 2026-05-24
-**Latest origin/main:** 6aeb85c (… + Primeval Titan) + Karn, the Great Creator + Crashing Footfalls / Cascade
+**Last updated:** 2026-05-25
+**Latest origin/main:** 6aeb85c (… + Primeval Titan + Karn, the Great Creator + Crashing Footfalls / Cascade) + Lurrus of the Dream-Den (this PR)
 
 ## Headline numbers
 
@@ -61,6 +61,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Ledger Shredder | Creature | #193 | second-spell surveil + counter |
 | Library Surveyor | Creature | — | ETB tutor shell |
 | Liliana of the Veil | Planeswalker | #178 | +1 discard, -2 discard |
+| Lurrus of the Dream-Den | Creature | TBD | Lifelink + cast-permanent-mv≤2-from-graveyard once per your turn (companion deck-rule deferred) |
 | Magus of the Moon | Creature | #157 | nonbasic-to-Mountain |
 | Mishra's Bauble | Artifact | — | sac → look + delayed draw |
 | Murktide Regent | Creature | #194 | delve cost + ETB X counters |
@@ -178,6 +179,7 @@ Cards under `Majik.Core/CardData/Cards/*.json`:
 | Spectacle | Stub | `Costs/SpectacleAlternativeCost.cs` |
 | Overload | Stub | `Costs/OverloadAlternativeCost.cs` |
 | Cast-from-exile | Done | `Costs/CastFromExileAlternativeCost.cs` (suspend resolution) |
+| Cast-from-graveyard (Lurrus) | Done (TBD PR) | `Costs/GraveyardCastAlternativeCost.cs` + `CardData/Factories/LurrusOfTheDreamDenFactory.cs` (per-turn gate, mv ≤ 2, permanent-only) |
 | Sacrifice-self | Done | `Costs/SacrificeAnotherCreatureCost.cs`, `SacrificeCreatureCost.cs`, `SacrificeBasicLandCost.cs` |
 | Discard-self | Done | `Costs/DiscardSelfCost.cs` |
 | Remove-counter | Done | `Costs/RemovePlusOnePlusOneCounterCost.cs` |
@@ -291,6 +293,7 @@ Per-keyword action helpers under `Majik.Core/Keywords/`:
 - **Yawgmoth combo** — Mid. Yawgmoth done. Undying creatures (Young Wolf, Strangleroot Geist, Geralf's Messenger) done. Chord of Calling, Eldritch Evolution absent. ~50%.
 - **Domain Zoo** — Mid. Boros Charm done, fetches done, shocks done, Tribal Flames done. Scion of Draco + Territorial Kavu absent. ~35%.
 - **Amulet Titan** — Mid. Amulet of Vigor done (untap-on-enters-tapped trigger) + Primeval Titan done (ETB + attack land-tutor for up to 2, tapped). No bounce lands. ~30%.
+- **Lurrus Companion** — Low-mid. Lurrus of the Dream-Den done (Lifelink + once-per-turn cast-permanent-mv≤2-from-graveyard; companion deck-construction rule deferred). Pairs with the existing low-mv permanent suite (Mishra's Bauble, Dryad Arbor, Stoneforge Mystic, Walking Ballista, Dark Confidant, etc.). Deck-construction enforcement absent. ~30%.
 - **Hammer Time / Equipment** — Low-mid. Stoneforge Mystic done. Sigarda's Aid, Colossus Hammer, Puresteel Paladin absent. ~20%.
 
 ## Top 20 Modern staples NOT yet implemented
