@@ -259,6 +259,16 @@ public static class NamedCardFactory
             // grant expiration on the next Cleanup step.
             "Snapcaster Mage" => SnapcasterMageFactory.Create(owner),
 
+            // Creature — Lhurgoyf {1}{G} (TarmogoyfFactory).
+            // CR 604.3 / 613.2 — Layer 7a characteristic-defining P/T.
+            // Power = number of distinct card types across all graveyards;
+            // toughness = power + 1. Wired via
+            // TarmogoyfFactory.Create(owner, effects, eventBus, graveyardSource)
+            // when runtime services are available; the single-arg dispatcher
+            // path here produces the correct card shape only (printed 0/1
+            // seed, no live CDA).
+            "Tarmogoyf" => TarmogoyfFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
