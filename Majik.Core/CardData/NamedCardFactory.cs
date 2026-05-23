@@ -1877,6 +1877,19 @@ public static class NamedCardFactory
             // StormHelper + SpellCopier xmldocs). Mirrors Brain Freeze.
             "Tendrils of Agony" => TendrilsOfAgonyFactory.Create(owner),
 
+            // Sorcery — {2}{R} (HidetsugusSecondRiteFactory). Champions of
+            // Kamigawa / Kamigawa: Neon Dynasty reprint. "If target
+            // opponent's life total is exactly 10, Hidetsugu's Second Rite
+            // deals 10 damage to them." Card shape only here; the
+            // resolve-time SpellDefinition (target-opponent request +
+            // life == 10 gate + 10 damage via OracleSpellBinder.DealDamage)
+            // is built on demand via
+            // HidetsugusSecondRiteFactory.BuildSpellDefinition. CR 608.2c
+            // — printed "if ..." is a resolve-time condition; non-10 life
+            // totals are a clean no-op rather than an illegal-target
+            // failure.
+            "Hidetsugu's Second Rite" => HidetsugusSecondRiteFactory.Create(owner),
+
             // Artifact — {1} (SolRingFactory). Limited Edition Alpha.
             // "{T}: Add {C}{C}." Single tap mana ability adding two
             // colourless (ManaCost.Parse("CC") routes {C} through the
