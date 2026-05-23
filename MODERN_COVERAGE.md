@@ -3,13 +3,13 @@
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
 **Last updated:** 2026-05-23
-**Latest origin/main:** Brain Freeze (Instant {U}{U} — mill 3 target player + Storm trigger (CR 702.40) via new `StormHelper` counting `TurnState.SpellsCastByPlayer - 1` and pushing copies through `SpellCopier.PushCopyOfTopSpell`; CR 702.40a retargeting deferred) on top of Lightning Helix + Sword of Feast and Famine + Boros Reckoner + Mishra's Workshop + Goblin Welder + Sword of Fire and Ice + Reckless Charge + Trinket Mage + Sun Titan + Sensei's Divining Top + Inkmoth Nexus + Spell Queller + Goblin Matron + Mutavault + Skullclamp + Umezawa's Jitte + Wasteland + Swords to Plowshares + Mystical Tutor + Path to Exile + Daze + Ponder + Preordain + Splinter Twin + Sythis, Harvest's Hand + Pyromancer's Goggles + Plague Engineer + Manabarbs + Yawgmoth's Will + Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere.
+**Latest origin/main:** Wheel of Fortune (Sorcery {2}{R} — each player discards their hand, then draws seven cards; all discards resolve before any draws; empty-library mid-draw flags CR 704.5b SBA loss on that player only) on top of Brain Freeze + Lightning Helix + Sword of Feast and Famine + Boros Reckoner + Mishra's Workshop + Goblin Welder + Sword of Fire and Ice + Reckless Charge + Trinket Mage + Sun Titan + Sensei's Divining Top + Inkmoth Nexus + Spell Queller + Goblin Matron + Mutavault + Skullclamp + Umezawa's Jitte + Wasteland + Swords to Plowshares + Mystical Tutor + Path to Exile + Daze + Ponder + Preordain + Splinter Twin + Sythis, Harvest's Hand + Pyromancer's Goggles + Plague Engineer + Manabarbs + Yawgmoth's Will + Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere.
 
 ## Headline numbers
 
 | Metric | Count |
 |---|---|
-| Named factories | 133 |
+| Named factories | 134 |
 | Bespoke templates | 27 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
@@ -158,6 +158,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Walking Ballista | Artifact Creature | — | grow + ping |
 | Wasteland | Land | TBD | {T}: {C} + {T}, sac: destroy target nonbasic land (ActivatedAbility with TargetRequest; self-sacrifice inline at resolution while AdditionalCost.Sacrifice is stubbed — mirrors Karakas's bounce shape) |
 | Wastewood Verge | Land | — | B/G activation-gate land |
+| Wheel of Fortune | Sorcery | TBD | {2}{R} — each player discards their hand, then draws seven cards. All discards resolve before any draws (the "then" sequences both halves); empty-library mid-draw flags CR 704.5b SBA loss on that player only. Card shape only at the named-factory dispatcher; resolve effect (hand → graveyard for every player, then 7 top-of-library draws) is built on demand via `WheelOfFortuneFactory.BuildResolveEffect(allPlayers)`. Distinct from the shuffle-wheel template (Day's Undoing / Time Reversal / Echo of Eons / Emergency Powers) which routes through `SpellTemplates.Templates.Library.WheelTemplate` — Wheel of Fortune discards into graveyard rather than shuffling hand+graveyard into library |
 | Wishclaw Talisman | Artifact | TBD | {1}{B} ETB tapped + {T}, Pay 3 life: tutor any card → hand + ControlChangeEffect (CR 613.2) swaps control to a caller-chosen opponent; sorcery-speed gate + shuffle + opponent-prompt deferred |
 | Wrenn and Six | Planeswalker | #178 | +1 land return, -1 ping |
 | Wrenn and Realmbreaker | Planeswalker | TBD | +1 mill 3 + may-return-land, -2 reanimate nonland permanent, -7 structural emblem |

@@ -549,6 +549,17 @@ public static class NamedCardFactory
             // so Player / Creature / Planeswalker targets all work.
             "Lightning Helix" => LightningHelixFactory.Create(owner),
 
+            // Sorcery — {2}{R} (WheelOfFortuneFactory). Limited Edition Alpha /
+            // Revised. "Each player discards their hand, then draws seven cards."
+            // Card shape only here; the resolve-time effect is built on demand
+            // via WheelOfFortuneFactory.BuildResolveEffect(allPlayers). Distinct
+            // from the shuffle-wheel template (Day's Undoing / Time Reversal /
+            // Echo of Eons / Emergency Powers) which routes through
+            // SpellTemplates.Templates.Library.WheelTemplate — Wheel of Fortune
+            // discards into graveyard rather than shuffling hand+graveyard into
+            // library, so it needs its own factory.
+            "Wheel of Fortune" => WheelOfFortuneFactory.Create(owner),
+
             // Instant — {R}{R} (SearingBlazeFactory). Worldwake / Modern Horizons.
             // "Searing Blaze deals 1 damage to target player or planeswalker
             //  and 1 damage to target creature that player or that
