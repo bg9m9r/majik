@@ -9,7 +9,7 @@ Living tracker for Modern-format card + mechanic implementation in the Majik eng
 
 | Metric | Count |
 |---|---|
-| Named factories | 156 |
+| Named factories | 158 |
 | Bespoke templates | 27 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
@@ -40,6 +40,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Bonecrusher Giant | Creature | TBD | 4/3 Giant {2}{R} + targeted-by-spell trigger deals 2 to spell's controller (Adventure / Stomp half deferred) |
 | Boros Reckoner | Creature | TBD | 3/3 Minotaur Wizard {R/W}{R/W}{R/W} + first strike + damage-received trigger redirecting that much damage to any target (v1 triggered, not the printed *replacement* effect — damage still resolves on Boros Reckoner before the redirect fires, and the redirect goes on the stack). Hybrid {R/W} parses via ManaCost.Parse's HybridPip path |
 | Boseiju, Who Endures | Land | — | channel destroy stub |
+| Bridge from Below | Enchantment | TBD | {B} (banned Modern) — graveyard-resident enchantment with two triggered abilities scoped to `activeZones = {Graveyard}` (CR 603.6d). Zombie trigger fires on `CardMovedEvent` Battlefield → Graveyard gated on Creature + !IsToken + into Bridge controller's graveyard, with an intervening-if checking Bridge is in its controller's graveyard (CR 603.4) — creates a 2/2 Zombie creature token via `TokenFactory.CreateOnBattlefield`. Self-exile trigger fires on `CardMovedEvent` Battlefield → Graveyard gated on Creature landing in an opponent's graveyard — moves Bridge graveyard → exile via raw zone mutation. Token-colour identity (black) deferred — same gap as Crashing Footfalls' green Rhinos / Wurmcoil's colourless Wurms. Top-20 #6 cleared |
 | Brain Freeze | Instant | TBD | {U}{U} — mill 3 target player + Storm (CR 702.40) on-cast trigger via StormHelper (count = TurnState.SpellsCastByPlayer - 1; copies via SpellCopier.PushCopyOfTopSpell re-executing the spell's effects per copy). CR 702.40a "you may choose new targets" + copies-as-distinct-stack-objects deferred (inherited from SpellCopier) |
 | Burst Lightning | Instant | TBD | {R} — 2 damage to any target; "if Burst Lightning was kicked" branch deals 4 damage instead (CR 702.33). Kicker primitive deferred — no IAdditionalCost for Kicker, no "was kicked" bit plumbed through SpellCastFlow yet, so production casts ship not-kicked (2 dmg). Kicked branch is structural and reachable via BuildSpellDefinition(resolver, wasKicked: true) |
 | Cabal Ritual | Instant | TBD | add {B}{B}{B}; threshold (7+ own grave) replaces with five colourless (CR 702.50) |
@@ -83,6 +84,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Grief | Creature | #205 | evoke pitch + ETB discard |
 | Grist, the Hunger Tide | Planeswalker | — | +1 token, -2 reanimate |
 | Harbinger of the Seas | Creature | #157 | nonbasic-to-Island |
+| Hogaak, Arisen Necropolis | Creature | TBD | Legendary Creature — Avatar {B}{B}{G}{G} 8/8 (MH1, banned Modern). Trample + Convoke keyword markers wired. Convoke alt-cost surfaced via `HogaakFactory.BuildAlternativeCost` (`ConvokeAlternativeCost` — same v1-lossy reduction plumbing as Chord of Calling). Additional cost (CR 601.2f — exile two creature cards from controller's graveyard) surfaced via `HogaakFactory.BuildExileTwoCreaturesAdditionalCost` (`ExileCreaturesFromGraveyardAdditionalCost` — generic shape parameterised on count so other graveyard-exile costs reuse it; `Exiled` captures the cards paid). "Can't be cast from hand" + "Hogaak's mana value is 8" documented but unenforced — no legal-cast-zones predicate on `SpellDefinition` and no name-keyed mana-value override surface exist yet. Convoke reduction integration deferred (same gap as Chord of Calling). Top-20 #5 cleared |
 | Inkmoth Nexus | Land | — | {T}: {C} + {1}: until EOT becomes 1/1 Phyrexian Insect artifact creature with flying + infect (still a land); infect mechanic deferred — keyword marker only |
 | Inspiring Vantage | Land | — | R/W fastland |
 | Karn, the Great Creator | Planeswalker | TBD | opponent-artifact static + +1 animate + -2 wishboard |
@@ -177,6 +179,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Urza's Mine | Land | TBD | Tron — {T}: {C}, {2} if all 3 Urza lands controlled |
 | Urza's Power-Plant | Land | TBD | Tron — {T}: {C}, {2} if all 3 Urza lands controlled |
 | Urza's Tower | Land | TBD | Tron — {T}: {C}, {2} if all 3 Urza lands controlled |
+| Uro, Titan of Nature's Wrath | Creature | TBD | Legendary Creature — Elder Giant {1}{G}{U} 6/6 (Theros Beyond Death). Three triggered abilities: (1) "When Uro enters, sacrifice it unless it escaped" — Escape (CR 702.143) not wired in v1, so the rider is structurally collapsed to "always sacrifice on ETB" faithful to the printed hardcast case (CR 603.1 + CR 701.16); (2)/(3) ETB + attack — gain 3 life (CR 119.3), draw a card (CR 121.1 — top-of-library, marks `MarkTriedToDrawFromEmptyLibrary` on empty per CR 704.5b), then may put a land card from hand onto the battlefield (CR 113.6c — alt-zone "play", v1 deterministic first-land-in-hand auto-accept, same shape as Aether Vial / Sneak Attack / Through the Breach). Single-arg dispatcher uses raw zone moves; `(owner, zoneService, eventBus, triggers)` overload routes the land-play through `ZoneService.MoveCard` so ETB triggers on the played land fire (CR 603.6a) and registers all three triggers with a live manager. Escape alt-cost (cast-from-graveyard + exile 5 other graveyard cards) deferred — no graveyard cast alt-cost + multi-card-exile additional-cost primitive yet. "Elder" subtype not in `CardSubtype` — Giant is wired |
 | Vampiric Tutor | Instant | TBD | {B} — search library for any card → top of library + controller loses 2 life. Sibling of Mystical Tutor: no predicate (unrestricted pick), pick destination is library index 0 via IZone.InsertCardAt, deterministic first-match fallback when no agent is registered. CR 701.19a decline path supported (agent returns null → no tutor); 2-life payment fires unconditionally via Player.LoseLife. Shuffle deferred (no IZone.Shuffle — same rationale as the rest of the tutor surface) |
 | Veil of Summer | Instant | TBD | conditional draw on opp UB cast + uncounterable rider (structural) + Hexproof-from-Blue/Black grant on controller's creatures (structural — TargetLegality only checks bare Hexproof; player-side hexproof deferred) |
 | Vexing Bauble | Artifact | — | sac-draw shell |
