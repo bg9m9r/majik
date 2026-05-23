@@ -1,3 +1,4 @@
+using Majik.Bot.Diagnostics;
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Game;
@@ -25,24 +26,81 @@ public static class TriggerOrderPolicy
     /// Stable-sort <paramref name="mine"/> so high-impact triggers resolve
     /// first. Ties preserve the original order (which carries timestamp
     /// semantics from <see cref="Majik.Core.Abilities.TriggerManager"/>).
+    ///
+    /// <para>When a <paramref name="sink"/> is supplied, emits a
+    /// <c>"TriggerOrder"</c> decision with the trigger that resolves
+    /// first (= last in returned list) as the chosen action, and the
+    /// remaining triggers as alternatives ranked by their score.</para>
     /// </summary>
     public static IReadOnlyList<ITriggeredAbility> Order(
         GameContext ctx,
-        IReadOnlyList<ITriggeredAbility> mine)
+        IReadOnlyList<ITriggeredAbility> mine,
+        IBotDecisionSink? sink = null)
     {
         if (mine.Count <= 1) return mine;
 
-        // Pair each trigger with its score and its original index for
-        // stable ordering, then sort ascending so the best score lands at
-        // the END of the list (= top of the stack = resolves first).
+        // Score once, sort, and reuse the scored tuples for emission.
         var scored = mine
             .Select((t, idx) => (trigger: t, score: ScoreTrigger(t), idx))
+            .ToList();
+
+        var ordered = scored
             .OrderBy(x => x.score)
             .ThenBy(x => x.idx)
             .Select(x => x.trigger)
             .ToList();
 
-        return scored;
+        EmitDecision(ctx, scored, sink);
+        return ordered;
+    }
+
+    private static void EmitDecision(
+        GameContext ctx,
+        IReadOnlyList<(ITriggeredAbility trigger, double score, int idx)> scored,
+        IBotDecisionSink? sink)
+    {
+        if (sink is null || ReferenceEquals(sink, NullBotDecisionSink.Instance)) return;
+
+        // Highest score = top of stack = resolves first; this is the
+        // "chosen" decision (the one the bot prioritised). Alternatives
+        // are the remaining triggers, ranked by their score.
+        var byScore = scored.OrderByDescending(x => x.score).ToList();
+        var top = byScore[0];
+        var chosenLabel = LabelFor(top.trigger);
+        var alts = byScore
+            .Skip(1)
+            .Take(3)
+            .Select(x => new BotDecisionAlternative(LabelFor(x.trigger), x.score))
+            .ToList();
+
+        var ctxFlags = new Dictionary<string, string>
+        {
+            ["turn"] = ctx.TurnNumber.ToString(),
+            ["phase"] = ctx.CurrentPhase?.ToString() ?? "null",
+            ["triggerCount"] = scored.Count.ToString(),
+            ["stackSize"] = ctx.Stack.Count.ToString(),
+        };
+        // Flag the all-zero case so log scrapers can identify "we had no
+        // basis to differentiate" — common for engine-internal effects with
+        // sparse Description strings, where ordering is just timestamp.
+        if (byScore.All(x => x.score == 0.0)) ctxFlags["noSignal"] = "true";
+
+        try
+        {
+            sink.Record(new BotDecision(
+                DecisionType: "TriggerOrder",
+                Chosen: chosenLabel,
+                ChosenScore: top.score,
+                Alternatives: alts,
+                Context: ctxFlags));
+        }
+        catch { /* observer fault must not abort engine */ }
+    }
+
+    private static string LabelFor(ITriggeredAbility trig)
+    {
+        var sourceName = trig.Source is ICard c ? (c.Name ?? "?") : trig.Source?.GetType().Name ?? "?";
+        return $"Trigger:{sourceName}";
     }
 
     /// <summary>

@@ -1,3 +1,4 @@
+using Majik.Bot.Diagnostics;
 using Majik.Bot.Evaluation;
 using Majik.Core.Cards;
 using Majik.Core.Game;
@@ -20,27 +21,83 @@ public static class ModalPolicy
     /// "more impact = better" heuristic that approximates what every
     /// archetype wants in absence of mode metadata. Tie → first mode
     /// (legal mode 0 is always a safe fallback).
+    ///
+    /// <para>When a <paramref name="sink"/> is supplied, emits a
+    /// <c>"Mode"</c> decision recording the chosen mode + score and the
+    /// next three alternatives by score. Sink is observational — the
+    /// returned index is unaffected by its presence.</para>
     /// </summary>
-    public static int PickMode(GameContext ctx, Player self, IReadOnlyList<string> modes)
+    public static int PickMode(
+        GameContext ctx, Player self, IReadOnlyList<string> modes,
+        IBotDecisionSink? sink = null)
     {
         if (modes.Count == 0) return 0;
 
         int bestIdx = 0;
         double bestScore = double.NegativeInfinity;
+        // Score every mode up front so we can both pick and surface alternatives.
+        var scored = new (int idx, string text, double score)[modes.Count];
         for (int i = 0; i < modes.Count; i++)
         {
             var score = ScoreModeText(modes[i]);
+            scored[i] = (i, modes[i], score);
             if (score > bestScore)
             {
                 bestScore = score;
                 bestIdx = i;
             }
         }
+
+        EmitDecision(ctx, self, bestIdx, bestScore, scored, sink);
         return bestIdx;
     }
 
     public static int PickX(GameContext ctx, Player self)
         => self.Zones.Battlefield.GetCards().OfType<Land>().Count();
+
+    private static void EmitDecision(
+        GameContext ctx, Player self,
+        int chosenIdx, double chosenScore,
+        (int idx, string text, double score)[] scored,
+        IBotDecisionSink? sink)
+    {
+        if (sink is null || ReferenceEquals(sink, NullBotDecisionSink.Instance)) return;
+
+        var chosenLabel = LabelFor(chosenIdx, scored[chosenIdx].text);
+        var alts = scored
+            .Where(s => s.idx != chosenIdx)
+            .OrderByDescending(s => s.score)
+            .Take(3)
+            .Select(s => new BotDecisionAlternative(LabelFor(s.idx, s.text), s.score))
+            .ToList();
+
+        var ctxFlags = new Dictionary<string, string>
+        {
+            ["turn"] = ctx.TurnNumber.ToString(),
+            ["phase"] = ctx.CurrentPhase?.ToString() ?? "null",
+            ["modeCount"] = scored.Length.ToString(),
+            ["life"] = self.LifeTotal.ToString(),
+        };
+        if (scored.Length == 1) ctxFlags["forced"] = "true";
+
+        try
+        {
+            sink.Record(new BotDecision(
+                DecisionType: "Mode",
+                Chosen: chosenLabel,
+                ChosenScore: chosenScore,
+                Alternatives: alts,
+                Context: ctxFlags));
+        }
+        catch { /* observer fault must not abort engine */ }
+    }
+
+    private static string LabelFor(int idx, string text)
+    {
+        // Truncate so the label stays log-friendly even on essay-length modes.
+        var snippet = text.Length > 40 ? text.Substring(0, 40) + "…" : text;
+        return $"Mode[{idx}]:{snippet}";
+    }
 
     /// <summary>
     /// Token-bag heuristic over the mode's printed description.

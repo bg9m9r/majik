@@ -34,12 +34,12 @@ internal sealed class HeuristicStrategy : IBotStrategy
         => hand.OrderByDescending(c => c is Land ? 0 : 1).Take(countToBottom).ToList();
 
     public IReadOnlyList<object> PickTargets(GameContext ctx, Player self, TargetRequest request)
-        => TargetPolicy.Pick(ctx, self, request);
+        => TargetPolicy.Pick(ctx, self, request, _sink);
 
     public int PickX(GameContext ctx, Player self) => ModalPolicy.PickX(ctx, self);
 
     public int PickMode(GameContext ctx, Player self, IReadOnlyList<string> modes)
-        => ModalPolicy.PickMode(ctx, self, modes);
+        => ModalPolicy.PickMode(ctx, self, modes, _sink);
 
     public ManaPayment PickMana(GameContext ctx, Player self, ManaCost cost)
         => ManaPolicy.Pick(ctx, self, 0, 0);
@@ -51,7 +51,7 @@ internal sealed class HeuristicStrategy : IBotStrategy
         => _combat.PickBlockers(ctx, self, attackers, eligible);
 
     public IReadOnlyList<ITriggeredAbility> OrderTriggers(GameContext ctx, IReadOnlyList<ITriggeredAbility> mine)
-        => TriggerOrderPolicy.Order(ctx, mine);
+        => TriggerOrderPolicy.Order(ctx, mine, _sink);
 
     public Majik.Core.Keywords.ScryAction.ScryDecision PickScry(GameContext? ctx, Player self, IReadOnlyList<ICard> peeked)
         => ctx == null
