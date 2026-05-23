@@ -3,13 +3,13 @@
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
 **Last updated:** 2026-05-23
-**Latest origin/main:** ceebf02 (… + Lurrus of the Dream-Den + Colossus Hammer + Sigarda's Aid + Living End + Phyrexian Tower + Puresteel Paladin) + Aether Vial (this PR)
+**Latest origin/main:** 2a73105 (… + Lurrus of the Dream-Den + Colossus Hammer + Sigarda's Aid + Living End + Phyrexian Tower + Puresteel Paladin + Aether Vial) + Mox Opal (this PR)
 
 ## Headline numbers
 
 | Metric | Count |
 |---|---|
-| Named factories | 83 |
+| Named factories | 84 |
 | Bespoke templates | 26 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
@@ -67,6 +67,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Lurrus of the Dream-Den | Creature | TBD | Lifelink + cast-permanent-mv≤2-from-graveyard once per your turn (companion deck-rule deferred) |
 | Magus of the Moon | Creature | #157 | nonbasic-to-Mountain |
 | Mishra's Bauble | Artifact | — | sac → look + delayed draw |
+| Mox Opal | Artifact | TBD | Legendary {0}: Metalcraft-gated any-color mana (CR 702.95) |
 | Murktide Regent | Creature | #194 | delve cost + ETB X counters |
 | Orcish Bowmasters | Creature | — | reactive ping shell |
 | Pithing Needle | Artifact | #189 | name-targeted activated suppression |

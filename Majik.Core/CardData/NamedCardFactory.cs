@@ -781,6 +781,17 @@ public static class NamedCardFactory
             // SacrificeChoice for deterministic test/bot behavior.
             "Phyrexian Tower" => PhyrexianTowerFactory.Create(owner),
 
+            // Legendary Artifact — {0} (MoxOpalFactory). Scars of Mirrodin.
+            // "Metalcraft — {T}: Add one mana of any color. Activate only if
+            //  you control three or more artifacts." CR 702.95. Five
+            // ManaAbility instances (one per WUBRG), each gated on
+            // !IsTapped AND controller's artifact count >= 3 (Mox Opal
+            // itself counts when on the battlefield). Opponent artifacts
+            // do not contribute. Single modal-colour ability shape is not
+            // in the engine yet — same five-ability fan-out used by
+            // DelightedHalflingFactory.
+            "Mox Opal" => MoxOpalFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
