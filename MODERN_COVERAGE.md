@@ -3,13 +3,13 @@
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
 **Last updated:** 2026-05-23
-**Latest origin/main:** Daze (bounce-Island pitch + counter-unless-pay-1) on top of Sythis, Harvest's Hand + Pyromancer's Goggles + Plague Engineer + Manabarbs + Yawgmoth's Will + Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere.
+**Latest origin/main:** Daze (bounce-Island pitch + counter-unless-pay-1) on top of Ponder + Preordain + Splinter Twin + Sythis, Harvest's Hand + Pyromancer's Goggles + Plague Engineer + Manabarbs + Yawgmoth's Will + Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere.
 
 ## Headline numbers
 
 | Metric | Count |
 |---|---|
-| Named factories | 118 |
+| Named factories | 119 |
 | Bespoke templates | 27 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
@@ -107,6 +107,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Snapcaster Mage | Creature | #170 | flash + ETB flashback grant |
 | Solitude | Creature | — | evoke pitch + ETB exile |
 | Spell Snare | Instant | TBD | counter target spell with mana value 2 (resolution-time MV sample, CR 202.3 / 608.2b) |
+| Splinter Twin | Aura | TBD | {2}{R}{R} Aura — grant-activated-ability-on-attach via AttachedAuraAbilityGrantStaticEffect; bearer gains `{T}: create haste token copy + exile EOT` while attached; revoked on aura LTB. v1 token snapshots bearer name/printed P/T/subtypes/keywords at activation (no live CopyEffect). Delayed end-step exile registered as a DelayedTriggeredAbility when a TriggerManager is wired |
 | Spreading Seas | Aura | #160 | retype land + draw |
 | Spymaster's Vault | Land | — | B-source shell |
 | Stoneforge Mystic | Creature | #184 | ETB tutor + activated put |
@@ -346,9 +347,9 @@ Sorted roughly by build priority (small infra lift × high meta share). Refreshe
 
 | # | Card | Difficulty | Blocker |
 |---|---|---|---|
-| 1 | Ponder | low | Sorcery {U} — look top 3, return to library in any order, may shuffle, draw. Pure library-manipulation template; needs `LookAtTopReorderThenOptionalShuffleThenDraw` template. |
+| ~~1~~ | ~~Ponder~~ | ~~low~~ | Shipped via `PonderFactory` — peek top 3 + agent-driven reorder (ScryDecision with empty ToBottom) + draw. "May shuffle" rider deferred (no `IZone.Shuffle` entry point yet). |
 | 2 | Brainstorm | low | Instant {U} — draw 3, put 2 back in any order. Existing `LookAtTopPutKInHand` doesn't cover the post-draw-replace shape; needs draw-then-return-N-to-top template. |
-| 3 | Preordain | low | Sorcery {U} — scry 2 then draw 1. Comment in `LibrarySpellFactory.cs:14` already names the shape; flip the stub on. |
+| ~~3~~ | ~~Preordain~~ | ~~low~~ | Shipped via `PreordainFactory` — scry 2 + draw 1 (delegates to standard `ScryAction` pipeline). The `LibrarySpellFactory.ScryNSpell` tail-detection path covers the same shape via the data-driven binder. |
 | 4 | Mystical Tutor | low | Instant {U} — search library for instant/sorcery, reveal, top. Tutor-to-top family exists in templates; needs filter-by-card-type restriction. |
 | 5 | Swords to Plowshares | low | Instant {W} — exile target creature, controller gains life equal to its power. ExileCreature + life-gain-by-power primitive missing the "by power" variable. |
 | 6 | Path to Exile | low | Instant {W} — exile target creature, controller may search for basic land tapped. ExileCreature exists; need conditional-search-basic-tapped rider on a different controller. |
@@ -366,7 +367,6 @@ Sorted roughly by build priority (small infra lift × high meta share). Refreshe
 | 18 | Daze | low | Instant {1}{U} — counter unless pay {1}; alt cost {0} + return an Island you control. Counter-unless-pay exists; needs alt-cost with non-mana additional cost (bounce-self-permanent), composable with `PitchAlternativeCost`-style probe. |
 | 19 | Boros Reckoner | high | Creature with damage-redirect: "If a source would deal damage to Boros Reckoner, instead it deals that damage to any target". Needs source-damage replacement effect with redirect to a chosen target — a generalization of `PreventNextDamageFromChosenSourceShield`. |
 | 20 | Reckless Charge | low | Sorcery — target creature gets +3/+0 and haste until EOT, Flashback {R}. Pump + grant-haste primitives both exist; FlashbackAlternativeCost done — needs `PumpAndGrantKeyword` template wired to flashback alt-cost. |
-| 21 | Splinter Twin | medium | Aura grants `{T}: create a token copy with haste`. `CopyEffect` exists, but ability-grant-on-attach (aura adds an activated ability to enchanted creature) does not. (Carried over from round 1.) |
 
 ## How to update this doc
 

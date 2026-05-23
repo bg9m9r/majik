@@ -283,6 +283,22 @@ public class Card : ICard
     }
 
     /// <summary>
+    /// Remove a previously-added ability from this card. Returns true if the
+    /// ability was attached and is now removed. Used by aura / equipment
+    /// lifecycle binders that grant an ability on attach and revoke it when
+    /// the aura leaves the battlefield or is detached (CR 303.4 / 613.1f).
+    /// </summary>
+    public bool RemoveAbility(IAbility ability)
+    {
+        if (ability == null)
+        {
+            throw new ArgumentNullException(nameof(ability));
+        }
+
+        return _abilities.Remove(ability);
+    }
+
+    /// <summary>
     /// Add an extra card type after construction. Used by named-card factories
     /// that build multi-type permanents (e.g. Artifact Creature) where the
     /// primary concrete subclass only registers its own type.
