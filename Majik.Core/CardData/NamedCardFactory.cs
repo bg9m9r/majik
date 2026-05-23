@@ -138,6 +138,17 @@ public static class NamedCardFactory
             // non-Incarnation white card from their hand to return") deferred.
             "Solitude" => SolitudeFactory.Create(owner),
 
+            // Creature — Elemental Incarnation {3}{R} 3/3 (FuryFactory).
+            // Double strike + Evoke keyword markers wired. Evoke alt-cost =
+            // "exile a red card from hand" via EvokeAlternativeCost; printed
+            // evoke-sacrifice trigger fires when Fury enters if evoke was paid
+            // (CR 702.74b). ETB damage-distribution trigger: X = cards in
+            // controller's hand; default distribution sends all X to the first
+            // chosen target. Real distribute-damage prompt (CR 601.2d / CR
+            // 119.4) is deferred — production callers supply a Func<Player,
+            // int, IReadOnlyDictionary<Permanent, int>> via the 2-arg overload.
+            "Fury" => FuryFactory.Create(owner),
+
             // Creature — Elemental Incarnation {2}{B} 3/2 (GriefFactory).
             // Menace + Evoke keyword markers wired. ETB reveal-and-discard
             // trigger wired ("target opponent reveals their hand; you choose

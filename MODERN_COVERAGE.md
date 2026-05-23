@@ -3,7 +3,7 @@
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
 **Last updated:** 2026-05-23
-**Latest origin/main:** 2fc5a93 (#206 — Grief MODERN_COVERAGE update) + Sylvan Scrying
+**Latest origin/main:** e0cef4d (#207 — Sylvan Scrying) + Fury
 
 ## Headline numbers
 
@@ -45,6 +45,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Fiery Islet | Land | — | pay-1-life U/R + sac-draw |
 | Force of Negation | Instant | #185 | pitch counter (non-creature) |
 | Force of Will | Instant | #185 | pitch counter (universal) |
+| Fury | Creature | — | evoke pitch + ETB X-damage divided |
 | Goblin Bombardment | Enchantment | — | sac-creature → 1 damage |
 | Grief | Creature | #205 | evoke pitch + ETB discard |
 | Grist, the Hunger Tide | Planeswalker | — | +1 token, -2 reanimate |
@@ -290,15 +291,14 @@ Sorted by build priority (small infra lift × high meta share).
 | 1 | Karn, the Great Creator | Mid | Sideboard-from-anywhere -2 ability needs wishboard concept |
 | 2 | Karn Liberated | Mid | Exile target, restart-game ultimate (game-restart deferred) |
 | 3 | Urza's Tron pieces (Mine/Tower/Power Plant) | Mid | "Tap: add 1; if you control all three, add 3" — conditional mana ability |
-| 4 | Fury | Low | Evoke + ETB damage split — Solitude/Grief pattern + damage-distribution prompt |
-| 5 | Subtlety | Low | Evoke + ETB bounce-and-look — Solitude/Grief pattern + bounce template |
-| 6 | Endurance ETB targeting | Low | Keyword bindings exist; ETB graveyard-to-library not wired through targeting |
-| 7 | Crashing Footfalls | High | Suspend done (#183), but cascade trigger on suspend-cast missing |
-| 8 | Living End | High | Cascade + mass-exile-grave + simultaneous mass-reanimate (#174 ready for the latter) |
-| 9 | Cascade keyword | High | Triggered "cast for free from top reveal" — alt-cast-from-library framework |
-| 10 | Primeval Titan | Mid | Attack/ETB triggers + land tutor; tutor template exists |
-| 11 | Amulet of Vigor | Mid | Replacement on enters-tapped → untap; needs ETB replacement composition |
-| 12 | Up the Beanstalk | Low | Cast-trigger by CMC threshold — trigger-by-CMC pattern |
+| 4 | Subtlety | Low | Evoke + ETB bounce-and-look — Solitude/Grief/Fury pattern + bounce template |
+| 5 | Endurance ETB targeting | Low | Keyword bindings exist; ETB graveyard-to-library not wired through targeting |
+| 6 | Crashing Footfalls | High | Suspend done (#183), but cascade trigger on suspend-cast missing |
+| 7 | Living End | High | Cascade + mass-exile-grave + simultaneous mass-reanimate (#174 ready for the latter) |
+| 8 | Cascade keyword | High | Triggered "cast for free from top reveal" — alt-cast-from-library framework |
+| 9 | Primeval Titan | Mid | Attack/ETB triggers + land tutor; tutor template exists |
+| 10 | Amulet of Vigor | Mid | Replacement on enters-tapped → untap; needs ETB replacement composition |
+| 11 | Up the Beanstalk | Low | Cast-trigger by CMC threshold — trigger-by-CMC pattern |
 
 ## How to update this doc
 
