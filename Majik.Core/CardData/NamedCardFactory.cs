@@ -2274,6 +2274,28 @@ public static class NamedCardFactory
             // delegates to WrathOfGodFactory.BuildResolveEffect.
             "Damnation" => DamnationFactory.Create(owner),
 
+            // Instant — {4}{B} (MurderousCutFactory). Khans of Tarkir.
+            // CR 702.66 — Delve. "Delve" marker keyword wired; the cost
+            // mechanic itself lives in DelveCost + SpellCastFlow (same
+            // wire-up as Treasure Cruise / Dig Through Time). Resolve-time
+            // SpellDefinition ("Destroy target creature" — CR 701.7) is
+            // built on demand via MurderousCutFactory.BuildSpellDefinition.
+            // Indestructible + "can't be regenerated" riders deferred — same
+            // lossy MVP as DestroySpellFactory.DestroyCreatureSpell.
+            "Murderous Cut" => MurderousCutFactory.Create(owner),
+
+            // Instant — {B} (ClingToDustFactory). Theros Beyond Death.
+            // CR 700.2d — modal "Choose one —" (2 printed modes): (0) exile
+            // target card from a graveyard + gain mv life; (1) exile target
+            // card from a graveyard + draw 1 + lose 1 life. Card shape only
+            // here; the bound SpellDefinition is built on demand via
+            // ClingToDustFactory.BuildSpellDefinition(caster, resolver). Per-
+            // mode TargetRequests with MinTargets=0 so unchosen modes don't
+            // gate the cast (mirrors ArchmagesCharmFactory). Escape alt-cost
+            // ({2}{B}, exile two other graveyard cards — CR 702.143) deferred,
+            // same gap as Uro / Phlage.
+            "Cling to Dust" => ClingToDustFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
