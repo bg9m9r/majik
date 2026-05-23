@@ -127,4 +127,56 @@ public static class AuraSpellDefinitionBuilder
             .ToList();
         return ForAura(aura, targetDescription, candidates, intent);
     }
+
+    /// <summary>
+    /// Oracle-text overload: parse the "Enchant X" clause out of
+    /// <paramref name="oracleText"/> via <see cref="AuraEnchantClauseParser"/>
+    /// and use that as the legality predicate.
+    ///
+    /// CR 702.5b — the printed "Enchant X" line is the canonical source for
+    /// an Aura's target type. Use this overload when a card factory just
+    /// wants to defer to the printed oracle rather than re-encoding the
+    /// predicate.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">Thrown when the parser
+    /// can't recognise an "Enchant X" clause in <paramref name="oracleText"/>.
+    /// Callers with bespoke clauses ("Enchant nonbasic land", etc.) should
+    /// use the explicit-predicate overload above.</exception>
+    public static SpellDefinition ForAuraFromOracle(
+        Permanent aura,
+        string oracleText,
+        IEnumerable<Permanent> battlefield,
+        BotIntent intent = BotIntent.None)
+    {
+        ArgumentNullException.ThrowIfNull(aura);
+        ArgumentNullException.ThrowIfNull(oracleText);
+        ArgumentNullException.ThrowIfNull(battlefield);
+
+        var predicate = AuraEnchantClauseParser.ParseTargetPredicate(oracleText)
+            ?? throw new InvalidOperationException(
+                $"AuraEnchantClauseParser could not derive a target " +
+                $"predicate from oracle text: \"{oracleText}\". Pass an " +
+                $"explicit predicate via the other ForAura overload.");
+
+        // Derive the human-readable description from the matched noun so
+        // bots/UIs see "target land" rather than "target permanent".
+        var description = DescribeFromOracle(oracleText);
+
+        return ForAura(aura, description, battlefield, predicate, intent);
+    }
+
+    private static string DescribeFromOracle(string oracleText)
+    {
+        // Lightweight echo of the parser's regex — surfaces the noun for
+        // a friendly target description. Falls back to "target permanent"
+        // if the noun can't be re-derived (shouldn't happen because the
+        // caller already validated the clause).
+        var match = System.Text.RegularExpressions.Regex.Match(
+            oracleText,
+            @"(?im)^\s*[*_]?\s*Enchant\s+(?<noun>[a-z]+)\s*[*_]?\s*(?:[.\r\n]|$)");
+        if (!match.Success) return "target permanent";
+        var noun = match.Groups["noun"].Value.ToLowerInvariant();
+        if (noun.EndsWith('s') && noun.Length > 1) noun = noun[..^1];
+        return $"target {noun}";
+    }
 }
