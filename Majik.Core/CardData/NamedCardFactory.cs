@@ -1190,6 +1190,60 @@ public static class NamedCardFactory
             // Sorcery shell — the resolve effect is wired by callers.
             "Yawgmoth's Will" => YawgmothsWillFactory.Create(owner),
 
+            // Enchantment — {2}{R}{R} (ManabarbsFactory). Sixth Edition.
+            // "Whenever a player taps a land for mana, Manabarbs deals 1
+            //  damage to that player." A symmetric triggered ability
+            // subscribed to ManaAbilityActivatedEvent (CR 605 — published
+            // by ManaAbilityActivator after the activator's mana pool is
+            // topped up). Source gate matches Land via printed type only;
+            // non-land mana abilities (Mox Opal, etc.) emit the same
+            // event but the source predicate rejects them. Damage is
+            // surfaced as Player.LoseLife(1) — same v1 non-combat-damage
+            // shape as Dark Confidant. The single-arg dispatcher path
+            // here produces the correct card shape without
+            // TriggerManager wiring; use the (owner, triggers) overload
+            // for bus-driven trigger firing.
+            "Manabarbs" => ManabarbsFactory.Create(owner),
+
+            // Creature — Human Rogue {2}{B} 2/2 (PlagueEngineerFactory).
+            // Core Set 2020 staple. Deathtouch keyword wired. ETB choose-a-
+            // creature-type: chosen subtype is resolved eagerly via a
+            // Func<Player, CardSubtype> typeChooser on the 3-arg overload
+            // (same pattern as Cavern of Souls). Static "Creatures of the
+            // chosen type your opponents control get -1/-1" wired via
+            // LordStaticEffect with opponentsOnly: true at Layer 7c — the
+            // effect's IsActive() gates on Plague Engineer being on the
+            // battlefield, so LTB/flicker naturally lifts the debuff
+            // (mirrors Colossus Hammer's no-LTB-cleanup pattern). The
+            // single-arg dispatcher path here produces the correct card
+            // shape (Deathtouch + 2/2 Human Rogue) without a live debuff;
+            // use PlagueEngineerFactory.Create(owner, continuousEffects,
+            // typeChooser) for fully-wired behaviour. Agent-prompt
+            // integration (ChooseSubtype) deferred — same queue as
+            // Pithing Needle / Cavern of Souls.
+            "Plague Engineer" => PlagueEngineerFactory.Create(owner),
+
+            // Legendary Artifact — {5} (PyromancersGogglesFactory). Magic Origins.
+            // "{T}: Add {R}. When you spend this mana to cast an instant or
+            //  sorcery spell, copy that spell. You may choose new targets for
+            //  the copy." v1 ships {T}: Add {R} as a single ManaAbility plus a
+            //  structural copy-rider TriggeredAbility (SpellCastEvent, gated on
+            //  controller + Instant|Sorcery) whose effect is a no-op. Mana-
+            //  provenance ledger ("when you spend this mana") + stack-copy
+            //  primitive ("copy that spell") + new-targets prompt all deferred.
+            "Pyromancer's Goggles" => PyromancersGogglesFactory.Create(owner),
+
+            // Legendary Creature — Nymph {G}{W} 1/2 (SythisHarvestsHandFactory).
+            // Theros Beyond Death constellation cycle. "Constellation —
+            // Whenever an enchantment enters under your control, you gain
+            // 1 life and draw a card." (CR 702.144 / 603.1). Trigger over
+            // CardMovedEvent → battlefield with controller-match + card-type
+            // Enchantment predicate (covers plain enchantments AND Auras
+            // per CR 303.1). The single-arg dispatcher path here produces
+            // the correct card shape without TriggerManager registration;
+            // use the (owner, triggers) overload for fully-wired behavior.
+            "Sythis, Harvest's Hand" => SythisHarvestsHandFactory.Create(owner),
+
             // Enchantment — Aura {2}{R}{R} (SplinterTwinFactory). Rise of
             // the Eldrazi. "Enchant creature. Enchanted creature has '{T}:
             // Create a token that's a copy of this creature, except it has
