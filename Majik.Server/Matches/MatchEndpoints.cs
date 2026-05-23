@@ -29,7 +29,16 @@ public static class MatchEndpoints
         group.MapDelete("/{id:guid}", Abandon).WithName("AbandonMatch");
 
         group.MapPost("/{id:guid}/commands", SubmitCommand).WithName("SubmitMatchCommand");
-        group.MapGet("/{id:guid}/state", GetState).WithName("GetMatchState");
+        // Annotate the response shape so ng-openapi-gen emits a typed
+        // GameStateDto return on the frontend client. Minimal-API infers
+        // void otherwise (the handler returns IResult, which the spec
+        // can't introspect into GameStateDto).
+        group.MapGet("/{id:guid}/state", GetState)
+            .WithName("GetMatchState")
+            .Produces<GameStateDto>(StatusCodes.Status200OK)
+            .Produces<MatchError>(StatusCodes.Status404NotFound)
+            .Produces<MatchError>(StatusCodes.Status403Forbidden)
+            .Produces<MatchError>(StatusCodes.Status409Conflict);
         return routes;
     }
 

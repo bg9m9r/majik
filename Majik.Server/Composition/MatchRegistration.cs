@@ -15,6 +15,11 @@ public static class MatchRegistration
         services.AddSingleton<IRandomSource, SystemRandomSource>();
         services.AddSingleton<DiceRoller>();
         services.AddSingleton<IMatchHubPublisher, MatchHubPublisher>();
+        // Engine → SignalR bridge. Singleton so the same instance holds
+        // subscriptions across the request lifetime of MatchService
+        // (scoped) — every match attaches once at facade-create and
+        // detaches at terminal state.
+        services.AddSingleton<MatchFacadeBridge>();
         services.AddSingleton(sp => new MatchTimeoutScheduler(
             async (matchId, holder, ct) =>
             {
