@@ -47,6 +47,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Consider | Instant | — | surveil 1 + draw |
 | Crashing Footfalls | Sorcery | TBD | cascade trigger + 2x 4/4 Rhino warrior tokens with trample |
 | Cryptic Command | Instant | #191 | modal choose-2 |
+| Cursed Totem | Artifact | TBD | {2} — global creature-activated suppression (mana exempt; CR 605); creature-side analogue of Stony Silence |
 | Damping Sphere | Artifact | #257 | {2} — symmetric land-mana cap to {C} on ≥2-mana taps (DampingSphereCappedManaAbility) + per-spell +{1} for each prior spell this turn (SpellCostIncreaseAbility scanned via CostReduction.GetEffectiveCost). Live-wiring of ManaPaymentResolver / SpellCastFlow / TurnDriver deferred — semantics locked via helpers + tests |
 | Dark Confidant | Creature | #178 | upkeep reveal + life loss |
 | Daze | Instant | TBD | bounce-Island pitch alt cost + counter target spell unless its controller pays {1} (CR 118.9 / 118.4) |
