@@ -3,13 +3,13 @@
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
 **Last updated:** 2026-05-23
-**Latest origin/main:** Damping Sphere (#257) + Goblin Lackey on top of 54a8d82 (… + Stony Silence + Aether Gust + Pact of Negation); Searing Blaze added in this PR.
+**Latest origin/main:** Wishclaw Talisman on top of Searing Blaze + Goblin Lackey + Damping Sphere (#257).
 
 ## Headline numbers
 
 | Metric | Count |
 |---|---|
-| Named factories | 111 |
+| Named factories | 112 |
 | Bespoke templates | 26 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
@@ -131,6 +131,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Vexing Bauble | Artifact | — | sac-draw shell |
 | Walking Ballista | Artifact Creature | — | grow + ping |
 | Wastewood Verge | Land | — | B/G activation-gate land |
+| Wishclaw Talisman | Artifact | TBD | {1}{B} ETB tapped + {T}, Pay 3 life: tutor any card → hand + ControlChangeEffect (CR 613.2) swaps control to a caller-chosen opponent; sorcery-speed gate + shuffle + opponent-prompt deferred |
 | Wrenn and Six | Planeswalker | #178 | +1 land return, -1 ping |
 | Wrenn and Realmbreaker | Planeswalker | TBD | +1 mill 3 + may-return-land, -2 reanimate nonland permanent, -7 structural emblem |
 | Wrenn's Resolve | Sorcery | TBD | Draw 2 + delayed end-step exile rider on drawn cards still in hand |
@@ -340,11 +341,10 @@ Sorted roughly by build priority (small infra lift × high meta share). Refreshe
 |---|---|---|---|
 | 1 | Plague Engineer | medium | ETB: choose a creature type → opponents' creatures of that type get -1/-1. Needs chosen-subtype state on permanents + opponent-only lord-style boost. |
 | 2 | Splinter Twin | medium | Aura grants `{T}: create a token copy with haste`. `CopyEffect` exists, but ability-grant-on-attach (aura adds an activated ability to enchanted creature) does not. |
-| 3 | Wishclaw Talisman | medium | Tutor-any-card + give-control-of-this trigger after activation; mid-turn permanent control-swap primitive absent (only Layer 1 control-change static exists today). |
-| 4 | Sythis, Harvest's Hand | medium | Constellation (cast-an-enchantment trigger) primitive absent; needs a cast-event-typed-card trigger surface comparable to landfall. |
-| 5 | Yawgmoth's Will | high | "Play cards from your graveyard this turn" — turn-scoped global cast-from-graveyard permission + EOT exile-instead-of-grave replacement chain. `GraveyardCastAlternativeCost` is per-card, not zone-wide. |
-| 6 | Manabarbs | high | Triggered ability on every land-tap event globally; tap-event subscription per-permanent works, but a global "whenever a player taps a land for mana" hook is unwired. |
-| 7 | Pyromancer's Goggles | high | Legendary {0} mana ability + replacement: "when you tap it for {R} to cast an instant/sorcery, copy that spell once". Needs cast-time mana-source tracking + spell-copy hook keyed off that source. |
+| 3 | Sythis, Harvest's Hand | medium | Constellation (cast-an-enchantment trigger) primitive absent; needs a cast-event-typed-card trigger surface comparable to landfall. |
+| 4 | Yawgmoth's Will | high | "Play cards from your graveyard this turn" — turn-scoped global cast-from-graveyard permission + EOT exile-instead-of-grave replacement chain. `GraveyardCastAlternativeCost` is per-card, not zone-wide. |
+| 5 | Manabarbs | high | Triggered ability on every land-tap event globally; tap-event subscription per-permanent works, but a global "whenever a player taps a land for mana" hook is unwired. |
+| 6 | Pyromancer's Goggles | high | Legendary {0} mana ability + replacement: "when you tap it for {R} to cast an instant/sorcery, copy that spell once". Needs cast-time mana-source tracking + spell-copy hook keyed off that source. |
 
 ## How to update this doc
 

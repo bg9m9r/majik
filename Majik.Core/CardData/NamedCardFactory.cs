@@ -1155,6 +1155,25 @@ public static class NamedCardFactory
             // CostReduction call-site plumbing.
             "Damping Sphere" => DampingSphereFactory.Create(owner),
 
+            // Artifact — {1}{B} (WishclawTalismanFactory). Throne of Eldraine.
+            // "Wishclaw Talisman enters tapped. {T}, Pay 3 life: Search your
+            //  library for a card, put that card into your hand, then shuffle.
+            //  An opponent gains control of Wishclaw Talisman. Activate only
+            //  as a sorcery."
+            // ETB tapped wired via EntersTappedReplacement (surfaced through
+            // WishclawTalismanWiring on the runtime overload). Activated
+            // ability has {T} + Pay 3 life costs; effect tutors any card via
+            // the SearchSpellFactory agent-driven primitive then registers
+            // a ControlChangeEffect (CR 613.2) swapping control of the
+            // Talisman to a caller-chosen opponent. Sorcery-speed gate +
+            // shuffle (CR 701.19c) + opponent-prompt deferred — same
+            // deferral patterns as Priest of Fell Rites / SearchSpellFactory.
+            // The single-arg dispatcher path here produces the correct card
+            // shape; control-swap is a no-op without a live
+            // ContinuousEffectsService (use the (owner, effects,
+            // opponentChooser) overload for the full effect).
+            "Wishclaw Talisman" => WishclawTalismanFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
