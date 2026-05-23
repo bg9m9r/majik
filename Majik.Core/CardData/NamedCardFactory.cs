@@ -1762,6 +1762,26 @@ public static class NamedCardFactory
             // Whack pillar.
             "Goblin Piledriver" => GoblinPiledriverFactory.Create(owner),
 
+            // Creature — Goblin Warrior {2}{R} 2/2 (GoblinRabblemasterFactory).
+            // Magic 2015 / many reprints. "Other Goblin creatures you control
+            // have haste. Whenever Goblin Rabblemaster attacks, create a 1/1
+            // red Goblin creature token, then it gets +1/+0 until end of turn
+            // for each attacking Goblin you control." Lord-style Haste grant
+            // wired via LordStaticEffect (Goblin Chieftain shape with
+            // power/toughness 0 — keyword-only). Attack trigger wired via
+            // Triggers.OnAttackSelf against CreatureAttacksEvent; the body
+            // creates a 1/1 Goblin token via TokenFactory.CreateOnBattlefield
+            // and then registers a PumpUntilEndOfTurnEffect on Rabblemaster
+            // for +N/+0 EOT, where N = count of attacking Goblins the
+            // controller controls (no "other" qualifier — Rabblemaster itself
+            // counts). The attackers list is read from an injected closure
+            // (attackingCreaturesSource); the single-arg dispatcher path
+            // produces the card shape with the attack trigger attached but
+            // no live pump body and no lord-static registration (no layers
+            // service / no attackers source). Modern Goblins / 8-Whack
+            // pillar.
+            "Goblin Rabblemaster" => GoblinRabblemasterFactory.Create(owner),
+
             // Creature — Goblin {2}{R} 1/1 (GoblinMatronFactory). Urza's Legacy.
             // "When Goblin Matron enters, you may search your library for a
             //  Goblin card, reveal that card, and put it into your hand.
