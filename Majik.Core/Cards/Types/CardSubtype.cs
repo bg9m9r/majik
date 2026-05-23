@@ -82,6 +82,12 @@ public enum CardSubtype
     /// <summary>Elk creature subtype — Oko, Thief of Crowns' +1 token target
     /// type and the Elk creature tokens it implies. CR 205.3m.</summary>
     Elk,
+    /// <summary>Frog creature subtype — Psychic Frog, Sakura-Tribe Scout's
+    /// sibling cycle. CR 205.3m.</summary>
+    Frog,
+    /// <summary>Mutant creature subtype — Psychic Frog, Mutavault's
+    /// changeling base type. CR 205.3m.</summary>
+    Mutant,
 
     // Land subtypes (examples)
     Forest,

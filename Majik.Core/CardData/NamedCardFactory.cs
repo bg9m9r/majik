@@ -1153,6 +1153,22 @@ public static class NamedCardFactory
             // bus-driven dies-trigger wiring.
             "Skullclamp" => SkullclampFactory.Create(owner),
 
+            // Creature — Frog Mutant {U}{B} 1/3 (PsychicFrogFactory).
+            // Modern Horizons 3. Flying keyword marker (CR 702.9) wired.
+            // Combat-damage-to-a-player trigger (CR 510 / CR 603.1) loots N
+            // (draws N + discards N) where N = combat damage dealt to a
+            // player — v1 deterministic first-card-in-hand pick for each
+            // discard, empty-library halts draw via
+            // MarkTriedToDrawFromEmptyLibrary, empty-hand halts discard
+            // cleanly. Activated ability "Discard a card: +1/+1 counter on
+            // Psychic Frog" (CR 602) wired via DiscardACardCost +
+            // CounterType.PlusOnePlusOne. The single-arg dispatcher path
+            // here produces the correct card shape without TriggerManager
+            // wiring; use the (owner, triggers) overload for bus-driven
+            // combat-damage firing. Discard prompt deferred (same queue as
+            // Liliana / Faithless Looting / Sword of Feast and Famine).
+            "Psychic Frog" => PsychicFrogFactory.Create(owner),
+
             // Artifact — Equipment {3} (SwordOfFeastAndFamineFactory).
             // Mirrodin Besieged. Static "+2/+2" via AttachedBoostEffect (Layer
             // 7c). "Has protection from black and from green" granted to the
