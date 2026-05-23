@@ -468,6 +468,20 @@ public static class NamedCardFactory
             // not scoped by v1.
             "Dress Down" => DressDownFactory.Create(owner),
 
+            // Creature — Human Cleric {W}{B} 2/1 (PriestOfFellRitesFactory).
+            // ETB triggered ability: reanimate target creature card with
+            // mana value 3 or less from controller's graveyard
+            // (deterministic first-match v1). Graveyard-activated
+            // unearth-style ability: {2}{W}{B}, Exile this from
+            // graveyard: reanimate target creature card from controller's
+            // graveyard. "Activate only as a sorcery" timing gate is
+            // deferred — engine has no per-activated-ability sorcery-
+            // speed restriction yet. The single-arg dispatcher path
+            // uses raw zone moves; use the (owner, zoneService,
+            // eventBus, triggers) overload for ETB-trigger / ZoneService
+            // wiring on the reanimated creature.
+            "Priest of Fell Rites" => PriestOfFellRitesFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
