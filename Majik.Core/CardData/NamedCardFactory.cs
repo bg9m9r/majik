@@ -502,6 +502,16 @@ public static class NamedCardFactory
             // seed, no live CDA).
             "Death's Shadow" => DeathsShadowFactory.Create(owner),
 
+            // Artifact Creature — Phyrexian Wurm {6} 6/6 (WurmcoilEngineFactory).
+            // Deathtouch + Lifelink keyword markers wired. Dies trigger
+            // (CR 603.6c / 700.4) creates two 3/3 Phyrexian Wurm artifact
+            // creature tokens — one with Deathtouch and one with Lifelink.
+            // The single-arg dispatcher path here produces the correct
+            // card shape without TriggerManager registration / ZoneService
+            // wiring on the spawned tokens. Use the (owner, zoneService,
+            // eventBus, triggers) overload for fully-wired behavior.
+            "Wurmcoil Engine" => WurmcoilEngineFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
