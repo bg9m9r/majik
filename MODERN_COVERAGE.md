@@ -75,6 +75,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Priest of Fell Rites | Creature | #196 | ETB reanimate + grave-unearth |
 | Primeval Titan | Creature | TBD | Trample + ETB/attack tutor up to 2 lands tapped |
 | Puresteel Paladin | Creature | TBD | Equipment-ETB draw trigger + zero-equip-cost on ≥3 artifacts |
+| Ragavan, Nimble Pilferer | Creature | TBD | combat-damage Treasure + exile + may-cast EOT (CR 118.9 grant + ExileCastAlternativeCost); Dash deferred |
 | Rift Bolt | Sorcery | #183 | suspend → 3 damage |
 | Scavenging Ooze | Creature | #188 | exile-graveyard + counter + life |
 | Sea's Claim | Aura | #160 | enchanted land becomes Island |
@@ -135,7 +136,6 @@ Cards implemented through generic or bespoke templates without a named factory. 
 - Thoughtseize — `Bespoke/ThoughtseizePatternTemplate`
 - Expressive Iteration — `Bespoke/ExpressiveIterationTemplate`
 - Malevolent Rumble — `Bespoke/MalevolentRumblePatternTemplate`
-- Ragavan, Nimble Pilferer — combat-damage trigger (Treasure + exile-from-top); Dash deferred
 - Fetch lands cycle (10 of them) — `OracleLandActivatedAbilityBinder`
 - Shock lands (Overgrown Tomb + cycle starts) — `Effects/ShockLandReplacement`
 - Sacred Foundry, Steam Vents — shock-land binding
@@ -296,7 +296,7 @@ Per-keyword action helpers under `Majik.Core/Keywords/`:
 - **Murktide / Izzet Tempo** — High. Murktide Regent done, Counterspell done, Snapcaster Mage done, Lightning Bolt done, Expressive Iteration done, Ledger Shredder done, Consider done, Spell Pierce done, Subtlety done. Missing: Demilich absent. ~75%.
 - **Mono-Green Tron** — High. Ancient Stirrings, Sylvan Scrying, Wurmcoil Engine done. Karn Liberated done. Karn, the Great Creator done. Tron lands (Urza's Mine + Tower + Power-Plant) done with the conditional {2} mana ability. ~70%.
 - **Living End / Crashing Footfalls cascade** — High. Cascade keyword done (`Keywords/CascadeAction.cs`) + Crashing Footfalls shipped (#219). Living End shipped (this PR) with both the Cascade trigger and the resolve chain (per-player mass-exile-grave + sacrifice-creatures + mass-reanimate; ETB triggers fire on reanimated permanents via PR #174 plumbing). Suspend itself is done (#183). ~75%.
-- **Rakdos Scam** — Mid-high. Grief done (#205, mirrors Solitude evoke + ETB pattern). Fury done (mirrors Solitude/Grief). Dauthi Voidwalker absent. Liliana of the Veil done, Fatal Push done, Thoughtseize done. ~55%.
+- **Rakdos Scam** — Mid-high. Grief done (#205, mirrors Solitude evoke + ETB pattern). Fury done (mirrors Solitude/Grief). Ragavan, Nimble Pilferer done (combat-damage Treasure + exile + may-cast EOT grant; Dash deferred). Dauthi Voidwalker absent. Liliana of the Veil done, Fatal Push done, Thoughtseize done. ~62%.
 - **Yawgmoth combo** — Mid. Yawgmoth done. Undying creatures (Young Wolf, Strangleroot Geist, Geralf's Messenger) done. Chord of Calling, Eldritch Evolution absent. ~50%.
 - **Domain Zoo** — Mid. Boros Charm done, fetches done, shocks done, Tribal Flames done. Scion of Draco + Territorial Kavu absent. ~35%.
 - **Amulet Titan** — Mid. Amulet of Vigor done (untap-on-enters-tapped trigger) + Primeval Titan done (ETB + attack land-tutor for up to 2, tapped). No bounce lands. ~30%.

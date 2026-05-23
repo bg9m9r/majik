@@ -792,6 +792,20 @@ public static class NamedCardFactory
             // DelightedHalflingFactory.
             "Mox Opal" => MoxOpalFactory.Create(owner),
 
+            // Legendary Creature — Monkey Pirate {R} 2/1 (RagavanNimblePilfererFactory).
+            // Modern Horizons 2 staple. Combat-damage-to-a-player trigger
+            // wired: creates a Treasure token under the Ragavan controller,
+            // exiles the damaged player's library top, and stamps a
+            // runtime exile-cast grant via Card.GrantRuntimeExileCast so
+            // the Ragavan controller may cast that exiled card via
+            // ExileCastAlternativeCost until end of turn (CR 118.9).
+            // Single-arg dispatcher path produces the correct card shape
+            // without bus-driven trigger registration / EOT-clear hook.
+            // Use the (owner, zoneService, eventBus, triggers) overload
+            // for fully-wired behaviour. Dash {1}{R} (CR 702.108) is
+            // DEFERRED — no DashAlternativeCost / DashReturnRegistry yet.
+            "Ragavan, Nimble Pilferer" => RagavanNimblePilfererFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
