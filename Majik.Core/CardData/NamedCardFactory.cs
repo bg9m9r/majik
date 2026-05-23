@@ -138,6 +138,17 @@ public static class NamedCardFactory
             // non-Incarnation white card from their hand to return") deferred.
             "Solitude" => SolitudeFactory.Create(owner),
 
+            // Creature — Elemental Incarnation {3}{R} 3/3 (FuryFactory).
+            // Double strike + Evoke keyword markers wired. Evoke alt-cost =
+            // "exile a red card from hand" via EvokeAlternativeCost; printed
+            // evoke-sacrifice trigger fires when Fury enters if evoke was paid
+            // (CR 702.74b). ETB damage-distribution trigger: X = cards in
+            // controller's hand; default distribution sends all X to the first
+            // chosen target. Real distribute-damage prompt (CR 601.2d / CR
+            // 119.4) is deferred — production callers supply a Func<Player,
+            // int, IReadOnlyDictionary<Permanent, int>> via the 2-arg overload.
+            "Fury" => FuryFactory.Create(owner),
+
             // Creature — Elemental Incarnation {2}{B} 3/2 (GriefFactory).
             // Menace + Evoke keyword markers wired. ETB reveal-and-discard
             // trigger wired ("target opponent reveals their hand; you choose
@@ -149,6 +160,15 @@ public static class NamedCardFactory
             // ability by exiling a non-Elemental, non-Incarnation black
             // card") deferred.
             "Grief" => GriefFactory.Create(owner),
+
+            // Creature — Elemental Incarnation {1}{G}{G} 3/4 (EnduranceFactory).
+            // Flash + Reach + Evoke keyword markers wired. ETB graveyard-to-
+            // library trigger wired ("target player shuffles their graveyard
+            // into their library" — CR 701.19c). Evoke alt-cost = "exile a
+            // green card from hand" via EvokeAlternativeCost; printed evoke-
+            // sacrifice trigger fires when Endurance enters if evoke was paid
+            // (CR 702.74b).
+            "Endurance" => EnduranceFactory.Create(owner),
 
             // U/R Horizon Canopy painless dual — Modern Horizons (FieryIsletFactory).
             // {T}, Pay 1 life: Add {U} or {R} — two ManaAbility instances, each with
@@ -558,6 +578,19 @@ public static class NamedCardFactory
             // wiring on the spawned tokens. Use the (owner, zoneService,
             // eventBus, triggers) overload for fully-wired behavior.
             "Wurmcoil Engine" => WurmcoilEngineFactory.Create(owner),
+
+            // Sorcery — {1}{G} (SylvanScryingFactory). "Search your library
+            // for a land card, reveal it, put it into your hand, then
+            // shuffle." (CR 701.19a). Tutors ANY land — basic or nonbasic —
+            // which is the Tron-enabling distinction vs. Cultivate-style
+            // basic-only tutors. The resolve-time SpellDefinition is built
+            // on demand via SylvanScryingFactory.BuildSpellDefinition,
+            // which delegates to the shared SearchSpellFactory.SearchLibrarySpell
+            // ("land") so the agent prompt + pick→hand machinery is shared
+            // with template-bound land tutors. Shuffle deferred (no
+            // IZone.Shuffle entry point yet — same rationale as the rest
+            // of SearchSpellFactory).
+            "Sylvan Scrying" => SylvanScryingFactory.Create(owner),
 
             _ => new Card(name, ""),
         };
