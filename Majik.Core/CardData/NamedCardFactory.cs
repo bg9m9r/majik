@@ -803,6 +803,18 @@ public static class NamedCardFactory
             // the first creature card deterministically.
             "Scavenging Ooze" => ScavengingOozeFactory.Create(owner),
 
+            // Creature — Zombie Knight {1}{B}{B} 2/3 (MurderousRiderFactory).
+            // Throne of Eldraine Adventure card. v1 ships the creature side
+            // (Lifelink keyword marker — CR 702.15) + a Swift End helper
+            // exposed via MurderousRiderFactory.BuildAdventureSpell that
+            // returns a destroy-target-creature-or-planeswalker SpellDefinition
+            // + self-life-loss 2 (CR 119.3). The Adventure cast-from-hand-to-
+            // exile pipeline (CR 715) is deferred — same gap as
+            // BonecrusherGiantFactory; the printed "when this dies, exile it"
+            // self-exile LTB clause is also deferred (no card-local death
+            // replacement surface yet).
+            "Murderous Rider" => MurderousRiderFactory.Create(owner),
+
             // Sorcery — {2}{G}{G} (ScapeshiftFactory). Morningtide.
             // "Sacrifice any number of lands. Search your library for that
             //  many land cards, put them onto the battlefield, then shuffle."
