@@ -1514,6 +1514,22 @@ public static class NamedCardFactory
             // GoblinWelderFactory.WeldResolve(players).
             "Goblin Welder" => GoblinWelderFactory.Create(owner),
 
+            // Creature — Minotaur Wizard {R/W}{R/W}{R/W} 3/3 (BorosReckonerFactory).
+            // Gatecrash. First strike + "Whenever Boros Reckoner is dealt damage,
+            // it deals that much damage to any target." Printed text is a
+            // *replacement* effect on the incoming damage (CR 614) but v1 ships
+            // it as a triggered ability (CR 603.1) over DamageDealtEvent —
+            // simpler than introducing a source-damage redirect primitive. The
+            // damage still resolves on Boros Reckoner before the redirect fires,
+            // and the redirect goes on the stack rather than replacing the
+            // original damage. Hybrid mana cost {R/W} parses via
+            // ManaCost.Parse's HybridPip path (CR 107.4e). The single-arg
+            // dispatcher path here produces the correct card shape without
+            // TriggerManager wiring; use the (owner, eventBus, triggers)
+            // overload to register the damage-received trigger and republish
+            // the redirect as a non-combat DamageDealtEvent (CR 119.2c).
+            "Boros Reckoner" => BorosReckonerFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
