@@ -50,8 +50,11 @@ public class ManaAbilityActivator
         // Add mana to player's pool
         player.AddManaToPool(manaGenerated);
 
-        // Fire event (if we add a ManaGeneratedEvent in the future)
-        // _eventBus?.Publish(new ManaGeneratedEvent(player, manaGenerated, ability.Source));
+        // CR 605 — publish so "whenever a player taps X for mana" triggers
+        // (Manabarbs, Badgermole Cub, etc.) and analytics subscribers can
+        // observe the activation. Mana abilities don't use the stack
+        // (CR 605.3), so this event is the only bus-visible signal.
+        _eventBus?.Publish(new ManaAbilityActivatedEvent(ability, player, manaGenerated));
 
         return manaGenerated;
     }

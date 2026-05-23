@@ -3,13 +3,13 @@
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
 **Last updated:** 2026-05-23
-**Latest origin/main:** Yawgmoth's Will on top of Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere (#257).
+**Latest origin/main:** Yawgmoth's Will on top of Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere (#257); Manabarbs added in this PR.
 
 ## Headline numbers
 
 | Metric | Count |
 |---|---|
-| Named factories | 113 |
+| Named factories | 114 |
 | Bespoke templates | 26 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
@@ -80,6 +80,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Living End | Sorcery | TBD | Cascade + each-player mass-exile-grave + sac-creatures + mass-reanimate |
 | Lurrus of the Dream-Den | Creature | TBD | Lifelink + cast-permanent-mv≤2-from-graveyard once per your turn (companion deck-rule deferred) |
 | Magus of the Moon | Creature | #157 | nonbasic-to-Mountain |
+| Manabarbs | Enchantment | TBD | {2}{R}{R} — symmetric "whenever a player taps a land for mana, deal 1" triggered ability over ManaAbilityActivatedEvent (CR 605); source gate matches Land via printed type; Mox Opal / Black Lotus / other non-land mana abilities publish the same event but are rejected by the source predicate |
 | Manamorphose | Instant | TBD | {1}{R/G} hybrid + add two mana any combo (caller-picked pair, default {R}{G}) + cantrip |
 | Mishra's Bauble | Artifact | — | sac → look + delayed draw |
 | Mox Opal | Artifact | TBD | Legendary {0}: Metalcraft-gated any-color mana (CR 702.95) |
@@ -343,8 +344,7 @@ Sorted roughly by build priority (small infra lift × high meta share). Refreshe
 | 1 | Plague Engineer | medium | ETB: choose a creature type → opponents' creatures of that type get -1/-1. Needs chosen-subtype state on permanents + opponent-only lord-style boost. |
 | 2 | Splinter Twin | medium | Aura grants `{T}: create a token copy with haste`. `CopyEffect` exists, but ability-grant-on-attach (aura adds an activated ability to enchanted creature) does not. |
 | 3 | Sythis, Harvest's Hand | medium | Constellation (cast-an-enchantment trigger) primitive absent; needs a cast-event-typed-card trigger surface comparable to landfall. |
-| 4 | Manabarbs | high | Triggered ability on every land-tap event globally; tap-event subscription per-permanent works, but a global "whenever a player taps a land for mana" hook is unwired. |
-| 5 | Pyromancer's Goggles | high | Legendary {0} mana ability + replacement: "when you tap it for {R} to cast an instant/sorcery, copy that spell once". Needs cast-time mana-source tracking + spell-copy hook keyed off that source. |
+| 4 | Pyromancer's Goggles | high | Legendary {0} mana ability + replacement: "when you tap it for {R} to cast an instant/sorcery, copy that spell once". Needs cast-time mana-source tracking + spell-copy hook keyed off that source. |
 
 ## How to update this doc
 

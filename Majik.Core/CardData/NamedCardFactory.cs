@@ -1190,6 +1190,21 @@ public static class NamedCardFactory
             // Sorcery shell — the resolve effect is wired by callers.
             "Yawgmoth's Will" => YawgmothsWillFactory.Create(owner),
 
+            // Enchantment — {2}{R}{R} (ManabarbsFactory). Sixth Edition.
+            // "Whenever a player taps a land for mana, Manabarbs deals 1
+            //  damage to that player." A symmetric triggered ability
+            // subscribed to ManaAbilityActivatedEvent (CR 605 — published
+            // by ManaAbilityActivator after the activator's mana pool is
+            // topped up). Source gate matches Land via printed type only;
+            // non-land mana abilities (Mox Opal, etc.) emit the same
+            // event but the source predicate rejects them. Damage is
+            // surfaced as Player.LoseLife(1) — same v1 non-combat-damage
+            // shape as Dark Confidant. The single-arg dispatcher path
+            // here produces the correct card shape without
+            // TriggerManager wiring; use the (owner, triggers) overload
+            // for bus-driven trigger firing.
+            "Manabarbs" => ManabarbsFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
