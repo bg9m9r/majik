@@ -47,7 +47,8 @@ public sealed class SpellCastFlow
         GameContext ctx,
         CancellationToken ct = default,
         IReadOnlyList<IAdditionalCost>? additionalCosts = null,
-        IAlternativeCost? alternativeCost = null)
+        IAlternativeCost? alternativeCost = null,
+        Majik.Core.Players.Agents.ManaPayment? preChosenMana = null)
     {
         if (caster == null) throw new ArgumentNullException(nameof(caster));
         if (card == null) throw new ArgumentNullException(nameof(card));
@@ -145,7 +146,13 @@ public sealed class SpellCastFlow
             totalCost = totalCost.AddGenericCost(xValue.Value);
         }
 
-        var mana = await agent.ChooseManaSourcesAsync(ctx, totalCost, ct);
+        // CR 601.2g — mana sourcing. When the caller has already prompted +
+        // paid mana (TurnDriver does this so a failed pay can rotate the
+        // hand instead of mutating the stack), reuse that ManaPayment as
+        // metadata so the agent isn't asked twice (visible UX bug: double
+        // mana prompt). Otherwise prompt here as the canonical caster.
+        var mana = preChosenMana
+            ?? await agent.ChooseManaSourcesAsync(ctx, totalCost, ct);
 
         var chosen = new ChosenSpellParams(
             mode, xValue, collectedTargets, mana, ctx.AllPlayers,
