@@ -3,13 +3,13 @@
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
 **Last updated:** 2026-05-23
-**Latest origin/main:** Manabarbs (#265) on top of Yawgmoth's Will + Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere (#257); Plague Engineer added in this PR.
+**Latest origin/main:** Pyromancer's Goggles on top of Plague Engineer (#262) + Manabarbs (#265) + Yawgmoth's Will + Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere (#257).
 
 ## Headline numbers
 
 | Metric | Count |
 |---|---|
-| Named factories | 115 |
+| Named factories | 116 |
 | Bespoke templates | 26 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
@@ -95,6 +95,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Priest of Fell Rites | Creature | #196 | ETB reanimate + grave-unearth |
 | Primeval Titan | Creature | TBD | Trample + ETB/attack tutor up to 2 lands tapped |
 | Puresteel Paladin | Creature | TBD | Equipment-ETB draw trigger + zero-equip-cost on ≥3 artifacts |
+| Pyromancer's Goggles | Artifact | TBD | Legendary {5} — {T}: Add {R} + structural copy-on-cast trigger (Instant/Sorcery, controller-match); mana-provenance gate + stack-copy primitive + new-targets prompt deferred |
 | Ragavan, Nimble Pilferer | Creature | TBD | combat-damage Treasure + exile + may-cast EOT (CR 118.9 grant + ExileCastAlternativeCost); Dash deferred |
 | Rift Bolt | Sorcery | #183 | suspend → 3 damage |
 | Scavenging Ooze | Creature | #188 | exile-graveyard + counter + life |
@@ -344,7 +345,6 @@ Sorted roughly by build priority (small infra lift × high meta share). Refreshe
 |---|---|---|---|
 | 1 | Splinter Twin | medium | Aura grants `{T}: create a token copy with haste`. `CopyEffect` exists, but ability-grant-on-attach (aura adds an activated ability to enchanted creature) does not. |
 | 2 | Sythis, Harvest's Hand | medium | Constellation (cast-an-enchantment trigger) primitive absent; needs a cast-event-typed-card trigger surface comparable to landfall. |
-| 3 | Pyromancer's Goggles | high | Legendary {0} mana ability + replacement: "when you tap it for {R} to cast an instant/sorcery, copy that spell once". Needs cast-time mana-source tracking + spell-copy hook keyed off that source. |
 
 ## How to update this doc
 

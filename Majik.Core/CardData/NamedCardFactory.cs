@@ -1223,6 +1223,16 @@ public static class NamedCardFactory
             // Pithing Needle / Cavern of Souls.
             "Plague Engineer" => PlagueEngineerFactory.Create(owner),
 
+            // Legendary Artifact — {5} (PyromancersGogglesFactory). Magic Origins.
+            // "{T}: Add {R}. When you spend this mana to cast an instant or
+            //  sorcery spell, copy that spell. You may choose new targets for
+            //  the copy." v1 ships {T}: Add {R} as a single ManaAbility plus a
+            //  structural copy-rider TriggeredAbility (SpellCastEvent, gated on
+            //  controller + Instant|Sorcery) whose effect is a no-op. Mana-
+            //  provenance ledger ("when you spend this mana") + stack-copy
+            //  primitive ("copy that spell") + new-targets prompt all deferred.
+            "Pyromancer's Goggles" => PyromancersGogglesFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
