@@ -207,9 +207,35 @@ public static class CardDefinitionFactory
             DestroyTargetStubEffectDef destroy => BuildDestroyTargetStubEffect(destroy, card),
             GainLifeSelfEffectDef gain => BuildGainLifeSelfEffect(gain, card, controller),
             MillThenPickFirstMatchingToHandEffectDef mp => BuildMillThenPickEffect(mp, card, controller),
+            ConniveSelfEffectDef connive => BuildConniveSelfEffect(connive, card),
+            AmassSelfEffectDef amass => BuildAmassSelfEffect(amass, card, controller),
             _ => throw new NotSupportedException(
                 $"Effect '{definition.GetType().Name}' is not yet supported by CardDefinitionFactory."),
         };
+
+    private static IEffect BuildConniveSelfEffect(ConniveSelfEffectDef def, ICard card)
+    {
+        var amount = def.Amount;
+        return new Effect(
+            $"{card.Name}: connive x{amount}",
+            () =>
+            {
+                if (card is not Creature creature) return;
+                Majik.Core.Keywords.ConniveAction.ApplyN(creature, amount);
+            });
+    }
+
+    private static IEffect BuildAmassSelfEffect(AmassSelfEffectDef def, ICard card, Player controller)
+    {
+        var amount = def.Amount;
+        var tribe = ParseSubtype(def.Tribe);
+        return new Effect(
+            $"{card.Name}: amass {def.Tribe} {amount}",
+            () =>
+            {
+                Majik.Core.Keywords.AmassAction.Apply(controller, amount, tribe);
+            });
+    }
 
     private static IEffect BuildGainLifeSelfEffect(GainLifeSelfEffectDef def, ICard card, Player controller)
     {
