@@ -145,6 +145,10 @@ public static class SeedImplementedCards
         "Mutagenic Growth",
         // Instant — {W}. CounterUnlessPayTemplate ({1} to keep).
         "Mana Tithe",
+        // Instant — {U}{U}. CounterTargetSpellTemplate ("Counter target spell.").
+        // The canonical hard counter; binds via the existing template registry
+        // with no new factory.
+        "Counterspell",
 
         // ---- Bot-deck land coverage (ShockLandBinder + OracleManaBinder) ----
         // Land — Mountain Plains. Shock-land replacement (pay 2 life or ETB
