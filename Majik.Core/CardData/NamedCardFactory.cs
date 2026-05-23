@@ -1233,6 +1233,17 @@ public static class NamedCardFactory
             //  primitive ("copy that spell") + new-targets prompt all deferred.
             "Pyromancer's Goggles" => PyromancersGogglesFactory.Create(owner),
 
+            // Legendary Creature — Nymph {G}{W} 1/2 (SythisHarvestsHandFactory).
+            // Theros Beyond Death constellation cycle. "Constellation —
+            // Whenever an enchantment enters under your control, you gain
+            // 1 life and draw a card." (CR 702.144 / 603.1). Trigger over
+            // CardMovedEvent → battlefield with controller-match + card-type
+            // Enchantment predicate (covers plain enchantments AND Auras
+            // per CR 303.1). The single-arg dispatcher path here produces
+            // the correct card shape without TriggerManager registration;
+            // use the (owner, triggers) overload for fully-wired behavior.
+            "Sythis, Harvest's Hand" => SythisHarvestsHandFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
