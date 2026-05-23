@@ -24,6 +24,13 @@ public abstract class ContinuousEffect
     public abstract void Apply(CreatureCharacteristics chars);
 
     public DateTime Timestamp { get; } = DateTime.UtcNow;
+
+    /// <summary>
+    /// CR 613.8 — return true iff this effect depends on <paramref name="other"/>:
+    /// applying <c>other</c> first would change this effect's existence, what it
+    /// does, or the set of objects it applies to. Default: no dependency.
+    /// </summary>
+    public virtual bool DependsOn(ContinuousEffect other) => false;
 }
 
 /// <summary>
