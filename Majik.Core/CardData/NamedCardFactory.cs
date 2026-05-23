@@ -1616,6 +1616,20 @@ public static class NamedCardFactory
             // Engineered Explosives + Mishra's Bauble).
             "Pernicious Deed" => PerniciousDeedFactory.Create(owner),
 
+            // Sorcery — {2}{B}{B} (TendrilsOfAgonyFactory). Scourge.
+            // "Target opponent loses 2 life and you gain 2 life. Storm
+            // (When you cast this spell, copy it for each spell cast
+            // before it this turn. You may choose new targets for the
+            // copies.)" CR 702.40. Card shape only here; the resolve-time
+            // life-swing SpellDefinition is built on demand via
+            // TendrilsOfAgonyFactory.BuildDefinition(controller, targetResolver).
+            // The structural Storm trigger is attached for shape inspection;
+            // use the (owner, triggers, stack, turnState) overload for
+            // fully-wired Storm copy semantics — copies share the original
+            // chosen opponent (CR 702.40a retargeting deferred — see
+            // StormHelper + SpellCopier xmldocs). Mirrors Brain Freeze.
+            "Tendrils of Agony" => TendrilsOfAgonyFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
