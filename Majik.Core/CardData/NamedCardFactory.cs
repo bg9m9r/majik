@@ -2203,6 +2203,20 @@ public static class NamedCardFactory
             // deferred to fully-wired callers — see factory xmldoc.
             "Nadu, Winged Wisdom" => NaduWingedWisdomFactory.Create(owner),
 
+            // Sorcery — {2}{W}{W} (WrathOfGodFactory). Limited Edition Alpha
+            // and many reprints. "Destroy all creatures. They can't be
+            // regenerated." Card shape only at the dispatcher; the resolve
+            // effect (every player's battlefield → graveyard sweep for every
+            // Creature) is built on demand via WrathOfGodFactory.BuildResolveEffect.
+            // The "can't be regenerated" rider and indestructible bypass are
+            // lossy at v1 — same gap as DestroyAllCreaturesTemplate's sweep.
+            "Wrath of God" => WrathOfGodFactory.Create(owner),
+
+            // Sorcery — {2}{B}{B} (DamnationFactory). Planar Chaos.
+            // Functional reprint of Wrath of God in black; resolve effect
+            // delegates to WrathOfGodFactory.BuildResolveEffect.
+            "Damnation" => DamnationFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
