@@ -673,6 +673,26 @@ public static class NamedCardFactory
             // prompt deferred (same queue as Stoneforge Mystic / Sun Titan).
             "Show and Tell" => ShowAndTellFactory.Create(owner),
 
+            // Enchantment — {2}{R} (SneakAttackFactory). Urza's Saga.
+            // "{R}: You may put a creature card from your hand onto the
+            //  battlefield. That creature gains haste. Sacrifice it at the
+            //  beginning of the next end step." CR 602 — repeatable {R}
+            //  activated ability. Each activation closes over its own
+            //  resolve-time creature pick and (when a TriggerManager is
+            //  wired) its own delayed end-step sacrifice (CR 603.7) so
+            //  multiple activations in the same turn each sacrifice their
+            //  cheated-in creature. v1 deterministic first-creature-in-hand
+            //  pick (auto-accepts the "you may" when a candidate exists —
+            //  same shape as Aether Vial / Through the Breach / Goblin
+            //  Lackey). Haste granted via the standard EOT-scoped keyword
+            //  grant (observationally equivalent to a no-duration grant
+            //  given the creature is sac'd at the same boundary).
+            //  Single-arg dispatcher path produces the correct card shape
+            //  without ZoneService / TriggerManager wiring; use the
+            //  (owner, zoneService, triggers) overload for fully-wired
+            //  behaviour.
+            "Sneak Attack" => SneakAttackFactory.Create(owner),
+
             // Creature — Human Soldier {1}{W} 2/2 (PuresteelPaladinFactory).
             // ETB-draw trigger: whenever an Equipment enters under controller's
             // control, draw a card (CR 603.1 — "you may" simplified to a
@@ -1880,6 +1900,35 @@ public static class NamedCardFactory
             // Token-colour identity (black) deferred — same gap as Crashing
             // Footfalls' green Rhinos and Wurmcoil's colourless Wurms.
             "Bridge from Below" => BridgeFromBelowFactory.Create(owner),
+
+            // Legendary Creature — Phyrexian Angel {3}{W}{U}{B}{R}{G}
+            // (AtraxaGrandUnifierFactory). Phyrexia: All Will Be One.
+            // Flying + Vigilance + Deathtouch + Lifelink keyword markers
+            // wired (CR 702.9 / 702.20 / 702.2 / 702.15). ETB triggered
+            // ability: reveal the top ten cards of your library, put one
+            // card of each card type into your hand, then place the rest
+            // on the bottom of your library in a random order (CR 603.6a,
+            // CR 701.20a). The single-arg dispatcher path attaches the
+            // ETB trigger to the card shape without TriggerManager
+            // wiring; callers can invoke AtraxaGrandUnifierFactory.ResolveEtb
+            // directly to drive the reveal-and-pick. The Battle card
+            // type (MoM+) is iterated transparently when added to the
+            // CardType enum — no factory change needed.
+            "Atraxa, Grand Unifier" => AtraxaGrandUnifierFactory.Create(owner),
+
+            // Legendary Creature — Phyrexian Praetor {2}{B}{B} 4/5
+            // (SheoldredTheApocalypseFactory). Dominaria United. Deathtouch
+            // wired as a KeywordAbility marker. Draw trigger (CR 603.1):
+            // "Whenever you draw a card, you gain 2 life and each opponent
+            // loses 2 life" wired via Triggers.OnCardDrawnByPlayer filtered
+            // to the controller — only the controller's draws fire it. The
+            // single-arg dispatcher path here produces the correct card
+            // shape and gains 2 life for the controller on execute; the
+            // "each opponent loses 2" clause silently no-ops without an
+            // opponent resolver (mirrors Liliana of the Veil's player-list-
+            // resolver pattern). Use the (owner, opponentResolver, eventBus,
+            // triggers) overload to wire full drain + bus-driven firing.
+            "Sheoldred, the Apocalypse" => SheoldredTheApocalypseFactory.Create(owner),
 
             _ => new Card(name, ""),
         };
