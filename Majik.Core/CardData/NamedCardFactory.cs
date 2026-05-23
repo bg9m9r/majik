@@ -977,6 +977,19 @@ public static class NamedCardFactory
             // mirroring Chalice of the Void. Illegal-mv target → no-op (CR 608.2b).
             "Spell Snare" => SpellSnareFactory.Create(owner),
 
+            // Instant — {1}{R/G} (ManamorphoseFactory). Shadowmoor.
+            // "Add two mana in any combination of colors. Draw a card."
+            // Hybrid pip parses to 1 generic + HybridPip(Red, Green) via
+            // ManaCost.Parse (CR 107.4e). Card shape only here; the resolve
+            // effect (deposit 2 picked mana + draw 1) is built on demand via
+            // ManamorphoseFactory.BuildResolveEffect with a Func<Player,
+            // ManaColor[]> picker — v1 default returns {R}{G}. No agent
+            // prompt for the colour pair yet (IPlayerAgent has no
+            // ChooseManaColorsAsync); callers can pre-pick. Net-zero
+            // mana-effect bookkeeping for cost-reduction restrictions
+            // (CR 106.11b) deferred — no mana-provenance ledger.
+            "Manamorphose" => ManamorphoseFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
