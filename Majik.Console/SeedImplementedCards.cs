@@ -280,6 +280,17 @@ public static class SeedImplementedCards
         // creature").
         "Solitude",
 
+        // Creature — Elemental Incarnation {3}{U} 3/3 (SubtletyFactory).
+        // Modern Horizons 2 incarnation — blue counterpart to Solitude.
+        // Flash + Evoke keyword markers via KeywordBinder; KeywordBinder
+        // attaches the printed evoke sacrifice trigger (EvokeFactory)
+        // automatically. ETB bounce-and-look trigger wired via SubtletyFactory:
+        // return target opponent's creature/planeswalker to its owner's hand,
+        // then that owner does a 1-card "look + may bottom" scry decision
+        // sourced from their registered IPlayerAgent. Evoke alt-cost —
+        // "exile a blue card from your hand" — via EvokeAlternativeCost.
+        "Subtlety",
+
         // U/R Horizon Canopy painless dual — Modern Horizons (FieryIsletFactory).
         // {T}, Pay 1 life: Add {U} or {R} — two ManaAbility instances with a
         // life-cost activation gate (CR 119.4) + LoseLife side-effect wired
