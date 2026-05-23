@@ -1,4 +1,5 @@
 using Majik.Core.Cards;
+using Majik.Core.Cards.Types;
 using Majik.Core.Effects;
 using Majik.Core.Events;
 using Majik.Core.Players;
@@ -20,11 +21,14 @@ namespace Majik.Core.CardData.Factories;
 /// {T}: Add {R} for each affected land (the printed mana abilities are
 /// lost per CR 305.6).
 ///
-/// The Layer 4 effect's lifecycle is event-driven via
-/// <see cref="BloodMoonStaticEffect"/>: subscribe to <see cref="CardMovedEvent"/>,
-/// register the <see cref="SetSubtypesEffect"/> when Blood Moon enters the
-/// battlefield, unregister when it leaves. This mirrors the pattern used by
-/// <see cref="TorporOrbFactory"/> + <see cref="TorporOrbStaticEffect"/>.
+/// The Layer 4 effect's lifecycle is event-driven via the generic
+/// <see cref="RetypeLandsStaticEffect"/>: subscribe to
+/// <see cref="CardMovedEvent"/>, register the
+/// <see cref="SetSubtypesEffect"/> when Blood Moon enters the battlefield,
+/// unregister when it leaves. This mirrors the pattern used by
+/// <see cref="TorporOrbFactory"/> + <see cref="TorporOrbStaticEffect"/>,
+/// and is shared with Magus of the Moon, Harbinger of the Seas, and
+/// Conversion via the same <see cref="RetypeLandsStaticEffect"/> binder.
 ///
 /// Callers wiring real gameplay should use
 /// <see cref="Create(Player, ContinuousEffectsService, IEventBus?)"/> so the
@@ -38,6 +42,9 @@ public static class BloodMoonFactory
     public const string CardName = "Blood Moon";
     public const string Cost = "{2}{R}";
 
+    private static readonly IReadOnlySet<CardSubtype> MountainOnly =
+        new HashSet<CardSubtype> { CardSubtype.Mountain };
+
     /// <summary>
     /// Creates a Blood Moon with correct card identity only (no live
     /// Layer 4 effect). Suitable for factory-shape / naming tests.
@@ -47,7 +54,7 @@ public static class BloodMoonFactory
 
     /// <summary>
     /// Creates a fully-wired Blood Moon. When <paramref name="effects"/> is
-    /// supplied, a <see cref="BloodMoonStaticEffect"/> is attached so the
+    /// supplied, a <see cref="RetypeLandsStaticEffect"/> is attached so the
     /// Layer 4 effect registers/unregisters as Blood Moon enters/leaves the
     /// battlefield via <see cref="CardMovedEvent"/> on
     /// <paramref name="eventBus"/>. When <paramref name="effects"/> is null
@@ -67,7 +74,15 @@ public static class BloodMoonFactory
 
         if (effects != null)
         {
-            var lifecycle = new BloodMoonStaticEffect(card, effects, eventBus);
+            // CR 305.6 — "Nonbasic lands are Mountains." Scope every Land
+            // without the Basic supertype; retype its land-subtype slot to
+            // { Mountain }.
+            var lifecycle = new RetypeLandsStaticEffect(
+                card,
+                effects,
+                eventBus,
+                scope: p => p is Land && !p.HasSupertype(CardSupertype.Basic),
+                newLandSubtypes: MountainOnly);
             lifecycle.Attach();
         }
 
