@@ -1104,6 +1104,26 @@ public static class NamedCardFactory
             // to bottom (mirrors Manamorphose's deterministic v1 fallback).
             "Aether Gust" => AetherGustFactory.Create(owner),
 
+            // Artifact — {2} (DampingSphereFactory). Dominaria.
+            // Two static riders:
+            //   1. "If a land is tapped for two or more mana, it produces
+            //      {C} instead of any other type and amount." Wired via
+            //      DampingSphereCappedManaAbility applied by
+            //      EffectiveManaAbilities.For when the all-players list is
+            //      supplied.
+            //   2. "Each spell a player casts costs {1} more to cast for
+            //      each other spell that player has cast this turn." Wired
+            //      via a SpellCostIncreaseAbility scanned by
+            //      CostReduction.GetEffectiveCost when the all-players list
+            //      is supplied.
+            // The single-arg dispatcher path here produces the correct card
+            // shape (cost rider reads a null TurnState → zero); production
+            // wiring should use DampingSphereFactory.Create(owner,
+            // turnState) so the rider reads the live per-turn tally. See
+            // factory xmldoc for deferred ManaPaymentResolver /
+            // CostReduction call-site plumbing.
+            "Damping Sphere" => DampingSphereFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
