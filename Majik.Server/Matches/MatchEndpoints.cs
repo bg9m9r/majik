@@ -39,6 +39,15 @@ public static class MatchEndpoints
             .Produces<MatchError>(StatusCodes.Status404NotFound)
             .Produces<MatchError>(StatusCodes.Status403Forbidden)
             .Produces<MatchError>(StatusCodes.Status409Conflict);
+        // Replay log download — MVP "share a finished game" capability.
+        // Returns the in-memory capture of EventDto + BotDecision records
+        // in arrival order. Access is gated to seated players via
+        // MatchService.GetReplayAsync.
+        group.MapGet("/{id:guid}/replay", GetReplay)
+            .WithName("GetMatchReplay")
+            .Produces<MatchReplayDto>(StatusCodes.Status200OK)
+            .Produces<MatchError>(StatusCodes.Status404NotFound)
+            .Produces<MatchError>(StatusCodes.Status403Forbidden);
         return routes;
     }
 
@@ -161,6 +170,16 @@ public static class MatchEndpoints
         if (svc == null) return MongoUnavailable();
         var sub = SubOf(user); if (sub == null) return Results.Unauthorized();
         var r = await svc.GetGameStateAsync(sub, id, ct);
+        return MapResult(r);
+    }
+
+    private static async Task<IResult> GetReplay(
+        Guid id, ClaimsPrincipal user,
+        [FromServices] MatchService? svc, CancellationToken ct)
+    {
+        if (svc == null) return MongoUnavailable();
+        var sub = SubOf(user); if (sub == null) return Results.Unauthorized();
+        var r = await svc.GetReplayAsync(sub, id, ct);
         return MapResult(r);
     }
 }

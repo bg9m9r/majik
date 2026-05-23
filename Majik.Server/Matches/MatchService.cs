@@ -48,6 +48,7 @@ public sealed class MatchService
     private readonly IMatchCommandForwarder? _forwarder;
     private readonly IInstanceIdProvider? _instanceIds;
     private readonly MatchFacadeBridge? _facadeBridge;
+    private readonly MatchReplayBuffer? _replayBuffer;
     private readonly ILogger<MatchService>? _logger;
 
     public MatchService(
@@ -66,7 +67,8 @@ public sealed class MatchService
         IInstanceIdProvider? instanceIds = null,
         ILogger<MatchService>? logger = null,
         IDeckOwnershipPolicy? deckOwnershipPolicy = null,
-        MatchFacadeBridge? facadeBridge = null)
+        MatchFacadeBridge? facadeBridge = null,
+        MatchReplayBuffer? replayBuffer = null)
     {
         _matches = matches;
         _profiles = profiles;
@@ -82,6 +84,7 @@ public sealed class MatchService
         _forwarder = forwarder;
         _instanceIds = instanceIds;
         _facadeBridge = facadeBridge;
+        _replayBuffer = replayBuffer;
         _logger = logger;
 
         // Strict by default: refuse construction without a real
@@ -277,12 +280,29 @@ public sealed class MatchService
                 {
                     signalrSink = new SignalrBotDecisionSink(matchId, _hub);
                 }
+
+                // Per-match replay sink. Always wired when the replay
+                // buffer is registered — unlike SignalrBotDecisionSink
+                // it isn't gated on Bot:DecisionLogging:Enabled, because
+                // the replay endpoint is meant to capture every game we
+                // can. Composed with signalrSink (if present) via
+                // CompositeBotDecisionSink so both observers see each
+                // decision; the existing extraDecisionSink composition
+                // inside ServerGameFactory.Create then folds in the
+                // process-wide logger sink.
+                IBotDecisionSink? replaySink = _replayBuffer != null
+                    ? new ReplayBufferBotDecisionSink(matchId, _replayBuffer)
+                    : null;
+                var perMatchSink = Majik.Bot.Diagnostics.CompositeBotDecisionSink.Compose(signalrSink, replaySink);
+                var extraSinkArg = ReferenceEquals(perMatchSink, Majik.Bot.Diagnostics.NullBotDecisionSink.Instance)
+                    ? null
+                    : perMatchSink;
                 facade = _gameFactory.Create(
                     creator.Handle, botPlayer.Handle,
                     creatorDeck, botDeck,
                     botSeatArchetype: bot.Archetype,
                     onBotThinking: onBotThinking,
-                    extraDecisionSink: signalrSink);
+                    extraDecisionSink: extraSinkArg);
                 // Wire the engine→SignalR bridge before any engine work
                 // can fire events (StartFullGameAsync happens later). The
                 // bridge holds the IDisposable subscriptions; teardown
@@ -898,6 +918,45 @@ public sealed class MatchService
 
         var state = facade.GetState();
         return Result.Ok(state);
+    }
+
+    // -----------------------------------------------------------------------
+    // GetReplayAsync
+    // -----------------------------------------------------------------------
+
+    /// <summary>
+    /// Returns the in-memory replay buffer for <paramref name="matchId"/>.
+    /// Access is restricted to seated players (invite matches are private;
+    /// see <see cref="GetAsync"/> for the same authorization pattern). The
+    /// replay endpoint is "share a finished game" — the caller is expected
+    /// to be a party to that game.
+    ///
+    /// <para>Returns <c>match-not-found</c> when no match document exists,
+    /// <c>forbidden</c> when the caller isn't a seated player, and
+    /// <c>match-not-found</c> when the buffer has been evicted (LRU under
+    /// <see cref="MatchReplayBuffer.MaxRetainedMatches"/>) — the buffer
+    /// loss is indistinguishable from the match not existing for a
+    /// downloader that just wants the JSON.</para>
+    /// </summary>
+    public async Task<Result<MatchReplayDto>> GetReplayAsync(
+        string callerSub, Guid matchId, CancellationToken ct)
+    {
+        if (_replayBuffer == null)
+            return Result.Fail<MatchReplayDto>(new MatchError("match-not-found"));
+
+        var match = await _matches.GetByIdAsync(matchId, ct);
+        if (match == null)
+            return Result.Fail<MatchReplayDto>(new MatchError("match-not-found"));
+
+        var isParty = callerSub == match.Creator.Sub || callerSub == match.Opponent?.Sub;
+        if (!isParty)
+            return Result.Fail<MatchReplayDto>(new MatchError("forbidden"));
+
+        var dto = _replayBuffer.GetReplay(matchId);
+        if (dto == null)
+            return Result.Fail<MatchReplayDto>(new MatchError("match-not-found"));
+
+        return Result.Ok(dto);
     }
 
     // -----------------------------------------------------------------------

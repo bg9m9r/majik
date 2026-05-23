@@ -482,4 +482,86 @@ public class MatchFacadeBridgeTests
         hub.Connection[0].Event.Should().Be("prompt");
         hub.Connection[0].Payload.Should().BeSameAs(openingMulligan);
     }
+
+    // -----------------------------------------------------------------------
+    // Replay buffer wiring
+    //
+    // The bridge is the engine→hub seam; the replay buffer hangs off
+    // ForwardEvent + Detach so the live broadcast and the replay log
+    // share a single capture point. Tests here verify the side-channel
+    // doesn't perturb the live broadcast and that Detach seals the log.
+    // -----------------------------------------------------------------------
+
+    private sealed class FixedClock : IClock
+    {
+        public DateTime UtcNow { get; private set; } =
+            new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+    }
+
+    private static MatchFacadeBridge BuildBridgeWithReplay(CaptureHub hub, out MatchReplayBuffer replay)
+    {
+        replay = new MatchReplayBuffer(new FixedClock(), NullLogger<MatchReplayBuffer>.Instance);
+        return new MatchFacadeBridge(hub, NullLogger<MatchFacadeBridge>.Instance, replay);
+    }
+
+    [Fact]
+    public void ForwardEvent_AlsoCapturesToReplayBuffer()
+    {
+        var hub = new CaptureHub();
+        var bridge = BuildBridgeWithReplay(hub, out var replay);
+        var matchId = Guid.NewGuid();
+        var evt = FakeEvent("CardDrawnEvent");
+
+        bridge.ForwardEvent(matchId, evt);
+
+        // Live broadcast unchanged — replay capture is a side-channel.
+        hub.Group.Should().ContainSingle();
+        hub.Group[0].Payload.Should().BeSameAs(evt);
+
+        // And the same EventDto is now in the replay log.
+        var dto = replay.GetReplay(matchId);
+        dto.Should().NotBeNull();
+        dto!.EntryCount.Should().Be(1);
+        dto.Entries[0].Kind.Should().Be(ReplayEntry.KindEvent);
+        dto.Entries[0].Event.Should().BeSameAs(evt);
+        dto.SealedAt.Should().BeNull();
+    }
+
+    [Fact]
+    public void Detach_SealsReplayBuffer()
+    {
+        var hub = new CaptureHub();
+        var bridge = BuildBridgeWithReplay(hub, out var replay);
+        var matchId = Guid.NewGuid();
+
+        bridge.ForwardEvent(matchId, FakeEvent("TurnStartedEvent"));
+        replay.GetReplay(matchId)!.SealedAt.Should().BeNull();
+
+        bridge.Detach(matchId);
+
+        var dto = replay.GetReplay(matchId)!;
+        dto.SealedAt.Should().NotBeNull("Detach seals the buffer so finished matches stop accepting writes");
+
+        // Writes after Detach are dropped from the replay log.
+        bridge.ForwardEvent(matchId, FakeEvent("LateEvent"));
+        replay.GetReplay(matchId)!.EntryCount.Should().Be(1);
+    }
+
+    [Fact]
+    public void Bridge_WithoutReplayBuffer_StillWorks()
+    {
+        // Buffer is optional — old call sites (and tests) construct
+        // the bridge without it. Live broadcast must continue.
+        var hub = new CaptureHub();
+        var bridge = new MatchFacadeBridge(hub, NullLogger<MatchFacadeBridge>.Instance, replay: null);
+        var matchId = Guid.NewGuid();
+
+        var act = () =>
+        {
+            bridge.ForwardEvent(matchId, FakeEvent("X"));
+            bridge.Detach(matchId);
+        };
+        act.Should().NotThrow();
+        hub.Group.Should().ContainSingle();
+    }
 }
