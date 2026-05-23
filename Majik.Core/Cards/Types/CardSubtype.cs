@@ -42,6 +42,10 @@ public enum CardSubtype
     Incarnation,
     /// <summary>Lhurgoyf creature subtype — Tarmogoyf, Mortivore. CR 205.3m.</summary>
     Lhurgoyf,
+    /// <summary>Kor creature subtype — Stoneforge Mystic, Kor Outfitter. CR 205.3m.</summary>
+    Kor,
+    /// <summary>Artificer creature subtype — Stoneforge Mystic, Goblin Engineer. CR 205.3m.</summary>
+    Artificer,
 
     // Land subtypes (examples)
     Forest,

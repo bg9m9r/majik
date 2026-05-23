@@ -370,6 +370,18 @@ public static class NamedCardFactory
             // and SuspendedCardRegistry.
             "Rift Bolt" => RiftBoltFactory.Create(owner),
 
+            // Creature — Kor Artificer {1}{W} 1/2 (StoneforgeMysticFactory).
+            // ETB tutor: search library for an Equipment card → hand
+            // (deterministic first-match; shuffle deferred). Activated
+            // {1}{W}, {T}: put an Equipment card from hand directly onto
+            // the battlefield, then attach to a creature you control
+            // (CR 113.6c / 117.1a — alt-zone "cast"). The single-arg
+            // dispatcher path here produces the correct card shape; the
+            // activated ability uses raw zone moves (no ZoneService).
+            // Use the (owner, zoneService, eventBus, triggers) overload
+            // for full ETB-replacement / trigger-firing wiring.
+            "Stoneforge Mystic" => StoneforgeMysticFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
