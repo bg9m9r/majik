@@ -3,13 +3,13 @@
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
 **Last updated:** 2026-05-23
-**Latest origin/main:** Lightning Helix (Instant {R}{W} — 3 damage to any target + controller gains 3 life; single any-target request; Planeswalker damage routed via shared `SearingBlazeFactory.DealDamageWithPlaneswalker`) on top of Sword of Feast and Famine + Boros Reckoner + Mishra's Workshop + Goblin Welder + Sword of Fire and Ice + Reckless Charge + Trinket Mage + Sun Titan + Sensei's Divining Top + Inkmoth Nexus + Spell Queller + Goblin Matron + Mutavault + Skullclamp + Umezawa's Jitte + Wasteland + Swords to Plowshares + Mystical Tutor + Path to Exile + Daze + Ponder + Preordain + Splinter Twin + Sythis, Harvest's Hand + Pyromancer's Goggles + Plague Engineer + Manabarbs + Yawgmoth's Will + Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere.
+**Latest origin/main:** Brain Freeze (Instant {U}{U} — mill 3 target player + Storm trigger (CR 702.40) via new `StormHelper` counting `TurnState.SpellsCastByPlayer - 1` and pushing copies through `SpellCopier.PushCopyOfTopSpell`; CR 702.40a retargeting deferred) on top of Lightning Helix + Sword of Feast and Famine + Boros Reckoner + Mishra's Workshop + Goblin Welder + Sword of Fire and Ice + Reckless Charge + Trinket Mage + Sun Titan + Sensei's Divining Top + Inkmoth Nexus + Spell Queller + Goblin Matron + Mutavault + Skullclamp + Umezawa's Jitte + Wasteland + Swords to Plowshares + Mystical Tutor + Path to Exile + Daze + Ponder + Preordain + Splinter Twin + Sythis, Harvest's Hand + Pyromancer's Goggles + Plague Engineer + Manabarbs + Yawgmoth's Will + Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere.
 
 ## Headline numbers
 
 | Metric | Count |
 |---|---|
-| Named factories | 132 |
+| Named factories | 133 |
 | Bespoke templates | 27 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
@@ -36,6 +36,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Bonecrusher Giant | Creature | TBD | 4/3 Giant {2}{R} + targeted-by-spell trigger deals 2 to spell's controller (Adventure / Stomp half deferred) |
 | Boros Reckoner | Creature | TBD | 3/3 Minotaur Wizard {R/W}{R/W}{R/W} + first strike + damage-received trigger redirecting that much damage to any target (v1 triggered, not the printed *replacement* effect — damage still resolves on Boros Reckoner before the redirect fires, and the redirect goes on the stack). Hybrid {R/W} parses via ManaCost.Parse's HybridPip path |
 | Boseiju, Who Endures | Land | — | channel destroy stub |
+| Brain Freeze | Instant | TBD | {U}{U} — mill 3 target player + Storm (CR 702.40) on-cast trigger via StormHelper (count = TurnState.SpellsCastByPlayer - 1; copies via SpellCopier.PushCopyOfTopSpell re-executing the spell's effects per copy). CR 702.40a "you may choose new targets" + copies-as-distinct-stack-objects deferred (inherited from SpellCopier) |
 | Cabal Ritual | Instant | TBD | add {B}{B}{B}; threshold (7+ own grave) replaces with five colourless (CR 702.50) |
 | Cavern of Souls | Land | TBD | ETB choose-creature-type + {T}: {C} + {T}: any color (spend-restriction + uncounterable rider deferred) |
 | Chalice of the Void | Artifact | TBD | {X}{X} — ETB with X charge counters (via PendingCastX) + symmetric "counter spell of MV = counters" trigger |
@@ -308,7 +309,7 @@ Per-keyword action helpers under `Majik.Core/Keywords/`:
 | Plot | TODO | — | — |
 | Mobilize | TODO | — | — |
 | Cascade | Done (TBD) | `Keywords/CascadeAction.cs` | Crashing Footfalls |
-| Storm | TODO | — | — |
+| Storm | Done (TBD) | `Keywords/StormHelper.cs` | Brain Freeze |
 | Affinity | TODO | — | — |
 | Bloodthirst / Echo / Buyback | TODO | — | — |
 
