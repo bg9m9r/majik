@@ -478,6 +478,18 @@ public static class NamedCardFactory
             // target check at resolution).
             "Force of Negation" => ForceOfNegationFactory.Create(owner),
 
+            // Instant — {0} (PactOfNegationFactory). Future Sight.
+            // "Counter target spell.
+            //  At the beginning of your next upkeep, pay {3}{U}{U}.
+            //  If you don't, you lose the game."
+            // Card shape only here; the resolve-time SpellDefinition is
+            // built on demand via PactOfNegationFactory.BuildDefinition,
+            // which counters the target spell (CR 701.5) and — when a
+            // TriggerManager is supplied — registers a delayed upkeep
+            // trigger (CR 603.7) that calls PayMana({3}{U}{U}) and falls
+            // back to MarkLost() on failure (CR 104.3 / CR 118.3).
+            "Pact of Negation" => PactOfNegationFactory.Create(owner),
+
             // Instant — {B/P} (SurgicalExtractionFactory).
             // "Choose target card in a graveyard other than a basic land
             //  card. Search its owner's graveyard, hand, and library for
@@ -1107,6 +1119,26 @@ public static class NamedCardFactory
             // Agent-driven "you may" decline + multi-candidate selection
             // deferred (mirrors Aether Vial + Stoneforge Mystic).
             "Goblin Lackey" => GoblinLackeyFactory.Create(owner),
+
+            // Artifact — {2} (DampingSphereFactory). Dominaria.
+            // Two static riders:
+            //   1. "If a land is tapped for two or more mana, it produces
+            //      {C} instead of any other type and amount." Wired via
+            //      DampingSphereCappedManaAbility applied by
+            //      EffectiveManaAbilities.For when the all-players list is
+            //      supplied.
+            //   2. "Each spell a player casts costs {1} more to cast for
+            //      each other spell that player has cast this turn." Wired
+            //      via a SpellCostIncreaseAbility scanned by
+            //      CostReduction.GetEffectiveCost when the all-players list
+            //      is supplied.
+            // The single-arg dispatcher path here produces the correct card
+            // shape (cost rider reads a null TurnState → zero); production
+            // wiring should use DampingSphereFactory.Create(owner,
+            // turnState) so the rider reads the live per-turn tally. See
+            // factory xmldoc for deferred ManaPaymentResolver /
+            // CostReduction call-site plumbing.
+            "Damping Sphere" => DampingSphereFactory.Create(owner),
 
             _ => new Card(name, ""),
         };

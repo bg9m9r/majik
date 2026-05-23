@@ -48,10 +48,36 @@ public static class EffectiveManaAbilities
     public static IReadOnlyList<IManaAbility> For(
         Permanent permanent,
         ContinuousEffectsService? layers,
-        Player? controller = null)
+        Player? controller = null) =>
+        For(permanent, layers, controller, allPlayers: null);
+
+    /// <summary>
+    /// Layer-aware mana-ability list with optional Damping Sphere awareness.
+    /// When <paramref name="allPlayers"/> is supplied and any of those
+    /// players controls a Damping Sphere on the battlefield, each returned
+    /// ability sourced from a <see cref="Land"/> is wrapped in a
+    /// <see cref="DampingSphereCappedManaAbility"/> so any activation
+    /// producing two or more mana resolves into a single {C} instead.
+    /// Pass null (default) to skip the scan — preserves pre-Damping-Sphere
+    /// behaviour for callers that don't have a game-graph handle.
+    /// </summary>
+    public static IReadOnlyList<IManaAbility> For(
+        Permanent permanent,
+        ContinuousEffectsService? layers,
+        Player? controller,
+        IEnumerable<Player>? allPlayers)
     {
         if (permanent == null) throw new ArgumentNullException(nameof(permanent));
 
+        var baseAbilities = ComputeLayered(permanent, layers, controller);
+        return DampingSphereCappedManaAbility.WrapIfPresent(baseAbilities, allPlayers);
+    }
+
+    private static IReadOnlyList<IManaAbility> ComputeLayered(
+        Permanent permanent,
+        ContinuousEffectsService? layers,
+        Player? controller)
+    {
         // No layer service available (e.g. agent has no path to it yet) —
         // null-fallback per the PR's scope. Behaviour matches the
         // pre-Blood-Moon enumeration: just the printed mana abilities.
