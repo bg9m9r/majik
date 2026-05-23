@@ -48,7 +48,8 @@ public sealed class SpellCastFlow
         CancellationToken ct = default,
         IReadOnlyList<IAdditionalCost>? additionalCosts = null,
         IAlternativeCost? alternativeCost = null,
-        Majik.Core.Players.Agents.ManaPayment? preChosenMana = null)
+        Majik.Core.Players.Agents.ManaPayment? preChosenMana = null,
+        DelveCost? delveCost = null)
     {
         if (caster == null) throw new ArgumentNullException(nameof(caster));
         if (card == null) throw new ArgumentNullException(nameof(card));
@@ -144,6 +145,24 @@ public sealed class SpellCastFlow
         if (xValue.HasValue && xValue.Value > 0)
         {
             totalCost = totalCost.AddGenericCost(xValue.Value);
+        }
+
+        // CR 702.66 — Delve. Each exiled graveyard card reduces the
+        // spell's total generic mana by 1. Apply after X (X is generic
+        // and is delve-payable per CR 702.66 + CR 601.2g order) and
+        // after cost reduction. Pay the exile portion of the cost now —
+        // CR 702.66b says delve is paid when the spell is cast.
+        if (delveCost != null)
+        {
+            if (!delveCost.CanPay(caster, totalCost))
+            {
+                throw new InvalidOperationException(
+                    $"Cannot pay Delve cost for {card.Name}: " +
+                    $"selection of {delveCost.ReductionAmount} card(s) " +
+                    $"invalid (generic={totalCost.Generic}).");
+            }
+            totalCost = delveCost.ApplyTo(totalCost);
+            delveCost.Pay(caster);
         }
 
         // CR 601.2g — mana sourcing. When the caller has already prompted +
