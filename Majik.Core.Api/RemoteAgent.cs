@@ -23,13 +23,18 @@ public sealed class RemoteAgent : IPlayerAgent
 {
     private readonly Player _player;
     private readonly Func<Guid, ICard?>? _cardLookup;
+    private readonly Func<Guid, Player?>? _playerLookup;
     private object? _pending;           // TaskCompletionSource<T> for currently-awaited prompt
     private Type[]? _pendingKinds;      // allowed command types (multi for priority)
 
-    public RemoteAgent(Player player, Func<Guid, ICard?>? cardLookup = null)
+    public RemoteAgent(
+        Player player,
+        Func<Guid, ICard?>? cardLookup = null,
+        Func<Guid, Player?>? playerLookup = null)
     {
         _player = player ?? throw new ArgumentNullException(nameof(player));
         _cardLookup = cardLookup;
+        _playerLookup = playerLookup;
     }
 
     /// <summary>True iff the engine is currently awaiting a command for this agent.</summary>
@@ -125,8 +130,12 @@ public sealed class RemoteAgent : IPlayerAgent
                 break;
             case OrderTriggersCommand:
                 throw new NotImplementedException("OrderTriggers resolution wired in P9.7.");
-            case DeclareAttackersCommand or DeclareBlockersCommand:
-                throw new NotImplementedException("Combat command resolution wired in phase 10.");
+            case DeclareAttackersCommand atk:
+                ((TaskCompletionSource<CombatPlan>)tcs).SetResult(BuildCombatPlan(atk));
+                break;
+            case DeclareBlockersCommand blk:
+                ((TaskCompletionSource<BlockPlan>)tcs).SetResult(BuildBlockPlan(blk));
+                break;
             default:
                 throw new InvalidOperationException($"Unhandled command {command.GetType().Name}.");
         }
@@ -174,10 +183,89 @@ public sealed class RemoteAgent : IPlayerAgent
         => Prompt<ManaPayment>(ct, typeof(ChooseManaCommand));
 
     public Task<CombatPlan> DeclareAttackersAsync(GameContext ctx, IReadOnlyList<Creature> eligibleAttackers, CancellationToken ct = default)
-        => throw new NotImplementedException("Combat wired in phase 10.");
+        => Prompt<CombatPlan>(ct, typeof(DeclareAttackersCommand));
 
     public Task<BlockPlan> DeclareBlockersAsync(GameContext ctx, IReadOnlyList<Creature> attackers, IReadOnlyList<Creature> eligibleBlockers, CancellationToken ct = default)
-        => throw new NotImplementedException("Combat wired in phase 10.");
+        => Prompt<BlockPlan>(ct, typeof(DeclareBlockersCommand));
+
+    // CR 508.1 — translate the wire DeclareAttackersCommand into the
+    // engine-shaped CombatPlan. Each declaration carries an attacker (must
+    // be a Creature this agent controls) and a defender (either a Player
+    // id or a Planeswalker InstanceId on the battlefield). We resolve the
+    // attacker via _cardLookup and the defender by trying _playerLookup
+    // first, then falling back to _cardLookup expecting a Planeswalker.
+    // Empty Attackers list = "attack with nothing", which is a legal plan
+    // and falls out naturally (CR 508.2 — declaring no attackers is fine).
+    private CombatPlan BuildCombatPlan(DeclareAttackersCommand cmd)
+    {
+        if (cmd.Attackers.Count == 0)
+        {
+            return CombatPlan.None;
+        }
+
+        var decls = new List<AttackerDeclaration>(cmd.Attackers.Count);
+        foreach (var dto in cmd.Attackers)
+        {
+            var card = ResolveCard(dto.AttackerInstanceId);
+            if (card is not Creature creature)
+            {
+                throw new InvalidOperationException(
+                    $"Attacker {dto.AttackerInstanceId} is not a Creature ({card.GetType().Name}).");
+            }
+
+            var defender = ResolveDefender(dto.DefenderId);
+            decls.Add(new AttackerDeclaration(creature, defender));
+        }
+        return new CombatPlan(decls);
+    }
+
+    // CR 509.1 — translate the wire DeclareBlockersCommand. Each blocker
+    // must be a Creature this agent controls; each attacker (referenced
+    // by InstanceId) must be a Creature on the battlefield. Multiple
+    // blockers may target the same attacker — declaration order in the
+    // wire list determines damage-assignment order downstream
+    // (CR 509.2 — the defending player orders blockers when declaring).
+    private BlockPlan BuildBlockPlan(DeclareBlockersCommand cmd)
+    {
+        if (cmd.Blockers.Count == 0)
+        {
+            return BlockPlan.None;
+        }
+
+        var decls = new List<BlockerDeclaration>(cmd.Blockers.Count);
+        foreach (var dto in cmd.Blockers)
+        {
+            var blockerCard = ResolveCard(dto.BlockerInstanceId);
+            if (blockerCard is not Creature blocker)
+            {
+                throw new InvalidOperationException(
+                    $"Blocker {dto.BlockerInstanceId} is not a Creature ({blockerCard.GetType().Name}).");
+            }
+
+            var attackerCard = ResolveCard(dto.AttackerInstanceId);
+            if (attackerCard is not Creature attacker)
+            {
+                throw new InvalidOperationException(
+                    $"Attacker {dto.AttackerInstanceId} is not a Creature ({attackerCard.GetType().Name}).");
+            }
+
+            decls.Add(new BlockerDeclaration(blocker, attacker));
+        }
+        return new BlockPlan(decls);
+    }
+
+    private object ResolveDefender(Guid defenderId)
+    {
+        var player = _playerLookup?.Invoke(defenderId);
+        if (player != null) return player;
+
+        // Fall back to planeswalker on the battlefield.
+        var card = _cardLookup?.Invoke(defenderId);
+        if (card is Majik.Core.Cards.Planeswalker pw) return pw;
+
+        throw new InvalidOperationException(
+            $"Defender {defenderId} is neither a known player nor a Planeswalker.");
+    }
 
     // TODO (v2): wire Scry/Surveil prompts through the command channel
     // (ChooseScryCommand / ChooseSurveilCommand) once the prompt system
