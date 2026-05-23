@@ -3,13 +3,13 @@
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
 **Last updated:** 2026-05-23
-**Latest origin/main:** f15841a (#204 — Wurmcoil Engine)
+**Latest origin/main:** d57603b (#210 — cards-seed bump)
 
 ## Headline numbers
 
 | Metric | Count |
 |---|---|
-| Named factories | 61 |
+| Named factories | 62 |
 | Bespoke templates | 26 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
@@ -80,6 +80,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Treasure Cruise | Sorcery | #181 | delve draw 3 |
 | Underground Mortuary | Land | — | U/B surveil dual |
 | Unholy Heat | Instant | #190 | delirium variable damage |
+| Up the Beanstalk | Enchantment | TBD | ETB draw + cast-MV-5+ draw |
 | Urborg, Tomb of Yawgmoth | Land | #158 | grant Swamp to all lands |
 | Vexing Bauble | Artifact | — | sac-draw shell |
 | Walking Ballista | Artifact Creature | — | grow + ping |
@@ -298,7 +299,6 @@ Sorted by build priority (small infra lift × high meta share).
 | 10 | Cascade keyword | High | Triggered "cast for free from top reveal" — alt-cast-from-library framework |
 | 11 | Primeval Titan | Mid | Attack/ETB triggers + land tutor; tutor template exists |
 | 12 | Amulet of Vigor | Mid | Replacement on enters-tapped → untap; needs ETB replacement composition |
-| 13 | Up the Beanstalk | Low | Cast-trigger by CMC threshold — trigger-by-CMC pattern |
 
 ## How to update this doc
 
