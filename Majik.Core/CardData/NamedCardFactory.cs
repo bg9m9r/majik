@@ -568,6 +568,19 @@ public static class NamedCardFactory
             // TarmogoyfFactory.CountDistinctCardTypes for the type count.
             "Unholy Heat" => UnholyHeatFactory.Create(owner),
 
+            // Instant — {R} (BurstLightningFactory). Zendikar / Modern Masters.
+            // "Kicker {4}. Burst Lightning deals 2 damage to any target. If
+            //  Burst Lightning was kicked, it deals 4 damage to that target
+            //  instead." CR 702.33. Card shape only here; the resolve-time
+            // SpellDefinition is built on demand via
+            // BurstLightningFactory.BuildSpellDefinition(resolver, wasKicked).
+            // Kicker primitive is DEFERRED (see factory xmldoc) — no
+            // IAdditionalCost shape for Kicker yet, no "was kicked" bit
+            // plumbed through SpellCastFlow, and no OracleSpellBinder /
+            // KeywordAnalyzer awareness. Production casts ship as
+            // not-kicked (2 damage); the wasKicked branch is structural.
+            "Burst Lightning" => BurstLightningFactory.Create(owner),
+
             // Instant — {R}{W} (LightningHelixFactory). Ravnica: City of Guilds /
             // Modern Horizons. "Lightning Helix deals 3 damage to any target and
             // you gain 3 life." Card shape only here; the resolve-time
