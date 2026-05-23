@@ -990,6 +990,19 @@ public static class NamedCardFactory
             // (CR 106.11b) deferred — no mana-provenance ledger.
             "Manamorphose" => ManamorphoseFactory.Create(owner),
 
+            // Creature — Illusion {1}{U} 0/0 (PhantasmalImageFactory).
+            // CR 706.10 — "You may have this enter as a copy of any creature
+            // on the battlefield, except it's an Illusion in addition to its
+            // other types and has 'When this creature becomes the target of
+            // a spell or ability, sacrifice it.'" The single-arg dispatcher
+            // path here produces the correct card shape (printed 0/0 Illusion
+            // + the targeted-by-spell-or-ability sacrifice trigger attached)
+            // without ReplacementBus / ContinuousEffectsService / EventBus /
+            // TriggerManager wiring. Use the (owner, eventBus, triggers,
+            // replacements, effects) overload for fully-wired enters-as-copy
+            // + Layer 4 Illusion rider + bus-driven trigger firing.
+            "Phantasmal Image" => PhantasmalImageFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 

@@ -68,6 +68,9 @@ public enum CardSubtype
     Pirate,
     /// <summary>Scout creature subtype — Tireless Tracker, Joraga Treespeaker. CR 205.3m.</summary>
     Scout,
+    /// <summary>Illusion creature subtype — Phantasmal Image, Phantasmal Bear,
+    /// Lord of the Unreal. CR 205.3m.</summary>
+    Illusion,
 
     // Land subtypes (examples)
     Forest,

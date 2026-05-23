@@ -22,7 +22,7 @@ public static class SeedImplementedCards
         // Undying creatures (CR 702.93 — UndyingFactory)
         "Young Wolf", "Strangleroot Geist", "Butcher Ghoul", "Geralf's Messenger",
         // Removal + discard (OracleSpellBinder)
-        "Fatal Push", "Thoughtseize",
+        "Fatal Push", "Thoughtseize", "Inquisition of Kozilek",
         // Dies-trigger land destruction (OracleTriggeredAbilityBinder — dies-destroy-land)
         "Fulminator Mage",
         // ETB graveyard-to-library trigger (OracleTriggeredAbilityBinder); Flash+Reach via KeywordBinder
