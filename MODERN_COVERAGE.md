@@ -68,6 +68,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Murktide Regent | Creature | #194 | delve cost + ETB X counters |
 | Orcish Bowmasters | Creature | — | reactive ping shell |
 | Pithing Needle | Artifact | #189 | name-targeted activated suppression |
+| Phyrexian Tower | Land | — | {T}: {C} + {T}, sac creature: {B}{B} (Legendary) |
 | Priest of Fell Rites | Creature | #196 | ETB reanimate + grave-unearth |
 | Primeval Titan | Creature | TBD | Trample + ETB/attack tutor up to 2 lands tapped |
 | Rift Bolt | Sorcery | #183 | suspend → 3 damage |
