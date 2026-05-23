@@ -27,6 +27,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Card | Type | PR | Note |
 |---|---|---|---|
 | Aether Gust | Instant | TBD | {1}{U} put target red/green spell or permanent on top or bottom of its owner's library (top/bottom decision via optional chooser callback; defaults to bottom) |
+| Aether Spellbomb | Artifact | TBD | {1} — {U}, sac: bounce target creature to owner's hand; {1}, sac: draw 1 (sac performed by effect closure; ActionValidator target-legality + ZoneService routing deferred) |
 | Aether Vial | Artifact | TBD | upkeep charge counter + {T} put creature from hand with mv = counters |
 | Agatha's Soul Cauldron | Artifact | — | activated counter-share |
 | Amulet of Vigor | Artifact | TBD | untap-on-enters-tapped trigger |

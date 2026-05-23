@@ -936,6 +936,18 @@ public static class NamedCardFactory
             // placed creature (CR 603.6a).
             "Aether Vial" => AetherVialFactory.Create(owner),
 
+            // Artifact — {1} (AetherSpellbombFactory). Mirrodin.
+            // "{U}, Sacrifice this artifact: Return target creature to its
+            // owner's hand."
+            // "{1}, Sacrifice this artifact: Draw a card."
+            // Two activated abilities — both sac the bomb. The bounce
+            // declares a single TargetRequest (resolution-time creature
+            // guard catches illegal picks; CR 608.2b). The cantrip mode is
+            // a vanilla {1} + sac + draw 1. Sacrifice is performed by the
+            // effect closure because the generic AdditionalCost.Pay
+            // sacrifice path is a stub (mirrors Mishra's Bauble).
+            "Aether Spellbomb" => AetherSpellbombFactory.Create(owner),
+
             // Artifact — Equipment {1} (ColossusHammerFactory).
             // Static "equipped creature gets +10/+0 and loses flying" via
             // AttachedBoostEffect (Layer 7c) + LoseKeywordEffect("Flying")
