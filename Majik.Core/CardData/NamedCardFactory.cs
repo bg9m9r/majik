@@ -178,6 +178,21 @@ public static class NamedCardFactory
             // (CR 702.74b).
             "Endurance" => EnduranceFactory.Create(owner),
 
+            // Legendary Artifact — Vehicle {3}{G} 4/4 (EsikasChariotFactory).
+            // Kaldheim. ETB trigger: create two 2/2 Cat creature tokens.
+            // Attack trigger: create a token that's a copy of target token
+            // you control (CR 706 — copiable values snapshotted; v1 lossy,
+            // matches existing CopyEffect semantics). Crew 4 (CR 702.122)
+            // surfaced via CrewAction integration. Single-arg dispatcher
+            // path uses raw zone moves + deterministic first-token-creature
+            // fallback for the attack-copy target; use the (owner,
+            // zoneService, eventBus, triggers, copyTargetPicker) overload
+            // for bus-driven trigger firing + agent-driven token picks.
+            // Token colour identity (green) deferred — same gap as
+            // Crashing Footfalls' green Rhinos and Wurmcoil's colourless
+            // Wurms.
+            "Esika's Chariot" => EsikasChariotFactory.Create(owner),
+
             // Sorcery — {R} (FaithlessLootingFactory). Innistrad / Modern
             // Horizons. "Draw two cards, then discard two cards. Flashback
             // {2}{R}." Card shape only here; the resolve effect (draw 2 +
