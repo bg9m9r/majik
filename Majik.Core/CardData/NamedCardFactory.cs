@@ -2288,6 +2288,23 @@ public static class NamedCardFactory
             // doesn't yet express "mana value X or less".
             "Drown in the Loch" => DrownInTheLochFactory.Create(owner),
 
+            // Land — Zendikar / Modern reprints (ValakutTheMoltenPinnacleFactory).
+            // "Valakut, the Molten Pinnacle enters tapped unless you control
+            //  five or more other Mountains. Whenever a Mountain enters under
+            //  your control, if you control at least five other Mountains,
+            //  you may have Valakut, the Molten Pinnacle deal 3 damage to
+            //  any target. {T}: Add {R}." CR 614.1c (conditional ETB-tapped)
+            //  + CR 603.1 / 603.4 (intervening-if landfall-style trigger).
+            // The single-arg dispatcher path here attaches the {T}: Add {R}
+            // mana ability + landfall-style trigger for shape; the
+            // conditional ETB-tapped replacement is omitted (no
+            // ReplacementBus available at dispatch). Use
+            // ValakutTheMoltenPinnacleFactory.Create(owner, replacements,
+            // triggers) for fully-wired behaviour. "You may" prompt +
+            // agent-driven "any target" pick deferred (v1 honours pre-set
+            // ChosenTargets and auto-accepts the may).
+            "Valakut, the Molten Pinnacle" => ValakutTheMoltenPinnacleFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
