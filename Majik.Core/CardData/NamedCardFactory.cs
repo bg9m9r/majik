@@ -615,6 +615,24 @@ public static class NamedCardFactory
             // of SearchSpellFactory).
             "Sylvan Scrying" => SylvanScryingFactory.Create(owner),
 
+            // Land — Urza's Mine (Antiquities, Urza Tron cycle).
+            // {T}: Add {C}. If controller controls an Urza's Mine, an
+            // Urza's Power-Plant, AND an Urza's Tower, add {2} instead.
+            // Wired via TronLandHelper.ComputeManaAddition (controller-
+            // only battlefield scan) plumbed through the Func<ManaCost>
+            // ManaAbility overload, so the amount is decided at
+            // activation time against live battlefield state.
+            "Urza's Mine" => UrzasMineFactory.Create(owner),
+
+            // Land — Urza's Tower (Antiquities). Same shape as Urza's
+            // Mine — only the printed subtype differs (Tower).
+            "Urza's Tower" => UrzasTowerFactory.Create(owner),
+
+            // Land — Urza's Power-Plant (Antiquities). Same shape as
+            // Urza's Mine — only the printed subtype differs
+            // (PowerPlant).
+            "Urza's Power-Plant" => UrzasPowerPlantFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 

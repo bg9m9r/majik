@@ -2,14 +2,14 @@
 
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
-**Last updated:** 2026-05-23
-**Latest origin/main:** 2b02e05 (#212 — Subtlety) + Karn Liberated
+**Last updated:** 2026-05-24
+**Latest origin/main:** 6d87f59 (Subtlety + Karn Liberated + Up the Beanstalk) + Urza Tron lands (this PR)
 
 ## Headline numbers
 
 | Metric | Count |
 |---|---|
-| Named factories | 66 |
+| Named factories | 69 |
 | Bespoke templates | 26 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
@@ -87,6 +87,9 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Unholy Heat | Instant | #190 | delirium variable damage |
 | Up the Beanstalk | Enchantment | TBD | ETB draw + cast-MV-5+ draw |
 | Urborg, Tomb of Yawgmoth | Land | #158 | grant Swamp to all lands |
+| Urza's Mine | Land | TBD | Tron — {T}: {C}, {2} if all 3 Urza lands controlled |
+| Urza's Power-Plant | Land | TBD | Tron — {T}: {C}, {2} if all 3 Urza lands controlled |
+| Urza's Tower | Land | TBD | Tron — {T}: {C}, {2} if all 3 Urza lands controlled |
 | Vexing Bauble | Artifact | — | sac-draw shell |
 | Walking Ballista | Artifact Creature | — | grow + ping |
 | Wastewood Verge | Land | — | B/G activation-gate land |
@@ -277,7 +280,7 @@ Per-keyword action helpers under `Majik.Core/Keywords/`:
 - **Burn** — Strong. Lightning Bolt, Lava Spike, Lava Dart, Skewer the Critics, Boros Charm, Eidolon of the Great Revel, Goblin Guide, Monastery Swiftspear, Rift Bolt all in. Missing: Searing Blaze (landfall conditional), Roiling Vortex, Sunscorched Desert. ~75%.
 - **Death's Shadow** — Mid-high. Thoughtseize, Fatal Push, Snapcaster Mage, Stubborn Denial, Death's Shadow itself (CDA P/T scaled by controller life — Layer 7a) all in. Mishra's Bauble in. Temur Battle Rage absent. ~60%.
 - **Murktide / Izzet Tempo** — High. Murktide Regent done, Counterspell done, Snapcaster Mage done, Lightning Bolt done, Expressive Iteration done, Ledger Shredder done, Consider done, Spell Pierce done, Subtlety done. Missing: Demilich absent. ~75%.
-- **Mono-Green Tron** — Mid-low. Ancient Stirrings, Sylvan Scrying, Wurmcoil Engine done. No Karn Liberated, no Tron lands. ~20%.
+- **Mono-Green Tron** — Mid-high. Ancient Stirrings, Sylvan Scrying, Wurmcoil Engine done. Karn Liberated done. Tron lands (Urza's Mine + Tower + Power-Plant) done with the conditional {2} mana ability. Karn the Great Creator absent. ~60%.
 - **Living End / Crashing Footfalls cascade** — Blocked. Cascade keyword + Suspend-trigger end-of-suspend exile-and-cast TODO. Suspend itself is done (#183), so partial groundwork. ~15%.
 - **Rakdos Scam** — Mid-high. Grief done (#205, mirrors Solitude evoke + ETB pattern). Fury done (mirrors Solitude/Grief). Dauthi Voidwalker absent. Liliana of the Veil done, Fatal Push done, Thoughtseize done. ~55%.
 - **Yawgmoth combo** — Mid. Yawgmoth done. Undying creatures (Young Wolf, Strangleroot Geist, Geralf's Messenger) done. Chord of Calling, Eldritch Evolution absent. ~50%.
@@ -292,12 +295,11 @@ Sorted by build priority (small infra lift × high meta share).
 | # | Card | Difficulty | Blocker |
 |---|---|---|---|
 | 1 | Karn, the Great Creator | Mid | Sideboard-from-anywhere -2 ability needs wishboard concept |
-| 2 | Urza's Tron pieces (Mine/Tower/Power Plant) | Mid | "Tap: add 1; if you control all three, add 3" — conditional mana ability |
-| 3 | Crashing Footfalls | High | Suspend done (#183), but cascade trigger on suspend-cast missing |
-| 4 | Living End | High | Cascade + mass-exile-grave + simultaneous mass-reanimate (#174 ready for the latter) |
-| 5 | Cascade keyword | High | Triggered "cast for free from top reveal" — alt-cast-from-library framework |
-| 6 | Primeval Titan | Mid | Attack/ETB triggers + land tutor; tutor template exists |
-| 7 | Amulet of Vigor | Mid | Replacement on enters-tapped → untap; needs ETB replacement composition |
+| 2 | Crashing Footfalls | High | Suspend done (#183), but cascade trigger on suspend-cast missing |
+| 3 | Living End | High | Cascade + mass-exile-grave + simultaneous mass-reanimate (#174 ready for the latter) |
+| 4 | Cascade keyword | High | Triggered "cast for free from top reveal" — alt-cast-from-library framework |
+| 5 | Primeval Titan | Mid | Attack/ETB triggers + land tutor; tutor template exists |
+| 6 | Amulet of Vigor | Mid | Replacement on enters-tapped → untap; needs ETB replacement composition |
 
 ## How to update this doc
 
