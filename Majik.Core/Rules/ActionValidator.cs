@@ -4,6 +4,7 @@ using Majik.Core.Combat;
 using Majik.Core.Domain.Exceptions;
 using Majik.Core.Events;
 using Majik.Core.Players;
+using Majik.Core.Zones;
 
 namespace Majik.Core.Rules;
 
@@ -71,6 +72,25 @@ public class ActionValidator
             return ValidationResult.Invalid(
                 $"{action.Player.Name} can cast spells only at sorcery speed",
                 new RuleViolation("117.1a", "external sorcery-speed restriction"));
+        }
+
+        // CR 113.6 / 601.3 — external cast-from-hand-only restrictions
+        // (e.g. Drannith Magistrate: "Your opponents can't cast spells
+        // from anywhere other than their hands."). When the casting
+        // player is restricted, reject any cast whose declared source
+        // zone is not the hand — including spells cast from exile
+        // (cascade, suspend, foretell, alt-cost from-exile flows), the
+        // graveyard (flashback / disturb / aftermath / escape /
+        // jump-start), the library (Mishra's Workshop-style tutors that
+        // also cast), or the command zone.
+        if (action.Player != null
+            && action.FromZone.HasValue
+            && action.FromZone.Value != ZoneType.Hand
+            && CastingRestrictions.MustCastFromHand(action.Player))
+        {
+            return ValidationResult.Invalid(
+                $"{action.Player.Name} can't cast spells from {action.FromZone.Value}",
+                new RuleViolation("113.6", "cast-from-hand-only restriction"));
         }
         return ValidationResult.Valid();
     }
@@ -184,11 +204,28 @@ public class CastSpellAction : PlayerAction
     /// supply; the validator doesn't introspect the game loop.</summary>
     public bool SorcerySpeedAvailable { get; }
 
+    /// <summary>
+    /// The zone the spell is being cast from (CR 601.2a). When set,
+    /// external "can only cast from hand" restrictions (CR 113.6 —
+    /// Drannith Magistrate) consult this to reject casts whose source
+    /// zone isn't the hand. Null means "unspecified" — the validator
+    /// treats unspecified casts as unrestricted on the from-zone axis
+    /// for backward compatibility with the (huge) set of callers that
+    /// don't yet stamp a source zone.
+    /// </summary>
+    public ZoneType? FromZone { get; }
+
     public CastSpellAction(ICard card, Player player, bool sorcerySpeedAvailable = true)
+        : this(card, player, sorcerySpeedAvailable, fromZone: null)
+    {
+    }
+
+    public CastSpellAction(ICard card, Player player, bool sorcerySpeedAvailable, ZoneType? fromZone)
     {
         Card = card;
         Player = player;
         SorcerySpeedAvailable = sorcerySpeedAvailable;
+        FromZone = fromZone;
     }
 }
 

@@ -2516,6 +2516,22 @@ public static class NamedCardFactory
             // gate enforces the threshold.
             "Earthshaker Khenra" => EarthshakerKhenraFactory.Create(owner),
 
+            // Creature — Human Wizard {1}{W} 1/3 (DrannithMagistrateFactory).
+            // Ikoria: Lair of Behemoths. Printed static "Your opponents
+            // can't cast spells from anywhere other than their hands."
+            // (CR 113.6) wired via CastFromHandOnlyRestrictionEffect when
+            // the runtime (owner, opponentResolver, eventBus) overload is
+            // used. CastSpellAction.FromZone is the validator's lookup —
+            // callers that stamp a non-Hand FromZone for an opponent's
+            // cast are rejected with RuleViolation 113.6. The single-arg
+            // dispatcher path here produces the correct card shape only
+            // (no live opponent restriction). Production casts that don't
+            // yet stamp a source zone are unaffected by the restriction
+            // — same posture as other CR 113.6 / CR 601.2a from-zone
+            // sensitive effects (Snapcaster grants flashback via a
+            // separate path).
+            "Drannith Magistrate" => DrannithMagistrateFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
