@@ -51,6 +51,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Eldritch Evolution | Sorcery | TBD | sac-creature additional cost + tutor creature mv ≤ sac.mv+2 → battlefield + self-exile (CR 601.2f / 701.19a / 608.2) |
 | Elegant Parlor | Land | — | R/W surveil dual |
 | Endurance | Creature | TBD | MH2 incarnation: Flash + Reach + evoke pitch + ETB shuffle-graveyard-to-library |
+| Engineered Explosives | Artifact | TBD | {X} Sunburst (charge counters via v1 X-provider) + {2}, sac: destroy each nonland permanent with mv = counters |
 | Fiery Islet | Land | — | pay-1-life U/R + sac-draw |
 | Force of Negation | Instant | #185 | pitch counter (non-creature) |
 | Force of Will | Instant | #185 | pitch counter (universal) |
