@@ -59,6 +59,9 @@ public enum CardSubtype
     Rhino,
     /// <summary>Giant creature subtype — Primeval Titan, Hill Giant. CR 205.3m.</summary>
     Giant,
+    /// <summary>Dauthi creature subtype — Tempest shadow creatures (Dauthi
+    /// Voidwalker, Dauthi Slayer, Dauthi Horror). CR 205.3m.</summary>
+    Dauthi,
     /// <summary>Monkey creature subtype — Ragavan, Nimble Pilferer. CR 205.3m.</summary>
     Monkey,
     /// <summary>Pirate creature subtype — Ragavan, Nimble Pilferer; Captain Lannery Storm. CR 205.3m.</summary>

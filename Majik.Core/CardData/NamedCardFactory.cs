@@ -793,6 +793,19 @@ public static class NamedCardFactory
             // SacrificeChoice for deterministic test/bot behavior.
             "Phyrexian Tower" => PhyrexianTowerFactory.Create(owner),
 
+            // Creature — Dauthi Rogue {1}{B} 3/2 (DauthiVoidwalkerFactory).
+            // Modern Horizons 2. Shadow keyword wired. Opponent-graveyard →
+            // exile-with-void-counter replacement effect (CR 614) ships via
+            // the bus-aware overload — the single-arg dispatcher path here
+            // produces the correct card shape (Shadow + activated ability)
+            // without ReplacementBus wiring. {2}, {T}, Remove a void
+            // counter from a card exiled with Dauthi Voidwalker: "you may
+            // play that card this turn without paying its mana cost" is
+            // wired via CastFromExileAlternativeCost({0}) — see
+            // DauthiVoidwalkerFactory.BuildAlternativeCost. EOT timing on
+            // the cast permission deferred.
+            "Dauthi Voidwalker" => DauthiVoidwalkerFactory.Create(owner),
+
             // Artifact Creature — Dragon {10} 4/4 (ScionOfDracoFactory).
             // Modern Horizons 2. Domain cost reduction (CR 702.16 / CR 117.7):
             // "This spell costs {2} less to cast for each basic land type

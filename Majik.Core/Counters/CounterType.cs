@@ -24,4 +24,13 @@ public sealed record CounterType(string Name)
     /// mana cost).
     /// </summary>
     public static readonly CounterType Time = new("Time");
+
+    /// <summary>
+    /// CR 122 — Void counters. Card-specific marker used by Dauthi
+    /// Voidwalker (Modern Horizons 2). When an opponent's card would go
+    /// to a graveyard, it is exiled with a void counter instead; removing
+    /// a void counter is the cost for casting that exiled card without
+    /// paying its mana cost.
+    /// </summary>
+    public static readonly CounterType Void = new("Void");
 }
