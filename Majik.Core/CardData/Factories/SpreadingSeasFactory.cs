@@ -49,6 +49,16 @@ public static class SpreadingSeasFactory
     public const string CardName = "Spreading Seas";
     public const string Cost = "{1}{U}";
 
+    /// <summary>
+    /// Printed oracle text. Source of truth for the "Enchant land" clause
+    /// — <see cref="AuraEnchantClauseParser"/> derives the cast-time target
+    /// predicate from this line so we don't have to hand-wire it.
+    /// </summary>
+    public const string OracleText =
+        "Enchant land\n" +
+        "When this Aura enters, draw a card.\n" +
+        "Enchanted land is an Island and has \"{T}: Add {U}\".";
+
     private static readonly IReadOnlySet<CardSubtype> IslandOnly =
         new HashSet<CardSubtype> { CardSubtype.Island };
 
@@ -141,10 +151,11 @@ public static class SpreadingSeasFactory
         ArgumentNullException.ThrowIfNull(aura);
         ArgumentNullException.ThrowIfNull(battlefield);
 
-        return AuraSpellDefinitionBuilder.ForAura(
+        // CR 702.5b — derive the target predicate from the printed
+        // "Enchant land" oracle clause rather than hand-wiring it.
+        return AuraSpellDefinitionBuilder.ForAuraFromOracle(
             aura,
-            "target land",
-            battlefield,
-            p => p.HasType(CardType.Land));
+            OracleText,
+            battlefield);
     }
 }
