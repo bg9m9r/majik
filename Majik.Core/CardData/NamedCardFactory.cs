@@ -1451,6 +1451,15 @@ public static class NamedCardFactory
             // keyword marker only in v1 — see InkmothNexusFactory xmldoc.
             "Inkmoth Nexus" => InkmothNexusFactory.Create(owner),
 
+            // Creature — Human Wizard {2}{U} 2/2 (TrinketMageFactory).
+            // ETB tutor: search library for an artifact card with mana
+            // value 1 or less → hand (deterministic first-match; shuffle
+            // deferred, mirrors Stoneforge Mystic). The single-arg
+            // dispatcher path here produces the correct card shape; use
+            // the (owner, eventBus, triggers) overload to register the
+            // ETB trigger with a TriggerManager.
+            "Trinket Mage" => TrinketMageFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
