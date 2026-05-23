@@ -2362,6 +2362,18 @@ public static class NamedCardFactory
             // (owner, bus, triggers) overload for fully-wired behavior.
             "Arclight Phoenix" => ArclightPhoenixFactory.Create(owner),
 
+            // Creature — Phoenix {2}{R}{R} 3/2 (PhoenixOfAshFactory).
+            // Throne of Eldraine. Haste keyword marker (CR 702.10). The
+            // printed "can attack as though it didn't have summoning
+            // sickness as long as it has haste" rider collapses
+            // observationally to Haste in v1 (CR 702.10b — haste already
+            // bypasses summoning sickness for attack declaration). Escape
+            // alt-cost ({3}{R}{R}, exile four other graveyard cards —
+            // CR 702.143) deferred — same gap as Uro / Phlage / Cling to
+            // Dust, blocked on the missing graveyard cast alt-cost +
+            // multi-card-exile additional-cost primitive.
+            "Phoenix of Ash" => PhoenixOfAshFactory.Create(owner),
+
             // Sorcery — {W} (PrismaticEndingFactory). Modern Horizons 2.
             // "Exile target nonland permanent with mana value less than
             //  or equal to the number of colors of mana spent to cast
