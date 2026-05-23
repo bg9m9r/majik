@@ -73,6 +73,20 @@ public sealed class SpellCastFlow
                 $"Cannot use alternative cost {alternativeCost.Description} for {card.Name}");
         }
 
+        // CR 118.9 — Pitch alt-cost imposes an additional context check:
+        // "If it's not your turn …". Force-of-Will-cycle spells embed this
+        // timing predicate in the alt cost itself. Other alt-costs (Flashback,
+        // Spectacle, Evoke, …) carry their own zone / state predicates inside
+        // CanCastFor and don't need this hook. Keep the surface minimal —
+        // SpellCastFlow stays generic, only this one concrete type gets the
+        // activePlayer gate.
+        if (alternativeCost is PitchAlternativeCost pitch
+            && !pitch.IsLegalInContext(ctx.ActivePlayer))
+        {
+            throw new InvalidOperationException(
+                $"Cannot cast {card.Name} via pitch: it is the caster's own turn (CR 118.9 timing gate).");
+        }
+
         // CR 601.2f — additional costs first, before mana payment.
         // Merge the caller-supplied list with any costs the card itself
         // declares via SpellDefinition.AdditionalCosts (template-bound
