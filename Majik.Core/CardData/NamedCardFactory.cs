@@ -803,6 +803,36 @@ public static class NamedCardFactory
             // the first creature card deterministically.
             "Scavenging Ooze" => ScavengingOozeFactory.Create(owner),
 
+            // Creature — Zombie Knight {1}{B}{B} 2/3 (MurderousRiderFactory).
+            // Throne of Eldraine Adventure card. v1 ships the creature side
+            // (Lifelink keyword marker — CR 702.15) + a Swift End helper
+            // exposed via MurderousRiderFactory.BuildAdventureSpell that
+            // returns a destroy-target-creature-or-planeswalker SpellDefinition
+            // + self-life-loss 2 (CR 119.3). The Adventure cast-from-hand-to-
+            // exile pipeline (CR 715) is deferred — same gap as
+            // BonecrusherGiantFactory; the printed "when this dies, exile it"
+            // self-exile LTB clause is also deferred (no card-local death
+            // replacement surface yet).
+            "Murderous Rider" => MurderousRiderFactory.Create(owner),
+
+            // Sorcery — {2}{G}{G} (ScapeshiftFactory). Morningtide.
+            // "Sacrifice any number of lands. Search your library for that
+            //  many land cards, put them onto the battlefield, then shuffle."
+            // (CR 701.16 + CR 701.19a). Card shape only at the dispatcher;
+            // resolve closure built on demand via
+            // ScapeshiftFactory.BuildResolveEffect(caster, sacSelector,
+            // tutorSelector). The selectors decouple "pick a subset of
+            // permanents to sacrifice" + multi-card library tutor from agent
+            // surfaces the engine does not yet expose. The tutor side falls
+            // back to PrimevalTitan's per-slot agent loop when no selector
+            // is supplied; the sacrifice side defaults to zero lands (clean
+            // no-op faithful to the lower bound of "any number"). Lands
+            // enter UNTAPPED per the printed oracle — distinct from
+            // Primeval Titan / Cultivate. Modern Titanshift combo finisher
+            // (pairs with Valakut, the Molten Pinnacle). Library shuffle
+            // deferred — same rationale as SearchSpellFactory.
+            "Scapeshift" => ScapeshiftFactory.Create(owner),
+
             // Creature — Dragon {3}{U}{U} 3/3 (MurktideRegentFactory).
             // Flying + Delve marker keywords wired. ETB trigger: exile target
             // instant or sorcery card from a graveyard; enters with +1/+1
@@ -1682,6 +1712,55 @@ public static class NamedCardFactory
             // Floor-at-zero is layered in alongside other reducers; coloured
             // pips are untouched (CR 117.7c).
             "Goblin Electromancer" => GoblinElectromancerFactory.Create(owner),
+
+            // Creature — Goblin Warrior {1}{R}{R} 2/2 (GoblinChieftainFactory).
+            // Magic 2010 / many reprints. "Haste. Other Goblin creatures you
+            // control have haste and get +1/+1." Printed Haste keyword on
+            // Chieftain itself wired via KeywordAbility. The lord-style static
+            // ("Other Goblins +1/+1 + Haste") is wired via LordStaticEffect
+            // (Plague Engineer shape, sign-flipped to +1/+1, includeSelf:
+            // false, scoped to controller's creatures via the default filter)
+            // when the (owner, ContinuousEffectsService) overload is used.
+            // The single-arg dispatcher path here produces the correct card
+            // shape with the Haste keyword only — no lord static is
+            // registered (no layers service available). Modern Goblins / 8-
+            // Whack pillar.
+            "Goblin Chieftain" => GoblinChieftainFactory.Create(owner),
+
+            // Creature — Goblin Warrior {1}{R}{R} 2/2 (GoblinWarchiefFactory).
+            // Scourge / many reprints. "Goblin spells you cast cost {1} less
+            // to cast. Goblins you control have haste." Cost-reduction rider
+            // wired via SpellCostReductionAbility (Goblin Electromancer
+            // shape, predicate filtered to spells carrying CardSubtype.Goblin
+            // — "Goblin spells" covers Goblin creature spells AND any non-
+            // creature spells with Goblin in the subtype line). Haste-grant
+            // static wired via LordStaticEffect (Goblin Chieftain shape with
+            // power/toughness = 0, grantedKeywords = ["Haste"], includeSelf:
+            // true — the oracle text says "Goblins you control" with no
+            // "other" rider, so Warchief grants Haste to itself too) when
+            // the (owner, ContinuousEffectsService) overload is used. The
+            // single-arg dispatcher path produces the card shape with the
+            // cost-reduction rider only — no live haste grant. Modern
+            // Goblins / 8-Whack pillar.
+            "Goblin Warchief" => GoblinWarchiefFactory.Create(owner),
+
+            // Creature — Goblin Warrior {1}{R} 1/2 (GoblinPiledriverFactory).
+            // Onslaught / many reprints. "Protection from blue. Whenever
+            // Goblin Piledriver attacks, it gets +2/+0 until end of turn for
+            // each other attacking Goblin." Protection from blue wired via
+            // ProtectionAbility (same shape as Sword of Fire and Ice's two
+            // protection riders). Attack trigger wired via Triggers.
+            // OnAttackSelf against CreatureAttacksEvent; the pump-per-other-
+            // attacking-Goblin body reads the attackers list from an injected
+            // closure (attackingCreaturesSource) and registers a
+            // PumpUntilEndOfTurnEffect for +2X/+0 EOT against
+            // Creature.ActiveEffects when the (owner, triggers,
+            // attackingCreaturesSource) overload is used. The single-arg
+            // dispatcher path produces the card shape with protection from
+            // blue + the attack trigger attached, but no live pump body
+            // (no attackers source means zero pump). Modern Goblins / 8-
+            // Whack pillar.
+            "Goblin Piledriver" => GoblinPiledriverFactory.Create(owner),
 
             // Creature — Goblin {2}{R} 1/1 (GoblinMatronFactory). Urza's Legacy.
             // "When Goblin Matron enters, you may search your library for a
