@@ -29,6 +29,12 @@ public sealed class TurnState
     // riders read this. A colourless spell (no entry) contributes no colours.
     private readonly Dictionary<Guid, HashSet<ManaColor>> _spellColorsCastByPlayer = new();
 
+    // Per-player count of spells cast this turn (any colour, including
+    // colourless). Damping Sphere's cost rider ("Each spell a player casts
+    // costs {1} more to cast for each other spell that player has cast this
+    // turn") reads this.
+    private readonly Dictionary<Guid, int> _spellsCastByPlayer = new();
+
     /// <summary>
     /// How many creatures controlled by <paramref name="player"/> died this turn.
     /// </summary>
@@ -100,6 +106,8 @@ public sealed class TurnState
     public void RecordSpellCast(Player caster, IReadOnlySet<ManaColor> colors)
     {
         if (caster == null) return;
+        _spellsCastByPlayer[caster.Id] =
+            _spellsCastByPlayer.GetValueOrDefault(caster.Id) + 1;
         if (colors == null || colors.Count == 0) return;
         if (!_spellColorsCastByPlayer.TryGetValue(caster.Id, out var set))
         {
@@ -108,6 +116,18 @@ public sealed class TurnState
         }
         foreach (var c in colors) set.Add(c);
     }
+
+    /// <summary>
+    /// Number of spells <paramref name="player"/> has cast this turn (CR 700.6
+    /// per-turn tally). Read by Damping Sphere's "+{1} per other spell cast
+    /// this turn" rider — cost calculation runs before the rider increments
+    /// the count for the announcing spell, so the value naturally reports
+    /// the count of OTHER spells already cast earlier this turn.
+    /// </summary>
+    public int SpellsCastByPlayer(Player player) =>
+        player == null
+            ? 0
+            : _spellsCastByPlayer.TryGetValue(player.Id, out var v) ? v : 0;
 
     /// <summary>
     /// True if any player other than <paramref name="viewer"/> has cast a
@@ -140,5 +160,6 @@ public sealed class TurnState
         _permanentsLeftByController.Clear();
         _cardsDrawnByPlayer.Clear();
         _spellColorsCastByPlayer.Clear();
+        _spellsCastByPlayer.Clear();
     }
 }

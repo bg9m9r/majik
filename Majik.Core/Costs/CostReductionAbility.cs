@@ -72,43 +72,130 @@ public sealed class CostReductionAbility : IAbility
 }
 
 /// <summary>
+/// CR 117.7 — additive sibling to <see cref="CostReductionAbility"/>.
+/// "Each spell a player casts costs {N} more to cast …" (Damping Sphere,
+/// Thalia, Guardian of Thraben, Lodestone Golem family). Lives on a
+/// permanent that's already on the battlefield rather than on the spell
+/// being cast — <see cref="CostReduction.GetEffectiveCost(ICard, Player,
+/// IEnumerable{Player}?)"/> scans every player's battlefield for these
+/// abilities at cost-calculation time and sums their per-cast deltas onto
+/// the spell's generic cost.
+///
+/// The increaser owns the spell-eligibility check via <see cref="Predicate"/>
+/// — "each spell a player casts" defaults to "all spells" but Thalia-shaped
+/// riders restrict to noncreature spells, artifact spells, etc. The
+/// <see cref="ExtraGeneric"/> function returns the per-cast {N} given the
+/// spell being cast and its caster, so dynamic riders ("for each OTHER
+/// spell that player has cast this turn" — Damping Sphere) can read the
+/// game's <see cref="Majik.Core.Game.TurnState"/> at evaluation time.
+/// </summary>
+public sealed class SpellCostIncreaseAbility : IAbility
+{
+    /// <summary>Predicate matching spells (the card being cast) that this
+    /// ability increases the cost of. "Each spell a player casts" maps to
+    /// <c>_ =&gt; true</c>.</summary>
+    public Func<ICard, bool> Predicate { get; }
+
+    /// <summary>Per-cast generic-mana increase. Inputs are the card being
+    /// cast and the caster (so the function can read per-player state such
+    /// as <see cref="Majik.Core.Game.TurnState.SpellsCastByPlayer"/>).
+    /// Returning zero is fine — emits no rider for that cast.</summary>
+    public Func<ICard, Player, int> ExtraGeneric { get; }
+
+    public string Description { get; }
+
+    public SpellCostIncreaseAbility(
+        Func<ICard, bool> predicate,
+        Func<ICard, Player, int> extraGeneric,
+        string description)
+    {
+        Predicate = predicate ?? throw new ArgumentNullException(nameof(predicate));
+        ExtraGeneric = extraGeneric ?? throw new ArgumentNullException(nameof(extraGeneric));
+        Description = description ?? string.Empty;
+    }
+}
+
+/// <summary>
 /// Cost-calculation entry point. Pure function — no side effects. Called
 /// by <see cref="Majik.Core.Game.SpellCastFlow"/> for the actual payment
 /// cost and by HeuristicBotAgent's mana picker for affordability.
 /// </summary>
 public static class CostReduction
 {
-    public static ManaCost GetEffectiveCost(ICard card, Player caster)
+    public static ManaCost GetEffectiveCost(ICard card, Player caster) =>
+        GetEffectiveCost(card, caster, allPlayers: null);
+
+    /// <summary>
+    /// CR 117.7 / 601.2f cost calculation. Applies (in order):
+    ///   1. Printed cost reductions on the card itself
+    ///      (<see cref="CostReductionAbility"/> — Affinity, Domain, …).
+    ///   2. Additive riders from battlefield permanents under any player
+    ///      (<see cref="SpellCostIncreaseAbility"/> — Damping Sphere, Thalia,
+    ///      …) — only scanned when <paramref name="allPlayers"/> is supplied.
+    ///      Callers without a game-graph reference pass null and the
+    ///      additive riders are silently skipped, preserving pre-rider
+    ///      cost-calc behaviour for tests / agents.
+    /// Floor at zero applies once after the reduction step (CR 117.7c —
+    /// costs can't go below zero); additive riders are then layered back
+    /// on, so an additive rider can claw back into positive after a
+    /// reduction has driven the cost to zero.
+    /// </summary>
+    public static ManaCost GetEffectiveCost(
+        ICard card,
+        Player caster,
+        IEnumerable<Player>? allPlayers)
     {
         if (card == null) throw new ArgumentNullException(nameof(card));
         if (caster == null) throw new ArgumentNullException(nameof(caster));
 
         var cost = ManaCost.Parse(card.ManaCost ?? "");
         var reducers = card.Abilities.OfType<CostReductionAbility>().ToList();
-        if (reducers.Count == 0) return cost;
 
-        var battlefield = caster.Zones.Battlefield.GetCards().ToList();
         var totalReduction = 0;
-        foreach (var r in reducers)
+        if (reducers.Count > 0)
         {
-            if (r.TotalReducer != null)
+            var battlefield = caster.Zones.Battlefield.GetCards().ToList();
+            foreach (var r in reducers)
             {
-                // Whole-reduction shape (Domain et al.). The function
-                // owns its semantics — distinct-basic-type counting for
-                // Domain is computed against the caster's battlefield
-                // and may dwarf the printed generic; floor-at-zero is
-                // enforced below.
-                totalReduction += Math.Max(0, r.TotalReducer(caster));
-                continue;
-            }
+                if (r.TotalReducer != null)
+                {
+                    // Whole-reduction shape (Domain et al.). The function
+                    // owns its semantics — distinct-basic-type counting for
+                    // Domain is computed against the caster's battlefield
+                    // and may dwarf the printed generic; floor-at-zero is
+                    // enforced below.
+                    totalReduction += Math.Max(0, r.TotalReducer(caster));
+                    continue;
+                }
 
-            // The spell itself doesn't count toward its own Affinity
-            // discount (it's still on the stack at cost-calc time, not
-            // battlefield); excluding by InstanceId is defensive.
-            var count = battlefield.Count(c =>
-                c.InstanceId != card.InstanceId && r.Predicate(c));
-            totalReduction += count * r.PerInstance;
+                // The spell itself doesn't count toward its own Affinity
+                // discount (it's still on the stack at cost-calc time, not
+                // battlefield); excluding by InstanceId is defensive.
+                var count = battlefield.Count(c =>
+                    c.InstanceId != card.InstanceId && r.Predicate(c));
+                totalReduction += count * r.PerInstance;
+            }
         }
-        return cost.WithGeneric(Math.Max(0, cost.Generic - totalReduction));
+
+        var totalIncrease = 0;
+        if (allPlayers != null)
+        {
+            foreach (var p in allPlayers)
+            {
+                if (p == null) continue;
+                foreach (var perm in p.Zones.Battlefield.GetCards())
+                {
+                    foreach (var inc in perm.Abilities.OfType<SpellCostIncreaseAbility>())
+                    {
+                        if (!inc.Predicate(card)) continue;
+                        var delta = inc.ExtraGeneric(card, caster);
+                        if (delta > 0) totalIncrease += delta;
+                    }
+                }
+            }
+        }
+
+        var newGeneric = Math.Max(0, cost.Generic - totalReduction) + totalIncrease;
+        return cost.WithGeneric(newGeneric);
     }
 }
