@@ -803,6 +803,24 @@ public static class NamedCardFactory
             // the first creature card deterministically.
             "Scavenging Ooze" => ScavengingOozeFactory.Create(owner),
 
+            // Sorcery — {2}{G}{G} (ScapeshiftFactory). Morningtide.
+            // "Sacrifice any number of lands. Search your library for that
+            //  many land cards, put them onto the battlefield, then shuffle."
+            // (CR 701.16 + CR 701.19a). Card shape only at the dispatcher;
+            // resolve closure built on demand via
+            // ScapeshiftFactory.BuildResolveEffect(caster, sacSelector,
+            // tutorSelector). The selectors decouple "pick a subset of
+            // permanents to sacrifice" + multi-card library tutor from agent
+            // surfaces the engine does not yet expose. The tutor side falls
+            // back to PrimevalTitan's per-slot agent loop when no selector
+            // is supplied; the sacrifice side defaults to zero lands (clean
+            // no-op faithful to the lower bound of "any number"). Lands
+            // enter UNTAPPED per the printed oracle — distinct from
+            // Primeval Titan / Cultivate. Modern Titanshift combo finisher
+            // (pairs with Valakut, the Molten Pinnacle). Library shuffle
+            // deferred — same rationale as SearchSpellFactory.
+            "Scapeshift" => ScapeshiftFactory.Create(owner),
+
             // Creature — Dragon {3}{U}{U} 3/3 (MurktideRegentFactory).
             // Flying + Delve marker keywords wired. ETB trigger: exile target
             // instant or sorcery card from a graveyard; enters with +1/+1
@@ -2295,6 +2313,20 @@ public static class NamedCardFactory
             // ({2}{B}, exile two other graveyard cards — CR 702.143) deferred,
             // same gap as Uro / Phlage.
             "Cling to Dust" => ClingToDustFactory.Create(owner),
+
+            // Instant — {U}{B} (DrownInTheLochFactory). Throne of Eldraine.
+            // CR 700.2d — modal "Choose one" with two modes (counter target
+            // spell mv ≤ X / destroy target creature mv ≤ X). X is the
+            // largest mana value among cards in opponents' graveyards,
+            // computed at resolution time from
+            // ChosenSpellParams.AllPlayers. The single-arg dispatcher path
+            // produces the correct card shape; the bound SpellDefinition is
+            // built on demand via DrownInTheLochFactory.BuildDefinition(
+            // caster, targetResolver, stack). Mirrors ArchmagesCharm /
+            // CrypticCommand for the modal shape; mv-≤-X gate is enforced
+            // at resolution (CR 608.2b) since the engine's target prompt
+            // doesn't yet express "mana value X or less".
+            "Drown in the Loch" => DrownInTheLochFactory.Create(owner),
 
             _ => new Card(name, ""),
         };
