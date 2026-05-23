@@ -3,13 +3,13 @@
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
 **Last updated:** 2026-05-23
-**Latest origin/main:** Mutavault (Land manland — {T}: Add {C} + {1}: until EOT becomes 2/2 every-creature-type creature, still a land; new Layer 4 add-Creature-type + every-modelled-creature-subtype effect + Layer 7b shim-PT pair, both ExpireAtEndOfTurn) on top of Skullclamp + Umezawa's Jitte + Wasteland + Swords to Plowshares + Mystical Tutor + Path to Exile + Daze + Ponder + Preordain + Splinter Twin + Sythis, Harvest's Hand + Pyromancer's Goggles + Plague Engineer + Manabarbs + Yawgmoth's Will + Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere.
+**Latest origin/main:** Goblin Matron (Creature {2}{R} 1/1 Goblin + ETB tutor a Goblin card from library to hand) on top of Mutavault + Skullclamp + Umezawa's Jitte + Wasteland + Swords to Plowshares + Mystical Tutor + Path to Exile + Daze + Ponder + Preordain + Splinter Twin + Sythis, Harvest's Hand + Pyromancer's Goggles + Plague Engineer + Manabarbs + Yawgmoth's Will + Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere.
 
 ## Headline numbers
 
 | Metric | Count |
 |---|---|
-| Named factories | 122 |
+| Named factories | 123 |
 | Bespoke templates | 27 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
@@ -66,6 +66,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Galvanic Discharge | Instant | TBD | 1 + charge counters on artifacts/lands you control damage |
 | Goblin Bombardment | Enchantment | — | sac-creature → 1 damage |
 | Goblin Lackey | Creature | TBD | {R} 1/1 Goblin + combat-damage-to-player trigger cheats first Goblin creature card from hand onto the battlefield (ZoneService-routed for ETB triggers) |
+| Goblin Matron | Creature | TBD | {2}{R} 1/1 Goblin + ETB tutor a Goblin card from library to hand (agent-driven pick with deterministic first-match fallback; shuffle deferred) |
 | Grief | Creature | #205 | evoke pitch + ETB discard |
 | Grist, the Hunger Tide | Planeswalker | — | +1 token, -2 reanimate |
 | Harbinger of the Seas | Creature | #157 | nonbasic-to-Island |
@@ -367,7 +368,7 @@ Sorted roughly by build priority (small infra lift × high meta share). Refreshe
 | ~~12~~ | ~~Wasteland~~ | ~~low~~ | Shipped via `WastelandFactory` — {T}: Add {C} (vanilla ManaAbility) + {T}, Sacrifice Wasteland: destroy target nonbasic land (ActivatedAbility with TargetRequest, self-sacrifice inline at resolution while AdditionalCost.Sacrifice is stubbed — mirrors Karakas's destroy/bounce shape). |
 | ~~13~~ | ~~Mutavault~~ | ~~medium~~ | Shipped via `MutavaultFactory` — Land with {T}: Add {C} mana ability + {1} activated ability that until EOT registers Layer 4 `MutavaultAnimateEffect` (add Creature type + every modelled creature subtype, CR 613.1c) and Layer 7b `MutavaultBecomesPTEffect` (set-base P/T 2/2 — shim pattern mirroring `KarnAnimatedShimPTEffect` since Mutavault is a Land runtime instance and `Compute(Permanent)` seeds a chars row with no P/T fields). Both effects flagged `ExpiresAtEndOfTurn` (CR 514.2). "Every creature type" approximated as every creature subtype currently enumerated in `CardSubtype`; auto-grows with the enum. |
 | 14 | Inkmoth Nexus | medium | Land {T}: {C} + {1}: until EOT, becomes 1/1 Blinkmoth artifact creature with flying + infect (still a land). Builds on Mutavault primitive + needs Infect keyword (poison counters + damage replacement). |
-| 15 | Goblin Matron | low | Creature ETB — search library for a Goblin, reveal, hand. Tutor-to-hand by subtype primitive; mirrors Stoneforge Mystic's ETB but filtered by subtype, not card type. |
+| ~~15~~ | ~~Goblin Matron~~ | ~~low~~ | Shipped via `GoblinMatronFactory` — Creature {2}{R} 1/1 Goblin + ETB tutor filtered by `CardSubtype.Goblin` (agent-driven pick with deterministic first-match fallback, mirroring `MysticalTutorFactory` / `SearchSpellFactory`). Shuffle + reveal event deferred (same gaps as the rest of the tutor surface). |
 | 16 | Trinket Mage | low | Creature ETB — search library for artifact mv ≤ 1, reveal, hand. Same tutor-to-hand-by-filter shape as Goblin Matron with mv-cap filter. |
 | 17 | Sensei's Divining Top | high | Legendary artifact {1}: look top 3, put back in any order. {T}: draw a card, then put Top on top of library. Needs activated ability that re-templates the library + self-return-to-top mid-resolution; classic infinite-Top problem. |
 | 18 | Daze | low | Instant {1}{U} — counter unless pay {1}; alt cost {0} + return an Island you control. Counter-unless-pay exists; needs alt-cost with non-mana additional cost (bounce-self-permanent), composable with `PitchAlternativeCost`-style probe. |

@@ -1208,6 +1208,20 @@ public static class NamedCardFactory
             // deferred (mirrors Aether Vial + Stoneforge Mystic).
             "Goblin Lackey" => GoblinLackeyFactory.Create(owner),
 
+            // Creature — Goblin {2}{R} 1/1 (GoblinMatronFactory). Urza's Legacy.
+            // "When Goblin Matron enters, you may search your library for a
+            //  Goblin card, reveal that card, and put it into your hand.
+            //  Then shuffle."
+            // ETB tutor (CR 603.1, CR 701.19a) — predicate filters library
+            // by CardSubtype.Goblin; agent-driven pick with deterministic
+            // first-match fallback (same pattern as MysticalTutorFactory /
+            // SearchSpellFactory). The single-arg dispatcher path here
+            // produces the correct card shape; use the
+            // (owner, zoneService, eventBus, triggers) overload for fully-
+            // wired behaviour. Shuffle (CR 701.19c) + reveal event deferred
+            // — same gaps as the rest of the tutor surface.
+            "Goblin Matron" => GoblinMatronFactory.Create(owner),
+
             // Artifact — {2} (DampingSphereFactory). Dominaria.
             // Two static riders:
             //   1. "If a land is tapped for two or more mana, it produces
