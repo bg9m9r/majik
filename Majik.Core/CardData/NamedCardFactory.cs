@@ -1374,6 +1374,19 @@ public static class NamedCardFactory
             // feed through). Negative power floors to zero per CR 119.3.
             "Swords to Plowshares" => SwordsToPlowsharesFactory.Create(owner),
 
+            // Creature — Spirit {1}{W}{U} 2/3 (SpellQuellerFactory). Eldritch Moon.
+            // Flash keyword wired. ETB triggered ability targets a spell with
+            // mana value 4 or less on the stack and exiles it (target supplied
+            // via TriggeredAbility.SetChosenTargets — same shape as Snapcaster
+            // Mage). LTB triggered ability releases the exiled card so its
+            // owner may cast it without paying its mana cost (CR 702.85a-style
+            // free cast via CastFromExileAlternativeCost — same pattern as
+            // Cascade). The single-arg dispatcher path produces the correct
+            // card shape without Stack / TriggerManager / host-callback wiring;
+            // use the (owner, stack, triggers, onExiledCardReleased) overload
+            // for fully-wired behaviour.
+            "Spell Queller" => SpellQuellerFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
