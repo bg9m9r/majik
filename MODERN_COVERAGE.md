@@ -3,17 +3,17 @@
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
 **Last updated:** 2026-05-23
-**Latest origin/main:** Daze (bounce-Island pitch + counter-unless-pay-1) on top of Pyromancer's Goggles on top of Plague Engineer (#262) + Manabarbs (#265) + Yawgmoth's Will + Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere (#257).
+**Latest origin/main:** Daze (bounce-Island pitch + counter-unless-pay-1) on top of Sythis, Harvest's Hand + Pyromancer's Goggles + Plague Engineer + Manabarbs + Yawgmoth's Will + Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere.
 
 ## Headline numbers
 
 | Metric | Count |
 |---|---|
-| Named factories | 117 |
-| Bespoke templates | 26 |
+| Named factories | 118 |
+| Bespoke templates | 27 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
-| Seeded cards | 59 |
+| Seeded cards | 60 |
 | Estimated Modern meta coverage | ~15% |
 
 (Coverage estimate is rough: counts top-25 archetype staples present in the engine vs. total. Many ancillary archetype pieces remain unimplemented.)
@@ -116,6 +116,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Sunbaked Canyon | Land | — | pay-1-life R/W + sac-draw |
 | Surgical Extraction | Instant | #192 | phyrexian global name exile |
 | Sylvan Scrying | Sorcery | TBD | any-land tutor to hand (Tron enabler) |
+| Sythis, Harvest's Hand | Creature | TBD | Legendary Nymph 1/2 {G}{W} — Constellation: enchantment-ETB-under-controller → gain 1 life + draw 1 (covers plain enchantments AND Auras via CardType.Enchantment predicate) |
 | Tarmogoyf | Creature | #173 | CDA P/T from grave types |
 | Teferi, Time Raveler | Planeswalker | #182 | sorcery-speed restriction emblem |
 | Test Conniver | Creature | — | connive-keyword test card |
@@ -168,6 +169,7 @@ Cards implemented through generic or bespoke templates without a named factory. 
 - Thoughtseize — `Bespoke/ThoughtseizePatternTemplate`
 - Inquisition of Kozilek — `Bespoke/InquisitionOfKozilekPatternTemplate` (nonland + mv ≤ 3 cap; no life cost)
 - Expressive Iteration — `Bespoke/ExpressiveIterationTemplate`
+- Brainstorm — `Bespoke/BrainstormTemplate` (draw 3, put 2 from hand on top of library; v1 deterministic return order)
 - Malevolent Rumble — `Bespoke/MalevolentRumblePatternTemplate`
 - Fetch lands cycle (10 of them) — `OracleLandActivatedAbilityBinder`
 - Shock lands (Overgrown Tomb + cycle starts) — `Effects/ShockLandReplacement`
@@ -340,12 +342,31 @@ Per-keyword action helpers under `Majik.Core/Keywords/`:
 
 ## Top 20 Modern staples NOT yet implemented
 
-Sorted roughly by build priority (small infra lift × high meta share). Refreshed against origin/main `4a8d76a` (post-Wrenn's-Resolve).
+Sorted roughly by build priority (small infra lift × high meta share). Refreshed against origin/main `8dc0625` (post-Pyromancer's Goggles). Round 2 of the refresh — round 1's list was almost entirely shipped (Living End, Karn Liberated, Tron lands, Ragavan, Sigarda's Aid, Puresteel Paladin, Manabarbs, Plague Engineer, Pyromancer's Goggles).
 
 | # | Card | Difficulty | Blocker |
 |---|---|---|---|
-| 1 | Splinter Twin | medium | Aura grants `{T}: create a token copy with haste`. `CopyEffect` exists, but ability-grant-on-attach (aura adds an activated ability to enchanted creature) does not. |
-| 2 | Sythis, Harvest's Hand | medium | Constellation (cast-an-enchantment trigger) primitive absent; needs a cast-event-typed-card trigger surface comparable to landfall. |
+| 1 | Ponder | low | Sorcery {U} — look top 3, return to library in any order, may shuffle, draw. Pure library-manipulation template; needs `LookAtTopReorderThenOptionalShuffleThenDraw` template. |
+| 2 | Brainstorm | low | Instant {U} — draw 3, put 2 back in any order. Existing `LookAtTopPutKInHand` doesn't cover the post-draw-replace shape; needs draw-then-return-N-to-top template. |
+| 3 | Preordain | low | Sorcery {U} — scry 2 then draw 1. Comment in `LibrarySpellFactory.cs:14` already names the shape; flip the stub on. |
+| 4 | Mystical Tutor | low | Instant {U} — search library for instant/sorcery, reveal, top. Tutor-to-top family exists in templates; needs filter-by-card-type restriction. |
+| 5 | Swords to Plowshares | low | Instant {W} — exile target creature, controller gains life equal to its power. ExileCreature + life-gain-by-power primitive missing the "by power" variable. |
+| 6 | Path to Exile | low | Instant {W} — exile target creature, controller may search for basic land tapped. ExileCreature exists; need conditional-search-basic-tapped rider on a different controller. |
+| 7 | Spell Queller | medium | Flash creature: ETB exile target spell mv ≤ 4; LTB return the exiled card to owner's hand (or cast it for free per current oracle). Needs paired ETB-exile-from-stack + LTB-return primitive with a tracked exile zone. |
+| 8 | Sun Titan | medium | ETB + attacks trigger — return permanent mv ≤ 3 from graveyard to battlefield. Reanimation primitive exists (Priest of Fell Rites); needs attack-trigger + mv-3-permanent filter. |
+| 9 | Skullclamp | medium | Equipment {1}: +1/-1 + equipped-dies → draw 2. Needs the dies-trigger keyed to a different permanent (the equipped creature, not Skullclamp itself); ties to equipment-lifecycle which Sigarda's Aid + Puresteel Paladin already exercise. |
+| 10 | Umezawa's Jitte | medium | Legendary equipment + combat-damage trigger gains 2 charge counters + three activated abilities (pump, lifegain/damage-to-creature, lifegain). Needs charge-counter resource on equipment + modal activation; multi-activation pattern similar to Engineered Explosives but per-ability. |
+| 11 | Sword of Fire and Ice | medium | Equipment with two-color protection + combat-damage trigger (deal 2 + draw 1). Needs protection-from-color shell (Layer 6 grant) + paired combat-damage trigger; mirrors any future Sword cycle. |
+| 12 | Wasteland | low | Land {T}: {C} + {1},{T},sac: destroy target nonbasic land. DestroyLand primitive exists for Boseiju channel; needs the activated-ability shell on a land with sac cost. |
+| 13 | Mutavault | medium | Land {T}: {C} + {1}: until EOT, becomes 2/2 creature with all creature types (still a land). Needs Layer 4/7 land-becomes-creature primitive + "all creature types" inclusion. |
+| 14 | Inkmoth Nexus | medium | Land {T}: {C} + {1}: until EOT, becomes 1/1 Blinkmoth artifact creature with flying + infect (still a land). Builds on Mutavault primitive + needs Infect keyword (poison counters + damage replacement). |
+| 15 | Goblin Matron | low | Creature ETB — search library for a Goblin, reveal, hand. Tutor-to-hand by subtype primitive; mirrors Stoneforge Mystic's ETB but filtered by subtype, not card type. |
+| 16 | Trinket Mage | low | Creature ETB — search library for artifact mv ≤ 1, reveal, hand. Same tutor-to-hand-by-filter shape as Goblin Matron with mv-cap filter. |
+| 17 | Sensei's Divining Top | high | Legendary artifact {1}: look top 3, put back in any order. {T}: draw a card, then put Top on top of library. Needs activated ability that re-templates the library + self-return-to-top mid-resolution; classic infinite-Top problem. |
+| 18 | Daze | low | Instant {1}{U} — counter unless pay {1}; alt cost {0} + return an Island you control. Counter-unless-pay exists; needs alt-cost with non-mana additional cost (bounce-self-permanent), composable with `PitchAlternativeCost`-style probe. |
+| 19 | Boros Reckoner | high | Creature with damage-redirect: "If a source would deal damage to Boros Reckoner, instead it deals that damage to any target". Needs source-damage replacement effect with redirect to a chosen target — a generalization of `PreventNextDamageFromChosenSourceShield`. |
+| 20 | Reckless Charge | low | Sorcery — target creature gets +3/+0 and haste until EOT, Flashback {R}. Pump + grant-haste primitives both exist; FlashbackAlternativeCost done — needs `PumpAndGrantKeyword` template wired to flashback alt-cost. |
+| 21 | Splinter Twin | medium | Aura grants `{T}: create a token copy with haste`. `CopyEffect` exists, but ability-grant-on-attach (aura adds an activated ability to enchanted creature) does not. (Carried over from round 1.) |
 
 ## How to update this doc
 

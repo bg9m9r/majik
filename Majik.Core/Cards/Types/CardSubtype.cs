@@ -71,6 +71,9 @@ public enum CardSubtype
     /// <summary>Illusion creature subtype — Phantasmal Image, Phantasmal Bear,
     /// Lord of the Unreal. CR 205.3m.</summary>
     Illusion,
+    /// <summary>Nymph creature subtype — Sythis, Harvest's Hand; Theros Beyond
+    /// Death constellation cycle. CR 205.3m.</summary>
+    Nymph,
 
     // Land subtypes (examples)
     Forest,
