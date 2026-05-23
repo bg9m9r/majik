@@ -3,13 +3,13 @@
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
 **Last updated:** 2026-05-23
-**Latest origin/main:** Sun Titan ({4}{W}{W} 6/6 Giant — Vigilance + ETB/attack reanimate target permanent card with mana value ≤ 3 from controller's graveyard; shared `ReanimatePermanentPick` widens Priest of Fell Rites' creature-only pick to any `Permanent`; ZoneService-routed move so ETB triggers fire on the reanimated permanent per CR 603.6a) on top of Sensei's Divining Top + Goblin Matron + Mutavault + Skullclamp + Umezawa's Jitte + Wasteland + Swords to Plowshares + Mystical Tutor + Path to Exile + Daze + Ponder + Preordain + Splinter Twin + Sythis, Harvest's Hand + Pyromancer's Goggles + Plague Engineer + Manabarbs + Yawgmoth's Will + Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere.
+**Latest origin/main:** Trinket Mage (Creature — Human Wizard {2}{U} 2/2 — ETB tutor: search library for an artifact card with mana value 1 or less, reveal, hand; mirrors Stoneforge Mystic's ETB tutor shape with an mv-cap predicate. Shuffle + reveal-event deferred) on top of Sun Titan + Sensei's Divining Top + Inkmoth Nexus + Spell Queller + Goblin Matron + Mutavault + Skullclamp + Umezawa's Jitte + Wasteland + Swords to Plowshares + Mystical Tutor + Path to Exile + Daze + Ponder + Preordain + Splinter Twin + Sythis, Harvest's Hand + Pyromancer's Goggles + Plague Engineer + Manabarbs + Yawgmoth's Will + Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere.
 
 ## Headline numbers
 
 | Metric | Count |
 |---|---|
-| Named factories | 124 |
+| Named factories | 125 |
 | Bespoke templates | 27 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
@@ -136,6 +136,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Torpor Orb | Artifact | — | ETB-trigger suppression |
 | Treasure Cruise | Sorcery | #181 | delve draw 3 |
 | Tribal Flames | Sorcery | TBD | Domain X damage = distinct basic land types you control (CR 702.16) |
+| Trinket Mage | Creature | TBD | Human Wizard {2}{U} 2/2 — ETB tutor: search library for an artifact card with mana value 1 or less → reveal → hand (deterministic first-match by `c.HasType(Artifact) && c.ManaCostValue.TotalValue <= 1`); shuffle + reveal-event deferred (same as Stoneforge Mystic) |
 | Umezawa's Jitte | Artifact | TBD | Legendary Equipment {2} — combat-damage trigger by equipped creature (CR 510) adds 2 charge counters; three modal activated abilities, each paid by new RemoveChargeCounterCost: (1) 2 damage to any target via OracleSpellBinder.DealDamage, (2) -1/-1 EOT via PumpUntilEndOfTurnEffect, (3) you gain 2 life; Equip {2}. Modes fanned out into separate abilities — native modal-activated infra deferred |
 | Underground Mortuary | Land | — | U/B surveil dual |
 | Unholy Heat | Instant | #190 | delirium variable damage |
@@ -373,7 +374,7 @@ Sorted roughly by build priority (small infra lift × high meta share). Refreshe
 | ~~13~~ | ~~Mutavault~~ | ~~medium~~ | Shipped via `MutavaultFactory` — Land with {T}: Add {C} mana ability + {1} activated ability that until EOT registers Layer 4 `MutavaultAnimateEffect` (add Creature type + every modelled creature subtype, CR 613.1c) and Layer 7b `MutavaultBecomesPTEffect` (set-base P/T 2/2 — shim pattern mirroring `KarnAnimatedShimPTEffect` since Mutavault is a Land runtime instance and `Compute(Permanent)` seeds a chars row with no P/T fields). Both effects flagged `ExpiresAtEndOfTurn` (CR 514.2). "Every creature type" approximated as every creature subtype currently enumerated in `CardSubtype`; auto-grows with the enum. |
 | ~~14~~ | ~~Inkmoth Nexus~~ | ~~medium~~ | Shipped via `InkmothNexusFactory` — Land {T}: Add {C} + {1}: until EOT, becomes a 1/1 Phyrexian Insect artifact creature with flying + infect (still a land). `InkmothAnimateLandEffect` is a Layer-4 type/subtype/keyword grant + 1/1 P/T shim (parallels `KarnAnimatedShimPTEffect` / Mutavault's pair — non-Creature C# permanents don't surface layer-7b through `Compute(Permanent)` yet). Infect mechanic itself (poison counters + creature damage as -1/-1 counters, CR 702.90) is deferred — keyword marker only. |
 | ~~15~~ | ~~Goblin Matron~~ | ~~low~~ | Shipped via `GoblinMatronFactory` — Creature {2}{R} 1/1 Goblin + ETB tutor filtered by `CardSubtype.Goblin` (agent-driven pick with deterministic first-match fallback, mirroring `MysticalTutorFactory` / `SearchSpellFactory`). Shuffle + reveal event deferred (same gaps as the rest of the tutor surface). |
-| 16 | Trinket Mage | low | Creature ETB — search library for artifact mv ≤ 1, reveal, hand. Same tutor-to-hand-by-filter shape as Goblin Matron with mv-cap filter. |
+| ~~16~~ | ~~Trinket Mage~~ | ~~low~~ | Shipped via `TrinketMageFactory` — Creature — Human Wizard {2}{U} 2/2 with ETB triggered ability that tutors the first artifact card with `ManaCostValue.TotalValue <= 1` from library → hand (deterministic first-match; shuffle + reveal-event deferred, same as Stoneforge Mystic). Registered in the `NamedCardFactory` dispatch and exercised by 6 unit tests covering identity, dispatch, mv-0 / mv-1 tutor happy paths, mv≥2-only no-op, and no-artifacts no-op. |
 | ~~17~~ | ~~Sensei's Divining Top~~ | ~~high~~ | Shipped via `SenseisDiviningTopFactory` — Artifact {1} with two activated abilities. {T}: peek top 3 + agent-driven reorder via `ScryAction.Peek` / `ScryAction.Apply` with `ToBottom=[]` (mirrors Ponder; default preserves order). {1}, {T}: draw a card (empty library flags `MarkTriedToDrawFromEmptyLibrary` per CR 704.5b) then move Top from battlefield to library index 0 via `IZone.InsertCardAt`. Printed Legendary supertype omitted in v1. |
 | 18 | Daze | low | Instant {1}{U} — counter unless pay {1}; alt cost {0} + return an Island you control. Counter-unless-pay exists; needs alt-cost with non-mana additional cost (bounce-self-permanent), composable with `PitchAlternativeCost`-style probe. |
 | 19 | Boros Reckoner | high | Creature with damage-redirect: "If a source would deal damage to Boros Reckoner, instead it deals that damage to any target". Needs source-damage replacement effect with redirect to a chosen target — a generalization of `PreventNextDamageFromChosenSourceShield`. |
