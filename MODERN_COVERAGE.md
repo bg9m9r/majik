@@ -3,13 +3,13 @@
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
 **Last updated:** 2026-05-23
-**Latest origin/main:** 4a8d76a (… + Tireless Tracker + Chalice of the Void + Wrenn's Resolve); Top-20 backlog refreshed in this PR.
+**Latest origin/main:** 4a8d76a (… + Tireless Tracker + Chalice of the Void + Wrenn's Resolve + Bonecrusher Giant + Spell Snare); Phantasmal Image added in this PR.
 
 ## Headline numbers
 
 | Metric | Count |
 |---|---|
-| Named factories | 92 |
+| Named factories | 93 |
 | Bespoke templates | 26 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
@@ -78,6 +78,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Mox Opal | Artifact | TBD | Legendary {0}: Metalcraft-gated any-color mana (CR 702.95) |
 | Murktide Regent | Creature | #194 | delve cost + ETB X counters |
 | Orcish Bowmasters | Creature | — | reactive ping shell |
+| Phantasmal Image | Creature | TBD | 0/0 Illusion {1}{U} + EntersAsCopyReplacement (AnyBattlefield) + Layer 4 Illusion subtype rider + targeted-by-spell-or-ability self-sacrifice trigger |
 | Pithing Needle | Artifact | #189 | name-targeted activated suppression |
 | Phyrexian Tower | Land | — | {T}: {C} + {T}, sac creature: {B}{B} (Legendary) |
 | Priest of Fell Rites | Creature | #196 | ETB reanimate + grave-unearth |
