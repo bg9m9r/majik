@@ -448,5 +448,62 @@ public static class SeedImplementedCards
         // ETB + attack trigger: search library for up to two land cards, put
         // them onto the battlefield tapped.
         "Primeval Titan",
+
+        // ---- Modern staples shipped in the 2026-05-23c bump ----
+
+        // Legendary Planeswalker — Karn {4} loyalty 5 (KarnTheGreatCreatorFactory).
+        // Static: activated abilities of artifacts your opponents control
+        // can't be activated (mana-ability exempt, CR 605). +1: target
+        // noncreature artifact becomes a creature with P/T equal to its
+        // mana value. -2: wishboard — fetch an artifact from outside-the-game.
+        "Karn, the Great Creator",
+        // Sorcery — {1}{R} (TribalFlamesFactory). Domain damage —
+        // ~ deals damage equal to the number of basic land types you
+        // control to any target (CR 702.16).
+        "Tribal Flames",
+        // Sorcery — {S}{S}{S} suspend-only (CrashingFootfallsFactory).
+        // Has no mana cost; cascade-enabled via Suspend 4 — {1}{R}.
+        // Create two 4/4 green Rhino creature tokens with trample.
+        "Crashing Footfalls",
+        // Legendary Creature — Cat Nightmare {W}{B} 3/2 (LurrusOfTheDreamDenFactory).
+        // Each turn, you may cast one permanent spell with mana value 2 or
+        // less from your graveyard. Companion clause deferred (no companion
+        // system).
+        "Lurrus of the Dream-Den",
+        // Artifact — Equipment {1} (ColossusHammerFactory).
+        // Equipped creature gets +10/+0 and loses flying. Equip {8}.
+        "Colossus Hammer",
+        // Sorcery — {3}{B}{B}{B} suspend-only (LivingEndFactory).
+        // Cascade-enabled via Suspend 3 — {2}{B}. Each player exiles all
+        // creatures from their graveyards, sacrifices all creatures they
+        // control, then returns the exiled cards to the battlefield.
+        "Living End",
+        // Enchantment — {1}{W} (SigardasAidFactory). Eldritch Moon.
+        // You may cast Aura and Equipment spells as though they had flash.
+        // Whenever an Equipment enters under your control, you may attach
+        // it to target creature you control.
+        "Sigarda's Aid",
+        // Legendary Land (PhyrexianTowerFactory).
+        // {T}: Add {C}. {T}, Sacrifice a creature: Add {B}{B}.
+        "Phyrexian Tower",
+        // Creature — Human Soldier {1}{W} 2/2 (PuresteelPaladinFactory).
+        // Whenever an Equipment enters under your control, you may draw a
+        // card. Metalcraft — Equipment you control have equip {0} as long as
+        // you control three or more artifacts.
+        "Puresteel Paladin",
+        // Artifact — {1} (AetherVialFactory). Darksteel.
+        // Upkeep: you may put a charge counter on ~. {T}: put a creature
+        // card with mana value equal to the number of charge counters on
+        // ~ from your hand onto the battlefield.
+        "Aether Vial",
+        // Artifact — {0} (MoxOpalFactory). Metalcraft —
+        // {T}: Add one mana of any color. Activate only if you control
+        // three or more artifacts (CR 702.95).
+        "Mox Opal",
+        // Artifact Creature — Dragon 4/4 (ScionOfDracoFactory).
+        // Domain cost reduction (CR 702.16) — costs {2} less to cast.
+        // Multicolored creatures you control have flying, first strike,
+        // vigilance, trample, and lifelink (subset wired per factory).
+        "Scion of Draco",
     };
 }
