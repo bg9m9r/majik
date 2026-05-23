@@ -3,13 +3,13 @@
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
 **Last updated:** 2026-05-23
-**Latest origin/main:** Skullclamp + Umezawa's Jitte (Equipment dies-draw-2 trigger + Equipment combat-damage charge-counter trigger with three fanned modal activated abilities; new RemoveChargeCounterCost) on top of Wasteland + Swords to Plowshares + Mystical Tutor + Path to Exile + Daze + Ponder + Preordain + Splinter Twin + Sythis, Harvest's Hand + Pyromancer's Goggles + Plague Engineer + Manabarbs + Yawgmoth's Will + Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere.
+**Latest origin/main:** Mutavault (Land manland — {T}: Add {C} + {1}: until EOT becomes 2/2 every-creature-type creature, still a land; new Layer 4 add-Creature-type + every-modelled-creature-subtype effect + Layer 7b shim-PT pair, both ExpireAtEndOfTurn) on top of Skullclamp + Umezawa's Jitte + Wasteland + Swords to Plowshares + Mystical Tutor + Path to Exile + Daze + Ponder + Preordain + Splinter Twin + Sythis, Harvest's Hand + Pyromancer's Goggles + Plague Engineer + Manabarbs + Yawgmoth's Will + Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere.
 
 ## Headline numbers
 
 | Metric | Count |
 |---|---|
-| Named factories | 121 |
+| Named factories | 122 |
 | Bespoke templates | 27 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
@@ -86,6 +86,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Mishra's Bauble | Artifact | — | sac → look + delayed draw |
 | Mox Opal | Artifact | TBD | Legendary {0}: Metalcraft-gated any-color mana (CR 702.95) |
 | Murktide Regent | Creature | #194 | delve cost + ETB X counters |
+| Mutavault | Land | TBD | {T}: Add {C} + {1}: until EOT becomes 2/2 every-creature-type creature, still a land (Layer 4 add-Creature + every-modelled-creature-subtype + Layer 7b set-base PT 2/2, both ExpireAtEndOfTurn; non-Creature runtime instance — PT recorded as shim until Compute(Permanent) upgrades chars row) |
 | Mystical Tutor | Instant | TBD | {U} — search library for instant/sorcery, reveal, top of library (shuffle deferred) |
 | Necropotence | Enchantment | TBD | {B}{B}{B} — skip-draw via SkipDrawRegistry + discard→exile ZoneMoveIntent replacement + Pay 1 life: exile top of library + delayed end-step return-to-hand (face-down exile deferred) |
 | Orcish Bowmasters | Creature | — | reactive ping shell |
@@ -364,7 +365,7 @@ Sorted roughly by build priority (small infra lift × high meta share). Refreshe
 | ~~10~~ | ~~Umezawa's Jitte~~ | ~~medium~~ | Shipped via `UmezawasJitteFactory` — Legendary Equipment {2} + combat-damage trigger by equipped creature adds 2 charge counters via new `CounterType.Charge` on the equipment + three modal activated abilities, each paid by new `RemoveChargeCounterCost`: (1) 2 damage to any target, (2) -1/-1 EOT via `PumpUntilEndOfTurnEffect`, (3) gain 2 life; Equip {2}. Modes fanned out into three separate activated abilities — native modal-activated infra deferred. |
 | 11 | Sword of Fire and Ice | medium | Equipment with two-color protection + combat-damage trigger (deal 2 + draw 1). Needs protection-from-color shell (Layer 6 grant) + paired combat-damage trigger; mirrors any future Sword cycle. |
 | ~~12~~ | ~~Wasteland~~ | ~~low~~ | Shipped via `WastelandFactory` — {T}: Add {C} (vanilla ManaAbility) + {T}, Sacrifice Wasteland: destroy target nonbasic land (ActivatedAbility with TargetRequest, self-sacrifice inline at resolution while AdditionalCost.Sacrifice is stubbed — mirrors Karakas's destroy/bounce shape). |
-| 13 | Mutavault | medium | Land {T}: {C} + {1}: until EOT, becomes 2/2 creature with all creature types (still a land). Needs Layer 4/7 land-becomes-creature primitive + "all creature types" inclusion. |
+| ~~13~~ | ~~Mutavault~~ | ~~medium~~ | Shipped via `MutavaultFactory` — Land with {T}: Add {C} mana ability + {1} activated ability that until EOT registers Layer 4 `MutavaultAnimateEffect` (add Creature type + every modelled creature subtype, CR 613.1c) and Layer 7b `MutavaultBecomesPTEffect` (set-base P/T 2/2 — shim pattern mirroring `KarnAnimatedShimPTEffect` since Mutavault is a Land runtime instance and `Compute(Permanent)` seeds a chars row with no P/T fields). Both effects flagged `ExpiresAtEndOfTurn` (CR 514.2). "Every creature type" approximated as every creature subtype currently enumerated in `CardSubtype`; auto-grows with the enum. |
 | 14 | Inkmoth Nexus | medium | Land {T}: {C} + {1}: until EOT, becomes 1/1 Blinkmoth artifact creature with flying + infect (still a land). Builds on Mutavault primitive + needs Infect keyword (poison counters + damage replacement). |
 | 15 | Goblin Matron | low | Creature ETB — search library for a Goblin, reveal, hand. Tutor-to-hand by subtype primitive; mirrors Stoneforge Mystic's ETB but filtered by subtype, not card type. |
 | 16 | Trinket Mage | low | Creature ETB — search library for artifact mv ≤ 1, reveal, hand. Same tutor-to-hand-by-filter shape as Goblin Matron with mv-cap filter. |
