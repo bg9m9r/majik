@@ -335,6 +335,21 @@ public static class NamedCardFactory
             // deferred — see factory xmldoc).
             "Wrenn and Realmbreaker" => WrennAndRealmbreakerFactory.Create(owner),
 
+            // Sorcery — {R} (WrennsResolveFactory). Murders at Karlov Manor.
+            // "Draw two cards. Exile cards drawn this way at the next end
+            // step." Card shape only here; the resolve effect (draw 2 +
+            // optional delayed-EOT exile rider) is built on demand via
+            // WrennsResolveFactory.BuildResolveEffect(caster, triggers?).
+            // The single-arg BuildResolveEffect overload draws the two
+            // cards without registering the exile rider (suitable for
+            // shape tests). Pass a TriggerManager to BuildResolveEffect
+            // to wire the DelayedTriggeredAbility that fires on the next
+            // End step's StepStartedEvent and exiles any captured cards
+            // still in the caster's hand (cards played, discarded, or
+            // otherwise relocated are skipped — "cards drawn this way"
+            // tracks identity, not current zone).
+            "Wrenn's Resolve" => WrennsResolveFactory.Create(owner),
+
             // Legendary Planeswalker — Karn {7} loyalty 6
             // (KarnLiberatedFactory). +4 target-player-exiles-a-card-from-
             // hand (auto-pick first opponent + first card), -3 exile-

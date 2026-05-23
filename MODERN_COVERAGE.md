@@ -3,13 +3,13 @@
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
 **Last updated:** 2026-05-23
-**Latest origin/main:** 6b29e01 (… + Lurrus of the Dream-Den + Colossus Hammer + Sigarda's Aid + Living End + Phyrexian Tower + Puresteel Paladin + Aether Vial + Mox Opal + Scion of Draco + Ragavan, Nimble Pilferer + Cavern of Souls + Galvanic Discharge + Dauthi Voidwalker + Chord of Calling + Eldritch Evolution) + Tireless Tracker (this PR)
+**Latest origin/main:** 6b29e01 (… + Lurrus of the Dream-Den + Colossus Hammer + Sigarda's Aid + Living End + Phyrexian Tower + Puresteel Paladin + Aether Vial + Mox Opal + Scion of Draco + Ragavan, Nimble Pilferer + Cavern of Souls + Galvanic Discharge + Dauthi Voidwalker + Chord of Calling + Eldritch Evolution + Tireless Tracker) + Wrenn's Resolve (this PR)
 
 ## Headline numbers
 
 | Metric | Count |
 |---|---|
-| Named factories | 90 |
+| Named factories | 91 |
 | Bespoke templates | 26 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
@@ -118,6 +118,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Wastewood Verge | Land | — | B/G activation-gate land |
 | Wrenn and Six | Planeswalker | #178 | +1 land return, -1 ping |
 | Wrenn and Realmbreaker | Planeswalker | TBD | +1 mill 3 + may-return-land, -2 reanimate nonland permanent, -7 structural emblem |
+| Wrenn's Resolve | Sorcery | TBD | Draw 2 + delayed end-step exile rider on drawn cards still in hand |
 | Wurmcoil Engine | Artifact Creature | TBD | deathtouch + lifelink + dies-trigger twin tokens |
 | Yavimaya, Cradle of Growth | Land | #158 | grant Forest to all lands |
 | Yawgmoth, Thran Physician | Creature | — | pay life + sac → discard/draw |
