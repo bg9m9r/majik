@@ -22,15 +22,11 @@ namespace Majik.Core.CardData;
 /// </summary>
 public static class OracleManaBinder
 {
-    private static readonly Dictionary<CardSubtype, string> BasicLandColors = new()
-    {
-        [CardSubtype.Mountain] = "R",
-        [CardSubtype.Forest] = "G",
-        [CardSubtype.Plains] = "W",
-        [CardSubtype.Island] = "U",
-        [CardSubtype.Swamp] = "B",
-        [CardSubtype.Wastes] = "C",
-    };
+    // Shared with Majik.Core.Effects.EffectiveManaAbilities so printed
+    // basic-land binding and Layer-4 retyping-induced override stay in
+    // sync. See <see cref="BasicLandManaColors"/>.
+    private static IReadOnlyDictionary<CardSubtype, string> BasicLandColors
+        => BasicLandManaColors.Map;
 
     // {T}: Add {R}.  or  {T}: Add {R}{R}.  or  {T}: Add one {G}.
     private static readonly Regex TapForManaRegex = new(

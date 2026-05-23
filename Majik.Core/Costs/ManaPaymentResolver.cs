@@ -1,5 +1,6 @@
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
+using Majik.Core.Effects;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
 using Majik.Core.ValueObjects;
@@ -13,6 +14,21 @@ namespace Majik.Core.Costs;
 /// </summary>
 public sealed class ManaPaymentResolver
 {
+    private readonly ContinuousEffectsService? _layers;
+
+    /// <summary>
+    /// Construct a resolver. When <paramref name="layers"/> is supplied,
+    /// each source's mana abilities are derived via
+    /// <see cref="EffectiveManaAbilities.For"/> so CR 305.6 retyping
+    /// (Blood Moon, Spreading Seas, etc.) is honoured. When null, the
+    /// resolver falls back to the printed mana abilities — preserves
+    /// behaviour for callers (and tests) that don't have a layer service.
+    /// </summary>
+    public ManaPaymentResolver(ContinuousEffectsService? layers = null)
+    {
+        _layers = layers;
+    }
+
     public bool Pay(Player payer, ManaCost cost, ManaPayment payment)
     {
         if (payer == null) throw new ArgumentNullException(nameof(payer));
@@ -34,7 +50,14 @@ public sealed class ManaPaymentResolver
         var abilities = new List<IManaAbility>(payment.Sources.Count);
         foreach (var src in payment.Sources)
         {
-            var options = src.Abilities.OfType<IManaAbility>().ToList();
+            // CR 305.6 — when a Layer 4 retyping effect has changed the
+            // source's land subtypes (Blood Moon, Spreading Seas, …),
+            // EffectiveManaAbilities substitutes basic mana abilities
+            // for the printed ones. Otherwise prints are returned as-is.
+            // Null _layers ⇒ printed path (legacy/tests).
+            var options = src is Permanent perm
+                ? EffectiveManaAbilities.For(perm, _layers).ToList()
+                : src.Abilities.OfType<IManaAbility>().ToList();
             if (options.Count == 0)
                 throw new InvalidOperationException($"{src.Name} has no mana ability.");
 
