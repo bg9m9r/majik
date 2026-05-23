@@ -803,6 +803,24 @@ public static class NamedCardFactory
             // the first creature card deterministically.
             "Scavenging Ooze" => ScavengingOozeFactory.Create(owner),
 
+            // Sorcery — {2}{G}{G} (ScapeshiftFactory). Morningtide.
+            // "Sacrifice any number of lands. Search your library for that
+            //  many land cards, put them onto the battlefield, then shuffle."
+            // (CR 701.16 + CR 701.19a). Card shape only at the dispatcher;
+            // resolve closure built on demand via
+            // ScapeshiftFactory.BuildResolveEffect(caster, sacSelector,
+            // tutorSelector). The selectors decouple "pick a subset of
+            // permanents to sacrifice" + multi-card library tutor from agent
+            // surfaces the engine does not yet expose. The tutor side falls
+            // back to PrimevalTitan's per-slot agent loop when no selector
+            // is supplied; the sacrifice side defaults to zero lands (clean
+            // no-op faithful to the lower bound of "any number"). Lands
+            // enter UNTAPPED per the printed oracle — distinct from
+            // Primeval Titan / Cultivate. Modern Titanshift combo finisher
+            // (pairs with Valakut, the Molten Pinnacle). Library shuffle
+            // deferred — same rationale as SearchSpellFactory.
+            "Scapeshift" => ScapeshiftFactory.Create(owner),
+
             // Creature — Dragon {3}{U}{U} 3/3 (MurktideRegentFactory).
             // Flying + Delve marker keywords wired. ETB trigger: exile target
             // instant or sorcery card from a graveyard; enters with +1/+1
