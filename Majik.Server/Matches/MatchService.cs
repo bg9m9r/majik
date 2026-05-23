@@ -46,6 +46,7 @@ public sealed class MatchService
     private readonly IMatchOwnership? _ownership;
     private readonly IMatchCommandForwarder? _forwarder;
     private readonly IInstanceIdProvider? _instanceIds;
+    private readonly MatchFacadeBridge? _facadeBridge;
     private readonly ILogger<MatchService>? _logger;
 
     public MatchService(
@@ -63,7 +64,8 @@ public sealed class MatchService
         IMatchCommandForwarder? forwarder = null,
         IInstanceIdProvider? instanceIds = null,
         ILogger<MatchService>? logger = null,
-        IDeckOwnershipPolicy? deckOwnershipPolicy = null)
+        IDeckOwnershipPolicy? deckOwnershipPolicy = null,
+        MatchFacadeBridge? facadeBridge = null)
     {
         _matches = matches;
         _profiles = profiles;
@@ -78,6 +80,7 @@ public sealed class MatchService
         _ownership = ownership;
         _forwarder = forwarder;
         _instanceIds = instanceIds;
+        _facadeBridge = facadeBridge;
         _logger = logger;
 
         // Strict by default: refuse construction without a real
@@ -266,6 +269,12 @@ public sealed class MatchService
                     creatorDeck, botDeck,
                     botSeatArchetype: bot.Archetype,
                     onBotThinking: onBotThinking);
+                // Wire the engine→SignalR bridge before any engine work
+                // can fire events (StartFullGameAsync happens later). The
+                // bridge holds the IDisposable subscriptions; teardown
+                // in the catch block / terminal-state handlers calls
+                // Detach.
+                _facadeBridge?.Attach(matchId, creator.Sub, botPlayer.Sub, facade);
                 if (_ownership != null) await _ownership.TryClaimAsync(matchId, ct);
                 if (_forwarder != null) await _forwarder.OnClaimedAsync(matchId, ct);
             }
@@ -343,6 +352,10 @@ public sealed class MatchService
             {
                 try
                 {
+                    // Detach the bridge BEFORE deleting the facade so we
+                    // don't leak hub subscriptions on a partial-setup
+                    // rollback.
+                    _facadeBridge?.Detach(matchId);
                     _gameFactory.Delete(facade.GameId);
                     if (_ownership != null) await _ownership.ReleaseAsync(matchId, ct);
                     if (_forwarder != null) await _forwarder.OnReleasedAsync(matchId, ct);
@@ -453,6 +466,13 @@ public sealed class MatchService
                 var creatorDeck = await _decks.LoadAsync(match.Creator.DeckId, ct);
                 var opponentDeck = await _decks.LoadAsync(opponent.DeckId, ct);
                 var facade = _gameFactory.Create(match.Creator.Handle, opponent.Handle, creatorDeck, opponentDeck);
+                // Wire the engine→SignalR bridge as soon as the facade
+                // exists. Subsequent state transitions (Joined→Starting→
+                // Rolling) only fire match.* publisher events, but the
+                // engine itself can start emitting EventDtos the moment
+                // PlayDrawAsync calls StartFullGameAsync — the bridge
+                // must already be attached by then.
+                _facadeBridge?.Attach(matchId, match.Creator.Sub, opponent.Sub, facade);
                 await _matches.TryAtomicUpdateAsync(matchId, MatchState.Joined,
                     Builders<Match>.Update.Set(m => m.GameId, facade.GameId),
                     ct);
@@ -631,6 +651,9 @@ public sealed class MatchService
         if (!moved) return Result.Fail<MatchDto>(new MatchError("cannot-concede"));
 
         _timeoutScheduler?.Cancel(matchId);
+        // Tear down engine→SignalR bridge: match is over, no further
+        // EventDto / PromptDto traffic should reach the hub group.
+        _facadeBridge?.Detach(matchId);
         _hub?.Publish(matchId, "match.state-changed",
             new { matchId, state = "Completed", transitionedAt = now });
 
@@ -661,6 +684,9 @@ public sealed class MatchService
         if (!moved) return Result.Fail<bool>(new MatchError("match-in-progress"));
 
         _timeoutScheduler?.Cancel(matchId);
+        // Tear down engine→SignalR bridge BEFORE deleting the facade so
+        // any in-flight EventDto can't dereference a disposed engine.
+        _facadeBridge?.Detach(matchId);
         if (_gameFactory != null && match.GameId is Guid gid)
         {
             _gameFactory.Delete(gid);
@@ -740,6 +766,10 @@ public sealed class MatchService
         if (!moved) return;
 
         _timeoutScheduler?.Cancel(matchId);
+        // Match terminated by clock — no further engine traffic should
+        // surface on the hub. (Facade itself is left to MatchCleanup /
+        // a future explicit teardown; the bridge just unhooks.)
+        _facadeBridge?.Detach(matchId);
         _hub?.Publish(matchId, "match.timed-out", new { matchId, loserSub, winnerSub = winner });
         _hub?.Publish(matchId, "match.state-changed",
             new { matchId, state = "Completed", transitionedAt = now });
