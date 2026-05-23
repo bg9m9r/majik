@@ -1554,6 +1554,24 @@ public static class NamedCardFactory
             // GoblinWelderFactory.WeldResolve(players).
             "Goblin Welder" => GoblinWelderFactory.Create(owner),
 
+            // Creature — Human Shaman {R} 1/1 (DragonsRageChannelerFactory).
+            // Modern Horizons 2. "Whenever you cast a noncreature spell,
+            // surveil 1. Delirium — Dragon's Rage Channeler gets +2/+2 and
+            // has flying as long as there are four or more card types
+            // among cards in your graveyard." Surveil trigger over
+            // SpellCastEvent gated on controller + non-creature card
+            // (mirrors Ledger Shredder's surveil routing). Delirium static
+            // wired via DeliriumPumpEffect — two registered ContinuousEffects
+            // (+2/+2 in Layer 7c, Flying in Layer 6) whose IsActive() gates
+            // on DRC being on the battlefield AND CR 702.105's distinct-
+            // type count >= 4 (sampled live via TarmogoyfFactory
+            // .CountDistinctCardTypes). The single-arg dispatcher path here
+            // produces the correct card shape with the surveil trigger
+            // attached for ability-shape observability; use the (owner,
+            // eventBus, triggers, effects) overload for fully-wired
+            // bus-driven trigger firing + ETB/LTB delirium lifecycle.
+            "Dragon's Rage Channeler" => DragonsRageChannelerFactory.Create(owner),
+
             // Creature — Minotaur Wizard {R/W}{R/W}{R/W} 3/3 (BorosReckonerFactory).
             // Gatecrash. First strike + "Whenever Boros Reckoner is dealt damage,
             // it deals that much damage to any target." Printed text is a

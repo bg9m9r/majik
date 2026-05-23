@@ -3,13 +3,13 @@
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
 **Last updated:** 2026-05-23
-**Latest origin/main:** Wheel of Fortune (Sorcery {2}{R} — each player discards their hand, then draws seven cards; all discards resolve before any draws; empty-library mid-draw flags CR 704.5b SBA loss on that player only) on top of Brain Freeze + Lightning Helix + Sword of Feast and Famine + Boros Reckoner + Mishra's Workshop + Goblin Welder + Sword of Fire and Ice + Reckless Charge + Trinket Mage + Sun Titan + Sensei's Divining Top + Inkmoth Nexus + Spell Queller + Goblin Matron + Mutavault + Skullclamp + Umezawa's Jitte + Wasteland + Swords to Plowshares + Mystical Tutor + Path to Exile + Daze + Ponder + Preordain + Splinter Twin + Sythis, Harvest's Hand + Pyromancer's Goggles + Plague Engineer + Manabarbs + Yawgmoth's Will + Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere.
+**Latest origin/main:** Dragon's Rage Channeler (Creature — Human Shaman {R} 1/1 — noncreature-cast `SpellCastEvent` trigger with surveil 1 effect routed through `IPlayerAgent.ChooseSurveilDecisionAsync` with all-to-graveyard fallback (CR 603.1 / 701.42); delirium static registers two `ContinuousEffect`s — Layer 7c +2/+2 and Layer 6 Flying — both gated on DRC being on the battlefield AND `TarmogoyfFactory.CountDistinctCardTypes(controller.Graveyard) >= 4` (CR 702.105 / 613.1f); ETB/LTB lifecycle mirrors Tarmogoyf's `CardMovedEvent` Sync) on top of Wheel of Fortune + Brain Freeze + Lightning Helix + Sword of Feast and Famine + Boros Reckoner + Mishra's Workshop + Goblin Welder + Sword of Fire and Ice + Reckless Charge + Trinket Mage + Sun Titan + Sensei's Divining Top + Inkmoth Nexus + Spell Queller + Goblin Matron + Mutavault + Skullclamp + Umezawa's Jitte + Wasteland + Swords to Plowshares + Mystical Tutor + Path to Exile + Daze + Ponder + Preordain + Splinter Twin + Sythis, Harvest's Hand + Pyromancer's Goggles + Plague Engineer + Manabarbs + Yawgmoth's Will + Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere.
 
 ## Headline numbers
 
 | Metric | Count |
 |---|---|
-| Named factories | 134 |
+| Named factories | 135 |
 | Bespoke templates | 27 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
@@ -51,6 +51,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Daze | Instant | TBD | bounce-Island pitch alt cost + counter target spell unless its controller pays {1} (CR 118.9 / 118.4) |
 | Dauthi Voidwalker | Creature | TBD | Shadow + opponent-grave→exile-with-void-counter replacement + {2},{T},remove counter: cast-for-free from exile |
 | Death's Shadow | Creature | TBD | Layer 7a CDA P/T scaled by controller life |
+| Dragon's Rage Channeler | Creature | TBD | {R} 1/1 Human Shaman + noncreature-cast surveil 1 trigger + delirium static (CR 702.105) registering Layer 7c +2/+2 and Layer 6 Flying grants when controller's graveyard has 4+ distinct card types (live sample via TarmogoyfFactory.CountDistinctCardTypes) |
 | Delighted Halfling | Creature | — | any-color mana ability |
 | Dig Through Time | Sorcery | #181 | delve top-7 to hand |
 | Dredger's Insight | Enchantment | — | dies-trigger surveil-equivalent |
