@@ -82,6 +82,9 @@ public enum CardSubtype
     /// <summary>Elk creature subtype — Oko, Thief of Crowns' +1 token target
     /// type and the Elk creature tokens it implies. CR 205.3m.</summary>
     Elk,
+    /// <summary>Bard creature subtype — Nadu, Winged Wisdom; Adventures in
+    /// the Forgotten Realms Bard cycle. CR 205.3m.</summary>
+    Bard,
 
     // Land subtypes (examples)
     Forest,

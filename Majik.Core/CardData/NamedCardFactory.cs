@@ -2035,6 +2035,19 @@ public static class NamedCardFactory
             // (the printed {W} pip).
             "Prismatic Ending" => PrismaticEndingFactory.Create(owner),
 
+            // Legendary Creature — Bird Bard {G}{W}{U} 3/4
+            // (NaduWingedWisdomFactory). Modern Horizons 3. Flying +
+            // "Whenever a creature you control becomes the target of a
+            // spell or ability, that creature's controller may reveal the
+            // top of their library; land → battlefield, otherwise →
+            // hand. Triggers only twice each turn." v1 wires the
+            // targeted-by trigger over TargetsChosenEvent (spell + ability
+            // sources publish it), enforces the twice-per-turn cap with a
+            // shared closure, and resets on TurnStartedEvent. The "may"
+            // is auto-taken; routing the land ETB through ZoneService is
+            // deferred to fully-wired callers — see factory xmldoc.
+            "Nadu, Winged Wisdom" => NaduWingedWisdomFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
