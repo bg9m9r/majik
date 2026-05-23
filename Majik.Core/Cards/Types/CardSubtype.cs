@@ -53,6 +53,8 @@ public enum CardSubtype
     Avatar,
     /// <summary>Wurm creature subtype — Wurmcoil Engine, Penumbra Wurm. CR 205.3m.</summary>
     Wurm,
+    /// <summary>Giant creature subtype — Primeval Titan, Hill Giant. CR 205.3m.</summary>
+    Giant,
 
     // Land subtypes (examples)
     Forest,
