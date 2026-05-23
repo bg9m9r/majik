@@ -165,6 +165,20 @@ public static class NamedCardFactory
             // ConditionalEntersTappedBinder in the production load path.
             "Inspiring Vantage" => InspiringVantageFactory.Create(owner),
 
+            // Enchantment — {2}{R} (BloodMoonFactory). "Nonbasic lands are
+            // Mountains." CR 305.6 / 613.1d. Implemented as a Layer 4
+            // SetSubtypesEffect scoped to every nonbasic Land on the
+            // battlefield (PR #151) — combined with EffectiveManaAbilities
+            // (PR #155) the affected lands lose their printed abilities and
+            // tap for {R}. Lifecycle wiring (BloodMoonStaticEffect ↔
+            // CardMovedEvent) requires the live ContinuousEffectsService +
+            // EventBus and goes through
+            // BloodMoonFactory.Create(owner, effects, eventBus). The
+            // single-arg dispatcher path here produces the correct card
+            // shape without a live Layer 4 effect (suitable for test /
+            // shape-only use).
+            "Blood Moon" => BloodMoonFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
