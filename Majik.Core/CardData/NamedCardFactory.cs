@@ -1026,6 +1026,18 @@ public static class NamedCardFactory
             // + Layer 4 Illusion rider + bus-driven trigger firing.
             "Phantasmal Image" => PhantasmalImageFactory.Create(owner),
 
+            // Instant — {G} (VeilOfSummerFactory). Core Set 2020.
+            // "Draw a card if an opponent has cast a blue or black spell this
+            // turn. Spells you control can't be countered this turn, and you
+            // and permanents you control gain hexproof from blue and from
+            // black until end of turn."
+            // Card shape only here; the resolve-time SpellDefinition is built
+            // on demand via VeilOfSummerFactory.BuildDefinition(caster,
+            // turnState, continuousEffects). Conditional draw consults
+            // TurnState.OpponentCastSpellOfColor; uncounterable + hexproof
+            // riders are structural in v1 (see factory doc).
+            "Veil of Summer" => VeilOfSummerFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
