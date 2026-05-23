@@ -156,7 +156,11 @@ public sealed class TurnDriver
         await PriorityRound(activePlayer, ct);
 
         SetPhase(PhaseStateType.Draw);
-        if (turnNumber > 1)
+        // CR 117.5 / 614.12 — "Skip your draw step" replacement effects
+        // (Necropotence, Yawgmoth's Bargain, etc.) are consulted via
+        // SkipDrawRegistry. Turn 1 already skips by convention; on any
+        // later turn we honour an active skip-draw predicate.
+        if (turnNumber > 1 && !SkipDrawRegistry.ShouldSkipDraw(activePlayer))
         {
             DrawCard(activePlayer);
         }
