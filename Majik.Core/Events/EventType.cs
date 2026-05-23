@@ -23,6 +23,7 @@ public enum EventType
     CardResolved,
     CardDestroyed,
     CardMoved,
+    CardRevealed,
 
     // Combat Events
     CombatStarted,

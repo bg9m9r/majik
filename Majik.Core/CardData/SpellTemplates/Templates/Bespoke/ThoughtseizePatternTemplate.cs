@@ -33,14 +33,18 @@ public sealed class ThoughtseizePatternTemplate : ISpellTemplate
     }
 
     public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
-        ThoughtseizeSpell(ctx.Caster, ctx.Resolver, SpellTemplateHelpers.WordToInt(@params["life"]));
+        ThoughtseizeSpell(ctx.Caster, ctx.Resolver, SpellTemplateHelpers.WordToInt(@params["life"]), ctx.EventBus);
 
     /// <summary>
     /// Thoughtseize template (v1 — deterministic pick: first non-land card in target's hand).
     /// Real Thoughtseize lets the caster choose; v1 simplification picks deterministically.
     /// Caster loses <paramref name="lifeLoss"/> life after the discard.
     /// </summary>
-    private static SpellDefinition ThoughtseizeSpell(Player caster, Func<object, object> resolver, int lifeLoss) => new(
+    private static SpellDefinition ThoughtseizeSpell(
+        Player caster,
+        Func<object, object> resolver,
+        int lifeLoss,
+        Majik.Core.Events.IEventBus? eventBus) => new(
         Modes: Array.Empty<string>(), HasVariableX: false,
         TargetRequests: new[] { new TargetRequest("target player", 1, 1, Array.Empty<object>()) },
         EffectFactory: p =>
@@ -49,6 +53,10 @@ public sealed class ThoughtseizePatternTemplate : ISpellTemplate
             return new IEffect[] { new Effect("thoughtseize", () =>
             {
                 if (target is not Player tp) return;
+                // CR 701.16 — "Target player reveals their hand": the entire
+                // hand becomes public. Emit one CardRevealedEvent per card so
+                // clients (portal) can flash them briefly.
+                RevealHelper.RevealHand(eventBus, tp, "Thoughtseize");
                 // v1: deterministic pick — first non-land card in target's hand.
                 var pick = tp.Zones.Hand.GetCards()
                     .FirstOrDefault(c => !c.HasType(Majik.Core.Cards.Types.CardType.Land));
