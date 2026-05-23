@@ -374,6 +374,18 @@ public static class NamedCardFactory
             // target check at resolution).
             "Force of Negation" => ForceOfNegationFactory.Create(owner),
 
+            // Instant — {B/P} (SurgicalExtractionFactory).
+            // "Choose target card in a graveyard other than a basic land
+            //  card. Search its owner's graveyard, hand, and library for
+            //  any number of cards with the same name as that card and
+            //  exile them. Then that player shuffles."
+            // Phyrexian-mana alt cost (2 life) via
+            // PhyrexianManaAlternativeCost. Card shape only here; the
+            // resolve effect is built on demand via
+            // SurgicalExtractionFactory.BuildDefinition at the
+            // SpellCastFlow resolver wire-up site.
+            "Surgical Extraction" => SurgicalExtractionFactory.Create(owner),
+
             // Sorcery — {2}{R} (RiftBoltFactory). 3 damage to any target;
             // Suspend 1—{R} (CR 702.62). Spell-def and suspend alt cost
             // built on demand via RiftBoltFactory.BuildSpellDefinition /
