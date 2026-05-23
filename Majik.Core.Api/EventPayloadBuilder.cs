@@ -1,4 +1,6 @@
 using System.Text.Json;
+using Majik.Core.Abilities;
+using Majik.Core.Cards;
 using Majik.Core.Domain.DomainEvents;
 using Majik.Core.Events;
 using Majik.Core.Spells;
@@ -87,21 +89,35 @@ public static class EventPayloadBuilder
         {
             playerId = x.Player.Id,
         }),
+        // SpellCastEvent / StackObject*Event payloads mirror StackObjectDto
+        // (see Dtos.cs + StateSnapshotter.SnapshotStackObject) so the
+        // frontend can patch `state.stack` from the wire delta without
+        // re-fetching /state. `kind` matches the StackObjectDto.Kind
+        // discriminator ("Spell" | "TriggeredAbility" | "ActivatedAbility")
+        // and `description` mirrors the same composition rules used by the
+        // snapshotter — keep these two builders in sync.
         SpellCastEvent x => Serialize(new
         {
             stackId = x.Spell.Id,
             controllerId = x.Spell.Controller.Id,
+            cardId = (x.Spell as ISpell)?.Card?.InstanceId,
             cardName = (x.Spell as ISpell)?.Card?.Name,
+            kind = "Spell",
+            description = (x.Spell as ISpell)?.Card?.Name ?? "",
         }),
         StackObjectAddedEvent x => Serialize(new
         {
             stackId = x.StackObject.Id,
-            kind = x.StackObject.GetType().Name,
+            controllerId = x.StackObject.Controller.Id,
+            kind = StackKind(x.StackObject),
+            description = StackDescription(x.StackObject),
         }),
         StackObjectResolvedEvent x => Serialize(new
         {
             stackId = x.StackObject.Id,
-            kind = x.StackObject.GetType().Name,
+            controllerId = x.StackObject.Controller.Id,
+            kind = StackKind(x.StackObject),
+            description = StackDescription(x.StackObject),
         }),
         GameStartedEvent => Empty(),
         _ => Empty(),
@@ -111,4 +127,25 @@ public static class EventPayloadBuilder
         => JsonSerializer.SerializeToElement(value, Opts);
 
     private static JsonElement Empty() => JsonDocument.Parse("{}").RootElement;
+
+    // The next two helpers must stay aligned with
+    // StateSnapshotter.SnapshotStackObject — the wire-format `kind` +
+    // `description` strings emitted on the stack DTO are the same the
+    // event payload promises, so the frontend can treat
+    // StackObjectAddedEvent as "append this StackItem" verbatim.
+    private static string StackKind(IStackObject obj) => obj switch
+    {
+        ISpell => "Spell",
+        ITriggeredAbility => "TriggeredAbility",
+        IActivatedAbility => "ActivatedAbility",
+        _ => obj.GetType().Name,
+    };
+
+    private static string StackDescription(IStackObject obj) => obj switch
+    {
+        ISpell spell => spell.Card?.Name ?? "",
+        ITriggeredAbility t => ((t.Source as ICard)?.Name ?? "") + " trigger",
+        IActivatedAbility => "ability",
+        _ => obj.GetType().Name,
+    };
 }
