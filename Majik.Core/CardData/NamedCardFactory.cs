@@ -170,6 +170,17 @@ public static class NamedCardFactory
             // (CR 702.74b).
             "Endurance" => EnduranceFactory.Create(owner),
 
+            // Sorcery — {R} (FaithlessLootingFactory). Innistrad / Modern
+            // Horizons. "Draw two cards, then discard two cards. Flashback
+            // {2}{R}." Card shape only here; the resolve effect (draw 2 +
+            // discard 2 via deterministic last-2-in-hand) is built on
+            // demand via FaithlessLootingFactory.BuildResolveEffect, and
+            // the flashback alt-cost (parsed by FlashbackOracleParser) is
+            // exposed via FaithlessLootingFactory.BuildFlashbackCost.
+            // Real agent-driven "choose 2 cards to discard" prompt
+            // deferred — same queue as Connive / Liliana / Yawgmoth.
+            "Faithless Looting" => FaithlessLootingFactory.Create(owner),
+
             // U/R Horizon Canopy painless dual — Modern Horizons (FieryIsletFactory).
             // {T}, Pay 1 life: Add {U} or {R} — two ManaAbility instances, each with
             // a life-cost activation gate (CR 119.4) and a LoseLife side-effect.
