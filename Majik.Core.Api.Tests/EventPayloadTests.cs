@@ -119,6 +119,60 @@ public class EventPayloadTests
     }
 
     [Fact]
+    public void CombatDamageDealtEvent_PayloadCarriesSourceTargetAndDamageType()
+    {
+        // Per-source/per-target damage payload (CR 119, CR 510). Frontend
+        // reads sourceInstanceId/targetInstanceId to animate the damage
+        // ping; targetIsPlayer + damageType drive which animation runs.
+        var attacker = new Creature("Bear", "1G", 2, 2);
+        var blocker = new Creature("Squirrel", "G", 1, 1);
+        var e = new CombatDamageDealtEvent(attacker, blocker, 2);
+
+        var payload = EventPayloadBuilder.Build(e);
+
+        payload.GetProperty("sourceInstanceId").GetGuid().Should().Be(attacker.InstanceId);
+        payload.GetProperty("targetInstanceId").GetGuid().Should().Be(blocker.InstanceId);
+        payload.GetProperty("targetIsPlayer").GetBoolean().Should().BeFalse();
+        payload.GetProperty("amount").GetInt32().Should().Be(2);
+        payload.GetProperty("damageType").GetString().Should().Be("Combat");
+    }
+
+    [Fact]
+    public void CombatDamageDealtEvent_PlayerTarget_PayloadFlagsPlayer()
+    {
+        var attacker = new Creature("Bear", "1G", 2, 2);
+        var victim = new Player("Victim");
+        var e = new CombatDamageDealtEvent(attacker, victim, 2);
+
+        var payload = EventPayloadBuilder.Build(e);
+
+        payload.GetProperty("sourceInstanceId").GetGuid().Should().Be(attacker.InstanceId);
+        payload.GetProperty("targetInstanceId").GetGuid().Should().Be(victim.Id);
+        payload.GetProperty("targetIsPlayer").GetBoolean().Should().BeTrue();
+        payload.GetProperty("amount").GetInt32().Should().Be(2);
+        payload.GetProperty("damageType").GetString().Should().Be("Combat");
+    }
+
+    [Fact]
+    public void DamageDealtEvent_SpellDamage_SerializesSpellDamageType()
+    {
+        var caster = new Player("Caster");
+        var target = new Creature("Victim", "1", 3, 3);
+        var e = new DamageDealtEvent(
+            sourceCard: null, sourcePlayer: caster,
+            targetCard: target, targetPlayer: null,
+            amount: 3, damageType: DamageType.Spell);
+
+        var payload = EventPayloadBuilder.Build(e);
+
+        payload.GetProperty("sourceInstanceId").GetGuid().Should().Be(caster.Id);
+        payload.GetProperty("targetInstanceId").GetGuid().Should().Be(target.InstanceId);
+        payload.GetProperty("targetIsPlayer").GetBoolean().Should().BeFalse();
+        payload.GetProperty("amount").GetInt32().Should().Be(3);
+        payload.GetProperty("damageType").GetString().Should().Be("Spell");
+    }
+
+    [Fact]
     public void UnknownEvent_FallsBackToEmptyPayload()
     {
         // GameStartedEvent is the only known no-fields event but still

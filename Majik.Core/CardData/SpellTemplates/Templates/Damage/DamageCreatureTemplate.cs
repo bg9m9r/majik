@@ -50,5 +50,5 @@ public sealed class DamageCreatureTemplate : ISpellTemplate
     public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
         DamageSpellFactory.DamageCreatureSpell(
             SpellTemplateHelpers.WordToInt(@params["n"]), ctx.Resolver,
-            ctx.Replacements, ctx.Caster);
+            ctx.Replacements, ctx.Caster, ctx.EventBus);
 }

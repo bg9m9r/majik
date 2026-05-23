@@ -32,5 +32,5 @@ public sealed class DealsXDamageCreatureTemplate : ISpellTemplate
         Pattern.IsMatch(oracleText) ? EmptyParams.Instance : null;
 
     public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx) =>
-        DamageSpellFactory.DealsXCreatureSpell(ctx.Resolver, ctx.Replacements, ctx.Caster);
+        DamageSpellFactory.DealsXCreatureSpell(ctx.Resolver, ctx.Replacements, ctx.Caster, ctx.EventBus);
 }
