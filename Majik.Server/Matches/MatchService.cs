@@ -896,7 +896,17 @@ public sealed class MatchService
         var facade = _gameFactory.Get(gid);
         if (facade == null) return Result.Fail<GameStateDto>(new MatchError("game-not-started"));
 
-        var state = facade.GetState();
+        // CR 706 — return the per-viewer snapshot so the opponent's hand
+        // is masked (each card surfaces as a "(hidden)" placeholder, count
+        // preserved so the UI can render face-down cards). Seat mapping
+        // matches the convention used everywhere else in this service:
+        // Creator → Alice, Opponent → Bob. See MatchFacadeBridge.Attach
+        // and ChoosePlayDrawAsync's firstPlayerSlot computation.
+        var viewerPlayerId = callerSub == match.Creator.Sub
+            ? facade.Alice.Id
+            : facade.Bob.Id;
+        var state = facade.GetStateFor(viewerPlayerId);
+        if (state == null) return Result.Fail<GameStateDto>(new MatchError("game-not-started"));
         return Result.Ok(state);
     }
 
