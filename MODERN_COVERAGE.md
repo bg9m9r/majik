@@ -3,13 +3,13 @@
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
 **Last updated:** 2026-05-23
-**Latest origin/main:** Pernicious Deed (Enchantment {1}{B}{G} — {X}, Sacrifice: destroy each artifact, creature, and enchantment with mv ≤ X across all battlefields; mirrors Engineered Explosives' v1 X-provider + sacrifice-stub pattern) on top of Dragon's Rage Channeler + Wheel of Fortune + Brain Freeze + Lightning Helix + Sword of Feast and Famine + Boros Reckoner + Mishra's Workshop + Goblin Welder + Sword of Fire and Ice + Reckless Charge + Trinket Mage + Sun Titan + Sensei's Divining Top + Inkmoth Nexus + Spell Queller + Goblin Matron + Mutavault + Skullclamp + Umezawa's Jitte + Wasteland + Swords to Plowshares + Mystical Tutor + Path to Exile + Daze + Ponder + Preordain + Splinter Twin + Sythis, Harvest's Hand + Pyromancer's Goggles + Plague Engineer + Manabarbs + Yawgmoth's Will + Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere.
+**Latest origin/main:** Tendrils of Agony (Sorcery {2}{B}{B} — target opponent loses 2 life + you gain 2 life + Storm trigger (CR 702.40) reusing `StormHelper`; second storm spell after Brain Freeze, sharing the same copy-via-`SpellCopier` v1 semantics) on top of Pernicious Deed (Enchantment {1}{B}{G} — {X}, Sacrifice: destroy each artifact, creature, and enchantment with mv ≤ X across all battlefields; mirrors Engineered Explosives' v1 X-provider + sacrifice-stub pattern) on top of Dragon's Rage Channeler + Wheel of Fortune + Brain Freeze + Lightning Helix + Sword of Feast and Famine + Boros Reckoner + Mishra's Workshop + Goblin Welder + Sword of Fire and Ice + Reckless Charge + Trinket Mage + Sun Titan + Sensei's Divining Top + Inkmoth Nexus + Spell Queller + Goblin Matron + Mutavault + Skullclamp + Umezawa's Jitte + Wasteland + Swords to Plowshares + Mystical Tutor + Path to Exile + Daze + Ponder + Preordain + Splinter Twin + Sythis, Harvest's Hand + Pyromancer's Goggles + Plague Engineer + Manabarbs + Yawgmoth's Will + Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere.
 
 ## Headline numbers
 
 | Metric | Count |
 |---|---|
-| Named factories | 136 |
+| Named factories | 137 |
 | Bespoke templates | 27 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
@@ -140,6 +140,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Sythis, Harvest's Hand | Creature | TBD | Legendary Nymph 1/2 {G}{W} — Constellation: enchantment-ETB-under-controller → gain 1 life + draw 1 (covers plain enchantments AND Auras via CardType.Enchantment predicate) |
 | Tarmogoyf | Creature | #173 | CDA P/T from grave types |
 | Teferi, Time Raveler | Planeswalker | #182 | sorcery-speed restriction emblem |
+| Tendrils of Agony | Sorcery | TBD | {2}{B}{B} — target opponent loses 2 life and you gain 2 life + Storm (CR 702.40) on-cast trigger via StormHelper (count = TurnState.SpellsCastByPlayer - 1; copies via SpellCopier.PushCopyOfTopSpell re-executing the spell's effects per copy → N-spell storm cast = (N) × 2-life swing). CR 702.40a "you may choose new targets" + copies-as-distinct-stack-objects deferred (inherited from SpellCopier) |
 | Test Conniver | Creature | — | connive-keyword test card |
 | Thundering Falls | Land | — | U/R surveil dual |
 | Tireless Tracker | Creature | TBD | Human Scout 3/2: landfall-style Clue trigger + {2}, sac Clue: +1/+1 counter |
