@@ -798,6 +798,35 @@ public static class NamedCardFactory
             // wiring on the reanimated creature.
             "Priest of Fell Rites" => PriestOfFellRitesFactory.Create(owner),
 
+            // Sorcery — {B} (ReanimateFactory). Tempest.
+            // "Put target creature card from a graveyard onto the
+            //  battlefield under your control. You lose life equal to its
+            //  mana value." Card shape only here; the resolve effect is
+            // built on demand via ReanimateFactory.BuildResolveEffect
+            // (deterministic first-creature pick scoped to the caster's
+            // graveyard via the single-arg path; multi-graveyard scan via
+            // the (caster, zoneService, allPlayersResolver) overload).
+            "Reanimate" => ReanimateFactory.Create(owner),
+
+            // Enchantment — Aura {1}{B} (AnimateDeadFactory). Limited Edition Alpha.
+            // "Enchant creature card in a graveyard. When Animate Dead
+            //  enters, if it's on the battlefield, it loses 'enchant
+            //  creature card in a graveyard' and gains 'enchant creature
+            //  put onto the battlefield with Animate Dead'. Return
+            //  enchanted creature card to the battlefield under your
+            //  control and attach Animate Dead to it. When Animate Dead
+            //  leaves the battlefield, that creature's controller
+            //  sacrifices it. Enchanted creature gets -1/-0."
+            // v1 simplification: the ETB mode-shift on the Enchant clause
+            // is collapsed into a single resolve effect (reanimate + auto-
+            // attach), so the runtime never observes the aura with the
+            // "enchant graveyard card" predicate on the battlefield. The
+            // -1/-0 static is registered via AttachedBoostEffect (Layer
+            // 7c) when the runtime (owner, continuousEffects, zoneService,
+            // eventBus, triggers) overload is used; the LTB-sacrifice
+            // trigger is registered when eventBus + triggers are supplied.
+            "Animate Dead" => AnimateDeadFactory.Create(owner),
+
             // Creature — Elemental Incarnation {3}{U} 3/3 (SubtletyFactory).
             // Modern Horizons 2 incarnation, blue counterpart to Solitude.
             // Flash + Evoke keyword markers wired. ETB bounce trigger wired:
