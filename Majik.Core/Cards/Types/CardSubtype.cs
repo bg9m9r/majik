@@ -79,6 +79,9 @@ public enum CardSubtype
     /// <summary>Praetor creature subtype — Sheoldred, the Apocalypse; the New
     /// Phyrexia / Phyrexia: All Will Be One praetor cycles. CR 205.3m.</summary>
     Praetor,
+    /// <summary>Elk creature subtype — Oko, Thief of Crowns' +1 token target
+    /// type and the Elk creature tokens it implies. CR 205.3m.</summary>
+    Elk,
 
     // Land subtypes (examples)
     Forest,
@@ -129,5 +132,6 @@ public enum CardSubtype
     Karn,
     Ugin,
     Bolas,
-    Wrenn
+    Wrenn,
+    Oko
 }
