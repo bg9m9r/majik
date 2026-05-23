@@ -997,26 +997,41 @@ public static class SeedImplementedCards
 
         // ---- Modern staples shipped in the 2026-05-23k bump ----
 
+        // Creature — Goblin {2}{R} 2/2 (GoblinRabblemasterFactory). Magic 2015.
+        "Goblin Rabblemaster",
+        // Instant — {4}{B} (MurderousCutFactory). Khans of Tarkir. Delve.
+        "Murderous Cut",
+        // Instant — {B} (ClingToDustFactory). Theros Beyond Death. Modal exile.
+        "Cling to Dust",
+        // Land — Mountain (ValakutTheMoltenPinnacleFactory). Zendikar.
+        "Valakut, the Molten Pinnacle",
+        // Sorcery — {1}{R}{R} (MizziumMortarsFactory). Return to Ravnica.
+        "Mizzium Mortars",
+        // Creature — Human Knight {1}{R} 2/1 (EmberethShieldbreakerFactory). Adventure.
+        "Embereth Shieldbreaker // Battle Display",
+        // Creature — Phoenix {3}{R} 2/2 (PhoenixOfAshFactory). Flying + Haste.
+        "Phoenix of Ash",
+        // Instant — {U}{R} (TibaltsTrickeryFactory). Kaldheim.
+        "Tibalt's Trickery",
+        // Legendary Creature — Human Shaman {4}{B/G} 4/5 (TasigurTheGoldenFangFactory). Delve.
+        "Tasigur, the Golden Fang",
+        // Creature — Human Warrior {1}{R} 2/1 (EarthshakerKhenraFactory). Haste.
+        "Earthshaker Khenra",
+        // Creature — Zombie Fish {7}{B} 5/5 (GurmagAnglerFactory). Delve.
+        "Gurmag Angler",
+        // Land — Kaladesh fastlands.
+        "Spirebluff Canal",
+        "Concealed Courtyard",
+        "Botanical Sanctum",
+        "Blooming Marsh",
+
         // Land — Island (MysticSanctuaryFactory). Modern Horizons 2.
-        // {T}: Add {U}. ETB intervening-if trigger (CR 603.4): if you control
-        // three or more other Islands, put target instant or sorcery card from
-        // your graveyard on top of your library (CR 608.2b guard at resolution).
-        // Island subtype enables interaction with Spreading Seas, Harbinger of
-        // the Seas, and island-count payoffs.
         "Mystic Sanctuary",
-
-        // Creature — Kavu {G}{W} 2/2 (TerritorialKavuFactory). Modern Horizons 2.
-        // Domain (CR 702.16) — gets +1/+1 per distinct basic land type among
-        // lands you control (Layer 7c static pump via DomainPumpStaticEffect).
-        // Attack trigger: discard a card, then draw a card (loot on attack).
+        // Creature — Kavu {G}{W} 2/2 (TerritorialKavuFactory). Domain pump + attack loot.
         "Territorial Kavu",
-
         // Legendary Creature — Human Soldier {1}{W} 2/1 (ThaliaGuardianOfThrabenFactory).
-        // Dark Ascension. First strike. Noncreature spells cost {1} more to cast.
         "Thalia, Guardian of Thraben",
-
-        // Sorcery {2}{G} (SearchForTomorrowFactory). Time Spiral.
-        // Search library for basic land → battlefield untapped + Suspend 2—{G}.
+        // Sorcery {2}{G} (SearchForTomorrowFactory). Basic land → battlefield + Suspend 2.
         "Search for Tomorrow",
     };
 }
