@@ -710,6 +710,16 @@ public static class NamedCardFactory
             // automatic per-turn budget reset on TurnStartedEvent.
             "Lurrus of the Dream-Den" => LurrusOfTheDreamDenFactory.Create(owner),
 
+            // Artifact — Equipment {1} (ColossusHammerFactory).
+            // Static "equipped creature gets +10/+0 and loses flying" via
+            // AttachedBoostEffect (Layer 7c) + LoseKeywordEffect("Flying")
+            // (Layer 6). Equip {8} activated ability wired (sorcery-speed
+            // restriction enforced via action-validator, deferred at this
+            // ability level). The single-arg dispatcher path produces the
+            // correct card shape only; use the (owner, continuousEffects)
+            // overload for live boost / lose-flying registration.
+            "Colossus Hammer" => ColossusHammerFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
