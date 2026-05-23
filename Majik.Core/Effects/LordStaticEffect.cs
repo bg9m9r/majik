@@ -12,6 +12,13 @@ namespace Majik.Core.Effects;
 /// While source is on the battlefield, every matching creature controlled
 /// by the source's controller (excluding the source itself) receives the
 /// bonus.
+///
+/// <para>Set <c>opponentsOnly: true</c> to flip the controller filter so
+/// the effect applies to matching creatures controlled by anyone OTHER
+/// than the source's controller — used by Plague Engineer ("Creatures of
+/// the chosen type your opponents control get -1/-1.") and similar
+/// debuff-the-opponent statics. With opponentsOnly the source itself is
+/// always excluded regardless of <c>includeSelf</c>.</para>
 /// </summary>
 public sealed class LordStaticEffect : ContinuousEffect
 {
@@ -21,6 +28,7 @@ public sealed class LordStaticEffect : ContinuousEffect
     private readonly int _toughness;
     private readonly IReadOnlyList<string> _grantedKeywords;
     private readonly bool _includeSelf;
+    private readonly bool _opponentsOnly;
 
     public LordStaticEffect(
         Permanent source,
@@ -28,7 +36,8 @@ public sealed class LordStaticEffect : ContinuousEffect
         int power = 1,
         int toughness = 1,
         IReadOnlyList<string>? grantedKeywords = null,
-        bool includeSelf = false)
+        bool includeSelf = false,
+        bool opponentsOnly = false)
     {
         _source = source ?? throw new ArgumentNullException(nameof(source));
         _subtype = matchingSubtype;
@@ -36,6 +45,7 @@ public sealed class LordStaticEffect : ContinuousEffect
         _toughness = toughness;
         _grantedKeywords = grantedKeywords ?? Array.Empty<string>();
         _includeSelf = includeSelf;
+        _opponentsOnly = opponentsOnly;
     }
 
     public override Layer Layer => Layer.PT_Modify;
@@ -49,8 +59,18 @@ public sealed class LordStaticEffect : ContinuousEffect
     public override bool AppliesTo(Creature creature)
     {
         if (creature.Zone != Majik.Core.Zones.ZoneType.Battlefield) return false;
-        if (!ReferenceEquals(creature.Controller, _source.Controller)) return false;
-        if (!_includeSelf && ReferenceEquals(creature, _source)) return false;
+        var sameController = ReferenceEquals(creature.Controller, _source.Controller);
+        if (_opponentsOnly)
+        {
+            // CR 109.5 — "opponents control" excludes everything the
+            // source's controller controls (including the source itself).
+            if (sameController) return false;
+        }
+        else
+        {
+            if (!sameController) return false;
+            if (!_includeSelf && ReferenceEquals(creature, _source)) return false;
+        }
         return creature.HasSubtype(_subtype);
     }
 

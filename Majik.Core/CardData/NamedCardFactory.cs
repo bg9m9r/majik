@@ -1205,6 +1205,24 @@ public static class NamedCardFactory
             // for bus-driven trigger firing.
             "Manabarbs" => ManabarbsFactory.Create(owner),
 
+            // Creature — Human Rogue {2}{B} 2/2 (PlagueEngineerFactory).
+            // Core Set 2020 staple. Deathtouch keyword wired. ETB choose-a-
+            // creature-type: chosen subtype is resolved eagerly via a
+            // Func<Player, CardSubtype> typeChooser on the 3-arg overload
+            // (same pattern as Cavern of Souls). Static "Creatures of the
+            // chosen type your opponents control get -1/-1" wired via
+            // LordStaticEffect with opponentsOnly: true at Layer 7c — the
+            // effect's IsActive() gates on Plague Engineer being on the
+            // battlefield, so LTB/flicker naturally lifts the debuff
+            // (mirrors Colossus Hammer's no-LTB-cleanup pattern). The
+            // single-arg dispatcher path here produces the correct card
+            // shape (Deathtouch + 2/2 Human Rogue) without a live debuff;
+            // use PlagueEngineerFactory.Create(owner, continuousEffects,
+            // typeChooser) for fully-wired behaviour. Agent-prompt
+            // integration (ChooseSubtype) deferred — same queue as
+            // Pithing Needle / Cavern of Souls.
+            "Plague Engineer" => PlagueEngineerFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 

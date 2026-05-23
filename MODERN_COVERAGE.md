@@ -3,13 +3,13 @@
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
 **Last updated:** 2026-05-23
-**Latest origin/main:** Yawgmoth's Will on top of Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere (#257); Manabarbs added in this PR.
+**Latest origin/main:** Manabarbs (#265) on top of Yawgmoth's Will + Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere (#257); Plague Engineer added in this PR.
 
 ## Headline numbers
 
 | Metric | Count |
 |---|---|
-| Named factories | 114 |
+| Named factories | 115 |
 | Bespoke templates | 26 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
@@ -90,6 +90,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Pact of Negation | Instant | TBD | {0} — counter target spell + delayed upkeep DelayedTriggeredAbility (CR 603.7) that tries PayMana({3}{U}{U}); on failure MarkLost() (CR 104.3 / 118.3); upkeep agent prompt deferred |
 | Phantasmal Image | Creature | TBD | 0/0 Illusion {1}{U} + EntersAsCopyReplacement (AnyBattlefield) + Layer 4 Illusion subtype rider + targeted-by-spell-or-ability self-sacrifice trigger |
 | Pithing Needle | Artifact | #189 | name-targeted activated suppression |
+| Plague Engineer | Creature | TBD | 2/2 Human Rogue {2}{B} + Deathtouch + ETB choose-creature-type + Layer 7c -1/-1 to opponents' creatures of chosen type (LordStaticEffect opponentsOnly) |
 | Phyrexian Tower | Land | — | {T}: {C} + {T}, sac creature: {B}{B} (Legendary) |
 | Priest of Fell Rites | Creature | #196 | ETB reanimate + grave-unearth |
 | Primeval Titan | Creature | TBD | Trample + ETB/attack tutor up to 2 lands tapped |
@@ -341,10 +342,9 @@ Sorted roughly by build priority (small infra lift × high meta share). Refreshe
 
 | # | Card | Difficulty | Blocker |
 |---|---|---|---|
-| 1 | Plague Engineer | medium | ETB: choose a creature type → opponents' creatures of that type get -1/-1. Needs chosen-subtype state on permanents + opponent-only lord-style boost. |
-| 2 | Splinter Twin | medium | Aura grants `{T}: create a token copy with haste`. `CopyEffect` exists, but ability-grant-on-attach (aura adds an activated ability to enchanted creature) does not. |
-| 3 | Sythis, Harvest's Hand | medium | Constellation (cast-an-enchantment trigger) primitive absent; needs a cast-event-typed-card trigger surface comparable to landfall. |
-| 4 | Pyromancer's Goggles | high | Legendary {0} mana ability + replacement: "when you tap it for {R} to cast an instant/sorcery, copy that spell once". Needs cast-time mana-source tracking + spell-copy hook keyed off that source. |
+| 1 | Splinter Twin | medium | Aura grants `{T}: create a token copy with haste`. `CopyEffect` exists, but ability-grant-on-attach (aura adds an activated ability to enchanted creature) does not. |
+| 2 | Sythis, Harvest's Hand | medium | Constellation (cast-an-enchantment trigger) primitive absent; needs a cast-event-typed-card trigger surface comparable to landfall. |
+| 3 | Pyromancer's Goggles | high | Legendary {0} mana ability + replacement: "when you tap it for {R} to cast an instant/sorcery, copy that spell once". Needs cast-time mana-source tracking + spell-copy hook keyed off that source. |
 
 ## How to update this doc
 
