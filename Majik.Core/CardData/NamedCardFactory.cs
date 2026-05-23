@@ -786,6 +786,21 @@ public static class NamedCardFactory
             // Cabal Ritual minus the threshold clause.
             "Dark Ritual" => DarkRitualFactory.Create(owner),
 
+            // Instant — {2}{R}{R} (ThroughTheBreachFactory). Champions of
+            // Kamigawa. "You may put a creature card from your hand onto
+            // the battlefield. That creature gains haste until end of
+            // turn. Sacrifice that creature at the beginning of the next
+            // end step. Splice onto Arcane {1}{R}{R}{R}." Card shape only
+            // here; the resolve effect (put first-creature-in-hand →
+            // battlefield, grant Haste EOT via
+            // GrantKeywordUntilEndOfTurnEffect, and register a delayed
+            // end-step sacrifice DelayedTriggeredAbility — CR 603.7) is
+            // built on demand via ThroughTheBreachFactory.BuildResolveEffect.
+            // Splice onto Arcane (CR 702.46) is DEFERRED — no splice alt-
+            // cost primitive in the engine yet (same gap as every other
+            // Splice card).
+            "Through the Breach" => ThroughTheBreachFactory.Create(owner),
+
             // Artifact — {0} (LotusPetalFactory). Tempest and many reprints.
             // "{T}, Sacrifice Lotus Petal: Add one mana of any color."
             // Five ManaAbility instances (one per WUBRG), each gated on
