@@ -468,6 +468,19 @@ public static class NamedCardFactory
             // not scoped by v1.
             "Dress Down" => DressDownFactory.Create(owner),
 
+            // Sorcery — {G} (AncientStirringsFactory). Rise of the Eldrazi.
+            // "Look at the top five cards of your library. You may reveal a
+            //  colorless card from among them and put it into your hand. Then
+            //  put the rest on the bottom of your library in a random order."
+            // Card shape only here; the resolve effect is built on demand via
+            // AncientStirringsFactory.BuildResolveEffect with a default
+            // selector that picks the first colourless peeked card (CR 105)
+            // and shuffles the remainder for the random-order bottom placement
+            // (CR 701.20a). The ImpulseMayRevealFilterTemplate also matches
+            // the oracle text by shape, but drops the colour filter — the
+            // named factory carries the predicate locally.
+            "Ancient Stirrings" => AncientStirringsFactory.Create(owner),
+
             // Creature — Human Cleric {W}{B} 2/1 (PriestOfFellRitesFactory).
             // ETB triggered ability: reanimate target creature card with
             // mana value 3 or less from controller's graveyard
