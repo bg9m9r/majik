@@ -85,6 +85,12 @@ public enum CardSubtype
     /// <summary>Bard creature subtype — Nadu, Winged Wisdom; Adventures in
     /// the Forgotten Realms Bard cycle. CR 205.3m.</summary>
     Bard,
+    /// <summary>Frog creature subtype — Psychic Frog, Sakura-Tribe Scout's
+    /// sibling cycle. CR 205.3m.</summary>
+    Frog,
+    /// <summary>Mutant creature subtype — Psychic Frog, Mutavault's
+    /// changeling base type. CR 205.3m.</summary>
+    Mutant,
 
     // Land subtypes (examples)
     Forest,
