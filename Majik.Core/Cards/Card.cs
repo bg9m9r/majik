@@ -234,6 +234,19 @@ public class Card : ICard
         PendingCastX = null;
     }
 
+    /// <summary>
+    /// CR 711 — double-faced / transform card face tracker. Non-null on
+    /// DFC cards; tracks which face (front / back) is currently active and
+    /// exposes <see cref="Majik.Core.CardData.MDFCs.MdfcState.Transform"/>
+    /// to flip between them. Null on single-faced cards.
+    ///
+    /// v1 is a thin attachment — flipping the state does not yet swap the
+    /// runtime characteristics on the underlying Card object (full Layer 0
+    /// per-face characteristic-replacement is deferred). It is the
+    /// canonical observation surface for "is this card transformed?".
+    /// </summary>
+    public Majik.Core.CardData.MDFCs.MdfcState? MdfcState { get; set; }
+
     public Card(string name, string manaCost = "", IEnumerable<CardType>? cardTypes = null, IEnumerable<CardSupertype>? supertypes = null, IEnumerable<CardSubtype>? subtypes = null)
     {
         if (string.IsNullOrWhiteSpace(name))

@@ -136,6 +136,17 @@ public static class NamedCardFactory
             // Loyalty abilities (+1, -2, -5) wired by OracleLoyaltyAbilityBinder.
             "Grist, the Hunger Tide" => GristFactory.Create(owner),
 
+            // DFC front face — Creature — Cat {1}{W} 1/1 (AjaniNacatlPariahFactory).
+            // Vigilance keyword marker wired. End-step "may sacrifice another
+            // creature, transform" trigger wired against an attached MdfcState
+            // (CR 711 / CR 701.28). The single-arg dispatcher path attaches
+            // the trigger to the card shape without TriggerManager wiring.
+            // Use the (owner, triggers) overload for live trigger firing.
+            // Back face (Ajani, Nacatl Avenger PW loyalty 3) tracked via
+            // MdfcState.BackFaceName only — back-face loyalty abilities
+            // and Layer 0 per-face hot-swap are deferred.
+            "Ajani, Nacatl Pariah" => AjaniNacatlPariahFactory.Create(owner),
+
             // Creature — Elemental Incarnation {3}{W}{W} 3/2 (SolitudeFactory).
             // Flash + Lifelink + Evoke keyword markers wired. ETB exile-target-
             // creature trigger wired (lifegain to target's controller equal to
@@ -1511,6 +1522,26 @@ public static class NamedCardFactory
             // overload for fully-wired behaviour. Face-down exile is
             // deferred — engine has no face-down flag.
             "Necropotence" => NecropotenceFactory.Create(owner),
+
+            // Enchantment — {B}{B}{B} (NecrodominanceFactory). Modern Horizons 3.
+            // "If you would draw a card except for the first card you draw in
+            //  each of your draw steps, skip that draw. Skip your draw step.
+            //  Pay 1 life: Exile the top card of your library face down. Look
+            //  at it any time. You may cast that card from exile until end
+            //  of turn." Necropotence variant — same skip-your-draw-step
+            //  hook (SkipDrawRegistry), plus an additional-draw-skip clause
+            //  surfaced as a static marker (engine has no CardDrawIntent on
+            //  the ReplacementBus in v1), and an activated ability that
+            //  swaps Necropotence's delayed end-step return-to-hand for a
+            //  cast-from-exile alternative cost (CR 118.9) revoked at the
+            //  next Cleanup step (CR 514.2). The single-arg dispatcher
+            //  path produces the correct card shape (Enchantment + two
+            //  Static markers + ActivatedAbility) without bus-driven EOT
+            //  revocation; use the (owner, eventBus) overload for fully-
+            //  wired behaviour. Face-down exile + live additional-draw
+            //  skip + sorcery-speed cast restrictions deferred — same
+            //  v1 gaps as Necropotence / Dauthi Voidwalker.
+            "Necrodominance" => NecrodominanceFactory.Create(owner),
 
             // Enchantment — {1}{W} (StonySilenceFactory). Return to Ravnica.
             // "Activated abilities of artifacts can't be activated unless
