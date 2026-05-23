@@ -616,6 +616,16 @@ public static class NamedCardFactory
             // SpellCastFlow resolver wire-up site.
             "Surgical Extraction" => SurgicalExtractionFactory.Create(owner),
 
+            // Artifact Creature — Horror {2} 0/4 (SpellskiteFactory).
+            // "{U/P}: Change the target of target spell or ability with a
+            //  single target to Spellskite."
+            // CR 107.4f / 118.8 — Phyrexian pip ({U/P}) modelled as two
+            // parallel ActivatedAbilities: pay {U} (ManaCostCost) or pay
+            // 2 life (AdditionalCost.PayLife). v1 redirects only spells
+            // (single-target), rewriting Spell.ChosenTargets — ability-
+            // target redirect deferred (same gap as RedirectTemplate).
+            "Spellskite" => SpellskiteFactory.Create(owner),
+
             // Sorcery — {2}{R} (RiftBoltFactory). 3 damage to any target;
             // Suspend 1—{R} (CR 702.62). Spell-def and suspend alt cost
             // built on demand via RiftBoltFactory.BuildSpellDefinition /
