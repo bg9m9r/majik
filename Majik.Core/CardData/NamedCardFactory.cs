@@ -660,6 +660,19 @@ public static class NamedCardFactory
             // for full ETB-replacement / trigger-firing wiring.
             "Stoneforge Mystic" => StoneforgeMysticFactory.Create(owner),
 
+            // Sorcery — {2}{U} (ShowAndTellFactory). Urza's Saga.
+            // "Each player may put an artifact, creature, enchantment, or
+            //  land card from their hand onto the battlefield."
+            // Card shape only at the dispatcher; the per-player resolve
+            // effect (iterate allPlayers, deterministic first-permanent
+            // pick + optional ZoneService routing so ETB triggers /
+            // replacements on the put-in permanent fire — CR 603.6a /
+            // CR 614) is built on demand via
+            // ShowAndTellFactory.BuildResolveEffect(allPlayers, zoneService,
+            // picker). Real "may"-decline + per-player permanent-choice
+            // prompt deferred (same queue as Stoneforge Mystic / Sun Titan).
+            "Show and Tell" => ShowAndTellFactory.Create(owner),
+
             // Creature — Human Soldier {1}{W} 2/2 (PuresteelPaladinFactory).
             // ETB-draw trigger: whenever an Equipment enters under controller's
             // control, draw a card (CR 603.1 — "you may" simplified to a
