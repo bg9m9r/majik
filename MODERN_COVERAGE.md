@@ -343,9 +343,9 @@ Sorted roughly by build priority (small infra lift × high meta share). Refreshe
 
 | # | Card | Difficulty | Blocker |
 |---|---|---|---|
-| 1 | Ponder | low | Sorcery {U} — look top 3, return to library in any order, may shuffle, draw. Pure library-manipulation template; needs `LookAtTopReorderThenOptionalShuffleThenDraw` template. |
+| ~~1~~ | ~~Ponder~~ | ~~low~~ | Shipped via `PonderFactory` — peek top 3 + agent-driven reorder (ScryDecision with empty ToBottom) + draw. "May shuffle" rider deferred (no `IZone.Shuffle` entry point yet). |
 | 2 | Brainstorm | low | Instant {U} — draw 3, put 2 back in any order. Existing `LookAtTopPutKInHand` doesn't cover the post-draw-replace shape; needs draw-then-return-N-to-top template. |
-| 3 | Preordain | low | Sorcery {U} — scry 2 then draw 1. Comment in `LibrarySpellFactory.cs:14` already names the shape; flip the stub on. |
+| ~~3~~ | ~~Preordain~~ | ~~low~~ | Shipped via `PreordainFactory` — scry 2 + draw 1 (delegates to standard `ScryAction` pipeline). The `LibrarySpellFactory.ScryNSpell` tail-detection path covers the same shape via the data-driven binder. |
 | 4 | Mystical Tutor | low | Instant {U} — search library for instant/sorcery, reveal, top. Tutor-to-top family exists in templates; needs filter-by-card-type restriction. |
 | 5 | Swords to Plowshares | low | Instant {W} — exile target creature, controller gains life equal to its power. ExileCreature + life-gain-by-power primitive missing the "by power" variable. |
 | 6 | Path to Exile | low | Instant {W} — exile target creature, controller may search for basic land tapped. ExileCreature exists; need conditional-search-basic-tapped rider on a different controller. |
