@@ -20,6 +20,8 @@ namespace Majik.Core.CardData.Definitions;
 [JsonDerivedType(typeof(DestroyTargetStubEffectDef), "destroy_target_stub")]
 [JsonDerivedType(typeof(GainLifeSelfEffectDef), "gain_life_self")]
 [JsonDerivedType(typeof(MillThenPickFirstMatchingToHandEffectDef), "mill_then_pick_first_matching_to_hand")]
+[JsonDerivedType(typeof(ConniveSelfEffectDef), "connive_self")]
+[JsonDerivedType(typeof(AmassSelfEffectDef), "amass_self")]
 public abstract class EffectDefinition { }
 
 /// <summary>Add N counters of the given type to a target permanent.
@@ -105,4 +107,35 @@ public sealed class MillThenPickFirstMatchingToHandEffectDef : EffectDefinition
 {
     public int Amount { get; set; } = 1;
     public List<string> MatchingTypes { get; set; } = new();
+}
+
+/// <summary>
+/// "Connive" applied to the source creature (CR 701.50). The source's
+/// controller draws a card, then discards a card; if the discarded card
+/// was nonland, a +1/+1 counter is placed on the source. Source must be
+/// a <see cref="Majik.Core.Cards.Creature"/>; otherwise the effect is a
+/// silent no-op. Uses the v1 deterministic discard-pick policy of
+/// <see cref="Majik.Core.Keywords.ConniveAction"/> (most-recent card in hand).
+/// <see cref="Amount"/> &gt; 1 repeats the routine that many times
+/// (the "Connive X" form).
+/// </summary>
+public sealed class ConniveSelfEffectDef : EffectDefinition
+{
+    public int Amount { get; set; } = 1;
+}
+
+/// <summary>
+/// "Amass [tribe] N" resolved for the source's controller (CR 701.49).
+/// If the controller has no Army on the battlefield, creates a 0/0
+/// black [tribe] Army creature token. Then puts N +1/+1 counters on
+/// an Army the controller controls (v1 auto-picks the first Army found
+/// on the battlefield). <see cref="Tribe"/> is the secondary creature
+/// subtype on the printed Amass card (e.g. "Zombie", "Orc", "Goblin").
+/// When the value resolves to <see cref="Majik.Core.Cards.Types.CardSubtype.Army"/>
+/// the created token has only the Army subtype.
+/// </summary>
+public sealed class AmassSelfEffectDef : EffectDefinition
+{
+    public int Amount { get; set; } = 1;
+    public string Tribe { get; set; } = "Zombie";
 }

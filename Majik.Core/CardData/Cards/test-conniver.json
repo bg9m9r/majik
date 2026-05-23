@@ -1,0 +1,17 @@
+{
+  "name": "Test Conniver",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Rogue"],
+  "manaCost": "{1}{U}",
+  "power": 1,
+  "toughness": 1,
+  "abilities": [
+    {
+      "kind": "triggered",
+      "trigger": { "type": "etb_self" },
+      "effects": [
+        { "type": "connive_self", "amount": 1 }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "name": "Lazotep Recruit",
+  "types": ["Creature"],
+  "subtypes": ["Zombie"],
+  "manaCost": "{1}{B}",
+  "power": 1,
+  "toughness": 1,
+  "abilities": [
+    {
+      "kind": "triggered",
+      "trigger": { "type": "etb_self" },
+      "effects": [
+        { "type": "amass_self", "amount": 1, "tribe": "Zombie" }
+      ]
+    }
+  ]
+}

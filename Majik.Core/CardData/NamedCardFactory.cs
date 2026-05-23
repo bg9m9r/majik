@@ -320,6 +320,30 @@ public static class NamedCardFactory
             // path here produces the correct card shape only.
             "Teferi, Time Raveler" => TeferiTimeRavelerFactory.Create(owner),
 
+            // Creature — Human Wizard {1}{U} 1/2 (LibrarySurveyorFactory).
+            // Synthetic Surveil keyword fixture. ETB: surveil 2 (CR 701.42).
+            // No printed Modern-legal Surveil card had a clean enough
+            // isolated trigger to ship inside the v1 keyword scope; this
+            // synthetic creature exercises the surveil_self effect path
+            // alongside the existing Underground Mortuary / Thundering
+            // Falls / Elegant Parlor surveil-lands.
+            "Library Surveyor" => LibrarySurveyorFactory.Create(owner),
+
+            // Creature — Human Rogue {1}{U} 1/1 (TestConniverFactory).
+            // Synthetic Connive keyword fixture. ETB: connive (CR 701.50).
+            // Draws + discards + +1/+1 counter if nonland was discarded.
+            // No printed Modern-legal Connive card had a clean enough
+            // isolated trigger — Ledger Shredder's second-spell-per-turn
+            // and Raffine's combat riders go beyond the v1 keyword scope.
+            "Test Conniver" => TestConniverFactory.Create(owner),
+
+            // Creature — Zombie {1}{B} 1/1 (LazotepRecruitFactory).
+            // Synthetic Amass keyword fixture (loosely modelled on the
+            // War of the Spark Lazotep cycle). ETB: amass Zombies 1
+            // (CR 701.49) — creates a 0/0 black Zombie Army token when
+            // the controller has no Army, then places a +1/+1 counter on it.
+            "Lazotep Recruit" => LazotepRecruitFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 

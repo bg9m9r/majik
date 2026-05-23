@@ -1,0 +1,17 @@
+{
+  "name": "Library Surveyor",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Wizard"],
+  "manaCost": "{1}{U}",
+  "power": 1,
+  "toughness": 2,
+  "abilities": [
+    {
+      "kind": "triggered",
+      "trigger": { "type": "etb_self" },
+      "effects": [
+        { "type": "surveil_self", "amount": 2 }
+      ]
+    }
+  ]
+}
