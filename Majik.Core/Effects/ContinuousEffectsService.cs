@@ -55,8 +55,25 @@ public sealed class ContinuousEffectsService
         // Seed printed subtypes; Layer 4 effects add/remove on top.
         foreach (var st in creature.Subtypes) chars.Subtypes.Add(st);
 
+        // CR 613.6 — pre-compute the set of creatures whose abilities have been
+        // stripped by an active Layer 6 ability-removing effect. We then drop
+        // any continuous effect whose Source is a stripped creature, since a
+        // creature with no abilities can no longer produce continuous effects
+        // (the dependency relationship between Layer 6 and Layer 7 under CR
+        // 613.8). The LoseAllAbilitiesEffect itself is exempt — it must keep
+        // applying so its own Apply() clears the affected creature's keywords.
+        //
+        // Source-suppression here is limited to creature sources: Source is
+        // typed as Permanent? but the stripped-set is HashSet<Creature>.
+        // Broader stripped-source tracking (e.g. type-changing-to-creature
+        // permanents) would require widening the typing of the stripped-set.
+        var stripped = ComputeStrippedSet();
+
         var applicable = _effects
             .Where(e => e.IsActive() && e.AppliesTo(creature))
+            .Where(e => e is LoseAllAbilitiesEffect
+                        || e.Source is not Creature src
+                        || !stripped.Contains(src))
             .ToList();
 
         // CR 613.8 — group by layer, then dependency-sort within each group.
@@ -83,6 +100,28 @@ public sealed class ContinuousEffectsService
         }
 
         return chars;
+    }
+
+    /// <summary>
+    /// Walk <see cref="_effects"/> once and collect every creature targeted
+    /// by an active <see cref="LoseAllAbilitiesEffect"/>. Used by Compute to
+    /// suppress effects sourced from stripped creatures WITHOUT re-entering
+    /// Compute (which would recurse indefinitely). Short-circuits to an empty
+    /// set when no LoseAllAbilitiesEffect is registered.
+    /// </summary>
+    private HashSet<Creature> ComputeStrippedSet()
+    {
+        var stripped = new HashSet<Creature>();
+        foreach (var e in _effects)
+        {
+            if (e is not LoseAllAbilitiesEffect strip) continue;
+            if (!strip.IsActive()) continue;
+            foreach (var c in strip.AffectedCreatures())
+            {
+                stripped.Add(c);
+            }
+        }
+        return stripped;
     }
 
     /// <summary>

@@ -26,6 +26,15 @@ public abstract class ContinuousEffect
     public DateTime Timestamp { get; } = DateTime.UtcNow;
 
     /// <summary>
+    /// CR 613.1g — the permanent generating this continuous effect, when one
+    /// exists. Null for floating effects (e.g. spell-resolution Giant Growth)
+    /// that have no on-battlefield source. The service uses this to suppress
+    /// effects whose source has had its abilities removed by a Humility-class
+    /// Layer 6 effect.
+    /// </summary>
+    public virtual Permanent? Source => null;
+
+    /// <summary>
     /// CR 613.8 — return true iff this effect depends on <paramref name="other"/>:
     /// applying <c>other</c> first would change this effect's existence, what it
     /// does, or the set of objects it applies to. Default: no dependency.

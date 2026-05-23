@@ -40,6 +40,9 @@ public sealed class LordStaticEffect : ContinuousEffect
 
     public override Layer Layer => Layer.PT_Modify;
 
+    /// <summary>CR 613.1g — the lord permanent generating this effect.</summary>
+    public override Permanent? Source => _source;
+
     public override bool IsActive() =>
         _source.Zone == Majik.Core.Zones.ZoneType.Battlefield;
 
