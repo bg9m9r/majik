@@ -2274,6 +2274,20 @@ public static class NamedCardFactory
             // delegates to WrathOfGodFactory.BuildResolveEffect.
             "Damnation" => DamnationFactory.Create(owner),
 
+            // Instant — {U}{B} (DrownInTheLochFactory). Throne of Eldraine.
+            // CR 700.2d — modal "Choose one" with two modes (counter target
+            // spell mv ≤ X / destroy target creature mv ≤ X). X is the
+            // largest mana value among cards in opponents' graveyards,
+            // computed at resolution time from
+            // ChosenSpellParams.AllPlayers. The single-arg dispatcher path
+            // produces the correct card shape; the bound SpellDefinition is
+            // built on demand via DrownInTheLochFactory.BuildDefinition(
+            // caster, targetResolver, stack). Mirrors ArchmagesCharm /
+            // CrypticCommand for the modal shape; mv-≤-X gate is enforced
+            // at resolution (CR 608.2b) since the engine's target prompt
+            // doesn't yet express "mana value X or less".
+            "Drown in the Loch" => DrownInTheLochFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
