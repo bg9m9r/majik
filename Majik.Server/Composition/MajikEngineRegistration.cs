@@ -83,11 +83,16 @@ public static class MajikEngineRegistration
         // ServerGameFactory takes ICardRepository so it can run the full binder
         // pipeline at game-start. Registered after ICardRepository so the DI
         // container can satisfy the constructor dependency.
+        // botDecisionLoggingEnabled propagates the same flag MatchService
+        // reads when deciding whether to compose a per-match
+        // SignalrBotDecisionSink — keeps the wire channel + stdout logger
+        // in lockstep instead of letting them drift apart.
         services.AddSingleton<ServerGameFactory>(sp =>
             new ServerGameFactory(
                 sp.GetRequiredService<GameRegistry>(),
                 sp.GetRequiredService<ICardRepository>(),
-                botDecisionSink: sp.GetService<IBotDecisionSink>()));
+                botDecisionSink: sp.GetService<IBotDecisionSink>(),
+                botDecisionLoggingEnabled: decisionLoggingEnabled));
 
         // Validate bot decks against ICardRepository at startup. Logs only;
         // never throws — keeps the server bootable even if a single bot

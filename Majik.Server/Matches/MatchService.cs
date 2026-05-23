@@ -1,3 +1,4 @@
+using Majik.Bot.Diagnostics;
 using Majik.Core.Api;
 using Majik.Core.Api.Commands;
 using Majik.Core.Api.Dtos;
@@ -264,11 +265,24 @@ public sealed class MatchService
                 Action<bool>? onBotThinking = hubForCallback != null
                     ? thinking => hubForCallback.PublishBotThinking(matchId, thinking)
                     : null;
+                // Per-match SignalR sink for bot decision diagnostics. Gated
+                // on the same flag the logger sink reads so wire + stdout
+                // toggle in lockstep. The sink captures matchId at
+                // construction; its lifetime is bounded by the facade —
+                // when the facade is deleted (Abandon / Concede / Timeout
+                // funnel through _gameFactory.Delete) the bot agent that
+                // holds the reference goes with it.
+                IBotDecisionSink? signalrSink = null;
+                if (_hub != null && _gameFactory.BotDecisionLoggingEnabled)
+                {
+                    signalrSink = new SignalrBotDecisionSink(matchId, _hub);
+                }
                 facade = _gameFactory.Create(
                     creator.Handle, botPlayer.Handle,
                     creatorDeck, botDeck,
                     botSeatArchetype: bot.Archetype,
-                    onBotThinking: onBotThinking);
+                    onBotThinking: onBotThinking,
+                    extraDecisionSink: signalrSink);
                 // Wire the engine→SignalR bridge before any engine work
                 // can fire events (StartFullGameAsync happens later). The
                 // bridge holds the IDisposable subscriptions; teardown
