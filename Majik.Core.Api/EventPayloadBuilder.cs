@@ -3,8 +3,10 @@ using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Domain.DomainEvents;
 using Majik.Core.Events;
+using Majik.Core.Players;
 using Majik.Core.Spells;
 using Majik.Core.Stack;
+using Majik.Core.Zones;
 
 namespace Majik.Core.Api;
 
@@ -17,6 +19,18 @@ namespace Majik.Core.Api;
 /// Unknown event types fall back to an empty payload; the client still
 /// receives <c>Type</c> + <c>EventId</c> on the envelope so future
 /// payload additions are non-breaking.
+///
+/// CR 706 hidden information: <see cref="CardMovedEvent"/> and
+/// <see cref="CardDrawnEvent"/> sometimes describe a move between zones
+/// that are hidden to a viewer (library / hand). The
+/// <see cref="Build(GameEvent, Player)"/> overload masks card identity
+/// for non-owner viewers when BOTH the source and destination zones are
+/// hidden to opponents (Hand or Library) — i.e. the card was never
+/// publicly visible at the time of the move. Any other transition
+/// (movement that touches Battlefield, Graveyard, Exile, or Stack on
+/// either side) reveals the card because the identity was already public
+/// at the time of the move. The full-reveal overload (<c>viewer = null</c>)
+/// keeps spectator / debug snapshot behavior.
 /// </summary>
 public static class EventPayloadBuilder
 {
@@ -25,21 +39,22 @@ public static class EventPayloadBuilder
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
     };
 
-    public static JsonElement Build(GameEvent e) => e switch
+    /// <summary>Full-reveal payload (no viewer scoping). Used for the
+    /// spectator broadcast and any consumer outside the per-recipient
+    /// SignalR routing path.</summary>
+    public static JsonElement Build(GameEvent e) => Build(e, viewer: null);
+
+    /// <summary>Viewer-scoped payload. <paramref name="viewer"/> = null
+    /// means full reveal (spectator). Non-null applies CR 706 masking
+    /// rules to <see cref="CardMovedEvent"/> / <see cref="CardDrawnEvent"/>;
+    /// the rest of the payload set is public and ignores the viewer.</summary>
+    public static JsonElement Build(GameEvent e, Player? viewer) => e switch
     {
-        CardMovedEvent x => Serialize(new
-        {
-            cardId = x.Card.InstanceId,
-            cardName = x.Card.Name,
-            from = x.FromZone.ToString(),
-            to = x.ToZone.ToString(),
-        }),
-        CardDrawnEvent x => Serialize(new
-        {
-            cardId = x.Card.InstanceId,
-            cardName = x.Card.Name,
-            playerId = x.Player.Id,
-        }),
+        CardMovedEvent x => BuildCardMoved(x, viewer),
+        CardDrawnEvent x => BuildCardDrawn(x, viewer),
+        // CardRevealedEvent: hand-reveal effects (CR 701.16) are public
+        // by definition — the controller chose to show the card to all
+        // players. No per-viewer masking required.
         CardRevealedEvent x => Serialize(new
         {
             cardId = x.Card.InstanceId,
@@ -144,6 +159,91 @@ public static class EventPayloadBuilder
         GameStartedEvent => Empty(),
         _ => Empty(),
     };
+
+    /// <summary>True iff <paramref name="e"/>'s payload varies per viewer
+    /// (CR 706). Bridge code uses this to decide between group broadcast
+    /// and per-recipient publish — group fan-out of a payload that masks
+    /// for some viewers but not others would leak the unmasked variant
+    /// to the wrong seat.</summary>
+    public static bool RequiresPerViewerMasking(GameEvent e) => e switch
+    {
+        CardMovedEvent x => BothZonesHidden(x.FromZone, x.ToZone),
+        CardDrawnEvent => true, // library → hand: always both hidden
+        _ => false,
+    };
+
+    private static JsonElement BuildCardMoved(CardMovedEvent x, Player? viewer)
+    {
+        var ownerId = x.Card.Owner?.Id;
+        bool mask = ShouldMaskCardForViewer(viewer, ownerId, x.FromZone, x.ToZone);
+
+        if (mask)
+        {
+            return Serialize(new
+            {
+                ownerId,
+                from = x.FromZone.ToString(),
+                to = x.ToZone.ToString(),
+                hidden = true,
+            });
+        }
+
+        return Serialize(new
+        {
+            cardId = x.Card.InstanceId,
+            cardName = x.Card.Name,
+            ownerId,
+            manaCost = x.Card.ManaCost,
+            types = x.Card.CardTypes.Select(t => t.ToString()).ToList(),
+            from = x.FromZone.ToString(),
+            to = x.ToZone.ToString(),
+        });
+    }
+
+    private static JsonElement BuildCardDrawn(CardDrawnEvent x, Player? viewer)
+    {
+        var ownerId = x.Player.Id;
+        // Library → Hand is always hidden→hidden. Owner sees the card;
+        // opponent gets count-only.
+        bool mask = viewer != null && viewer.Id != ownerId;
+
+        if (mask)
+        {
+            return Serialize(new
+            {
+                playerId = ownerId,
+                hidden = true,
+            });
+        }
+
+        return Serialize(new
+        {
+            cardId = x.Card.InstanceId,
+            cardName = x.Card.Name,
+            playerId = ownerId,
+            manaCost = x.Card.ManaCost,
+            types = x.Card.CardTypes.Select(t => t.ToString()).ToList(),
+        });
+    }
+
+    private static bool ShouldMaskCardForViewer(Player? viewer, Guid? ownerId, ZoneType from, ZoneType to)
+    {
+        // Spectator / full-reveal view: never mask.
+        if (viewer == null) return false;
+        // Owner sees their own private zones.
+        if (ownerId.HasValue && viewer.Id == ownerId.Value) return false;
+        // Non-owner: mask only when BOTH zones are hidden information
+        // (Hand or Library). Any transition that touches a public zone
+        // reveals the card identity — it was already visible to the
+        // opponent at the time of the move.
+        return BothZonesHidden(from, to);
+    }
+
+    private static bool BothZonesHidden(ZoneType a, ZoneType b)
+        => IsHiddenZone(a) && IsHiddenZone(b);
+
+    private static bool IsHiddenZone(ZoneType z) =>
+        z == ZoneType.Library || z == ZoneType.Hand;
 
     private static JsonElement Serialize<T>(T value)
         => JsonSerializer.SerializeToElement(value, Opts);

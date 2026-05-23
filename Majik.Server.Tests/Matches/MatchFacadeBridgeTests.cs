@@ -67,6 +67,17 @@ public class MatchFacadeBridgeTests
         At: DateTime.UtcNow,
         Payload: JsonDocument.Parse("""{"hello":"world"}""").RootElement.Clone());
 
+    private static EventDto FakeEvent(string type, string payloadJson) => new(
+        EventId: Guid.NewGuid(),
+        Type: type,
+        At: DateTime.UtcNow,
+        Payload: JsonDocument.Parse(payloadJson).RootElement.Clone());
+
+    private static MatchFacadeBridge.PromptRouting DefaultRouting(
+        Guid aliceId, Guid bobId,
+        string creatorSub = "creator-sub", string opponentSub = "opponent-sub")
+        => new(aliceId, bobId, creatorSub, opponentSub);
+
     // -----------------------------------------------------------------------
     // 1. End-to-end against a real GameFacade
     // -----------------------------------------------------------------------
@@ -139,17 +150,84 @@ public class MatchFacadeBridgeTests
         var hub = new CaptureHub();
         var bridge = BuildBridge(hub);
         var matchId = Guid.NewGuid();
-        var evt = FakeEvent("CardDrawnEvent");
+        var aliceId = Guid.NewGuid();
+        var bobId = Guid.NewGuid();
+        var evt = FakeEvent("TurnStartedEvent");
+        var envelope = new EventEnvelope(evt, PerPlayer: null);
 
-        bridge.ForwardEvent(matchId, evt);
+        bridge.ForwardEvent(matchId, envelope, DefaultRouting(aliceId, bobId));
 
         hub.Group.Should().ContainSingle();
         hub.Group[0].MatchId.Should().Be(matchId);
         hub.Group[0].Event.Should().Be("event");
         hub.Group[0].Payload.Should().BeSameAs(evt);
-        // Group fan-out goes to ALL connections in the match group —
-        // there's no per-viewer masking on this channel.
+        // Envelope.PerPlayer == null → group fan-out, no per-recipient
+        // routing on this channel.
         hub.PerRecipient.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void ForwardEvent_PerPlayerEnvelope_RoutesPerRecipient_NoGroupFanout()
+    {
+        // CR 706: when the envelope carries per-player variants, each
+        // seated sub receives ITS OWN payload via PublishPerRecipient —
+        // never the other seat's variant. Group fan-out is bypassed
+        // entirely so the unmasked variant can't leak.
+        var hub = new CaptureHub();
+        var bridge = BuildBridge(hub);
+        var matchId = Guid.NewGuid();
+        var aliceId = Guid.NewGuid();
+        var bobId = Guid.NewGuid();
+
+        var aliceView = FakeEvent("CardDrawnEvent", $$"""{"playerId":"{{aliceId}}","cardName":"Bolt"}""");
+        var bobView = FakeEvent("CardDrawnEvent", $$"""{"playerId":"{{aliceId}}","hidden":true}""");
+        var publicView = FakeEvent("CardDrawnEvent", $$"""{"playerId":"{{aliceId}}","cardName":"Bolt"}""");
+
+        var envelope = new EventEnvelope(
+            publicView,
+            new Dictionary<Guid, EventDto> { [aliceId] = aliceView, [bobId] = bobView });
+
+        bridge.ForwardEvent(matchId, envelope, DefaultRouting(aliceId, bobId));
+
+        hub.Group.Should().BeEmpty();
+        hub.PerRecipient.Should().HaveCount(2);
+        // Creator (Alice's seat) sees the unmasked Alice view.
+        var creatorCall = hub.PerRecipient.Single(c => c.RecipientSub == "creator-sub");
+        creatorCall.Payload.Should().BeSameAs(aliceView);
+        // Opponent (Bob's seat) sees the masked Bob view — never Alice's.
+        var opponentCall = hub.PerRecipient.Single(c => c.RecipientSub == "opponent-sub");
+        opponentCall.Payload.Should().BeSameAs(bobView);
+        opponentCall.Payload.Should().NotBeSameAs(aliceView);
+    }
+
+    [Fact]
+    public void ForwardEvent_PerPlayerEnvelope_SkipsBotRecipient()
+    {
+        // Bot seats have no SignalR connection — sending the per-recipient
+        // event to "bot:*" is pointless. We must not skip the human seat
+        // though, so a bot vs human match still gets the hidden-info
+        // event delivered to the human player.
+        var hub = new CaptureHub();
+        var bridge = BuildBridge(hub);
+        var matchId = Guid.NewGuid();
+        var aliceId = Guid.NewGuid();
+        var bobId = Guid.NewGuid();
+        var routing = DefaultRouting(aliceId, bobId, creatorSub: "creator-sub", opponentSub: "bot:archer");
+
+        var aliceView = FakeEvent("CardDrawnEvent", $$"""{"playerId":"{{aliceId}}","cardName":"Bolt"}""");
+        var bobView = FakeEvent("CardDrawnEvent", $$"""{"playerId":"{{aliceId}}","hidden":true}""");
+        var publicView = aliceView;
+
+        var envelope = new EventEnvelope(
+            publicView,
+            new Dictionary<Guid, EventDto> { [aliceId] = aliceView, [bobId] = bobView });
+
+        bridge.ForwardEvent(matchId, envelope, routing);
+
+        hub.Group.Should().BeEmpty();
+        hub.PerRecipient.Should().ContainSingle();
+        hub.PerRecipient[0].RecipientSub.Should().Be("creator-sub");
+        hub.PerRecipient[0].Payload.Should().BeSameAs(aliceView);
     }
 
     [Fact]
@@ -510,9 +588,12 @@ public class MatchFacadeBridgeTests
         var hub = new CaptureHub();
         var bridge = BuildBridgeWithReplay(hub, out var replay);
         var matchId = Guid.NewGuid();
+        var aliceId = Guid.NewGuid();
+        var bobId = Guid.NewGuid();
         var evt = FakeEvent("CardDrawnEvent");
+        var envelope = new EventEnvelope(evt, PerPlayer: null);
 
-        bridge.ForwardEvent(matchId, evt);
+        bridge.ForwardEvent(matchId, envelope, DefaultRouting(aliceId, bobId));
 
         // Live broadcast unchanged — replay capture is a side-channel.
         hub.Group.Should().ContainSingle();
@@ -533,8 +614,11 @@ public class MatchFacadeBridgeTests
         var hub = new CaptureHub();
         var bridge = BuildBridgeWithReplay(hub, out var replay);
         var matchId = Guid.NewGuid();
+        var aliceId = Guid.NewGuid();
+        var bobId = Guid.NewGuid();
+        var routing = DefaultRouting(aliceId, bobId);
 
-        bridge.ForwardEvent(matchId, FakeEvent("TurnStartedEvent"));
+        bridge.ForwardEvent(matchId, new EventEnvelope(FakeEvent("TurnStartedEvent"), PerPlayer: null), routing);
         replay.GetReplay(matchId)!.SealedAt.Should().BeNull();
 
         bridge.Detach(matchId);
@@ -543,7 +627,7 @@ public class MatchFacadeBridgeTests
         dto.SealedAt.Should().NotBeNull("Detach seals the buffer so finished matches stop accepting writes");
 
         // Writes after Detach are dropped from the replay log.
-        bridge.ForwardEvent(matchId, FakeEvent("LateEvent"));
+        bridge.ForwardEvent(matchId, new EventEnvelope(FakeEvent("LateEvent"), PerPlayer: null), routing);
         replay.GetReplay(matchId)!.EntryCount.Should().Be(1);
     }
 
@@ -555,10 +639,11 @@ public class MatchFacadeBridgeTests
         var hub = new CaptureHub();
         var bridge = new MatchFacadeBridge(hub, NullLogger<MatchFacadeBridge>.Instance, replay: null);
         var matchId = Guid.NewGuid();
+        var routing = DefaultRouting(Guid.NewGuid(), Guid.NewGuid());
 
         var act = () =>
         {
-            bridge.ForwardEvent(matchId, FakeEvent("X"));
+            bridge.ForwardEvent(matchId, new EventEnvelope(FakeEvent("X"), PerPlayer: null), routing);
             bridge.Detach(matchId);
         };
         act.Should().NotThrow();

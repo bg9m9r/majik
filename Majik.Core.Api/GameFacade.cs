@@ -49,6 +49,7 @@ public sealed class GameFacade
     private Task? _loopTask;
     private Task<GameDriver.GameResult>? _fullGameTask;
     private readonly List<Action<EventDto>> _subscribers = new();
+    private readonly List<Action<EventEnvelope>> _envelopeSubscribers = new();
     private readonly ActionLog _log = new();
 
     // Synchronization signal that pulses every time an agent registers a
@@ -521,11 +522,28 @@ public sealed class GameFacade
 
     /// <summary>
     /// Stream events. Returned <see cref="IDisposable"/> unsubscribes.
+    /// Receives the public / full-reveal <see cref="EventDto"/>; use
+    /// <see cref="SubscribeEnvelopes"/> when you need access to the
+    /// per-player masked variants for CR 706 hidden-information events.
     /// </summary>
     public IDisposable Subscribe(Action<EventDto> handler)
     {
         _subscribers.Add(handler);
         return new Subscription(() => _subscribers.Remove(handler));
+    }
+
+    /// <summary>
+    /// Stream <see cref="EventEnvelope"/>s — same firing cadence as
+    /// <see cref="Subscribe(Action{EventDto})"/> but the handler receives
+    /// the full envelope (public payload + optional per-player overrides).
+    /// Used by <c>MatchFacadeBridge</c> so it can route per-recipient
+    /// publishes for events that mask card identity (CR 706).
+    /// </summary>
+    public IDisposable SubscribeEnvelopes(Action<EventEnvelope> handler)
+    {
+        ArgumentNullException.ThrowIfNull(handler);
+        _envelopeSubscribers.Add(handler);
+        return new Subscription(() => _envelopeSubscribers.Remove(handler));
     }
 
     /// <summary>
@@ -552,15 +570,46 @@ public sealed class GameFacade
 
     private void BridgeEvent(GameEvent e)
     {
-        var dto = new EventDto(
+        var type = e.GetType().Name;
+        var publicDto = new EventDto(
             EventId: e.EventId,
-            Type: e.GetType().Name,
+            Type: type,
             At: e.Timestamp,
-            Payload: EventPayloadBuilder.Build(e));
+            Payload: EventPayloadBuilder.Build(e, viewer: null));
+
+        IReadOnlyDictionary<Guid, EventDto>? perPlayer = null;
+        if (EventPayloadBuilder.RequiresPerViewerMasking(e))
+        {
+            // Build a payload per seated player. Same EventId / Type /
+            // timestamp on each variant — only the inner payload differs.
+            // Spectators receive the public DTO via the legacy
+            // Subscribe(Action<EventDto>) channel; the bridge picks up
+            // the per-player variants from the envelope and routes them
+            // through PublishPerRecipient.
+            perPlayer = new Dictionary<Guid, EventDto>
+            {
+                [_alice.Id] = new EventDto(
+                    EventId: e.EventId,
+                    Type: type,
+                    At: e.Timestamp,
+                    Payload: EventPayloadBuilder.Build(e, _alice)),
+                [_bob.Id] = new EventDto(
+                    EventId: e.EventId,
+                    Type: type,
+                    At: e.Timestamp,
+                    Payload: EventPayloadBuilder.Build(e, _bob)),
+            };
+        }
+
+        var envelope = new EventEnvelope(publicDto, perPlayer);
 
         foreach (var sub in _subscribers.ToList())
         {
-            sub(dto);
+            sub(publicDto);
+        }
+        foreach (var sub in _envelopeSubscribers.ToList())
+        {
+            sub(envelope);
         }
     }
 

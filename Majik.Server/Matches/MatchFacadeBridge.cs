@@ -15,14 +15,19 @@ namespace Majik.Server.Matches;
 ///
 /// <list type="bullet">
 ///   <item><description>
-///     <c>facade.Subscribe(EventDto)</c> — forwarded to the
-///     <c>"event"</c> channel as a group broadcast. <see cref="EventDto"/>
-///     carries the engine's public game events; opponent-hidden info
-///     (CR 706 hand / library contents) is never embedded directly in
-///     these payloads, so group fan-out is safe. If a future event needs
-///     per-viewer masking, route it through
-///     <see cref="IMatchHubPublisher.PublishPerRecipient"/> from the
-///     producer instead of widening the bridge contract.
+///     <c>facade.SubscribeEnvelopes(EventEnvelope)</c> — forwarded to
+///     the <c>"event"</c> channel. The envelope carries the
+///     full-reveal <see cref="EventDto"/> in <see cref="EventEnvelope.Public"/>
+///     and, for CR 706 hidden-information events (e.g. card moves
+///     between hand / library, draws), per-player masked variants in
+///     <see cref="EventEnvelope.PerPlayer"/>. When per-player variants
+///     are present the bridge calls
+///     <see cref="IMatchHubPublisher.PublishPerRecipient"/> so each seat
+///     receives ONLY its own scoped payload — group fan-out is bypassed
+///     entirely to avoid leaking the unmasked variant to the opponent.
+///     For purely public events PerPlayer is null and the bridge falls
+///     through to a single group broadcast (cheaper than two
+///     per-recipient sends).
 ///   </description></item>
 ///   <item><description>
 ///     <c>facade.SubscribePrompts(PromptDto)</c> — forwarded to the
@@ -115,7 +120,7 @@ public sealed class MatchFacadeBridge
 
         var routing = new PromptRouting(facade.Alice.Id, facade.Bob.Id, creatorSub, opponentSub);
 
-        IDisposable eventSub = facade.Subscribe(evt => ForwardEvent(matchId, evt));
+        IDisposable eventSub = facade.SubscribeEnvelopes(env => ForwardEvent(matchId, env, routing));
         IDisposable promptSub = facade.SubscribePrompts(prompt => ForwardPrompt(matchId, prompt, routing));
 
         var attachment = new Attachment(eventSub, promptSub);
@@ -223,27 +228,75 @@ public sealed class MatchFacadeBridge
     }
 
     // Event-handler core — internal so unit tests can drive forwarding
-    // without standing up a full engine. Producing a real EventDto from
+    // without standing up a full engine. Producing real envelopes from
     // the engine requires a game loop; isolating the routing here lets
-    // the test inject a synthesized DTO and assert the resulting hub
-    // publish.
-    internal void ForwardEvent(Guid matchId, EventDto evt)
+    // the test inject a synthesized envelope and assert the resulting
+    // hub publish.
+    //
+    // Routing:
+    //   * envelope.PerPlayer == null  → group broadcast on "event".
+    //     The payload is identical for every viewer, so a single fan-out
+    //     is correct and cheaper than two per-recipient sends.
+    //   * envelope.PerPlayer != null  → per-recipient publish, mapping
+    //     each seated sub (creator + opponent) to its viewer-scoped
+    //     EventDto. CR 706 hidden-info events (CardMovedEvent /
+    //     CardDrawnEvent into a hidden zone) take this path so the
+    //     unmasked variant never reaches the opponent.
+    internal void ForwardEvent(Guid matchId, EventEnvelope envelope, PromptRouting routing)
     {
         // Capture BEFORE publish so a hub-publish fault doesn't lose the
         // record from the replay log. Capture is best-effort — the buffer
         // swallows its own exceptions, so the live broadcast can't be
-        // perturbed by a replay-side failure.
-        _replay?.RecordEvent(matchId, evt);
+        // perturbed by a replay-side failure. The replay buffer stores
+        // the full-reveal Public variant — replay is a spectator surface
+        // (no per-viewer masking), matching the StateSnapshotter
+        // viewer == null path used by GET /matches/{id}/replay.
+        _replay?.RecordEvent(matchId, envelope.Public);
 
         try
         {
-            _hub.Publish(matchId, "event", evt);
+            if (envelope.PerPlayer == null)
+            {
+                _hub.Publish(matchId, "event", envelope.Public);
+                return;
+            }
+
+            var recipients = new List<string>(capacity: 2);
+            if (!string.IsNullOrEmpty(routing.CreatorSub)
+                && !routing.CreatorSub.StartsWith("bot:", StringComparison.Ordinal))
+            {
+                recipients.Add(routing.CreatorSub);
+            }
+            if (!string.IsNullOrEmpty(routing.OpponentSub)
+                && !routing.OpponentSub.StartsWith("bot:", StringComparison.Ordinal))
+            {
+                recipients.Add(routing.OpponentSub);
+            }
+
+            if (recipients.Count == 0) return;
+
+            _hub.PublishPerRecipient(
+                matchId,
+                "event",
+                recipients,
+                sub =>
+                {
+                    var playerId = routing.ResolvePlayerIdForSub(sub);
+                    if (playerId.HasValue && envelope.PerPlayer.TryGetValue(playerId.Value, out var dto))
+                    {
+                        return dto;
+                    }
+                    // Fall back to the public variant if routing can't
+                    // map the recipient — better than dropping the event
+                    // and leaving the UI stuck on a stale snapshot.
+                    return envelope.Public;
+                });
         }
         catch (Exception ex)
         {
             _logger.LogError(ex,
                 "MatchFacadeBridge: failed to forward EventDto. MatchId={MatchId} EventType={EventType}",
-                matchId, evt.Type);
+                matchId, envelope.Public.Type);
         }
     }
 
@@ -305,6 +358,16 @@ public sealed class MatchFacadeBridge
         {
             if (playerId == AliceId) return CreatorSub;
             if (playerId == BobId) return OpponentSub;
+            return null;
+        }
+
+        /// <summary>Reverse mapping used by per-recipient event routing —
+        /// the publish callback receives a recipient sub and needs to
+        /// pick the matching per-player EventDto out of the envelope.</summary>
+        public Guid? ResolvePlayerIdForSub(string sub)
+        {
+            if (sub == CreatorSub) return AliceId;
+            if (sub == OpponentSub) return BobId;
             return null;
         }
     }
