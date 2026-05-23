@@ -3,13 +3,13 @@
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
 **Last updated:** 2026-05-24
-**Latest origin/main:** 6d87f59 (Subtlety + Karn Liberated + Up the Beanstalk) + Urza Tron lands + Amulet of Vigor (this PR)
+**Latest origin/main:** 6d87f59 (Subtlety + Karn Liberated + Up the Beanstalk + Urza Tron + Amulet of Vigor) + Primeval Titan (this PR)
 
 ## Headline numbers
 
 | Metric | Count |
 |---|---|
-| Named factories | 70 |
+| Named factories | 71 |
 | Bespoke templates | 26 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
@@ -65,6 +65,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Orcish Bowmasters | Creature | — | reactive ping shell |
 | Pithing Needle | Artifact | #189 | name-targeted activated suppression |
 | Priest of Fell Rites | Creature | #196 | ETB reanimate + grave-unearth |
+| Primeval Titan | Creature | TBD | Trample + ETB/attack tutor up to 2 lands tapped |
 | Rift Bolt | Sorcery | #183 | suspend → 3 damage |
 | Scavenging Ooze | Creature | #188 | exile-graveyard + counter + life |
 | Sea's Claim | Aura | #160 | enchanted land becomes Island |
@@ -286,7 +287,7 @@ Per-keyword action helpers under `Majik.Core/Keywords/`:
 - **Rakdos Scam** — Mid-high. Grief done (#205, mirrors Solitude evoke + ETB pattern). Fury done (mirrors Solitude/Grief). Dauthi Voidwalker absent. Liliana of the Veil done, Fatal Push done, Thoughtseize done. ~55%.
 - **Yawgmoth combo** — Mid. Yawgmoth done. Undying creatures (Young Wolf, Strangleroot Geist, Geralf's Messenger) done. Chord of Calling, Eldritch Evolution absent. ~50%.
 - **Domain Zoo** — Low-mid. Boros Charm done, fetches done, shocks done. Scion of Draco, Territorial Kavu, Tribal Flames absent. ~25%.
-- **Amulet Titan** — Low. Amulet of Vigor done (#TBD — untap-on-enters-tapped trigger). No Primeval Titan, no bounce lands. ~10%.
+- **Amulet Titan** — Mid. Amulet of Vigor done (untap-on-enters-tapped trigger) + Primeval Titan done (ETB + attack land-tutor for up to 2, tapped). No bounce lands. ~30%.
 - **Hammer Time / Equipment** — Low-mid. Stoneforge Mystic done. Sigarda's Aid, Colossus Hammer, Puresteel Paladin absent. ~20%.
 
 ## Top 20 Modern staples NOT yet implemented
@@ -299,7 +300,6 @@ Sorted by build priority (small infra lift × high meta share).
 | 2 | Crashing Footfalls | High | Suspend done (#183), but cascade trigger on suspend-cast missing |
 | 3 | Living End | High | Cascade + mass-exile-grave + simultaneous mass-reanimate (#174 ready for the latter) |
 | 4 | Cascade keyword | High | Triggered "cast for free from top reveal" — alt-cast-from-library framework |
-| 5 | Primeval Titan | Mid | Attack/ETB triggers + land tutor; tutor template exists |
 
 ## How to update this doc
 

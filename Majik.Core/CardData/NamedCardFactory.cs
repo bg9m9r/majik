@@ -626,6 +626,20 @@ public static class NamedCardFactory
             // of SearchSpellFactory).
             "Sylvan Scrying" => SylvanScryingFactory.Create(owner),
 
+            // Creature — Giant {4}{G}{G} 6/6 (PrimevalTitanFactory).
+            // Trample keyword wired. ETB + attack triggered abilities both
+            // tutor up to two lands → battlefield tapped (CR 603.1, CR
+            // 508.1f, CR 701.19a). "Up to two" composes the existing single-
+            // land tutor primitive twice — the agent picks zero or one land
+            // per slot (decline returns null, CR 701.19a). The single-arg
+            // dispatcher path uses the agent-driven default selector and
+            // does NOT register the triggers with a TriggerManager. Use the
+            // (owner, triggers, selector) overload for fully-wired trigger
+            // registration or deterministic test selectors. Library shuffle
+            // deferred (no IZone.Shuffle entry point yet — same rationale
+            // as SearchSpellFactory).
+            "Primeval Titan" => PrimevalTitanFactory.Create(owner),
+
             // Land — Urza's Mine (Antiquities, Urza Tron cycle).
             // {T}: Add {C}. If controller controls an Urza's Mine, an
             // Urza's Power-Plant, AND an Urza's Tower, add {2} instead.
