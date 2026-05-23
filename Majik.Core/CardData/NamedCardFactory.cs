@@ -752,6 +752,18 @@ public static class NamedCardFactory
             // automatic per-turn budget reset on TurnStartedEvent.
             "Lurrus of the Dream-Den" => LurrusOfTheDreamDenFactory.Create(owner),
 
+            // Artifact — {1} (AetherVialFactory). Darksteel.
+            // Upkeep trigger: add a charge counter (v1 auto-accept). {T}:
+            // put a creature card from hand with mv = charge counters
+            // onto the battlefield (v1 deterministic first match,
+            // auto-accept on "you may"). The single-arg dispatcher path
+            // attaches both abilities to the card shape without
+            // TriggerManager registration or ZoneService routing; use
+            // the (owner, zoneService, eventBus, triggers) overload for
+            // bus-driven upkeep firing and ETB-trigger routing on the
+            // placed creature (CR 603.6a).
+            "Aether Vial" => AetherVialFactory.Create(owner),
+
             // Artifact — Equipment {1} (ColossusHammerFactory).
             // Static "equipped creature gets +10/+0 and loses flying" via
             // AttachedBoostEffect (Layer 7c) + LoseKeywordEffect("Flying")

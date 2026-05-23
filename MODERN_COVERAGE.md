@@ -2,14 +2,14 @@
 
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
-**Last updated:** 2026-05-25
-**Latest origin/main:** 6aeb85c (… + Primeval Titan + Karn, the Great Creator + Crashing Footfalls / Cascade) + Lurrus of the Dream-Den (this PR)
+**Last updated:** 2026-05-23
+**Latest origin/main:** ceebf02 (… + Lurrus of the Dream-Den + Colossus Hammer + Sigarda's Aid + Living End + Phyrexian Tower + Puresteel Paladin) + Aether Vial (this PR)
 
 ## Headline numbers
 
 | Metric | Count |
 |---|---|
-| Named factories | 73 |
+| Named factories | 83 |
 | Bespoke templates | 26 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
@@ -26,6 +26,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 
 | Card | Type | PR | Note |
 |---|---|---|---|
+| Aether Vial | Artifact | TBD | upkeep charge counter + {T} put creature from hand with mv = counters |
 | Agatha's Soul Cauldron | Artifact | — | activated counter-share |
 | Amulet of Vigor | Artifact | TBD | untap-on-enters-tapped trigger |
 | Ancient Stirrings | Sorcery | #201 | top-5 colorless reveal + random-bottom |
@@ -72,6 +73,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Phyrexian Tower | Land | — | {T}: {C} + {T}, sac creature: {B}{B} (Legendary) |
 | Priest of Fell Rites | Creature | #196 | ETB reanimate + grave-unearth |
 | Primeval Titan | Creature | TBD | Trample + ETB/attack tutor up to 2 lands tapped |
+| Puresteel Paladin | Creature | TBD | Equipment-ETB draw trigger + zero-equip-cost on ≥3 artifacts |
 | Rift Bolt | Sorcery | #183 | suspend → 3 damage |
 | Scavenging Ooze | Creature | #188 | exile-graveyard + counter + life |
 | Sea's Claim | Aura | #160 | enchanted land becomes Island |
@@ -299,6 +301,8 @@ Per-keyword action helpers under `Majik.Core/Keywords/`:
 - **Amulet Titan** — Mid. Amulet of Vigor done (untap-on-enters-tapped trigger) + Primeval Titan done (ETB + attack land-tutor for up to 2, tapped). No bounce lands. ~30%.
 - **Lurrus Companion** — Low-mid. Lurrus of the Dream-Den done (Lifelink + once-per-turn cast-permanent-mv≤2-from-graveyard; companion deck-construction rule deferred). Pairs with the existing low-mv permanent suite (Mishra's Bauble, Dryad Arbor, Stoneforge Mystic, Walking Ballista, Dark Confidant, etc.). Deck-construction enforcement absent. ~30%.
 - **Hammer Time / Equipment** — Mid-high. Stoneforge Mystic done. Colossus Hammer done (+10/+0 + lose flying via AttachedBoostEffect + new LoseKeywordEffect). Sigarda's Aid done (flash-grant on Equipment/Aura via FlashGrantRegistry + ETB-attach rider). Puresteel Paladin done (Equipment-ETB draw trigger + zero-equip-cost lifecycle binder that gates on ≥3 artifacts; equip-cost consumer wires up when an `EquipActivatedAbility` primitive lands). ~50%.
+- **Merfolk** — Low. Aether Vial done (mana-free creature-cheater that's the deck's engine). Spreading Seas done. Lord of Atlantis, Master of the Pearl Trident, Silvergill Adept, Cursecatcher, Merfolk Trickster absent. ~20%.
+- **Death and Taxes** — Low-mid. Aether Vial done (mana-free creature drop — the deck's signature). Stoneforge Mystic done. Solitude done. Thalia, Guardian of Thraben + Skyclave Apparition + Leonin Arbiter absent. ~30%.
 
 ## Top 20 Modern staples NOT yet implemented
 
