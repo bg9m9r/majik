@@ -3,13 +3,13 @@
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
 **Last updated:** 2026-05-23
-**Latest origin/main:** `3a16c24` — Pyromancer's Goggles on top of Plague Engineer + Manabarbs + Yawgmoth's Will + Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere. Top 20 list refreshed (round 2). Sythis, Harvest's Hand added in this PR.
+**Latest origin/main:** `3a16c24` — Splinter Twin on top of Pyromancer's Goggles + Plague Engineer + Manabarbs + Sythis, Harvest's Hand + Yawgmoth's Will + Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere. Top 20 list refreshed (round 2).
 
 ## Headline numbers
 
 | Metric | Count |
 |---|---|
-| Named factories | 117 |
+| Named factories | 118 |
 | Bespoke templates | 27 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
@@ -106,6 +106,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Snapcaster Mage | Creature | #170 | flash + ETB flashback grant |
 | Solitude | Creature | — | evoke pitch + ETB exile |
 | Spell Snare | Instant | TBD | counter target spell with mana value 2 (resolution-time MV sample, CR 202.3 / 608.2b) |
+| Splinter Twin | Aura | TBD | {2}{R}{R} Aura — grant-activated-ability-on-attach via AttachedAuraAbilityGrantStaticEffect; bearer gains `{T}: create haste token copy + exile EOT` while attached; revoked on aura LTB. v1 token snapshots bearer name/printed P/T/subtypes/keywords at activation (no live CopyEffect). Delayed end-step exile registered as a DelayedTriggeredAbility when a TriggerManager is wired |
 | Spreading Seas | Aura | #160 | retype land + draw |
 | Spymaster's Vault | Land | — | B-source shell |
 | Stoneforge Mystic | Creature | #184 | ETB tutor + activated put |
@@ -365,7 +366,6 @@ Sorted roughly by build priority (small infra lift × high meta share). Refreshe
 | 18 | Daze | low | Instant {1}{U} — counter unless pay {1}; alt cost {0} + return an Island you control. Counter-unless-pay exists; needs alt-cost with non-mana additional cost (bounce-self-permanent), composable with `PitchAlternativeCost`-style probe. |
 | 19 | Boros Reckoner | high | Creature with damage-redirect: "If a source would deal damage to Boros Reckoner, instead it deals that damage to any target". Needs source-damage replacement effect with redirect to a chosen target — a generalization of `PreventNextDamageFromChosenSourceShield`. |
 | 20 | Reckless Charge | low | Sorcery — target creature gets +3/+0 and haste until EOT, Flashback {R}. Pump + grant-haste primitives both exist; FlashbackAlternativeCost done — needs `PumpAndGrantKeyword` template wired to flashback alt-cost. |
-| 21 | Splinter Twin | medium | Aura grants `{T}: create a token copy with haste`. `CopyEffect` exists, but ability-grant-on-attach (aura adds an activated ability to enchanted creature) does not. (Carried over from round 1.) |
 
 ## How to update this doc
 
