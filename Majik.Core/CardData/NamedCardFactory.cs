@@ -1763,6 +1763,28 @@ public static class NamedCardFactory
             // StormHelper + SpellCopier xmldocs). Mirrors Brain Freeze.
             "Tendrils of Agony" => TendrilsOfAgonyFactory.Create(owner),
 
+            // Artifact — {1} (SolRingFactory). Limited Edition Alpha.
+            // "{T}: Add {C}{C}." Single tap mana ability adding two
+            // colourless (ManaCost.Parse("CC") routes {C} through the
+            // generic bucket per CR 107.4c).
+            "Sol Ring" => SolRingFactory.Create(owner),
+
+            // Artifact — {1} (ManaVaultFactory). Limited Edition Alpha.
+            // "Mana Vault doesn't untap during your untap step." (deferred —
+            // no engine surface for "doesn't untap" yet).
+            // "At the beginning of your upkeep, if Mana Vault is tapped, you
+            //  may pay {4}. If you don't, Mana Vault deals 1 damage to you."
+            //  — upkeep TriggeredAbility (CR 603.1 / CR 603.4) attempts
+            //  PayMana({4}) on the controller's pool and falls back to
+            //  LoseLife(1) on failure (v1 "may" = pay-if-able, same prompt
+            //  gap shared with the Pact cycle).
+            // "{T}: Add {C}{C}{C}." Tap mana ability adding three colourless
+            //  (Generic = 3 via ManaCost.Parse).
+            // The single-arg dispatcher path attaches the upkeep trigger for
+            // shape; use the (owner, triggers) overload to register it with
+            // a live TriggerManager.
+            "Mana Vault" => ManaVaultFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
