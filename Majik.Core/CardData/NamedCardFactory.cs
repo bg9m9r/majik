@@ -900,6 +900,22 @@ public static class NamedCardFactory
             // 701.19c) deferred — same rationale as SearchSpellFactory.
             "Chord of Calling" => ChordOfCallingFactory.Create(owner),
 
+            // Artifact — {X} (EngineeredExplosivesFactory). Fifth Dawn / Modern
+            // Horizons. Sunburst ETB → enters with X charge counters
+            // (CR 702.43a — non-creature variant). v1 approximation: the
+            // engine has no per-cast mana-provenance ledger, so the
+            // (owner, xValueProvider, allPlayersResolver) overload accepts a
+            // Func<int> X provider that callers wire to the cast-time printed
+            // X (upper bound on colours spent for {X} artifacts). Activated
+            // {2}, Sacrifice this: destroy each nonland permanent with mv =
+            // charge counters — wired. The single-arg dispatcher path uses
+            // no X provider (ETB applies 0 counters, matching X=0) and
+            // scans only the controller's battlefield. Sacrifice payment is
+            // still a no-op stub at AdditionalCost.Pay; the effect closure
+            // moves Engineered Explosives to the graveyard so visible state
+            // matches CR 701.16 (same trick as Mishra's Bauble).
+            "Engineered Explosives" => EngineeredExplosivesFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
