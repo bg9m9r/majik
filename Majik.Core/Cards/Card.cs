@@ -75,6 +75,34 @@ public class Card : ICard
         Owner = newOwner;
     }
 
+    /// <summary>
+    /// CR 702.33 — runtime flashback grant ("target … gains flashback until
+    /// end of turn. The flashback cost is equal to its mana cost.").
+    /// When non-null, the card may be cast from the graveyard via a
+    /// <see cref="Majik.Core.Costs.FlashbackAlternativeCost"/> built from
+    /// this mana cost, in addition to any printed flashback. Cleared at
+    /// end of turn by the granting effect's bus subscription.
+    /// </summary>
+    public ValueObjects.ManaCost? RuntimeFlashbackCost { get; private set; }
+
+    /// <summary>
+    /// Stamp a flashback grant on this card. Used by Snapcaster Mage and
+    /// any future "until end of turn, gains flashback" effect. Idempotent —
+    /// later grants overwrite earlier ones; clearing happens at EOT via the
+    /// granting effect's own bookkeeping.
+    /// </summary>
+    public void GrantRuntimeFlashback(ValueObjects.ManaCost cost)
+    {
+        if (cost == null) throw new ArgumentNullException(nameof(cost));
+        RuntimeFlashbackCost = cost;
+    }
+
+    /// <summary>Clear any runtime flashback grant on this card.</summary>
+    public void ClearRuntimeFlashback()
+    {
+        RuntimeFlashbackCost = null;
+    }
+
     public Card(string name, string manaCost = "", IEnumerable<CardType>? cardTypes = null, IEnumerable<CardSupertype>? supertypes = null, IEnumerable<CardSubtype>? subtypes = null)
     {
         if (string.IsNullOrWhiteSpace(name))
