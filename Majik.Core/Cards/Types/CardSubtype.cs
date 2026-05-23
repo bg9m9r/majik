@@ -97,6 +97,9 @@ public enum CardSubtype
     /// <summary>Phoenix creature subtype — Arclight Phoenix, Rekindling
     /// Phoenix, Skarrgan Pit-Skulk-adjacent. CR 205.3m.</summary>
     Phoenix,
+    /// <summary>Fish creature subtype — Gurmag Angler, Tatsumasa, the Dragon's Fang's
+    /// Dragon Fish token. CR 205.3m.</summary>
+    Fish,
 
     // Land subtypes (examples)
     Forest,

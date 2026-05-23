@@ -66,7 +66,8 @@ public sealed class PitchAltCostProbe : IAlternativeCostProbe
     /// <summary>
     /// Built-in lookup that recognizes the ship-list of named pitch cards by
     /// name. Wired by callers that don't have a richer per-card metadata
-    /// source. Force of Will = blue, +1 life; Force of Negation = blue, 0 life.
+    /// source. Force of Will = blue, +1 life; Force of Negation = blue, 0 life;
+    /// Force of Vigor = green, 0 life.
     /// </summary>
     public static PitchDescriptor? DefaultLookup(ICard card)
     {
@@ -74,6 +75,7 @@ public sealed class PitchAltCostProbe : IAlternativeCostProbe
         {
             "Force of Will" => new PitchDescriptor(ManaColor.Blue, 1),
             "Force of Negation" => new PitchDescriptor(ManaColor.Blue, 0),
+            "Force of Vigor" => new PitchDescriptor(ManaColor.Green, 0),
             _ => null,
         };
     }

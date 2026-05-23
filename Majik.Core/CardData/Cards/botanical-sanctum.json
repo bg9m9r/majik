@@ -1,0 +1,8 @@
+{
+  "name": "Botanical Sanctum",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "G" },
+    { "kind": "mana", "produces": "U" }
+  ]
+}

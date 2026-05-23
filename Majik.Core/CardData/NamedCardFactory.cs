@@ -259,6 +259,30 @@ public static class NamedCardFactory
             // ConditionalEntersTappedBinder in the production load path.
             "Inspiring Vantage" => InspiringVantageFactory.Create(owner),
 
+            // U/R fastland — Kaladesh (SpirebluffCanalFactory).
+            // {T}: Add {U} or {R} — two ManaAbility instances wired.
+            // ETB-tapped-unless-two-or-fewer-other-lands handled via
+            // ConditionalEntersTappedBinder in the production load path.
+            "Spirebluff Canal" => SpirebluffCanalFactory.Create(owner),
+
+            // W/B fastland — Kaladesh (ConcealedCourtyardFactory).
+            // {T}: Add {W} or {B} — two ManaAbility instances wired.
+            // ETB-tapped-unless-two-or-fewer-other-lands handled via
+            // ConditionalEntersTappedBinder in the production load path.
+            "Concealed Courtyard" => ConcealedCourtyardFactory.Create(owner),
+
+            // G/U fastland — Kaladesh (BotanicalSanctumFactory).
+            // {T}: Add {G} or {U} — two ManaAbility instances wired.
+            // ETB-tapped-unless-two-or-fewer-other-lands handled via
+            // ConditionalEntersTappedBinder in the production load path.
+            "Botanical Sanctum" => BotanicalSanctumFactory.Create(owner),
+
+            // B/G fastland — Kaladesh (BloomingMarshFactory).
+            // {T}: Add {B} or {G} — two ManaAbility instances wired.
+            // ETB-tapped-unless-two-or-fewer-other-lands handled via
+            // ConditionalEntersTappedBinder in the production load path.
+            "Blooming Marsh" => BloomingMarshFactory.Create(owner),
+
             // Enchantment — {2}{R} (BloodMoonFactory). "Nonbasic lands are
             // Mountains." CR 305.6 / 613.1d. Implemented as a Layer 4
             // SetSubtypesEffect scoped to every nonbasic Land on the
@@ -581,6 +605,16 @@ public static class NamedCardFactory
             // target check at resolution).
             "Force of Negation" => ForceOfNegationFactory.Create(owner),
 
+            // Instant — {2}{G}{G} (ForceOfVigorFactory).
+            // "If it's not your turn, you may exile a green card from your
+            //  hand rather than pay this spell's mana cost. Destroy up to
+            //  two target artifacts and/or enchantments."
+            // Same pitch pattern as Force of Negation but green-flavoured
+            // (no life rider). Resolve effect delegates to the shared
+            // DestroyUpToArtifactEnchantmentSpell — identical behaviour to
+            // the data-driven oracle-template binding.
+            "Force of Vigor" => ForceOfVigorFactory.Create(owner),
+
             // Instant — {0} (PactOfNegationFactory). Future Sight.
             // "Counter target spell.
             //  At the beginning of your next upkeep, pay {3}{U}{U}.
@@ -876,6 +910,14 @@ public static class NamedCardFactory
             // stamped by SpellCastFlow when DelveCost is paid and consumed
             // by the ETB effect.
             "Murktide Regent" => MurktideRegentFactory.Create(owner),
+
+            // Creature — Zombie Fish {7}{B} 5/5 (GurmagAnglerFactory). Khans of Tarkir.
+            // Delve marker keyword only — no printed triggers or activated abilities.
+            // The delve mechanic itself lives in DelveCost + SpellCastFlow; cast via
+            // the cast-flow's delveCost parameter to substitute exiled graveyard cards
+            // for generic mana (CR 702.66). Bot-side delve discovery deferred — same
+            // gap as Treasure Cruise / Murktide Regent.
+            "Gurmag Angler" => GurmagAnglerFactory.Create(owner),
 
             // Enchantment — {1}{U} (DressDownFactory). Flash. CR 613.6 + 613.7b:
             // "Creatures lose all abilities and have base power and toughness
@@ -1302,6 +1344,24 @@ public static class NamedCardFactory
             // effect closure because the generic AdditionalCost.Pay
             // sacrifice path is a stub (mirrors Mishra's Bauble).
             "Aether Spellbomb" => AetherSpellbombFactory.Create(owner),
+
+            // Land — Aether Hub (Kaladesh, AetherHubFactory).
+            // Oracle: "Aether Hub enters with an energy counter on it.
+            // {T}: Add {C}. {T}, Pay {E}: Add one mana of any color."
+            // ETB trigger (CR 603.6a) grants the controller one energy
+            // (CR 106.13 — player-scoped resource via Player.GainEnergy)
+            // AND stamps a CounterType.Energy marker on the land for
+            // shape inspection. {T}: Add {C} wired as a ManaAbility.
+            // {T}, Pay {E}: Add one mana of any color modelled as 5
+            // ManaAbility instances (one per WUBRG) carrying the
+            // additional-cost overload — gated on
+            // controller.EnergyCounters >= 1 (CR 119.4) and the
+            // additionalCostPayer spends one energy via PayEnergy(1)
+            // after the {T} tap pays out. Single-arg dispatcher path
+            // attaches the ETB trigger without TriggerManager
+            // registration; (owner, eventBus, triggers) overload wires
+            // bus-driven firing. See factory xmldoc.
+            "Aether Hub" => AetherHubFactory.Create(owner),
 
             // Artifact — Equipment {1} (ColossusHammerFactory).
             // Static "equipped creature gets +10/+0 and loses flying" via
