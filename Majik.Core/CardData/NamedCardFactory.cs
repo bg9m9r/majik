@@ -2213,6 +2213,27 @@ public static class NamedCardFactory
             // WishclawTalismanFactory for the control-change registration.
             "Archmage's Charm" => ArchmagesCharmFactory.Create(owner),
 
+            // Creature — Phoenix {3}{R} 3/2 (ArclightPhoenixFactory).
+            // Guilds of Ravnica. Flying + Haste keyword markers (CR 702.9 /
+            // CR 702.10). Graveyard-resident triggered ability scoped to
+            // activeZones = {Graveyard} (CR 603.6d): at the beginning of
+            // combat on the controller's turn, if the controller has cast
+            // three or more instant and/or sorcery spells this turn, return
+            // Arclight Phoenix from graveyard to battlefield. Per-turn
+            // instant+sorcery count is held in a closure private to the
+            // card instance, incremented on every SpellCastEvent owned by
+            // the controller whose card has CardType.Instant or Sorcery,
+            // and reset on TurnStartedEvent when an event bus is supplied
+            // (CR 500.1) — mirrors LedgerShredderFactory's per-turn-counter
+            // pattern. CR 603.10 intervening "if" re-checks both the
+            // ≥3-cast gate and the from-graveyard zone constraint at
+            // resolution. "May" auto-accepted at v1 (same simplification
+            // as Sneak Attack / Through the Breach). Single-arg dispatcher
+            // path attaches the trigger to the card without bus-driven
+            // count tracking or TriggerManager registration; use the
+            // (owner, bus, triggers) overload for fully-wired behavior.
+            "Arclight Phoenix" => ArclightPhoenixFactory.Create(owner),
+
             // Sorcery — {W} (PrismaticEndingFactory). Modern Horizons 2.
             // "Exile target nonland permanent with mana value less than
             //  or equal to the number of colors of mana spent to cast
