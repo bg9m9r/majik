@@ -560,6 +560,17 @@ public static class NamedCardFactory
             // wiring on the reanimated creature.
             "Priest of Fell Rites" => PriestOfFellRitesFactory.Create(owner),
 
+            // Creature — Elemental Incarnation {3}{U} 3/3 (SubtletyFactory).
+            // Modern Horizons 2 incarnation, blue counterpart to Solitude.
+            // Flash + Evoke keyword markers wired. ETB bounce trigger wired:
+            // returns target opponent's creature/planeswalker to its owner's
+            // hand, then that owner does a 1-card "look + may bottom" scry
+            // decision sourced from their registered IPlayerAgent. Evoke
+            // alt-cost = "exile a blue card from hand" via EvokeAlternativeCost;
+            // printed evoke-sacrifice trigger fires when Subtlety enters if
+            // evoke was paid (CR 702.74b).
+            "Subtlety" => SubtletyFactory.Create(owner),
+
             // Creature — Avatar {B} 13/13 (DeathsShadowFactory).
             // CR 604.3 / 613.2 — Layer 7a characteristic-defining P/T.
             // P/T = clamp(13 - controller life, 0, 13). Wired via
