@@ -103,6 +103,28 @@ public static class AuthRegistration
                 options.Events = new JwtBearerEvents
                 {
                     OnTokenValidated = Auth0TokenValidator.ValidateAsync,
+                    // SignalR WebSocket connections cannot send arbitrary
+                    // headers, so the JS client passes the JWT via the
+                    // `access_token` query string parameter during the
+                    // negotiate + WebSocket upgrade for any URL it considers
+                    // a hub. ASP.NET's JwtBearer middleware only reads the
+                    // Authorization header by default, so hub negotiate
+                    // returned 401 even with a valid token. Lift the query
+                    // token into `context.Token` for `/hubs/*` requests so
+                    // the rest of the JwtBearer pipeline (signature, issuer,
+                    // audience, Auth0TokenValidator) runs as normal.
+                    // See: https://learn.microsoft.com/aspnet/core/signalr/authn-and-authz#bearer-token-authentication
+                    OnMessageReceived = ctx =>
+                    {
+                        var accessToken = ctx.Request.Query["access_token"];
+                        var path = ctx.HttpContext.Request.Path;
+                        if (!string.IsNullOrEmpty(accessToken)
+                            && path.StartsWithSegments("/hubs"))
+                        {
+                            ctx.Token = accessToken;
+                        }
+                        return Task.CompletedTask;
+                    },
                     // Default log level masks JwtBearer auth events. Surface
                     // failures + challenges at Warning so they're visible in
                     // production hosting (Render etc) without flipping the
