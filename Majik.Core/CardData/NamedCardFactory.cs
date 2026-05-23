@@ -1531,6 +1531,18 @@ public static class NamedCardFactory
             // deferred (mirrors Aether Vial + Stoneforge Mystic).
             "Goblin Lackey" => GoblinLackeyFactory.Create(owner),
 
+            // Creature — Goblin Wizard {U}{R} 2/2 (GoblinElectromancerFactory).
+            // Return to Ravnica. "Instant and sorcery spells you cast cost
+            // {1} less to cast." Wired via SpellCostReductionAbility — a
+            // sibling to SpellCostIncreaseAbility (Damping Sphere family).
+            // Predicate matches instant/sorcery spells; reduction is a flat
+            // {1} generic per cast. CostReduction.GetEffectiveCost scans
+            // only the caster's battlefield for this ability shape, so the
+            // "you cast" scope is enforced inside the cost-calc helper.
+            // Floor-at-zero is layered in alongside other reducers; coloured
+            // pips are untouched (CR 117.7c).
+            "Goblin Electromancer" => GoblinElectromancerFactory.Create(owner),
+
             // Creature — Goblin {2}{R} 1/1 (GoblinMatronFactory). Urza's Legacy.
             // "When Goblin Matron enters, you may search your library for a
             //  Goblin card, reveal that card, and put it into your hand.
