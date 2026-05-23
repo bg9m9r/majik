@@ -468,6 +468,17 @@ public static class NamedCardFactory
             // not scoped by v1.
             "Dress Down" => DressDownFactory.Create(owner),
 
+            // Instant — {U} (StubbornDenialFactory). Khans of Tarkir.
+            // "Choose one — Counter target noncreature spell unless its
+            //  controller pays {1}. Ferocious — Counter that spell if you
+            //  control a creature with power 4 or greater." CR 702.114.
+            // Card shape only here; the resolve-time SpellDefinition (with
+            // the ferocious gate and the unless-pay fallback) is built on
+            // demand via StubbornDenialFactory.BuildSpellDefinition. The
+            // unless-pay rider is surfaced as a Func<bool> callback because
+            // the engine has no Yes/No agent prompt yet — default is "no".
+            "Stubborn Denial" => StubbornDenialFactory.Create(owner),
+
             // Creature — Human Cleric {W}{B} 2/1 (PriestOfFellRitesFactory).
             // ETB triggered ability: reanimate target creature card with
             // mana value 3 or less from controller's graveyard
