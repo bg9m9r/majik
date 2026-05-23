@@ -867,6 +867,21 @@ public static class NamedCardFactory
             // ledger yet (see CavernOfSoulsFactory xmldoc).
             "Cavern of Souls" => CavernOfSoulsFactory.Create(owner),
 
+            // Instant — {X}{G}{G}{G} (ChordOfCallingFactory). Ravnica.
+            // Flash + Convoke keyword markers wired inline. Convoke
+            // alt-cost surfaced via ChordOfCallingFactory.BuildAlternativeCost
+            // (ConvokeAlternativeCost) — v1 returns printed cost unchanged
+            // until SpellCastFlow grows a Convoke-aware reduction hook
+            // (see ConvokeAlternativeCost xmldoc). Resolve-time
+            // SpellDefinition (HasVariableX = true, tutor creature with
+            // mv ≤ X → battlefield) is built on demand via
+            // ChordOfCallingFactory.BuildSpellDefinition(caster, zones?).
+            // ETB triggers on the tutored creature fire when a live
+            // ZoneService is threaded in (mirrors LivingEnd /
+            // PrimevalTitan PR #165 / #174 wiring). Library shuffle (CR
+            // 701.19c) deferred — same rationale as SearchSpellFactory.
+            "Chord of Calling" => ChordOfCallingFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
