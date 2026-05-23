@@ -15,4 +15,13 @@ public sealed record CounterType(string Name)
     public static readonly CounterType Charge = new("Charge");
     public static readonly CounterType Defense = new("Defense");
     public static readonly CounterType Poison = new("Poison");
+
+    /// <summary>
+    /// CR 122.1 — Time counters. Used by Suspend (CR 702.62), Vanishing
+    /// (CR 702.63), Fading (CR 702.32), and similar timed-exile / fade
+    /// mechanics. Each tick removes one counter; reaching zero triggers
+    /// the mechanic's payoff (Suspend casts the card without paying its
+    /// mana cost).
+    /// </summary>
+    public static readonly CounterType Time = new("Time");
 }
