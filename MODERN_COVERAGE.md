@@ -73,6 +73,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Rift Bolt | Sorcery | #183 | suspend → 3 damage |
 | Scavenging Ooze | Creature | #188 | exile-graveyard + counter + life |
 | Sea's Claim | Aura | #160 | enchanted land becomes Island |
+| Sigarda's Aid | Enchantment | TBD | flash-grant equipment/aura + ETB auto-attach |
 | Snapcaster Mage | Creature | #170 | flash + ETB flashback grant |
 | Solitude | Creature | — | evoke pitch + ETB exile |
 | Spreading Seas | Aura | #160 | retype land + draw |
@@ -295,7 +296,7 @@ Per-keyword action helpers under `Majik.Core/Keywords/`:
 - **Domain Zoo** — Mid. Boros Charm done, fetches done, shocks done, Tribal Flames done. Scion of Draco + Territorial Kavu absent. ~35%.
 - **Amulet Titan** — Mid. Amulet of Vigor done (untap-on-enters-tapped trigger) + Primeval Titan done (ETB + attack land-tutor for up to 2, tapped). No bounce lands. ~30%.
 - **Lurrus Companion** — Low-mid. Lurrus of the Dream-Den done (Lifelink + once-per-turn cast-permanent-mv≤2-from-graveyard; companion deck-construction rule deferred). Pairs with the existing low-mv permanent suite (Mishra's Bauble, Dryad Arbor, Stoneforge Mystic, Walking Ballista, Dark Confidant, etc.). Deck-construction enforcement absent. ~30%.
-- **Hammer Time / Equipment** — Low-mid. Stoneforge Mystic done. Colossus Hammer done (+10/+0 + lose flying via AttachedBoostEffect + new LoseKeywordEffect). Sigarda's Aid, Puresteel Paladin absent. ~30%.
+- **Hammer Time / Equipment** — Mid. Stoneforge Mystic done. Colossus Hammer done (+10/+0 + lose flying via AttachedBoostEffect + new LoseKeywordEffect). Sigarda's Aid done (flash-grant on Equipment/Aura via FlashGrantRegistry + ETB-attach rider). Puresteel Paladin absent. ~40%.
 
 ## Top 20 Modern staples NOT yet implemented
 
