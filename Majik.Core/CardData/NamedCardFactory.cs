@@ -532,6 +532,15 @@ public static class NamedCardFactory
             // TarmogoyfFactory.CountDistinctCardTypes for the type count.
             "Unholy Heat" => UnholyHeatFactory.Create(owner),
 
+            // Instant — {R}{W} (LightningHelixFactory). Ravnica: City of Guilds /
+            // Modern Horizons. "Lightning Helix deals 3 damage to any target and
+            // you gain 3 life." Card shape only here; the resolve-time
+            // SpellDefinition (single any-target damage + controller lifegain)
+            // is built on demand via LightningHelixFactory.BuildSpellDefinition.
+            // Damage is dispatched through SearingBlazeFactory.DealDamageWithPlaneswalker
+            // so Player / Creature / Planeswalker targets all work.
+            "Lightning Helix" => LightningHelixFactory.Create(owner),
+
             // Instant — {R}{R} (SearingBlazeFactory). Worldwake / Modern Horizons.
             // "Searing Blaze deals 1 damage to target player or planeswalker
             //  and 1 damage to target creature that player or that
