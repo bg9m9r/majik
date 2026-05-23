@@ -3,13 +3,13 @@
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
 **Last updated:** 2026-05-23
-**Latest origin/main:** Yawgmoth's Will on top of Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere (#257).
+**Latest origin/main:** Splinter Twin on top of Yawgmoth's Will + Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere (#257).
 
 ## Headline numbers
 
 | Metric | Count |
 |---|---|
-| Named factories | 113 |
+| Named factories | 114 |
 | Bespoke templates | 26 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
@@ -103,6 +103,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Snapcaster Mage | Creature | #170 | flash + ETB flashback grant |
 | Solitude | Creature | — | evoke pitch + ETB exile |
 | Spell Snare | Instant | TBD | counter target spell with mana value 2 (resolution-time MV sample, CR 202.3 / 608.2b) |
+| Splinter Twin | Aura | TBD | {2}{R}{R} Aura — grant-activated-ability-on-attach via AttachedAuraAbilityGrantStaticEffect; bearer gains `{T}: create haste token copy + exile EOT` while attached; revoked on aura LTB. v1 token snapshots bearer name/printed P/T/subtypes/keywords at activation (no live CopyEffect). Delayed end-step exile registered as a DelayedTriggeredAbility when a TriggerManager is wired |
 | Spreading Seas | Aura | #160 | retype land + draw |
 | Spymaster's Vault | Land | — | B-source shell |
 | Stoneforge Mystic | Creature | #184 | ETB tutor + activated put |
@@ -341,10 +342,9 @@ Sorted roughly by build priority (small infra lift × high meta share). Refreshe
 | # | Card | Difficulty | Blocker |
 |---|---|---|---|
 | 1 | Plague Engineer | medium | ETB: choose a creature type → opponents' creatures of that type get -1/-1. Needs chosen-subtype state on permanents + opponent-only lord-style boost. |
-| 2 | Splinter Twin | medium | Aura grants `{T}: create a token copy with haste`. `CopyEffect` exists, but ability-grant-on-attach (aura adds an activated ability to enchanted creature) does not. |
-| 3 | Sythis, Harvest's Hand | medium | Constellation (cast-an-enchantment trigger) primitive absent; needs a cast-event-typed-card trigger surface comparable to landfall. |
-| 4 | Manabarbs | high | Triggered ability on every land-tap event globally; tap-event subscription per-permanent works, but a global "whenever a player taps a land for mana" hook is unwired. |
-| 5 | Pyromancer's Goggles | high | Legendary {0} mana ability + replacement: "when you tap it for {R} to cast an instant/sorcery, copy that spell once". Needs cast-time mana-source tracking + spell-copy hook keyed off that source. |
+| 2 | Sythis, Harvest's Hand | medium | Constellation (cast-an-enchantment trigger) primitive absent; needs a cast-event-typed-card trigger surface comparable to landfall. |
+| 3 | Manabarbs | high | Triggered ability on every land-tap event globally; tap-event subscription per-permanent works, but a global "whenever a player taps a land for mana" hook is unwired. |
+| 4 | Pyromancer's Goggles | high | Legendary {0} mana ability + replacement: "when you tap it for {R} to cast an instant/sorcery, copy that spell once". Needs cast-time mana-source tracking + spell-copy hook keyed off that source. |
 
 ## How to update this doc
 

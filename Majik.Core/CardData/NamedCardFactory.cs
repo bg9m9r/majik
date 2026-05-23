@@ -1190,6 +1190,24 @@ public static class NamedCardFactory
             // Sorcery shell — the resolve effect is wired by callers.
             "Yawgmoth's Will" => YawgmothsWillFactory.Create(owner),
 
+            // Enchantment — Aura {2}{R}{R} (SplinterTwinFactory). Rise of
+            // the Eldrazi. "Enchant creature. Enchanted creature has '{T}:
+            // Create a token that's a copy of this creature, except it has
+            // haste. Exile the token at the beginning of the next end
+            // step.'" CR 303.4 / 613.1f — grant-activated-ability-on-attach
+            // wired via AttachedAuraAbilityGrantStaticEffect. The granted
+            // ability lives on the bearer's Abilities collection only while
+            // the aura is attached + on the battlefield; revoked on LTB or
+            // detach. Token copies snapshot bearer name + printed P/T +
+            // subtypes + keyword names at activation (v1 lossy — aligns
+            // with CopyEffect's printed-values semantics). Delayed
+            // end-step exile registers as a DelayedTriggeredAbility when a
+            // TriggerManager is wired. Single-arg dispatcher path produces
+            // the correct card shape without lifecycle / trigger wiring;
+            // use the (owner, eventBus, zoneService, triggers) overload
+            // for fully-wired behaviour.
+            "Splinter Twin" => SplinterTwinFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
