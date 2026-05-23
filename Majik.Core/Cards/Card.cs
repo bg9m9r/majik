@@ -204,6 +204,36 @@ public class Card : ICard
         PendingDelveExiledCount = null;
     }
 
+    /// <summary>
+    /// CR 202.3b — when this card was cast as a spell with a variable {X}
+    /// cost, the value chosen for X. Stamped by
+    /// <see cref="Majik.Core.Game.SpellCastFlow"/> right after the caster
+    /// chooses X (and before the spell hits the stack); read by ETB
+    /// effects that need to know "what was X" without otherwise plumbing
+    /// <c>ChosenSpellParams.X</c> through to the resolving permanent
+    /// (Chalice of the Void's "enters with X charge counters", etc.).
+    /// Null when the card was not cast via the X-prompt path, or has
+    /// already been consumed/cleared.
+    /// </summary>
+    public int? PendingCastX { get; private set; }
+
+    /// <summary>Stamp the chosen X on this card. Called by
+    /// <see cref="Majik.Core.Game.SpellCastFlow"/> right after the agent
+    /// chooses X for a variable-X spell.</summary>
+    public void SetPendingCastX(int x)
+    {
+        if (x < 0) throw new ArgumentOutOfRangeException(nameof(x));
+        PendingCastX = x;
+    }
+
+    /// <summary>Clear the stamped X value. Called by any ETB consumer
+    /// (e.g. Chalice of the Void) once it has used the value, so a later
+    /// non-cast battlefield entry (blink, token copy) doesn't reuse it.</summary>
+    public void ClearPendingCastX()
+    {
+        PendingCastX = null;
+    }
+
     public Card(string name, string manaCost = "", IEnumerable<CardType>? cardTypes = null, IEnumerable<CardSupertype>? supertypes = null, IEnumerable<CardSubtype>? subtypes = null)
     {
         if (string.IsNullOrWhiteSpace(name))

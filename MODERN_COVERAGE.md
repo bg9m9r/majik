@@ -34,6 +34,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Blood Moon | Enchantment | #156 | nonbasic-to-Mountain Layer 4 |
 | Boseiju, Who Endures | Land | — | channel destroy stub |
 | Cavern of Souls | Land | TBD | ETB choose-creature-type + {T}: {C} + {T}: any color (spend-restriction + uncounterable rider deferred) |
+| Chalice of the Void | Artifact | TBD | {X}{X} — ETB with X charge counters (via PendingCastX) + symmetric "counter spell of MV = counters" trigger |
 | Chord of Calling | Instant | TBD | Flash + Convoke + X tutor creature mv ≤ X → battlefield (convoke reduction integration deferred) |
 | Colossus Hammer | Artifact | TBD | Equipment {1}: +10/+0 + lose flying + equip {8} |
 | Conversion | Enchantment | #157 | Mountains-are-Plains retype |

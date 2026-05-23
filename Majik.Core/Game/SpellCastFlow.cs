@@ -133,6 +133,18 @@ public sealed class SpellCastFlow
         if (definition.HasVariableX)
         {
             xValue = await agent.ChooseXAsync(ctx, card, ct);
+
+            // CR 202.3b — stamp the chosen X on the card itself so
+            // permanents whose ETB references X (Chalice of the Void's
+            // "enters with X charge counters", Walking Ballista, …) can
+            // read the value without us threading ChosenSpellParams.X
+            // through the spell → permanent boundary. Consumed + cleared
+            // by the ETB effect (same pattern Murktide Regent uses for
+            // PendingDelveExiledCount).
+            if (card is Card concreteForX && xValue.HasValue)
+            {
+                concreteForX.SetPendingCastX(xValue.Value);
+            }
         }
 
         var collectedTargets = new List<IReadOnlyList<object>>(definition.TargetRequests.Count);

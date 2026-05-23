@@ -885,6 +885,21 @@ public static class NamedCardFactory
             // ledger yet (see CavernOfSoulsFactory xmldoc).
             "Cavern of Souls" => CavernOfSoulsFactory.Create(owner),
 
+            // Artifact — {X}{X} (ChaliceOfTheVoidFactory). Mirrodin.
+            // ETB trigger: enters with X charge counters (X read from
+            // Card.PendingCastX, stamped by SpellCastFlow after the
+            // caster's ChooseXAsync). Triggered ability: whenever any
+            // player casts a spell with mana value equal to the number
+            // of charge counters on Chalice, counter that spell.
+            // Symmetric — counters both players' spells. The
+            // single-arg dispatcher path produces the correct card
+            // shape (both triggered abilities attached) without
+            // TriggerManager registration or stack-coupled counter
+            // wiring; use the (owner, stack, eventBus, triggers)
+            // overload for bus-driven trigger firing + RemoveFromStack
+            // routing.
+            "Chalice of the Void" => ChaliceOfTheVoidFactory.Create(owner),
+
             // Instant — {X}{G}{G}{G} (ChordOfCallingFactory). Ravnica.
             // Flash + Convoke keyword markers wired inline. Convoke
             // alt-cost surfaced via ChordOfCallingFactory.BuildAlternativeCost
