@@ -503,6 +503,18 @@ public static class NamedCardFactory
             // for full ETB-replacement / trigger-firing wiring.
             "Stoneforge Mystic" => StoneforgeMysticFactory.Create(owner),
 
+            // Creature — Human Soldier {1}{W} 2/2 (PuresteelPaladinFactory).
+            // ETB-draw trigger: whenever an Equipment enters under controller's
+            // control, draw a card (CR 603.1 — "you may" simplified to a
+            // forced draw in v1). Conditional static: while controller has
+            // ≥3 artifacts on battlefield, Equipment they control have
+            // equip {0}; tracked via ZeroEquipCostEffect lifecycle and read
+            // back through IsZeroEquipActiveFor(player). The single-arg
+            // dispatcher path here produces card shape + ETB trigger; the
+            // (owner, eventBus, triggers) overload also attaches the
+            // zero-equip-cost lifecycle.
+            "Puresteel Paladin" => PuresteelPaladinFactory.Create(owner),
+
             // Creature — Ooze {1}{G} 2/2 (ScavengingOozeFactory).
             // Activated {G}: exile target creature card from a graveyard;
             // if you do, put a +1/+1 counter on Scavenging Ooze and gain
