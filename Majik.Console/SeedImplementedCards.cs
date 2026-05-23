@@ -578,5 +578,57 @@ public static class SeedImplementedCards
         // your library in any order." v1 deterministically returns the last
         // two hand cards; real "any order" player choice deferred.
         "Brainstorm",
+
+        // ---- Modern staples shipped in the 2026-05-23e bump ----
+
+        // Creature — Goblin {R} 1/1 (GoblinLackeyFactory).
+        // Combat-damage trigger: cheat a Goblin from hand into play.
+        "Goblin Lackey",
+        // Instant — {R} (SearingBlazeFactory).
+        // Landfall conditional twin damage (1 to player + 3 to creature
+        // when landfall met; deals 1 + 3 split per oracle text).
+        "Searing Blaze",
+        // Artifact — {1}{B} (WishclawTalismanFactory). Throne of Eldraine.
+        // {T}, Pay 3 life: search for a card → hand; opponent gains control.
+        "Wishclaw Talisman",
+        // Sorcery — {2}{B}{B}{B} (YawgmothsWillFactory). Urza's Saga.
+        // Play cards from your graveyard this turn; cards that would be
+        // put into your graveyard from anywhere are exiled instead.
+        "Yawgmoth's Will",
+        // Enchantment — {2}{R}{R} (ManabarbsFactory). Sixth Edition.
+        // "Whenever a player taps a land for mana, Manabarbs deals 1
+        // damage to that player."
+        "Manabarbs",
+        // Creature — Human Mercenary {1}{B} 2/2 (PlagueEngineerFactory).
+        // ETB choose creature type; creatures of chosen type opponents
+        // control get -1/-1.
+        "Plague Engineer",
+        // Legendary Artifact — {5} (PyromancersGogglesFactory). Magic Origins.
+        // {T}: Add {R}. Copy-instant-or-sorcery-using-this-mana rider deferred.
+        "Pyromancer's Goggles",
+        // Instant — {1}{U} (DazeFactory). Nemesis.
+        // Counter target spell unless its controller pays {1}.
+        // Bounce-Island pitch alt-cost via BounceLandPitchAlternativeCost.
+        "Daze",
+        // Legendary Enchantment Creature — Nymph {G}{W} 1/2
+        // (SythisHarvestsHandFactory). Modern Horizons 2.
+        // Constellation — whenever an enchantment enters under your control,
+        // gain 1 life; if it's not a token, also draw a card.
+        "Sythis, Harvest's Hand",
+        // Enchantment — Aura {2}{U}{R} (SplinterTwinFactory). Rise of the Eldrazi.
+        // Enchant creature; enchanted creature has "{T}: Create a token that's
+        // a copy of this creature, except it has haste. Exile token at end of turn."
+        // Wired via AttachedAuraAbilityGrantStaticEffect.
+        "Splinter Twin",
+        // Sorcery — {U} (PonderFactory). Lorwyn / Modern Horizons 3.
+        // Look at top 3, rearrange or shuffle, then draw.
+        "Ponder",
+        // Sorcery — {U} (PreordainFactory). Magic 2011 / Modern Horizons 3.
+        // Scry 2, then draw a card.
+        "Preordain",
+        // Instant — {W} (PathToExileFactory). Conflux / Modern Horizons 3.
+        // Exile target creature; that player may search library for a basic
+        // land card and put it onto the battlefield tapped, then shuffle.
+        "Path to Exile",
     };
 }
