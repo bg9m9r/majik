@@ -3,7 +3,7 @@
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
 **Last updated:** 2026-05-23
-**Latest origin/main:** Goblin Matron (Creature {2}{R} 1/1 Goblin + ETB tutor a Goblin card from library to hand) on top of Mutavault + Skullclamp + Umezawa's Jitte + Wasteland + Swords to Plowshares + Mystical Tutor + Path to Exile + Daze + Ponder + Preordain + Splinter Twin + Sythis, Harvest's Hand + Pyromancer's Goggles + Plague Engineer + Manabarbs + Yawgmoth's Will + Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere.
+**Latest origin/main:** Sensei's Divining Top (Artifact {1} with two activated abilities — {T}: peek top 3 + agent-driven reorder; {1}, {T}: draw + self-return to library top) on top of Goblin Matron + Mutavault + Skullclamp + Umezawa's Jitte + Wasteland + Swords to Plowshares + Mystical Tutor + Path to Exile + Daze + Ponder + Preordain + Splinter Twin + Sythis, Harvest's Hand + Pyromancer's Goggles + Plague Engineer + Manabarbs + Yawgmoth's Will + Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere.
 
 ## Headline numbers
 
@@ -107,6 +107,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Scion of Draco | Artifact Creature | TBD | Domain cost-reduction {10} → {0} at 5 basic types (CR 702.16); keyword-grant rider deferred |
 | Sea's Claim | Aura | #160 | enchanted land becomes Island |
 | Searing Blaze | Instant | TBD | 1 damage to player/planeswalker + 1 to a creature they control; landfall → 3 each instead (resolution-time TurnState.LandEnteredThisTurn gate) |
+| Sensei's Divining Top | Artifact | TBD | {1} artifact with two activated abilities — {T}: peek top 3 + agent-driven reorder via ScryAction with ToBottom=[] (mirrors Ponder; default preserves order); {1}, {T}: draw a card (empty-library flags MarkTriedToDrawFromEmptyLibrary per CR 704.5b) then move Top from battlefield to library index 0 via IZone.InsertCardAt. Printed Legendary supertype omitted in v1. |
 | Sigarda's Aid | Enchantment | TBD | flash-grant equipment/aura + ETB auto-attach |
 | Skullclamp | Artifact | TBD | Equipment {1} — AttachedBoostEffect(+1, -1) at Layer 7c; dies trigger (CR 603.6c) matches the currently-equipped creature's Battlefield→Graveyard CardMovedEvent and draws 2 cards; Equip {1}. Sorcery-speed gate + attach-target prompt deferred (same as Colossus Hammer) |
 | Snapcaster Mage | Creature | #170 | flash + ETB flashback grant |
@@ -371,7 +372,7 @@ Sorted roughly by build priority (small infra lift × high meta share). Refreshe
 | 14 | Inkmoth Nexus | medium | Land {T}: {C} + {1}: until EOT, becomes 1/1 Blinkmoth artifact creature with flying + infect (still a land). Builds on Mutavault primitive + needs Infect keyword (poison counters + damage replacement). |
 | ~~15~~ | ~~Goblin Matron~~ | ~~low~~ | Shipped via `GoblinMatronFactory` — Creature {2}{R} 1/1 Goblin + ETB tutor filtered by `CardSubtype.Goblin` (agent-driven pick with deterministic first-match fallback, mirroring `MysticalTutorFactory` / `SearchSpellFactory`). Shuffle + reveal event deferred (same gaps as the rest of the tutor surface). |
 | 16 | Trinket Mage | low | Creature ETB — search library for artifact mv ≤ 1, reveal, hand. Same tutor-to-hand-by-filter shape as Goblin Matron with mv-cap filter. |
-| 17 | Sensei's Divining Top | high | Legendary artifact {1}: look top 3, put back in any order. {T}: draw a card, then put Top on top of library. Needs activated ability that re-templates the library + self-return-to-top mid-resolution; classic infinite-Top problem. |
+| ~~17~~ | ~~Sensei's Divining Top~~ | ~~high~~ | Shipped via `SenseisDiviningTopFactory` — Artifact {1} with two activated abilities. {T}: peek top 3 + agent-driven reorder via `ScryAction.Peek` / `ScryAction.Apply` with `ToBottom=[]` (mirrors Ponder; default preserves order). {1}, {T}: draw a card (empty library flags `MarkTriedToDrawFromEmptyLibrary` per CR 704.5b) then move Top from battlefield to library index 0 via `IZone.InsertCardAt`. Printed Legendary supertype omitted in v1. |
 | 18 | Daze | low | Instant {1}{U} — counter unless pay {1}; alt cost {0} + return an Island you control. Counter-unless-pay exists; needs alt-cost with non-mana additional cost (bounce-self-permanent), composable with `PitchAlternativeCost`-style probe. |
 | 19 | Boros Reckoner | high | Creature with damage-redirect: "If a source would deal damage to Boros Reckoner, instead it deals that damage to any target". Needs source-damage replacement effect with redirect to a chosen target — a generalization of `PreventNextDamageFromChosenSourceShield`. |
 | 20 | Reckless Charge | low | Sorcery — target creature gets +3/+0 and haste until EOT, Flashback {R}. Pump + grant-haste primitives both exist; FlashbackAlternativeCost done — needs `PumpAndGrantKeyword` template wired to flashback alt-cost. |
