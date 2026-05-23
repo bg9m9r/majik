@@ -53,6 +53,8 @@ public enum CardSubtype
     Avatar,
     /// <summary>Wurm creature subtype — Wurmcoil Engine, Penumbra Wurm. CR 205.3m.</summary>
     Wurm,
+    /// <summary>Nightmare creature subtype — Lurrus of the Dream-Den, Nightmare Lash. CR 205.3m.</summary>
+    Nightmare,
 
     // Land subtypes (examples)
     Forest,
