@@ -373,6 +373,17 @@ public static class NamedCardFactory
             // Use the (owner, bus, triggers) overload for fully-wired behavior.
             "Ledger Shredder" => LedgerShredderFactory.Create(owner),
 
+            // Enchantment — {1}{G} (UpTheBeanstalkFactory).
+            // Two triggered abilities surfaced on the card: (1) ETB →
+            // controller draws a card (CardMovedEvent → battlefield); and
+            // (2) whenever the controller casts a spell with mana value
+            // 5+ → controller draws a card (SpellCastEvent gated on
+            // controller + ISpell.Card.ManaCostValue.TotalValue >= 5).
+            // Single-arg dispatcher produces the correct card shape without
+            // trigger-manager wiring; use the (owner, triggers) overload
+            // for end-to-end firing.
+            "Up the Beanstalk" => UpTheBeanstalkFactory.Create(owner),
+
             // Creature — Human Rogue {1}{U} 1/1 (TestConniverFactory).
             // Synthetic Connive keyword fixture. ETB: connive (CR 701.50).
             // Draws + discards + +1/+1 counter if nonland was discarded.
