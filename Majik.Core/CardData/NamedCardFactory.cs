@@ -424,6 +424,24 @@ public static class NamedCardFactory
             // full +4/-3 effects.
             "Karn Liberated" => KarnLiberatedFactory.Create(owner),
 
+            // Legendary Planeswalker — Karn {4} loyalty 5
+            // (KarnScionOfUrzaFactory). +1 reveal-top-2 + deterministic
+            // split (higher-mv to hand, other to bottom of library;
+            // collapses the opponent's pile-separator + controller's
+            // pick-pile prompts to an auto-pick, same posture as the
+            // rest of the planeswalker family). -1 is DEFERRED to a
+            // no-op (loyalty change still applies per CR 606.3) since
+            // "exiled with this source" tag tracking isn't wired yet.
+            // -2 creates a 0/0 colorless Construct artifact creature
+            // token with a CDA Layer 7a "+1/+1 for each artifact you
+            // control" effect registered on the supplied
+            // ContinuousEffectsService. Single-arg dispatcher path
+            // produces the card shape with no live effects service
+            // (token is created as a 0/0 — a same-turn SBA pass will
+            // graveyard it); use the (owner, zoneService, effects)
+            // overload for fully-wired behavior.
+            "Karn, Scion of Urza" => KarnScionOfUrzaFactory.Create(owner),
+
             // Sorcery — {7}{U} (TreasureCruiseFactory).
             // CR 702.66 — Delve. "Delve" marker keyword wired; the cost
             // mechanic itself lives in DelveCost + SpellCastFlow. Resolve
