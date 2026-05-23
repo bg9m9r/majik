@@ -140,7 +140,9 @@ public sealed class ScryfallCardFactory
             var fast = OracleSpellBinder.BindCompiled(
                 compiled.TemplateName,
                 compiled.ParamsJson,
-                entity, caster, targetResolver, effects: null, stack);
+                entity, caster, targetResolver,
+                effects: _effects, stack, replacements: _replacements,
+                triggers: _triggers, eventBus: _eventBus, zones: _zones);
             if (fast is not null) return fast;
         }
 

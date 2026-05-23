@@ -263,14 +263,19 @@ public static class OracleSpellBinder
         Func<object, object> resolver,
         Majik.Core.Effects.ContinuousEffectsService? effects,
         Majik.Core.Stack.Stack? stack,
-        Majik.Core.Effects.ReplacementBus? replacements = null)
+        Majik.Core.Effects.ReplacementBus? replacements = null,
+        Majik.Core.Abilities.TriggerManager? triggers = null,
+        Majik.Core.Events.IEventBus? eventBus = null,
+        Majik.Core.Services.ZoneService? zones = null)
     {
         ArgumentNullException.ThrowIfNull(templateName);
         ArgumentNullException.ThrowIfNull(entity);
         ArgumentNullException.ThrowIfNull(caster);
         ArgumentNullException.ThrowIfNull(resolver);
 
-        var ctx = new SpellBindContext(entity, caster, resolver, effects, stack, replacements);
+        var ctx = new SpellBindContext(
+            entity, caster, resolver, effects, stack, replacements,
+            triggers, eventBus, zones);
 
         var template = Registry.OrderedTemplates
             .FirstOrDefault(t => string.Equals(t.Name, templateName, StringComparison.Ordinal));
