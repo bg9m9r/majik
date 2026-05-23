@@ -3,13 +3,13 @@
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
 **Last updated:** 2026-05-23
-**Latest origin/main:** 6b29e01 (… + Lurrus of the Dream-Den + Colossus Hammer + Sigarda's Aid + Living End + Phyrexian Tower + Puresteel Paladin + Aether Vial + Mox Opal + Scion of Draco + Ragavan, Nimble Pilferer + Cavern of Souls + Galvanic Discharge + Dauthi Voidwalker) + Chord of Calling (this PR)
+**Latest origin/main:** 6b29e01 (… + Lurrus of the Dream-Den + Colossus Hammer + Sigarda's Aid + Living End + Phyrexian Tower + Puresteel Paladin + Aether Vial + Mox Opal + Scion of Draco + Ragavan, Nimble Pilferer + Cavern of Souls + Galvanic Discharge + Dauthi Voidwalker + Chord of Calling) + Eldritch Evolution (this PR)
 
 ## Headline numbers
 
 | Metric | Count |
 |---|---|
-| Named factories | 88 |
+| Named factories | 89 |
 | Bespoke templates | 26 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
@@ -48,6 +48,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Dredger's Insight | Enchantment | — | dies-trigger surveil-equivalent |
 | Dress Down | Enchantment | #195 | lose-abilities + 1/1 base PT |
 | Dryad Arbor | Land Creature | — | 1/1 Forest creature, no cost |
+| Eldritch Evolution | Sorcery | TBD | sac-creature additional cost + tutor creature mv ≤ sac.mv+2 → battlefield + self-exile (CR 601.2f / 701.19a / 608.2) |
 | Elegant Parlor | Land | — | R/W surveil dual |
 | Endurance | Creature | TBD | MH2 incarnation: Flash + Reach + evoke pitch + ETB shuffle-graveyard-to-library |
 | Fiery Islet | Land | — | pay-1-life U/R + sac-draw |
@@ -303,7 +304,7 @@ Per-keyword action helpers under `Majik.Core/Keywords/`:
 - **Mono-Green Tron** — High. Ancient Stirrings, Sylvan Scrying, Wurmcoil Engine done. Karn Liberated done. Karn, the Great Creator done. Tron lands (Urza's Mine + Tower + Power-Plant) done with the conditional {2} mana ability. ~70%.
 - **Living End / Crashing Footfalls cascade** — High. Cascade keyword done (`Keywords/CascadeAction.cs`) + Crashing Footfalls shipped (#219). Living End shipped (this PR) with both the Cascade trigger and the resolve chain (per-player mass-exile-grave + sacrifice-creatures + mass-reanimate; ETB triggers fire on reanimated permanents via PR #174 plumbing). Suspend itself is done (#183). ~75%.
 - **Rakdos Scam** — High. Grief done (#205, mirrors Solitude evoke + ETB pattern). Fury done (mirrors Solitude/Grief). Ragavan, Nimble Pilferer done (combat-damage Treasure + exile + may-cast EOT grant; Dash deferred). Dauthi Voidwalker done (Shadow + opponent-grave→exile-with-void-counter replacement effect + {2},{T},remove-void-counter activated cast-from-exile via CastFromExileAlternativeCost; EOT "this turn" timing on the cast permission deferred). Liliana of the Veil done, Fatal Push done, Thoughtseize done. ~75%.
-- **Yawgmoth combo** — Mid. Yawgmoth done. Undying creatures (Young Wolf, Strangleroot Geist, Geralf's Messenger) done. Chord of Calling done. Eldritch Evolution absent. ~60%.
+- **Yawgmoth combo** — High. Yawgmoth done. Undying creatures (Young Wolf, Strangleroot Geist, Geralf's Messenger) done. Chord of Calling done. Eldritch Evolution done — tutor-with-sac is a primary engine starter for the deck. ~70%.
 - **Domain Zoo** — Mid. Boros Charm done, fetches done, shocks done, Tribal Flames done, Scion of Draco's domain cost-reduction done (keyword-grant rider deferred). Territorial Kavu absent. ~45%.
 - **Amulet Titan** — Mid. Amulet of Vigor done (untap-on-enters-tapped trigger) + Primeval Titan done (ETB + attack land-tutor for up to 2, tapped). No bounce lands. ~30%.
 - **Lurrus Companion** — Low-mid. Lurrus of the Dream-Den done (Lifelink + once-per-turn cast-permanent-mv≤2-from-graveyard; companion deck-construction rule deferred). Pairs with the existing low-mv permanent suite (Mishra's Bauble, Dryad Arbor, Stoneforge Mystic, Walking Ballista, Dark Confidant, etc.). Deck-construction enforcement absent. ~30%.

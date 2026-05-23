@@ -855,6 +855,24 @@ public static class NamedCardFactory
             // DEFERRED — no DashAlternativeCost / DashReturnRegistry yet.
             "Ragavan, Nimble Pilferer" => RagavanNimblePilfererFactory.Create(owner),
 
+            // Sorcery — {1}{G} (EldritchEvolutionFactory). Eldritch Moon.
+            // "As an additional cost to cast this spell, sacrifice a
+            //  creature. Search your library for a creature card with mana
+            //  value less than or equal to the sacrificed creature's mana
+            //  value plus 2, put it onto the battlefield, then shuffle.
+            //  Exile Eldritch Evolution." CR 601.2f additional-cost +
+            // CR 701.19a creature tutor → battlefield + CR 608.2 self-exile
+            // override. Card shape only here; the resolve-time spell
+            // definition is built on demand via
+            // EldritchEvolutionFactory.BuildSpellDefinition(caster, card,
+            // zoneService) so ETB triggers fire on the tutored permanent
+            // when a ZoneService is wired. Sacrifice target picks the
+            // first eligible creature on the controller's battlefield
+            // deterministically (same v1 behaviour as Fling / Thud /
+            // Life's Legacy). Library shuffle (CR 701.19c) deferred —
+            // same rationale as SearchSpellFactory.
+            "Eldritch Evolution" => EldritchEvolutionFactory.Create(owner),
+
             // Land — Cavern of Souls (Avacyn Restored, CavernOfSoulsFactory).
             // ETB: choose a creature type (resolved eagerly via a Func<Player,
             // CardSubtype> typeChooser on the 2-arg overload; the single-arg
