@@ -3,13 +3,13 @@
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
 **Last updated:** 2026-05-23
-**Latest origin/main:** Sword of Fire and Ice (Artifact — Equipment {3} — AttachedBoostEffect(+2, +2) at Layer 7c; protection-from-red + protection-from-blue ride as two ProtectionAbility markers on the equipment card (full DEBT-A enforcement deferred — no attachment-aware Layer 6 grant for protection yet); combat-damage-to-a-player trigger deals 2 damage to any target + draws 1; Equip {2}) on top of Reckless Charge + Trinket Mage + Sun Titan + Sensei's Divining Top + Inkmoth Nexus + Spell Queller + Goblin Matron + Mutavault + Skullclamp + Umezawa's Jitte + Wasteland + Swords to Plowshares + Mystical Tutor + Path to Exile + Daze + Ponder + Preordain + Splinter Twin + Sythis, Harvest's Hand + Pyromancer's Goggles + Plague Engineer + Manabarbs + Yawgmoth's Will + Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere.
+**Latest origin/main:** Goblin Welder (Creature — Goblin Artificer {R} 1/1 — {T} activated ability that pairs a same-player (battlefield artifact, graveyard artifact card) and sac-then-reanimates; ZoneService-routed when supplied so dies / ETB triggers fire, raw zone fallback for shape tests; target prompt + on-stack legality check deferred) on top of Sword of Fire and Ice + Reckless Charge + Trinket Mage + Sun Titan + Sensei's Divining Top + Inkmoth Nexus + Spell Queller + Goblin Matron + Mutavault + Skullclamp + Umezawa's Jitte + Wasteland + Swords to Plowshares + Mystical Tutor + Path to Exile + Daze + Ponder + Preordain + Splinter Twin + Sythis, Harvest's Hand + Pyromancer's Goggles + Plague Engineer + Manabarbs + Yawgmoth's Will + Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere.
 
 ## Headline numbers
 
 | Metric | Count |
 |---|---|
-| Named factories | 127 |
+| Named factories | 128 |
 | Bespoke templates | 27 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
@@ -67,6 +67,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Goblin Bombardment | Enchantment | — | sac-creature → 1 damage |
 | Goblin Lackey | Creature | TBD | {R} 1/1 Goblin + combat-damage-to-player trigger cheats first Goblin creature card from hand onto the battlefield (ZoneService-routed for ETB triggers) |
 | Goblin Matron | Creature | TBD | {2}{R} 1/1 Goblin + ETB tutor a Goblin card from library to hand (agent-driven pick with deterministic first-match fallback; shuffle deferred) |
+| Goblin Welder | Creature | TBD | {R} 1/1 Goblin Artificer + {T} activated ability: pair same-player (battlefield artifact, graveyard artifact card) and sac-then-reanimate (ZoneService-routed when supplied; raw zone fallback for shape tests). Target prompt + on-stack legality check deferred — resolution scans candidate players in order and picks the first legal pair |
 | Grief | Creature | #205 | evoke pitch + ETB discard |
 | Grist, the Hunger Tide | Planeswalker | — | +1 token, -2 reanimate |
 | Harbinger of the Seas | Creature | #157 | nonbasic-to-Island |

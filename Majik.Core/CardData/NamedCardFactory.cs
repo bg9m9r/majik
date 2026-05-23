@@ -1490,6 +1490,22 @@ public static class NamedCardFactory
             // ETB trigger with a TriggerManager.
             "Trinket Mage" => TrinketMageFactory.Create(owner),
 
+            // Creature — Goblin Artificer {R} 1/1 (GoblinWelderFactory).
+            // Urza's Legacy. Activated ability {T}: target artifact a
+            // player controls + target artifact card in that player's
+            // graveyard; on resolve that player sacrifices the
+            // battlefield artifact and returns the graveyard artifact
+            // to the battlefield (CR 608). The single-arg dispatcher
+            // path here produces the correct card shape — the
+            // activated ability is attached with the {T} cost but its
+            // effect body no-ops because the dispatcher path does not
+            // supply a player iterator. Use the
+            // (owner, zoneService, eventBus, playerProvider) overload
+            // for full sac-then-reanimate resolution; tests can also
+            // drive the resolution directly via
+            // GoblinWelderFactory.WeldResolve(players).
+            "Goblin Welder" => GoblinWelderFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
