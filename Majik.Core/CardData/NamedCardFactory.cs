@@ -2499,6 +2499,23 @@ public static class NamedCardFactory
             // not-overloaded — 4 damage to one target creature.
             "Mizzium Mortars" => MizziumMortarsFactory.Create(owner),
 
+            // Creature — Minotaur Warrior {1}{R} 2/1 (EarthshakerKhenraFactory).
+            // Hour of Devastation. Haste keyword wired. ETB triggered ability
+            // (CR 603.6a) declares a 1..1 "target creature with power 2 or less"
+            // TargetRequest and on resolution registers a CombatRestrictionEffect
+            // with CombatRestriction.CannotBlock targeting the chosen creature
+            // (CR 509.1c) — EOT-scoped (CR 514.2) via the default ExpiresAtEndOfTurn.
+            // Resolution rechecks "power 2 or less" + still-on-battlefield (CR 608.2b);
+            // restriction is registered against the target's
+            // ContinuousEffectsService (Creature.ActiveEffects) where the combat
+            // validator looks. Eternalize {5}{R}{R} (CR 702.117) is deferred —
+            // needs an exile-cost / graveyard-to-token alt-cost (sibling of
+            // Unearth / Priest of Fell Rites). "Power 2 or less" target-legality
+            // filter at choose-time deferred — same posture as Solitude / Kraul
+            // Harpooner; engine accepts any Creature target and the resolve-time
+            // gate enforces the threshold.
+            "Earthshaker Khenra" => EarthshakerKhenraFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
