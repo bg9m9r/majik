@@ -114,6 +114,14 @@ public static class NamedCardFactory
             // player's library" deferred.
             "Mishra's Bauble" => MishrasBaubleFactory.Create(owner),
 
+            // Land — Mishra's Workshop (Antiquities, MishrasWorkshopFactory).
+            // Printed: "{T}: Add {C}{C}{C}. Spend this mana only to cast
+            // artifact spells." v1 ships the 3-colourless tap ability;
+            // the "spend only on artifact spells" restriction is
+            // structural-only — enforcement deferred until a per-mana
+            // provenance ledger exists (CR 106.4). See factory xmldoc.
+            "Mishra's Workshop" => MishrasWorkshopFactory.Create(owner),
+
             // Enchantment — {1}{R} (GoblinBombardmentFactory).
             // Sacrifice a creature: This enchantment deals 1 damage to any
             // target — wired. The shell uses Create(owner) (no pre-bound
@@ -936,6 +944,26 @@ public static class NamedCardFactory
             // bus-driven dies-trigger wiring.
             "Skullclamp" => SkullclampFactory.Create(owner),
 
+            // Artifact — Equipment {3} (SwordOfFeastAndFamineFactory).
+            // Mirrodin Besieged. Static "+2/+2" via AttachedBoostEffect (Layer
+            // 7c). "Has protection from black and from green" granted to the
+            // equipped creature via two AttachedAuraAbilityGrantStaticEffect
+            // lifecycles (one ProtectionAbility per colour); Protection lookup
+            // (Majik.Core.Rules.Protection.HasProtectionFromColor) scans the
+            // bearer's Abilities for ProtectionAbility so the grants feed
+            // standard CR 702.16 gameplay. Combat-damage-to-a-player trigger
+            // (CR 510 / CR 603.1) fires when the equipped creature deals
+            // combat damage to a player: damaged player discards a card (v1
+            // deterministic first-card pick) and controller's lands untap.
+            // Equip {2} activated ability wired. The single-arg dispatcher
+            // path produces the correct card shape; use the (owner,
+            // continuousEffects, eventBus, triggers) overload for fully-wired
+            // boost / protection lifecycle / bus-driven combat-damage firing.
+            // Sorcery-speed gate + attach-target prompt + discard-prompt
+            // deferred (same queue as Colossus Hammer / Umezawa's Jitte /
+            // Liliana of the Veil).
+            "Sword of Feast and Famine" => SwordOfFeastAndFamineFactory.Create(owner),
+
             // Legendary Artifact — Equipment {2} (UmezawasJitteFactory).
             // Betrayers of Kamigawa. Combat-damage trigger places two charge
             // counters on Jitte. Three modal activated abilities, each
@@ -1514,6 +1542,22 @@ public static class NamedCardFactory
             // drive the resolution directly via
             // GoblinWelderFactory.WeldResolve(players).
             "Goblin Welder" => GoblinWelderFactory.Create(owner),
+
+            // Creature — Minotaur Wizard {R/W}{R/W}{R/W} 3/3 (BorosReckonerFactory).
+            // Gatecrash. First strike + "Whenever Boros Reckoner is dealt damage,
+            // it deals that much damage to any target." Printed text is a
+            // *replacement* effect on the incoming damage (CR 614) but v1 ships
+            // it as a triggered ability (CR 603.1) over DamageDealtEvent —
+            // simpler than introducing a source-damage redirect primitive. The
+            // damage still resolves on Boros Reckoner before the redirect fires,
+            // and the redirect goes on the stack rather than replacing the
+            // original damage. Hybrid mana cost {R/W} parses via
+            // ManaCost.Parse's HybridPip path (CR 107.4e). The single-arg
+            // dispatcher path here produces the correct card shape without
+            // TriggerManager wiring; use the (owner, eventBus, triggers)
+            // overload to register the damage-received trigger and republish
+            // the redirect as a non-combat DamageDealtEvent (CR 119.2c).
+            "Boros Reckoner" => BorosReckonerFactory.Create(owner),
 
             _ => new Card(name, ""),
         };
