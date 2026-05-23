@@ -142,6 +142,15 @@ public sealed class OpponentArtifactActivatedSuppressionEffect
     /// </summary>
     private bool IsBlocked(IActivatedAbility ability)
     {
+        // Defensive — the lifecycle binder is expected to Unregister this
+        // predicate from the registry on LTB. In case a host fails to
+        // clean up (e.g. xUnit parallel tests where one suite leaks state
+        // before its Dispose fires), self-deactivate when our source is
+        // no longer on the battlefield. This keeps the predicate honest
+        // about the printed text's "while on the battlefield" implicit
+        // scope (CR 604.2) without relying on prompt registry hygiene.
+        if (_source != null && _source.Zone != ZoneType.Battlefield) return false;
+
         if (ability.Source is not ICard card) return false;
         if (!card.HasType(CardType.Artifact)) return false;
         // Only on-battlefield artifacts — Karn's printed static targets

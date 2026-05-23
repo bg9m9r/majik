@@ -29,12 +29,29 @@ namespace Majik.Core.Tests.CardData;
 ///   - -2: selector returns a Wurmcoil from "outside" → goes to hand.
 ///   - LTB: static suppression lifts.
 ///   - NamedCardFactory dispatch.
+///
+/// Shares the <see cref="ActivatedAbilityRestrictionsCollection"/> non-
+/// parallel xUnit collection with <see cref="PithingNeedleTests"/> and the
+/// rule-engine tests that consult the registry — the registry is
+/// process-global, and predicate restrictions (Karn-style) can otherwise
+/// leak into concurrently-running tests that touch
+/// <see cref="ActionValidator.ValidateActivateAbility"/>.
 /// </summary>
+[Collection(nameof(ActivatedAbilityRestrictionsCollection))]
 public class KarnTheGreatCreatorTests : IDisposable
 {
     private readonly Player _alice = new("Alice", 20);
     private readonly Player _bob = new("Bob", 20);
     private readonly EventBus _bus = new();
+
+    public KarnTheGreatCreatorTests()
+    {
+        // Defensive — ensure no other test left predicates behind. The
+        // Collection attribute already serialises us against the other
+        // registry-touching suites, but a constructor-side clear costs
+        // nothing and tightens the invariant.
+        ActivatedAbilityRestrictions.Clear();
+    }
 
     public void Dispose()
     {

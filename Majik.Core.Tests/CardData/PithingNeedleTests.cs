@@ -21,7 +21,13 @@ namespace Majik.Core.Tests.CardData;
 /// CR 602.5c — "Activated abilities of sources with the chosen name
 /// can't be activated unless they're mana abilities."
 /// CR 605 — mana-ability exemption.
+///
+/// Shares the <see cref="ActivatedAbilityRestrictionsCollection"/> non-
+/// parallel xUnit collection with Karn the Great Creator and the
+/// validator-side activation tests. See the collection xmldoc for the
+/// global-registry isolation rationale.
 /// </summary>
+[Collection(nameof(ActivatedAbilityRestrictionsCollection))]
 public class PithingNeedleTests : IDisposable
 {
     private readonly Player _alice = new("Alice", 20);

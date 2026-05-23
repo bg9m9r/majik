@@ -616,6 +616,17 @@ public static class NamedCardFactory
             // (no live static, +1 no-ops without effects/board).
             "Karn, the Great Creator" => KarnTheGreatCreatorFactory.Create(owner),
 
+            // Artifact — {1} (AmuletOfVigorFactory). Worldwake.
+            // "Whenever a permanent enters tapped under your control,
+            //  untap it." Triggered ability over CardMovedEvent →
+            // Battlefield; condition gates on controller + Permanent +
+            // IsTapped (ZoneService taps before publishing, so IsTapped
+            // is already true at trigger-evaluation time per CR 614.6).
+            // Single-arg dispatcher path attaches the ability for shape
+            // tests; use the (owner, triggers) overload to wire up
+            // bus-driven firing.
+            "Amulet of Vigor" => AmuletOfVigorFactory.Create(owner),
+
             // Sorcery — {1}{G} (SylvanScryingFactory). "Search your library
             // for a land card, reveal it, put it into your hand, then
             // shuffle." (CR 701.19a). Tutors ANY land — basic or nonbasic —
