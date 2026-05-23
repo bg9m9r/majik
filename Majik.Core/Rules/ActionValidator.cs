@@ -80,7 +80,26 @@ public class ActionValidator
     /// </summary>
     private ValidationResult ValidateActivateAbility(ActivateAbilityAction action)
     {
-        // Use RulesEngine to validate
+        if (action == null || action.Ability == null)
+        {
+            return ValidationResult.Invalid("ActivateAbilityAction is missing an ability");
+        }
+
+        // CR 602.5c — name-targeted activated-ability suppression
+        // (Pithing Needle, Phyrexian Revoker, Sorcerous Spyglass, …). When
+        // a registered suppressor's chosen name matches this ability's
+        // source name, reject the activation. CR 605 — mana abilities
+        // are exempt; ActivatedAbilityRestrictions handles that filter
+        // internally (and mana abilities take a separate activator path
+        // anyway, so they don't reach ValidateActivateAbility).
+        if (ActivatedAbilityRestrictions.IsActivatedAbilityRestricted(action.Ability))
+        {
+            var sourceName = (action.Ability.Source as Cards.ICard)?.Name ?? "<unknown>";
+            return ValidationResult.Invalid(
+                $"Activated abilities of {sourceName} can't be activated (chosen name)",
+                new RuleViolation("602.5c", "name-targeted activated-ability suppression"));
+        }
+
         return ValidationResult.Valid();
     }
 

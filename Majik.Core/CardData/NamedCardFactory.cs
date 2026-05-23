@@ -381,6 +381,16 @@ public static class NamedCardFactory
             // TarmogoyfFactory.CountDistinctCardTypes for the type count.
             "Unholy Heat" => UnholyHeatFactory.Create(owner),
 
+            // Artifact — {1} (PithingNeedleFactory).
+            // "As Pithing Needle enters, choose a card name. Activated
+            //  abilities of sources with the chosen name can't be
+            //  activated unless they're mana abilities." (CR 602.5c / 605.)
+            // Wired via PithingNeedleStaticEffect when the runtime
+            // (owner, nameSelector, eventBus) overload is used. The
+            // single-arg dispatcher path here produces the correct card
+            // shape only.
+            "Pithing Needle" => PithingNeedleFactory.Create(owner),
+
             // Creature — Kor Artificer {1}{W} 1/2 (StoneforgeMysticFactory).
             // ETB tutor: search library for an Equipment card → hand
             // (deterministic first-match; shuffle deferred). Activated
