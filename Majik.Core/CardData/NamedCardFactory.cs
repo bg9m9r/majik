@@ -370,6 +370,17 @@ public static class NamedCardFactory
             // and SuspendedCardRegistry.
             "Rift Bolt" => RiftBoltFactory.Create(owner),
 
+            // Instant — {R} (UnholyHeatFactory). Modern Horizons 2.
+            // "Unholy Heat deals 2 damage to any target. Delirium —
+            //  Unholy Heat deals 4 damage to that target instead if
+            //  there are four or more card types among cards in your
+            //  graveyard." CR 702.105. Card shape only here; the
+            // resolve-time SpellDefinition (with the delirium gate
+            // sampling the controller's graveyard) is built on demand
+            // via UnholyHeatFactory.BuildSpellDefinition. Reuses
+            // TarmogoyfFactory.CountDistinctCardTypes for the type count.
+            "Unholy Heat" => UnholyHeatFactory.Create(owner),
+
             // Artifact — {1} (PithingNeedleFactory).
             // "As Pithing Needle enters, choose a card name. Activated
             //  abilities of sources with the chosen name can't be
