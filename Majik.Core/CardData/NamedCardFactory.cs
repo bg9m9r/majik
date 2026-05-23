@@ -457,6 +457,17 @@ public static class NamedCardFactory
             // by the ETB effect.
             "Murktide Regent" => MurktideRegentFactory.Create(owner),
 
+            // Enchantment — {1}{U} (DressDownFactory). Flash. CR 613.6 + 613.7b:
+            // "Creatures lose all abilities and have base power and toughness
+            // 1/1." End-step sacrifice trigger wired (CR 500.4 / CR 603.1).
+            // The single-arg dispatcher path here attaches the Flash keyword
+            // and the end-step trigger to the card shape; live continuous-
+            // effects + TriggerManager wiring requires the (owner, effects,
+            // eventBus, triggers, creaturePoolSource) overload. Candidate-pool
+            // snapshot semantics — creatures entering AFTER Dress Down are
+            // not scoped by v1.
+            "Dress Down" => DressDownFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
