@@ -1093,6 +1093,22 @@ public static class NamedCardFactory
             // (resolution-time guard catches illegal picks).
             "Karakas" => KarakasFactory.Create(owner),
 
+            // Land — Wasteland (Tempest / reprints, WastelandFactory).
+            // {T}: Add {C} — vanilla ManaAbility wired.
+            // {T}, Sacrifice Wasteland: Destroy target nonbasic land —
+            // ActivatedAbility with AdditionalCost.Tap + TargetRequest for
+            // "target nonbasic land". The self-sacrifice is performed inline
+            // by the effect closure (AdditionalCost.Sacrifice's Pay is a
+            // stub — same trick Engineered Explosives + Mishra's Bauble use).
+            // Resolution-time gate checks the chosen target is a non-basic
+            // Land on the battlefield (CR 608.2b illegal-target → effect
+            // does nothing). v1 uses raw zone moves (no ZoneService routing —
+            // mirrors Karakas's bounce). ActionValidator doesn't yet filter
+            // the agent's target list by "nonbasic land" (resolution-time
+            // guard catches illegal picks). Instant-speed per the printed
+            // oracle (CR 602.5b default activation timing).
+            "Wasteland" => WastelandFactory.Create(owner),
+
             // Creature — Illusion {1}{U} 0/0 (PhantasmalImageFactory).
             // CR 706.10 — "You may have this enter as a copy of any creature
             // on the battlefield, except it's an Illusion in addition to its
