@@ -337,6 +337,23 @@ public static class NamedCardFactory
             // multi-player effects.
             "Liliana of the Veil" => LilianaOfTheVeilFactory.Create(owner),
 
+            // Legendary Planeswalker — Oko {1}{G}{U} loyalty 4
+            // (OkoThiefOfCrownsFactory). +2 create-Food-token, +1
+            // target-artifact-or-creature-becomes-3/3-Elk + lose-all-
+            // abilities (Layer 4 type-set to Elk Creature + Layer 6 strip
+            // + Layer 7b 3/3; v1 colour-set-to-green deferred — no
+            // Layer 5 colour-changing primitive yet), -5 exchange-control
+            // of target opp-permanent + target your-creature (counter
+            // removal deferred — no CR 611 counter surface on Permanent
+            // yet). Single-arg dispatcher path attaches all three loyalty
+            // bodies; +1/-5 effect bodies gate on the (effects /
+            // battlefieldResolver / allPlayersResolver) wiring and no-op
+            // when the resolvers aren't supplied (loyalty changes still
+            // apply per CR 606.3). The +2 still spawns a Food token even
+            // on the single-arg path because TokenFactory operates on
+            // controller zones directly.
+            "Oko, Thief of Crowns" => OkoThiefOfCrownsFactory.Create(owner),
+
             // Legendary Planeswalker — Wrenn {R}{G} loyalty 3
             // (WrennAndSixFactory). +1 return land card from graveyard
             // to hand (auto-pick), -1 lands-ping (deferred no-op), -7
