@@ -3,13 +3,13 @@
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
 **Last updated:** 2026-05-23
-**Latest origin/main:** `8dc0625` — Pyromancer's Goggles on top of Plague Engineer + Manabarbs + Yawgmoth's Will + Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere. Top 20 list refreshed (round 2).
+**Latest origin/main:** `3a16c24` — Pyromancer's Goggles on top of Plague Engineer + Manabarbs + Yawgmoth's Will + Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere. Top 20 list refreshed (round 2). Sythis, Harvest's Hand added in this PR.
 
 ## Headline numbers
 
 | Metric | Count |
 |---|---|
-| Named factories | 116 |
+| Named factories | 117 |
 | Bespoke templates | 26 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
@@ -115,6 +115,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Sunbaked Canyon | Land | — | pay-1-life R/W + sac-draw |
 | Surgical Extraction | Instant | #192 | phyrexian global name exile |
 | Sylvan Scrying | Sorcery | TBD | any-land tutor to hand (Tron enabler) |
+| Sythis, Harvest's Hand | Creature | TBD | Legendary Nymph 1/2 {G}{W} — Constellation: enchantment-ETB-under-controller → gain 1 life + draw 1 (covers plain enchantments AND Auras via CardType.Enchantment predicate) |
 | Tarmogoyf | Creature | #173 | CDA P/T from grave types |
 | Teferi, Time Raveler | Planeswalker | #182 | sorcery-speed restriction emblem |
 | Test Conniver | Creature | — | connive-keyword test card |
@@ -364,7 +365,6 @@ Sorted roughly by build priority (small infra lift × high meta share). Refreshe
 | 19 | Boros Reckoner | high | Creature with damage-redirect: "If a source would deal damage to Boros Reckoner, instead it deals that damage to any target". Needs source-damage replacement effect with redirect to a chosen target — a generalization of `PreventNextDamageFromChosenSourceShield`. |
 | 20 | Reckless Charge | low | Sorcery — target creature gets +3/+0 and haste until EOT, Flashback {R}. Pump + grant-haste primitives both exist; FlashbackAlternativeCost done — needs `PumpAndGrantKeyword` template wired to flashback alt-cost. |
 | 21 | Splinter Twin | medium | Aura grants `{T}: create a token copy with haste`. `CopyEffect` exists, but ability-grant-on-attach (aura adds an activated ability to enchanted creature) does not. (Carried over from round 1.) |
-| 22 | Sythis, Harvest's Hand | medium | Constellation (cast-an-enchantment trigger) primitive absent; needs a cast-event-typed-card trigger surface comparable to landfall. (Carried over.) |
 
 ## How to update this doc
 
