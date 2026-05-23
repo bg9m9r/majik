@@ -935,6 +935,26 @@ public static class NamedCardFactory
             // bus-driven dies-trigger wiring.
             "Skullclamp" => SkullclampFactory.Create(owner),
 
+            // Artifact — Equipment {3} (SwordOfFeastAndFamineFactory).
+            // Mirrodin Besieged. Static "+2/+2" via AttachedBoostEffect (Layer
+            // 7c). "Has protection from black and from green" granted to the
+            // equipped creature via two AttachedAuraAbilityGrantStaticEffect
+            // lifecycles (one ProtectionAbility per colour); Protection lookup
+            // (Majik.Core.Rules.Protection.HasProtectionFromColor) scans the
+            // bearer's Abilities for ProtectionAbility so the grants feed
+            // standard CR 702.16 gameplay. Combat-damage-to-a-player trigger
+            // (CR 510 / CR 603.1) fires when the equipped creature deals
+            // combat damage to a player: damaged player discards a card (v1
+            // deterministic first-card pick) and controller's lands untap.
+            // Equip {2} activated ability wired. The single-arg dispatcher
+            // path produces the correct card shape; use the (owner,
+            // continuousEffects, eventBus, triggers) overload for fully-wired
+            // boost / protection lifecycle / bus-driven combat-damage firing.
+            // Sorcery-speed gate + attach-target prompt + discard-prompt
+            // deferred (same queue as Colossus Hammer / Umezawa's Jitte /
+            // Liliana of the Veil).
+            "Sword of Feast and Famine" => SwordOfFeastAndFamineFactory.Create(owner),
+
             // Legendary Artifact — Equipment {2} (UmezawasJitteFactory).
             // Betrayers of Kamigawa. Combat-damage trigger places two charge
             // counters on Jitte. Three modal activated abilities, each
