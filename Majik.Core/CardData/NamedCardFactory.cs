@@ -259,6 +259,30 @@ public static class NamedCardFactory
             // ConditionalEntersTappedBinder in the production load path.
             "Inspiring Vantage" => InspiringVantageFactory.Create(owner),
 
+            // U/R fastland — Kaladesh (SpirebluffCanalFactory).
+            // {T}: Add {U} or {R} — two ManaAbility instances wired.
+            // ETB-tapped-unless-two-or-fewer-other-lands handled via
+            // ConditionalEntersTappedBinder in the production load path.
+            "Spirebluff Canal" => SpirebluffCanalFactory.Create(owner),
+
+            // W/B fastland — Kaladesh (ConcealedCourtyardFactory).
+            // {T}: Add {W} or {B} — two ManaAbility instances wired.
+            // ETB-tapped-unless-two-or-fewer-other-lands handled via
+            // ConditionalEntersTappedBinder in the production load path.
+            "Concealed Courtyard" => ConcealedCourtyardFactory.Create(owner),
+
+            // G/U fastland — Kaladesh (BotanicalSanctumFactory).
+            // {T}: Add {G} or {U} — two ManaAbility instances wired.
+            // ETB-tapped-unless-two-or-fewer-other-lands handled via
+            // ConditionalEntersTappedBinder in the production load path.
+            "Botanical Sanctum" => BotanicalSanctumFactory.Create(owner),
+
+            // B/G fastland — Kaladesh (BloomingMarshFactory).
+            // {T}: Add {B} or {G} — two ManaAbility instances wired.
+            // ETB-tapped-unless-two-or-fewer-other-lands handled via
+            // ConditionalEntersTappedBinder in the production load path.
+            "Blooming Marsh" => BloomingMarshFactory.Create(owner),
+
             // Enchantment — {2}{R} (BloodMoonFactory). "Nonbasic lands are
             // Mountains." CR 305.6 / 613.1d. Implemented as a Layer 4
             // SetSubtypesEffect scoped to every nonbasic Land on the
