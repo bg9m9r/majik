@@ -3,13 +3,13 @@
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
 **Last updated:** 2026-05-23
-**Latest origin/main:** Mishra's Workshop (Land — {T}: Add {C}{C}{C}; printed "spend only to cast artifact spells" restriction is structural-only — enforcement deferred until a per-mana provenance ledger exists, CR 106.4) on top of Goblin Welder + Sword of Fire and Ice + Reckless Charge + Trinket Mage + Sun Titan + Sensei's Divining Top + Inkmoth Nexus + Spell Queller + Goblin Matron + Mutavault + Skullclamp + Umezawa's Jitte + Wasteland + Swords to Plowshares + Mystical Tutor + Path to Exile + Daze + Ponder + Preordain + Splinter Twin + Sythis, Harvest's Hand + Pyromancer's Goggles + Plague Engineer + Manabarbs + Yawgmoth's Will + Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere.
+**Latest origin/main:** Boros Reckoner (Creature — Minotaur Wizard {R/W}{R/W}{R/W} 3/3 — First strike + "Whenever Boros Reckoner is dealt damage, it deals that much damage to any target". v1 ships the redirect as a triggered ability over DamageDealtEvent rather than as a printed source-damage *replacement* effect; the damage still resolves on Boros Reckoner before the redirect fires, and the redirect goes on the stack. Hybrid {R/W} parses via ManaCost.Parse's HybridPip path) on top of Mishra's Workshop + Goblin Welder + Sword of Fire and Ice + Reckless Charge + Trinket Mage + Sun Titan + Sensei's Divining Top + Inkmoth Nexus + Spell Queller + Goblin Matron + Mutavault + Skullclamp + Umezawa's Jitte + Wasteland + Swords to Plowshares + Mystical Tutor + Path to Exile + Daze + Ponder + Preordain + Splinter Twin + Sythis, Harvest's Hand + Pyromancer's Goggles + Plague Engineer + Manabarbs + Yawgmoth's Will + Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere.
 
 ## Headline numbers
 
 | Metric | Count |
 |---|---|
-| Named factories | 129 |
+| Named factories | 130 |
 | Bespoke templates | 27 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
@@ -34,6 +34,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Badgermole Cub | Creature | — | earthbend shell |
 | Blood Moon | Enchantment | #156 | nonbasic-to-Mountain Layer 4 |
 | Bonecrusher Giant | Creature | TBD | 4/3 Giant {2}{R} + targeted-by-spell trigger deals 2 to spell's controller (Adventure / Stomp half deferred) |
+| Boros Reckoner | Creature | TBD | 3/3 Minotaur Wizard {R/W}{R/W}{R/W} + first strike + damage-received trigger redirecting that much damage to any target (v1 triggered, not the printed *replacement* effect — damage still resolves on Boros Reckoner before the redirect fires, and the redirect goes on the stack). Hybrid {R/W} parses via ManaCost.Parse's HybridPip path |
 | Boseiju, Who Endures | Land | — | channel destroy stub |
 | Cabal Ritual | Instant | TBD | add {B}{B}{B}; threshold (7+ own grave) replaces with five colourless (CR 702.50) |
 | Cavern of Souls | Land | TBD | ETB choose-creature-type + {T}: {C} + {T}: any color (spend-restriction + uncounterable rider deferred) |
@@ -381,7 +382,7 @@ Sorted roughly by build priority (small infra lift × high meta share). Refreshe
 | ~~16~~ | ~~Trinket Mage~~ | ~~low~~ | Shipped via `TrinketMageFactory` — Creature — Human Wizard {2}{U} 2/2 with ETB triggered ability that tutors the first artifact card with `ManaCostValue.TotalValue <= 1` from library → hand (deterministic first-match; shuffle + reveal-event deferred, same as Stoneforge Mystic). Registered in the `NamedCardFactory` dispatch and exercised by 6 unit tests covering identity, dispatch, mv-0 / mv-1 tutor happy paths, mv≥2-only no-op, and no-artifacts no-op. |
 | ~~17~~ | ~~Sensei's Divining Top~~ | ~~high~~ | Shipped via `SenseisDiviningTopFactory` — Artifact {1} with two activated abilities. {T}: peek top 3 + agent-driven reorder via `ScryAction.Peek` / `ScryAction.Apply` with `ToBottom=[]` (mirrors Ponder; default preserves order). {1}, {T}: draw a card (empty library flags `MarkTriedToDrawFromEmptyLibrary` per CR 704.5b) then move Top from battlefield to library index 0 via `IZone.InsertCardAt`. Printed Legendary supertype omitted in v1. |
 | 18 | Daze | low | Instant {1}{U} — counter unless pay {1}; alt cost {0} + return an Island you control. Counter-unless-pay exists; needs alt-cost with non-mana additional cost (bounce-self-permanent), composable with `PitchAlternativeCost`-style probe. |
-| 19 | Boros Reckoner | high | Creature with damage-redirect: "If a source would deal damage to Boros Reckoner, instead it deals that damage to any target". Needs source-damage replacement effect with redirect to a chosen target — a generalization of `PreventNextDamageFromChosenSourceShield`. |
+| ~~19~~ | ~~Boros Reckoner~~ | ~~high~~ | Shipped via `BorosReckonerFactory` — 3/3 Minotaur Wizard {R/W}{R/W}{R/W} + First strike + damage-received trigger (CR 603.1) redirecting the captured damage amount to a settable any-target via `OracleSpellBinder.DealDamage`. v1 simplification: ships as a triggered ability rather than the printed source-damage *replacement* effect (CR 614); damage still resolves on Boros Reckoner before the redirect fires, and the redirect goes on the stack. Source-damage redirect primitive — a generalisation of `PreventNextDamageFromChosenSourceShield` — still on the backlog for the true replacement-effect upgrade. |
 | ~~20~~ | ~~Reckless Charge~~ | ~~low~~ | Shipped via `RecklessChargeFactory` — Sorcery {R}. Resolve-time `SpellDefinition` declares one 1..1 "target creature" request; on resolution registers `PumpUntilEndOfTurnEffect(+3/+0)` and `GrantKeywordUntilEndOfTurnEffect("Haste")` on the target's `ActiveEffects` (CR 514.2 — both expire at cleanup). Flashback alt-cost `{2}{R}` parsed from oracle via `FlashbackOracleParser` (mirrors Faithless Looting); post-resolve exile via `FlashbackAlternativeCost.OnResolved` (CR 702.34b). Illegal-target / missing-ActiveEffects fallbacks no-op cleanly. |
 
 ## How to update this doc

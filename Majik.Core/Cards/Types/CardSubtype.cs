@@ -74,6 +74,8 @@ public enum CardSubtype
     /// <summary>Nymph creature subtype — Sythis, Harvest's Hand; Theros Beyond
     /// Death constellation cycle. CR 205.3m.</summary>
     Nymph,
+    /// <summary>Minotaur creature subtype — Boros Reckoner. CR 205.3m.</summary>
+    Minotaur,
 
     // Land subtypes (examples)
     Forest,
