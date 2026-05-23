@@ -781,6 +781,19 @@ public static class NamedCardFactory
             // SacrificeChoice for deterministic test/bot behavior.
             "Phyrexian Tower" => PhyrexianTowerFactory.Create(owner),
 
+            // Artifact Creature — Dragon {10} 4/4 (ScionOfDracoFactory).
+            // Modern Horizons 2. Domain cost reduction (CR 702.16 / CR 117.7):
+            // "This spell costs {2} less to cast for each basic land type
+            //  among lands you control." Wired via the whole-reducer shape
+            // on CostReductionAbility, delegating to
+            // TribalFlamesFactory.CountDomain for the distinct-basic-type
+            // count (printed-subtypes mode at cost-calc time; floor-at-zero
+            // in CostReduction.GetEffectiveCost). Keyword-grant rider
+            // ("creatures you control of each creature type have first
+            // strike, vigilance, trample, lifelink, and hexproof") deferred
+            // — needs per-permanent shared-creature-type Layer 6 grants.
+            "Scion of Draco" => ScionOfDracoFactory.Create(owner),
+
             // Legendary Artifact — {0} (MoxOpalFactory). Scars of Mirrodin.
             // "Metalcraft — {T}: Add one mana of any color. Activate only if
             //  you control three or more artifacts." CR 702.95. Five
