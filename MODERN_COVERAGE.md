@@ -3,13 +3,13 @@
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
 **Last updated:** 2026-05-23
-**Latest origin/main:** Sword of Fire and Ice (Artifact — Equipment {3} — AttachedBoostEffect(+2, +2) at Layer 7c; protection-from-red + protection-from-blue ride as two ProtectionAbility markers on the equipment card (full DEBT-A enforcement deferred — no attachment-aware Layer 6 grant for protection yet); combat-damage-to-a-player trigger deals 2 damage to any target + draws 1; Equip {2}) on top of Trinket Mage + Sun Titan + Sensei's Divining Top + Inkmoth Nexus + Spell Queller + Goblin Matron + Mutavault + Skullclamp + Umezawa's Jitte + Wasteland + Swords to Plowshares + Mystical Tutor + Path to Exile + Daze + Ponder + Preordain + Splinter Twin + Sythis, Harvest's Hand + Pyromancer's Goggles + Plague Engineer + Manabarbs + Yawgmoth's Will + Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere.
+**Latest origin/main:** Sword of Fire and Ice (Artifact — Equipment {3} — AttachedBoostEffect(+2, +2) at Layer 7c; protection-from-red + protection-from-blue ride as two ProtectionAbility markers on the equipment card (full DEBT-A enforcement deferred — no attachment-aware Layer 6 grant for protection yet); combat-damage-to-a-player trigger deals 2 damage to any target + draws 1; Equip {2}) on top of Reckless Charge + Trinket Mage + Sun Titan + Sensei's Divining Top + Inkmoth Nexus + Spell Queller + Goblin Matron + Mutavault + Skullclamp + Umezawa's Jitte + Wasteland + Swords to Plowshares + Mystical Tutor + Path to Exile + Daze + Ponder + Preordain + Splinter Twin + Sythis, Harvest's Hand + Pyromancer's Goggles + Plague Engineer + Manabarbs + Yawgmoth's Will + Wishclaw Talisman + Searing Blaze + Goblin Lackey + Damping Sphere.
 
 ## Headline numbers
 
 | Metric | Count |
 |---|---|
-| Named factories | 126 |
+| Named factories | 127 |
 | Bespoke templates | 27 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
@@ -103,6 +103,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Puresteel Paladin | Creature | TBD | Equipment-ETB draw trigger + zero-equip-cost on ≥3 artifacts |
 | Pyromancer's Goggles | Artifact | TBD | Legendary {5} — {T}: Add {R} + structural copy-on-cast trigger (Instant/Sorcery, controller-match); mana-provenance gate + stack-copy primitive + new-targets prompt deferred |
 | Ragavan, Nimble Pilferer | Creature | TBD | combat-damage Treasure + exile + may-cast EOT (CR 118.9 grant + ExileCastAlternativeCost); Dash deferred |
+| Reckless Charge | Sorcery | TBD | {R} — target creature gets +3/+0 and gains haste until end of turn; Flashback {2}{R} (alt cost parsed from oracle via FlashbackOracleParser, mirroring Faithless Looting) |
 | Rift Bolt | Sorcery | #183 | suspend → 3 damage |
 | Scavenging Ooze | Creature | #188 | exile-graveyard + counter + life |
 | Scion of Draco | Artifact Creature | TBD | Domain cost-reduction {10} → {0} at 5 basic types (CR 702.16); keyword-grant rider deferred |
@@ -379,7 +380,7 @@ Sorted roughly by build priority (small infra lift × high meta share). Refreshe
 | ~~17~~ | ~~Sensei's Divining Top~~ | ~~high~~ | Shipped via `SenseisDiviningTopFactory` — Artifact {1} with two activated abilities. {T}: peek top 3 + agent-driven reorder via `ScryAction.Peek` / `ScryAction.Apply` with `ToBottom=[]` (mirrors Ponder; default preserves order). {1}, {T}: draw a card (empty library flags `MarkTriedToDrawFromEmptyLibrary` per CR 704.5b) then move Top from battlefield to library index 0 via `IZone.InsertCardAt`. Printed Legendary supertype omitted in v1. |
 | 18 | Daze | low | Instant {1}{U} — counter unless pay {1}; alt cost {0} + return an Island you control. Counter-unless-pay exists; needs alt-cost with non-mana additional cost (bounce-self-permanent), composable with `PitchAlternativeCost`-style probe. |
 | 19 | Boros Reckoner | high | Creature with damage-redirect: "If a source would deal damage to Boros Reckoner, instead it deals that damage to any target". Needs source-damage replacement effect with redirect to a chosen target — a generalization of `PreventNextDamageFromChosenSourceShield`. |
-| 20 | Reckless Charge | low | Sorcery — target creature gets +3/+0 and haste until EOT, Flashback {R}. Pump + grant-haste primitives both exist; FlashbackAlternativeCost done — needs `PumpAndGrantKeyword` template wired to flashback alt-cost. |
+| ~~20~~ | ~~Reckless Charge~~ | ~~low~~ | Shipped via `RecklessChargeFactory` — Sorcery {R}. Resolve-time `SpellDefinition` declares one 1..1 "target creature" request; on resolution registers `PumpUntilEndOfTurnEffect(+3/+0)` and `GrantKeywordUntilEndOfTurnEffect("Haste")` on the target's `ActiveEffects` (CR 514.2 — both expire at cleanup). Flashback alt-cost `{2}{R}` parsed from oracle via `FlashbackOracleParser` (mirrors Faithless Looting); post-resolve exile via `FlashbackAlternativeCost.OnResolved` (CR 702.34b). Illegal-target / missing-ActiveEffects fallbacks no-op cleanly. |
 
 ## How to update this doc
 
