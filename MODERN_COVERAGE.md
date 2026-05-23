@@ -9,7 +9,7 @@ Living tracker for Modern-format card + mechanic implementation in the Majik eng
 
 | Metric | Count |
 |---|---|
-| Named factories | 141 |
+| Named factories | 142 |
 | Bespoke templates | 27 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
@@ -40,6 +40,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Brain Freeze | Instant | TBD | {U}{U} — mill 3 target player + Storm (CR 702.40) on-cast trigger via StormHelper (count = TurnState.SpellsCastByPlayer - 1; copies via SpellCopier.PushCopyOfTopSpell re-executing the spell's effects per copy). CR 702.40a "you may choose new targets" + copies-as-distinct-stack-objects deferred (inherited from SpellCopier) |
 | Burst Lightning | Instant | TBD | {R} — 2 damage to any target; "if Burst Lightning was kicked" branch deals 4 damage instead (CR 702.33). Kicker primitive deferred — no IAdditionalCost for Kicker, no "was kicked" bit plumbed through SpellCastFlow yet, so production casts ship not-kicked (2 dmg). Kicked branch is structural and reachable via BuildSpellDefinition(resolver, wasKicked: true) |
 | Cabal Ritual | Instant | TBD | add {B}{B}{B}; threshold (7+ own grave) replaces with five colourless (CR 702.50) |
+| Cabal Therapy | Sorcery | TBD | {B} — name a nonland card + target player reveals their hand and discards all cards with that name; flashback cost = "Sacrifice a creature" (v1 split: FlashbackAlternativeCost carries ManaCost.Zero, sacrifice rider ships as paired SacrificeACreatureAdditionalCost — engine's IAlternativeCost only carries the mana portion). Card-name picker + nonland gate deferred (same queue as Pithing Needle) |
 | Cavern of Souls | Land | TBD | ETB choose-creature-type + {T}: {C} + {T}: any color (spend-restriction + uncounterable rider deferred) |
 | Chalice of the Void | Artifact | TBD | {X}{X} — ETB with X charge counters (via PendingCastX) + symmetric "counter spell of MV = counters" trigger |
 | Chord of Calling | Instant | TBD | Flash + Convoke + X tutor creature mv ≤ X → battlefield (convoke reduction integration deferred) |

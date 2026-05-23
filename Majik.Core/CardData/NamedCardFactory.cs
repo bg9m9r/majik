@@ -1713,6 +1713,24 @@ public static class NamedCardFactory
             // Engineered Explosives + Mishra's Bauble).
             "Pernicious Deed" => PerniciousDeedFactory.Create(owner),
 
+            // Sorcery — {B} (CabalTherapyFactory). Judgment / Modern Horizons 2.
+            // "Name a nonland card. Target player reveals their hand and
+            //  discards all cards with that name. Flashback—Sacrifice a
+            //  creature." Card shape only here; the resolve-time
+            // SpellDefinition (target-player request + RevealHelper publish +
+            // discard-all-with-name) is built on demand via
+            // CabalTherapyFactory.BuildSpellDefinition(caster, resolver,
+            // nameSelector, eventBus). Flashback alt-cost is split between
+            // BuildFlashbackCost (ManaCost.Zero — Cabal Therapy's printed
+            // flashback cost is non-mana) and BuildFlashbackAdditionalCosts
+            // (SacrificeACreatureAdditionalCost). The engine's
+            // FlashbackAlternativeCost only carries the mana portion (CR
+            // 118.9) so the sacrifice rider is threaded as a paired
+            // additional cost — v1 simplification noted in the factory
+            // xmldoc. Card-name picker prompt deferred (same queue as
+            // Pithing Needle).
+            "Cabal Therapy" => CabalTherapyFactory.Create(owner),
+
             // Sorcery — {2}{B}{B} (TendrilsOfAgonyFactory). Scourge.
             // "Target opponent loses 2 life and you gain 2 life. Storm
             // (When you cast this spell, copy it for each spell cast
