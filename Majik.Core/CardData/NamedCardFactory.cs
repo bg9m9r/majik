@@ -324,6 +324,18 @@ public static class NamedCardFactory
             // retrace emblem (structural shell).
             "Wrenn and Six" => WrennAndSixFactory.Create(owner),
 
+            // Legendary Planeswalker — Karn {7} loyalty 6
+            // (KarnLiberatedFactory). +4 target-player-exiles-a-card-from-
+            // hand (auto-pick first opponent + first card), -3 exile-
+            // target-permanent (auto-pick first candidate). -14 restart-
+            // the-game ultimate is DEFERRED as a no-op — CR 720 game
+            // restart is engine-foundational. The single-arg dispatcher
+            // path here passes no resolvers so +4/-3 no-op; loyalty
+            // changes still apply (CR 606.3). Use the (owner,
+            // allPlayersResolver, targetResolver) overload to enable the
+            // full +4/-3 effects.
+            "Karn Liberated" => KarnLiberatedFactory.Create(owner),
+
             // Sorcery — {7}{U} (TreasureCruiseFactory).
             // CR 702.66 — Delve. "Delve" marker keyword wired; the cost
             // mechanic itself lives in DelveCost + SpellCastFlow. Resolve
@@ -560,6 +572,17 @@ public static class NamedCardFactory
             // wiring on the reanimated creature.
             "Priest of Fell Rites" => PriestOfFellRitesFactory.Create(owner),
 
+            // Creature — Elemental Incarnation {3}{U} 3/3 (SubtletyFactory).
+            // Modern Horizons 2 incarnation, blue counterpart to Solitude.
+            // Flash + Evoke keyword markers wired. ETB bounce trigger wired:
+            // returns target opponent's creature/planeswalker to its owner's
+            // hand, then that owner does a 1-card "look + may bottom" scry
+            // decision sourced from their registered IPlayerAgent. Evoke
+            // alt-cost = "exile a blue card from hand" via EvokeAlternativeCost;
+            // printed evoke-sacrifice trigger fires when Subtlety enters if
+            // evoke was paid (CR 702.74b).
+            "Subtlety" => SubtletyFactory.Create(owner),
+
             // Creature — Avatar {B} 13/13 (DeathsShadowFactory).
             // CR 604.3 / 613.2 — Layer 7a characteristic-defining P/T.
             // P/T = clamp(13 - controller life, 0, 13). Wired via
@@ -578,6 +601,17 @@ public static class NamedCardFactory
             // wiring on the spawned tokens. Use the (owner, zoneService,
             // eventBus, triggers) overload for fully-wired behavior.
             "Wurmcoil Engine" => WurmcoilEngineFactory.Create(owner),
+
+            // Artifact — {1} (AmuletOfVigorFactory). Worldwake.
+            // "Whenever a permanent enters tapped under your control,
+            //  untap it." Triggered ability over CardMovedEvent →
+            // Battlefield; condition gates on controller + Permanent +
+            // IsTapped (ZoneService taps before publishing, so IsTapped
+            // is already true at trigger-evaluation time per CR 614.6).
+            // Single-arg dispatcher path attaches the ability for shape
+            // tests; use the (owner, triggers) overload to wire up
+            // bus-driven firing.
+            "Amulet of Vigor" => AmuletOfVigorFactory.Create(owner),
 
             // Sorcery — {1}{G} (SylvanScryingFactory). "Search your library
             // for a land card, reveal it, put it into your hand, then
@@ -605,6 +639,24 @@ public static class NamedCardFactory
             // deferred (no IZone.Shuffle entry point yet — same rationale
             // as SearchSpellFactory).
             "Primeval Titan" => PrimevalTitanFactory.Create(owner),
+
+            // Land — Urza's Mine (Antiquities, Urza Tron cycle).
+            // {T}: Add {C}. If controller controls an Urza's Mine, an
+            // Urza's Power-Plant, AND an Urza's Tower, add {2} instead.
+            // Wired via TronLandHelper.ComputeManaAddition (controller-
+            // only battlefield scan) plumbed through the Func<ManaCost>
+            // ManaAbility overload, so the amount is decided at
+            // activation time against live battlefield state.
+            "Urza's Mine" => UrzasMineFactory.Create(owner),
+
+            // Land — Urza's Tower (Antiquities). Same shape as Urza's
+            // Mine — only the printed subtype differs (Tower).
+            "Urza's Tower" => UrzasTowerFactory.Create(owner),
+
+            // Land — Urza's Power-Plant (Antiquities). Same shape as
+            // Urza's Mine — only the printed subtype differs
+            // (PowerPlant).
+            "Urza's Power-Plant" => UrzasPowerPlantFactory.Create(owner),
 
             _ => new Card(name, ""),
         };
