@@ -548,6 +548,19 @@ public static class NamedCardFactory
             // eventBus, triggers) overload for fully-wired behavior.
             "Wurmcoil Engine" => WurmcoilEngineFactory.Create(owner),
 
+            // Sorcery — {1}{G} (SylvanScryingFactory). "Search your library
+            // for a land card, reveal it, put it into your hand, then
+            // shuffle." (CR 701.19a). Tutors ANY land — basic or nonbasic —
+            // which is the Tron-enabling distinction vs. Cultivate-style
+            // basic-only tutors. The resolve-time SpellDefinition is built
+            // on demand via SylvanScryingFactory.BuildSpellDefinition,
+            // which delegates to the shared SearchSpellFactory.SearchLibrarySpell
+            // ("land") so the agent prompt + pick→hand machinery is shared
+            // with template-bound land tutors. Shuffle deferred (no
+            // IZone.Shuffle entry point yet — same rationale as the rest
+            // of SearchSpellFactory).
+            "Sylvan Scrying" => SylvanScryingFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
