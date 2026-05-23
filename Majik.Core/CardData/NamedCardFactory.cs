@@ -793,6 +793,18 @@ public static class NamedCardFactory
             // of SearchSpellFactory).
             "Sylvan Scrying" => SylvanScryingFactory.Create(owner),
 
+            // Instant — {U} (MysticalTutorFactory). Mirage and reprinted.
+            // "Search your library for an instant or sorcery card, reveal
+            //  it, put it on top of your library, then shuffle." (CR 701.19a).
+            // The resolve-time SpellDefinition is built on demand via
+            // MysticalTutorFactory.BuildSpellDefinition. Pick destination
+            // is top-of-library (index 0) via IZone.InsertCardAt, not hand
+            // — distinguishes it from the shared SearchSpellFactory path
+            // used by Sylvan Scrying / Stoneforge Mystic. Shuffle deferred
+            // (no IZone.Shuffle entry point yet — same rationale as the
+            // rest of SearchSpellFactory).
+            "Mystical Tutor" => MysticalTutorFactory.Create(owner),
+
             // Sorcery — {1}{R}{G}{W} (CrashingFootfallsFactory). Modern Horizons.
             // CR 702.85 — Cascade. On-cast triggered ability fires
             // CascadeAction.Cascade with sourceManaValue = 4 (exile from top
