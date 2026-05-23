@@ -130,19 +130,110 @@ public sealed class GameFacade
         _bus.Subscribe<StepStartedEvent>(e => { _currentPhase = e.StepType; });
     }
 
-    private PriorityLoop BuildPriorityLoop() => new PriorityLoop(
-        players: new[] { _alice, _bob },
-        priority: _priority,
-        stack: _stack,
-        stackResolver: _resolver,
-        zoneService: _zones,
-        agents: new Dictionary<Player, IPlayerAgent>
+    private PriorityLoop BuildPriorityLoop()
+    {
+        var agents = new Dictionary<Player, IPlayerAgent>
         {
             [_alice] = _aliceAgentEffective,
             [_bob] = _bobAgentEffective,
-        },
-        turnNumberAccessor: () => 1,
-        phaseAccessor: () => PhaseStateType.Main);
+        };
+
+        // Mirror TurnDriver.PriorityRound's dispatcher wiring (Majik.Core/Game/TurnDriver.cs)
+        // so the legacy single-round StartAsync path can also accept
+        // CastSpellCommand / activated-ability commands without throwing
+        // "PriorityLoop received CastSpell but no castDispatcher was supplied."
+        //
+        // GameFacade has no spellDefResolver, so instants/sorceries without
+        // a binder match are skipped (the card is rotated in hand). Permanents
+        // and abilities still resolve through SpellCastFlow + AbilityActivator.
+        var castFlow = new SpellCastFlow(_stack, _zones, _bus);
+        var manaResolver = new Majik.Core.Costs.ManaPaymentResolver(ContinuousEffects);
+
+        async Task DispatchCast(Player actor, PriorityAction.CastSpell cast, GameContext ctx)
+        {
+            var isPermanent = cast.Card.HasType(Majik.Core.Cards.Types.CardType.Creature)
+                || cast.Card.HasType(Majik.Core.Cards.Types.CardType.Artifact)
+                || cast.Card.HasType(Majik.Core.Cards.Types.CardType.Enchantment)
+                || cast.Card.HasType(Majik.Core.Cards.Types.CardType.Planeswalker);
+            if (!isPermanent)
+            {
+                // No spell-def resolver in this facade — skip non-permanent
+                // casts rather than waste the card.
+                return;
+            }
+
+            var agent = agents[actor];
+            var cost = cast.AlternativeCost?.AlternativeManaCost
+                ?? Majik.Core.Costs.CostReduction.GetEffectiveCost(cast.Card, actor);
+            var payment = await agent.ChooseManaSourcesAsync(ctx, cost, CancellationToken.None);
+            if (!manaResolver.Pay(actor, cost, payment))
+            {
+                return;
+            }
+
+            try
+            {
+                var def = Majik.Core.Game.SpellDefinition.Vanilla(_ => Array.Empty<IEffect>());
+                await castFlow.CastAsync(
+                    actor, cast.Card, def, agent, ctx, CancellationToken.None,
+                    additionalCosts: cast.AdditionalCosts,
+                    alternativeCost: cast.AlternativeCost,
+                    preChosenMana: payment);
+            }
+            catch (InvalidOperationException)
+            {
+                // Swallow — same posture as TurnDriver. Failure leaves the
+                // card in hand; bot/agent memo prevents re-proposing.
+            }
+        }
+
+        async Task DispatchActivate(Player actor, PriorityAction.ActivateAbility activate, GameContext ctx)
+        {
+            var targets = new List<Majik.Core.Targeting.ITarget>();
+            if (activate.Ability is Majik.Core.Abilities.ActivatedAbility aa)
+            {
+                foreach (var req in aa.TargetRequests)
+                {
+                    var chosen = await agents[actor].ChooseTargetsAsync(ctx, req, ct: default);
+                    foreach (var obj in chosen)
+                    {
+                        var wrapper = obj switch
+                        {
+                            Majik.Core.Cards.Permanent perm => Majik.Core.Targeting.Target.Permanent(perm),
+                            Majik.Core.Cards.ICard card => Majik.Core.Targeting.Target.Card(card),
+                            Player p => Majik.Core.Targeting.Target.Player(p),
+                            Majik.Core.Spells.ISpell spell => Majik.Core.Targeting.Target.Spell(spell),
+                            Majik.Core.Abilities.IActivatedAbility ab => Majik.Core.Targeting.Target.Ability(ab),
+                            _ => null,
+                        };
+                        if (wrapper != null) targets.Add(wrapper);
+                    }
+                }
+            }
+
+            var activator = new Majik.Core.Services.AbilityActivator(_stack, _bus);
+            try
+            {
+                activator.ActivateAbility(activate.Ability, actor, targets, activate.Ability.Costs);
+            }
+            catch (InvalidOperationException)
+            {
+                // Cost-payment or zone-gate failed — let the priority loop move on.
+            }
+        }
+
+        return new PriorityLoop(
+            players: new[] { _alice, _bob },
+            priority: _priority,
+            stack: _stack,
+            stackResolver: _resolver,
+            zoneService: _zones,
+            agents: agents,
+            turnNumberAccessor: () => 1,
+            phaseAccessor: () => PhaseStateType.Main,
+            castDispatcher: DispatchCast,
+            activateDispatcher: DispatchActivate);
+    }
 
     /// <summary>Replaces the Alice-seat agent (typically with a
     /// <see cref="Majik.Bot.BotPlayerAgent"/>). Must be called before
