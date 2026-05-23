@@ -1081,6 +1081,22 @@ public static class NamedCardFactory
             // (CR 106.11b) deferred — no mana-provenance ledger.
             "Manamorphose" => ManamorphoseFactory.Create(owner),
 
+            // Land — Mutavault (Morningtide / reprints, MutavaultFactory).
+            // {T}: Add {C} — vanilla ManaAbility wired.
+            // {1}: Until end of turn, Mutavault becomes a 2/2 creature that's
+            // every creature type. It's still a land. ActivatedAbility with a
+            // ManaCostCost("{1}") that, on resolution, registers Layer 4
+            // (MutavaultAnimateEffect — add Creature + every modelled creature
+            // subtype) and Layer 7b (MutavaultBecomesPTEffect — base P/T 2/2).
+            // Both effects flagged ExpiresAtEndOfTurn (CR 514.2). Single-arg
+            // dispatch wires no ContinuousEffectsService — the activated
+            // ability resolves but no animate effect is recorded; use
+            // MutavaultFactory.Create(owner, effects) for fully-wired animate.
+            // "Every creature type" is approximated as every creature subtype
+            // currently enumerated in CardSubtype — see MutavaultAnimateEffect
+            // .EveryCreatureType + class xmldoc for the v1 simplification.
+            "Mutavault" => MutavaultFactory.Create(owner),
+
             // Legendary Land — Karakas (Legends / reprints, KarakasFactory).
             // {T}: Add {W} — vanilla ManaAbility wired.
             // {T}: Return target legendary creature to its owner's hand —
