@@ -3,13 +3,13 @@
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
 **Last updated:** 2026-05-23
-**Latest origin/main:** 2fc5a93 (#206 — Grief MODERN_COVERAGE update) + Sylvan Scrying
+**Latest origin/main:** e0cef4d (#207 — Sylvan Scrying) + Karn, the Great Creator
 
 ## Headline numbers
 
 | Metric | Count |
 |---|---|
-| Named factories | 62 |
+| Named factories | 63 |
 | Bespoke templates | 26 |
 | Generic templates | 94 |
 | JSON-defined cards | 15 |
@@ -50,6 +50,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Grist, the Hunger Tide | Planeswalker | — | +1 token, -2 reanimate |
 | Harbinger of the Seas | Creature | #157 | nonbasic-to-Island |
 | Inspiring Vantage | Land | — | R/W fastland |
+| Karn, the Great Creator | Planeswalker | TBD | opponent-artifact static + +1 animate + -2 wishboard |
 | Kraul Harpooner | Creature | — | fight-flyer shell |
 | Lazotep Recruit | Creature | — | amass-keyword shell |
 | Ledger Shredder | Creature | #193 | second-spell surveil + counter |
@@ -273,7 +274,7 @@ Per-keyword action helpers under `Majik.Core/Keywords/`:
 - **Burn** — Strong. Lightning Bolt, Lava Spike, Lava Dart, Skewer the Critics, Boros Charm, Eidolon of the Great Revel, Goblin Guide, Monastery Swiftspear, Rift Bolt all in. Missing: Searing Blaze (landfall conditional), Roiling Vortex, Sunscorched Desert. ~75%.
 - **Death's Shadow** — Mid-high. Thoughtseize, Fatal Push, Snapcaster Mage, Stubborn Denial, Death's Shadow itself (CDA P/T scaled by controller life — Layer 7a) all in. Mishra's Bauble in. Temur Battle Rage absent. ~60%.
 - **Murktide / Izzet Tempo** — High. Murktide Regent done, Counterspell done, Snapcaster Mage done, Lightning Bolt done, Expressive Iteration done, Ledger Shredder done, Consider done, Spell Pierce done. Missing: Unholy Heat is done but Demilich/Subtlety absent. ~70%.
-- **Mono-Green Tron** — Mid-low. Ancient Stirrings, Sylvan Scrying, Wurmcoil Engine done. No Karn Liberated, no Tron lands. ~20%.
+- **Mono-Green Tron** — Mid. Ancient Stirrings, Sylvan Scrying, Wurmcoil Engine, Karn the Great Creator done. No Karn Liberated, no Tron lands. ~30%.
 - **Living End / Crashing Footfalls cascade** — Blocked. Cascade keyword + Suspend-trigger end-of-suspend exile-and-cast TODO. Suspend itself is done (#183), so partial groundwork. ~15%.
 - **Rakdos Scam** — Mid. Grief done (#205, mirrors Solitude evoke + ETB pattern). Dauthi Voidwalker absent. Fury absent. Liliana of the Veil done, Fatal Push done, Thoughtseize done. ~40%.
 - **Yawgmoth combo** — Mid. Yawgmoth done. Undying creatures (Young Wolf, Strangleroot Geist, Geralf's Messenger) done. Chord of Calling, Eldritch Evolution absent. ~50%.
@@ -287,18 +288,17 @@ Sorted by build priority (small infra lift × high meta share).
 
 | # | Card | Difficulty | Blocker |
 |---|---|---|---|
-| 1 | Karn, the Great Creator | Mid | Sideboard-from-anywhere -2 ability needs wishboard concept |
-| 2 | Karn Liberated | Mid | Exile target, restart-game ultimate (game-restart deferred) |
-| 3 | Urza's Tron pieces (Mine/Tower/Power Plant) | Mid | "Tap: add 1; if you control all three, add 3" — conditional mana ability |
-| 4 | Fury | Low | Evoke + ETB damage split — Solitude/Grief pattern + damage-distribution prompt |
-| 5 | Subtlety | Low | Evoke + ETB bounce-and-look — Solitude/Grief pattern + bounce template |
-| 6 | Endurance ETB targeting | Low | Keyword bindings exist; ETB graveyard-to-library not wired through targeting |
-| 7 | Crashing Footfalls | High | Suspend done (#183), but cascade trigger on suspend-cast missing |
-| 8 | Living End | High | Cascade + mass-exile-grave + simultaneous mass-reanimate (#174 ready for the latter) |
-| 9 | Cascade keyword | High | Triggered "cast for free from top reveal" — alt-cast-from-library framework |
-| 10 | Primeval Titan | Mid | Attack/ETB triggers + land tutor; tutor template exists |
-| 11 | Amulet of Vigor | Mid | Replacement on enters-tapped → untap; needs ETB replacement composition |
-| 12 | Up the Beanstalk | Low | Cast-trigger by CMC threshold — trigger-by-CMC pattern |
+| 1 | Karn Liberated | Mid | Exile target, restart-game ultimate (game-restart deferred) |
+| 2 | Urza's Tron pieces (Mine/Tower/Power Plant) | Mid | "Tap: add 1; if you control all three, add 3" — conditional mana ability |
+| 3 | Fury | Low | Evoke + ETB damage split — Solitude/Grief pattern + damage-distribution prompt |
+| 4 | Subtlety | Low | Evoke + ETB bounce-and-look — Solitude/Grief pattern + bounce template |
+| 5 | Endurance ETB targeting | Low | Keyword bindings exist; ETB graveyard-to-library not wired through targeting |
+| 6 | Crashing Footfalls | High | Suspend done (#183), but cascade trigger on suspend-cast missing |
+| 7 | Living End | High | Cascade + mass-exile-grave + simultaneous mass-reanimate (#174 ready for the latter) |
+| 8 | Cascade keyword | High | Triggered "cast for free from top reveal" — alt-cast-from-library framework |
+| 9 | Primeval Titan | Mid | Attack/ETB triggers + land tutor; tutor template exists |
+| 10 | Amulet of Vigor | Mid | Replacement on enters-tapped → untap; needs ETB replacement composition |
+| 11 | Up the Beanstalk | Low | Cast-trigger by CMC threshold — trigger-by-CMC pattern |
 
 ## How to update this doc
 
