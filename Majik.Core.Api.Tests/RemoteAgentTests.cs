@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Majik.Core.Abilities;
 using Majik.Core.Api;
 using Majik.Core.Api.Commands;
 using Majik.Core.Cards;
@@ -287,6 +288,105 @@ public class RemoteAgentTests
         plan.Blockers.Should().ContainSingle();
         plan.Blockers[0].Blocker.Should().BeSameAs(blocker);
         plan.Blockers[0].Attacker.Should().BeSameAs(attacker);
+    }
+
+    // ---------------------------------------------------------------------
+    // OrderTriggers — mirrors the wire wire-up used for DeclareAttackers
+    // (PR #154) and MulliganCommand (PR #147): RemoteAgent maps the wire
+    // DTO's StackObjectIds back to the engine-provided ITriggeredAbility
+    // instances and resolves the prompt with the reordered list.
+    // ---------------------------------------------------------------------
+
+    [Fact]
+    public async Task OrderTriggers_PromptRequested_AnnouncesCommandKind()
+    {
+        var agent = new RemoteAgent(_alice);
+        var ctx = NewContext();
+
+        IReadOnlyList<Type>? announced = null;
+        agent.PromptRequested += k => announced = k;
+
+        _ = agent.OrderTriggersAsync(ctx, Array.Empty<ITriggeredAbility>());
+
+        announced.Should().NotBeNull();
+        announced!.Should().ContainSingle().Which.Should().Be(typeof(OrderTriggersCommand));
+        agent.HasPending.Should().BeTrue();
+        await Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task OrderTriggers_Submitted_ReordersByStackObjectIds()
+    {
+        // CR 603.3b — when multiple triggered abilities owned by the same
+        // player would go on the stack simultaneously, that player chooses
+        // the order. The wire command transports only Guids; RemoteAgent
+        // must look each id up in the list the engine just handed it.
+        var bear = new Creature("Grizzly Bears", "1G", 2, 2) { Owner = _alice };
+        var a = new TriggeredAbility(bear, _alice, Triggers.OnEnterBattlefieldSelf(bear));
+        var b = new TriggeredAbility(bear, _alice, Triggers.OnEnterBattlefieldSelf(bear));
+        var c = new TriggeredAbility(bear, _alice, Triggers.OnEnterBattlefieldSelf(bear));
+        var agent = new RemoteAgent(_alice);
+        var ctx = NewContext();
+
+        // Engine offers them in (a, b, c) order; controller asks for (c, a, b).
+        var task = agent.OrderTriggersAsync(ctx, new ITriggeredAbility[] { a, b, c });
+        agent.Submit(new OrderTriggersCommand(new[] { c.Id, a.Id, b.Id })
+        {
+            PlayerId = _alice.Id,
+        });
+
+        var ordered = await task;
+        ordered.Should().HaveCount(3);
+        ordered[0].Should().BeSameAs(c);
+        ordered[1].Should().BeSameAs(a);
+        ordered[2].Should().BeSameAs(b);
+    }
+
+    [Fact]
+    public async Task OrderTriggers_Submitted_UnknownIdThrows()
+    {
+        // Defensive: a client supplying a Guid that doesn't match any
+        // pending trigger must surface as a clear error rather than
+        // silently losing an ability.
+        var bear = new Creature("Bear", "G", 1, 1) { Owner = _alice };
+        var a = new TriggeredAbility(bear, _alice, Triggers.OnEnterBattlefieldSelf(bear));
+        var agent = new RemoteAgent(_alice);
+        var ctx = NewContext();
+
+        _ = agent.OrderTriggersAsync(ctx, new ITriggeredAbility[] { a });
+
+        var act = () => agent.Submit(new OrderTriggersCommand(new[] { Guid.NewGuid() })
+        {
+            PlayerId = _alice.Id,
+        });
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*unknown stack object*");
+        await Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task OrderTriggers_Submitted_PartialListThrows()
+    {
+        // The controller must order every offered trigger, not a subset.
+        // Skipping any ability would lose its effect — the engine relies
+        // on receiving the full list back.
+        var bear = new Creature("Bear", "G", 1, 1) { Owner = _alice };
+        var a = new TriggeredAbility(bear, _alice, Triggers.OnEnterBattlefieldSelf(bear));
+        var b = new TriggeredAbility(bear, _alice, Triggers.OnEnterBattlefieldSelf(bear));
+        var agent = new RemoteAgent(_alice);
+        var ctx = NewContext();
+
+        _ = agent.OrderTriggersAsync(ctx, new ITriggeredAbility[] { a, b });
+
+        var act = () => agent.Submit(new OrderTriggersCommand(new[] { a.Id })
+        {
+            PlayerId = _alice.Id,
+        });
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*expected 2*");
+        await Task.CompletedTask;
     }
 
     private GameContext NewContext() =>

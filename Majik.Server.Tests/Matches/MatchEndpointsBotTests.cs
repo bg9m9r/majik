@@ -252,6 +252,59 @@ public class MatchEndpointsBotTests : IClassFixture<TestMongoFixture>
     }
 
     // -----------------------------------------------------------------------
+    // PlayerId stamping: portal posts a MulliganCommand WITHOUT a PlayerId
+    // (the generated OpenAPI client marks the field optional and the portal's
+    // command builders don't set it). MatchService must stamp the caller's
+    // seat-derived PlayerId before handing the command to the facade, or
+    // GameFacade.SubmitAsync throws "Unknown player {Guid.Empty}" and the
+    // commands endpoint surfaces a 500 / failure.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task SubmitCommand_MulliganWithoutPlayerId_StampsAndAdvances()
+    {
+        var db = await FreshDb();
+        await SeedProfile(db, "alice", "Alice");
+        var aliceDeckId = await SeedDeckAsync(db, "alice", "Alice Deck");
+        using var factory = Factory(db);
+        var client = Authed(factory, "alice");
+
+        var createResp = await client.PostAsJsonAsync("/matches", new
+        {
+            format = "constructed",
+            visibility = "invite",
+            deckId = aliceDeckId.ToString(),
+            clockMinutes = 20,
+            botOpponent = new { archetype = "Burn" },
+        });
+        createResp.StatusCode.Should().Be(HttpStatusCode.Created);
+        var match = await createResp.Content.ReadFromJsonAsync<MatchDto>();
+        match!.GameId.Should().NotBeNull();
+
+        // POST a MulliganCommand with NO PlayerId — exactly what the portal
+        // sends. The wire payload only has the $type discriminator and the
+        // Keep flag; PlayerId is omitted entirely.
+        var resp = await client.PostAsJsonAsync(
+            $"/matches/{match.Id}/commands",
+            new System.Collections.Generic.Dictionary<string, object>
+            {
+                ["$type"] = "mulligan",
+                ["keep"] = true,
+            });
+
+        resp.StatusCode.Should().Be(HttpStatusCode.NoContent,
+            "MatchService must stamp PlayerId from the caller's seat before " +
+            "dispatching to the facade — otherwise the engine sees Guid.Empty " +
+            "and throws on player routing");
+
+        // Match should still be Playing (or have progressed); the game state
+        // endpoint must keep returning 200 to confirm the engine did not
+        // crash out of the facade.
+        var stateResp = await client.GetAsync($"/matches/{match.Id}/state");
+        stateResp.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    // -----------------------------------------------------------------------
     // Lobby leak guard: a bot match must NOT appear in the public list
     // -----------------------------------------------------------------------
 
