@@ -8,16 +8,18 @@ namespace Majik.Server.Composition;
 /// <summary>
 /// Wires OIDC bearer-token auth.
 ///
-/// Production path: validate JWTs against the configured Descope project
-/// (Auth:Authority = "https://api.descope.com/&lt;PROJECT_ID&gt;") with the
-/// project ID as audience (Auth:Audience). On top of the standard
-/// signature/issuer/audience/lifetime checks, <see cref="DescopeTokenValidator"/>
-/// enforces a non-empty `sub` and lifts a `discordUserId` claim from
-/// either a direct claim or Descope's nested `customAttributes` JSON.
+/// Production path: validate JWTs against the configured Auth0 tenant
+/// (Auth:Authority = "https://auth.majik.tech/" — trailing slash matters,
+/// Auth0 stamps `iss` with the slash) with the API identifier as audience
+/// (Auth:Audience = "https://api.majik.tech"). On top of the standard
+/// signature/issuer/audience/lifetime checks, <see cref="Auth0TokenValidator"/>
+/// enforces a non-empty `sub` and lifts the Discord user ID from the
+/// namespaced custom claim Auth0 injects via the "Lift Discord user ID"
+/// post-login Action.
 ///
 /// Token discovery is the standard OIDC dance — metadata lives at
-/// `{authority}/.well-known/openid-configuration` and the handler
-/// caches the signing keys.
+/// `{authority}.well-known/openid-configuration` and the handler caches
+/// the signing keys.
 ///
 /// When `Auth:Authority` is missing or empty, auth is disabled — useful
 /// for local development before an IdP is provisioned. In that mode
@@ -45,7 +47,7 @@ public static class AuthRegistration
         // the default handler returned NoResult and the policy short-circuited
         // to 401 only sometimes. With no default scheme registered,
         // [Authorize] consistently emits 401 — the behavior production
-        // wants when Descope hasn't been provisioned yet.
+        // wants when Auth0 hasn't been provisioned yet.
         if (!enabled)
         {
             services.AddAuthentication();
@@ -75,7 +77,7 @@ public static class AuthRegistration
                 // ASP.NET defaults to rewriting JWT claim names into legacy
                 // WS-Federation / SOAP XML schema URIs (`sub` →
                 // `http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier`,
-                // `email` → `…/emailaddress`, etc.). DescopeTokenValidator
+                // `email` → `…/emailaddress`, etc.). Auth0TokenValidator
                 // looks up the raw `sub` and the AsPlayer policy requires
                 // a literal "sub" claim — both fail silently when mapping
                 // is on, producing 401s with "sub missing" warnings even
@@ -84,26 +86,23 @@ public static class AuthRegistration
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
                     ValidateIssuer = true,
-                    // Descope stamps different `iss` claims depending on
-                    // which auth surface mints the token:
-                    //   - direct flow:    https://api.descope.com/<PID>
-                    //   - OIDC app flow:  https://api.descope.com/v1/apps/<PID>
-                    // Both are signed by the same JWKS at the project root,
-                    // so we keep `Authority` pointed there for key discovery
-                    // and accept either issuer here.
-                    ValidIssuers = BuildValidIssuers(authority!),
+                    // Auth0 stamps `iss` with the configured Authority
+                    // verbatim (custom domain + trailing slash). One issuer,
+                    // unlike Descope's dual direct-flow / OIDC-app-flow
+                    // issuers, so no allowlist needed.
+                    ValidIssuer = authority,
                     ValidateAudience = !string.IsNullOrWhiteSpace(audience),
                     ValidateLifetime = true,
                     ValidateIssuerSigningKey = true,
                     NameClaimType = "sub",
                     // Default ClockSkew is 5 minutes — far too generous for
-                    // short-lived Descope JWTs. Tighten so expired tokens
-                    // are rejected within the 30s NTP drift budget.
+                    // short-lived JWTs. Tighten so expired tokens are
+                    // rejected within the 30s NTP drift budget.
                     ClockSkew = TimeSpan.FromSeconds(30),
                 };
                 options.Events = new JwtBearerEvents
                 {
-                    OnTokenValidated = DescopeTokenValidator.ValidateAsync,
+                    OnTokenValidated = Auth0TokenValidator.ValidateAsync,
                     // Default log level masks JwtBearer auth events. Surface
                     // failures + challenges at Warning so they're visible in
                     // production hosting (Render etc) without flipping the
@@ -146,23 +145,5 @@ public static class AuthRegistration
         });
 
         return services;
-    }
-
-    private static string[] BuildValidIssuers(string authority)
-    {
-        var trimmed = authority.TrimEnd('/');
-        var lastSlash = trimmed.LastIndexOf('/');
-        if (lastSlash <= "https://".Length)
-        {
-            return new[] { trimmed };
-        }
-
-        var baseUrl = trimmed[..lastSlash];
-        var projectId = trimmed[(lastSlash + 1)..];
-        return new[]
-        {
-            trimmed,
-            $"{baseUrl}/v1/apps/{projectId}",
-        };
     }
 }

@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using System.Text.Json;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -7,31 +6,37 @@ using Microsoft.Extensions.Logging;
 namespace Majik.Server.Auth;
 
 /// <summary>
-/// Descope-specific validation hardening on top of the standard JwtBearer
+/// Auth0-specific validation hardening on top of the standard JwtBearer
 /// pipeline. Runs after the signature + issuer + audience + lifetime
 /// checks succeed.
 ///
-/// Descope `sub` values are opaque project-scoped user IDs (e.g.
-/// `U2P...`) — unlike Auth0's `oauth2|{provider}|{external-id}` layout
-/// they carry no provider info, so we don't enforce a prefix. We only
-/// require that `sub` exist and is non-empty.
+/// Auth0 `sub` values look like <c>oauth2|discord|{discord-user-id}</c>
+/// for users coming through the Discord social connection. We don't
+/// enforce that shape — `sub` is opaque to the application — we just
+/// require it be present and non-empty.
 ///
-/// To get a Discord user ID into the principal, configure Descope to
-/// emit either a top-level <c>discordUserId</c> claim or a nested
-/// <c>customAttributes.discordUserId</c> claim on the JWT (via a custom
-/// claim mapper attached to the Discord social connection). When present
+/// To get a Discord user ID into the principal, the Auth0 tenant must
+/// have a post-login Action that copies <c>identities[0].user_id</c>
+/// (when provider is "discord") into a namespaced custom claim on the
+/// access token. The claim name is <c>https://majik.tech/discord_user_id</c>
+/// — Auth0 silently strips non-namespaced custom claims. When present
 /// we lift it onto the principal under <see cref="DiscordUserIdClaim"/>
 /// so downstream code (audit log, future friends list) reads it without
-/// parsing JSON.
+/// inspecting the namespaced URI.
 ///
 /// Disabled when `Auth:Authority` is unset — the handler is not wired
 /// in that mode (see <see cref="Composition.AuthRegistration"/>).
 /// </summary>
-public static class DescopeTokenValidator
+public static class Auth0TokenValidator
 {
     public const string DiscordUserIdClaim = "discordUserId";
 
-    private const string CustomAttributesClaim = "customAttributes";
+    /// <summary>
+    /// Namespaced custom-claim URI emitted by the "Lift Discord user ID"
+    /// post-login Action in the Auth0 tenant. Must be a URL — Auth0 drops
+    /// custom claims that aren't namespaced with an http(s)://.
+    /// </summary>
+    private const string NamespacedDiscordClaim = "https://majik.tech/discord_user_id";
 
     public static Task ValidateAsync(TokenValidatedContext context)
     {
@@ -57,7 +62,7 @@ public static class DescopeTokenValidator
                 : string.Join(", ",
                     context.Principal.Claims.Select(c => c.Type).Distinct());
             logger.LogWarning(
-                "DescopeTokenValidator: sub missing. Claim types: {ClaimTypes}",
+                "Auth0TokenValidator: sub missing. Claim types: {ClaimTypes}",
                 claimTypes);
             context.Fail("Token missing 'sub' claim.");
             return Task.CompletedTask;
@@ -76,7 +81,7 @@ public static class DescopeTokenValidator
             identity.AddClaim(new Claim("sub", sub));
         }
 
-        var discordId = ExtractDiscordUserId(context.Principal!);
+        var discordId = context.Principal!.FindFirst(NamespacedDiscordClaim)?.Value;
         if (!string.IsNullOrEmpty(discordId) && !identity.HasClaim(c => c.Type == DiscordUserIdClaim))
         {
             identity.AddClaim(new Claim(DiscordUserIdClaim, discordId));
@@ -86,41 +91,9 @@ public static class DescopeTokenValidator
         // value entirely (PII). The Discord ID is still lifted onto the
         // principal above; we just don't log it on every request.
         logger.LogDebug(
-            "DescopeTokenValidator: validated sub={Sub} discordPresent={DiscordPresent}",
+            "Auth0TokenValidator: validated sub={Sub} discordPresent={DiscordPresent}",
             sub, !string.IsNullOrEmpty(discordId));
 
         return Task.CompletedTask;
-    }
-
-    private static string? ExtractDiscordUserId(ClaimsPrincipal principal)
-    {
-        var direct = principal.FindFirst(DiscordUserIdClaim)?.Value;
-        if (!string.IsNullOrEmpty(direct))
-        {
-            return direct;
-        }
-
-        var customAttrs = principal.FindFirst(CustomAttributesClaim)?.Value;
-        if (string.IsNullOrEmpty(customAttrs))
-        {
-            return null;
-        }
-
-        try
-        {
-            using var doc = JsonDocument.Parse(customAttrs);
-            if (doc.RootElement.ValueKind == JsonValueKind.Object
-                && doc.RootElement.TryGetProperty(DiscordUserIdClaim, out var prop)
-                && prop.ValueKind == JsonValueKind.String)
-            {
-                return prop.GetString();
-            }
-        }
-        catch (JsonException)
-        {
-            // customAttributes wasn't a JSON object — ignore.
-        }
-
-        return null;
     }
 }
