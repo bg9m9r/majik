@@ -354,6 +354,17 @@ public static class NamedCardFactory
             // turn (PitchAlternativeCost). Bot probe via PitchAltCostProbe.
             "Force of Will" => ForceOfWillFactory.Create(owner),
 
+            // Instant — {1}{U}{U}{U} (CrypticCommandFactory).
+            // CR 700.2d — modal "Choose two —" with 4 printed modes
+            // (counter spell / bounce permanent / tap-all-opponents-creatures /
+            // draw a card). The single-arg dispatcher path produces the
+            // correct card shape; the bound SpellDefinition is built on
+            // demand via CrypticCommandFactory.BuildDefinition(caster,
+            // targetResolver, stack). Multi-pick relies on the caller
+            // populating ChosenSpellParams.ModeIndexes — the runtime
+            // honours either the list or the scalar ModeIndex shape.
+            "Cryptic Command" => CrypticCommandFactory.Create(owner),
+
             // Instant — {1}{U}{U} (ForceOfNegationFactory).
             // "If it's not your turn, you may exile a blue card from your
             //  hand rather than pay this spell's mana cost. Counter target
