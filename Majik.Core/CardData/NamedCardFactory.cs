@@ -673,6 +673,26 @@ public static class NamedCardFactory
             // prompt deferred (same queue as Stoneforge Mystic / Sun Titan).
             "Show and Tell" => ShowAndTellFactory.Create(owner),
 
+            // Enchantment — {2}{R} (SneakAttackFactory). Urza's Saga.
+            // "{R}: You may put a creature card from your hand onto the
+            //  battlefield. That creature gains haste. Sacrifice it at the
+            //  beginning of the next end step." CR 602 — repeatable {R}
+            //  activated ability. Each activation closes over its own
+            //  resolve-time creature pick and (when a TriggerManager is
+            //  wired) its own delayed end-step sacrifice (CR 603.7) so
+            //  multiple activations in the same turn each sacrifice their
+            //  cheated-in creature. v1 deterministic first-creature-in-hand
+            //  pick (auto-accepts the "you may" when a candidate exists —
+            //  same shape as Aether Vial / Through the Breach / Goblin
+            //  Lackey). Haste granted via the standard EOT-scoped keyword
+            //  grant (observationally equivalent to a no-duration grant
+            //  given the creature is sac'd at the same boundary).
+            //  Single-arg dispatcher path produces the correct card shape
+            //  without ZoneService / TriggerManager wiring; use the
+            //  (owner, zoneService, triggers) overload for fully-wired
+            //  behaviour.
+            "Sneak Attack" => SneakAttackFactory.Create(owner),
+
             // Creature — Human Soldier {1}{W} 2/2 (PuresteelPaladinFactory).
             // ETB-draw trigger: whenever an Equipment enters under controller's
             // control, draw a card (CR 603.1 — "you may" simplified to a
