@@ -1080,6 +1080,18 @@ public static class NamedCardFactory
             // riders are structural in v1 (see factory doc).
             "Veil of Summer" => VeilOfSummerFactory.Create(owner),
 
+            // Instant — {1}{U} (AetherGustFactory). Core Set 2020.
+            // "Choose target spell or permanent that's red or green. Its owner
+            //  puts it on the top or bottom of their library." (CR 115 +
+            //  CR 109.4 / 701.20a.) Card shape only here; the bounce
+            // SpellDefinition is built on demand via
+            // AetherGustFactory.BuildDefinition(targetResolver, stack,
+            // topChooser?). Colour-of-target gate runs at resolution time
+            // via CardColors.GetColors (CR 105). Top-vs-bottom decision is
+            // sourced from the optional topChooser callback; null defaults
+            // to bottom (mirrors Manamorphose's deterministic v1 fallback).
+            "Aether Gust" => AetherGustFactory.Create(owner),
+
             // Artifact — {2} (DampingSphereFactory). Dominaria.
             // Two static riders:
             //   1. "If a land is tapped for two or more mana, it produces
