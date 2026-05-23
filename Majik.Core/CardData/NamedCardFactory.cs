@@ -448,6 +448,15 @@ public static class NamedCardFactory
             // the first creature card deterministically.
             "Scavenging Ooze" => ScavengingOozeFactory.Create(owner),
 
+            // Creature — Dragon {3}{U}{U} 3/3 (MurktideRegentFactory).
+            // Flying + Delve marker keywords wired. ETB trigger: exile target
+            // instant or sorcery card from a graveyard; enters with +1/+1
+            // counters = delve-exiled-count + (ETB exile ? 1 : 0) per CR 122.1g.
+            // The delve count is plumbed via Card.PendingDelveExiledCount,
+            // stamped by SpellCastFlow when DelveCost is paid and consumed
+            // by the ETB effect.
+            "Murktide Regent" => MurktideRegentFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
