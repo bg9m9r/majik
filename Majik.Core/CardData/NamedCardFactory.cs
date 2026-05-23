@@ -1879,6 +1879,21 @@ public static class NamedCardFactory
             // a live TriggerManager.
             "Mana Vault" => ManaVaultFactory.Create(owner),
 
+            // Legendary Creature — Phyrexian Angel {3}{W}{U}{B}{R}{G}
+            // (AtraxaGrandUnifierFactory). Phyrexia: All Will Be One.
+            // Flying + Vigilance + Deathtouch + Lifelink keyword markers
+            // wired (CR 702.9 / 702.20 / 702.2 / 702.15). ETB triggered
+            // ability: reveal the top ten cards of your library, put one
+            // card of each card type into your hand, then place the rest
+            // on the bottom of your library in a random order (CR 603.6a,
+            // CR 701.20a). The single-arg dispatcher path attaches the
+            // ETB trigger to the card shape without TriggerManager
+            // wiring; callers can invoke AtraxaGrandUnifierFactory.ResolveEtb
+            // directly to drive the reveal-and-pick. The Battle card
+            // type (MoM+) is iterated transparently when added to the
+            // CardType enum — no factory change needed.
+            "Atraxa, Grand Unifier" => AtraxaGrandUnifierFactory.Create(owner),
+
             // Legendary Creature — Phyrexian Praetor {2}{B}{B} 4/5
             // (SheoldredTheApocalypseFactory). Dominaria United. Deathtouch
             // wired as a KeywordAbility marker. Draw trigger (CR 603.1):
@@ -1892,6 +1907,36 @@ public static class NamedCardFactory
             // resolver pattern). Use the (owner, opponentResolver, eventBus,
             // triggers) overload to wire full drain + bus-driven firing.
             "Sheoldred, the Apocalypse" => SheoldredTheApocalypseFactory.Create(owner),
+
+            // Legendary Artifact — {4} (TheOneRingFactory). Tales of
+            // Middle-earth. Indestructible keyword wired. ETB trigger
+            // ("when this enters, if you cast it, you gain protection
+            // from everything until your next turn") attached as a
+            // structural no-op — no cast-marker, no "until your next
+            // turn" cleanup, no player-scoped protection layer yet.
+            // Upkeep trigger: lose 1 life per burden counter on The One
+            // Ring (CR 500.4 / CR 603.1). Activated {T}: add a burden
+            // counter, then draw a card for each burden counter on it
+            // (add-then-draw ordering — first activation draws 1, second
+            // draws 2, etc., per CR 608.2c). Single-arg dispatcher path
+            // here produces the correct card shape without TriggerManager
+            // wiring; use the (owner, eventBus, triggers) overload for
+            // bus-driven trigger firing.
+            "The One Ring" => TheOneRingFactory.Create(owner),
+
+            // Instant — {U}{U}{U} (ArchmagesCharmFactory). Modern Horizons.
+            // CR 700.2d — modal "Choose one —" with 3 printed modes
+            // (counter spell / target player draws two / gain control of
+            // nonland permanent with mv ≤ 1). The single-arg dispatcher
+            // path produces the correct card shape; the bound
+            // SpellDefinition is built on demand via
+            // ArchmagesCharmFactory.BuildDefinition(caster, targetResolver,
+            // stack[, effects]). Mode 2's ControlChangeEffect (CR 613.2,
+            // Layer 2) is no-op without a live ContinuousEffectsService —
+            // counter / draw modes still resolve fully. Mirrors
+            // CrypticCommandFactory for the modal shape and
+            // WishclawTalismanFactory for the control-change registration.
+            "Archmage's Charm" => ArchmagesCharmFactory.Create(owner),
 
             _ => new Card(name, ""),
         };
