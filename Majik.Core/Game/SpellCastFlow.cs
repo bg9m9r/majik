@@ -177,6 +177,16 @@ public sealed class SpellCastFlow
             }
             totalCost = delveCost.ApplyTo(totalCost);
             delveCost.Pay(caster);
+
+            // CR 702.66 — stamp the count of delve-exiled cards on the card
+            // itself so downstream ETB-with-counters effects (Murktide Regent
+            // — CR 122.1g X-counter ETB) can read "cards exiled with me"
+            // without us re-plumbing DelveCost across the spell-cast →
+            // permanent boundary. Consumed + cleared by the ETB effect.
+            if (card is Card concreteCard)
+            {
+                concreteCard.SetPendingDelveExiledCount(delveCost.ReductionAmount);
+            }
         }
 
         // CR 601.2g — mana sourcing. When the caller has already prompted +

@@ -103,6 +103,34 @@ public class Card : ICard
         RuntimeFlashbackCost = null;
     }
 
+    /// <summary>
+    /// CR 702.66 — when this card was cast paying delve, the number of cards
+    /// that were exiled from its caster's graveyard as part of the delve
+    /// payment. Set by <see cref="Majik.Core.Game.SpellCastFlow"/> right after
+    /// <see cref="Majik.Core.Costs.DelveCost.Pay"/> succeeds; read by
+    /// Murktide-Regent-style ETB effects that need to know "how many cards
+    /// were exiled with me" without otherwise plumbing the delve cost
+    /// through to the resolving permanent. Null when the card was not cast
+    /// via delve, or has already been consumed/cleared.
+    /// </summary>
+    public int? PendingDelveExiledCount { get; private set; }
+
+    /// <summary>Stamp the delve-exile count on this card. Called by
+    /// <see cref="Majik.Core.Game.SpellCastFlow"/> immediately after the
+    /// delve cost is paid.</summary>
+    public void SetPendingDelveExiledCount(int count)
+    {
+        if (count < 0) throw new ArgumentOutOfRangeException(nameof(count));
+        PendingDelveExiledCount = count;
+    }
+
+    /// <summary>Clear the stamped delve-exile count. Called by any ETB
+    /// consumer (e.g. Murktide Regent) once it has used the value.</summary>
+    public void ClearPendingDelveExiledCount()
+    {
+        PendingDelveExiledCount = null;
+    }
+
     public Card(string name, string manaCost = "", IEnumerable<CardType>? cardTypes = null, IEnumerable<CardSupertype>? supertypes = null, IEnumerable<CardSubtype>? subtypes = null)
     {
         if (string.IsNullOrWhiteSpace(name))
