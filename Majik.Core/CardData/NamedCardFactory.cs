@@ -1038,6 +1038,24 @@ public static class NamedCardFactory
             // + Layer 4 Illusion rider + bus-driven trigger firing.
             "Phantasmal Image" => PhantasmalImageFactory.Create(owner),
 
+            // Enchantment — {B}{B}{B} (NecropotenceFactory). Ice Age.
+            // "Skip your draw step. Whenever you discard a card, exile that
+            //  card. Pay 1 life: Exile the top card of your library face
+            //  down. Put that card into your hand at the beginning of your
+            //  next end step." Skip-draw wired via SkipDrawRegistry
+            // (consulted by TurnDriver); discard→exile wired via
+            // ReplacementBus on the hand→graveyard ZoneMoveIntent funnel
+            // (engine has no DiscardEvent in v1); activated ability wired
+            // with Pay 1 life + delayed end-step return-to-hand. The
+            // single-arg dispatcher path produces the correct card shape
+            // (Enchantment + Static + ReplacementEffect + ActivatedAbility)
+            // but the skip-draw / discard-exile / delayed draw side
+            // effects do not fire because no registry/bus/triggers are
+            // wired. Use the (owner, replacements, triggerManager)
+            // overload for fully-wired behaviour. Face-down exile is
+            // deferred — engine has no face-down flag.
+            "Necropotence" => NecropotenceFactory.Create(owner),
+
             // Enchantment — {1}{W} (StonySilenceFactory). Return to Ravnica.
             // "Activated abilities of artifacts can't be activated unless
             //  they're mana abilities." (CR 602.5c / 605.) Symmetric global
