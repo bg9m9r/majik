@@ -189,6 +189,21 @@ public static class NamedCardFactory
             // (CR 702.74b).
             "Endurance" => EnduranceFactory.Create(owner),
 
+            // Creature — Human Shaman {1}{G}{G} 2/1 (EternalWitnessFactory).
+            // Fifth Dawn + many reprints. ETB triggered ability (CR 603.6a)
+            // wired via Triggers.OnEnterBattlefieldSelf with a bespoke 1..1
+            // "target card in your graveyard" TargetRequest (ANY card type,
+            // distinct from Animate Dead's creature-only graveyard target).
+            // On resolution returns the chosen card Graveyard → Hand;
+            // single-arg dispatcher path falls back to first-card-in-grave
+            // pick when no agent-set target is present (mirrors Wishclaw
+            // Talisman / Tasigur). Empty graveyard / illegal target → clean
+            // no-op (CR 608.2b). "You may" auto-accepted at v1 (same
+            // posture as Tireless Tracker / Phlage / Snapcaster Mage).
+            // Use the (owner, zoneService, eventBus, triggers) overload
+            // for bus-driven firing + ZoneService-routed return.
+            "Eternal Witness" => EternalWitnessFactory.Create(owner),
+
             // Legendary Artifact — Vehicle {3}{G} 4/4 (EsikasChariotFactory).
             // Kaldheim. ETB trigger: create two 2/2 Cat creature tokens.
             // Attack trigger: create a token that's a copy of target token
