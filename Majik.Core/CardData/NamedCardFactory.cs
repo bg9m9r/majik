@@ -3036,6 +3036,19 @@ public static class NamedCardFactory
             // behavior.
             "Monastery Mentor" => MonasteryMentorFactory.Create(owner),
 
+            // Creature — Human Monk {R} 1/2 (MonasterySwiftspearFactory).
+            // Khans of Tarkir + many reprints. Haste (CR 702.10) +
+            // Prowess (CR 702.108) — "Whenever you cast a noncreature
+            // spell, this creature gets +1/+1 until end of turn." Haste +
+            // Prowess KeywordAbility markers always attached for shape
+            // inspection. Prowess mechanic itself wired via
+            // ProwessFactory.Build when a ContinuousEffectsService is
+            // supplied. The single-arg dispatcher path produces the
+            // correct card shape without trigger-manager or effects
+            // wiring. Use the (owner, eventBus, triggers, effects)
+            // overload for fully-wired behavior.
+            "Monastery Swiftspear" => MonasterySwiftspearFactory.Create(owner),
+
             // Instant — {B}{G} (AssassinsTrophyFactory). Guilds of Ravnica.
             // "Destroy target permanent an opponent controls. Its controller
             //  searches their library for a basic land card, puts it onto
