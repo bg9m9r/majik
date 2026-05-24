@@ -1,4 +1,5 @@
 using Majik.Core.Abilities;
+using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Game;
@@ -18,30 +19,23 @@ namespace Majik.Core.CardData.Factories;
 ///    Counter target noncreature spell."
 ///
 /// Implemented in v1:
-///   * Instant card shape ({1}{U}{U}, Blue).
+///   * Instant card shape ({1}{U}{U}, Blue) — built via the fluent
+///     <see cref="CardDef"/> DSL.
 ///   * Counter target noncreature spell — <see cref="BuildDefinition"/>
 ///     builds a SpellDefinition whose effect ignores creature spells at
-///     resolution time (CR 608.2b — illegal targets cause the effect to do
-///     nothing for that target).
-///   * Pitch alternative cost (<see cref="Majik.Core.Costs.PitchAlternativeCost"/>):
-///     not-your-turn + exile a blue card from hand. No life rider.
-///   * Bot probe — <see cref="PitchAltCostProbe"/> recognizes this card by
-///     name and emits a candidate per blue card in hand.
+///     resolution time (CR 608.2b).
+///   * Pitch alternative cost (<see cref="Majik.Core.Costs.PitchAlternativeCost"/>).
+///   * Bot probe — <see cref="PitchAltCostProbe"/> recognizes this card.
 /// </summary>
 [CardName("Force of Negation")]
 public static class ForceOfNegationFactory
 {
     public const string CardName = "Force of Negation";
 
-    public static Instant Create(Player owner)
-    {
-        ArgumentNullException.ThrowIfNull(owner);
+    public static CardDef Define() => CardDef.Instant(CardName, "{1}{U}{U}");
 
-        var card = new Instant(CardName, "{1}{U}{U}");
-        card.SetOwner(owner);
-        card.SetController(owner);
-        return card;
-    }
+    public static Instant Create(Player owner) =>
+        (Instant)CardDefRuntime.Build(Define(), owner);
 
     /// <summary>Build the "counter target noncreature spell" SpellDefinition.
     /// Mirrors <c>CounterSpellFactory.CounterTypedSpell(requireNonCreature: true)</c>

@@ -142,9 +142,27 @@ public sealed class NamedCardFactoryGenerator : IIncrementalGenerator
         //   2. Create(Player owner, string cardName, ...)    → reprint
         //   3. Create(Player owner, string[] args)           → parametric cycle
         // The args[] overload wins when present (most general).
+        //
+        // ALSO: scan for a parameterless static `CardDef Define()` (fluent
+        // DSL opt-in). When present and no `Create(Player)` exists, the
+        // generator synthesizes the dispatch arm by calling
+        // `CardDefRuntime.Build(Factory.Define(), owner)` directly — the
+        // factory class can omit `Create` entirely.
         var hasCreate = false;
         var hasNamedCreate = false;
         var hasArgsCreate = false;
+        var hasDefine = false;
+        foreach (var defineMember in cls.GetMembers("Define"))
+        {
+            if (defineMember is not IMethodSymbol dm) continue;
+            if (!dm.IsStatic) continue;
+            if (dm.DeclaredAccessibility != Accessibility.Public) continue;
+            if (dm.Parameters.Length != 0) continue;
+            // Return type must be the CardDef DSL type.
+            if (dm.ReturnType.Name != "CardDef") continue;
+            hasDefine = true;
+            break;
+        }
         foreach (var member in cls.GetMembers("Create"))
         {
             if (member is not IMethodSymbol m) continue;
@@ -191,16 +209,22 @@ public sealed class NamedCardFactoryGenerator : IIncrementalGenerator
             hasCreate,
             hasNamedCreate,
             hasArgsCreate,
+            hasDefine,
             location);
     }
 
     private static void Emit(SourceProductionContext spc, ImmutableArray<FactoryEntry> entries)
     {
         // Diagnostic — missing Create overload. Any of plain / named /
-        // args-aware satisfies dispatch.
+        // args-aware satisfies dispatch; a `CardDef Define()` also
+        // satisfies it (the generator synthesizes the call to
+        // `CardDefRuntime.Build`).
         foreach (var entry in entries)
         {
-            if (!entry.HasCreateOverload && !entry.HasNamedCreateOverload && !entry.HasArgsCreateOverload)
+            if (!entry.HasCreateOverload
+                && !entry.HasNamedCreateOverload
+                && !entry.HasArgsCreateOverload
+                && !entry.HasDefineMethod)
             {
                 spc.ReportDiagnostic(Diagnostic.Create(
                     MissingCreateDescriptor,
@@ -215,7 +239,10 @@ public sealed class NamedCardFactoryGenerator : IIncrementalGenerator
 
         foreach (var entry in entries)
         {
-            if (!entry.HasCreateOverload && !entry.HasNamedCreateOverload && !entry.HasArgsCreateOverload) continue;
+            if (!entry.HasCreateOverload
+                && !entry.HasNamedCreateOverload
+                && !entry.HasArgsCreateOverload
+                && !entry.HasDefineMethod) continue;
             foreach (var reg in entry.Registrations)
             {
                 if (map.TryGetValue(reg.Name, out var existing))
@@ -291,9 +318,17 @@ public sealed class NamedCardFactoryGenerator : IIncrementalGenerator
                 // so the canonical factory can mint each reprint distinctly.
                 call = $"{arm.Entry.FullyQualifiedName}.Create(owner, {literal})";
             }
-            else
+            else if (arm.Entry.HasCreateOverload)
             {
                 call = $"{arm.Entry.FullyQualifiedName}.Create(owner)";
+            }
+            else
+            {
+                // Fluent-DSL factory — no Create at all, just a Define()
+                // returning a CardDef. The generator synthesizes the
+                // construction call here so the factory file can shrink
+                // to the bare `Define()` body.
+                call = $"global::Majik.Core.CardData.Definitions.CardDefRuntime.Build({arm.Entry.FullyQualifiedName}.Define(), owner)";
             }
 
             sb.AppendLine($"            {literal} => {call},");
@@ -315,6 +350,7 @@ public sealed class NamedCardFactoryGenerator : IIncrementalGenerator
         bool HasCreateOverload,
         bool HasNamedCreateOverload,
         bool HasArgsCreateOverload,
+        bool HasDefineMethod,
         Location? Location);
 
     private sealed record DispatchArm(FactoryEntry Entry, ImmutableArray<string> Args);
