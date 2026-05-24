@@ -2387,6 +2387,20 @@ public static class NamedCardFactory
             // keyword marker only in v1 — see InkmothNexusFactory xmldoc.
             "Inkmoth Nexus" => InkmothNexusFactory.Create(owner),
 
+            // Instant — {U} (IntoTheFloodMawFactory). Bloomburrow.
+            // "Gift a tapped Fish (...). Return target creature an opponent
+            //  controls to its owner's hand. If the gift was promised,
+            //  instead return target nonland permanent an opponent controls
+            //  to its owner's hand." v1 ships the printed base mode only
+            //  (no-gift bounce target creature an opponent controls). Gift
+            //  cast-time prompt + conditional target predicate are DEFERRED
+            //  pending SpellCastFlow gift-promise hook + TargetRequest
+            //  conditional-predicate primitive. Single-arg dispatcher
+            //  produces the correct card shape; pass (caster, zoneService)
+            //  to BuildDefinition for the opponent-control gate +
+            //  replacement-bus-aware zone moves.
+            "Into the Flood Maw" => IntoTheFloodMawFactory.Create(owner),
+
             // Creature — Human Wizard {2}{U} 2/2 (TrinketMageFactory).
             // ETB tutor: search library for an artifact card with mana
             // value 1 or less → hand (deterministic first-match; shuffle
