@@ -2807,6 +2807,18 @@ public static class NamedCardFactory
             // for bus-driven trigger registration.
             "Mystic Sanctuary" => MysticSanctuaryFactory.Create(owner),
 
+            // Instant — {2}{U} (MysticalDisputeFactory). Throne of Eldraine.
+            // "This spell costs {2} less to cast if it targets a blue spell.
+            //  Counter target spell unless its controller pays {3}."
+            // Card shape attaches the target-conditional CostReductionAbility
+            // (CR 117.7) wired to Card.PendingCastTargets — SpellCastFlow
+            // stamps the picked targets onto the card before cost calc so the
+            // reducer can read them. Counter-unless-pay-{3} resolve-time
+            // SpellDefinition is built on demand via
+            // MysticalDisputeFactory.BuildSpellDefinition(targetResolver,
+            // stack); mirrors ManaLeakFactory shape with N=3.
+            "Mystical Dispute" => MysticalDisputeFactory.Create(owner),
+
             // Sorcery — {1}{R} (MizziumMortarsFactory). Return to Ravnica.
             // CR 702.96 — Overload. Default printed cast deals 4 damage to
             // target creature; the overload alt-cost {4}{R}{R} rewrites

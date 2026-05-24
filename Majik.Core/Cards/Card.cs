@@ -235,6 +235,39 @@ public class Card : ICard
     }
 
     /// <summary>
+    /// CR 601.2f — when this card is currently being cast as a spell, the
+    /// set of targets the agent picked during target selection (one inner
+    /// list per <see cref="Majik.Core.Game.TargetRequest"/>, mirroring
+    /// <see cref="Majik.Core.Game.ChosenSpellParams.Targets"/>). Stamped by
+    /// <see cref="Majik.Core.Game.SpellCastFlow"/> immediately after target
+    /// collection so cost-calculation rules that depend on the chosen
+    /// targets ("This spell costs {2} less to cast if it targets a blue
+    /// spell." — Mystical Dispute) can read them. Null when the card is
+    /// not actively being cast.
+    /// </summary>
+    public IReadOnlyList<IReadOnlyList<object>>? PendingCastTargets { get; private set; }
+
+    /// <summary>Stamp the chosen targets on this card. Called by
+    /// <see cref="Majik.Core.Game.SpellCastFlow"/> right after target
+    /// collection and before cost calculation, so a
+    /// <see cref="Majik.Core.Costs.CostReductionAbility"/> on the card can
+    /// reference the targets that have just been picked (e.g. Mystical
+    /// Dispute's "costs {2} less if it targets a blue spell").</summary>
+    public void SetPendingCastTargets(IReadOnlyList<IReadOnlyList<object>> targets)
+    {
+        PendingCastTargets = targets ?? throw new ArgumentNullException(nameof(targets));
+    }
+
+    /// <summary>Clear the stamped pending targets. Called by
+    /// <see cref="Majik.Core.Game.SpellCastFlow"/> once the spell has been
+    /// pushed onto the stack, so a later re-cast doesn't see stale
+    /// targets.</summary>
+    public void ClearPendingCastTargets()
+    {
+        PendingCastTargets = null;
+    }
+
+    /// <summary>
     /// CR 711 — double-faced / transform card face tracker. Non-null on
     /// DFC cards; tracks which face (front / back) is currently active and
     /// exposes <see cref="Majik.Core.CardData.MDFCs.MdfcState.Transform"/>
