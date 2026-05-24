@@ -134,6 +134,9 @@ public enum CardSubtype
     /// <summary>Wolf creature subtype — Young Wolf (Innistrad), Strangleroot Geist,
     /// Master of the Wild Hunt. CR 205.3m.</summary>
     Wolf,
+    /// <summary>Faerie creature subtype — Sprite Dragon (Ikoria), Spellstutter Sprite,
+    /// Bitterblossom tokens. CR 205.3m.</summary>
+    Faerie,
 
     // Land subtypes (examples)
     Forest,
