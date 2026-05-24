@@ -11,6 +11,15 @@ public sealed record CounterType(string Name)
 {
     public static readonly CounterType PlusOnePlusOne = new("+1/+1");
     public static readonly CounterType MinusOneMinusOne = new("-1/-1");
+
+    /// <summary>
+    /// CR 122.1g — toughness-only -0/-1 counter (Wall of Roots cost-counter
+    /// shape, Phyrexian Furnace's stress cycle, etc.). Power is unaffected;
+    /// toughness is reduced by 1 per counter via layer 7c. Does NOT
+    /// participate in the +1/+1 / -1/-1 cancellation SBA (CR 704.5q —
+    /// that pair-off rule is named to those two types only).
+    /// </summary>
+    public static readonly CounterType MinusZeroMinusOne = new("-0/-1");
     public static readonly CounterType Loyalty = new("Loyalty");
     public static readonly CounterType Charge = new("Charge");
     public static readonly CounterType Defense = new("Defense");

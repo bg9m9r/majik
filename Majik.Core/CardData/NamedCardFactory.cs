@@ -43,6 +43,24 @@ public static class NamedCardFactory
 
             // Named-card factories — fully-wired cards with real abilities.
             "Walking Ballista" => WalkingBallistaFactory.Create(owner),
+
+            // Creature — Plant Wall {1}{G} 0/5 (WallOfRootsFactory).
+            // Mirrodin / many reprints. "Defender. Put a -0/-1 counter on
+            // Wall of Roots: Add {G}. Activate only once each turn."
+            // Defender keyword marker (CR 702.3) wired. The mana ability is
+            // built on the new no-tap ManaAbility overload — the activation
+            // cost is the place-counter-on-self side-effect alone, no {T}.
+            // canActivateCheck enforces the once-per-turn lock via an
+            // int[1] closure (CR 602.5e); additionalCostPayer stamps one
+            // CounterType.MinusZeroMinusOne and flips the closure to
+            // "used". The single-arg dispatcher path attaches the mana
+            // ability with the gate active but never resets the closure;
+            // use the (owner, eventBus) overload to wire the
+            // TurnStartedEvent reset (CR 500.1). -0/-1 toughness reduction
+            // surfaces via ContinuousEffectsService's layer 7c handler
+            // (CR 122.1g — counter-handler extended this PR). Modern
+            // Yawgmoth combo ramp / Amulet Titan colour-fixer.
+            "Wall of Roots" => WallOfRootsFactory.Create(owner),
             "Dryad Arbor"      => DryadArborFactory.Create(owner),
             "Yawgmoth, Thran Physician" => YawgmothFactory.Create(owner),
             "Boseiju, Who Endures" => BoseijuFactory.Create(owner),

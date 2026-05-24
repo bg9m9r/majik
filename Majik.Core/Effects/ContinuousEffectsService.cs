@@ -115,15 +115,22 @@ public sealed class ContinuousEffectsService
             }
         }
 
-        // Layer 7c — +1/+1 and -1/-1 counter P/T adjustment (CR 122.1g).
-        // Applied after other 7c effects per CR 613.7 (counters last).
-        // Only meaningful for creatures.
+        // Layer 7c — +1/+1, -1/-1, and -0/-1 counter P/T adjustment
+        // (CR 122.1g). Applied after other 7c effects per CR 613.7
+        // (counters last). Only meaningful for creatures.
+        //   - +1/+1 and -1/-1 both shift power and toughness.
+        //   - -0/-1 (Wall of Roots cost-counter, Phyrexian Furnace's stress
+        //     cycle) shifts only toughness. The named counter type is
+        //     opaque to the +1/+1 / -1/-1 SBA cancellation (CR 704.5q
+        //     names only that pair), so it can stack to lethal-toughness
+        //     on Wall of Roots without being cancelled out.
         if (chars is CreatureCharacteristics cc && permanent is Permanent perm)
         {
             var plus = perm.Counters.Count(Majik.Core.Counters.CounterType.PlusOnePlusOne);
             var minus = perm.Counters.Count(Majik.Core.Counters.CounterType.MinusOneMinusOne);
+            var minusZeroMinusOne = perm.Counters.Count(Majik.Core.Counters.CounterType.MinusZeroMinusOne);
             cc.Power += plus - minus;
-            cc.Toughness += plus - minus;
+            cc.Toughness += plus - minus - minusZeroMinusOne;
         }
 
         return chars;

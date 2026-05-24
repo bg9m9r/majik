@@ -12,6 +12,7 @@ public class ManaAbility : IManaAbility
     private readonly Func<bool>? _canActivateCheck;
     private readonly Func<ManaCost> _manaGenerator;
     private readonly Action<Player>? _additionalCostPayer;
+    private readonly bool _tapsAsCost;
 
     public object Source { get; }
     public Player Controller { get; }
@@ -24,6 +25,7 @@ public class ManaAbility : IManaAbility
         ManaGenerated = manaGenerated ?? throw new ArgumentNullException(nameof(manaGenerated));
         _canActivateCheck = canActivateCheck;
         _manaGenerator = () => manaGenerated;
+        _tapsAsCost = true;
     }
 
     public ManaAbility(object source, Player controller, Func<ManaCost> manaGenerator, Func<bool>? canActivateCheck = null)
@@ -33,6 +35,7 @@ public class ManaAbility : IManaAbility
         _manaGenerator = manaGenerator ?? throw new ArgumentNullException(nameof(manaGenerator));
         _canActivateCheck = canActivateCheck;
         ManaGenerated = ManaCost.Zero; // Will be set when activated
+        _tapsAsCost = true;
     }
 
     /// <summary>
@@ -61,6 +64,42 @@ public class ManaAbility : IManaAbility
         _canActivateCheck = canActivateCheck ?? throw new ArgumentNullException(nameof(canActivateCheck));
         _additionalCostPayer = additionalCostPayer ?? throw new ArgumentNullException(nameof(additionalCostPayer));
         _manaGenerator = () => manaGenerated;
+        _tapsAsCost = true;
+    }
+
+    /// <summary>
+    /// Construct a mana ability whose activation cost does NOT include
+    /// {T}. Wall of Roots' "Put a -0/-1 counter on this: Add {G}" is the
+    /// canonical shape — the activation cost is the additional non-mana
+    /// cost payer alone; the permanent stays untapped. Distinct from the
+    /// standard "{T}, &lt;extra cost&gt;: Add …" overload which always taps
+    /// the source.
+    ///
+    /// <para>Caller MUST supply both <paramref name="canActivateCheck"/>
+    /// (the legality gate — typically a per-turn lock and/or a resource
+    /// check) and <paramref name="additionalCostPayer"/> (the side-effect
+    /// that actually pays the printed cost — e.g. place a -0/-1 counter on
+    /// self).</para>
+    ///
+    /// CR 605.1 — the ability is still a mana ability (doesn't use the
+    /// stack); the activation cost is paid up front and the generated
+    /// mana is returned in the same atomic step.
+    /// </summary>
+    public ManaAbility(
+        object source,
+        Player controller,
+        ManaCost manaGenerated,
+        Func<bool> canActivateCheck,
+        Action<Player> additionalCostPayer,
+        bool tapsAsCost)
+    {
+        Source = source ?? throw new ArgumentNullException(nameof(source));
+        Controller = controller ?? throw new ArgumentNullException(nameof(controller));
+        ManaGenerated = manaGenerated ?? throw new ArgumentNullException(nameof(manaGenerated));
+        _canActivateCheck = canActivateCheck ?? throw new ArgumentNullException(nameof(canActivateCheck));
+        _additionalCostPayer = additionalCostPayer ?? throw new ArgumentNullException(nameof(additionalCostPayer));
+        _manaGenerator = () => manaGenerated;
+        _tapsAsCost = tapsAsCost;
     }
 
     public bool CanActivate()
@@ -90,8 +129,12 @@ public class ManaAbility : IManaAbility
         var mana = _manaGenerator();
         ManaGenerated = mana;
 
-        // Tap the source if it's a permanent
-        if (Source is Cards.Permanent permanent)
+        // Tap the source if it's a permanent AND the printed cost
+        // includes {T} (default). Wall of Roots' "Put a -0/-1 counter on
+        // this: Add {G}" ability does NOT tap — the no-tap overload sets
+        // _tapsAsCost = false so the permanent stays untapped through
+        // multiple cost-counter activations across consecutive turns.
+        if (_tapsAsCost && Source is Cards.Permanent permanent)
         {
             permanent.Tap();
         }
