@@ -709,6 +709,30 @@ public static class NamedCardFactory
             // target redirect deferred (same gap as RedirectTemplate).
             "Spellskite" => SpellskiteFactory.Create(owner),
 
+            // Instant — {U} (VaporSnagFactory). New Phyrexia.
+            // "Return target creature to its owner's hand. Its controller
+            //  loses 1 life." Bounce effect + 1 life loss wired via
+            //  VaporSnagFactory.BuildDefinition. Single-arg dispatcher
+            //  produces the correct card shape; pass a ZoneService to
+            //  BuildDefinition for replacement-bus-aware zone moves.
+            "Vapor Snag" => VaporSnagFactory.Create(owner),
+
+            // Instant — {R/P} (GutShotFactory). New Phyrexia.
+            // "({R/P} can be paid with either {R} or 2 life.)
+            //  Gut Shot deals 1 damage to any target." Main cost {R};
+            //  Phyrexian alt-cost (2 life) via GutShotFactory.PhyrexianAlternativeCost.
+            //  1 damage to any target via OracleSpellBinder.DealDamage in
+            //  GutShotFactory.BuildDefinition.
+            "Gut Shot" => GutShotFactory.Create(owner),
+
+            // Instant — {1}{B/P}{B/P} (DismemberFactory). New Phyrexia.
+            // "({B/P} can be paid with either {B} or 2 life each.)
+            //  Target creature gets -5/-5 until end of turn." Main cost
+            //  {1}{B}{B}; Phyrexian alt-cost (4 life + {1}) via
+            //  DismemberFactory.PhyrexianAlternativeCost. -5/-5 EOT via
+            //  PumpUntilEndOfTurnEffect in DismemberFactory.BuildDefinition.
+            "Dismember" => DismemberFactory.Create(owner),
+
             // Sorcery — {2}{R} (RiftBoltFactory). 3 damage to any target;
             // Suspend 1—{R} (CR 702.62). Spell-def and suspend alt cost
             // built on demand via RiftBoltFactory.BuildSpellDefinition /
