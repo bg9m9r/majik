@@ -1,4 +1,5 @@
 using Majik.Core.Abilities;
+using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
 using Majik.Core.Game;
 using Majik.Core.Players;
@@ -39,21 +40,12 @@ public static class SwordsToPlowsharesFactory
     public const string CardName = "Swords to Plowshares";
     public const string Cost = "{W}";
 
-    /// <summary>
-    /// Construct Swords to Plowshares as an Instant card with owner /
-    /// controller wired. The resolve SpellDefinition is built on demand via
-    /// <see cref="BuildDefinition"/> at the SpellCastFlow resolver wire-up
-    /// site (mirrors Spell Snare / Force of Will).
-    /// </summary>
-    public static Instant Create(Player owner)
-    {
-        ArgumentNullException.ThrowIfNull(owner);
+    /// <summary>CardDef DSL — card shape only. Exile-and-lifegain body
+    /// lives in <see cref="BuildDefinition"/>.</summary>
+    public static CardDef Define() => CardDef.Instant(CardName, Cost);
 
-        var card = new Instant(CardName, Cost);
-        card.SetOwner(owner);
-        card.SetController(owner);
-        return card;
-    }
+    public static Instant Create(Player owner) =>
+        (Instant)CardDefRuntime.Build(Define(), owner);
 
     /// <summary>
     /// Build the "exile target creature + controller gains life equal to its

@@ -1,4 +1,5 @@
 using Majik.Core.Abilities;
+using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
 using Majik.Core.Game;
 using Majik.Core.Players;
@@ -45,23 +46,12 @@ public static class HidetsugusSecondRiteFactory
     /// passes.</summary>
     public const int DamageAmount = 10;
 
-    /// <summary>
-    /// Build a Hidetsugu's Second Rite sorcery owned by
-    /// <paramref name="owner"/>. Card shape only — the spell definition
-    /// (target + conditional damage effect) is built on-demand by
-    /// <see cref="BuildSpellDefinition"/> since
-    /// <see cref="SpellDefinition"/> needs a target resolver supplied
-    /// by the caller's <see cref="GameContext"/>.
-    /// </summary>
-    public static Sorcery Create(Player owner)
-    {
-        ArgumentNullException.ThrowIfNull(owner);
+    /// <summary>CardDef DSL — card shape only. Conditional damage body
+    /// lives in <see cref="BuildSpellDefinition"/>.</summary>
+    public static CardDef Define() => CardDef.Sorcery(CardName, PrintedManaCost);
 
-        var card = new Sorcery(CardName, PrintedManaCost);
-        card.SetOwner(owner);
-        card.SetController(owner);
-        return card;
-    }
+    public static Sorcery Create(Player owner) =>
+        (Sorcery)CardDefRuntime.Build(Define(), owner);
 
     /// <summary>
     /// Build the <see cref="SpellDefinition"/> Hidetsugu's Second Rite

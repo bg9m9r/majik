@@ -1,4 +1,5 @@
 using Majik.Core.Abilities;
+using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
@@ -62,22 +63,13 @@ public static class FaithlessLootingFactory
     public const string OracleText =
         "Draw two cards, then discard two cards.\nFlashback {2}{R}";
 
-    /// <summary>
-    /// Build a Faithless Looting sorcery owned by <paramref name="owner"/>.
-    /// Card shape only — the resolve effect is built on demand via
-    /// <see cref="BuildResolveEffect"/> so tests / integrations can splice
-    /// it into a <see cref="Majik.Core.Game.SpellDefinition"/> or pass it
-    /// directly to a <see cref="Majik.Core.Spells.Spell"/>.
-    /// </summary>
-    public static Sorcery Create(Player owner)
-    {
-        ArgumentNullException.ThrowIfNull(owner);
+    /// <summary>CardDef DSL — card shape only. Draw-2-discard-2 body
+    /// lives in <see cref="BuildResolveEffect"/>; flashback cost in
+    /// <see cref="BuildFlashbackCost"/>.</summary>
+    public static CardDef Define() => CardDef.Sorcery(CardName, PrintedManaCost);
 
-        var card = new Sorcery(CardName, PrintedManaCost);
-        card.SetOwner(owner);
-        card.SetController(owner);
-        return card;
-    }
+    public static Sorcery Create(Player owner) =>
+        (Sorcery)CardDefRuntime.Build(Define(), owner);
 
     /// <summary>
     /// Build Faithless Looting's resolve effect — draw two cards, then

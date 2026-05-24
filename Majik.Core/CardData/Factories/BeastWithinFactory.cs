@@ -1,4 +1,5 @@
 using Majik.Core.Abilities;
+using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Game;
@@ -54,20 +55,12 @@ public static class BeastWithinFactory
             // CR 105 / CR 111.4 — printed "3/3 green Beast creature token".
             Colors: new[] { Majik.Core.ValueObjects.ManaColor.Green });
 
-    /// <summary>
-    /// Construct the Beast Within card shape (Instant, {2}{G}).
-    /// Resolve behaviour is built on demand via
-    /// <see cref="BuildSpellDefinition"/>.
-    /// </summary>
-    public static Instant Create(Player owner)
-    {
-        ArgumentNullException.ThrowIfNull(owner);
+    /// <summary>CardDef DSL — card shape only. Destroy + Beast-token body
+    /// lives in <see cref="BuildSpellDefinition"/>.</summary>
+    public static CardDef Define() => CardDef.Instant(CardName, PrintedManaCost);
 
-        var card = new Instant(CardName, PrintedManaCost);
-        card.SetOwner(owner);
-        card.SetController(owner);
-        return card;
-    }
+    public static Instant Create(Player owner) =>
+        (Instant)CardDefRuntime.Build(Define(), owner);
 
     /// <summary>
     /// Build the <see cref="SpellDefinition"/> used when Beast Within is
