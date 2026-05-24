@@ -59,10 +59,6 @@ namespace Majik.Core.CardData.Factories;
 ///   "doubled to 2" half of the printed text is deferred until an Ascend
 ///   primitive lands. Documented in <c>MECHANICS_GAP.md</c> as the first
 ///   Ascend-bearing card to land in the engine.
-/// - <b>Token colour identity (white)</b>: Cat tokens are created as
-///   colourless under the v1 token shape — same gap as Esika's Chariot
-///   Cats / Crashing Footfalls Rhinos. Subtype + P/T + token flag are
-///   correct; CardColors plumbing for tokens is the broader fix.
 /// - <b>True new-object flicker semantics</b>: CR 701.20a treats the
 ///   returning permanent as a new object. v1 returns the same
 ///   <see cref="Card"/> instance (preserves abilities + Lifelink marker)
@@ -200,7 +196,8 @@ public static class OcelotPrideFactory
     /// <summary>
     /// CR 603.1 attack-effect — create <paramref name="count"/> 1/1 white
     /// Cat creature tokens under <paramref name="controller"/>'s control.
-    /// Token colour identity (white) is deferred (see class xmldoc).
+    /// CR 105 / CR 111.4 — white stamped via
+    /// <see cref="TokenFactory.TokenSpec.Colors"/>.
     /// </summary>
     private static void CreateCatTokens(Player controller, int count, ZoneService? zones)
     {
@@ -208,7 +205,9 @@ public static class OcelotPrideFactory
             Name: "Cat",
             Power: 1,
             Toughness: 1,
-            Subtypes: new[] { CardSubtype.Cat });
+            Subtypes: new[] { CardSubtype.Cat },
+            // CR 105 / CR 111.4 — printed "1/1 white Cat creature token".
+            Colors: new[] { Majik.Core.ValueObjects.ManaColor.White });
 
         for (var i = 0; i < count; i++)
         {

@@ -497,6 +497,7 @@ Per-keyword action helpers under `Majik.Core/Keywords/`:
 | Hand-reveal events | Done | #164 |
 | Per-viewer event masking (CR 706) | Done | #168, #169 |
 | Delayed triggered abilities | Done | `Abilities/` (used by Mishra's Bauble) |
+| Token colour identity (CR 105 / CR 903.4) | Done (TBD PR) | `Tokens/TokenFactory.cs` (`TokenSpec.Colors`) + `Cards/Card.cs::TokenColorsOverride` + `Cards/CardColors.cs` (override beats mana-cost scan). 11 named factories retrofitted: Esika's Chariot (green Cats), Crashing Footfalls (green Rhinos), Pact of the Titan (red Giant), Wurmcoil Engine (explicit colourless Wurms), Goblin Rabblemaster (red Goblins), Stormchaser's Talent (U/R Mercenary), Ocelot Pride (white Cats), Cori-Steel Cutter (white Monk + Prowess marker), Monastery Mentor (white Monk), Skyclave Apparition (blue X/X Illusion), Beast Within (green Beast), Bridge from Below (black Zombie), Karn Scion of Urza (explicit colourless Construct), Young Pyromancer (red Elemental). Copy paths (Splinter Twin, Esika's attack copy, `CreateCopyToken` / `MultiTargetCopyToken` templates) snapshot the source's colour via `CardColors.GetColors`. Helper-token surfaces (Treasure / Clue / Food / Eldrazi Spawn) stamp explicit colourless. The `CreateTokens` spell template now forwards the regex-captured colour phrase (`"white"` / `"red and green"` / `"colorless"`) to `TokensSpellFactory.CreateTokensSpell` → `ParseTokenColours` → `TokenSpec.Colors`. |
 
 ### Infra / build
 
