@@ -837,6 +837,17 @@ public static class NamedCardFactory
             //  PumpUntilEndOfTurnEffect in DismemberFactory.BuildDefinition.
             "Dismember" => DismemberFactory.Create(owner),
 
+            // Instant — {G/P} (MutagenicGrowthFactory). New Phyrexia.
+            // "({G/P} can be paid with either {G} or 2 life.)
+            //  Target creature gets +2/+2 until end of turn." Main cost {G};
+            //  Phyrexian alt-cost (2 life) via
+            //  MutagenicGrowthFactory.PhyrexianAlternativeCost. +2/+2 EOT
+            //  via PumpUntilEndOfTurnEffect in
+            //  MutagenicGrowthFactory.BuildDefinition. Sibling of
+            //  GutShotFactory (single {X/P} pip) and DismemberFactory
+            //  (pump-EOT resolve shape).
+            "Mutagenic Growth" => MutagenicGrowthFactory.Create(owner),
+
             // Sorcery — {2}{R} (RiftBoltFactory). 3 damage to any target;
             // Suspend 1—{R} (CR 702.62). Spell-def and suspend alt cost
             // built on demand via RiftBoltFactory.BuildSpellDefinition /

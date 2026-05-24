@@ -11,7 +11,7 @@ Living tracker for Modern-format card + mechanic implementation in the Majik eng
 
 | Metric | Count |
 |---|---|
-| Named factories | 272 |
+| Named factories | 274 |
 | Bespoke templates | 28 |
 | Generic templates | 94 |
 | JSON-defined cards | 18 |
@@ -148,6 +148,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Murderous Cut | Instant | TBD | {4}{B} (KTK) — Delve marker keyword (CR 702.66) reusing the existing `DelveCost` + `SpellCastFlow` plumbing (same wire-up as Treasure Cruise / Dig Through Time). Resolve-time `SpellDefinition` exposes a single 1..1 "target creature" `TargetRequest`; on resolve the targeted creature is destroyed via `OracleSpellBinder.MoveToGraveyard` (CR 701.7) with a battlefield-zone illegal-target guard (CR 608.2b). Indestructible + "can't be regenerated" riders deferred — same lossy MVP as `DestroySpellFactory.DestroyCreatureSpell` |
 | Murderous Rider | Creature | TBD | 2/3 Zombie Knight {1}{B}{B} + Lifelink (CR 702.15) keyword marker. Swift End Adventure half is exposed as a standalone `MurderousRiderFactory.BuildAdventureSpell(caster, targetResolver)` helper that returns a `SpellDefinition` with a single 1..1 "target creature or planeswalker" `TargetRequest`; on resolve destroys the chosen permanent via `OracleSpellBinder.MoveToGraveyard` (CR 701.7) and makes the caster `LoseLife(2)` (CR 119.3) as an unconditional payment even when the destroy half fizzles at resolution (CR 608.2b — printed wording is two consecutive sentences with no conditional gate). Adventure cast-from-hand-to-exile pipeline (CR 715) deferred — same gap as `BonecrusherGiantFactory`. Printed "when this dies, exile it" self-exile LTB clause also deferred (no card-local death replacement surface yet). Indestructible / regeneration riders on the destroy path inherited from `MoveToGraveyard` — same gap as `SlaughterPactFactory` and the rest of the single-target destroy family. Top-20 #4 cleared (Adventure mechanic still gapped) |
 | Murktide Regent | Creature | #194 | delve cost + ETB X counters |
+| Mutagenic Growth | Instant | TBD | {G/P} New Phyrexia — target creature gets +2/+2 EOT (CR 514.2) via PumpUntilEndOfTurnEffect on target's ActiveEffects (mirrors DismemberFactory.BuildDefinition modulo sign). Printed cost stored as {G} (mana-only pip); Phyrexian alt-cost via PhyrexianAlternativeCost (LifeCost=2, AlternativeManaCost=Zero) sibling to GutShotFactory. Structural KeywordAbility("Phyrexian") marker preserves the {G/P} pip shape for visibility/search. CR 608.2b — illegal-target → no-op. Per-pip selectivity not applicable (single pip) |
 | Mutavault | Land | TBD | {T}: Add {C} + {1}: until EOT becomes 2/2 every-creature-type creature, still a land (Layer 4 add-Creature + every-modelled-creature-subtype + Layer 7b set-base PT 2/2, both ExpireAtEndOfTurn; non-Creature runtime instance — PT recorded as shim until Compute(Permanent) upgrades chars row) |
 | Mystical Tutor | Instant | TBD | {U} — search library for instant/sorcery, reveal, top of library (shuffle deferred) |
 | Mystic Sanctuary | Land | #371 | Land — Island (THB). `{T}: Add {U}` basic tap mana ability. ETB intervening-if triggered ability (CR 603.4): when Mystic Sanctuary enters, if you control three or more other Islands, you may put target instant or sorcery card from your graveyard on top of your library. Condition sampled live at trigger resolution (CR 603.10 — same intervening-if pattern as Valakut). Target card is moved Graveyard → library index 0 via `IZone.InsertCardAt`. "May" auto-accepted at v1; agent prompt deferred. Single-arg dispatcher wires the ETB subscription directly; (owner, zoneService, eventBus, triggers) overload routes through ZoneService for full zone-move semantics. Modern Blue Control / Merfolk pillar |
@@ -279,7 +280,6 @@ Cards implemented through generic or bespoke templates without a named factory. 
 - Lava Spike — `Damage/DamagePlayerTemplate`
 - Lava Dart — `Damage/DamageAnyTargetTemplate` (flashback handled by KeywordBinder)
 - Skewer the Critics — `Damage/DamagePlayerTemplate`
-- Mutagenic Growth — `Counters/PumpCreatureTemplate` + Phyrexian alt cost
 - Mana Tithe — `Counter/CounterUnlessPayTemplate`
 - Spell Pierce — `Counter/CounterUnlessPayTemplate` (regex broadened to recognize the "noncreature" type qualifier; pay rider consults the target spell's controller's mana pool)
 - Counterspell — `Counter/CounterTargetSpellTemplate`
