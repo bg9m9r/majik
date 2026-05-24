@@ -1076,5 +1076,19 @@ public static class SeedImplementedCards
         // you control. Whenever another Human enters under your control, put a
         // +1/+1 counter on ~.
         "Thalia's Lieutenant",
+
+        // ---- Modern Humans pieces shipped in the feat/humans-mantis-reflector bump ----
+
+        // Creature — Human Monk {W}{U}{R} 3/3 (MantisRiderFactory). Khans of Tarkir.
+        // Flying + Vigilance + Haste keyword markers wired (CR 702.9, 702.20, 702.10).
+        // Vanilla three-keyword creature — core Modern Humans speed threat.
+        "Mantis Rider",
+
+        // Creature — Human Wizard {1}{W}{U} 2/3 (ReflectorMageFactory). Oath of the Gatewatch.
+        // ETB triggered ability: bounce target creature an opponent controls to its owner's
+        // hand (CR 701.10 / CR 603.6a). CR 608.2b: no-op if target leaves battlefield before
+        // resolution. Name-based cast restriction ("can't cast same-named spells until
+        // your next turn") deferred — no delayed-until-next-turn restriction surface in v1.
+        "Reflector Mage",
     };
 }
