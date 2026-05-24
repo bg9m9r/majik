@@ -2012,6 +2012,21 @@ public static class NamedCardFactory
             // oracle (CR 602.5b default activation timing).
             "Wasteland" => WastelandFactory.Create(owner),
 
+            // Creature — Elemental Shaman {B/R}{B/R} 2/2 — Shadowmoor
+            // (FulminatorMageFactory). Oracle: "Sacrifice Fulminator
+            // Mage: Destroy target nonbasic land." ActivatedAbility with
+            // empty Costs (sacrifice is the only activation cost — see
+            // the inline self-sac in the effect closure, same trick as
+            // Wasteland because AdditionalCost.Sacrifice's Pay() is a
+            // stub) + a single 1..1 "target nonbasic land" TargetRequest.
+            // Resolution-time gate filters non-land, basic, off-battlefield,
+            // and orphan-owner picks (CR 608.2b illegal target → effect
+            // does nothing). v1 uses raw zone moves (no ZoneService
+            // routing — mirrors Wasteland). ActionValidator doesn't yet
+            // filter the agent's target list by "nonbasic land"
+            // (resolution-time guard catches illegal picks).
+            "Fulminator Mage" => FulminatorMageFactory.Create(owner),
+
             // Creature — Illusion {1}{U} 0/0 (PhantasmalImageFactory).
             // CR 706.10 — "You may have this enter as a copy of any creature
             // on the battlefield, except it's an Illusion in addition to its
@@ -3484,6 +3499,21 @@ public static class NamedCardFactory
 
             // Land — Onslaught (WoodedFoothillsFactory). Fetches Mountain or Forest.
             "Wooded Foothills" => WoodedFoothillsFactory.Create(owner),
+
+            // Land — Zendikar (ScaldingTarnFactory). Fetches Island or Mountain.
+            "Scalding Tarn" => ScaldingTarnFactory.Create(owner),
+
+            // Land — Zendikar (MistyRainforestFactory). Fetches Forest or Island.
+            "Misty Rainforest" => MistyRainforestFactory.Create(owner),
+
+            // Land — Onslaught (FloodedStrandFactory). Fetches Plains or Island.
+            "Flooded Strand" => FloodedStrandFactory.Create(owner),
+
+            // Land — Zendikar (VerdantCatacombsFactory). Fetches Swamp or Forest.
+            "Verdant Catacombs" => VerdantCatacombsFactory.Create(owner),
+
+            // Land — Zendikar (MarshFlatsFactory). Fetches Plains or Swamp.
+            "Marsh Flats" => MarshFlatsFactory.Create(owner),
 
             _ => new Card(name, ""),
         };
