@@ -581,6 +581,27 @@ public static class NamedCardFactory
             // full +4/-3 effects.
             "Karn Liberated" => KarnLiberatedFactory.Create(owner),
 
+            // Legendary Planeswalker — Ashiok {1}{U/B}{U/B} loyalty 5
+            // (AshiokDreamRenderFactory). War of the Spark. -1 target-
+            // opponent-mills-4 (CR 701.13b via MillAction.Apply) +
+            // EOT-expirable graveyard→exile ReplacementBus rider (CR 614 /
+            // CR 514.2) — unconditional destination=Graveyard rewrite,
+            // no controller scoping, mirrors AngerOfTheGodsExileInstead
+            // shape without the "damaged this way" scoping; loyalty change
+            // still applies on the single-arg dispatcher path (CR 606.3)
+            // even though the mill body / rider half no-op without an
+            // allPlayersResolver / ReplacementBus. Printed static "Players
+            // can't search libraries" wired via AshiokSearchRestrictionEffect
+            // — unconditional sentinel on the ContinuousEffectsService
+            // (distinct from Leonin Arbiter's pay-{2}-to-bypass restriction;
+            // enforcement at library-search call sites deferred, same gap
+            // as LeoninArbiterSearchRestrictionEffect). Use the (owner,
+            // allPlayersResolver, replacements, continuousEffects) overload
+            // for fully-wired behaviour. Introduces no new CardSubtype —
+            // CardSubtype.Ashiok was already present in the planeswalker
+            // subtype block.
+            "Ashiok, Dream Render" => AshiokDreamRenderFactory.Create(owner),
+
             // Legendary Planeswalker — Karn {4} loyalty 5
             // (KarnScionOfUrzaFactory). +1 reveal-top-2 + deterministic
             // split (higher-mv to hand, other to bottom of library;
