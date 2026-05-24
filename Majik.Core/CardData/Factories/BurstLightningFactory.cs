@@ -1,10 +1,12 @@
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Costs;
 using Majik.Core.Primitives;
 using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
+using Majik.Core.ValueObjects;
 
 namespace Majik.Core.CardData.Factories;
 
@@ -18,35 +20,21 @@ namespace Majik.Core.CardData.Factories;
 ///    If Burst Lightning was kicked, it deals 4 damage to that target
 ///    instead."
 ///
-/// ## Implementation (v1 — kicker primitive deferred)
+/// <para>Kicker (CR 702.33) is now a real <see cref="IAdditionalCost"/>
+/// primitive — <see cref="KickerAdditionalCost"/>. The factory exposes
+/// <see cref="BuildAdditionalCost"/> to construct the kicker rider for
+/// a specific card instance, and the resolve body reads
+/// <see cref="Card.WasKicked"/> at resolution time (CR 702.33b — "if
+/// [spell] was kicked" is checked when the spell resolves; the cast-
+/// time payment locks in the sentinel during
+/// <see cref="SpellCastFlow"/>'s additional-cost loop and the cleanup
+/// effect appended by the cast flow clears the flag after resolution).</para>
 ///
-/// CR 702.33 — Kicker is an additional cost (not an alternative cost)
-/// that modifies the spell's effect when paid. There is no Kicker
-/// primitive in the engine yet (see <c>Majik.Core/Costs/</c> — Buyback,
-/// Delve, Suspend, Convoke, etc. are present; Kicker is not). Wiring
-/// Kicker properly requires:
-///   - An <see cref="IAdditionalCost"/> shape callers can layer onto a
-///     cast (Buyback is the closest existing analogue).
-///   - A "was kicked?" state bit plumbed from cast-time decision through
-///     <see cref="SpellCastFlow"/> to the resolving stack object so the
-///     EffectFactory can branch on it (CR 702.33b).
-///   - <see cref="OracleSpellBinder"/> / <see cref="KeywordAnalyzer"/>
-///     awareness so data-driven cards (Goblin Bushwhacker, Kicker
-///     Apocalypse, etc.) discover the additional cost from oracle text.
-///
-/// Until that infra lands, Burst Lightning ships with default-not-kicked
-/// behavior: cast resolves for 2 damage. The kicked branch is structural
-/// — callers can opt in by passing <c>wasKicked: true</c> to
-/// <see cref="BuildSpellDefinition"/>, which yields 4 damage. Bots
-/// driving the cost-payment side won't choose to kick today (no
-/// additional-cost probe), so the practical effect at the table is "{R}
-/// Instant: 2 damage to any target".
-///
-/// Card-shape only here; the resolve-time spell definition (target +
-/// damage effect with the kicked branch) is built on-demand via
-/// <see cref="BuildSpellDefinition(Func{object, object}, bool)"/>
-/// because <see cref="SpellDefinition"/> needs a target resolver
-/// supplied by the caller's <see cref="GameContext"/>.
+/// <para>Bot-side discovery flows through
+/// <see cref="KickerAltCostProbe"/> (registered in
+/// <see cref="AlternativeCostProbeRegistry.CreateDefault"/>); the
+/// probe's <see cref="KickerAltCostProbe.DefaultLookup"/> recognises
+/// Burst Lightning as a {4}-kicker card.</para>
 /// </summary>
 [CardName("Burst Lightning")]
 public static class BurstLightningFactory
@@ -75,25 +63,31 @@ public static class BurstLightningFactory
 
     /// <summary>
     /// Build the <see cref="SpellDefinition"/> used when Burst Lightning
-    /// is cast. Single 1..1 "any target" request; on resolution deals
-    /// <see cref="BaseDamage"/> (2) or <see cref="KickedDamage"/> (4)
-    /// based on <paramref name="wasKicked"/>.
+    /// is cast. Single 1..1 "any target" request; on resolution reads
+    /// <see cref="Card.WasKicked"/> on <paramref name="caster"/>'s
+    /// active-cast card (the same card supplied to
+    /// <see cref="SpellCastFlow.CastAsync"/>) to choose between
+    /// <see cref="BaseDamage"/> (2) and <see cref="KickedDamage"/> (4).
     ///
-    /// CR 702.33b — "if [spell] was kicked" is checked at the moment
-    /// the spell resolves; the kicker decision is locked in when the
-    /// spell is cast (CR 601.2b). Until Kicker is a real primitive, the
-    /// flag is supplied by the caller.
+    /// <para>CR 702.33b — "if [spell] was kicked" is checked at the
+    /// moment the spell resolves; the kicker decision is locked in when
+    /// the spell is cast (CR 601.2b). The runtime read off
+    /// <c>card.WasKicked</c> captures that decision because
+    /// <see cref="KickerAdditionalCost.Pay"/> stamps the flag at
+    /// cast-announcement and <see cref="SpellCastFlow"/> appends a
+    /// cleanup effect that clears it after resolution.</para>
     /// </summary>
+    /// <param name="card">The cast card instance — the resolve body
+    /// reads <see cref="Card.WasKicked"/> off this same reference so
+    /// the kicker branch fires only when the cast actually paid the
+    /// rider (CR 702.33b).</param>
     /// <param name="resolver">Target resolver supplied by the caller's
     /// <see cref="GameContext"/> (chosen target → live game object).</param>
-    /// <param name="wasKicked">Whether the kicker cost was paid at cast
-    /// time. Defaults to <c>false</c> — kicker is not yet wired through
-    /// <see cref="SpellCastFlow"/>, so production casts ship as
-    /// not-kicked.</param>
     public static SpellDefinition BuildSpellDefinition(
-        Func<object, object> resolver,
-        bool wasKicked = false)
+        ICard card,
+        Func<object, object> resolver)
     {
+        ArgumentNullException.ThrowIfNull(card);
         ArgumentNullException.ThrowIfNull(resolver);
 
         return new SpellDefinition(
@@ -106,6 +100,12 @@ public static class BurstLightningFactory
             EffectFactory: chosen =>
             {
                 var target = resolver(chosen.Targets[0][0]);
+                // CR 702.33b — branch on the cast-time kicker stamp.
+                // Card.WasKicked is set by KickerAdditionalCost.Pay
+                // during SpellCastFlow's additional-cost loop and
+                // cleared by the post-resolve cleanup effect the
+                // cast flow appends.
+                bool wasKicked = card is Card concrete && concrete.WasKicked;
                 var amount = wasKicked ? KickedDamage : BaseDamage;
                 return new IEffect[]
                 {
@@ -113,5 +113,19 @@ public static class BurstLightningFactory
                         Fx.DealDamage(target, amount)),
                 };
             });
+    }
+
+    /// <summary>
+    /// Construct Burst Lightning's kicker <see cref="IAdditionalCost"/>
+    /// for the supplied <paramref name="card"/> instance. Convenience
+    /// builder for callers (tests, bot decision layer) that have already
+    /// decided to pay the kicker; layer the returned cost onto the cast
+    /// via <see cref="SpellCastFlow.CastAsync"/>'s <c>additionalCosts</c>
+    /// parameter.
+    /// </summary>
+    public static IAdditionalCost BuildAdditionalCost(ICard card)
+    {
+        ArgumentNullException.ThrowIfNull(card);
+        return new KickerAdditionalCost(card, ManaCost.Parse(KickerCostText));
     }
 }
