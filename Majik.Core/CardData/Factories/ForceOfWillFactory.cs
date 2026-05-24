@@ -1,4 +1,5 @@
 using Majik.Core.Abilities;
+using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
 using Majik.Core.Game;
 using Majik.Core.Players;
@@ -17,34 +18,26 @@ namespace Majik.Core.CardData.Factories;
 ///    Counter target spell."
 ///
 /// Implemented in v1:
-///   * Instant card shape ({3}{U}{U}, Blue).
+///   * Instant card shape ({3}{U}{U}, Blue) — built via the fluent
+///     <see cref="CardDef"/> DSL.
 ///   * Counter target spell — <see cref="SpellDefinition"/> built by
-///     <see cref="BuildDefinition"/>; binds via the same target-spell + push-to-graveyard
-///     idiom used by <c>CounterTargetSpellTemplate</c>.
+///     <see cref="BuildDefinition"/>; binds via the same target-spell +
+///     push-to-graveyard idiom used by <c>CounterTargetSpellTemplate</c>.
 ///   * Pitch alternative cost (<see cref="Majik.Core.Costs.PitchAlternativeCost"/>):
-///     not-your-turn + exile a blue card from hand + lose 1 life. The cast
-///     flow checks the timing predicate via
-///     <see cref="Majik.Core.Costs.PitchAlternativeCost.IsLegalInContext(Player)"/>.
-///   * Bot probe — <see cref="PitchAltCostProbe"/> recognizes this card by
-///     name and emits a candidate per blue card in hand.
+///     not-your-turn + exile a blue card from hand + lose 1 life.
+///   * Bot probe — <see cref="PitchAltCostProbe"/> recognizes this card.
 ///
-/// Reminder: the Force-of-Will pitch is CR 118.9 (alternative cost) + a
-/// timing rider that lives on <see cref="Majik.Core.Costs.PitchAlternativeCost"/>.
+/// Reminder: the Force-of-Will pitch is CR 118.9 (alternative cost).
 /// </summary>
 [CardName("Force of Will")]
 public static class ForceOfWillFactory
 {
     public const string CardName = "Force of Will";
 
-    public static Instant Create(Player owner)
-    {
-        ArgumentNullException.ThrowIfNull(owner);
+    public static CardDef Define() => CardDef.Instant(CardName, "{3}{U}{U}");
 
-        var card = new Instant(CardName, "{3}{U}{U}");
-        card.SetOwner(owner);
-        card.SetController(owner);
-        return card;
-    }
+    public static Instant Create(Player owner) =>
+        (Instant)CardDefRuntime.Build(Define(), owner);
 
     /// <summary>Build the "counter target spell" SpellDefinition for Force of Will.
     /// Mirrors <c>CounterSpellFactory.CounterTargetSpell</c> — kept inline here so
