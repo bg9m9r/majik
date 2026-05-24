@@ -120,6 +120,11 @@ class Program
                 Environment.Exit(await MechanicDepsCommand.RunAsync(args));
                 return;
             }
+            else if (args[0].Equals("scaffold-factory", StringComparison.OrdinalIgnoreCase))
+            {
+                Environment.Exit(await ScaffoldFactoryCommand.RunAsync(args));
+                return;
+            }
         }
 
         System.Console.WriteLine("Usage:");
@@ -131,10 +136,11 @@ class Program
         System.Console.WriteLine("  Majik.Console ingest-claude-results <path-to-jsonl-file>");
         System.Console.WriteLine("  Majik.Console play-triggers [etb|apnap|intervening-if|delayed|all]");
         System.Console.WriteLine("  Majik.Console coverage-report [--format <fmt>] [--dedup-by-name] [--dump-unmatched <path>]");
-        System.Console.WriteLine("  Majik.Console coverage [--modern|--legacy|--vintage|--commander|--format <fmt>] [--decklist <path>] [--json-out <path>] [--md-out <path>] [--no-dedup] [--top N]");
+        System.Console.WriteLine("  Majik.Console coverage [--modern|--legacy|--vintage|--commander|--format <fmt>] [--decklist <path>] [--weighted [<snapshot.json>]] [--json-out <path>] [--md-out <path>] [--no-dedup] [--top N]");
         System.Console.WriteLine("  Majik.Console coverage-gaps [--modern|--legacy|--vintage|--commander|--format <fmt>] [--top N] [--min-cluster K] [--json-out <path>] [--md-out <path>]");
         System.Console.WriteLine("  Majik.Console compile-templates");
         System.Console.WriteLine("  Majik.Console mechanic-deps [--top N] [--json-out <path>] [--md-out <path>] [--factories-dir <path>]");
+        System.Console.WriteLine("  Majik.Console scaffold-factory <Card Name> [--out <path>] [--force]");
         System.Console.WriteLine();
         TriggerPlayground.PrintScenarios();
     }

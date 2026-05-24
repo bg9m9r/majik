@@ -1,5 +1,6 @@
 using Majik.Core.Abilities;
 using Majik.Core.Api.Commands;
+using Majik.Core.Api.Dtos;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Game;
@@ -34,6 +35,16 @@ public sealed class RemoteAgent : IPlayerAgent
     // original list to map IDs back to abilities. Cleared once the prompt
     // resolves (in Submit), or replaced on the next OrderTriggersAsync.
     private IReadOnlyList<ITriggeredAbility>? _pendingTriggerOrder;
+    // Engine-supplied candidate list for the most recent library-search
+    // prompt (CR 701.19a). Stashed so Submit can validate the picked
+    // InstanceId came from the offered set and resolve it back to an
+    // ICard. Cleared on prompt resolution; replaced on each new prompt.
+    private IReadOnlyList<ICard>? _pendingLibraryCandidates;
+    // Per-prompt extra payload (currently: library-search candidates +
+    // label) surfaced via PendingPayload for GameFacade.BuildPrompt to
+    // copy into the wire PromptDto. Null on prompt kinds that need no
+    // additional context.
+    private PromptPayload? _pendingPayload;
 
     public RemoteAgent(
         Player player,
@@ -50,6 +61,16 @@ public sealed class RemoteAgent : IPlayerAgent
 
     /// <summary>Type the next submitted command must be (null when no prompt outstanding).</summary>
     public IReadOnlyList<Type>? ExpectedCommandKinds => _pendingKinds;
+
+    /// <summary>
+    /// Extra payload the engine attached to the currently-outstanding
+    /// prompt (e.g. the library-search candidate list +
+    /// human-readable kind label). Null on every prompt that needs no
+    /// additional context — the priority window, mulligan, X, mode, etc.
+    /// Consumed by <see cref="GameFacade"/> when it builds the wire
+    /// <see cref="PromptDto"/>.
+    /// </summary>
+    public PromptPayload? PendingPayload => _pendingPayload;
 
     /// <summary>Player slot this agent represents.</summary>
     public Player Player => _player;
@@ -85,13 +106,20 @@ public sealed class RemoteAgent : IPlayerAgent
 
         var pending = _pending;
         var triggerOrder = _pendingTriggerOrder;
+        var libraryCandidates = _pendingLibraryCandidates;
         _pending = null;
         _pendingKinds = null;
         _pendingTriggerOrder = null;
-        Resolve(pending, command, triggerOrder);
+        _pendingLibraryCandidates = null;
+        _pendingPayload = null;
+        Resolve(pending, command, triggerOrder, libraryCandidates);
     }
 
-    private void Resolve(object tcs, GameCommand command, IReadOnlyList<ITriggeredAbility>? triggerOrder)
+    private void Resolve(
+        object tcs,
+        GameCommand command,
+        IReadOnlyList<ITriggeredAbility>? triggerOrder,
+        IReadOnlyList<ICard>? libraryCandidates)
     {
         switch (command)
         {
@@ -217,6 +245,35 @@ public sealed class RemoteAgent : IPlayerAgent
             case DeclareBlockersCommand blk:
                 ((TaskCompletionSource<BlockPlan>)tcs).SetResult(BuildBlockPlan(blk));
                 break;
+            case ChooseLibraryPickCommand lp:
+            {
+                // CR 701.19a — translate the wire command into the
+                // ICard the engine's search effect expects, or null for
+                // "find nothing". Verify the pick is from the engine-
+                // offered candidate set so the client can't smuggle a
+                // pick of an arbitrary library card (which would bypass
+                // the search predicate — e.g. tutoring a non-green card
+                // for Green Sun's Zenith). Submit() already enforced
+                // _pendingKinds, so we know libraryCandidates was set
+                // when this prompt fired.
+                if (libraryCandidates == null)
+                {
+                    throw new InvalidOperationException(
+                        "ChooseLibraryPickCommand resolved without a pending candidate list.");
+                }
+                ICard? picked = null;
+                if (lp.SelectedInstanceId is Guid id)
+                {
+                    picked = libraryCandidates.FirstOrDefault(c => c.InstanceId == id);
+                    if (picked == null)
+                    {
+                        throw new InvalidOperationException(
+                            $"ChooseLibraryPickCommand selected instance {id} is not in the offered candidate list.");
+                    }
+                }
+                ((TaskCompletionSource<ICard?>)tcs).SetResult(picked);
+                break;
+            }
             default:
                 throw new InvalidOperationException($"Unhandled command {command.GetType().Name}.");
         }
@@ -508,6 +565,53 @@ public sealed class RemoteAgent : IPlayerAgent
     public Task<SurveilAction.SurveilDecision> ChooseSurveilDecisionAsync(GameContext? ctx, IReadOnlyList<ICard> peeked, CancellationToken ct = default)
         => throw new NotImplementedException("Surveil prompt wired in v2 (effect async refactor).");
 
+    /// <summary>
+    /// CR 701.19a — library search. Default in <see cref="IPlayerAgent"/>
+    /// auto-picks <c>candidates[0]</c>, which caused remote (human) users
+    /// to see Green Sun's Zenith / Mystical Tutor / Path to Exile etc.
+    /// resolve silently without any UI. Override snapshots the engine-
+    /// filtered candidates onto the prompt payload so the portal can
+    /// render a searchable list, then awaits a
+    /// <see cref="ChooseLibraryPickCommand"/> back from the client. The
+    /// command's <c>SelectedInstanceId</c> is resolved against the
+    /// candidate set in <see cref="Resolve"/>; a <see langword="null"/>
+    /// id models the legal "find nothing" branch.
+    /// </summary>
+    public Task<ICard?> ChooseLibraryPickAsync(
+        GameContext? ctx,
+        IReadOnlyList<ICard> candidates,
+        string kindLabel,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(candidates);
+        // Stash candidates + payload BEFORE Prompt invokes PromptRequested
+        // observers — GameFacade.BuildPrompt reads PendingPayload
+        // synchronously from inside the observer to populate the wire
+        // PromptDto's Candidates/Label fields. If Prompt threw because a
+        // prompt is already outstanding (_pending != null), we'd be
+        // smearing our stash on top of the prior prompt's state — guard
+        // by checking _pending first, mirroring the same gate Prompt uses.
+        if (_pending != null)
+        {
+            throw new InvalidOperationException("A prompt is already pending.");
+        }
+        var snapshots = candidates.Select(StateSnapshotter.SnapshotCard).ToList();
+        _pendingLibraryCandidates = candidates;
+        _pendingPayload = new PromptPayload(
+            Candidates: snapshots,
+            Label: kindLabel);
+        try
+        {
+            return Prompt<ICard?>(ct, typeof(ChooseLibraryPickCommand));
+        }
+        catch
+        {
+            _pendingLibraryCandidates = null;
+            _pendingPayload = null;
+            throw;
+        }
+    }
+
     private Task<T> Prompt<T>(CancellationToken ct, params Type[] acceptedKinds)
     {
         if (_pending != null)
@@ -526,3 +630,14 @@ public sealed class RemoteAgent : IPlayerAgent
         return tcs.Task;
     }
 }
+
+/// <summary>
+/// Extra per-prompt context the engine attaches to an outstanding
+/// <see cref="RemoteAgent"/> prompt. Currently used for library-search
+/// (CR 701.19a) so the wire <see cref="PromptDto"/> can ship the
+/// engine-filtered candidate list + a human-readable kind label without
+/// the portal having to re-derive either client-side.
+/// </summary>
+public sealed record PromptPayload(
+    IReadOnlyList<CardSnapshotDto>? Candidates = null,
+    string? Label = null);

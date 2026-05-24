@@ -79,12 +79,22 @@ public sealed record EventEnvelope(
 /// Server → client envelope signalling that the engine is awaiting a
 /// command from <see cref="PlayerId"/>. The client renders the
 /// appropriate UI and responds via POST /games/{id}/commands with a
-/// command of one of the kinds in <see cref="ExpectedKinds"/>. The
-/// envelope intentionally carries no card data — opponent visibility is
-/// unaffected (the opponent already knows the prompted player is
-/// thinking).
+/// command of one of the kinds in <see cref="ExpectedKinds"/>.
+/// <para>
+/// <see cref="Candidates"/> + <see cref="Label"/> are populated only for
+/// prompts that carry an engine-pre-filtered card list the player picks
+/// from (currently library-search via
+/// <see cref="Majik.Core.Players.Agents.IPlayerAgent.ChooseLibraryPickAsync"/>).
+/// Null on every other prompt kind. Including the candidate snapshot
+/// here is necessary because the library is otherwise hidden in
+/// <see cref="GameStateDto"/> (CR 706) — without it the portal has no
+/// safe way to render the choice. Opponent visibility is unaffected
+/// (opponents already know the searcher is thinking).
+/// </para>
 /// </summary>
 public sealed record PromptDto(
     Guid GameId,
     Guid PlayerId,
-    IReadOnlyList<string> ExpectedKinds);
+    IReadOnlyList<string> ExpectedKinds,
+    IReadOnlyList<CardSnapshotDto>? Candidates = null,
+    string? Label = null);
