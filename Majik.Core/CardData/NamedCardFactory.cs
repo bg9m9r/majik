@@ -720,6 +720,18 @@ public static class NamedCardFactory
             // NegateFactory.BuildSpellDefinition.
             "Negate" => NegateFactory.Create(owner),
 
+            // Instant — {U} (ConsignToMemoryFactory). Modern Horizons 3.
+            // "Replicate {1} (...) Counter target triggered ability or
+            //  colorless spell."
+            // Card shape only here; the resolve-time SpellDefinition
+            // (counter target triggered ability or colorless spell) is
+            // built on demand via ConsignToMemoryFactory.BuildSpellDefinition.
+            // Replicate alt-cost (CR 702.99) deferred — same gap as the
+            // Storm cycle's self-copy-on-cast plumbing (no Replicate
+            // primitive yet), so the single-arg dispatcher ships the
+            // instant shape without Replicate wiring.
+            "Consign to Memory" => ConsignToMemoryFactory.Create(owner),
+
             // Instant — {2}{G}{G} (ForceOfVigorFactory).
             // "If it's not your turn, you may exile a green card from your
             //  hand rather than pay this spell's mana cost. Destroy up to
