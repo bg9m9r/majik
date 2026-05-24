@@ -130,6 +130,12 @@ public enum CardSubtype
     /// <summary>Wolf creature subtype — Young Wolf (Innistrad), Strangleroot Geist,
     /// Master of the Wild Hunt. CR 205.3m.</summary>
     Wolf,
+    /// <summary>Mercenary creature subtype — Slickshot Show-Off (Outlaws of
+    /// Thunder Junction). CR 205.3m.</summary>
+    Mercenary,
+    /// <summary>Jock creature subtype — Slickshot Show-Off (Outlaws of Thunder
+    /// Junction). One of the OTJ "outlaw" character class subtypes. CR 205.3m.</summary>
+    Jock,
 
     // Land subtypes (examples)
     Forest,
