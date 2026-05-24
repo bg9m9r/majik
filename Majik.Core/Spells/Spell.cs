@@ -53,6 +53,18 @@ public class Spell : ISpell
     /// </summary>
     public ZoneType? PostResolutionZoneOverride { get; set; }
 
+    /// <summary>
+    /// CR 118 — "no mana was spent to cast this spell" sentinel. Stamped by
+    /// <see cref="Majik.Core.Game.SpellCastFlow"/> when the resolved total
+    /// cost (printed + X + alt-cost overrides + Delve / cost reductions) is
+    /// <c>ManaCost.Zero</c>. Read by triggers gated on the free-cast posture
+    /// — Roiling Vortex's "Whenever a player casts a spell, if no mana was
+    /// spent to cast it, …" is the prototypical consumer. Defaults to
+    /// <c>false</c> so hand-built test spells without an explicit stamp are
+    /// treated as normal (mana-paid) casts.
+    /// </summary>
+    public bool WasFreeCast { get; set; }
+
     public Spell(ICard card, Player controller, IEnumerable<ITarget>? targets = null, IEnumerable<ICost>? costs = null, IEnumerable<IEffect>? effects = null)
     {
         if (card == null)

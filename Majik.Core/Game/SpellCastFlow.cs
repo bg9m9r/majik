@@ -259,6 +259,15 @@ public sealed class SpellCastFlow
             spell.PostResolutionZoneOverride = overrideZone;
         }
 
+        // CR 118 — Roiling Vortex / Eidolon of the Great Revel-style
+        // "no mana was spent to cast it" sentinel. After all cost
+        // collapses (printed → alternative → cost reductions → +X →
+        // Delve), if the resulting totalCost is zero across every bucket
+        // then no mana payment was actually made for this cast. Stamping
+        // the spell rather than diffing buckets at trigger time lets
+        // downstream consumers ignore the cost machinery entirely.
+        spell.WasFreeCast = totalCost.IsZero;
+
         _stack.Push(spell);
         _eventBus.Publish(new SpellCastEvent(spell));
 
