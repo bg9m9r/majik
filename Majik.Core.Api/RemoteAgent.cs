@@ -1,10 +1,12 @@
 using Majik.Core.Abilities;
 using Majik.Core.Api.Commands;
 using Majik.Core.Cards;
+using Majik.Core.Cards.Types;
 using Majik.Core.Game;
 using Majik.Core.Keywords;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
+using Majik.Core.StateMachine;
 using Majik.Core.ValueObjects;
 
 namespace Majik.Core.Api;
@@ -192,8 +194,74 @@ public sealed class RemoteAgent : IPlayerAgent
     }
 
     public Task<PriorityAction> ChoosePriorityActionAsync(GameContext ctx, CancellationToken ct = default)
-        => Prompt<PriorityAction>(ct,
-            typeof(PassPriorityCommand), typeof(PlayLandCommand), typeof(CastSpellCommand));
+        => Prompt<PriorityAction>(ct, BuildPriorityKinds(ctx));
+
+    /// <summary>
+    /// Narrows the priority-prompt command kinds to those that are at least
+    /// plausibly legal at this priority moment. The portal uses an exact
+    /// match on <c>[PassPriorityCommand]</c> to auto-pass dead windows
+    /// without bothering the user; sending the full 3-kind menu every time
+    /// (the old behaviour) defeats that gate.
+    ///
+    /// Conservative by design — false positives (offering a kind the player
+    /// can't actually use) are acceptable because the engine still
+    /// validates each submitted command; false negatives (hiding a kind
+    /// the player legitimately can use) would lock the user out and are
+    /// catastrophic. The bot path (BotPlayerAgent / Heuristic / Deterministic)
+    /// enumerates its own moves and does not consult ExpectedCommandKinds,
+    /// so this narrowing is purely a UX hint for remote (human) clients.
+    /// </summary>
+    private static Type[] BuildPriorityKinds(GameContext ctx)
+    {
+        // PassPriorityCommand is always legal — passing priority is a
+        // player's fundamental action at every priority window (CR 117.4).
+        var kinds = new List<Type>(3) { typeof(PassPriorityCommand) };
+
+        var hand = ctx.Self.Zones.Hand.GetCards();
+        var sorceryWindow = ctx.CurrentPhase == PhaseStateType.Main
+            && ReferenceEquals(ctx.Self, ctx.ActivePlayer)
+            && ctx.Stack.IsEmpty;
+
+        // CR 305.2 — lands are sorcery-speed-only, your-turn-only, and
+        // stack-must-be-empty. We don't have a reference to LandDropTracker
+        // here so we can't check the per-turn cap — overinclude when the
+        // window is right and there's a land in hand; the engine's
+        // LandDropTracker rejects an over-cap submission cleanly.
+        if (sorceryWindow && hand.Any(c => c.HasType(CardType.Land)))
+        {
+            kinds.Add(typeof(PlayLandCommand));
+        }
+
+        // CR 302.1 / 307.1 / 117.1a — spells need either sorcery speed
+        // (own main + empty stack) for vanilla cards or instant speed
+        // (Instant card type or Flash keyword) anytime. Skip the
+        // mana-source check entirely: it's expensive and the user might
+        // legitimately want to float mana / activate a ritual first.
+        // Including CastSpellCommand whenever there's at least one card
+        // they could plausibly cast (now or after producing mana) keeps
+        // the gate honest without starving the user of action.
+        var hasCastable = hand.Any(c =>
+            !c.HasType(CardType.Land)
+            && (sorceryWindow || IsInstantSpeed(c)));
+        if (hasCastable)
+        {
+            kinds.Add(typeof(CastSpellCommand));
+        }
+
+        return kinds.ToArray();
+    }
+
+    /// <summary>Card is castable at instant speed: Instant card type, or
+    /// any card with the Flash keyword (CR 702.8). Used by
+    /// <see cref="BuildPriorityKinds"/> to decide whether
+    /// <see cref="CastSpellCommand"/> belongs in the prompt kinds outside
+    /// a sorcery window.</summary>
+    private static bool IsInstantSpeed(ICard card)
+    {
+        if (card.HasType(CardType.Instant)) return true;
+        return card.Abilities.OfType<KeywordAbility>().Any(k =>
+            string.Equals(k.Keyword, "Flash", StringComparison.OrdinalIgnoreCase));
+    }
 
     public Task<MulliganDecision> ChooseMulliganAsync(GameContext ctx, IReadOnlyList<ICard> hand, int mulligansTaken, CancellationToken ct = default)
         => Prompt<MulliganDecision>(ct, typeof(MulliganCommand));
