@@ -961,7 +961,8 @@ public static class SeedImplementedCards
         // Sorcery — {2}{W}{W} (WrathOfGodFactory). Limited Edition Alpha.
         // Destroy all creatures. They can't be regenerated.
         "Wrath of God",
-        // Sorcery — {2}{B}{B} (DamnationFactory). Planar Chaos.
+        // Sorcery — {2}{B}{B} (WrathOfGodFactory — second [CardName]
+        // attribute for the Damnation reprint). Planar Chaos.
         // Black functional reprint of Wrath of God — destroy all creatures.
         "Damnation",
         // Artifact Creature — Horror {2} 0/4 (SpellskiteFactory). New Phyrexia.

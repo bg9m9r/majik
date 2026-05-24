@@ -6,10 +6,23 @@ namespace Majik.Core.CardData.Factories;
 
 /// <summary>
 /// Named-card factory for Wrath of God (Limited Edition Alpha and many
-/// reprints, {2}{W}{W}).
+/// reprints, {2}{W}{W}) and its functional reprints.
 ///
 /// Sorcery. Oracle text:
 ///   "Destroy all creatures. They can't be regenerated."
+///
+/// ## Functional reprints served here
+/// <list type="bullet">
+///   <item><b>Wrath of God</b> — {2}{W}{W}, Limited Edition Alpha.</item>
+///   <item><b>Damnation</b> — {2}{B}{B}, Planar Chaos. Black functional
+///     reprint with the same resolve body (CR 701.7 sweep, no regen,
+///     no indestructible bypass at v1).</item>
+/// </list>
+/// The two printed names are surfaced on the <see cref="NamedCardFactory"/>
+/// dispatcher via the two <c>[CardName]</c> attributes below; the source
+/// generator routes both names through <see cref="Create(Player, string)"/>
+/// so the produced sorcery carries the right printed name + cost per
+/// reprint.
 ///
 /// ## Implementation
 ///
@@ -37,21 +50,49 @@ namespace Majik.Core.CardData.Factories;
 ///   sweep template.
 /// </summary>
 [CardName("Wrath of God")]
+[CardName("Damnation")]
 public static class WrathOfGodFactory
 {
     public const string CardName = "Wrath of God";
     public const string PrintedManaCost = "{2}{W}{W}";
 
+    /// <summary>Printed name for the <b>Damnation</b> reprint (Planar Chaos).</summary>
+    public const string DamnationCardName = "Damnation";
+
+    /// <summary>Printed mana cost for the <b>Damnation</b> reprint.</summary>
+    public const string DamnationPrintedManaCost = "{2}{B}{B}";
+
     /// <summary>
     /// Build a Wrath of God sorcery owned and controlled by
     /// <paramref name="owner"/>. Card shape only — wire the resolve
-    /// effect via <see cref="BuildResolveEffect"/>.
+    /// effect via <see cref="BuildResolveEffect"/>. Equivalent to
+    /// <c>Create(owner, "Wrath of God")</c>; kept so callers that don't
+    /// care about the reprint variant don't need to spell the name.
     /// </summary>
-    public static Sorcery Create(Player owner)
+    public static Sorcery Create(Player owner) => Create(owner, CardName);
+
+    /// <summary>
+    /// Build the sorcery for the requested printed name. Supports the
+    /// canonical <c>"Wrath of God"</c> and the functional reprint
+    /// <c>"Damnation"</c> (different cost, same resolve body). Any other
+    /// name is rejected — the source-generated dispatcher routes only
+    /// declared <c>[CardName]</c>s here.
+    /// </summary>
+    public static Sorcery Create(Player owner, string cardName)
     {
         ArgumentNullException.ThrowIfNull(owner);
+        ArgumentException.ThrowIfNullOrWhiteSpace(cardName);
 
-        var card = new Sorcery(CardName, PrintedManaCost);
+        var (printed, cost) = cardName switch
+        {
+            CardName => (CardName, PrintedManaCost),
+            DamnationCardName => (DamnationCardName, DamnationPrintedManaCost),
+            _ => throw new ArgumentException(
+                $"WrathOfGodFactory does not serve card name '{cardName}'.",
+                nameof(cardName)),
+        };
+
+        var card = new Sorcery(printed, cost);
         card.SetOwner(owner);
         card.SetController(owner);
         return card;
@@ -74,7 +115,7 @@ public static class WrathOfGodFactory
 
         return new IEffect[]
         {
-            new Effect($"{CardName}: destroy all creatures (no regen).", () =>
+            new Effect($"{CardName} / {DamnationCardName}: destroy all creatures (no regen).", () =>
             {
                 // Snapshot every battlefield up front — MoveToGraveyard
                 // mutates the source zone in place.
