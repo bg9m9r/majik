@@ -41,6 +41,8 @@ public sealed class GameFacade
     private readonly CombatFlow _combatFlow;
     private readonly Player _alice;
     private readonly Player _bob;
+    private ICardRepository? _cardRepo;
+    private ScryfallCardFactory? _spellFactory;
     private readonly RemoteAgent _aliceAgent;
     private readonly RemoteAgent _bobAgent;
     private IPlayerAgent _aliceAgentEffective;
@@ -236,6 +238,35 @@ public sealed class GameFacade
             activateDispatcher: DispatchActivate);
     }
 
+    /// <summary>
+    /// Build the spell-definition resolver TurnDriver consults at cast time
+    /// for non-permanent spells (Lava Spike, Lightning Bolt, Boltwave, etc.).
+    /// Without it, TurnDriver.DispatchCast hits the "no SpellDef for
+    /// instant/sorcery" branch and rotates the card back into hand — the
+    /// card is never actually cast. The resolver mirrors what
+    /// TriggerPlayground wires for its bot vs bot face-off (and what
+    /// MatchService implicitly relied on via the card repo) so every
+    /// instant/sorcery whose oracle text matches an OracleSpellBinder
+    /// template gets a runnable SpellDefinition. Returns null when no card
+    /// repo was supplied at <see cref="Create"/> time — tests that build
+    /// purely synthetic decks (no repo) keep their existing skip-rotate
+    /// behaviour.
+    /// </summary>
+    private Func<ICard, Player, Majik.Core.Stack.Stack?, SpellDefinition?>? BuildSpellDefinitionResolver()
+    {
+        if (_cardRepo == null) return null;
+        _spellFactory ??= new ScryfallCardFactory(
+            _cardRepo,
+            replacements: Replacements,
+            effects: ContinuousEffects,
+            triggers: _triggers,
+            eventBus: _bus,
+            zones: _zones);
+
+        return (card, caster, stk) =>
+            _spellFactory.LookupSpellDefinition(card.Name, caster, raw => raw, stk);
+    }
+
     /// <summary>Replaces the Alice-seat agent (typically with a
     /// <see cref="Majik.Bot.BotPlayerAgent"/>). Must be called before
     /// <see cref="StartAsync"/> / <see cref="StartFullGameAsync"/>; throws
@@ -274,6 +305,12 @@ public sealed class GameFacade
         // facade's own bus, which ZoneService already holds a reference to.
         var facade = new GameFacade(alice, bob);
         var bus = facade.Replacements;
+
+        // Stash the repo so StartFullGameAsync can build a spell-definition
+        // resolver later. Without this, TurnDriver.DispatchCast falls through
+        // to "no SpellDef for instant/sorcery" and silently rotates the card
+        // back into hand — every non-permanent spell becomes uncastable.
+        facade._cardRepo = cardRepo;
 
         foreach (var card in aliceDeck)
         {
@@ -401,6 +438,7 @@ public sealed class GameFacade
             priorityManager: _priority,
             combatFlow: _combatFlow,
             eventBus: _bus,
+            spellDefinitionResolver: BuildSpellDefinitionResolver(),
             continuousEffects: ContinuousEffects);
 
         var settled = _nextPromptSignal.Task;

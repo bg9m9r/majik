@@ -381,6 +381,15 @@ public static class SeedImplementedCards
         // chosen name can't be activated unless they're mana abilities
         // (CR 605 / 614 suppression).
         "Pithing Needle",
+        // Creature — Human Cleric {1}{W} 2/2 (ContainmentPriestFactory).
+        // Flash keyword wired. CR 614 replacement: nontoken, non-cast
+        // creatures that would enter the battlefield are exiled instead.
+        // ZoneService ReplacementBus plumbing deferred (structural in v1).
+        "Containment Priest",
+        // Creature — Human Wizard {W}{U} 2/2 (MeddlingMageFactory).
+        // CR 601.3 named-cast block: chosen name registered in
+        // CastingRestrictions; ActionValidator rejects matching casts.
+        "Meddling Mage",
         // Instant — {R} (UnholyHeatFactory).
         // ~ deals 2 damage to any target. Delirium — deals 6 instead if four
         // or more card types among cards in your graveyard.
@@ -1075,5 +1084,31 @@ public static class SeedImplementedCards
         // Activated: Sacrifice ~: Counter target spell unless its controller pays {1}.
         // Sacrifice-in-effect + counter-unless-pay wired (v1 auto-resolve payment).
         "Cursecatcher",
+
+        // ---- Humans-lords shipped in the humans-lords bump ----
+
+        // Creature — Human Soldier {W} 1/1 (ChampionOfTheParishFactory). Innistrad.
+        // Whenever another Human enters the battlefield under your control, put a
+        // +1/+1 counter on Champion of the Parish.
+        "Champion of the Parish",
+        // Creature — Human Soldier {1}{W} 1/1 (ThaliaLieutenantFactory). Shadows
+        // over Innistrad. When ~ enters, put a +1/+1 counter on each other Human
+        // you control. Whenever another Human enters under your control, put a
+        // +1/+1 counter on ~.
+        "Thalia's Lieutenant",
+
+        // ---- Modern Humans pieces shipped in the feat/humans-mantis-reflector bump ----
+
+        // Creature — Human Monk {W}{U}{R} 3/3 (MantisRiderFactory). Khans of Tarkir.
+        // Flying + Vigilance + Haste keyword markers wired (CR 702.9, 702.20, 702.10).
+        // Vanilla three-keyword creature — core Modern Humans speed threat.
+        "Mantis Rider",
+
+        // Creature — Human Wizard {1}{W}{U} 2/3 (ReflectorMageFactory). Oath of the Gatewatch.
+        // ETB triggered ability: bounce target creature an opponent controls to its owner's
+        // hand (CR 701.10 / CR 603.6a). CR 608.2b: no-op if target leaves battlefield before
+        // resolution. Name-based cast restriction ("can't cast same-named spells until
+        // your next turn") deferred — no delayed-until-next-turn restriction surface in v1.
+        "Reflector Mage",
     };
 }

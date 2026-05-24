@@ -92,6 +92,17 @@ public class ActionValidator
                 $"{action.Player.Name} can't cast spells from {action.FromZone.Value}",
                 new RuleViolation("113.6", "cast-from-hand-only restriction"));
         }
+        // CR 601.3 — named-card cast block (Meddling Mage: "spells with the
+        // chosen name can't be cast"). Reject a cast when the spell's card
+        // name is currently registered as blocked.
+        if (action.Card != null
+            && CastingRestrictions.IsCardNameBlocked(action.Card.Name))
+        {
+            return ValidationResult.Invalid(
+                $"{action.Card.Name} can't be cast (Meddling Mage / named-card block)",
+                new RuleViolation("601.3", "named-card cast restriction"));
+        }
+
         return ValidationResult.Valid();
     }
 

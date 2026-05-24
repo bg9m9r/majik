@@ -2654,6 +2654,29 @@ public static class NamedCardFactory
             // separate path).
             "Drannith Magistrate" => DrannithMagistrateFactory.Create(owner),
 
+            // Creature — Human Cleric {1}{W} 2/2 (ContainmentPriestFactory).
+            // Commander 2014 / Modern Horizons 2. Flash keyword wired.
+            // Printed replacement effect (CR 614): "If a nontoken creature
+            // would enter the battlefield and it wasn't cast, exile it
+            // instead." Wired via ContainmentPriestExileReplacementEffect
+            // when the runtime (owner, replacementBus, eventBus) overload
+            // is used. The single-arg dispatcher path here produces the
+            // correct card shape + Flash keyword without live replacement
+            // registration. ZoneMoveIntent.WasCast enforcement deferred
+            // until ZoneService consults the ReplacementBus on all ETB paths.
+            "Containment Priest" => ContainmentPriestFactory.Create(owner),
+
+            // Creature — Human Wizard {W}{U} 2/2 (MeddlingMageFactory).
+            // Planeshift / various reprints. ETB "choose a nonland card name"
+            // — the single-arg dispatcher path defaults to an empty name (no
+            // restriction). Printed static (CR 601.3): "Spells with the
+            // chosen name can't be cast." Wired via
+            // MeddlingMageCastRestrictionEffect + CastingRestrictions when
+            // the runtime (owner, chosenName, eventBus) overload is used
+            // (ActionValidator.ValidateCastSpell rejects casts via
+            // RuleViolation 601.3). LTB releases the block automatically.
+            "Meddling Mage" => MeddlingMageFactory.Create(owner),
+
             // Creature — Kavu {G}{W} 2/2 (TerritorialKavuFactory).
             // Modern Horizons 2. Domain — gets +1/+1 for each basic land
             // type among lands you control (CR 702.16 / CR 613.1g, Layer
@@ -2694,6 +2717,23 @@ public static class NamedCardFactory
             // via RemandFactory.BuildDefinition(caster, targetResolver, stack).
             "Remand" => RemandFactory.Create(owner),
 
+            // Creature — Human Monk {W}{U}{R} 3/3 (MantisRiderFactory). Khans of Tarkir.
+            // Flying + Vigilance + Haste keyword markers wired (CR 702.9, 702.20, 702.10).
+            // Vanilla three-keyword creature — no activated abilities, triggered
+            // abilities, or static effects. Core Modern Humans piece.
+            "Mantis Rider" => MantisRiderFactory.Create(owner),
+
+            // Creature — Human Wizard {1}{W}{U} 2/3 (ReflectorMageFactory). Oath of the Gatewatch.
+            // ETB triggered ability (CR 603.6a): bounce target creature an opponent controls
+            // to its owner's hand (CR 701.10). CR 608.2b: if target is no longer on
+            // battlefield at resolution, ability does nothing. The single-arg dispatcher
+            // path here produces the correct card shape with the ETB trigger attached
+            // (raw zone-move fallback); use the (owner, zoneService, eventBus, triggers)
+            // overload for full ZoneService routing + TriggerManager wiring. Name-based
+            // cast restriction ("can't cast same-named spells until your next turn") deferred
+            // — no delayed-until-next-turn NamedCastRestriction surface in v1.
+            "Reflector Mage" => ReflectorMageFactory.Create(owner),
+
             // Instant — {1}{U} (ManaLeakFactory). Stronghold / various reprints.
             // "Counter target spell unless its controller pays {3}." Card shape
             // only here; the resolve-time SpellDefinition (counter-unless-pay-{3})
@@ -2718,6 +2758,30 @@ public static class NamedCardFactory
             // path passes no live stack; use the (owner, stack) overload for
             // a fully-wired counter effect.
             "Cursecatcher" => CursecatcherFactory.Create(owner),
+
+            // Creature — Human Soldier {W} 1/1 (ChampionOfTheParishFactory).
+            // Innistrad. "Whenever another Human enters the battlefield under
+            // your control, put a +1/+1 counter on Champion of the Parish."
+            // ETB-other-Human trigger wired via EventTriggerCondition over
+            // CardMovedEvent: Creature + Human subtype + controller match +
+            // not self. Active only while Champion is on the battlefield.
+            // Single-arg dispatcher path attaches the trigger for shape tests
+            // without TriggerManager registration; use the (owner, triggers)
+            // overload for bus-driven firing.
+            "Champion of the Parish" => ChampionOfTheParishFactory.Create(owner),
+
+            // Creature — Human Soldier {1}{W} 1/1 (ThaliaLieutenantFactory).
+            // Shadows over Innistrad. Two triggered abilities:
+            //   1. ETB-self — "When Thalia's Lieutenant enters, put a +1/+1
+            //      counter on each other Human you control." Wired via
+            //      Triggers.OnEnterBattlefieldSelf; iterates controller's
+            //      battlefield for Humans excluding self.
+            //   2. ETB-other-Human — same predicate as Champion of the Parish.
+            //      Put a +1/+1 counter on Lieutenant when another Human enters.
+            // Single-arg dispatcher path attaches both triggers for shape tests
+            // without TriggerManager registration; use the (owner, triggers)
+            // overload for bus-driven firing.
+            "Thalia's Lieutenant" => ThaliaLieutenantFactory.Create(owner),
 
             _ => new Card(name, ""),
         };
