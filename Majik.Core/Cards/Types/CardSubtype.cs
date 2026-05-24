@@ -118,6 +118,8 @@ public enum CardSubtype
     /// <summary>Vampire creature subtype — Bloodghast (Zendikar), Vampire Nighthawk,
     /// Olivia Voldaren. CR 205.3m.</summary>
     Vampire,
+    /// <summary>Devil creature subtype — Bedlam Reveler (Eldritch Moon). CR 205.3m.</summary>
+    Devil,
 
     // Land subtypes (examples)
     Forest,

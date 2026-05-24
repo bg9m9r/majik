@@ -2960,6 +2960,27 @@ public static class NamedCardFactory
             // Pact of the Titan / Crashing Footfalls).
             "Beast Within" => BeastWithinFactory.Create(owner),
 
+            // Creature — Devil Horror {6}{R}{R} 3/4 (BedlamRevelerFactory).
+            // Eldritch Moon. Costs {1} less to cast for each instant and
+            // sorcery card in your graveyard (CostReductionAbility TotalReducer).
+            // Prowess keyword marker wired; live pump via ProwessFactory when
+            // effects service is supplied. ETB: discard your hand, then draw
+            // three cards (CR 603.1 — full-hand discard, no choice). The
+            // single-arg dispatcher path produces the correct card shape
+            // without trigger-manager or effects wiring.
+            "Bedlam Reveler" => BedlamRevelerFactory.Create(owner),
+
+            // Creature — Human Shaman Wizard {R} 1/2 (SoulScarMageFactory).
+            // Amonkhet. Prowess keyword marker wired; live pump via ProwessFactory
+            // when effects service is supplied. Replacement effect (CR 614):
+            // "If a source you control would deal noncombat damage to a creature
+            // an opponent controls, put that many -1/-1 counters on that
+            // creature instead." Wired via LambdaReplacement<DamageIntent> on
+            // the supplied ReplacementBus when the runtime overload is used.
+            // The single-arg dispatcher path here produces the correct card
+            // shape without live wiring.
+            "Soul-Scar Mage" => SoulScarMageFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 

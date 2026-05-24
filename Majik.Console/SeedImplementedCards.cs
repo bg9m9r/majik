@@ -1218,5 +1218,17 @@ public static class SeedImplementedCards
         // Its controller creates a 3/3 green Beast creature token (CR 111.4).
         // Token colour (green) deferred — same gap as Pact of the Titan.
         "Beast Within",
+
+        // ---- Izzet/Prowess staples shipped in the feat/bedlam-reveler-soul-scar-mage bump ----
+
+        // Creature — Devil Horror {6}{R}{R} 3/4 (BedlamRevelerFactory). Eldritch Moon.
+        // Costs {1} less to cast for each instant/sorcery in your graveyard (CostReductionAbility
+        // TotalReducer). Prowess keyword marker + ETB: discard your hand, then draw 3 cards.
+        "Bedlam Reveler",
+        // Creature — Human Shaman Wizard {R} 1/2 (SoulScarMageFactory). Amonkhet.
+        // Prowess keyword marker + noncombat-damage-to-counters replacement (CR 614):
+        // sources you control dealing noncombat damage to opponent creatures place -1/-1
+        // counters instead. v1 gap: noncombat discriminator deferred.
+        "Soul-Scar Mage",
     };
 }
