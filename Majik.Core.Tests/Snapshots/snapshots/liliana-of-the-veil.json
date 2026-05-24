@@ -1,0 +1,48 @@
+{
+  "name": "Liliana of the Veil",
+  "manaCost": "1BB",
+  "primaryType": "Planeswalker",
+  "cardTypes": [
+    "Planeswalker"
+  ],
+  "supertypes": [
+    "Legendary"
+  ],
+  "subtypes": [
+    "Liliana"
+  ],
+  "power": null,
+  "toughness": null,
+  "loyalty": 3,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null
+}
