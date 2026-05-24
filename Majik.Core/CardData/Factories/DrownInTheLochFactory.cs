@@ -43,10 +43,10 @@ namespace Majik.Core.CardData.Factories;
 ///
 /// CR 701.5 — counter via <see cref="OracleSpellBinder.RemoveFromStack"/>
 /// + zone move to graveyard. CR 701.7 — destroy via
-/// <see cref="OracleSpellBinder.MoveToGraveyard"/>. Indestructible /
-/// regeneration riders are deferred (same gap as
-/// <see cref="SlaughterPactFactory"/> and the rest of the single-target
-/// destroy family).
+/// <see cref="OracleSpellBinder.MoveToGraveyard(ICard, ZoneMoveReason)"/>
+/// with <see cref="Majik.Core.Zones.ZoneMoveReason.Destroy"/>, which
+/// honours Indestructible (CR 702.12) and any active regeneration shield
+/// (CR 701.15).
 /// </summary>
 [CardName("Drown in the Loch")]
 public static class DrownInTheLochFactory
@@ -207,8 +207,9 @@ public static class DrownInTheLochFactory
             var x = ComputeX(caster, p.AllPlayers);
             if (creature.ManaCostValue.TotalValue > x) return;
 
-            // CR 701.7 — destroy → owner's graveyard (Indestructible /
-            // regeneration deferred, same gap as SlaughterPactFactory).
-            Fx.MoveToGraveyard(creature);
+            // CR 701.7 — destroy → owner's graveyard. Indestructible
+            // (CR 702.12) and regeneration (CR 701.15) handled via the
+            // Destroy-reason gate in OracleSpellBinder.MoveToGraveyard.
+            OracleSpellBinder.MoveToGraveyard(creature, Majik.Core.Zones.ZoneMoveReason.Destroy);
         });
 }

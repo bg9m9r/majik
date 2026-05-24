@@ -40,12 +40,11 @@ namespace Majik.Core.CardData.Factories;
 ///   Embereth Shieldbreaker cost via
 ///   <see cref="Card.GrantRuntimeExileCast"/>.
 ///
-/// ## Deferred (v1 gaps)
-/// - <b>Indestructible / regeneration riders</b> on the Battle Display
-///   destroy path — inherited from
-///   <see cref="OracleSpellBinder.MoveToGraveyard"/>; same gap as
-///   <see cref="SlaughterPactFactory"/> and the rest of the single-target
-///   destroy family.
+///
+/// Battle Display's destroy path honours Indestructible (CR 702.12) and
+/// regeneration (CR 701.15) via
+/// <see cref="OracleSpellBinder.MoveToGraveyard(ICard, ZoneMoveReason)"/>
+/// with <see cref="Majik.Core.Zones.ZoneMoveReason.Destroy"/>.
 /// </summary>
 [CardName("Embereth Shieldbreaker")]
 public static class EmberethShieldbreakerFactory
@@ -125,12 +124,13 @@ public static class EmberethShieldbreakerFactory
                     {
                         // CR 701.7 — destroy → owner's graveyard. CR 608.2b
                         // illegal-target check: must still be an Artifact
-                        // permanent at resolution. Indestructible /
-                        // regeneration deferred (same gap as SlaughterPact).
+                        // permanent at resolution. Indestructible (CR 702.12)
+                        // / regeneration (CR 701.15) handled by
+                        // MoveToGraveyard's Destroy-reason gate.
                         if (resolved is Permanent permanent
                             && permanent.HasType(CardType.Artifact))
                         {
-                            OracleSpellBinder.MoveToGraveyard(permanent);
+                            OracleSpellBinder.MoveToGraveyard(permanent, Majik.Core.Zones.ZoneMoveReason.Destroy);
                         }
                     }),
                 };

@@ -517,9 +517,14 @@ public sealed class TurnDriver
         }
 
         // 2. Remove damage from creatures.
-        foreach (var creature in _players.SelectMany(p => p.Zones.Battlefield.GetCards().OfType<Creature>()))
+        //    Also drop any remaining regeneration shields (CR 701.15a /
+        //    CR 514.2 — shields are "until end of turn"). Done in the
+        //    same battlefield sweep so the EOT pass touches each permanent
+        //    once.
+        foreach (var permanent in _players.SelectMany(p => p.Zones.Battlefield.GetCards().OfType<Permanent>()))
         {
-            creature.ClearDamage();
+            if (permanent is Creature creature) creature.ClearDamage();
+            permanent.ClearRegenerationShields();
         }
 
         // 3. Empty mana pools.

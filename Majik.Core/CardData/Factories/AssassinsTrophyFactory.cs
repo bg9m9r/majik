@@ -34,11 +34,12 @@ namespace Majik.Core.CardData.Factories;
 ///   Shuffle deferred — same MVP gap as every other tutor
 ///   (<see cref="PathToExileFactory"/>).
 ///
+/// Indestructible (CR 702.12) and regeneration (CR 701.15) are handled
+/// at the destroy site via
+/// <see cref="OracleSpellBinder.MoveToGraveyard(ICard, ZoneMoveReason)"/>
+/// with <see cref="Majik.Core.Zones.ZoneMoveReason.Destroy"/>.
+///
 /// ## Deferred (v1 gaps)
-/// - <b>Indestructible</b>: the destroy call moves the permanent to the
-///   graveyard without checking for Indestructible (same gap as every
-///   other single-target destroy template — Terminate, Abrupt Decay,
-///   Slaughter Pact).
 /// - <b>Library shuffle</b>: no IZone.Shuffle entry point yet (same
 ///   rationale as SearchSpellFactory / PathToExileFactory).
 /// - <b>Resolve-time opponent check</b>: if the target's controller has
@@ -130,9 +131,10 @@ public static class AssassinsTrophyFactory
                             var targetController = target.Controller ?? target.Owner;
                             if (targetController == caster) return;
 
-                            // CR 701.7 — Destroy. Indestructible rider deferred
-                            // (same gap as Terminate / Abrupt Decay / Slaughter Pact).
-                            OracleSpellBinder.MoveToGraveyard(target);
+                            // CR 701.7 — Destroy. Indestructible (CR 702.12)
+                            // and regeneration (CR 701.15) honoured via
+                            // MoveToGraveyard's Destroy-reason gate.
+                            OracleSpellBinder.MoveToGraveyard(target, Majik.Core.Zones.ZoneMoveReason.Destroy);
 
                             // Basic-land tutor rider — "its controller searches
                             // their library for a basic land card, puts it onto

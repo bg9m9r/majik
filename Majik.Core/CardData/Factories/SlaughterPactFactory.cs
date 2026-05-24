@@ -40,9 +40,10 @@ namespace Majik.Core.CardData.Factories;
 /// - <b>Cost-payment prompt</b>: production callers pre-stage the
 ///   controller's mana pool to model "yes, I pay". The v1 trigger reads
 ///   whatever mana is already in the pool — no in-trigger tap-lands prompt.
-/// - <b>Indestructible / regeneration riders</b>: matches every other
-///   single-target destroy template — Indestructible is not yet honoured
-///   at the destroy site.
+///
+/// Indestructible (CR 702.12) and regeneration shields (CR 701.15) are
+/// handled by <see cref="OracleSpellBinder.MoveToGraveyard"/>'s
+/// <see cref="Majik.Core.Zones.ZoneMoveReason.Destroy"/> reason gate.
 /// </summary>
 [CardName("Slaughter Pact")]
 public static class SlaughterPactFactory
@@ -107,7 +108,10 @@ public static class SlaughterPactFactory
                         if (resolved is Creature creature
                             && !CardColors.GetColors(creature).Contains(ManaColor.Black))
                         {
-                            OracleSpellBinder.MoveToGraveyard(creature);
+                            // Indestructible (CR 702.12) / regeneration (CR 701.15)
+                            // handled via the Destroy-reason gate in
+                            // OracleSpellBinder.MoveToGraveyard.
+                            OracleSpellBinder.MoveToGraveyard(creature, Majik.Core.Zones.ZoneMoveReason.Destroy);
                         }
 
                         // ----------------------------------------------------

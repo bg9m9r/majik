@@ -37,16 +37,17 @@ namespace Majik.Core.CardData.Factories;
 ///     <item>If any fails: no-op.</item>
 ///   </list>
 ///
+/// Indestructible (CR 702.12) and regeneration (CR 701.15) are handled
+/// at the destroy site via
+/// <see cref="OracleSpellBinder.MoveToGraveyard(ICard, ZoneMoveReason)"/>
+/// with <see cref="Majik.Core.Zones.ZoneMoveReason.Destroy"/>.
+///
 /// ## Deferred (v1 gaps)
 /// - <b>Can't-be-countered enforcement</b>: the keyword marker is attached
 ///   but counter effects (Force of Negation, Mana Leak, etc.) do not yet
 ///   consult it at the StackResolver / SpellCaster layer. See
 ///   <c>CastingRestrictions.SpellsCannotBeCountered</c> as the existing
 ///   precedent for the wiring pattern.
-/// - <b>Indestructible</b>: the destroy call moves the permanent to the
-///   graveyard without checking for Indestructible — same gap as every
-///   other single-target destroy template (Slaughter Pact, Force of Vigor
-///   destroy path, etc.).
 /// </summary>
 [CardName("Abrupt Decay")]
 public static class AbruptDecayFactory
@@ -121,11 +122,13 @@ public static class AbruptDecayFactory
                             // CR 202.3 — mana value is checked at resolution.
                             if (target.ManaCostValue.TotalValue > 3) return;
 
-                            // CR 701.7 — Destroy. Routed through
-                            // OracleSpellBinder.MoveToGraveyard so the permanent's
-                            // owner-of-zone bookkeeping stays consistent (mirrors
-                            // SlaughterPactFactory / ForceOfVigorFactory destroy path).
-                            OracleSpellBinder.MoveToGraveyard(target);
+                            // CR 701.7 — Destroy. Indestructible (CR 702.12)
+                            // and regeneration (CR 701.15) handled via
+                            // MoveToGraveyard's Destroy-reason gate; note
+                            // Abrupt Decay reads "can't be countered", not
+                            // "can't be regenerated", so the regen shield
+                            // is honoured normally.
+                            OracleSpellBinder.MoveToGraveyard(target, Majik.Core.Zones.ZoneMoveReason.Destroy);
                         }),
                 };
             });

@@ -35,14 +35,11 @@ namespace Majik.Core.CardData.Factories;
 /// produces card shape only — no resolve effect is wired, since X is
 /// unknown until cast.
 ///
-/// ## v1 simplifications
-/// - <see cref="Majik.Core.Abilities.Keywords.KeywordType.Indestructible"/>
-///   bypass is lossy — <see cref="OracleSpellBinder.MoveToGraveyard"/>
-///   doesn't yet consult indestructibility (CR 702.12). Same gap as
-///   <see cref="SlaughterPactFactory"/> and the rest of the destroy
-///   family.
-/// - "Can't be regenerated" is not a printed rider on Meltdown; CR
-///   701.15 (Regenerate) is therefore moot here.
+/// Indestructible (CR 702.12) and regeneration (CR 701.15) are honoured
+/// at the destroy site via
+/// <see cref="OracleSpellBinder.MoveToGraveyard(ICard, ZoneMoveReason)"/>
+/// with <see cref="Majik.Core.Zones.ZoneMoveReason.Destroy"/>. Meltdown
+/// has no printed "can't be regenerated" rider so shields are honoured.
 /// </summary>
 [CardName("Meltdown")]
 public static class MeltdownFactory
@@ -116,7 +113,10 @@ public static class MeltdownFactory
 
                     foreach (var v in victims)
                     {
-                        OracleSpellBinder.MoveToGraveyard(v);
+                        // CR 701.7 — destroy. Indestructible (CR 702.12) /
+                        // regeneration (CR 701.15) handled in
+                        // MoveToGraveyard via the Destroy-reason gate.
+                        OracleSpellBinder.MoveToGraveyard(v, Majik.Core.Zones.ZoneMoveReason.Destroy);
                     }
                 }),
         };

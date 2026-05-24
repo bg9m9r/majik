@@ -35,14 +35,17 @@ namespace Majik.Core.CardData.Factories;
 /// - If the target is illegal at resolution (CR 608.2b), neither the
 ///   destroy nor the token occur.
 ///
+/// Indestructible (CR 702.12) and regeneration (CR 701.15) are honoured
+/// at the destroy site via
+/// <see cref="OracleSpellBinder.MoveToGraveyard(ICard, ZoneMoveReason)"/>
+/// with <see cref="Majik.Core.Zones.ZoneMoveReason.Destroy"/>. The token
+/// half of the spell is unconditional per printed wording and fires even
+/// when the destroy is cancelled.
+///
 /// ## Deferred (v1 gaps)
 /// - <b>Token colour (green)</b>: TokenFactory does not yet model token
 ///   colour identity (same gap as Pact of the Titan's "red" Giant token,
 ///   Crashing Footfalls' "green" Rhino tokens).
-/// - <b>Indestructible / regeneration</b>: the destroy call moves the
-///   permanent to the graveyard without checking for Indestructible or
-///   an active regeneration shield (same gap as every other single-target
-///   destroy template — Terminate, Abrupt Decay, Slaughter Pact).
 /// </summary>
 [CardName("Beast Within")]
 public static class BeastWithinFactory
@@ -121,10 +124,13 @@ public static class BeastWithinFactory
                             // moment of resolution (CR 608.2b last-known-info).
                             var targetController = target.Controller ?? target.Owner;
 
-                            // CR 701.7 — Destroy. Indestructible / regeneration
-                            // rider deferred (same gap as Terminate / Abrupt Decay /
-                            // Slaughter Pact).
-                            OracleSpellBinder.MoveToGraveyard(target);
+                            // CR 701.7 — Destroy. Indestructible (CR 702.12)
+                            // and regeneration (CR 701.15) are honoured by
+                            // MoveToGraveyard via the Destroy-reason gate.
+                            // The token half is unconditional per the
+                            // printed oracle text — it fires even when
+                            // indestructible cancels the destroy.
+                            OracleSpellBinder.MoveToGraveyard(target, Majik.Core.Zones.ZoneMoveReason.Destroy);
 
                             // "Its controller creates a 3/3 green Beast creature
                             // token." (CR 111.4 / CR 111.6). Token colour (green)
