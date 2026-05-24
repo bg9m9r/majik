@@ -22,6 +22,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Majik.Core\Majik.Core.csproj" />
+    <ProjectReference Include="..\Majik.Console\Majik.Console.csproj" />
   </ItemGroup>
 
 </Project>
