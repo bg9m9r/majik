@@ -144,6 +144,9 @@ public enum CardSubtype
     /// <summary>Faerie creature subtype — Sprite Dragon (Ikoria), Spellstutter Sprite,
     /// Bitterblossom tokens. CR 205.3m.</summary>
     Faerie,
+    /// <summary>Eye creature subtype — Abhorrent Oculus (Duskmourn: House of Horror).
+    /// CR 205.3m.</summary>
+    Eye,
 
     // Land subtypes (examples)
     Forest,
