@@ -34,7 +34,9 @@ services:
     dockerfilePath: ./Majik.Server/Dockerfile
     dockerContext: .
     healthCheckPath: /healthz
-    autoDeploy: true
+    # autoDeploy intentionally omitted — manage deploys manually in the Render
+    # dashboard. Constant auto-deploys made prod validation impractical; flip
+    # back to `autoDeploy: true` when iteration cadence calms down.
     # No `disk:` — majik-api is fully diskless after the cards extraction.
     # Card lookups happen over HTTP via Cards__BaseUrl. Removing the disk is
     # what unblocks horizontal scaling (Render disks are single-instance).
@@ -66,7 +68,7 @@ services:
     rootDir: .
     dockerfilePath: ./Majik.CardsServer/Dockerfile
     dockerContext: .
-    autoDeploy: true
+    # autoDeploy intentionally omitted — see comment on majik-api above.
     disk:
       # Owns the SQLite cards.db file. Single-instance by Render policy; this
       # is fine because reads are cacheable on the majik-api side via the
