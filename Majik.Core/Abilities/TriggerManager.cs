@@ -282,8 +282,17 @@ public class TriggerManager
                     var collected = new List<IReadOnlyList<object>>();
                     foreach (var req in ta.TargetRequests)
                     {
+                        // Resolve any lazy CandidateGatherer (TargetRequest.ResolveCandidates)
+                        // against the live ctx so triggers that compute candidates at
+                        // resolution time (e.g. opponent's creatures, your graveyard)
+                        // get a fresh pool every fire. Static LegalCandidates pass
+                        // through unchanged.
+                        var live = req.ResolveCandidates(ctx);
+                        var promptReq = ReferenceEquals(live, req.LegalCandidates)
+                            ? req
+                            : req.WithCandidates(live);
                         var picked = agent != null
-                            ? await agent.ChooseTargetsAsync(ctx, req, ct)
+                            ? await agent.ChooseTargetsAsync(ctx, promptReq, ct)
                             : Array.Empty<object>();
                         collected.Add(picked);
                     }

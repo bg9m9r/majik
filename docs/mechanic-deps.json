@@ -1,8 +1,8 @@
 {
-  "generated_utc": "2026-05-24T19:11:53.3581029Z",
-  "scanned_dir": "/home/brett/Projects/majik.project/majik.core/Majik.Core/CardData/Factories",
-  "total_mentions": 238,
-  "distinct_factories": 149,
+  "generated_utc": "2026-05-24T19:17:30.1832481Z",
+  "scanned_dir": "/home/brett/Projects/majik.project/majik.core/.claude/worktrees/agent-a17d225be2ce3f70d/Majik.Core/CardData/Factories",
+  "total_mentions": 237,
+  "distinct_factories": 148,
   "cluster_count": 17,
   "unclustered_count": 124,
   "clusters": [
@@ -10,8 +10,8 @@
       "primitive_id": "agent-prompt-targeting",
       "display_name": "Agent-prompt targeting MVP",
       "implementation_hint": "IPlayerAgent needs ChooseTarget / ChooseYesNo surfaces; many spell factories punt on real targeting prompts.",
-      "factory_count": 25,
-      "mention_count": 32,
+      "factory_count": 24,
+      "mention_count": 31,
       "factories": [
         "AetherVialFactory",
         "AgathasSoulCauldronFactory",
@@ -32,7 +32,6 @@
         "RelicOfProgenitusFactory",
         "SilvergillAdeptFactory",
         "SkyclaveApparitionFactory",
-        "SpellQuellerFactory",
         "SunTitanFactory",
         "SwordOfFeastAndFamineFactory",
         "TerritorialKavuFactory",
@@ -69,12 +68,6 @@
           "file": "AgathasSoulCauldronFactory.cs",
           "line": 65,
           "sentence": "Full targeting deferred (see xmldoc above)."
-        },
-        {
-          "factory": "SpellQuellerFactory",
-          "file": "SpellQuellerFactory.cs",
-          "line": 15,
-          "sentence": "A \u0022pick a spell from the stack\u0022 prompt is part of the broader agent-prompt MVP and is deferred."
         },
         {
           "factory": "SkyclaveApparitionFactory",
@@ -640,7 +633,7 @@
         {
           "factory": "DrownInTheLochFactory",
           "file": "DrownInTheLochFactory.cs",
-          "line": 210,
+          "line": 234,
           "sentence": "CR 701.7 \u2014 destroy \u2192 owner\u0027s graveyard (Indestructible / regeneration deferred, same gap as SlaughterPactFactory).",
           "cr": "CR 701.7"
         },
@@ -659,7 +652,7 @@
         {
           "factory": "MurderousRiderFactory",
           "file": "MurderousRiderFactory.cs",
-          "line": 147,
+          "line": 157,
           "sentence": "Indestructible / regeneration deferred (same gap as SlaughterPact)."
         },
         {

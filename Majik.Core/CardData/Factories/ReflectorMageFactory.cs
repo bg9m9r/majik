@@ -170,7 +170,18 @@ public static class ReflectorMageFactory
                     Description: "target creature an opponent controls",
                     MinTargets: 1,
                     MaxTargets: 1,
-                    LegalCandidates: Array.Empty<object>()),
+                    LegalCandidates: Array.Empty<object>(),
+                    Intent: BotIntent.Bounce,
+                    // Agent-prompt MVP: enumerate creatures owned/controlled
+                    // by anyone other than this card's controller. Bounce
+                    // intent in the bot's ranker picks the most-expensive
+                    // opposing creature.
+                    CandidateGatherer: ctx => ctx.AllPlayers
+                        .Where(p => !ReferenceEquals(p, card.Controller ?? owner))
+                        .SelectMany(p => p.Zones.Battlefield.GetCards())
+                        .OfType<Creature>()
+                        .Cast<object>()
+                        .ToList()),
             });
 
         card.AddAbility(etbTrigger);

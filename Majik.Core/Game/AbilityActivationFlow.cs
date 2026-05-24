@@ -49,7 +49,15 @@ public sealed class AbilityActivationFlow
         var collected = new List<IReadOnlyList<object>>();
         foreach (var req in targetRequests ?? Array.Empty<TargetRequest>())
         {
-            var picked = await agent.ChooseTargetsAsync(ctx, req, ct);
+            // Resolve any lazy CandidateGatherer against the live ctx, then
+            // hand the agent the merged candidate list. Same pattern used
+            // by SpellCastFlow + TriggerManager so factories can declare
+            // gatherers once and have them honored on every prompt path.
+            var live = req.ResolveCandidates(ctx);
+            var promptReq = ReferenceEquals(live, req.LegalCandidates)
+                ? req
+                : req.WithCandidates(live);
+            var picked = await agent.ChooseTargetsAsync(ctx, promptReq, ct);
             collected.Add(picked);
         }
 

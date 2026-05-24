@@ -122,9 +122,33 @@ public static class DrownInTheLochFactory
         var targetRequests = new[]
         {
             // Mode 0 — counter target spell (mv ≤ X resolution gate).
-            new TargetRequest("target spell", 0, 1, Array.Empty<object>(), BotIntent.Counter),
+            // Agent-prompt MVP: gatherer enumerates the live stack so the
+            // agent ranks among the actual spells in flight (Counter intent
+            // picks the most-expensive entry).
+            new TargetRequest(
+                "target spell",
+                MinTargets: 0,
+                MaxTargets: 1,
+                LegalCandidates: Array.Empty<object>(),
+                Intent: BotIntent.Counter,
+                CandidateGatherer: ctx => ctx.Stack.GetAll()
+                    .OfType<Majik.Core.Spells.ISpell>()
+                    .Cast<object>()
+                    .ToList()),
             // Mode 1 — destroy target creature (mv ≤ X resolution gate).
-            new TargetRequest("target creature", 0, 1, Array.Empty<object>(), BotIntent.Removal),
+            // Agent-prompt MVP: enumerate every creature on the battlefield;
+            // Removal intent ranks opponent's biggest threat first.
+            new TargetRequest(
+                "target creature",
+                MinTargets: 0,
+                MaxTargets: 1,
+                LegalCandidates: Array.Empty<object>(),
+                Intent: BotIntent.Removal,
+                CandidateGatherer: ctx => ctx.AllPlayers
+                    .SelectMany(p => p.Zones.Battlefield.GetCards())
+                    .OfType<Creature>()
+                    .Cast<object>()
+                    .ToList()),
         };
 
         return new SpellDefinition(

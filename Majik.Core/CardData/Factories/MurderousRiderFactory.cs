@@ -134,7 +134,17 @@ public static class MurderousRiderFactory
                     MinTargets: 1,
                     MaxTargets: 1,
                     LegalCandidates: Array.Empty<object>(),
-                    Intent: BotIntent.Removal),
+                    Intent: BotIntent.Removal,
+                    // Live gatherer (agent-prompt MVP). All creatures +
+                    // planeswalkers on the battlefield — caller's intent +
+                    // ownership flip pushes opponent permanents to the top
+                    // (HeuristicBotAgent.Score handles ownership).
+                    CandidateGatherer: ctx => ctx.AllPlayers
+                        .SelectMany(p => p.Zones.Battlefield.GetCards())
+                        .Where(c => c.HasType(CardType.Creature)
+                            || c.HasType(CardType.Planeswalker))
+                        .Cast<object>()
+                        .ToList()),
             },
             EffectFactory: p =>
             {
