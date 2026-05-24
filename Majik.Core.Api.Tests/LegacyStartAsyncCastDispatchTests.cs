@@ -32,15 +32,19 @@ public class LegacyStartAsyncCastDispatchTests
             new ICard[] { bear },
             Array.Empty<ICard>());
 
+        // Move bear into hand BEFORE StartAsync so the priority prompt's
+        // legality-narrowed ExpectedKinds includes CastSpellCommand.
+        // (Pre-narrowing the kinds list always included CastSpell; with
+        // narrowing in place, an empty hand at prompt time yields the
+        // pass-only kinds set and the cast submit would be rejected.)
+        facade.Alice.Zones.Library.RemoveCard(bear);
+        facade.Alice.Zones.Hand.AddCard(bear);
+        bear.SetZone(ZoneType.Hand);
+
         await facade.StartAsync();
         var state = facade.GetState();
         var alice = state.Players[0].Id;
         var bob = state.Players[1].Id;
-
-        // Move the bear from library to hand so it's a legal cast target.
-        facade.Alice.Zones.Library.RemoveCard(bear);
-        facade.Alice.Zones.Hand.AddCard(bear);
-        bear.SetZone(ZoneType.Hand);
 
         // CastSpellCommand on legacy StartAsync. This used to throw
         // "PriorityLoop received CastSpell but no castDispatcher was supplied."
