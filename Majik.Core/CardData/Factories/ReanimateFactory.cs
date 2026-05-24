@@ -2,6 +2,7 @@ using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Events;
 using Majik.Core.Players;
+using Majik.Core.Primitives;
 using Majik.Core.Services;
 using Majik.Core.Zones;
 
@@ -88,7 +89,7 @@ public static class ReanimateFactory
 
         return new IEffect[]
         {
-            new Effect(
+            Fx.Inline(
                 $"{CardName}: reanimate target creature card from a graveyard; caster loses life = its mana value",
                 () => Resolve(caster, zoneService, allPlayersResolver)),
         };
@@ -118,26 +119,15 @@ public static class ReanimateFactory
                 .FirstOrDefault();
             if (pick == null) continue;
 
-            if (zoneService != null)
-            {
-                zoneService.MoveCard(pick, ZoneType.Graveyard, ZoneType.Battlefield, caster);
-            }
-            else
-            {
-                p.Zones.Graveyard.RemoveCard(pick);
-                caster.Zones.Battlefield.AddCard(pick);
-                pick.SetZone(ZoneType.Battlefield);
-                pick.SetController(caster);
-            }
+            // CR 701.20 — graveyard → battlefield. The Effects facade
+            // routes through ZoneService when supplied so ETB triggers
+            // fire (CR 603.6a); raw-zone fallback otherwise.
+            Fx.ReturnFromGraveyardToBattlefield(pick, caster, zoneService);
 
             // CR 202.3b — mana value (the printed total mana cost, X = 0).
             // Lose life happens AFTER the move (CR 608.2c — resolve in
             // printed order) and is unconditional given a legal target.
-            var lifeLoss = pick.ManaCostValue.TotalValue;
-            if (lifeLoss > 0)
-            {
-                caster.LoseLife(lifeLoss);
-            }
+            Fx.LoseLife(caster, pick.ManaCostValue.TotalValue);
 
             return; // CR 700.6 — "target" is a single object
         }

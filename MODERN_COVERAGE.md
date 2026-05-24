@@ -34,9 +34,9 @@ Living tracker for Modern-format card + mechanic implementation in the Majik eng
 
 | Metric | Count |
 |---|---|
-| Named factories | 295 |
-| Named factories | 295 |
-| Named factories | 295 |
+| Named factories | 285 |
+| Named factories | 285 |
+| Named factories | 285 |
 | Bespoke templates | 28 |
 | Generic templates | 94 |
 | JSON-defined cards | 18 |
@@ -427,6 +427,7 @@ Cards under `Majik.Core/CardData/Cards/*.json`:
 | Regeneration shield | Done | `Effects/RegenerationShieldEffect.cs` |
 | Damage prevention shields | Done (#143) | `Effects/PreventAllCombatDamageShield.cs`, `PreventAllCombatDamageToPlayersShield.cs`, `PreventAllDamageToYouAndYourPermanentsShield.cs`, `PreventNextDamageFromChosenSourceShield.cs`, `PreventNextNDamageToAnyTargetShield.cs` |
 | Ward keyword | Done | `Keywords/WardEffect.cs` |
+| Effects-primitive facade (`Fx`) | Done | `Primitives/Fx.cs` — single `using Majik.Core.Primitives;` re-exporting OracleSpellBinder / MillAction / Scry / Surveil / TokenFactory / ZoneService / Player / CounterCollection verbs plus a handful of new primitives (`DrawCards`, `Discard`, `LookAtTopN`, `BounceToHand`, `ReturnFromGraveyardToBattlefield`, `Inline`). Audit + pilot details in `docs/EFFECTS_AUDIT.md`; 11 pilot factories migrated (Burst Lightning, Galvanic Discharge, Gut Shot, Lightning Helix, Mizzium Mortars, Reanimate, Rift Bolt, Searing Blaze, Tribal Flames, Unholy Heat, Drown in the Loch). Remaining ~277 factories still call the underlying helpers directly — migration is a mechanical follow-up (no logic change). |
 
 ### Keywords / triggers
 

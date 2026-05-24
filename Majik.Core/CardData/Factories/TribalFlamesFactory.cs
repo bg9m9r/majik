@@ -2,6 +2,7 @@ using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Effects;
+using Majik.Core.Primitives;
 using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
@@ -112,10 +113,10 @@ public static class TribalFlamesFactory
                 var target = resolver(chosen.Targets[0][0]);
                 return new IEffect[]
                 {
-                    new Effect("Tribal Flames: deal Domain damage", () =>
+                    Fx.Inline("Tribal Flames: deal Domain damage", () =>
                     {
                         var amount = CountDomain(controller, effects);
-                        OracleSpellBinder.DealDamage(target, amount);
+                        Fx.DealDamage(target, amount);
                     }),
                 };
             });

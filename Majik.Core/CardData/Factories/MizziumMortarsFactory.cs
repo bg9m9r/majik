@@ -4,6 +4,7 @@ using Majik.Core.Cards.Types;
 using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
+using Majik.Core.Primitives;
 
 namespace Majik.Core.CardData.Factories;
 
@@ -175,8 +176,8 @@ public static class MizziumMortarsFactory
                 var target = resolver(chosen.Targets[0][0]);
                 return new IEffect[]
                 {
-                    new Effect($"Mizzium Mortars: {Damage} damage to target creature.", () =>
-                        OracleSpellBinder.DealDamage(target, Damage)),
+                    Fx.Inline($"Mizzium Mortars: {Damage} damage to target creature.", () =>
+                        Fx.DealDamage(target, Damage)),
                 };
             });
     }

@@ -2,6 +2,7 @@ using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
+using Majik.Core.Primitives;
 using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
@@ -79,8 +80,8 @@ public static class RiftBoltFactory
                 var target = resolver(chosen.Targets[0][0]);
                 return new IEffect[]
                 {
-                    new Effect("Rift Bolt: deal 3 damage", () =>
-                        OracleSpellBinder.DealDamage(target, 3)),
+                    Fx.Inline("Rift Bolt: deal 3 damage", () =>
+                        Fx.DealDamage(target, 3)),
                 };
             });
 

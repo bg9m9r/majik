@@ -4,6 +4,7 @@ using Majik.Core.Cards.Types;
 using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
+using Majik.Core.Primitives;
 using Majik.Core.Spells;
 using Majik.Core.Zones;
 
@@ -170,7 +171,7 @@ public static class DrownInTheLochFactory
         ChosenSpellParams p,
         Func<object, object> resolver,
         Majik.Core.Stack.Stack? stack) =>
-        new Effect("Drown in the Loch — counter target spell with mv ≤ X", () =>
+        Fx.Inline("Drown in the Loch — counter target spell with mv ≤ X", () =>
         {
             if (stack == null) return;
             if (p.Targets.Count <= ModeCounter) return;
@@ -186,16 +187,15 @@ public static class DrownInTheLochFactory
             var x = ComputeX(caster, p.AllPlayers);
             if (spellCard.ManaCostValue.TotalValue > x) return;
 
-            // CR 701.5 — counter → top of graveyard.
-            OracleSpellBinder.RemoveFromStack(stack, spell);
-            spell.Card.SetZone(ZoneType.Graveyard);
+            // CR 701.5 — counter → top of graveyard via the shared facade.
+            Fx.Counter(stack, spell);
         });
 
     private static IEffect BuildDestroyEffect(
         Player caster,
         ChosenSpellParams p,
         Func<object, object> resolver) =>
-        new Effect("Drown in the Loch — destroy target creature with mv ≤ X", () =>
+        Fx.Inline("Drown in the Loch — destroy target creature with mv ≤ X", () =>
         {
             if (p.Targets.Count <= ModeDestroy) return;
             var slot = p.Targets[ModeDestroy];
@@ -209,6 +209,6 @@ public static class DrownInTheLochFactory
 
             // CR 701.7 — destroy → owner's graveyard (Indestructible /
             // regeneration deferred, same gap as SlaughterPactFactory).
-            OracleSpellBinder.MoveToGraveyard(creature);
+            Fx.MoveToGraveyard(creature);
         });
 }

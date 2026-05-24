@@ -1,6 +1,7 @@
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Primitives;
 using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
@@ -87,12 +88,12 @@ public static class UnholyHeatFactory
                 var target = resolver(chosen.Targets[0][0]);
                 return new IEffect[]
                 {
-                    new Effect("Unholy Heat: delirium-conditional damage", () =>
+                    Fx.Inline("Unholy Heat: delirium-conditional damage", () =>
                     {
                         var amount = IsDeliriumActive(controller)
                             ? DeliriumDamage
                             : BaseDamage;
-                        OracleSpellBinder.DealDamage(target, amount);
+                        Fx.DealDamage(target, amount);
                     }),
                 };
             });

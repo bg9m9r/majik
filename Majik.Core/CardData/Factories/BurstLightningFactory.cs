@@ -1,6 +1,7 @@
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Primitives;
 using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
@@ -108,8 +109,8 @@ public static class BurstLightningFactory
                 var amount = wasKicked ? KickedDamage : BaseDamage;
                 return new IEffect[]
                 {
-                    new Effect("Burst Lightning: kicker-conditional damage", () =>
-                        OracleSpellBinder.DealDamage(target, amount)),
+                    Fx.Inline("Burst Lightning: kicker-conditional damage", () =>
+                        Fx.DealDamage(target, amount)),
                 };
             });
     }

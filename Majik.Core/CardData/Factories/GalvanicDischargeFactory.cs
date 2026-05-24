@@ -5,6 +5,7 @@ using Majik.Core.Counters;
 using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
+using Majik.Core.Primitives;
 
 namespace Majik.Core.CardData.Factories;
 
@@ -83,10 +84,10 @@ public static class GalvanicDischargeFactory
                 var target = resolver(chosen.Targets[0][0]);
                 return new IEffect[]
                 {
-                    new Effect("Galvanic Discharge: deal 1 + charge counters damage", () =>
+                    Fx.Inline("Galvanic Discharge: deal 1 + charge counters damage", () =>
                     {
                         var amount = 1 + CountChargeCountersOnArtifactsAndLands(controller);
-                        OracleSpellBinder.DealDamage(target, amount);
+                        Fx.DealDamage(target, amount);
                     }),
                 };
             });
