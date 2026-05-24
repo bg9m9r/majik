@@ -289,6 +289,29 @@ public static class NamedCardFactory
             // Same shape as Fiery Islet; only colour differs.
             "Sunbaked Canyon" => SunbakedCanyonFactory.Create(owner),
 
+            // Land — Hour of Devastation (SunscorchedDesertFactory).
+            // Oracle: "Sunscorched Desert enters tapped. When this land
+            // enters, it deals 1 damage to any target. {T}: Add {C}."
+            // Unconditional ETB-tapped replacement (CR 614.1c) via
+            // EntersTappedReplacement on the supplied ReplacementBus
+            // (mirrors Geralf's Messenger's unconditional ETB-tapped
+            // wiring). ETB triggered ability (CR 603.6a) wired via
+            // Triggers.OnEnterBattlefieldSelf with a 1..1 "any target"
+            // TargetRequest; on resolution deals 1 damage via
+            // SearingBlazeFactory.DealDamageWithPlaneswalker (Player /
+            // Creature / Planeswalker — CR 306.7). The single-arg
+            // dispatcher path attaches the ETB trigger + mana ability
+            // for shape (the ETB-tapped replacement is omitted because
+            // no ReplacementBus is available at dispatch — the Desert
+            // enters untapped in that posture, mirroring how every
+            // other always-tapped factory defers the restriction to
+            // the binder layer for shape-only construction). Use the
+            // (owner, eventBus, triggers, replacements) overload for
+            // fully-wired behaviour. Agent-driven "any target" prompt
+            // deferred — v1 honours pre-set ChosenTargets and absent a
+            // target the damage no-ops cleanly (CR 608.2b).
+            "Sunscorched Desert" => SunscorchedDesertFactory.Create(owner),
+
             // U/R surveil land — Foundations (ThunderingFallsFactory).
             // {T}: Add {U} or {R} — two ManaAbility instances wired.
             // ETB trigger: surveil 1 — default-all-graveyard decision wired.
@@ -599,6 +622,20 @@ public static class NamedCardFactory
             // Falls / Elegant Parlor surveil-lands.
             "Library Surveyor" => LibrarySurveyorFactory.Create(owner),
 
+            // Creature — Faerie Dragon {U}{R} 1/1 (SpriteDragonFactory).
+            // Ikoria: Lair of Behemoths. Flying KeywordAbility marker
+            // (CR 702.9). Cast-noncreature-spell trigger (CR 603.1 / 122.1)
+            // fires on a SpellCastEvent whose ISpell.Controller matches
+            // Sprite Dragon's controller AND whose ISpell.Card lacks
+            // CardType.Creature; effect adds a CounterType.PlusOnePlusOne
+            // counter on Sprite Dragon (same predicate shape as
+            // ProwessFactory, but counters instead of pump — accumulates
+            // across turns with no per-turn cap). Single-arg dispatcher
+            // path attaches the trigger without TriggerManager registration;
+            // (owner, triggers) overload wires bus-driven firing.
+            // Introduces CardSubtype.Faerie (Dragon already present).
+            "Sprite Dragon" => SpriteDragonFactory.Create(owner),
+
             // Creature — Bird Advisor {1}{U} 1/3 (LedgerShredderFactory).
             // Flying keyword wired. Two triggered abilities surfaced on the
             // card for shape: (1) "whenever you cast the second spell each
@@ -717,6 +754,27 @@ public static class NamedCardFactory
             // trigger (CR 603.7) that calls PayMana({2}{B}) and falls
             // back to MarkLost() on failure (CR 104.3 / CR 118.3).
             "Slaughter Pact" => SlaughterPactFactory.Create(owner),
+
+            // Creature — Human Mercenary Jock {1}{R} 1/1 (SlickshotShowOffFactory).
+            // Outlaws of Thunder Junction. Flying + Haste keyword markers
+            // (CR 702.9 / 702.10) on a 1/1 body, plus a cast-noncreature
+            // pump triggered ability (CR 603.1) firing on the controller's
+            // own SpellCastEvent for any non-Creature spell — registers a
+            // raw PumpUntilEndOfTurnEffect(+3, 0) on Slickshot's
+            // ActiveEffects per cast (Layer 7c, CR 514.2 EOT cleanup).
+            // Multiple noncreature casts in a single turn stack additively;
+            // Slickshot's own cast doesn't contribute (its SpellCastEvent
+            // fires while the card is a Creature spell on the stack — fails
+            // the noncreature predicate).
+            // Plot {R} (CR 718 — new in OTJ) DEFERRED — needs a sorcery-
+            // speed cast-from-exile-on-a-later-turn alt-cost primitive +
+            // an activated-from-hand "pay {R}, exile with plot marker"
+            // shape; same posture as BurstLightning's deferred Kicker.
+            // The single-arg dispatcher path produces the correct card
+            // shape without trigger-manager or effects wiring. Use the
+            // (owner, eventBus, triggers, effects) overload for fully-wired
+            // behavior.
+            "Slickshot Show-Off" => SlickshotShowOffFactory.Create(owner),
 
             // Instant — {0} (PactOfTheTitanFactory). Future Sight.
             // "Create a 4/4 red Giant creature token.
@@ -1048,6 +1106,34 @@ public static class NamedCardFactory
             // gap as Treasure Cruise / Murktide Regent.
             "Gurmag Angler" => GurmagAnglerFactory.Create(owner),
 
+            // Creature — Spirit Cleric {W} 1/2 (GuideOfSoulsFactory).
+            // Modern Horizons 3. "Whenever Guide of Souls or another
+            // creature you control with power 2 or less enters, you
+            // get {E}. Pay {E}{E}: Target creature gains flying and
+            // gets +1/+1 until end of turn."
+            // ETB triggered ability (CR 603.6a + CR 106.13) wired over
+            // CardMovedEvent → Battlefield filtered to (Creature +
+            // controller-matches + BasePower ≤ 2); includes Guide
+            // itself (printed 1 ≤ 2 — the "or another" disjunction).
+            // On trigger, Player.GainEnergy(1). v1 reads BasePower
+            // (printed) not effective power — promoting to live
+            // effective power would require threading a
+            // ContinuousEffectsService through the factory (same
+            // posture as Champion of the Parish's printed-subtype
+            // predicate). Activated ability {E}{E}: target creature
+            // gains Flying (Layer 6) + +1/+1 (Layer 7c) EOT — wired
+            // via a 1..1 "target creature" TargetRequest, a new
+            // private PayEnergyCost(2) sibling of RemoveVoidCounterCost,
+            // and EOT-scoped GrantKeywordUntilEndOfTurnEffect("Flying")
+            // + PumpUntilEndOfTurnEffect(+1,+1) registered against the
+            // target's ActiveEffects (no-op if null — shape-only).
+            // Single-arg dispatcher attaches the trigger structurally
+            // (no TriggerManager registration — same posture as
+            // AetherHubFactory.Create(Player)); energy cost gate is
+            // always live since energy lives on Player. Anchors the
+            // Modern Boros Energy / Boros Convoke axis.
+            "Guide of Souls" => GuideOfSoulsFactory.Create(owner),
+
             // Enchantment — {1}{U} (DressDownFactory). Flash. CR 613.6 + 613.7b:
             // "Creatures lose all abilities and have base power and toughness
             // 1/1." End-step sacrifice trigger wired (CR 500.4 / CR 603.1).
@@ -1336,6 +1422,21 @@ public static class NamedCardFactory
             // shape without TriggerManager wiring; use the (owner, triggers,
             // willCast, onCascadeResolved) overload to drive the free cast.
             "Crashing Footfalls" => CrashingFootfallsFactory.Create(owner),
+
+            // Creature — Dinosaur {1}{R} 3/1 (AmpedRaptorFactory). Modern Horizons 3.
+            // Trample keyword marker (CR 702.19) wired. ETB triggered
+            // ability (CR 603.6a): exile the top four cards of controller's
+            // library, then "you may cast a spell with mana value 2 or less
+            // from among them without paying its mana cost." The single-arg
+            // dispatcher path attaches Trample + the ETB trigger
+            // structurally for shape inspection; the effect is a no-op
+            // without a SpellCastFlow binding. Use the (owner, triggers,
+            // chooseSpell, onEtbResolved) overload to drive the free cast
+            // via CastFromExileAlternativeCost + SpellCastFlow (mirrors
+            // CrashingFootfallsFactory's cascade-resolved hook). Cards
+            // not cast stay in exile — printed oracle, distinct from
+            // Cascade's bottom-the-rest step.
+            "Amped Raptor" => AmpedRaptorFactory.Create(owner),
 
             // Creature — Giant {4}{G}{G} 6/6 (PrimevalTitanFactory).
             // Trample keyword wired. ETB + attack triggered abilities both
@@ -2008,6 +2109,17 @@ public static class NamedCardFactory
             // (owner, triggers, attackingCreaturesSource) overload for
             // fully-wired behavior.
             "Noble Hierarch" => NobleHierarchFactory.Create(owner),
+
+            // Creature — Goblin Shaman {G} 0/1 (IgnobleHierarchFactory).
+            // Modern Horizons 3. Mono-G black/red/green sibling of Noble
+            // Hierarch — same shape (Exalted CR 702.90 + three tap
+            // ManaAbility instances) with mana colours swapped to {B}, {R},
+            // {G} and subtypes swapped to Goblin Shaman. Single-arg
+            // dispatcher path attaches the exalted trigger without
+            // TriggerManager wiring; attackingCreaturesSource is null so the
+            // pump body is a no-op. Use the (owner, triggers,
+            // attackingCreaturesSource) overload for fully-wired behavior.
+            "Ignoble Hierarch" => IgnobleHierarchFactory.Create(owner),
 
             // Creature — Goblin Warrior {2}{R} 2/2 (GoblinRabblemasterFactory).
             // Magic 2015 / many reprints. "Other Goblin creatures you control
@@ -3038,6 +3150,19 @@ public static class NamedCardFactory
             // behavior.
             "Monastery Mentor" => MonasteryMentorFactory.Create(owner),
 
+            // Creature — Human Monk {R} 1/2 (MonasterySwiftspearFactory).
+            // Khans of Tarkir + many reprints. Haste (CR 702.10) +
+            // Prowess (CR 702.108) — "Whenever you cast a noncreature
+            // spell, this creature gets +1/+1 until end of turn." Haste +
+            // Prowess KeywordAbility markers always attached for shape
+            // inspection. Prowess mechanic itself wired via
+            // ProwessFactory.Build when a ContinuousEffectsService is
+            // supplied. The single-arg dispatcher path produces the
+            // correct card shape without trigger-manager or effects
+            // wiring. Use the (owner, eventBus, triggers, effects)
+            // overload for fully-wired behavior.
+            "Monastery Swiftspear" => MonasterySwiftspearFactory.Create(owner),
+
             // Instant — {B}{G} (AssassinsTrophyFactory). Guilds of Ravnica.
             // "Destroy target permanent an opponent controls. Its controller
             //  searches their library for a basic land card, puts it onto
@@ -3073,6 +3198,31 @@ public static class NamedCardFactory
             // trigger firing.
             "Nihil Spellbomb" => NihilSpellbombFactory.Create(owner),
 
+            // Enchantment — {2}{W} (StaticPrisonFactory). Modern Horizons 3.
+            // "When Static Prison enters, you get {E}{E}, then put a stasis
+            //  counter on Static Prison for each energy you have. Then if
+            //  Static Prison has no stasis counters on it, exile it.
+            //  Static Prison has 'Permanents enter tapped' as long as it has
+            //  a stasis counter on it.
+            //  At the beginning of each upkeep, remove a stasis counter
+            //  from Static Prison."
+            // ETB trigger (CR 603.6a): gain {E}{E} → stasis counters =
+            // controller's post-gain energy → self-exile (CR 701.21) if 0.
+            // Each-upkeep trigger removes one stasis counter (CR 500.4 —
+            // scoped to BOTH players' upkeeps, not just controller's; raw
+            // EventTriggerCondition<StepStartedEvent>, not the
+            // Triggers.OnStepBegin controller-filtered helper). Introduces
+            // CounterType.Stasis. While stasis > 0, a global
+            // LambdaReplacement<ZoneMoveIntent> on the supplied
+            // ReplacementBus rewrites every battlefield-entering permanent
+            // (other than Static Prison itself) with EntersTapped=true
+            // (CR 614.1c). Single-arg dispatcher path attaches the two
+            // triggers structurally without TriggerManager registration
+            // and without the global tap-replacement; use the
+            // (owner, replacements, eventBus, triggers) overload for fully-
+            // wired behavior.
+            "Static Prison" => StaticPrisonFactory.Create(owner),
+
             // Creature — Spirit {G}{G} 2/1 (StrangleRootGeistFactory).
             // Dark Ascension. Haste (CR 702.10) + Undying (CR 702.93)
             // keyword markers wired. Undying trigger built via the canonical
@@ -3088,6 +3238,73 @@ public static class NamedCardFactory
             // card shape without TriggerManager registration; use the
             // (owner, triggers) overload for bus-driven trigger firing.
             "Strangleroot Geist" => StrangleRootGeistFactory.Create(owner),
+
+            // Enchantment — {R} (RoilingVortexFactory). Zendikar Rising.
+            //   "At the beginning of your upkeep, Roiling Vortex deals 1
+            //    damage to each player.
+            //    Whenever a player casts a spell, if no mana was spent to
+            //    cast it, Roiling Vortex deals 3 damage to that player.
+            //    {1}{R}, Sacrifice Roiling Vortex: Roiling Vortex deals 3
+            //    damage to any target.
+            //    Players can't gain life."
+            // Upkeep ping wired via Triggers.OnStepBegin (controller-only
+            // posture without an allPlayersResolver — same convention as
+            // Pernicious Deed / Meathook Massacre). Free-cast trigger
+            // reads the new Spell.WasFreeCast sentinel stamped by
+            // SpellCastFlow when totalCost.IsZero (Cascade / Suspend /
+            // Memnite-style {0} / Force-of-Will-style pitch). {1}{R} +
+            // Sacrifice activated ability deals 3 to any target via
+            // OracleSpellBinder.DealDamage; AdditionalCost.Sacrifice is
+            // the v1 no-op stub (same gap as Relic of Progenitus / Nihil
+            // Spellbomb). "Players can't gain life" registers a
+            // LifeGainIntent replacement on the supplied
+            // ReplacementBus that rewrites every gain to zero; without a
+            // bus the static silently no-ops (mirrors Valakut's
+            // single-arg posture). Use the
+            // (owner, triggers, replacements, allPlayersResolver)
+            // overload for fully-wired behaviour. Modern Burn sideboard
+            // hate piece. Clears top-20 #11.
+            "Roiling Vortex" => RoilingVortexFactory.Create(owner),
+
+            // Creature — Human Monk {R} 1/2 (SoulScarMageFactory). Amonkhet.
+            // Prowess (CR 702.108) — wired via ProwessFactory.Build when a
+            // ContinuousEffectsService is supplied. Damage → -1/-1 counters
+            // replacement (CR 614): "If a source you control would deal
+            // noncombat damage to a creature an opponent controls, put that
+            // many -1/-1 counters on that creature instead." Registered as
+            // a SoulScarMageDamageReplacement on the ReplacementBus when
+            // supplied; self-gates on Soul-Scar Mage being on the
+            // battlefield (CR 614.6) so flicker / LTB lifts the rider
+            // naturally without explicit unregister. The single-arg
+            // dispatcher path produces the correct card shape without
+            // Prowess or replacement wiring — mirrors Anger of the Gods's
+            // shape-only posture; use the (owner, effects, replacements,
+            // triggers) overload for fully-wired behavior.
+            "Soul-Scar Mage" => SoulScarMageFactory.Create(owner),
+
+            // Enchantment — Class {U}{R} (StormchasersTalentFactory).
+            // Modern Horizons 3. ETB trigger (CR 603.6a) creates a 1/1
+            // Mercenary creature token with a "Prowess" KeywordAbility
+            // marker (CR 702.108) via TokenFactory.CreateOnBattlefield.
+            // Single-arg dispatcher path attaches the trigger to the card
+            // shape without ZoneService / TriggerManager wiring; use the
+            // (owner, zoneService, triggers) overload for bus-driven
+            // firing + ZoneService-routed token entry. Class leveling
+            // (CR 716) DEFERRED — {1}{U}{R}: Level 2 and {3}{U}{R}: Level 3
+            // activated abilities are not wired (blocked on per-activated-
+            // ability sorcery-speed gate + ClassState binder hook + the
+            // sequential-level cost restriction; same gap as Tasigur's
+            // {B}{G}{U} on the sorcery-speed axis). Level 2 cast-trigger
+            // (Mercenary deals 1 damage) and Level 3 loot trigger DEFERRED
+            // with the leveling primitive — both are simple bodies that
+            // mirror PsychicFrog / FaithlessLooting / LedgerShredder once
+            // the level gate exists. Token colour identity (blue + red)
+            // deferred — same gap as Esika's Chariot's green Cats.
+            // Prowess pump on the token deferred — KeywordAbility marker
+            // attached but no live ContinuousEffectsService is threaded
+            // through TokenFactory (same posture as MonasteryMentor's
+            // Monk tokens).
+            "Stormchaser's Talent" => StormchasersTalentFactory.Create(owner),
 
             _ => new Card(name, ""),
         };
