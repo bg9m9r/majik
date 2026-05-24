@@ -180,6 +180,17 @@ public sealed class SpellCastFlow
             collectedTargets.Add(picked);
         }
 
+        // CR 601.2f — stamp the freshly-picked targets onto the card so
+        // any cost-reduction ability on the card itself can read them
+        // during cost calculation below (Mystical Dispute's "costs {2}
+        // less if it targets a blue spell"). Same Pending* idiom used
+        // for X / Delve count above. Cleared after the spell hits the
+        // stack so a later re-cast starts from a clean slate.
+        if (card is Card concreteForTargets && collectedTargets.Count > 0)
+        {
+            concreteForTargets.SetPendingCastTargets(collectedTargets);
+        }
+
         // Cost — printed + X, OR alternative cost when supplied. CR 117.7:
         // also subtract any CostReductionAbility on the card (Affinity etc.).
         var totalCost = alternativeCost?.AlternativeManaCost
@@ -270,6 +281,15 @@ public sealed class SpellCastFlow
 
         _stack.Push(spell);
         _eventBus.Publish(new SpellCastEvent(spell));
+
+        // Clear the pending-targets stamp — the spell is on the stack and
+        // its ChosenSpellParams.Targets is the authoritative source from
+        // here on. Cost-calc only needed the stamp for the brief window
+        // between target collection and the GetEffectiveCost call.
+        if (card is Card concreteToClear)
+        {
+            concreteToClear.ClearPendingCastTargets();
+        }
 
         return spell;
     }
