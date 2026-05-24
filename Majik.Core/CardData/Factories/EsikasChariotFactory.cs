@@ -49,10 +49,6 @@ namespace Majik.Core.CardData.Factories;
 ///   bots, same shape as the rest of the vehicle MVP).
 ///
 /// ## Deferred (v1 gaps)
-/// - <b>Token colour identity (green)</b>: Cat tokens are created as
-///   colourless under the v1 token shape — same gap as Crashing Footfalls'
-///   green Rhinos and Wurmcoil's colourless Wurms. Subtype + P/T + token
-///   flag are correct; CardColors plumbing for tokens is the broader fix.
 /// - <b>"You may" / prompts</b>: both triggers are mandatory in the
 ///   printed text (no "may"). Token-copy targeting auto-picks the first
 ///   eligible token-creature the controller controls; agent-driven
@@ -130,7 +126,6 @@ public static class EsikasChariotFactory
         // ETB trigger — CR 603.1.
         //   "When Esika's Chariot enters, create two 2/2 green Cat creature
         //    tokens."
-        // Token colour identity (green) deferred — see class xmldoc.
         // ----------------------------------------------------------------
         var etbEffect = new Effect(
             $"{CardName}: create two 2/2 Cat creature tokens",
@@ -172,9 +167,9 @@ public static class EsikasChariotFactory
     }
 
     /// <summary>
-    /// CR 603.1 ETB effect — create two 2/2 Cat creature tokens under
-    /// <paramref name="controller"/>'s control. Token colour identity
-    /// (green) is deferred (see class xmldoc).
+    /// CR 603.1 ETB effect — create two 2/2 green Cat creature tokens under
+    /// <paramref name="controller"/>'s control. CR 105 / CR 111.4 — green is
+    /// stamped on each token via <see cref="TokenFactory.TokenSpec.Colors"/>.
     /// </summary>
     private static IReadOnlyList<Creature> CreateTwoCatTokens(
         Player controller, ZoneService? zones)
@@ -183,7 +178,8 @@ public static class EsikasChariotFactory
             Name: "Cat",
             Power: 2,
             Toughness: 2,
-            Subtypes: new[] { CardSubtype.Cat });
+            Subtypes: new[] { CardSubtype.Cat },
+            Colors: new[] { Majik.Core.ValueObjects.ManaColor.Green });
 
         var first = TokenFactory.CreateOnBattlefield(spec, controller, zones);
         var second = TokenFactory.CreateOnBattlefield(spec, controller, zones);
@@ -214,12 +210,21 @@ public static class EsikasChariotFactory
         var keywords = target.Abilities.OfType<KeywordAbility>()
             .Select(k => k.Keyword).ToList();
 
+        // CR 706.2 — copy effects snapshot the source's colour identity
+        // alongside its other copiable values. Read it via the same
+        // <see cref="CardColors.GetColors"/> surface that powers
+        // protection / lord-style triggers so the snapshot matches the
+        // game-state observation surface (including any explicit token
+        // colour the source itself was stamped with).
+        var colours = CardColors.GetColors(target).ToList();
+
         var spec = new TokenFactory.TokenSpec(
             Name: target.Name,
             Power: target.BasePower,
             Toughness: target.BaseToughness,
             Subtypes: target.Subtypes.ToList(),
-            Keywords: keywords);
+            Keywords: keywords,
+            Colors: colours);
 
         var copy = TokenFactory.CreateOnBattlefield(spec, controller, zones);
         return copy;

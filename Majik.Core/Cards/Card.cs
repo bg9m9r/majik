@@ -317,6 +317,36 @@ public class Card : ICard
     /// </summary>
     public Majik.Core.CardData.Adventures.AdventureSpec? AdventureSpec { get; set; }
 
+    /// <summary>
+    /// CR 105 / CR 111.4 / CR 903.4 — explicit colour identity for tokens
+    /// (and any future card whose colour cannot be derived from its mana
+    /// cost). Tokens have no printed mana cost so their colour is set by
+    /// the effect that created them: "create a 2/2 green Cat creature
+    /// token" stamps <c>{Green}</c> here. Null on normal cards (colour
+    /// derives from <see cref="ManaCost"/> via
+    /// <see cref="Majik.Core.Cards.CardColors.GetColors"/>); empty list is
+    /// explicit "colourless" (CR 105.2c — Wurmcoil's Phyrexian Wurm
+    /// tokens, Karn's Construct tokens). <see cref="CardColors.GetColors"/>
+    /// honours this override when non-null; otherwise it falls back to the
+    /// mana-cost pip scan.
+    /// </summary>
+    public IReadOnlyList<ValueObjects.ManaColor>? TokenColorsOverride { get; private set; }
+
+    /// <summary>
+    /// Stamp an explicit colour set on this card. Used by
+    /// <see cref="Majik.Core.Tokens.TokenFactory.CreateOnBattlefield"/> to
+    /// honour the printed colour of token-creation effects (Esika's Chariot's
+    /// "green" Cats, Ocelot Pride's "white" Cats, Pact of the Titan's "red"
+    /// Giant, Wurmcoil's "colourless" Wurms — empty list). Idempotent;
+    /// later calls overwrite earlier ones. Should generally only be set
+    /// once at token construction.
+    /// </summary>
+    public void SetTokenColors(IReadOnlyList<ValueObjects.ManaColor> colors)
+    {
+        if (colors == null) throw new ArgumentNullException(nameof(colors));
+        TokenColorsOverride = colors;
+    }
+
     public Card(string name, string manaCost = "", IEnumerable<CardType>? cardTypes = null, IEnumerable<CardSupertype>? supertypes = null, IEnumerable<CardSubtype>? subtypes = null)
     {
         if (string.IsNullOrWhiteSpace(name))

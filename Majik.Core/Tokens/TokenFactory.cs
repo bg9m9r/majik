@@ -4,6 +4,7 @@ using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
 using Majik.Core.Players;
 using Majik.Core.Services;
+using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
 
 namespace Majik.Core.Tokens;
@@ -15,16 +16,38 @@ namespace Majik.Core.Tokens;
 /// </summary>
 public static class TokenFactory
 {
+    /// <summary>
+    /// Token characteristics shape. CR 111.4 — the effect that creates a
+    /// token enumerates its name, P/T, subtypes, colour, and any granted
+    /// keyword abilities. Token colour is carried explicitly (not derived
+    /// from a printed mana cost — tokens have none) and stamped on the
+    /// resulting <see cref="Card.TokenColorsOverride"/> so
+    /// <see cref="CardColors.GetColors"/> returns the correct colour set
+    /// for protection / lord-style pumps / colour-matters triggers
+    /// (CR 105 / CR 903.4).
+    /// </summary>
+    /// <param name="Colors">Explicit colour set. <c>null</c> defaults to
+    /// "colourless" (an empty override is stamped so the token reports
+    /// no colours regardless of any future cost-derived inference).
+    /// Single-colour tokens pass a one-element list (<c>[ManaColor.White]</c>
+    /// for Ocelot Pride's Cats); multi-colour tokens pass each colour
+    /// (<c>[ManaColor.Blue, ManaColor.Red]</c> for Stormchaser's Talent's
+    /// Mercenary).</param>
     public sealed record TokenSpec(
         string Name,
         int Power,
         int Toughness,
         IReadOnlyList<CardSubtype>? Subtypes = null,
-        IReadOnlyList<string>? Keywords = null);
+        IReadOnlyList<string>? Keywords = null,
+        IReadOnlyList<ManaColor>? Colors = null);
 
     /// <summary>Create a creature token and put it onto the battlefield under
     /// the given controller. Uses <see cref="ZoneService"/> when supplied so
-    /// CardMovedEvent fires (triggers Soul Warden etc.).</summary>
+    /// CardMovedEvent fires (triggers Soul Warden etc.). The token's colour
+    /// identity (CR 105 / CR 111.4) is stamped from
+    /// <see cref="TokenSpec.Colors"/>; callers should pass the printed
+    /// colour explicitly, including an empty list for colourless tokens
+    /// (Wurmcoil's Wurms, Karn Scion's Constructs).</summary>
     public static Creature CreateOnBattlefield(
         TokenSpec spec,
         Player controller,
@@ -43,6 +66,12 @@ public static class TokenFactory
             IsToken = true,
             HasSummoningSickness = true,
         };
+
+        // CR 111.4 — stamp the token's colour identity. Always set the
+        // override (even for null / empty input, where the explicit empty
+        // override declares "colourless") so CardColors.GetColors stops
+        // probing the empty mana cost and returns the authoritative set.
+        token.SetTokenColors(spec.Colors ?? Array.Empty<ManaColor>());
 
         foreach (var kw in spec.Keywords ?? Array.Empty<string>())
         {
@@ -92,6 +121,9 @@ public static class TokenFactory
             HasSummoningSickness = true,
         };
 
+        // CR 701.49 — Amass tokens are black [tribe] Army creatures.
+        token.SetTokenColors(new[] { ManaColor.Black });
+
         // Use sentinel-library pattern so CardMovedEvent fires correctly.
         token.SetZone(ZoneType.Library);
         controller.Zones.Library.AddCard(token);
@@ -124,6 +156,8 @@ public static class TokenFactory
             Controller = controller,
             IsToken = true,
         };
+        // CR 111.10 — Treasure tokens are colourless artifacts.
+        token.SetTokenColors(Array.Empty<ManaColor>());
         foreach (var color in new[] { "W", "U", "B", "R", "G" })
         {
             token.AddAbility(new ManaAbility(token, controller,
@@ -145,6 +179,8 @@ public static class TokenFactory
             Controller = controller,
             IsToken = true,
         };
+        // CR 111.10 — Clue tokens are colourless artifacts.
+        token.SetTokenColors(Array.Empty<ManaColor>());
 
         // {2}, Sacrifice this artifact: Draw a card.
         token.AddAbility(BuildClueDrawAbility(token, controller));
@@ -165,6 +201,8 @@ public static class TokenFactory
             Controller = controller,
             IsToken = true,
         };
+        // CR 111.10 — Food tokens are colourless artifacts.
+        token.SetTokenColors(Array.Empty<ManaColor>());
 
         // {2}, {T}, Sacrifice this artifact: You gain 3 life.
         token.AddAbility(BuildFoodGainLifeAbility(token, controller));
@@ -191,6 +229,8 @@ public static class TokenFactory
             IsToken = true,
             HasSummoningSickness = true,
         };
+        // CR 111.10 — Eldrazi Spawn tokens are colourless creatures.
+        token.SetTokenColors(Array.Empty<ManaColor>());
 
         // "Sacrifice this token: Add {C}."
         // v1: wired as a plain ManaAbility that produces {C}.

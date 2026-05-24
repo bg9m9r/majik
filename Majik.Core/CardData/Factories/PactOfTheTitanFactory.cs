@@ -38,10 +38,6 @@ namespace Majik.Core.CardData.Factories;
 ///   controller (CR 104.3 / CR 118.3 — "if you don't, you lose the game").
 ///
 /// ## Deferred (v1 gaps)
-/// - <b>"Red" colour on tokens</b>: tokens have no <see cref="ICard.ManaCost"/>
-///   so colour is identity-only via subtype/ability text today. Same gap
-///   as Crashing Footfalls' "green" tokens — token characteristic colour
-///   is a downstream concern.
 /// - <b>Cost-payment prompt</b>: production callers pre-stage the
 ///   controller's mana pool to model "yes, I pay". The v1 trigger reads
 ///   whatever mana is already in the pool — no in-trigger tap-lands prompt.
@@ -155,7 +151,9 @@ public static class PactOfTheTitanFactory
             Power: TokenPower,
             Toughness: TokenToughness,
             Subtypes: new[] { CardSubtype.Giant },
-            Keywords: null);
+            Keywords: null,
+            // CR 105 / CR 111.4 — printed "4/4 red Giant creature token".
+            Colors: new[] { Majik.Core.ValueObjects.ManaColor.Red });
 
         return TokenFactory.CreateOnBattlefield(spec, controller, zoneService);
     }
