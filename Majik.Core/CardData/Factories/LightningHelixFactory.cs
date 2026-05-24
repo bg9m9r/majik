@@ -1,6 +1,7 @@
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Primitives;
 using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
@@ -90,17 +91,15 @@ public static class LightningHelixFactory
                 var target = resolver(chosen.Targets[0][0]);
                 return new IEffect[]
                 {
-                    new Effect("Lightning Helix: 3 damage + 3 life", () =>
+                    Fx.Inline("Lightning Helix: 3 damage + 3 life", () =>
                     {
                         // CR 119 — damage step. Routes Player / Creature /
-                        // Planeswalker via the shared helper so loyalty
-                        // removal works on PW targets.
-                        SearingBlazeFactory.DealDamageWithPlaneswalker(
-                            target, DamageAmount);
+                        // Planeswalker via the shared Effects facade.
+                        Fx.DealDamageAny(target, DamageAmount);
 
                         // CR 119.3 — controller gains 3 life unconditionally
                         // as part of the same resolution.
-                        controller.GainLife(LifeGainAmount);
+                        Fx.GainLife(controller, LifeGainAmount);
                     }),
                 };
             });

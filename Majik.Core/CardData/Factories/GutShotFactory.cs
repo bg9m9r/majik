@@ -1,6 +1,7 @@
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Costs;
+using Majik.Core.Primitives;
 using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
@@ -98,9 +99,9 @@ public static class GutShotFactory
                 var raw = p.Targets[0][0];
                 return new IEffect[]
                 {
-                    new Effect(
+                    Fx.Inline(
                         "Gut Shot — deals 1 damage to any target",
-                        () => OracleSpellBinder.DealDamage(raw, 1)),
+                        () => Fx.DealDamage(raw, 1)),
                 };
             });
 }

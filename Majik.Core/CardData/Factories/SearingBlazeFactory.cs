@@ -4,6 +4,7 @@ using Majik.Core.Cards.Types;
 using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
+using Majik.Core.Primitives;
 
 namespace Majik.Core.CardData.Factories;
 
@@ -111,13 +112,13 @@ public static class SearingBlazeFactory
                 var creature = resolver(chosen.Targets[1][0]);
                 return new IEffect[]
                 {
-                    new Effect("Searing Blaze: landfall-conditional twin damage", () =>
+                    Fx.Inline("Searing Blaze: landfall-conditional twin damage", () =>
                     {
                         var amount = IsLandfallActive(controller, turnStateResolver)
                             ? LandfallDamage
                             : BaseDamage;
-                        DealDamageWithPlaneswalker(playerOrPw, amount);
-                        DealDamageWithPlaneswalker(creature, amount);
+                        Fx.DealDamageAny(playerOrPw, amount);
+                        Fx.DealDamageAny(creature, amount);
                     }),
                 };
             });
@@ -144,14 +145,10 @@ public static class SearingBlazeFactory
     /// Deal <paramref name="amount"/> damage to <paramref name="target"/>,
     /// extending <see cref="OracleSpellBinder.DealDamage"/> to also handle
     /// <see cref="Planeswalker"/> (loyalty removal — CR 119.3 / 306.7).
+    ///
+    /// Kept as a backward-compat passthrough — new factories should call
+    /// <see cref="Fx.DealDamageAny(object, int)"/> directly.
     /// </summary>
     public static void DealDamageWithPlaneswalker(object target, int amount)
-    {
-        if (amount <= 0) return;
-        switch (target)
-        {
-            case Planeswalker pw: pw.RemoveLoyalty(amount); break;
-            default: OracleSpellBinder.DealDamage(target, amount); break;
-        }
-    }
+        => Fx.DealDamageAny(target, amount);
 }
