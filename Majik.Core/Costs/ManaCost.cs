@@ -32,7 +32,7 @@ public class ManaCostCost : ICost
         }
     }
 
-    public bool CanPay(Player player)
+    public virtual bool CanPay(Player player)
     {
         if (player == null)
         {
@@ -42,7 +42,7 @@ public class ManaCostCost : ICost
         return player.ManaPool.CanPay(_manaCost);
     }
 
-    public void Pay(Player player)
+    public virtual void Pay(Player player)
     {
         if (player == null)
         {
