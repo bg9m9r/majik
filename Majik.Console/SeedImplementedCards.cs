@@ -994,5 +994,15 @@ public static class SeedImplementedCards
         // target creature or planeswalker, you lose 2 life — exposed via
         // MurderousRiderFactory.BuildAdventureSpell.
         "Murderous Rider // Swift End",
+
+        // ---- Modern staples shipped in the 2026-05-23k bump ----
+
+        // Land — Island (MysticSanctuaryFactory). Modern Horizons 2.
+        // {T}: Add {U}. ETB intervening-if trigger (CR 603.4): if you control
+        // three or more other Islands, put target instant or sorcery card from
+        // your graveyard on top of your library (CR 608.2b guard at resolution).
+        // Island subtype enables interaction with Spreading Seas, Harbinger of
+        // the Seas, and island-count payoffs.
+        "Mystic Sanctuary",
     };
 }
