@@ -1,17 +1,17 @@
 {
-  "generated_utc": "2026-05-24T19:17:33.6973188Z",
+  "generated_utc": "2026-05-24T19:21:54.0046338Z",
   "scanned_dir": "/home/brett/Projects/majik.project/majik.core/.claude/worktrees/agent-a0e91ec5cb2c11031/Majik.Core/CardData/Factories",
-  "total_mentions": 223,
-  "distinct_factories": 141,
+  "total_mentions": 218,
+  "distinct_factories": 138,
   "cluster_count": 15,
-  "unclustered_count": 122,
+  "unclustered_count": 120,
   "clusters": [
     {
       "primitive_id": "agent-prompt-targeting",
       "display_name": "Agent-prompt targeting MVP",
       "implementation_hint": "IPlayerAgent needs ChooseTarget / ChooseYesNo surfaces; many spell factories punt on real targeting prompts.",
-      "factory_count": 25,
-      "mention_count": 32,
+      "factory_count": 24,
+      "mention_count": 31,
       "factories": [
         "AetherVialFactory",
         "AgathasSoulCauldronFactory",
@@ -32,7 +32,6 @@
         "RelicOfProgenitusFactory",
         "SilvergillAdeptFactory",
         "SkyclaveApparitionFactory",
-        "SpellQuellerFactory",
         "SunTitanFactory",
         "SwordOfFeastAndFamineFactory",
         "TerritorialKavuFactory",
@@ -69,12 +68,6 @@
           "file": "AgathasSoulCauldronFactory.cs",
           "line": 65,
           "sentence": "Full targeting deferred (see xmldoc above)."
-        },
-        {
-          "factory": "SpellQuellerFactory",
-          "file": "SpellQuellerFactory.cs",
-          "line": 15,
-          "sentence": "A \u0022pick a spell from the stack\u0022 prompt is part of the broader agent-prompt MVP and is deferred."
         },
         {
           "factory": "SkyclaveApparitionFactory",
@@ -529,26 +522,19 @@
       "display_name": "\u0022Activate only as a sorcery\u0022 gate (CR 117.1a)",
       "comp_rules_citation": "CR 117.1a",
       "implementation_hint": "ActionValidator-side check: ability/spell flagged sorcery-speed only legal during own main phase with empty stack.",
-      "factory_count": 9,
-      "mention_count": 12,
+      "factory_count": 8,
+      "mention_count": 11,
       "factories": [
         "ColossusHammerFactory",
         "CoriSteelCutterFactory",
         "SkullclampFactory",
         "SwordOfFeastAndFamineFactory",
-        "SwordOfFireAndIceFactory",
         "TasigurTheGoldenFangFactory",
         "TirelessTrackerFactory",
         "UmezawasJitteFactory",
         "WishclawTalismanFactory"
       ],
       "mentions": [
-        {
-          "factory": "SwordOfFireAndIceFactory",
-          "file": "SwordOfFireAndIceFactory.cs",
-          "line": 209,
-          "sentence": "Sorcery-speed restriction deferred (see class xmldoc)."
-        },
         {
           "factory": "WishclawTalismanFactory",
           "file": "WishclawTalismanFactory.cs",
@@ -627,21 +613,13 @@
       "display_name": "Layer-6 ability-grant subsystem (CR 613.1f)",
       "comp_rules_citation": "CR 613.1f",
       "implementation_hint": "ContinuousEffectsService needs an \u0027ability grant\u0027 layer so \u0027gains \u003Cability\u003E\u0027 effects flow through GetAbilities() at read time.",
-      "factory_count": 3,
-      "mention_count": 5,
+      "factory_count": 2,
+      "mention_count": 4,
       "factories": [
         "AgathasSoulCauldronFactory",
-        "BloodghastFactory",
-        "SwordOfFireAndIceFactory"
+        "BloodghastFactory"
       ],
       "mentions": [
-        {
-          "factory": "SwordOfFireAndIceFactory",
-          "file": "SwordOfFireAndIceFactory.cs",
-          "line": 146,
-          "sentence": "\u0022 (CR 702.16) Markers ride on the equipment card itself; a Layer 6 grant re-projecting them onto the equipped creature is deferred (see class xmldoc).",
-          "cr": "CR 702.16"
-        },
         {
           "factory": "AgathasSoulCauldronFactory",
           "file": "AgathasSoulCauldronFactory.cs",
@@ -939,20 +917,6 @@
       "file": "NihilSpellbombFactory.cs",
       "line": 13,
       "sentence": "Real prompt deferred until IPlayerAgent grows a ChooseYesNoAsync surface."
-    },
-    {
-      "factory": "SwordOfFireAndIceFactory",
-      "file": "SwordOfFireAndIceFactory.cs",
-      "line": 15,
-      "sentence": "The shipped markers are inspectable on the card so tests \u002B bot heuristics can read intent, with full DEBT-A enforcement (CR 702.16e \u2014 damage / enchanting / equipping / blocking / targeting) deferred behind that grant-on-attach work.",
-      "cr": "CR 702.16e"
-    },
-    {
-      "factory": "SwordOfFireAndIceFactory",
-      "file": "SwordOfFireAndIceFactory.cs",
-      "line": 15,
-      "sentence": "\u003Cb\u003ESorcery-speed restriction\u003C/b\u003E on Equip activation (CR 702.6a) \u2014 same gap as \u003Csee cref=\u0022ColossusHammerFactory\u0022/\u003E.",
-      "cr": "CR 702.6a"
     },
     {
       "factory": "IzzetCharmFactory",

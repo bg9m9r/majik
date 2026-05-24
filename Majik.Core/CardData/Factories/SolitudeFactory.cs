@@ -142,7 +142,20 @@ public static class SolitudeFactory
                     Description: "up to one other target creature",
                     MinTargets: 0,
                     MaxTargets: 1,
-                    LegalCandidates: Array.Empty<object>()),
+                    LegalCandidates: Array.Empty<object>(),
+                    Intent: BotIntent.Removal,
+                    // Live candidate gatherer (agent-prompt MVP). Enumerates
+                    // every Creature on the battlefield except Solitude itself
+                    // — "other" rider per CR 109.5. Engine resolves this at
+                    // prompt time so the agent picks against the live board,
+                    // not an empty list. Bot ranks opponent creatures higher
+                    // than self for Removal intent (HeuristicBotAgent.Score).
+                    CandidateGatherer: ctx => ctx.AllPlayers
+                        .SelectMany(p => p.Zones.Battlefield.GetCards())
+                        .OfType<Creature>()
+                        .Where(c => !ReferenceEquals(c, card))
+                        .Cast<object>()
+                        .ToList()),
             });
 
         card.AddAbility(exileTrigger);

@@ -405,7 +405,15 @@ public sealed class TurnDriver
             {
                 foreach (var req in aa.TargetRequests)
                 {
-                    var chosen = await _agents[actor].ChooseTargetsAsync(ctx, req, ct: default);
+                    // Resolve any lazy CandidateGatherer against the live ctx
+                    // (mirrors AbilityActivationFlow / SpellCastFlow / TriggerManager
+                    // so the activated-ability dispatcher path honours the same
+                    // gatherer surface).
+                    var live = req.ResolveCandidates(ctx);
+                    var promptReq = ReferenceEquals(live, req.LegalCandidates)
+                        ? req
+                        : req.WithCandidates(live);
+                    var chosen = await _agents[actor].ChooseTargetsAsync(ctx, promptReq, ct: default);
                     foreach (var obj in chosen)
                     {
                         var wrapper = obj switch

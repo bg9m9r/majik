@@ -5,11 +5,11 @@ Scanner output: every `*Factory.cs` xmldoc / inline comment mentioning
 engine primitive. Each row answers: "if we ship primitive _X_, which factory
 xmldocs flagged that they're blocked on it?"
 
-- **Generated:** 2026-05-24 19:17 UTC
+- **Generated:** 2026-05-24 19:21 UTC
 - **Scanned dir:** `Majik.Core/CardData/Factories`
-- **Total mentions:** 223
+- **Total mentions:** 218
 - **Clusters:** 15
-- **Unclustered (need new registry pattern):** 122
+- **Unclustered (need new registry pattern):** 120
 
 Regenerate with `dotnet run --project Majik.Console -- mechanic-deps --md-out docs/MECHANIC_DEPS.md --json-out docs/mechanic-deps.json`.
 
@@ -17,11 +17,11 @@ Regenerate with `dotnet run --project Majik.Console -- mechanic-deps --md-out do
 
 | Rank | Primitive | CR | Factories | Mentions |
 |---:|---|---|---:|---:|
-| 1 | Agent-prompt targeting MVP | — | 25 | 32 |
+| 1 | Agent-prompt targeting MVP | — | 24 | 31 |
 | 2 | Library shuffle (CR 701.20) | CR 701.20 | 12 | 17 |
 | 3 | Token colour identity (CR 105 / CR 903.4) | CR 105 | 11 | 21 |
-| 4 | "Activate only as a sorcery" gate (CR 117.1a) | CR 117.1a | 9 | 12 |
-| 5 | Layer-6 ability-grant subsystem (CR 613.1f) | CR 613.1f | 3 | 5 |
+| 4 | "Activate only as a sorcery" gate (CR 117.1a) | CR 117.1a | 8 | 11 |
+| 5 | Layer-6 ability-grant subsystem (CR 613.1f) | CR 613.1f | 2 | 4 |
 | 6 | Escape alt-cost (CR 702.143) | CR 702.143 | 2 | 2 |
 | 7 | Kicker alt-cost (CR 702.33) | CR 702.33 | 2 | 2 |
 | 8 | Class leveling (CR 716) | CR 716 | 1 | 2 |
@@ -37,7 +37,7 @@ Regenerate with `dotnet run --project Majik.Console -- mechanic-deps --md-out do
 
 ### 1. Agent-prompt targeting MVP
 
-- **Blocks:** 25 factories (32 mentions)
+- **Blocks:** 24 factories (31 mentions)
 - **Implementation hint:** IPlayerAgent needs ChooseTarget / ChooseYesNo surfaces; many spell factories punt on real targeting prompts.
 
 Mentions:
@@ -52,8 +52,6 @@ Mentions:
   > (Full targeting deferred — see below.
 - `AgathasSoulCauldronFactory` (`AgathasSoulCauldronFactory.cs:65`)
   > Full targeting deferred (see xmldoc above).
-- `SpellQuellerFactory` (`SpellQuellerFactory.cs:15`)
-  > A "pick a spell from the stack" prompt is part of the broader agent-prompt MVP and is deferred.
 - `SkyclaveApparitionFactory` (`SkyclaveApparitionFactory.cs:13`)
   > SetChosenTargets"/>; the agent prompt is deferred.
 - `TerritorialKavuFactory` (`TerritorialKavuFactory.cs:12`)
@@ -204,13 +202,11 @@ Mentions:
 ### 4. "Activate only as a sorcery" gate (CR 117.1a)
 
 - **CR citation:** CR 117.1a
-- **Blocks:** 9 factories (12 mentions)
+- **Blocks:** 8 factories (11 mentions)
 - **Implementation hint:** ActionValidator-side check: ability/spell flagged sorcery-speed only legal during own main phase with empty stack.
 
 Mentions:
 
-- `SwordOfFireAndIceFactory` (`SwordOfFireAndIceFactory.cs:209`)
-  > Sorcery-speed restriction deferred (see class xmldoc).
 - `WishclawTalismanFactory` (`WishclawTalismanFactory.cs:110`)
   > CR 117.1a sorcery-speed restriction deferred (see class xmldoc).
 - `SkullclampFactory` (`SkullclampFactory.cs:13`)
@@ -237,13 +233,11 @@ Mentions:
 ### 5. Layer-6 ability-grant subsystem (CR 613.1f)
 
 - **CR citation:** CR 613.1f
-- **Blocks:** 3 factories (5 mentions)
+- **Blocks:** 2 factories (4 mentions)
 - **Implementation hint:** ContinuousEffectsService needs an 'ability grant' layer so 'gains <ability>' effects flow through GetAbilities() at read time.
 
 Mentions:
 
-- `SwordOfFireAndIceFactory` (`SwordOfFireAndIceFactory.cs:146`)
-  > " (CR 702.16) Markers ride on the equipment card itself; a Layer 6 grant re-projecting them onto the equipped creature is deferred (see class xmldoc).
 - `AgathasSoulCauldronFactory` (`AgathasSoulCauldronFactory.cs:10`)
   > The layer-6 continuous effect that actually grants those abilities to battlefield creatures is deferred until the layer-6 ability-grant subsystem is in place.
 - `AgathasSoulCauldronFactory` (`AgathasSoulCauldronFactory.cs:88`)
@@ -387,10 +381,6 @@ Mentions:
   > Prowess pump on token deferred — keyword marker only, see class xmldoc.
 - `NihilSpellbombFactory` (`NihilSpellbombFactory.cs:13`)
   > Real prompt deferred until IPlayerAgent grows a ChooseYesNoAsync surface.
-- `SwordOfFireAndIceFactory` (`SwordOfFireAndIceFactory.cs:15`)
-  > The shipped markers are inspectable on the card so tests + bot heuristics can read intent, with full DEBT-A enforcement (CR 702.16e — damage / enchanting / equipping / blocking / targeting) deferred behind that grant-on-attach work.
-- `SwordOfFireAndIceFactory` (`SwordOfFireAndIceFactory.cs:15`)
-  > <b>Sorcery-speed restriction</b> on Equip activation (CR 702.6a) — same gap as <see cref="ColossusHammerFactory"/>.
 - `IzzetCharmFactory` (`IzzetCharmFactory.cs:211`)
   > Real agent- driven "choose 2 cards to discard" prompt is deferred — same queue as Faithless Looting / Liliana / Connive.
 - `ConversionFactory` (`ConversionFactory.cs:54`)

@@ -29,19 +29,20 @@ namespace Majik.Core.CardData.Factories;
 ///   effect reads <see cref="Permanent.AttachedTo"/> dynamically, so
 ///   re-equipping transfers the boost without re-registration. Mirrors
 ///   <see cref="ColossusHammerFactory"/> / <see cref="SkullclampFactory"/>.
-/// - <b>"Protection from red and from blue"</b> — surfaced on the
-///   equipment card itself as two <see cref="ProtectionAbility"/>
-///   markers ("red", "blue"). The printed text confers protection on the
-///   <em>equipped creature</em> (CR 702.16), but the engine does not yet
-///   have a "grant ability via attachment" Layer 6 infrastructure for
-///   protection (only the broader continuous-effects keyword-add /
-///   keyword-remove pair used by Sigarda's Aid / Colossus Hammer covers
-///   single-keyword scope). The shipped markers are inspectable on the
-///   card so tests + bot heuristics can read intent, with full DEBT-A
-///   enforcement (CR 702.16e — damage / enchanting / equipping /
-///   blocking / targeting) deferred behind that grant-on-attach work.
+/// - <b>"Protection from red and from blue"</b> — CR 702.16. With a
+///   <see cref="ContinuousEffectsService"/> wired, two
+///   <see cref="GrantAbilityEffect"/> instances (CR 613.1f, Layer 6)
+///   re-project <see cref="ProtectionAbility"/>("red") /
+///   <see cref="ProtectionAbility"/>("blue") onto the live equipped
+///   creature. The grant selectors read <see cref="Permanent.AttachedTo"/>
+///   at sync time, so re-equipping transfers the protection automatically.
 ///   <see cref="Majik.Core.Rules.Protection.HasProtectionFromColor"/>
-///   reads these markers directly off the equipment card.
+///   reads the markers off the bearer, so CR 702.16e (DEBT-A — damage /
+///   enchanting / equipping / blocking / targeting) is correctly scoped
+///   to the equipped creature instead of the equipment card. The
+///   shape-only constructor (no service) falls back to leaving the two
+///   markers on the equipment card so factory-shape / dispatch tests
+///   still get a deterministic answer.
 /// - <b>Combat-damage-to-a-player trigger (CR 510, CR 603.1)</b> — wired
 ///   over <see cref="CombatDamageDealtEvent"/> filtered to the equipped
 ///   creature (<see cref="Permanent.AttachedTo"/> at trigger-evaluation
@@ -75,14 +76,6 @@ namespace Majik.Core.CardData.Factories;
 ///
 /// ## Deferred
 ///
-/// - <b>Protection enforcement (CR 702.16e — DEBT-A)</b>: the keyword
-///   markers ride on the equipment card itself; an attachment-aware
-///   Layer 6 grant that re-projects them onto the equipped creature is
-///   not yet implemented. Damage-prevention / target-illegality /
-///   block-restrictions for "red or blue" sources against the equipped
-///   creature do not fire.
-/// - <b>Sorcery-speed restriction</b> on Equip activation (CR 702.6a) —
-///   same gap as <see cref="ColossusHammerFactory"/>.
 /// - <b>Attach-target prompt</b> for Equip — v1 picks the first
 ///   controller-side creature deterministically.
 /// - <b>Real "any target" prompt</b> for the combat trigger — v1
@@ -144,14 +137,38 @@ public static class SwordOfFireAndIceFactory
         }
 
         // --------------------------------------------------------------
-        // Protection markers — "Equipped creature has protection from
-        // red and from blue." (CR 702.16)
-        // Markers ride on the equipment card itself; a Layer 6 grant
-        // re-projecting them onto the equipped creature is deferred
-        // (see class xmldoc).
+        // Protection grants — "Equipped creature has protection from red
+        // and from blue." (CR 702.16, CR 613.1f).
+        //
+        // When a ContinuousEffectsService is supplied, two Layer-6
+        // ability-grant effects re-project ProtectionAbility("red") /
+        // ProtectionAbility("blue") onto the live equipped creature. The
+        // selectors read card.AttachedTo at sync time, so re-equipping
+        // transfers the grants without re-registration; LTB / Humility
+        // revoke them via the service's grant lifecycle.
+        //
+        // Shape-only path (no service): both ProtectionAbility markers
+        // remain on the equipment card so HasProtectionFromColor still
+        // returns a deterministic answer for factory-shape / dispatch
+        // tests. With the service wired the markers live on the equipped
+        // creature itself, which is what CR 702.16e (DEBT-A) reads.
         // --------------------------------------------------------------
-        card.AddAbility(new ProtectionAbility("red"));
-        card.AddAbility(new ProtectionAbility("blue"));
+        if (continuousEffects != null)
+        {
+            continuousEffects.Register(new GrantAbilityEffect(
+                source: card,
+                targetSelector: () => card.AttachedTo,
+                abilityFactory: _ => new ProtectionAbility("red")));
+            continuousEffects.Register(new GrantAbilityEffect(
+                source: card,
+                targetSelector: () => card.AttachedTo,
+                abilityFactory: _ => new ProtectionAbility("blue")));
+        }
+        else
+        {
+            card.AddAbility(new ProtectionAbility("red"));
+            card.AddAbility(new ProtectionAbility("blue"));
+        }
 
         // --------------------------------------------------------------
         // Combat-damage-to-a-player trigger — CR 510 / CR 603.1.
@@ -211,7 +228,8 @@ public static class SwordOfFireAndIceFactory
         //   "{2}: Attach to target creature you control. Activate only
         //    as a sorcery."
         // v1 picker: deterministic first controller-side creature.
-        // Sorcery-speed restriction deferred (see class xmldoc).
+        // CR 117.1a / 307.5 — sorcery-speed restriction now enforced via
+        // ActionValidator.
         // --------------------------------------------------------------
         var equipEffect = new Effect(
             $"{CardName}: equip — attach to a creature you control",

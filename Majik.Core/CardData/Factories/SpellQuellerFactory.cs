@@ -66,12 +66,12 @@ namespace Majik.Core.CardData.Factories;
 /// remains on the stack.
 ///
 /// ## Target-selection prompt
-/// Spell Queller's ETB target is filled by the caller via
-/// <see cref="TriggeredAbility.SetChosenTargets"/> — same pattern as
-/// Snapcaster Mage. A "pick a spell from the stack" prompt is part of the
-/// broader agent-prompt MVP and is deferred. Production code should pass
-/// the <see cref="ISpell"/> the agent picked; the resolve effect tolerates
-/// missing / illegal targets per CR 603.10b.
+/// Spell Queller's ETB target is filled by the agent-prompt pipeline via the
+/// <see cref="TargetRequest.CandidateGatherer"/> that enumerates the live
+/// stack at trigger-resolve time and filters to spells with mana value ≤ 4.
+/// <see cref="HeuristicBotAgent"/>'s Counter intent ranks the most-expensive
+/// eligible spell first; the resolve effect tolerates missing / illegal
+/// targets per CR 603.10b.
 /// </summary>
 [CardName("Spell Queller")]
 public static class SpellQuellerFactory
@@ -201,7 +201,18 @@ public static class SpellQuellerFactory
                     Description: "target spell with mana value 4 or less",
                     MinTargets: 1,
                     MaxTargets: 1,
-                    LegalCandidates: Array.Empty<object>()),
+                    LegalCandidates: Array.Empty<object>(),
+                    Intent: BotIntent.Counter,
+                    // Agent-prompt MVP: enumerate stack spells whose mana
+                    // value is ≤ 4 (CR 601.2c — choose-time legality).
+                    // Counter intent in the bot's ranker picks the most-
+                    // expensive eligible spell (ISpell.Card mana value).
+                    CandidateGatherer: ctx => ctx.Stack.GetAll()
+                        .OfType<Majik.Core.Spells.ISpell>()
+                        .Where(s => Majik.Core.ValueObjects.ManaCost
+                            .Parse(s.Card?.ManaCost ?? "").TotalValue <= 4)
+                        .Cast<object>()
+                        .ToList()),
             });
 
         card.AddAbility(etb);
