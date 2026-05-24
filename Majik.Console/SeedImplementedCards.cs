@@ -1110,5 +1110,21 @@ public static class SeedImplementedCards
         // resolution. Name-based cast restriction ("can't cast same-named spells until
         // your next turn") deferred — no delayed-until-next-turn restriction surface in v1.
         "Reflector Mage",
+
+        // ---- Death and Taxes / Taxes staples shipped 2026-05-23 ----
+
+        // Creature — Kor Spirit {1}{W}{W} 2/2 (SkyclaveApparitionFactory).
+        // ETB: exile up to one target nonland nontoken permanent an opponent
+        // controls with mv ≤ 4 (MinTargets=0, MaxTargets=1). LTB: that
+        // permanent's controller creates an X/X blue Illusion token (X = mv).
+        // Token colour (blue) deferred — same gap as Crashing Footfalls.
+        "Skyclave Apparition",
+
+        // Creature — Cat Cleric {1}{W} 2/2 (LeoninArbiterFactory).
+        // "Players can't search their libraries unless they pay {2}."
+        // v1 structural: LeoninArbiterSearchRestrictionEffect marker
+        // registered when wired overload is used; enforcement deferred
+        // (no unified search-library surface yet).
+        "Leonin Arbiter",
     };
 }

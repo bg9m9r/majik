@@ -2783,6 +2783,31 @@ public static class NamedCardFactory
             // overload for bus-driven firing.
             "Thalia's Lieutenant" => ThaliaLieutenantFactory.Create(owner),
 
+            // Creature — Kor Spirit {1}{W}{W} 2/2 (SkyclaveApparitionFactory).
+            // Zendikar Rising. ETB exile "up to one target nonland, nontoken
+            // permanent an opponent controls with mana value 4 or less"
+            // (MinTargets=0, MaxTargets=1 TargetRequest). LTB creates an X/X
+            // blue Illusion creature token under the exiled permanent's
+            // controller, X = exiled card's mana value. If 0 targets chosen,
+            // LTB no-ops. Single-arg dispatcher path produces the correct
+            // card shape without TriggerManager wiring; use the
+            // (owner, eventBus, triggers) overload for fully-wired behaviour.
+            // Token colour (blue) deferred — same gap as Crashing Footfalls.
+            "Skyclave Apparition" => SkyclaveApparitionFactory.Create(owner),
+
+            // Creature — Cat Cleric {1}{W} 2/2 (LeoninArbiterFactory).
+            // Scars of Mirrodin. "Players can't search their libraries unless
+            // they pay {2}." v1 structural shape only: a
+            // LeoninArbiterSearchRestrictionEffect marker is registered on
+            // the ContinuousEffectsService (via the wired overload) while
+            // Leonin Arbiter is on the battlefield; actual search-tax
+            // enforcement is deferred (no unified search-library surface yet).
+            // The single-arg dispatcher path here produces the correct card
+            // shape only (no live marker). Use
+            // LeoninArbiterFactory.Create(owner, continuousEffectsService)
+            // for the wired form.
+            "Leonin Arbiter" => LeoninArbiterFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
