@@ -478,6 +478,12 @@ public static class SeedImplementedCards
         // creatures from their graveyards, sacrifices all creatures they
         // control, then returns the exiled cards to the battlefield.
         "Living End",
+        // Sorcery — {2}{G} (SearchForTomorrowFactory). Time Spiral.
+        // Search your library for a basic land card, put it onto the
+        // battlefield (untapped), then shuffle. Suspend 2—{G} (CR 702.62).
+        // Basic-land tutor directly to battlefield, distinguishing it from
+        // Cultivate/Rampant Growth (tapped) and Sylvan Scrying (to hand).
+        "Search for Tomorrow",
         // Enchantment — {1}{W} (SigardasAidFactory). Eldritch Moon.
         // You may cast Aura and Equipment spells as though they had flash.
         // Whenever an Equipment enters under your control, you may attach
