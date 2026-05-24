@@ -1064,5 +1064,17 @@ public static class SeedImplementedCards
         // Instant — {1}{U} (ManaLeakFactory). Stronghold / many reprints.
         // Counter target spell unless its controller pays {3}.
         "Mana Leak",
+
+        // ---- Humans-lords shipped in the humans-lords bump ----
+
+        // Creature — Human Soldier {W} 1/1 (ChampionOfTheParishFactory). Innistrad.
+        // Whenever another Human enters the battlefield under your control, put a
+        // +1/+1 counter on Champion of the Parish.
+        "Champion of the Parish",
+        // Creature — Human Soldier {1}{W} 1/1 (ThaliaLieutenantFactory). Shadows
+        // over Innistrad. When ~ enters, put a +1/+1 counter on each other Human
+        // you control. Whenever another Human enters under your control, put a
+        // +1/+1 counter on ~.
+        "Thalia's Lieutenant",
     };
 }
