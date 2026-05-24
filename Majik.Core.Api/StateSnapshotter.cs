@@ -86,7 +86,15 @@ public static class StateSnapshotter
     private static ZoneDto SnapshotZone(IZone zone) =>
         new(zone.GetCards().Select(SnapshotCard).ToList());
 
-    private static CardSnapshotDto SnapshotCard(ICard card)
+    /// <summary>
+    /// Single-card snapshot shared with prompt envelopes (e.g.
+    /// <see cref="Majik.Core.Api.Dtos.PromptDto.Candidates"/> for
+    /// library-search picks) so the wire shape is identical to what the
+    /// portal already renders for in-zone cards. Internal — call sites
+    /// outside this assembly must use the zone-level <see cref="Snapshot"/>
+    /// entry point.
+    /// </summary>
+    internal static CardSnapshotDto SnapshotCard(ICard card)
     {
         int? power = null;
         int? toughness = null;

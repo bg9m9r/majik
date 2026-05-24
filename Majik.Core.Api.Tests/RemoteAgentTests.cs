@@ -808,6 +808,108 @@ public class RemoteAgentTests
         await Task.CompletedTask;
     }
 
+    [Fact]
+    public async Task ChooseLibraryPick_Submit_ResolvesToPickedCard()
+    {
+        // CR 701.19a — library search. The base IPlayerAgent default
+        // returns candidates[0], which made Green Sun's Zenith silently
+        // auto-resolve for remote (human) players. RemoteAgent's override
+        // must prompt the client with the candidate list and resolve to
+        // the picked card on submission.
+        var ferret = new Creature("Llanowar Elves", "G", 1, 1) { Owner = _alice };
+        var elf = new Creature("Birds of Paradise", "G", 0, 1) { Owner = _alice };
+        var candidates = new ICard[] { ferret, elf };
+        var agent = new RemoteAgent(_alice);
+
+        var task = agent.ChooseLibraryPickAsync(ctx: null, candidates, "green creature card");
+        agent.HasPending.Should().BeTrue();
+        agent.ExpectedCommandKinds.Should().ContainSingle()
+            .Which.Should().Be(typeof(ChooseLibraryPickCommand));
+
+        agent.Submit(new ChooseLibraryPickCommand(elf.InstanceId) { PlayerId = _alice.Id });
+        var picked = await task;
+
+        picked.Should().BeSameAs(elf);
+    }
+
+    [Fact]
+    public async Task ChooseLibraryPick_SubmitNull_ResolvesToNullForFindNothing()
+    {
+        // CR 701.19a — a player may decline to choose a card from a
+        // successful search. Null SelectedInstanceId models that branch
+        // (e.g. Green Sun's Zenith finds nothing → spell still shuffles
+        // into its owner's library, no creature enters the battlefield).
+        var elf = new Creature("Llanowar Elves", "G", 1, 1) { Owner = _alice };
+        var agent = new RemoteAgent(_alice);
+
+        var task = agent.ChooseLibraryPickAsync(ctx: null, new ICard[] { elf }, "green creature card");
+        agent.Submit(new ChooseLibraryPickCommand(SelectedInstanceId: null) { PlayerId = _alice.Id });
+
+        (await task).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ChooseLibraryPick_InvalidInstanceId_Throws()
+    {
+        // Defence: the wire command must not be able to smuggle a pick of
+        // a card outside the engine-offered candidate set — that would
+        // bypass the search predicate (e.g. tutoring a non-green or
+        // out-of-range creature for Green Sun's Zenith).
+        var elf = new Creature("Llanowar Elves", "G", 1, 1) { Owner = _alice };
+        var agent = new RemoteAgent(_alice);
+
+        _ = agent.ChooseLibraryPickAsync(ctx: null, new ICard[] { elf }, "green creature card");
+        var act = () => agent.Submit(new ChooseLibraryPickCommand(Guid.NewGuid()) { PlayerId = _alice.Id });
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*not in the offered candidate list*");
+        await Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task ChooseLibraryPick_PromptPayload_SnapshotsCandidates()
+    {
+        // The portal needs the candidate card data to render the picker —
+        // the library zone is hidden in GameStateDto (CR 706). RemoteAgent
+        // stashes a CardSnapshotDto list in PendingPayload so
+        // GameFacade.BuildPrompt can copy it onto the wire PromptDto.
+        var elf = new Creature("Llanowar Elves", "G", 1, 1) { Owner = _alice };
+        var bop = new Creature("Birds of Paradise", "G", 0, 1) { Owner = _alice };
+        var agent = new RemoteAgent(_alice);
+
+        _ = agent.ChooseLibraryPickAsync(ctx: null, new ICard[] { elf, bop },
+            kindLabel: "green creature card with mana value 2 or less");
+
+        agent.PendingPayload.Should().NotBeNull();
+        agent.PendingPayload!.Label.Should()
+            .Be("green creature card with mana value 2 or less");
+        var snapshots = agent.PendingPayload.Candidates;
+        snapshots.Should().NotBeNull();
+        snapshots!.Should().HaveCount(2);
+        snapshots![0].InstanceId.Should().Be(elf.InstanceId);
+        snapshots![0].Name.Should().Be("Llanowar Elves");
+        await Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task ChooseLibraryPick_PromptPayload_ClearedAfterSubmit()
+    {
+        // Per-prompt payload must not leak past the prompt that owns it —
+        // a subsequent priority prompt should see no library candidates,
+        // or the portal would re-render a stale library picker.
+        var elf = new Creature("Llanowar Elves", "G", 1, 1) { Owner = _alice };
+        var agent = new RemoteAgent(_alice);
+
+        var task = agent.ChooseLibraryPickAsync(ctx: null, new ICard[] { elf }, "creature");
+        agent.PendingPayload.Should().NotBeNull();
+
+        agent.Submit(new ChooseLibraryPickCommand(elf.InstanceId) { PlayerId = _alice.Id });
+        await task;
+
+        agent.PendingPayload.Should().BeNull();
+        agent.HasPending.Should().BeFalse();
+    }
+
     private sealed class TestStackObject : Majik.Core.Stack.IStackObject
     {
         public Guid Id { get; } = Guid.NewGuid();
