@@ -1004,5 +1004,11 @@ public static class SeedImplementedCards
         // Island subtype enables interaction with Spreading Seas, Harbinger of
         // the Seas, and island-count payoffs.
         "Mystic Sanctuary",
+
+        // Creature — Kavu {G}{W} 2/2 (TerritorialKavuFactory). Modern Horizons 2.
+        // Domain (CR 702.16) — gets +1/+1 per distinct basic land type among
+        // lands you control (Layer 7c static pump via DomainPumpStaticEffect).
+        // Attack trigger: discard a card, then draw a card (loot on attack).
+        "Territorial Kavu",
     };
 }

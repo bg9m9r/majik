@@ -2626,6 +2626,18 @@ public static class NamedCardFactory
             // separate path).
             "Drannith Magistrate" => DrannithMagistrateFactory.Create(owner),
 
+            // Creature — Kavu {G}{W} 2/2 (TerritorialKavuFactory).
+            // Modern Horizons 2. Domain — gets +1/+1 for each basic land
+            // type among lands you control (CR 702.16 / CR 613.1g, Layer
+            // 7c). Wired via DomainPumpStaticEffect + ETB/LTB lifecycle
+            // when the (owner, effects, eventBus, triggers) overload is
+            // used. Attack trigger (CR 508.1f): discard a card, then draw
+            // a card — v1 deterministic first-card-in-hand pick; "you may"
+            // + agent-driven choice deferred. The single-arg dispatcher
+            // path produces the correct card shape without live layers
+            // service or TriggerManager wiring.
+            "Territorial Kavu" => TerritorialKavuFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
