@@ -72,9 +72,11 @@ namespace Majik.Core.CardData.Factories;
 ///   permission slot — adjacent to <see cref="Costs.CastFromExileAlternativeCost"/>
 ///   but additionally gated by "turn-cast-on > turn-plotted" + sorcery
 ///   speed (CR 718.2 / CR 117.1a), and (c) a once-per-turn-per-plotted-card
-///   cast cap (CR 718.2c). Same posture as <see cref="BurstLightningFactory"/>'s
-///   deferred Kicker rider — ship the printed shape + the most common
-///   triggered/static body, defer the alt-cost mechanic until its
+///   cast cap (CR 718.2c). Plot is its own alt-cost primitive cluster
+///   (not Kicker — Kicker is the cast-time additive cost shipped via
+///   <see cref="Costs.KickerAdditionalCost"/>; Plot is the cast-from-
+///   exile-on-a-later-turn shape). Ship the printed shape + the most
+///   common triggered/static body, defer the Plot mechanic until its
 ///   primitive lands. Bot evaluation will treat Slickshot as a vanilla
 ///   1/1 Flying+Haste body with prowess-style pump rider until Plot
 ///   ships.

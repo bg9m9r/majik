@@ -3,6 +3,7 @@ using Majik.Core.CardData;
 using Majik.Core.CardData.Factories;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Costs;
 using Majik.Core.Events;
 using Majik.Core.Game;
 using Majik.Core.Players;
@@ -24,11 +25,12 @@ namespace Majik.Core.Tests.CardData;
 ///   - Resolve default-not-kicked → 2 damage to target.
 ///   - Resolve structural kicked branch → 4 damage to target.
 ///
-/// Kicker (CR 702.33) is an additional cost that modifies the spell's
-/// effect when paid. There is no Kicker primitive in the engine yet, so
-/// production casts ship not-kicked; the kicked branch is exercised
-/// here by passing <c>wasKicked: true</c> through the spell-definition
-/// builder directly. See <see cref="BurstLightningFactory"/> xmldoc.
+/// Kicker (CR 702.33) is now a real <see cref="IAdditionalCost"/>
+/// primitive — <see cref="KickerAdditionalCost"/>. The kicked branch
+/// is reached by layering the cost onto the cast via
+/// <see cref="SpellCastFlow.CastAsync"/>'s <c>additionalCosts</c>
+/// parameter; the not-kicked branch is the default cast with no
+/// additional cost. See <see cref="BurstLightningFactory"/> xmldoc.
 /// </summary>
 public class BurstLightningTests
 {
@@ -109,10 +111,9 @@ public class BurstLightningTests
     /// Cast Burst Lightning from Alice's hand at <paramref name="target"/>
     /// and resolve the resulting stack object. Mirrors the
     /// UnholyHeatTests cast harness — direct cast/resolve, no priority
-    /// loop. The <paramref name="wasKicked"/> flag is plumbed through
-    /// the spell-definition builder because there is no Kicker primitive
-    /// in <see cref="SpellCastFlow"/> yet (see
-    /// <see cref="BurstLightningFactory"/> xmldoc).
+    /// loop. The <paramref name="wasKicked"/> flag is exercised by
+    /// layering a <see cref="KickerAdditionalCost"/> onto the cast (the
+    /// production wiring; see <see cref="BurstLightningFactory"/> xmldoc).
     /// </summary>
     private async Task CastAndResolveTargeting(object target, bool wasKicked)
     {
@@ -127,10 +128,21 @@ public class BurstLightningTests
         var ctx = new GameContext(_alice, new[] { _alice, _bob },
             _alice, 1, PhaseStateType.Main, _stack);
 
+        IReadOnlyList<IAdditionalCost>? additional = null;
+        if (wasKicked)
+        {
+            // CR 702.33 — pay the kicker mana into Alice's pool so
+            // KickerAdditionalCost.Pay (which routes through
+            // Player.PayMana) succeeds.
+            _alice.AddManaToPool(ManaCost.Parse("{4}"));
+            additional = new[] { BurstLightningFactory.BuildAdditionalCost(bl) };
+        }
+
         var spell = await _flow.CastAsync(
             _alice, bl,
-            BurstLightningFactory.BuildSpellDefinition(t => t, wasKicked),
-            agent, ctx);
+            BurstLightningFactory.BuildSpellDefinition(bl, t => t),
+            agent, ctx,
+            additionalCosts: additional);
 
         bl.Zone.Should().Be(ZoneType.Stack);
 

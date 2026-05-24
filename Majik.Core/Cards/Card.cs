@@ -282,6 +282,45 @@ public class Card : ICard
     }
 
     /// <summary>
+    /// CR 702.33b — "kicked" runtime sentinel. Stamped <c>true</c> by
+    /// <see cref="Majik.Core.Costs.KickerAdditionalCost.Pay"/> at cast
+    /// announcement when the caster pays the optional kicker mana
+    /// (CR 601.2b — kicker decision is locked in when the spell is
+    /// cast). Read by the resolving spell's <c>EffectFactory</c> to
+    /// branch the printed body on the "if [spell] was kicked" rider
+    /// (Burst Lightning's deals-4-instead-of-2 toggle is the canonical
+    /// consumer).
+    ///
+    /// <para>Cleared by <see cref="Majik.Core.Game.SpellCastFlow"/>
+    /// once the spell resolves so a later re-cast / blink / token
+    /// copy / on-battlefield permanent doesn't inherit the prior
+    /// kicker posture (CR 400.7 — new object on each zone change).
+    /// Mirrors the <see cref="Majik.Core.Spells.Spell.WasKicked"/>
+    /// stamping on the resolving stack object.</para>
+    ///
+    /// <para>Defaults to <c>false</c> so hand-built test cards
+    /// without an explicit stamp are treated as non-kicked casts.</para>
+    /// </summary>
+    public bool WasKicked { get; private set; }
+
+    /// <summary>Stamp the kicker sentinel. Called by
+    /// <see cref="Majik.Core.Costs.KickerAdditionalCost.Pay"/> after
+    /// the kicker mana is successfully paid.</summary>
+    public void SetWasKicked(bool value)
+    {
+        WasKicked = value;
+    }
+
+    /// <summary>Clear the kicker sentinel. Called by
+    /// <see cref="Majik.Core.Game.SpellCastFlow"/> via a cleanup
+    /// effect appended after the spell's printed body so the flag
+    /// doesn't leak past resolution (CR 400.7).</summary>
+    public void ClearWasKicked()
+    {
+        WasKicked = false;
+    }
+
+    /// <summary>
     /// CR 601.2f — when this card is currently being cast as a spell, the
     /// set of targets the agent picked during target selection (one inner
     /// list per <see cref="Majik.Core.Game.TargetRequest"/>, mirroring

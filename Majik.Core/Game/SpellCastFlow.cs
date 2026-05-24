@@ -282,6 +282,37 @@ public sealed class SpellCastFlow
             finalEffects = wrapped;
         }
 
+        // CR 702.33b / CR 400.7 — if a kicker additional cost was paid
+        // this cast, append a cleanup effect that clears
+        // <see cref="Card.WasKicked"/> after the spell's printed body
+        // resolves so the sentinel doesn't leak to a copy / blink /
+        // re-cast. KickerAdditionalCost.Pay stamps the flag during the
+        // additional-cost loop above; the spell-level mirror stamp
+        // (see below) is read by stack-side gates that don't have
+        // the card handy.
+        bool hasKickerPayment = false;
+        foreach (var addCost in mergedAdditional)
+        {
+            if (addCost is KickerAdditionalCost)
+            {
+                hasKickerPayment = true;
+                break;
+            }
+        }
+        if (hasKickerPayment)
+        {
+            var withKickerCleanup = finalEffects.Append(new Effect(
+                "Kicker cleanup — clear Card.WasKicked",
+                () =>
+                {
+                    if (card is Card concreteForKicked)
+                    {
+                        concreteForKicked.ClearWasKicked();
+                    }
+                })).ToList();
+            finalEffects = withKickerCleanup;
+        }
+
         var spell = new Spells.Spell(card, caster, effects: finalEffects);
 
         // CR 608.2 / CR 715.3d — let the alt-cost re-route the post-
@@ -318,6 +349,15 @@ public sealed class SpellCastFlow
             {
                 concreteForEscape.SetWasCastForEscape(true);
             }
+        }
+
+        // CR 702.33b — mirror the kicked posture onto the resolving
+        // stack object so stack-side gates that don't have the card
+        // reference handy (downstream triggers, future "casts a
+        // kicked spell" replacements) can read it off the spell.
+        if (hasKickerPayment)
+        {
+            spell.WasKicked = true;
         }
 
         _stack.Push(spell);
