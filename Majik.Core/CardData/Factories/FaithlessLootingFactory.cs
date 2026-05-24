@@ -47,6 +47,7 @@ namespace Majik.Core.CardData.Factories;
 /// - Madness / "exile from graveyard" alternate resolution riders are
 ///   out of scope; only the printed flashback alt cost is wired.
 /// </summary>
+[CardName("Faithless Looting")]
 public static class FaithlessLootingFactory
 {
     public const string CardName = "Faithless Looting";

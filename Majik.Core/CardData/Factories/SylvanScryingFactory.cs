@@ -43,6 +43,7 @@ namespace Majik.Core.CardData.Factories;
 /// - <b>Reveal event</b>. The picked land moves Library → Hand without
 ///   publishing a reveal event; same gap as Stoneforge Mystic's ETB tutor.
 /// </summary>
+[CardName("Sylvan Scrying")]
 public static class SylvanScryingFactory
 {
     public const string CardName = "Sylvan Scrying";

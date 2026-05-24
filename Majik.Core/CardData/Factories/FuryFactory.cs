@@ -47,6 +47,7 @@ namespace Majik.Core.CardData.Factories;
 ///   plumbing the resolving permanent into the trigger effect — deferred
 ///   for parity with Solitude's lifelink wiring.
 /// </summary>
+[CardName("Fury")]
 public static class FuryFactory
 {
     /// <summary>Construct Fury owned and controlled by <paramref name="owner"/>.

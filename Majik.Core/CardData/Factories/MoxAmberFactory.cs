@@ -45,6 +45,7 @@ namespace Majik.Core.CardData.Factories;
 ///   layer-4 type-changing effects feed through naturally (mirrors
 ///   <see cref="MoxOpalFactory"/>'s live artifact-count scan).
 /// </summary>
+[CardName("Mox Amber")]
 public static class MoxAmberFactory
 {
     public const string CardName = "Mox Amber";

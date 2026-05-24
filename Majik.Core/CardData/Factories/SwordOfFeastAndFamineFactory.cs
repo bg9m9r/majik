@@ -85,6 +85,7 @@ namespace Majik.Core.CardData.Factories;
 ///   701.16a — damaged player chooses) is deferred behind the same prompt
 ///   queue as Liliana of the Veil + Faithless Looting.
 /// </summary>
+[CardName("Sword of Feast and Famine")]
 public static class SwordOfFeastAndFamineFactory
 {
     public const string CardName = "Sword of Feast and Famine";

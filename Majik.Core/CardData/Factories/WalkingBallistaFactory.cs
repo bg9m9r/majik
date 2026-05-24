@@ -34,6 +34,7 @@ namespace Majik.Core.CardData.Factories;
 ///   route damage to a chosen target. Full targeting requires the
 ///   active prompt system (ITarget / TargetResolver).
 /// </summary>
+[CardName("Walking Ballista")]
 public static class WalkingBallistaFactory
 {
     private static readonly CardDefinition Definition =

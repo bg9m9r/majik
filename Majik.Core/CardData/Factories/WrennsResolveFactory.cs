@@ -35,6 +35,7 @@ namespace Majik.Core.CardData.Factories;
 ///   case this matches CR 603.7c. Multi-player turn-skipping nuances
 ///   deferred.
 /// </summary>
+[CardName("Wrenn's Resolve")]
 public static class WrennsResolveFactory
 {
     public const string CardName = "Wrenn's Resolve";

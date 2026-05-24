@@ -57,6 +57,7 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="OracleSpellBinder.MoveToGraveyard"/> directly (same
 ///   pattern as Dress Down's end-step self-sac).
 /// </summary>
+[CardName("Phantasmal Image")]
 public static class PhantasmalImageFactory
 {
     /// <summary>

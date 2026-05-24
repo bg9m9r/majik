@@ -54,6 +54,7 @@ namespace Majik.Core.CardData.Factories;
 ///   the moment of the begin-combat step, so spells cast AFTER the trigger
 ///   resolves don't retroactively requalify the Phoenix the same turn).
 /// </summary>
+[CardName("Arclight Phoenix")]
 public static class ArclightPhoenixFactory
 {
     public const string CardName = "Arclight Phoenix";

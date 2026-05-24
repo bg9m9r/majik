@@ -66,6 +66,7 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="BuildSpellDefinition"/> path, identical shape to
 ///   Spreading Seas.
 /// </summary>
+[CardName("Splinter Twin")]
 public static class SplinterTwinFactory
 {
     public const string CardName = "Splinter Twin";

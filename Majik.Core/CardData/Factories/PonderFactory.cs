@@ -34,6 +34,7 @@ namespace Majik.Core.CardData.Factories;
 ///   <c>SearchSpellFactory</c>). The decision is not yet sourced from an
 ///   agent prompt.
 /// </summary>
+[CardName("Ponder")]
 public static class PonderFactory
 {
     public const string CardName = "Ponder";

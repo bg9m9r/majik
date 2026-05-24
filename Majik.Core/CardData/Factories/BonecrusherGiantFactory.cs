@@ -59,6 +59,7 @@ namespace Majik.Core.CardData.Factories;
 ///   2-damage payload still resolves unconditionally because no
 ///   prevention shields exist for non-combat damage in v1.
 /// </summary>
+[CardName("Bonecrusher Giant")]
 public static class BonecrusherGiantFactory
 {
     public const string CardName = "Bonecrusher Giant";

@@ -29,6 +29,7 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="Majik.Core.Players.Agents.IPlayerAgent.ChooseSurveilDecisionAsync"/>
 ///   when an agent is registered; otherwise the deterministic default applies.
 /// </summary>
+[CardName("Library Surveyor")]
 public static class LibrarySurveyorFactory
 {
     private static readonly CardDefinition Definition =

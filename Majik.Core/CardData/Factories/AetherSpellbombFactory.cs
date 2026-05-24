@@ -47,6 +47,7 @@ namespace Majik.Core.CardData.Factories;
 ///   observable. Remove the explicit move-to-graveyard once
 ///   <see cref="AdditionalCost.Pay"/> performs the sacrifice itself.
 /// </summary>
+[CardName("Aether Spellbomb")]
 public static class AetherSpellbombFactory
 {
     public const string CardName = "Aether Spellbomb";

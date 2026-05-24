@@ -53,6 +53,7 @@ namespace Majik.Core.CardData.Factories;
 ///   dispatch, the default flip source should switch to
 ///   <c>game.Random.FlipCoin()</c>.
 /// </summary>
+[CardName("Mana Crypt")]
 public static class ManaCryptFactory
 {
     public const string CardName = "Mana Crypt";

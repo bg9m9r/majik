@@ -66,6 +66,7 @@ namespace Majik.Core.CardData.Factories;
 ///   call the two-arg overload; they need to forward the all-players list
 ///   for the per-spell cost rider to apply in live play. Same follow-up.
 /// </summary>
+[CardName("Damping Sphere")]
 public static class DampingSphereFactory
 {
     public const string CardName = "Damping Sphere";

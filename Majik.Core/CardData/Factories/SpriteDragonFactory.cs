@@ -56,6 +56,7 @@ namespace Majik.Core.CardData.Factories;
 ///   Ledger Shredder surveil rider, Undying-return creatures). No
 ///   Sprite-Dragon-specific layer wiring required.
 /// </summary>
+[CardName("Sprite Dragon")]
 public static class SpriteDragonFactory
 {
     public const string CardName = "Sprite Dragon";

@@ -61,6 +61,7 @@ namespace Majik.Core.CardData.Factories;
 ///   the debuff lifts correctly, but a future Prune pass could drop
 ///   the entry. Same shape as Colossus Hammer.
 /// </summary>
+[CardName("Plague Engineer")]
 public static class PlagueEngineerFactory
 {
     public const string CardName = "Plague Engineer";

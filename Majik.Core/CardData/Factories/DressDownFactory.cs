@@ -45,6 +45,7 @@ namespace Majik.Core.CardData.Factories;
 ///   tests see them, but neither the static-effect lifecycle nor the
 ///   live TriggerManager registration runs without the runtime overload.
 /// </summary>
+[CardName("Dress Down")]
 public static class DressDownFactory
 {
     public const string CardName = "Dress Down";

@@ -45,6 +45,7 @@ namespace Majik.Core.CardData.Factories;
 ///   than via the agent. Hand-card choice for +4 is similarly
 ///   deterministic (first card in the target player's hand).
 /// </summary>
+[CardName("Karn Liberated")]
 public static class KarnLiberatedFactory
 {
     public const string CardName = "Karn Liberated";

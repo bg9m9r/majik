@@ -51,6 +51,7 @@ namespace Majik.Core.CardData.Factories;
 /// - CR 702.11 — Hexproof (and its colour-qualified variants).
 /// - CR 701.5 — Counter; uncounterable spells can't be countered.
 /// </summary>
+[CardName("Veil of Summer")]
 public static class VeilOfSummerFactory
 {
     public const string CardName = "Veil of Summer";

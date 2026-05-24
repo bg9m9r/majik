@@ -34,6 +34,7 @@ namespace Majik.Core.CardData.Factories;
 /// - Plain Land. No supertypes (not legendary, not basic). No printed
 ///   land subtypes.
 /// </summary>
+[CardName("Mishra's Workshop")]
 public static class MishrasWorkshopFactory
 {
     /// <summary>

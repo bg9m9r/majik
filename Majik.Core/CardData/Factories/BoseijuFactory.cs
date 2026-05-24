@@ -41,6 +41,7 @@ namespace Majik.Core.CardData.Factories;
 ///   library for a basic land. Deferred entirely (requires
 ///   library-search + optional prompt).
 /// </summary>
+[CardName("Boseiju, Who Endures")]
 public static class BoseijuFactory
 {
     private static readonly CardDefinition Definition =

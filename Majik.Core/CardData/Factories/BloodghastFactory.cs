@@ -58,6 +58,7 @@ namespace Majik.Core.CardData.Factories;
 ///   restriction is not registered on the single-arg dispatcher path, so
 ///   shape tests that need it should use the full-wiring overload.
 /// </summary>
+[CardName("Bloodghast")]
 public static class BloodghastFactory
 {
     public const string CardName = "Bloodghast";

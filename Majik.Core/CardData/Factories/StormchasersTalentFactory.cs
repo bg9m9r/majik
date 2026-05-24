@@ -78,6 +78,7 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="MonasteryMentorFactory"/>'s spawned Monk tokens (see that
 ///   factory's xmldoc for the broader plan).
 /// </summary>
+[CardName("Stormchaser's Talent")]
 public static class StormchasersTalentFactory
 {
     public const string CardName = "Stormchaser's Talent";

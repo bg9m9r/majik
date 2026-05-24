@@ -57,6 +57,7 @@ namespace Majik.Core.CardData.Factories;
 ///   emitting a CardRevealedEvent. Wire a reveal when CardRevealedEvent
 ///   plumbing is exercised by an in-engine prompt path.
 /// </summary>
+[CardName("Stoneforge Mystic")]
 public static class StoneforgeMysticFactory
 {
     /// <summary>

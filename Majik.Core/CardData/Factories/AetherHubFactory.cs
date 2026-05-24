@@ -72,6 +72,7 @@ namespace Majik.Core.CardData.Factories;
 ///   adding a per-card energy-tracker; intentionally skipped — the
 ///   marker is bookkeeping only.
 /// </summary>
+[CardName("Aether Hub")]
 public static class AetherHubFactory
 {
     public const string CardName = "Aether Hub";

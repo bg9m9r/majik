@@ -70,6 +70,7 @@ namespace Majik.Core.CardData.Factories;
 ///   bookkeeping is deferred; the test suite asserts shape, not
 ///   attack legality.
 /// </summary>
+[CardName("Mutavault")]
 public static class MutavaultFactory
 {
     public const string CardName = "Mutavault";

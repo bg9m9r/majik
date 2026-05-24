@@ -58,6 +58,7 @@ namespace Majik.Core.CardData.Factories;
 /// calls <see cref="Permanent.MarkEnteredBattlefield"/> on return but does
 /// not reset summoning sickness — Haste makes that moot.
 /// </summary>
+[CardName("Strangleroot Geist")]
 public static class StrangleRootGeistFactory
 {
     public const string CardName = "Strangleroot Geist";

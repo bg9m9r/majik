@@ -75,6 +75,7 @@ namespace Majik.Core.CardData.Factories;
 ///   choosing logic. No exile-zone scan is built in — tests / bots
 ///   supply the resolved card directly.
 /// </summary>
+[CardName("Karn, the Great Creator")]
 public static class KarnTheGreatCreatorFactory
 {
     public const string CardName = "Karn, the Great Creator";

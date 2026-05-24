@@ -31,6 +31,7 @@ namespace Majik.Core.CardData.Factories;
 /// the extra sacrifice cost; the sacrifice happens as part of activation
 /// alongside the tap.
 /// </summary>
+[CardName("Phyrexian Tower")]
 public static class PhyrexianTowerFactory
 {
     public const string CardName = "Phyrexian Tower";

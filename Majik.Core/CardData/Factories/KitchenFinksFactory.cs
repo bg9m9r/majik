@@ -56,6 +56,7 @@ namespace Majik.Core.CardData.Factories;
 /// zero +1/+1 counters; Persist uses <see cref="CounterType.MinusOneMinusOne"/>
 /// and fires when the creature has zero -1/-1 counters.
 /// </summary>
+[CardName("Kitchen Finks")]
 public static class KitchenFinksFactory
 {
     public const string CardName = "Kitchen Finks";

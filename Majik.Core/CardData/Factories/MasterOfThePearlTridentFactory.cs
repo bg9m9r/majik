@@ -43,6 +43,7 @@ namespace Majik.Core.CardData.Factories;
 ///   Master of the Pearl Trident isn't on the battlefield so the bonus
 ///   lifts correctly.
 /// </summary>
+[CardName("Master of the Pearl Trident")]
 public static class MasterOfThePearlTridentFactory
 {
     public const string CardName = "Master of the Pearl Trident";

@@ -45,6 +45,7 @@ namespace Majik.Core.CardData.Factories;
 ///   and immediately moves the card to hand; clients are expected to
 ///   render the reveal as a transient flash.
 /// </summary>
+[CardName("Dark Confidant")]
 public static class DarkConfidantFactory
 {
     /// <summary>

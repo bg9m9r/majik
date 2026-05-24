@@ -37,6 +37,7 @@ namespace Majik.Core.CardData.Factories;
 ///   via the Delve <see cref="KeywordAbility"/> marker, as a
 ///   <see cref="Majik.Core.Costs.DelveAlternativeCost"/>.
 /// </summary>
+[CardName("Murderous Cut")]
 public static class MurderousCutFactory
 {
     public const string CardName = "Murderous Cut";

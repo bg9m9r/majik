@@ -35,6 +35,7 @@ namespace Majik.Core.CardData.Factories;
 ///   graveyard without checking for Indestructible — same gap as every
 ///   other single-target destroy template.
 /// </summary>
+[CardName("Terminate")]
 public static class TerminateFactory
 {
     public const string CardName = "Terminate";

@@ -54,6 +54,7 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="Majik.Core.Players.Agents.IAlternativeCostProbe"/> stream
 ///   as a <see cref="Majik.Core.Costs.DelveAlternativeCost"/>.
 /// </summary>
+[CardName("Tasigur, the Golden Fang")]
 public static class TasigurTheGoldenFangFactory
 {
     public const string CardName = "Tasigur, the Golden Fang";

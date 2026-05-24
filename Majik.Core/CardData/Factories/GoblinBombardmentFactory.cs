@@ -39,6 +39,7 @@ namespace Majik.Core.CardData.Factories;
 ///   creature) so behavior is correct — only the cost name reads
 ///   "another," which is fine.
 /// </summary>
+[CardName("Goblin Bombardment")]
 public static class GoblinBombardmentFactory
 {
     /// <summary>

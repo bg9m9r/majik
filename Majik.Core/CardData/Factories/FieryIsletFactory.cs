@@ -43,6 +43,7 @@ namespace Majik.Core.CardData.Factories;
 ///   ability — when it picks this source to pay a cost, the life loss
 ///   happens silently.
 /// </summary>
+[CardName("Fiery Islet")]
 public static class FieryIsletFactory
 {
     /// <summary>

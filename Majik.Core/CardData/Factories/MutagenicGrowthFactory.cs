@@ -39,6 +39,7 @@ namespace Majik.Core.CardData.Factories;
 ///   payment — caller passes the alternative cost explicitly.
 /// - Per-pip selectivity (not applicable here — single pip).
 /// </summary>
+[CardName("Mutagenic Growth")]
 public static class MutagenicGrowthFactory
 {
     public const string CardName = "Mutagenic Growth";

@@ -46,6 +46,7 @@ namespace Majik.Core.CardData.Factories;
 /// - <b>Sorcery-speed gate</b>: fetchlands activate at instant speed per
 ///   oracle (no printed timing restriction) — no gate needed.
 /// </summary>
+[CardName("Scalding Tarn")]
 public static class ScaldingTarnFactory
 {
     public const string CardName = "Scalding Tarn";

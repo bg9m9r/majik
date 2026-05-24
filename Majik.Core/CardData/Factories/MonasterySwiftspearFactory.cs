@@ -50,6 +50,7 @@ namespace Majik.Core.CardData.Factories;
 /// - None for the printed card. (No ETB, no activated, no LTB clauses
 ///   to defer — Swiftspear is the minimum-viable Prowess body.)
 /// </summary>
+[CardName("Monastery Swiftspear")]
 public static class MonasterySwiftspearFactory
 {
     public const string CardName = "Monastery Swiftspear";

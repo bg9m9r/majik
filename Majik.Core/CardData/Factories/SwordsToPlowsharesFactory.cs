@@ -33,6 +33,7 @@ namespace Majik.Core.CardData.Factories;
 /// - Mirrors the Solitude ETB-exile pattern but ships on an instant spell with
 ///   a 1..1 target request (Solitude is "up to one").
 /// </summary>
+[CardName("Swords to Plowshares")]
 public static class SwordsToPlowsharesFactory
 {
     public const string CardName = "Swords to Plowshares";

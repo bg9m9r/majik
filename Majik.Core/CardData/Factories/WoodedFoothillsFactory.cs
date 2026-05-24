@@ -22,6 +22,7 @@ namespace Majik.Core.CardData.Factories;
 /// Library shuffle (CR 701.19c) and agent-driven pick deferred — same as
 /// Polluted Delta and all other tutors in the codebase.
 /// </summary>
+[CardName("Wooded Foothills")]
 public static class WoodedFoothillsFactory
 {
     public const string CardName = "Wooded Foothills";

@@ -79,6 +79,7 @@ namespace Majik.Core.CardData.Factories;
 ///   1/1 Flying+Haste body with prowess-style pump rider until Plot
 ///   ships.
 /// </summary>
+[CardName("Slickshot Show-Off")]
 public static class SlickshotShowOffFactory
 {
     public const string CardName = "Slickshot Show-Off";

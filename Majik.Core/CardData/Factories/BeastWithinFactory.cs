@@ -44,6 +44,7 @@ namespace Majik.Core.CardData.Factories;
 ///   an active regeneration shield (same gap as every other single-target
 ///   destroy template — Terminate, Abrupt Decay, Slaughter Pact).
 /// </summary>
+[CardName("Beast Within")]
 public static class BeastWithinFactory
 {
     public const string CardName = "Beast Within";

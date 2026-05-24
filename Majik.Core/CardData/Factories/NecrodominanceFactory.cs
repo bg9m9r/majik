@@ -79,6 +79,7 @@ namespace Majik.Core.CardData.Factories;
 ///   the skip-draw predicate. Same gap as Necropotence /
 ///   Dauthi Voidwalker.
 /// </summary>
+[CardName("Necrodominance")]
 public static class NecrodominanceFactory
 {
     public const string CardName = "Necrodominance";

@@ -69,6 +69,7 @@ namespace Majik.Core.CardData.Factories;
 ///   timing-restriction checks to the engine's normal cast-speed
 ///   machinery; nothing extra is required here.
 /// </summary>
+[CardName("Yawgmoth's Will")]
 public static class YawgmothsWillFactory
 {
     public const string CardName = "Yawgmoth's Will";

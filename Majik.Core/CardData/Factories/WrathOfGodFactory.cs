@@ -36,6 +36,7 @@ namespace Majik.Core.CardData.Factories;
 ///   doesn't yet consult indestructibility (CR 702.12). Same gap as the
 ///   sweep template.
 /// </summary>
+[CardName("Wrath of God")]
 public static class WrathOfGodFactory
 {
     public const string CardName = "Wrath of God";

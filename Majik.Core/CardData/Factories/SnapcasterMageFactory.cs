@@ -61,6 +61,7 @@ namespace Majik.Core.CardData.Factories;
 ///   the stack with no effect. The factory honours that — when no target
 ///   is supplied, the effect no-ops.
 /// </summary>
+[CardName("Snapcaster Mage")]
 public static class SnapcasterMageFactory
 {
     /// <summary>

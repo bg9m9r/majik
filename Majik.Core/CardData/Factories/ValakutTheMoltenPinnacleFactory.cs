@@ -69,6 +69,7 @@ namespace Majik.Core.CardData.Factories;
 ///   via <see cref="TriggeredAbility.SetChosenTargets"/>; no target →
 ///   damage no-ops.
 /// </summary>
+[CardName("Valakut, the Molten Pinnacle")]
 public static class ValakutTheMoltenPinnacleFactory
 {
     public const string CardName = "Valakut, the Molten Pinnacle";

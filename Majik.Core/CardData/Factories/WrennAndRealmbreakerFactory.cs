@@ -64,6 +64,7 @@ namespace Majik.Core.CardData.Factories;
 /// - <b>"Under your control"</b>: the -2 sets the reanimated permanent's
 ///   controller to the activator. Owner is preserved on the moved card.
 /// </summary>
+[CardName("Wrenn and Realmbreaker")]
 public static class WrennAndRealmbreakerFactory
 {
     /// <summary>

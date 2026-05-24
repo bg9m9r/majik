@@ -24,6 +24,7 @@ namespace Majik.Core.CardData.Factories;
 ///   Deferred until the cost-legality-check infrastructure supports
 ///   battlefield-state predicates.
 /// </summary>
+[CardName("Wastewood Verge")]
 public static class WastewoodVergeFactory
 {
     /// <summary>

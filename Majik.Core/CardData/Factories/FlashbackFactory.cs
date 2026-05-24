@@ -86,6 +86,7 @@ namespace Majik.Core.CardData.Factories;
 ///   the Flashback keyword itself (CR 702.34) and needs no extra wiring —
 ///   it's already serviced by <see cref="Majik.Core.Costs.FlashbackAlternativeCost"/>.
 /// </summary>
+[CardName("Flashback")]
 public static class FlashbackFactory
 {
     public const string CardName = "Flashback";

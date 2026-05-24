@@ -44,6 +44,7 @@ namespace Majik.Core.CardData.Factories;
 ///   single-target destroy template — Indestructible is not yet honoured
 ///   at the destroy site.
 /// </summary>
+[CardName("Slaughter Pact")]
 public static class SlaughterPactFactory
 {
     public const string CardName = "Slaughter Pact";

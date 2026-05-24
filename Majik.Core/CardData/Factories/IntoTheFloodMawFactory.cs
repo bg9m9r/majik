@@ -60,6 +60,7 @@ namespace Majik.Core.CardData.Factories;
 /// here + in MODERN_COVERAGE so the next pass adds it without rewriting
 /// the dispatcher entry.
 /// </summary>
+[CardName("Into the Flood Maw")]
 public static class IntoTheFloodMawFactory
 {
     public const string CardName = "Into the Flood Maw";

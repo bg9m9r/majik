@@ -28,6 +28,7 @@ namespace Majik.Core.CardData.Factories;
 ///   multiple cards leave simultaneously. Batching awaits a
 ///   zone-change batch event.
 /// </summary>
+[CardName("Dredger's Insight")]
 public static class DredgersInsightFactory
 {
     private static readonly CardDefinition Definition =

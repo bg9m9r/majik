@@ -29,6 +29,7 @@ namespace Majik.Core.CardData.Factories;
 /// - Real "do you want to pay {3}?" agent prompt — same queue as Daze /
 ///   Stubborn Denial / Spell Pierce. v1 is deterministic: "pay if able."
 /// </summary>
+[CardName("Mana Leak")]
 public static class ManaLeakFactory
 {
     public const string CardName = "Mana Leak";

@@ -70,6 +70,7 @@ namespace Majik.Core.CardData.Factories;
 ///   would let the destination override happen in the right place — out
 ///   of scope for this v1 named-card factory.
 /// </summary>
+[CardName("Green Sun's Zenith")]
 public static class GreenSunsZenithFactory
 {
     public const string CardName = "Green Sun's Zenith";

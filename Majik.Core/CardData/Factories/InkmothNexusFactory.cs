@@ -67,6 +67,7 @@ namespace Majik.Core.CardData.Factories;
 ///   fires "whenever a permanent becomes a creature" — Mutavault / Inkmoth
 ///   activations would otherwise interact with Master of Cruelties etc.
 /// </summary>
+[CardName("Inkmoth Nexus")]
 public static class InkmothNexusFactory
 {
     public const string CardName = "Inkmoth Nexus";

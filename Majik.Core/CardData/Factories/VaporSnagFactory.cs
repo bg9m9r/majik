@@ -34,6 +34,7 @@ namespace Majik.Core.CardData.Factories;
 /// text's "its controller" refers to the creature's controller at resolution,
 /// which is indeterminate if it is no longer on the battlefield).
 /// </summary>
+[CardName("Vapor Snag")]
 public static class VaporSnagFactory
 {
     public const string CardName = "Vapor Snag";

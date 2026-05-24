@@ -52,6 +52,7 @@ namespace Majik.Core.CardData.Factories;
 ///   lose-abilities registration silently no-ops — same posture as
 ///   Earthshaker Khenra's <see cref="CombatRestrictionEffect"/> grant.
 /// </summary>
+[CardName("Merfolk Trickster")]
 public static class MerfolkTricksterFactory
 {
     public const string CardName = "Merfolk Trickster";

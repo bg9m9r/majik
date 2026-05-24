@@ -67,6 +67,7 @@ namespace Majik.Core.CardData.Factories;
 ///   NOT cycle them off in the cleanup step — they accumulate across
 ///   turns). No deferred work; behaviour matches the printed card.
 /// </summary>
+[CardName("Wall of Roots")]
 public static class WallOfRootsFactory
 {
     public const string CardName = "Wall of Roots";

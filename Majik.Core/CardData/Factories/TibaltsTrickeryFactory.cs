@@ -47,6 +47,7 @@ namespace Majik.Core.CardData.Factories;
 ///   happens. Production callers wire the callback to spawn the free cast
 ///   through SpellCastFlow.
 /// </summary>
+[CardName("Tibalt's Trickery")]
 public static class TibaltsTrickeryFactory
 {
     public const string CardName = "Tibalt's Trickery";

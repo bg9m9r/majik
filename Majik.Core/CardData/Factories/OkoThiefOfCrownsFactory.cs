@@ -75,6 +75,7 @@ namespace Majik.Core.CardData.Factories;
 ///   requires a target. The single-arg dispatcher path passes no resolver
 ///   so the +1 no-ops cleanly (legal for tests / shape).
 /// </summary>
+[CardName("Oko, Thief of Crowns")]
 public static class OkoThiefOfCrownsFactory
 {
     public const string CardName = "Oko, Thief of Crowns";

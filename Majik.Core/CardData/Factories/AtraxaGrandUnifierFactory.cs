@@ -58,6 +58,7 @@ namespace Majik.Core.CardData.Factories;
 ///   path here produces the correct card shape without TriggerManager
 ///   registration. Tests drive the effect by invoking it directly.
 /// </summary>
+[CardName("Atraxa, Grand Unifier")]
 public static class AtraxaGrandUnifierFactory
 {
     public const string CardName = "Atraxa, Grand Unifier";

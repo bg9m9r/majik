@@ -50,6 +50,7 @@ namespace Majik.Core.CardData.Factories;
 /// - <b>Flash / sorcery timing</b>: none — Cursecatcher is a creature with
 ///   no flash keyword.
 /// </summary>
+[CardName("Cursecatcher")]
 public static class CursecatcherFactory
 {
     public const string CardName = "Cursecatcher";

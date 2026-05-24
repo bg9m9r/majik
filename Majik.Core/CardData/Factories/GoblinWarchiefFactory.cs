@@ -49,6 +49,7 @@ namespace Majik.Core.CardData.Factories;
 ///   but a future Prune pass could drop the entry. Same shape as Plague
 ///   Engineer / Goblin Chieftain.
 /// </summary>
+[CardName("Goblin Warchief")]
 public static class GoblinWarchiefFactory
 {
     public const string CardName = "Goblin Warchief";

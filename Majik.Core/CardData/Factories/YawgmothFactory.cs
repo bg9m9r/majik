@@ -44,6 +44,7 @@ namespace Majik.Core.CardData.Factories;
 /// - <b>Discard — first non-land preference</b>: v1 picks the first card in
 ///   hand regardless of card type; full oracle-compliant discard is deferred.
 /// </summary>
+[CardName("Yawgmoth, Thran Physician")]
 public static class YawgmothFactory
 {
     /// <summary>

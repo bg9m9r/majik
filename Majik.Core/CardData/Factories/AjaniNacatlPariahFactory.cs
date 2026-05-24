@@ -57,6 +57,7 @@ namespace Majik.Core.CardData.Factories;
 ///   controller's battlefield). A real agent-driven yes/no + target
 ///   prompt is deferred — same queue as Sun Titan / Stoneforge Mystic.
 /// </summary>
+[CardName("Ajani, Nacatl Pariah")]
 public static class AjaniNacatlPariahFactory
 {
     public const string FrontName = "Ajani, Nacatl Pariah";

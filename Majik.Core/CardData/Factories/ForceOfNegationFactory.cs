@@ -28,6 +28,7 @@ namespace Majik.Core.CardData.Factories;
 ///   * Bot probe — <see cref="PitchAltCostProbe"/> recognizes this card by
 ///     name and emits a candidate per blue card in hand.
 /// </summary>
+[CardName("Force of Negation")]
 public static class ForceOfNegationFactory
 {
     public const string CardName = "Force of Negation";

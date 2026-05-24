@@ -74,6 +74,7 @@ namespace Majik.Core.CardData.Factories;
 /// - <b>"You may" prompt on the attack trigger</b>: v1 always takes the
 ///   loot when a card is available; an explicit yes/no prompt is deferred.
 /// </summary>
+[CardName("Territorial Kavu")]
 public static class TerritorialKavuFactory
 {
     public const string CardName = "Territorial Kavu";

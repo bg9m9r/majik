@@ -71,6 +71,7 @@ namespace Majik.Core.CardData.Factories;
 /// of cards in non-battlefield zones), 603.4 (intervening-if), 111
 /// (tokens), 700.4 (dying = Battlefield → Graveyard).
 /// </summary>
+[CardName("Bridge from Below")]
 public static class BridgeFromBelowFactory
 {
     public const string CardName = "Bridge from Below";

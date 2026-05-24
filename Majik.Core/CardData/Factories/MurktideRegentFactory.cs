@@ -67,6 +67,7 @@ namespace Majik.Core.CardData.Factories;
 ///   the +1/+1 counter count, so callers needing optimal counter-stacking
 ///   should supply a custom <see cref="Majik.Core.Players.Agents.DelveAltCostProbe.ChoiceStrategy"/>.
 /// </summary>
+[CardName("Murktide Regent")]
 public static class MurktideRegentFactory
 {
     /// <summary>

@@ -48,6 +48,7 @@ namespace Majik.Core.CardData.Factories;
 ///   damage directly to keep the resolve body minimal, same shape as
 ///   <see cref="Majik.Core.CardData.SpellTemplates.Templates.Damage.DamageSpellFactory.DealsDamageEachCreatureSpell"/>.
 /// </summary>
+[CardName("Pyroclasm")]
 public static class PyroclasmFactory
 {
     public const string CardName = "Pyroclasm";

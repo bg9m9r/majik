@@ -65,6 +65,7 @@ namespace Majik.Core.CardData.Factories;
 ///   oracle text — it is an unrestricted activation. No deferral
 ///   needed here.
 /// </summary>
+[CardName("Goblin Engineer")]
 public static class GoblinEngineerFactory
 {
     /// <summary>

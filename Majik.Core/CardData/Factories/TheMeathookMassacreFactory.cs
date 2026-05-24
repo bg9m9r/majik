@@ -62,6 +62,7 @@ namespace Majik.Core.CardData.Factories;
 ///   it directly. A future LKI snapshot pass would replace the
 ///   controller read with a captured value.
 /// </summary>
+[CardName("The Meathook Massacre")]
 public static class TheMeathookMassacreFactory
 {
     public const string CardName = "The Meathook Massacre";

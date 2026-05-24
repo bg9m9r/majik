@@ -55,6 +55,7 @@ namespace Majik.Core.CardData.Factories;
 ///   a card if one is available. Same gap as Tireless Tracker / Phlage /
 ///   Snapcaster Mage.
 /// </summary>
+[CardName("Eternal Witness")]
 public static class EternalWitnessFactory
 {
     public const string CardName = "Eternal Witness";

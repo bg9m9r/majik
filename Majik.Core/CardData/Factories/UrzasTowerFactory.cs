@@ -16,6 +16,7 @@ namespace Majik.Core.CardData.Factories;
 /// subtype differs (<see cref="CardSubtype.Tower"/>). The shared
 /// conditional mana logic lives in <see cref="TronLandHelper"/>.
 /// </summary>
+[CardName("Urza's Tower")]
 public static class UrzasTowerFactory
 {
     /// <summary>

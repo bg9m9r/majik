@@ -29,6 +29,7 @@ namespace Majik.Core.CardData.Factories;
 ///   named-card factory builds the land without the replacement (test
 ///   convenience).
 /// </summary>
+[CardName("Botanical Sanctum")]
 public static class BotanicalSanctumFactory
 {
     private static readonly CardDefinition Definition =

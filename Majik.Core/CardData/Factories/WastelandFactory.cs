@@ -50,6 +50,7 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="Majik.Core.Events.CardMovedEvent"/> via this path. Wire
 ///   ZoneService through when the broader destroy-pipeline pass lands.
 /// </summary>
+[CardName("Wasteland")]
 public static class WastelandFactory
 {
     public const string CardName = "Wasteland";

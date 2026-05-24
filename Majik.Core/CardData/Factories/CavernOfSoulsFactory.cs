@@ -54,6 +54,7 @@ namespace Majik.Core.CardData.Factories;
 ///   has no ChooseSubtype prompt yet. Selector closure stands in until
 ///   that lands — same pattern as Pithing Needle's <c>nameSelector</c>.
 /// </summary>
+[CardName("Cavern of Souls")]
 public static class CavernOfSoulsFactory
 {
     public const string CardName = "Cavern of Souls";

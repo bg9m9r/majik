@@ -61,6 +61,7 @@ namespace Majik.Core.CardData.Factories;
 ///   chosen target → the damage effect no-ops (mirrors Valakut /
 ///   Earthshaker Khenra / Phlage).
 /// </summary>
+[CardName("Sunscorched Desert")]
 public static class SunscorchedDesertFactory
 {
     public const string CardName = "Sunscorched Desert";

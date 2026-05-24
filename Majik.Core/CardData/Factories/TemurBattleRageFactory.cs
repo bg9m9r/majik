@@ -39,6 +39,7 @@ namespace Majik.Core.CardData.Factories;
 ///   additionally guards against a non-Creature resolver result and a
 ///   missing <see cref="Creature.ActiveEffects"/> service.
 /// </summary>
+[CardName("Temur Battle Rage")]
 public static class TemurBattleRageFactory
 {
     public const string CardName = "Temur Battle Rage";

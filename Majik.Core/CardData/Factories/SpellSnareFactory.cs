@@ -30,6 +30,7 @@ namespace Majik.Core.CardData.Factories;
 /// existing X-collapse (see Chalice of the Void) — Spell Snare reuses the
 /// same shape since both want printed mv + chosen X.
 /// </summary>
+[CardName("Spell Snare")]
 public static class SpellSnareFactory
 {
     public const string CardName = "Spell Snare";

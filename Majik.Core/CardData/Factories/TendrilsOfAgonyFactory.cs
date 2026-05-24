@@ -49,6 +49,7 @@ namespace Majik.Core.CardData.Factories;
 ///   the agent's pick is honoured verbatim (no extra opponent-only
 ///   filtering yet — same gap as <see cref="GriefFactory"/>).
 /// </summary>
+[CardName("Tendrils of Agony")]
 public static class TendrilsOfAgonyFactory
 {
     public const string CardName = "Tendrils of Agony";

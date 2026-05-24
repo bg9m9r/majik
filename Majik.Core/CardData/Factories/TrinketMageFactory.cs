@@ -40,6 +40,7 @@ namespace Majik.Core.CardData.Factories;
 ///   the first eligible card; a full implementation would prompt the
 ///   controller for the choice (including declining).
 /// </summary>
+[CardName("Trinket Mage")]
 public static class TrinketMageFactory
 {
     /// <summary>

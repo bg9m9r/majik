@@ -47,6 +47,7 @@ namespace Majik.Core.CardData.Factories;
 /// <see cref="SlaughterPactFactory"/> and the rest of the single-target
 /// destroy family).
 /// </summary>
+[CardName("Drown in the Loch")]
 public static class DrownInTheLochFactory
 {
     public const string CardName = "Drown in the Loch";

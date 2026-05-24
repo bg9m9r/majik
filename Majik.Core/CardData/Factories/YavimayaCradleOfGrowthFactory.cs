@@ -26,6 +26,7 @@ namespace Majik.Core.CardData.Factories;
 /// Yavimaya has no printed mana ability; it taps for {G} because its
 /// own Layer 4 effect grants itself the Forest subtype.
 /// </summary>
+[CardName("Yavimaya, Cradle of Growth")]
 public static class YavimayaCradleOfGrowthFactory
 {
     public const string CardName = "Yavimaya, Cradle of Growth";

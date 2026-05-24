@@ -65,6 +65,7 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="Majik.Core.Costs.PhyrexianManaAlternativeCost"/> is
 ///   wired only for spell-level alt-costs.
 /// </summary>
+[CardName("Spellskite")]
 public static class SpellskiteFactory
 {
     public const string CardName = "Spellskite";

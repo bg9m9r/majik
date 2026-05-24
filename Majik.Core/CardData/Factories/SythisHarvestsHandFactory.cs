@@ -48,6 +48,7 @@ namespace Majik.Core.CardData.Factories;
 ///   without TriggerManager wiring; use the (owner, triggers) overload for
 ///   end-to-end bus firing.
 /// </summary>
+[CardName("Sythis, Harvest's Hand")]
 public static class SythisHarvestsHandFactory
 {
     public const string CardName = "Sythis, Harvest's Hand";

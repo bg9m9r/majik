@@ -59,6 +59,7 @@ namespace Majik.Core.CardData.Factories;
 ///   resolves-now shape (observationally equivalent for the +2X/+0 read
 ///   at damage step).
 /// </summary>
+[CardName("Goblin Piledriver")]
 public static class GoblinPiledriverFactory
 {
     public const string CardName = "Goblin Piledriver";

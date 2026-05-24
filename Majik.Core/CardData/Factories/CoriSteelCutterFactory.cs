@@ -88,6 +88,7 @@ namespace Majik.Core.CardData.Factories;
 /// - <b>Attach-target prompt for Equip</b> — v1 picks the first
 ///   controller-side creature deterministically.
 /// </summary>
+[CardName("Cori-Steel Cutter")]
 public static class CoriSteelCutterFactory
 {
     public const string CardName = "Cori-Steel Cutter";

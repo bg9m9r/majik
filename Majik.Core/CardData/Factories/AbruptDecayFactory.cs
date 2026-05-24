@@ -48,6 +48,7 @@ namespace Majik.Core.CardData.Factories;
 ///   other single-target destroy template (Slaughter Pact, Force of Vigor
 ///   destroy path, etc.).
 /// </summary>
+[CardName("Abrupt Decay")]
 public static class AbruptDecayFactory
 {
     public const string CardName = "Abrupt Decay";

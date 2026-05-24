@@ -38,6 +38,7 @@ namespace Majik.Core.CardData.Factories;
 /// because <see cref="SpellDefinition"/> needs a target resolver supplied
 /// by the caller's <see cref="GameContext"/>.
 /// </summary>
+[CardName("Lightning Helix")]
 public static class LightningHelixFactory
 {
     public const string CardName = "Lightning Helix";

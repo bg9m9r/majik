@@ -64,6 +64,7 @@ namespace Majik.Core.CardData.Factories;
 ///   filtering should populate <see cref="TargetRequest.LegalCandidates"/>
 ///   themselves.
 /// </summary>
+[CardName("Earthshaker Khenra")]
 public static class EarthshakerKhenraFactory
 {
     public const string CardName = "Earthshaker Khenra";

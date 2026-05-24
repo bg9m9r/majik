@@ -32,6 +32,7 @@ namespace Majik.Core.CardData.Factories;
 ///   {T}: Add {C} on a Mox / Sol Ring / etc. still works under Stony
 ///   Silence.
 /// </summary>
+[CardName("Stony Silence")]
 public static class StonySilenceFactory
 {
     public const string CardName = "Stony Silence";

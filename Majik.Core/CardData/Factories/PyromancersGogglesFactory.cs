@@ -42,6 +42,7 @@ namespace Majik.Core.CardData.Factories;
 /// - "Choose new targets" prompt — depends on the copy primitive above
 ///   plus an agent-driven retarget surface.
 /// </summary>
+[CardName("Pyromancer's Goggles")]
 public static class PyromancersGogglesFactory
 {
     public const string CardName = "Pyromancer's Goggles";

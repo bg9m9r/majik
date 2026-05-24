@@ -56,6 +56,7 @@ namespace Majik.Core.CardData.Factories;
 ///   without a wider TokenFactory refactor. Deferred to the broader token-
 ///   keyword-wiring pass.
 /// </summary>
+[CardName("Monastery Mentor")]
 public static class MonasteryMentorFactory
 {
     public const string CardName = "Monastery Mentor";

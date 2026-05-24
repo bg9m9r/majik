@@ -46,6 +46,7 @@ namespace Majik.Core.CardData.Factories;
 ///   controller's mana pool to model "yes, I pay". The v1 trigger reads
 ///   whatever mana is already in the pool — no in-trigger tap-lands prompt.
 /// </summary>
+[CardName("Pact of the Titan")]
 public static class PactOfTheTitanFactory
 {
     public const string CardName = "Pact of the Titan";

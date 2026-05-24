@@ -64,6 +64,7 @@ namespace Majik.Core.CardData.Factories;
 ///   enumerable from any zone; a future engine pass should restrict
 ///   activation to the printed source zone (CR 113.6).
 /// </summary>
+[CardName("Priest of Fell Rites")]
 public static class PriestOfFellRitesFactory
 {
     /// <summary>

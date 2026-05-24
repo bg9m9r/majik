@@ -65,6 +65,7 @@ namespace Majik.Core.CardData.Factories;
 ///   etc.) are not yet wired through ZoneService.MoveCard, so v1 uses
 ///   raw zone mutation — same simplification as PrimevalTitan's tutor.
 /// </summary>
+[CardName("Scapeshift")]
 public static class ScapeshiftFactory
 {
     public const string CardName = "Scapeshift";

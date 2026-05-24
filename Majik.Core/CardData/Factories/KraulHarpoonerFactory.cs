@@ -33,6 +33,7 @@ namespace Majik.Core.CardData.Factories;
 ///   no fight action wired in v1.
 /// - <b>"You may" prompt</b>: the fight is optional; deferred alongside targeting.
 /// </summary>
+[CardName("Kraul Harpooner")]
 public static class KraulHarpoonerFactory
 {
     /// <summary>

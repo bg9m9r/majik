@@ -62,6 +62,7 @@ namespace Majik.Core.CardData.Factories;
 ///   creature on the battlefield whose controller is not the spell's
 ///   controller (i.e., every other player's creatures).
 /// </summary>
+[CardName("Mizzium Mortars")]
 public static class MizziumMortarsFactory
 {
     public const string CardName = "Mizzium Mortars";

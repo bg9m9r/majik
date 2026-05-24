@@ -39,6 +39,7 @@ namespace Majik.Core.CardData.Factories;
 ///   the re-check; once true targeting lands here, the re-check must be
 ///   wired so the "If you do" rider correctly no-ops.
 /// </summary>
+[CardName("Scavenging Ooze")]
 public static class ScavengingOozeFactory
 {
     /// <summary>

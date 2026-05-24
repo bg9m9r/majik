@@ -55,6 +55,7 @@ namespace Majik.Core.CardData.Factories;
 /// - <b>Attach-target prompt</b> for "creature you control" (CR 702.6b)
 ///   — v1 picks the first controller-side creature deterministically.
 /// </summary>
+[CardName("Colossus Hammer")]
 public static class ColossusHammerFactory
 {
     public const string CardName = "Colossus Hammer";

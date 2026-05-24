@@ -43,6 +43,7 @@ namespace Majik.Core.CardData.Factories;
 /// - <b>Targeting prompt</b>: +1 picks the first land in graveyard
 ///   deterministically rather than via the agent.
 /// </summary>
+[CardName("Wrenn and Six")]
 public static class WrennAndSixFactory
 {
     /// <summary>

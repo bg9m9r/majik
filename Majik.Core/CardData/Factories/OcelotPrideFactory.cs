@@ -70,6 +70,7 @@ namespace Majik.Core.CardData.Factories;
 ///   primitive (same v1 simplification Skyclave Apparition would face if
 ///   the exiled permanent ever came back).
 /// </summary>
+[CardName("Ocelot Pride")]
 public static class OcelotPrideFactory
 {
     public const string CardName = "Ocelot Pride";

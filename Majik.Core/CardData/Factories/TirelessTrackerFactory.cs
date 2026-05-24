@@ -50,6 +50,7 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="SacrificeAClueCost"/> rather than relying on the
 ///   <see cref="AdditionalCost.Sacrifice"/> stub (whose Pay is a TODO).
 /// </summary>
+[CardName("Tireless Tracker")]
 public static class TirelessTrackerFactory
 {
     public const string CardName = "Tireless Tracker";

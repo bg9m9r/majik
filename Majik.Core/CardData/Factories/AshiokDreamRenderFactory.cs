@@ -60,6 +60,7 @@ namespace Majik.Core.CardData.Factories;
 ///   Gods / Containment Priest.
 /// - <b>Library-search enforcement</b>: see static effect note above.
 /// </summary>
+[CardName("Ashiok, Dream Render")]
 public static class AshiokDreamRenderFactory
 {
     public const string CardName = "Ashiok, Dream Render";

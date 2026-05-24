@@ -56,6 +56,7 @@ namespace Majik.Core.CardData.Factories;
 ///   the caller wires to either an agent prompt or a deterministic
 ///   first-opponent pick. v1 default is whatever the caller supplies.
 /// </summary>
+[CardName("Wishclaw Talisman")]
 public static class WishclawTalismanFactory
 {
     public const string CardName = "Wishclaw Talisman";

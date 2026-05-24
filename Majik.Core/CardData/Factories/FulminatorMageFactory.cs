@@ -53,6 +53,7 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="Majik.Core.Events.CardMovedEvent"/> via this path. Wire
 ///   ZoneService through when the broader destroy-pipeline pass lands.
 /// </summary>
+[CardName("Fulminator Mage")]
 public static class FulminatorMageFactory
 {
     public const string CardName = "Fulminator Mage";

@@ -41,6 +41,7 @@ namespace Majik.Core.CardData.Factories;
 /// shape and <see cref="WishclawTalismanFactory"/> for the
 /// ControlChangeEffect registration.
 /// </summary>
+[CardName("Archmage's Charm")]
 public static class ArchmagesCharmFactory
 {
     public const string CardName = "Archmage's Charm";

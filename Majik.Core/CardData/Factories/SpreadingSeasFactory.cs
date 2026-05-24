@@ -44,6 +44,7 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="TriggerManager"/> is required for the draw to actually
 ///   fire end-to-end during play.
 /// </summary>
+[CardName("Spreading Seas")]
 public static class SpreadingSeasFactory
 {
     public const string CardName = "Spreading Seas";

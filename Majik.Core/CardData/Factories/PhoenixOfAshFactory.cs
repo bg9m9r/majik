@@ -40,6 +40,7 @@ namespace Majik.Core.CardData.Factories;
 ///   — no keyword-removal surface yet, same gap as Goblin Chieftain's
 ///   Haste-loss interactions.
 /// </summary>
+[CardName("Phoenix of Ash")]
 public static class PhoenixOfAshFactory
 {
     public const string CardName = "Phoenix of Ash";

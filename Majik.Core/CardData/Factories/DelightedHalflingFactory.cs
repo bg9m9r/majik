@@ -29,6 +29,7 @@ namespace Majik.Core.CardData.Factories;
 ///   counter-spells in <see cref="Majik.Core.Services.StackResolver"/>.
 ///   Deferred.
 /// </summary>
+[CardName("Delighted Halfling")]
 public static class DelightedHalflingFactory
 {
     private static readonly CardDefinition Definition =

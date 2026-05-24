@@ -48,6 +48,7 @@ namespace Majik.Core.CardData.Factories;
 ///   still applies (CR 606.3 — the cost is paid even if the effect
 ///   does nothing).
 /// </summary>
+[CardName("Liliana of the Veil")]
 public static class LilianaOfTheVeilFactory
 {
     /// <summary>

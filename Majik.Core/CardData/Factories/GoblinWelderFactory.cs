@@ -58,6 +58,7 @@ namespace Majik.Core.CardData.Factories;
 ///   <c>() => game.Players</c>. The single-arg dispatcher path leaves
 ///   it null and the effect body no-ops (shape only).
 /// </summary>
+[CardName("Goblin Welder")]
 public static class GoblinWelderFactory
 {
     /// <summary>

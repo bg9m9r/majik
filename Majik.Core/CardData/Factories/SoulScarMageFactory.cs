@@ -89,6 +89,7 @@ namespace Majik.Core.CardData.Factories;
 ///   registration order (CR 616.1c each effect fires at most once). Same
 ///   simplification as every other replacement here.
 /// </summary>
+[CardName("Soul-Scar Mage")]
 public static class SoulScarMageFactory
 {
     public const string CardName = "Soul-Scar Mage";

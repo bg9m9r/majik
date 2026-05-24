@@ -31,6 +31,7 @@ namespace Majik.Core.CardData.Factories;
 /// Reminder: the Force-of-Will pitch is CR 118.9 (alternative cost) + a
 /// timing rider that lives on <see cref="Majik.Core.Costs.PitchAlternativeCost"/>.
 /// </summary>
+[CardName("Force of Will")]
 public static class ForceOfWillFactory
 {
     public const string CardName = "Force of Will";

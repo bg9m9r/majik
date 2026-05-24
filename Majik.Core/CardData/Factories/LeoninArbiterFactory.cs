@@ -32,6 +32,7 @@ namespace Majik.Core.CardData.Factories;
 ///   allowing the search to proceed (CR 701.19 / CR 118.7 — optional
 ///   additional cost).
 /// </summary>
+[CardName("Leonin Arbiter")]
 public static class LeoninArbiterFactory
 {
     public const string CardName = "Leonin Arbiter";

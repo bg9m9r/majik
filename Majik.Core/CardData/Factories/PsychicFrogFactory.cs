@@ -71,6 +71,7 @@ namespace Majik.Core.CardData.Factories;
 ///   behind the same queue as Liliana of the Veil + Faithless Looting +
 ///   Sword of Feast and Famine.
 /// </summary>
+[CardName("Psychic Frog")]
 public static class PsychicFrogFactory
 {
     public const string CardName = "Psychic Frog";

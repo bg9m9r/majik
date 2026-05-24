@@ -37,6 +37,7 @@ namespace Majik.Core.CardData.Factories;
 ///   injected <c>attackingCreaturesSource</c> closure (same source-closure
 ///   pattern as Noble Hierarch / Goblin Piledriver).
 /// </summary>
+[CardName("Ignoble Hierarch")]
 public static class IgnobleHierarchFactory
 {
     public const string CardName = "Ignoble Hierarch";

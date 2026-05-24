@@ -42,6 +42,7 @@ namespace Majik.Core.CardData.Factories;
 ///   activation) is not in the engine yet — same pattern as Mox Opal /
 ///   Delighted Halfling / City of Brass.
 /// </summary>
+[CardName("Lotus Petal")]
 public static class LotusPetalFactory
 {
     public const string CardName = "Lotus Petal";

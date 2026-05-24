@@ -41,6 +41,7 @@ namespace Majik.Core.CardData.Factories;
 /// Pattern mirrors <see cref="ArchmagesCharmFactory"/> for the modal
 /// choose-one shape.
 /// </summary>
+[CardName("Izzet Charm")]
 public static class IzzetCharmFactory
 {
     public const string CardName = "Izzet Charm";

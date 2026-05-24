@@ -43,6 +43,7 @@ namespace Majik.Core.CardData.Factories;
 ///   the multi-candidate "choose a card to put onto the battlefield"
 ///   prompt ships (mirrors the same gap on Stoneforge Mystic's tutor).
 /// </summary>
+[CardName("Goblin Lackey")]
 public static class GoblinLackeyFactory
 {
     /// <summary>
