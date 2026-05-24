@@ -1895,6 +1895,18 @@ public static class NamedCardFactory
             // Whack pillar.
             "Goblin Piledriver" => GoblinPiledriverFactory.Create(owner),
 
+            // Creature — Human Druid {G} 0/1 (NobleHierarchFactory).
+            // Conflux / Modern Horizons 2. Exalted (CR 702.90) — whenever a
+            // creature you control attacks alone, that creature gets +1/+1
+            // until end of turn. {T}: Add {G}, {W}, or {U} — three
+            // ManaAbility instances wired. The single-arg dispatcher path
+            // attaches the exalted trigger to the card shape without
+            // TriggerManager wiring; attackingCreaturesSource is null so
+            // the pump body is a no-op. Use the
+            // (owner, triggers, attackingCreaturesSource) overload for
+            // fully-wired behavior.
+            "Noble Hierarch" => NobleHierarchFactory.Create(owner),
+
             // Creature — Goblin Warrior {2}{R} 2/2 (GoblinRabblemasterFactory).
             // Magic 2015 / many reprints. "Other Goblin creatures you control
             // have haste. Whenever Goblin Rabblemaster attacks, create a 1/1
