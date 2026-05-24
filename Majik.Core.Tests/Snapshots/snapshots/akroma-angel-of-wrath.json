@@ -1,0 +1,54 @@
+{
+  "name": "Akroma, Angel of Wrath",
+  "manaCost": "5WWW",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [
+    "Legendary"
+  ],
+  "subtypes": [
+    "Angel"
+  ],
+  "power": 6,
+  "toughness": 6,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 5,
+      "list": [
+        "First strike",
+        "Flying",
+        "Haste",
+        "Trample",
+        "Vigilance"
+      ]
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null
+}

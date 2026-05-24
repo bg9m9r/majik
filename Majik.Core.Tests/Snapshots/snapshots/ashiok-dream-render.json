@@ -1,0 +1,48 @@
+{
+  "name": "Ashiok, Dream Render",
+  "manaCost": "1U/BU/B",
+  "primaryType": "Planeswalker",
+  "cardTypes": [
+    "Planeswalker"
+  ],
+  "supertypes": [
+    "Legendary"
+  ],
+  "subtypes": [
+    "Ashiok"
+  ],
+  "power": null,
+  "toughness": null,
+  "loyalty": 5,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null
+}

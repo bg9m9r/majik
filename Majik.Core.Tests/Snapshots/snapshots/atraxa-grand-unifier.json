@@ -1,0 +1,54 @@
+{
+  "name": "Atraxa, Grand Unifier",
+  "manaCost": "3GWUB",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [
+    "Legendary"
+  ],
+  "subtypes": [
+    "Angel",
+    "Phyrexian"
+  ],
+  "power": 7,
+  "toughness": 7,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 4,
+      "list": [
+        "Deathtouch",
+        "Flying",
+        "Lifelink",
+        "Vigilance"
+      ]
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null
+}

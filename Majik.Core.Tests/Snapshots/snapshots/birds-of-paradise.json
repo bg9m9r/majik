@@ -1,0 +1,54 @@
+{
+  "name": "Birds of Paradise",
+  "manaCost": "G",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Bird"
+  ],
+  "power": 0,
+  "toughness": 1,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 1,
+      "list": [
+        "Flying"
+      ]
+    },
+    "mana": {
+      "count": 5,
+      "list": [
+        "mana:B",
+        "mana:G",
+        "mana:R",
+        "mana:U",
+        "mana:W"
+      ]
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null
+}
