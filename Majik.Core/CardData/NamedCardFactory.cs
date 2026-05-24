@@ -742,6 +742,27 @@ public static class NamedCardFactory
             // back to MarkLost() on failure (CR 104.3 / CR 118.3).
             "Slaughter Pact" => SlaughterPactFactory.Create(owner),
 
+            // Creature — Human Mercenary Jock {1}{R} 1/1 (SlickshotShowOffFactory).
+            // Outlaws of Thunder Junction. Flying + Haste keyword markers
+            // (CR 702.9 / 702.10) on a 1/1 body, plus a cast-noncreature
+            // pump triggered ability (CR 603.1) firing on the controller's
+            // own SpellCastEvent for any non-Creature spell — registers a
+            // raw PumpUntilEndOfTurnEffect(+3, 0) on Slickshot's
+            // ActiveEffects per cast (Layer 7c, CR 514.2 EOT cleanup).
+            // Multiple noncreature casts in a single turn stack additively;
+            // Slickshot's own cast doesn't contribute (its SpellCastEvent
+            // fires while the card is a Creature spell on the stack — fails
+            // the noncreature predicate).
+            // Plot {R} (CR 718 — new in OTJ) DEFERRED — needs a sorcery-
+            // speed cast-from-exile-on-a-later-turn alt-cost primitive +
+            // an activated-from-hand "pay {R}, exile with plot marker"
+            // shape; same posture as BurstLightning's deferred Kicker.
+            // The single-arg dispatcher path produces the correct card
+            // shape without trigger-manager or effects wiring. Use the
+            // (owner, eventBus, triggers, effects) overload for fully-wired
+            // behavior.
+            "Slickshot Show-Off" => SlickshotShowOffFactory.Create(owner),
+
             // Instant — {0} (PactOfTheTitanFactory). Future Sight.
             // "Create a 4/4 red Giant creature token.
             //  At the beginning of your next upkeep, pay {4}{R}.
