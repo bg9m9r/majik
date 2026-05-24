@@ -2743,6 +2743,17 @@ public static class NamedCardFactory
             // delegates to WrathOfGodFactory.BuildResolveEffect.
             "Damnation" => DamnationFactory.Create(owner),
 
+            // Sorcery — {X}{W}{W} (WrathOfTheSkiesFactory). Modern Horizons 3.
+            // "You may pay {E}{E}{E}{E} rather than pay this spell's mana
+            // cost. Destroy each nonland permanent with mana value X or
+            // less." Card shape only at the dispatcher; the resolve
+            // effect (all-battlefields nonland mv-≤-X sweep) is built on
+            // demand via WrathOfTheSkiesFactory.BuildResolveEffect, and
+            // the printed energy alt-cost (CR 118.9 + CR 106.13) via
+            // WrathOfTheSkiesFactory.BuildAlternativeCost — the first
+            // card to wire the new EnergyAlternativeCost surface.
+            "Wrath of the Skies" => WrathOfTheSkiesFactory.Create(owner),
+
             // Instant — {4}{B} (MurderousCutFactory). Khans of Tarkir.
             // CR 702.66 — Delve. "Delve" marker keyword wired; the cost
             // mechanic itself lives in DelveCost + SpellCastFlow (same

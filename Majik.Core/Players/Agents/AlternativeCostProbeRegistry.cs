@@ -28,6 +28,8 @@ namespace Majik.Core.Players.Agents;
 ///   alt-cost candidates (cascade doesn't change cost) but exposes a
 ///   <see cref="CascadeAltCostProbe.HasCascade"/> discovery query and slots
 ///   into the composite stream cleanly for future surface growth.</item>
+///   <item><see cref="EnergyAltCostProbe"/> — CR 118.9 + CR 106.13 energy
+///   alt-cost (Wrath of the Skies).</item>
 /// </list>
 ///
 /// <para>Card factories that need a per-card probe (a "this specific card
@@ -103,6 +105,7 @@ public sealed class AlternativeCostProbeRegistry : IAlternativeCostProbe
             .Register(new PitchAltCostProbe(PitchAltCostProbe.DefaultLookup))
             .Register(new DelveAltCostProbe())
             .Register(new OverloadAltCostProbe())
-            .Register(new CascadeAltCostProbe());
+            .Register(new CascadeAltCostProbe())
+            .Register(new EnergyAltCostProbe(EnergyAltCostProbe.DefaultLookup));
     }
 }
