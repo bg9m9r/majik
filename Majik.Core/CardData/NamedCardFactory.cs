@@ -2879,6 +2879,29 @@ public static class NamedCardFactory
             // CrypticCommandFactory — 4 TargetRequests with MinTargets=0.
             "Kolaghan's Command" => KolaghansCommandFactory.Create(owner),
 
+            // Creature — Human Shaman {1}{R} 2/1 (YoungPyromancerFactory).
+            // Magic 2014. Whenever you cast an instant or sorcery spell,
+            // create a 1/1 red Elemental creature token (CR 603.1).
+            // Token colour (red) deferred — same gap as Goblin Rabblemaster.
+            // The single-arg dispatcher path produces the correct card shape
+            // without trigger-manager wiring. Use the (owner, eventBus,
+            // triggers) overload for fully-wired behavior.
+            "Young Pyromancer" => YoungPyromancerFactory.Create(owner),
+
+            // Creature — Human Monk {2}{W} 2/2 (MonasteryMentorFactory).
+            // Fate Reforged. Prowess (CR 702.108) — whenever you cast a
+            // noncreature spell, +1/+1 until end of turn (wired via
+            // ProwessFactory.Build when a ContinuousEffectsService is
+            // supplied). Whenever you cast a noncreature spell, create a
+            // 1/1 white Monk creature token with prowess. Token colour (white)
+            // and prowess on the token are deferred — same gap as
+            // Goblin Rabblemaster / Crashing Footfalls token gaps.
+            // The single-arg dispatcher path produces the correct card shape
+            // without trigger-manager or effects wiring. Use the
+            // (owner, eventBus, triggers, effects) overload for fully-wired
+            // behavior.
+            "Monastery Mentor" => MonasteryMentorFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
