@@ -1152,5 +1152,13 @@ public static class SeedImplementedCards
         // Instant — {1}{U} (NegateFactory). Various sets.
         // Counter target noncreature spell.
         "Negate",
+
+        // Instant — {1}{B}{R} (KolaghansCommandFactory). Dragons of Tarkir.
+        // CR 700.2e — modal "Choose two —" with 4 modes:
+        // (0) return target creature card from graveyard to hand (v1 auto-pick),
+        // (1) deal 2 damage to any target (Player / Creature / Planeswalker),
+        // (2) target player discards a card (v1 deterministic first-card-in-hand),
+        // (3) destroy target artifact (CR 701.7; indestructible rider deferred).
+        "Kolaghan's Command",
     };
 }

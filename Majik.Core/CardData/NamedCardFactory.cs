@@ -2868,6 +2868,17 @@ public static class NamedCardFactory
             // yet (same gap as Wrath of God / Day of Judgment).
             "Terminate" => TerminateFactory.Create(owner),
 
+            // Instant — {1}{B}{R} (KolaghansCommandFactory). Dragons of Tarkir.
+            // CR 700.2e — modal "Choose two —" with 4 printed modes
+            // (return creature from graveyard to hand / 2 damage to any target /
+            // target player discards a card / destroy target artifact). The
+            // single-arg dispatcher path produces the correct card shape;
+            // the bound SpellDefinition is built on demand via
+            // KolaghansCommandFactory.BuildDefinition(caster, targetResolver,
+            // allPlayers, stack, chosenModes). Same modal structure as
+            // CrypticCommandFactory — 4 TargetRequests with MinTargets=0.
+            "Kolaghan's Command" => KolaghansCommandFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
