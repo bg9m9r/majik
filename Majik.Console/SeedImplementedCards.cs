@@ -964,6 +964,18 @@ public static class SeedImplementedCards
         // {Phyrexian/U}: Change the target of target spell or ability to ~
         // (CR 702.59 — phyrexian-mana redirect activation).
         "Spellskite",
+        // Instant — {U} (VaporSnagFactory). New Phyrexia.
+        // Return target creature to its owner's hand. Its controller loses
+        // 1 life. Bounce + 1 life loss wired via BuildDefinition.
+        "Vapor Snag",
+        // Instant — {R/P} (GutShotFactory). New Phyrexia.
+        // 1 damage to any target. Phyrexian alt-cost (2 life) via
+        // GutShotFactory.PhyrexianAlternativeCost.
+        "Gut Shot",
+        // Instant — {1}{B/P}{B/P} (DismemberFactory). New Phyrexia.
+        // Target creature gets -5/-5 until end of turn. Phyrexian alt-cost
+        // (4 life + {1}) via DismemberFactory.PhyrexianAlternativeCost.
+        "Dismember",
         // Sorcery — {1}{R} (PyroclasmFactory). Many reprints.
         // ~ deals 2 damage to each creature.
         "Pyroclasm",
