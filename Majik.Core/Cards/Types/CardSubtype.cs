@@ -130,6 +130,9 @@ public enum CardSubtype
     /// <summary>Wolf creature subtype — Young Wolf (Innistrad), Strangleroot Geist,
     /// Master of the Wild Hunt. CR 205.3m.</summary>
     Wolf,
+    /// <summary>Mercenary creature subtype — Stormchaser's Talent's 1/1 U/R Mercenary
+    /// token (Modern Horizons 3) and the Mercadian Masques cycle. CR 205.3m.</summary>
+    Mercenary,
     /// <summary>Faerie creature subtype — Sprite Dragon (Ikoria), Spellstutter Sprite,
     /// Bitterblossom tokens. CR 205.3m.</summary>
     Faerie,
@@ -154,6 +157,10 @@ public enum CardSubtype
     Aura,
     Saga,
     Shrine,
+    /// <summary>Class enchantment subtype — CR 716. Multi-level enchantment
+    /// shape (Stormchaser's Talent, Modern Horizons 3 and the Adventures in
+    /// the Forgotten Realms cycle). CR 205.3h.</summary>
+    Class,
 
     // Artifact subtypes (examples)
     Equipment,
