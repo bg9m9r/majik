@@ -193,6 +193,72 @@ public class Permanent : Card
     /// <see cref="ResetTurnState"/>.</summary>
     public bool LoyaltyAbilityActivatedThisTurn { get; internal set; }
 
+    // -----------------------------------------------------------------------
+    // CR 701.15 — Regeneration shields
+    //
+    // A "regeneration effect" applies a replacement: the next time this
+    // permanent would be destroyed this turn, instead tap it, remove all
+    // damage, and remove it from combat. Shields stack (CR 701.15a — each
+    // regeneration creates a separate shield) and clear during cleanup
+    // (CR 514.2 — "until end of turn" effects end).
+    //
+    // Modeled as a counter on the permanent rather than a ReplacementBus
+    // entry so the destroy gate in
+    // <see cref="Majik.Core.CardData.OracleSpellBinder.MoveToGraveyard(Majik.Core.Cards.ICard, Majik.Core.Zones.ZoneMoveReason)"/>
+    // can consume shields without needing a Replacements reference (the
+    // many destroy-spell factories that route through MoveToGraveyard are
+    // called from effect closures that don't capture the bus). State-based
+    // destroys still go through the bus-driven
+    // <see cref="Majik.Core.Effects.RegenerationShieldEffect"/> so the
+    // existing SBA-side flow is unchanged.
+    // -----------------------------------------------------------------------
+
+    private int _regenerationShields;
+
+    /// <summary>True if this permanent has at least one active regeneration
+    /// shield queued up (CR 701.15a).</summary>
+    public bool HasRegenerationShield => _regenerationShields > 0;
+
+    /// <summary>Number of regeneration shields queued on this permanent
+    /// (CR 701.15a — multiple regeneration effects stack as separate
+    /// shields, each consumed independently by the next destroy).</summary>
+    public int RegenerationShieldCount => _regenerationShields;
+
+    /// <summary>
+    /// CR 701.15a — add one regeneration shield to this permanent. The
+    /// next time it would be destroyed this turn,
+    /// <see cref="ConsumeRegenerationShield"/> taps it, clears damage,
+    /// and removes the shield instead of moving it to the graveyard.
+    /// Shields stack and clear during cleanup.
+    /// </summary>
+    public void AddRegenerationShield() => _regenerationShields++;
+
+    /// <summary>
+    /// CR 701.15c — consume one regeneration shield. Taps the permanent
+    /// (if untapped), clears marked damage (creatures only), and
+    /// decrements the shield count. Returns <c>true</c> if a shield was
+    /// available and consumed.
+    /// </summary>
+    public bool ConsumeRegenerationShield()
+    {
+        if (_regenerationShields <= 0) return false;
+        _regenerationShields--;
+        if (!IsTapped) Tap();
+        if (this is Creature c) c.ClearDamage();
+        // CR 701.15c also removes the permanent from combat; the combat
+        // manager owns per-turn attacker/blocker plans and doesn't expose
+        // a per-creature removal hook yet (same gap as
+        // RegenerationShieldEffect). Followup when CombatFlow surfaces it.
+        return true;
+    }
+
+    /// <summary>
+    /// CR 514.2 — clear regeneration shields during the cleanup step.
+    /// Called by <see cref="Majik.Core.Game.TurnDriver"/> alongside the
+    /// damage-clear / continuous-effect / replacement-bus EOT sweep.
+    /// </summary>
+    public void ClearRegenerationShields() => _regenerationShields = 0;
+
     /// <summary>
     /// Clear per-turn flags (loyalty-once-per-turn, attacked-this-turn,
     /// summoning sickness). Called by the engine during the untap step.

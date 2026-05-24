@@ -118,7 +118,9 @@ public static class UroTitanFactory
             () =>
             {
                 if (card.Zone != ZoneType.Battlefield) return;
-                OracleSpellBinder.MoveToGraveyard(card);
+                // CR 701.16 — sacrifice bypasses Indestructible /
+                // regeneration (CR 702.12b).
+                OracleSpellBinder.MoveToGraveyard(card, Majik.Core.Zones.ZoneMoveReason.Sacrifice);
             });
 
         var sacTrigger = new TriggeredAbility(

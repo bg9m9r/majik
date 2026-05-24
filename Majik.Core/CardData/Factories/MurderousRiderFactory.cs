@@ -56,11 +56,11 @@ namespace Majik.Core.CardData.Factories;
 ///   the Anger of the Gods exile rider (see
 ///   <see cref="AngerOfTheGodsFactory"/>); deferred to keep the v1 ship
 ///   minimal.
-/// - <b>Indestructible / regeneration riders</b> on the Swift End
-///   destroy path — inherited from
-///   <see cref="OracleSpellBinder.MoveToGraveyard"/>; same gap as
-///   <see cref="SlaughterPactFactory"/> and the rest of the
-///   single-target destroy family.
+///
+/// Swift End's destroy path honours Indestructible (CR 702.12) and
+/// regeneration (CR 701.15) via
+/// <see cref="OracleSpellBinder.MoveToGraveyard(ICard, ZoneMoveReason)"/>
+/// with <see cref="Majik.Core.Zones.ZoneMoveReason.Destroy"/>.
 /// </summary>
 [CardName("Murderous Rider")]
 public static class MurderousRiderFactory
@@ -134,7 +134,17 @@ public static class MurderousRiderFactory
                     MinTargets: 1,
                     MaxTargets: 1,
                     LegalCandidates: Array.Empty<object>(),
-                    Intent: BotIntent.Removal),
+                    Intent: BotIntent.Removal,
+                    // Live gatherer (agent-prompt MVP). All creatures +
+                    // planeswalkers on the battlefield — caller's intent +
+                    // ownership flip pushes opponent permanents to the top
+                    // (HeuristicBotAgent.Score handles ownership).
+                    CandidateGatherer: ctx => ctx.AllPlayers
+                        .SelectMany(p => p.Zones.Battlefield.GetCards())
+                        .Where(c => c.HasType(CardType.Creature)
+                            || c.HasType(CardType.Planeswalker))
+                        .Cast<object>()
+                        .ToList()),
             },
             EffectFactory: p =>
             {
@@ -147,12 +157,13 @@ public static class MurderousRiderFactory
                         // CR 701.7 — destroy → owner's graveyard. CR 608.2b
                         // illegal-target check: must still be a Creature or
                         // Planeswalker permanent at resolution. Indestructible
-                        // / regeneration deferred (same gap as SlaughterPact).
+                        // (CR 702.12) / regeneration (CR 701.15) handled via
+                        // MoveToGraveyard's Destroy-reason gate.
                         if (resolved is Permanent permanent
                             && (permanent.HasType(CardType.Creature)
                                 || permanent.HasType(CardType.Planeswalker)))
                         {
-                            OracleSpellBinder.MoveToGraveyard(permanent);
+                            OracleSpellBinder.MoveToGraveyard(permanent, Majik.Core.Zones.ZoneMoveReason.Destroy);
                         }
 
                         // CR 119.3 — caster loses 2 life as part of the same

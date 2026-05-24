@@ -61,10 +61,6 @@ namespace Majik.Core.CardData.Factories;
 /// tests.
 ///
 /// ## Deferred (v1 gaps)
-/// - <b>Token colour identity (red)</b>: tokens are created as colourless
-///   under the v1 token shape — same gap as Pact of the Titan's "red"
-///   Giant and Crashing Footfalls' "green" Rhinos. Subtype + P/T + token
-///   flag are correct; CardColors plumbing for tokens is the broader fix.
 /// - <b>Live combat-attackers provider</b>: production callers must wire
 ///   the closure manually. Once <c>ICurrentCombatProvider</c> ships, this
 ///   factory will read attackers off the live provider directly. Same
@@ -226,7 +222,9 @@ public static class GoblinRabblemasterFactory
             Power: TokenPower,
             Toughness: TokenToughness,
             Subtypes: new[] { CardSubtype.Goblin },
-            Keywords: null);
+            Keywords: null,
+            // CR 105 / CR 111.4 — printed "1/1 red Goblin creature token".
+            Colors: new[] { Majik.Core.ValueObjects.ManaColor.Red });
 
         return TokenFactory.CreateOnBattlefield(spec, controller, zoneService);
     }

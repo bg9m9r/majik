@@ -129,7 +129,9 @@ public static class AjaniNacatlPariahFactory
                     .FirstOrDefault(c => !ReferenceEquals(c, card));
                 if (sacrificeTarget == null) return;
 
-                OracleSpellBinder.MoveToGraveyard(sacrificeTarget);
+                // CR 701.16 — sacrifice. Bypasses Indestructible /
+                // regeneration per CR 702.12b.
+                OracleSpellBinder.MoveToGraveyard(sacrificeTarget, Majik.Core.Zones.ZoneMoveReason.Sacrifice);
                 card.MdfcState.Transform();
             });
 

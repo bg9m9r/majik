@@ -27,8 +27,10 @@ namespace Majik.Core.CardData.Factories;
 ///   mana — same wire-up as Treasure Cruise / Dig Through Time.
 /// - On-resolve "Destroy target creature" effect (CR 701.7), exposed via
 ///   <see cref="BuildSpellDefinition"/>. Single 1..1 target-creature
-///   request; "indestructible" + "can't be regenerated" riders deferred —
-///   same lossy MVP as <c>DestroySpellFactory.DestroyCreatureSpell</c>.
+///   request. Indestructible (CR 702.12) and any regeneration shield
+///   (CR 701.15) are honoured at the destroy site via
+///   <see cref="OracleSpellBinder.MoveToGraveyard(ICard, ZoneMoveReason)"/>
+///   with <see cref="Majik.Core.Zones.ZoneMoveReason.Destroy"/>.
 ///
 /// ## Bot-side discovery
 /// - <see cref="Majik.Core.Players.Agents.DelveAltCostProbe"/> surfaces
@@ -95,7 +97,12 @@ public static class MurderousCutFactory
                         if (raw is not Creature target) return;
                         // CR 608.2b — illegal-target check at resolution.
                         if (target.Zone != ZoneType.Battlefield) return;
-                        OracleSpellBinder.MoveToGraveyard(target);
+                        // CR 701.7 — Destroy. Indestructible (CR 702.12) /
+                        // regeneration (CR 701.15) handled via the
+                        // Destroy-reason gate in MoveToGraveyard. Murderous
+                        // Cut's printed text has no "can't be regenerated"
+                        // rider so the shield is honoured normally.
+                        OracleSpellBinder.MoveToGraveyard(target, Majik.Core.Zones.ZoneMoveReason.Destroy);
                     }),
                 };
             });

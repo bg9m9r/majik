@@ -321,8 +321,69 @@ public static class OracleSpellBinder
         }
     }
 
+    /// <summary>
+    /// Move <paramref name="card"/> from the battlefield to its owner's
+    /// graveyard. Backward-compatible overload — implicitly treats the
+    /// move as a "destroy" effect (CR 701.7), which means
+    /// <see cref="ZoneMoveReason.Destroy"/>'s indestructible (CR 702.12b)
+    /// and regeneration (CR 701.15c) gates apply.
+    ///
+    /// Callers that aren't issuing a destroy (sacrifice, SBA, mill, etc.)
+    /// should pass the explicit
+    /// <see cref="MoveToGraveyard(ICard, ZoneMoveReason)"/> overload with
+    /// a non-Destroy reason to bypass those gates.
+    /// </summary>
     internal static void MoveToGraveyard(ICard card)
+        => MoveToGraveyard(card, ZoneMoveReason.Destroy);
+
+    /// <summary>
+    /// CR 701.7 / 701.15 / 702.12 — move <paramref name="card"/> from the
+    /// battlefield to its owner's graveyard, gated by
+    /// <paramref name="reason"/>.
+    ///
+    /// When <paramref name="reason"/> is <see cref="ZoneMoveReason.Destroy"/>:
+    /// <list type="number">
+    ///   <item>If the target is a <see cref="Permanent"/> with the
+    ///     "Indestructible" keyword, the move is cancelled
+    ///     (CR 702.12b — "a permanent with indestructible can't be
+    ///     destroyed").</item>
+    ///   <item>Otherwise, if the target has one or more active
+    ///     regeneration shields (<see cref="Permanent.HasRegenerationShield"/>),
+    ///     one shield is consumed: the permanent is tapped, its damage
+    ///     cleared, and the destroy is cancelled (CR 701.15c).</item>
+    ///   <item>Otherwise, the card moves to its owner's graveyard.</item>
+    /// </list>
+    ///
+    /// For any other <paramref name="reason"/> the gates are skipped —
+    /// sacrifice (CR 701.16), SBA-driven death (which gates upstream in
+    /// <see cref="Majik.Core.Rules.Sba.Checks.CreatureDeathCheck"/>), and
+    /// other graveyard-bound moves all bypass indestructible /
+    /// regeneration per CR 702.12b.
+    /// </summary>
+    internal static void MoveToGraveyard(ICard card, ZoneMoveReason reason)
     {
+        ArgumentNullException.ThrowIfNull(card);
+
+        var isDestroy = reason == ZoneMoveReason.Destroy
+            || reason == ZoneMoveReason.DestroyNoRegeneration;
+        if (isDestroy && card is Permanent permanent)
+        {
+            // CR 702.12b — indestructible permanents can't be destroyed.
+            // Applies even to "can't be regenerated" wording — the
+            // no-regen rider only suppresses CR 701.15, not indestructible.
+            if (HasIndestructible(permanent)) return;
+
+            // CR 701.15c — consume one regeneration shield (tap + clear
+            // damage) in place of the destroy. Skipped when the destroy
+            // effect explicitly says "can't be regenerated"
+            // (e.g. Wrath of God, Damnation, Terminate).
+            if (reason == ZoneMoveReason.Destroy
+                && permanent.ConsumeRegenerationShield())
+            {
+                return;
+            }
+        }
+
         var owner = card.Owner;
         if (owner != null)
         {
@@ -330,6 +391,22 @@ public static class OracleSpellBinder
             owner.Zones.Graveyard.AddCard(card);
         }
         card.SetZone(ZoneType.Graveyard);
+    }
+
+    private static bool HasIndestructible(Permanent permanent)
+    {
+        // Creature path goes through CombatAbilities so layer-system
+        // grants (CR 613.1f) are picked up; non-creature permanents
+        // (Darksteel Citadel, The One Ring under its mark, etc.) fall
+        // back to the printed KeywordAbility marker.
+        if (permanent is Creature creature)
+        {
+            return Majik.Core.Combat.CombatAbilities.HasIndestructible(creature);
+        }
+
+        return permanent.Abilities
+            .OfType<Majik.Core.Abilities.KeywordAbility>()
+            .Any(k => string.Equals(k.Keyword, "Indestructible", StringComparison.OrdinalIgnoreCase));
     }
 
     internal static void RemoveFromStack(Majik.Core.Stack.Stack stack, IStackObject spell)

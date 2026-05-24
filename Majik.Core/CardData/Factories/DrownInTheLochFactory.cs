@@ -43,10 +43,10 @@ namespace Majik.Core.CardData.Factories;
 ///
 /// CR 701.5 — counter via <see cref="OracleSpellBinder.RemoveFromStack"/>
 /// + zone move to graveyard. CR 701.7 — destroy via
-/// <see cref="OracleSpellBinder.MoveToGraveyard"/>. Indestructible /
-/// regeneration riders are deferred (same gap as
-/// <see cref="SlaughterPactFactory"/> and the rest of the single-target
-/// destroy family).
+/// <see cref="OracleSpellBinder.MoveToGraveyard(ICard, ZoneMoveReason)"/>
+/// with <see cref="Majik.Core.Zones.ZoneMoveReason.Destroy"/>, which
+/// honours Indestructible (CR 702.12) and any active regeneration shield
+/// (CR 701.15).
 /// </summary>
 [CardName("Drown in the Loch")]
 public static class DrownInTheLochFactory
@@ -122,9 +122,33 @@ public static class DrownInTheLochFactory
         var targetRequests = new[]
         {
             // Mode 0 — counter target spell (mv ≤ X resolution gate).
-            new TargetRequest("target spell", 0, 1, Array.Empty<object>(), BotIntent.Counter),
+            // Agent-prompt MVP: gatherer enumerates the live stack so the
+            // agent ranks among the actual spells in flight (Counter intent
+            // picks the most-expensive entry).
+            new TargetRequest(
+                "target spell",
+                MinTargets: 0,
+                MaxTargets: 1,
+                LegalCandidates: Array.Empty<object>(),
+                Intent: BotIntent.Counter,
+                CandidateGatherer: ctx => ctx.Stack.GetAll()
+                    .OfType<Majik.Core.Spells.ISpell>()
+                    .Cast<object>()
+                    .ToList()),
             // Mode 1 — destroy target creature (mv ≤ X resolution gate).
-            new TargetRequest("target creature", 0, 1, Array.Empty<object>(), BotIntent.Removal),
+            // Agent-prompt MVP: enumerate every creature on the battlefield;
+            // Removal intent ranks opponent's biggest threat first.
+            new TargetRequest(
+                "target creature",
+                MinTargets: 0,
+                MaxTargets: 1,
+                LegalCandidates: Array.Empty<object>(),
+                Intent: BotIntent.Removal,
+                CandidateGatherer: ctx => ctx.AllPlayers
+                    .SelectMany(p => p.Zones.Battlefield.GetCards())
+                    .OfType<Creature>()
+                    .Cast<object>()
+                    .ToList()),
         };
 
         return new SpellDefinition(
@@ -207,8 +231,9 @@ public static class DrownInTheLochFactory
             var x = ComputeX(caster, p.AllPlayers);
             if (creature.ManaCostValue.TotalValue > x) return;
 
-            // CR 701.7 — destroy → owner's graveyard (Indestructible /
-            // regeneration deferred, same gap as SlaughterPactFactory).
-            Fx.MoveToGraveyard(creature);
+            // CR 701.7 — destroy → owner's graveyard. Indestructible
+            // (CR 702.12) and regeneration (CR 701.15) handled via the
+            // Destroy-reason gate in OracleSpellBinder.MoveToGraveyard.
+            OracleSpellBinder.MoveToGraveyard(creature, Majik.Core.Zones.ZoneMoveReason.Destroy);
         });
 }

@@ -167,7 +167,10 @@ public static class PhantasmalImageFactory
                 // sacrifice is a no-op (CR 701.16, CR 603.7c).
                 if (card.Zone != ZoneType.Battlefield) return;
 
-                OracleSpellBinder.MoveToGraveyard(card);
+                // CR 701.16 — sacrifice bypasses Indestructible /
+                // regeneration (CR 702.12b, CR 701.15c). Pass the
+                // Sacrifice reason so the binder doesn't gate.
+                OracleSpellBinder.MoveToGraveyard(card, Majik.Core.Zones.ZoneMoveReason.Sacrifice);
 
                 // Drop the AddSubtypeEffect once the card has left the
                 // battlefield — the Illusion subtype rider only applies

@@ -38,12 +38,6 @@ namespace Majik.Core.CardData.Factories;
 ///   under the caster's control (CR 111.6).
 ///
 /// ## Deferred (v1 gaps)
-/// - <b>"Green" colour on tokens</b>: tokens have no <see cref="ICard.ManaCost"/>
-///   so colour is identity-only via subtype/ability text today — Majik
-///   doesn't yet model token characteristic colour. The Trample +
-///   creature-type assignments match the printed text; the green colour
-///   identity is a downstream concern (same gap as Wurmcoil's "colorless"
-///   tokens, Solitude's "white" creatures, etc.).
 /// - <b>Cascade-into-cascade</b>: if cascade resolves into another cascade
 ///   spell (e.g. Crashing Footfalls hits Shardless Agent), the secondary
 ///   cascade fires when the secondary spell is cast — which is wired
@@ -174,7 +168,9 @@ public static class CrashingFootfallsFactory
             Power: TokenPower,
             Toughness: TokenToughness,
             Subtypes: new[] { CardSubtype.Rhino, CardSubtype.Warrior },
-            Keywords: new[] { "Trample" });
+            Keywords: new[] { "Trample" },
+            // CR 105 / CR 111.4 — printed "4/4 green Rhino Warrior".
+            Colors: new[] { Majik.Core.ValueObjects.ManaColor.Green });
 
         var result = new List<Creature>(TokenCount);
         for (int i = 0; i < TokenCount; i++)

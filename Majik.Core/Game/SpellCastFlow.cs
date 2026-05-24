@@ -166,7 +166,14 @@ public sealed class SpellCastFlow
         var collectedTargets = new List<IReadOnlyList<object>>(definition.TargetRequests.Count);
         foreach (var req in definition.TargetRequests)
         {
-            var picked = await agent.ChooseTargetsAsync(ctx, req, ct);
+            // Lazy-gather candidate pool against the live ctx (TargetRequest's
+            // optional CandidateGatherer fires here). Falls through to the
+            // request's static LegalCandidates when no gatherer is set.
+            var live = req.ResolveCandidates(ctx);
+            var promptReq = ReferenceEquals(live, req.LegalCandidates)
+                ? req
+                : req.WithCandidates(live);
+            var picked = await agent.ChooseTargetsAsync(ctx, promptReq, ct);
             // CR 601.2c — cast is illegal if the agent can't pick enough
             // legal targets. Throw a typed exception so the caller (cast
             // dispatcher) can catch and abort cleanly instead of letting

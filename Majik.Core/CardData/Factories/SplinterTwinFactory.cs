@@ -182,12 +182,20 @@ public static class SplinterTwinFactory
                         .Select(k => k.Keyword));
                 if (!keywords.Contains("Haste")) keywords.Add("Haste");
 
+                // CR 706.2 — copy effects snapshot the source's colour
+                // identity. Read it through CardColors.GetColors so we
+                // get whatever the source reports (its mana-cost-derived
+                // colour for printed permanents, or an explicit token
+                // colour override if the source was itself a token).
+                var colours = CardColors.GetColors(original).ToList();
+
                 var spec = new TokenFactory.TokenSpec(
                     Name: original.Name,
                     Power: original.BasePower,
                     Toughness: original.BaseToughness,
                     Subtypes: original.Subtypes.ToList(),
-                    Keywords: keywords);
+                    Keywords: keywords,
+                    Colors: colours);
 
                 var token = TokenFactory.CreateOnBattlefield(spec, controller, zones);
 

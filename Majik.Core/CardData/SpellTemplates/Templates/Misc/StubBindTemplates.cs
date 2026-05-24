@@ -247,7 +247,9 @@ public sealed class TargetPlayerSacrificesCreatureTemplate : ISpellTemplate
                     var pick = tp.Zones.Battlefield.GetCards()
                         .OfType<Creature>()
                         .FirstOrDefault();
-                    if (pick != null) OracleSpellBinder.MoveToGraveyard(pick);
+                    // Edicts are "target player sacrifices" — CR 701.16
+                    // sacrifice bypasses Indestructible / regeneration.
+                    if (pick != null) OracleSpellBinder.MoveToGraveyard(pick, Majik.Core.Zones.ZoneMoveReason.Sacrifice);
                 }) };
             });
     }
@@ -769,7 +771,9 @@ public sealed class EachOpponentSacrificesCreatureTemplate : ISpellTemplate
                         var pick = pl.Zones.Battlefield.GetCards()
                             .OfType<Creature>()
                             .FirstOrDefault();
-                        if (pick != null) OracleSpellBinder.MoveToGraveyard(pick);
+                        // "Each opponent sacrifices a creature" — CR 701.16
+                        // sacrifice bypasses Indestructible / regeneration.
+                        if (pick != null) OracleSpellBinder.MoveToGraveyard(pick, Majik.Core.Zones.ZoneMoveReason.Sacrifice);
                     }
                 }) };
             });

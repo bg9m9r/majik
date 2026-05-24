@@ -48,8 +48,6 @@ namespace Majik.Core.CardData.Factories;
 ///   is supplied.
 ///
 /// ## Deferred (v1 gaps)
-/// - Token colour identity (white): tokens are created as colourless under
-///   the v1 token shape — same gap as Crashing Footfalls / Goblin Rabblemaster.
 /// - Prowess on Monk tokens: TokenFactory Keywords list could carry "Prowess"
 ///   but the ProwessFactory.Build() requires a Creature reference + a live
 ///   ContinuousEffectsService, which isn't available at token-creation time
@@ -175,7 +173,11 @@ public static class MonasteryMentorFactory
             Power: TokenPower,
             Toughness: TokenToughness,
             Subtypes: new[] { CardSubtype.Monk },
-            Keywords: null);
+            Keywords: null,
+            // CR 105 / CR 111.4 — printed "1/1 white Monk creature token
+            // with prowess". The Prowess keyword on the token is deferred
+            // (see class xmldoc) but the colour identity is now stamped.
+            Colors: new[] { Majik.Core.ValueObjects.ManaColor.White });
 
         return TokenFactory.CreateOnBattlefield(spec, controller, zoneService);
     }

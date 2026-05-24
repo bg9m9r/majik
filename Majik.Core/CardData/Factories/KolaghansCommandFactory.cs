@@ -246,7 +246,9 @@ public static class KolaghansCommandFactory
             if (slot.Count == 0) return;
             var resolved = resolver(slot[0]);
             if (resolved is not ICard card) return;
-            // CR 701.7 — "destroy". Indestructible rider deferred.
-            OracleSpellBinder.MoveToGraveyard(card);
+            // CR 701.7 — "destroy". Indestructible (CR 702.12) /
+            // regeneration (CR 701.15) handled by MoveToGraveyard's
+            // Destroy-reason gate.
+            OracleSpellBinder.MoveToGraveyard(card, Majik.Core.Zones.ZoneMoveReason.Destroy);
         });
 }

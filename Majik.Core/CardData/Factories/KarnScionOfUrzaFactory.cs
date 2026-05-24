@@ -69,10 +69,6 @@ namespace Majik.Core.CardData.Factories;
 ///   declare <see cref="Majik.Core.Targeting.TargetRequest"/>s yet, so
 ///   the opponent picker for the +1 isn't agent-driven (same gap as
 ///   <see cref="WrennAndRealmbreakerFactory"/>).
-/// - <b>Token colour</b>: Construct token is created with no colour-set
-///   primitive (matches Wurmcoil Engine + Crashing Footfalls token v1
-///   gap — `CardColors.GetColors` reads mana cost; an empty mana cost
-///   already implies colourless).
 /// </summary>
 [CardName("Karn, Scion of Urza")]
 public static class KarnScionOfUrzaFactory
@@ -211,7 +207,10 @@ public static class KarnScionOfUrzaFactory
             Name: "Construct",
             Power: 0,
             Toughness: 0,
-            Subtypes: new[] { CardSubtype.Construct });
+            Subtypes: new[] { CardSubtype.Construct },
+            // CR 105.2c / CR 111.4 — printed "0/0 colorless Construct
+            // artifact creature token". Empty Colors = explicit colourless.
+            Colors: Array.Empty<Majik.Core.ValueObjects.ManaColor>());
 
         var token = TokenFactory.CreateOnBattlefield(spec, controller, zoneService);
 

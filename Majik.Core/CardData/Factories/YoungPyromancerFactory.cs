@@ -28,9 +28,8 @@ namespace Majik.Core.CardData.Factories;
 ///   token via <see cref="TokenFactory.CreateOnBattlefield"/>.
 ///
 /// ## Deferred (v1 gaps)
-/// - Token colour identity (red): tokens are created as colourless under the
-///   v1 token shape — same gap as Goblin Rabblemaster / Crashing Footfalls.
-///   Subtype (Elemental), P/T, and IsToken flag are correct.
+/// - None at this layer — token colour identity (red) is now stamped via
+///   <see cref="TokenFactory.TokenSpec.Colors"/> (CR 105 / CR 903.4).
 /// </summary>
 [CardName("Young Pyromancer")]
 public static class YoungPyromancerFactory
@@ -121,7 +120,9 @@ public static class YoungPyromancerFactory
             Power: TokenPower,
             Toughness: TokenToughness,
             Subtypes: new[] { CardSubtype.Elemental },
-            Keywords: null);
+            Keywords: null,
+            // CR 105 / CR 111.4 — printed "1/1 red Elemental creature token".
+            Colors: new[] { Majik.Core.ValueObjects.ManaColor.Red });
 
         return TokenFactory.CreateOnBattlefield(spec, controller, zoneService);
     }

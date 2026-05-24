@@ -405,7 +405,15 @@ public sealed class TurnDriver
             {
                 foreach (var req in aa.TargetRequests)
                 {
-                    var chosen = await _agents[actor].ChooseTargetsAsync(ctx, req, ct: default);
+                    // Resolve any lazy CandidateGatherer against the live ctx
+                    // (mirrors AbilityActivationFlow / SpellCastFlow / TriggerManager
+                    // so the activated-ability dispatcher path honours the same
+                    // gatherer surface).
+                    var live = req.ResolveCandidates(ctx);
+                    var promptReq = ReferenceEquals(live, req.LegalCandidates)
+                        ? req
+                        : req.WithCandidates(live);
+                    var chosen = await _agents[actor].ChooseTargetsAsync(ctx, promptReq, ct: default);
                     foreach (var obj in chosen)
                     {
                         var wrapper = obj switch
@@ -517,9 +525,14 @@ public sealed class TurnDriver
         }
 
         // 2. Remove damage from creatures.
-        foreach (var creature in _players.SelectMany(p => p.Zones.Battlefield.GetCards().OfType<Creature>()))
+        //    Also drop any remaining regeneration shields (CR 701.15a /
+        //    CR 514.2 — shields are "until end of turn"). Done in the
+        //    same battlefield sweep so the EOT pass touches each permanent
+        //    once.
+        foreach (var permanent in _players.SelectMany(p => p.Zones.Battlefield.GetCards().OfType<Permanent>()))
         {
-            creature.ClearDamage();
+            if (permanent is Creature creature) creature.ClearDamage();
+            permanent.ClearRegenerationShields();
         }
 
         // 3. Empty mana pools.

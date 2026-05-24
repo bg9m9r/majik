@@ -70,12 +70,16 @@ public sealed class MultiTargetCopyTokenTemplate : ISpellTemplate
                         .Select(k => k.Keyword)
                         .Distinct(StringComparer.OrdinalIgnoreCase)
                         .ToArray();
+                    // CR 706.2 — copy effects snapshot the source's
+                    // colour identity alongside its other copiable values.
+                    var colours = CardColors.GetColors(src).ToList();
                     var spec = new TokenFactory.TokenSpec(
                         Name: src.Name,
                         Power: src.BasePower,
                         Toughness: src.BaseToughness,
                         Subtypes: src.Subtypes.ToArray(),
-                        Keywords: keywords);
+                        Keywords: keywords,
+                        Colors: colours);
                     TokenFactory.CreateOnBattlefield(spec, caster, zones: null);
                 }
             }) });

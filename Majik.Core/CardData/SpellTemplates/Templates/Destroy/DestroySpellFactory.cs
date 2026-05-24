@@ -6,6 +6,14 @@ using Majik.Core.Players.Agents;
 
 namespace Majik.Core.CardData.SpellTemplates.Templates.Destroy;
 
+/// <summary>
+/// Shared spell-definition shapes for "destroy" templates. Indestructible
+/// (CR 702.12) and regeneration shields (CR 701.15) are now handled by
+/// <see cref="OracleSpellBinder.MoveToGraveyard(Majik.Core.Cards.ICard, Majik.Core.Zones.ZoneMoveReason)"/>
+/// via the explicit <see cref="Majik.Core.Zones.ZoneMoveReason.Destroy"/>
+/// reason — callers below don't need to filter targets up front; the
+/// binder cancels the move (or consumes a shield) on the gated branch.
+/// </summary>
 internal static class DestroySpellFactory
 {
     internal static SpellDefinition DestroyCreatureSpell(Func<object, object> resolver) => new(
@@ -16,7 +24,7 @@ internal static class DestroySpellFactory
             var target = resolver(p.Targets[0][0]);
             return new IEffect[] { new Effect("destroy creature", () =>
             {
-                if (target is Creature c) OracleSpellBinder.MoveToGraveyard(c);
+                if (target is Creature c) OracleSpellBinder.MoveToGraveyard(c, Majik.Core.Zones.ZoneMoveReason.Destroy);
             }) };
         });
 
@@ -36,7 +44,7 @@ internal static class DestroySpellFactory
                 if (target is Creature crt)
                 {
                     var cmc = crt.ManaCostValue.TotalValue;
-                    if (cmc <= maxCmc) OracleSpellBinder.MoveToGraveyard(crt);
+                    if (cmc <= maxCmc) OracleSpellBinder.MoveToGraveyard(crt, Majik.Core.Zones.ZoneMoveReason.Destroy);
                 }
             }) };
         });
@@ -49,7 +57,7 @@ internal static class DestroySpellFactory
             var target = resolver(p.Targets[0][0]);
             return new IEffect[] { new Effect("destroy artifact/enchantment", () =>
             {
-                if (target is ICard card) OracleSpellBinder.MoveToGraveyard(card);
+                if (target is ICard card) OracleSpellBinder.MoveToGraveyard(card, Majik.Core.Zones.ZoneMoveReason.Destroy);
             }) };
         });
 
@@ -83,7 +91,7 @@ internal static class DestroySpellFactory
                         && (card.HasType(CardType.Artifact)
                             || card.HasType(CardType.Enchantment)))
                     {
-                        OracleSpellBinder.MoveToGraveyard(card);
+                        OracleSpellBinder.MoveToGraveyard(card, Majik.Core.Zones.ZoneMoveReason.Destroy);
                     }
                 }
             }) };
@@ -103,7 +111,7 @@ internal static class DestroySpellFactory
             var creatures = caster.Zones.Battlefield.GetCards().OfType<Creature>().ToList();
             foreach (var c in creatures)
             {
-                OracleSpellBinder.MoveToGraveyard(c);
+                OracleSpellBinder.MoveToGraveyard(c, Majik.Core.Zones.ZoneMoveReason.Destroy);
             }
         }) });
 
@@ -122,7 +130,7 @@ internal static class DestroySpellFactory
             var snap = caster.Zones.Battlefield.GetCards().Where(predicate).ToList();
             foreach (var c in snap)
             {
-                OracleSpellBinder.MoveToGraveyard(c);
+                OracleSpellBinder.MoveToGraveyard(c, Majik.Core.Zones.ZoneMoveReason.Destroy);
             }
         }) });
 
@@ -135,7 +143,7 @@ internal static class DestroySpellFactory
             var target = resolver(p.Targets[0][0]);
             return new IEffect[] { new Effect("destroy target", () =>
             {
-                if (target is ICard card && filter(card)) OracleSpellBinder.MoveToGraveyard(card);
+                if (target is ICard card && filter(card)) OracleSpellBinder.MoveToGraveyard(card, Majik.Core.Zones.ZoneMoveReason.Destroy);
             }) };
         });
 }
