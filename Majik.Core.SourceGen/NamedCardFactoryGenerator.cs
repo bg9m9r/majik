@@ -18,6 +18,19 @@ namespace Majik.Core.SourceGen;
 /// Replaces the previous 317-arm hand-maintained <c>name switch</c> with
 /// compile-time-generated code so that adding a new card no longer
 /// requires editing a shared dispatch file.
+///
+/// ## Multi-[CardName] factories
+///
+/// A factory may carry multiple <c>[CardName]</c> attributes when it
+/// serves functional reprints (e.g. Wrath of God + Damnation — same
+/// resolve body, different printed name + cost). To produce the right
+/// printed name per reprint, the factory exposes a
+/// <c>public static &lt;Card&gt; Create(Player owner, string cardName)</c>
+/// overload alongside the canonical <c>Create(Player owner)</c>. The
+/// generator detects the named overload and emits dispatch arms of the
+/// form <c>"Damnation" =&gt; F.Create(owner, "Damnation")</c>; single-name
+/// factories without the overload continue to use the plain
+/// <c>F.Create(owner)</c> shape unchanged.
 /// </summary>
 [Generator(LanguageNames.CSharp)]
 public sealed class NamedCardFactoryGenerator : IIncrementalGenerator
@@ -89,7 +102,13 @@ public sealed class NamedCardFactoryGenerator : IIncrementalGenerator
 
         // Look for a callable `Create(Player owner)` overload — single-arg
         // or any overload whose remaining parameters all have defaults.
+        // Separately detect a `Create(Player owner, string cardName, ...)`
+        // overload (name as the second positional parameter, any remaining
+        // parameters defaulted). When present, multi-[CardName] factories
+        // dispatch through it so the canonical factory can produce the
+        // right printed name for each functional reprint.
         var hasCreate = false;
+        var hasNamedCreate = false;
         foreach (var member in cls.GetMembers("Create"))
         {
             if (member is not IMethodSymbol m) continue;
@@ -98,12 +117,26 @@ public sealed class NamedCardFactoryGenerator : IIncrementalGenerator
             if (m.Parameters.Length == 0) continue;
             var first = m.Parameters[0];
             if (first.Type.Name != "Player") continue;
+
+            // Plain `Create(Player owner, [defaults...])`.
             var restOk = true;
             for (var i = 1; i < m.Parameters.Length; i++)
             {
                 if (!m.Parameters[i].HasExplicitDefaultValue) { restOk = false; break; }
             }
-            if (restOk) { hasCreate = true; break; }
+            if (restOk) hasCreate = true;
+
+            // `Create(Player owner, string cardName, [defaults...])`.
+            if (m.Parameters.Length >= 2
+                && m.Parameters[1].Type.SpecialType == SpecialType.System_String)
+            {
+                var namedRestOk = true;
+                for (var i = 2; i < m.Parameters.Length; i++)
+                {
+                    if (!m.Parameters[i].HasExplicitDefaultValue) { namedRestOk = false; break; }
+                }
+                if (namedRestOk) hasNamedCreate = true;
+            }
         }
 
         return new FactoryEntry(
@@ -111,15 +144,18 @@ public sealed class NamedCardFactoryGenerator : IIncrementalGenerator
             displayName,
             names.ToImmutable(),
             hasCreate,
+            hasNamedCreate,
             location);
     }
 
     private static void Emit(SourceProductionContext spc, ImmutableArray<FactoryEntry> entries)
     {
-        // Diagnostic — missing Create overload.
+        // Diagnostic — missing Create overload. Either the plain
+        // `Create(Player)` or the named `Create(Player, string, ...)` form
+        // satisfies dispatch.
         foreach (var entry in entries)
         {
-            if (!entry.HasCreateOverload)
+            if (!entry.HasCreateOverload && !entry.HasNamedCreateOverload)
             {
                 spc.ReportDiagnostic(Diagnostic.Create(
                     MissingCreateDescriptor,
@@ -128,13 +164,17 @@ public sealed class NamedCardFactoryGenerator : IIncrementalGenerator
             }
         }
 
-        // Build name → factory map, reporting duplicates.
+        // Build name → factory map, reporting duplicates. A factory is
+        // eligible if it has either the plain `Create(Player)` overload
+        // or the named `Create(Player, string, ...)` overload — the
+        // dispatcher picks the latter when available so multi-[CardName]
+        // factories can produce the correct printed name per reprint.
         var map = new SortedDictionary<string, FactoryEntry>(StringComparer.Ordinal);
         var duplicates = new Dictionary<string, List<FactoryEntry>>(StringComparer.Ordinal);
 
         foreach (var entry in entries)
         {
-            if (!entry.HasCreateOverload) continue;
+            if (!entry.HasCreateOverload && !entry.HasNamedCreateOverload) continue;
             foreach (var name in entry.CardNames)
             {
                 if (map.TryGetValue(name, out var existing))
@@ -190,7 +230,15 @@ public sealed class NamedCardFactoryGenerator : IIncrementalGenerator
         foreach (var kvp in map)
         {
             var literal = SymbolDisplay.FormatLiteral(kvp.Key, true);
-            sb.AppendLine($"            {literal} => {kvp.Value.FullyQualifiedName}.Create(owner),");
+            // Prefer the `Create(Player, string)` overload when the factory
+            // exposes one — multi-[CardName] factories use the second
+            // argument to produce the correct printed name per reprint.
+            // Fall back to the plain `Create(Player)` otherwise so existing
+            // single-name factories stay unchanged.
+            var call = kvp.Value.HasNamedCreateOverload
+                ? $"{kvp.Value.FullyQualifiedName}.Create(owner, {literal})"
+                : $"{kvp.Value.FullyQualifiedName}.Create(owner)";
+            sb.AppendLine($"            {literal} => {call},");
         }
         sb.AppendLine("            _ => null,");
         sb.AppendLine("        };");
@@ -205,5 +253,6 @@ public sealed class NamedCardFactoryGenerator : IIncrementalGenerator
         string DisplayName,
         ImmutableArray<string> CardNames,
         bool HasCreateOverload,
+        bool HasNamedCreateOverload,
         Location? Location);
 }

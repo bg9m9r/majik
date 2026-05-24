@@ -14,13 +14,20 @@ namespace Majik.Core.Tests.CardData;
 /// Tests for Damnation (Planar Chaos, {2}{B}{B}, Sorcery).
 ///
 /// Oracle: "Destroy all creatures. They can't be regenerated."
-/// Functional reprint of Wrath of God.
+/// Functional reprint of Wrath of God — served by
+/// <see cref="WrathOfGodFactory"/>'s second <c>[CardName]</c> attribute
+/// (single-factory multi-name dispatch). There is no separate
+/// <c>DamnationFactory</c>; tests reach the printed card via
+/// <see cref="NamedCardFactory"/> or
+/// <see cref="WrathOfGodFactory.Create(Player, string)"/>.
 ///
 /// Coverage:
-///   - Identity (name, type, cost) + NamedCardFactory dispatch.
+///   - Identity (name, type, cost) via <see cref="NamedCardFactory"/> dispatch.
 ///   - Sweep destroys every creature on every supplied player's
 ///     battlefield → owner's graveyard (CR 701.7).
 ///   - Non-creature permanents survive the sweep.
+///   - Damnation and Wrath of God remain observationally identical (same
+///     resolve body, different printed cost/name).
 /// </summary>
 public class DamnationTests
 {
@@ -34,7 +41,7 @@ public class DamnationTests
     [Fact]
     public void Damnation_IsSorcery_At2BB()
     {
-        var d = DamnationFactory.Create(_alice);
+        var d = WrathOfGodFactory.Create(_alice, "Damnation");
 
         d.Name.Should().Be("Damnation");
         d.ManaCost.Should().Be("{2}{B}{B}");
@@ -65,7 +72,7 @@ public class DamnationTests
         var aliceCreatures = new[] { SeedCreature(_alice, "Alice-Zombie"), SeedCreature(_alice, "Alice-Imp") };
         var bobCreatures = new[] { SeedCreature(_bob, "Bob-Zombie"), SeedCreature(_bob, "Bob-Imp") };
 
-        var effects = DamnationFactory.BuildResolveEffect(new[] { _alice, _bob });
+        var effects = WrathOfGodFactory.BuildResolveEffect(new[] { _alice, _bob });
         foreach (var e in effects) e.Execute();
 
         _alice.Zones.Battlefield.GetCards().Should().BeEmpty();
@@ -86,7 +93,7 @@ public class DamnationTests
         var aliceEnchantment = SeedEnchantment(_alice, "Alice-Curse");
         var aliceArtifact = SeedArtifact(_alice, "Alice-Mox");
 
-        var effects = DamnationFactory.BuildResolveEffect(new[] { _alice, _bob });
+        var effects = WrathOfGodFactory.BuildResolveEffect(new[] { _alice, _bob });
         foreach (var e in effects) e.Execute();
 
         _alice.Zones.Battlefield.GetCards().Should().BeEquivalentTo(
@@ -101,13 +108,14 @@ public class DamnationTests
     [Fact]
     public void Resolve_FunctionalReprintOfWrathOfGod()
     {
-        // Seed identical board state and verify Damnation and Wrath of God
-        // produce the same end state — the two factories must remain
-        // observationally identical (functional reprint).
+        // Seed identical board state on two parallel pairs of players and
+        // verify both printed names produce the same end state — the
+        // single factory must remain observationally identical across its
+        // [CardName]s (functional reprint).
         var damAliceCreatures = new[] { SeedCreature(_alice, "Bear-1"), SeedCreature(_alice, "Bear-2") };
         var damBobCreatures = new[] { SeedCreature(_bob, "Wolf-1") };
 
-        DamnationFactory.BuildResolveEffect(new[] { _alice, _bob })
+        WrathOfGodFactory.BuildResolveEffect(new[] { _alice, _bob })
             .ToList().ForEach(e => e.Execute());
 
         var damAliceGy = _alice.Zones.Graveyard.GetCards().ToList();
