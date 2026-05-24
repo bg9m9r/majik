@@ -3468,6 +3468,21 @@ public static class NamedCardFactory
             // Land — Onslaught (WoodedFoothillsFactory). Fetches Mountain or Forest.
             "Wooded Foothills" => WoodedFoothillsFactory.Create(owner),
 
+            // Land — Zendikar (ScaldingTarnFactory). Fetches Island or Mountain.
+            "Scalding Tarn" => ScaldingTarnFactory.Create(owner),
+
+            // Land — Zendikar (MistyRainforestFactory). Fetches Forest or Island.
+            "Misty Rainforest" => MistyRainforestFactory.Create(owner),
+
+            // Land — Onslaught (FloodedStrandFactory). Fetches Plains or Island.
+            "Flooded Strand" => FloodedStrandFactory.Create(owner),
+
+            // Land — Zendikar (VerdantCatacombsFactory). Fetches Swamp or Forest.
+            "Verdant Catacombs" => VerdantCatacombsFactory.Create(owner),
+
+            // Land — Zendikar (MarshFlatsFactory). Fetches Plains or Swamp.
+            "Marsh Flats" => MarshFlatsFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
