@@ -22,6 +22,14 @@
 > can be prioritised by leverage. Regenerate with
 > `dotnet run --project Majik.Console -- coverage-gaps --modern
 > --md-out docs/COVERAGE_GAPS_MODERN.md --json-out docs/coverage-gaps-modern.json`.
+>
+> **Mechanic-dependency DAG:** [`docs/MECHANIC_DEPS.md`](docs/MECHANIC_DEPS.md)
+> — Deferred-rider mentions in `*Factory.cs` xmldocs scanned + clustered onto
+> canonical engine primitives. Each row answers "build primitive X →
+> unblock N factories' riders" so engine-primitive PRs can be sequenced
+> by impact. Regenerate with
+> `dotnet run --project Majik.Console -- mechanic-deps
+> --md-out docs/MECHANIC_DEPS.md --json-out docs/mechanic-deps.json`.
 
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 

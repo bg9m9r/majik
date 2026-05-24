@@ -115,6 +115,11 @@ class Program
                 await DiagnoseClausesCommand.RunAsync(top);
                 return;
             }
+            else if (args[0].Equals("mechanic-deps", StringComparison.OrdinalIgnoreCase))
+            {
+                Environment.Exit(await MechanicDepsCommand.RunAsync(args));
+                return;
+            }
             else if (args[0].Equals("scaffold-factory", StringComparison.OrdinalIgnoreCase))
             {
                 Environment.Exit(await ScaffoldFactoryCommand.RunAsync(args));
@@ -134,6 +139,7 @@ class Program
         System.Console.WriteLine("  Majik.Console coverage [--modern|--legacy|--vintage|--commander|--format <fmt>] [--decklist <path>] [--weighted [<snapshot.json>]] [--json-out <path>] [--md-out <path>] [--no-dedup] [--top N]");
         System.Console.WriteLine("  Majik.Console coverage-gaps [--modern|--legacy|--vintage|--commander|--format <fmt>] [--top N] [--min-cluster K] [--json-out <path>] [--md-out <path>]");
         System.Console.WriteLine("  Majik.Console compile-templates");
+        System.Console.WriteLine("  Majik.Console mechanic-deps [--top N] [--json-out <path>] [--md-out <path>] [--factories-dir <path>]");
         System.Console.WriteLine("  Majik.Console scaffold-factory <Card Name> [--out <path>] [--force]");
         System.Console.WriteLine();
         TriggerPlayground.PrintScenarios();
