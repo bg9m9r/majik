@@ -1010,5 +1010,13 @@ public static class SeedImplementedCards
         // lands you control (Layer 7c static pump via DomainPumpStaticEffect).
         // Attack trigger: discard a card, then draw a card (loot on attack).
         "Territorial Kavu",
+
+        // Legendary Creature — Human Soldier {1}{W} 2/1 (ThaliaGuardianOfThrabenFactory).
+        // Dark Ascension. First strike. Noncreature spells cost {1} more to cast.
+        "Thalia, Guardian of Thraben",
+
+        // Sorcery {2}{G} (SearchForTomorrowFactory). Time Spiral.
+        // Search library for basic land → battlefield untapped + Suspend 2—{G}.
+        "Search for Tomorrow",
     };
 }

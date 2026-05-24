@@ -2638,6 +2638,16 @@ public static class NamedCardFactory
             // service or TriggerManager wiring.
             "Territorial Kavu" => TerritorialKavuFactory.Create(owner),
 
+            // Legendary Creature — Human Soldier {1}{W} 2/1
+            // (ThaliaGuardianOfThrabenFactory). Dark Ascension.
+            // First strike keyword wired. Static "Noncreature spells cost
+            // {1} more to cast" wired via SpellCostIncreaseAbility on the
+            // card (CR 117.7 / CR 601.2f) — symmetric across all casters.
+            // The cost rider is consulted by CostReduction.GetEffectiveCost
+            // when allPlayers is supplied; inert while Thalia is off the
+            // battlefield.
+            "Thalia, Guardian of Thraben" => ThaliaGuardianOfThrabenFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
