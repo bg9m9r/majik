@@ -2686,6 +2686,21 @@ public static class NamedCardFactory
             // (CR 107.4e — same HybridPip path as Boros Reckoner {R/W}).
             "Kitchen Finks" => KitchenFinksFactory.Create(owner),
 
+            // Instant — {1}{U} (RemandFactory). Ravnica: City of Guilds.
+            // "Counter target spell. If that spell is countered this way,
+            //  put it into its owner's hand instead of into that player's
+            //  graveyard. Draw a card." Card shape only here; the resolve-time
+            // SpellDefinition (counter + hand-return + draw) is built on demand
+            // via RemandFactory.BuildDefinition(caster, targetResolver, stack).
+            "Remand" => RemandFactory.Create(owner),
+
+            // Instant — {1}{U} (ManaLeakFactory). Stronghold / various reprints.
+            // "Counter target spell unless its controller pays {3}." Card shape
+            // only here; the resolve-time SpellDefinition (counter-unless-pay-{3})
+            // is built on demand via ManaLeakFactory.BuildDefinition(targetResolver,
+            // stack). Mirrors DazeFactory's "unless pay" pattern with N=3.
+            "Mana Leak" => ManaLeakFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
