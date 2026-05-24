@@ -2654,6 +2654,29 @@ public static class NamedCardFactory
             // separate path).
             "Drannith Magistrate" => DrannithMagistrateFactory.Create(owner),
 
+            // Creature — Human Cleric {1}{W} 2/2 (ContainmentPriestFactory).
+            // Commander 2014 / Modern Horizons 2. Flash keyword wired.
+            // Printed replacement effect (CR 614): "If a nontoken creature
+            // would enter the battlefield and it wasn't cast, exile it
+            // instead." Wired via ContainmentPriestExileReplacementEffect
+            // when the runtime (owner, replacementBus, eventBus) overload
+            // is used. The single-arg dispatcher path here produces the
+            // correct card shape + Flash keyword without live replacement
+            // registration. ZoneMoveIntent.WasCast enforcement deferred
+            // until ZoneService consults the ReplacementBus on all ETB paths.
+            "Containment Priest" => ContainmentPriestFactory.Create(owner),
+
+            // Creature — Human Wizard {W}{U} 2/2 (MeddlingMageFactory).
+            // Planeshift / various reprints. ETB "choose a nonland card name"
+            // — the single-arg dispatcher path defaults to an empty name (no
+            // restriction). Printed static (CR 601.3): "Spells with the
+            // chosen name can't be cast." Wired via
+            // MeddlingMageCastRestrictionEffect + CastingRestrictions when
+            // the runtime (owner, chosenName, eventBus) overload is used
+            // (ActionValidator.ValidateCastSpell rejects casts via
+            // RuleViolation 601.3). LTB releases the block automatically.
+            "Meddling Mage" => MeddlingMageFactory.Create(owner),
+
             // Creature — Kavu {G}{W} 2/2 (TerritorialKavuFactory).
             // Modern Horizons 2. Domain — gets +1/+1 for each basic land
             // type among lands you control (CR 702.16 / CR 613.1g, Layer
