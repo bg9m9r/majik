@@ -57,6 +57,10 @@ public enum CardSubtype
     Nightmare,
     /// <summary>Rhino creature subtype — Crashing Footfalls Rhino tokens, Siege Rhino. CR 205.3m.</summary>
     Rhino,
+    /// <summary>Dinosaur creature subtype — Amped Raptor, Ripjaw Raptor,
+    /// Ghalta, Primal Hunger. Introduced in Ixalan; renamed from "Lizard"
+    /// for the original tribal cycle. CR 205.3m.</summary>
+    Dinosaur,
     /// <summary>Giant creature subtype — Primeval Titan, Hill Giant. CR 205.3m.</summary>
     Giant,
     /// <summary>Dauthi creature subtype — Tempest shadow creatures (Dauthi
