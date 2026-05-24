@@ -1,5 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <PropertyGroup>
+    <!-- Emit the source-generator output to disk so we can eyeball it
+         in CI and during local debugging. Files land under
+         obj/$(Configuration)/$(TargetFramework)/generated/. -->
+    <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+  </PropertyGroup>
+
   <ItemGroup>
     <!-- JSON card definitions. Bundled into the assembly so the engine
          has no filesystem dependency at runtime. -->
@@ -13,6 +20,15 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Source generator: builds the [CardName]-driven dispatch table
+         for NamedCardFactory at compile time. Loaded as an analyzer,
+         never shipped as a runtime dependency. -->
+    <ProjectReference Include="..\Majik.Core.SourceGen\Majik.Core.SourceGen.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false" />
   </ItemGroup>
 
 </Project>
