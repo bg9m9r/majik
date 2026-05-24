@@ -5,11 +5,11 @@ Scanner output: every `*Factory.cs` xmldoc / inline comment mentioning
 engine primitive. Each row answers: "if we ship primitive _X_, which factory
 xmldocs flagged that they're blocked on it?"
 
-- **Generated:** 2026-05-24 18:34 UTC
+- **Generated:** 2026-05-24 19:21 UTC
 - **Scanned dir:** `Majik.Core/CardData/Factories`
-- **Total mentions:** 247
+- **Total mentions:** 229
 - **Clusters:** 17
-- **Unclustered (need new registry pattern):** 131
+- **Unclustered (need new registry pattern):** 125
 
 Regenerate with `dotnet run --project Majik.Console -- mechanic-deps --md-out docs/MECHANIC_DEPS.md --json-out docs/mechanic-deps.json`.
 
@@ -17,12 +17,12 @@ Regenerate with `dotnet run --project Majik.Console -- mechanic-deps --md-out do
 
 | Rank | Primitive | CR | Factories | Mentions |
 |---:|---|---|---:|---:|
-| 1 | Agent-prompt targeting MVP | — | 25 | 32 |
-| 2 | Library shuffle (CR 701.20) | CR 701.20 | 12 | 17 |
-| 3 | Token colour identity (CR 105 / CR 903.4) | CR 105 | 11 | 21 |
-| 4 | "Activate only as a sorcery" gate (CR 117.1a) | CR 117.1a | 9 | 12 |
-| 5 | Regeneration shield (CR 701.15) | CR 701.15 | 6 | 8 |
-| 6 | Indestructible bypass on destroy (CR 702.12) | CR 702.12 | 6 | 7 |
+| 1 | Agent-prompt targeting MVP | — | 26 | 33 |
+| 2 | Token colour identity (CR 105 / CR 903.4) | CR 105 | 11 | 21 |
+| 3 | "Activate only as a sorcery" gate (CR 117.1a) | CR 117.1a | 9 | 12 |
+| 4 | Regeneration shield (CR 701.15) | CR 701.15 | 6 | 8 |
+| 5 | Indestructible bypass on destroy (CR 702.12) | CR 702.12 | 6 | 7 |
+| 6 | Library shuffle (CR 701.20) | CR 701.20 | 4 | 4 |
 | 7 | Layer-6 ability-grant subsystem (CR 613.1f) | CR 613.1f | 3 | 5 |
 | 8 | Escape alt-cost (CR 702.143) | CR 702.143 | 2 | 2 |
 | 9 | Kicker alt-cost (CR 702.33) | CR 702.33 | 2 | 2 |
@@ -39,7 +39,7 @@ Regenerate with `dotnet run --project Majik.Console -- mechanic-deps --md-out do
 
 ### 1. Agent-prompt targeting MVP
 
-- **Blocks:** 25 factories (32 mentions)
+- **Blocks:** 26 factories (33 mentions)
 - **Implementation hint:** IPlayerAgent needs ChooseTarget / ChooseYesNo surfaces; many spell factories punt on real targeting prompts.
 
 Mentions:
@@ -88,6 +88,8 @@ Mentions:
   > v1 always plays the first land in hand when one exists; a first-class yes/no agent prompt is deferred (same gap as Sun Titan / Primeval Titan / Stoneforge Mystic).
 - `DauthiVoidwalkerFactory` (`DauthiVoidwalkerFactory.cs:13`)
   > Wiring an agent prompt mirrors the rest of the v1 factories (deferred).
+- `PonderFactory` (`PonderFactory.cs:114`)
+  > Shuffle primitive is now wired (CR 701.20), but Ponder's "may" rider is a yes/no agent prompt — deferred behind the agent-prompt MVP (rank #1 in MECHANIC_DEPS).
 - `SilvergillAdeptFactory` (`SilvergillAdeptFactory.cs:10`)
   > The actual enforcement at cast-time (agent prompt: reveal a Merfolk card from hand OR pay {3} as an additional cost) is deferred until the additional-cost framework supports reveal-based alternatives.
 - `GoblinPiledriverFactory` (`GoblinPiledriverFactory.cs:10`)
@@ -109,50 +111,7 @@ Mentions:
 - `CoriSteelCutterFactory` (`CoriSteelCutterFactory.cs:15`)
   > A real prompt-driven flow (and the "to it" bookkeeping that pins attachment to *that specific* token rather than any creature) is deferred behind the broader agent-prompt surface — same posture as Eternal Witness / Snapcaster Mage.
 
-### 2. Library shuffle (CR 701.20)
-
-- **CR citation:** CR 701.20
-- **Blocks:** 12 factories (17 mentions)
-- **Implementation hint:** Add IZone.Shuffle / ZoneService.ShuffleLibrary. Tutor-family factories all block on this single primitive.
-
-Mentions:
-
-- `ScapeshiftFactory` (`ScapeshiftFactory.cs:10`)
-  > Library shuffle (CR 701.19c) deferred — no IZone.
-- `ScapeshiftFactory` (`ScapeshiftFactory.cs:175`)
-  > CR 701.19c — shuffle deferred (same rationale as SearchSpellFactory / PrimevalTitanFactory).
-- `WishclawTalismanFactory` (`WishclawTalismanFactory.cs:146`)
-  > CR 701.19c — shuffle deferred (no IZone.
-- `StoneforgeMysticFactory` (`StoneforgeMysticFactory.cs:99`)
-  > Shuffle and reveal- event emission are deferred (see class xmldoc).
-- `StoneforgeMysticFactory` (`StoneforgeMysticFactory.cs:119`)
-  > CR 701.19c shuffle deferred — see class xmldoc.
-- `AssassinsTrophyFactory` (`AssassinsTrophyFactory.cs:11`)
-  > Shuffle deferred — same MVP gap as every other tutor (<see cref="PathToExileFactory"/>).
-- `GreenSunsZenithFactory` (`GreenSunsZenithFactory.cs:14`)
-  > ## Deferred (v1 gaps)  - <b>Library shuffle</b> (CR 701.20a).
-- `GreenSunsZenithFactory` (`GreenSunsZenithFactory.cs:185`)
-  > Shuffle randomization itself is deferred (same gap as SearchSpellFactory).
-- `EldritchEvolutionFactory` (`EldritchEvolutionFactory.cs:182`)
-  > CR 701.19c — shuffle after a search effect (deferred — see class xmldoc / SearchSpellFactory).
-- `GoblinEngineerFactory` (`GoblinEngineerFactory.cs:111`)
-  > " v1: deterministic — take the first artifact card in the library; shuffle and reveal-event emission deferred (see class xmldoc).
-- `GoblinEngineerFactory` (`GoblinEngineerFactory.cs:132`)
-  > CR 701.19c shuffle deferred — see class xmldoc.
-- `PrimevalTitanFactory` (`PrimevalTitanFactory.cs:101`)
-  > CR 701.19a (search), CR 701.19c (shuffle deferred — see xmldoc).
-- `SearchForTomorrowFactory` (`SearchForTomorrowFactory.cs:10`)
-  > Library shuffle deferred — same gap as every other search effect in <see cref="SearchSpellFactory"/> (no IZone.
-- `GoblinMatronFactory` (`GoblinMatronFactory.cs:138`)
-  > CR 701.19c shuffle deferred — see class xmldoc.
-- `TrinketMageFactory` (`TrinketMageFactory.cs:77`)
-  > Shuffle and reveal-event emission are deferred (see class xmldoc).
-- `TrinketMageFactory` (`TrinketMageFactory.cs:99`)
-  > CR 701.19c shuffle deferred — see class xmldoc.
-- `PonderFactory` (`PonderFactory.cs:58`)
-  > The "may shuffle" rider is deferred (no-op).
-
-### 3. Token colour identity (CR 105 / CR 903.4)
+### 2. Token colour identity (CR 105 / CR 903.4)
 
 - **CR citation:** CR 105
 - **Blocks:** 11 factories (21 mentions)
@@ -203,7 +162,7 @@ Mentions:
 - `CoriSteelCutterFactory` (`CoriSteelCutterFactory.cs:187`)
   > Token colour identity (white) deferred — see class xmldoc.
 
-### 4. "Activate only as a sorcery" gate (CR 117.1a)
+### 3. "Activate only as a sorcery" gate (CR 117.1a)
 
 - **CR citation:** CR 117.1a
 - **Blocks:** 9 factories (12 mentions)
@@ -213,7 +172,7 @@ Mentions:
 
 - `SwordOfFireAndIceFactory` (`SwordOfFireAndIceFactory.cs:209`)
   > Sorcery-speed restriction deferred (see class xmldoc).
-- `WishclawTalismanFactory` (`WishclawTalismanFactory.cs:110`)
+- `WishclawTalismanFactory` (`WishclawTalismanFactory.cs:106`)
   > CR 117.1a sorcery-speed restriction deferred (see class xmldoc).
 - `SkullclampFactory` (`SkullclampFactory.cs:13`)
   > ## Deferred  - <b>Sorcery-speed restriction</b> on Equip activation (CR 702.6a) — same gap as <see cref="ColossusHammerFactory"/>.
@@ -236,7 +195,7 @@ Mentions:
 - `CoriSteelCutterFactory` (`CoriSteelCutterFactory.cs:225`)
   > Sorcery-speed restriction deferred (see class xmldoc).
 
-### 5. Regeneration shield (CR 701.15)
+### 4. Regeneration shield (CR 701.15)
 
 - **CR citation:** CR 701.15
 - **Blocks:** 6 factories (8 mentions)
@@ -244,7 +203,7 @@ Mentions:
 
 Mentions:
 
-- `DrownInTheLochFactory` (`DrownInTheLochFactory.cs:12`)
+- `DrownInTheLochFactory` (`DrownInTheLochFactory.cs:13`)
   > Indestructible / regeneration riders are deferred (same gap as <see cref="SlaughterPactFactory"/> and the rest of the single-target destroy family).
 - `DrownInTheLochFactory` (`DrownInTheLochFactory.cs:210`)
   > CR 701.7 — destroy → owner's graveyard (Indestructible / regeneration deferred, same gap as SlaughterPactFactory).
@@ -261,7 +220,7 @@ Mentions:
 - `EmberethShieldbreakerFactory` (`EmberethShieldbreakerFactory.cs:126`)
   > Indestructible / regeneration deferred (same gap as SlaughterPact).
 
-### 6. Indestructible bypass on destroy (CR 702.12)
+### 5. Indestructible bypass on destroy (CR 702.12)
 
 - **CR citation:** CR 702.12
 - **Blocks:** 6 factories (7 mentions)
@@ -275,7 +234,7 @@ Mentions:
   > Indestructible rider deferred.
 - `AssassinsTrophyFactory` (`AssassinsTrophyFactory.cs:11`)
   > <b>Indestructible</b>: the destroy call moves the permanent to the graveyard without checking for Indestructible (same gap as every other single-target destroy template — Terminate, Abrupt Decay, Slaughter Pact).
-- `AssassinsTrophyFactory` (`AssassinsTrophyFactory.cs:133`)
+- `AssassinsTrophyFactory` (`AssassinsTrophyFactory.cs:131`)
   > Indestructible rider deferred (same gap as Terminate / Abrupt Decay / Slaughter Pact).
 - `WrathOfTheSkiesFactory` (`WrathOfTheSkiesFactory.cs:12`)
   > ## v1 simplifications  - <b>Indestructible bypass</b>: same gap as <see cref="WrathOfGodFactory"/> / <see cref="EngineeredExplosivesFactory"/> — <see cref="OracleSpellBinder.
@@ -283,6 +242,23 @@ Mentions:
   > <b>Indestructible / regeneration</b>: the destroy call moves the permanent to the graveyard without checking for Indestructible or an active regeneration shield (same gap as every other single-target destroy template — Terminate, Abrupt Decay, Slaughter Pact).
 - `AbruptDecayFactory` (`AbruptDecayFactory.cs:11`)
   > <b>Indestructible</b>: the destroy call moves the permanent to the graveyard without checking for Indestructible — same gap as every other single-target destroy template (Slaughter Pact, Force of Vigor destroy path, etc.
+
+### 6. Library shuffle (CR 701.20)
+
+- **CR citation:** CR 701.20
+- **Blocks:** 4 factories (4 mentions)
+- **Implementation hint:** Add IZone.Shuffle / ZoneService.ShuffleLibrary. Tutor-family factories all block on this single primitive.
+
+Mentions:
+
+- `StoneforgeMysticFactory` (`StoneforgeMysticFactory.cs:96`)
+  > Reveal-event emission is deferred (see class xmldoc); CR 701.20a shuffle now wired via LibraryShuffle.
+- `GoblinEngineerFactory` (`GoblinEngineerFactory.cs:108`)
+  > " v1: deterministic — take the first artifact card in the library; reveal-event emission deferred (see class xmldoc); CR 701.20a shuffle is now wired via LibraryShuffle.
+- `TrinketMageFactory` (`TrinketMageFactory.cs:74`)
+  > Reveal-event emission is deferred (see class xmldoc); CR 701.20a shuffle now wired via LibraryShuffle.
+- `PonderFactory` (`PonderFactory.cs:58`)
+  > The "may shuffle" rider is deferred (no-op).
 
 ### 7. Layer-6 ability-grant subsystem (CR 613.1f)
 
@@ -326,7 +302,7 @@ Mentions:
 
 - `SlickshotShowOffFactory` (`SlickshotShowOffFactory.cs:10`)
   > Same posture as <see cref="BurstLightningFactory"/>'s deferred Kicker rider — ship the printed shape + the most common triggered/static body, defer the alt-cost mechanic until its primitive lands.
-- `BurstLightningFactory` (`BurstLightningFactory.cs:10`)
+- `BurstLightningFactory` (`BurstLightningFactory.cs:11`)
   > "  ## Implementation (v1 — kicker primitive deferred)  CR 702.33 — Kicker is an additional cost (not an alternative cost) that modifies the spell's effect when paid.
 
 ### 10. Class leveling (CR 716)
@@ -425,8 +401,6 @@ Mentions:
   > ## Deferred (v1 gaps)  - <b>Layer 1 copy effect</b>: the token's P/T + keywords are snapshotted at the moment the ability resolves; if the bearer's characteristics change later (counters, +1/+1 boost, lord anthems), the token does NOT track them.
 - `ScapeshiftFactory` (`ScapeshiftFactory.cs:10`)
   > ## v1 gaps - <b>"Any number" prompt</b>: the engine has no first-class "pick a subset of permanents to sacrifice" agent hook.
-- `ScapeshiftFactory` (`ScapeshiftFactory.cs:10`)
-  > <b>Library shuffle</b> (CR 701.19c) — same gap as the rest of the tutor surface.
 - `TheOneRingFactory` (`TheOneRingFactory.cs:121`)
   > " Structural: "if you cast it" + "until your next turn" expiry deferred — see class xmldoc.
 - `StormchasersTalentFactory` (`StormchasersTalentFactory.cs:12`)
@@ -489,12 +463,10 @@ Mentions:
   > The "pick a spell from the stack" prompt is deferred to the agent MVP.
 - `TerritorialKavuFactory` (`TerritorialKavuFactory.cs:12`)
   > <b>"You may" prompt on the attack trigger</b>: v1 always takes the loot when a card is available; an explicit yes/no prompt is deferred.
-- `GristFactory` (`GristFactory.cs:7`)
+- `GristFactory` (`GristFactory.cs:8`)
   > ## V1 simplification The "not on the battlefield" conditional is deferred.
-- `GristFactory` (`GristFactory.cs:7`)
-  > The conditional layer-4 effect ("only when not on battlefield") is documented but deferred to a future slice.
-- `GristFactory` (`GristFactory.cs:50`)
-  > The oracle-text restriction ("as long as … isn't on the battlefield") is a conditional layer-4 effect — deferred.
+- `GristFactory` (`GristFactory.cs:36`)
+  > The oracle-text restriction is a deferred conditional layer-4 effect.
 - `KarnLiberatedFactory` (`KarnLiberatedFactory.cs:140`)
   > v1 DEFERRED — shipped as a no-op so the loyalty change (and "this card is a legal -14 ability") still apply (CR 606.3).
 - `AmpedRaptorFactory` (`AmpedRaptorFactory.cs:252`)
@@ -507,6 +479,8 @@ Mentions:
   > Adding this requires the same replacement-effect surface used by the Anger of the Gods exile rider (see <see cref="AngerOfTheGodsFactory"/>); deferred to keep the v1 ship minimal.
 - `MurderousRiderFactory` (`MurderousRiderFactory.cs:12`)
   > MoveToGraveyard"/>; same gap as <see cref="SlaughterPactFactory"/> and the rest of the single-target destroy family.
+- `GreenSunsZenithFactory` (`GreenSunsZenithFactory.cs:14`)
+  > ## Deferred (v1 gaps)  - <b>Replacing the spell's destination via the stack resolver</b>.
 - `PriestOfFellRitesFactory` (`PriestOfFellRitesFactory.cs:12`)
   > </para>  ## Deferred (v1 gaps)
 - `PriestOfFellRitesFactory` (`PriestOfFellRitesFactory.cs:132`)
@@ -587,8 +561,6 @@ Mentions:
   > Face-down exile is deferred — engine has no face-down flag.
 - `MishrasBaubleFactory` (`MishrasBaubleFactory.cs:12`)
   > Multi-player turn-skipping semantics deferred.
-- `BadgermoleCubFactory` (`BadgermoleCubFactory.cs:51`)
-  > No abilities attached in v1 — both are deferred (see xmldoc above).
 - `DauthiVoidwalkerFactory` (`DauthiVoidwalkerFactory.cs:13`)
   > Cleanup) and is deferred until a cast-permission flag is added.
 - `DauthiVoidwalkerFactory` (`DauthiVoidwalkerFactory.cs:117`)
@@ -631,8 +603,6 @@ Mentions:
   > Targeting + fight step deferred (see xmldoc above).
 - `ShowAndTellFactory` (`ShowAndTellFactory.cs:10`)
   > Real "any of N choices + opt-out" prompt deferred (same queue as Stoneforge Mystic / Sun Titan).
-- `MishrasWorkshopFactory` (`MishrasWorkshopFactory.cs:8`)
-  > Per the same gap acknowledged across the codebase, the v1 shell ships the structural mana amount without the artifact-only gate; once a provenance ledger lands, wire the restriction here as a <c>spendableForPredicate</c>-style hook on the <c>ManaAbility</c>.
 - `YawgmothFactory` (`YawgmothFactory.cs:10`)
   > Effect 4: Controller draws a card  ## Deferred (v1 gaps)
 - `YawgmothFactory` (`YawgmothFactory.cs:10`)
@@ -649,8 +619,6 @@ Mentions:
   > <b>Combat math through Compute</b>: same gap as Karn's animate- artifact (<see cref="KarnAnimateArtifactEffect"/>).
 - `MutavaultFactory` (`MutavaultFactory.cs:11`)
   > Mutavault was on the battlefield long enough but its Creature-ness is fresh — the intricate "had Creature type continuously since untap step" bookkeeping is deferred; the test suite asserts shape, not attack legality.
-- `FetchLandCycleFactory` (`FetchLandCycleFactory.cs:11`)
-  > Shuffle</c> entry point yet — same gap as every other tutor in the codebase.
 - `AtraxaGrandUnifierFactory` (`AtraxaGrandUnifierFactory.cs:10`)
   > No live observer cares yet (same gap as the rest of the reveal-and-pick factories — Ancient Stirrings, Goblin Matron, Mystical Tutor).
 - `CavernOfSoulsFactory` (`CavernOfSoulsFactory.cs:120`)
@@ -659,10 +627,6 @@ Mentions:
   > Wire a selector callback when the multi-candidate "choose a card to put onto the battlefield" prompt ships (mirrors the same gap on Stoneforge Mystic's tutor).
 - `DazeFactory` (`DazeFactory.cs:11`)
   > A bot-side probe (mirror of <c>PitchAltCostProbe</c>) is deferred — Daze's pitch always pays so the probe shape is just "for each Island controlled, yield one candidate" and lives outside this factory's surface in v1.
-- `PhoenixOfAshFactory` (`PhoenixOfAshFactory.cs:8`)
-  > The printed "can attack as though it didn't have summoning sickness as long as it has haste" rider collapses observationally to the Haste keyword in v1 — CR 702.10b already lets a creature with haste attack the turn it came under its controller's control, so the additional clause only matters when Haste is granted-then…
-- `PhoenixOfAshFactory` (`PhoenixOfAshFactory.cs:8`)
-  > Distinct behaviour only manifests if Haste is removed mid-turn after the controller has owned Phoenix of Ash for less than a full turn — no keyword-removal surface yet, same gap as Goblin Chieftain's Haste-loss interactions.
 - `AjaniNacatlPariahFactory` (`AjaniNacatlPariahFactory.cs:11`)
   > The MdfcState flip is the v1 observation surface — combat / loyalty interactions on the back face are deferred.
 - `AjaniNacatlPariahFactory` (`AjaniNacatlPariahFactory.cs:105`)

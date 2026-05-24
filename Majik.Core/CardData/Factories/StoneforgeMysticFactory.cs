@@ -50,9 +50,6 @@ namespace Majik.Core.CardData.Factories;
 /// - <b>Attach target prompt</b>: "attach it to a creature you control"
 ///   should prompt the controller for any of their creatures (CR 701.3a).
 ///   v1 auto-picks the first creature on the controller's battlefield.
-/// - <b>Library shuffle</b>: CR 701.19c — "then shuffle." The ETB tutor
-///   skips the shuffle (no IZone.Shuffle entry point yet; same rationale
-///   as <see cref="SpellTemplates.Templates.Search.SearchSpellFactory"/>).
 /// - <b>Reveal event</b>: the ETB tutor moves the card to hand without
 ///   emitting a CardRevealedEvent. Wire a reveal when CardRevealedEvent
 ///   plumbing is exercised by an in-engine prompt path.
@@ -102,8 +99,9 @@ public static class StoneforgeMysticFactory
         //    an Equipment card, reveal it, put it into your hand, then
         //    shuffle."
         // v1: deterministic — take the first Equipment card in the library
-        // (Artifact whose subtypes include Equipment). Shuffle and reveal-
-        // event emission are deferred (see class xmldoc).
+        // (Artifact whose subtypes include Equipment). Reveal-event emission
+        // is deferred (see class xmldoc); CR 701.20a shuffle now wired via
+        // LibraryShuffle.
         // ----------------------------------------------------------------
         var etbEffect = new Effect(
             "Stoneforge Mystic: tutor an Equipment to hand",
@@ -116,7 +114,8 @@ public static class StoneforgeMysticFactory
                 owner.Zones.Library.RemoveCard(pick);
                 owner.Zones.Hand.AddCard(pick);
                 pick.SetZone(ZoneType.Hand);
-                // CR 701.19c shuffle deferred — see class xmldoc.
+                // CR 701.20a — shuffle after the search resolves.
+                Majik.Core.Zones.LibraryShuffle.ShuffleLibrary(owner, "stoneforge-mystic");
             });
 
         var etbTrigger = new TriggeredAbility(

@@ -51,9 +51,6 @@ namespace Majik.Core.CardData.Factories;
 ///   deterministic match). Real "Sacrifice an artifact" + "target
 ///   artifact card from your graveyard" prompts ship with the
 ///   agent-driven targeting MVP.
-/// - <b>Library shuffle</b> (CR 701.19c): the ETB tutor skips the
-///   shuffle (no IZone.Shuffle entry point yet; same rationale as
-///   TrinketMage / GoblinMatron / StoneforgeMystic).
 /// - <b>Reveal event</b>: the ETB tutor moves the artifact Library →
 ///   Graveyard without publishing a reveal event. Same gap as the
 ///   rest of the tutor surface.
@@ -114,7 +111,8 @@ public static class GoblinEngineerFactory
         //    an artifact card, then put that card into your graveyard. If
         //    you do, shuffle."
         // v1: deterministic — take the first artifact card in the library;
-        // shuffle and reveal-event emission deferred (see class xmldoc).
+        // reveal-event emission deferred (see class xmldoc); CR 701.20a
+        // shuffle is now wired via LibraryShuffle.
         // Destination is graveyard (NOT hand) — distinguishes from
         // TrinketMageFactory / GoblinMatronFactory.
         // ----------------------------------------------------------------
@@ -129,7 +127,8 @@ public static class GoblinEngineerFactory
                 owner.Zones.Library.RemoveCard(pick);
                 owner.Zones.Graveyard.AddCard(pick);
                 pick.SetZone(ZoneType.Graveyard);
-                // CR 701.19c shuffle deferred — see class xmldoc.
+                // CR 701.20a — shuffle after the search resolves.
+                Majik.Core.Zones.LibraryShuffle.ShuffleLibrary(owner, "goblin-engineer");
             });
 
         var etbTrigger = new TriggeredAbility(

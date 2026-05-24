@@ -46,9 +46,6 @@ namespace Majik.Core.CardData.Factories;
 ///   returning null per pick acts as the opt-out lever. A first-class
 ///   yes/no agent prompt is deferred (see <c>StoneforgeMystic</c> for
 ///   the same gap).
-/// - <b>Library shuffle</b>: CR 701.19c — same rationale as
-///   <see cref="SpellTemplates.Templates.Search.SearchSpellFactory"/>;
-///   no <c>IZone.Shuffle</c> entry point yet.
 /// - <b>Per-pick uniqueness</b>: the engine does not yet enforce
 ///   that a multi-pick search must choose distinct cards. The default
 ///   agent path naturally picks distinct lands (each picked land is
@@ -100,7 +97,7 @@ public static class PrimevalTitanFactory
 
         // ----------------------------------------------------------------
         // Shared tutor effect — search up to two lands → battlefield tapped.
-        // CR 701.19a (search), CR 701.19c (shuffle deferred — see xmldoc).
+        // CR 701.19a (search), CR 701.20a (shuffle after — see helper call).
         // ----------------------------------------------------------------
         IEffect BuildTutorEffect(string label) =>
             new Effect(label, () => TutorUpToTwoLandsTapped(owner, selector));
@@ -171,6 +168,8 @@ public static class PrimevalTitanFactory
                 MoveToBattlefieldTapped(caster, pick);
                 placed++;
             }
+            // CR 701.20a — shuffle after the search resolves.
+            Majik.Core.Zones.LibraryShuffle.ShuffleLibrary(caster, "primeval-titan");
             return;
         }
 
@@ -183,16 +182,18 @@ public static class PrimevalTitanFactory
             var candidates = caster.Zones.Library.GetCards()
                 .Where(c => c.HasType(CardType.Land))
                 .ToList();
-            if (candidates.Count == 0) return;
+            if (candidates.Count == 0) break;
 
             ICard? pick = agent != null
                 ? agent.ChooseLibraryPickAsync(ctx: null, candidates, "land card")
                     .GetAwaiter().GetResult()
                 : candidates[0];
-            if (pick == null) return; // CR 701.19a — decline is legal.
+            if (pick == null) break; // CR 701.19a — decline is legal.
 
             MoveToBattlefieldTapped(caster, pick);
         }
+        // CR 701.20a — shuffle after the search resolves.
+        Majik.Core.Zones.LibraryShuffle.ShuffleLibrary(caster, "primeval-titan");
     }
 
     /// <summary>

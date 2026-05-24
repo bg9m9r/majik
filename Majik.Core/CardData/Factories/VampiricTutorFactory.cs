@@ -44,10 +44,6 @@ namespace Majik.Core.CardData.Factories;
 ///   post-tutor side effect in the same effect closure.
 ///
 /// ## Deferred (v1 gaps)
-/// - <b>Library shuffle</b> (CR 701.19c). Same rationale as the rest of
-///   the tutor surface — no IZone.Shuffle entry point yet. The picked
-///   card still ends up on top, which is the end state Vampiric Tutor
-///   controllers actually consume next turn.
 /// - <b>Reveal event</b>. The picked card moves Library → top-of-Library
 ///   without publishing a reveal event; same gap as the other search
 ///   factories.
@@ -115,14 +111,15 @@ public static class VampiricTutorFactory
                         if (pick != null)
                         {
                             caster.Zones.Library.RemoveCard(pick);
+                            // CR 701.20a — Vampiric Tutor's printed oracle is
+                            // "search your library for a card, then shuffle,
+                            // then put that card on top of your library."
+                            // Shuffle the (now without-pick) library, THEN
+                            // insert the pick on top so the controller still
+                            // draws it next turn.
+                            Majik.Core.Zones.LibraryShuffle.ShuffleLibrary(caster, "vampiric-tutor");
                             caster.Zones.Library.InsertCardAt(0, pick);
                             pick.SetZone(ZoneType.Library);
-                            // CR 701.19c — shuffle after a search effect.
-                            // Deferred (see class xmldoc): no IZone.Shuffle
-                            // entry point yet. The picked card still ends
-                            // up on top, which is the end state Vampiric
-                            // Tutor controllers actually consume next
-                            // turn.
                         }
                     }
 

@@ -26,8 +26,6 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="SearchSpellFactory.SearchLandToBattlefieldSpell"/> with
 ///   <c>kindRaw = "basic land"</c> and <c>tapped = false</c>. Deterministic
 ///   first-match fallback when no agent is registered.
-///   Library shuffle deferred — same gap as every other search effect in
-///   <see cref="SearchSpellFactory"/> (no IZone.Shuffle entry point yet).
 /// - Suspend alt cost: pay {G}, exile Search for Tomorrow with 2 time
 ///   counters via <see cref="SuspendAlternativeCost"/>. On each of the
 ///   controller's upkeeps <see cref="SuspendedCardRegistry"/> decrements
@@ -36,7 +34,6 @@ namespace Majik.Core.CardData.Factories;
 ///   exactly, only the counter value (2) and cost ({G}) differ.
 ///
 /// ## Deferred (v1 gaps)
-/// - <b>Library shuffle</b> (CR 701.19c). No IZone.Shuffle entry point yet.
 /// - <b>Oracle binder discovery</b>: Suspend is not yet auto-detected from
 ///   Scryfall oracle text by OracleSpellBinder. Bots see it via
 ///   <see cref="BuildSuspendCost"/> or direct factory construction.

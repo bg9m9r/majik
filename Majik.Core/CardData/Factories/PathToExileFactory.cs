@@ -33,10 +33,6 @@ namespace Majik.Core.CardData.Factories;
 /// commits to searching they may legally find nothing.
 ///
 /// ## Deferred (v1 gaps)
-/// - <b>Library shuffle</b>: <c>IZone.Shuffle</c> is not yet exposed; the
-///   search consumes the picked card but no actual reordering happens
-///   (same MVP gap as every other tutor in the codebase — see
-///   <see cref="SpellTemplates.Templates.Search.SearchSpellFactory"/>).
 /// - <b>Reveal-on-find</b>: tutor effects in this engine don't yet emit
 ///   a reveal event for the picked card. Cosmetic for engine purposes.
 /// - <b>Illegal-target fizzle</b>: handled by <see cref="SpellCastFlow"/>
@@ -154,8 +150,7 @@ public static class PathToExileFactory
         {
             perm.Tap();
         }
-        // CR 701.19c — shuffle after a search effect. Skipped for MVP
-        // (no IZone.Shuffle entry point yet; same rationale as
-        // SearchSpellFactory).
+        // CR 701.20a — shuffle after the search resolves.
+        Majik.Core.Zones.LibraryShuffle.ShuffleLibrary(player, "path-to-exile");
     }
 }

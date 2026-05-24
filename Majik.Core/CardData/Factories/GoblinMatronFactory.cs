@@ -45,9 +45,6 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="GoblinLackeyFactory"/>).
 ///
 /// ## Deferred (v1 gaps)
-/// - <b>Library shuffle</b> (CR 701.19c). Same rationale as the rest of
-///   <see cref="SpellTemplates.Templates.Search.SearchSpellFactory"/> —
-///   no IZone.Shuffle entry point yet; GameDriver owns shuffle.
 /// - <b>Reveal event</b>. The picked card moves Library → Hand without
 ///   publishing a CardRevealedEvent; same gap as the other tutor
 ///   factories.
@@ -135,7 +132,8 @@ public static class GoblinMatronFactory
                 owner.Zones.Library.RemoveCard(pick);
                 owner.Zones.Hand.AddCard(pick);
                 pick.SetZone(ZoneType.Hand);
-                // CR 701.19c shuffle deferred — see class xmldoc.
+                // CR 701.20a — shuffle after the search resolves.
+                Majik.Core.Zones.LibraryShuffle.ShuffleLibrary(owner, "goblin-matron");
             });
 
         var etbTrigger = new TriggeredAbility(

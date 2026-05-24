@@ -717,6 +717,10 @@ public sealed class ShuffleGraveyardIntoLibraryTemplate : ISpellTemplate
                         pl.Zones.Library.AddCard(c);
                         c.SetZone(Majik.Core.Zones.ZoneType.Library);
                     }
+                    // CR 701.20 — the printed effect is a "shuffle into
+                    // library" which the rules treat as an explicit shuffle
+                    // of the destination library.
+                    Majik.Core.Zones.LibraryShuffle.ShuffleLibrary(pl, "graveyard-into-library");
                 }) };
             });
     }

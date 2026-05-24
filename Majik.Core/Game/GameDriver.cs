@@ -28,6 +28,7 @@ public sealed class GameDriver
     private readonly TurnDriver _turnDriver;
     private readonly StateBasedActions _sba;
     private readonly Majik.Core.Random.GameRandom _rng;
+    private readonly Majik.Core.Events.IEventBus? _eventBus;
     private readonly ExtraTurnQueue _extraTurns = new();
 
     /// <summary>Effects that grant an extra turn enqueue here; the loop
@@ -56,6 +57,26 @@ public sealed class GameDriver
         _agents = agents ?? throw new ArgumentNullException(nameof(agents));
         _sba = stateBasedActions ?? throw new ArgumentNullException(nameof(stateBasedActions));
         _rng = rng ?? new Majik.Core.Random.GameRandom();
+        _eventBus = eventBus;
+
+        // CR 701.20 — register the game RNG + bus so factory closures
+        // (e.g. SearchSpellFactory's tutor effects) can resolve the
+        // active randomness source and emit LibraryShuffledEvent without
+        // a parameter-threading rewrite. AgentRegistry uses the same
+        // pattern for per-player agent lookup.
+        foreach (var p in _players)
+        {
+            Majik.Core.Random.GameRandomRegistry.Set(p, _rng);
+            if (_eventBus is not null)
+            {
+                Majik.Core.Events.EventBusRegistry.Set(p, _eventBus);
+            }
+        }
+        Majik.Core.Random.GameRandomRegistry.SetDefault(_rng);
+        if (_eventBus is not null)
+        {
+            Majik.Core.Events.EventBusRegistry.SetDefault(_eventBus);
+        }
 
         // CR 305.2 — a full game ALWAYS needs a LandDropTracker so the
         // per-turn one-land cap is enforced in PriorityLoop. Default-
@@ -138,9 +159,9 @@ public sealed class GameDriver
 
     private void ShuffleLibrary(Player p)
     {
-        var lib = p.Zones.Library.GetCards().ToList();
-        foreach (var c in lib) p.Zones.Library.RemoveCard(c);
-        _rng.Shuffle(lib);
-        foreach (var c in lib) p.Zones.Library.AddCard(c);
+        // CR 103.1 — pre-game shuffle. Use the new IZone.Shuffle primitive
+        // so the shared LibraryShuffle helper publishes a single
+        // LibraryShuffledEvent ("game-start" reason) on the event bus.
+        Majik.Core.Zones.LibraryShuffle.ShuffleLibrary(p, "game-start");
     }
 }

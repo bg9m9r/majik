@@ -1,17 +1,17 @@
 {
-  "generated_utc": "2026-05-24T18:34:51.8750064Z",
-  "scanned_dir": "/home/brett/Projects/majik.project/majik.core/.claude/worktrees/agent-a6a9323cefcd8c2d2/Majik.Core/CardData/Factories",
-  "total_mentions": 247,
-  "distinct_factories": 154,
+  "generated_utc": "2026-05-24T19:21:50.3231618Z",
+  "scanned_dir": "/home/brett/Projects/majik.project/majik.core/.claude/worktrees/agent-afd16e016f7f13b7f/Majik.Core/CardData/Factories",
+  "total_mentions": 229,
+  "distinct_factories": 147,
   "cluster_count": 17,
-  "unclustered_count": 131,
+  "unclustered_count": 125,
   "clusters": [
     {
       "primitive_id": "agent-prompt-targeting",
       "display_name": "Agent-prompt targeting MVP",
       "implementation_hint": "IPlayerAgent needs ChooseTarget / ChooseYesNo surfaces; many spell factories punt on real targeting prompts.",
-      "factory_count": 25,
-      "mention_count": 32,
+      "factory_count": 26,
+      "mention_count": 33,
       "factories": [
         "AetherVialFactory",
         "AgathasSoulCauldronFactory",
@@ -26,6 +26,7 @@
         "GoblinPiledriverFactory",
         "MysticSanctuaryFactory",
         "NihilSpellbombFactory",
+        "PonderFactory",
         "PriestOfFellRitesFactory",
         "PrimevalTitanFactory",
         "PsychicFrogFactory",
@@ -176,6 +177,13 @@
           "sentence": "Wiring an agent prompt mirrors the rest of the v1 factories (deferred)."
         },
         {
+          "factory": "PonderFactory",
+          "file": "PonderFactory.cs",
+          "line": 114,
+          "sentence": "Shuffle primitive is now wired (CR 701.20), but Ponder\u0027s \u0022may\u0022 rider is a yes/no agent prompt \u2014 deferred behind the agent-prompt MVP (rank #1 in MECHANIC_DEPS).",
+          "cr": "CR 701.20"
+        },
+        {
           "factory": "SilvergillAdeptFactory",
           "file": "SilvergillAdeptFactory.cs",
           "line": 10,
@@ -235,142 +243,6 @@
           "file": "CoriSteelCutterFactory.cs",
           "line": 15,
           "sentence": "A real prompt-driven flow (and the \u0022to it\u0022 bookkeeping that pins attachment to *that specific* token rather than any creature) is deferred behind the broader agent-prompt surface \u2014 same posture as Eternal Witness / Snapcaster Mage."
-        }
-      ]
-    },
-    {
-      "primitive_id": "library-shuffle",
-      "display_name": "Library shuffle (CR 701.20)",
-      "comp_rules_citation": "CR 701.20",
-      "implementation_hint": "Add IZone.Shuffle / ZoneService.ShuffleLibrary. Tutor-family factories all block on this single primitive.",
-      "factory_count": 12,
-      "mention_count": 17,
-      "factories": [
-        "AssassinsTrophyFactory",
-        "EldritchEvolutionFactory",
-        "GoblinEngineerFactory",
-        "GoblinMatronFactory",
-        "GreenSunsZenithFactory",
-        "PonderFactory",
-        "PrimevalTitanFactory",
-        "ScapeshiftFactory",
-        "SearchForTomorrowFactory",
-        "StoneforgeMysticFactory",
-        "TrinketMageFactory",
-        "WishclawTalismanFactory"
-      ],
-      "mentions": [
-        {
-          "factory": "ScapeshiftFactory",
-          "file": "ScapeshiftFactory.cs",
-          "line": 10,
-          "sentence": "Library shuffle (CR 701.19c) deferred \u2014 no IZone.",
-          "cr": "CR 701.19c"
-        },
-        {
-          "factory": "ScapeshiftFactory",
-          "file": "ScapeshiftFactory.cs",
-          "line": 175,
-          "sentence": "CR 701.19c \u2014 shuffle deferred (same rationale as SearchSpellFactory / PrimevalTitanFactory).",
-          "cr": "CR 701.19c"
-        },
-        {
-          "factory": "WishclawTalismanFactory",
-          "file": "WishclawTalismanFactory.cs",
-          "line": 146,
-          "sentence": "CR 701.19c \u2014 shuffle deferred (no IZone.",
-          "cr": "CR 701.19c"
-        },
-        {
-          "factory": "StoneforgeMysticFactory",
-          "file": "StoneforgeMysticFactory.cs",
-          "line": 99,
-          "sentence": "Shuffle and reveal- event emission are deferred (see class xmldoc)."
-        },
-        {
-          "factory": "StoneforgeMysticFactory",
-          "file": "StoneforgeMysticFactory.cs",
-          "line": 119,
-          "sentence": "CR 701.19c shuffle deferred \u2014 see class xmldoc.",
-          "cr": "CR 701.19c"
-        },
-        {
-          "factory": "AssassinsTrophyFactory",
-          "file": "AssassinsTrophyFactory.cs",
-          "line": 11,
-          "sentence": "Shuffle deferred \u2014 same MVP gap as every other tutor (\u003Csee cref=\u0022PathToExileFactory\u0022/\u003E)."
-        },
-        {
-          "factory": "GreenSunsZenithFactory",
-          "file": "GreenSunsZenithFactory.cs",
-          "line": 14,
-          "sentence": "## Deferred (v1 gaps)  - \u003Cb\u003ELibrary shuffle\u003C/b\u003E (CR 701.20a).",
-          "cr": "CR 701.20a"
-        },
-        {
-          "factory": "GreenSunsZenithFactory",
-          "file": "GreenSunsZenithFactory.cs",
-          "line": 185,
-          "sentence": "Shuffle randomization itself is deferred (same gap as SearchSpellFactory)."
-        },
-        {
-          "factory": "EldritchEvolutionFactory",
-          "file": "EldritchEvolutionFactory.cs",
-          "line": 182,
-          "sentence": "CR 701.19c \u2014 shuffle after a search effect (deferred \u2014 see class xmldoc / SearchSpellFactory).",
-          "cr": "CR 701.19c"
-        },
-        {
-          "factory": "GoblinEngineerFactory",
-          "file": "GoblinEngineerFactory.cs",
-          "line": 111,
-          "sentence": "\u0022 v1: deterministic \u2014 take the first artifact card in the library; shuffle and reveal-event emission deferred (see class xmldoc)."
-        },
-        {
-          "factory": "GoblinEngineerFactory",
-          "file": "GoblinEngineerFactory.cs",
-          "line": 132,
-          "sentence": "CR 701.19c shuffle deferred \u2014 see class xmldoc.",
-          "cr": "CR 701.19c"
-        },
-        {
-          "factory": "PrimevalTitanFactory",
-          "file": "PrimevalTitanFactory.cs",
-          "line": 101,
-          "sentence": "CR 701.19a (search), CR 701.19c (shuffle deferred \u2014 see xmldoc).",
-          "cr": "CR 701.19a"
-        },
-        {
-          "factory": "SearchForTomorrowFactory",
-          "file": "SearchForTomorrowFactory.cs",
-          "line": 10,
-          "sentence": "Library shuffle deferred \u2014 same gap as every other search effect in \u003Csee cref=\u0022SearchSpellFactory\u0022/\u003E (no IZone."
-        },
-        {
-          "factory": "GoblinMatronFactory",
-          "file": "GoblinMatronFactory.cs",
-          "line": 138,
-          "sentence": "CR 701.19c shuffle deferred \u2014 see class xmldoc.",
-          "cr": "CR 701.19c"
-        },
-        {
-          "factory": "TrinketMageFactory",
-          "file": "TrinketMageFactory.cs",
-          "line": 77,
-          "sentence": "Shuffle and reveal-event emission are deferred (see class xmldoc)."
-        },
-        {
-          "factory": "TrinketMageFactory",
-          "file": "TrinketMageFactory.cs",
-          "line": 99,
-          "sentence": "CR 701.19c shuffle deferred \u2014 see class xmldoc.",
-          "cr": "CR 701.19c"
-        },
-        {
-          "factory": "PonderFactory",
-          "file": "PonderFactory.cs",
-          "line": 58,
-          "sentence": "The \u0022may shuffle\u0022 rider is deferred (no-op)."
         }
       ]
     },
@@ -552,7 +424,7 @@
         {
           "factory": "WishclawTalismanFactory",
           "file": "WishclawTalismanFactory.cs",
-          "line": 110,
+          "line": 106,
           "sentence": "CR 117.1a sorcery-speed restriction deferred (see class xmldoc).",
           "cr": "CR 117.1a"
         },
@@ -641,7 +513,7 @@
         {
           "factory": "DrownInTheLochFactory",
           "file": "DrownInTheLochFactory.cs",
-          "line": 12,
+          "line": 13,
           "sentence": "Indestructible / regeneration riders are deferred (same gap as \u003Csee cref=\u0022SlaughterPactFactory\u0022/\u003E and the rest of the single-target destroy family)."
         },
         {
@@ -726,7 +598,7 @@
         {
           "factory": "AssassinsTrophyFactory",
           "file": "AssassinsTrophyFactory.cs",
-          "line": 133,
+          "line": 131,
           "sentence": "Indestructible rider deferred (same gap as Terminate / Abrupt Decay / Slaughter Pact)."
         },
         {
@@ -746,6 +618,49 @@
           "file": "AbruptDecayFactory.cs",
           "line": 11,
           "sentence": "\u003Cb\u003EIndestructible\u003C/b\u003E: the destroy call moves the permanent to the graveyard without checking for Indestructible \u2014 same gap as every other single-target destroy template (Slaughter Pact, Force of Vigor destroy path, etc."
+        }
+      ]
+    },
+    {
+      "primitive_id": "library-shuffle",
+      "display_name": "Library shuffle (CR 701.20)",
+      "comp_rules_citation": "CR 701.20",
+      "implementation_hint": "Add IZone.Shuffle / ZoneService.ShuffleLibrary. Tutor-family factories all block on this single primitive.",
+      "factory_count": 4,
+      "mention_count": 4,
+      "factories": [
+        "GoblinEngineerFactory",
+        "PonderFactory",
+        "StoneforgeMysticFactory",
+        "TrinketMageFactory"
+      ],
+      "mentions": [
+        {
+          "factory": "StoneforgeMysticFactory",
+          "file": "StoneforgeMysticFactory.cs",
+          "line": 96,
+          "sentence": "Reveal-event emission is deferred (see class xmldoc); CR 701.20a shuffle now wired via LibraryShuffle.",
+          "cr": "CR 701.20a"
+        },
+        {
+          "factory": "GoblinEngineerFactory",
+          "file": "GoblinEngineerFactory.cs",
+          "line": 108,
+          "sentence": "\u0022 v1: deterministic \u2014 take the first artifact card in the library; reveal-event emission deferred (see class xmldoc); CR 701.20a shuffle is now wired via LibraryShuffle.",
+          "cr": "CR 701.20a"
+        },
+        {
+          "factory": "TrinketMageFactory",
+          "file": "TrinketMageFactory.cs",
+          "line": 74,
+          "sentence": "Reveal-event emission is deferred (see class xmldoc); CR 701.20a shuffle now wired via LibraryShuffle.",
+          "cr": "CR 701.20a"
+        },
+        {
+          "factory": "PonderFactory",
+          "file": "PonderFactory.cs",
+          "line": 58,
+          "sentence": "The \u0022may shuffle\u0022 rider is deferred (no-op)."
         }
       ]
     },
@@ -845,7 +760,7 @@
         {
           "factory": "BurstLightningFactory",
           "file": "BurstLightningFactory.cs",
-          "line": 10,
+          "line": 11,
           "sentence": "\u0022  ## Implementation (v1 \u2014 kicker primitive deferred)  CR 702.33 \u2014 Kicker is an additional cost (not an alternative cost) that modifies the spell\u0027s effect when paid.",
           "cr": "CR 702.33"
         }
@@ -1029,13 +944,6 @@
       "file": "ScapeshiftFactory.cs",
       "line": 10,
       "sentence": "## v1 gaps - \u003Cb\u003E\u0022Any number\u0022 prompt\u003C/b\u003E: the engine has no first-class \u0022pick a subset of permanents to sacrifice\u0022 agent hook."
-    },
-    {
-      "factory": "ScapeshiftFactory",
-      "file": "ScapeshiftFactory.cs",
-      "line": 10,
-      "sentence": "\u003Cb\u003ELibrary shuffle\u003C/b\u003E (CR 701.19c) \u2014 same gap as the rest of the tutor surface.",
-      "cr": "CR 701.19c"
     },
     {
       "factory": "TheOneRingFactory",
@@ -1230,20 +1138,14 @@
     {
       "factory": "GristFactory",
       "file": "GristFactory.cs",
-      "line": 7,
+      "line": 8,
       "sentence": "## V1 simplification The \u0022not on the battlefield\u0022 conditional is deferred."
     },
     {
       "factory": "GristFactory",
       "file": "GristFactory.cs",
-      "line": 7,
-      "sentence": "The conditional layer-4 effect (\u0022only when not on battlefield\u0022) is documented but deferred to a future slice."
-    },
-    {
-      "factory": "GristFactory",
-      "file": "GristFactory.cs",
-      "line": 50,
-      "sentence": "The oracle-text restriction (\u0022as long as \u2026 isn\u0027t on the battlefield\u0022) is a conditional layer-4 effect \u2014 deferred."
+      "line": 36,
+      "sentence": "The oracle-text restriction is a deferred conditional layer-4 effect."
     },
     {
       "factory": "KarnLiberatedFactory",
@@ -1281,6 +1183,12 @@
       "file": "MurderousRiderFactory.cs",
       "line": 12,
       "sentence": "MoveToGraveyard\u0022/\u003E; same gap as \u003Csee cref=\u0022SlaughterPactFactory\u0022/\u003E and the rest of the single-target destroy family."
+    },
+    {
+      "factory": "GreenSunsZenithFactory",
+      "file": "GreenSunsZenithFactory.cs",
+      "line": 14,
+      "sentence": "## Deferred (v1 gaps)  - \u003Cb\u003EReplacing the spell\u0027s destination via the stack resolver\u003C/b\u003E."
     },
     {
       "factory": "PriestOfFellRitesFactory",
@@ -1530,12 +1438,6 @@
       "sentence": "Multi-player turn-skipping semantics deferred."
     },
     {
-      "factory": "BadgermoleCubFactory",
-      "file": "BadgermoleCubFactory.cs",
-      "line": 51,
-      "sentence": "No abilities attached in v1 \u2014 both are deferred (see xmldoc above)."
-    },
-    {
       "factory": "DauthiVoidwalkerFactory",
       "file": "DauthiVoidwalkerFactory.cs",
       "line": 13,
@@ -1663,12 +1565,6 @@
       "sentence": "Real \u0022any of N choices \u002B opt-out\u0022 prompt deferred (same queue as Stoneforge Mystic / Sun Titan)."
     },
     {
-      "factory": "MishrasWorkshopFactory",
-      "file": "MishrasWorkshopFactory.cs",
-      "line": 8,
-      "sentence": "Per the same gap acknowledged across the codebase, the v1 shell ships the structural mana amount without the artifact-only gate; once a provenance ledger lands, wire the restriction here as a \u003Cc\u003EspendableForPredicate\u003C/c\u003E-style hook on the \u003Cc\u003EManaAbility\u003C/c\u003E."
-    },
-    {
       "factory": "YawgmothFactory",
       "file": "YawgmothFactory.cs",
       "line": 10,
@@ -1718,12 +1614,6 @@
       "sentence": "Mutavault was on the battlefield long enough but its Creature-ness is fresh \u2014 the intricate \u0022had Creature type continuously since untap step\u0022 bookkeeping is deferred; the test suite asserts shape, not attack legality."
     },
     {
-      "factory": "FetchLandCycleFactory",
-      "file": "FetchLandCycleFactory.cs",
-      "line": 11,
-      "sentence": "Shuffle\u003C/c\u003E entry point yet \u2014 same gap as every other tutor in the codebase."
-    },
-    {
       "factory": "AtraxaGrandUnifierFactory",
       "file": "AtraxaGrandUnifierFactory.cs",
       "line": 10,
@@ -1746,19 +1636,6 @@
       "file": "DazeFactory.cs",
       "line": 11,
       "sentence": "A bot-side probe (mirror of \u003Cc\u003EPitchAltCostProbe\u003C/c\u003E) is deferred \u2014 Daze\u0027s pitch always pays so the probe shape is just \u0022for each Island controlled, yield one candidate\u0022 and lives outside this factory\u0027s surface in v1."
-    },
-    {
-      "factory": "PhoenixOfAshFactory",
-      "file": "PhoenixOfAshFactory.cs",
-      "line": 8,
-      "sentence": "The printed \u0022can attack as though it didn\u0027t have summoning sickness as long as it has haste\u0022 rider collapses observationally to the Haste keyword in v1 \u2014 CR 702.10b already lets a creature with haste attack the turn it came under its controller\u0027s control, so the additional clause only matters when Haste is granted-then\u2026",
-      "cr": "CR 702.10b"
-    },
-    {
-      "factory": "PhoenixOfAshFactory",
-      "file": "PhoenixOfAshFactory.cs",
-      "line": 8,
-      "sentence": "Distinct behaviour only manifests if Haste is removed mid-turn after the controller has owned Phoenix of Ash for less than a full turn \u2014 no keyword-removal surface yet, same gap as Goblin Chieftain\u0027s Haste-loss interactions."
     },
     {
       "factory": "AjaniNacatlPariahFactory",

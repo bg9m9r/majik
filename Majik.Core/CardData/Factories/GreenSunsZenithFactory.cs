@@ -50,13 +50,6 @@ namespace Majik.Core.CardData.Factories;
 ///
 /// ## Deferred (v1 gaps)
 ///
-/// - <b>Library shuffle</b> (CR 701.20a). Same rationale as the rest of
-///   <see cref="SearchSpellFactory"/> — no <c>IZone.Shuffle</c> entry
-///   point yet; <c>GameDriver</c> owns shuffle. Both the post-tutor
-///   shuffle clause and the self-into-library "shuffle" are no-ops in
-///   terms of randomization — Green Sun's Zenith does land back in its
-///   owner's library zone (so a subsequent draw can pull it), it just
-///   isn't randomly re-positioned.
 /// - <b>Replacing the spell's destination via the stack resolver</b>.
 ///   Same gap noted on <see cref="EldritchEvolutionFactory"/>: the
 ///   printed self-shuffle is implemented inside the resolve closure
@@ -177,8 +170,7 @@ public static class GreenSunsZenithFactory
                             pick.SetController(caster);
                         }
                         // CR 701.20a — shuffle after a search effect.
-                        // Deferred for the same reason as the rest of
-                        // SearchSpellFactory: no IZone.Shuffle entry point.
+                        Majik.Core.Zones.LibraryShuffle.ShuffleLibrary(caster, "green-suns-zenith");
                     }),
                     new Effect("Green Sun's Zenith: shuffle self into owner's library", () =>
                     {
@@ -190,8 +182,8 @@ public static class GreenSunsZenithFactory
                         // path; hand when tests bypass SpellCastFlow;
                         // graveyard if StackResolver already routed it
                         // post-effect — see class xmldoc for the
-                        // sequencing note). Shuffle randomization itself
-                        // is deferred (same gap as SearchSpellFactory).
+                        // sequencing note). The library shuffle itself
+                        // runs via LibraryShuffle after re-insertion.
                         var ownerPlayer = card.Owner ?? caster;
                         var fromZone = card.Zone;
                         if (fromZone == ZoneType.Library) return;
@@ -224,6 +216,9 @@ public static class GreenSunsZenithFactory
                             ownerPlayer.Zones.Library.AddCard(card);
                             card.SetZone(ZoneType.Library);
                         }
+                        // CR 701.20a / printed GSZ rider — explicit "shuffle"
+                        // after re-inserting the spell itself.
+                        Majik.Core.Zones.LibraryShuffle.ShuffleLibrary(ownerPlayer, "green-suns-zenith-self");
                     }),
                 };
             });

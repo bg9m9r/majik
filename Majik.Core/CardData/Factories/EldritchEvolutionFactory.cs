@@ -41,10 +41,6 @@ namespace Majik.Core.CardData.Factories;
 ///   otherwise.
 ///
 /// ## Deferred (v1 gaps)
-/// - <b>Library shuffle</b> (CR 701.19c). Same rationale as the rest of
-///   <see cref="SearchSpellFactory"/> — no <c>IZone.Shuffle</c> entry point
-///   yet; <c>GameDriver</c> owns shuffle. The shuffle clause is a no-op
-///   here.
 /// - <b>Sacrifice target prompt</b>. <see cref="SacrificeACreatureAdditionalCost"/>
 ///   picks the first creature on the controller's battlefield deterministically
 ///   (same v1 behaviour as Fling / Thud / Life's Legacy bespoke templates).
@@ -179,8 +175,8 @@ public static class EldritchEvolutionFactory
                             pick.SetZone(ZoneType.Battlefield);
                             pick.SetController(caster);
                         }
-                        // CR 701.19c — shuffle after a search effect
-                        // (deferred — see class xmldoc / SearchSpellFactory).
+                        // CR 701.20a — shuffle after a search effect.
+                        Majik.Core.Zones.LibraryShuffle.ShuffleLibrary(caster, "eldritch-evolution");
                     }),
                     new Effect("Eldritch Evolution: exile self", () =>
                     {

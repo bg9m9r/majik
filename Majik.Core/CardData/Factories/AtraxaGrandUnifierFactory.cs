@@ -185,15 +185,10 @@ public static class AtraxaGrandUnifierFactory
 
     private static void Shuffle<T>(IList<T> list)
     {
-        // Fisher-Yates via Random.Shared. Tests that need determinism can
-        // drive the resolver directly without invoking the bottom step,
-        // or stub through SelectOnePerCardType to keep the bottom pile
-        // empty.
-        var rng = System.Random.Shared;
-        for (var i = list.Count - 1; i > 0; i--)
-        {
-            var j = rng.Next(i + 1);
-            (list[i], list[j]) = (list[j], list[i]);
-        }
+        // Fisher-Yates via the active GameRandom (per CR 100.6) so
+        // deterministic replay is preserved. Falls back to a shared
+        // default when no per-player RNG is registered (tests that
+        // need determinism call GameRandomRegistry.SetDefault).
+        Majik.Core.Random.GameRandomRegistry.Default.Shuffle(list);
     }
 }
