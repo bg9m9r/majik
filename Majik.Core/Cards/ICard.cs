@@ -66,6 +66,26 @@ public interface ICard
     IReadOnlyList<IAbility> Abilities { get; }
 
     /// <summary>
+    /// True when this card is a "vanilla shell" — the
+    /// <see cref="Majik.Core.CardData.ScryfallCardFactory"/> recognised the
+    /// name and constructed the correct typed shell (Creature/Sorcery/etc.
+    /// with power/toughness + mana cost), but no binders / templates / named
+    /// factory matched the oracle text, so none of the printed rules text is
+    /// actually enforced. The card still has a legal cast path (resolves to
+    /// a vanilla permanent or a do-nothing spell, per
+    /// <see cref="Majik.Core.Game.SpellDefinition.Vanilla"/>); the bot uses
+    /// this flag to deprioritise such cards in EV scoring and emit a one-
+    /// shot "unimplemented" warning so callers (engine logs, portal UI)
+    /// know game decisions are unreliable.
+    /// <para>False for fully-implemented cards, for true blank-oracle
+    /// vanilla creatures (which DO have their printed rules covered — there
+    /// are none), and for the unknown-name fallback shell (which is also
+    /// flagged true, since by definition the engine doesn't know what the
+    /// card does).</para>
+    /// </summary>
+    bool IsVanillaShell { get; }
+
+    /// <summary>
     /// Attach an ability to this card.
     /// </summary>
     void AddAbility(IAbility ability);

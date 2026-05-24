@@ -137,7 +137,7 @@ public sealed class CoverageClassifier
     /// "vanilla + keyword" shape: e.g. "Flying", "Flying, vigilance",
     /// "Flying (This creature can't be blocked except by …)".
     /// </summary>
-    internal static bool IsKeywordOnlyOracleText(CardEntity entity)
+    public static bool IsKeywordOnlyOracleText(CardEntity entity)
     {
         var raw = entity.OracleText ?? "";
         if (string.IsNullOrWhiteSpace(raw)) return true;

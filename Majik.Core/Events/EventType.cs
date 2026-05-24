@@ -45,5 +45,11 @@ public enum EventType
     // Player Events
     LifeChanged,
     ManaAdded,
-    ManaSpent
+    ManaSpent,
+
+    // Diagnostics — engine-meta events surfaced to the UI / logs without
+    // being part of game-state changes. The vanilla-shell graceful-degrade
+    // path uses this to tell the portal "the bot encountered an
+    // unimplemented card; EV from here on is unreliable for that card".
+    UnimplementedCardEncountered
 }

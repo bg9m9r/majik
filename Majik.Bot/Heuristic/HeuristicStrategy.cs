@@ -17,11 +17,14 @@ internal sealed class HeuristicStrategy : IBotStrategy
     private readonly CombatPolicy _combat;
     private readonly IBotDecisionSink _sink;
 
+    private readonly Majik.Core.Diagnostics.VanillaShellTracker? _vanillaTracker;
+
     public HeuristicStrategy(BotConfig config)
     {
         _weights = ArchetypeWeights.ForArchetype(config.ArchetypeName);
         _sink = config.DecisionSink ?? NullBotDecisionSink.Instance;
-        _priority = new PriorityPolicy(_weights, _sink);
+        _vanillaTracker = config.VanillaShellTracker;
+        _priority = new PriorityPolicy(_weights, _sink, _vanillaTracker);
         _combat = new CombatPolicy(_weights, sink: _sink);
     }
 
@@ -34,7 +37,23 @@ internal sealed class HeuristicStrategy : IBotStrategy
         => hand.OrderByDescending(c => c is Land ? 0 : 1).Take(countToBottom).ToList();
 
     public IReadOnlyList<object> PickTargets(GameContext ctx, Player self, TargetRequest request)
-        => TargetPolicy.Pick(ctx, self, request, _sink);
+    {
+        // Vanilla-shell graceful degrade: a candidate that's a vanilla shell
+        // still has its name + type + P/T (for creatures) — TargetPolicy.Score
+        // happily ranks it. Notice the encounter so the operator knows the
+        // bot's targeting EV is approximate for this card.
+        if (_vanillaTracker is not null)
+        {
+            foreach (var candidate in request.LegalCandidates)
+            {
+                if (candidate is ICard c && c.IsVanillaShell)
+                {
+                    _vanillaTracker.Notice(c, self, "target candidate");
+                }
+            }
+        }
+        return TargetPolicy.Pick(ctx, self, request, _sink);
+    }
 
     public int PickX(GameContext ctx, Player self) => ModalPolicy.PickX(ctx, self);
 

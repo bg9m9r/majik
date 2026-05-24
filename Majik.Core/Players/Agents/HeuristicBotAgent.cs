@@ -55,12 +55,26 @@ public sealed class HeuristicBotAgent : IPlayerAgent
     /// </summary>
     private readonly Majik.Core.CardData.ICardRepository? _cardRepository;
 
+    /// <summary>
+    /// Optional vanilla-shell tracker. When non-null, the bot calls
+    /// <see cref="Majik.Core.Diagnostics.VanillaShellTracker.Notice"/> on
+    /// every castable-spell enumeration touching a vanilla shell — once-
+    /// per-game per name, the tracker emits a WARN + an
+    /// <see cref="Majik.Core.Events.UnimplementedCardEncounteredEvent"/>.
+    /// Cast-bid priority is also pushed below every implemented bid so
+    /// the bot only proposes a vanilla shell when nothing else is in
+    /// hand to cast.
+    /// </summary>
+    private readonly Majik.Core.Diagnostics.VanillaShellTracker? _vanillaTracker;
+
     public HeuristicBotAgent(
         IAlternativeCostProbe? altCostProbe = null,
-        Majik.Core.CardData.ICardRepository? cardRepository = null)
+        Majik.Core.CardData.ICardRepository? cardRepository = null,
+        Majik.Core.Diagnostics.VanillaShellTracker? vanillaTracker = null)
     {
         _altCostProbe = altCostProbe;
         _cardRepository = cardRepository;
+        _vanillaTracker = vanillaTracker;
     }
 
     public Task<PriorityAction> ChoosePriorityActionAsync(GameContext ctx, CancellationToken ct = default)
@@ -138,6 +152,20 @@ public sealed class HeuristicBotAgent : IPlayerAgent
         var bids = new List<(ICard Card, ManaCost Cost, IAlternativeCost? Alt, int Priority)>();
         foreach (var card in pool)
         {
+            // Vanilla-shell graceful degrade. Notice + heavily downscore so
+            // the bid loop only proposes an unimplemented card when no
+            // implemented alternative bid wins. The penalty (-100) sinks
+            // even a 6+ CMC vanilla shell below every printed-cost bid in
+            // a normal-curve deck; a future per-card EV override can lift
+            // the penalty back to zero for cards whose vanilla resolution
+            // is actually fine (e.g. a creature whose body alone is worth
+            // the cast).
+            if (card.IsVanillaShell)
+            {
+                _vanillaTracker?.Notice(card, ctx.Self, "castable-spell enumeration");
+            }
+            var vanillaPenalty = card.IsVanillaShell ? -100 : 0;
+
             var printedCost = Majik.Core.Costs.CostReduction.GetEffectiveCost(card, ctx.Self);
             var inHand = card.Zone == ZoneType.Hand;
 
@@ -173,7 +201,8 @@ public sealed class HeuristicBotAgent : IPlayerAgent
                 {
                     var intent = _cardRepository?.IntentFor(card.Name) ?? BotIntent.None;
                     bids.Add((card, printedCost, null, printedCost.TotalValue
-                        + SequencingBonus(card, ctx, sorceryWindow, intent)));
+                        + SequencingBonus(card, ctx, sorceryWindow, intent)
+                        + vanillaPenalty));
                 }
                 // Alt-cost bids prefer the cheapest alt that is strictly
                 // cheaper than the printed cost (else stick with printed
@@ -188,7 +217,7 @@ public sealed class HeuristicBotAgent : IPlayerAgent
                     // Bid priority uses the PRINTED cost so a $1 spectacle
                     // on a {2}{R} card still ranks as a {2}{R}-priority bid,
                     // i.e. the bot picks it over a vanilla 1-drop.
-                    bids.Add((card, chosen.Cost, chosen.Alt, printedCost.TotalValue));
+                    bids.Add((card, chosen.Cost, chosen.Alt, printedCost.TotalValue + vanillaPenalty));
                 }
             }
             else
@@ -201,7 +230,7 @@ public sealed class HeuristicBotAgent : IPlayerAgent
                     .FirstOrDefault();
                 if (cheapestAlt is { } chosen)
                 {
-                    bids.Add((card, chosen.Cost, chosen.Alt, printedCost.TotalValue));
+                    bids.Add((card, chosen.Cost, chosen.Alt, printedCost.TotalValue + vanillaPenalty));
                 }
             }
         }
@@ -480,6 +509,20 @@ public sealed class HeuristicBotAgent : IPlayerAgent
         // prefer caster-side targets.
         if (request.LegalCandidates.Count > 0)
         {
+            // Vanilla-shell graceful degrade: notice any unimplemented card
+            // in the candidate pool so the operator hears about it. We still
+            // rank + pick normally — for permanents the body / mana value
+            // is enough signal even when the printed rules text is opaque.
+            if (_vanillaTracker is not null)
+            {
+                foreach (var candidate in request.LegalCandidates)
+                {
+                    if (candidate is ICard c && c.IsVanillaShell)
+                    {
+                        _vanillaTracker.Notice(c, ctx.Self, "target candidate");
+                    }
+                }
+            }
             var ordered = RankCandidates(request.LegalCandidates, ctx, opponent, preferSelf, label);
             return Task.FromResult<IReadOnlyList<object>>(
                 ordered.Take(request.MinTargets).ToList());
