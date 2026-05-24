@@ -2701,6 +2701,30 @@ public static class NamedCardFactory
             // stack). Mirrors DazeFactory's "unless pay" pattern with N=3.
             "Mana Leak" => ManaLeakFactory.Create(owner),
 
+            // Creature — Human Soldier {W} 1/1 (ChampionOfTheParishFactory).
+            // Innistrad. "Whenever another Human enters the battlefield under
+            // your control, put a +1/+1 counter on Champion of the Parish."
+            // ETB-other-Human trigger wired via EventTriggerCondition over
+            // CardMovedEvent: Creature + Human subtype + controller match +
+            // not self. Active only while Champion is on the battlefield.
+            // Single-arg dispatcher path attaches the trigger for shape tests
+            // without TriggerManager registration; use the (owner, triggers)
+            // overload for bus-driven firing.
+            "Champion of the Parish" => ChampionOfTheParishFactory.Create(owner),
+
+            // Creature — Human Soldier {1}{W} 1/1 (ThaliaLieutenantFactory).
+            // Shadows over Innistrad. Two triggered abilities:
+            //   1. ETB-self — "When Thalia's Lieutenant enters, put a +1/+1
+            //      counter on each other Human you control." Wired via
+            //      Triggers.OnEnterBattlefieldSelf; iterates controller's
+            //      battlefield for Humans excluding self.
+            //   2. ETB-other-Human — same predicate as Champion of the Parish.
+            //      Put a +1/+1 counter on Lieutenant when another Human enters.
+            // Single-arg dispatcher path attaches both triggers for shape tests
+            // without TriggerManager registration; use the (owner, triggers)
+            // overload for bus-driven firing.
+            "Thalia's Lieutenant" => ThaliaLieutenantFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
