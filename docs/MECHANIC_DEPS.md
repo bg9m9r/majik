@@ -5,11 +5,11 @@ Scanner output: every `*Factory.cs` xmldoc / inline comment mentioning
 engine primitive. Each row answers: "if we ship primitive _X_, which factory
 xmldocs flagged that they're blocked on it?"
 
-- **Generated:** 2026-05-24 19:24 UTC
+- **Generated:** 2026-05-24 19:26 UTC
 - **Scanned dir:** `Majik.Core/CardData/Factories`
-- **Total mentions:** 210
-- **Clusters:** 16
-- **Unclustered (need new registry pattern):** 128
+- **Total mentions:** 191
+- **Clusters:** 14
+- **Unclustered (need new registry pattern):** 124
 
 Regenerate with `dotnet run --project Majik.Console -- mechanic-deps --md-out docs/MECHANIC_DEPS.md --json-out docs/mechanic-deps.json`.
 
@@ -19,20 +19,18 @@ Regenerate with `dotnet run --project Majik.Console -- mechanic-deps --md-out do
 |---:|---|---|---:|---:|
 | 1 | Agent-prompt targeting MVP | — | 24 | 31 |
 | 2 | Library shuffle (CR 701.20) | CR 701.20 | 12 | 17 |
-| 3 | Regeneration shield (CR 701.15) | CR 701.15 | 6 | 8 |
-| 4 | Indestructible bypass on destroy (CR 702.12) | CR 702.12 | 6 | 7 |
-| 5 | Layer-6 ability-grant subsystem (CR 613.1f) | CR 613.1f | 2 | 4 |
-| 6 | Escape alt-cost (CR 702.143) | CR 702.143 | 2 | 2 |
-| 7 | Kicker alt-cost (CR 702.33) | CR 702.33 | 2 | 2 |
-| 8 | Class leveling (CR 716) | CR 716 | 1 | 2 |
-| 9 | Manifest dread (CR 701.59) | CR 701.59 | 1 | 2 |
-| 10 | Ascend / city's blessing (CR 702.131) | CR 702.131 | 1 | 1 |
-| 11 | Cast-marker on Card | — | 1 | 1 |
-| 12 | Companion (CR 702.139) | CR 702.139 | 1 | 1 |
-| 13 | Equip activated-ability primitive (CR 702.6) | CR 702.6 | 1 | 1 |
-| 14 | Gift (Bloomburrow) | — | 1 | 1 |
-| 15 | "Activate only as a sorcery" gate (CR 117.1a) | CR 117.1a | 1 | 1 |
-| 16 | Suspend alt-cost (CR 702.61) | CR 702.61 | 1 | 1 |
+| 3 | Layer-6 ability-grant subsystem (CR 613.1f) | CR 613.1f | 2 | 4 |
+| 4 | Escape alt-cost (CR 702.143) | CR 702.143 | 2 | 2 |
+| 5 | Kicker alt-cost (CR 702.33) | CR 702.33 | 2 | 2 |
+| 6 | Class leveling (CR 716) | CR 716 | 1 | 2 |
+| 7 | Manifest dread (CR 701.59) | CR 701.59 | 1 | 2 |
+| 8 | Ascend / city's blessing (CR 702.131) | CR 702.131 | 1 | 1 |
+| 9 | Cast-marker on Card | — | 1 | 1 |
+| 10 | Companion (CR 702.139) | CR 702.139 | 1 | 1 |
+| 11 | Equip activated-ability primitive (CR 702.6) | CR 702.6 | 1 | 1 |
+| 12 | Gift (Bloomburrow) | — | 1 | 1 |
+| 13 | "Activate only as a sorcery" gate (CR 117.1a) | CR 117.1a | 1 | 1 |
+| 14 | Suspend alt-cost (CR 702.61) | CR 702.61 | 1 | 1 |
 
 ## Cluster detail
 
@@ -149,55 +147,7 @@ Mentions:
 - `PonderFactory` (`PonderFactory.cs:58`)
   > The "may shuffle" rider is deferred (no-op).
 
-### 3. Regeneration shield (CR 701.15)
-
-- **CR citation:** CR 701.15
-- **Blocks:** 6 factories (8 mentions)
-- **Implementation hint:** ReplacementBus filter on ZoneMoveIntent battlefield→graveyard, gated by sourceCard.HasAbility("Regenerate").
-
-Mentions:
-
-- `DrownInTheLochFactory` (`DrownInTheLochFactory.cs:13`)
-  > Indestructible / regeneration riders are deferred (same gap as <see cref="SlaughterPactFactory"/> and the rest of the single-target destroy family).
-- `DrownInTheLochFactory` (`DrownInTheLochFactory.cs:234`)
-  > CR 701.7 — destroy → owner's graveyard (Indestructible / regeneration deferred, same gap as SlaughterPactFactory).
-- `TerminateFactory` (`TerminateFactory.cs:58`)
-  > The "it can't be regenerated" rider is deferred — the engine has no regeneration shield surface in v1 (see class xmldoc).
-- `TerminateFactory` (`TerminateFactory.cs:100`)
-  > "It can't be regenerated" rider is deferred — no regeneration shield surface in the engine yet (same gap as Wrath of God / Day of Judgment's can't-regenerate clause).
-- `MurderousRiderFactory` (`MurderousRiderFactory.cs:157`)
-  > Indestructible / regeneration deferred (same gap as SlaughterPact).
-- `MurderousCutFactory` (`MurderousCutFactory.cs:11`)
-  > 1 target-creature request; "indestructible" + "can't be regenerated" riders deferred — same lossy MVP as <c>DestroySpellFactory.
-- `BeastWithinFactory` (`BeastWithinFactory.cs:122`)
-  > Indestructible / regeneration rider deferred (same gap as Terminate / Abrupt Decay / Slaughter Pact).
-- `EmberethShieldbreakerFactory` (`EmberethShieldbreakerFactory.cs:126`)
-  > Indestructible / regeneration deferred (same gap as SlaughterPact).
-
-### 4. Indestructible bypass on destroy (CR 702.12)
-
-- **CR citation:** CR 702.12
-- **Blocks:** 6 factories (7 mentions)
-- **Implementation hint:** Destroy intent should consult a HasIndestructible() predicate before issuing ZoneMoveIntent → graveyard.
-
-Mentions:
-
-- `TerminateFactory` (`TerminateFactory.cs:11`)
-  > <b>Indestructible</b>: the destroy call moves the creature to the graveyard without checking for Indestructible — same gap as every other single-target destroy template.
-- `KolaghansCommandFactory` (`KolaghansCommandFactory.cs:249`)
-  > Indestructible rider deferred.
-- `AssassinsTrophyFactory` (`AssassinsTrophyFactory.cs:11`)
-  > <b>Indestructible</b>: the destroy call moves the permanent to the graveyard without checking for Indestructible (same gap as every other single-target destroy template — Terminate, Abrupt Decay, Slaughter Pact).
-- `AssassinsTrophyFactory` (`AssassinsTrophyFactory.cs:133`)
-  > Indestructible rider deferred (same gap as Terminate / Abrupt Decay / Slaughter Pact).
-- `WrathOfTheSkiesFactory` (`WrathOfTheSkiesFactory.cs:12`)
-  > ## v1 simplifications  - <b>Indestructible bypass</b>: same gap as <see cref="WrathOfGodFactory"/> / <see cref="EngineeredExplosivesFactory"/> — <see cref="OracleSpellBinder.
-- `BeastWithinFactory` (`BeastWithinFactory.cs:12`)
-  > <b>Indestructible / regeneration</b>: the destroy call moves the permanent to the graveyard without checking for Indestructible or an active regeneration shield (same gap as every other single-target destroy template — Terminate, Abrupt Decay, Slaughter Pact).
-- `AbruptDecayFactory` (`AbruptDecayFactory.cs:11`)
-  > <b>Indestructible</b>: the destroy call moves the permanent to the graveyard without checking for Indestructible — same gap as every other single-target destroy template (Slaughter Pact, Force of Vigor destroy path, etc.
-
-### 5. Layer-6 ability-grant subsystem (CR 613.1f)
+### 3. Layer-6 ability-grant subsystem (CR 613.1f)
 
 - **CR citation:** CR 613.1f
 - **Blocks:** 2 factories (4 mentions)
@@ -214,7 +164,7 @@ Mentions:
 - `BloodghastFactory` (`BloodghastFactory.cs:126`)
   > A full dynamic Layer 6 conditional keyword grant is deferred — see class xmldoc.
 
-### 6. Escape alt-cost (CR 702.143)
+### 4. Escape alt-cost (CR 702.143)
 
 - **CR citation:** CR 702.143
 - **Blocks:** 2 factories (2 mentions)
@@ -227,7 +177,7 @@ Mentions:
 - `UroTitanFactory` (`UroTitanFactory.cs:12`)
   > The printed "unless it escaped" rider is structurally collapsed — Escape (CR 702.143) is not wired in v1 (see deferred section), so a hardcast Uro is always sacrificed by this trigger, faithful to the printed text in the non-escape case.
 
-### 7. Kicker alt-cost (CR 702.33)
+### 5. Kicker alt-cost (CR 702.33)
 
 - **CR citation:** CR 702.33
 - **Blocks:** 2 factories (2 mentions)
@@ -240,7 +190,7 @@ Mentions:
 - `BurstLightningFactory` (`BurstLightningFactory.cs:11`)
   > "  ## Implementation (v1 — kicker primitive deferred)  CR 702.33 — Kicker is an additional cost (not an alternative cost) that modifies the spell's effect when paid.
 
-### 8. Class leveling (CR 716)
+### 6. Class leveling (CR 716)
 
 - **CR citation:** CR 716
 - **Blocks:** 1 factories (2 mentions)
@@ -253,7 +203,7 @@ Mentions:
 - `StormchasersTalentFactory` (`StormchasersTalentFactory.cs:12`)
   > <b>Level 3 cast-trigger</b> ("Whenever you cast a noncreature spell, draw a card, then discard a card"): DEFERRED with the leveling primitive.
 
-### 9. Manifest dread (CR 701.59)
+### 7. Manifest dread (CR 701.59)
 
 - **CR citation:** CR 701.59
 - **Blocks:** 1 factories (2 mentions)
@@ -266,7 +216,7 @@ Mentions:
 - `AbhorrentOculusFactory` (`AbhorrentOculusFactory.cs:13`)
   > CR rule references: 205.3m (Eye subtype), 601.2f (additional cost), 603.1 / 500.4 (upkeep trigger), 702.9 (Flying), 701.59 (manifest dread — deferred).
 
-### 10. Ascend / city's blessing (CR 702.131)
+### 8. Ascend / city's blessing (CR 702.131)
 
 - **CR citation:** CR 702.131
 - **Blocks:** 1 factories (1 mentions)
@@ -277,7 +227,7 @@ Mentions:
 - `OcelotPrideFactory` (`OcelotPrideFactory.cs:14`)
   > The attack trigger ships with the gate stubbed (always 1 token); the "doubled to 2" half of the printed text is deferred until an Ascend primitive lands.
 
-### 11. Cast-marker on Card
+### 9. Cast-marker on Card
 
 - **Blocks:** 1 factories (1 mentions)
 - **Implementation hint:** Persistent 'this object was cast (vs. put onto the battlefield)' flag — Bloodghast, The One Ring, Pact triggers all key off it.
@@ -287,7 +237,7 @@ Mentions:
 - `TheOneRingFactory` (`TheOneRingFactory.cs:15`)
   > The effect body is a no-op — the "if you cast it" intervening-if clause, the "until your next turn" expiry, and the "protection from everything" player-scoped grant are all deferred (no cast-marker on Card, no per-player delayed cleanup, no Player.
 
-### 12. Companion (CR 702.139)
+### 10. Companion (CR 702.139)
 
 - **CR citation:** CR 702.139
 - **Blocks:** 1 factories (1 mentions)
@@ -298,7 +248,7 @@ Mentions:
 - `LurrusOfTheDreamDenFactory` (`LurrusOfTheDreamDenFactory.cs:12`)
   > ## Companion (DEFERRED) The companion deck-construction rule (CR 702.139 — "Each permanent card in your starting deck has mana value 2 or less") is foundational to the deck-builder, not the runtime, and is intentionally NOT enforced here.
 
-### 13. Equip activated-ability primitive (CR 702.6)
+### 11. Equip activated-ability primitive (CR 702.6)
 
 - **CR citation:** CR 702.6
 - **Blocks:** 1 factories (1 mentions)
@@ -309,7 +259,7 @@ Mentions:
 - `PuresteelPaladinFactory` (`PuresteelPaladinFactory.cs:11`)
   > ## Deferred (v1 gaps)  - <b>Equip-ability primitive</b>: the engine has no <c>EquipActivatedAbility</c> primitive yet — Equipment cards currently don't model their printed "Equip {N}" activated ability at all (Stoneforge Mystic's activated ability is a separate "put-an-Equipment-from-hand" effect, not an equip activati…
 
-### 14. Gift (Bloomburrow)
+### 12. Gift (Bloomburrow)
 
 - **Blocks:** 1 factories (1 mentions)
 - **Implementation hint:** Cast-time choice: a static/triggered side effect granting an opponent a defined gift (treasure, draw, etc.).
@@ -319,7 +269,7 @@ Mentions:
 - `IntoTheFloodMawFactory` (`IntoTheFloodMawFactory.cs:12`)
   > ## Deferred (v1 gaps) — Gift mechanic (CR 701.59 in the 2024 errata) The "Gift a tapped Fish" clause is a cast-time choice that lets the caster promise an opponent a gift; if promised, the opponent creates a tapped 1/1 blue Fish creature token BEFORE the spell's other effects, and Into the Flood Maw's target predicate …
 
-### 15. "Activate only as a sorcery" gate (CR 117.1a)
+### 13. "Activate only as a sorcery" gate (CR 117.1a)
 
 - **CR citation:** CR 117.1a
 - **Blocks:** 1 factories (1 mentions)
@@ -330,7 +280,7 @@ Mentions:
 - `TirelessTrackerFactory` (`TirelessTrackerFactory.cs:14`)
   > <b>"Activate only as a sorcery"</b> — Tireless Tracker's printed activated ability has NO sorcery-speed restriction (instant speed on the official card), so nothing is deferred here for this card.
 
-### 16. Suspend alt-cost (CR 702.61)
+### 14. Suspend alt-cost (CR 702.61)
 
 - **CR citation:** CR 702.61
 - **Blocks:** 1 factories (1 mentions)
@@ -363,8 +313,6 @@ Mentions:
   > Colors"/>; Prowess pump on the token deferred (see class xmldoc).
 - `NihilSpellbombFactory` (`NihilSpellbombFactory.cs:13`)
   > Real prompt deferred until IPlayerAgent grows a ChooseYesNoAsync surface.
-- `TerminateFactory` (`TerminateFactory.cs:11`)
-  > <b>"It can't be regenerated"</b>: the engine has no regeneration shield surface in v1 (same gap as Wrath of God's and DayOfJudgment's can't-be-regenerated rider, and SlaughterPact's indestructible/regeneration note).
 - `IzzetCharmFactory` (`IzzetCharmFactory.cs:211`)
   > Real agent- driven "choose 2 cards to discard" prompt is deferred — same queue as Faithless Looting / Liliana / Connive.
 - `ConversionFactory` (`ConversionFactory.cs:54`)
@@ -429,8 +377,6 @@ Mentions:
   > " (LTB exile clause deferred — see Deferred section.
 - `MurderousRiderFactory` (`MurderousRiderFactory.cs:12`)
   > Adding this requires the same replacement-effect surface used by the Anger of the Gods exile rider (see <see cref="AngerOfTheGodsFactory"/>); deferred to keep the v1 ship minimal.
-- `MurderousRiderFactory` (`MurderousRiderFactory.cs:12`)
-  > MoveToGraveyard"/>; same gap as <see cref="SlaughterPactFactory"/> and the rest of the single-target destroy family.
 - `PriestOfFellRitesFactory` (`PriestOfFellRitesFactory.cs:12`)
   > </para>  ## Deferred (v1 gaps) (The activate-as-sorcery timing window is now enforced via the ActionValidator gate; see "Implemented" above.
 - `PriestOfFellRitesFactory` (`PriestOfFellRitesFactory.cs:128`)
@@ -521,9 +467,7 @@ Mentions:
   > ## Deferred (v1 gaps) (The activate-as-sorcery timing window for the {B}{G}{U} ability is now enforced via the ActionValidator gate; see "Implemented" above.
 - `AbruptDecayFactory` (`AbruptDecayFactory.cs:11`)
   > <b>Can't be countered</b> — a <see cref="KeywordAbility"/> marker "Can't Be Countered" is attached to the card shape (structural; actual enforcement via SpellCaster / StackResolver is deferred — same posture as Veil of Summer's turn-scoped uncounterable rider and Force of Will's text interaction).
-- `AbruptDecayFactory` (`AbruptDecayFactory.cs:11`)
-  > </item> </list>  ## Deferred (v1 gaps)
-- `AbruptDecayFactory` (`AbruptDecayFactory.cs:57`)
+- `AbruptDecayFactory` (`AbruptDecayFactory.cs:58`)
   > Enforcement is deferred — see xmldoc.
 - `BrainFreezeFactory` (`BrainFreezeFactory.cs:10`)
   > CR 702.40a's "you may choose new targets for the copies" rider is deferred (see <see cref="StormHelper"/> + <see cref="Majik.
@@ -539,8 +483,6 @@ Mentions:
   > The picked card moves Library → top-of-Library without publishing a reveal event; same gap as the other search factories.
 - `YawgmothsWillFactory` (`YawgmothsWillFactory.cs:10`)
   > A bus-aware overload could clear it; deferred.
-- `EmberethShieldbreakerFactory` (`EmberethShieldbreakerFactory.cs:12`)
-  > MoveToGraveyard"/>; same gap as <see cref="SlaughterPactFactory"/> and the rest of the single-target destroy family.
 - `GoblinWelderFactory` (`GoblinWelderFactory.cs:12`)
   > A formal stack / target-snapshot path is deferred to the targeting MVP.
 - `MoxAmberFactory` (`MoxAmberFactory.cs:9`)

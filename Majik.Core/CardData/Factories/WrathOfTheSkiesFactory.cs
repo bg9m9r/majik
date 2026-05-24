@@ -65,13 +65,13 @@ namespace Majik.Core.CardData.Factories;
 /// chosen alt-cost, skip the agent's <c>ChooseXAsync</c> prompt (or
 /// supply X = 0).
 ///
+/// Indestructible (CR 702.12) and regeneration (CR 701.15) are honoured
+/// at the destroy site via
+/// <see cref="OracleSpellBinder.MoveToGraveyard(ICard, ZoneMoveReason)"/>
+/// with <see cref="Majik.Core.Zones.ZoneMoveReason.Destroy"/>.
+///
 /// ## v1 simplifications
 ///
-/// - <b>Indestructible bypass</b>: same gap as
-///   <see cref="WrathOfGodFactory"/> /
-///   <see cref="EngineeredExplosivesFactory"/> —
-///   <see cref="OracleSpellBinder.MoveToGraveyard"/> doesn't yet consult
-///   CR 702.12 indestructible.
 /// - <b>Cast-flow integration of the agent's X-prompt skip when the
 ///   energy alt-cost is used</b>: <see cref="Majik.Core.Game.SpellCastFlow"/>
 ///   today always prompts for X when <see cref="SpellDefinition.HasVariableX"/>
@@ -168,7 +168,11 @@ public static class WrathOfTheSkiesFactory
 
                     foreach (var v in victims)
                     {
-                        OracleSpellBinder.MoveToGraveyard(v);
+                        // Indestructible (CR 702.12) / regeneration
+                        // (CR 701.15) gated in MoveToGraveyard. Printed
+                        // text has no "can't be regenerated" rider, so
+                        // shields are honoured.
+                        OracleSpellBinder.MoveToGraveyard(v, Majik.Core.Zones.ZoneMoveReason.Destroy);
                     }
                 }),
         };
