@@ -276,6 +276,29 @@ public static class NamedCardFactory
             // Same shape as Fiery Islet; only colour differs.
             "Sunbaked Canyon" => SunbakedCanyonFactory.Create(owner),
 
+            // Land — Hour of Devastation (SunscorchedDesertFactory).
+            // Oracle: "Sunscorched Desert enters tapped. When this land
+            // enters, it deals 1 damage to any target. {T}: Add {C}."
+            // Unconditional ETB-tapped replacement (CR 614.1c) via
+            // EntersTappedReplacement on the supplied ReplacementBus
+            // (mirrors Geralf's Messenger's unconditional ETB-tapped
+            // wiring). ETB triggered ability (CR 603.6a) wired via
+            // Triggers.OnEnterBattlefieldSelf with a 1..1 "any target"
+            // TargetRequest; on resolution deals 1 damage via
+            // SearingBlazeFactory.DealDamageWithPlaneswalker (Player /
+            // Creature / Planeswalker — CR 306.7). The single-arg
+            // dispatcher path attaches the ETB trigger + mana ability
+            // for shape (the ETB-tapped replacement is omitted because
+            // no ReplacementBus is available at dispatch — the Desert
+            // enters untapped in that posture, mirroring how every
+            // other always-tapped factory defers the restriction to
+            // the binder layer for shape-only construction). Use the
+            // (owner, eventBus, triggers, replacements) overload for
+            // fully-wired behaviour. Agent-driven "any target" prompt
+            // deferred — v1 honours pre-set ChosenTargets and absent a
+            // target the damage no-ops cleanly (CR 608.2b).
+            "Sunscorched Desert" => SunscorchedDesertFactory.Create(owner),
+
             // U/R surveil land — Foundations (ThunderingFallsFactory).
             // {T}: Add {U} or {R} — two ManaAbility instances wired.
             // ETB trigger: surveil 1 — default-all-graveyard decision wired.
