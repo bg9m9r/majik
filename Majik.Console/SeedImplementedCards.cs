@@ -1205,5 +1205,18 @@ public static class SeedImplementedCards
         // Flash keyword wired. {T}: 1 damage to target creature and each other
         // creature with the same name as that creature (name-sweep via allCreaturesResolver).
         "Izzet Staticaster",
+
+        // Instant — {B}{G} (AssassinsTrophyFactory). Guilds of Ravnica.
+        // Destroy target permanent an opponent controls; its controller
+        // searches their library for a basic land, puts it onto the
+        // battlefield untapped. Opponent-controls constraint enforced at
+        // resolve time (CR 608.2b). Library shuffle deferred.
+        "Assassin's Trophy",
+
+        // Instant — {2}{G} (BeastWithinFactory). New Phyrexia / various.
+        // Destroy target permanent (any permanent, including your own).
+        // Its controller creates a 3/3 green Beast creature token (CR 111.4).
+        // Token colour (green) deferred — same gap as Pact of the Titan.
+        "Beast Within",
     };
 }
