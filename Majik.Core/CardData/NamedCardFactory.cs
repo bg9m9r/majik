@@ -278,6 +278,20 @@ public static class NamedCardFactory
             // Psychic Frog.
             "Faithless Salvaging" => FaithlessSalvagingFactory.Create(owner),
 
+            // Instant — {R} (FlashbackFactory). Secrets of Strixhaven, #115.
+            // Distinct from the Flashback KEYWORD (CR 702.34) parsed by
+            // FlashbackOracleParser; this is the printed-name card from SoS
+            // whose effect GRANTS the keyword. Oracle text: "Target instant
+            // or sorcery card in your graveyard gains flashback until end of
+            // turn. The flashback cost is equal to its mana cost." Card
+            // shape only at the dispatcher; the bound SpellDefinition is
+            // built on demand via FlashbackFactory.BuildSpellDefinition(
+            // caster, resolver, eventBus?). Resolve-time mirrors
+            // Snapcaster Mage's ETB grant (same Card.GrantRuntimeFlashback
+            // wiring + EOT cleanup via a one-shot StepStartedEvent
+            // subscription scoped to PhaseStateType.Cleanup, CR 514.2).
+            "Flashback" => FlashbackFactory.Create(owner),
+
             // U/R Horizon Canopy painless dual — Modern Horizons (FieryIsletFactory).
             // {T}, Pay 1 life: Add {U} or {R} — two ManaAbility instances, each with
             // a life-cost activation gate (CR 119.4) and a LoseLife side-effect.
