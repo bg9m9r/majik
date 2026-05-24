@@ -79,12 +79,25 @@ public class PhoenixOfAshTests
     }
 
     [Fact]
-    public void PhoenixOfAsh_HasNoTriggeredAbilities_EscapeDeferred()
+    public void PhoenixOfAsh_HasNoTriggeredAbilities()
     {
+        // CR 702.138 — Escape is implemented as an alternative cost, not
+        // a triggered ability; Phoenix's only static is Haste, no triggers.
         var phoenix = PhoenixOfAshFactory.Create(_alice);
 
         phoenix.Abilities.OfType<TriggeredAbility>().Should().BeEmpty(
-            "Escape (CR 702.143) is deferred — no graveyard cast alt-cost yet, " +
-            "same gap as Uro / Phlage / Cling to Dust");
+            "Escape (CR 702.138) is wired via BuildAlternativeCost, not a triggered ability");
+    }
+
+    [Fact]
+    public void PhoenixOfAsh_BuildAlternativeCost_ReturnsEscapeAltCost_WithPrintedShape()
+    {
+        var cost = PhoenixOfAshFactory.BuildAlternativeCost();
+
+        cost.ExileFromGraveyardCount.Should().Be(4,
+            "Phoenix of Ash's printed Escape rider exiles 4 OTHER graveyard cards");
+        // {3}{R}{R} = 3 generic + 2 red.
+        cost.AlternativeManaCost.Generic.Should().Be(3);
+        cost.AlternativeManaCost.Red.Should().Be(2);
     }
 }

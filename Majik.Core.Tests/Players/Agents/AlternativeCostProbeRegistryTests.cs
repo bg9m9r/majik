@@ -37,13 +37,15 @@ public class AlternativeCostProbeRegistryTests
     {
         var registry = AlternativeCostProbeRegistry.CreateDefault();
 
-        // Pitch + Delve + Overload + Cascade + Energy (CR 118.9 + CR 106.13).
-        registry.Probes.Should().HaveCount(5);
+        // Pitch + Delve + Overload + Cascade + Energy + Escape
+        // (CR 118.9 + CR 106.13 + CR 702.138).
+        registry.Probes.Should().HaveCount(6);
         registry.Probes.Should().ContainSingle(p => p is PitchAltCostProbe);
         registry.Probes.Should().ContainSingle(p => p is DelveAltCostProbe);
         registry.Probes.Should().ContainSingle(p => p is OverloadAltCostProbe);
         registry.Probes.Should().ContainSingle(p => p is CascadeAltCostProbe);
         registry.Probes.Should().ContainSingle(p => p is EnergyAltCostProbe);
+        registry.Probes.Should().ContainSingle(p => p is EscapeAltCostProbe);
     }
 
     [Fact]

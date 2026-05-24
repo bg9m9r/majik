@@ -1,10 +1,12 @@
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Costs;
 using Majik.Core.Domain.DomainEvents;
 using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Services;
+using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
@@ -26,12 +28,13 @@ namespace Majik.Core.CardData.Factories;
 /// - 6/6 Legendary Creature — Giant, mana cost {1}{G}{U}.
 ///   ("Elder" creature subtype is not yet in <see cref="CardSubtype"/> —
 ///    Giant is wired; Elder is deferred — see gaps below.)
-/// - <b>Self-sacrifice ETB trigger (CR 603.1 / CR 701.16)</b>: When Uro
-///   enters, sacrifice it. The printed "unless it escaped" rider is
-///   structurally collapsed — Escape (CR 702.143) is not wired in v1
-///   (see deferred section), so a hardcast Uro is always sacrificed by
-///   this trigger, faithful to the printed text in the non-escape case.
-///   Sacrifice routes battlefield → owner's graveyard via
+/// - <b>Self-sacrifice ETB trigger (CR 603.1 / CR 701.16 / CR 702.138b)</b>:
+///   When Uro enters, sacrifice it unless it escaped. The trigger reads
+///   the cast-time <see cref="Card.WasCastForEscape"/> stamp set by
+///   <see cref="Majik.Core.Game.SpellCastFlow"/> when the cast used
+///   <see cref="Majik.Core.Costs.EscapeAlternativeCost"/>; hardcast Uro
+///   gets sacrificed, escaped Uro stays on the battlefield. Sacrifice
+///   routes battlefield → owner's graveyard via
 ///   <see cref="OracleSpellBinder.MoveToGraveyard"/> when still on the
 ///   battlefield (skips if a previous effect already moved it).
 /// - <b>ETB + attack triggered ability (CR 603.1 + CR 508.1f)</b>: On each
@@ -45,15 +48,16 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="ZoneService.MoveCard"/> when supplied so ETB-on-land
 ///   triggers fire (CR 603.6a); falls back to raw zone moves otherwise.
 ///
+/// - <b>Escape (CR 702.138) — wired via
+///   <see cref="EscapeAlternativeCost"/></b>: cast-from-graveyard alt
+///   cost with the "exile five other cards from your graveyard" rider.
+///   <see cref="BuildAlternativeCost"/> returns the bound alt-cost
+///   instance. The "sacrifice it unless it escaped" rider on the ETB
+///   trigger now consults <see cref="Card.WasCastForEscape"/>: a
+///   hardcast Uro still gets sacrificed; an escaped Uro stays on the
+///   battlefield.
+///
 /// ## Deferred (v1 gaps)
-/// - <b>Escape (CR 702.143)</b>: cast-from-graveyard alt cost with the
-///   "exile five other cards from your graveyard" rider. Engine has
-///   <see cref="Costs.CastFromExileAlternativeCost"/> for cast-from-exile
-///   only; no graveyard variant + multi-card-exile additional-cost
-///   primitive yet. The "sacrifice it unless it escaped" rider is
-///   therefore the trivial always-sac branch — once Escape ships, the
-///   sac trigger must be gated on the cast's escape flag. Same shape as
-///   the deferred Boromir / suspend cost primitives.
 /// - <b>"You may" prompts</b>: each trigger's land-play clause is
 ///   optional in the oracle text. v1 always plays the first land in
 ///   hand when one exists; a first-class yes/no agent prompt is deferred
@@ -68,6 +72,24 @@ public static class UroTitanFactory
 {
     public const string CardName = "Uro, Titan of Nature's Wrath";
     public const string PrintedManaCost = "{1}{G}{U}";
+
+    /// <summary>CR 702.138 — printed Escape mana cost: {G}{G}{U}{U}.</summary>
+    public const string EscapeManaCost = "{G}{G}{U}{U}";
+
+    /// <summary>CR 702.138a — Escape rider: exile five OTHER cards from
+    /// your graveyard.</summary>
+    public const int EscapeExileCount = 5;
+
+    /// <summary>
+    /// CR 702.138 — Uro's printed Escape alt-cost ({G}{G}{U}{U}, exile
+    /// five OTHER graveyard cards). The cast pipeline picks this up
+    /// from <see cref="Players.Agents.EscapeAltCostProbe"/> / direct
+    /// <c>SpellCaster</c> calls; the ETB sacrifice trigger reads the
+    /// resulting <see cref="Card.WasCastForEscape"/> stamp to skip
+    /// the sacrifice when Uro escaped.
+    /// </summary>
+    public static EscapeAlternativeCost BuildAlternativeCost() =>
+        new(ValueObjects.ManaCost.Parse(EscapeManaCost), EscapeExileCount);
 
     /// <summary>
     /// Construct Uro with no live ZoneService / TriggerManager wiring (the
@@ -106,18 +128,21 @@ public static class UroTitanFactory
         card.SetController(owner);
 
         // ----------------------------------------------------------------
-        // Self-sacrifice ETB trigger — CR 603.1 / CR 701.16.
+        // Self-sacrifice ETB trigger — CR 603.1 / CR 701.16 / CR 702.138b.
         //   "When Uro enters, sacrifice it unless it escaped."
-        // Escape is not wired in v1 (CR 702.143) — the "unless it escaped"
-        // gate is structurally collapsed to "always sacrifice" since a
-        // hardcast Uro never satisfies the escape branch. Once Escape
-        // ships this trigger must consume the cast's escape flag.
+        // Reads the cast-time escape stamp off the card (set by
+        // SpellCastFlow when the cast used an EscapeAlternativeCost).
+        // Hardcast Uro lacks the stamp → always sacrificed; escaped
+        // Uro skips the sacrifice and stays on the battlefield.
         // ----------------------------------------------------------------
         var sacEffect = new Effect(
-            $"{CardName}: sacrifice unless escaped (escape not wired — always sac)",
+            $"{CardName}: sacrifice unless escaped",
             () =>
             {
                 if (card.Zone != ZoneType.Battlefield) return;
+                // CR 702.138b — "escaped" gate. Hardcast Uro is sacrificed;
+                // escaped Uro stays.
+                if (card.WasCastForEscape) return;
                 // CR 701.16 — sacrifice bypasses Indestructible /
                 // regeneration (CR 702.12b).
                 OracleSpellBinder.MoveToGraveyard(card, Majik.Core.Zones.ZoneMoveReason.Sacrifice);

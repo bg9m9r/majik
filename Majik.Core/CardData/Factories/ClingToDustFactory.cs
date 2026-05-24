@@ -1,9 +1,11 @@
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Costs;
 using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
+using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
@@ -32,19 +34,34 @@ namespace Majik.Core.CardData.Factories;
 /// mode 1 draws one card from the controller's library and subtracts 1
 /// from their life total.
 ///
-/// ## Deferred (v1 gaps)
+/// ## Escape (CR 702.138)
 ///
-/// - Escape alt-cost ({2}{B}, exile two other graveyard cards — CR
-///   702.143) deferred — same gap as Uro / Phlage, blocked on the
-///   missing graveyard-cast alt-cost + multi-card-exile additional-cost
-///   primitive. Cling without Escape ships fine as the cheap GY-hate
-///   cantrip on the printed cast.
+/// Wired via <see cref="EscapeAlternativeCost"/>. Cling's printed
+/// Escape cost is {3}{B}, "Exile five other cards from your graveyard."
+/// <see cref="BuildAlternativeCost"/> returns the bound alt-cost
+/// instance; the modal resolve body is unchanged — Escape only changes
+/// how the spell is cast, not its on-resolution effect.
 /// </summary>
 [CardName("Cling to Dust")]
 public static class ClingToDustFactory
 {
     public const string CardName = "Cling to Dust";
     public const string PrintedManaCost = "{B}";
+
+    /// <summary>CR 702.138 — printed Escape mana cost: {3}{B}.</summary>
+    public const string EscapeManaCost = "{3}{B}";
+
+    /// <summary>CR 702.138a — Escape rider: exile five OTHER cards from
+    /// your graveyard.</summary>
+    public const int EscapeExileCount = 5;
+
+    /// <summary>
+    /// CR 702.138 — Cling to Dust's printed Escape alt-cost ({2}{B},
+    /// exile five OTHER graveyard cards). Mana cost replaces the
+    /// printed {B}; the modal resolve body is unchanged.
+    /// </summary>
+    public static EscapeAlternativeCost BuildAlternativeCost() =>
+        new(ValueObjects.ManaCost.Parse(EscapeManaCost), EscapeExileCount);
 
     /// <summary>Mode 0 — exile target card from a graveyard + gain mv life.</summary>
     public const int ModeExileGainLife = 0;

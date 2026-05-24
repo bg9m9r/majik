@@ -160,4 +160,21 @@ public class PhlageTests
         _alice.LifeTotal.Should().Be(aliceStart, "no target → full fizzle, no life gained");
         _bob.LifeTotal.Should().Be(bobStart, "no target → no damage to anyone");
     }
+
+    // -----------------------------------------------------------------
+    // BuildAlternativeCost — CR 702.138 Escape factory exposure
+    // -----------------------------------------------------------------
+
+    [Fact]
+    public void Phlage_BuildAlternativeCost_ReturnsEscapeAltCost_WithPrintedShape()
+    {
+        var cost = PhlageFactory.BuildAlternativeCost();
+
+        cost.ExileFromGraveyardCount.Should().Be(5,
+            "Phlage's printed Escape rider exiles 5 OTHER graveyard cards");
+        // {R}{R}{W}{W} = 2 red + 2 white.
+        cost.AlternativeManaCost.Generic.Should().Be(0);
+        cost.AlternativeManaCost.Red.Should().Be(2);
+        cost.AlternativeManaCost.White.Should().Be(2);
+    }
 }
