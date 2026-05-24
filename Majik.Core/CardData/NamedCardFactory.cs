@@ -1324,6 +1324,21 @@ public static class NamedCardFactory
             // willCast, onCascadeResolved) overload to drive the free cast.
             "Crashing Footfalls" => CrashingFootfallsFactory.Create(owner),
 
+            // Creature — Dinosaur {1}{R} 3/1 (AmpedRaptorFactory). Modern Horizons 3.
+            // Trample keyword marker (CR 702.19) wired. ETB triggered
+            // ability (CR 603.6a): exile the top four cards of controller's
+            // library, then "you may cast a spell with mana value 2 or less
+            // from among them without paying its mana cost." The single-arg
+            // dispatcher path attaches Trample + the ETB trigger
+            // structurally for shape inspection; the effect is a no-op
+            // without a SpellCastFlow binding. Use the (owner, triggers,
+            // chooseSpell, onEtbResolved) overload to drive the free cast
+            // via CastFromExileAlternativeCost + SpellCastFlow (mirrors
+            // CrashingFootfallsFactory's cascade-resolved hook). Cards
+            // not cast stay in exile — printed oracle, distinct from
+            // Cascade's bottom-the-rest step.
+            "Amped Raptor" => AmpedRaptorFactory.Create(owner),
+
             // Creature — Giant {4}{G}{G} 6/6 (PrimevalTitanFactory).
             // Trample keyword wired. ETB + attack triggered abilities both
             // tutor up to two lands → battlefield tapped (CR 603.1, CR
