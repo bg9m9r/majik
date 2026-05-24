@@ -3,6 +3,7 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
 COPY global.json Directory.Build.props Directory.Packages.props ./
+COPY Majik.Core.SourceGen/ ./Majik.Core.SourceGen/
 COPY Majik.Core/ ./Majik.Core/
 COPY Majik.Core.Api/ ./Majik.Core.Api/
 COPY Majik.Bot/ ./Majik.Bot/
