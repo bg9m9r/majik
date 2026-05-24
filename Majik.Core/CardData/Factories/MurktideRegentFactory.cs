@@ -56,8 +56,16 @@ namespace Majik.Core.CardData.Factories;
 ///   not on ETB trigger resolution. The v1 impl folds counter placement
 ///   into the ETB effect because no general 122.1g infrastructure exists
 ///   yet and the test matrix doesn't depend on the strict ordering.
-/// - <b>Bot-side delve discovery</b>: same gap as Treasure Cruise — the
-///   heuristic bot won't proactively delve when casting Murktide.
+///
+/// ## Bot-side discovery
+/// - <see cref="Majik.Core.Players.Agents.DelveAltCostProbe"/> surfaces
+///   Murktide Regent to the heuristic bot's
+///   <see cref="Majik.Core.Players.Agents.IAlternativeCostProbe"/> stream
+///   via the Delve <see cref="KeywordAbility"/> marker. The probe yields a
+///   <see cref="Majik.Core.Costs.DelveAlternativeCost"/>; the default
+///   "max-delve" chooser doesn't preserve specific graveyard payoffs for
+///   the +1/+1 counter count, so callers needing optimal counter-stacking
+///   should supply a custom <see cref="Majik.Core.Players.Agents.DelveAltCostProbe.ChoiceStrategy"/>.
 /// </summary>
 public static class MurktideRegentFactory
 {

@@ -47,9 +47,12 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="ManaCostCost"/> with the printed cost string; the
 ///   payment surface itself is handled by the activation flow and the
 ///   controller's mana pool.
-/// - <b>Bot-side <c>IAlternativeCostProbe</c>-style discovery for
-///   Delve</b> is not yet wired; the heuristic bot won't proactively
-///   delve Tasigur — same gap as Treasure Cruise.
+/// - <b>Bot-side delve discovery</b>: now wired via
+///   <see cref="Majik.Core.Players.Agents.DelveAltCostProbe"/>, which
+///   surfaces Tasigur's Delve <see cref="KeywordAbility"/> marker to the
+///   heuristic bot's
+///   <see cref="Majik.Core.Players.Agents.IAlternativeCostProbe"/> stream
+///   as a <see cref="Majik.Core.Costs.DelveAlternativeCost"/>.
 /// </summary>
 public static class TasigurTheGoldenFangFactory
 {

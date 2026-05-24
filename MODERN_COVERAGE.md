@@ -325,7 +325,8 @@ Cards under `Majik.Core/CardData/Cards/*.json`:
 | Buyback (additional) | Stub | `Costs/BuybackAdditionalCost.cs` (no caster wiring yet) |
 | Madness | Stub | `Costs/MadnessAlternativeCost.cs` (no discard-replacement trigger) |
 | Spectacle | Stub | `Costs/SpectacleAlternativeCost.cs` |
-| Overload | Stub | `Costs/OverloadAlternativeCost.cs` |
+| Overload | Done (TBD) | `Costs/OverloadAlternativeCost.cs` + `Players/Agents/OverloadAltCostProbe.cs` (Mizzium Mortars) |
+| Bot-side alt-cost discovery (probe registry) | Done (TBD) | `Players/Agents/AlternativeCostProbeRegistry.cs` + `PitchAltCostProbe`, `DelveAltCostProbe`, `OverloadAltCostProbe`, `CascadeAltCostProbe`; pluggable via `Register(probe)` |
 | Cast-from-exile | Done | `Costs/CastFromExileAlternativeCost.cs` (suspend resolution) |
 | Cast-from-graveyard (Lurrus) | Done (TBD PR) | `Costs/GraveyardCastAlternativeCost.cs` + `CardData/Factories/LurrusOfTheDreamDenFactory.cs` (per-turn gate, mv ≤ 2, permanent-only) |
 | Sacrifice-self | Done | `Costs/SacrificeAnotherCreatureCost.cs`, `SacrificeCreatureCost.cs`, `SacrificeBasicLandCost.cs` |

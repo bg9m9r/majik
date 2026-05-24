@@ -30,11 +30,12 @@ namespace Majik.Core.CardData.Factories;
 ///   request; "indestructible" + "can't be regenerated" riders deferred —
 ///   same lossy MVP as <c>DestroySpellFactory.DestroyCreatureSpell</c>.
 ///
-/// ## Deferred (v1 gaps)
-/// - Bot-side <c>IAlternativeCostProbe</c>-style discovery for Delve is
-///   not yet wired; the heuristic bot won't proactively delve. Parallels
-///   the Treasure Cruise / Dig Through Time v1 PRs which deferred bot
-///   probe wiring.
+/// ## Bot-side discovery
+/// - <see cref="Majik.Core.Players.Agents.DelveAltCostProbe"/> surfaces
+///   Murderous Cut to the heuristic bot's
+///   <see cref="Majik.Core.Players.Agents.IAlternativeCostProbe"/> stream
+///   via the Delve <see cref="KeywordAbility"/> marker, as a
+///   <see cref="Majik.Core.Costs.DelveAlternativeCost"/>.
 /// </summary>
 public static class MurderousCutFactory
 {

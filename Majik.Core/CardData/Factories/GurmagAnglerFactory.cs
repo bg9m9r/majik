@@ -23,11 +23,13 @@ namespace Majik.Core.CardData.Factories;
 ///   activated abilities, so the factory ends right after the keyword
 ///   markers.
 ///
-/// ## Deferred (v1 gaps)
-/// - <b>Bot-side delve discovery</b>: same gap as Treasure Cruise / Murktide
-///   Regent — the heuristic bot won't proactively delve when casting Gurmag
-///   Angler. Tests construct <see cref="Majik.Core.Costs.DelveCost"/>
-///   explicitly and hand it to the cast flow.
+/// ## Bot-side discovery
+/// - <see cref="Majik.Core.Players.Agents.DelveAltCostProbe"/> surfaces
+///   Gurmag Angler to the heuristic bot's
+///   <see cref="Majik.Core.Players.Agents.IAlternativeCostProbe"/> stream
+///   via the Delve <see cref="KeywordAbility"/> marker. The probe yields a
+///   <see cref="Majik.Core.Costs.DelveAlternativeCost"/> that reduces the
+///   generic mana cost by the graveyard exiles the bot selects.
 /// </summary>
 public static class GurmagAnglerFactory
 {
