@@ -1049,5 +1049,13 @@ public static class SeedImplementedCards
         // Exalted (CR 702.90) — whenever a creature you control attacks alone,
         // that creature gets +1/+1 until end of turn. {T}: Add {G}, {W}, or {U}.
         "Noble Hierarch",
+
+        // ---- Modern staples shipped in the 2026-05-23l bump ----
+
+        // Creature — Ouphe {1}{G/W}{G/W} 3/2 (KitchenFinksFactory).
+        // Shadowmoor / Modern Horizons 2. ETB gains 2 life (CR 603.6a + CR 119.3).
+        // Persist (CR 702.78) — returns to battlefield with a -1/-1 counter when
+        // it dies without a -1/-1 counter on it.
+        "Kitchen Finks",
     };
 }

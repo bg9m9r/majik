@@ -2676,6 +2676,16 @@ public static class NamedCardFactory
             // battlefield.
             "Thalia, Guardian of Thraben" => ThaliaGuardianOfThrabenFactory.Create(owner),
 
+            // Creature — Ouphe {1}{G/W}{G/W} 3/2 (KitchenFinksFactory).
+            // Shadowmoor / Modern Horizons 2. "When Kitchen Finks enters the
+            // battlefield, you gain 2 life. Persist (When this creature dies,
+            // if it had no -1/-1 counters on it, return it to the battlefield
+            // under its owner's control with a -1/-1 counter on it.)"
+            // ETB lifegain (CR 603.6a + CR 119.3) and Persist (CR 702.78)
+            // triggers both wired. Hybrid mana cost {G/W} via ManaCost.Parse
+            // (CR 107.4e — same HybridPip path as Boros Reckoner {R/W}).
+            "Kitchen Finks" => KitchenFinksFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
