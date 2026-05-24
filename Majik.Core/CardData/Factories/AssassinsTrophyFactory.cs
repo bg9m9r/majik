@@ -45,6 +45,7 @@ namespace Majik.Core.CardData.Factories;
 ///   changed (e.g. control-effect) to the caster by the time the spell
 ///   resolves, the spell does nothing (CR 608.2b target legality).
 /// </summary>
+[CardName("Assassin's Trophy")]
 public static class AssassinsTrophyFactory
 {
     public const string CardName = "Assassin's Trophy";

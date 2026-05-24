@@ -57,6 +57,7 @@ namespace Majik.Core.CardData.Factories;
 ///   observable. Once <see cref="AdditionalCost.Pay"/> performs the
 ///   sacrifice itself the explicit move-to-graveyard can be removed.
 /// </summary>
+[CardName("Mishra's Bauble")]
 public static class MishrasBaubleFactory
 {
     /// <summary>

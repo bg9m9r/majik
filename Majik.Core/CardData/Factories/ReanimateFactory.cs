@@ -37,6 +37,7 @@ namespace Majik.Core.CardData.Factories;
 ///   ZoneService path uses its built-in "controller follows destination"
 ///   semantics; the raw-zone fallback path is explicit.
 /// </summary>
+[CardName("Reanimate")]
 public static class ReanimateFactory
 {
     public const string CardName = "Reanimate";

@@ -55,6 +55,7 @@ namespace Majik.Core.CardData.Factories;
 ///   <c>TakeDamage</c> directly (same as other ping effects). Prevention
 ///   replacement effects (CR 615) are not wired at this call site.
 /// </summary>
+[CardName("Izzet Staticaster")]
 public static class IzzetStaticasterFactory
 {
     public const string CardName = "Izzet Staticaster";

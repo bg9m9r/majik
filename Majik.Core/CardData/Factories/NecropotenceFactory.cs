@@ -76,6 +76,7 @@ namespace Majik.Core.CardData.Factories;
 ///   ideal. Auto-cleanup mirrors the
 ///   <see cref="DauthiVoidwalkerFactory"/> v1 gap.
 /// </summary>
+[CardName("Necropotence")]
 public static class NecropotenceFactory
 {
     public const string CardName = "Necropotence";

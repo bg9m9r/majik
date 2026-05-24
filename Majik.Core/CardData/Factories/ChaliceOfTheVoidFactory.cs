@@ -61,6 +61,7 @@ namespace Majik.Core.CardData.Factories;
 ///   replacement-effect surface yet — and the observable end state is
 ///   identical for the test matrix here.
 /// </summary>
+[CardName("Chalice of the Void")]
 public static class ChaliceOfTheVoidFactory
 {
     /// <summary>

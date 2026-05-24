@@ -41,6 +41,7 @@ namespace Majik.Core.CardData.Factories;
 ///   Scryfall oracle text by OracleSpellBinder. Bots see it via
 ///   <see cref="BuildSuspendCost"/> or direct factory construction.
 /// </summary>
+[CardName("Search for Tomorrow")]
 public static class SearchForTomorrowFactory
 {
     public const string CardName = "Search for Tomorrow";

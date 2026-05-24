@@ -28,6 +28,7 @@ namespace Majik.Core.CardData.Factories;
 /// The conditional layer-4 effect ("only when not on battlefield") is
 /// documented but deferred to a future slice.
 /// </summary>
+[CardName("Grist, the Hunger Tide")]
 public static class GristFactory
 {
     /// <summary>

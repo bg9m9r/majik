@@ -36,6 +36,7 @@ namespace Majik.Core.CardData.Factories;
 ///   it is net-zero) isn't tracked because the engine has no mana-provenance
 ///   ledger yet (same gap as Cavern of Souls' spend-restriction).
 /// </summary>
+[CardName("Manamorphose")]
 public static class ManamorphoseFactory
 {
     public const string CardName = "Manamorphose";

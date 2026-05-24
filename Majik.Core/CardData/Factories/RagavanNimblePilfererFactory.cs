@@ -62,6 +62,7 @@ namespace Majik.Core.CardData.Factories;
 ///   priority loop (HeuristicBotAgent already iterates alt costs and
 ///   chooses whether to play them). No new prompt surface is introduced.
 /// </summary>
+[CardName("Ragavan, Nimble Pilferer")]
 public static class RagavanNimblePilfererFactory
 {
     /// <summary>

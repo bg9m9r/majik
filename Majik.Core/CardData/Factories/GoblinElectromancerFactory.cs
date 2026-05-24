@@ -29,6 +29,7 @@ namespace Majik.Core.CardData.Factories;
 /// — creature / artifact / planeswalker / enchantment / land spells are
 /// untouched.
 /// </summary>
+[CardName("Goblin Electromancer")]
 public static class GoblinElectromancerFactory
 {
     public const string CardName = "Goblin Electromancer";

@@ -80,6 +80,7 @@ namespace Majik.Core.CardData.Factories;
 ///   the caller can <see cref="ReplacementBus.Unregister{TIntent}"/> it
 ///   on the Voidwalker's leave-battlefield event.
 /// </summary>
+[CardName("Dauthi Voidwalker")]
 public static class DauthiVoidwalkerFactory
 {
     public const string CardName = "Dauthi Voidwalker";

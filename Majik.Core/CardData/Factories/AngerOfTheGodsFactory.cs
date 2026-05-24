@@ -70,6 +70,7 @@ namespace Majik.Core.CardData.Factories;
 ///   — matching the printed "If a creature dealt damage this way would
 ///   die" (no controller restriction).
 /// </summary>
+[CardName("Anger of the Gods")]
 public static class AngerOfTheGodsFactory
 {
     public const string CardName = "Anger of the Gods";

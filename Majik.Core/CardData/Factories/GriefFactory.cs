@@ -40,6 +40,7 @@ namespace Majik.Core.CardData.Factories;
 ///   (mirrors <see cref="ThoughtseizePatternTemplate"/>). Real Grief lets the
 ///   caster choose any nonland card from the revealed hand.
 /// </summary>
+[CardName("Grief")]
 public static class GriefFactory
 {
     /// <summary>Construct Grief owned and controlled by <paramref name="owner"/>.</summary>

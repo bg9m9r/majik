@@ -42,6 +42,7 @@ namespace Majik.Core.CardData.Factories;
 ///   their own RNG at engine boot. The observable contract — graveyard ends
 ///   empty, those cards end in the library — is preserved.
 /// </summary>
+[CardName("Endurance")]
 public static class EnduranceFactory
 {
     /// <summary>Construct Endurance owned and controlled by <paramref name="owner"/>.</summary>

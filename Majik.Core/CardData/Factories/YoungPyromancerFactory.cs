@@ -32,6 +32,7 @@ namespace Majik.Core.CardData.Factories;
 ///   v1 token shape — same gap as Goblin Rabblemaster / Crashing Footfalls.
 ///   Subtype (Elemental), P/T, and IsToken flag are correct.
 /// </summary>
+[CardName("Young Pyromancer")]
 public static class YoungPyromancerFactory
 {
     public const string CardName = "Young Pyromancer";

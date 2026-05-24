@@ -45,6 +45,7 @@ namespace Majik.Core.CardData.Factories;
 ///   emitted by this path. Wire ZoneService through when the broader
 ///   bounce-pipeline pass lands.
 /// </summary>
+[CardName("Karakas")]
 public static class KarakasFactory
 {
     public const string CardName = "Karakas";

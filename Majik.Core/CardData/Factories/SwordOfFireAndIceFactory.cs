@@ -90,6 +90,7 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="TriggeredAbility.SetChosenTargets"/>; absent a chosen
 ///   target the damage half no-ops while the draw half still resolves.
 /// </summary>
+[CardName("Sword of Fire and Ice")]
 public static class SwordOfFireAndIceFactory
 {
     public const string CardName = "Sword of Fire and Ice";

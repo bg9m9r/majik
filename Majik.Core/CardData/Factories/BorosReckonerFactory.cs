@@ -58,6 +58,7 @@ namespace Majik.Core.CardData.Factories;
 /// caller is expected to wire a real prompt or default in production
 /// code, mirroring Goblin Bombardment's <c>DamageTarget</c> pattern).
 /// </summary>
+[CardName("Boros Reckoner")]
 public static class BorosReckonerFactory
 {
     /// <summary>

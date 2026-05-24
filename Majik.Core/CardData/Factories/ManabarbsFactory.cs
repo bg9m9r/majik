@@ -52,6 +52,7 @@ namespace Majik.Core.CardData.Factories;
 ///   captured reference. Same pattern as Amulet of Vigor's pending
 ///   permanent.
 /// </summary>
+[CardName("Manabarbs")]
 public static class ManabarbsFactory
 {
     public const string CardName = "Manabarbs";

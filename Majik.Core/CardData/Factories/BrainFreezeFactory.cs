@@ -46,6 +46,7 @@ namespace Majik.Core.CardData.Factories;
 /// - <b>Action validator filtering</b>: target list is "target player";
 ///   the agent's pick is honoured verbatim (no extra filtering yet).
 /// </summary>
+[CardName("Brain Freeze")]
 public static class BrainFreezeFactory
 {
     public const string CardName = "Brain Freeze";

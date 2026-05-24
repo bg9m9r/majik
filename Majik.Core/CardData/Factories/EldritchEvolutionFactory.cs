@@ -66,6 +66,7 @@ namespace Majik.Core.CardData.Factories;
 ///   in the right place — that hook is out of scope for this v1 named-card
 ///   factory.
 /// </summary>
+[CardName("Eldritch Evolution")]
 public static class EldritchEvolutionFactory
 {
     public const string CardName = "Eldritch Evolution";

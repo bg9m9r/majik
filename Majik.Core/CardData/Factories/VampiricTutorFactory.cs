@@ -52,6 +52,7 @@ namespace Majik.Core.CardData.Factories;
 ///   without publishing a reveal event; same gap as the other search
 ///   factories.
 /// </summary>
+[CardName("Vampiric Tutor")]
 public static class VampiricTutorFactory
 {
     public const string CardName = "Vampiric Tutor";

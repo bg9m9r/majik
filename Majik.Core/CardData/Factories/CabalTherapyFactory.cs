@@ -61,6 +61,7 @@ namespace Majik.Core.CardData.Factories;
 ///   Future work: extend <see cref="IAlternativeCost"/> to carry a
 ///   non-mana rider list so the cast flow charges them together.
 /// </summary>
+[CardName("Cabal Therapy")]
 public static class CabalTherapyFactory
 {
     public const string CardName = "Cabal Therapy";

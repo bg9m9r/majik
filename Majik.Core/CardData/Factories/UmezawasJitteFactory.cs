@@ -87,6 +87,7 @@ namespace Majik.Core.CardData.Factories;
 ///   <c>ChooseModeAsync</c> call. When modal-activated infra ships, the
 ///   three abilities can collapse to one.
 /// </summary>
+[CardName("Umezawa's Jitte")]
 public static class UmezawasJitteFactory
 {
     public const string CardName = "Umezawa's Jitte";

@@ -64,6 +64,7 @@ namespace Majik.Core.CardData.Factories;
 ///   lifecycle binder is the entire surface — the card carries the ETB
 ///   trigger only.
 /// </summary>
+[CardName("Puresteel Paladin")]
 public static class PuresteelPaladinFactory
 {
     public const string CardName = "Puresteel Paladin";

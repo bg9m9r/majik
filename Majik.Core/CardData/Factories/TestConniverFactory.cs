@@ -33,6 +33,7 @@ namespace Majik.Core.CardData.Factories;
 ///   Raffine attack rider) wait on the spell-cast watcher + combat-step
 ///   triggers respectively.
 /// </summary>
+[CardName("Test Conniver")]
 public static class TestConniverFactory
 {
     private static readonly CardDefinition Definition =

@@ -63,6 +63,7 @@ namespace Majik.Core.CardData.Factories;
 ///   triggers check controller on resolution) is not modelled because
 ///   <see cref="TargetsChosenEvent"/> is the only attachment point.
 /// </summary>
+[CardName("Nadu, Winged Wisdom")]
 public static class NaduWingedWisdomFactory
 {
     /// <summary>

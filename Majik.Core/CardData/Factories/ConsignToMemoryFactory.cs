@@ -51,6 +51,7 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="ActivatedAbility"/> stack objects (and any non-spell,
 ///   non-triggered-ability shape) as illegal targets per CR 608.2b.
 /// </summary>
+[CardName("Consign to Memory")]
 public static class ConsignToMemoryFactory
 {
     public const string CardName = "Consign to Memory";

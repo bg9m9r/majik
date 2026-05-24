@@ -68,6 +68,7 @@ namespace Majik.Core.CardData.Factories;
 ///   crewed. This is the same v1 simplification used by every other
 ///   Vehicle modelled today (see <see cref="CardData.Vehicles.CrewActionTests"/>).
 /// </summary>
+[CardName("Esika's Chariot")]
 public static class EsikasChariotFactory
 {
     public const string CardName = "Esika's Chariot";

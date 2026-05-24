@@ -43,6 +43,7 @@ namespace Majik.Core.CardData.Factories;
 ///   changes; <see cref="ContinuousEffect.IsActive"/> short-circuits when
 ///   Lord of Atlantis isn't on the battlefield so the bonus lifts correctly.
 /// </summary>
+[CardName("Lord of Atlantis")]
 public static class LordOfAtlantisFactory
 {
     public const string CardName = "Lord of Atlantis";

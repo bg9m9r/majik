@@ -81,6 +81,7 @@ namespace Majik.Core.CardData.Factories;
 ///   X" hook (CR 107.3b) the prompt-skip can move out of factory xmldoc
 ///   into engine code.
 /// </summary>
+[CardName("Wrath of the Skies")]
 public static class WrathOfTheSkiesFactory
 {
     public const string CardName = "Wrath of the Skies";

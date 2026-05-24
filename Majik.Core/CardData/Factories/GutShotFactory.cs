@@ -37,6 +37,7 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="PhyrexianManaAlternativeCost"/> only models "pay every
 ///   pip as life".
 /// </summary>
+[CardName("Gut Shot")]
 public static class GutShotFactory
 {
     public const string CardName = "Gut Shot";

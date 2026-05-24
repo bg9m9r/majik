@@ -46,6 +46,7 @@ namespace Majik.Core.CardData.Factories;
 /// inlines its Persist mechanic, but Young Wolf delegates to the shared
 /// <see cref="UndyingFactory"/> helper (CR 702.93).
 /// </summary>
+[CardName("Young Wolf")]
 public static class YoungWolfFactory
 {
     public const string CardName = "Young Wolf";

@@ -34,6 +34,7 @@ namespace Majik.Core.CardData.Factories;
 ///   (<see cref="HeuristicBotAgent"/> / <see cref="DeterministicBotAgent"/>);
 ///   this factory just consults whichever agent is registered.
 /// </summary>
+[CardName("Consider")]
 public static class ConsiderFactory
 {
     public const string CardName = "Consider";

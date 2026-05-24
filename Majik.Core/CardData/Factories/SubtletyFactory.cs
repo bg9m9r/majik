@@ -54,6 +54,7 @@ namespace Majik.Core.CardData.Factories;
 ///   keys off "that player", which depends on the bounce having a chosen
 ///   target).
 /// </summary>
+[CardName("Subtlety")]
 public static class SubtletyFactory
 {
     public const string CardName = "Subtlety";

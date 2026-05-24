@@ -59,6 +59,7 @@ namespace Majik.Core.CardData.Factories;
 ///   via <see cref="TriggeredAbility.SetChosenTargets"/>; no chosen target
 ///   → the life-loss effect no-ops (mirrors Valakut / Earthshaker Khenra).
 /// </summary>
+[CardName("Geralf's Messenger")]
 public static class GeralfsMessengerFactory
 {
     public const string CardName = "Geralf's Messenger";

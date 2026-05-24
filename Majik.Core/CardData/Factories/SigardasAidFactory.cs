@@ -54,6 +54,7 @@ namespace Majik.Core.CardData.Factories;
 ///   in hand are not modelled by v1 and would need a separate hand-
 ///   controller-override hook to flow through this predicate.
 /// </summary>
+[CardName("Sigarda's Aid")]
 public static class SigardasAidFactory
 {
     public const string CardName = "Sigarda's Aid";

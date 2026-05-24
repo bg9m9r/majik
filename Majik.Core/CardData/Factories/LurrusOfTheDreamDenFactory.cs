@@ -56,6 +56,7 @@ namespace Majik.Core.CardData.Factories;
 /// payment (CR 118.9), and default post-resolution destination
 /// (battlefield for permanents).
 /// </summary>
+[CardName("Lurrus of the Dream-Den")]
 public static class LurrusOfTheDreamDenFactory
 {
     /// <summary>

@@ -58,6 +58,7 @@ namespace Majik.Core.CardData.Factories;
 /// — Living End needs to be on the stack when its cast event fires.
 /// Mirrors <c>CrashingFootfallsFactory</c>.
 /// </summary>
+[CardName("Living End")]
 public static class LivingEndFactory
 {
     public const string CardName = "Living End";

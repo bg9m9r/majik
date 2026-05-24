@@ -31,6 +31,7 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="Majik.Core.Costs.DelveAlternativeCost"/> that reduces the
 ///   generic mana cost by the graveyard exiles the bot selects.
 /// </summary>
+[CardName("Gurmag Angler")]
 public static class GurmagAnglerFactory
 {
     /// <summary>

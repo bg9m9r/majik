@@ -44,6 +44,7 @@ namespace Majik.Core.CardData.Factories;
 /// the conservative "opponent can't or won't save" reading for shape-
 /// only tests.
 /// </summary>
+[CardName("Stubborn Denial")]
 public static class StubbornDenialFactory
 {
     public const string CardName = "Stubborn Denial";

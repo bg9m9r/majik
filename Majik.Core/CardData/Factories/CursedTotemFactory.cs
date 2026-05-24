@@ -31,6 +31,7 @@ namespace Majik.Core.CardData.Factories;
 ///   {T}: Add {G} on a Birds of Paradise / Llanowar Elves / etc. still
 ///   works under Cursed Totem.
 /// </summary>
+[CardName("Cursed Totem")]
 public static class CursedTotemFactory
 {
     public const string CardName = "Cursed Totem";

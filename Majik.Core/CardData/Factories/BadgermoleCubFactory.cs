@@ -30,6 +30,7 @@ namespace Majik.Core.CardData.Factories;
 ///   is a creature) and an extra-mana production side effect. No mana-ability
 ///   tap-watcher infrastructure exists. Deferred.
 /// </summary>
+[CardName("Badgermole Cub")]
 public static class BadgermoleCubFactory
 {
     /// <summary>

@@ -65,6 +65,7 @@ namespace Majik.Core.CardData.Factories;
 ///   resolution guard enforces the instant/sorcery + graveyard + owner
 ///   checks per CR 608.2b.
 /// </summary>
+[CardName("Mystic Sanctuary")]
 public static class MysticSanctuaryFactory
 {
     public const string CardName = "Mystic Sanctuary";

@@ -40,6 +40,7 @@ namespace Majik.Core.CardData.Factories;
 ///   primitive. Cling without Escape ships fine as the cheap GY-hate
 ///   cantrip on the printed cast.
 /// </summary>
+[CardName("Cling to Dust")]
 public static class ClingToDustFactory
 {
     public const string CardName = "Cling to Dust";

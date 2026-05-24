@@ -43,6 +43,7 @@ namespace Majik.Core.CardData.Factories;
 ///   Phyrexian pips paid with life count zero colours. The
 ///   <see cref="Func{Int32}"/> closure is the integration point.
 /// </summary>
+[CardName("Prismatic Ending")]
 public static class PrismaticEndingFactory
 {
     public const string CardName = "Prismatic Ending";

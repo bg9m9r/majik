@@ -47,6 +47,7 @@ namespace Majik.Core.CardData.Factories;
 ///   creature" binds to the same target as the pump/first-strike half —
 ///   there is no second target request (CR 700.2).
 /// </summary>
+[CardName("Violent Urge")]
 public static class ViolentUrgeFactory
 {
     public const string CardName = "Violent Urge";

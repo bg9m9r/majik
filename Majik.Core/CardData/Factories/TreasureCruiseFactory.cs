@@ -35,6 +35,7 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="Majik.Core.Costs.DelveAlternativeCost"/> that reduces the
 ///   generic mana cost by the graveyard exiles the bot selects.
 /// </summary>
+[CardName("Treasure Cruise")]
 public static class TreasureCruiseFactory
 {
     public static Sorcery Create(Player owner)

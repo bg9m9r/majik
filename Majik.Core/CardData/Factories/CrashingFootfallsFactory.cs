@@ -50,6 +50,7 @@ namespace Majik.Core.CardData.Factories;
 ///   automatically as long as that spell's factory registers its own
 ///   SpellCastEvent trigger.
 /// </summary>
+[CardName("Crashing Footfalls")]
 public static class CrashingFootfallsFactory
 {
     public const string CardName = "Crashing Footfalls";

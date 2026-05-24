@@ -65,6 +65,7 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="ContinuousEffectsService"/> on creatures before they
 ///   move to the battlefield (same shape as Reckless Charge's pump path).
 /// </summary>
+[CardName("Through the Breach")]
 public static class ThroughTheBreachFactory
 {
     public const string CardName = "Through the Breach";

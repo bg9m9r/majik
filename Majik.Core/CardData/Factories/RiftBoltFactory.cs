@@ -39,6 +39,7 @@ namespace Majik.Core.CardData.Factories;
 ///   helper or by direct factory construction. Auto-discovery from
 ///   Scryfall oracle text is a follow-up.
 /// </summary>
+[CardName("Rift Bolt")]
 public static class RiftBoltFactory
 {
     public const string CardName = "Rift Bolt";

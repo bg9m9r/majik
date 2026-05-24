@@ -56,6 +56,7 @@ namespace Majik.Core.CardData.Factories;
 ///   prompt is queued behind the same may-prompt MVP that Aether Vial /
 ///   Goblin Lackey are waiting on.
 /// </summary>
+[CardName("Goblin Matron")]
 public static class GoblinMatronFactory
 {
     public const string CardName = "Goblin Matron";

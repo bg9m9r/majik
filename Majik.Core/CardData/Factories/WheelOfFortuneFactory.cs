@@ -40,6 +40,7 @@ namespace Majik.Core.CardData.Factories;
 ///   the only case that needs a chooser; this is "discards their hand"
 ///   wholesale).
 /// </summary>
+[CardName("Wheel of Fortune")]
 public static class WheelOfFortuneFactory
 {
     public const string CardName = "Wheel of Fortune";

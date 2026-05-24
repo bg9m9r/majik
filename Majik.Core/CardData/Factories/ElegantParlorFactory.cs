@@ -32,6 +32,7 @@ namespace Majik.Core.CardData.Factories;
 ///   when registered; otherwise default all-to-graveyard. Mirrors the
 ///   Underground Mortuary path.
 /// </summary>
+[CardName("Elegant Parlor")]
 public static class ElegantParlorFactory
 {
     private static readonly CardDefinition Definition =

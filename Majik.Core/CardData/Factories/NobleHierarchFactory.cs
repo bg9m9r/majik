@@ -60,6 +60,7 @@ namespace Majik.Core.CardData.Factories;
 ///   same controller each add +1/+1 — a correct v1 observation, since each
 ///   factory instance registers its own trigger independently.
 /// </summary>
+[CardName("Noble Hierarch")]
 public static class NobleHierarchFactory
 {
     public const string CardName = "Noble Hierarch";

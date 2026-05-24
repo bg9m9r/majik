@@ -58,6 +58,7 @@ namespace Majik.Core.CardData.Factories;
 /// - No <c>CardsRevealedEvent</c> is published; no live observer cares
 ///   yet.
 /// </summary>
+[CardName("Malevolent Rumble")]
 public static class MalevolentRumbleFactory
 {
     public const string CardName = "Malevolent Rumble";

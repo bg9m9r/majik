@@ -54,6 +54,7 @@ namespace Majik.Core.CardData.Factories;
 ///   (everything mv-0-or-less destroyed — i.e. 0-mana artifacts /
 ///   creature tokens with 0 printed cost / enchantments with mv 0).
 /// </summary>
+[CardName("Pernicious Deed")]
 public static class PerniciousDeedFactory
 {
     /// <summary>

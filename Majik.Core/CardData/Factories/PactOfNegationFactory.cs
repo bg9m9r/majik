@@ -49,6 +49,7 @@ namespace Majik.Core.CardData.Factories;
 ///   with timestamp strictly after the resolve. Multi-player turn-skipping
 ///   nuances deferred.
 /// </summary>
+[CardName("Pact of Negation")]
 public static class PactOfNegationFactory
 {
     public const string CardName = "Pact of Negation";

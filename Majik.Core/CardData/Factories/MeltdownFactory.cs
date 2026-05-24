@@ -44,6 +44,7 @@ namespace Majik.Core.CardData.Factories;
 /// - "Can't be regenerated" is not a printed rider on Meltdown; CR
 ///   701.15 (Regenerate) is therefore moot here.
 /// </summary>
+[CardName("Meltdown")]
 public static class MeltdownFactory
 {
     public const string CardName = "Meltdown";

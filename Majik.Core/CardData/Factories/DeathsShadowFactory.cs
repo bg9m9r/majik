@@ -53,6 +53,7 @@ namespace Majik.Core.CardData.Factories;
 /// single-argument <see cref="Create(Player)"/> overload produces a card with
 /// correct identity but no live CDA — suitable for pure card-shape tests.
 /// </summary>
+[CardName("Death's Shadow")]
 public static class DeathsShadowFactory
 {
     public const string CardName = "Death's Shadow";

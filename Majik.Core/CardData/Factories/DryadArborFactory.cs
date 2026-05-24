@@ -24,6 +24,7 @@ namespace Majik.Core.CardData.Factories;
 /// - Green Sun's Zenith interaction (can be fetched as a Forest
 ///   creature — deferred to the targeting / land-subtype search slice).
 /// </summary>
+[CardName("Dryad Arbor")]
 public static class DryadArborFactory
 {
     private static readonly CardDefinition Definition =

@@ -32,6 +32,7 @@ namespace Majik.Core.CardData.Factories;
 ///   needed). No Army-token type, Amass infrastructure, or token-upsizing logic
 ///   exists yet. Deferred until the Amass subsystem is implemented.
 /// </summary>
+[CardName("Orcish Bowmasters")]
 public static class OrcishBowmastersFactory
 {
     /// <summary>

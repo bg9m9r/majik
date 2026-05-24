@@ -74,6 +74,7 @@ namespace Majik.Core.CardData.Factories;
 ///   gap — `CardColors.GetColors` reads mana cost; an empty mana cost
 ///   already implies colourless).
 /// </summary>
+[CardName("Karn, Scion of Urza")]
 public static class KarnScionOfUrzaFactory
 {
     public const string CardName = "Karn, Scion of Urza";

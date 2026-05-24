@@ -43,6 +43,7 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="TriggerManager"/> via their respective (owner, triggers)
 ///   overloads — no special-casing needed here.
 /// </summary>
+[CardName("Champion of the Parish")]
 public static class ChampionOfTheParishFactory
 {
     /// <summary>

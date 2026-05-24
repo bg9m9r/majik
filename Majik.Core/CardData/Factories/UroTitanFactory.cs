@@ -63,6 +63,7 @@ namespace Majik.Core.CardData.Factories;
 ///   the enum, mirroring the same gap for other "Elder X" creatures
 ///   (Elder Dragons etc).
 /// </summary>
+[CardName("Uro, Titan of Nature's Wrath")]
 public static class UroTitanFactory
 {
     public const string CardName = "Uro, Titan of Nature's Wrath";

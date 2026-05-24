@@ -73,6 +73,7 @@ namespace Majik.Core.CardData.Factories;
 /// the <see cref="ISpell"/> the agent picked; the resolve effect tolerates
 /// missing / illegal targets per CR 603.10b.
 /// </summary>
+[CardName("Spell Queller")]
 public static class SpellQuellerFactory
 {
     public const string CardName = "Spell Queller";

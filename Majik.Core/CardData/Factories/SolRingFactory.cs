@@ -28,6 +28,7 @@ namespace Majik.Core.CardData.Factories;
 ///   line is plain Artifact, matching every other oracle reference in the
 ///   engine).
 /// </summary>
+[CardName("Sol Ring")]
 public static class SolRingFactory
 {
     public const string CardName = "Sol Ring";

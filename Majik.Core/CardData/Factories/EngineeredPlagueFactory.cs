@@ -49,6 +49,7 @@ namespace Majik.Core.CardData.Factories;
 ///   short-circuits when Engineered Plague isn't on the battlefield, so
 ///   the debuff lifts correctly.
 /// </summary>
+[CardName("Engineered Plague")]
 public static class EngineeredPlagueFactory
 {
     public const string CardName = "Engineered Plague";

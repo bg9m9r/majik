@@ -47,6 +47,7 @@ namespace Majik.Core.CardData.Factories;
 /// resolve-time guard catches illegal picks and no-ops the effect, matching
 /// the pattern used by SpellSnare / ForceOfNegation / Karakas.
 /// </summary>
+[CardName("Aether Gust")]
 public static class AetherGustFactory
 {
     public const string CardName = "Aether Gust";

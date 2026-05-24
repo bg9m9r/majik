@@ -45,6 +45,7 @@ namespace Majik.Core.CardData.Factories;
 ///   so no extra gate is required — the absence of "as a sorcery" is
 ///   what the oracle text encodes.
 /// </summary>
+[CardName("Aether Vial")]
 public static class AetherVialFactory
 {
     /// <summary>

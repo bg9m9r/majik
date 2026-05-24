@@ -59,6 +59,7 @@ namespace Majik.Core.CardData.Factories;
 ///   damage prevention won't see Mana Vault's ping. Same scope decision
 ///   as Dark Confidant / Manabarbs.
 /// </summary>
+[CardName("Mana Vault")]
 public static class ManaVaultFactory
 {
     public const string CardName = "Mana Vault";

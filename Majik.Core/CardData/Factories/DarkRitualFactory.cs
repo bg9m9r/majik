@@ -26,6 +26,7 @@ namespace Majik.Core.CardData.Factories;
 /// Sibling of <see cref="CabalRitualFactory"/> minus the threshold
 /// clause — straight three-black ritual every resolution.
 /// </summary>
+[CardName("Dark Ritual")]
 public static class DarkRitualFactory
 {
     public const string CardName = "Dark Ritual";

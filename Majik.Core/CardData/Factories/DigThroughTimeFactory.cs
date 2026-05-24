@@ -31,6 +31,7 @@ namespace Majik.Core.CardData.Factories;
 /// - Agent-driven choose-2 prompt. Bots auto-pick the first two
 ///   candidates; UI clients must build the selector themselves.
 /// </summary>
+[CardName("Dig Through Time")]
 public static class DigThroughTimeFactory
 {
     public static Instant Create(Player owner)

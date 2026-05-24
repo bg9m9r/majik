@@ -52,6 +52,7 @@ namespace Majik.Core.CardData.Factories;
 ///   (relevant if Ledger Shredder is ever in a deck with extra-surveil
 ///   replacement effects — none exist as of CR 2025-11-14).
 /// </summary>
+[CardName("Ledger Shredder")]
 public static class LedgerShredderFactory
 {
     /// <summary>

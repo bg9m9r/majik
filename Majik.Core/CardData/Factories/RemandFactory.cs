@@ -31,6 +31,7 @@ namespace Majik.Core.CardData.Factories;
 ///   it is mandatory — always goes to hand, never to graveyard, when countered by Remand).
 /// - "Countered this way" tracking for interactions where the spell was already gone.
 /// </summary>
+[CardName("Remand")]
 public static class RemandFactory
 {
     public const string CardName = "Remand";

@@ -26,6 +26,7 @@ namespace Majik.Core.CardData.Factories;
 /// bypass is also lossy (no CR 702.12 surface on
 /// <see cref="OracleSpellBinder.MoveToGraveyard"/>).
 /// </summary>
+[CardName("Damnation")]
 public static class DamnationFactory
 {
     public const string CardName = "Damnation";

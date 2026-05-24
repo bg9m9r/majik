@@ -93,6 +93,7 @@ namespace Majik.Core.CardData.Factories;
 ///   call <see cref="ActivatedAbility.SetChosenTargets"/> directly
 ///   (same posture as Earthshaker Khenra's ETB target).
 /// </summary>
+[CardName("Guide of Souls")]
 public static class GuideOfSoulsFactory
 {
     public const string CardName = "Guide of Souls";

@@ -41,6 +41,7 @@ namespace Majik.Core.CardData.Factories;
 /// with correct identity but no live effect — suitable for pure
 /// card-shape tests.
 /// </summary>
+[CardName("Urborg, Tomb of Yawgmoth")]
 public static class UrborgTombOfYawgmothFactory
 {
     public const string CardName = "Urborg, Tomb of Yawgmoth";

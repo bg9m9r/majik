@@ -82,6 +82,7 @@ namespace Majik.Core.CardData.Factories;
 ///   v1 collapses this to the trigger-resolves-now shape (observationally
 ///   equivalent for the +N/+0 read at damage step).
 /// </summary>
+[CardName("Goblin Rabblemaster")]
 public static class GoblinRabblemasterFactory
 {
     public const string CardName = "Goblin Rabblemaster";

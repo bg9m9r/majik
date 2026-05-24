@@ -48,6 +48,7 @@ namespace Majik.Core.CardData.Factories;
 ///   the engine exposes a deterministic RNG seam for replay, this
 ///   should consume it instead.
 /// </summary>
+[CardName("Ancient Stirrings")]
 public static class AncientStirringsFactory
 {
     /// <summary>

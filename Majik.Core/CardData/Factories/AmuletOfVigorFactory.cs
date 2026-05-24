@@ -55,6 +55,7 @@ namespace Majik.Core.CardData.Factories;
 ///   event payload on Apply, so a closure is the established pattern (see
 ///   the inline draw effects on Up the Beanstalk / Spreading Seas).
 /// </summary>
+[CardName("Amulet of Vigor")]
 public static class AmuletOfVigorFactory
 {
     public const string CardName = "Amulet of Vigor";

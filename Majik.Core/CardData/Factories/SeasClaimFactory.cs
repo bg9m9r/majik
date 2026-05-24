@@ -30,6 +30,7 @@ namespace Majik.Core.CardData.Factories;
 ///   manually <see cref="Permanent.AttachTo"/> after putting both
 ///   permanents onto the battlefield.
 /// </summary>
+[CardName("Sea's Claim")]
 public static class SeasClaimFactory
 {
     public const string CardName = "Sea's Claim";

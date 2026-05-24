@@ -45,6 +45,7 @@ namespace Majik.Core.CardData.Factories;
 ///   a future Prune pass could drop the entry. Same shape as Plague
 ///   Engineer / Colossus Hammer.
 /// </summary>
+[CardName("Goblin Chieftain")]
 public static class GoblinChieftainFactory
 {
     public const string CardName = "Goblin Chieftain";

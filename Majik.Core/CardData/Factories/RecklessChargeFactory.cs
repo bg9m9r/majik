@@ -45,6 +45,7 @@ namespace Majik.Core.CardData.Factories;
 ///   half (CR 700.2). This matches the printed text "Target creature gets
 ///   +3/+0 and gains haste".
 /// </summary>
+[CardName("Reckless Charge")]
 public static class RecklessChargeFactory
 {
     public const string CardName = "Reckless Charge";

@@ -46,6 +46,7 @@ namespace Majik.Core.CardData.Factories;
 ///   to the overload to register both triggers with the bus for end-to-end
 ///   firing.
 /// </summary>
+[CardName("Up the Beanstalk")]
 public static class UpTheBeanstalkFactory
 {
     public const string CardName = "Up the Beanstalk";

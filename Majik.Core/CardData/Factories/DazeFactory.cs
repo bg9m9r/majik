@@ -37,6 +37,7 @@ namespace Majik.Core.CardData.Factories;
 /// pays so the probe shape is just "for each Island controlled, yield one
 /// candidate" and lives outside this factory's surface in v1.
 /// </summary>
+[CardName("Daze")]
 public static class DazeFactory
 {
     public const string CardName = "Daze";

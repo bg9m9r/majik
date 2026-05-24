@@ -31,6 +31,7 @@ namespace Majik.Core.CardData.Factories;
 /// request + resolver-driven token unwrap (illegal target → resolver
 /// returns a non-<see cref="Player"/>, the effect no-ops per CR 608.2b).
 /// </summary>
+[CardName("Hidetsugu's Second Rite")]
 public static class HidetsugusSecondRiteFactory
 {
     public const string CardName = "Hidetsugu's Second Rite";

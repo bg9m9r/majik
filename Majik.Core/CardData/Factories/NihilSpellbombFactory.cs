@@ -49,6 +49,7 @@ namespace Majik.Core.CardData.Factories;
 /// - <b>Sacrifice payment side effects</b>: same no-op stub as
 ///   Aether Spellbomb — the effect closure performs the zone move.
 /// </summary>
+[CardName("Nihil Spellbomb")]
 public static class NihilSpellbombFactory
 {
     public const string CardName = "Nihil Spellbomb";

@@ -48,6 +48,7 @@ namespace Majik.Core.CardData.Factories;
 ///   oracle wording (the exiled creature is the last-known-information source
 ///   per CR 112.7a after it leaves the battlefield).
 /// </summary>
+[CardName("Solitude")]
 public static class SolitudeFactory
 {
     /// <summary>Construct Solitude owned and controlled by <paramref name="owner"/>.</summary>

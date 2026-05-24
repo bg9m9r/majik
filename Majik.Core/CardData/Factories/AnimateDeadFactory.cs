@@ -76,6 +76,7 @@ namespace Majik.Core.CardData.Factories;
 /// - <b>Sorcery-speed cast restriction</b>: not enforced — same gap as
 ///   every other Aura factory in this repo.
 /// </summary>
+[CardName("Animate Dead")]
 public static class AnimateDeadFactory
 {
     public const string CardName = "Animate Dead";

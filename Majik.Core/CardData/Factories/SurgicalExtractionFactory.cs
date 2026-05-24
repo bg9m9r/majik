@@ -44,6 +44,7 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="Majik.Core.Costs.PhyrexianManaAlternativeCost"/> only
 ///   models "pay every pip with life", not per-pip mixing.
 /// </summary>
+[CardName("Surgical Extraction")]
 public static class SurgicalExtractionFactory
 {
     public const string CardName = "Surgical Extraction";

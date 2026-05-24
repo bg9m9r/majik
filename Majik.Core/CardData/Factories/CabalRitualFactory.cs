@@ -42,6 +42,7 @@ namespace Majik.Core.CardData.Factories;
 /// plug it into a <see cref="Majik.Core.Game.SpellDefinition"/> or
 /// pass it directly to a <see cref="Majik.Core.Spells.Spell"/>.
 /// </summary>
+[CardName("Cabal Ritual")]
 public static class CabalRitualFactory
 {
     public const string CardName = "Cabal Ritual";

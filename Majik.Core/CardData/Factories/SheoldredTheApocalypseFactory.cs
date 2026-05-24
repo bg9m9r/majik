@@ -36,6 +36,7 @@ namespace Majik.Core.CardData.Factories;
 ///   factory takes an explicit resolver so tests + the engine wire-up site
 ///   can both feed in the right player set without depending on a global.
 /// </summary>
+[CardName("Sheoldred, the Apocalypse")]
 public static class SheoldredTheApocalypseFactory
 {
     /// <summary>

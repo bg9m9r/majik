@@ -42,6 +42,7 @@ namespace Majik.Core.CardData.Factories;
 ///   a raw string; enforcement that it isn't a basic land name is deferred
 ///   (rules-layer validation, not mechanical).
 /// </summary>
+[CardName("Meddling Mage")]
 public static class MeddlingMageFactory
 {
     public const string CardName = "Meddling Mage";

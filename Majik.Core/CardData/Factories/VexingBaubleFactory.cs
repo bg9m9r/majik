@@ -26,6 +26,7 @@ namespace Majik.Core.CardData.Factories;
 ///   (c) a counter-spell effect. Deferred until the stack carries
 ///   cast-cost provenance.
 /// </summary>
+[CardName("Vexing Bauble")]
 public static class VexingBaubleFactory
 {
     private static readonly CardDefinition Definition =

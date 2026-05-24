@@ -37,6 +37,7 @@ namespace Majik.Core.CardData.Factories;
 /// with correct identity but no live effect — suitable for pure card-shape
 /// tests.
 /// </summary>
+[CardName("Blood Moon")]
 public static class BloodMoonFactory
 {
     public const string CardName = "Blood Moon";

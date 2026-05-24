@@ -32,6 +32,7 @@ namespace Majik.Core.CardData.Factories;
 /// <see cref="Create(Player, ContinuousEffectsService, IEventBus?)"/> so
 /// the effect is attached to the game's continuous-effects service.
 /// </summary>
+[CardName("Harbinger of the Seas")]
 public static class HarbingerOfTheSeasFactory
 {
     public const string CardName = "Harbinger of the Seas";

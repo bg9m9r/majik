@@ -28,6 +28,7 @@ namespace Majik.Core.CardData.Factories;
 ///   defensively at resolve time rather than at choose-time
 ///   (<see cref="TargetRequest.LegalCandidates"/> left empty).
 /// </summary>
+[CardName("Negate")]
 public static class NegateFactory
 {
     public const string CardName = "Negate";

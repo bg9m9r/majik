@@ -23,6 +23,7 @@ namespace Majik.Core.CardData.Factories;
 /// - <see cref="CardSubtype.Urzas"/> + <see cref="CardSubtype.Mine"/>.
 ///   No supertypes (not legendary, not basic).
 /// </summary>
+[CardName("Urza's Mine")]
 public static class UrzasMineFactory
 {
     /// <summary>

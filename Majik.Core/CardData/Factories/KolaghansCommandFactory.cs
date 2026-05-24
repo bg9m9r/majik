@@ -30,6 +30,7 @@ namespace Majik.Core.CardData.Factories;
 ///
 /// v1 defaults to modes 0+1 chosen when no explicit mode selectors provided.
 /// </summary>
+[CardName("Kolaghan's Command")]
 public static class KolaghansCommandFactory
 {
     public const string CardName = "Kolaghan's Command";

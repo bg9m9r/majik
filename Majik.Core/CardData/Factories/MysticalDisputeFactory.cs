@@ -51,6 +51,7 @@ namespace Majik.Core.CardData.Factories;
 ///   later — same posture as a hypothetical "Spell Pierce sees the
 ///   target's CMC."
 /// </summary>
+[CardName("Mystical Dispute")]
 public static class MysticalDisputeFactory
 {
     public const string CardName = "Mystical Dispute";

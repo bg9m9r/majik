@@ -33,6 +33,7 @@ namespace Majik.Core.CardData.Factories;
 ///   when registered; otherwise default all-to-graveyard. Mirrors the
 ///   Underground Mortuary path.
 /// </summary>
+[CardName("Thundering Falls")]
 public static class ThunderingFallsFactory
 {
     private static readonly CardDefinition Definition =

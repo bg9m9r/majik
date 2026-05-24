@@ -49,6 +49,7 @@ namespace Majik.Core.CardData.Factories;
 ///   TriggerManager evaluates ETB trigger so it fires automatically when the
 ///   card enters the battlefield. Use this overload from production game setup.
 /// </summary>
+[CardName("Reflector Mage")]
 public static class ReflectorMageFactory
 {
     public const string CardName = "Reflector Mage";

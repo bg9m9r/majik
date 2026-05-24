@@ -93,6 +93,7 @@ namespace Majik.Core.CardData.Factories;
 ///   prevention / replacement subscribers won't observe Vortex's pings.
 ///   Same shape as Manabarbs / Dark Confidant.
 /// </summary>
+[CardName("Roiling Vortex")]
 public static class RoilingVortexFactory
 {
     public const string CardName = "Roiling Vortex";

@@ -36,6 +36,7 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="Majik.Core.Players.Agents.AgentRegistry"/>; falls back to
 ///   all-to-graveyard default when none is registered.
 /// </summary>
+[CardName("Underground Mortuary")]
 public static class UndergroundMortuaryFactory
 {
     private static readonly CardDefinition Definition =

@@ -31,6 +31,7 @@ namespace Majik.Core.CardData.Factories;
 /// - Army-target player prompt (when multiple Armies exist) waits on the
 ///   target-prompt system. v1 auto-picks deterministically.
 /// </summary>
+[CardName("Lazotep Recruit")]
 public static class LazotepRecruitFactory
 {
     private static readonly CardDefinition Definition =

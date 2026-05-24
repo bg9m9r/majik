@@ -43,6 +43,7 @@ namespace Majik.Core.CardData.Factories;
 ///   lands, the selector signature stays; the closure simply forwards to
 ///   <c>agent.ChooseCardNameAsync(...)</c>.
 /// </summary>
+[CardName("Pithing Needle")]
 public static class PithingNeedleFactory
 {
     public const string CardName = "Pithing Needle";

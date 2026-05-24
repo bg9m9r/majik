@@ -44,6 +44,7 @@ namespace Majik.Core.CardData.Factories;
 ///   all intents not constructed explicitly with <c>WasCast: true</c>.
 ///   SpellCastFlow should stamp it once it builds its ZoneMoveIntent.
 /// </summary>
+[CardName("Containment Priest")]
 public static class ContainmentPriestFactory
 {
     public const string CardName = "Containment Priest";

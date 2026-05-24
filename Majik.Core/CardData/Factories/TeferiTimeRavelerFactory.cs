@@ -51,6 +51,7 @@ namespace Majik.Core.CardData.Factories;
 /// - <b>Targeting prompt</b>: -3 picks the first matching permanent in
 ///   the supplied resolver deterministically rather than via the agent.
 /// </summary>
+[CardName("Teferi, Time Raveler")]
 public static class TeferiTimeRavelerFactory
 {
     public const string CardName = "Teferi, Time Raveler";

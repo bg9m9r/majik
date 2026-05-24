@@ -62,6 +62,7 @@ namespace Majik.Core.CardData.Factories;
 ///   performs the sacrifice itself the explicit move-to-graveyard can
 ///   be removed.
 /// </summary>
+[CardName("Engineered Explosives")]
 public static class EngineeredExplosivesFactory
 {
     /// <summary>

@@ -32,6 +32,7 @@ namespace Majik.Core.CardData.Factories;
 /// because <see cref="SpellDefinition"/> needs a target resolver
 /// supplied by the caller's <see cref="GameContext"/>.
 /// </summary>
+[CardName("Galvanic Discharge")]
 public static class GalvanicDischargeFactory
 {
     public const string CardName = "Galvanic Discharge";

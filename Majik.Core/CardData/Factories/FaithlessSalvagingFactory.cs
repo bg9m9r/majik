@@ -56,6 +56,7 @@ namespace Majik.Core.CardData.Factories;
 ///   portion, so the discard rider rides as a paired additional cost
 ///   (same pattern as Cabal Therapy's sacrifice rider).
 /// </summary>
+[CardName("Faithless Salvaging")]
 public static class FaithlessSalvagingFactory
 {
     public const string CardName = "Faithless Salvaging";

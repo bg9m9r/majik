@@ -49,6 +49,7 @@ namespace Majik.Core.CardData.Factories;
 ///   permanent card type (creature, artifact, enchantment, land,
 ///   planeswalker — CR 110.4) without further filtering.
 /// </summary>
+[CardName("Sun Titan")]
 public static class SunTitanFactory
 {
     public const string CardName = "Sun Titan";

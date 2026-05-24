@@ -32,6 +32,7 @@ namespace Majik.Core.CardData.Factories;
 ///   other shipped cantrips (Consider, Ponder), and so the
 ///   <see cref="NamedCardFactory"/> path produces an identical card shape.
 /// </summary>
+[CardName("Preordain")]
 public static class PreordainFactory
 {
     public const string CardName = "Preordain";

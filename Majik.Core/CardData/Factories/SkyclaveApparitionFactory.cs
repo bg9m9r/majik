@@ -54,6 +54,7 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="TriggeredAbility.SetChosenTargets"/>; the agent prompt is
 ///   deferred.
 /// </summary>
+[CardName("Skyclave Apparition")]
 public static class SkyclaveApparitionFactory
 {
     public const string CardName = "Skyclave Apparition";

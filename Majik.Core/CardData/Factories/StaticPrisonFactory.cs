@@ -106,6 +106,7 @@ namespace Majik.Core.CardData.Factories;
 ///   ZoneService route, but currently mirrors the raw-move shape for
 ///   parity.
 /// </summary>
+[CardName("Static Prison")]
 public static class StaticPrisonFactory
 {
     public const string CardName = "Static Prison";

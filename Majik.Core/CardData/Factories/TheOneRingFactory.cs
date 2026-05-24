@@ -80,6 +80,7 @@ namespace Majik.Core.CardData.Factories;
 ///   triggers) overload registers both triggers so bus-driven firing
 ///   works end-to-end.
 /// </summary>
+[CardName("The One Ring")]
 public static class TheOneRingFactory
 {
     public const string CardName = "The One Ring";

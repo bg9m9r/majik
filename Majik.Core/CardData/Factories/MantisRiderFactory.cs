@@ -31,6 +31,7 @@ namespace Majik.Core.CardData.Factories;
 /// (each instance carries its own keyword set; HasFlying/HasVigilance/HasHaste
 /// are idempotent over multiple checks).
 /// </summary>
+[CardName("Mantis Rider")]
 public static class MantisRiderFactory
 {
     public const string CardName = "Mantis Rider";

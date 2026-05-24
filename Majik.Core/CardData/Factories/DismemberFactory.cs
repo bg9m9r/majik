@@ -37,6 +37,7 @@ namespace Majik.Core.CardData.Factories;
 ///   models "pay every phyrexian pip as life". The caller decides which
 ///   path to use.
 /// </summary>
+[CardName("Dismember")]
 public static class DismemberFactory
 {
     public const string CardName = "Dismember";

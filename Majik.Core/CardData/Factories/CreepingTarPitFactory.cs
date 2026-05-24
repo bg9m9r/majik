@@ -67,6 +67,7 @@ namespace Majik.Core.CardData.Factories;
 ///   Shroud still functions correctly because it is a Layer 6 keyword grant,
 ///   independent of colour.
 /// </summary>
+[CardName("Creeping Tar Pit")]
 public static class CreepingTarPitFactory
 {
     public const string CardName = "Creeping Tar Pit";

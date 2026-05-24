@@ -69,6 +69,7 @@ namespace Majik.Core.CardData.Factories;
 ///   bot probe drives the choice the same way the EV-search policies
 ///   do for Library Pick today.
 /// </summary>
+[CardName("Amped Raptor")]
 public static class AmpedRaptorFactory
 {
     public const string CardName = "Amped Raptor";

@@ -37,6 +37,7 @@ namespace Majik.Core.CardData.Factories;
 ///   deterministically. A real prompt via <c>IPlayerAgent.ChooseLibraryPickAsync</c>
 ///   is needed for player-driven choice (same gap as Primeval Titan / Path to Exile).
 /// </summary>
+[CardName("Polluted Delta")]
 public static class PollutedDeltaFactory
 {
     public const string CardName = "Polluted Delta";

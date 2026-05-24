@@ -37,6 +37,7 @@ namespace Majik.Core.CardData.Factories;
 ///   creatures entering are also suppressed). Future precision may be
 ///   needed if the engine adds "player-controlled" suppression semantics.
 /// </summary>
+[CardName("Torpor Orb")]
 public static class TorporOrbFactory
 {
     /// <summary>

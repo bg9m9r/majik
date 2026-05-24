@@ -38,6 +38,7 @@ namespace Majik.Core.CardData.Factories;
 ///   trigger body is unchanged — escape only changes how the spell is
 ///   cast, not the on-resolution effect.
 /// </summary>
+[CardName("Phlage, Titan of Fire's Fury")]
 public static class PhlageFactory
 {
     public const string CardName = "Phlage, Titan of Fire's Fury";

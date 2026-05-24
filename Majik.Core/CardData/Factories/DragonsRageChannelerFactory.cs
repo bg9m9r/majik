@@ -59,6 +59,7 @@ namespace Majik.Core.CardData.Factories;
 ///   a battlefield-zone lifecycle handler subscribed to the bus
 ///   (mirrors <see cref="TarmogoyfFactory"/>'s lifecycle wiring).
 /// </summary>
+[CardName("Dragon's Rage Channeler")]
 public static class DragonsRageChannelerFactory
 {
     public const string CardName = "Dragon's Rage Channeler";

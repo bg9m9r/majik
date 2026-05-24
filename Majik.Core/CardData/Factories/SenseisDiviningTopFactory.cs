@@ -69,6 +69,7 @@ namespace Majik.Core.CardData.Factories;
 ///   the Legend Rule SBA (CR 704.5j) is unaffected unless multiple
 ///   copies share a controller.
 /// </summary>
+[CardName("Sensei's Divining Top")]
 public static class SenseisDiviningTopFactory
 {
     public const string CardName = "Sensei's Divining Top";

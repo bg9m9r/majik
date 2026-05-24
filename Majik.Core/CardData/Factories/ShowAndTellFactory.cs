@@ -56,6 +56,7 @@ namespace Majik.Core.CardData.Factories;
 ///   hand. Real "any of N choices + opt-out" prompt deferred (same
 ///   queue as Stoneforge Mystic / Sun Titan).
 /// </summary>
+[CardName("Show and Tell")]
 public static class ShowAndTellFactory
 {
     public const string CardName = "Show and Tell";

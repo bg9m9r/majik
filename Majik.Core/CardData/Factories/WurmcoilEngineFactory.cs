@@ -45,6 +45,7 @@ namespace Majik.Core.CardData.Factories;
 ///   mandatory, so this is faithful to the oracle, but the engine has
 ///   no other choices to defer here).
 /// </summary>
+[CardName("Wurmcoil Engine")]
 public static class WurmcoilEngineFactory
 {
     /// <summary>

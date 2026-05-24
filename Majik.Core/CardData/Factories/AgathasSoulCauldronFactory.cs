@@ -47,6 +47,7 @@ namespace Majik.Core.CardData.Factories;
 ///   creatures is deferred until the layer-6 ability-grant subsystem is in
 ///   place.
 /// </summary>
+[CardName("Agatha's Soul Cauldron")]
 public static class AgathasSoulCauldronFactory
 {
     /// <summary>

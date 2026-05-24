@@ -77,6 +77,7 @@ namespace Majik.Core.CardData.Factories;
 /// subtype), 601.2f (additional costs), 702.19 (Trample), 702.51
 /// (Convoke), 117.6 (casting cards from non-hand zones).
 /// </summary>
+[CardName("Hogaak, Arisen Necropolis")]
 public static class HogaakFactory
 {
     public const string CardName = "Hogaak, Arisen Necropolis";

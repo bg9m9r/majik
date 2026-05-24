@@ -60,6 +60,7 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="SearchSpellFactory"/> — no <c>IZone.Shuffle</c> entry
 ///   point yet; GameDriver owns shuffle.
 /// </summary>
+[CardName("Chord of Calling")]
 public static class ChordOfCallingFactory
 {
     public const string CardName = "Chord of Calling";

@@ -42,6 +42,7 @@ namespace Majik.Core.CardData.Factories;
 ///   a <see cref="Majik.Core.Domain.DomainEvents.CardRevealedEvent"/>. No
 ///   reveal event is emitted in v1 (same gap as other reveal-cost cards).
 /// </summary>
+[CardName("Silvergill Adept")]
 public static class SilvergillAdeptFactory
 {
     public const string CardName = "Silvergill Adept";

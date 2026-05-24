@@ -35,6 +35,7 @@ namespace Majik.Core.CardData.Factories;
 ///   is not yet present in the engine; this factory ships the Layer 4
 ///   type-change only. See PR body for tracking.
 /// </summary>
+[CardName("Conversion")]
 public static class ConversionFactory
 {
     public const string CardName = "Conversion";

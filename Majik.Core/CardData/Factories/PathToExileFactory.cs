@@ -43,6 +43,7 @@ namespace Majik.Core.CardData.Factories;
 ///   at resolution-time target legality (CR 608.2b); if all targets are
 ///   illegal the spell does nothing, including no tutor.
 /// </summary>
+[CardName("Path to Exile")]
 public static class PathToExileFactory
 {
     public const string CardName = "Path to Exile";

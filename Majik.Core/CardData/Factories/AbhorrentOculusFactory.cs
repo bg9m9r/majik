@@ -71,6 +71,7 @@ namespace Majik.Core.CardData.Factories;
 /// 603.1 / 500.4 (upkeep trigger), 702.9 (Flying), 701.59 (manifest
 /// dread — deferred).
 /// </summary>
+[CardName("Abhorrent Oculus")]
 public static class AbhorrentOculusFactory
 {
     public const string CardName = "Abhorrent Oculus";

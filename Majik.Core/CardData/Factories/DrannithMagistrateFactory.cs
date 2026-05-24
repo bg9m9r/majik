@@ -46,6 +46,7 @@ namespace Majik.Core.CardData.Factories;
 ///   abilities such as cycling, channel, or Dread Wanderer-style
 ///   recursion are out of scope and remain unrestricted.
 /// </summary>
+[CardName("Drannith Magistrate")]
 public static class DrannithMagistrateFactory
 {
     public const string CardName = "Drannith Magistrate";

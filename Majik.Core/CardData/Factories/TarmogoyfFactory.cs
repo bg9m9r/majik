@@ -51,6 +51,7 @@ namespace Majik.Core.CardData.Factories;
 /// with correct identity but no live CDA — suitable for pure card-shape
 /// tests.
 /// </summary>
+[CardName("Tarmogoyf")]
 public static class TarmogoyfFactory
 {
     public const string CardName = "Tarmogoyf";

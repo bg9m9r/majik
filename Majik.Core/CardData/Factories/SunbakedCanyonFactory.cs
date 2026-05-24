@@ -23,6 +23,7 @@ namespace Majik.Core.CardData.Factories;
 /// - Sacrifice cost doesn't yet move the land to the graveyard
 ///   (see <see cref="Majik.Core.CardData.HorizonLandBinder.AttachSacDraw"/>).
 /// </summary>
+[CardName("Sunbaked Canyon")]
 public static class SunbakedCanyonFactory
 {
     /// <summary>

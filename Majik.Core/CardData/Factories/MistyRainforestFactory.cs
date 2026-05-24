@@ -28,6 +28,7 @@ namespace Majik.Core.CardData.Factories;
 /// ## Deferred (v1 gaps)
 /// - Library shuffle (CR 701.19c): no IZone.Shuffle entry point yet.
 /// </summary>
+[CardName("Misty Rainforest")]
 public static class MistyRainforestFactory
 {
     public const string CardName = "Misty Rainforest";

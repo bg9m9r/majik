@@ -47,6 +47,7 @@ namespace Majik.Core.CardData.Factories;
 ///   battlefield permanents), so the cost rider lifts automatically without
 ///   an explicit unregister step.
 /// </summary>
+[CardName("Thalia, Guardian of Thraben")]
 public static class ThaliaGuardianOfThrabenFactory
 {
     public const string CardName = "Thalia, Guardian of Thraben";

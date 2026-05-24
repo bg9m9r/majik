@@ -55,6 +55,7 @@ namespace Majik.Core.CardData.Factories;
 ///   this in favour of the same direct-zone pattern used by Agatha's Soul
 ///   Cauldron, Goblin Chieftain, and Kraul Harpooner.
 /// </summary>
+[CardName("Thalia's Lieutenant")]
 public static class ThaliaLieutenantFactory
 {
     /// <summary>

@@ -39,6 +39,7 @@ namespace Majik.Core.CardData.Factories;
 ///   creature the controller controls) — that machinery doesn't ship
 ///   here. Tier-2 follow-up. The cost-reduction is the headline.
 /// </summary>
+[CardName("Scion of Draco")]
 public static class ScionOfDracoFactory
 {
     public const string CardName = "Scion of Draco";

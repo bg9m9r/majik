@@ -43,6 +43,7 @@ namespace Majik.Core.CardData.Factories;
 /// <see cref="ChosenSpellParams"/> (the modal runtime honours either
 /// shape — see <see cref="ModalChooseOneTemplate.Rehydrate"/>).
 /// </summary>
+[CardName("Cryptic Command")]
 public static class CrypticCommandFactory
 {
     public const string CardName = "Cryptic Command";

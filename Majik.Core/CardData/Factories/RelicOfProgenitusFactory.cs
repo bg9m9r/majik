@@ -46,6 +46,7 @@ namespace Majik.Core.CardData.Factories;
 ///   keep test-visible behavior correct. Remove once the additional
 ///   cost infrastructure performs the zone move itself.
 /// </summary>
+[CardName("Relic of Progenitus")]
 public static class RelicOfProgenitusFactory
 {
     public const string CardName = "Relic of Progenitus";

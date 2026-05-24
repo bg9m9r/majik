@@ -55,6 +55,7 @@ namespace Majik.Core.CardData.Factories;
 ///   removed from the library before the second prompt). Test selectors
 ///   that return duplicates have the duplicates filtered defensively.
 /// </summary>
+[CardName("Primeval Titan")]
 public static class PrimevalTitanFactory
 {
     public const string CardName = "Primeval Titan";

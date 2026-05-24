@@ -31,6 +31,7 @@ namespace Majik.Core.CardData.Factories;
 ///   selection, and counter placement on a targeted permanent.
 ///   (CR 701.41: connive.) Not yet wired.
 /// </summary>
+[CardName("Spymaster's Vault")]
 public static class SpymastersVaultFactory
 {
     private static readonly CardDefinition Definition =
