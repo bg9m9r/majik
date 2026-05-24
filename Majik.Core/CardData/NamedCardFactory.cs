@@ -1995,6 +1995,21 @@ public static class NamedCardFactory
             // oracle (CR 602.5b default activation timing).
             "Wasteland" => WastelandFactory.Create(owner),
 
+            // Creature — Elemental Shaman {B/R}{B/R} 2/2 — Shadowmoor
+            // (FulminatorMageFactory). Oracle: "Sacrifice Fulminator
+            // Mage: Destroy target nonbasic land." ActivatedAbility with
+            // empty Costs (sacrifice is the only activation cost — see
+            // the inline self-sac in the effect closure, same trick as
+            // Wasteland because AdditionalCost.Sacrifice's Pay() is a
+            // stub) + a single 1..1 "target nonbasic land" TargetRequest.
+            // Resolution-time gate filters non-land, basic, off-battlefield,
+            // and orphan-owner picks (CR 608.2b illegal target → effect
+            // does nothing). v1 uses raw zone moves (no ZoneService
+            // routing — mirrors Wasteland). ActionValidator doesn't yet
+            // filter the agent's target list by "nonbasic land"
+            // (resolution-time guard catches illegal picks).
+            "Fulminator Mage" => FulminatorMageFactory.Create(owner),
+
             // Creature — Illusion {1}{U} 0/0 (PhantasmalImageFactory).
             // CR 706.10 — "You may have this enter as a copy of any creature
             // on the battlefield, except it's an Illusion in addition to its
