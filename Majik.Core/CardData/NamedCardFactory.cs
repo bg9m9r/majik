@@ -1996,6 +1996,17 @@ public static class NamedCardFactory
             // fully-wired behavior.
             "Noble Hierarch" => NobleHierarchFactory.Create(owner),
 
+            // Creature — Goblin Shaman {G} 0/1 (IgnobleHierarchFactory).
+            // Modern Horizons 3. Mono-G black/red/green sibling of Noble
+            // Hierarch — same shape (Exalted CR 702.90 + three tap
+            // ManaAbility instances) with mana colours swapped to {B}, {R},
+            // {G} and subtypes swapped to Goblin Shaman. Single-arg
+            // dispatcher path attaches the exalted trigger without
+            // TriggerManager wiring; attackingCreaturesSource is null so the
+            // pump body is a no-op. Use the (owner, triggers,
+            // attackingCreaturesSource) overload for fully-wired behavior.
+            "Ignoble Hierarch" => IgnobleHierarchFactory.Create(owner),
+
             // Creature — Goblin Warrior {2}{R} 2/2 (GoblinRabblemasterFactory).
             // Magic 2015 / many reprints. "Other Goblin creatures you control
             // have haste. Whenever Goblin Rabblemaster attacks, create a 1/1
