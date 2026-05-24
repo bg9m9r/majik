@@ -23,6 +23,10 @@ public static class SeedImplementedCards
         "Young Wolf", "Strangleroot Geist", "Butcher Ghoul", "Geralf's Messenger",
         // Removal + discard (OracleSpellBinder)
         "Fatal Push", "Thoughtseize", "Inquisition of Kozilek",
+        // Instant {B}{G} — destroy target nonland permanent mv ≤ 3; "can't be countered" marker (AbruptDecayFactory)
+        "Abrupt Decay",
+        // Instant {B}{R} — destroy target creature; "can't be regenerated" deferred (TerminateFactory)
+        "Terminate",
         // Dies-trigger land destruction (OracleTriggeredAbilityBinder — dies-destroy-land)
         "Fulminator Mage",
         // ETB graveyard-to-library trigger (OracleTriggeredAbilityBinder); Flash+Reach via KeywordBinder
