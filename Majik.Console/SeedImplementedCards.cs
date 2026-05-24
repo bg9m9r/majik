@@ -1033,5 +1033,16 @@ public static class SeedImplementedCards
         "Thalia, Guardian of Thraben",
         // Sorcery {2}{G} (SearchForTomorrowFactory). Basic land → battlefield + Suspend 2.
         "Search for Tomorrow",
+
+        // ---- Merfolk lords shipped in the feat/merfolk-lords bump ----
+
+        // Creature — Merfolk {U}{U} 2/2 (LordOfAtlantisFactory). Alpha / reprints.
+        // Symmetric: other Merfolk (ALL players) get +1/+1 and have Islandwalk.
+        // Islandwalk keyword marker wired; combat-validator enforcement deferred.
+        "Lord of Atlantis",
+        // Creature — Merfolk {U}{U} 2/2 (MasterOfThePearlTridentFactory). M13.
+        // Controller-only: other Merfolk you control get +1/+1 and have Islandwalk.
+        // Islandwalk keyword marker wired; combat-validator enforcement deferred.
+        "Master of the Pearl Trident",
     };
 }

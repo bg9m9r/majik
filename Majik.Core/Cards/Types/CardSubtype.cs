@@ -100,6 +100,9 @@ public enum CardSubtype
     /// <summary>Fish creature subtype — Gurmag Angler, Tatsumasa, the Dragon's Fang's
     /// Dragon Fish token. CR 205.3m.</summary>
     Fish,
+    /// <summary>Merfolk creature subtype — Lord of Atlantis, Master of the Pearl Trident,
+    /// Harbinger of the Seas, Silvergill Adept. CR 205.3m.</summary>
+    Merfolk,
     /// <summary>Kavu creature subtype — Territorial Kavu, Shivan Wurm's body type.
     /// CR 205.3m.</summary>
     Kavu,

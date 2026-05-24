@@ -310,10 +310,26 @@ public static class NamedCardFactory
             // Creature — Wizard {1}{U} 2/2 (HarbingerOfTheSeasFactory).
             // "Nonbasic lands are Islands" — same scope as Blood Moon,
             // retypes to {Island} instead of {Mountain}. Printed creature
-            // type "Merfolk Wizard" — Merfolk not yet in CardSubtype, so
-            // only Wizard is assigned. Full lifecycle via
-            // HarbingerOfTheSeasFactory.Create(owner, effects, eventBus).
+            // type "Merfolk Wizard" — now that CardSubtype.Merfolk exists,
+            // a follow-up PR can wire both subtypes; v1 keeps only Wizard.
+            // Full lifecycle via HarbingerOfTheSeasFactory.Create(owner, effects, eventBus).
             "Harbinger of the Seas" => HarbingerOfTheSeasFactory.Create(owner),
+
+            // Creature — Merfolk {U}{U} 2/2 (LordOfAtlantisFactory).
+            // "Other Merfolk get +1/+1 and have Islandwalk." Symmetric
+            // (allPlayers: true) — opponents' Merfolk are also buffed.
+            // Islandwalk keyword marker wired (CR 702.14); combat-validator
+            // enforcement deferred. Full lifecycle via
+            // LordOfAtlantisFactory.Create(owner, continuousEffects).
+            "Lord of Atlantis" => LordOfAtlantisFactory.Create(owner),
+
+            // Creature — Merfolk {U}{U} 2/2 (MasterOfThePearlTridentFactory).
+            // "Other Merfolk you control get +1/+1 and have Islandwalk."
+            // Controller-scoped (allPlayers: false) — opponent's Merfolk
+            // are not buffed. Islandwalk keyword marker wired (CR 702.14);
+            // combat-validator enforcement deferred. Full lifecycle via
+            // MasterOfThePearlTridentFactory.Create(owner, continuousEffects).
+            "Master of the Pearl Trident" => MasterOfThePearlTridentFactory.Create(owner),
 
             // Enchantment — {2}{W}{W} (ConversionFactory).
             // "All Mountains are Plains." Scope: any Land whose subtype
