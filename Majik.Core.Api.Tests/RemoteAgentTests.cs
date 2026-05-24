@@ -581,6 +581,233 @@ public class RemoteAgentTests
         agent.ExpectedCommandKinds.Should().NotContain(typeof(PlayLandCommand));
     }
 
+    // ── ActivateManaAbility — wire-format → PriorityAction.ActivateManaAbility ──
+    //
+    // Mana abilities are activated at any priority window (CR 605.1a) and
+    // don't pass priority (CR 605.3a). These tests cover the RemoteAgent
+    // translation path: colour-disambiguation, empty-string single-ability
+    // shortcut, rejection of foreign permanents, and the
+    // BuildPriorityKinds advertising the command kind when the player
+    // controls a mana source.
+
+    [Fact]
+    public async Task ActivateManaAbility_Mountain_ResolvesToManaActionByColor()
+    {
+        var mountain = new Land(
+            "Mountain",
+            supertypes: new[] { Majik.Core.Cards.Types.CardSupertype.Basic },
+            subtypes: new[] { Majik.Core.Cards.Types.CardSubtype.Mountain });
+        mountain.SetOwner(_alice);
+        mountain.ChangeController(_alice);
+        Majik.Core.CardData.OracleManaBinder.BindBasicLandMana(mountain, _alice);
+        _alice.Zones.Battlefield.AddCard(mountain);
+
+        var agent = new RemoteAgent(_alice,
+            cardLookup: id => id == mountain.InstanceId ? (ICard)mountain : null);
+        var ctx = NewContext();
+
+        var task = agent.ChoosePriorityActionAsync(ctx);
+        agent.Submit(new ActivateManaAbilityCommand(mountain.InstanceId, "R")
+        {
+            PlayerId = _alice.Id,
+        });
+
+        var action = await task;
+        var ma = action.Should().BeOfType<PriorityAction.ActivateManaAbility>().Subject;
+        ma.Source.Should().BeSameAs(mountain);
+        ma.Ability.ManaGenerated.Red.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task ActivateManaAbility_EmptyColor_SingleManaAbility_Resolves()
+    {
+        var mountain = new Land(
+            "Mountain",
+            supertypes: new[] { Majik.Core.Cards.Types.CardSupertype.Basic },
+            subtypes: new[] { Majik.Core.Cards.Types.CardSubtype.Mountain });
+        mountain.SetOwner(_alice);
+        mountain.ChangeController(_alice);
+        Majik.Core.CardData.OracleManaBinder.BindBasicLandMana(mountain, _alice);
+        _alice.Zones.Battlefield.AddCard(mountain);
+
+        var agent = new RemoteAgent(_alice,
+            cardLookup: id => id == mountain.InstanceId ? (ICard)mountain : null);
+        var ctx = NewContext();
+
+        var task = agent.ChoosePriorityActionAsync(ctx);
+        agent.Submit(new ActivateManaAbilityCommand(mountain.InstanceId, "")
+        {
+            PlayerId = _alice.Id,
+        });
+
+        var action = await task;
+        action.Should().BeOfType<PriorityAction.ActivateManaAbility>()
+            .Which.Ability.ManaGenerated.Red.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task ActivateManaAbility_DualLand_PicksBlackVsGreen()
+    {
+        // Synthetic dual: two ManaAbility instances on one permanent, one
+        // adding {B}, one adding {G}. Mirrors the shape OracleManaBinder
+        // produces for a shock land like Overgrown Tomb when the dual-
+        // modal regex matches.
+        var dual = new Land("Overgrown Tomb");
+        dual.SetOwner(_alice);
+        dual.ChangeController(_alice);
+        dual.AddAbility(new ManaAbility(dual, _alice, Majik.Core.ValueObjects.ManaCost.Parse("B")));
+        dual.AddAbility(new ManaAbility(dual, _alice, Majik.Core.ValueObjects.ManaCost.Parse("G")));
+        _alice.Zones.Battlefield.AddCard(dual);
+
+        var agent = new RemoteAgent(_alice,
+            cardLookup: id => id == dual.InstanceId ? (ICard)dual : null);
+        var ctx = NewContext();
+
+        var task = agent.ChoosePriorityActionAsync(ctx);
+        agent.Submit(new ActivateManaAbilityCommand(dual.InstanceId, "G")
+        {
+            PlayerId = _alice.Id,
+        });
+
+        var action = await task;
+        action.Should().BeOfType<PriorityAction.ActivateManaAbility>()
+            .Which.Ability.ManaGenerated.Green.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task ActivateManaAbility_EmptyColor_AmbiguousMultipleAbilities_Throws()
+    {
+        var dual = new Land("Overgrown Tomb");
+        dual.SetOwner(_alice);
+        dual.ChangeController(_alice);
+        dual.AddAbility(new ManaAbility(dual, _alice, Majik.Core.ValueObjects.ManaCost.Parse("B")));
+        dual.AddAbility(new ManaAbility(dual, _alice, Majik.Core.ValueObjects.ManaCost.Parse("G")));
+        _alice.Zones.Battlefield.AddCard(dual);
+
+        var agent = new RemoteAgent(_alice,
+            cardLookup: id => id == dual.InstanceId ? (ICard)dual : null);
+        var ctx = NewContext();
+
+        _ = agent.ChoosePriorityActionAsync(ctx);
+
+        var act = () => agent.Submit(new ActivateManaAbilityCommand(dual.InstanceId, "")
+        {
+            PlayerId = _alice.Id,
+        });
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*disambiguate*");
+        await Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task ActivateManaAbility_OpponentControlled_Throws()
+    {
+        // Alice needs to control SOMETHING with a mana ability so the
+        // ExpectedCommandKinds gate even lets the command through to
+        // Resolve; otherwise the wrong-kind check fires first. Stage a
+        // Forest under Alice (irrelevant to the assertion) and point the
+        // command at Bob's Mountain.
+        var bob = new Player("Bob", 20);
+        var aliceForest = new Land(
+            "Forest",
+            supertypes: new[] { Majik.Core.Cards.Types.CardSupertype.Basic },
+            subtypes: new[] { Majik.Core.Cards.Types.CardSubtype.Forest });
+        aliceForest.SetOwner(_alice);
+        aliceForest.ChangeController(_alice);
+        Majik.Core.CardData.OracleManaBinder.BindBasicLandMana(aliceForest, _alice);
+        _alice.Zones.Battlefield.AddCard(aliceForest);
+
+        var mountain = new Land(
+            "Mountain",
+            supertypes: new[] { Majik.Core.Cards.Types.CardSupertype.Basic },
+            subtypes: new[] { Majik.Core.Cards.Types.CardSubtype.Mountain });
+        mountain.SetOwner(bob);
+        mountain.ChangeController(bob);
+        Majik.Core.CardData.OracleManaBinder.BindBasicLandMana(mountain, bob);
+        bob.Zones.Battlefield.AddCard(mountain);
+
+        var agent = new RemoteAgent(_alice,
+            cardLookup: id => id == mountain.InstanceId ? (ICard)mountain
+                : id == aliceForest.InstanceId ? (ICard)aliceForest
+                : null);
+        var ctx = NewContext();
+
+        _ = agent.ChoosePriorityActionAsync(ctx);
+
+        var act = () => agent.Submit(new ActivateManaAbilityCommand(mountain.InstanceId, "R")
+        {
+            PlayerId = _alice.Id,
+        });
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*does not control*");
+        await Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task ActivateManaAbility_NoMatchingColor_Throws()
+    {
+        var mountain = new Land(
+            "Mountain",
+            supertypes: new[] { Majik.Core.Cards.Types.CardSupertype.Basic },
+            subtypes: new[] { Majik.Core.Cards.Types.CardSubtype.Mountain });
+        mountain.SetOwner(_alice);
+        mountain.ChangeController(_alice);
+        Majik.Core.CardData.OracleManaBinder.BindBasicLandMana(mountain, _alice);
+        _alice.Zones.Battlefield.AddCard(mountain);
+
+        var agent = new RemoteAgent(_alice,
+            cardLookup: id => id == mountain.InstanceId ? (ICard)mountain : null);
+        var ctx = NewContext();
+
+        _ = agent.ChoosePriorityActionAsync(ctx);
+
+        var act = () => agent.Submit(new ActivateManaAbilityCommand(mountain.InstanceId, "U")
+        {
+            PlayerId = _alice.Id,
+        });
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*producing*");
+        await Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task PriorityKinds_HasManaSource_AdvertisesActivateManaAbility()
+    {
+        var mountain = new Land(
+            "Mountain",
+            supertypes: new[] { Majik.Core.Cards.Types.CardSupertype.Basic },
+            subtypes: new[] { Majik.Core.Cards.Types.CardSubtype.Mountain });
+        mountain.SetOwner(_alice);
+        mountain.ChangeController(_alice);
+        Majik.Core.CardData.OracleManaBinder.BindBasicLandMana(mountain, _alice);
+        _alice.Zones.Battlefield.AddCard(mountain);
+
+        var agent = new RemoteAgent(_alice);
+        var ctx = NewContext();
+
+        _ = agent.ChoosePriorityActionAsync(ctx);
+
+        agent.ExpectedCommandKinds.Should().Contain(typeof(ActivateManaAbilityCommand));
+    }
+
+    [Fact]
+    public async Task PriorityKinds_NoManaSource_OmitsActivateManaAbility()
+    {
+        // Empty battlefield → no mana source → kind must be hidden so the
+        // portal doesn't surface a tap-for-mana affordance with nothing
+        // to tap.
+        var agent = new RemoteAgent(_alice);
+        var ctx = NewContext();
+
+        _ = agent.ChoosePriorityActionAsync(ctx);
+
+        agent.ExpectedCommandKinds.Should().NotContain(typeof(ActivateManaAbilityCommand));
+        await Task.CompletedTask;
+    }
+
     private sealed class TestStackObject : Majik.Core.Stack.IStackObject
     {
         public Guid Id { get; } = Guid.NewGuid();

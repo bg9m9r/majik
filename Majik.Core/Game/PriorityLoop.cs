@@ -29,6 +29,7 @@ public sealed class PriorityLoop
     private readonly LandDropTracker? _landDropTracker;
     private readonly Func<Player, PriorityAction.CastSpell, GameContext, Task>? _castDispatcher;
     private readonly Func<Player, PriorityAction.ActivateAbility, GameContext, Task>? _activateDispatcher;
+    private readonly Action<Player, PriorityAction.ActivateManaAbility>? _manaAbilityDispatcher;
     private Player? _activePlayer;
 
     public PriorityLoop(
@@ -42,10 +43,12 @@ public sealed class PriorityLoop
         Func<PhaseStateType?> phaseAccessor,
         LandDropTracker? landDropTracker = null,
         Func<Player, PriorityAction.CastSpell, GameContext, Task>? castDispatcher = null,
-        Func<Player, PriorityAction.ActivateAbility, GameContext, Task>? activateDispatcher = null)
+        Func<Player, PriorityAction.ActivateAbility, GameContext, Task>? activateDispatcher = null,
+        Action<Player, PriorityAction.ActivateManaAbility>? manaAbilityDispatcher = null)
     {
         _castDispatcher = castDispatcher;
         _activateDispatcher = activateDispatcher;
+        _manaAbilityDispatcher = manaAbilityDispatcher;
         _players = players ?? throw new ArgumentNullException(nameof(players));
         _priority = priority ?? throw new ArgumentNullException(nameof(priority));
         _stack = stack ?? throw new ArgumentNullException(nameof(stack));
@@ -154,6 +157,16 @@ public sealed class PriorityLoop
                         "PriorityLoop received ActivateAbility but no activateDispatcher was supplied.");
                 await _activateDispatcher(actor, activate, ctx);
                 break;
+            case PriorityAction.ActivateManaAbility mana:
+                if (_manaAbilityDispatcher == null)
+                    throw new InvalidOperationException(
+                        "PriorityLoop received ActivateManaAbility but no manaAbilityDispatcher was supplied.");
+                // CR 605.3a — mana abilities don't use the stack and don't
+                // pass priority. The activator handles tapping + adding to
+                // pool synchronously; HoldsPriority below keeps the same
+                // player on the prompt so they can chain into a cast.
+                _manaAbilityDispatcher(actor, mana);
+                break;
             case PriorityAction.PassAction:
                 _priority.PassPriority();
                 break;
@@ -170,6 +183,10 @@ public sealed class PriorityLoop
         PriorityAction.CastSpell cs => cs.HoldPriority,
         PriorityAction.ActivateAbility a => a.HoldPriority,
         PriorityAction.PlayLand pl => pl.HoldPriority,
+        // CR 605.3a — activating a mana ability does not cause the player
+        // to pass priority. Implicit hold so the same player gets the next
+        // prompt and can spend the mana they just produced.
+        PriorityAction.ActivateManaAbility => true,
         _ => false,
     };
 }

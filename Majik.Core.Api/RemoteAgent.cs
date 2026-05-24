@@ -138,6 +138,37 @@ public sealed class RemoteAgent : IPlayerAgent
                 ((TaskCompletionSource<ManaPayment>)tcs).SetResult(
                     new ManaPayment(mp.SourceInstanceIds.Select(ResolveCard).ToList()));
                 break;
+            case ActivateManaAbilityCommand ama:
+            {
+                // CR 605 — translate the wire command into the engine's
+                // PriorityAction.ActivateManaAbility. The source must be a
+                // Permanent the caller controls; we resolve it via the
+                // lookup, pick the matching IManaAbility by colour, and
+                // surface a clear InvalidOperationException on any mismatch
+                // (no source, not a permanent, wrong controller, no mana
+                // ability, ambiguous when Color is empty, no colour match).
+                var source = ResolveCard(ama.PermanentInstanceId);
+                if (source is not Permanent permanent)
+                {
+                    throw new InvalidOperationException(
+                        $"ActivateManaAbilityCommand source {ama.PermanentInstanceId} is not a Permanent ({source.GetType().Name}).");
+                }
+                if (permanent.Controller != null && !ReferenceEquals(permanent.Controller, _player))
+                {
+                    throw new InvalidOperationException(
+                        $"Player {_player.Id} does not control permanent {permanent.Name}.");
+                }
+                var manaAbilities = permanent.Abilities.OfType<IManaAbility>().ToList();
+                if (manaAbilities.Count == 0)
+                {
+                    throw new InvalidOperationException(
+                        $"Permanent {permanent.Name} has no mana abilities.");
+                }
+                var chosen = PickManaAbility(permanent, manaAbilities, ama.Color);
+                ((TaskCompletionSource<PriorityAction>)tcs).SetResult(
+                    new PriorityAction.ActivateManaAbility(permanent, chosen));
+                break;
+            }
             case OrderTriggersCommand ot:
                 // CR 603.3b — APNAP-controller orders their own simultaneous
                 // triggers onto the stack. The wire command carries only
@@ -179,6 +210,57 @@ public sealed class RemoteAgent : IPlayerAgent
             default:
                 throw new InvalidOperationException($"Unhandled command {command.GetType().Name}.");
         }
+    }
+
+    /// <summary>
+    /// CR 605 — pick which mana ability on <paramref name="permanent"/> the
+    /// wire command's colour code (W/U/B/R/G/C) maps to. Empty string
+    /// resolves to the sole ability when there is exactly one; otherwise
+    /// requires an exact colour match. Throws if no ability produces the
+    /// requested colour or if the empty-string shortcut is ambiguous.
+    /// </summary>
+    private static IManaAbility PickManaAbility(
+        Permanent permanent,
+        IReadOnlyList<IManaAbility> abilities,
+        string color)
+    {
+        if (string.IsNullOrEmpty(color))
+        {
+            if (abilities.Count == 1) return abilities[0];
+            throw new InvalidOperationException(
+                $"Permanent {permanent.Name} has {abilities.Count} mana abilities; " +
+                "ActivateManaAbilityCommand.Color is required to disambiguate.");
+        }
+
+        var normalized = color.Trim().ToUpperInvariant();
+        var matches = abilities.Where(a => ManaAbilityProducesColor(a, normalized)).ToList();
+        if (matches.Count == 0)
+        {
+            throw new InvalidOperationException(
+                $"Permanent {permanent.Name} has no mana ability producing {{{normalized}}}.");
+        }
+        return matches[0];
+    }
+
+    /// <summary>Single-symbol colour-of-produced-mana test used by
+    /// <see cref="PickManaAbility"/>. Only the five WUBRG colours plus C
+    /// (colourless, modelled as Generic) are supported in v1.</summary>
+    private static bool ManaAbilityProducesColor(IManaAbility ability, string color)
+    {
+        var mc = ability.ManaGenerated;
+        if (mc == null) return false;
+        return color switch
+        {
+            "W" => mc.White > 0,
+            "U" => mc.Blue > 0,
+            "B" => mc.Black > 0,
+            "R" => mc.Red > 0,
+            "G" => mc.Green > 0,
+            // {C} is currently stored under Generic (see ManaCost.Parse).
+            "C" => mc.Generic > 0 && mc.White == 0 && mc.Blue == 0
+                && mc.Black == 0 && mc.Red == 0 && mc.Green == 0,
+            _ => false,
+        };
     }
 
     private ICard ResolveCard(Guid id)
@@ -246,6 +328,18 @@ public sealed class RemoteAgent : IPlayerAgent
         if (hasCastable)
         {
             kinds.Add(typeof(CastSpellCommand));
+        }
+
+        // CR 605.1a / 605.3a — mana abilities are activated whenever the
+        // controller has priority. Advertise the command kind whenever the
+        // player controls at least one permanent with a mana ability; the
+        // engine validates legality (untapped, CanActivate, etc.) on submit.
+        var battlefield = ctx.Self.Zones.Battlefield.GetCards();
+        var hasManaSource = battlefield.Any(c =>
+            c.Abilities.OfType<Majik.Core.Abilities.IManaAbility>().Any());
+        if (hasManaSource)
+        {
+            kinds.Add(typeof(ActivateManaAbilityCommand));
         }
 
         return kinds.ToArray();

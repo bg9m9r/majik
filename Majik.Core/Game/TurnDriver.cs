@@ -401,6 +401,26 @@ public sealed class TurnDriver
             }
         }
 
+        var manaActivator = new Majik.Core.Services.ManaAbilityActivator(_eventBus);
+        void DispatchManaAbility(Player actor, PriorityAction.ActivateManaAbility ma)
+        {
+            try
+            {
+                manaActivator.ActivateManaAbility(ma.Ability, actor);
+            }
+            catch (InvalidOperationException)
+            {
+                // Mirror DispatchActivate's posture: swallow validation
+                // failures (wrong controller / CanActivate false) so the
+                // pump keeps moving instead of tearing down the round.
+            }
+            catch (Majik.Core.Domain.Exceptions.InvalidPlayerActionException)
+            {
+                // ManaAbilityActivator's own validation throw — same
+                // posture as above.
+            }
+        }
+
         var loop = new PriorityLoop(
             players: _players,
             priority: _priorityManager,
@@ -411,7 +431,8 @@ public sealed class TurnDriver
             turnNumberAccessor: () => _currentTurnNumber,
             phaseAccessor: () => _currentPhase,
             castDispatcher: DispatchCast,
-            activateDispatcher: DispatchActivate);
+            activateDispatcher: DispatchActivate,
+            manaAbilityDispatcher: DispatchManaAbility);
 
         await loop.RunUntilRoundEndsAsync(activePlayer, ct);
     }

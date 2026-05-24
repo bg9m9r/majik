@@ -114,7 +114,44 @@ public static class StateSnapshotter
             Toughness: toughness,
             Tapped: tapped,
             SummoningSickness: summoningSickness,
-            Abilities: card.Abilities.Select(SnapshotAbility).ToList());
+            Abilities: card.Abilities.Select(SnapshotAbility).ToList(),
+            ProducedManaColors: ComputeProducedManaColors(card));
+    }
+
+    /// <summary>
+    /// CR 605 — derive the WUBRG/C colour string from the card's actual
+    /// <see cref="IManaAbility"/> instances so the client can render a
+    /// "tap for mana" affordance without round-tripping oracle text.
+    /// Order is fixed WUBRG then C. Hybrid / generic / X / Snow are
+    /// excluded from v1; only the five colours plus pure {C} are emitted.
+    /// </summary>
+    private static string ComputeProducedManaColors(ICard card)
+    {
+        var w = false; var u = false; var b = false; var r = false; var g = false; var c = false;
+        foreach (var ma in card.Abilities.OfType<IManaAbility>())
+        {
+            var mc = ma.ManaGenerated;
+            if (mc == null) continue;
+            if (mc.White > 0) w = true;
+            if (mc.Blue > 0) u = true;
+            if (mc.Black > 0) b = true;
+            if (mc.Red > 0) r = true;
+            if (mc.Green > 0) g = true;
+            // {C} is parsed into Generic with no colour pips set.
+            if (mc.Generic > 0 && mc.White == 0 && mc.Blue == 0
+                && mc.Black == 0 && mc.Red == 0 && mc.Green == 0)
+            {
+                c = true;
+            }
+        }
+        var sb = new System.Text.StringBuilder(6);
+        if (w) sb.Append('W');
+        if (u) sb.Append('U');
+        if (b) sb.Append('B');
+        if (r) sb.Append('R');
+        if (g) sb.Append('G');
+        if (c) sb.Append('C');
+        return sb.ToString();
     }
 
     private static AbilityDto SnapshotAbility(IAbility ability) => ability switch

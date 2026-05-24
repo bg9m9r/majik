@@ -45,6 +45,14 @@ public abstract record PriorityAction
     /// <summary>Activate an ability of a permanent the player controls.</summary>
     public sealed record ActivateAbility(IActivatedAbility Ability, IReadOnlyList<object> Targets, bool HoldPriority = false) : PriorityAction;
 
+    /// <summary>
+    /// Activate a mana ability (CR 605). Mana abilities don't use the stack
+    /// (CR 605.3a) and the activating player retains priority — the
+    /// priority loop treats this as an implicit hold-priority so the same
+    /// player gets the next prompt without yielding to the opponent.
+    /// </summary>
+    public sealed record ActivateManaAbility(ICard Source, IManaAbility Ability) : PriorityAction;
+
     /// <summary>Play a land from hand (special action, doesn't use the stack).</summary>
     public sealed record PlayLand(ICard Land, bool HoldPriority = false) : PriorityAction;
 
