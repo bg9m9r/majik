@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- Roslyn analyzers / source generators must target netstandard2.0
+         so the compiler can load them from any modern SDK. -->
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <!-- This project is a build-time tool only; nothing should reference
+         its assembly at runtime. -->
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <IsRoslynComponent>true</IsRoslynComponent>
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <!-- Directory.Build.props treats warnings as errors. The Roslyn
+         APIs we pull in surface a couple of nullable warnings on
+         netstandard2.0 that we intentionally do not want to fix at
+         the source-gen layer. -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Release-tracking analyzer (RS2008) expects these files. -->
+    <AdditionalFiles Include="AnalyzerReleases.Shipped.md" />
+    <AdditionalFiles Include="AnalyzerReleases.Unshipped.md" />
+  </ItemGroup>
+
+</Project>
