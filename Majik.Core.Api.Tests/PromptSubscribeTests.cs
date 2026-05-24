@@ -45,11 +45,22 @@ public class PromptSubscribeTests
     public async Task SubscribePrompts_PriorityPromptAdvertisesCastSpellCommand()
     {
         // Defence in depth: hand-click cast on the portal sends a
-        // CastSpellCommand. The first prompt the facade ships when priority
-        // opens must include CastSpellCommand in ExpectedKinds, otherwise
-        // the client has no way to know that path is valid AND the bridge
-        // ends up dropping the only chance to cast.
-        var facade = GameFacade.Create("Alice", "Bob", Array.Empty<ICard>(), Array.Empty<ICard>());
+        // CastSpellCommand. When the active player has a castable spell in
+        // hand at the first priority window, the prompt the facade ships
+        // must include CastSpellCommand in ExpectedKinds — otherwise the
+        // client has no way to know that path is valid AND the bridge
+        // ends up dropping the only chance to cast. RemoteAgent narrows
+        // ExpectedKinds by legality (PR adding ChoosePriorityActionAsync
+        // narrowing), so the test gives Alice a Lightning Bolt to hold.
+        var facade = GameFacade.Create(
+            "Alice", "Bob",
+            aliceDeck: Array.Empty<ICard>(),
+            bobDeck: Array.Empty<ICard>());
+        // StartAsync doesn't draw an opening hand on the legacy path, so
+        // seed Alice's hand directly with an instant. (Instant chosen so
+        // the test is independent of the sorcery-window check too.)
+        var bolt = new Instant("Lightning Bolt", "R") { Owner = facade.Alice };
+        facade.Alice.Zones.Hand.AddCard(bolt);
         var prompts = new List<PromptDto>();
         using var subscription = facade.SubscribePrompts(prompts.Add);
 

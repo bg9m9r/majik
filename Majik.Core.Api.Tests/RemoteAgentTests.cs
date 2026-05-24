@@ -34,6 +34,7 @@ public class RemoteAgentTests
     public async Task PlayLand_Submitted_ResolvesToActionWithCardLookup()
     {
         var land = new Land("Mountain") { Owner = _alice };
+        _alice.Zones.Hand.AddCard(land);
         var agent = new RemoteAgent(_alice, cardLookup: id => id == land.InstanceId ? land : null);
         var ctx = NewContext();
 
@@ -54,6 +55,7 @@ public class RemoteAgentTests
         // prompt the agent for ChooseTargets / ChooseX / ChooseMode in
         // separate envelopes (CR 601.2b/c/d).
         var bolt = new Instant("Lightning Bolt", "R") { Owner = _alice };
+        _alice.Zones.Hand.AddCard(bolt);
         var agent = new RemoteAgent(_alice, cardLookup: id => id == bolt.InstanceId ? bolt : null);
         var ctx = NewContext();
 
@@ -79,6 +81,7 @@ public class RemoteAgentTests
         // future "smart bot" agents that pre-plan targets aren't blocked.
         var bolt = new Instant("Lightning Bolt", "R") { Owner = _alice };
         var goblin = new Creature("Goblin", "R", 1, 1) { Owner = _alice };
+        _alice.Zones.Hand.AddCard(bolt);
         var agent = new RemoteAgent(_alice, cardLookup: id =>
             id == bolt.InstanceId ? bolt : id == goblin.InstanceId ? goblin : null);
         var ctx = NewContext();
@@ -387,6 +390,205 @@ public class RemoteAgentTests
         act.Should().Throw<InvalidOperationException>()
             .WithMessage("*expected 2*");
         await Task.CompletedTask;
+    }
+
+    // ── ExpectedCommandKinds narrowing (PR: ChoosePriorityActionAsync legality gate) ──
+    //
+    // Portal auto-passes "true pass-only" priority windows by checking
+    // ExpectedCommandKinds === ['PassPriorityCommand']. The old behaviour
+    // (always advertise Pass + PlayLand + CastSpell) disabled that gate.
+    // These tests pin down the legality narrowing so a regression there is
+    // a build break, not a silent UX bug.
+
+    [Fact]
+    public async Task PriorityKinds_EmptyHand_OnlyAdvertisesPass()
+    {
+        // Untap/upkeep/draw/cleanup with nothing in hand → there is
+        // literally nothing the player could do but pass. Portal relies on
+        // the singleton kinds list to auto-pass without prompting.
+        var agent = new RemoteAgent(_alice);
+        var ctx = NewContext();
+
+        _ = agent.ChoosePriorityActionAsync(ctx);
+
+        agent.ExpectedCommandKinds.Should().BeEquivalentTo(new[] { typeof(PassPriorityCommand) });
+        await Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task PriorityKinds_LandInHand_SorceryWindow_AdvertisesPlayLand()
+    {
+        // Active player's main phase + empty stack + land in hand → land
+        // drop is legal (CR 305.2). LandDropTracker per-turn cap is not
+        // checked here (engine validates on submit); we just need to keep
+        // the option visible to the user.
+        var land = new Land("Mountain") { Owner = _alice };
+        _alice.Zones.Hand.AddCard(land);
+        var agent = new RemoteAgent(_alice);
+        var ctx = NewContext();
+
+        _ = agent.ChoosePriorityActionAsync(ctx);
+
+        agent.ExpectedCommandKinds.Should().Contain(typeof(PlayLandCommand));
+        agent.ExpectedCommandKinds.Should().Contain(typeof(PassPriorityCommand));
+        await Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task PriorityKinds_LandInHand_NotMainPhase_OmitsPlayLand()
+    {
+        // CR 305.2 — lands are sorcery-speed-only. A priority window in
+        // upkeep / draw / combat / end with the active player still
+        // shouldn't advertise PlayLand even with a land in hand.
+        var land = new Land("Mountain") { Owner = _alice };
+        _alice.Zones.Hand.AddCard(land);
+        var agent = new RemoteAgent(_alice);
+        var ctx = new GameContext(
+            _alice, new[] { _alice }, _alice, 1,
+            PhaseStateType.Upkeep, new Majik.Core.Stack.Stack());
+
+        _ = agent.ChoosePriorityActionAsync(ctx);
+
+        agent.ExpectedCommandKinds.Should().NotContain(typeof(PlayLandCommand));
+    }
+
+    [Fact]
+    public async Task PriorityKinds_LandInHand_OpponentTurn_OmitsPlayLand()
+    {
+        // CR 305.2 — lands only on your own turn. Even Main phase + empty
+        // stack on the opponent's turn must hide PlayLand.
+        var bob = new Player("Bob", 20);
+        var land = new Land("Mountain") { Owner = _alice };
+        _alice.Zones.Hand.AddCard(land);
+        var agent = new RemoteAgent(_alice);
+        var ctx = new GameContext(
+            self: _alice,
+            allPlayers: new[] { _alice, bob },
+            activePlayer: bob,
+            turnNumber: 1,
+            currentPhase: PhaseStateType.Main,
+            stack: new Majik.Core.Stack.Stack());
+
+        _ = agent.ChoosePriorityActionAsync(ctx);
+
+        agent.ExpectedCommandKinds.Should().NotContain(typeof(PlayLandCommand));
+    }
+
+    [Fact]
+    public async Task PriorityKinds_InstantInHand_OpponentTurn_AdvertisesCastSpell()
+    {
+        // CR 307.1 / 117.1 — instants are castable any time a player has
+        // priority. On the opponent's untap-step priority window (no, wait:
+        // untap has no priority; use End step) an instant should still be
+        // offered.
+        var bob = new Player("Bob", 20);
+        var bolt = new Instant("Lightning Bolt", "R") { Owner = _alice };
+        _alice.Zones.Hand.AddCard(bolt);
+        var agent = new RemoteAgent(_alice);
+        var ctx = new GameContext(
+            self: _alice,
+            allPlayers: new[] { _alice, bob },
+            activePlayer: bob,
+            turnNumber: 1,
+            currentPhase: PhaseStateType.End,
+            stack: new Majik.Core.Stack.Stack());
+
+        _ = agent.ChoosePriorityActionAsync(ctx);
+
+        agent.ExpectedCommandKinds.Should().Contain(typeof(CastSpellCommand));
+    }
+
+    [Fact]
+    public async Task PriorityKinds_SorceryInHand_OpponentTurn_OmitsCastSpell()
+    {
+        // CR 307.1 — sorceries need sorcery speed. On the opponent's end
+        // step with only a sorcery in hand, CastSpell should be omitted so
+        // the portal auto-passes the dead window.
+        var bob = new Player("Bob", 20);
+        var sorcery = new Sorcery("Wrath of God", "2WW") { Owner = _alice };
+        _alice.Zones.Hand.AddCard(sorcery);
+        var agent = new RemoteAgent(_alice);
+        var ctx = new GameContext(
+            self: _alice,
+            allPlayers: new[] { _alice, bob },
+            activePlayer: bob,
+            turnNumber: 1,
+            currentPhase: PhaseStateType.End,
+            stack: new Majik.Core.Stack.Stack());
+
+        _ = agent.ChoosePriorityActionAsync(ctx);
+
+        agent.ExpectedCommandKinds.Should().BeEquivalentTo(new[] { typeof(PassPriorityCommand) });
+    }
+
+    [Fact]
+    public async Task PriorityKinds_SorceryInHand_SorceryWindow_AdvertisesCastSpell()
+    {
+        // Own main phase + empty stack with a sorcery in hand → CastSpell
+        // is legal (CR 307.1). Land present too should yield all three.
+        var sorcery = new Sorcery("Wrath of God", "2WW") { Owner = _alice };
+        _alice.Zones.Hand.AddCard(sorcery);
+        var agent = new RemoteAgent(_alice);
+        var ctx = NewContext();
+
+        _ = agent.ChoosePriorityActionAsync(ctx);
+
+        agent.ExpectedCommandKinds.Should().Contain(typeof(CastSpellCommand));
+    }
+
+    [Fact]
+    public async Task PriorityKinds_FlashCreatureInHand_OpponentTurn_AdvertisesCastSpell()
+    {
+        // CR 702.8 — Flash lets a creature be cast at instant speed.
+        // Conservative narrowing must still surface CastSpell when the
+        // only non-land card has Flash, regardless of phase / turn.
+        var bob = new Player("Bob", 20);
+        var ambusher = new Creature("Vendilion Clique", "1UU", 3, 1) { Owner = _alice };
+        ambusher.AddAbility(new Majik.Core.Abilities.KeywordAbility("Flash"));
+        _alice.Zones.Hand.AddCard(ambusher);
+        var agent = new RemoteAgent(_alice);
+        var ctx = new GameContext(
+            self: _alice,
+            allPlayers: new[] { _alice, bob },
+            activePlayer: bob,
+            turnNumber: 1,
+            currentPhase: PhaseStateType.DeclareAttackers,
+            stack: new Majik.Core.Stack.Stack());
+
+        _ = agent.ChoosePriorityActionAsync(ctx);
+
+        agent.ExpectedCommandKinds.Should().Contain(typeof(CastSpellCommand));
+    }
+
+    [Fact]
+    public async Task PriorityKinds_StackNonEmpty_OmitsPlayLand()
+    {
+        // CR 305.2 — lands require the stack to be empty. With a spell on
+        // the stack, even in own main phase, PlayLand must be omitted.
+        var land = new Land("Mountain") { Owner = _alice };
+        _alice.Zones.Hand.AddCard(land);
+        var agent = new RemoteAgent(_alice);
+        var stack = new Majik.Core.Stack.Stack();
+        // We can't easily push a real stack object here without dragging in
+        // a full spell; use a stub that satisfies IStackObject.
+        stack.Push(new TestStackObject());
+        var ctx = new GameContext(
+            _alice, new[] { _alice }, _alice, 1,
+            PhaseStateType.Main, stack);
+
+        _ = agent.ChoosePriorityActionAsync(ctx);
+
+        agent.ExpectedCommandKinds.Should().NotContain(typeof(PlayLandCommand));
+    }
+
+    private sealed class TestStackObject : Majik.Core.Stack.IStackObject
+    {
+        public Guid Id { get; } = Guid.NewGuid();
+        public Player Controller { get; }
+        public DateTime Timestamp { get; } = DateTime.UtcNow;
+        public bool IsResolving => false;
+        public TestStackObject() { Controller = new Player("Stub", 20); }
+        public void Resolve() { }
     }
 
     private GameContext NewContext() =>
