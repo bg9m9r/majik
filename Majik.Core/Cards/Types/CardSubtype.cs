@@ -118,6 +118,15 @@ public enum CardSubtype
     /// <summary>Vampire creature subtype — Bloodghast (Zendikar), Vampire Nighthawk,
     /// Olivia Voldaren. CR 205.3m.</summary>
     Vampire,
+    /// <summary>Plant creature subtype — Wall of Roots (Mirrodin / many
+    /// reprints), Sakura-Tribe Elder's adjacent flora cycle, Dryad cousins.
+    /// CR 205.3m.</summary>
+    Plant,
+    /// <summary>Wall creature subtype — Wall of Roots (Mirrodin), Wall of
+    /// Omens, Wall of Blossoms. Walls historically carry the Defender
+    /// keyword but the subtype itself is mechanically inert; the Defender
+    /// keyword is what blocks combat (CR 702.3). CR 205.3m.</summary>
+    Wall,
 
     // Land subtypes (examples)
     Forest,
