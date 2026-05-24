@@ -3076,6 +3076,30 @@ public static class NamedCardFactory
             // (owner, triggers) overload for bus-driven trigger firing.
             "Strangleroot Geist" => StrangleRootGeistFactory.Create(owner),
 
+            // Enchantment — Class {U}{R} (StormchasersTalentFactory).
+            // Modern Horizons 3. ETB trigger (CR 603.6a) creates a 1/1
+            // Mercenary creature token with a "Prowess" KeywordAbility
+            // marker (CR 702.108) via TokenFactory.CreateOnBattlefield.
+            // Single-arg dispatcher path attaches the trigger to the card
+            // shape without ZoneService / TriggerManager wiring; use the
+            // (owner, zoneService, triggers) overload for bus-driven
+            // firing + ZoneService-routed token entry. Class leveling
+            // (CR 716) DEFERRED — {1}{U}{R}: Level 2 and {3}{U}{R}: Level 3
+            // activated abilities are not wired (blocked on per-activated-
+            // ability sorcery-speed gate + ClassState binder hook + the
+            // sequential-level cost restriction; same gap as Tasigur's
+            // {B}{G}{U} on the sorcery-speed axis). Level 2 cast-trigger
+            // (Mercenary deals 1 damage) and Level 3 loot trigger DEFERRED
+            // with the leveling primitive — both are simple bodies that
+            // mirror PsychicFrog / FaithlessLooting / LedgerShredder once
+            // the level gate exists. Token colour identity (blue + red)
+            // deferred — same gap as Esika's Chariot's green Cats.
+            // Prowess pump on the token deferred — KeywordAbility marker
+            // attached but no live ContinuousEffectsService is threaded
+            // through TokenFactory (same posture as MonasteryMentor's
+            // Monk tokens).
+            "Stormchaser's Talent" => StormchasersTalentFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
