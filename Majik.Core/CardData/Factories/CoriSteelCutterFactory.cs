@@ -71,11 +71,6 @@ namespace Majik.Core.CardData.Factories;
 ///   through <see cref="TokenFactory"/>. Same v1 gap as
 ///   <see cref="StormchasersTalentFactory"/>'s Mercenary tokens and
 ///   <see cref="MonasteryMentorFactory"/>'s Monk tokens.
-/// - <b>Token colour identity (white)</b>: Monk token is colourless under
-///   the v1 token shape — same gap as Esika's Chariot's green Cats /
-///   Crashing Footfalls' green Rhinos / Pact of the Titan's red Giant.
-///   Subtype + P/T + token flag are correct; <c>CardColors</c> plumbing
-///   for tokens is the broader fix.
 /// - <b>"You may attach this Equipment to it" prompt</b>: v1 auto-accepts
 ///   the may-clause and unconditionally attaches Cori-Steel Cutter to the
 ///   spawned Monk token. A real prompt-driven flow (and the "to it"
@@ -181,15 +176,19 @@ public static class CoriSteelCutterFactory
             $"{CardName}: Flurry — create a 1/1 white Monk token with prowess and attach this Equipment to it",
             () =>
             {
-                // 1) Create the Monk token. Token colour identity (white)
-                //    deferred — see class xmldoc.
+                // 1) Create the 1/1 white Monk token (CR 105 / CR 111.4 —
+                //    white stamped via TokenSpec.Colors). Prowess pump on
+                //    the token is deferred — see class xmldoc.
                 var controller = card.Controller ?? owner;
                 var spec = new TokenFactory.TokenSpec(
                     Name: "Monk",
                     Power: 1,
                     Toughness: 1,
                     Subtypes: new[] { CardSubtype.Monk },
-                    Keywords: new[] { "Prowess" });
+                    Keywords: new[] { "Prowess" },
+                    // CR 105 / CR 111.4 — printed "1/1 white Monk creature
+                    // token with prowess".
+                    Colors: new[] { Majik.Core.ValueObjects.ManaColor.White });
                 var token = TokenFactory.CreateOnBattlefield(spec, controller, zoneService);
 
                 // 2) "You may attach this Equipment to it." v1 auto-accepts

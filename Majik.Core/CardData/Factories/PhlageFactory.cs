@@ -127,7 +127,29 @@ public static class PhlageFactory
                     Description: "any target",
                     MinTargets: 1,
                     MaxTargets: 1,
-                    LegalCandidates: Array.Empty<object>()),
+                    LegalCandidates: Array.Empty<object>(),
+                    Intent: BotIntent.Burn,
+                    // Live gatherer (agent-prompt MVP). "Any target" =
+                    // players + creatures + planeswalkers (CR 115.4). Bot
+                    // ranks opponent first (lethal-face when low), then
+                    // biggest opposing creature.
+                    CandidateGatherer: ctx =>
+                    {
+                        var pool = new List<object>();
+                        foreach (var p in ctx.AllPlayers)
+                        {
+                            pool.Add(p);
+                            foreach (var c in p.Zones.Battlefield.GetCards())
+                            {
+                                if (c.HasType(CardType.Creature)
+                                    || c.HasType(CardType.Planeswalker))
+                                {
+                                    pool.Add(c);
+                                }
+                            }
+                        }
+                        return pool;
+                    }),
             });
 
         card.AddAbility(etbTrigger);

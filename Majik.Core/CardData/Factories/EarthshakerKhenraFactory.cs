@@ -154,7 +154,19 @@ public static class EarthshakerKhenraFactory
                     MinTargets: 1,
                     MaxTargets: 1,
                     LegalCandidates: Array.Empty<object>(),
-                    Intent: BotIntent.Removal),
+                    Intent: BotIntent.Removal,
+                    // Live candidate gatherer (agent-prompt MVP). Filters to
+                    // creatures with power ≤ 2 across the live board so the
+                    // agent only sees legal picks. The resolve-time recheck
+                    // (CR 608.2b) further validates this at resolution, so a
+                    // creature pumped above 2 between choose and resolve
+                    // fizzles cleanly.
+                    CandidateGatherer: ctx => ctx.AllPlayers
+                        .SelectMany(p => p.Zones.Battlefield.GetCards())
+                        .OfType<Creature>()
+                        .Where(c => c.GetPower() <= CannotBlockPowerThreshold)
+                        .Cast<object>()
+                        .ToList()),
             });
 
         card.AddAbility(etbTrigger);

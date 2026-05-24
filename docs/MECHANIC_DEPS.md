@@ -5,11 +5,11 @@ Scanner output: every `*Factory.cs` xmldoc / inline comment mentioning
 engine primitive. Each row answers: "if we ship primitive _X_, which factory
 xmldocs flagged that they're blocked on it?"
 
-- **Generated:** 2026-05-24 19:20 UTC
+- **Generated:** 2026-05-24 19:24 UTC
 - **Scanned dir:** `Majik.Core/CardData/Factories`
-- **Total mentions:** 231
-- **Clusters:** 17
-- **Unclustered (need new registry pattern):** 126
+- **Total mentions:** 210
+- **Clusters:** 16
+- **Unclustered (need new registry pattern):** 128
 
 Regenerate with `dotnet run --project Majik.Console -- mechanic-deps --md-out docs/MECHANIC_DEPS.md --json-out docs/mechanic-deps.json`.
 
@@ -17,29 +17,28 @@ Regenerate with `dotnet run --project Majik.Console -- mechanic-deps --md-out do
 
 | Rank | Primitive | CR | Factories | Mentions |
 |---:|---|---|---:|---:|
-| 1 | Agent-prompt targeting MVP | — | 25 | 32 |
+| 1 | Agent-prompt targeting MVP | — | 24 | 31 |
 | 2 | Library shuffle (CR 701.20) | CR 701.20 | 12 | 17 |
-| 3 | Token colour identity (CR 105 / CR 903.4) | CR 105 | 11 | 21 |
-| 4 | Regeneration shield (CR 701.15) | CR 701.15 | 6 | 8 |
-| 5 | Indestructible bypass on destroy (CR 702.12) | CR 702.12 | 6 | 7 |
-| 6 | Layer-6 ability-grant subsystem (CR 613.1f) | CR 613.1f | 3 | 5 |
-| 7 | Escape alt-cost (CR 702.143) | CR 702.143 | 2 | 2 |
-| 8 | Kicker alt-cost (CR 702.33) | CR 702.33 | 2 | 2 |
-| 9 | Class leveling (CR 716) | CR 716 | 1 | 2 |
-| 10 | Manifest dread (CR 701.59) | CR 701.59 | 1 | 2 |
-| 11 | Ascend / city's blessing (CR 702.131) | CR 702.131 | 1 | 1 |
-| 12 | Cast-marker on Card | — | 1 | 1 |
-| 13 | Companion (CR 702.139) | CR 702.139 | 1 | 1 |
-| 14 | Equip activated-ability primitive (CR 702.6) | CR 702.6 | 1 | 1 |
-| 15 | Gift (Bloomburrow) | — | 1 | 1 |
-| 16 | "Activate only as a sorcery" gate (CR 117.1a) | CR 117.1a | 1 | 1 |
-| 17 | Suspend alt-cost (CR 702.61) | CR 702.61 | 1 | 1 |
+| 3 | Regeneration shield (CR 701.15) | CR 701.15 | 6 | 8 |
+| 4 | Indestructible bypass on destroy (CR 702.12) | CR 702.12 | 6 | 7 |
+| 5 | Layer-6 ability-grant subsystem (CR 613.1f) | CR 613.1f | 2 | 4 |
+| 6 | Escape alt-cost (CR 702.143) | CR 702.143 | 2 | 2 |
+| 7 | Kicker alt-cost (CR 702.33) | CR 702.33 | 2 | 2 |
+| 8 | Class leveling (CR 716) | CR 716 | 1 | 2 |
+| 9 | Manifest dread (CR 701.59) | CR 701.59 | 1 | 2 |
+| 10 | Ascend / city's blessing (CR 702.131) | CR 702.131 | 1 | 1 |
+| 11 | Cast-marker on Card | — | 1 | 1 |
+| 12 | Companion (CR 702.139) | CR 702.139 | 1 | 1 |
+| 13 | Equip activated-ability primitive (CR 702.6) | CR 702.6 | 1 | 1 |
+| 14 | Gift (Bloomburrow) | — | 1 | 1 |
+| 15 | "Activate only as a sorcery" gate (CR 117.1a) | CR 117.1a | 1 | 1 |
+| 16 | Suspend alt-cost (CR 702.61) | CR 702.61 | 1 | 1 |
 
 ## Cluster detail
 
 ### 1. Agent-prompt targeting MVP
 
-- **Blocks:** 25 factories (32 mentions)
+- **Blocks:** 24 factories (31 mentions)
 - **Implementation hint:** IPlayerAgent needs ChooseTarget / ChooseYesNo surfaces; many spell factories punt on real targeting prompts.
 
 Mentions:
@@ -54,8 +53,6 @@ Mentions:
   > (Full targeting deferred — see below.
 - `AgathasSoulCauldronFactory` (`AgathasSoulCauldronFactory.cs:65`)
   > Full targeting deferred (see xmldoc above).
-- `SpellQuellerFactory` (`SpellQuellerFactory.cs:15`)
-  > A "pick a spell from the stack" prompt is part of the broader agent-prompt MVP and is deferred.
 - `SkyclaveApparitionFactory` (`SkyclaveApparitionFactory.cs:13`)
   > SetChosenTargets"/>; the agent prompt is deferred.
 - `TerritorialKavuFactory` (`TerritorialKavuFactory.cs:12`)
@@ -152,58 +149,7 @@ Mentions:
 - `PonderFactory` (`PonderFactory.cs:58`)
   > The "may shuffle" rider is deferred (no-op).
 
-### 3. Token colour identity (CR 105 / CR 903.4)
-
-- **CR citation:** CR 105
-- **Blocks:** 11 factories (21 mentions)
-- **Implementation hint:** TokenFactory needs an explicit Colors field separate from mana cost; today tokens default to colourless.
-
-Mentions:
-
-- `BridgeFromBelowFactory` (`BridgeFromBelowFactory.cs:12`)
-  > ## Deferred (v1 gaps)  - <b>Token-creature colour identity</b>: tokens carry subtype + keywords but no explicit colour today (same scope decision as Crashing Footfalls' "green" Rhinos, Wurmcoil's "colorless" Wurms).
-- `BridgeFromBelowFactory` (`BridgeFromBelowFactory.cs:198`)
-  > Colour identity ("black") is documented but the runtime token has no colour stamp (same gap as Crashing Footfalls / Pact of the Titan / Wurmcoil Engine).
-- `StormchasersTalentFactory` (`StormchasersTalentFactory.cs:12`)
-  > <b>Token colour identity (blue + red)</b>: Mercenary token is created as colourless under the v1 token shape — same gap as Esika's Chariot's green Cats, Crashing Footfalls' green Rhinos, Pact of the Titan's red Giant.
-- `StormchasersTalentFactory` (`StormchasersTalentFactory.cs:120`)
-  > " Token colour identity (blue + red) deferred — see class xmldoc.
-- `StormchasersTalentFactory` (`StormchasersTalentFactory.cs:145`)
-  > Token colour identity (blue + red) deferred (see class xmldoc); Prowess pump on the token deferred (see class xmldoc).
-- `EsikasChariotFactory` (`EsikasChariotFactory.cs:12`)
-  > <b>Token colour identity (green)</b>: Cat tokens are created as colourless under the v1 token shape — same gap as Crashing Footfalls' green Rhinos and Wurmcoil's colourless Wurms.
-- `EsikasChariotFactory` (`EsikasChariotFactory.cs:129`)
-  > " Token colour identity (green) deferred — see class xmldoc.
-- `EsikasChariotFactory` (`EsikasChariotFactory.cs:174`)
-  > Token colour identity (green) is deferred (see class xmldoc).
-- `MonasteryMentorFactory` (`MonasteryMentorFactory.cs:15`)
-  > Token colour identity (white): tokens are created as colourless under the v1 token shape — same gap as Crashing Footfalls / Goblin Rabblemaster.
-- `SkyclaveApparitionFactory` (`SkyclaveApparitionFactory.cs:13`)
-  > v1 does not inject colour identity into tokens — the engine's token colour system (same gap as Crashing Footfalls' green Rhinos, Pact of the Titan's red Giant).
-- `SkyclaveApparitionFactory` (`SkyclaveApparitionFactory.cs:199`)
-  > NOTE (v1): token colour (blue) is not wired — same gap as Crashing Footfalls' green Rhinos / Pact of the Titan's red Giant.
-- `GoblinRabblemasterFactory` (`GoblinRabblemasterFactory.cs:12`)
-  > <b>Token colour identity (red)</b>: tokens are created as colourless under the v1 token shape — same gap as Pact of the Titan's "red" Giant and Crashing Footfalls' "green" Rhinos.
-- `CrashingFootfallsFactory` (`CrashingFootfallsFactory.cs:15`)
-  > The Trample + creature-type assignments match the printed text; the green colour identity is a downstream concern (same gap as Wurmcoil's "colorless" tokens, Solitude's "white" creatures, etc.
-- `YoungPyromancerFactory` (`YoungPyromancerFactory.cs:13`)
-  > Token colour identity (red): tokens are created as colourless under the v1 token shape — same gap as Goblin Rabblemaster / Crashing Footfalls.
-- `BeastWithinFactory` (`BeastWithinFactory.cs:12`)
-  > The token is a 3/3 green Beast creature token (CR 111.4 — token characteristics include colour; token "green" colour identity deferred — same gap as Crashing Footfalls' green Rhinos; token enters with <c>HasSummoningSickness = true</c> via <see cref="TokenFactory"/>).
-- `BeastWithinFactory` (`BeastWithinFactory.cs:12`)
-  > <b>Token colour (green)</b>: TokenFactory does not yet model token colour identity (same gap as Pact of the Titan's "red" Giant token, Crashing Footfalls' "green" Rhino tokens).
-- `BeastWithinFactory` (`BeastWithinFactory.cs:129`)
-  > Token colour (green) deferred — same gap as Pact of the Titan / Crashing Footfalls.
-- `OcelotPrideFactory` (`OcelotPrideFactory.cs:14`)
-  > <b>Token colour identity (white)</b>: Cat tokens are created as colourless under the v1 token shape — same gap as Esika's Chariot Cats / Crashing Footfalls Rhinos.
-- `OcelotPrideFactory` (`OcelotPrideFactory.cs:200`)
-  > Token colour identity (white) is deferred (see class xmldoc).
-- `CoriSteelCutterFactory` (`CoriSteelCutterFactory.cs:15`)
-  > <b>Token colour identity (white)</b>: Monk token is colourless under the v1 token shape — same gap as Esika's Chariot's green Cats / Crashing Footfalls' green Rhinos / Pact of the Titan's red Giant.
-- `CoriSteelCutterFactory` (`CoriSteelCutterFactory.cs:184`)
-  > Token colour identity (white) deferred — see class xmldoc.
-
-### 4. Regeneration shield (CR 701.15)
+### 3. Regeneration shield (CR 701.15)
 
 - **CR citation:** CR 701.15
 - **Blocks:** 6 factories (8 mentions)
@@ -213,22 +159,22 @@ Mentions:
 
 - `DrownInTheLochFactory` (`DrownInTheLochFactory.cs:13`)
   > Indestructible / regeneration riders are deferred (same gap as <see cref="SlaughterPactFactory"/> and the rest of the single-target destroy family).
-- `DrownInTheLochFactory` (`DrownInTheLochFactory.cs:210`)
+- `DrownInTheLochFactory` (`DrownInTheLochFactory.cs:234`)
   > CR 701.7 — destroy → owner's graveyard (Indestructible / regeneration deferred, same gap as SlaughterPactFactory).
 - `TerminateFactory` (`TerminateFactory.cs:58`)
   > The "it can't be regenerated" rider is deferred — the engine has no regeneration shield surface in v1 (see class xmldoc).
 - `TerminateFactory` (`TerminateFactory.cs:100`)
   > "It can't be regenerated" rider is deferred — no regeneration shield surface in the engine yet (same gap as Wrath of God / Day of Judgment's can't-regenerate clause).
-- `MurderousRiderFactory` (`MurderousRiderFactory.cs:147`)
+- `MurderousRiderFactory` (`MurderousRiderFactory.cs:157`)
   > Indestructible / regeneration deferred (same gap as SlaughterPact).
 - `MurderousCutFactory` (`MurderousCutFactory.cs:11`)
   > 1 target-creature request; "indestructible" + "can't be regenerated" riders deferred — same lossy MVP as <c>DestroySpellFactory.
-- `BeastWithinFactory` (`BeastWithinFactory.cs:124`)
+- `BeastWithinFactory` (`BeastWithinFactory.cs:122`)
   > Indestructible / regeneration rider deferred (same gap as Terminate / Abrupt Decay / Slaughter Pact).
 - `EmberethShieldbreakerFactory` (`EmberethShieldbreakerFactory.cs:126`)
   > Indestructible / regeneration deferred (same gap as SlaughterPact).
 
-### 5. Indestructible bypass on destroy (CR 702.12)
+### 4. Indestructible bypass on destroy (CR 702.12)
 
 - **CR citation:** CR 702.12
 - **Blocks:** 6 factories (7 mentions)
@@ -251,16 +197,14 @@ Mentions:
 - `AbruptDecayFactory` (`AbruptDecayFactory.cs:11`)
   > <b>Indestructible</b>: the destroy call moves the permanent to the graveyard without checking for Indestructible — same gap as every other single-target destroy template (Slaughter Pact, Force of Vigor destroy path, etc.
 
-### 6. Layer-6 ability-grant subsystem (CR 613.1f)
+### 5. Layer-6 ability-grant subsystem (CR 613.1f)
 
 - **CR citation:** CR 613.1f
-- **Blocks:** 3 factories (5 mentions)
+- **Blocks:** 2 factories (4 mentions)
 - **Implementation hint:** ContinuousEffectsService needs an 'ability grant' layer so 'gains <ability>' effects flow through GetAbilities() at read time.
 
 Mentions:
 
-- `SwordOfFireAndIceFactory` (`SwordOfFireAndIceFactory.cs:144`)
-  > " (CR 702.16) Markers ride on the equipment card itself; a Layer 6 grant re-projecting them onto the equipped creature is deferred (see class xmldoc).
 - `AgathasSoulCauldronFactory` (`AgathasSoulCauldronFactory.cs:10`)
   > The layer-6 continuous effect that actually grants those abilities to battlefield creatures is deferred until the layer-6 ability-grant subsystem is in place.
 - `AgathasSoulCauldronFactory` (`AgathasSoulCauldronFactory.cs:88`)
@@ -270,7 +214,7 @@ Mentions:
 - `BloodghastFactory` (`BloodghastFactory.cs:126`)
   > A full dynamic Layer 6 conditional keyword grant is deferred — see class xmldoc.
 
-### 7. Escape alt-cost (CR 702.143)
+### 6. Escape alt-cost (CR 702.143)
 
 - **CR citation:** CR 702.143
 - **Blocks:** 2 factories (2 mentions)
@@ -283,7 +227,7 @@ Mentions:
 - `UroTitanFactory` (`UroTitanFactory.cs:12`)
   > The printed "unless it escaped" rider is structurally collapsed — Escape (CR 702.143) is not wired in v1 (see deferred section), so a hardcast Uro is always sacrificed by this trigger, faithful to the printed text in the non-escape case.
 
-### 8. Kicker alt-cost (CR 702.33)
+### 7. Kicker alt-cost (CR 702.33)
 
 - **CR citation:** CR 702.33
 - **Blocks:** 2 factories (2 mentions)
@@ -296,7 +240,7 @@ Mentions:
 - `BurstLightningFactory` (`BurstLightningFactory.cs:11`)
   > "  ## Implementation (v1 — kicker primitive deferred)  CR 702.33 — Kicker is an additional cost (not an alternative cost) that modifies the spell's effect when paid.
 
-### 9. Class leveling (CR 716)
+### 8. Class leveling (CR 716)
 
 - **CR citation:** CR 716
 - **Blocks:** 1 factories (2 mentions)
@@ -309,7 +253,7 @@ Mentions:
 - `StormchasersTalentFactory` (`StormchasersTalentFactory.cs:12`)
   > <b>Level 3 cast-trigger</b> ("Whenever you cast a noncreature spell, draw a card, then discard a card"): DEFERRED with the leveling primitive.
 
-### 10. Manifest dread (CR 701.59)
+### 9. Manifest dread (CR 701.59)
 
 - **CR citation:** CR 701.59
 - **Blocks:** 1 factories (2 mentions)
@@ -322,7 +266,7 @@ Mentions:
 - `AbhorrentOculusFactory` (`AbhorrentOculusFactory.cs:13`)
   > CR rule references: 205.3m (Eye subtype), 601.2f (additional cost), 603.1 / 500.4 (upkeep trigger), 702.9 (Flying), 701.59 (manifest dread — deferred).
 
-### 11. Ascend / city's blessing (CR 702.131)
+### 10. Ascend / city's blessing (CR 702.131)
 
 - **CR citation:** CR 702.131
 - **Blocks:** 1 factories (1 mentions)
@@ -333,7 +277,7 @@ Mentions:
 - `OcelotPrideFactory` (`OcelotPrideFactory.cs:14`)
   > The attack trigger ships with the gate stubbed (always 1 token); the "doubled to 2" half of the printed text is deferred until an Ascend primitive lands.
 
-### 12. Cast-marker on Card
+### 11. Cast-marker on Card
 
 - **Blocks:** 1 factories (1 mentions)
 - **Implementation hint:** Persistent 'this object was cast (vs. put onto the battlefield)' flag — Bloodghast, The One Ring, Pact triggers all key off it.
@@ -343,7 +287,7 @@ Mentions:
 - `TheOneRingFactory` (`TheOneRingFactory.cs:15`)
   > The effect body is a no-op — the "if you cast it" intervening-if clause, the "until your next turn" expiry, and the "protection from everything" player-scoped grant are all deferred (no cast-marker on Card, no per-player delayed cleanup, no Player.
 
-### 13. Companion (CR 702.139)
+### 12. Companion (CR 702.139)
 
 - **CR citation:** CR 702.139
 - **Blocks:** 1 factories (1 mentions)
@@ -354,7 +298,7 @@ Mentions:
 - `LurrusOfTheDreamDenFactory` (`LurrusOfTheDreamDenFactory.cs:12`)
   > ## Companion (DEFERRED) The companion deck-construction rule (CR 702.139 — "Each permanent card in your starting deck has mana value 2 or less") is foundational to the deck-builder, not the runtime, and is intentionally NOT enforced here.
 
-### 14. Equip activated-ability primitive (CR 702.6)
+### 13. Equip activated-ability primitive (CR 702.6)
 
 - **CR citation:** CR 702.6
 - **Blocks:** 1 factories (1 mentions)
@@ -365,7 +309,7 @@ Mentions:
 - `PuresteelPaladinFactory` (`PuresteelPaladinFactory.cs:11`)
   > ## Deferred (v1 gaps)  - <b>Equip-ability primitive</b>: the engine has no <c>EquipActivatedAbility</c> primitive yet — Equipment cards currently don't model their printed "Equip {N}" activated ability at all (Stoneforge Mystic's activated ability is a separate "put-an-Equipment-from-hand" effect, not an equip activati…
 
-### 15. Gift (Bloomburrow)
+### 14. Gift (Bloomburrow)
 
 - **Blocks:** 1 factories (1 mentions)
 - **Implementation hint:** Cast-time choice: a static/triggered side effect granting an opponent a defined gift (treasure, draw, etc.).
@@ -375,7 +319,7 @@ Mentions:
 - `IntoTheFloodMawFactory` (`IntoTheFloodMawFactory.cs:12`)
   > ## Deferred (v1 gaps) — Gift mechanic (CR 701.59 in the 2024 errata) The "Gift a tapped Fish" clause is a cast-time choice that lets the caster promise an opponent a gift; if promised, the opponent creates a tapped 1/1 blue Fish creature token BEFORE the spell's other effects, and Into the Flood Maw's target predicate …
 
-### 16. "Activate only as a sorcery" gate (CR 117.1a)
+### 15. "Activate only as a sorcery" gate (CR 117.1a)
 
 - **CR citation:** CR 117.1a
 - **Blocks:** 1 factories (1 mentions)
@@ -386,7 +330,7 @@ Mentions:
 - `TirelessTrackerFactory` (`TirelessTrackerFactory.cs:14`)
   > <b>"Activate only as a sorcery"</b> — Tireless Tracker's printed activated ability has NO sorcery-speed restriction (instant speed on the official card), so nothing is deferred here for this card.
 
-### 17. Suspend alt-cost (CR 702.61)
+### 16. Suspend alt-cost (CR 702.61)
 
 - **CR citation:** CR 702.61
 - **Blocks:** 1 factories (1 mentions)
@@ -405,18 +349,20 @@ Mentions:
   > ## v1 gaps - <b>"Any number" prompt</b>: the engine has no first-class "pick a subset of permanents to sacrifice" agent hook.
 - `ScapeshiftFactory` (`ScapeshiftFactory.cs:10`)
   > <b>Library shuffle</b> (CR 701.19c) — same gap as the rest of the tutor surface.
+- `BridgeFromBelowFactory` (`BridgeFromBelowFactory.cs:12`)
+  > ## Deferred (v1 gaps)  - <b>APNAP simultaneous-trigger ordering</b>: when one creature dies to a chained event (combat damage, board wipe), CR 603.3b sorts pending triggers by APNAP and within each player by the player's choice.
 - `TheOneRingFactory` (`TheOneRingFactory.cs:121`)
   > " Structural: "if you cast it" + "until your next turn" expiry deferred — see class xmldoc.
 - `StormchasersTalentFactory` (`StormchasersTalentFactory.cs:12`)
   > Blockers: (1) no per-activated-ability sorcery-speed gate yet (same gap as Tasigur, the Golden Fang's {B}{G}{U} activation, Wishclaw Talisman's tutor, Priest of Fell Rites' reanimate); (2) no Class-level tracker bound to the card via a binder analogous to <see cref="CardData.
 - `StormchasersTalentFactory` (`StormchasersTalentFactory.cs:12`)
   > Same v1 gap as <see cref="MonasteryMentorFactory"/>'s spawned Monk tokens (see that factory's xmldoc for the broader plan).
-- `StormchasersTalentFactory` (`StormchasersTalentFactory.cs:120`)
-  > Prowess pump on token deferred — keyword marker only, see class xmldoc.
+- `StormchasersTalentFactory` (`StormchasersTalentFactory.cs:115`)
+  > " Prowess pump on token deferred — keyword marker only, see class xmldoc.
+- `StormchasersTalentFactory` (`StormchasersTalentFactory.cs:139`)
+  > Colors"/>; Prowess pump on the token deferred (see class xmldoc).
 - `NihilSpellbombFactory` (`NihilSpellbombFactory.cs:13`)
   > Real prompt deferred until IPlayerAgent grows a ChooseYesNoAsync surface.
-- `SwordOfFireAndIceFactory` (`SwordOfFireAndIceFactory.cs:15`)
-  > The shipped markers are inspectable on the card so tests + bot heuristics can read intent, with full DEBT-A enforcement (CR 702.16e — damage / enchanting / equipping / blocking / targeting) deferred behind that grant-on-attach work.
 - `TerminateFactory` (`TerminateFactory.cs:11`)
   > <b>"It can't be regenerated"</b>: the engine has no regeneration shield surface in v1 (same gap as Wrath of God's and DayOfJudgment's can't-be-regenerated rider, and SlaughterPact's indestructible/regeneration note).
 - `IzzetCharmFactory` (`IzzetCharmFactory.cs:211`)
@@ -441,8 +387,10 @@ Mentions:
   > Without the bus (single-arg dispatcher path), the land enters untapped — deferred to the production binder layer (mirrors every other always-tapped factory path in this codebase).
 - `MonasteryMentorFactory` (`MonasteryMentorFactory.cs:15`)
   > Monk tokens are "with prowess" — prowess on the token is deferred (same gap as Goblin Rabblemaster's token keyword wiring).
-- `MonasteryMentorFactory` (`MonasteryMentorFactory.cs:162`)
+- `MonasteryMentorFactory` (`MonasteryMentorFactory.cs:160`)
   > "With prowess" on the token is deferred — see factory xmldoc.
+- `MonasteryMentorFactory` (`MonasteryMentorFactory.cs:177`)
+  > The Prowess keyword on the token is deferred (see class xmldoc) but the colour identity is now stamped.
 - `WastewoodVergeFactory` (`WastewoodVergeFactory.cs:8`)
   > {T}: Add {B} mana ability — wired (restriction deferred; see below).
 - `WastewoodVergeFactory` (`WastewoodVergeFactory.cs:47`)
@@ -553,9 +501,7 @@ Mentions:
   > <b>-1</b>: DEFERRED to a no-op body (loyalty change still applies per CR 606.3).
 - `KarnScionOfUrzaFactory` (`KarnScionOfUrzaFactory.cs:12`)
   > TargetRequest"/>s yet, so the opponent picker for the +1 isn't agent-driven (same gap as <see cref="WrennAndRealmbreakerFactory"/>).
-- `KarnScionOfUrzaFactory` (`KarnScionOfUrzaFactory.cs:12`)
-  > <b>Token colour</b>: Construct token is created with no colour-set primitive (matches Wurmcoil Engine + Crashing Footfalls token v1 gap — `CardColors.
-- `KarnScionOfUrzaFactory` (`KarnScionOfUrzaFactory.cs:168`)
+- `KarnScionOfUrzaFactory` (`KarnScionOfUrzaFactory.cs:164`)
   > DEFERRED — requires "exiled with this source" tag tracking on exiled cards.
 - `NecropotenceFactory` (`NecropotenceFactory.cs:14`)
   > Auto-cleanup mirrors the <see cref="DauthiVoidwalkerFactory"/> v1 gap.
@@ -641,6 +587,8 @@ Mentions:
   > ## Deferred (v1 gaps)  - <b>Prowess pump on the spawned Monk token</b>: the <c>"Prowess"</c> keyword marker is attached to the Monk token so shape inspection sees the printed reminder text, but the <see cref="Majik.
 - `CoriSteelCutterFactory` (`CoriSteelCutterFactory.cs:15`)
   > Same v1 gap as <see cref="StormchasersTalentFactory"/>'s Mercenary tokens and <see cref="MonasteryMentorFactory"/>'s Monk tokens.
+- `CoriSteelCutterFactory` (`CoriSteelCutterFactory.cs:179`)
+  > Prowess pump on the token is deferred — see class xmldoc.
 - `LordOfAtlantisFactory` (`LordOfAtlantisFactory.cs:9`)
   > The combat-validator enforcement of Islandwalk ("creature can't be blocked as long as the defending player controls an Island") is deferred — same posture as Intimidate / Menace enforcement.
 - `HogaakFactory` (`HogaakFactory.cs:11`)

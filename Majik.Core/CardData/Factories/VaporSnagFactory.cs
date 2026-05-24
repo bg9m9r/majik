@@ -76,7 +76,16 @@ public static class VaporSnagFactory
                     "target creature",
                     MinTargets: 1,
                     MaxTargets: 1,
-                    LegalCandidates: Array.Empty<object>()),
+                    LegalCandidates: Array.Empty<object>(),
+                    Intent: BotIntent.Bounce,
+                    // Agent-prompt MVP: live gather all creatures; Bounce
+                    // intent in the bot's ranker picks opponent's most-
+                    // expensive creature (CMC-as-spend proxy).
+                    CandidateGatherer: ctx => ctx.AllPlayers
+                        .SelectMany(p => p.Zones.Battlefield.GetCards())
+                        .OfType<Creature>()
+                        .Cast<object>()
+                        .ToList()),
             },
             EffectFactory: p =>
             {

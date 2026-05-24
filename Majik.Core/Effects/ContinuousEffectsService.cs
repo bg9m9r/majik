@@ -25,11 +25,22 @@ public sealed class ContinuousEffectsService
         _effects.Add(effect);
     }
 
-    public void Unregister(ContinuousEffect effect) => _effects.Remove(effect);
+    public void Unregister(ContinuousEffect effect)
+    {
+        if (effect is GrantAbilityEffect grant) grant.Revoke();
+        _effects.Remove(effect);
+    }
 
     /// <summary>Drop any inactive (expired) effects.</summary>
     public void Prune()
     {
+        // CR 613.6e — when a Layer-6 ability-grant ends, the granted ability
+        // is removed from the bearer. Revoke before drop so the bearer's
+        // Abilities list stays consistent.
+        foreach (var grant in _effects.OfType<GrantAbilityEffect>())
+        {
+            if (!grant.IsActive()) grant.Revoke();
+        }
         _effects.RemoveAll(e => !e.IsActive());
     }
 
@@ -94,6 +105,13 @@ public sealed class ContinuousEffectsService
         // Broader stripped-source tracking keyed by Permanent (e.g. for
         // type-changing-to-creature permanents) is a follow-up.
         var stripped = ComputeStrippedSet();
+
+        // CR 613.1f / 613.6e — reconcile every Layer-6 ability-grant before
+        // we walk the layer pipeline. If the grant's source is stripped
+        // (Humility-class), or its source LTB'd, or the grant target itself
+        // is stripped, the grant is revoked so downstream
+        // Card.Abilities reads see consistent state.
+        SyncAbilityGrants(stripped);
 
         var applicable = _effects
             .Where(e => e.IsActive() && e.AppliesTo(permanent))
@@ -245,7 +263,52 @@ public sealed class ContinuousEffectsService
     /// <summary>Expire and drop all effects whose duration is "until end of turn".</summary>
     public void ExpireEndOfTurn()
     {
+        // CR 613.6e — revoke grant lifecycles before drop so the bearer's
+        // Abilities list reflects the cleanup-step end of the grant.
+        foreach (var grant in _effects.OfType<GrantAbilityEffect>())
+        {
+            if (grant.ExpiresAtEndOfTurn) grant.Revoke();
+        }
         _effects.RemoveAll(e => e.ExpiresAtEndOfTurn);
+    }
+
+    /// <summary>
+    /// CR 613.1f — reconcile every active <see cref="GrantAbilityEffect"/>
+    /// against the current battlefield state. A grant is revoked when its
+    /// source has been Humility-stripped (source is in
+    /// <paramref name="strippedCreatures"/>) or when its current target is
+    /// stripped; otherwise <see cref="GrantAbilityEffect.Sync"/> ensures the
+    /// granted ability sits on the live bearer.
+    /// </summary>
+    private void SyncAbilityGrants(HashSet<Creature> strippedCreatures)
+    {
+        foreach (var grant in _effects.OfType<GrantAbilityEffect>())
+        {
+            // Source stripped → grant suppressed (CR 613.8 dependency).
+            if (grant.Source is Creature srcCreature && strippedCreatures.Contains(srcCreature))
+            {
+                grant.Revoke();
+                continue;
+            }
+
+            // Target stripped → granted ability is removed from the
+            // characteristic ability set (CR 613.6 — strip applies after the
+            // grant within Layer 6; the strip wins).
+            if (grant.GrantedTo is Creature bearerCreature && strippedCreatures.Contains(bearerCreature))
+            {
+                grant.Revoke();
+                continue;
+            }
+
+            grant.Sync();
+
+            // Re-check target-stripping in case Sync attached to a freshly
+            // resolved bearer that's also under a strip.
+            if (grant.GrantedTo is Creature freshBearer && strippedCreatures.Contains(freshBearer))
+            {
+                grant.Revoke();
+            }
+        }
     }
 
     /// <summary>

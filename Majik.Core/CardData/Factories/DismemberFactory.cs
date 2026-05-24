@@ -94,7 +94,15 @@ public static class DismemberFactory
                     "target creature",
                     MinTargets: 1,
                     MaxTargets: 1,
-                    LegalCandidates: Array.Empty<object>()),
+                    LegalCandidates: Array.Empty<object>(),
+                    Intent: BotIntent.Removal,
+                    // Agent-prompt MVP: enumerate every creature live; bot
+                    // ranks opponent's biggest threat via Removal intent.
+                    CandidateGatherer: ctx => ctx.AllPlayers
+                        .SelectMany(p => p.Zones.Battlefield.GetCards())
+                        .OfType<Creature>()
+                        .Cast<object>()
+                        .ToList()),
             },
             EffectFactory: p =>
             {

@@ -1,17 +1,17 @@
 {
-  "generated_utc": "2026-05-24T19:20:20.6486777Z",
+  "generated_utc": "2026-05-24T19:24:32.9549154Z",
   "scanned_dir": "/home/brett/Projects/majik.project/majik.core/.claude/worktrees/agent-a0dac5ee3cc669569/Majik.Core/CardData/Factories",
-  "total_mentions": 231,
-  "distinct_factories": 149,
-  "cluster_count": 17,
-  "unclustered_count": 126,
+  "total_mentions": 210,
+  "distinct_factories": 142,
+  "cluster_count": 16,
+  "unclustered_count": 128,
   "clusters": [
     {
       "primitive_id": "agent-prompt-targeting",
       "display_name": "Agent-prompt targeting MVP",
       "implementation_hint": "IPlayerAgent needs ChooseTarget / ChooseYesNo surfaces; many spell factories punt on real targeting prompts.",
-      "factory_count": 25,
-      "mention_count": 32,
+      "factory_count": 24,
+      "mention_count": 31,
       "factories": [
         "AetherVialFactory",
         "AgathasSoulCauldronFactory",
@@ -32,7 +32,6 @@
         "RelicOfProgenitusFactory",
         "SilvergillAdeptFactory",
         "SkyclaveApparitionFactory",
-        "SpellQuellerFactory",
         "SunTitanFactory",
         "SwordOfFeastAndFamineFactory",
         "TerritorialKavuFactory",
@@ -69,12 +68,6 @@
           "file": "AgathasSoulCauldronFactory.cs",
           "line": 65,
           "sentence": "Full targeting deferred (see xmldoc above)."
-        },
-        {
-          "factory": "SpellQuellerFactory",
-          "file": "SpellQuellerFactory.cs",
-          "line": 15,
-          "sentence": "A \u0022pick a spell from the stack\u0022 prompt is part of the broader agent-prompt MVP and is deferred."
         },
         {
           "factory": "SkyclaveApparitionFactory",
@@ -375,156 +368,6 @@
       ]
     },
     {
-      "primitive_id": "token-colour-identity",
-      "display_name": "Token colour identity (CR 105 / CR 903.4)",
-      "comp_rules_citation": "CR 105",
-      "implementation_hint": "TokenFactory needs an explicit Colors field separate from mana cost; today tokens default to colourless.",
-      "factory_count": 11,
-      "mention_count": 21,
-      "factories": [
-        "BeastWithinFactory",
-        "BridgeFromBelowFactory",
-        "CoriSteelCutterFactory",
-        "CrashingFootfallsFactory",
-        "EsikasChariotFactory",
-        "GoblinRabblemasterFactory",
-        "MonasteryMentorFactory",
-        "OcelotPrideFactory",
-        "SkyclaveApparitionFactory",
-        "StormchasersTalentFactory",
-        "YoungPyromancerFactory"
-      ],
-      "mentions": [
-        {
-          "factory": "BridgeFromBelowFactory",
-          "file": "BridgeFromBelowFactory.cs",
-          "line": 12,
-          "sentence": "## Deferred (v1 gaps)  - \u003Cb\u003EToken-creature colour identity\u003C/b\u003E: tokens carry subtype \u002B keywords but no explicit colour today (same scope decision as Crashing Footfalls\u0027 \u0022green\u0022 Rhinos, Wurmcoil\u0027s \u0022colorless\u0022 Wurms)."
-        },
-        {
-          "factory": "BridgeFromBelowFactory",
-          "file": "BridgeFromBelowFactory.cs",
-          "line": 198,
-          "sentence": "Colour identity (\u0022black\u0022) is documented but the runtime token has no colour stamp (same gap as Crashing Footfalls / Pact of the Titan / Wurmcoil Engine)."
-        },
-        {
-          "factory": "StormchasersTalentFactory",
-          "file": "StormchasersTalentFactory.cs",
-          "line": 12,
-          "sentence": "\u003Cb\u003EToken colour identity (blue \u002B red)\u003C/b\u003E: Mercenary token is created as colourless under the v1 token shape \u2014 same gap as Esika\u0027s Chariot\u0027s green Cats, Crashing Footfalls\u0027 green Rhinos, Pact of the Titan\u0027s red Giant."
-        },
-        {
-          "factory": "StormchasersTalentFactory",
-          "file": "StormchasersTalentFactory.cs",
-          "line": 120,
-          "sentence": "\u0022 Token colour identity (blue \u002B red) deferred \u2014 see class xmldoc."
-        },
-        {
-          "factory": "StormchasersTalentFactory",
-          "file": "StormchasersTalentFactory.cs",
-          "line": 145,
-          "sentence": "Token colour identity (blue \u002B red) deferred (see class xmldoc); Prowess pump on the token deferred (see class xmldoc)."
-        },
-        {
-          "factory": "EsikasChariotFactory",
-          "file": "EsikasChariotFactory.cs",
-          "line": 12,
-          "sentence": "\u003Cb\u003EToken colour identity (green)\u003C/b\u003E: Cat tokens are created as colourless under the v1 token shape \u2014 same gap as Crashing Footfalls\u0027 green Rhinos and Wurmcoil\u0027s colourless Wurms."
-        },
-        {
-          "factory": "EsikasChariotFactory",
-          "file": "EsikasChariotFactory.cs",
-          "line": 129,
-          "sentence": "\u0022 Token colour identity (green) deferred \u2014 see class xmldoc."
-        },
-        {
-          "factory": "EsikasChariotFactory",
-          "file": "EsikasChariotFactory.cs",
-          "line": 174,
-          "sentence": "Token colour identity (green) is deferred (see class xmldoc)."
-        },
-        {
-          "factory": "MonasteryMentorFactory",
-          "file": "MonasteryMentorFactory.cs",
-          "line": 15,
-          "sentence": "Token colour identity (white): tokens are created as colourless under the v1 token shape \u2014 same gap as Crashing Footfalls / Goblin Rabblemaster."
-        },
-        {
-          "factory": "SkyclaveApparitionFactory",
-          "file": "SkyclaveApparitionFactory.cs",
-          "line": 13,
-          "sentence": "v1 does not inject colour identity into tokens \u2014 the engine\u0027s token colour system (same gap as Crashing Footfalls\u0027 green Rhinos, Pact of the Titan\u0027s red Giant)."
-        },
-        {
-          "factory": "SkyclaveApparitionFactory",
-          "file": "SkyclaveApparitionFactory.cs",
-          "line": 199,
-          "sentence": "NOTE (v1): token colour (blue) is not wired \u2014 same gap as Crashing Footfalls\u0027 green Rhinos / Pact of the Titan\u0027s red Giant."
-        },
-        {
-          "factory": "GoblinRabblemasterFactory",
-          "file": "GoblinRabblemasterFactory.cs",
-          "line": 12,
-          "sentence": "\u003Cb\u003EToken colour identity (red)\u003C/b\u003E: tokens are created as colourless under the v1 token shape \u2014 same gap as Pact of the Titan\u0027s \u0022red\u0022 Giant and Crashing Footfalls\u0027 \u0022green\u0022 Rhinos."
-        },
-        {
-          "factory": "CrashingFootfallsFactory",
-          "file": "CrashingFootfallsFactory.cs",
-          "line": 15,
-          "sentence": "The Trample \u002B creature-type assignments match the printed text; the green colour identity is a downstream concern (same gap as Wurmcoil\u0027s \u0022colorless\u0022 tokens, Solitude\u0027s \u0022white\u0022 creatures, etc."
-        },
-        {
-          "factory": "YoungPyromancerFactory",
-          "file": "YoungPyromancerFactory.cs",
-          "line": 13,
-          "sentence": "Token colour identity (red): tokens are created as colourless under the v1 token shape \u2014 same gap as Goblin Rabblemaster / Crashing Footfalls."
-        },
-        {
-          "factory": "BeastWithinFactory",
-          "file": "BeastWithinFactory.cs",
-          "line": 12,
-          "sentence": "The token is a 3/3 green Beast creature token (CR 111.4 \u2014 token characteristics include colour; token \u0022green\u0022 colour identity deferred \u2014 same gap as Crashing Footfalls\u0027 green Rhinos; token enters with \u003Cc\u003EHasSummoningSickness = true\u003C/c\u003E via \u003Csee cref=\u0022TokenFactory\u0022/\u003E).",
-          "cr": "CR 111.4"
-        },
-        {
-          "factory": "BeastWithinFactory",
-          "file": "BeastWithinFactory.cs",
-          "line": 12,
-          "sentence": "\u003Cb\u003EToken colour (green)\u003C/b\u003E: TokenFactory does not yet model token colour identity (same gap as Pact of the Titan\u0027s \u0022red\u0022 Giant token, Crashing Footfalls\u0027 \u0022green\u0022 Rhino tokens)."
-        },
-        {
-          "factory": "BeastWithinFactory",
-          "file": "BeastWithinFactory.cs",
-          "line": 129,
-          "sentence": "Token colour (green) deferred \u2014 same gap as Pact of the Titan / Crashing Footfalls."
-        },
-        {
-          "factory": "OcelotPrideFactory",
-          "file": "OcelotPrideFactory.cs",
-          "line": 14,
-          "sentence": "\u003Cb\u003EToken colour identity (white)\u003C/b\u003E: Cat tokens are created as colourless under the v1 token shape \u2014 same gap as Esika\u0027s Chariot Cats / Crashing Footfalls Rhinos."
-        },
-        {
-          "factory": "OcelotPrideFactory",
-          "file": "OcelotPrideFactory.cs",
-          "line": 200,
-          "sentence": "Token colour identity (white) is deferred (see class xmldoc)."
-        },
-        {
-          "factory": "CoriSteelCutterFactory",
-          "file": "CoriSteelCutterFactory.cs",
-          "line": 15,
-          "sentence": "\u003Cb\u003EToken colour identity (white)\u003C/b\u003E: Monk token is colourless under the v1 token shape \u2014 same gap as Esika\u0027s Chariot\u0027s green Cats / Crashing Footfalls\u0027 green Rhinos / Pact of the Titan\u0027s red Giant."
-        },
-        {
-          "factory": "CoriSteelCutterFactory",
-          "file": "CoriSteelCutterFactory.cs",
-          "line": 184,
-          "sentence": "Token colour identity (white) deferred \u2014 see class xmldoc."
-        }
-      ]
-    },
-    {
       "primitive_id": "regeneration",
       "display_name": "Regeneration shield (CR 701.15)",
       "comp_rules_citation": "CR 701.15",
@@ -549,7 +392,7 @@
         {
           "factory": "DrownInTheLochFactory",
           "file": "DrownInTheLochFactory.cs",
-          "line": 210,
+          "line": 234,
           "sentence": "CR 701.7 \u2014 destroy \u2192 owner\u0027s graveyard (Indestructible / regeneration deferred, same gap as SlaughterPactFactory).",
           "cr": "CR 701.7"
         },
@@ -568,7 +411,7 @@
         {
           "factory": "MurderousRiderFactory",
           "file": "MurderousRiderFactory.cs",
-          "line": 147,
+          "line": 157,
           "sentence": "Indestructible / regeneration deferred (same gap as SlaughterPact)."
         },
         {
@@ -580,7 +423,7 @@
         {
           "factory": "BeastWithinFactory",
           "file": "BeastWithinFactory.cs",
-          "line": 124,
+          "line": 122,
           "sentence": "Indestructible / regeneration rider deferred (same gap as Terminate / Abrupt Decay / Slaughter Pact)."
         },
         {
@@ -656,21 +499,13 @@
       "display_name": "Layer-6 ability-grant subsystem (CR 613.1f)",
       "comp_rules_citation": "CR 613.1f",
       "implementation_hint": "ContinuousEffectsService needs an \u0027ability grant\u0027 layer so \u0027gains \u003Cability\u003E\u0027 effects flow through GetAbilities() at read time.",
-      "factory_count": 3,
-      "mention_count": 5,
+      "factory_count": 2,
+      "mention_count": 4,
       "factories": [
         "AgathasSoulCauldronFactory",
-        "BloodghastFactory",
-        "SwordOfFireAndIceFactory"
+        "BloodghastFactory"
       ],
       "mentions": [
-        {
-          "factory": "SwordOfFireAndIceFactory",
-          "file": "SwordOfFireAndIceFactory.cs",
-          "line": 144,
-          "sentence": "\u0022 (CR 702.16) Markers ride on the equipment card itself; a Layer 6 grant re-projecting them onto the equipped creature is deferred (see class xmldoc).",
-          "cr": "CR 702.16"
-        },
         {
           "factory": "AgathasSoulCauldronFactory",
           "file": "AgathasSoulCauldronFactory.cs",
@@ -959,6 +794,13 @@
       "cr": "CR 701.19c"
     },
     {
+      "factory": "BridgeFromBelowFactory",
+      "file": "BridgeFromBelowFactory.cs",
+      "line": 12,
+      "sentence": "## Deferred (v1 gaps)  - \u003Cb\u003EAPNAP simultaneous-trigger ordering\u003C/b\u003E: when one creature dies to a chained event (combat damage, board wipe), CR 603.3b sorts pending triggers by APNAP and within each player by the player\u0027s choice.",
+      "cr": "CR 603.3b"
+    },
+    {
       "factory": "TheOneRingFactory",
       "file": "TheOneRingFactory.cs",
       "line": 121,
@@ -979,21 +821,20 @@
     {
       "factory": "StormchasersTalentFactory",
       "file": "StormchasersTalentFactory.cs",
-      "line": 120,
-      "sentence": "Prowess pump on token deferred \u2014 keyword marker only, see class xmldoc."
+      "line": 115,
+      "sentence": "\u0022 Prowess pump on token deferred \u2014 keyword marker only, see class xmldoc."
+    },
+    {
+      "factory": "StormchasersTalentFactory",
+      "file": "StormchasersTalentFactory.cs",
+      "line": 139,
+      "sentence": "Colors\u0022/\u003E; Prowess pump on the token deferred (see class xmldoc)."
     },
     {
       "factory": "NihilSpellbombFactory",
       "file": "NihilSpellbombFactory.cs",
       "line": 13,
       "sentence": "Real prompt deferred until IPlayerAgent grows a ChooseYesNoAsync surface."
-    },
-    {
-      "factory": "SwordOfFireAndIceFactory",
-      "file": "SwordOfFireAndIceFactory.cs",
-      "line": 15,
-      "sentence": "The shipped markers are inspectable on the card so tests \u002B bot heuristics can read intent, with full DEBT-A enforcement (CR 702.16e \u2014 damage / enchanting / equipping / blocking / targeting) deferred behind that grant-on-attach work.",
-      "cr": "CR 702.16e"
     },
     {
       "factory": "TerminateFactory",
@@ -1070,8 +911,14 @@
     {
       "factory": "MonasteryMentorFactory",
       "file": "MonasteryMentorFactory.cs",
-      "line": 162,
+      "line": 160,
       "sentence": "\u0022With prowess\u0022 on the token is deferred \u2014 see factory xmldoc."
+    },
+    {
+      "factory": "MonasteryMentorFactory",
+      "file": "MonasteryMentorFactory.cs",
+      "line": 177,
+      "sentence": "The Prowess keyword on the token is deferred (see class xmldoc) but the colour identity is now stamped."
     },
     {
       "factory": "WastewoodVergeFactory",
@@ -1416,13 +1263,7 @@
     {
       "factory": "KarnScionOfUrzaFactory",
       "file": "KarnScionOfUrzaFactory.cs",
-      "line": 12,
-      "sentence": "\u003Cb\u003EToken colour\u003C/b\u003E: Construct token is created with no colour-set primitive (matches Wurmcoil Engine \u002B Crashing Footfalls token v1 gap \u2014 \u0060CardColors."
-    },
-    {
-      "factory": "KarnScionOfUrzaFactory",
-      "file": "KarnScionOfUrzaFactory.cs",
-      "line": 168,
+      "line": 164,
       "sentence": "DEFERRED \u2014 requires \u0022exiled with this source\u0022 tag tracking on exiled cards."
     },
     {
@@ -1678,6 +1519,12 @@
       "file": "CoriSteelCutterFactory.cs",
       "line": 15,
       "sentence": "Same v1 gap as \u003Csee cref=\u0022StormchasersTalentFactory\u0022/\u003E\u0027s Mercenary tokens and \u003Csee cref=\u0022MonasteryMentorFactory\u0022/\u003E\u0027s Monk tokens."
+    },
+    {
+      "factory": "CoriSteelCutterFactory",
+      "file": "CoriSteelCutterFactory.cs",
+      "line": 179,
+      "sentence": "Prowess pump on the token is deferred \u2014 see class xmldoc."
     },
     {
       "factory": "LordOfAtlantisFactory",
