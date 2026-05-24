@@ -81,7 +81,7 @@ services:
         value: http://0.0.0.0:10000
       - key: CARDS_SEED_TAG
         # Bump to a new release tag to trigger a fresh download on next deploy.
-        value: cards-seed-2026-05-23j
+        value: cards-seed-2026-05-23k
       - key: Cards__InternalToken
         sync: false
 
