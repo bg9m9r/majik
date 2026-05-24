@@ -1110,5 +1110,20 @@ public static class SeedImplementedCards
         // resolution. Name-based cast restriction ("can't cast same-named spells until
         // your next turn") deferred — no delayed-until-next-turn restriction surface in v1.
         "Reflector Mage",
+
+        // Creature — Vampire Spirit {1}{B} 2/1 (BloodghastFactory). Zendikar.
+        // Can't block (permanent CombatRestrictionEffect wired via full overload).
+        // Landfall trigger (CR 603.6d): return from graveyard to battlefield when a land
+        // enters under your control; "you may" auto-accepted (v1). Haste while an opponent
+        // has ≤10 life (v1 snapshot — dynamic conditional keyword grant deferred).
+        "Bloodghast",
+
+        // Land (non-basic, Worldwake) — (CreepingTarPitFactory).
+        // Enters tapped (EntersTappedReplacement). {T}: Add {U} or {B}.
+        // {1}{U}{B}: Until EOT becomes 3/2 Elemental creature still a land + Shroud
+        // (Layer 4 + Layer 7b + Layer 6 effects, all ExpiresAtEndOfTurn).
+        // Colour-identity of animated form (blue + black) deferred — no Layer 5
+        // colour-set primitive yet. Combat math via Compute deferred — same gap as Mutavault.
+        "Creeping Tar Pit",
     };
 }
