@@ -225,6 +225,26 @@ public sealed class GameFacade
             }
         }
 
+        var manaActivator = new ManaAbilityActivator(_bus);
+        void DispatchManaAbility(Player actor, PriorityAction.ActivateManaAbility ma)
+        {
+            try
+            {
+                manaActivator.ActivateManaAbility(ma.Ability, actor);
+            }
+            catch (InvalidOperationException)
+            {
+                // CanActivate / wrong-controller failure — swallow so the
+                // priority pump keeps moving. Same posture as DispatchCast /
+                // DispatchActivate above.
+            }
+            catch (Majik.Core.Domain.Exceptions.InvalidPlayerActionException)
+            {
+                // Mirrors ManaAbilityActivator's own validation throw
+                // (wrong controller / CanActivate false).
+            }
+        }
+
         return new PriorityLoop(
             players: new[] { _alice, _bob },
             priority: _priority,
@@ -235,7 +255,8 @@ public sealed class GameFacade
             turnNumberAccessor: () => 1,
             phaseAccessor: () => PhaseStateType.Main,
             castDispatcher: DispatchCast,
-            activateDispatcher: DispatchActivate);
+            activateDispatcher: DispatchActivate,
+            manaAbilityDispatcher: DispatchManaAbility);
     }
 
     /// <summary>

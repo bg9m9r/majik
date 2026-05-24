@@ -34,7 +34,8 @@ public sealed record CardSnapshotDto(
     int? Toughness,
     bool Tapped,
     bool SummoningSickness,
-    IReadOnlyList<AbilityDto> Abilities);
+    IReadOnlyList<AbilityDto> Abilities,
+    string ProducedManaColors = "");
 
 public sealed record AbilityDto(string Kind, string Description);
 

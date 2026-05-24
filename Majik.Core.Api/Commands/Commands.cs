@@ -17,6 +17,7 @@ namespace Majik.Core.Api.Commands;
 [JsonDerivedType(typeof(ChooseXCommand), "x")]
 [JsonDerivedType(typeof(ChooseModeCommand), "mode")]
 [JsonDerivedType(typeof(ChooseManaCommand), "mana")]
+[JsonDerivedType(typeof(ActivateManaAbilityCommand), "activateManaAbility")]
 [JsonDerivedType(typeof(OrderTriggersCommand), "order-triggers")]
 [JsonDerivedType(typeof(DeclareAttackersCommand), "attackers")]
 [JsonDerivedType(typeof(DeclareBlockersCommand), "blockers")]
@@ -46,6 +47,16 @@ public sealed record ChooseXCommand(int X) : GameCommand;
 public sealed record ChooseModeCommand(int ModeIndex) : GameCommand;
 
 public sealed record ChooseManaCommand(IReadOnlyList<Guid> SourceInstanceIds) : GameCommand;
+
+/// <summary>
+/// Activate a mana ability of a permanent the player controls (CR 605.3a —
+/// mana abilities don't use the stack and don't pass priority). The same
+/// player keeps priority after activation. <see cref="Color"/> selects
+/// which mana ability for multi-colour sources (e.g. Overgrown Tomb's
+/// {B} vs {G}); valid values are "W", "U", "B", "R", "G", "C". Empty
+/// string is allowed for sources with exactly one mana ability.
+/// </summary>
+public sealed record ActivateManaAbilityCommand(Guid PermanentInstanceId, string Color) : GameCommand;
 
 public sealed record OrderTriggersCommand(IReadOnlyList<Guid> StackObjectIdsInOrder) : GameCommand;
 
