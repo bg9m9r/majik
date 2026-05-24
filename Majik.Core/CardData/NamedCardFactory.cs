@@ -621,6 +621,22 @@ public static class NamedCardFactory
             // target check at resolution).
             "Force of Negation" => ForceOfNegationFactory.Create(owner),
 
+            // Instant — {1}{R} (TemurBattleRageFactory). Khans of Tarkir.
+            // "Target creature gains double strike until end of turn.
+            //  Ferocious — That creature also gains trample until end of
+            //  turn if you control a creature with power 4 or greater."
+            // Card shape only here; the resolve-time SpellDefinition
+            // (double-strike grant + ferocious trample rider) is built on
+            // demand via TemurBattleRageFactory.BuildSpellDefinition.
+            "Temur Battle Rage" => TemurBattleRageFactory.Create(owner),
+
+            // Instant — {1}{U} (NegateFactory). Various sets.
+            // "Counter target noncreature spell."
+            // Card shape only here; the resolve-time SpellDefinition
+            // (counter target noncreature spell) is built on demand via
+            // NegateFactory.BuildSpellDefinition.
+            "Negate" => NegateFactory.Create(owner),
+
             // Instant — {2}{G}{G} (ForceOfVigorFactory).
             // "If it's not your turn, you may exile a green card from your
             //  hand rather than pay this spell's mana cost. Destroy up to
@@ -692,6 +708,30 @@ public static class NamedCardFactory
             // (single-target), rewriting Spell.ChosenTargets — ability-
             // target redirect deferred (same gap as RedirectTemplate).
             "Spellskite" => SpellskiteFactory.Create(owner),
+
+            // Instant — {U} (VaporSnagFactory). New Phyrexia.
+            // "Return target creature to its owner's hand. Its controller
+            //  loses 1 life." Bounce effect + 1 life loss wired via
+            //  VaporSnagFactory.BuildDefinition. Single-arg dispatcher
+            //  produces the correct card shape; pass a ZoneService to
+            //  BuildDefinition for replacement-bus-aware zone moves.
+            "Vapor Snag" => VaporSnagFactory.Create(owner),
+
+            // Instant — {R/P} (GutShotFactory). New Phyrexia.
+            // "({R/P} can be paid with either {R} or 2 life.)
+            //  Gut Shot deals 1 damage to any target." Main cost {R};
+            //  Phyrexian alt-cost (2 life) via GutShotFactory.PhyrexianAlternativeCost.
+            //  1 damage to any target via OracleSpellBinder.DealDamage in
+            //  GutShotFactory.BuildDefinition.
+            "Gut Shot" => GutShotFactory.Create(owner),
+
+            // Instant — {1}{B/P}{B/P} (DismemberFactory). New Phyrexia.
+            // "({B/P} can be paid with either {B} or 2 life each.)
+            //  Target creature gets -5/-5 until end of turn." Main cost
+            //  {1}{B}{B}; Phyrexian alt-cost (4 life + {1}) via
+            //  DismemberFactory.PhyrexianAlternativeCost. -5/-5 EOT via
+            //  PumpUntilEndOfTurnEffect in DismemberFactory.BuildDefinition.
+            "Dismember" => DismemberFactory.Create(owner),
 
             // Sorcery — {2}{R} (RiftBoltFactory). 3 damage to any target;
             // Suspend 1—{R} (CR 702.62). Spell-def and suspend alt cost
@@ -2782,6 +2822,62 @@ public static class NamedCardFactory
             // without TriggerManager registration; use the (owner, triggers)
             // overload for bus-driven firing.
             "Thalia's Lieutenant" => ThaliaLieutenantFactory.Create(owner),
+
+            // Creature — Kor Spirit {1}{W}{W} 2/2 (SkyclaveApparitionFactory).
+            // Zendikar Rising. ETB exile "up to one target nonland, nontoken
+            // permanent an opponent controls with mana value 4 or less"
+            // (MinTargets=0, MaxTargets=1 TargetRequest). LTB creates an X/X
+            // blue Illusion creature token under the exiled permanent's
+            // controller, X = exiled card's mana value. If 0 targets chosen,
+            // LTB no-ops. Single-arg dispatcher path produces the correct
+            // card shape without TriggerManager wiring; use the
+            // (owner, eventBus, triggers) overload for fully-wired behaviour.
+            // Token colour (blue) deferred — same gap as Crashing Footfalls.
+            "Skyclave Apparition" => SkyclaveApparitionFactory.Create(owner),
+
+            // Creature — Cat Cleric {1}{W} 2/2 (LeoninArbiterFactory).
+            // Scars of Mirrodin. "Players can't search their libraries unless
+            // they pay {2}." v1 structural shape only: a
+            // LeoninArbiterSearchRestrictionEffect marker is registered on
+            // the ContinuousEffectsService (via the wired overload) while
+            // Leonin Arbiter is on the battlefield; actual search-tax
+            // enforcement is deferred (no unified search-library surface yet).
+            // The single-arg dispatcher path here produces the correct card
+            // shape only (no live marker). Use
+            // LeoninArbiterFactory.Create(owner, continuousEffectsService)
+            // for the wired form.
+            "Leonin Arbiter" => LeoninArbiterFactory.Create(owner),
+
+            // Instant — {B}{G} (AbruptDecayFactory). Return to Ravnica.
+            // "This spell can't be countered. Destroy target nonland
+            //  permanent with mana value 3 or less." (CR 701.7 / CR 202.3.)
+            // "Can't Be Countered" keyword marker attached for structural
+            // observability; enforcement deferred (same posture as
+            // Veil of Summer / Cavern of Souls). Card shape only here;
+            // the resolve-time SpellDefinition (mv ≤ 3 gate + destroy)
+            // is built on demand via
+            // AbruptDecayFactory.BuildSpellDefinition.
+            "Abrupt Decay" => AbruptDecayFactory.Create(owner),
+
+            // Instant — {B}{R} (TerminateFactory). Planeshift / various reprints.
+            // "Destroy target creature. It can't be regenerated." (CR 701.7.)
+            // Card shape only here; the resolve-time SpellDefinition
+            // (target-creature request + destroy) is built on demand via
+            // TerminateFactory.BuildSpellDefinition. "Can't be regenerated"
+            // rider deferred — no regeneration shield surface in the engine
+            // yet (same gap as Wrath of God / Day of Judgment).
+            "Terminate" => TerminateFactory.Create(owner),
+
+            // Instant — {1}{B}{R} (KolaghansCommandFactory). Dragons of Tarkir.
+            // CR 700.2e — modal "Choose two —" with 4 printed modes
+            // (return creature from graveyard to hand / 2 damage to any target /
+            // target player discards a card / destroy target artifact). The
+            // single-arg dispatcher path produces the correct card shape;
+            // the bound SpellDefinition is built on demand via
+            // KolaghansCommandFactory.BuildDefinition(caster, targetResolver,
+            // allPlayers, stack, chosenModes). Same modal structure as
+            // CrypticCommandFactory — 4 TargetRequests with MinTargets=0.
+            "Kolaghan's Command" => KolaghansCommandFactory.Create(owner),
 
             // Creature — Vampire Spirit {1}{B} 2/1 (BloodghastFactory). Zendikar.
             // Can't block (permanent CombatRestriction — wired via full overload).

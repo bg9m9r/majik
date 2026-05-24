@@ -23,6 +23,10 @@ public static class SeedImplementedCards
         "Young Wolf", "Strangleroot Geist", "Butcher Ghoul", "Geralf's Messenger",
         // Removal + discard (OracleSpellBinder)
         "Fatal Push", "Thoughtseize", "Inquisition of Kozilek",
+        // Instant {B}{G} — destroy target nonland permanent mv ≤ 3; "can't be countered" marker (AbruptDecayFactory)
+        "Abrupt Decay",
+        // Instant {B}{R} — destroy target creature; "can't be regenerated" deferred (TerminateFactory)
+        "Terminate",
         // Dies-trigger land destruction (OracleTriggeredAbilityBinder — dies-destroy-land)
         "Fulminator Mage",
         // ETB graveyard-to-library trigger (OracleTriggeredAbilityBinder); Flash+Reach via KeywordBinder
@@ -964,6 +968,18 @@ public static class SeedImplementedCards
         // {Phyrexian/U}: Change the target of target spell or ability to ~
         // (CR 702.59 — phyrexian-mana redirect activation).
         "Spellskite",
+        // Instant — {U} (VaporSnagFactory). New Phyrexia.
+        // Return target creature to its owner's hand. Its controller loses
+        // 1 life. Bounce + 1 life loss wired via BuildDefinition.
+        "Vapor Snag",
+        // Instant — {R/P} (GutShotFactory). New Phyrexia.
+        // 1 damage to any target. Phyrexian alt-cost (2 life) via
+        // GutShotFactory.PhyrexianAlternativeCost.
+        "Gut Shot",
+        // Instant — {1}{B/P}{B/P} (DismemberFactory). New Phyrexia.
+        // Target creature gets -5/-5 until end of turn. Phyrexian alt-cost
+        // (4 life + {1}) via DismemberFactory.PhyrexianAlternativeCost.
+        "Dismember",
         // Sorcery — {1}{R} (PyroclasmFactory). Many reprints.
         // ~ deals 2 damage to each creature.
         "Pyroclasm",
@@ -1110,6 +1126,40 @@ public static class SeedImplementedCards
         // resolution. Name-based cast restriction ("can't cast same-named spells until
         // your next turn") deferred — no delayed-until-next-turn restriction surface in v1.
         "Reflector Mage",
+
+        // ---- Death and Taxes / Taxes staples shipped 2026-05-23 ----
+
+        // Creature — Kor Spirit {1}{W}{W} 2/2 (SkyclaveApparitionFactory).
+        // ETB: exile up to one target nonland nontoken permanent an opponent
+        // controls with mv ≤ 4 (MinTargets=0, MaxTargets=1). LTB: that
+        // permanent's controller creates an X/X blue Illusion token (X = mv).
+        // Token colour (blue) deferred — same gap as Crashing Footfalls.
+        "Skyclave Apparition",
+
+        // Creature — Cat Cleric {1}{W} 2/2 (LeoninArbiterFactory).
+        // "Players can't search their libraries unless they pay {2}."
+        // v1 structural: LeoninArbiterSearchRestrictionEffect marker
+        // registered when wired overload is used; enforcement deferred
+        // (no unified search-library surface yet).
+        "Leonin Arbiter",
+
+        // ---- Modern staples shipped in the feat/temur-battle-rage-negate bump ----
+
+        // Instant — {1}{R} (TemurBattleRageFactory). Khans of Tarkir.
+        // Target creature gains double strike until end of turn.
+        // Ferocious — also gains trample if you control a power-4+ creature.
+        "Temur Battle Rage",
+        // Instant — {1}{U} (NegateFactory). Various sets.
+        // Counter target noncreature spell.
+        "Negate",
+
+        // Instant — {1}{B}{R} (KolaghansCommandFactory). Dragons of Tarkir.
+        // CR 700.2e — modal "Choose two —" with 4 modes:
+        // (0) return target creature card from graveyard to hand (v1 auto-pick),
+        // (1) deal 2 damage to any target (Player / Creature / Planeswalker),
+        // (2) target player discards a card (v1 deterministic first-card-in-hand),
+        // (3) destroy target artifact (CR 701.7; indestructible rider deferred).
+        "Kolaghan's Command",
 
         // Creature — Vampire Spirit {1}{B} 2/1 (BloodghastFactory). Zendikar.
         // Can't block (permanent CombatRestrictionEffect wired via full overload).
