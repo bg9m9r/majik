@@ -138,6 +138,16 @@ public sealed class RemoteAgent : IPlayerAgent
                 ((TaskCompletionSource<ManaPayment>)tcs).SetResult(
                     new ManaPayment(mp.SourceInstanceIds.Select(ResolveCard).ToList()));
                 break;
+            case CancelCastCommand:
+                // CR 601.2 / CR 727 — bailing out of a cast at the cost-
+                // payment step. Surface the Cancelled sentinel so the
+                // dispatch site can refund any pool-deducted mana and
+                // leave the spell in hand. Validity of the prompt context
+                // (must be a ChooseManaCommand awaiting) is enforced by
+                // _pendingKinds in Submit — a CancelCastCommand sent at
+                // any other prompt is rejected before reaching here.
+                ((TaskCompletionSource<ManaPayment>)tcs).SetResult(ManaPayment.Cancelled);
+                break;
             case ActivateManaAbilityCommand ama:
             {
                 // CR 605 — translate the wire command into the engine's
@@ -398,7 +408,11 @@ public sealed class RemoteAgent : IPlayerAgent
     }
 
     public Task<ManaPayment> ChooseManaSourcesAsync(GameContext ctx, ManaCost cost, CancellationToken ct = default)
-        => Prompt<ManaPayment>(ct, typeof(ChooseManaCommand));
+        // CR 601.2 / CR 727 — CancelCastCommand is offered alongside
+        // ChooseManaCommand at the cost-payment prompt so the remote
+        // (human) player can back out before any mana is spent. The
+        // resolver translates Cancelled → no-op cast at the dispatch site.
+        => Prompt<ManaPayment>(ct, typeof(ChooseManaCommand), typeof(CancelCastCommand));
 
     public Task<CombatPlan> DeclareAttackersAsync(GameContext ctx, IReadOnlyList<Creature> eligibleAttackers, CancellationToken ct = default)
         => Prompt<CombatPlan>(ct, typeof(DeclareAttackersCommand));

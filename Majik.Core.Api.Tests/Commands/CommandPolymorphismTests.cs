@@ -47,6 +47,7 @@ public class CommandPolymorphismTests
     [InlineData("x", typeof(ChooseXCommand))]
     [InlineData("mode", typeof(ChooseModeCommand))]
     [InlineData("mana", typeof(ChooseManaCommand))]
+    [InlineData("cancelCast", typeof(CancelCastCommand))]
     [InlineData("order-triggers", typeof(OrderTriggersCommand))]
     [InlineData("attackers", typeof(DeclareAttackersCommand))]
     [InlineData("blockers", typeof(DeclareBlockersCommand))]

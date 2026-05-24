@@ -49,18 +49,18 @@ public class LegacyStartAsyncCastDispatchTests
         // CastSpellCommand on legacy StartAsync. This used to throw
         // "PriorityLoop received CastSpell but no castDispatcher was supplied."
         // because BuildPriorityLoop omitted castDispatcher.
+        //
+        // CR 601.2g + pool-pay-first (see TurnDriver.DispatchCast and
+        // GameFacade.DispatchCast): the empty pool already CanPay a 0-cost
+        // spell, so the dispatcher silently auto-pays and skips the
+        // ChooseManaCommand prompt. Reaching the post-submit assertion at
+        // all (no throw) is the regression check; no ChooseManaCommand is
+        // sent in the new behaviour.
         await facade.SubmitAsync(new CastSpellCommand(
             CardInstanceId: bear.InstanceId,
             TargetInstanceIds: Array.Empty<Guid>(),
             XValue: null,
             ModeIndex: null)
-        { PlayerId = alice });
-
-        // Dispatcher prompts for mana sources (CR 601.2g). For a 0-cost,
-        // an empty source list is sufficient. If the dispatcher had been
-        // missing the test would have thrown above and never reached this
-        // line — getting here at all is the regression check.
-        await facade.SubmitAsync(new ChooseManaCommand(Array.Empty<Guid>())
         { PlayerId = alice });
 
         // Cast landed on the stack (SpellCastFlow pushed it). The single-

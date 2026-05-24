@@ -168,7 +168,31 @@ public sealed class GameFacade
             var agent = agents[actor];
             var cost = cast.AlternativeCost?.AlternativeManaCost
                 ?? Majik.Core.Costs.CostReduction.GetEffectiveCost(cast.Card, actor);
-            var payment = await agent.ChooseManaSourcesAsync(ctx, cost, CancellationToken.None);
+
+            // CR 601.2g + CR 106.4 — pay from floating pool first when it
+            // fully covers the cost (drag-to-cast UX: float via
+            // ActivateManaAbilityCommand, then cast silently). Mirrors
+            // TurnDriver.DispatchCast — see comment there for rationale
+            // and the hybrid/Phyrexian guardrail.
+            var canAutoPayFromPool = cost.HybridPips.Count == 0
+                && cost.PhyrexianPips.Count == 0
+                && actor.ManaPool.CanPay(cost);
+
+            ManaPayment payment;
+            if (canAutoPayFromPool)
+            {
+                payment = ManaPayment.Empty;
+            }
+            else
+            {
+                payment = await agent.ChooseManaSourcesAsync(ctx, cost, CancellationToken.None);
+                // CR 601.2 / CR 727 — CancelCastCommand surfaces as the
+                // Cancelled sentinel. Spell stays in hand, nothing fires.
+                if (payment.IsCancelled)
+                {
+                    return;
+                }
+            }
             if (!manaResolver.Pay(actor, cost, payment))
             {
                 return;
