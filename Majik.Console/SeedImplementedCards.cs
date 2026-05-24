@@ -606,6 +606,10 @@ public static class SeedImplementedCards
         // ETB choose creature type; creatures of chosen type opponents
         // control get -1/-1.
         "Plague Engineer",
+        // Enchantment — {2}{B} (EngineeredPlagueFactory). Urza's Legacy.
+        // As ~ enters, choose a creature type. All creatures of the chosen
+        // type get -1/-1 (ALL players — no "opponents" qualifier).
+        "Engineered Plague",
         // Legendary Artifact — {5} (PyromancersGogglesFactory). Magic Origins.
         // {T}: Add {R}. Copy-instant-or-sorcery-using-this-mana rider deferred.
         "Pyromancer's Goggles",

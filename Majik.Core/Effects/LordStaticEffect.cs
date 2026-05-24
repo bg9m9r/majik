@@ -19,6 +19,12 @@ namespace Majik.Core.Effects;
 /// the chosen type your opponents control get -1/-1.") and similar
 /// debuff-the-opponent statics. With opponentsOnly the source itself is
 /// always excluded regardless of <c>includeSelf</c>.</para>
+///
+/// <para>Set <c>allPlayers: true</c> to bypass the controller filter
+/// entirely so the effect applies to matching creatures controlled by
+/// ANY player — used by Engineered Plague ("All creatures of the chosen
+/// type get -1/-1."). When allPlayers is true, opponentsOnly is
+/// ignored.</para>
 /// </summary>
 public sealed class LordStaticEffect : ContinuousEffect
 {
@@ -29,6 +35,7 @@ public sealed class LordStaticEffect : ContinuousEffect
     private readonly IReadOnlyList<string> _grantedKeywords;
     private readonly bool _includeSelf;
     private readonly bool _opponentsOnly;
+    private readonly bool _allPlayers;
 
     public LordStaticEffect(
         Permanent source,
@@ -37,7 +44,8 @@ public sealed class LordStaticEffect : ContinuousEffect
         int toughness = 1,
         IReadOnlyList<string>? grantedKeywords = null,
         bool includeSelf = false,
-        bool opponentsOnly = false)
+        bool opponentsOnly = false,
+        bool allPlayers = false)
     {
         _source = source ?? throw new ArgumentNullException(nameof(source));
         _subtype = matchingSubtype;
@@ -46,6 +54,7 @@ public sealed class LordStaticEffect : ContinuousEffect
         _grantedKeywords = grantedKeywords ?? Array.Empty<string>();
         _includeSelf = includeSelf;
         _opponentsOnly = opponentsOnly;
+        _allPlayers = allPlayers;
     }
 
     public override Layer Layer => Layer.PT_Modify;
@@ -59,6 +68,13 @@ public sealed class LordStaticEffect : ContinuousEffect
     public override bool AppliesTo(Creature creature)
     {
         if (creature.Zone != Majik.Core.Zones.ZoneType.Battlefield) return false;
+        if (_allPlayers)
+        {
+            // No controller filter — effect applies to ALL creatures of the
+            // matching subtype regardless of controller. Used by Engineered
+            // Plague ("All creatures of the chosen type get -1/-1.").
+            return creature.HasSubtype(_subtype);
+        }
         var sameController = ReferenceEquals(creature.Controller, _source.Controller);
         if (_opponentsOnly)
         {
