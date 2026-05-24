@@ -118,6 +118,8 @@ public enum CardSubtype
     /// <summary>Vampire creature subtype — Bloodghast (Zendikar), Vampire Nighthawk,
     /// Olivia Voldaren. CR 205.3m.</summary>
     Vampire,
+    /// <summary>Wraith creature subtype — Street Wraith (Future Sight). CR 205.3m.</summary>
+    Wraith,
 
     // Land subtypes (examples)
     Forest,

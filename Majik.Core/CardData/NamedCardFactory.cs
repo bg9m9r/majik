@@ -2960,6 +2960,19 @@ public static class NamedCardFactory
             // Pact of the Titan / Crashing Footfalls).
             "Beast Within" => BeastWithinFactory.Create(owner),
 
+            // Creature — Goblin Scout {R} 2/2 (GoblinGuideFactory).
+            // Haste wired via KeywordAbility marker. Attack trigger: defending
+            // player reveals top of library; if it's a land, they put it in
+            // their hand (CR 508.1f). Defender captured from
+            // CreatureAttacksEvent.DefendingPlayerOrPlaneswalker.
+            "Goblin Guide" => GoblinGuideFactory.Create(owner),
+
+            // Creature — Wraith {3}{B}{B} 3/4 (StreetWraithFactory).
+            // Swampwalk (CR 702.14) — keyword marker; combat enforcement deferred.
+            // Cycling — Pay 2 life (CR 702.29) — structural keyword marker stub;
+            // no CyclingAlternativeCost yet.
+            "Street Wraith" => StreetWraithFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 

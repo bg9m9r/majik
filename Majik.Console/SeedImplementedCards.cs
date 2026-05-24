@@ -199,6 +199,11 @@ public static class SeedImplementedCards
         // v1 only emits the move-to-hand on the land branch).
         "Goblin Guide",
 
+        // Creature — Wraith {3}{B}{B} 3/4 (StreetWraithFactory).
+        // Swampwalk (CR 702.14) — keyword marker; combat enforcement deferred.
+        // Cycling — Pay 2 life (CR 702.29) — structural keyword marker stub.
+        "Street Wraith",
+
         // Legendary Creature — Monkey Pirate {R} 2/1 (OracleTriggeredAbilityBinder).
         // Combat-damage trigger: "create a Treasure token and exile the top
         // card of that player's library" — Treasure handled by
