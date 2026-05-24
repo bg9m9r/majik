@@ -4,6 +4,7 @@ using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
 using Majik.Core.Events;
 using Majik.Core.Players;
+using Majik.Core.Rules;
 using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
 
@@ -38,13 +39,19 @@ namespace Majik.Core.CardData.Factories;
 ///   turn begins. Without a bus the test harness is expected to call
 ///   <see cref="LurrusGraveyardCastGate.ResetForTurn"/> manually.
 ///
-/// ## Companion (DEFERRED)
+/// ## Companion (deck-construction half)
 /// The companion deck-construction rule (CR 702.139 — "Each permanent
-/// card in your starting deck has mana value 2 or less") is foundational
-/// to the deck-builder, not the runtime, and is intentionally NOT
-/// enforced here. Only the gameplay clause ("during each of your turns,
-/// you may cast one permanent spell with mana value 2 or less from
-/// your graveyard") is wired.
+/// card in your starting deck has mana value 2 or less") is exposed via
+/// <see cref="CompanionRestriction"/>, an
+/// <see cref="ICompanionRestriction"/> that
+/// <see cref="Majik.Core.Rules.CompanionValidator"/> consumes at
+/// deck-registration time. The runtime "cast from outside the game"
+/// pipeline is still deferred — the engine has no sideboard zone yet
+/// (see <see cref="Majik.Core.Zones.ZoneType"/>), so the once-per-game
+/// companion-tax cast is layered on once that surface lands. Until
+/// then, the runtime grant ("during each of your turns, you may cast
+/// one permanent spell with mana value 2 or less from your graveyard")
+/// is the only in-game effect wired.
 ///
 /// ## Approach
 /// Mirrors Snapcaster Mage's runtime-cost-flag pattern. Instead of
@@ -65,6 +72,15 @@ public static class LurrusOfTheDreamDenFactory
     /// magic number.
     /// </summary>
     public const int MaxGraveyardCastManaValue = 2;
+
+    /// <summary>
+    /// CR 702.139 — Lurrus's companion deck-construction predicate:
+    /// "Each permanent card in your starting deck has mana value 2 or
+    /// less." Surfaced as a static singleton so deck-registration call
+    /// sites can validate without instantiating Lurrus.
+    /// </summary>
+    public static ICompanionRestriction CompanionRestriction { get; } =
+        new LurrusCompanionRestriction();
 
     /// <summary>
     /// Card-instance → gate registry. Lurrus's static ability is
@@ -298,5 +314,34 @@ public sealed class LurrusGraveyardCastGate : IGraveyardCastGate
     {
         if (caster == null) return;
         _castThisTurn.Add(caster);
+    }
+}
+
+/// <summary>
+/// CR 702.139 — Lurrus's deck-construction predicate: "Each permanent
+/// card in your starting deck has mana value 2 or less." Non-permanent
+/// cards (instants, sorceries) are unconstrained per the printed wording
+/// ("each permanent card"); among permanents (artifact, creature,
+/// enchantment, land, planeswalker, battle), every one must satisfy
+/// <see cref="ValueObjects.ManaCost.TotalValue"/> ≤
+/// <see cref="LurrusOfTheDreamDenFactory.MaxGraveyardCastManaValue"/>.
+/// </summary>
+internal sealed class LurrusCompanionRestriction : ICompanionRestriction
+{
+    public string Description =>
+        "Each permanent card in your starting deck has mana value 2 or less.";
+
+    public bool IsSatisfiedBy(IEnumerable<ICard> startingDeck)
+    {
+        ArgumentNullException.ThrowIfNull(startingDeck);
+        foreach (var card in startingDeck)
+        {
+            if (card == null) continue;
+            if (!LurrusGraveyardCastGate.IsPermanentSpell(card)) continue;
+            var mv = LurrusOfTheDreamDenFactory.ManaCostOf(card).TotalValue;
+            if (mv > LurrusOfTheDreamDenFactory.MaxGraveyardCastManaValue)
+                return false;
+        }
+        return true;
     }
 }

@@ -248,9 +248,9 @@ public static class MechanicPrimitiveRegistry
                 Rx(@"\bsuspend\b.{0,80}\bdefer"),
                 Rx(@"\bdefer\w*\b.{0,80}\bsuspend"),
             }),
-        new("companion", "Companion (CR 702.139)",
+        new("companion", "Companion runtime cast-from-outside (CR 702.139)",
             "CR 702.139",
-            "Deck-construction check + 'cast from outside the game' once-per-game pipeline.",
+            "Deck-construction predicate shipped via ICompanionRestriction + CompanionValidator. Remaining gap: 'cast from outside the game' once-per-game pipeline (needs a sideboard zone + Player.CompanionUsedThisGame ledger).",
             new[]
             {
                 Rx(@"companion\b.{0,80}\bdefer"),

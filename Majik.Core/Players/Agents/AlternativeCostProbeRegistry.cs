@@ -32,6 +32,12 @@ namespace Majik.Core.Players.Agents;
 ///   alt-cost (Wrath of the Skies).</item>
 ///   <item><see cref="EscapeAltCostProbe"/> — CR 702.138 Escape
 ///   (Uro / Phlage / Phoenix of Ash / Cling to Dust).</item>
+///   <item><see cref="KickerAltCostProbe"/> — CR 702.33 Kicker. Like
+///   Cascade, yields no <see cref="IAlternativeCost"/> candidates
+///   (kicker is an <em>additional</em> cost, not an alternative);
+///   exposes <see cref="KickerAltCostProbe.KickerCostFor"/> +
+///   <see cref="KickerAltCostProbe.BuildAdditionalCost"/> for the
+///   bot's "should I pay the kicker?" decision.</item>
 /// </list>
 ///
 /// <para>Card factories that need a per-card probe (a "this specific card
@@ -109,6 +115,7 @@ public sealed class AlternativeCostProbeRegistry : IAlternativeCostProbe
             .Register(new OverloadAltCostProbe())
             .Register(new CascadeAltCostProbe())
             .Register(new EnergyAltCostProbe(EnergyAltCostProbe.DefaultLookup))
-            .Register(new EscapeAltCostProbe(EscapeAltCostProbe.DefaultLookup));
+            .Register(new EscapeAltCostProbe(EscapeAltCostProbe.DefaultLookup))
+            .Register(new KickerAltCostProbe(KickerAltCostProbe.DefaultLookup));
     }
 }

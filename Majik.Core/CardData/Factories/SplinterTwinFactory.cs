@@ -46,6 +46,27 @@ namespace Majik.Core.CardData.Factories;
 ///     beginning of the next end step. Registered on the supplied
 ///     <see cref="TriggerManager"/> when one is wired.
 ///
+/// ## Ability projection (the Splinter Twin combo)
+///
+/// CR 706.2 — when a token enters as a copy of a creature, the token
+/// copies the original's copiable values INCLUDING its current
+/// abilities (printed + granted). For Splinter Twin this is the
+/// printed combo: the bearer's granted "{T}: create token copy"
+/// ability is itself copyable, so the spawned token inherits its own
+/// "{T}: create another token copy" ability — when paired with a
+/// self-untap creature (Pestermite, Deceiver Exarch) this produces an
+/// arbitrarily-large chain of haste tokens (the famous Twin combo).
+///
+/// Implementation: the token-creation closure, after spawning the
+/// token, calls the same <see cref="BuildGrantedAbility"/> builder
+/// with the token as the new bearer and attaches the resulting
+/// <see cref="ActivatedAbility"/> directly to the token's
+/// <see cref="Card.Abilities"/> collection. The token's grant is NOT
+/// tied to the aura's lifecycle — it's a copied ability that sits on
+/// the token permanently (CR 706.2 — copiable values are fixed at the
+/// moment the copy is created); the aura LTB only revokes the
+/// bearer's grant, not the tokens'.
+///
 /// ## Deferred (v1 gaps)
 ///
 /// - <b>Layer 1 copy effect</b>: the token's P/T + keywords are
@@ -55,12 +76,6 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="CopyEffect"/> v1 lossiness; a future revision can
 ///   register a live <see cref="CopyEffect"/> via the
 ///   <see cref="ContinuousEffectsService"/> overload.
-/// - <b>Real "create a token that's a copy" pipeline</b>: the
-///   <see cref="TokenFactory"/> token returns a fresh Creature with
-///   snapshotted characteristics. The "is a copy" relationship (CR
-///   706.2 copiable values incl. mana cost, colours, abilities-other-
-///   than-keywords) is approximated to the engine's existing copy
-///   primitive.
 /// - <b>Cast-time targeting + auto-attach</b>: covered by
 ///   <see cref="AuraSpellDefinitionBuilder.ForAuraFromOracle"/> on the
 ///   <see cref="BuildSpellDefinition"/> path, identical shape to
@@ -203,6 +218,27 @@ public static class SplinterTwinFactory
                 // tests observe the token as attack-ready immediately
                 // (CR 702.10b).
                 token.HasSummoningSickness = false;
+
+                // CR 706.2 — copy fidelity for granted abilities. The
+                // token is a copy of the bearer, so it inherits the
+                // bearer's currently-granted "{T}: create token copy"
+                // ability as part of its own copiable values. Build a
+                // fresh activation bound to the token (cost taps the
+                // token, effect closes over the token as "original"
+                // for the next copy) and attach it directly — the
+                // grant on the token is divorced from the aura's
+                // lifecycle binder (a token's copied abilities persist
+                // independently per CR 706.2 / 707.2). When the token
+                // activates, the chain perpetuates: it spawns its own
+                // token, which inherits the same ability, and so on.
+                var tokenAbility = BuildGrantedAbility(
+                    aura,
+                    token,
+                    controller,
+                    zones,
+                    triggers,
+                    eventBus);
+                token.AddAbility(tokenAbility);
 
                 // CR 603.7 — delayed end-step trigger to exile the token.
                 // Bound at activation time so the closure captures the

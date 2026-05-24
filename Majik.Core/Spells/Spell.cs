@@ -81,6 +81,24 @@ public class Spell : ISpell
     /// </summary>
     public bool WasCastForEscape { get; set; }
 
+    /// <summary>
+    /// CR 702.33b — "kicked" runtime sentinel on the resolving spell.
+    /// Stamped <c>true</c> by <see cref="Majik.Core.Game.SpellCastFlow"/>
+    /// when the cast layered a paid
+    /// <see cref="Majik.Core.Costs.KickerAdditionalCost"/>. Read by
+    /// downstream rules / triggers that branch on the kicker decision
+    /// (Burst Lightning's deals-4-instead-of-2 toggle is the canonical
+    /// consumer; future kicker-bearing factories that key triggers on
+    /// "if [spell] was kicked" read off the resolving spell).
+    /// <see cref="Majik.Core.Cards.Card.WasKicked"/> mirrors the flag
+    /// on the underlying card for resolve-body reads that don't have
+    /// the spell reference handy.
+    ///
+    /// Defaults to <c>false</c> so hand-built test spells without an
+    /// explicit stamp are treated as non-kicked casts.
+    /// </summary>
+    public bool WasKicked { get; set; }
+
     public Spell(ICard card, Player controller, IEnumerable<ITarget>? targets = null, IEnumerable<ICost>? costs = null, IEnumerable<IEffect>? effects = null)
     {
         if (card == null)
