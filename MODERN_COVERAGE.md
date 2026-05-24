@@ -11,9 +11,9 @@ Living tracker for Modern-format card + mechanic implementation in the Majik eng
 
 | Metric | Count |
 |---|---|
-| Named factories | 294 |
-| Named factories | 294 |
-| Named factories | 294 |
+| Named factories | 296 |
+| Named factories | 296 |
+| Named factories | 296 |
 | Bespoke templates | 28 |
 | Generic templates | 94 |
 | JSON-defined cards | 18 |
@@ -465,6 +465,12 @@ Per-keyword action helpers under `Majik.Core/Keywords/`:
 | Hand-reveal events | Done | #164 |
 | Per-viewer event masking (CR 706) | Done | #168, #169 |
 | Delayed triggered abilities | Done | `Abilities/` (used by Mishra's Bauble) |
+
+### Infra / build
+
+| Surface | Status | File |
+|---|---|---|
+| `NamedCardFactory` source-gen dispatch | Done | `Majik.Core.SourceGen/NamedCardFactoryGenerator.cs` — Roslyn `IIncrementalGenerator` scans every `[CardName("...")]`-attributed factory class and emits the dispatch switch into a partial `NamedCardFactory.CreateGenerated(string, Player)` method. Replaces the hand-maintained 296-arm switch (3581 → 97 lines) so adding a card is now "drop a factory file with `[CardName("Foo")]`" — no edits to the shared dispatch file required, eliminating the merge-conflict hotspot. Diagnostics: `MJK001` (duplicate `[CardName]` across factories — error), `MJK002` (factory missing `Create(Player)` overload — error). Generated file lives at `Majik.Core/obj/$(Configuration)/$(TargetFramework)/generated/Majik.Core.SourceGen/…` (EmitCompilerGeneratedFiles=true). |
 
 ## Coverage by archetype
 
