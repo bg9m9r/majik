@@ -11,7 +11,7 @@ using Xunit;
 namespace Majik.Core.Tests.CardData;
 
 /// <summary>
-/// Unit tests for <see cref="SunbakedCanyonFactory"/>.
+/// Unit tests for <see cref="HorizonLandCycleFactory"/>.
 ///
 /// Covers:
 /// - Card identity (name, Land type, non-legendary)
@@ -27,7 +27,7 @@ public class SunbakedCanyonTests
     [Fact]
     public void SunbakedCanyon_IsLand()
     {
-        var land = SunbakedCanyonFactory.Create(_alice);
+        var land = HorizonLandCycleFactory.Create(_alice, new[] { "Sunbaked Canyon", "R", "W" });
 
         land.HasType(CardType.Land).Should().BeTrue();
     }
@@ -35,7 +35,7 @@ public class SunbakedCanyonTests
     [Fact]
     public void SunbakedCanyon_NameIsCorrect()
     {
-        var land = SunbakedCanyonFactory.Create(_alice);
+        var land = HorizonLandCycleFactory.Create(_alice, new[] { "Sunbaked Canyon", "R", "W" });
 
         land.Name.Should().Be("Sunbaked Canyon");
     }
@@ -43,7 +43,7 @@ public class SunbakedCanyonTests
     [Fact]
     public void SunbakedCanyon_OwnerAndControllerAreSet()
     {
-        var land = SunbakedCanyonFactory.Create(_alice);
+        var land = HorizonLandCycleFactory.Create(_alice, new[] { "Sunbaked Canyon", "R", "W" });
 
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
@@ -52,7 +52,7 @@ public class SunbakedCanyonTests
     [Fact]
     public void SunbakedCanyon_HasTwoManaAbilities()
     {
-        var land = SunbakedCanyonFactory.Create(_alice);
+        var land = HorizonLandCycleFactory.Create(_alice, new[] { "Sunbaked Canyon", "R", "W" });
 
         land.Abilities.OfType<ManaAbility>().Should().HaveCount(2,
             "one for {R} and one for {W}");
@@ -61,7 +61,7 @@ public class SunbakedCanyonTests
     [Fact]
     public void SunbakedCanyon_HasRedManaAbility()
     {
-        var land = SunbakedCanyonFactory.Create(_alice);
+        var land = HorizonLandCycleFactory.Create(_alice, new[] { "Sunbaked Canyon", "R", "W" });
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Red == 1 && m.ManaGenerated.White == 0);
@@ -70,7 +70,7 @@ public class SunbakedCanyonTests
     [Fact]
     public void SunbakedCanyon_HasWhiteManaAbility()
     {
-        var land = SunbakedCanyonFactory.Create(_alice);
+        var land = HorizonLandCycleFactory.Create(_alice, new[] { "Sunbaked Canyon", "R", "W" });
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.White == 1 && m.ManaGenerated.Red == 0);
@@ -80,7 +80,7 @@ public class SunbakedCanyonTests
     public void SunbakedCanyon_ManaActivation_ReducesLifeByOne()
     {
         var alice = new Player("Alice", 20);
-        var land = SunbakedCanyonFactory.Create(alice);
+        var land = HorizonLandCycleFactory.Create(alice, new[] { "Sunbaked Canyon", "R", "W" });
         var white = land.Abilities.OfType<ManaAbility>().Single(m => m.ManaGenerated.White == 1);
 
         white.Activate();
@@ -92,7 +92,7 @@ public class SunbakedCanyonTests
     public void SunbakedCanyon_CannotActivateManaAt1Life()
     {
         var alice = new Player("Alice", 1);
-        var land = SunbakedCanyonFactory.Create(alice);
+        var land = HorizonLandCycleFactory.Create(alice, new[] { "Sunbaked Canyon", "R", "W" });
         var red = land.Abilities.OfType<ManaAbility>().Single(m => m.ManaGenerated.Red == 1);
 
         red.CanActivate().Should().BeFalse(
@@ -102,7 +102,7 @@ public class SunbakedCanyonTests
     [Fact]
     public void SunbakedCanyon_SacDrawAbility_HasThreeCosts()
     {
-        var land = SunbakedCanyonFactory.Create(_alice);
+        var land = HorizonLandCycleFactory.Create(_alice, new[] { "Sunbaked Canyon", "R", "W" });
         var ability = land.Abilities.OfType<ActivatedAbility>().Single();
 
         ability.Costs.Should().HaveCount(3, "{1} + tap + sacrifice");
@@ -116,7 +116,7 @@ public class SunbakedCanyonTests
         alice.Zones.Library.AddCard(top);
         top.SetZone(ZoneType.Library);
 
-        var land = SunbakedCanyonFactory.Create(alice);
+        var land = HorizonLandCycleFactory.Create(alice, new[] { "Sunbaked Canyon", "R", "W" });
         var ability = land.Abilities.OfType<ActivatedAbility>().Single();
         foreach (var effect in ability.Effects) effect.Execute();
 
