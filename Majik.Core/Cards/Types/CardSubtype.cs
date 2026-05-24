@@ -118,6 +118,9 @@ public enum CardSubtype
     /// <summary>Vampire creature subtype — Bloodghast (Zendikar), Vampire Nighthawk,
     /// Olivia Voldaren. CR 205.3m.</summary>
     Vampire,
+    /// <summary>Wolf creature subtype — Young Wolf (Innistrad), Strangleroot Geist,
+    /// Master of the Wild Hunt. CR 205.3m.</summary>
+    Wolf,
 
     // Land subtypes (examples)
     Forest,
