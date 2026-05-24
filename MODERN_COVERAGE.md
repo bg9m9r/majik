@@ -8,6 +8,12 @@
 > totals + the unimplemented backlog are the canonical responsibility of the
 > generated doc (followup: retire the archetype rollups once the auto-report
 > grows archetype tagging).
+>
+> **Ranked binder-promotion backlog:** [`docs/COVERAGE_GAPS_MODERN.md`](docs/COVERAGE_GAPS_MODERN.md)
+> — Unimplemented cards clustered by oracle-text shape so binder/template work
+> can be prioritised by leverage. Regenerate with
+> `dotnet run --project Majik.Console -- coverage-gaps --modern
+> --md-out docs/COVERAGE_GAPS_MODERN.md --json-out docs/coverage-gaps-modern.json`.
 
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 

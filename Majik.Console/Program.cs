@@ -94,6 +94,11 @@ class Program
                 await CoverageReportCommand.RunAsync(args);
                 return;
             }
+            else if (args[0].Equals("coverage-gaps", StringComparison.OrdinalIgnoreCase))
+            {
+                Environment.Exit(await CoverageGapsCommand.RunAsync(args));
+                return;
+            }
             else if (args[0].Equals("coverage", StringComparison.OrdinalIgnoreCase))
             {
                 Environment.Exit(await CoverageCommand.RunAsync(args));
@@ -122,6 +127,7 @@ class Program
         System.Console.WriteLine("  Majik.Console play-triggers [etb|apnap|intervening-if|delayed|all]");
         System.Console.WriteLine("  Majik.Console coverage-report [--format <fmt>] [--dedup-by-name] [--dump-unmatched <path>]");
         System.Console.WriteLine("  Majik.Console coverage [--modern|--legacy|--vintage|--commander|--format <fmt>] [--decklist <path>] [--json-out <path>] [--md-out <path>] [--no-dedup] [--top N]");
+        System.Console.WriteLine("  Majik.Console coverage-gaps [--modern|--legacy|--vintage|--commander|--format <fmt>] [--top N] [--min-cluster K] [--json-out <path>] [--md-out <path>]");
         System.Console.WriteLine("  Majik.Console compile-templates");
         System.Console.WriteLine();
         TriggerPlayground.PrintScenarios();
