@@ -3374,6 +3374,24 @@ public static class NamedCardFactory
             // hate piece. Clears top-20 #11.
             "Roiling Vortex" => RoilingVortexFactory.Create(owner),
 
+            // Creature — Eye {2}{U} 5/5 (AbhorrentOculusFactory). Duskmourn:
+            // House of Horror. "As an additional cost to cast this spell,
+            // exile six cards from your graveyard. Flying. At the beginning
+            // of each opponent's upkeep, manifest dread." Flying KeywordAbility
+            // marker (CR 702.9). Additional cost surfaced via
+            // AbhorrentOculusFactory.BuildExileSixCardsAdditionalCost →
+            // new generic ExileCardsFromGraveyardAdditionalCost (sibling of
+            // Hogaak's ExileCreaturesFromGraveyardAdditionalCost — drops the
+            // creature-type gate so any six cards qualify). Opponent-upkeep
+            // trigger (CR 603.1 / 500.4) wired over StepStartedEvent filtered
+            // to (Upkeep, !controller). Manifest dread (CR 701.59) ships as a
+            // v1 no-op stub — face-down/manifest primitive + agent two-card
+            // look-and-split prompt deferred; see factory xmldoc. Single-arg
+            // dispatcher attaches Flying + the opponent-upkeep trigger to the
+            // card shape without TriggerManager wiring; (owner, triggers)
+            // overload registers for bus-driven firing.
+            "Abhorrent Oculus" => AbhorrentOculusFactory.Create(owner),
+
             // Creature — Human Monk {R} 1/2 (SoulScarMageFactory). Amonkhet.
             // Prowess (CR 702.108) — wired via ProwessFactory.Build when a
             // ContinuousEffectsService is supplied. Damage → -1/-1 counters
