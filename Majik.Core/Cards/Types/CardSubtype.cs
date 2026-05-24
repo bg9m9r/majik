@@ -134,9 +134,13 @@ public enum CardSubtype
     /// <summary>Wolf creature subtype — Young Wolf (Innistrad), Strangleroot Geist,
     /// Master of the Wild Hunt. CR 205.3m.</summary>
     Wolf,
-    /// <summary>Mercenary creature subtype — Stormchaser's Talent's 1/1 U/R Mercenary
-    /// token (Modern Horizons 3) and the Mercadian Masques cycle. CR 205.3m.</summary>
+    /// <summary>Mercenary creature subtype — Slickshot Show-Off (Outlaws of
+    /// Thunder Junction), Stormchaser's Talent's 1/1 U/R Mercenary token
+    /// (Modern Horizons 3), and the Mercadian Masques cycle. CR 205.3m.</summary>
     Mercenary,
+    /// <summary>Jock creature subtype — Slickshot Show-Off (Outlaws of Thunder
+    /// Junction). One of the OTJ "outlaw" character class subtypes. CR 205.3m.</summary>
+    Jock,
     /// <summary>Faerie creature subtype — Sprite Dragon (Ikoria), Spellstutter Sprite,
     /// Bitterblossom tokens. CR 205.3m.</summary>
     Faerie,

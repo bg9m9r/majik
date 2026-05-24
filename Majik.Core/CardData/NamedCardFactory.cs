@@ -742,6 +742,27 @@ public static class NamedCardFactory
             // back to MarkLost() on failure (CR 104.3 / CR 118.3).
             "Slaughter Pact" => SlaughterPactFactory.Create(owner),
 
+            // Creature — Human Mercenary Jock {1}{R} 1/1 (SlickshotShowOffFactory).
+            // Outlaws of Thunder Junction. Flying + Haste keyword markers
+            // (CR 702.9 / 702.10) on a 1/1 body, plus a cast-noncreature
+            // pump triggered ability (CR 603.1) firing on the controller's
+            // own SpellCastEvent for any non-Creature spell — registers a
+            // raw PumpUntilEndOfTurnEffect(+3, 0) on Slickshot's
+            // ActiveEffects per cast (Layer 7c, CR 514.2 EOT cleanup).
+            // Multiple noncreature casts in a single turn stack additively;
+            // Slickshot's own cast doesn't contribute (its SpellCastEvent
+            // fires while the card is a Creature spell on the stack — fails
+            // the noncreature predicate).
+            // Plot {R} (CR 718 — new in OTJ) DEFERRED — needs a sorcery-
+            // speed cast-from-exile-on-a-later-turn alt-cost primitive +
+            // an activated-from-hand "pay {R}, exile with plot marker"
+            // shape; same posture as BurstLightning's deferred Kicker.
+            // The single-arg dispatcher path produces the correct card
+            // shape without trigger-manager or effects wiring. Use the
+            // (owner, eventBus, triggers, effects) overload for fully-wired
+            // behavior.
+            "Slickshot Show-Off" => SlickshotShowOffFactory.Create(owner),
+
             // Instant — {0} (PactOfTheTitanFactory). Future Sight.
             // "Create a 4/4 red Giant creature token.
             //  At the beginning of your next upkeep, pay {4}{R}.
@@ -3204,6 +3225,33 @@ public static class NamedCardFactory
             // card shape without TriggerManager registration; use the
             // (owner, triggers) overload for bus-driven trigger firing.
             "Strangleroot Geist" => StrangleRootGeistFactory.Create(owner),
+
+            // Enchantment — {R} (RoilingVortexFactory). Zendikar Rising.
+            //   "At the beginning of your upkeep, Roiling Vortex deals 1
+            //    damage to each player.
+            //    Whenever a player casts a spell, if no mana was spent to
+            //    cast it, Roiling Vortex deals 3 damage to that player.
+            //    {1}{R}, Sacrifice Roiling Vortex: Roiling Vortex deals 3
+            //    damage to any target.
+            //    Players can't gain life."
+            // Upkeep ping wired via Triggers.OnStepBegin (controller-only
+            // posture without an allPlayersResolver — same convention as
+            // Pernicious Deed / Meathook Massacre). Free-cast trigger
+            // reads the new Spell.WasFreeCast sentinel stamped by
+            // SpellCastFlow when totalCost.IsZero (Cascade / Suspend /
+            // Memnite-style {0} / Force-of-Will-style pitch). {1}{R} +
+            // Sacrifice activated ability deals 3 to any target via
+            // OracleSpellBinder.DealDamage; AdditionalCost.Sacrifice is
+            // the v1 no-op stub (same gap as Relic of Progenitus / Nihil
+            // Spellbomb). "Players can't gain life" registers a
+            // LifeGainIntent replacement on the supplied
+            // ReplacementBus that rewrites every gain to zero; without a
+            // bus the static silently no-ops (mirrors Valakut's
+            // single-arg posture). Use the
+            // (owner, triggers, replacements, allPlayersResolver)
+            // overload for fully-wired behaviour. Modern Burn sideboard
+            // hate piece. Clears top-20 #11.
+            "Roiling Vortex" => RoilingVortexFactory.Create(owner),
 
             // Creature — Human Monk {R} 1/2 (SoulScarMageFactory). Amonkhet.
             // Prowess (CR 702.108) — wired via ProwessFactory.Build when a
