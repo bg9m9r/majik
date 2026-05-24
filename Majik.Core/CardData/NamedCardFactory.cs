@@ -2868,6 +2868,27 @@ public static class NamedCardFactory
             // yet (same gap as Wrath of God / Day of Judgment).
             "Terminate" => TerminateFactory.Create(owner),
 
+            // Instant — {U}{R} (IzzetCharmFactory). Return to Ravnica.
+            // CR 700.2d — modal "Choose one —" with 3 printed modes:
+            // (0) counter noncreature spell unless pay {2} (v1 auto-resolve),
+            // (1) deal 2 damage to any target,
+            // (2) draw two cards, then discard two cards (v1 deterministic
+            // last-two-in-hand). Card shape only here; the bound
+            // SpellDefinition is built on demand via
+            // IzzetCharmFactory.BuildDefinition(caster, targetResolver,
+            // allPlayers, stack).
+            "Izzet Charm" => IzzetCharmFactory.Create(owner),
+
+            // Creature — Human Wizard {1}{U}{R} 0/3 (IzzetStaticasterFactory).
+            // Return to Ravnica. Flash keyword wired. Activated ability {T}:
+            // 1 damage to target creature and each other creature with the
+            // same name as that creature. The single-arg dispatcher path
+            // produces the correct card shape (Flash + tap-ping ability);
+            // the name-sweep body no-ops without an allCreaturesResolver.
+            // Use IzzetStaticasterFactory.Create(owner, allCreaturesResolver)
+            // for fully-wired same-name sweep.
+            "Izzet Staticaster" => IzzetStaticasterFactory.Create(owner),
+
             // Instant — {1}{B}{R} (KolaghansCommandFactory). Dragons of Tarkir.
             // CR 700.2e — modal "Choose two —" with 4 printed modes
             // (return creature from graveyard to hand / 2 damage to any target /
