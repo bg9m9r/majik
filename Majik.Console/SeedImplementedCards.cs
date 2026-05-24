@@ -1057,5 +1057,12 @@ public static class SeedImplementedCards
         // Persist (CR 702.78) — returns to battlefield with a -1/-1 counter when
         // it dies without a -1/-1 counter on it.
         "Kitchen Finks",
+        // Instant — {1}{U} (RemandFactory). Ravnica: City of Guilds.
+        // Counter target spell; return it to its owner's hand instead of
+        // graveyard; draw a card.
+        "Remand",
+        // Instant — {1}{U} (ManaLeakFactory). Stronghold / many reprints.
+        // Counter target spell unless its controller pays {3}.
+        "Mana Leak",
     };
 }
