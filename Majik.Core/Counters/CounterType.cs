@@ -64,4 +64,15 @@ public sealed record CounterType(string Name)
     /// in the ETB effect — the on-card counter is bookkeeping only.
     /// </summary>
     public static readonly CounterType Energy = new("Energy");
+
+    /// <summary>
+    /// CR 122 — Stasis counters. Card-specific marker used by Static Prison
+    /// (Modern Horizons 3). Static Prison's ETB places one stasis counter
+    /// for each energy the controller has after gaining {E}{E}; while
+    /// Static Prison has at least one stasis counter on it, "Permanents
+    /// enter tapped" (CR 614.1c). Each upkeep removes one stasis counter
+    /// — when it hits zero, the global tap-replacement automatically
+    /// deactivates (the gate consults the live count).
+    /// </summary>
+    public static readonly CounterType Stasis = new("Stasis");
 }
