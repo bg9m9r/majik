@@ -34,6 +34,12 @@ public class Permanent : Card
     /// Set via <see cref="AttachSagaState"/>.</summary>
     public Majik.Core.CardData.Sagas.SagaState? SagaState { get; internal set; }
 
+    /// <summary>Optional Class-enchantment leveling tracker (CR 716).
+    /// Set via <see cref="AttachClassState"/>; consulted by per-level
+    /// activated / triggered abilities to gate on
+    /// <see cref="Majik.Core.CardData.Classes.ClassState.CurrentLevel"/>.</summary>
+    public Majik.Core.CardData.Classes.ClassState? ClassState { get; internal set; }
+
     /// <summary>Mark this permanent as a token (CR 111). Tokens are
     /// removed off-battlefield by SBA 704.5d.</summary>
     public void MarkAsToken() => IsToken = true;
@@ -72,6 +78,13 @@ public class Permanent : Card
     {
         ArgumentNullException.ThrowIfNull(state);
         SagaState = state;
+    }
+
+    /// <summary>Attach a Class-leveling tracker (CR 716) to this permanent.</summary>
+    public void AttachClassState(Majik.Core.CardData.Classes.ClassState state)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        ClassState = state;
     }
 
     /// <summary>

@@ -1,17 +1,17 @@
 {
-  "generated_utc": "2026-05-24T19:31:22.4918508Z",
-  "scanned_dir": "/home/brett/Projects/majik.project/majik.core/.claude/worktrees/agent-afd16e016f7f13b7f/Majik.Core/CardData/Factories",
-  "total_mentions": 174,
+  "generated_utc": "2026-05-24T20:00:20.6549811Z",
+  "scanned_dir": "/home/brett/Projects/majik.project/majik.core/.claude/worktrees/agent-a21d91a6a2dc0e618/Majik.Core/CardData/Factories",
+  "total_mentions": 172,
   "distinct_factories": 123,
-  "cluster_count": 12,
-  "unclustered_count": 122,
+  "cluster_count": 11,
+  "unclustered_count": 121,
   "clusters": [
     {
       "primitive_id": "agent-prompt-targeting",
       "display_name": "Agent-prompt targeting MVP",
       "implementation_hint": "IPlayerAgent needs ChooseTarget / ChooseYesNo surfaces; many spell factories punt on real targeting prompts.",
-      "factory_count": 25,
-      "mention_count": 32,
+      "factory_count": 26,
+      "mention_count": 33,
       "factories": [
         "AetherVialFactory",
         "AgathasSoulCauldronFactory",
@@ -33,6 +33,7 @@
         "RelicOfProgenitusFactory",
         "SilvergillAdeptFactory",
         "SkyclaveApparitionFactory",
+        "StormchasersTalentFactory",
         "SunTitanFactory",
         "SwordOfFeastAndFamineFactory",
         "TerritorialKavuFactory",
@@ -40,6 +41,12 @@
         "YawgmothFactory"
       ],
       "mentions": [
+        {
+          "factory": "StormchasersTalentFactory",
+          "file": "StormchasersTalentFactory.cs",
+          "line": 16,
+          "sentence": "Real agent-driven any-target prompt (creature / planeswalker / battle / player) is deferred behind the broader prompt surface \u2014 same posture as Lightning Bolt."
+        },
         {
           "factory": "NihilSpellbombFactory",
           "file": "NihilSpellbombFactory.cs",
@@ -349,31 +356,6 @@
       ]
     },
     {
-      "primitive_id": "class-leveling",
-      "display_name": "Class leveling (CR 716)",
-      "comp_rules_citation": "CR 716",
-      "implementation_hint": "Class enchantment level-up cost \u002B per-level static/triggered ability accretion.",
-      "factory_count": 1,
-      "mention_count": 2,
-      "factories": [
-        "StormchasersTalentFactory"
-      ],
-      "mentions": [
-        {
-          "factory": "StormchasersTalentFactory",
-          "file": "StormchasersTalentFactory.cs",
-          "line": 12,
-          "sentence": "\u003Cb\u003ELevel 2 cast-trigger\u003C/b\u003E (\u0022Whenever you cast a noncreature spell, the Mercenary deals 1 damage to any target\u0022): DEFERRED with the leveling primitive."
-        },
-        {
-          "factory": "StormchasersTalentFactory",
-          "file": "StormchasersTalentFactory.cs",
-          "line": 12,
-          "sentence": "\u003Cb\u003ELevel 3 cast-trigger\u003C/b\u003E (\u0022Whenever you cast a noncreature spell, draw a card, then discard a card\u0022): DEFERRED with the leveling primitive."
-        }
-      ]
-    },
-    {
       "primitive_id": "manifest-dread",
       "display_name": "Manifest dread (CR 701.59)",
       "comp_rules_citation": "CR 701.59",
@@ -543,25 +525,19 @@
     {
       "factory": "StormchasersTalentFactory",
       "file": "StormchasersTalentFactory.cs",
-      "line": 12,
-      "sentence": "Blockers: (1) no per-activated-ability sorcery-speed gate yet (same gap as Tasigur, the Golden Fang\u0027s {B}{G}{U} activation, Wishclaw Talisman\u0027s tutor, Priest of Fell Rites\u0027 reanimate); (2) no Class-level tracker bound to the card via a binder analogous to \u003Csee cref=\u0022CardData."
+      "line": 16,
+      "sentence": "\u003Cb\u003EProwess pump on the Mercenary token\u003C/b\u003E: still keyword-marker-only (same gap as Cori-Steel Cutter / Monastery Mentor \u2014 TokenFactory doesn\u0027t thread ContinuousEffectsService for token-resident keywords yet)."
     },
     {
       "factory": "StormchasersTalentFactory",
       "file": "StormchasersTalentFactory.cs",
-      "line": 12,
-      "sentence": "Same v1 gap as \u003Csee cref=\u0022MonasteryMentorFactory\u0022/\u003E\u0027s spawned Monk tokens (see that factory\u0027s xmldoc for the broader plan)."
+      "line": 159,
+      "sentence": "Prowess pump on token deferred \u2014 keyword marker only, see class xmldoc."
     },
     {
       "factory": "StormchasersTalentFactory",
       "file": "StormchasersTalentFactory.cs",
-      "line": 115,
-      "sentence": "\u0022 Prowess pump on token deferred \u2014 keyword marker only, see class xmldoc."
-    },
-    {
-      "factory": "StormchasersTalentFactory",
-      "file": "StormchasersTalentFactory.cs",
-      "line": 139,
+      "line": 319,
       "sentence": "Colors\u0022/\u003E; Prowess pump on the token deferred (see class xmldoc)."
     },
     {
