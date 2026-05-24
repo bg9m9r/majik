@@ -1,10 +1,14 @@
 using Majik.Core.Abilities;
+using Majik.Core.CardData.Adventures;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Domain.DomainEvents;
 using Majik.Core.Events;
+using Majik.Core.Game;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
 using Majik.Core.Targeting;
+using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
@@ -38,31 +42,32 @@ namespace Majik.Core.CardData.Factories;
 ///   damage to a player is life loss for SBA + frontend purposes (CR
 ///   120.3 — damage dealt to a player causes that player to lose that
 ///   much life).
+/// - <b>Adventure cast pipeline (CR 715)</b>: the Stomp half is attached
+///   as an <see cref="AdventureSpec"/> on the card. The cast flow
+///   (<see cref="Costs.AdventureAlternativeCost"/> + <see cref="SpellCastFlow"/>)
+///   routes Stomp through the standard Rule 601 sequence with the
+///   Adventure mana cost, exiles the card on resolve (CR 715.3d), and
+///   grants the owner a runtime "may cast from exile" permission for the
+///   printed Bonecrusher Giant cost via <see cref="Card.GrantRuntimeExileCast"/>
+///   — same probe surface Ragavan / Cascade use, so casting the creature
+///   side from Adventure-exile reuses the existing
+///   <see cref="Costs.ExileCastAlternativeCost"/> path.
 ///
 /// ## Deferred (v1 gaps)
-/// - <b>Adventure cast-from-exile (CR 715)</b>: the Stomp half is not
-///   shipped. Adventures require:
-///     1. A split-card / dual-faced data model where casting the Adventure
-///        face exiles the card if it resolves instead of going to the
-///        graveyard (CR 715.2),
-///     2. An alternative-cost / cast-from-exile rule that lets the owner
-///        cast Bonecrusher Giant from exile until it leaves exile (CR
-///        715.3),
-///     3. A "damage can't be prevented this turn" replacement-effect
-///        global flag.
-///   `Majik.Core/CardData/Adventures/` has an `AdventureState.cs` stub but
-///   no cast pipeline yet — once that pipeline exists, the Stomp instant
-///   side can be added without disturbing this factory.
-/// - <b>Live wiring against <see cref="Majik.Core.Services.SpellCaster"/></b>:
-///   the trigger registers with a passed-in <see cref="TriggerManager"/>
-///   when the live overload is used. Production cast paths publish
-///   <see cref="TargetsChosenEvent"/> from <see cref="Majik.Core.Services.SpellCaster"/>,
-///   so the trigger surfaces as pending automatically. The single-arg
-///   factory attaches the ability for shape tests; the trigger only fires
-///   when an event bus is involved.
+/// - <b>"Damage can't be prevented this turn"</b> global flag from
+///   Stomp's first sentence — prevention infra is not modelled yet; the
+///   2-damage payload still resolves unconditionally because no
+///   prevention shields exist for non-combat damage in v1.
 /// </summary>
 public static class BonecrusherGiantFactory
 {
+    public const string CardName = "Bonecrusher Giant";
+    public const string PrintedManaCost = "{2}{R}";
+
+    public const string AdventureName = "Stomp";
+    public const string AdventureManaCost = "{1}{R}";
+    public const int StompDamage = 2;
+
     /// <summary>
     /// Construct Bonecrusher Giant with no live event-bus / trigger-manager
     /// wiring. The targeted-by-spell trigger is attached to the card so
@@ -86,8 +91,8 @@ public static class BonecrusherGiantFactory
         ArgumentNullException.ThrowIfNull(owner);
 
         var card = new Creature(
-            name: "Bonecrusher Giant",
-            manaCost: "{2}{R}",
+            name: CardName,
+            manaCost: PrintedManaCost,
             power: 4,
             toughness: 3,
             subtypes: new[] { CardSubtype.Giant });
@@ -99,34 +104,17 @@ public static class BonecrusherGiantFactory
         // Targeted-by-spell trigger — CR 603.6c, 115.6.
         //   "Whenever Bonecrusher Giant becomes the target of a spell,
         //    Bonecrusher Giant deals 2 damage to that spell's controller."
-        //
-        // Fires on TargetsChosenEvent where:
-        //   - the stack object is a spell (Spells.ISpell), AND
-        //   - one of the chosen targets references this Bonecrusher Giant
-        //     (TargetType.Permanent or TargetType.Card, since spells may
-        //     target either).
-        //
-        // The trigger resolves by dealing 2 damage to the spell's
-        // controller — which we model as a DamageDealtEvent + LoseLife,
-        // matching the pattern used by other non-combat ping cards.
         // ----------------------------------------------------------------
 
-        // Capture spell controller at trigger-evaluation time. We need the
-        // *spell's* controller (not the target's) so that targeting your
-        // own Bonecrusher with your own spell deals 2 to you.
         Player? capturedSpellController = null;
 
         var condition = new EventTriggerCondition<TargetsChosenEvent>((e, _) =>
         {
-            // Only spells trigger this — not activated/triggered abilities
-            // that target. CR 115.6 specifies "becomes the target of a
-            // spell".
             if (e.StackObject is not Majik.Core.Spells.ISpell spell)
             {
                 return false;
             }
 
-            // Is this Bonecrusher Giant in the chosen-target list?
             var matched = e.Targets.Any(t =>
                 (t.TargetType == TargetType.Permanent || t.TargetType == TargetType.Card)
                 && t is Target concrete
@@ -151,7 +139,6 @@ public static class BonecrusherGiantFactory
                     return;
                 }
 
-                // CR 119.2c — non-combat damage from a triggered ability.
                 eventBus?.Publish(new DamageDealtEvent(
                     sourceCard: card,
                     sourcePlayer: null,
@@ -160,16 +147,8 @@ public static class BonecrusherGiantFactory
                     amount: 2,
                     damageType: DamageType.Ability));
 
-                // CR 120.3 — damage dealt to a player causes that player to
-                // lose that much life. We bypass any prevention rider
-                // (Bonecrusher Giant's Adventure half says "damage can't be
-                // prevented", but the creature side itself has no
-                // prevention rider — prevention infra is also deferred, so
-                // damage goes through unconditionally for now).
                 target.LoseLife(2);
 
-                // Clear the captured reference so a future fire doesn't
-                // accidentally reuse stale state.
                 capturedSpellController = null;
             });
 
@@ -182,10 +161,83 @@ public static class BonecrusherGiantFactory
 
         card.AddAbility(trigger);
 
-        // Live registration with TriggerManager so the bus actually
-        // surfaces the trigger as pending when a spell targets this card.
         triggers?.RegisterTriggeredAbility(trigger);
 
+        // CR 715 — attach the Stomp Adventure half. Detached from the cast
+        // pipeline plumbing — the AdventureSpec only carries the
+        // alternative characteristics + an effects-factory closure; cast
+        // path is driven by AdventureAlternativeCost + SpellCastFlow.
+        card.AdventureSpec = new AdventureSpec(
+            Name: AdventureName,
+            ManaCost: ManaCost.Parse(AdventureManaCost),
+            AdventureType: CardType.Instant,
+            BuildDefinition: BuildAdventureSpell);
+
         return card;
+    }
+
+    /// <summary>
+    /// Build the standalone Stomp <see cref="SpellDefinition"/> — a single
+    /// 1..1 "any target" target request whose resolve effect deals 2
+    /// damage to the chosen target (creature, planeswalker, or player).
+    /// The caller resolves the chosen target through
+    /// <paramref name="targetResolver"/>.
+    /// </summary>
+    /// <param name="caster">The controller of Stomp — unused at resolve
+    /// time but kept for API symmetry with the other Adventure factories
+    /// (Swift End needs it for "you lose 2 life").</param>
+    /// <param name="targetResolver">Resolves the raw target token to a
+    /// live engine object (typically a <see cref="Permanent"/> or
+    /// <see cref="Player"/>).</param>
+    public static SpellDefinition BuildAdventureSpell(
+        Player caster,
+        Func<object, object> targetResolver)
+    {
+        ArgumentNullException.ThrowIfNull(caster);
+        ArgumentNullException.ThrowIfNull(targetResolver);
+
+        return new SpellDefinition(
+            Modes: Array.Empty<string>(),
+            HasVariableX: false,
+            TargetRequests: new[]
+            {
+                new TargetRequest(
+                    "any target",
+                    MinTargets: 1,
+                    MaxTargets: 1,
+                    LegalCandidates: Array.Empty<object>(),
+                    Intent: BotIntent.Removal),
+            },
+            EffectFactory: p =>
+            {
+                var raw = p.Targets[0][0];
+                var resolved = targetResolver(raw);
+                return new IEffect[]
+                {
+                    new Effect("Stomp: deal 2 damage to any target", () =>
+                    {
+                        // CR 119.2 — damage from an instant. Damage to a
+                        // creature → TakeDamage (lethal SBA picks up).
+                        // Damage to a player → LoseLife (Bonecrusher's own
+                        // pattern — engine has no separate "deal damage
+                        // to a player" outside combat in v1).
+                        switch (resolved)
+                        {
+                            case Creature creature:
+                                creature.TakeDamage(StompDamage);
+                                break;
+                            case Player player:
+                                player.LoseLife(StompDamage);
+                                break;
+                            case Planeswalker pw:
+                                // CR 120.3c — non-combat damage to a
+                                // planeswalker is removal of that many
+                                // loyalty counters.
+                                pw.RemoveLoyalty(StompDamage);
+                                break;
+                        }
+                    }),
+                };
+            });
     }
 }

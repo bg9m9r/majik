@@ -1,9 +1,11 @@
 using Majik.Core.Abilities;
+using Majik.Core.CardData.Adventures;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
+using Majik.Core.ValueObjects;
 
 namespace Majik.Core.CardData.Factories;
 
@@ -28,19 +30,17 @@ namespace Majik.Core.CardData.Factories;
 ///   even though the engine has no Adventure cast pipeline yet (see
 ///   Deferred).
 ///
+/// - <b>Adventure cast pipeline (CR 715)</b>: the Battle Display half is
+///   attached as an <see cref="AdventureSpec"/> on the card. The cast flow
+///   (<see cref="Costs.AdventureAlternativeCost"/> + <see cref="SpellCastFlow"/>)
+///   routes Battle Display through the standard Rule 601 sequence with
+///   the Adventure mana cost (sorcery-speed gated — Battle Display is a
+///   Sorcery), exiles the card on resolve (CR 715.3d), and grants the
+///   owner a runtime "may cast from exile" permission for the printed
+///   Embereth Shieldbreaker cost via
+///   <see cref="Card.GrantRuntimeExileCast"/>.
+///
 /// ## Deferred (v1 gaps)
-/// - <b>Adventure cast-from-hand-to-exile (CR 715)</b>: matches the gap
-///   documented on <see cref="BonecrusherGiantFactory"/> /
-///   <see cref="MurderousRiderFactory"/>. Adventures require:
-///     1. A split-card / dual-faced data model where casting the Adventure
-///        face exiles the card if it resolves instead of going to the
-///        graveyard (CR 715.2),
-///     2. An alternative-cost / cast-from-exile rule that lets the owner
-///        cast Embereth Shieldbreaker from exile until it leaves exile
-///        (CR 715.3).
-///   Until that pipeline exists, callers wanting the Battle Display shape
-///   should invoke <see cref="BuildAdventureSpell"/> directly to obtain a
-///   standalone destroy-target-artifact <see cref="SpellDefinition"/>.
 /// - <b>Indestructible / regeneration riders</b> on the Battle Display
 ///   destroy path — inherited from
 ///   <see cref="OracleSpellBinder.MoveToGraveyard"/>; same gap as
@@ -74,6 +74,13 @@ public static class EmberethShieldbreakerFactory
 
         card.SetOwner(owner);
         card.SetController(owner);
+
+        // CR 715 — Battle Display Adventure attached for the cast pipeline.
+        card.AdventureSpec = new AdventureSpec(
+            Name: AdventureName,
+            ManaCost: ManaCost.Parse(AdventureManaCost),
+            AdventureType: CardType.Sorcery,
+            BuildDefinition: BuildAdventureSpell);
 
         return card;
     }

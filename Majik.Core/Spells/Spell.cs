@@ -42,6 +42,17 @@ public class Spell : ISpell
     /// </summary>
     public Func<object, bool>? TargetLegalityPredicate { get; set; }
 
+    /// <summary>
+    /// CR 608.2 / CR 715.3d — optional override of the post-resolution
+    /// destination zone. Stamped by <see cref="Majik.Core.Game.SpellCastFlow"/>
+    /// from <see cref="Majik.Core.Costs.IAlternativeCost.PostResolutionZone"/>
+    /// when the cast used an alt-cost that re-routes destination (Adventure
+    /// → Exile so a creature card cast as Adventure does not enter the
+    /// battlefield). Read by <see cref="Majik.Core.Services.StackResolver"/>
+    /// in preference to the printed-type default when non-null.
+    /// </summary>
+    public ZoneType? PostResolutionZoneOverride { get; set; }
+
     public Spell(ICard card, Player controller, IEnumerable<ITarget>? targets = null, IEnumerable<ICost>? costs = null, IEnumerable<IEffect>? effects = null)
     {
         if (card == null)
