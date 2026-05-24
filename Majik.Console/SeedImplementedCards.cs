@@ -1218,5 +1218,17 @@ public static class SeedImplementedCards
         // Its controller creates a 3/3 green Beast creature token (CR 111.4).
         // Token colour (green) deferred — same gap as Pact of the Titan.
         "Beast Within",
+
+        // Instant — {R} (LightningBoltFactory). Limited Edition Alpha / many reprints.
+        // "Lightning Bolt deals 3 damage to any target." Single any-target
+        // damage via SearingBlazeFactory.DealDamageWithPlaneswalker (covers
+        // Player / Creature / Planeswalker — CR 119 / CR 306.7).
+        "Lightning Bolt",
+
+        // Sorcery — {B} (ThoughtseizeFactory). Lorwyn / Theros.
+        // "Target player reveals their hand. You choose a nonland card from it.
+        //  That player discards that card. You lose 2 life." v1 deterministic
+        // first-nonland pick; caster loses 2 life unconditionally (CR 119.3).
+        "Thoughtseize",
     };
 }

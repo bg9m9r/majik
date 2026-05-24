@@ -796,6 +796,28 @@ public static class NamedCardFactory
             // so Player / Creature / Planeswalker targets all work.
             "Lightning Helix" => LightningHelixFactory.Create(owner),
 
+            // Instant — {R} (LightningBoltFactory). Limited Edition Alpha /
+            // many reprints. "Lightning Bolt deals 3 damage to any target."
+            // Card shape only here; the resolve-time SpellDefinition is built
+            // on demand via LightningBoltFactory.BuildSpellDefinition(resolver).
+            // Damage routes through SearingBlazeFactory.DealDamageWithPlaneswalker
+            // so Player / Creature / Planeswalker targets all work (CR 119 /
+            // CR 306.7). The simplest burn spell — no kicker, no threshold,
+            // no conditional. Modern burn staple.
+            "Lightning Bolt" => LightningBoltFactory.Create(owner),
+
+            // Sorcery — {B} (ThoughtseizeFactory). Lorwyn / Theros and reprints.
+            // "Target player reveals their hand. You choose a nonland card
+            //  from it. That player discards that card. You lose 2 life."
+            // Card shape only here; the resolve-time SpellDefinition is built
+            // on demand via ThoughtseizeFactory.BuildSpellDefinition(caster,
+            // resolver). v1 deterministically picks the first nonland card from
+            // the target's hand (mirrors GriefFactory's ETB discard body).
+            // Caster loses 2 life unconditionally (CR 119.3) even if no nonland
+            // card was present. Real agent-driven card-pick deferred — same
+            // queue as Connive / Liliana of the Veil / Yawgmoth.
+            "Thoughtseize" => ThoughtseizeFactory.Create(owner),
+
             // Sorcery — {2}{R} (WheelOfFortuneFactory). Limited Edition Alpha /
             // Revised. "Each player discards their hand, then draws seven cards."
             // Card shape only here; the resolve-time effect is built on demand
