@@ -1,4 +1,5 @@
 using Majik.Core.Abilities;
+using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
 using Majik.Core.Keywords;
 using Majik.Core.Players;
@@ -40,22 +41,12 @@ public static class ConsiderFactory
     public const string CardName = "Consider";
     public const string PrintedManaCost = "{U}";
 
-    /// <summary>
-    /// Build a Consider instant owned by <paramref name="owner"/>. Card shape
-    /// only — the resolve effect is built on-demand via
-    /// <see cref="BuildResolveEffect"/> so tests / integrations can plug it
-    /// into a <see cref="Majik.Core.Game.SpellDefinition"/> or pass it
-    /// directly to a <see cref="Majik.Core.Spells.Spell"/>.
-    /// </summary>
-    public static Instant Create(Player owner)
-    {
-        ArgumentNullException.ThrowIfNull(owner);
+    /// <summary>CardDef DSL — card shape only. Surveil-then-draw body
+    /// lives in <see cref="BuildResolveEffect"/>.</summary>
+    public static CardDef Define() => CardDef.Instant(CardName, PrintedManaCost);
 
-        var card = new Instant(CardName, PrintedManaCost);
-        card.SetOwner(owner);
-        card.SetController(owner);
-        return card;
-    }
+    public static Instant Create(Player owner) =>
+        (Instant)CardDefRuntime.Build(Define(), owner);
 
     /// <summary>
     /// Build Consider's resolve effect — surveil 1, then draw a card. Returns

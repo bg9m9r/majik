@@ -1,4 +1,5 @@
 using Majik.Core.Abilities;
+using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Primitives;
@@ -48,20 +49,12 @@ public static class LightningHelixFactory
     public const int DamageAmount = 3;
     public const int LifeGainAmount = 3;
 
-    /// <summary>
-    /// Build a Lightning Helix instant owned by <paramref name="owner"/>.
-    /// Card shape only — see <see cref="BuildSpellDefinition"/> for the
-    /// resolve-time damage + lifegain effect.
-    /// </summary>
-    public static Instant Create(Player owner)
-    {
-        ArgumentNullException.ThrowIfNull(owner);
+    /// <summary>CardDef DSL — card shape only. Damage + lifegain body is
+    /// built via <see cref="BuildSpellDefinition"/>.</summary>
+    public static CardDef Define() => CardDef.Instant(CardName, PrintedManaCost);
 
-        var card = new Instant(CardName, PrintedManaCost);
-        card.SetOwner(owner);
-        card.SetController(owner);
-        return card;
-    }
+    public static Instant Create(Player owner) =>
+        (Instant)CardDefRuntime.Build(Define(), owner);
 
     /// <summary>
     /// Build the <see cref="SpellDefinition"/> used when Lightning Helix is

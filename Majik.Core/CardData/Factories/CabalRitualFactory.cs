@@ -1,4 +1,5 @@
 using Majik.Core.Abilities;
+using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
 using Majik.Core.Players;
 using Majik.Core.ValueObjects;
@@ -64,20 +65,12 @@ public static class CabalRitualFactory
     /// </summary>
     public const string ThresholdManaProduced = "CCCCC";
 
-    /// <summary>
-    /// Build a Cabal Ritual instant owned by <paramref name="owner"/>.
-    /// Card shape only — see <see cref="BuildResolveEffect"/> for the
-    /// resolve-time mana production.
-    /// </summary>
-    public static Instant Create(Player owner)
-    {
-        ArgumentNullException.ThrowIfNull(owner);
+    /// <summary>CardDef DSL — card shape only. Threshold-gated mana
+    /// production lives in <see cref="BuildResolveEffect"/>.</summary>
+    public static CardDef Define() => CardDef.Instant(CardName, PrintedManaCost);
 
-        var card = new Instant(CardName, PrintedManaCost);
-        card.SetOwner(owner);
-        card.SetController(owner);
-        return card;
-    }
+    public static Instant Create(Player owner) =>
+        (Instant)CardDefRuntime.Build(Define(), owner);
 
     /// <summary>
     /// Build Cabal Ritual's resolve effect. On resolution, sample the
