@@ -5,11 +5,11 @@ Scanner output: every `*Factory.cs` xmldoc / inline comment mentioning
 engine primitive. Each row answers: "if we ship primitive _X_, which factory
 xmldocs flagged that they're blocked on it?"
 
-- **Generated:** 2026-05-24 19:31 UTC
+- **Generated:** 2026-05-24 20:16 UTC
 - **Scanned dir:** `Majik.Core/CardData/Factories`
-- **Total mentions:** 174
-- **Clusters:** 12
-- **Unclustered (need new registry pattern):** 122
+- **Total mentions:** 173
+- **Clusters:** 10
+- **Unclustered (need new registry pattern):** 123
 
 Regenerate with `dotnet run --project Majik.Console -- mechanic-deps --md-out docs/MECHANIC_DEPS.md --json-out docs/mechanic-deps.json`.
 
@@ -17,28 +17,28 @@ Regenerate with `dotnet run --project Majik.Console -- mechanic-deps --md-out do
 
 | Rank | Primitive | CR | Factories | Mentions |
 |---:|---|---|---:|---:|
-| 1 | Agent-prompt targeting MVP | — | 25 | 32 |
+| 1 | Agent-prompt targeting MVP | — | 26 | 33 |
 | 2 | Library shuffle (CR 701.20) | CR 701.20 | 4 | 4 |
 | 3 | Layer-6 ability-grant subsystem (CR 613.1f) | CR 613.1f | 2 | 4 |
 | 4 | Kicker alt-cost (CR 702.33) | CR 702.33 | 2 | 2 |
-| 5 | Class leveling (CR 716) | CR 716 | 1 | 2 |
-| 6 | Manifest dread (CR 701.59) | CR 701.59 | 1 | 2 |
-| 7 | Ascend / city's blessing (CR 702.131) | CR 702.131 | 1 | 1 |
-| 8 | Cast-marker on Card | — | 1 | 1 |
-| 9 | Companion (CR 702.139) | CR 702.139 | 1 | 1 |
-| 10 | Equip activated-ability primitive (CR 702.6) | CR 702.6 | 1 | 1 |
-| 11 | Gift (Bloomburrow) | — | 1 | 1 |
-| 12 | "Activate only as a sorcery" gate (CR 117.1a) | CR 117.1a | 1 | 1 |
+| 5 | Manifest dread (CR 701.59) | CR 701.59 | 1 | 2 |
+| 6 | Ascend / city's blessing (CR 702.131) | CR 702.131 | 1 | 1 |
+| 7 | Cast-marker on Card | — | 1 | 1 |
+| 8 | Companion (CR 702.139) | CR 702.139 | 1 | 1 |
+| 9 | Gift (Bloomburrow) | — | 1 | 1 |
+| 10 | "Activate only as a sorcery" gate (CR 117.1a) | CR 117.1a | 1 | 1 |
 
 ## Cluster detail
 
 ### 1. Agent-prompt targeting MVP
 
-- **Blocks:** 25 factories (32 mentions)
+- **Blocks:** 26 factories (33 mentions)
 - **Implementation hint:** IPlayerAgent needs ChooseTarget / ChooseYesNo surfaces; many spell factories punt on real targeting prompts.
 
 Mentions:
 
+- `StormchasersTalentFactory` (`StormchasersTalentFactory.cs:16`)
+  > Real agent-driven any-target prompt (creature / planeswalker / battle / player) is deferred behind the broader prompt surface — same posture as Lightning Bolt.
 - `NihilSpellbombFactory` (`NihilSpellbombFactory.cs:13`)
   > Full agent-prompt targeting deferred.
 - `EsikasChariotFactory` (`EsikasChariotFactory.cs:12`)
@@ -151,20 +151,7 @@ Mentions:
 - `BurstLightningFactory` (`BurstLightningFactory.cs:11`)
   > "  ## Implementation (v1 — kicker primitive deferred)  CR 702.33 — Kicker is an additional cost (not an alternative cost) that modifies the spell's effect when paid.
 
-### 5. Class leveling (CR 716)
-
-- **CR citation:** CR 716
-- **Blocks:** 1 factories (2 mentions)
-- **Implementation hint:** Class enchantment level-up cost + per-level static/triggered ability accretion.
-
-Mentions:
-
-- `StormchasersTalentFactory` (`StormchasersTalentFactory.cs:12`)
-  > <b>Level 2 cast-trigger</b> ("Whenever you cast a noncreature spell, the Mercenary deals 1 damage to any target"): DEFERRED with the leveling primitive.
-- `StormchasersTalentFactory` (`StormchasersTalentFactory.cs:12`)
-  > <b>Level 3 cast-trigger</b> ("Whenever you cast a noncreature spell, draw a card, then discard a card"): DEFERRED with the leveling primitive.
-
-### 6. Manifest dread (CR 701.59)
+### 5. Manifest dread (CR 701.59)
 
 - **CR citation:** CR 701.59
 - **Blocks:** 1 factories (2 mentions)
@@ -177,7 +164,7 @@ Mentions:
 - `AbhorrentOculusFactory` (`AbhorrentOculusFactory.cs:13`)
   > CR rule references: 205.3m (Eye subtype), 601.2f (additional cost), 603.1 / 500.4 (upkeep trigger), 702.9 (Flying), 701.59 (manifest dread — deferred).
 
-### 7. Ascend / city's blessing (CR 702.131)
+### 6. Ascend / city's blessing (CR 702.131)
 
 - **CR citation:** CR 702.131
 - **Blocks:** 1 factories (1 mentions)
@@ -188,7 +175,7 @@ Mentions:
 - `OcelotPrideFactory` (`OcelotPrideFactory.cs:14`)
   > The attack trigger ships with the gate stubbed (always 1 token); the "doubled to 2" half of the printed text is deferred until an Ascend primitive lands.
 
-### 8. Cast-marker on Card
+### 7. Cast-marker on Card
 
 - **Blocks:** 1 factories (1 mentions)
 - **Implementation hint:** Persistent 'this object was cast (vs. put onto the battlefield)' flag — Bloodghast, The One Ring, Pact triggers all key off it.
@@ -198,7 +185,7 @@ Mentions:
 - `TheOneRingFactory` (`TheOneRingFactory.cs:15`)
   > The effect body is a no-op — the "if you cast it" intervening-if clause, the "until your next turn" expiry, and the "protection from everything" player-scoped grant are all deferred (no cast-marker on Card, no per-player delayed cleanup, no Player.
 
-### 9. Companion (CR 702.139)
+### 8. Companion (CR 702.139)
 
 - **CR citation:** CR 702.139
 - **Blocks:** 1 factories (1 mentions)
@@ -209,18 +196,7 @@ Mentions:
 - `LurrusOfTheDreamDenFactory` (`LurrusOfTheDreamDenFactory.cs:12`)
   > ## Companion (DEFERRED) The companion deck-construction rule (CR 702.139 — "Each permanent card in your starting deck has mana value 2 or less") is foundational to the deck-builder, not the runtime, and is intentionally NOT enforced here.
 
-### 10. Equip activated-ability primitive (CR 702.6)
-
-- **CR citation:** CR 702.6
-- **Blocks:** 1 factories (1 mentions)
-- **Implementation hint:** EquipActivatedAbility — sorcery-speed activation, attaches/re-attaches Equipment to a chosen creature.
-
-Mentions:
-
-- `PuresteelPaladinFactory` (`PuresteelPaladinFactory.cs:11`)
-  > ## Deferred (v1 gaps)  - <b>Equip-ability primitive</b>: the engine has no <c>EquipActivatedAbility</c> primitive yet — Equipment cards currently don't model their printed "Equip {N}" activated ability at all (Stoneforge Mystic's activated ability is a separate "put-an-Equipment-from-hand" effect, not an equip activati…
-
-### 11. Gift (Bloomburrow)
+### 9. Gift (Bloomburrow)
 
 - **Blocks:** 1 factories (1 mentions)
 - **Implementation hint:** Cast-time choice: a static/triggered side effect granting an opponent a defined gift (treasure, draw, etc.).
@@ -230,7 +206,7 @@ Mentions:
 - `IntoTheFloodMawFactory` (`IntoTheFloodMawFactory.cs:12`)
   > ## Deferred (v1 gaps) — Gift mechanic (CR 701.59 in the 2024 errata) The "Gift a tapped Fish" clause is a cast-time choice that lets the caster promise an opponent a gift; if promised, the opponent creates a tapped 1/1 blue Fish creature token BEFORE the spell's other effects, and Into the Flood Maw's target predicate …
 
-### 12. "Activate only as a sorcery" gate (CR 117.1a)
+### 10. "Activate only as a sorcery" gate (CR 117.1a)
 
 - **CR citation:** CR 117.1a
 - **Blocks:** 1 factories (1 mentions)
@@ -247,17 +223,17 @@ Mentions:
   > ## Deferred (v1 gaps)  - <b>Layer 1 copy effect</b>: the token's P/T + keywords are snapshotted at the moment the ability resolves; if the bearer's characteristics change later (counters, +1/+1 boost, lord anthems), the token does NOT track them.
 - `ScapeshiftFactory` (`ScapeshiftFactory.cs:10`)
   > ## v1 gaps - <b>"Any number" prompt</b>: the engine has no first-class "pick a subset of permanents to sacrifice" agent hook.
+- `OmnathLocusOfCreationFactory` (`OmnathLocusOfCreationFactory.cs:13`)
+  > <b>Live "each opponent" / "each planeswalker you don't control" enumeration without resolvers</b>: same gap as Sheoldred / Meathook Massacre — <see cref="Player"/> doesn't expose opponent list at construction time.
 - `BridgeFromBelowFactory` (`BridgeFromBelowFactory.cs:12`)
   > ## Deferred (v1 gaps)  - <b>APNAP simultaneous-trigger ordering</b>: when one creature dies to a chained event (combat damage, board wipe), CR 603.3b sorts pending triggers by APNAP and within each player by the player's choice.
 - `TheOneRingFactory` (`TheOneRingFactory.cs:121`)
   > " Structural: "if you cast it" + "until your next turn" expiry deferred — see class xmldoc.
-- `StormchasersTalentFactory` (`StormchasersTalentFactory.cs:12`)
-  > Blockers: (1) no per-activated-ability sorcery-speed gate yet (same gap as Tasigur, the Golden Fang's {B}{G}{U} activation, Wishclaw Talisman's tutor, Priest of Fell Rites' reanimate); (2) no Class-level tracker bound to the card via a binder analogous to <see cref="CardData.
-- `StormchasersTalentFactory` (`StormchasersTalentFactory.cs:12`)
-  > Same v1 gap as <see cref="MonasteryMentorFactory"/>'s spawned Monk tokens (see that factory's xmldoc for the broader plan).
-- `StormchasersTalentFactory` (`StormchasersTalentFactory.cs:115`)
-  > " Prowess pump on token deferred — keyword marker only, see class xmldoc.
-- `StormchasersTalentFactory` (`StormchasersTalentFactory.cs:139`)
+- `StormchasersTalentFactory` (`StormchasersTalentFactory.cs:16`)
+  > <b>Prowess pump on the Mercenary token</b>: still keyword-marker-only (same gap as Cori-Steel Cutter / Monastery Mentor — TokenFactory doesn't thread ContinuousEffectsService for token-resident keywords yet).
+- `StormchasersTalentFactory` (`StormchasersTalentFactory.cs:159`)
+  > Prowess pump on token deferred — keyword marker only, see class xmldoc.
+- `StormchasersTalentFactory` (`StormchasersTalentFactory.cs:319`)
   > Colors"/>; Prowess pump on the token deferred (see class xmldoc).
 - `NihilSpellbombFactory` (`NihilSpellbombFactory.cs:13`)
   > Real prompt deferred until IPlayerAgent grows a ChooseYesNoAsync surface.
@@ -323,6 +299,8 @@ Mentions:
   > " (LTB exile clause deferred — see Deferred section.
 - `MurderousRiderFactory` (`MurderousRiderFactory.cs:12`)
   > Adding this requires the same replacement-effect surface used by the Anger of the Gods exile rider (see <see cref="AngerOfTheGodsFactory"/>); deferred to keep the v1 ship minimal.
+- `PuresteelPaladinFactory` (`PuresteelPaladinFactory.cs:11`)
+  > ## Deferred (v1 gaps)  - <b>"You may" prompt</b>: the ETB-draw effect is unconditional.
 - `GreenSunsZenithFactory` (`GreenSunsZenithFactory.cs:14`)
   > ## Deferred (v1 gaps)  - <b>Replacing the spell's destination via the stack resolver</b>.
 - `PriestOfFellRitesFactory` (`PriestOfFellRitesFactory.cs:12`)

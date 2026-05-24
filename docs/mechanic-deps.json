@@ -1,10 +1,10 @@
 {
-  "generated_utc": "2026-05-24T20:00:20.6549811Z",
-  "scanned_dir": "/home/brett/Projects/majik.project/majik.core/.claude/worktrees/agent-a21d91a6a2dc0e618/Majik.Core/CardData/Factories",
-  "total_mentions": 172,
-  "distinct_factories": 123,
-  "cluster_count": 11,
-  "unclustered_count": 121,
+  "generated_utc": "2026-05-24T20:16:08.1870277Z",
+  "scanned_dir": "/home/brett/Projects/majik.project/majik.core/.claude/worktrees/agent-aab575e131cb44566/Majik.Core/CardData/Factories",
+  "total_mentions": 173,
+  "distinct_factories": 124,
+  "cluster_count": 10,
+  "unclustered_count": 123,
   "clusters": [
     {
       "primitive_id": "agent-prompt-targeting",
@@ -439,25 +439,6 @@
       ]
     },
     {
-      "primitive_id": "equip-primitive",
-      "display_name": "Equip activated-ability primitive (CR 702.6)",
-      "comp_rules_citation": "CR 702.6",
-      "implementation_hint": "EquipActivatedAbility \u2014 sorcery-speed activation, attaches/re-attaches Equipment to a chosen creature.",
-      "factory_count": 1,
-      "mention_count": 1,
-      "factories": [
-        "PuresteelPaladinFactory"
-      ],
-      "mentions": [
-        {
-          "factory": "PuresteelPaladinFactory",
-          "file": "PuresteelPaladinFactory.cs",
-          "line": 11,
-          "sentence": "## Deferred (v1 gaps)  - \u003Cb\u003EEquip-ability primitive\u003C/b\u003E: the engine has no \u003Cc\u003EEquipActivatedAbility\u003C/c\u003E primitive yet \u2014 Equipment cards currently don\u0027t model their printed \u0022Equip {N}\u0022 activated ability at all (Stoneforge Mystic\u0027s activated ability is a separate \u0022put-an-Equipment-from-hand\u0022 effect, not an equip activati\u2026"
-        }
-      ]
-    },
-    {
       "primitive_id": "gift",
       "display_name": "Gift (Bloomburrow)",
       "implementation_hint": "Cast-time choice: a static/triggered side effect granting an opponent a defined gift (treasure, draw, etc.).",
@@ -508,6 +489,12 @@
       "file": "ScapeshiftFactory.cs",
       "line": 10,
       "sentence": "## v1 gaps - \u003Cb\u003E\u0022Any number\u0022 prompt\u003C/b\u003E: the engine has no first-class \u0022pick a subset of permanents to sacrifice\u0022 agent hook."
+    },
+    {
+      "factory": "OmnathLocusOfCreationFactory",
+      "file": "OmnathLocusOfCreationFactory.cs",
+      "line": 13,
+      "sentence": "\u003Cb\u003ELive \u0022each opponent\u0022 / \u0022each planeswalker you don\u0027t control\u0022 enumeration without resolvers\u003C/b\u003E: same gap as Sheoldred / Meathook Massacre \u2014 \u003Csee cref=\u0022Player\u0022/\u003E doesn\u0027t expose opponent list at construction time."
     },
     {
       "factory": "BridgeFromBelowFactory",
@@ -734,6 +721,12 @@
       "file": "MurderousRiderFactory.cs",
       "line": 12,
       "sentence": "Adding this requires the same replacement-effect surface used by the Anger of the Gods exile rider (see \u003Csee cref=\u0022AngerOfTheGodsFactory\u0022/\u003E); deferred to keep the v1 ship minimal."
+    },
+    {
+      "factory": "PuresteelPaladinFactory",
+      "file": "PuresteelPaladinFactory.cs",
+      "line": 11,
+      "sentence": "## Deferred (v1 gaps)  - \u003Cb\u003E\u0022You may\u0022 prompt\u003C/b\u003E: the ETB-draw effect is unconditional."
     },
     {
       "factory": "GreenSunsZenithFactory",

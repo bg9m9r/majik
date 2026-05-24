@@ -249,25 +249,15 @@ public static class SwordOfFeastAndFamineFactory
         // so test/non-bus paths see the grant immediately after a
         // re-equip.
         // ----------------------------------------------------------------
-        var equipEffect = new Effect(
-            $"{CardName}: equip — attach to a creature you control",
-            () =>
+        var equipAbility = new EquipActivatedAbility(
+            source: card,
+            cost: EquipCost,
+            costProvider: PuresteelPaladinFactory.ZeroEquipCostProvider,
+            onAttached: (_, _) =>
             {
-                var bearer = owner.Zones.Battlefield.GetCards()
-                    .OfType<Creature>()
-                    .FirstOrDefault(c => ReferenceEquals(c.Controller, owner));
-                if (bearer == null) return;
-                card.AttachTo(bearer);
                 protBlack.Sync();
                 protGreen.Sync();
             });
-
-        var equipAbility = new ActivatedAbility(
-            source: card,
-            controller: owner,
-            costs: new ICost[] { new ManaCostCost(EquipCost) },
-            effects: new IEffect[] { equipEffect },
-            sorcerySpeed: true);
 
         card.AddAbility(equipAbility);
 

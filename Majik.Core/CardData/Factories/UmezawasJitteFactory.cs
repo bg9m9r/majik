@@ -242,29 +242,13 @@ public static class UmezawasJitteFactory
         card.AddAbility(lifeAbility);
 
         // --------------------------------------------------------------
-        // Equip {2} — activated ability (CR 702.6).
-        //   "{2}: Attach to target creature you control. Activate only
-        //    as a sorcery."
-        // v1 picker: deterministic first controller-side creature.
-        // CR 117.1a / 307.5 sorcery-speed restriction enforced via
-        // ActionValidator (sorcerySpeed: true below).
+        // Equip {2} — activated ability (CR 702.6) via the
+        // EquipActivatedAbility primitive.
         // --------------------------------------------------------------
-        var equipEffect = new Effect(
-            $"{CardName}: equip — attach to a creature you control",
-            () =>
-            {
-                var bearer = owner.Zones.Battlefield.GetCards()
-                    .OfType<Creature>()
-                    .FirstOrDefault(c => ReferenceEquals(c.Controller, owner));
-                if (bearer == null) return;
-                card.AttachTo(bearer);
-            });
-        var equipAbility = new ActivatedAbility(
+        var equipAbility = new EquipActivatedAbility(
             source: card,
-            controller: owner,
-            costs: new ICost[] { new ManaCostCost(EquipCost) },
-            effects: new IEffect[] { equipEffect },
-            sorcerySpeed: true);
+            cost: EquipCost,
+            costProvider: PuresteelPaladinFactory.ZeroEquipCostProvider);
         card.AddAbility(equipAbility);
 
         return card;

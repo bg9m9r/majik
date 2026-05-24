@@ -43,18 +43,17 @@ namespace Majik.Core.CardData.Factories;
 ///   itself is a Creature, not an Artifact, so it never counts toward its
 ///   own threshold). Opponents' artifacts do not count.
 ///
+/// ## Equip-cost integration
+///
+/// The zero-cost override is consumed by
+/// <see cref="EquipActivatedAbility.CostProvider"/> at pay time —
+/// <see cref="ZeroEquipCostProvider"/> is wired as the default
+/// `costProvider` on every equipment factory's Equip ability. Activation
+/// re-reads the registry each pay, so the override turns on and off live
+/// as artifacts enter and leave the controller's battlefield.
+///
 /// ## Deferred (v1 gaps)
 ///
-/// - <b>Equip-ability primitive</b>: the engine has no
-///   <c>EquipActivatedAbility</c> primitive yet — Equipment cards
-///   currently don't model their printed "Equip {N}" activated ability at
-///   all (Stoneforge Mystic's activated ability is a separate
-///   "put-an-Equipment-from-hand" effect, not an equip activation). The
-///   zero-cost override is therefore wired as a query-side registry
-///   (<see cref="ZeroEquipCostEffect.IsZeroEquipActiveFor(Player)"/>);
-///   when an <c>EquipActivatedAbility</c> primitive lands, it should
-///   consult that query at cost-resolution time. The factory and tests
-///   don't change.
 /// - <b>"You may" prompt</b>: the ETB-draw effect is unconditional. A
 ///   future agent prompt should gate the draw behind controller consent.
 /// - <b>Static-ability attachment to <see cref="Card.Abilities"/></b>:
@@ -69,6 +68,34 @@ public static class PuresteelPaladinFactory
 {
     public const string CardName = "Puresteel Paladin";
     public const string Cost = "{1}{W}";
+
+    /// <summary>
+    /// Cost-provider hook for <see cref="EquipActivatedAbility"/>: consults
+    /// the <see cref="ZeroEquipCostEffect"/> registry for the equipment's
+    /// CURRENT controller and substitutes <see cref="ManaCost.Zero"/> when
+    /// any active Puresteel-Paladin-style zero-equip lifecycle owns that
+    /// controller. Otherwise returns the equipment's printed equip cost
+    /// (looked up from the ability the equipment carries).
+    ///
+    /// <para>
+    /// Wired as the default <c>costProvider</c> on every retrofitted
+    /// equipment factory; live game state alone gates whether the
+    /// override applies, so unequipped / Puresteel-less boards see the
+    /// printed cost.
+    /// </para>
+    /// </summary>
+    public static Majik.Core.ValueObjects.ManaCost ZeroEquipCostProvider(Permanent source)
+    {
+        var ctrl = source.Controller ?? source.Owner;
+        var printed = source.Abilities
+            .OfType<EquipActivatedAbility>()
+            .FirstOrDefault()?.EquipCost
+            ?? Majik.Core.ValueObjects.ManaCost.Zero;
+
+        if (ctrl != null && ZeroEquipCostEffect.IsZeroEquipActiveFor(ctrl))
+            return Majik.Core.ValueObjects.ManaCost.Zero;
+        return printed;
+    }
 
     /// <summary>
     /// Construct Puresteel Paladin with no live event-bus / trigger-manager
