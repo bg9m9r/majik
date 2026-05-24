@@ -2017,6 +2017,17 @@ public static class NamedCardFactory
             // fully-wired behavior.
             "Noble Hierarch" => NobleHierarchFactory.Create(owner),
 
+            // Creature — Goblin Shaman {G} 0/1 (IgnobleHierarchFactory).
+            // Modern Horizons 3. Mono-G black/red/green sibling of Noble
+            // Hierarch — same shape (Exalted CR 702.90 + three tap
+            // ManaAbility instances) with mana colours swapped to {B}, {R},
+            // {G} and subtypes swapped to Goblin Shaman. Single-arg
+            // dispatcher path attaches the exalted trigger without
+            // TriggerManager wiring; attackingCreaturesSource is null so the
+            // pump body is a no-op. Use the (owner, triggers,
+            // attackingCreaturesSource) overload for fully-wired behavior.
+            "Ignoble Hierarch" => IgnobleHierarchFactory.Create(owner),
+
             // Creature — Goblin Warrior {2}{R} 2/2 (GoblinRabblemasterFactory).
             // Magic 2015 / many reprints. "Other Goblin creatures you control
             // have haste. Whenever Goblin Rabblemaster attacks, create a 1/1
@@ -3045,6 +3056,19 @@ public static class NamedCardFactory
             // (owner, eventBus, triggers, effects) overload for fully-wired
             // behavior.
             "Monastery Mentor" => MonasteryMentorFactory.Create(owner),
+
+            // Creature — Human Monk {R} 1/2 (MonasterySwiftspearFactory).
+            // Khans of Tarkir + many reprints. Haste (CR 702.10) +
+            // Prowess (CR 702.108) — "Whenever you cast a noncreature
+            // spell, this creature gets +1/+1 until end of turn." Haste +
+            // Prowess KeywordAbility markers always attached for shape
+            // inspection. Prowess mechanic itself wired via
+            // ProwessFactory.Build when a ContinuousEffectsService is
+            // supplied. The single-arg dispatcher path produces the
+            // correct card shape without trigger-manager or effects
+            // wiring. Use the (owner, eventBus, triggers, effects)
+            // overload for fully-wired behavior.
+            "Monastery Swiftspear" => MonasterySwiftspearFactory.Create(owner),
 
             // Instant — {B}{G} (AssassinsTrophyFactory). Guilds of Ravnica.
             // "Destroy target permanent an opponent controls. Its controller
