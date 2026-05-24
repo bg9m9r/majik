@@ -112,6 +112,9 @@ public enum CardSubtype
     /// <summary>Ouphe creature subtype — Kitchen Finks (Shadowmoor / Modern
     /// Horizons 2), Witchstalker. CR 205.3m.</summary>
     Ouphe,
+    /// <summary>Monk creature subtype — Mantis Rider (Khans of Tarkir),
+    /// Monastery Swiftspear. CR 205.3m.</summary>
+    Monk,
 
     // Land subtypes (examples)
     Forest,

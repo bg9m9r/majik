@@ -2694,6 +2694,23 @@ public static class NamedCardFactory
             // via RemandFactory.BuildDefinition(caster, targetResolver, stack).
             "Remand" => RemandFactory.Create(owner),
 
+            // Creature — Human Monk {W}{U}{R} 3/3 (MantisRiderFactory). Khans of Tarkir.
+            // Flying + Vigilance + Haste keyword markers wired (CR 702.9, 702.20, 702.10).
+            // Vanilla three-keyword creature — no activated abilities, triggered
+            // abilities, or static effects. Core Modern Humans piece.
+            "Mantis Rider" => MantisRiderFactory.Create(owner),
+
+            // Creature — Human Wizard {1}{W}{U} 2/3 (ReflectorMageFactory). Oath of the Gatewatch.
+            // ETB triggered ability (CR 603.6a): bounce target creature an opponent controls
+            // to its owner's hand (CR 701.10). CR 608.2b: if target is no longer on
+            // battlefield at resolution, ability does nothing. The single-arg dispatcher
+            // path here produces the correct card shape with the ETB trigger attached
+            // (raw zone-move fallback); use the (owner, zoneService, eventBus, triggers)
+            // overload for full ZoneService routing + TriggerManager wiring. Name-based
+            // cast restriction ("can't cast same-named spells until your next turn") deferred
+            // — no delayed-until-next-turn NamedCastRestriction surface in v1.
+            "Reflector Mage" => ReflectorMageFactory.Create(owner),
+
             // Instant — {1}{U} (ManaLeakFactory). Stronghold / various reprints.
             // "Counter target spell unless its controller pays {3}." Card shape
             // only here; the resolve-time SpellDefinition (counter-unless-pay-{3})
