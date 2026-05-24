@@ -101,6 +101,18 @@ public static class NamedCardFactory
             // "You may put …" opt-out + batched simultaneous-leavers deferred.
             "Dredger's Insight" => DredgersInsightFactory.Create(owner),
 
+            // Sorcery — {1}{G} (MalevolentRumbleFactory). Modern Horizons 3.
+            // Reveal top 4 → first permanent to hand, rest to graveyard,
+            // then create one 0/1 colorless Eldrazi Spawn creature token
+            // ("Sacrifice this token: Add {C}.") via TokenFactory.
+            // Card shape only here; the resolve effect is built on demand
+            // via MalevolentRumbleFactory.BuildResolveEffect. The
+            // data-driven cast path goes through
+            // MalevolentRumblePatternTemplate via OracleSpellBinder; both
+            // bodies stay in sync.
+            // "You may" opt-out + real permanent-choice prompt deferred.
+            "Malevolent Rumble" => MalevolentRumbleFactory.Create(owner),
+
             // Creature — Insect Warrior {1}{G} 3/2 (KraulHarpoonerFactory).
             // Reach keyword wired.
             // ETB Undergrowth: +X/+0 EOT, X = creature cards in controller's graveyard — wired.
