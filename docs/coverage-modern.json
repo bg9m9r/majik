@@ -1,37 +1,37 @@
 {
   "scope": "format=modern, dedup-by-name",
-  "generated_utc": "2026-05-24T19:53:05.4680707Z",
+  "generated_utc": "2026-05-24T20:17:19.1396728Z",
   "total_cards": 21879,
   "total_weight": 21879,
-  "covered_cards": 5994,
-  "covered_percent": 27.4,
-  "weighted_covered": 5994,
-  "weighted_covered_percent": 27.4,
+  "covered_cards": 5998,
+  "covered_percent": 27.41,
+  "weighted_covered": 5998,
+  "weighted_covered_percent": 27.41,
   "frequency_total_weight": 19250,
-  "frequency_weighted_covered": 17180,
-  "frequency_weighted_covered_percent": 89.25,
+  "frequency_weighted_covered": 17770,
+  "frequency_weighted_covered_percent": 92.31,
   "top_meta_covered": 20,
   "top_meta_total": 20,
   "counts_by_tier": {
-    "NamedFactory": 240,
+    "NamedFactory": 244,
     "SpellBound": 3708,
     "KeywordOnly": 1417,
     "Vanilla": 629,
-    "Unimplemented": 15885
+    "Unimplemented": 15881
   },
   "weighted_by_tier": {
-    "NamedFactory": 240,
+    "NamedFactory": 244,
     "SpellBound": 3708,
     "KeywordOnly": 1417,
     "Vanilla": 629,
-    "Unimplemented": 15885
+    "Unimplemented": 15881
   },
   "frequency_weighted_by_tier": {
-    "NamedFactory": 11680,
+    "NamedFactory": 12270,
     "SpellBound": 1470,
     "KeywordOnly": 4030,
     "Vanilla": 0,
-    "Unimplemented": 2070
+    "Unimplemented": 1480
   },
   "top_meta": [
     {
@@ -28871,7 +28871,7 @@
     {
       "name": "Esper Sentinel",
       "type_line": "Artifact Creature \u2014 Human Soldier",
-      "tier": "Unimplemented"
+      "tier": "NamedFactory"
     },
     {
       "name": "Esper Sojourners",
@@ -53291,7 +53291,7 @@
     {
       "name": "Leyline Binding",
       "type_line": "Enchantment",
-      "tier": "Unimplemented"
+      "tier": "NamedFactory"
     },
     {
       "name": "Leyline Immersion",
@@ -65431,7 +65431,7 @@
     {
       "name": "Omnath, Locus of Creation",
       "type_line": "Legendary Creature \u2014 Elemental",
-      "tier": "Unimplemented"
+      "tier": "NamedFactory"
     },
     {
       "name": "Omnath, Locus of Mana",
@@ -98391,7 +98391,7 @@
     {
       "name": "Tormod\u0027s Crypt",
       "type_line": "Artifact",
-      "tier": "Unimplemented"
+      "tier": "NamedFactory"
     },
     {
       "name": "Tormod\u0027s Cryptkeeper",
