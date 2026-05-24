@@ -23,6 +23,7 @@ public class PriorityPolicy
 {
     protected readonly ArchetypeWeights _weights;
     private readonly IBotDecisionSink _sink;
+    private readonly Majik.Core.Diagnostics.VanillaShellTracker? _vanillaTracker;
 
     /// <summary>Tracks activated-ability IDs we've already fired this turn so
     /// the priority pump doesn't infinite-loop on the same activation. Reset
@@ -32,12 +33,19 @@ public class PriorityPolicy
     private Guid? _lastAbilityProposed;
 
     public PriorityPolicy(ArchetypeWeights weights)
-        : this(weights, NullBotDecisionSink.Instance) { }
+        : this(weights, NullBotDecisionSink.Instance, vanillaTracker: null) { }
 
     public PriorityPolicy(ArchetypeWeights weights, IBotDecisionSink sink)
+        : this(weights, sink, vanillaTracker: null) { }
+
+    public PriorityPolicy(
+        ArchetypeWeights weights,
+        IBotDecisionSink sink,
+        Majik.Core.Diagnostics.VanillaShellTracker? vanillaTracker)
     {
         _weights = weights;
         _sink = sink ?? NullBotDecisionSink.Instance;
+        _vanillaTracker = vanillaTracker;
     }
 
     public virtual PriorityAction Pick(GameContext ctx, Player self)
@@ -186,6 +194,17 @@ public class PriorityPolicy
                 var cmc = ApproxCmc(card);
                 if (cmc > manaAvailable) continue;
 
+                // Vanilla-shell graceful degrade: the engine doesn't enforce
+                // this card's rules text, so casting it is mostly a tempo
+                // loss (mana + a card from hand for no observable effect
+                // beyond zone change for permanents). Notice it (one-shot
+                // WARN + bus event) and apply a -CMC EV penalty so the bot
+                // only casts it when nothing better is in hand.
+                if (card.IsVanillaShell)
+                {
+                    _vanillaTracker?.Notice(card, self, "castable-spell enumeration");
+                }
+
                 var projected = current + ProjectCastDelta(card);
                 yield return (new PriorityAction.CastSpell(card, Array.Empty<object>()), projected);
             }
@@ -234,6 +253,25 @@ public class PriorityPolicy
     {
         // Every cast leaves hand → -1 HandSize.
         double delta = -_weights.HandSize;
+
+        // Vanilla-shell graceful degrade (see ICard.IsVanillaShell). The
+        // engine doesn't enforce the printed rules text; casting it is a
+        // mana + card loss for no observable effect beyond a zone change
+        // for permanents. Apply a penalty equal to the CMC so the bot
+        // strongly prefers any implemented alternative — but doesn't
+        // refuse outright (a future per-card EV override can boost the
+        // score for cards with a known good fallback, e.g. a vanilla
+        // creature shell where the body alone is worth casting).
+        //
+        // Vanilla creatures (P/T body is fully enforced) still score
+        // their body via the BoardPower/Toughness terms below; the net
+        // delta is body − cmc, which mirrors "would I pay X mana for an
+        // N/N vanilla?" sanity. Sorceries / instants without an effect
+        // sink below 0 — bot defaults to Pass over casting them.
+        if (card.IsVanillaShell)
+        {
+            delta -= ApproxCmc(card);
+        }
 
         switch (card)
         {

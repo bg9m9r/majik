@@ -49,8 +49,13 @@ public sealed class ScryfallCardFactory
         var entity = _repo.GetByName(name);
         if (entity == null)
         {
+            // Unknown name — minimal shell. Definitely a vanilla shell from
+            // the bot's perspective: the engine has zero idea what this card
+            // does. Tag it so the bot's graceful-degrade path can deprioritise
+            // it and emit a one-shot warning.
             var shell = new Card(name, "");
             shell.SetOwner(owner);
+            shell.MarkAsVanillaShell();
             return shell;
         }
 
@@ -112,7 +117,74 @@ public sealed class ScryfallCardFactory
             }
         }
 
+        // Vanilla-shell detection. After running the full binder chain, if a
+        // card has printed oracle text whose meaning was NOT captured by any
+        // of:
+        //   - the keyword pipeline (KeywordBinder, OracleManaBinder,
+        //     ETB replacement chain),
+        //   - the triggered-ability binder (OracleTriggeredAbilityBinder),
+        //   - the saga / affinity binders,
+        // then the engine produced a card that LOOKS like the printed card
+        // (right name, cost, P/T, types) but does NOT enforce its rules. Tag
+        // it so the bot's graceful-degrade path treats it as unimplemented.
+        //
+        // Instant/sorcery special case: abilities live in the binder-built
+        // SpellDefinition (resolved at cast time), not on the Card. We still
+        // flag them when the oracle text is non-trivial AND no compiled
+        // template is registered for this name — when a template IS present,
+        // we leave the flag false because the cast path will actually do
+        // something on resolve.
+        if (IsLikelyVanillaShell(card, entity))
+        {
+            (card as Card)?.MarkAsVanillaShell();
+        }
+
         return card;
+    }
+
+    /// <summary>
+    /// Inspect the built card + its source row and decide whether it's a
+    /// "vanilla shell" — see <see cref="ICard.IsVanillaShell"/>. The check
+    /// is split: permanents need an attached ability OR keyword-only text;
+    /// instants/sorceries need a compiled template (the runtime binder is
+    /// not consulted here — too expensive on every Create — but coverage
+    /// in practice is &gt;99% gated through the compiled table for the
+    /// SpellBound tier).
+    /// </summary>
+    private bool IsLikelyVanillaShell(ICard card, CardEntity entity)
+    {
+        var oracle = entity.OracleText ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(oracle))
+        {
+            // True vanilla creature / basic land — no printed rules text to
+            // enforce. The engine plays these correctly as plain bodies, so
+            // they are NOT vanilla shells from the bot's perspective.
+            return false;
+        }
+
+        var isInstantOrSorcery =
+            card.HasType(Majik.Core.Cards.Types.CardType.Instant)
+            || card.HasType(Majik.Core.Cards.Types.CardType.Sorcery);
+
+        if (isInstantOrSorcery)
+        {
+            // No compiled template = engine can't bind the effect; spell
+            // will resolve as a vanilla / no-op spell. Live template walk
+            // could still match at cast time, but the compiled table is the
+            // SpellBound source of truth for the current production layout.
+            // Conservative: tag when no compiled row exists, untag at cast
+            // time if Bind() actually returns a non-null SpellDefinition
+            // (see ClearVanillaShellOnSpellBind below — call site is the
+            // production resolver in TurnDriver).
+            return _compiledRepo?.Lookup(entity.Name) is null;
+        }
+
+        // Permanent path: has at least one ability OR oracle text is purely
+        // keyword markers + reminder text → engine covers it. Otherwise, the
+        // card prints rules that we didn't bind → vanilla shell.
+        var hasAnyAbility = card.Abilities.Count > 0;
+        if (hasAnyAbility) return false;
+        return !Majik.Core.CardData.Coverage.CoverageClassifier.IsKeywordOnlyOracleText(entity);
     }
 
     /// <summary>

@@ -22,6 +22,28 @@ public class Card : ICard
     public Guid InstanceId { get; } = Guid.NewGuid();
     public string Name { get; }
     public string ManaCost { get; }
+
+    /// <summary>
+    /// See <see cref="ICard.IsVanillaShell"/>. Stamped by
+    /// <see cref="Majik.Core.CardData.ScryfallCardFactory.Create"/> after
+    /// the binder chain runs, when the card carries printed oracle text
+    /// but the engine produced no abilities to enforce it. Mutated through
+    /// <see cref="MarkAsVanillaShell"/> so the factory has a public seam
+    /// without exposing the setter for general use.
+    /// </summary>
+    public bool IsVanillaShell { get; private set; }
+
+    /// <summary>
+    /// Flip this card to the vanilla-shell state. Called by
+    /// <see cref="Majik.Core.CardData.ScryfallCardFactory.Create"/> once it
+    /// has run the full binder chain and observed that no abilities were
+    /// attached for a card whose oracle text demanded them. Idempotent;
+    /// re-flipping is a no-op.
+    /// </summary>
+    public void MarkAsVanillaShell()
+    {
+        IsVanillaShell = true;
+    }
     
     /// <summary>
     /// The mana cost as a value object.
