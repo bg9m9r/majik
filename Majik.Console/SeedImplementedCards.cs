@@ -381,6 +381,15 @@ public static class SeedImplementedCards
         // chosen name can't be activated unless they're mana abilities
         // (CR 605 / 614 suppression).
         "Pithing Needle",
+        // Creature — Human Cleric {1}{W} 2/2 (ContainmentPriestFactory).
+        // Flash keyword wired. CR 614 replacement: nontoken, non-cast
+        // creatures that would enter the battlefield are exiled instead.
+        // ZoneService ReplacementBus plumbing deferred (structural in v1).
+        "Containment Priest",
+        // Creature — Human Wizard {W}{U} 2/2 (MeddlingMageFactory).
+        // CR 601.3 named-cast block: chosen name registered in
+        // CastingRestrictions; ActionValidator rejects matching casts.
+        "Meddling Mage",
         // Instant — {R} (UnholyHeatFactory).
         // ~ deals 2 damage to any target. Delirium — deals 6 instead if four
         // or more card types among cards in your graveyard.

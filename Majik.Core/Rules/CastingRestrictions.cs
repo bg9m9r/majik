@@ -40,6 +40,10 @@ public static class CastingRestrictions
     // Canonist's cousin). Same (token, player) shape as the sorcery-
     // speed list so multiple sources can stack without trampling.
     private static readonly List<(object Token, Player Player)> _castFromHandOnly = new();
+    // CR 601.3 — "<named card> can't be cast" (Meddling Mage). Stored as
+    // (token, cardName) entries; a name is blocked while at least one entry
+    // targeting it exists.
+    private static readonly List<(object Token, string Name)> _namedCardBlocks = new();
     private static readonly object _gate = new();
 
     /// <summary>
@@ -185,6 +189,67 @@ public static class CastingRestrictions
         }
     }
 
+    /// <summary>
+    /// Register a "spells with the named card's name can't be cast"
+    /// restriction (CR 601.3 — Meddling Mage), keyed by
+    /// <paramref name="token"/>. Idempotent for the same (token, name)
+    /// pair. The name comparison is ordinal-case-insensitive to match
+    /// Scryfall oracle naming conventions.
+    /// </summary>
+    public static void AddNamedCardBlock(object token, string cardName)
+    {
+        ArgumentNullException.ThrowIfNull(token);
+        if (string.IsNullOrEmpty(cardName)) return;
+        lock (_gate)
+        {
+            foreach (var entry in _namedCardBlocks)
+            {
+                if (ReferenceEquals(entry.Token, token)
+                    && string.Equals(entry.Name, cardName,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    return;
+                }
+            }
+            _namedCardBlocks.Add((token, cardName));
+        }
+    }
+
+    /// <summary>
+    /// Remove every named-card block registered under
+    /// <paramref name="token"/>. Used when the Meddling Mage (or similar
+    /// source) leaves the battlefield.
+    /// </summary>
+    public static void RemoveNamedCardBlock(object token)
+    {
+        ArgumentNullException.ThrowIfNull(token);
+        lock (_gate)
+        {
+            _namedCardBlocks.RemoveAll(e => ReferenceEquals(e.Token, token));
+        }
+    }
+
+    /// <summary>
+    /// True if at least one registered block currently prevents casting a
+    /// spell named <paramref name="cardName"/> (CR 601.3).
+    /// </summary>
+    public static bool IsCardNameBlocked(string cardName)
+    {
+        if (string.IsNullOrEmpty(cardName)) return false;
+        lock (_gate)
+        {
+            foreach (var entry in _namedCardBlocks)
+            {
+                if (string.Equals(entry.Name, cardName,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
+
     /// <summary>Reset the registry. Test-only.</summary>
     public static void Clear()
     {
@@ -193,6 +258,7 @@ public static class CastingRestrictions
             _sorcerySpeed.Clear();
             _uncounterableControllers.Clear();
             _castFromHandOnly.Clear();
+            _namedCardBlocks.Clear();
         }
     }
 }
