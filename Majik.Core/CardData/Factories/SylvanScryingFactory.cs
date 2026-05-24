@@ -1,3 +1,4 @@
+using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
 using Majik.Core.CardData.SpellTemplates.Templates.Search;
 using Majik.Core.Game;
@@ -45,21 +46,12 @@ public static class SylvanScryingFactory
     public const string CardName = "Sylvan Scrying";
     public const string PrintedManaCost = "{1}{G}";
 
-    /// <summary>
-    /// Build a Sylvan Scrying sorcery owned by <paramref name="owner"/>.
-    /// Card shape only — the resolve-time spell definition is built on
-    /// demand via <see cref="BuildSpellDefinition"/> so the caster
-    /// reference matches the player resolving the spell.
-    /// </summary>
-    public static Sorcery Create(Player owner)
-    {
-        ArgumentNullException.ThrowIfNull(owner);
+    /// <summary>CardDef DSL — card shape only. Resolve-time tutor body is
+    /// built via <see cref="BuildSpellDefinition"/>.</summary>
+    public static CardDef Define() => CardDef.Sorcery(CardName, PrintedManaCost);
 
-        var card = new Sorcery(CardName, PrintedManaCost);
-        card.SetOwner(owner);
-        card.SetController(owner);
-        return card;
-    }
+    public static Sorcery Create(Player owner) =>
+        (Sorcery)CardDefRuntime.Build(Define(), owner);
 
     /// <summary>
     /// Build the <see cref="SpellDefinition"/> Sylvan Scrying uses on

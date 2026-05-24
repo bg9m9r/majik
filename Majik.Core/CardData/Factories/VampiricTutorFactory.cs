@@ -1,4 +1,5 @@
 using Majik.Core.Abilities;
+using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Game;
@@ -54,21 +55,12 @@ public static class VampiricTutorFactory
     public const string CardName = "Vampiric Tutor";
     public const string PrintedManaCost = "{B}";
 
-    /// <summary>
-    /// Build a Vampiric Tutor instant owned by <paramref name="owner"/>.
-    /// Card shape only — the resolve-time spell definition is built on
-    /// demand via <see cref="BuildSpellDefinition"/> so the caster
-    /// reference matches the player resolving the spell.
-    /// </summary>
-    public static Instant Create(Player owner)
-    {
-        ArgumentNullException.ThrowIfNull(owner);
+    /// <summary>CardDef DSL — card shape only. Tutor + life-loss body
+    /// lives in <see cref="BuildSpellDefinition"/>.</summary>
+    public static CardDef Define() => CardDef.Instant(CardName, PrintedManaCost);
 
-        var card = new Instant(CardName, PrintedManaCost);
-        card.SetOwner(owner);
-        card.SetController(owner);
-        return card;
-    }
+    public static Instant Create(Player owner) =>
+        (Instant)CardDefRuntime.Build(Define(), owner);
 
     /// <summary>
     /// Build the <see cref="SpellDefinition"/> Vampiric Tutor uses on

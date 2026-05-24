@@ -1,4 +1,5 @@
 using Majik.Core.Abilities;
+using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
 using Majik.Core.Keywords;
 using Majik.Core.Players;
@@ -40,20 +41,12 @@ public static class PonderFactory
     public const string CardName = "Ponder";
     public const string PrintedManaCost = "{U}";
 
-    /// <summary>
-    /// Build a Ponder sorcery owned by <paramref name="owner"/>. Card shape
-    /// only — the resolve effect is built on demand via
-    /// <see cref="BuildResolveEffect"/>.
-    /// </summary>
-    public static Sorcery Create(Player owner)
-    {
-        ArgumentNullException.ThrowIfNull(owner);
+    /// <summary>CardDef DSL — card shape only. Resolve effect lives in
+    /// <see cref="BuildResolveEffect"/>.</summary>
+    public static CardDef Define() => CardDef.Sorcery(CardName, PrintedManaCost);
 
-        var card = new Sorcery(CardName, PrintedManaCost);
-        card.SetOwner(owner);
-        card.SetController(owner);
-        return card;
-    }
+    public static Sorcery Create(Player owner) =>
+        (Sorcery)CardDefRuntime.Build(Define(), owner);
 
     /// <summary>
     /// Build Ponder's resolve effect — peek top 3, reorder via the registered

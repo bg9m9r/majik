@@ -1,4 +1,5 @@
 using Majik.Core.Abilities;
+using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Game;
@@ -63,21 +64,14 @@ public static class AbruptDecayFactory
     /// </summary>
     public const string CantBeCounteredMarker = "Can't Be Countered";
 
-    /// <summary>
-    /// Construct the Abrupt Decay card shape (Instant, {B}{G}).
-    /// Attaches the "Can't Be Countered" keyword marker. Resolve
-    /// behaviour is built on demand via <see cref="BuildSpellDefinition"/>.
-    /// </summary>
-    public static Instant Create(Player owner)
-    {
-        ArgumentNullException.ThrowIfNull(owner);
+    /// <summary>CardDef DSL — card shape + "Can't Be Countered" marker.
+    /// Resolve behaviour is built via <see cref="BuildSpellDefinition"/>.</summary>
+    public static CardDef Define() => CardDef
+        .Instant(CardName, PrintedManaCost)
+        .WithKeyword(CantBeCounteredMarker);
 
-        var card = new Instant(CardName, PrintedManaCost);
-        card.SetOwner(owner);
-        card.SetController(owner);
-        card.AddAbility(new KeywordAbility(CantBeCounteredMarker));
-        return card;
-    }
+    public static Instant Create(Player owner) =>
+        (Instant)CardDefRuntime.Build(Define(), owner);
 
     /// <summary>
     /// Build the <see cref="SpellDefinition"/> used when Abrupt Decay is

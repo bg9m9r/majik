@@ -1,4 +1,5 @@
 using Majik.Core.Abilities;
+using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
 using Majik.Core.Costs;
 using Majik.Core.Effects;
@@ -50,21 +51,15 @@ public static class MutagenicGrowthFactory
     /// </summary>
     public const string PrintedManaCost = "{G}";
 
-    /// <summary>Construct Mutagenic Growth as an Instant with owner/controller wired.</summary>
-    public static Instant Create(Player owner)
-    {
-        ArgumentNullException.ThrowIfNull(owner);
-        var card = new Instant(CardName, PrintedManaCost);
-        card.SetOwner(owner);
-        card.SetController(owner);
+    /// <summary>CardDef DSL — card shape only. CR 107.4f Phyrexian marker
+    /// is wired via <see cref="CardDefBuilder.WithKeyword"/>; the pump
+    /// SpellDefinition lives in <see cref="BuildDefinition"/>.</summary>
+    public static CardDef Define() => CardDef
+        .Instant(CardName, PrintedManaCost)
+        .WithKeyword("Phyrexian");
 
-        // Structural Phyrexian mana marker (CR 107.4f) — the {G/P} pip shape.
-        // SpellCastFlow's alt-cost selection reads PhyrexianAlternativeCost;
-        // the KeywordAbility is a visibility/search marker only.
-        card.AddAbility(new KeywordAbility("Phyrexian", card, owner));
-
-        return card;
-    }
+    public static Instant Create(Player owner) =>
+        (Instant)CardDefRuntime.Build(Define(), owner);
 
     /// <summary>
     /// Returns a <see cref="PhyrexianManaAlternativeCost"/> for the {G/P}

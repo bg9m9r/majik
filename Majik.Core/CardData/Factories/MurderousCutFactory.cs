@@ -1,4 +1,5 @@
 using Majik.Core.Abilities;
+using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Game;
@@ -45,27 +46,14 @@ public static class MurderousCutFactory
     public const string CardName = "Murderous Cut";
     public const string PrintedManaCost = "{4}{B}";
 
-    /// <summary>
-    /// Build a Murderous Cut instant owned by <paramref name="owner"/>.
-    /// Card shape + Delve keyword marker; the resolve-time
-    /// <see cref="SpellDefinition"/> is built on demand via
-    /// <see cref="BuildSpellDefinition"/>.
-    /// </summary>
-    public static Instant Create(Player owner)
-    {
-        ArgumentNullException.ThrowIfNull(owner);
+    /// <summary>CardDef DSL — card shape + Delve marker (CR 702.66).
+    /// Destroy-target body is built via <see cref="BuildSpellDefinition"/>.</summary>
+    public static CardDef Define() => CardDef
+        .Instant(CardName, PrintedManaCost)
+        .WithKeyword("Delve");
 
-        var card = new Instant(CardName, PrintedManaCost);
-        card.SetOwner(owner);
-        card.SetController(owner);
-
-        // CR 702.66 — Delve marker. The behavior itself is in DelveCost +
-        // SpellCastFlow; the marker is here so introspection (UI, bots)
-        // can see the keyword on the card.
-        card.AddAbility(new KeywordAbility("Delve", card, owner));
-
-        return card;
-    }
+    public static Instant Create(Player owner) =>
+        (Instant)CardDefRuntime.Build(Define(), owner);
 
     /// <summary>
     /// Build the resolve-time <see cref="SpellDefinition"/>. Single 1..1

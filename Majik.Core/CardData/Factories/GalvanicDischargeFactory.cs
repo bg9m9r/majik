@@ -1,4 +1,5 @@
 using Majik.Core.Abilities;
+using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Counters;
@@ -39,20 +40,12 @@ public static class GalvanicDischargeFactory
     public const string CardName = "Galvanic Discharge";
     public const string PrintedManaCost = "{R}";
 
-    /// <summary>
-    /// Build a Galvanic Discharge instant owned by <paramref name="owner"/>.
-    /// Card shape only — see <see cref="BuildSpellDefinition"/> for the
-    /// resolve-time damage effect.
-    /// </summary>
-    public static Instant Create(Player owner)
-    {
-        ArgumentNullException.ThrowIfNull(owner);
+    /// <summary>CardDef DSL — card shape only. Charge-counter-driven damage
+    /// body is built via <see cref="BuildSpellDefinition"/>.</summary>
+    public static CardDef Define() => CardDef.Instant(CardName, PrintedManaCost);
 
-        var card = new Instant(CardName, PrintedManaCost);
-        card.SetOwner(owner);
-        card.SetController(owner);
-        return card;
-    }
+    public static Instant Create(Player owner) =>
+        (Instant)CardDefRuntime.Build(Define(), owner);
 
     /// <summary>
     /// Build the <see cref="SpellDefinition"/> used when Galvanic

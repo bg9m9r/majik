@@ -1,4 +1,5 @@
 using Majik.Core.Abilities;
+using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Game;
@@ -34,20 +35,12 @@ public static class NegateFactory
     public const string CardName = "Negate";
     public const string PrintedManaCost = "{1}{U}";
 
-    /// <summary>
-    /// Build a Negate instant owned by <paramref name="owner"/>.
-    /// Card shape only; the resolve-time SpellDefinition is built via
-    /// <see cref="BuildSpellDefinition"/>.
-    /// </summary>
-    public static Instant Create(Player owner)
-    {
-        ArgumentNullException.ThrowIfNull(owner);
+    /// <summary>CardDef DSL — card shape only. The noncreature-spell
+    /// counter SpellDefinition is built via <see cref="BuildSpellDefinition"/>.</summary>
+    public static CardDef Define() => CardDef.Instant(CardName, PrintedManaCost);
 
-        var card = new Instant(CardName, PrintedManaCost);
-        card.SetOwner(owner);
-        card.SetController(owner);
-        return card;
-    }
+    public static Instant Create(Player owner) =>
+        (Instant)CardDefRuntime.Build(Define(), owner);
 
     /// <summary>
     /// Build the "counter target noncreature spell" SpellDefinition.

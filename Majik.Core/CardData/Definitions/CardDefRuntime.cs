@@ -1,7 +1,11 @@
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Effects;
 using Majik.Core.Players;
+using Majik.Core.Primitives;
+using Majik.Core.Spells;
+using Majik.Core.Tokens;
 using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
 
@@ -124,7 +128,9 @@ public static class CardDefRuntime
         CardDef def,
         Player controller,
         Func<object?, object?> targetResolver,
-        object? chosenTarget = null)
+        object? chosenTarget = null,
+        Majik.Core.Stack.Stack? stack = null,
+        Majik.Core.Services.ZoneService? zones = null)
     {
         ArgumentNullException.ThrowIfNull(def);
         ArgumentNullException.ThrowIfNull(controller);
@@ -135,7 +141,7 @@ public static class CardDefRuntime
         var result = new List<IEffect>(def.ResolveBody.Effects.Count);
         foreach (var step in def.ResolveBody.Effects)
         {
-            result.Add(MaterializeStep(def, step, controller, targetResolver, chosenTarget));
+            result.Add(MaterializeStep(def, step, controller, targetResolver, chosenTarget, stack, zones));
         }
         return result;
     }
@@ -145,7 +151,9 @@ public static class CardDefRuntime
         ResolveEffect step,
         Player controller,
         Func<object?, object?> targetResolver,
-        object? chosenTarget)
+        object? chosenTarget,
+        Majik.Core.Stack.Stack? stack,
+        Majik.Core.Services.ZoneService? zones)
     {
         // TODO(effects-primitives): swap each branch for the matching
         // primitive once Majik.Core/Effects/Primitives/ lands.
@@ -165,16 +173,34 @@ public static class CardDefRuntime
                     $"{def.Name}: +{step.IntArg}/+{step.IntArg2} until EOT to {step.Target}",
                     () =>
                     {
-                        // Pump primitive not yet on the shared library — stub:
-                        // run the effect (resolution proceeds), no live P/T
-                        // mutation until the pump primitive lands.
-                        _ = targetResolver(chosenTarget);
+                        // CR 514.2 — register a +P/+T effect that expires at
+                        // end of turn. Layer 7c modify, registered on the
+                        // target's ActiveEffects. ActiveEffects null (shape
+                        // tests) → silently no-op; same posture as
+                        // DismemberFactory / MutagenicGrowthFactory.
+                        var live = targetResolver(chosenTarget);
+                        if (live is not Creature creature) return;
+                        if (creature.Zone != ZoneType.Battlefield) return;
+                        if (creature.ActiveEffects == null) return;
+                        creature.ActiveEffects.Register(
+                            new PumpUntilEndOfTurnEffect(creature, step.IntArg, step.IntArg2));
                     });
 
             case ResolveEffectKind.DestroyTarget:
                 return new Effect(
-                    $"{def.Name}: destroy {step.Target} (stub — targeted destroy primitive pending)",
-                    () => { _ = targetResolver(chosenTarget); /* destroy deferred */ });
+                    $"{def.Name}: destroy {step.Target}",
+                    () =>
+                    {
+                        // CR 701.7 — "destroy" effect. MoveToGraveyard with
+                        // ZoneMoveReason.Destroy routes through the binder's
+                        // indestructible (CR 702.12) / regeneration (CR
+                        // 701.15) gate so neither is double-applied.
+                        // CR 608.2b — illegal-target check at resolution.
+                        var live = targetResolver(chosenTarget);
+                        if (live is not Permanent permanent) return;
+                        if (permanent.Zone != ZoneType.Battlefield) return;
+                        Fx.MoveToGraveyard(permanent, ZoneMoveReason.Destroy);
+                    });
 
             case ResolveEffectKind.Mill:
                 return new Effect(
@@ -208,8 +234,23 @@ public static class CardDefRuntime
 
             case ResolveEffectKind.Counter:
                 return new Effect(
-                    $"{def.Name}: counter target {step.Target} (stub — counter primitive pending)",
-                    () => { _ = targetResolver(chosenTarget); /* counter deferred */ });
+                    $"{def.Name}: counter target {step.Target}",
+                    () =>
+                    {
+                        // CR 701.5 — counter target spell. Requires the live
+                        // stack reference (passed by callers wiring real
+                        // gameplay); shape-only tests pass null and the
+                        // effect silently no-ops. CR 608.2b — illegal-target
+                        // check at resolution: target must still be a spell
+                        // on the stack, and the NoncreatureSpell filter
+                        // gates creature spells out.
+                        if (stack is null) { _ = targetResolver(chosenTarget); return; }
+                        var live = targetResolver(chosenTarget);
+                        if (live is not ISpell spell) return;
+                        if (step.Target == TargetKind.NoncreatureSpell
+                            && spell.Card.HasType(CardType.Creature)) return;
+                        Fx.Counter(stack, spell);
+                    });
 
             case ResolveEffectKind.AddMana:
                 return new Effect(
@@ -218,8 +259,25 @@ public static class CardDefRuntime
 
             case ResolveEffectKind.CreateToken:
                 return new Effect(
-                    $"{def.Name}: create token (stub — token primitive pending)",
-                    () => { /* token creation deferred */ });
+                    $"{def.Name}: create token",
+                    () =>
+                    {
+                        // CR 111 / CR 111.4 — token shape (name, P/T,
+                        // subtypes, keywords, colour identity) lives on the
+                        // TokenBlueprint payload. Route through
+                        // TokenFactory.CreateOnBattlefield so ETB triggers
+                        // fire and the token's colour is stamped via
+                        // SetTokenColors.
+                        if (step.Payload is not TokenBlueprint blueprint) return;
+                        var spec = new TokenFactory.TokenSpec(
+                            blueprint.Name,
+                            blueprint.Power,
+                            blueprint.Toughness,
+                            blueprint.Subtypes,
+                            blueprint.Keywords,
+                            blueprint.Colors);
+                        TokenFactory.CreateOnBattlefield(spec, controller, zones);
+                    });
 
             default:
                 throw new NotSupportedException(

@@ -1,4 +1,4 @@
-using Majik.Core.Abilities;
+using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Players;
@@ -40,35 +40,18 @@ public static class MantisRiderFactory
     public const int Toughness = 3;
 
     /// <summary>
-    /// Construct Mantis Rider owned and controlled by <paramref name="owner"/>.
-    /// Flying, Vigilance, and Haste keyword markers are always wired.
+    /// CardDef DSL — vanilla three-keyword creature. CR 702.9 (Flying),
+    /// CR 702.20 (Vigilance), CR 702.10 (Haste) — the markers are read by
+    /// the combat-abilities subsystem to gate evasion / tap-on-attack /
+    /// summoning-sickness checks.
     /// </summary>
-    public static Creature Create(Player owner)
-    {
-        ArgumentNullException.ThrowIfNull(owner);
+    public static CardDef Define() => CardDef
+        .Creature(CardName, PrintedManaCost, Power, Toughness)
+        .WithSubtypes(CardSubtype.Human, CardSubtype.Monk)
+        .WithKeyword("Flying")
+        .WithKeyword("Vigilance")
+        .WithKeyword("Haste");
 
-        var card = new Creature(
-            name: CardName,
-            manaCost: PrintedManaCost,
-            power: Power,
-            toughness: Toughness,
-            subtypes: new[] { CardSubtype.Human, CardSubtype.Monk });
-
-        card.SetOwner(owner);
-        card.SetController(owner);
-
-        // CR 702.9 — Flying. KeywordAbility marker; CombatAbilities.HasFlying
-        // reads it for evasion enforcement in the declare-attackers step.
-        card.AddAbility(new KeywordAbility("Flying", card, owner));
-
-        // CR 702.20 — Vigilance. KeywordAbility marker; CombatAbilities.HasVigilance
-        // suppresses the tap-when-attacking rule (Rule 506.3a) in declare-attackers.
-        card.AddAbility(new KeywordAbility("Vigilance", card, owner));
-
-        // CR 702.10 — Haste. KeywordAbility marker; CombatAbilities.HasHaste
-        // overrides the summoning-sickness guard (Rule 302.6 / 706.10).
-        card.AddAbility(new KeywordAbility("Haste", card, owner));
-
-        return card;
-    }
+    public static Creature Create(Player owner) =>
+        (Creature)CardDefRuntime.Build(Define(), owner);
 }

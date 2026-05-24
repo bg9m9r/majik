@@ -1,4 +1,5 @@
 using Majik.Core.Abilities;
+using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Effects;
@@ -63,20 +64,12 @@ public static class TribalFlamesFactory
         CardSubtype.Forest,
     };
 
-    /// <summary>
-    /// Build a Tribal Flames sorcery owned by <paramref name="owner"/>.
-    /// Card shape only — see <see cref="BuildSpellDefinition"/> for the
-    /// resolve-time damage effect.
-    /// </summary>
-    public static Sorcery Create(Player owner)
-    {
-        ArgumentNullException.ThrowIfNull(owner);
+    /// <summary>CardDef DSL — card shape only. Domain-driven damage body
+    /// is built via <see cref="BuildSpellDefinition"/>.</summary>
+    public static CardDef Define() => CardDef.Sorcery(CardName, PrintedManaCost);
 
-        var card = new Sorcery(CardName, PrintedManaCost);
-        card.SetOwner(owner);
-        card.SetController(owner);
-        return card;
-    }
+    public static Sorcery Create(Player owner) =>
+        (Sorcery)CardDefRuntime.Build(Define(), owner);
 
     /// <summary>
     /// Build the <see cref="SpellDefinition"/> used when Tribal Flames

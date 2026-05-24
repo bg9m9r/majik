@@ -1,4 +1,5 @@
 using Majik.Core.Abilities;
+using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
 using Majik.Core.Game;
 using Majik.Core.Players;
@@ -35,18 +36,12 @@ public static class ManaLeakFactory
     public const string CardName = "Mana Leak";
     public const string PrintedManaCost = "{1}{U}";
 
-    /// <summary>
-    /// Construct the Mana Leak card shape (Instant, {1}{U}).
-    /// </summary>
-    public static Instant Create(Player owner)
-    {
-        ArgumentNullException.ThrowIfNull(owner);
+    /// <summary>CardDef DSL — card shape only. Resolve behaviour
+    /// (counter unless pay {3}) is built via <see cref="BuildDefinition"/>.</summary>
+    public static CardDef Define() => CardDef.Instant(CardName, PrintedManaCost);
 
-        var card = new Instant(CardName, PrintedManaCost);
-        card.SetOwner(owner);
-        card.SetController(owner);
-        return card;
-    }
+    public static Instant Create(Player owner) =>
+        (Instant)CardDefRuntime.Build(Define(), owner);
 
     /// <summary>
     /// Build the resolve-time <see cref="SpellDefinition"/>. Targets a single
