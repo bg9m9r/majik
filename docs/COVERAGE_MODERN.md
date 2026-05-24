@@ -1,11 +1,11 @@
 # Engine coverage report
 
 - **Scope:** format=modern, dedup-by-name
-- **Generated:** 2026-05-24 18:30 UTC
+- **Generated:** 2026-05-24 19:53 UTC
 - **Total cards:** 21879
-- **Distinct coverage:** 23.8% (5210 / 21879)
-- **Tournament-weighted coverage:** 68.3% (by play-rate; matched weight 19250)
-- **Top-20 most-played covered:** 16 / 20 (80%)
+- **Distinct coverage:** 27.4% (5994 / 21879)
+- **Tournament-weighted coverage:** 89.2% (by play-rate; matched weight 19250)
+- **Top-20 most-played covered:** 20 / 20 (100%)
 
 ## Tier breakdown
 
@@ -13,9 +13,9 @@
 |---|---:|---:|
 | NamedFactory | 240 | 1.1% |
 | SpellBound | 3708 | 16.9% |
-| KeywordOnly | 710 | 3.2% |
-| Vanilla | 552 | 2.5% |
-| Unimplemented | 16669 | 76.2% |
+| KeywordOnly | 1417 | 6.5% |
+| Vanilla | 629 | 2.9% |
+| Unimplemented | 15885 | 72.6% |
 
 ## Top-20 most-played cards
 
@@ -23,7 +23,7 @@
 |---:|---|---|
 | 530.0 | Consign to Memory | NamedFactory |
 | 530.0 | Mystical Dispute | NamedFactory |
-| 480.0 | Island | Unimplemented |
+| 480.0 | Island | KeywordOnly |
 | 450.0 | Misty Rainforest | NamedFactory |
 | 420.0 | Verdant Catacombs | NamedFactory |
 | 400.0 | Marsh Flats | NamedFactory |
@@ -31,14 +31,14 @@
 | 350.0 | Bloodstained Mire | NamedFactory |
 | 350.0 | Windswept Heath | NamedFactory |
 | 350.0 | Wooded Foothills | NamedFactory |
-| 340.0 | Swamp | Unimplemented |
+| 340.0 | Swamp | KeywordOnly |
 | 340.0 | Vexing Bauble | NamedFactory |
 | 330.0 | Arid Mesa | NamedFactory |
 | 300.0 | Lightning Bolt | SpellBound |
 | 290.0 | Damping Sphere | NamedFactory |
 | 290.0 | Polluted Delta | NamedFactory |
-| 280.0 | Steam Vents | Unimplemented |
-| 280.0 | Watery Grave | Unimplemented |
+| 280.0 | Steam Vents | KeywordOnly |
+| 280.0 | Watery Grave | KeywordOnly |
 | 270.0 | Flooded Strand | NamedFactory |
 | 270.0 | Thoughtseize | SpellBound |
 
@@ -52,8 +52,6 @@
 - Aang, the Last Airbender
 - Aatchik, Emerald Radian
 - Abandon the Post
-- Abandoned Air Temple
-- Abandoned Campground
 - Abandoned Sarcophagus
 - Abattoir Ghoul
 - Abbot of Keral Keep
@@ -64,6 +62,8 @@
 - Abigale, Eloquent First-Year
 - Abnormal Endurance
 - Abominable Treefolk
+- Abomination of Gudul
+- Absolute Virtue
 
 ---
 

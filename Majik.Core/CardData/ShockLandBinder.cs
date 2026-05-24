@@ -23,7 +23,13 @@ namespace Majik.Core.CardData;
 /// </summary>
 public static class ShockLandBinder
 {
-    private static readonly Regex ShockClause = new(
+    /// <summary>
+    /// Oracle-text regex shared with
+    /// <see cref="Majik.Core.CardData.Coverage.CoverageClassifier"/> so
+    /// the classifier can recognise shock-land coverage without standing
+    /// up a full <see cref="ReplacementBus"/>.
+    /// </summary>
+    public static readonly Regex ShockClause = new(
         @"as this (?:land |permanent |~ )?enters,?\s+you may pay 2 life\.\s+if you don'?t,?\s+it enters tapped",
         RegexOptions.IgnoreCase);
 
