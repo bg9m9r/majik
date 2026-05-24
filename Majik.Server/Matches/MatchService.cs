@@ -49,6 +49,7 @@ public sealed class MatchService
     private readonly IInstanceIdProvider? _instanceIds;
     private readonly MatchFacadeBridge? _facadeBridge;
     private readonly MatchReplayBuffer? _replayBuffer;
+    private readonly IBotMatchScheduler _botScheduler;
     private readonly ILogger<MatchService>? _logger;
 
     public MatchService(
@@ -68,7 +69,8 @@ public sealed class MatchService
         ILogger<MatchService>? logger = null,
         IDeckOwnershipPolicy? deckOwnershipPolicy = null,
         MatchFacadeBridge? facadeBridge = null,
-        MatchReplayBuffer? replayBuffer = null)
+        MatchReplayBuffer? replayBuffer = null,
+        IBotMatchScheduler? botScheduler = null)
     {
         _matches = matches;
         _profiles = profiles;
@@ -85,6 +87,7 @@ public sealed class MatchService
         _instanceIds = instanceIds;
         _facadeBridge = facadeBridge;
         _replayBuffer = replayBuffer;
+        _botScheduler = botScheduler ?? NullBotMatchScheduler.Instance;
         _logger = logger;
 
         // Strict by default: refuse construction without a real
@@ -219,9 +222,12 @@ public sealed class MatchService
     //     no second-player join, no roll.
     //   * Visibility is forced to Invite so bot matches never surface in the
     //     public lobby listing.
-    //   * State transitions go straight Open → Joined → Starting → Playing,
-    //     bypassing Rolling entirely. Bot always sits on the Opponent (Bob)
-    //     seat; creator is the first player.
+    //   * State transitions follow the same path as the human flow:
+    //     Open → Joined → Starting → Rolling → Playing. The bot dwells
+    //     briefly in Rolling (driven by IBotMatchScheduler) so the user
+    //     can see the dice roll on the frontend before play starts;
+    //     transition into Playing is handled by PlayDrawAsync (either
+    //     bot-triggered after it wins the roll, or human-triggered).
     //   * GameFacade is wired with botSeatArchetype so the engine gets a
     //     BotPlayerAgent on the Bob seat from the moment the game starts.
     // -----------------------------------------------------------------------
@@ -389,23 +395,24 @@ public sealed class MatchService
         {
             await _matches.InsertAsync(match, ct);
 
-            // Open → Joined → Starting → Playing. Skip Rolling: the bot doesn't
-            // roll and the creator always plays first.
+            // Bot matches follow the same lifecycle as human-vs-human:
+            // Open → Joined → Starting → Rolling. Transition into
+            // Playing is deferred until PlayDrawAsync lands (either
+            // human's choice if they won the roll, or the bot scheduler's
+            // greedy "play" pick if the bot won).
             if (!await TryTransitionStateAsync(matchId, MatchState.Open, MatchState.Joined, now, ct))
                 throw new InvalidOperationException("CAS conflict during bot match setup (Open→Joined).");
             if (!await TryTransitionStateAsync(matchId, MatchState.Joined, MatchState.Starting, now, ct))
                 throw new InvalidOperationException("CAS conflict during bot match setup (Joined→Starting).");
+            if (!await TryTransitionStateAsync(matchId, MatchState.Starting, MatchState.Rolling, now, ct))
+                throw new InvalidOperationException("CAS conflict during bot match setup (Starting→Rolling).");
 
-            // Mirror PlayDrawAsync's into-Playing transition: set priority holder
-            // + start clock for the creator, then kick the engine.
-            var setPlaying = Builders<Match>.Update
-                .Set(m => m.FirstChoice, "play")
-                .Set(m => m.State, MatchState.Playing)
-                .Set(m => m.PriorityHolderSub, creator.Sub)
-                .Set(m => m.PriorityStartedAt, now)
-                .Set(m => m.UpdatedAt, now);
-            if (!await _matches.TryAtomicUpdateAsync(matchId, MatchState.Starting, setPlaying, ct))
-                throw new InvalidOperationException("CAS conflict during bot match setup (Starting→Playing).");
+            // Initialize empty roll record so SubmitRollAsync can update it
+            // in place (mirrors the JoinAsync flow).
+            var setRoll = Builders<Match>.Update
+                .Set(m => m.Roll, new MatchRoll())
+                .Set(m => m.UpdatedAt, _clock.UtcNow);
+            await _matches.TryAtomicUpdateAsync(matchId, MatchState.Rolling, setRoll, ct);
 
             fresh = (await _matches.GetByIdAsync(matchId, ct))!;
         }
@@ -449,25 +456,26 @@ public sealed class MatchService
                 $"Bot match setup failed: {ex.GetType().Name}: {ex.Message}"));
         }
 
-        // 3) Fire-and-forget the engine startup, but log faults instead of
-        //    swallowing them so a dead engine doesn't masquerade as Playing.
-        if (facade != null)
-        {
-            _ = facade.StartFullGameAsync(firstPlayerSlot: 0)
-                .ContinueWith(t =>
-                {
-                    if (t.IsFaulted)
-                        _logger?.LogError(t.Exception,
-                            "Bot match engine faulted at startup. MatchId={MatchId}", matchId);
-                    else if (t.IsCanceled)
-                        _logger?.LogWarning(
-                            "Bot match engine canceled at startup. MatchId={MatchId}", matchId);
-                }, TaskScheduler.Default);
-        }
-        _timeoutScheduler?.Schedule(matchId, creator.Sub, clockMinutes * 60_000L);
-        _hub?.Publish(matchId, "match.state-changed",
-            new { matchId, state = "Playing", transitionedAt = now });
+        // 3) Engine startup is deferred to PlayDrawAsync (same as the
+        //    human-vs-human flow). We're still in Rolling state here —
+        //    StartFullGameAsync fires once the play/draw choice lands.
 
+        // 4) Schedule the bot to submit its dice roll after a brief dwell.
+        //    The bot uses the same SubmitRollAsync path as a human player,
+        //    so the SignalR `match.player-rolled` + `match.rolled` events
+        //    fire identically and the frontend's RollingStateComponent can
+        //    render the dice. If the bot wins, SubmitRollAsync will in turn
+        //    schedule its PlayDraw follow-up; if the human wins, the match
+        //    sits in Rolling until the human posts /play-draw.
+        _botScheduler.ScheduleBotRoll(matchId, botPlayer.Sub);
+
+        // Re-fetch so the returned DTO reflects any state mutations the
+        // bot scheduler made synchronously (test path with
+        // SynchronousBotMatchScheduler — production fires-and-forgets
+        // and this re-read is a noop). Without this the wire payload
+        // returned to the test client would never include the bot's
+        // roll, even after the scheduler had submitted it.
+        fresh = (await _matches.GetByIdAsync(matchId, ct)) ?? fresh;
         return Result.Ok(ToDto(fresh, viewerSub: creator.Sub));
     }
 
@@ -712,6 +720,15 @@ public sealed class MatchService
         {
             _hub?.Publish(matchId, "match.rolled",
                 new { matchId, roll = new MatchRollDto(roll.CreatorRoll, roll.OpponentRoll, roll.WinnerSub) });
+
+            // If the winner is a bot seat, schedule the bot's play/draw
+            // follow-up so the match isn't stranded in Rolling. Detection
+            // is by sub-prefix — the only seat we ever stamp with "bot:"
+            // is the synthesized opponent in CreateBotMatchAsync.
+            if (roll.WinnerSub.StartsWith("bot:", StringComparison.Ordinal))
+            {
+                _botScheduler.ScheduleBotPlayDraw(matchId, roll.WinnerSub);
+            }
         }
 
         var fresh = (await _matches.GetByIdAsync(matchId, ct))!;

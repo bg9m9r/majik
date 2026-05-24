@@ -36,7 +36,7 @@ public class MatchEndpointsBotTests : IClassFixture<TestMongoFixture>
     // Factory helpers — mirror MatchEndpointsLifecycleTests
     // -----------------------------------------------------------------------
 
-    private WebApplicationFactory<Program> Factory(IMongoDatabase db) =>
+    private WebApplicationFactory<Program> Factory(IMongoDatabase db, IRandomSource? rng = null) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseSetting("Mongo:ConnectionString", _fixture.ConnectionString);
@@ -55,6 +55,20 @@ public class MatchEndpointsBotTests : IClassFixture<TestMongoFixture>
 
                 services.RemoveAll<ICardRepository>();
                 services.AddSingleton<ICardRepository>(BotTestCardRepo());
+
+                if (rng != null)
+                {
+                    services.RemoveAll<IRandomSource>();
+                    services.AddSingleton<IRandomSource>(rng);
+                }
+
+                // Swap the production bot scheduler (real wall-clock delays)
+                // for a synchronous one so the bot's roll + play/draw land
+                // inside the same request that triggered them. Without this,
+                // tests would have to poll for state transitions.
+                services.RemoveAll<IBotMatchScheduler>();
+                services.AddSingleton<IBotMatchScheduler>(sp =>
+                    new SynchronousBotMatchScheduler(sp));
             });
         });
 
@@ -146,12 +160,16 @@ public class MatchEndpointsBotTests : IClassFixture<TestMongoFixture>
     // -----------------------------------------------------------------------
 
     [Fact]
-    public async Task CreateMatch_WithBotOpponent_SkipsRollAndPopulatesBotSeat()
+    public async Task CreateMatch_WithBotOpponent_EntersRollingWithBotSeatPopulated()
     {
         var db = await FreshDb();
         await SeedProfile(db, "alice", "Alice");
         var aliceDeckId = await SeedDeckAsync(db, "alice", "Alice Deck");
-        using var factory = Factory(db);
+        // Deterministic RNG: bot rolls 6 (first call, fired by scheduler
+        // synchronously during POST /matches), alice would roll 1 if she
+        // posts /roll. We only assert the bot's slot here.
+        var rng = new StubRandomSource(new Queue<int>(new[] { 6, 1 }));
+        using var factory = Factory(db, rng);
         var client = Authed(factory, "alice");
 
         var resp = await client.PostAsJsonAsync("/matches", new
@@ -169,12 +187,100 @@ public class MatchEndpointsBotTests : IClassFixture<TestMongoFixture>
         body!.Opponent.Should().NotBeNull();
         body.Opponent!.Sub.Should().StartWith("bot:");
         body.Opponent.DeckId.Should().Be("bot:Burn");
-        // vs-Bot skips Rolling and lands directly in Playing.
-        body.State.Should().Be("Playing");
-        body.Roll.Should().BeNull();
+        // Bot matches now flow through Rolling like human matches — the
+        // SynchronousBotMatchScheduler has already submitted the bot's
+        // dice roll inline, but alice hasn't rolled yet so the match is
+        // sitting in Rolling with the bot's slot filled and no winner.
+        body.State.Should().Be("Rolling");
+        body.Roll.Should().NotBeNull();
+        body.Roll!.OpponentRoll.Should().Be(6, "bot's roll was submitted synchronously by the scheduler");
+        body.Roll.CreatorRoll.Should().BeNull("alice hasn't rolled yet");
+        body.Roll.WinnerSub.Should().BeNull();
         // Invite is forced — bot matches must not surface in the public lobby.
         body.Visibility.Should().Be("Invite");
         body.GameId.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task BotMatch_BotWinsRoll_AutoChoosesPlayAndEntersPlaying()
+    {
+        var db = await FreshDb();
+        await SeedProfile(db, "alice", "Alice");
+        var aliceDeckId = await SeedDeckAsync(db, "alice", "Alice Deck");
+        // RNG order matches SubmitRollAsync call order:
+        //   1. Bot scheduler fires SubmitRollAsync(bot) first → bot rolls 6.
+        //   2. Alice POSTs /roll → she rolls 1.
+        // Bot wins, scheduler synchronously calls PlayDraw("play") →
+        // match transitions to Playing.
+        var rng = new StubRandomSource(new Queue<int>(new[] { 6, 1 }));
+        using var factory = Factory(db, rng);
+        var client = Authed(factory, "alice");
+
+        var created = await client.PostAsJsonAsync("/matches", new
+        {
+            format = "constructed",
+            visibility = "invite",
+            deckId = aliceDeckId.ToString(),
+            clockMinutes = 20,
+            botOpponent = new { archetype = "Burn" },
+        });
+        created.StatusCode.Should().Be(HttpStatusCode.Created);
+        var match = await created.Content.ReadFromJsonAsync<MatchDto>();
+        match!.State.Should().Be("Rolling");
+
+        // Alice rolls — at this point both slots are filled. Bot wins
+        // (6 > 1), so the scheduler immediately calls PlayDraw("play")
+        // on the bot's behalf, transitioning the match into Playing
+        // before this call returns.
+        var rollResp = await client.PostAsync($"/matches/{match.Id}/roll", null);
+        rollResp.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var afterResp = await client.GetAsync($"/matches/{match.Id}");
+        afterResp.StatusCode.Should().Be(HttpStatusCode.OK);
+        var after = await afterResp.Content.ReadFromJsonAsync<MatchDto>();
+        after!.State.Should().Be("Playing",
+            "bot won the roll and the scheduler auto-chose play, " +
+            "transitioning the match to Playing inline");
+        after.FirstChoice.Should().Be("play");
+        after.Roll!.WinnerSub.Should().StartWith("bot:");
+    }
+
+    [Fact]
+    public async Task BotMatch_HumanWinsRoll_MatchSitsInRollingUntilHumanChooses()
+    {
+        var db = await FreshDb();
+        await SeedProfile(db, "alice", "Alice");
+        var aliceDeckId = await SeedDeckAsync(db, "alice", "Alice Deck");
+        // Bot rolls 1, alice rolls 6 → alice wins. Scheduler does NOT
+        // schedule PlayDraw; match must stay in Rolling until alice
+        // explicitly posts /play-draw.
+        var rng = new StubRandomSource(new Queue<int>(new[] { 1, 6 }));
+        using var factory = Factory(db, rng);
+        var client = Authed(factory, "alice");
+
+        var created = await client.PostAsJsonAsync("/matches", new
+        {
+            format = "constructed",
+            visibility = "invite",
+            deckId = aliceDeckId.ToString(),
+            clockMinutes = 20,
+            botOpponent = new { archetype = "Burn" },
+        });
+        var match = (await created.Content.ReadFromJsonAsync<MatchDto>())!;
+
+        var rollResp = await client.PostAsync($"/matches/{match.Id}/roll", null);
+        rollResp.StatusCode.Should().Be(HttpStatusCode.OK);
+        var afterRoll = await rollResp.Content.ReadFromJsonAsync<MatchDto>();
+        afterRoll!.Roll!.WinnerSub.Should().Be("alice");
+        afterRoll.State.Should().Be("Rolling",
+            "human won the roll — match should wait for the human's play/draw choice");
+
+        // Human posts /play-draw → match transitions to Playing.
+        var pd = await client.PostAsJsonAsync($"/matches/{match.Id}/play-draw",
+            new { choice = "play" });
+        pd.StatusCode.Should().Be(HttpStatusCode.OK);
+        var afterPd = await pd.Content.ReadFromJsonAsync<MatchDto>();
+        afterPd!.State.Should().Be("Playing");
     }
 
     // -----------------------------------------------------------------------
@@ -190,12 +296,14 @@ public class MatchEndpointsBotTests : IClassFixture<TestMongoFixture>
     // -----------------------------------------------------------------------
 
     [Fact]
-    public async Task GetState_AfterBotMatchCreate_Returns200WithPopulatedDto()
+    public async Task GetState_AfterBotMatchEntersPlaying_Returns200WithPopulatedDto()
     {
         var db = await FreshDb();
         await SeedProfile(db, "alice", "Alice");
         var aliceDeckId = await SeedDeckAsync(db, "alice", "Alice Deck");
-        using var factory = Factory(db);
+        // Bot wins the roll → scheduler auto-chooses play → Playing.
+        var rng = new StubRandomSource(new Queue<int>(new[] { 6, 1 }));
+        using var factory = Factory(db, rng);
         var client = Authed(factory, "alice");
 
         var createResp = await client.PostAsJsonAsync("/matches", new
@@ -211,9 +319,12 @@ public class MatchEndpointsBotTests : IClassFixture<TestMongoFixture>
         match.Should().NotBeNull();
         match!.GameId.Should().NotBeNull();
 
+        // Alice rolls → bot wins → scheduler triggers PlayDraw → Playing.
+        await client.PostAsync($"/matches/{match.Id}/roll", null);
+
         // GET /state must succeed — this is the call the portal makes
-        // immediately after match creation. Failing here is what produced
-        // the "No game state." regression.
+        // once the match is Playing. Failing here is what produced the
+        // "No game state." regression.
         var stateResp = await client.GetAsync($"/matches/{match.Id}/state");
         stateResp.StatusCode.Should().Be(HttpStatusCode.OK,
             "bot match landed in Playing with a live facade — /state must " +
@@ -266,7 +377,9 @@ public class MatchEndpointsBotTests : IClassFixture<TestMongoFixture>
         var db = await FreshDb();
         await SeedProfile(db, "alice", "Alice");
         var aliceDeckId = await SeedDeckAsync(db, "alice", "Alice Deck");
-        using var factory = Factory(db);
+        // Bot wins the roll → match auto-advances to Playing.
+        var rng = new StubRandomSource(new Queue<int>(new[] { 6, 1 }));
+        using var factory = Factory(db, rng);
         var client = Authed(factory, "alice");
 
         var createResp = await client.PostAsJsonAsync("/matches", new
@@ -280,6 +393,9 @@ public class MatchEndpointsBotTests : IClassFixture<TestMongoFixture>
         createResp.StatusCode.Should().Be(HttpStatusCode.Created);
         var match = await createResp.Content.ReadFromJsonAsync<MatchDto>();
         match!.GameId.Should().NotBeNull();
+
+        // Alice rolls → bot wins → scheduler triggers PlayDraw → Playing.
+        await client.PostAsync($"/matches/{match.Id}/roll", null);
 
         // POST a MulliganCommand with NO PlayerId — exactly what the portal
         // sends. The wire payload only has the $type discriminator and the
@@ -358,6 +474,10 @@ public class MatchEndpointsBotTests : IClassFixture<TestMongoFixture>
 
                 services.RemoveAll<ICardRepository>();
                 services.AddSingleton<ICardRepository>(BotTestCardRepoWithRecentCards());
+
+                services.RemoveAll<IBotMatchScheduler>();
+                services.AddSingleton<IBotMatchScheduler>(sp =>
+                    new SynchronousBotMatchScheduler(sp));
             });
         });
 
@@ -413,12 +533,14 @@ public class MatchEndpointsBotTests : IClassFixture<TestMongoFixture>
         });
 
         // If the call succeeded, the binder pipeline is happy for these
-        // cards — match should be in Playing with a live facade.
+        // cards — match should be in Rolling with a live facade (the
+        // engine is started later by PlayDrawAsync; the create path now
+        // only goes Open → Joined → Starting → Rolling).
         if (resp.StatusCode == HttpStatusCode.Created)
         {
             var body = await resp.Content.ReadFromJsonAsync<MatchDto>();
             body.Should().NotBeNull();
-            body!.State.Should().Be("Playing");
+            body!.State.Should().Be("Rolling");
             body.GameId.Should().NotBeNull();
 
             // Verify the match landed in Mongo.
