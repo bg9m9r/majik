@@ -2799,6 +2799,25 @@ public static class NamedCardFactory
             // a fully-wired counter effect.
             "Cursecatcher" => CursecatcherFactory.Create(owner),
 
+            // Creature — Merfolk Wizard {U}{U} 2/2 (MerfolkTricksterFactory).
+            // Dominaria. Flash keyword wired (CR 702.8). Single ETB triggered
+            // ability (CR 603.6a) declares a 1..1 "target creature an opponent
+            // controls" TargetRequest (Intent: BotIntent.Removal); on resolution
+            // taps the chosen creature via Permanent.Tap (CR 701.20 — guarded
+            // against already-tapped state) and registers a
+            // LoseAllAbilitiesEffect scoped to the target with
+            // expiresAtEndOfTurn: true against the target's
+            // ContinuousEffectsService (Creature.ActiveEffects) — Layer 6 strip
+            // expires at the cleanup step (CR 613.6 / 514.2 — same EOT scope as
+            // the UntilEndOfTurn family of pump/keyword grants). Resolution
+            // rechecks still-on-battlefield + opponent-controlled (CR 608.2b);
+            // shape-only path silently no-ops the lose-abilities grant when
+            // target.ActiveEffects is null. "Creature an opponent controls"
+            // choose-time filter deferred — same posture as Solitude /
+            // Earthshaker Khenra; the resolve-time recheck enforces the
+            // controller scope. Caps Modern Merfolk pillar at ~85%.
+            "Merfolk Trickster" => MerfolkTricksterFactory.Create(owner),
+
             // Creature — Human Soldier {W} 1/1 (ChampionOfTheParishFactory).
             // Innistrad. "Whenever another Human enters the battlefield under
             // your control, put a +1/+1 counter on Champion of the Parish."
