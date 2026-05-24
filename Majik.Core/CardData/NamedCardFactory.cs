@@ -720,6 +720,18 @@ public static class NamedCardFactory
             // NegateFactory.BuildSpellDefinition.
             "Negate" => NegateFactory.Create(owner),
 
+            // Instant — {U} (ConsignToMemoryFactory). Modern Horizons 3.
+            // "Replicate {1} (...) Counter target triggered ability or
+            //  colorless spell."
+            // Card shape only here; the resolve-time SpellDefinition
+            // (counter target triggered ability or colorless spell) is
+            // built on demand via ConsignToMemoryFactory.BuildSpellDefinition.
+            // Replicate alt-cost (CR 702.99) deferred — same gap as the
+            // Storm cycle's self-copy-on-cast plumbing (no Replicate
+            // primitive yet), so the single-arg dispatcher ships the
+            // instant shape without Replicate wiring.
+            "Consign to Memory" => ConsignToMemoryFactory.Create(owner),
+
             // Instant — {2}{G}{G} (ForceOfVigorFactory).
             // "If it's not your turn, you may exile a green card from your
             //  hand rather than pay this spell's mana cost. Destroy up to
@@ -2322,6 +2334,18 @@ public static class NamedCardFactory
             // ExpireEndOfTurn sweep. The single-arg dispatcher path
             // produces the correct card shape only.
             "Anger of the Gods" => AngerOfTheGodsFactory.Create(owner),
+
+            // Sorcery — {X}{R} (MeltdownFactory). Urza's Destiny.
+            // "Destroy each artifact with mana value X or less." Card shape
+            // only on the dispatcher path; the resolve effect is built on
+            // demand via MeltdownFactory.BuildResolveEffect(caster,
+            // allPlayers, x). Effect snapshots every supplied player's
+            // battlefield, filters to Artifact cards with mv ≤ X, HashSet-
+            // dedupes, and routes each victim to its owner's graveyard via
+            // OracleSpellBinder.MoveToGraveyard (CR 701.7). Indestructible
+            // bypass is the same lossy gap as SlaughterPactFactory and the
+            // rest of the destroy family.
+            "Meltdown" => MeltdownFactory.Create(owner),
 
             // Instant — {1}{U} (DazeFactory). Nemesis.
             // "You may return an Island you control to its owner's hand
