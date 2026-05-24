@@ -1,9 +1,9 @@
 {
-  "generated_utc": "2026-05-24T19:26:18.3764711Z",
+  "generated_utc": "2026-05-24T19:26:50.9320133Z",
   "scanned_dir": "/home/brett/Projects/majik.project/majik.core/.claude/worktrees/agent-a0dac5ee3cc669569/Majik.Core/CardData/Factories",
-  "total_mentions": 191,
-  "distinct_factories": 131,
-  "cluster_count": 14,
+  "total_mentions": 188,
+  "distinct_factories": 130,
+  "cluster_count": 12,
   "unclustered_count": 124,
   "clusters": [
     {
@@ -159,7 +159,7 @@
         {
           "factory": "UroTitanFactory",
           "file": "UroTitanFactory.cs",
-          "line": 12,
+          "line": 14,
           "sentence": "v1 always plays the first land in hand when one exists; a first-class yes/no agent prompt is deferred (same gap as Sun Titan / Primeval Titan / Stoneforge Mystic)."
         },
         {
@@ -407,34 +407,6 @@
       ]
     },
     {
-      "primitive_id": "escape",
-      "display_name": "Escape alt-cost (CR 702.143)",
-      "comp_rules_citation": "CR 702.143",
-      "implementation_hint": "Cast-from-graveyard alt cost that additionally exiles N cards. Sibling of Flashback\u0027s cast-from-graveyard, but with the extra exile-cost rider.",
-      "factory_count": 2,
-      "mention_count": 2,
-      "factories": [
-        "ClingToDustFactory",
-        "UroTitanFactory"
-      ],
-      "mentions": [
-        {
-          "factory": "ClingToDustFactory",
-          "file": "ClingToDustFactory.cs",
-          "line": 11,
-          "sentence": "## Deferred (v1 gaps)  - Escape alt-cost ({2}{B}, exile two other graveyard cards \u2014 CR 702.143) deferred \u2014 same gap as Uro / Phlage, blocked on the missing graveyard-cast alt-cost \u002B multi-card-exile additional-cost primitive.",
-          "cr": "CR 702.143"
-        },
-        {
-          "factory": "UroTitanFactory",
-          "file": "UroTitanFactory.cs",
-          "line": 12,
-          "sentence": "The printed \u0022unless it escaped\u0022 rider is structurally collapsed \u2014 Escape (CR 702.143) is not wired in v1 (see deferred section), so a hardcast Uro is always sacrificed by this trigger, faithful to the printed text in the non-escape case.",
-          "cr": "CR 702.143"
-        }
-      ]
-    },
-    {
       "primitive_id": "kicker",
       "display_name": "Kicker alt-cost (CR 702.33)",
       "comp_rules_citation": "CR 702.33",
@@ -623,25 +595,6 @@
           "file": "TirelessTrackerFactory.cs",
           "line": 14,
           "sentence": "\u003Cb\u003E\u0022Activate only as a sorcery\u0022\u003C/b\u003E \u2014 Tireless Tracker\u0027s printed activated ability has NO sorcery-speed restriction (instant speed on the official card), so nothing is deferred here for this card."
-        }
-      ]
-    },
-    {
-      "primitive_id": "suspend",
-      "display_name": "Suspend alt-cost (CR 702.61)",
-      "comp_rules_citation": "CR 702.61",
-      "implementation_hint": "Exile-from-hand alt cost with time counters; upkeep auto-cast when last counter is removed.",
-      "factory_count": 1,
-      "mention_count": 1,
-      "factories": [
-        "UroTitanFactory"
-      ],
-      "mentions": [
-        {
-          "factory": "UroTitanFactory",
-          "file": "UroTitanFactory.cs",
-          "line": 12,
-          "sentence": "Same shape as the deferred Boromir / suspend cost primitives."
         }
       ]
     }
@@ -1093,13 +1046,13 @@
     {
       "factory": "UroTitanFactory",
       "file": "UroTitanFactory.cs",
-      "line": 12,
+      "line": 14,
       "sentence": "(\u0022Elder\u0022 creature subtype is not yet in \u003Csee cref=\u0022CardSubtype\u0022/\u003E \u2014 Giant is wired; Elder is deferred \u2014 see gaps below."
     },
     {
       "factory": "UroTitanFactory",
       "file": "UroTitanFactory.cs",
-      "line": 12,
+      "line": 14,
       "sentence": "\u003Csee cref=\u0022CardSubtype\u0022/\u003E only carries Giant; Elder is not yet in the enum, mirroring the same gap for other \u0022Elder X\u0022 creatures (Elder Dragons etc)."
     },
     {

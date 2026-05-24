@@ -66,9 +66,9 @@ public class UroTitanTests
     }
 
     // -----------------------------------------------------------------------
-    // Self-sacrifice ETB trigger — CR 603.1 / CR 701.16
-    // Escape (CR 702.143) is deferred so the trigger always sacs on ETB —
-    // faithful to the printed hardcast case.
+    // Self-sacrifice ETB trigger — CR 603.1 / CR 701.16 / CR 702.138b
+    // Hardcast Uro: no escape stamp → trigger sacrifices.
+    // Escaped Uro: WasCastForEscape stamp → trigger skips the sacrifice.
     // -----------------------------------------------------------------------
 
     [Fact]
@@ -91,9 +91,54 @@ public class UroTitanTests
         foreach (var effect in sacTrigger.Effects) effect.Execute();
 
         uro.Zone.Should().Be(ZoneType.Graveyard,
-            "Escape is not wired (CR 702.143), so the ETB sac trigger fires unconditionally — Uro goes to its owner's graveyard (CR 701.16)");
+            "hardcast Uro has WasCastForEscape=false, so the sac trigger fires — Uro goes to its owner's graveyard (CR 701.16)");
         alice.Zones.Graveyard.GetCards().Should().Contain(uro);
         alice.Zones.Battlefield.GetCards().Should().NotContain(uro);
+    }
+
+    [Fact]
+    public void UroTitan_EtbSacTrigger_SkipsSacrifice_WhenEscaped()
+    {
+        // CR 702.138b — when the spell that became this permanent was cast
+        // from a graveyard with its Escape ability, the "escaped" sentinel
+        // is set on the resulting permanent. The sac trigger's "unless it
+        // escaped" rider must short-circuit and leave Uro on the battlefield.
+        var alice = new Player("Alice", 20);
+        var uro = UroTitanFactory.Create(alice);
+
+        alice.Zones.Battlefield.AddCard(uro);
+        uro.SetZone(ZoneType.Battlefield);
+        uro.SetWasCastForEscape(true);  // simulate the SpellCastFlow stamp
+
+        var sacTrigger = uro.Abilities.OfType<TriggeredAbility>()
+            .Where(t => t.Condition is EventTriggerCondition<CardMovedEvent>)
+            .Single(t => t.Effects.Any(e => e.Description != null
+                && e.Description.Contains("sacrifice unless escaped")));
+
+        foreach (var effect in sacTrigger.Effects) effect.Execute();
+
+        uro.Zone.Should().Be(ZoneType.Battlefield,
+            "escaped Uro (CR 702.138b) is NOT sacrificed by the ETB trigger");
+        alice.Zones.Battlefield.GetCards().Should().Contain(uro);
+        alice.Zones.Graveyard.GetCards().Should().NotContain(uro);
+    }
+
+    // -----------------------------------------------------------------------
+    // BuildAlternativeCost — CR 702.138 Escape factory exposure
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void UroTitan_BuildAlternativeCost_ReturnsEscapeAltCost_WithPrintedShape()
+    {
+        var cost = UroTitanFactory.BuildAlternativeCost();
+
+        cost.Should().NotBeNull();
+        cost.ExileFromGraveyardCount.Should().Be(5,
+            "Uro's printed Escape rider exiles 5 OTHER graveyard cards");
+        // {G}{G}{U}{U} = 2 green + 2 blue, no generic.
+        cost.AlternativeManaCost.Green.Should().Be(2);
+        cost.AlternativeManaCost.Blue.Should().Be(2);
+        cost.AlternativeManaCost.Generic.Should().Be(0);
     }
 
     // -----------------------------------------------------------------------

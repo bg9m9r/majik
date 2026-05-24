@@ -103,6 +103,24 @@ public sealed class SpellCastFlow
                 $"Cannot cast {card.Name} as Adventure: sorcery-speed restriction (CR 117.1 / 715.3b).");
         }
 
+        // CR 702.138a — Escape alt-cost has a bundled "exile N other
+        // graveyard cards" rider that must be paid as part of the
+        // alt-cost (not as a generic IAdditionalCost — see
+        // EscapeAlternativeCost xmldoc). Pre-check + pay it BEFORE any
+        // other zone mutations so a graveyard with too few "other"
+        // cards short-circuits the cast cleanly (CR 601.2g — illegal to
+        // announce a cost you can't pay, no partial payment). The
+        // Pay call atomically moves the picked cards Graveyard → Exile.
+        if (alternativeCost is EscapeAlternativeCost escape)
+        {
+            if (!escape.Pay(caster, card))
+            {
+                throw new InvalidOperationException(
+                    $"Cannot pay Escape exile rider for {card.Name}: " +
+                    $"need {escape.ExileFromGraveyardCount} OTHER graveyard cards.");
+            }
+        }
+
         // CR 601.2f — additional costs first, before mana payment.
         // Merge the caller-supplied list with any costs the card itself
         // declares via SpellDefinition.AdditionalCosts (template-bound
@@ -285,6 +303,22 @@ public sealed class SpellCastFlow
         // the spell rather than diffing buckets at trigger time lets
         // downstream consumers ignore the cost machinery entirely.
         spell.WasFreeCast = totalCost.IsZero;
+
+        // CR 702.138b — stamp the "escaped" sentinel so downstream gates
+        // (Uro's "sacrifice it unless it escaped" trigger; future
+        // "escapes with [counters]" replacements per CR 702.138c) can
+        // read it off the resolving spell + resulting permanent. We
+        // stamp the Card too — Uro's sac trigger fires on the
+        // battlefield, sourced off the resolved permanent, and that
+        // is the easiest read site for the gate body.
+        if (alternativeCost is EscapeAlternativeCost)
+        {
+            spell.WasCastForEscape = true;
+            if (card is Card concreteForEscape)
+            {
+                concreteForEscape.SetWasCastForEscape(true);
+            }
+        }
 
         _stack.Push(spell);
         _eventBus.Publish(new SpellCastEvent(spell));

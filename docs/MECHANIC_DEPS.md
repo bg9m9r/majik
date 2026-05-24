@@ -7,8 +7,8 @@ xmldocs flagged that they're blocked on it?"
 
 - **Generated:** 2026-05-24 19:26 UTC
 - **Scanned dir:** `Majik.Core/CardData/Factories`
-- **Total mentions:** 191
-- **Clusters:** 14
+- **Total mentions:** 188
+- **Clusters:** 12
 - **Unclustered (need new registry pattern):** 124
 
 Regenerate with `dotnet run --project Majik.Console -- mechanic-deps --md-out docs/MECHANIC_DEPS.md --json-out docs/mechanic-deps.json`.
@@ -20,17 +20,15 @@ Regenerate with `dotnet run --project Majik.Console -- mechanic-deps --md-out do
 | 1 | Agent-prompt targeting MVP | — | 24 | 31 |
 | 2 | Library shuffle (CR 701.20) | CR 701.20 | 12 | 17 |
 | 3 | Layer-6 ability-grant subsystem (CR 613.1f) | CR 613.1f | 2 | 4 |
-| 4 | Escape alt-cost (CR 702.143) | CR 702.143 | 2 | 2 |
-| 5 | Kicker alt-cost (CR 702.33) | CR 702.33 | 2 | 2 |
-| 6 | Class leveling (CR 716) | CR 716 | 1 | 2 |
-| 7 | Manifest dread (CR 701.59) | CR 701.59 | 1 | 2 |
-| 8 | Ascend / city's blessing (CR 702.131) | CR 702.131 | 1 | 1 |
-| 9 | Cast-marker on Card | — | 1 | 1 |
-| 10 | Companion (CR 702.139) | CR 702.139 | 1 | 1 |
-| 11 | Equip activated-ability primitive (CR 702.6) | CR 702.6 | 1 | 1 |
-| 12 | Gift (Bloomburrow) | — | 1 | 1 |
-| 13 | "Activate only as a sorcery" gate (CR 117.1a) | CR 117.1a | 1 | 1 |
-| 14 | Suspend alt-cost (CR 702.61) | CR 702.61 | 1 | 1 |
+| 4 | Kicker alt-cost (CR 702.33) | CR 702.33 | 2 | 2 |
+| 5 | Class leveling (CR 716) | CR 716 | 1 | 2 |
+| 6 | Manifest dread (CR 701.59) | CR 701.59 | 1 | 2 |
+| 7 | Ascend / city's blessing (CR 702.131) | CR 702.131 | 1 | 1 |
+| 8 | Cast-marker on Card | — | 1 | 1 |
+| 9 | Companion (CR 702.139) | CR 702.139 | 1 | 1 |
+| 10 | Equip activated-ability primitive (CR 702.6) | CR 702.6 | 1 | 1 |
+| 11 | Gift (Bloomburrow) | — | 1 | 1 |
+| 12 | "Activate only as a sorcery" gate (CR 117.1a) | CR 117.1a | 1 | 1 |
 
 ## Cluster detail
 
@@ -79,7 +77,7 @@ Mentions:
   > Full agent-prompt targeting deferred.
 - `FaithlessLootingFactory` (`FaithlessLootingFactory.cs:119`)
   > Real agent-driven choice deferred.
-- `UroTitanFactory` (`UroTitanFactory.cs:12`)
+- `UroTitanFactory` (`UroTitanFactory.cs:14`)
   > v1 always plays the first land in hand when one exists; a first-class yes/no agent prompt is deferred (same gap as Sun Titan / Primeval Titan / Stoneforge Mystic).
 - `DauthiVoidwalkerFactory` (`DauthiVoidwalkerFactory.cs:13`)
   > Wiring an agent prompt mirrors the rest of the v1 factories (deferred).
@@ -164,20 +162,7 @@ Mentions:
 - `BloodghastFactory` (`BloodghastFactory.cs:126`)
   > A full dynamic Layer 6 conditional keyword grant is deferred — see class xmldoc.
 
-### 4. Escape alt-cost (CR 702.143)
-
-- **CR citation:** CR 702.143
-- **Blocks:** 2 factories (2 mentions)
-- **Implementation hint:** Cast-from-graveyard alt cost that additionally exiles N cards. Sibling of Flashback's cast-from-graveyard, but with the extra exile-cost rider.
-
-Mentions:
-
-- `ClingToDustFactory` (`ClingToDustFactory.cs:11`)
-  > ## Deferred (v1 gaps)  - Escape alt-cost ({2}{B}, exile two other graveyard cards — CR 702.143) deferred — same gap as Uro / Phlage, blocked on the missing graveyard-cast alt-cost + multi-card-exile additional-cost primitive.
-- `UroTitanFactory` (`UroTitanFactory.cs:12`)
-  > The printed "unless it escaped" rider is structurally collapsed — Escape (CR 702.143) is not wired in v1 (see deferred section), so a hardcast Uro is always sacrificed by this trigger, faithful to the printed text in the non-escape case.
-
-### 5. Kicker alt-cost (CR 702.33)
+### 4. Kicker alt-cost (CR 702.33)
 
 - **CR citation:** CR 702.33
 - **Blocks:** 2 factories (2 mentions)
@@ -190,7 +175,7 @@ Mentions:
 - `BurstLightningFactory` (`BurstLightningFactory.cs:11`)
   > "  ## Implementation (v1 — kicker primitive deferred)  CR 702.33 — Kicker is an additional cost (not an alternative cost) that modifies the spell's effect when paid.
 
-### 6. Class leveling (CR 716)
+### 5. Class leveling (CR 716)
 
 - **CR citation:** CR 716
 - **Blocks:** 1 factories (2 mentions)
@@ -203,7 +188,7 @@ Mentions:
 - `StormchasersTalentFactory` (`StormchasersTalentFactory.cs:12`)
   > <b>Level 3 cast-trigger</b> ("Whenever you cast a noncreature spell, draw a card, then discard a card"): DEFERRED with the leveling primitive.
 
-### 7. Manifest dread (CR 701.59)
+### 6. Manifest dread (CR 701.59)
 
 - **CR citation:** CR 701.59
 - **Blocks:** 1 factories (2 mentions)
@@ -216,7 +201,7 @@ Mentions:
 - `AbhorrentOculusFactory` (`AbhorrentOculusFactory.cs:13`)
   > CR rule references: 205.3m (Eye subtype), 601.2f (additional cost), 603.1 / 500.4 (upkeep trigger), 702.9 (Flying), 701.59 (manifest dread — deferred).
 
-### 8. Ascend / city's blessing (CR 702.131)
+### 7. Ascend / city's blessing (CR 702.131)
 
 - **CR citation:** CR 702.131
 - **Blocks:** 1 factories (1 mentions)
@@ -227,7 +212,7 @@ Mentions:
 - `OcelotPrideFactory` (`OcelotPrideFactory.cs:14`)
   > The attack trigger ships with the gate stubbed (always 1 token); the "doubled to 2" half of the printed text is deferred until an Ascend primitive lands.
 
-### 9. Cast-marker on Card
+### 8. Cast-marker on Card
 
 - **Blocks:** 1 factories (1 mentions)
 - **Implementation hint:** Persistent 'this object was cast (vs. put onto the battlefield)' flag — Bloodghast, The One Ring, Pact triggers all key off it.
@@ -237,7 +222,7 @@ Mentions:
 - `TheOneRingFactory` (`TheOneRingFactory.cs:15`)
   > The effect body is a no-op — the "if you cast it" intervening-if clause, the "until your next turn" expiry, and the "protection from everything" player-scoped grant are all deferred (no cast-marker on Card, no per-player delayed cleanup, no Player.
 
-### 10. Companion (CR 702.139)
+### 9. Companion (CR 702.139)
 
 - **CR citation:** CR 702.139
 - **Blocks:** 1 factories (1 mentions)
@@ -248,7 +233,7 @@ Mentions:
 - `LurrusOfTheDreamDenFactory` (`LurrusOfTheDreamDenFactory.cs:12`)
   > ## Companion (DEFERRED) The companion deck-construction rule (CR 702.139 — "Each permanent card in your starting deck has mana value 2 or less") is foundational to the deck-builder, not the runtime, and is intentionally NOT enforced here.
 
-### 11. Equip activated-ability primitive (CR 702.6)
+### 10. Equip activated-ability primitive (CR 702.6)
 
 - **CR citation:** CR 702.6
 - **Blocks:** 1 factories (1 mentions)
@@ -259,7 +244,7 @@ Mentions:
 - `PuresteelPaladinFactory` (`PuresteelPaladinFactory.cs:11`)
   > ## Deferred (v1 gaps)  - <b>Equip-ability primitive</b>: the engine has no <c>EquipActivatedAbility</c> primitive yet — Equipment cards currently don't model their printed "Equip {N}" activated ability at all (Stoneforge Mystic's activated ability is a separate "put-an-Equipment-from-hand" effect, not an equip activati…
 
-### 12. Gift (Bloomburrow)
+### 11. Gift (Bloomburrow)
 
 - **Blocks:** 1 factories (1 mentions)
 - **Implementation hint:** Cast-time choice: a static/triggered side effect granting an opponent a defined gift (treasure, draw, etc.).
@@ -269,7 +254,7 @@ Mentions:
 - `IntoTheFloodMawFactory` (`IntoTheFloodMawFactory.cs:12`)
   > ## Deferred (v1 gaps) — Gift mechanic (CR 701.59 in the 2024 errata) The "Gift a tapped Fish" clause is a cast-time choice that lets the caster promise an opponent a gift; if promised, the opponent creates a tapped 1/1 blue Fish creature token BEFORE the spell's other effects, and Into the Flood Maw's target predicate …
 
-### 13. "Activate only as a sorcery" gate (CR 117.1a)
+### 12. "Activate only as a sorcery" gate (CR 117.1a)
 
 - **CR citation:** CR 117.1a
 - **Blocks:** 1 factories (1 mentions)
@@ -279,17 +264,6 @@ Mentions:
 
 - `TirelessTrackerFactory` (`TirelessTrackerFactory.cs:14`)
   > <b>"Activate only as a sorcery"</b> — Tireless Tracker's printed activated ability has NO sorcery-speed restriction (instant speed on the official card), so nothing is deferred here for this card.
-
-### 14. Suspend alt-cost (CR 702.61)
-
-- **CR citation:** CR 702.61
-- **Blocks:** 1 factories (1 mentions)
-- **Implementation hint:** Exile-from-hand alt cost with time counters; upkeep auto-cast when last counter is removed.
-
-Mentions:
-
-- `UroTitanFactory` (`UroTitanFactory.cs:12`)
-  > Same shape as the deferred Boromir / suspend cost primitives.
 
 ## Unclustered (need new registry pattern)
 
@@ -437,9 +411,9 @@ Mentions:
   > On resolve: auto-pick first card from target player's graveyard and exile it (v1 deterministic; real agent-pick deferred).
 - `PactOfNegationFactory` (`PactOfNegationFactory.cs:14`)
   > Multi-player turn-skipping nuances deferred.
-- `UroTitanFactory` (`UroTitanFactory.cs:12`)
+- `UroTitanFactory` (`UroTitanFactory.cs:14`)
   > ("Elder" creature subtype is not yet in <see cref="CardSubtype"/> — Giant is wired; Elder is deferred — see gaps below.
-- `UroTitanFactory` (`UroTitanFactory.cs:12`)
+- `UroTitanFactory` (`UroTitanFactory.cs:14`)
   > <see cref="CardSubtype"/> only carries Giant; Elder is not yet in the enum, mirroring the same gap for other "Elder X" creatures (Elder Dragons etc).
 - `BloodghastFactory` (`BloodghastFactory.cs:14`)
   > "You may" prompt: auto-accepted (same gap as Arclight Phoenix / Sneak Attack / Tireless Tracker).
