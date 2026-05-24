@@ -87,16 +87,21 @@ public class Creature : Permanent
     /// </summary>
     public Majik.Core.Effects.ContinuousEffectsService? ActiveEffects { get; set; }
 
-    /// <summary>Get the current power after applying continuous effects.</summary>
+    /// <summary>Get the current power after applying continuous effects.
+    /// CR 708.2 — face-down creatures are 2/2 with no other characteristics,
+    /// short-circuited before consulting the layer system.</summary>
     public int GetPower()
     {
+        if (IsFaceDown) return 2;
         if (ActiveEffects == null) return BasePower;
         return ActiveEffects.Compute(this).Power;
     }
 
-    /// <summary>Get the current toughness after applying continuous effects.</summary>
+    /// <summary>Get the current toughness after applying continuous effects.
+    /// CR 708.2 — face-down creatures are 2/2.</summary>
     public int GetToughness()
     {
+        if (IsFaceDown) return 2;
         if (ActiveEffects == null) return BaseToughness;
         return ActiveEffects.Compute(this).Toughness;
     }
