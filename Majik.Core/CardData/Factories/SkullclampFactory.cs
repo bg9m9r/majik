@@ -37,9 +37,9 @@ namespace Majik.Core.CardData.Factories;
 ///   resolution, the controller draws two cards.
 /// - <b>Equip {1}</b> — activated ability (CR 702.6a / 702.6d). Cost is
 ///   <c>{1}</c>. v1 picker is deterministic: the first creature on the
-///   controller's battlefield. Sorcery-speed restriction (CR 702.6a)
-///   would be enforced by an action-validator gate; the activated
-///   ability itself does not carry a speed marker. Same shape as
+///   controller's battlefield. CR 117.1a / 307.5 sorcery-speed
+///   restriction is enforced via the ActionValidator gate
+///   (<c>sorcerySpeed: true</c> on the activated ability). Same shape as
 ///   <see cref="ColossusHammerFactory"/>'s {8} activation.
 ///
 /// ## Lifecycle
@@ -59,8 +59,6 @@ namespace Majik.Core.CardData.Factories;
 ///
 /// ## Deferred
 ///
-/// - <b>Sorcery-speed restriction</b> on Equip activation (CR 702.6a)
-///   — same gap as <see cref="ColossusHammerFactory"/>.
 /// - <b>Attach-target prompt</b> for "creature you control" (CR 702.6b)
 ///   — v1 picks the first controller-side creature deterministically.
 /// </summary>
@@ -161,7 +159,8 @@ public static class SkullclampFactory
         //   "{1}: Attach to target creature you control. Activate only
         //    as a sorcery."
         // v1 picker: deterministic first controller-side creature.
-        // Sorcery-speed restriction deferred (see class xmldoc).
+        // CR 117.1a / 307.5 sorcery-speed restriction enforced via
+        // ActionValidator (sorcerySpeed: true below).
         // --------------------------------------------------------------
         var equipEffect = new Effect(
             $"{CardName}: equip — attach to a creature you control",
@@ -178,7 +177,8 @@ public static class SkullclampFactory
             source: card,
             controller: owner,
             costs: new ICost[] { new ManaCostCost(EquipCost) },
-            effects: new IEffect[] { equipEffect });
+            effects: new IEffect[] { equipEffect },
+            sorcerySpeed: true);
 
         card.AddAbility(equipAbility);
 

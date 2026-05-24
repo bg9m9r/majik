@@ -25,10 +25,11 @@ namespace Majik.Core.CardData.Factories;
 ///   exists, Walking Ballista enters as a 0/0 with zero counters
 ///   (state-based actions will immediately put it in the graveyard —
 ///   acceptable for unit tests that pre-seed counters manually).
-/// - <b>Sorcery-speed restriction on {4}</b>: schema records
-///   <c>"sorcerySpeed": true</c>; ActivatedAbility has no IsSorcerySpeed
-///   flag yet, so the restriction is preserved in JSON for the future
-///   without enforcement at runtime.
+/// - <b>Sorcery-speed restriction on {4}</b>: JSON
+///   <c>"sorcerySpeed": true</c> threads through
+///   <c>CardDefinitionFactory</c> onto the runtime ActivatedAbility's
+///   <c>IsSorcerySpeed</c> flag; ActionValidator gates the activation
+///   on the controller's main phase + empty stack (CR 117.1a / 307.5).
 /// - <b>Target prompt for ping damage</b>: emitted as
 ///   <c>deal_damage_stub</c> in JSON; the effect fires but does not
 ///   route damage to a chosen target. Full targeting requires the

@@ -229,7 +229,8 @@ public static class SwordOfFireAndIceFactory
         //    as a sorcery."
         // v1 picker: deterministic first controller-side creature.
         // CR 117.1a / 307.5 — sorcery-speed restriction now enforced via
-        // ActionValidator.
+        // ActionValidator (sorcerySpeed: true on the activated ability
+        // below).
         // --------------------------------------------------------------
         var equipEffect = new Effect(
             $"{CardName}: equip — attach to a creature you control",
@@ -246,7 +247,8 @@ public static class SwordOfFireAndIceFactory
             source: card,
             controller: owner,
             costs: new ICost[] { new ManaCostCost(EquipCost) },
-            effects: new IEffect[] { equipEffect });
+            effects: new IEffect[] { equipEffect },
+            sorcerySpeed: true);
 
         card.AddAbility(equipAbility);
 

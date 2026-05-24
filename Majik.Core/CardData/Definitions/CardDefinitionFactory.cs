@@ -134,15 +134,17 @@ public static class CardDefinitionFactory
     {
         var costs = definition.Costs.Select(c => BuildCost(c, card)).ToArray();
         var effects = definition.Effects.Select(e => BuildEffect(e, card, controller)).ToArray();
-        // NOTE: SorcerySpeed is informational on the definition; the runtime
-        // ActivatedAbility doesn't yet carry a SorcerySpeed flag, so the
-        // restriction is preserved in JSON for the future without enforcement
-        // here. Matches the existing C# Walking Ballista deferred note.
+        // CR 117.1a / 307.5 — "Activate only as a sorcery" rider is
+        // threaded from the definition onto the runtime ActivatedAbility
+        // so ActionValidator can gate activation on the controller's
+        // main phase + empty stack. See SorcerySpeedActivationTests for
+        // the validator behaviour.
         return new ActivatedAbility(
             source: card,
             controller: controller,
             costs: costs,
-            effects: effects);
+            effects: effects,
+            sorcerySpeed: definition.SorcerySpeed);
     }
 
     private static ICost BuildCost(CostDefinition definition, ICard card) =>

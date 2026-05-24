@@ -40,6 +40,14 @@ public class ActivatedAbility : IActivatedAbility
     public IReadOnlyList<TargetRequest> TargetRequests { get; }
 
     /// <summary>
+    /// CR 117.1a / 307.5 — "Activate only as a sorcery" rider. When true,
+    /// <see cref="Rules.ActionValidator"/> rejects activations outside the
+    /// controller's main phase or when the stack is non-empty. Defaults
+    /// to false (any-time activation).
+    /// </summary>
+    public bool IsSorcerySpeed { get; }
+
+    /// <summary>
     /// The targets chosen by the activating player's agent (parallel
     /// list-of-lists matching <see cref="TargetRequests"/>). Populated by
     /// <see cref="SetChosenTargets"/> after the agent responds. Effects
@@ -54,7 +62,8 @@ public class ActivatedAbility : IActivatedAbility
         IEnumerable<ITarget>? targets = null,
         IEnumerable<ICost>? costs = null,
         IEnumerable<IEffect>? effects = null,
-        IEnumerable<TargetRequest>? targetRequests = null)
+        IEnumerable<TargetRequest>? targetRequests = null,
+        bool sorcerySpeed = false)
     {
         if (source == null)
         {
@@ -70,6 +79,7 @@ public class ActivatedAbility : IActivatedAbility
         Controller = controller;
         Id = Guid.NewGuid();
         Timestamp = DateTime.UtcNow;
+        IsSorcerySpeed = sorcerySpeed;
         _resolutionState = ResolutionState.NotResolving();
 
         TargetRequests = targetRequests is null
