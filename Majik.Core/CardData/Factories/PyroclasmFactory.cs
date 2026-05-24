@@ -1,4 +1,5 @@
 using Majik.Core.Abilities;
+using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Players;
@@ -55,20 +56,12 @@ public static class PyroclasmFactory
     public const string PrintedManaCost = "{1}{R}";
     public const int Damage = 2;
 
-    /// <summary>
-    /// Build a Pyroclasm sorcery owned by <paramref name="owner"/>. Card
-    /// shape only — the resolve effect is built on demand via
-    /// <see cref="BuildResolveEffect"/>.
-    /// </summary>
-    public static Sorcery Create(Player owner)
-    {
-        ArgumentNullException.ThrowIfNull(owner);
+    /// <summary>CardDef DSL — card shape only. <see cref="BuildResolveEffect"/>
+    /// supplies the resolve-time "2 damage to each creature" sweep.</summary>
+    public static CardDef Define() => CardDef.Sorcery(CardName, PrintedManaCost);
 
-        var card = new Sorcery(CardName, PrintedManaCost);
-        card.SetOwner(owner);
-        card.SetController(owner);
-        return card;
-    }
+    public static Sorcery Create(Player owner) =>
+        (Sorcery)CardDefRuntime.Build(Define(), owner);
 
     /// <summary>
     /// Build Pyroclasm's resolve effect — 2 damage to every creature on

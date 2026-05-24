@@ -1,4 +1,5 @@
 using Majik.Core.Abilities;
+using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Game;
@@ -37,19 +38,13 @@ public static class TerminateFactory
     public const string CardName = "Terminate";
     public const string PrintedManaCost = "{B}{R}";
 
-    /// <summary>
-    /// Construct the Terminate card shape (Instant, {B}{R}).
-    /// Resolve behaviour is built on demand via <see cref="BuildSpellDefinition"/>.
-    /// </summary>
-    public static Instant Create(Player owner)
-    {
-        ArgumentNullException.ThrowIfNull(owner);
+    /// <summary>CardDef DSL — card shape only. Resolve behaviour
+    /// (destroy with the "can't be regenerated" rider) is built on demand
+    /// via <see cref="BuildSpellDefinition"/>.</summary>
+    public static CardDef Define() => CardDef.Instant(CardName, PrintedManaCost);
 
-        var card = new Instant(CardName, PrintedManaCost);
-        card.SetOwner(owner);
-        card.SetController(owner);
-        return card;
-    }
+    public static Instant Create(Player owner) =>
+        (Instant)CardDefRuntime.Build(Define(), owner);
 
     /// <summary>
     /// Build the <see cref="SpellDefinition"/> used when Terminate is

@@ -1,4 +1,5 @@
 using Majik.Core.Abilities;
+using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
 using Majik.Core.Game;
 using Majik.Core.Players;
@@ -35,21 +36,12 @@ public static class SpellSnareFactory
 {
     public const string CardName = "Spell Snare";
 
-    /// <summary>
-    /// Construct Spell Snare as an Instant card with owner / controller
-    /// wired. The counter SpellDefinition is built on demand via
-    /// <see cref="BuildDefinition"/> at the SpellCastFlow resolver wire-up
-    /// site (mirrors Force of Negation / Force of Will).
-    /// </summary>
-    public static Instant Create(Player owner)
-    {
-        ArgumentNullException.ThrowIfNull(owner);
+    /// <summary>CardDef DSL — card shape only. Counter-with-mv-2 body is
+    /// built via <see cref="BuildDefinition"/>.</summary>
+    public static CardDef Define() => CardDef.Instant(CardName, "{U}");
 
-        var card = new Instant(CardName, "{U}");
-        card.SetOwner(owner);
-        card.SetController(owner);
-        return card;
-    }
+    public static Instant Create(Player owner) =>
+        (Instant)CardDefRuntime.Build(Define(), owner);
 
     /// <summary>
     /// Build the "counter target spell with mana value 2" SpellDefinition.
