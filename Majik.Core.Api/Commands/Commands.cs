@@ -17,6 +17,7 @@ namespace Majik.Core.Api.Commands;
 [JsonDerivedType(typeof(ChooseXCommand), "x")]
 [JsonDerivedType(typeof(ChooseModeCommand), "mode")]
 [JsonDerivedType(typeof(ChooseManaCommand), "mana")]
+[JsonDerivedType(typeof(CancelCastCommand), "cancelCast")]
 [JsonDerivedType(typeof(ActivateManaAbilityCommand), "activateManaAbility")]
 [JsonDerivedType(typeof(OrderTriggersCommand), "order-triggers")]
 [JsonDerivedType(typeof(DeclareAttackersCommand), "attackers")]
@@ -47,6 +48,15 @@ public sealed record ChooseXCommand(int X) : GameCommand;
 public sealed record ChooseModeCommand(int ModeIndex) : GameCommand;
 
 public sealed record ChooseManaCommand(IReadOnlyList<Guid> SourceInstanceIds) : GameCommand;
+
+/// <summary>
+/// CR 601.2 / CR 727 — bail out of an in-flight cast while the engine is
+/// still at the cost-payment step. Only valid as a response to a
+/// <see cref="ChooseManaCommand"/> prompt; the engine refunds any
+/// pool-deducted mana and returns the spell to the player's hand. No
+/// stack push, no <c>SpellCastEvent</c>, no priority change.
+/// </summary>
+public sealed record CancelCastCommand() : GameCommand;
 
 /// <summary>
 /// Activate a mana ability of a permanent the player controls (CR 605.3a —

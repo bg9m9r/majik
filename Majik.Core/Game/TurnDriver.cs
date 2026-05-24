@@ -334,7 +334,38 @@ public sealed class TurnDriver
             // CR 117.7 Affinity / cost-reducers on the printed cost.
             var cost = cast.AlternativeCost?.AlternativeManaCost
                 ?? Majik.Core.Costs.CostReduction.GetEffectiveCost(cast.Card, actor);
-            var payment = await _agents[actor].ChooseManaSourcesAsync(ctx, cost, ct);
+
+            // CR 601.2g + CR 106.4 — pay from the player's already-floating
+            // mana pool first. When the pool fully covers the cost we don't
+            // need to prompt the agent for sources at all (drag-to-cast UX
+            // in the portal: float mana via ActivateManaAbilityCommand,
+            // then cast and have the cost paid silently). Hybrid/Phyrexian
+            // pips need agent input even when raw colour counts add up, so
+            // we restrict the auto-pay short-circuit to plain WUBRG+generic
+            // costs. ManaPaymentResolver.Pay with an empty source list
+            // still consumes from the actual pool — same code path the
+            // existing prompt route hits when the agent picks no sources.
+            var canAutoPayFromPool = cost.HybridPips.Count == 0
+                && cost.PhyrexianPips.Count == 0
+                && actor.ManaPool.CanPay(cost);
+
+            ManaPayment payment;
+            if (canAutoPayFromPool)
+            {
+                payment = Majik.Core.Players.Agents.ManaPayment.Empty;
+            }
+            else
+            {
+                payment = await _agents[actor].ChooseManaSourcesAsync(ctx, cost, ct);
+                // CR 601.2 / CR 727 — remote player aborted the cast at
+                // the cost-payment prompt. Nothing has been paid yet
+                // (the resolver hasn't run), so the spell simply stays
+                // in hand. No SpellCastEvent, no priority change.
+                if (payment.IsCancelled)
+                {
+                    return;
+                }
+            }
             if (!manaResolver.Pay(actor, cost, payment))
             {
                 RotateHand(cast.Card, "Pay failed");
