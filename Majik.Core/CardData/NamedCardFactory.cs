@@ -1093,6 +1093,34 @@ public static class NamedCardFactory
             // gap as Treasure Cruise / Murktide Regent.
             "Gurmag Angler" => GurmagAnglerFactory.Create(owner),
 
+            // Creature — Spirit Cleric {W} 1/2 (GuideOfSoulsFactory).
+            // Modern Horizons 3. "Whenever Guide of Souls or another
+            // creature you control with power 2 or less enters, you
+            // get {E}. Pay {E}{E}: Target creature gains flying and
+            // gets +1/+1 until end of turn."
+            // ETB triggered ability (CR 603.6a + CR 106.13) wired over
+            // CardMovedEvent → Battlefield filtered to (Creature +
+            // controller-matches + BasePower ≤ 2); includes Guide
+            // itself (printed 1 ≤ 2 — the "or another" disjunction).
+            // On trigger, Player.GainEnergy(1). v1 reads BasePower
+            // (printed) not effective power — promoting to live
+            // effective power would require threading a
+            // ContinuousEffectsService through the factory (same
+            // posture as Champion of the Parish's printed-subtype
+            // predicate). Activated ability {E}{E}: target creature
+            // gains Flying (Layer 6) + +1/+1 (Layer 7c) EOT — wired
+            // via a 1..1 "target creature" TargetRequest, a new
+            // private PayEnergyCost(2) sibling of RemoveVoidCounterCost,
+            // and EOT-scoped GrantKeywordUntilEndOfTurnEffect("Flying")
+            // + PumpUntilEndOfTurnEffect(+1,+1) registered against the
+            // target's ActiveEffects (no-op if null — shape-only).
+            // Single-arg dispatcher attaches the trigger structurally
+            // (no TriggerManager registration — same posture as
+            // AetherHubFactory.Create(Player)); energy cost gate is
+            // always live since energy lives on Player. Anchors the
+            // Modern Boros Energy / Boros Convoke axis.
+            "Guide of Souls" => GuideOfSoulsFactory.Create(owner),
+
             // Enchantment — {1}{U} (DressDownFactory). Flash. CR 613.6 + 613.7b:
             // "Creatures lose all abilities and have base power and toughness
             // 1/1." End-step sacrifice trigger wired (CR 500.4 / CR 603.1).
