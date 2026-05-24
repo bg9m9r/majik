@@ -115,6 +115,9 @@ public enum CardSubtype
     /// <summary>Monk creature subtype — Mantis Rider (Khans of Tarkir),
     /// Monastery Swiftspear. CR 205.3m.</summary>
     Monk,
+    /// <summary>Vampire creature subtype — Bloodghast (Zendikar), Vampire Nighthawk,
+    /// Olivia Voldaren. CR 205.3m.</summary>
+    Vampire,
 
     // Land subtypes (examples)
     Forest,

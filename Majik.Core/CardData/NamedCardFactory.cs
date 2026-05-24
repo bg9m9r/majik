@@ -2879,6 +2879,28 @@ public static class NamedCardFactory
             // CrypticCommandFactory — 4 TargetRequests with MinTargets=0.
             "Kolaghan's Command" => KolaghansCommandFactory.Create(owner),
 
+            // Creature — Vampire Spirit {1}{B} 2/1 (BloodghastFactory). Zendikar.
+            // Can't block (permanent CombatRestriction — wired via full overload).
+            // Landfall trigger (CR 603.6d — graveyard-resident): when a land enters
+            // under your control, return Bloodghast from your graveyard to the
+            // battlefield (v1 auto-accepts "you may"). Haste while an opponent has
+            // ≤10 life (v1 snapshot — deferred dynamic conditional keyword grant).
+            // The single-arg dispatcher path produces the correct card shape with
+            // the landfall trigger attached but not TriggerManager-registered, and
+            // without the can't-block or haste wiring.
+            "Bloodghast" => BloodghastFactory.Create(owner),
+
+            // Land (non-basic) — (CreepingTarPitFactory). Worldwake.
+            // Enters tapped (EntersTappedReplacement — wired via full overload).
+            // {T}: Add {U} and {T}: Add {B} — two ManaAbility instances wired.
+            // {1}{U}{B}: Until EOT, becomes 3/2 Elemental creature still a land +
+            // gains Shroud — Layer 4 (CreepingTarPitAnimateEffect) + Layer 7b
+            // (CreepingTarPitBecomesPTEffect) + Layer 6 (CreepingTarPitShroudEffect).
+            // Colour identity of the animated form (blue + black Layer 5 colour-set)
+            // deferred — no colour-changing effect primitive yet. Combat math via
+            // Compute deferred — same gap as Mutavault (Land runtime instance).
+            "Creeping Tar Pit" => CreepingTarPitFactory.Create(owner),
+
             // Creature — Human Shaman {1}{R} 2/1 (YoungPyromancerFactory).
             // Magic 2014. Whenever you cast an instant or sorcery spell,
             // create a 1/1 red Elemental creature token (CR 603.1).
