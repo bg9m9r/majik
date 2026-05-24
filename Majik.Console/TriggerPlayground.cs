@@ -355,7 +355,8 @@ internal static class TriggerPlayground
                 [bob] = new DeterministicBotAgent(),
             },
             turnNumberAccessor: () => 1,
-            phaseAccessor: () => PhaseStateType.Main);
+            phaseAccessor: () => PhaseStateType.Main,
+            landDropTracker: new LandDropTracker());
 
         Log("RunUntilRoundEndsAsync — both bots pass, stack drains");
         await loop.RunUntilRoundEndsAsync(alice);

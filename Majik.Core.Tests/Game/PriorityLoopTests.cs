@@ -98,6 +98,7 @@ public class PriorityLoopTests
             zoneService: new ZoneService(_bus),
             agents: agents,
             turnNumberAccessor: () => 1,
-            phaseAccessor: () => PhaseStateType.Main);
+            phaseAccessor: () => PhaseStateType.Main,
+            landDropTracker: new LandDropTracker());
     }
 }
