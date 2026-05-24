@@ -30,9 +30,6 @@ namespace Majik.Core.CardData.Factories;
 ///   trigger consumes).
 ///
 /// ## Deferred (v1 gaps)
-/// - <b>Library shuffle</b>: CR 701.19c — "then shuffle." The ETB tutor
-///   skips the shuffle (no IZone.Shuffle entry point yet; same rationale
-///   as <see cref="StoneforgeMysticFactory"/>).
 /// - <b>Reveal event</b>: the ETB tutor moves the card to hand without
 ///   emitting a CardRevealedEvent. Wire a reveal when CardRevealedEvent
 ///   plumbing is exercised by an in-engine prompt path.
@@ -80,8 +77,8 @@ public static class TrinketMageFactory
         //    artifact card with mana value 1 or less, reveal that card,
         //    put it into your hand, then shuffle."
         // v1: deterministic — take the first artifact card in the library
-        // whose mana value is ≤ 1. Shuffle and reveal-event emission are
-        // deferred (see class xmldoc).
+        // whose mana value is ≤ 1. Reveal-event emission is deferred (see
+        // class xmldoc); CR 701.20a shuffle now wired via LibraryShuffle.
         // ----------------------------------------------------------------
         var etbEffect = new Effect(
             "Trinket Mage: tutor an artifact with mana value 1 or less to hand",
@@ -96,7 +93,8 @@ public static class TrinketMageFactory
                 owner.Zones.Library.RemoveCard(pick);
                 owner.Zones.Hand.AddCard(pick);
                 pick.SetZone(ZoneType.Hand);
-                // CR 701.19c shuffle deferred — see class xmldoc.
+                // CR 701.20a — shuffle after the search resolves.
+                Majik.Core.Zones.LibraryShuffle.ShuffleLibrary(owner, "trinket-mage");
             });
 
         var etbTrigger = new TriggeredAbility(

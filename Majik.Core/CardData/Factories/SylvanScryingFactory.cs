@@ -36,10 +36,6 @@ namespace Majik.Core.CardData.Factories;
 ///   declining to find).
 ///
 /// ## Deferred (v1 gaps)
-/// - <b>Library shuffle</b> (CR 701.19c). Same rationale as the rest of
-///   <see cref="SearchSpellFactory"/> — no IZone.Shuffle entry point yet;
-///   GameDriver owns shuffle. The reveal-then-shuffle clause is a no-op
-///   here.
 /// - <b>Reveal event</b>. The picked land moves Library → Hand without
 ///   publishing a reveal event; same gap as Stoneforge Mystic's ETB tutor.
 /// </summary>

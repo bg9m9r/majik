@@ -111,8 +111,11 @@ public static class PonderFactory
                     ScryAction.Apply(caster, peeked.Count, decision);
                 }
 
-                // "You may shuffle your library." Deferred — no IZone.Shuffle
-                // entry point yet (same rationale as SearchSpellFactory).
+                // "You may shuffle your library." The IZone.Shuffle primitive
+                // is now wired (CR 701.20), but Ponder's "may" rider is a
+                // yes/no agent prompt — deferred behind the agent-prompt MVP
+                // (rank #1 in MECHANIC_DEPS). v1 auto-declines, leaving the
+                // (possibly reordered) top three on top.
                 //
                 // "Draw a card." Simple top-of-library draw; empty library
                 // flags the player for the SBA-driven loss (CR 704.5b) via

@@ -49,8 +49,8 @@ namespace Majik.Core.CardData.Factories;
 ///      caster's library to put onto the battlefield (CR 701.19a). The
 ///      closure filters to lands present in the library, dedupes, and
 ///      clamps to N. Each pick is moved Library → Battlefield untapped.
-///   4. Library shuffle (CR 701.19c) deferred — no IZone.Shuffle entry
-///      point yet; same rationale as SearchSpellFactory / PrimevalTitan.
+///   4. Library shuffle (CR 701.20a) — routed through
+///      <see cref="Majik.Core.Zones.LibraryShuffle.ShuffleLibrary"/>.
 ///
 /// ## v1 gaps
 /// - <b>"Any number" prompt</b>: the engine has no first-class "pick a
@@ -58,8 +58,6 @@ namespace Majik.Core.CardData.Factories;
 ///   API is the v1 substitute. Single-arg dispatcher path = zero lands
 ///   sacrificed → zero lands fetched (clean no-op, faithful to the lower
 ///   bound of "any number" per CR 119.x).
-/// - <b>Library shuffle</b> (CR 701.19c) — same gap as the rest of the
-///   tutor surface.
 /// - <b>Untapped vs. tapped</b>: lands enter untapped per the printed
 ///   oracle. Lands with their own ETB-tapped replacements (shock lands,
 ///   etc.) are not yet wired through ZoneService.MoveCard, so v1 uses
@@ -172,8 +170,8 @@ public static class ScapeshiftFactory
 
                     MoveLibraryToBattlefield(caster, pick);
                 }
-                // CR 701.19c — shuffle deferred (same rationale as
-                // SearchSpellFactory / PrimevalTitanFactory).
+                // CR 701.20a — shuffle after the search resolves.
+                LibraryShuffle.ShuffleLibrary(caster, "scapeshift");
             }),
         };
     }

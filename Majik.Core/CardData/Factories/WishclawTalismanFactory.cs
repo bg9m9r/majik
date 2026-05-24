@@ -40,12 +40,6 @@ namespace Majik.Core.CardData.Factories;
 ///   <b>Pay 3 life</b> uses <see cref="AdditionalCost.PayLife"/>.
 ///
 /// ## Deferred (v1 gaps)
-/// (No remaining gaps for the printed activated ability — see
-/// "Implemented" above for the timing-gate wiring.)
-/// - <b>Shuffle after search</b>: CR 701.19c. The shared search template
-///   skips the shuffle for the same reason — no <c>IZone.Shuffle</c>
-///   entry point yet. Library ordering is not exposed through the
-///   public iteration surface, so this is observably correct.
 /// - <b>Opponent-choice prompt for control change</b>: "An opponent
 ///   gains control" should prompt the controller to choose among
 ///   opponents (CR 800.4 / 113.6). The single-arg dispatcher path does
@@ -142,8 +136,8 @@ public static class WishclawTalismanFactory
                 owner.Zones.Library.RemoveCard(pick);
                 owner.Zones.Hand.AddCard(pick);
                 pick.SetZone(ZoneType.Hand);
-                // CR 701.19c — shuffle deferred (no IZone.Shuffle entry
-                // point yet; same rationale as SearchSpellFactory).
+                // CR 701.20a — shuffle after the search resolves.
+                Majik.Core.Zones.LibraryShuffle.ShuffleLibrary(owner, "wishclaw-talisman");
             });
 
         var giveAwayEffect = new Effect(

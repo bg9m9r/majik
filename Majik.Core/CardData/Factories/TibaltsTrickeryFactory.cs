@@ -155,7 +155,7 @@ public static class TibaltsTrickeryFactory
         // CR 701.20 (reveal) / CR 701.21 (exile) — exile from the top of
         // that player's library until a nonland card sharing a card type
         // with the countered spell is exiled (or the library runs out).
-        random ??= new GameRandom();
+        random ??= Majik.Core.Random.GameRandomRegistry.Get(controller);
         var library = controller.Zones.Library;
         var exile = controller.Zones.Exile;
 

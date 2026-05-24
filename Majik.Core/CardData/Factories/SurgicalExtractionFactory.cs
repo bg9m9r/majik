@@ -174,28 +174,10 @@ public static class SurgicalExtractionFactory
         card.HasType(CardType.Land) && card.HasSupertype(CardSupertype.Basic);
 
     /// <summary>
-    /// Library shuffle. CR 701.19c. No <see cref="IZone.Shuffle"/> entry
-    /// point yet, so we mirror <see cref="Majik.Core.Game.GameDriver"/>'s
-    /// shuffle pattern (remove all, randomise, re-add) using a freshly
-    /// seeded <see cref="Random"/>. Deterministic shuffles can be
-    /// achieved by the caller via injecting a known RNG seed at engine
-    /// boot; in-effect we just need the order to change post-search.
+    /// CR 701.20a — library shuffle via the shared primitive.
     /// </summary>
     private static void ShuffleLibrary(Player player)
     {
-        var lib = player.Zones.Library.GetCards().ToList();
-        foreach (var c in lib) player.Zones.Library.RemoveCard(c);
-
-        // Fisher-Yates with a local RNG. Surgical's effect is
-        // observationally complete once the library is re-emitted; the
-        // exact shuffle order is not asserted in tests.
-        var rng = new System.Random();
-        for (var i = lib.Count - 1; i > 0; i--)
-        {
-            var j = rng.Next(i + 1);
-            (lib[i], lib[j]) = (lib[j], lib[i]);
-        }
-
-        foreach (var c in lib) player.Zones.Library.AddCard(c);
+        Majik.Core.Zones.LibraryShuffle.ShuffleLibrary(player, "surgical-extraction");
     }
 }

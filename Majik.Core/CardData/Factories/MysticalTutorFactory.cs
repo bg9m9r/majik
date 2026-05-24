@@ -38,12 +38,6 @@ namespace Majik.Core.CardData.Factories;
 ///   = no-op (CR 701.19a permits declining to find).
 ///
 /// ## Deferred (v1 gaps)
-/// - <b>Library shuffle</b> (CR 701.19c). Same rationale as the rest of
-///   <see cref="SearchSpellFactory"/> — no IZone.Shuffle entry point yet;
-///   GameDriver owns shuffle. The post-search shuffle clause is a no-op
-///   here. Practically this leaves the rest of the library in its
-///   pre-search order with the picked card on top — which matches the
-///   end state Mystical Tutor's controller cares about anyway.
 /// - <b>Reveal event</b>. The picked card moves Library → top-of-Library
 ///   without publishing a reveal event; same gap as the other search
 ///   factories.
@@ -111,13 +105,17 @@ public static class MysticalTutorFactory
                     if (pick == null) return;
 
                     caster.Zones.Library.RemoveCard(pick);
+                    // CR 701.20a — shuffle the library AFTER the search.
+                    // Sequence the shuffle BEFORE the top-of-library
+                    // placement so the picked card ends up on top of a
+                    // randomized library (matches every other Vampiric /
+                    // Mystical Tutor implementation; the printed oracle
+                    // "then shuffle" historically means shuffle the rest
+                    // of the deck while preserving the just-placed card —
+                    // see ruling on Vampiric Tutor / CR 701.20).
+                    Majik.Core.Zones.LibraryShuffle.ShuffleLibrary(caster, "mystical-tutor");
                     caster.Zones.Library.InsertCardAt(0, pick);
                     pick.SetZone(ZoneType.Library);
-                    // CR 701.19c — shuffle after a search effect.
-                    // Deferred (see class xmldoc): no IZone.Shuffle entry
-                    // point yet. The picked card still ends up on top,
-                    // which is the end state Mystical Tutor controllers
-                    // actually consume next turn.
                 }),
             });
     }

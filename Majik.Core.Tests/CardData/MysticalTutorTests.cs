@@ -4,9 +4,11 @@ using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.CardData;
 using Majik.Core.CardData.Factories;
+using Majik.Core.Events;
 using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
+using Majik.Core.Random;
 using Majik.Core.ValueObjects;
 using Xunit;
 
@@ -96,6 +98,9 @@ public class MysticalTutorTests
         caster.Zones.Library.AddCard(counterspell);
 
         AgentRegistry.Set(caster, new DeterministicBotAgent());
+        // Seed the per-player RNG so the CR 701.20a shuffle of the
+        // remaining library is deterministic for this assertion.
+        GameRandomRegistry.Set(caster, new GameRandom(seed: 1));
 
         Resolve(MysticalTutorFactory.BuildSpellDefinition(caster));
 
@@ -103,6 +108,8 @@ public class MysticalTutorTests
         caster.Zones.Hand.GetCards().Should().BeEmpty();
 
         // Library still holds both cards; Counterspell must be at index 0.
+        // The remaining card (Grizzly Bears) was the only other entry so
+        // its position is unambiguous — index 1.
         var libCards = caster.Zones.Library.GetCards().ToList();
         libCards.Should().HaveCount(2);
         libCards[0].Name.Should().Be("Counterspell");
@@ -128,6 +135,12 @@ public class MysticalTutorTests
         caster.Zones.Library.AddCard(mountain);
 
         AgentRegistry.Set(caster, new DeterministicBotAgent());
+        // CR 701.20a — shuffle is now wired; the remaining (Bear,
+        // Mountain) pile is randomized between pick and re-insert. Assert
+        // on the set of remaining cards rather than their relative order,
+        // since the printed-oracle "then shuffle" is meant to scramble
+        // exactly that pile.
+        GameRandomRegistry.Set(caster, new GameRandom(seed: 1));
 
         Resolve(MysticalTutorFactory.BuildSpellDefinition(caster));
 
@@ -136,9 +149,39 @@ public class MysticalTutorTests
         var libCards = caster.Zones.Library.GetCards().ToList();
         libCards.Should().HaveCount(3);
         libCards[0].Name.Should().Be("Wrath of God");
-        // Non-eligible cards retain their relative order.
+        // Non-eligible cards still present (any order — shuffled).
         libCards.Skip(1).Select(c => c.Name)
             .Should().BeEquivalentTo(new[] { "Grizzly Bears", "Mountain" });
+    }
+
+    [Fact]
+    public void Resolve_PublishesLibraryShuffledEvent()
+    {
+        // CR 701.20a — shuffle after the search resolves; the helper
+        // publishes LibraryShuffledEvent so replay / UI can observe.
+        var caster = new Player("A", 20);
+        var counterspell = MakeInstant("Counterspell", caster, "UU");
+        caster.Zones.Library.AddCard(counterspell);
+
+        AgentRegistry.Set(caster, new DeterministicBotAgent());
+        GameRandomRegistry.Set(caster, new GameRandom(seed: 1));
+        var bus = new EventBus();
+        LibraryShuffledEvent? captured = null;
+        bus.Subscribe<LibraryShuffledEvent>(e => captured = e);
+        EventBusRegistry.Set(caster, bus);
+        try
+        {
+            Resolve(MysticalTutorFactory.BuildSpellDefinition(caster));
+
+            captured.Should().NotBeNull();
+            captured!.Player.Should().BeSameAs(caster);
+            captured.Reason.Should().Be("mystical-tutor");
+        }
+        finally
+        {
+            EventBusRegistry.Clear();
+            GameRandomRegistry.Clear();
+        }
     }
 
     [Fact]

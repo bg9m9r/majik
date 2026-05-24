@@ -51,9 +51,11 @@ internal static class SearchSpellFactory
             caster.Zones.Library.RemoveCard(pick);
             caster.Zones.Hand.AddCard(pick);
             pick.SetZone(ZoneType.Hand);
-            // CR 701.19c — shuffle after a search effect.
-            // (No IZone.Shuffle yet; GameDriver owns shuffle. Skip for MVP —
-            // search ordering not exposed via library iteration today.)
+            // CR 701.20a — "If a player searches a library, that library
+            // is shuffled afterward." LibraryShuffle pulls the active
+            // GameRandom from GameRandomRegistry (deterministic when
+            // tests seed it) and publishes a LibraryShuffledEvent.
+            LibraryShuffle.ShuffleLibrary(caster, $"search/{kindRaw}");
         }) });
 
     // Basic land names per CR 305.6.
@@ -91,8 +93,8 @@ internal static class SearchSpellFactory
             pick.SetZone(ZoneType.Battlefield);
             if (tapped && pick is Permanent perm)
                 perm.Tap();
-            // CR 701.19c — shuffle after a search effect (skipped for MVP;
-            // same rationale as SearchLibrarySpell above).
+            // CR 701.20a — shuffle after a search effect (see SearchLibrarySpell).
+            LibraryShuffle.ShuffleLibrary(caster, $"search-land/{kindRaw}");
         }) });
 
     /// <summary>
@@ -146,8 +148,8 @@ internal static class SearchSpellFactory
                 caster.Zones.Library.RemoveCard(pick);
                 caster.Zones.Battlefield.AddCard(pick);
                 pick.SetZone(ZoneType.Battlefield);
-                // CR 701.19c — shuffle after a search effect (deferred, same rationale
-                // as other search spells in this binder).
+                // CR 701.20a — shuffle after a search effect.
+                LibraryShuffle.ShuffleLibrary(caster, "green-suns-zenith");
             }) };
         });
 

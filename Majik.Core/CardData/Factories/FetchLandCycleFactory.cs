@@ -51,8 +51,6 @@ namespace Majik.Core.CardData.Factories;
 ///   <c>CanPay</c> gate still reads correctly.
 ///
 /// ## Deferred (v1 gaps)
-/// - <b>Library shuffle</b> (CR 701.19c): no <c>IZone.Shuffle</c> entry
-///   point yet — same gap as every other tutor in the codebase.
 /// - <b>Sorcery-speed gate</b>: fetchlands have no printed timing restriction;
 ///   none needed.
 /// </summary>
@@ -186,6 +184,7 @@ public static class FetchLandCycleFactory
         player.Zones.Battlefield.AddCard(pick);
         pick.SetZone(ZoneType.Battlefield);
         pick.SetController(player);
-        // CR 701.19c — shuffle library after search. Deferred (no IZone.Shuffle yet).
+        // CR 701.20a — shuffle library after search.
+        Majik.Core.Zones.LibraryShuffle.ShuffleLibrary(player, "fetch-land");
     }
 }

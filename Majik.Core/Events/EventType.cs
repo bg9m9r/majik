@@ -41,6 +41,7 @@ public enum EventType
 
     // Zone Events
     ZoneChanged,
+    LibraryShuffled,
 
     // Player Events
     LifeChanged,

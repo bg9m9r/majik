@@ -31,8 +31,8 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="IPlayerAgent.ChooseLibraryPickAsync"/>. The land enters
 ///   the battlefield untapped (no tapped qualifier in the oracle text).
 ///   v1: deterministic first basic land found when no agent is registered.
-///   Shuffle deferred — same MVP gap as every other tutor
-///   (<see cref="PathToExileFactory"/>).
+///   CR 701.20a shuffle is wired via
+///   <see cref="Majik.Core.Zones.LibraryShuffle.ShuffleLibrary"/>.
 ///
 /// Indestructible (CR 702.12) and regeneration (CR 701.15) are handled
 /// at the destroy site via
@@ -40,8 +40,6 @@ namespace Majik.Core.CardData.Factories;
 /// with <see cref="Majik.Core.Zones.ZoneMoveReason.Destroy"/>.
 ///
 /// ## Deferred (v1 gaps)
-/// - <b>Library shuffle</b>: no IZone.Shuffle entry point yet (same
-///   rationale as SearchSpellFactory / PathToExileFactory).
 /// - <b>Resolve-time opponent check</b>: if the target's controller has
 ///   changed (e.g. control-effect) to the caster by the time the spell
 ///   resolves, the spell does nothing (CR 608.2b target legality).
@@ -174,8 +172,7 @@ public static class AssassinsTrophyFactory
         pick.SetZone(ZoneType.Battlefield);
         pick.SetController(player);
         // Oracle text: "puts it onto the battlefield" — no "tapped" qualifier.
-        // CR 701.19c — shuffle after a search effect. Skipped for MVP
-        // (no IZone.Shuffle entry point yet; same rationale as
-        // PathToExileFactory / SearchSpellFactory).
+        // CR 701.20a — shuffle after the search resolves.
+        Majik.Core.Zones.LibraryShuffle.ShuffleLibrary(player, "assassins-trophy");
     }
 }

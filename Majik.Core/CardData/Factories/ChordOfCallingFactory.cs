@@ -56,9 +56,6 @@ namespace Majik.Core.CardData.Factories;
 ///   will reduce the cast cost per CR 702.51b. Callers can still exercise
 ///   the pure-function reducer (<see cref="ConvokeAlternativeCost.ReduceCost"/>)
 ///   in isolation — that is what the test suite for this card uses.
-/// - <b>Library shuffle</b> (CR 701.19c). Same rationale as the rest of
-///   <see cref="SearchSpellFactory"/> — no <c>IZone.Shuffle</c> entry
-///   point yet; GameDriver owns shuffle.
 /// </summary>
 [CardName("Chord of Calling")]
 public static class ChordOfCallingFactory
@@ -175,9 +172,8 @@ public static class ChordOfCallingFactory
                             pick.SetZone(ZoneType.Battlefield);
                             pick.SetController(caster);
                         }
-                        // CR 701.19c — shuffle after a search effect.
-                        // Deferred for the same reason as the rest of
-                        // SearchSpellFactory: no IZone.Shuffle entry point.
+                        // CR 701.20a — shuffle after a search effect.
+                        Majik.Core.Zones.LibraryShuffle.ShuffleLibrary(caster, "chord-of-calling");
                     }),
                 };
             });

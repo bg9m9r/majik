@@ -5,11 +5,11 @@ Scanner output: every `*Factory.cs` xmldoc / inline comment mentioning
 engine primitive. Each row answers: "if we ship primitive _X_, which factory
 xmldocs flagged that they're blocked on it?"
 
-- **Generated:** 2026-05-24 19:26 UTC
+- **Generated:** 2026-05-24 19:31 UTC
 - **Scanned dir:** `Majik.Core/CardData/Factories`
-- **Total mentions:** 188
+- **Total mentions:** 174
 - **Clusters:** 12
-- **Unclustered (need new registry pattern):** 124
+- **Unclustered (need new registry pattern):** 122
 
 Regenerate with `dotnet run --project Majik.Console -- mechanic-deps --md-out docs/MECHANIC_DEPS.md --json-out docs/mechanic-deps.json`.
 
@@ -17,8 +17,8 @@ Regenerate with `dotnet run --project Majik.Console -- mechanic-deps --md-out do
 
 | Rank | Primitive | CR | Factories | Mentions |
 |---:|---|---|---:|---:|
-| 1 | Agent-prompt targeting MVP | — | 24 | 31 |
-| 2 | Library shuffle (CR 701.20) | CR 701.20 | 12 | 17 |
+| 1 | Agent-prompt targeting MVP | — | 25 | 32 |
+| 2 | Library shuffle (CR 701.20) | CR 701.20 | 4 | 4 |
 | 3 | Layer-6 ability-grant subsystem (CR 613.1f) | CR 613.1f | 2 | 4 |
 | 4 | Kicker alt-cost (CR 702.33) | CR 702.33 | 2 | 2 |
 | 5 | Class leveling (CR 716) | CR 716 | 1 | 2 |
@@ -34,7 +34,7 @@ Regenerate with `dotnet run --project Majik.Console -- mechanic-deps --md-out do
 
 ### 1. Agent-prompt targeting MVP
 
-- **Blocks:** 24 factories (31 mentions)
+- **Blocks:** 25 factories (32 mentions)
 - **Implementation hint:** IPlayerAgent needs ChooseTarget / ChooseYesNo surfaces; many spell factories punt on real targeting prompts.
 
 Mentions:
@@ -81,6 +81,8 @@ Mentions:
   > v1 always plays the first land in hand when one exists; a first-class yes/no agent prompt is deferred (same gap as Sun Titan / Primeval Titan / Stoneforge Mystic).
 - `DauthiVoidwalkerFactory` (`DauthiVoidwalkerFactory.cs:13`)
   > Wiring an agent prompt mirrors the rest of the v1 factories (deferred).
+- `PonderFactory` (`PonderFactory.cs:114`)
+  > Shuffle primitive is now wired (CR 701.20), but Ponder's "may" rider is a yes/no agent prompt — deferred behind the agent-prompt MVP (rank #1 in MECHANIC_DEPS).
 - `SilvergillAdeptFactory` (`SilvergillAdeptFactory.cs:10`)
   > The actual enforcement at cast-time (agent prompt: reveal a Merfolk card from hand OR pay {3} as an additional cost) is deferred until the additional-cost framework supports reveal-based alternatives.
 - `GoblinPiledriverFactory` (`GoblinPiledriverFactory.cs:10`)
@@ -105,43 +107,17 @@ Mentions:
 ### 2. Library shuffle (CR 701.20)
 
 - **CR citation:** CR 701.20
-- **Blocks:** 12 factories (17 mentions)
+- **Blocks:** 4 factories (4 mentions)
 - **Implementation hint:** Add IZone.Shuffle / ZoneService.ShuffleLibrary. Tutor-family factories all block on this single primitive.
 
 Mentions:
 
-- `ScapeshiftFactory` (`ScapeshiftFactory.cs:10`)
-  > Library shuffle (CR 701.19c) deferred — no IZone.
-- `ScapeshiftFactory` (`ScapeshiftFactory.cs:175`)
-  > CR 701.19c — shuffle deferred (same rationale as SearchSpellFactory / PrimevalTitanFactory).
-- `WishclawTalismanFactory` (`WishclawTalismanFactory.cs:145`)
-  > CR 701.19c — shuffle deferred (no IZone.
-- `StoneforgeMysticFactory` (`StoneforgeMysticFactory.cs:99`)
-  > Shuffle and reveal- event emission are deferred (see class xmldoc).
-- `StoneforgeMysticFactory` (`StoneforgeMysticFactory.cs:119`)
-  > CR 701.19c shuffle deferred — see class xmldoc.
-- `AssassinsTrophyFactory` (`AssassinsTrophyFactory.cs:11`)
-  > Shuffle deferred — same MVP gap as every other tutor (<see cref="PathToExileFactory"/>).
-- `GreenSunsZenithFactory` (`GreenSunsZenithFactory.cs:14`)
-  > ## Deferred (v1 gaps)  - <b>Library shuffle</b> (CR 701.20a).
-- `GreenSunsZenithFactory` (`GreenSunsZenithFactory.cs:185`)
-  > Shuffle randomization itself is deferred (same gap as SearchSpellFactory).
-- `EldritchEvolutionFactory` (`EldritchEvolutionFactory.cs:182`)
-  > CR 701.19c — shuffle after a search effect (deferred — see class xmldoc / SearchSpellFactory).
-- `GoblinEngineerFactory` (`GoblinEngineerFactory.cs:111`)
-  > " v1: deterministic — take the first artifact card in the library; shuffle and reveal-event emission deferred (see class xmldoc).
-- `GoblinEngineerFactory` (`GoblinEngineerFactory.cs:132`)
-  > CR 701.19c shuffle deferred — see class xmldoc.
-- `PrimevalTitanFactory` (`PrimevalTitanFactory.cs:101`)
-  > CR 701.19a (search), CR 701.19c (shuffle deferred — see xmldoc).
-- `SearchForTomorrowFactory` (`SearchForTomorrowFactory.cs:10`)
-  > Library shuffle deferred — same gap as every other search effect in <see cref="SearchSpellFactory"/> (no IZone.
-- `GoblinMatronFactory` (`GoblinMatronFactory.cs:138`)
-  > CR 701.19c shuffle deferred — see class xmldoc.
-- `TrinketMageFactory` (`TrinketMageFactory.cs:77`)
-  > Shuffle and reveal-event emission are deferred (see class xmldoc).
-- `TrinketMageFactory` (`TrinketMageFactory.cs:99`)
-  > CR 701.19c shuffle deferred — see class xmldoc.
+- `StoneforgeMysticFactory` (`StoneforgeMysticFactory.cs:96`)
+  > Reveal-event emission is deferred (see class xmldoc); CR 701.20a shuffle now wired via LibraryShuffle.
+- `GoblinEngineerFactory` (`GoblinEngineerFactory.cs:108`)
+  > " v1: deterministic — take the first artifact card in the library; reveal-event emission deferred (see class xmldoc); CR 701.20a shuffle is now wired via LibraryShuffle.
+- `TrinketMageFactory` (`TrinketMageFactory.cs:74`)
+  > Reveal-event emission is deferred (see class xmldoc); CR 701.20a shuffle now wired via LibraryShuffle.
 - `PonderFactory` (`PonderFactory.cs:58`)
   > The "may shuffle" rider is deferred (no-op).
 
@@ -271,8 +247,6 @@ Mentions:
   > ## Deferred (v1 gaps)  - <b>Layer 1 copy effect</b>: the token's P/T + keywords are snapshotted at the moment the ability resolves; if the bearer's characteristics change later (counters, +1/+1 boost, lord anthems), the token does NOT track them.
 - `ScapeshiftFactory` (`ScapeshiftFactory.cs:10`)
   > ## v1 gaps - <b>"Any number" prompt</b>: the engine has no first-class "pick a subset of permanents to sacrifice" agent hook.
-- `ScapeshiftFactory` (`ScapeshiftFactory.cs:10`)
-  > <b>Library shuffle</b> (CR 701.19c) — same gap as the rest of the tutor surface.
 - `BridgeFromBelowFactory` (`BridgeFromBelowFactory.cs:12`)
   > ## Deferred (v1 gaps)  - <b>APNAP simultaneous-trigger ordering</b>: when one creature dies to a chained event (combat damage, board wipe), CR 603.3b sorts pending triggers by APNAP and within each player by the player's choice.
 - `TheOneRingFactory` (`TheOneRingFactory.cs:121`)
@@ -293,8 +267,6 @@ Mentions:
   > The upkeep sacrifice clause is deferred — only the type-change is live.
 - `MysticSanctuaryFactory` (`MysticSanctuaryFactory.cs:12`)
   > CanBePutOnStack"/> runs it at stack-push time; a second recheck at resolution is deferred.
-- `WishclawTalismanFactory` (`WishclawTalismanFactory.cs:11`)
-  > ## Deferred (v1 gaps) (No remaining gaps for the printed activated ability — see "Implemented" above for the timing-gate wiring.
 - `AshiokDreamRenderFactory` (`AshiokDreamRenderFactory.cs:11`)
   > Enforcement at the actual library-search sites is DEFERRED (same gap as <see cref="LeoninArbiterSearchRestrictionEffect"/>): the engine currently lacks a unified library-search surface that enforcement could hook.
 - `AshiokDreamRenderFactory` (`AshiokDreamRenderFactory.cs:11`)
@@ -351,6 +323,8 @@ Mentions:
   > " (LTB exile clause deferred — see Deferred section.
 - `MurderousRiderFactory` (`MurderousRiderFactory.cs:12`)
   > Adding this requires the same replacement-effect surface used by the Anger of the Gods exile rider (see <see cref="AngerOfTheGodsFactory"/>); deferred to keep the v1 ship minimal.
+- `GreenSunsZenithFactory` (`GreenSunsZenithFactory.cs:14`)
+  > ## Deferred (v1 gaps)  - <b>Replacing the spell's destination via the stack resolver</b>.
 - `PriestOfFellRitesFactory` (`PriestOfFellRitesFactory.cs:12`)
   > </para>  ## Deferred (v1 gaps) (The activate-as-sorcery timing window is now enforced via the ActionValidator gate; see "Implemented" above.
 - `PriestOfFellRitesFactory` (`PriestOfFellRitesFactory.cs:128`)
@@ -485,8 +459,6 @@ Mentions:
   > <b>Combat math through Compute</b>: same gap as Karn's animate- artifact (<see cref="KarnAnimateArtifactEffect"/>).
 - `MutavaultFactory` (`MutavaultFactory.cs:11`)
   > Mutavault was on the battlefield long enough but its Creature-ness is fresh — the intricate "had Creature type continuously since untap step" bookkeeping is deferred; the test suite asserts shape, not attack legality.
-- `FetchLandCycleFactory` (`FetchLandCycleFactory.cs:11`)
-  > Shuffle</c> entry point yet — same gap as every other tutor in the codebase.
 - `AtraxaGrandUnifierFactory` (`AtraxaGrandUnifierFactory.cs:10`)
   > No live observer cares yet (same gap as the rest of the reveal-and-pick factories — Ancient Stirrings, Goblin Matron, Mystical Tutor).
 - `CavernOfSoulsFactory` (`CavernOfSoulsFactory.cs:120`)
