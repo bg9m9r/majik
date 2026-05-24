@@ -138,19 +138,24 @@ public static class WurmcoilEngineFactory
     private static (Creature deathtouch, Creature lifelink) CreateWurmTokens(
         Player controller, ZoneService? zoneService)
     {
+        // CR 105.2c / CR 111.4 — printed "3/3 colorless Phyrexian Wurm
+        // artifact creature token". Empty Colors list = explicit
+        // colourless.
         var dtSpec = new TokenFactory.TokenSpec(
             Name: "Phyrexian Wurm",
             Power: 3,
             Toughness: 3,
             Subtypes: new[] { CardSubtype.Phyrexian, CardSubtype.Wurm },
-            Keywords: new[] { "Deathtouch" });
+            Keywords: new[] { "Deathtouch" },
+            Colors: Array.Empty<Majik.Core.ValueObjects.ManaColor>());
 
         var llSpec = new TokenFactory.TokenSpec(
             Name: "Phyrexian Wurm",
             Power: 3,
             Toughness: 3,
             Subtypes: new[] { CardSubtype.Phyrexian, CardSubtype.Wurm },
-            Keywords: new[] { "Lifelink" });
+            Keywords: new[] { "Lifelink" },
+            Colors: Array.Empty<Majik.Core.ValueObjects.ManaColor>());
 
         var dt = TokenFactory.CreateOnBattlefield(dtSpec, controller, zoneService);
         var ll = TokenFactory.CreateOnBattlefield(llSpec, controller, zoneService);

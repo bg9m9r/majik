@@ -44,11 +44,6 @@ namespace Majik.Core.CardData.Factories;
 ///   owner for the free-cast callback.
 ///
 /// ## Deferred (v1 gaps)
-/// - <b>Token colour</b>: The Illusion token is printed as "blue". v1 does not
-///   inject colour identity into tokens — the engine's token colour system
-///   (same gap as Crashing Footfalls' green Rhinos, Pact of the Titan's red
-///   Giant). The token is created colourless by the Creature constructor; a
-///   future colour-layer pass will populate this.
 /// - <b>Legality prompt</b>: CR 601.2c — choosing 0 targets requires player
 ///   confirmation. v1 trusts the caller to supply 0 or 1 chosen targets via
 ///   <see cref="TriggeredAbility.SetChosenTargets"/>; the agent prompt is
@@ -198,13 +193,15 @@ public static class SkyclaveApparitionFactory
 
                 // Create X/X blue Illusion token under the permanent's controller.
                 // CR 111.6 — tokens are created on the battlefield.
-                // NOTE (v1): token colour (blue) is not wired — same gap as
-                // Crashing Footfalls' green Rhinos / Pact of the Titan's red Giant.
+                // CR 105 / CR 903.4 — blue is stamped via TokenSpec.Colors.
                 var spec = new TokenFactory.TokenSpec(
                     Name: "Illusion",
                     Power: x,
                     Toughness: x,
-                    Subtypes: new[] { CardSubtype.Illusion });
+                    Subtypes: new[] { CardSubtype.Illusion },
+                    // CR 105 / CR 111.4 — printed "X/X blue Illusion
+                    // creature token".
+                    Colors: new[] { Majik.Core.ValueObjects.ManaColor.Blue });
 
                 TokenFactory.CreateOnBattlefield(spec, exiledController, zones: null);
             });

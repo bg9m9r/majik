@@ -54,11 +54,6 @@ namespace Majik.Core.CardData.Factories;
 ///
 /// ## Deferred (v1 gaps)
 ///
-/// - <b>Token-creature colour identity</b>: tokens carry subtype +
-///   keywords but no explicit colour today (same scope decision as
-///   Crashing Footfalls' "green" Rhinos, Wurmcoil's "colorless" Wurms).
-///   Bridge's 2/2 black Zombie tokens are documented as black; the
-///   runtime token has no colour stamp.
 /// - <b>APNAP simultaneous-trigger ordering</b>: when one creature dies
 ///   to a chained event (combat damage, board wipe), CR 603.3b sorts
 ///   pending triggers by APNAP and within each player by the player's
@@ -202,9 +197,8 @@ public static class BridgeFromBelowFactory
     /// publishes a <see cref="CardMovedEvent"/> when a live
     /// <see cref="ZoneService"/> is threaded in (downstream ETB
     /// listeners — Soul Warden, Cult of the Waxing Moon — fire).
-    /// Colour identity ("black") is documented but the runtime token
-    /// has no colour stamp (same gap as Crashing Footfalls / Pact of
-    /// the Titan / Wurmcoil Engine).
+    /// CR 105 / CR 111.4 — black is stamped via
+    /// <see cref="TokenFactory.TokenSpec.Colors"/>.
     /// </summary>
     private static Creature CreateZombieToken(Player controller, ZoneService? zoneService)
     {
@@ -212,7 +206,9 @@ public static class BridgeFromBelowFactory
             Name: "Zombie",
             Power: 2,
             Toughness: 2,
-            Subtypes: new[] { CardSubtype.Zombie });
+            Subtypes: new[] { CardSubtype.Zombie },
+            // CR 105 / CR 111.4 — printed "2/2 black Zombie creature token".
+            Colors: new[] { Majik.Core.ValueObjects.ManaColor.Black });
 
         return TokenFactory.CreateOnBattlefield(spec, controller, zoneService);
     }

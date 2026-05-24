@@ -63,11 +63,6 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="PsychicFrogFactory"/> / <see cref="FaithlessLootingFactory"/>
 ///   /<see cref="SwordOfFeastAndFamineFactory"/>. Discard prompt would
 ///   inherit the deterministic-first-card v1 picker.
-/// - <b>Token colour identity (blue + red)</b>: Mercenary token is created
-///   as colourless under the v1 token shape — same gap as Esika's Chariot's
-///   green Cats, Crashing Footfalls' green Rhinos, Pact of the Titan's red
-///   Giant. Subtype + P/T + token flag are correct;
-///   <c>CardColors</c> plumbing for tokens is the broader fix.
 /// - <b>Prowess pump on the token</b>: the <c>"Prowess"</c> keyword marker
 ///   is attached to the Mercenary token so structural shape inspection
 ///   (and `KeywordAbility` introspection) reads Prowess, but the
@@ -121,7 +116,6 @@ public static class StormchasersTalentFactory
         // ETB trigger — CR 603.6a.
         //   "When this Class enters, create a 1/1 blue and red Mercenary
         //    creature token with prowess."
-        // Token colour identity (blue + red) deferred — see class xmldoc.
         // Prowess pump on token deferred — keyword marker only, see class
         // xmldoc.
         // ----------------------------------------------------------------
@@ -143,10 +137,11 @@ public static class StormchasersTalentFactory
     }
 
     /// <summary>
-    /// CR 603.6a ETB effect — create a 1/1 Mercenary creature token with
-    /// the <c>"Prowess"</c> keyword marker under <paramref name="controller"/>'s
-    /// control. Token colour identity (blue + red) deferred (see class
-    /// xmldoc); Prowess pump on the token deferred (see class xmldoc).
+    /// CR 603.6a ETB effect — create a 1/1 blue and red Mercenary creature
+    /// token with the <c>"Prowess"</c> keyword marker under
+    /// <paramref name="controller"/>'s control. CR 105 / CR 111.4 — colour
+    /// identity stamped via <see cref="TokenFactory.TokenSpec.Colors"/>;
+    /// Prowess pump on the token deferred (see class xmldoc).
     /// </summary>
     private static Creature CreateMercenaryToken(Player controller, ZoneService? zones)
     {
@@ -155,7 +150,13 @@ public static class StormchasersTalentFactory
             Power: 1,
             Toughness: 1,
             Subtypes: new[] { CardSubtype.Mercenary },
-            Keywords: new[] { "Prowess" });
+            Keywords: new[] { "Prowess" },
+            // CR 105 / CR 111.4 — printed "1/1 blue and red Mercenary".
+            Colors: new[]
+            {
+                Majik.Core.ValueObjects.ManaColor.Blue,
+                Majik.Core.ValueObjects.ManaColor.Red,
+            });
 
         return TokenFactory.CreateOnBattlefield(spec, controller, zones);
     }

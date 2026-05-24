@@ -58,7 +58,8 @@ public sealed class CreateTokensTemplate : ISpellTemplate
         return TokensSpellFactory.CreateTokensSpell(
             ctx.Caster, n, p, t,
             @params["subtype"],
-            TokensSpellFactory.ParseKeywordList(@params["keywords"]));
+            TokensSpellFactory.ParseKeywordList(@params["keywords"]),
+            colourRaw: @params["colour"]);
     }
 
     private static int ParseIntOrZero(string s) =>

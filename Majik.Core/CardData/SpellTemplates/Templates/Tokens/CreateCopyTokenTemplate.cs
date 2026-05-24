@@ -64,12 +64,16 @@ public sealed class CreateCopyTokenTemplate : ISpellTemplate
                         .Select(k => k.Keyword)
                         .Distinct(StringComparer.OrdinalIgnoreCase)
                         .ToArray();
+                    // CR 706.2 — copy effects snapshot the source's
+                    // colour identity alongside its other copiable values.
+                    var colours = CardColors.GetColors(src).ToList();
                     var spec = new TokenFactory.TokenSpec(
                         Name: src.Name,
                         Power: src.BasePower,
                         Toughness: src.BaseToughness,
                         Subtypes: src.Subtypes.ToArray(),
-                        Keywords: keywords);
+                        Keywords: keywords,
+                        Colors: colours);
                     // Spawn under the spell's caster, not the source's owner —
                     // CR 707.2: a copy token's controller is the controller
                     // of the effect creating it.

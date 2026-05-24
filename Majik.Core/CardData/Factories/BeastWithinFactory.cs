@@ -27,9 +27,8 @@ namespace Majik.Core.CardData.Factories;
 ///   the controller at the moment of resolution (CR 608.2b
 ///   last-known-information) receives the token via
 ///   <see cref="TokenFactory.CreateOnBattlefield"/>. The token is a
-///   3/3 green Beast creature token (CR 111.4 — token characteristics
-///   include colour; token "green" colour identity deferred — same gap as
-///   Crashing Footfalls' green Rhinos; token enters with
+///   3/3 green Beast creature token (CR 111.4 — green stamped via
+///   <see cref="TokenFactory.TokenSpec.Colors"/>; token enters with
 ///   <c>HasSummoningSickness = true</c> via <see cref="TokenFactory"/>).
 ///   <see cref="CardSubtype.Beast"/> already exists in the subtype enum.
 /// - If the target is illegal at resolution (CR 608.2b), neither the
@@ -42,10 +41,6 @@ namespace Majik.Core.CardData.Factories;
 /// half of the spell is unconditional per printed wording and fires even
 /// when the destroy is cancelled.
 ///
-/// ## Deferred (v1 gaps)
-/// - <b>Token colour (green)</b>: TokenFactory does not yet model token
-///   colour identity (same gap as Pact of the Titan's "red" Giant token,
-///   Crashing Footfalls' "green" Rhino tokens).
 /// </summary>
 [CardName("Beast Within")]
 public static class BeastWithinFactory
@@ -55,7 +50,9 @@ public static class BeastWithinFactory
 
     private static readonly TokenFactory.TokenSpec BeastTokenSpec =
         new(Name: "Beast", Power: 3, Toughness: 3,
-            Subtypes: new[] { CardSubtype.Beast });
+            Subtypes: new[] { CardSubtype.Beast },
+            // CR 105 / CR 111.4 — printed "3/3 green Beast creature token".
+            Colors: new[] { Majik.Core.ValueObjects.ManaColor.Green });
 
     /// <summary>
     /// Construct the Beast Within card shape (Instant, {2}{G}).
@@ -133,9 +130,8 @@ public static class BeastWithinFactory
                             OracleSpellBinder.MoveToGraveyard(target, Majik.Core.Zones.ZoneMoveReason.Destroy);
 
                             // "Its controller creates a 3/3 green Beast creature
-                            // token." (CR 111.4 / CR 111.6). Token colour (green)
-                            // deferred — same gap as Pact of the Titan / Crashing
-                            // Footfalls.
+                            // token." (CR 111.4 / CR 111.6). Green colour identity
+                            // is stamped on the spec (CR 105 / CR 903.4).
                             if (targetController == null) return;
                             TokenFactory.CreateOnBattlefield(BeastTokenSpec, targetController);
                         }),
