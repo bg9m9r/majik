@@ -849,6 +849,22 @@ public static class NamedCardFactory
             // artifact/land creatures are excluded.
             "Galvanic Discharge" => GalvanicDischargeFactory.Create(owner),
 
+            // Creature — Zombie {B}{B}{B} 3/2 (GeralfsMessengerFactory).
+            // Dark Ascension. "Geralf's Messenger enters tapped. When
+            // Geralf's Messenger enters, target opponent loses 2 life.
+            // Undying." (CR 614.1c + CR 603.6a + CR 119.3 + CR 702.93.)
+            // ETB-tapped replacement registered via EntersTappedReplacement
+            // on the supplied ReplacementBus (single-arg dispatcher path
+            // omits the replacement — Messenger enters untapped on shape-
+            // only paths, mirroring Creeping Tar Pit / Valakut). ETB
+            // triggered ability with a 1..1 "target opponent" TargetRequest
+            // (mirrors Hidetsugu's Second Rite). Undying via the shared
+            // UndyingFactory.Build helper. Undying return re-applies the
+            // enters-tapped replacement per CR 614.1c. Use the
+            // (owner, eventBus, triggers, replacements) overload for fully-
+            // wired behavior.
+            "Geralf's Messenger" => GeralfsMessengerFactory.Create(owner),
+
             // Sorcery — {1}{R} (TribalFlamesFactory). Onslaught / Modern Horizons 2.
             // "Tribal Flames deals X damage to any target, where X is the
             //  number of basic land types among lands you control." CR 702.16
