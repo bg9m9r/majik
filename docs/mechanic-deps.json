@@ -1,10 +1,10 @@
 {
-  "generated_utc": "2026-05-24T19:20:02.5367334Z",
-  "scanned_dir": "/home/brett/Projects/majik.project/majik.core/.claude/worktrees/agent-a74b6faf7a502b3ce/Majik.Core/CardData/Factories",
-  "total_mentions": 219,
-  "distinct_factories": 144,
-  "cluster_count": 16,
-  "unclustered_count": 127,
+  "generated_utc": "2026-05-24T19:23:17.4025756Z",
+  "scanned_dir": "/home/brett/Projects/majik.project/majik.core/.claude/worktrees/agent-a0e91ec5cb2c11031/Majik.Core/CardData/Factories",
+  "total_mentions": 200,
+  "distinct_factories": 133,
+  "cluster_count": 14,
+  "unclustered_count": 123,
   "clusters": [
     {
       "primitive_id": "agent-prompt-targeting",
@@ -459,133 +459,6 @@
       ]
     },
     {
-      "primitive_id": "regeneration",
-      "display_name": "Regeneration shield (CR 701.15)",
-      "comp_rules_citation": "CR 701.15",
-      "implementation_hint": "ReplacementBus filter on ZoneMoveIntent battlefield\u2192graveyard, gated by sourceCard.HasAbility(\u0022Regenerate\u0022).",
-      "factory_count": 6,
-      "mention_count": 8,
-      "factories": [
-        "BeastWithinFactory",
-        "DrownInTheLochFactory",
-        "EmberethShieldbreakerFactory",
-        "MurderousCutFactory",
-        "MurderousRiderFactory",
-        "TerminateFactory"
-      ],
-      "mentions": [
-        {
-          "factory": "DrownInTheLochFactory",
-          "file": "DrownInTheLochFactory.cs",
-          "line": 13,
-          "sentence": "Indestructible / regeneration riders are deferred (same gap as \u003Csee cref=\u0022SlaughterPactFactory\u0022/\u003E and the rest of the single-target destroy family)."
-        },
-        {
-          "factory": "DrownInTheLochFactory",
-          "file": "DrownInTheLochFactory.cs",
-          "line": 234,
-          "sentence": "CR 701.7 \u2014 destroy \u2192 owner\u0027s graveyard (Indestructible / regeneration deferred, same gap as SlaughterPactFactory).",
-          "cr": "CR 701.7"
-        },
-        {
-          "factory": "TerminateFactory",
-          "file": "TerminateFactory.cs",
-          "line": 58,
-          "sentence": "The \u0022it can\u0027t be regenerated\u0022 rider is deferred \u2014 the engine has no regeneration shield surface in v1 (see class xmldoc)."
-        },
-        {
-          "factory": "TerminateFactory",
-          "file": "TerminateFactory.cs",
-          "line": 100,
-          "sentence": "\u0022It can\u0027t be regenerated\u0022 rider is deferred \u2014 no regeneration shield surface in the engine yet (same gap as Wrath of God / Day of Judgment\u0027s can\u0027t-regenerate clause)."
-        },
-        {
-          "factory": "MurderousRiderFactory",
-          "file": "MurderousRiderFactory.cs",
-          "line": 157,
-          "sentence": "Indestructible / regeneration deferred (same gap as SlaughterPact)."
-        },
-        {
-          "factory": "MurderousCutFactory",
-          "file": "MurderousCutFactory.cs",
-          "line": 11,
-          "sentence": "1 target-creature request; \u0022indestructible\u0022 \u002B \u0022can\u0027t be regenerated\u0022 riders deferred \u2014 same lossy MVP as \u003Cc\u003EDestroySpellFactory."
-        },
-        {
-          "factory": "BeastWithinFactory",
-          "file": "BeastWithinFactory.cs",
-          "line": 122,
-          "sentence": "Indestructible / regeneration rider deferred (same gap as Terminate / Abrupt Decay / Slaughter Pact)."
-        },
-        {
-          "factory": "EmberethShieldbreakerFactory",
-          "file": "EmberethShieldbreakerFactory.cs",
-          "line": 126,
-          "sentence": "Indestructible / regeneration deferred (same gap as SlaughterPact)."
-        }
-      ]
-    },
-    {
-      "primitive_id": "indestructible-bypass",
-      "display_name": "Indestructible bypass on destroy (CR 702.12)",
-      "comp_rules_citation": "CR 702.12",
-      "implementation_hint": "Destroy intent should consult a HasIndestructible() predicate before issuing ZoneMoveIntent \u2192 graveyard.",
-      "factory_count": 6,
-      "mention_count": 7,
-      "factories": [
-        "AbruptDecayFactory",
-        "AssassinsTrophyFactory",
-        "BeastWithinFactory",
-        "KolaghansCommandFactory",
-        "TerminateFactory",
-        "WrathOfTheSkiesFactory"
-      ],
-      "mentions": [
-        {
-          "factory": "TerminateFactory",
-          "file": "TerminateFactory.cs",
-          "line": 11,
-          "sentence": "\u003Cb\u003EIndestructible\u003C/b\u003E: the destroy call moves the creature to the graveyard without checking for Indestructible \u2014 same gap as every other single-target destroy template."
-        },
-        {
-          "factory": "KolaghansCommandFactory",
-          "file": "KolaghansCommandFactory.cs",
-          "line": 249,
-          "sentence": "Indestructible rider deferred."
-        },
-        {
-          "factory": "AssassinsTrophyFactory",
-          "file": "AssassinsTrophyFactory.cs",
-          "line": 11,
-          "sentence": "\u003Cb\u003EIndestructible\u003C/b\u003E: the destroy call moves the permanent to the graveyard without checking for Indestructible (same gap as every other single-target destroy template \u2014 Terminate, Abrupt Decay, Slaughter Pact)."
-        },
-        {
-          "factory": "AssassinsTrophyFactory",
-          "file": "AssassinsTrophyFactory.cs",
-          "line": 133,
-          "sentence": "Indestructible rider deferred (same gap as Terminate / Abrupt Decay / Slaughter Pact)."
-        },
-        {
-          "factory": "WrathOfTheSkiesFactory",
-          "file": "WrathOfTheSkiesFactory.cs",
-          "line": 12,
-          "sentence": "## v1 simplifications  - \u003Cb\u003EIndestructible bypass\u003C/b\u003E: same gap as \u003Csee cref=\u0022WrathOfGodFactory\u0022/\u003E / \u003Csee cref=\u0022EngineeredExplosivesFactory\u0022/\u003E \u2014 \u003Csee cref=\u0022OracleSpellBinder."
-        },
-        {
-          "factory": "BeastWithinFactory",
-          "file": "BeastWithinFactory.cs",
-          "line": 12,
-          "sentence": "\u003Cb\u003EIndestructible / regeneration\u003C/b\u003E: the destroy call moves the permanent to the graveyard without checking for Indestructible or an active regeneration shield (same gap as every other single-target destroy template \u2014 Terminate, Abrupt Decay, Slaughter Pact)."
-        },
-        {
-          "factory": "AbruptDecayFactory",
-          "file": "AbruptDecayFactory.cs",
-          "line": 11,
-          "sentence": "\u003Cb\u003EIndestructible\u003C/b\u003E: the destroy call moves the permanent to the graveyard without checking for Indestructible \u2014 same gap as every other single-target destroy template (Slaughter Pact, Force of Vigor destroy path, etc."
-        }
-      ]
-    },
-    {
       "primitive_id": "layer6-ability-grant",
       "display_name": "Layer-6 ability-grant subsystem (CR 613.1f)",
       "comp_rules_citation": "CR 613.1f",
@@ -909,12 +782,6 @@
       "sentence": "Real prompt deferred until IPlayerAgent grows a ChooseYesNoAsync surface."
     },
     {
-      "factory": "TerminateFactory",
-      "file": "TerminateFactory.cs",
-      "line": 11,
-      "sentence": "\u003Cb\u003E\u0022It can\u0027t be regenerated\u0022\u003C/b\u003E: the engine has no regeneration shield surface in v1 (same gap as Wrath of God\u0027s and DayOfJudgment\u0027s can\u0027t-be-regenerated rider, and SlaughterPact\u0027s indestructible/regeneration note)."
-    },
-    {
       "factory": "IzzetCharmFactory",
       "file": "IzzetCharmFactory.cs",
       "line": 211,
@@ -1102,12 +969,6 @@
       "file": "MurderousRiderFactory.cs",
       "line": 12,
       "sentence": "Adding this requires the same replacement-effect surface used by the Anger of the Gods exile rider (see \u003Csee cref=\u0022AngerOfTheGodsFactory\u0022/\u003E); deferred to keep the v1 ship minimal."
-    },
-    {
-      "factory": "MurderousRiderFactory",
-      "file": "MurderousRiderFactory.cs",
-      "line": 12,
-      "sentence": "MoveToGraveyard\u0022/\u003E; same gap as \u003Csee cref=\u0022SlaughterPactFactory\u0022/\u003E and the rest of the single-target destroy family."
     },
     {
       "factory": "PriestOfFellRitesFactory",
@@ -1383,13 +1244,7 @@
     {
       "factory": "AbruptDecayFactory",
       "file": "AbruptDecayFactory.cs",
-      "line": 11,
-      "sentence": "\u003C/item\u003E \u003C/list\u003E  ## Deferred (v1 gaps)"
-    },
-    {
-      "factory": "AbruptDecayFactory",
-      "file": "AbruptDecayFactory.cs",
-      "line": 57,
+      "line": 58,
       "sentence": "Enforcement is deferred \u2014 see xmldoc."
     },
     {
@@ -1434,12 +1289,6 @@
       "file": "YawgmothsWillFactory.cs",
       "line": 10,
       "sentence": "A bus-aware overload could clear it; deferred."
-    },
-    {
-      "factory": "EmberethShieldbreakerFactory",
-      "file": "EmberethShieldbreakerFactory.cs",
-      "line": 12,
-      "sentence": "MoveToGraveyard\u0022/\u003E; same gap as \u003Csee cref=\u0022SlaughterPactFactory\u0022/\u003E and the rest of the single-target destroy family."
     },
     {
       "factory": "GoblinWelderFactory",

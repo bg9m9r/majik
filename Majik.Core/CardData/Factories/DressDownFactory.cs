@@ -108,7 +108,9 @@ public static class DressDownFactory
             () =>
             {
                 if (card.Zone != ZoneType.Battlefield) return;
-                OracleSpellBinder.MoveToGraveyard(card);
+                // CR 701.16 — sacrifice. Bypasses Indestructible /
+                // regeneration per CR 702.12b.
+                OracleSpellBinder.MoveToGraveyard(card, Majik.Core.Zones.ZoneMoveReason.Sacrifice);
             });
 
         var endStepSac = new TriggeredAbility(

@@ -23,17 +23,13 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="OracleSpellBinder.MoveToGraveyard"/> (CR 701.7) iff it
 ///   is still on the battlefield and is a creature (CR 608.2b).
 ///
-/// ## Deferred (v1 gaps)
-/// - <b>"It can't be regenerated"</b>: the engine has no regeneration
-///   shield surface in v1 (same gap as Wrath of God's and
-///   DayOfJudgment's can't-be-regenerated rider, and SlaughterPact's
-///   indestructible/regeneration note). The printed rider is noted here
-///   for completeness — it would be implemented as a one-shot
-///   RegenerationShield suppression flag on the targeted permanent at
-///   resolution time.
-/// - <b>Indestructible</b>: the destroy call moves the creature to the
-///   graveyard without checking for Indestructible — same gap as every
-///   other single-target destroy template.
+/// Indestructible (CR 702.12) and the "it can't be regenerated" rider
+/// (CR 701.15) are handled at the destroy site:
+/// <see cref="OracleSpellBinder.MoveToGraveyard(ICard, ZoneMoveReason)"/>
+/// is invoked with
+/// <see cref="Majik.Core.Zones.ZoneMoveReason.DestroyNoRegeneration"/>,
+/// so indestructible cancels the destroy (CR 702.12b) and any active
+/// regeneration shield on the target is bypassed rather than consumed.
 /// </summary>
 [CardName("Terminate")]
 public static class TerminateFactory
@@ -61,8 +57,9 @@ public static class TerminateFactory
     /// targeted creature is destroyed (CR 701.7) iff it is still on the
     /// battlefield and is a creature (CR 608.2b — illegal target → no-op).
     ///
-    /// The "it can't be regenerated" rider is deferred — the engine has
-    /// no regeneration shield surface in v1 (see class xmldoc).
+    /// The "it can't be regenerated" rider is honoured via
+    /// <see cref="Majik.Core.Zones.ZoneMoveReason.DestroyNoRegeneration"/>
+    /// (see class xmldoc).
     /// </summary>
     /// <param name="resolver">Resolves the raw target token to a
     /// live engine object (chosen target → live game object).</param>
@@ -98,10 +95,11 @@ public static class TerminateFactory
                             if (target.Zone != ZoneType.Battlefield) return;
 
                             // CR 701.7 — Destroy. "It can't be regenerated"
-                            // rider is deferred — no regeneration shield surface
-                            // in the engine yet (same gap as Wrath of God /
-                            // Day of Judgment's can't-regenerate clause).
-                            OracleSpellBinder.MoveToGraveyard(target);
+                            // is honoured via DestroyNoRegeneration:
+                            // indestructible (CR 702.12) still cancels the
+                            // destroy, but any active regeneration shield
+                            // (CR 701.15) is bypassed.
+                            OracleSpellBinder.MoveToGraveyard(target, Majik.Core.Zones.ZoneMoveReason.DestroyNoRegeneration);
                         }),
                 };
             });

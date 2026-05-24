@@ -204,10 +204,21 @@ public static class Fx
     // ------------------------------------------------------------------
 
     /// <summary>CR 701.7 — move <paramref name="card"/> from the
-    /// battlefield to its owner's graveyard. Aliases
-    /// <see cref="OracleSpellBinder.MoveToGraveyard"/>.</summary>
+    /// battlefield to its owner's graveyard, treated as a "destroy"
+    /// effect (Indestructible / regeneration gates apply). Aliases
+    /// <see cref="OracleSpellBinder.MoveToGraveyard(ICard)"/>.</summary>
     public static void MoveToGraveyard(ICard card)
         => OracleSpellBinder.MoveToGraveyard(card);
+
+    /// <summary>
+    /// Move <paramref name="card"/> from the battlefield to its owner's
+    /// graveyard with an explicit <paramref name="reason"/>. Routes
+    /// through the binder's reason-gated path so destroy effects honour
+    /// Indestructible (CR 702.12) and regeneration (CR 701.15), while
+    /// sacrifice / SBA / mill paths bypass.
+    /// </summary>
+    public static void MoveToGraveyard(ICard card, ZoneMoveReason reason)
+        => OracleSpellBinder.MoveToGraveyard(card, reason);
 
     /// <summary>CR 701.20 — move <paramref name="card"/> from its current
     /// zone to its owner's exile zone. Aliases the binder's existing
@@ -322,14 +333,14 @@ public static class Fx
 
     /// <summary>
     /// CR 701.16 — sacrifice <paramref name="permanent"/>. Owner-routed
-    /// move from battlefield to graveyard. Aliases
-    /// <see cref="OracleSpellBinder.MoveToGraveyard"/> — sacrifice and
-    /// destroy share the same zone-move tail; the cost / decision
-    /// difference is captured upstream (sacrifice is an action of the
-    /// controlling player, destroy is an effect).
+    /// move from battlefield to graveyard. Routes through
+    /// <see cref="OracleSpellBinder.MoveToGraveyard(ICard, ZoneMoveReason)"/>
+    /// with <see cref="ZoneMoveReason.Sacrifice"/> so the binder skips
+    /// the Indestructible (CR 702.12b) / regeneration (CR 701.15c)
+    /// gates — sacrifice is not a "destroy" effect.
     /// </summary>
     public static void Sacrifice(ICard permanent)
-        => OracleSpellBinder.MoveToGraveyard(permanent);
+        => OracleSpellBinder.MoveToGraveyard(permanent, ZoneMoveReason.Sacrifice);
 
     // ------------------------------------------------------------------
     // Stack (CR 701.5) — counter target spell/ability.

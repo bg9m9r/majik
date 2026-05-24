@@ -39,15 +39,12 @@ namespace Majik.Core.CardData.Factories;
 /// battlefield (CR 701.7 — destroy applies to ALL creatures, regardless
 /// of controller). The factory carries the multi-player sweep locally.
 ///
-/// ## v1 simplifications
-/// - "They can't be regenerated" is a no-op rider — the engine doesn't
-///   honour CR 701.15 (Regenerate) yet, so destruction is unconditional
-///   regardless of the clause. Same gap as
-///   <see cref="Majik.Core.CardData.SpellTemplates.Templates.Destroy.DestroyAllCreaturesTemplate"/>.
-/// - <see cref="Majik.Core.Abilities.Keywords.KeywordType.Indestructible"/>
-///   bypass is also lossy at v1 — <see cref="OracleSpellBinder.MoveToGraveyard"/>
-///   doesn't yet consult indestructibility (CR 702.12). Same gap as the
-///   sweep template.
+/// Wrath / Damnation pass
+/// <see cref="Majik.Core.Zones.ZoneMoveReason.DestroyNoRegeneration"/>
+/// to <see cref="OracleSpellBinder.MoveToGraveyard"/>: Indestructible
+/// (CR 702.12) still cancels the destroy, but any active regeneration
+/// shield (CR 701.15) is bypassed rather than consumed — honouring the
+/// printed "They can't be regenerated." rider.
 /// </summary>
 [CardName("Wrath of God")]
 [CardName("Damnation")]
@@ -126,7 +123,11 @@ public static class WrathOfGodFactory
                         .ToList();
                     foreach (var c in creatures)
                     {
-                        OracleSpellBinder.MoveToGraveyard(c);
+                        // Wrath / Damnation: "Destroy all creatures. They
+                        // can't be regenerated." — DestroyNoRegeneration
+                        // honours indestructible (CR 702.12b) but skips
+                        // the regen-shield consume.
+                        OracleSpellBinder.MoveToGraveyard(c, Majik.Core.Zones.ZoneMoveReason.DestroyNoRegeneration);
                     }
                 }
             }),
