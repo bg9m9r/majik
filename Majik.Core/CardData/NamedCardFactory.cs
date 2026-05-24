@@ -3042,6 +3042,22 @@ public static class NamedCardFactory
             // trigger firing.
             "Nihil Spellbomb" => NihilSpellbombFactory.Create(owner),
 
+            // Creature — Spirit {G}{G} 2/1 (StrangleRootGeistFactory).
+            // Dark Ascension. Haste (CR 702.10) + Undying (CR 702.93)
+            // keyword markers wired. Undying trigger built via the canonical
+            // UndyingFactory helper (same path as Young Wolf / Geralf's
+            // Messenger / Butcher Ghoul): on death without a +1/+1 counter
+            // the creature returns to its owner's battlefield with one
+            // +1/+1 counter; interveningIf (CR 603.4) gates the second
+            // death so the post-return Geist stays dead. Both keyword
+            // markers survive the Undying return so CombatAbilities.HasHaste
+            // still reads true — the returned Geist can attack the same
+            // turn (CR 302.1 bypass via Haste). Single-arg dispatcher path
+            // attaches both keyword markers + the Undying trigger to the
+            // card shape without TriggerManager registration; use the
+            // (owner, triggers) overload for bus-driven trigger firing.
+            "Strangleroot Geist" => StrangleRootGeistFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
