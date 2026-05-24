@@ -3076,6 +3076,33 @@ public static class NamedCardFactory
             // (owner, triggers) overload for bus-driven trigger firing.
             "Strangleroot Geist" => StrangleRootGeistFactory.Create(owner),
 
+            // Enchantment — {R} (RoilingVortexFactory). Zendikar Rising.
+            //   "At the beginning of your upkeep, Roiling Vortex deals 1
+            //    damage to each player.
+            //    Whenever a player casts a spell, if no mana was spent to
+            //    cast it, Roiling Vortex deals 3 damage to that player.
+            //    {1}{R}, Sacrifice Roiling Vortex: Roiling Vortex deals 3
+            //    damage to any target.
+            //    Players can't gain life."
+            // Upkeep ping wired via Triggers.OnStepBegin (controller-only
+            // posture without an allPlayersResolver — same convention as
+            // Pernicious Deed / Meathook Massacre). Free-cast trigger
+            // reads the new Spell.WasFreeCast sentinel stamped by
+            // SpellCastFlow when totalCost.IsZero (Cascade / Suspend /
+            // Memnite-style {0} / Force-of-Will-style pitch). {1}{R} +
+            // Sacrifice activated ability deals 3 to any target via
+            // OracleSpellBinder.DealDamage; AdditionalCost.Sacrifice is
+            // the v1 no-op stub (same gap as Relic of Progenitus / Nihil
+            // Spellbomb). "Players can't gain life" registers a
+            // LifeGainIntent replacement on the supplied
+            // ReplacementBus that rewrites every gain to zero; without a
+            // bus the static silently no-ops (mirrors Valakut's
+            // single-arg posture). Use the
+            // (owner, triggers, replacements, allPlayersResolver)
+            // overload for fully-wired behaviour. Modern Burn sideboard
+            // hate piece. Clears top-20 #11.
+            "Roiling Vortex" => RoilingVortexFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 

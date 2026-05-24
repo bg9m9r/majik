@@ -1,3 +1,4 @@
+using Majik.Core.Effects;
 using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
 
@@ -146,6 +147,26 @@ public class Player
         _emblems.Add(emblem);
     }
 
+    /// <summary>
+    /// CR 614 — optional <see cref="ReplacementBus"/> the player routes
+    /// life-change intents through. Attached via
+    /// <see cref="AttachReplacementBus"/>; when null,
+    /// <see cref="GainLife"/> takes the direct mutation path it has
+    /// always taken (every pre-existing call site keeps its semantics).
+    /// Used by static "players can't gain life" effects (Roiling Vortex /
+    /// Sulfuric Vortex / Leyline of Punishment).
+    /// </summary>
+    public ReplacementBus? Replacements { get; private set; }
+
+    /// <summary>Attach a replacement bus so subsequent life-change
+    /// intents route through it. Idempotent — re-attaching the same bus
+    /// is a no-op; swapping busses replaces the prior reference.</summary>
+    public void AttachReplacementBus(ReplacementBus bus)
+    {
+        ArgumentNullException.ThrowIfNull(bus);
+        Replacements = bus;
+    }
+
     public Player(string name, int startingLife = 20, ZoneManager? zoneManager = null)
     {
         if (string.IsNullOrWhiteSpace(name))
@@ -175,7 +196,21 @@ public class Player
             throw new Domain.Exceptions.InvalidPlayerActionException("Cannot gain life after losing the game");
         }
 
-        _lifeTotal = _lifeTotal.Add(amount);
+        // CR 614 — when a replacement bus is attached, route the intent
+        // through it so static "players can't gain life" effects (Roiling
+        // Vortex / Sulfuric Vortex / Leyline of Punishment) can rewrite
+        // the gain amount before commit. Players without a bus take the
+        // direct path — every pre-existing caller keeps its semantics.
+        var resolvedAmount = amount;
+        if (Replacements != null)
+        {
+            var replaced = Replacements.Apply(new LifeGainIntent(this, amount));
+            if (replaced == null) return; // cancelled entirely
+            resolvedAmount = Math.Max(0, replaced.Amount);
+        }
+
+        if (resolvedAmount == 0) return;
+        _lifeTotal = _lifeTotal.Add(resolvedAmount);
     }
 
     /// <summary>
