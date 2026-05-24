@@ -5,9 +5,9 @@ Scanner output: every `*Factory.cs` xmldoc / inline comment mentioning
 engine primitive. Each row answers: "if we ship primitive _X_, which factory
 xmldocs flagged that they're blocked on it?"
 
-- **Generated:** 2026-05-24 19:11 UTC
+- **Generated:** 2026-05-24 19:17 UTC
 - **Scanned dir:** `Majik.Core/CardData/Factories`
-- **Total mentions:** 238
+- **Total mentions:** 237
 - **Clusters:** 17
 - **Unclustered (need new registry pattern):** 124
 
@@ -17,7 +17,7 @@ Regenerate with `dotnet run --project Majik.Console -- mechanic-deps --md-out do
 
 | Rank | Primitive | CR | Factories | Mentions |
 |---:|---|---|---:|---:|
-| 1 | Agent-prompt targeting MVP | — | 25 | 32 |
+| 1 | Agent-prompt targeting MVP | — | 24 | 31 |
 | 2 | Library shuffle (CR 701.20) | CR 701.20 | 12 | 17 |
 | 3 | Token colour identity (CR 105 / CR 903.4) | CR 105 | 11 | 21 |
 | 4 | "Activate only as a sorcery" gate (CR 117.1a) | CR 117.1a | 8 | 11 |
@@ -39,7 +39,7 @@ Regenerate with `dotnet run --project Majik.Console -- mechanic-deps --md-out do
 
 ### 1. Agent-prompt targeting MVP
 
-- **Blocks:** 25 factories (32 mentions)
+- **Blocks:** 24 factories (31 mentions)
 - **Implementation hint:** IPlayerAgent needs ChooseTarget / ChooseYesNo surfaces; many spell factories punt on real targeting prompts.
 
 Mentions:
@@ -54,8 +54,6 @@ Mentions:
   > (Full targeting deferred — see below.
 - `AgathasSoulCauldronFactory` (`AgathasSoulCauldronFactory.cs:65`)
   > Full targeting deferred (see xmldoc above).
-- `SpellQuellerFactory` (`SpellQuellerFactory.cs:15`)
-  > A "pick a spell from the stack" prompt is part of the broader agent-prompt MVP and is deferred.
 - `SkyclaveApparitionFactory` (`SkyclaveApparitionFactory.cs:13`)
   > SetChosenTargets"/>; the agent prompt is deferred.
 - `TerritorialKavuFactory` (`TerritorialKavuFactory.cs:12`)
@@ -244,13 +242,13 @@ Mentions:
 
 - `DrownInTheLochFactory` (`DrownInTheLochFactory.cs:13`)
   > Indestructible / regeneration riders are deferred (same gap as <see cref="SlaughterPactFactory"/> and the rest of the single-target destroy family).
-- `DrownInTheLochFactory` (`DrownInTheLochFactory.cs:210`)
+- `DrownInTheLochFactory` (`DrownInTheLochFactory.cs:234`)
   > CR 701.7 — destroy → owner's graveyard (Indestructible / regeneration deferred, same gap as SlaughterPactFactory).
 - `TerminateFactory` (`TerminateFactory.cs:58`)
   > The "it can't be regenerated" rider is deferred — the engine has no regeneration shield surface in v1 (see class xmldoc).
 - `TerminateFactory` (`TerminateFactory.cs:100`)
   > "It can't be regenerated" rider is deferred — no regeneration shield surface in the engine yet (same gap as Wrath of God / Day of Judgment's can't-regenerate clause).
-- `MurderousRiderFactory` (`MurderousRiderFactory.cs:147`)
+- `MurderousRiderFactory` (`MurderousRiderFactory.cs:157`)
   > Indestructible / regeneration deferred (same gap as SlaughterPact).
 - `MurderousCutFactory` (`MurderousCutFactory.cs:11`)
   > 1 target-creature request; "indestructible" + "can't be regenerated" riders deferred — same lossy MVP as <c>DestroySpellFactory.

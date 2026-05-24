@@ -539,7 +539,7 @@ public sealed class HeuristicBotAgent : IPlayerAgent
                     }
                 }
             }
-            var ordered = RankCandidates(request.LegalCandidates, ctx, opponent, preferSelf, label);
+            var ordered = RankCandidates(request.LegalCandidates, ctx, opponent, preferSelf, label, request.Intent);
             return Task.FromResult<IReadOnlyList<object>>(
                 ordered.Take(request.MinTargets).ToList());
         }
@@ -575,13 +575,13 @@ public sealed class HeuristicBotAgent : IPlayerAgent
     /// damage opponent.</summary>
     private static IEnumerable<object> RankCandidates(
         IReadOnlyList<object> candidates, GameContext ctx, Player? opponent,
-        bool preferSelf, string label)
+        bool preferSelf, string label, BotIntent intent = BotIntent.None)
     {
         var self = ctx.Self;
-        return candidates.OrderByDescending(c => Score(c, self, opponent, preferSelf, label));
+        return candidates.OrderByDescending(c => Score(c, self, opponent, preferSelf, label, intent));
     }
 
-    private static int Score(object candidate, Player self, Player? opponent, bool preferSelf, string label)
+    private static int Score(object candidate, Player self, Player? opponent, bool preferSelf, string label, BotIntent intent = BotIntent.None)
     {
         switch (candidate)
         {
@@ -603,16 +603,44 @@ public sealed class HeuristicBotAgent : IPlayerAgent
                 if (Majik.Core.Combat.CombatAbilities.HasTrample(c)) bigThreat += 5;
                 if (Majik.Core.Combat.CombatAbilities.HasLifelink(c)) bigThreat += 8;
                 if (Majik.Core.Combat.CombatAbilities.HasDeathtouch(c)) bigThreat += 3;
+                // Intent-aware bumps. Removal+Burn double down on raw power so
+                // the biggest opposing threat ranks highest. Pump+CombatTrick
+                // prefer our attackers (power) over flat board stats.
+                if (intent.HasAny(BotIntent.Removal | BotIntent.Burn))
+                {
+                    bigThreat += c.Power * 5;                         // emphasise power
+                }
+                if (intent.HasAny(BotIntent.Buff | BotIntent.CombatTrick))
+                {
+                    bigThreat += c.Power * 3;                         // bias toward existing attackers
+                }
                 // For removal: opponent's biggest is BEST; ours is WORST.
                 // For buff: ours is BEST; opponent's is WORST.
                 var ownership = ReferenceEquals(c.Controller, self) ? 1 : -1;
                 return preferSelf ? bigThreat * ownership : bigThreat * -ownership;
+
+            // Stack-resident spell. Counter intent ranks by mana value: the
+            // expensive bomb is the one worth answering. (ISpell.SourceCard
+            // gives us the mana cost; ManaCost.Parse handles nulls.)
+            case Majik.Core.Spells.ISpell spell when intent.HasAny(BotIntent.Counter):
+                var src = spell.Card;
+                var spellCmc = src != null
+                    ? ValueObjects.ManaCost.Parse(src.ManaCost ?? "").TotalValue
+                    : 0;
+                // Always positive — we WANT to counter the biggest spell.
+                return 100 + spellCmc * 10;
 
             case Cards.ICard card:
                 // Generic non-creature permanent / card target. Score by
                 // mana value as a "spend" proxy — bigger mana value = more
                 // valuable target. Ownership flip same as creature.
                 var cmc = ValueObjects.ManaCost.Parse(card.ManaCost ?? "").TotalValue;
+                // Bounce / Discard / Mill: opponent's most-expensive card is best.
+                if (intent.HasAny(BotIntent.Bounce | BotIntent.Discard | BotIntent.Mill))
+                {
+                    var oppOwned = ReferenceEquals(card.Controller, self) ? -1 : 1;
+                    return cmc * oppOwned * 5;
+                }
                 var own = ReferenceEquals(card.Controller, self) ? 1 : -1;
                 return preferSelf ? cmc * own : cmc * -own;
 

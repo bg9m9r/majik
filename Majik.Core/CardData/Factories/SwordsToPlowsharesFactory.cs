@@ -73,7 +73,16 @@ public static class SwordsToPlowsharesFactory
                     Description: "target creature",
                     MinTargets: 1,
                     MaxTargets: 1,
-                    LegalCandidates: Array.Empty<object>()),
+                    LegalCandidates: Array.Empty<object>(),
+                    Intent: BotIntent.Removal,
+                    // Agent-prompt MVP: live gather all creatures on the
+                    // battlefield. Removal intent in the bot's ranker pushes
+                    // opponent's biggest threat to the top.
+                    CandidateGatherer: ctx => ctx.AllPlayers
+                        .SelectMany(p => p.Zones.Battlefield.GetCards())
+                        .OfType<Creature>()
+                        .Cast<object>()
+                        .ToList()),
             },
             EffectFactory: p =>
             {

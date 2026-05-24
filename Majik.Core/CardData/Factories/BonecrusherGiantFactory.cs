@@ -207,7 +207,26 @@ public static class BonecrusherGiantFactory
                     MinTargets: 1,
                     MaxTargets: 1,
                     LegalCandidates: Array.Empty<object>(),
-                    Intent: BotIntent.Removal),
+                    Intent: BotIntent.Removal | BotIntent.Burn,
+                    // Live gatherer (agent-prompt MVP). Stomp's "any target"
+                    // covers players + creatures + planeswalkers (CR 115.4).
+                    CandidateGatherer: ctx =>
+                    {
+                        var pool = new List<object>();
+                        foreach (var p in ctx.AllPlayers)
+                        {
+                            pool.Add(p);
+                            foreach (var c in p.Zones.Battlefield.GetCards())
+                            {
+                                if (c.HasType(CardType.Creature)
+                                    || c.HasType(CardType.Planeswalker))
+                                {
+                                    pool.Add(c);
+                                }
+                            }
+                        }
+                        return pool;
+                    }),
             },
             EffectFactory: p =>
             {
