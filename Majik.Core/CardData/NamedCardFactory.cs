@@ -586,6 +586,20 @@ public static class NamedCardFactory
             // Falls / Elegant Parlor surveil-lands.
             "Library Surveyor" => LibrarySurveyorFactory.Create(owner),
 
+            // Creature — Faerie Dragon {U}{R} 1/1 (SpriteDragonFactory).
+            // Ikoria: Lair of Behemoths. Flying KeywordAbility marker
+            // (CR 702.9). Cast-noncreature-spell trigger (CR 603.1 / 122.1)
+            // fires on a SpellCastEvent whose ISpell.Controller matches
+            // Sprite Dragon's controller AND whose ISpell.Card lacks
+            // CardType.Creature; effect adds a CounterType.PlusOnePlusOne
+            // counter on Sprite Dragon (same predicate shape as
+            // ProwessFactory, but counters instead of pump — accumulates
+            // across turns with no per-turn cap). Single-arg dispatcher
+            // path attaches the trigger without TriggerManager registration;
+            // (owner, triggers) overload wires bus-driven firing.
+            // Introduces CardSubtype.Faerie (Dragon already present).
+            "Sprite Dragon" => SpriteDragonFactory.Create(owner),
+
             // Creature — Bird Advisor {1}{U} 1/3 (LedgerShredderFactory).
             // Flying keyword wired. Two triggered abilities surfaced on the
             // card for shape: (1) "whenever you cast the second spell each

@@ -133,6 +133,9 @@ public enum CardSubtype
     /// <summary>Mercenary creature subtype — Stormchaser's Talent's 1/1 U/R Mercenary
     /// token (Modern Horizons 3) and the Mercadian Masques cycle. CR 205.3m.</summary>
     Mercenary,
+    /// <summary>Faerie creature subtype — Sprite Dragon (Ikoria), Spellstutter Sprite,
+    /// Bitterblossom tokens. CR 205.3m.</summary>
+    Faerie,
 
     // Land subtypes (examples)
     Forest,
