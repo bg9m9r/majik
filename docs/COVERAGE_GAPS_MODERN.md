@@ -1,131 +1,72 @@
 # Coverage gaps — mechanic-cluster backlog
 
 - **Scope:** format=modern, dedup-by-name
-- **Generated:** 2026-05-24 17:37 UTC
-- **Unimplemented total:** 16669
+- **Generated:** 2026-05-24 19:53 UTC
+- **Unimplemented total:** 15885
 - **Min cluster size:** 5
-- **Clusters ≥ threshold:** 217 (rendering top 50)
-- **Cards in above-threshold clusters:** 2792 (16.7% of unimplemented)
-- **Cards in rendered top-50:** 1726 (10.4% of unimplemented)
-- **Long-tail cards (below threshold):** 13877
+- **Clusters ≥ threshold:** 205 (rendering top 50)
+- **Cards in above-threshold clusters:** 2177 (13.7% of unimplemented)
+- **Cards in rendered top-50:** 1191 (7.5% of unimplemented)
+- **Long-tail cards (below threshold):** 13708
 
 ## Ranked clusters
 
 | Rank | Count | Suggested binder | Signature |
 |---:|---:|---|---|
-| 1 | 331 | ActivatedGenericBinder | `{cost}: add {cost}` |
-| 2 | 303 | _(none)_ | `this land enters tapped` |
-| 3 | 98 | _(none)_ | `equipped creature gets +n/+n` |
-| 4 | 76 | ActivatedSelfPumpBinder | `{cost}: ~ gets +n/+n until end of turn` |
-| 5 | 50 | ActivatedGenericBinder | `{cost}: add one mana of any color` |
-| 6 | 42 | _(none)_ | `this spell can't be countered` |
-| 7 | 41 | ActivatedGenericBinder | `{cost}: add {cost} or {cost}` |
-| 8 | 39 | _(none)_ | `enchant creature enchanted creature gets +n/+n` |
-| 9 | 33 | _(none)_ | `~ can't block` |
-| 10 | 32 | _(none)_ | `~ enters tapped` |
-| 11 | 31 | _(none)_ | `flying {cost}: ~ gets +n/+n until end of turn` |
-| 12 | 29 | EtbGainLifeTriggerBinder | `when ~ enters, you gain n life` |
-| 13 | 29 | _(none)_ | `~ can't be blocked` |
-| 14 | 26 | _(none)_ | `creatures you control get +n/+n until end of turn` |
-| 15 | 26 | EtbGenericTriggerBinder | `when ~ enters, you get {cost}` |
-| 16 | 25 | EtbDrawCardTriggerBinder | `when ~ enters, draw a card` |
-| 17 | 24 | _(none)_ | `{cost}, {cost}: tap target creature` |
-| 18 | 20 | EtbScryTriggerBinder | `when ~ enters, scry n` |
-| 19 | 20 | ActivatedGenericBinder | `{cost}: regenerate ~` |
-| 20 | 19 | _(none)_ | `enchant creature enchanted creature gets -n/-n` |
-| 21 | 19 | _(none)_ | `~ attacks each combat if able` |
-| 22 | 19 | _(none)_ | `~ enters with x +n/+n counters on it` |
-| 23 | 18 | _(none)_ | `enchant creature enchanted creature can't attack or block` |
-| 24 | 18 | _(none)_ | `this artifact enters tapped` |
-| 25 | 18 | ActivatedGenericBinder | `{cost}: add {cost}, {cost}, or {cost}` |
-| 26 | 17 | _(none)_ | `enchant creature when this aura enters, tap enchanted creature` |
-| 27 | 17 | _(none)_ | `if ~ is in your opening hand, you may begin the game with it on the battlefield` |
-| 28 | 17 | _(none)_ | `when this equipment enters, attach it to target creature you control` |
-| 29 | 17 | _(none)_ | `you may exert ~ as it attacks` |
-| 30 | 16 | EtbGenericTriggerBinder | `when ~ enters, mill three cards` |
-| 31 | 16 | _(none)_ | `you may look at the top card of your library any time` |
-| 32 | 15 | _(none)_ | `flying ~ can block only creatures with flying` |
-| 33 | 15 | ActivatedGenericBinder | `{cost}: ~ gains flying until end of turn` |
-| 34 | 14 | _(none)_ | `creatures you control get +n/+n` |
-| 35 | 14 | _(none)_ | `enchant creature enchanted creature gets +n/+n and has flying` |
-| 36 | 14 | _(none)_ | `flash when this equipment enters, attach it to target creature you control` |
-| 37 | 14 | EtbCounterTriggerBinder | `when ~ enters, put a +n/+n counter on target creature` |
-| 38 | 13 | _(none)_ | `enchant creature you control enchanted creature` |
-| 39 | 13 | _(none)_ | `when this artifact enters, draw a card` |
-| 40 | 13 | EtbCreateTokenTriggerBinder | `when ~ enters, create a food token` |
-| 41 | 13 | ActivatedGenericBinder | `{cost}: adapt n` |
-| 42 | 12 | _(none)_ | `enchant creature when this aura enters, draw a card` |
-| 43 | 12 | _(none)_ | `hexproof` |
-| 44 | 12 | _(none)_ | `{cost}, {cost}: draw a card, then discard a card` |
-| 45 | 11 | _(none)_ | `flying ~ can't block` |
-| 46 | 11 | _(none)_ | `gain control of target creature until end of turn` |
-| 47 | 11 | _(none)_ | `kinship — at the beginning of your upkeep, you may look at the top card of your…` |
-| 48 | 11 | EtbCreateTokenTriggerBinder | `when ~ enters, create a treasure token` |
-| 49 | 11 | _(none)_ | `{cost}, {cost}: add {cost}` |
-| 50 | 11 | _(none)_ | `~ doesn't untap during your untap step` |
+| 1 | 98 | _(none)_ | `equipped creature gets +n/+n` |
+| 2 | 92 | ActivatedGenericBinder | `{cost}: add {cost}` |
+| 3 | 76 | ActivatedSelfPumpBinder | `{cost}: ~ gets +n/+n until end of turn` |
+| 4 | 47 | ActivatedGenericBinder | `{cost}: add one mana of any color` |
+| 5 | 42 | _(none)_ | `this spell can't be countered` |
+| 6 | 41 | ActivatedGenericBinder | `{cost}: add {cost} or {cost}` |
+| 7 | 39 | _(none)_ | `enchant creature enchanted creature gets +n/+n` |
+| 8 | 33 | _(none)_ | `~ can't block` |
+| 9 | 32 | _(none)_ | `~ enters tapped` |
+| 10 | 31 | _(none)_ | `flying {cost}: ~ gets +n/+n until end of turn` |
+| 11 | 29 | EtbGainLifeTriggerBinder | `when ~ enters, you gain n life` |
+| 12 | 29 | _(none)_ | `~ can't be blocked` |
+| 13 | 26 | _(none)_ | `creatures you control get +n/+n until end of turn` |
+| 14 | 26 | EtbGenericTriggerBinder | `when ~ enters, you get {cost}` |
+| 15 | 25 | EtbDrawCardTriggerBinder | `when ~ enters, draw a card` |
+| 16 | 24 | _(none)_ | `{cost}, {cost}: tap target creature` |
+| 17 | 20 | ActivatedGenericBinder | `{cost}: regenerate ~` |
+| 18 | 19 | _(none)_ | `enchant creature enchanted creature gets -n/-n` |
+| 19 | 19 | EtbScryTriggerBinder | `when ~ enters, scry n` |
+| 20 | 19 | _(none)_ | `~ attacks each combat if able` |
+| 21 | 19 | _(none)_ | `~ enters with x +n/+n counters on it` |
+| 22 | 18 | _(none)_ | `enchant creature enchanted creature can't attack or block` |
+| 23 | 18 | _(none)_ | `this artifact enters tapped` |
+| 24 | 18 | ActivatedGenericBinder | `{cost}: add {cost}, {cost}, or {cost}` |
+| 25 | 17 | _(none)_ | `enchant creature when this aura enters, tap enchanted creature` |
+| 26 | 17 | _(none)_ | `if ~ is in your opening hand, you may begin the game with it on the battlefield` |
+| 27 | 17 | _(none)_ | `when this equipment enters, attach it to target creature you control` |
+| 28 | 17 | _(none)_ | `you may exert ~ as it attacks` |
+| 29 | 16 | EtbGenericTriggerBinder | `when ~ enters, mill three cards` |
+| 30 | 16 | _(none)_ | `you may look at the top card of your library any time` |
+| 31 | 15 | _(none)_ | `flying ~ can block only creatures with flying` |
+| 32 | 15 | ActivatedGenericBinder | `{cost}: ~ gains flying until end of turn` |
+| 33 | 14 | _(none)_ | `creatures you control get +n/+n` |
+| 34 | 14 | _(none)_ | `enchant creature enchanted creature gets +n/+n and has flying` |
+| 35 | 14 | _(none)_ | `flash when this equipment enters, attach it to target creature you control` |
+| 36 | 14 | EtbCounterTriggerBinder | `when ~ enters, put a +n/+n counter on target creature` |
+| 37 | 13 | _(none)_ | `enchant creature you control enchanted creature` |
+| 38 | 13 | _(none)_ | `when this artifact enters, draw a card` |
+| 39 | 13 | EtbCreateTokenTriggerBinder | `when ~ enters, create a food token` |
+| 40 | 13 | ActivatedGenericBinder | `{cost}: adapt n` |
+| 41 | 12 | _(none)_ | `enchant creature when this aura enters, draw a card` |
+| 42 | 12 | _(none)_ | `hexproof` |
+| 43 | 12 | _(none)_ | `{cost}, {cost}: draw a card, then discard a card` |
+| 44 | 11 | _(none)_ | `flying ~ can't block` |
+| 45 | 11 | _(none)_ | `gain control of target creature until end of turn` |
+| 46 | 11 | _(none)_ | `kinship — at the beginning of your upkeep, you may look at the top card of your…` |
+| 47 | 11 | EtbCreateTokenTriggerBinder | `when ~ enters, create a treasure token` |
+| 48 | 11 | _(none)_ | `{cost}, {cost}: add {cost}` |
+| 49 | 11 | _(none)_ | `~ doesn't untap during your untap step` |
+| 50 | 11 | _(none)_ | `~ enters with a +n/+n counter on it` |
 
 ## Cluster detail
 
-### 1. 331 cards — `{cost}: add {cost}`
-
-- **Suggested binder:** `ActivatedGenericBinder` — Activated ability — catch-all
-- **Trigger signature:** `{cost}:`
-- **Canonical example:** Abstergo Entertainment
-
-  > {T}: Add {C}. {1}, {T}: Add one mana of any color. {3}, {T}, Exile Abstergo Entertainment: Return up to one target historic card from your graveyard to your hand, then exile all graveyards.
-
-- **Example cards (up to 20):**
-  - Abstergo Entertainment
-  - Academy Ruins
-  - Access Tunnel
-  - Adarkar Wastes
-  - Alchemist's Refuge
-  - Ally Encampment
-  - Animal Sanctuary
-  - Automated Artificer
-  - Avacyn's Pilgrim
-  - Bant Panorama
-  - Barbarian Ring
-  - Battlefield Forge
-  - Blazemire Verge
-  - Bleachbone Verge
-  - Blighted Cataract
-  - Blighted Fen
-  - Blighted Gorge
-  - Blighted Steppe
-  - Blighted Woodland
-  - Blinkmoth Nexus
-
-### 2. 303 cards — `this land enters tapped`
-
-- **Suggested binder:** _(no registry hit — add a new template)_
-- **Canonical example:** Abraded Bluffs
-
-  > This land enters tapped. When this land enters, it deals 1 damage to target opponent. {T}: Add {R} or {W}.
-
-- **Example cards (up to 20):**
-  - Abraded Bluffs
-  - Adagia, Windswept Bastion
-  - Airship Engine Room
-  - Akoum Refuge
-  - Alpine Meadow
-  - Arcane Sanctum
-  - Archway Commons
-  - Arctic Flats
-  - Arctic Treeline
-  - Arid Archway
-  - Axgard Armory
-  - Azorius Chancery
-  - Azorius Guildgate
-  - Baron, Airship Kingdom
-  - Barren Moor
-  - Base Camp
-  - Bloodfell Caves
-  - Blossoming Sands
-  - Boiling Rock Prison
-  - Bojuka Bog
-
-### 3. 98 cards — `equipped creature gets +n/+n`
+### 1. 98 cards — `equipped creature gets +n/+n`
 
 - **Suggested binder:** _(no registry hit — add a new template)_
 - **Canonical example:** +2 Mace
@@ -154,7 +95,37 @@
   - Dancing Sword
   - Deathrender
 
-### 4. 76 cards — `{cost}: ~ gets +n/+n until end of turn`
+### 2. 92 cards — `{cost}: add {cost}`
+
+- **Suggested binder:** `ActivatedGenericBinder` — Activated ability — catch-all
+- **Trigger signature:** `{cost}:`
+- **Canonical example:** Automated Artificer
+
+  > {T}: Add {C}. Spend this mana only to activate an ability or cast an artifact spell.
+
+- **Example cards (up to 20):**
+  - Automated Artificer
+  - Avacyn's Pilgrim
+  - Boreal Druid
+  - Carnelian Orb of Dragonkind
+  - Chandra's Embercat
+  - Chronatog Totem
+  - Copper Myr
+  - Creeping Peeper
+  - Cursed Mirror
+  - Dalakos, Crafter of Wonders
+  - Devoted Druid
+  - Dreamstone Hedron
+  - Druid of the Cowl
+  - Dungeon Map
+  - Elfhame Druid
+  - Elves of Deep Shadow
+  - Elvish Mystic
+  - Fabrication Foundry
+  - Fanatic of Rhonas
+  - Foriysian Totem
+
+### 3. 76 cards — `{cost}: ~ gets +n/+n until end of turn`
 
 - **Suggested binder:** `ActivatedSelfPumpBinder` — Activated — self pump EOT
 - **Trigger signature:** `{cost}:`
@@ -185,7 +156,7 @@
   - Frilled Oculus
   - Frilled Sandwalla
 
-### 5. 50 cards — `{cost}: add one mana of any color`
+### 4. 47 cards — `{cost}: add one mana of any color`
 
 - **Suggested binder:** `ActivatedGenericBinder` — Activated ability — catch-all
 - **Trigger signature:** `{cost}:`
@@ -197,14 +168,12 @@
   - Accomplished Alchemist
   - All-Fates Scroll
   - Alloy Myr
-  - Ancient Ziggurat
   - Atzocan Seer
   - Barrels of Blasting Jelly
   - Blitzball
   - Coalition Relic
   - Cultivator's Caravan
   - Draconic Disciple
-  - Forbidden Orchard
   - Fountain of Ichor
   - Gravestone Strider
   - Guy in the Chair
@@ -214,8 +183,10 @@
   - Honored Heirloom
   - Humble Naturalist
   - Ilysian Caryatid
+  - Intrepid Paleontologist
+  - Ixalli's Lorekeeper
 
-### 6. 42 cards — `this spell can't be countered`
+### 5. 42 cards — `this spell can't be countered`
 
 - **Suggested binder:** _(no registry hit — add a new template)_
 - **Canonical example:** Absolute Virtue
@@ -244,7 +215,7 @@
   - Last March of the Ents
   - Lightning Mare
 
-### 7. 41 cards — `{cost}: add {cost} or {cost}`
+### 6. 41 cards — `{cost}: add {cost} or {cost}`
 
 - **Suggested binder:** `ActivatedGenericBinder` — Activated ability — catch-all
 - **Trigger signature:** `{cost}:`
@@ -274,7 +245,7 @@
   - Gruul Locket
   - Haunted Screen
 
-### 8. 39 cards — `enchant creature enchanted creature gets +n/+n`
+### 7. 39 cards — `enchant creature enchanted creature gets +n/+n`
 
 - **Suggested binder:** _(no registry hit — add a new template)_
 - **Canonical example:** Abzan Runemark
@@ -303,7 +274,7 @@
   - Moldervine Cloak
   - Oakenform
 
-### 9. 33 cards — `~ can't block`
+### 8. 33 cards — `~ can't block`
 
 - **Suggested binder:** _(no registry hit — add a new template)_
 - **Canonical example:** Ashenmoor Gouger
@@ -332,7 +303,7 @@
   - Ogre Taskmaster
   - Postmortem Professor
 
-### 10. 32 cards — `~ enters tapped`
+### 9. 32 cards — `~ enters tapped`
 
 - **Suggested binder:** _(no registry hit — add a new template)_
 - **Canonical example:** Alirios, Enraptured
@@ -361,7 +332,7 @@
   - Mardu Skullhunter
   - Nyx Lotus
 
-### 11. 31 cards — `flying {cost}: ~ gets +n/+n until end of turn`
+### 10. 31 cards — `flying {cost}: ~ gets +n/+n until end of turn`
 
 - **Suggested binder:** _(no registry hit — add a new template)_
 - **Trigger signature:** `flying {cost}:`
@@ -392,7 +363,7 @@
   - Paragon of Modernity
   - Pardic Dragon
 
-### 12. 29 cards — `when ~ enters, you gain n life`
+### 11. 29 cards — `when ~ enters, you gain n life`
 
 - **Suggested binder:** `EtbGainLifeTriggerBinder` — ETB triggered ability — controller gains N life
 - **Trigger signature:** `when ~ enters,`
@@ -423,7 +394,7 @@
   - Oil-Gorger Troll
   - Peace Strider
 
-### 13. 29 cards — `~ can't be blocked`
+### 12. 29 cards — `~ can't be blocked`
 
 - **Suggested binder:** _(no registry hit — add a new template)_
 - **Canonical example:** Azorius Herald
@@ -452,7 +423,7 @@
   - Plasma Elemental
   - River Sneak
 
-### 14. 26 cards — `creatures you control get +n/+n until end of turn`
+### 13. 26 cards — `creatures you control get +n/+n until end of turn`
 
 - **Suggested binder:** _(no registry hit — add a new template)_
 - **Effect verb:** `pump (+N/+N EOT)`
@@ -482,7 +453,7 @@
   - Sanctified Charge
   - Solidarity
 
-### 15. 26 cards — `when ~ enters, you get {cost}`
+### 14. 26 cards — `when ~ enters, you get {cost}`
 
 - **Suggested binder:** `EtbGenericTriggerBinder` — ETB triggered ability — catch-all
 - **Trigger signature:** `when ~ enters,`
@@ -512,7 +483,7 @@
   - Tempest Harvester
   - Thriving Grubs
 
-### 16. 25 cards — `when ~ enters, draw a card`
+### 15. 25 cards — `when ~ enters, draw a card`
 
 - **Suggested binder:** `EtbDrawCardTriggerBinder` — ETB triggered ability — draw one card
 - **Trigger signature:** `when ~ enters,`
@@ -543,7 +514,7 @@
   - Rhox Oracle
   - Sarulf's Packmate
 
-### 17. 24 cards — `{cost}, {cost}: tap target creature`
+### 16. 24 cards — `{cost}, {cost}: tap target creature`
 
 - **Suggested binder:** _(no registry hit — add a new template)_
 - **Effect verb:** `tap target`
@@ -573,38 +544,7 @@
   - Nebelgast Beguiler
   - Ostiary Thrull
 
-### 18. 20 cards — `when ~ enters, scry n`
-
-- **Suggested binder:** `EtbScryTriggerBinder` — ETB triggered ability — scry N
-- **Trigger signature:** `when ~ enters,`
-- **Effect verb:** `scry`
-- **Canonical example:** April O'Neil, Kunoichi Trainee
-
-  > When April O'Neil enters, scry 2. April O'Neil can't be blocked by creatures with power 3 or greater.
-
-- **Example cards (up to 20):**
-  - April O'Neil, Kunoichi Trainee
-  - Automatic Librarian
-  - Cavern Stomper
-  - Chrome Cat
-  - Cloudspire Coordinator
-  - Fortune, Loyal Steed
-  - Galadhrim Guide
-  - Haunt of the Dead Marshes
-  - Inga Rune-Eyes
-  - Inquisitive Puppet
-  - Lost Legion
-  - Mardu Devotee
-  - Myr Custodian
-  - Octoprophet
-  - Omenspeaker
-  - Prophet of the Peak
-  - Rumbling Sentry
-  - Sage's Row Savant
-  - The Grey Havens
-  - Veteran Motorist
-
-### 19. 20 cards — `{cost}: regenerate ~`
+### 17. 20 cards — `{cost}: regenerate ~`
 
 - **Suggested binder:** `ActivatedGenericBinder` — Activated ability — catch-all
 - **Trigger signature:** `{cost}:`
@@ -634,7 +574,7 @@
   - Uthden Troll
   - Votary of the Conclave
 
-### 20. 19 cards — `enchant creature enchanted creature gets -n/-n`
+### 18. 19 cards — `enchant creature enchanted creature gets -n/-n`
 
 - **Suggested binder:** _(no registry hit — add a new template)_
 - **Canonical example:** Agoraphobia
@@ -662,7 +602,37 @@
   - Weight of the Underworld
   - World-Weary
 
-### 21. 19 cards — `~ attacks each combat if able`
+### 19. 19 cards — `when ~ enters, scry n`
+
+- **Suggested binder:** `EtbScryTriggerBinder` — ETB triggered ability — scry N
+- **Trigger signature:** `when ~ enters,`
+- **Effect verb:** `scry`
+- **Canonical example:** April O'Neil, Kunoichi Trainee
+
+  > When April O'Neil enters, scry 2. April O'Neil can't be blocked by creatures with power 3 or greater.
+
+- **Example cards (up to 20):**
+  - April O'Neil, Kunoichi Trainee
+  - Automatic Librarian
+  - Cavern Stomper
+  - Chrome Cat
+  - Cloudspire Coordinator
+  - Fortune, Loyal Steed
+  - Galadhrim Guide
+  - Haunt of the Dead Marshes
+  - Inga Rune-Eyes
+  - Inquisitive Puppet
+  - Lost Legion
+  - Mardu Devotee
+  - Myr Custodian
+  - Octoprophet
+  - Omenspeaker
+  - Prophet of the Peak
+  - Rumbling Sentry
+  - Sage's Row Savant
+  - Veteran Motorist
+
+### 20. 19 cards — `~ attacks each combat if able`
 
 - **Suggested binder:** _(no registry hit — add a new template)_
 - **Canonical example:** Berserkers of Blood Ridge
@@ -690,7 +660,7 @@
   - Tattermunge Maniac
   - Underworld Rage-Hound
 
-### 22. 19 cards — `~ enters with x +n/+n counters on it`
+### 21. 19 cards — `~ enters with x +n/+n counters on it`
 
 - **Suggested binder:** _(no registry hit — add a new template)_
 - **Canonical example:** Apocalypse Hydra
@@ -718,7 +688,7 @@
   - Vastwood Hydra
   - Wildwood Scourge
 
-### 23. 18 cards — `enchant creature enchanted creature can't attack or block`
+### 22. 18 cards — `enchant creature enchanted creature can't attack or block`
 
 - **Suggested binder:** _(no registry hit — add a new template)_
 - **Canonical example:** Bound in Silence
@@ -745,7 +715,7 @@
   - Uneasy Alliance
   - Utopia Vow
 
-### 24. 18 cards — `this artifact enters tapped`
+### 23. 18 cards — `this artifact enters tapped`
 
 - **Suggested binder:** _(no registry hit — add a new template)_
 - **Canonical example:** Altar of the Lost
@@ -772,7 +742,7 @@
   - Wizard's Rockets
   - Worn Powerstone
 
-### 25. 18 cards — `{cost}: add {cost}, {cost}, or {cost}`
+### 24. 18 cards — `{cost}: add {cost}, {cost}, or {cost}`
 
 - **Suggested binder:** `ActivatedGenericBinder` — Activated ability — catch-all
 - **Trigger signature:** `{cost}:`
@@ -800,7 +770,7 @@
   - Temur Banner
   - Zagoth Crystal
 
-### 26. 17 cards — `enchant creature when this aura enters, tap enchanted creature`
+### 25. 17 cards — `enchant creature when this aura enters, tap enchanted creature`
 
 - **Suggested binder:** _(no registry hit — add a new template)_
 - **Canonical example:** Bewitching Leechcraft
@@ -826,7 +796,7 @@
   - Waterknot
   - Winter's Rest
 
-### 27. 17 cards — `if ~ is in your opening hand, you may begin the game with it on the battlefield`
+### 26. 17 cards — `if ~ is in your opening hand, you may begin the game with it on the battlefield`
 
 - **Suggested binder:** _(no registry hit — add a new template)_
 - **Canonical example:** Leyline Axe
@@ -852,7 +822,7 @@
   - Leyline of the Meek
   - Leyline of the Void
 
-### 28. 17 cards — `when this equipment enters, attach it to target creature you control`
+### 27. 17 cards — `when this equipment enters, attach it to target creature you control`
 
 - **Suggested binder:** _(no registry hit — add a new template)_
 - **Trigger signature:** `when this equipment enters,`
@@ -879,7 +849,7 @@
   - Thunder Lasso
   - Utility Knife
 
-### 29. 17 cards — `you may exert ~ as it attacks`
+### 28. 17 cards — `you may exert ~ as it attacks`
 
 - **Suggested binder:** _(no registry hit — add a new template)_
 - **Canonical example:** Ahn-Crop Champion
@@ -905,7 +875,7 @@
   - Vizier of the True
   - Watchful Naga
 
-### 30. 16 cards — `when ~ enters, mill three cards`
+### 29. 16 cards — `when ~ enters, mill three cards`
 
 - **Suggested binder:** `EtbGenericTriggerBinder` — ETB triggered ability — catch-all
 - **Trigger signature:** `when ~ enters,`
@@ -931,7 +901,7 @@
   - Undead Butler
   - Wick's Patrol
 
-### 31. 16 cards — `you may look at the top card of your library any time`
+### 30. 16 cards — `you may look at the top card of your library any time`
 
 - **Suggested binder:** _(no registry hit — add a new template)_
 - **Canonical example:** Assemble the Players
@@ -956,7 +926,7 @@
   - Vivien, Monsters' Advocate
   - Vizier of the Menagerie
 
-### 32. 15 cards — `flying ~ can block only creatures with flying`
+### 31. 15 cards — `flying ~ can block only creatures with flying`
 
 - **Suggested binder:** _(no registry hit — add a new template)_
 - **Canonical example:** Cloud Elemental
@@ -980,7 +950,7 @@
   - Wanderlight Spirit
   - Welkin Tern
 
-### 33. 15 cards — `{cost}: ~ gains flying until end of turn`
+### 32. 15 cards — `{cost}: ~ gains flying until end of turn`
 
 - **Suggested binder:** `ActivatedGenericBinder` — Activated ability — catch-all
 - **Trigger signature:** `{cost}:`
@@ -1005,7 +975,7 @@
   - Steeple Creeper
   - Stream Hopper
 
-### 34. 14 cards — `creatures you control get +n/+n`
+### 33. 14 cards — `creatures you control get +n/+n`
 
 - **Suggested binder:** _(no registry hit — add a new template)_
 - **Canonical example:** Anthem of Champions
@@ -1028,7 +998,7 @@
   - War Effort
   - Warleader's Call
 
-### 35. 14 cards — `enchant creature enchanted creature gets +n/+n and has flying`
+### 34. 14 cards — `enchant creature enchanted creature gets +n/+n and has flying`
 
 - **Suggested binder:** _(no registry hit — add a new template)_
 - **Canonical example:** Arcane Flight
@@ -1051,7 +1021,7 @@
   - Spectral Flight
   - Wingspan Stride
 
-### 36. 14 cards — `flash when this equipment enters, attach it to target creature you control`
+### 35. 14 cards — `flash when this equipment enters, attach it to target creature you control`
 
 - **Suggested binder:** _(no registry hit — add a new template)_
 - **Canonical example:** Bladed Battle-Fan
@@ -1074,7 +1044,7 @@
   - Squire's Lightblade
   - Twin Blades
 
-### 37. 14 cards — `when ~ enters, put a +n/+n counter on target creature`
+### 36. 14 cards — `when ~ enters, put a +n/+n counter on target creature`
 
 - **Suggested binder:** `EtbCounterTriggerBinder` — ETB triggered ability — put counters / counter spells
 - **Trigger signature:** `when ~ enters,`
@@ -1098,7 +1068,7 @@
   - Tenured Inkcaster
   - Timberland Guide
 
-### 38. 13 cards — `enchant creature you control enchanted creature`
+### 37. 13 cards — `enchant creature you control enchanted creature`
 
 - **Suggested binder:** _(no registry hit — add a new template)_
 - **Canonical example:** Biting Tether
@@ -1120,7 +1090,7 @@
   - Spirit Away
   - Vapor Snare
 
-### 39. 13 cards — `when this artifact enters, draw a card`
+### 38. 13 cards — `when this artifact enters, draw a card`
 
 - **Suggested binder:** _(no registry hit — add a new template)_
 - **Trigger signature:** `when this artifact enters,`
@@ -1144,7 +1114,7 @@
   - Sleeper Dart
   - Wedding Invitation
 
-### 40. 13 cards — `when ~ enters, create a food token`
+### 39. 13 cards — `when ~ enters, create a food token`
 
 - **Suggested binder:** `EtbCreateTokenTriggerBinder` — ETB triggered ability — token creation
 - **Trigger signature:** `when ~ enters,`
@@ -1168,7 +1138,7 @@
   - Tough Cookie
   - Unlucky Cabbage Merchant
 
-### 41. 13 cards — `{cost}: adapt n`
+### 40. 13 cards — `{cost}: adapt n`
 
 - **Suggested binder:** `ActivatedGenericBinder` — Activated ability — catch-all
 - **Trigger signature:** `{cost}:`
@@ -1191,7 +1161,7 @@
   - Temperamental Oozewagg
   - Trollbred Guardian
 
-### 42. 12 cards — `enchant creature when this aura enters, draw a card`
+### 41. 12 cards — `enchant creature when this aura enters, draw a card`
 
 - **Suggested binder:** _(no registry hit — add a new template)_
 - **Effect verb:** `draw a card`
@@ -1213,7 +1183,7 @@
   - Shielding Plax
   - Stratus Walk
 
-### 43. 12 cards — `hexproof`
+### 42. 12 cards — `hexproof`
 
 - **Suggested binder:** _(no registry hit — add a new template)_
 - **Canonical example:** Benthic Giant
@@ -1234,7 +1204,7 @@
   - Slippery Bogle
   - Wardscale Crocodile
 
-### 44. 12 cards — `{cost}, {cost}: draw a card, then discard a card`
+### 43. 12 cards — `{cost}, {cost}: draw a card, then discard a card`
 
 - **Suggested binder:** _(no registry hit — add a new template)_
 - **Effect verb:** `draw a card`
@@ -1256,7 +1226,7 @@
   - Teferi's Protege
   - Zephyr Scribe
 
-### 45. 11 cards — `flying ~ can't block`
+### 44. 11 cards — `flying ~ can't block`
 
 - **Suggested binder:** _(no registry hit — add a new template)_
 - **Canonical example:** Aesthir Glider
@@ -1276,7 +1246,7 @@
   - Vampire Interloper
   - Vampire Soulcaller
 
-### 46. 11 cards — `gain control of target creature until end of turn`
+### 45. 11 cards — `gain control of target creature until end of turn`
 
 - **Suggested binder:** _(no registry hit — add a new template)_
 - **Canonical example:** Act of Treason
@@ -1296,7 +1266,7 @@
   - Unexpected Request
   - Unwilling Recruit
 
-### 47. 11 cards — `kinship — at the beginning of your upkeep, you may look at the top card of your library`
+### 46. 11 cards — `kinship — at the beginning of your upkeep, you may look at the top card of your library`
 
 - **Suggested binder:** _(no registry hit — add a new template)_
 - **Canonical example:** Ink Dissolver
@@ -1316,7 +1286,7 @@
   - Winnower Patrol
   - Wolf-Skull Shaman
 
-### 48. 11 cards — `when ~ enters, create a treasure token`
+### 47. 11 cards — `when ~ enters, create a treasure token`
 
 - **Suggested binder:** `EtbCreateTokenTriggerBinder` — ETB triggered ability — token creation
 - **Trigger signature:** `when ~ enters,`
@@ -1338,7 +1308,7 @@
   - Skullport Merchant
   - Wily Goblin
 
-### 49. 11 cards — `{cost}, {cost}: add {cost}`
+### 48. 11 cards — `{cost}, {cost}: add {cost}`
 
 - **Suggested binder:** _(no registry hit — add a new template)_
 - **Canonical example:** Azorius Signet
@@ -1358,7 +1328,7 @@
   - Selesnya Signet
   - Simic Signet
 
-### 50. 11 cards — `~ doesn't untap during your untap step`
+### 49. 11 cards — `~ doesn't untap during your untap step`
 
 - **Suggested binder:** _(no registry hit — add a new template)_
 - **Canonical example:** Battered Golem
@@ -1377,6 +1347,26 @@
   - Phyrexian Colossus
   - Phyrexian Ironfoot
   - Slumbering Cerberus
+
+### 50. 11 cards — `~ enters with a +n/+n counter on it`
+
+- **Suggested binder:** _(no registry hit — add a new template)_
+- **Canonical example:** Barkhide Troll
+
+  > This creature enters with a +1/+1 counter on it. {1}, Remove a +1/+1 counter from this creature: This creature gains hexproof until end of turn.
+
+- **Example cards (up to 20):**
+  - Barkhide Troll
+  - District Mascot
+  - Dockworker Drone
+  - Festercreep
+  - Iron Apprentice
+  - Monoskelion
+  - Selfless Police Captain
+  - Servant of the Scale
+  - Star Pupil
+  - Swarm Shambler
+  - Zack Fair
 
 ---
 

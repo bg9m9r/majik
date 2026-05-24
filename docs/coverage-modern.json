@@ -1,37 +1,37 @@
 {
   "scope": "format=modern, dedup-by-name",
-  "generated_utc": "2026-05-24T18:30:35.3395765Z",
+  "generated_utc": "2026-05-24T19:53:05.4680707Z",
   "total_cards": 21879,
   "total_weight": 21879,
-  "covered_cards": 5210,
-  "covered_percent": 23.81,
-  "weighted_covered": 5210,
-  "weighted_covered_percent": 23.81,
+  "covered_cards": 5994,
+  "covered_percent": 27.4,
+  "weighted_covered": 5994,
+  "weighted_covered_percent": 27.4,
   "frequency_total_weight": 19250,
-  "frequency_weighted_covered": 13150,
-  "frequency_weighted_covered_percent": 68.31,
-  "top_meta_covered": 16,
+  "frequency_weighted_covered": 17180,
+  "frequency_weighted_covered_percent": 89.25,
+  "top_meta_covered": 20,
   "top_meta_total": 20,
   "counts_by_tier": {
     "NamedFactory": 240,
     "SpellBound": 3708,
-    "KeywordOnly": 710,
-    "Vanilla": 552,
-    "Unimplemented": 16669
+    "KeywordOnly": 1417,
+    "Vanilla": 629,
+    "Unimplemented": 15885
   },
   "weighted_by_tier": {
     "NamedFactory": 240,
     "SpellBound": 3708,
-    "KeywordOnly": 710,
-    "Vanilla": 552,
-    "Unimplemented": 16669
+    "KeywordOnly": 1417,
+    "Vanilla": 629,
+    "Unimplemented": 15885
   },
   "frequency_weighted_by_tier": {
     "NamedFactory": 11680,
     "SpellBound": 1470,
-    "KeywordOnly": 0,
+    "KeywordOnly": 4030,
     "Vanilla": 0,
-    "Unimplemented": 6100
+    "Unimplemented": 2070
   },
   "top_meta": [
     {
@@ -47,7 +47,7 @@
     {
       "name": "Island",
       "weight": 480,
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Misty Rainforest",
@@ -87,7 +87,7 @@
     {
       "name": "Swamp",
       "weight": 340,
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Vexing Bauble",
@@ -117,12 +117,12 @@
     {
       "name": "Steam Vents",
       "weight": 280,
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Watery Grave",
       "weight": 280,
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Flooded Strand",
@@ -169,14 +169,6 @@
       "weight": 1
     },
     {
-      "name": "Abandoned Air Temple",
-      "weight": 1
-    },
-    {
-      "name": "Abandoned Campground",
-      "weight": 1
-    },
-    {
       "name": "Abandoned Sarcophagus",
       "weight": 1
     },
@@ -214,6 +206,14 @@
     },
     {
       "name": "Abominable Treefolk",
+      "weight": 1
+    },
+    {
+      "name": "Abomination of Gudul",
+      "weight": 1
+    },
+    {
+      "name": "Absolute Virtue",
       "weight": 1
     }
   ],
@@ -291,12 +291,12 @@
     {
       "name": "Abandoned Air Temple",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Abandoned Campground",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Abandoned Sarcophagus",
@@ -381,7 +381,7 @@
     {
       "name": "Abraded Bluffs",
       "type_line": "Land \u2014 Desert",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Abrupt Decay",
@@ -421,7 +421,7 @@
     {
       "name": "Abstergo Entertainment",
       "type_line": "Legendary Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Abstract Paintmage",
@@ -611,7 +611,7 @@
     {
       "name": "Academy Ruins",
       "type_line": "Legendary Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Academy Wall",
@@ -621,7 +621,7 @@
     {
       "name": "Access Tunnel",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Acclaimed Contender",
@@ -791,7 +791,7 @@
     {
       "name": "Adagia, Windswept Bastion",
       "type_line": "Land \u2014 Planet",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Adamant Will",
@@ -841,7 +841,7 @@
     {
       "name": "Adarkar Wastes",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Adarkar Windform",
@@ -951,7 +951,7 @@
     {
       "name": "Adventurer\u0027s Inn",
       "type_line": "Land \u2014 Town",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Adventuring Gear",
@@ -1431,7 +1431,7 @@
     {
       "name": "Agadeem\u0027s Awakening // Agadeem, the Undercrypt",
       "type_line": "Sorcery // Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Against All Odds",
@@ -1556,7 +1556,7 @@
     {
       "name": "Agna Qel\u0027a",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Agonasaur Rex",
@@ -1731,7 +1731,7 @@
     {
       "name": "Airship Engine Room",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Airtight Alibi",
@@ -1991,7 +1991,7 @@
     {
       "name": "Akoum Refuge",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Akoum Stonewaker",
@@ -2161,7 +2161,7 @@
     {
       "name": "Alchemist\u0027s Refuge",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Alchemist\u0027s Retrieval",
@@ -2346,7 +2346,7 @@
     {
       "name": "Ally Encampment",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Almighty Brushwagg",
@@ -2416,7 +2416,7 @@
     {
       "name": "Alpine Meadow",
       "type_line": "Snow Land \u2014 Mountain Plains",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Alpine Moon",
@@ -2636,7 +2636,7 @@
     {
       "name": "Amonkhet Raceway",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Amorphous Axe",
@@ -2826,7 +2826,7 @@
     {
       "name": "Ancient Amphitheater",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Ancient Animus",
@@ -2896,7 +2896,7 @@
     {
       "name": "Ancient Ziggurat",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "And\u00FAril, Flame of the West",
@@ -3226,7 +3226,7 @@
     {
       "name": "Animal Sanctuary",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Animating Faerie // Bring to Life",
@@ -3876,7 +3876,7 @@
     {
       "name": "Arcane Sanctum",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Arcane Signet",
@@ -4021,7 +4021,7 @@
     {
       "name": "Arch of Orazca",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Archaeomancer",
@@ -4271,12 +4271,12 @@
     {
       "name": "Archway Commons",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Archway of Innovation",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Archweaver",
@@ -4301,7 +4301,7 @@
     {
       "name": "Arctic Flats",
       "type_line": "Snow Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Arctic Nishoba",
@@ -4311,7 +4311,7 @@
     {
       "name": "Arctic Treeline",
       "type_line": "Snow Land \u2014 Forest Plains",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Arcum Dagsson",
@@ -4386,7 +4386,7 @@
     {
       "name": "Arena of Glory",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Argent Dais",
@@ -4431,7 +4431,7 @@
     {
       "name": "Argoth, Sanctum of Nature",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Argothian Opportunist",
@@ -4446,7 +4446,7 @@
     {
       "name": "Arguel\u0027s Blood Fast // Temple of Aclazotz",
       "type_line": "Legendary Enchantment // Legendary Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Aria of Flame",
@@ -4456,7 +4456,7 @@
     {
       "name": "Arid Archway",
       "type_line": "Land \u2014 Desert",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Arid Mesa",
@@ -5501,7 +5501,7 @@
     {
       "name": "Auntie\u0027s Hovel",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Auntie\u0027s Snitch",
@@ -6021,7 +6021,7 @@
     {
       "name": "Avishkar Raceway",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Avoid Fate",
@@ -6121,7 +6121,7 @@
     {
       "name": "Axgard Armory",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Axgard Artisan",
@@ -6206,7 +6206,7 @@
     {
       "name": "Azor\u0027s Gateway // Sanctum of the Sun",
       "type_line": "Legendary Artifact // Legendary Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Azor, the Lawbringer",
@@ -6226,7 +6226,7 @@
     {
       "name": "Azorius Chancery",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Azorius Charm",
@@ -6246,7 +6246,7 @@
     {
       "name": "Azorius Guildgate",
       "type_line": "Land \u2014 Gate",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Azorius Guildmage",
@@ -6341,7 +6341,7 @@
     {
       "name": "Ba Sing Se",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Back for More",
@@ -6461,7 +6461,7 @@
     {
       "name": "Bala Ged Recovery // Bala Ged Sanctuary",
       "type_line": "Sorcery // Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Bala Ged Scorpion",
@@ -6811,7 +6811,7 @@
     {
       "name": "Bant Panorama",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Bant Sojourners",
@@ -6836,7 +6836,7 @@
     {
       "name": "Barad-d\u00FBr",
       "type_line": "Legendary Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Baral and Kari Zev",
@@ -6866,7 +6866,7 @@
     {
       "name": "Barbarian Ring",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Barbed Batterfist",
@@ -6926,7 +6926,7 @@
     {
       "name": "Barkchannel Pathway // Tidechannel Pathway",
       "type_line": "Land // Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Barkform Harvester",
@@ -6956,7 +6956,7 @@
     {
       "name": "Baron, Airship Kingdom",
       "type_line": "Land \u2014 Town",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Barony Vampire",
@@ -7001,7 +7001,7 @@
     {
       "name": "Barren Moor",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Barrensteppe Siege",
@@ -7111,7 +7111,7 @@
     {
       "name": "Base Camp",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Baseball Bat",
@@ -7416,7 +7416,7 @@
     {
       "name": "Battlefield Forge",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Battlefield Improvisation",
@@ -8196,7 +8196,7 @@
     {
       "name": "Beyeen Veil // Beyeen Coast",
       "type_line": "Instant // Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Beyond the Quiet",
@@ -8621,7 +8621,7 @@
     {
       "name": "Blackcleave Cliffs",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Blackcleave Goblin",
@@ -8806,7 +8806,7 @@
     {
       "name": "Blast Zone",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Blast of Genius",
@@ -8836,7 +8836,7 @@
     {
       "name": "Blazemire Verge",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Blazethorn Scarecrow",
@@ -8896,7 +8896,7 @@
     {
       "name": "Bleachbone Verge",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Bleak Coven Vampires",
@@ -8926,7 +8926,7 @@
     {
       "name": "Bleeding Woods",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Blessed Alliance",
@@ -9071,27 +9071,27 @@
     {
       "name": "Blighted Cataract",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Blighted Fen",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Blighted Gorge",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Blighted Steppe",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Blighted Woodland",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Blightning",
@@ -9126,7 +9126,7 @@
     {
       "name": "Blightstep Pathway // Searstep Pathway",
       "type_line": "Land // Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Blightwidow",
@@ -9241,7 +9241,7 @@
     {
       "name": "Blinkmoth Nexus",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Blinkmoth Urn",
@@ -9251,7 +9251,7 @@
     {
       "name": "Blinkmoth Well",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Blister Beetle",
@@ -9391,7 +9391,7 @@
     {
       "name": "Blood Crypt",
       "type_line": "Land \u2014 Swamp Mountain",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Blood Crypt // Blood Crypt",
@@ -9646,7 +9646,7 @@
     {
       "name": "Bloodfell Caves",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Bloodfire Colossus",
@@ -9841,7 +9841,7 @@
     {
       "name": "Bloodsoaked Insight // Sanguine Morass",
       "type_line": "Sorcery // Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Bloodstained Mire",
@@ -9981,7 +9981,7 @@
     {
       "name": "Blossoming Sands",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Blossoming Tortoise",
@@ -10256,7 +10256,7 @@
     {
       "name": "Boiling Rock Prison",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Boiling Rock Rioter",
@@ -10271,7 +10271,7 @@
     {
       "name": "Bojuka Bog",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Bojuka Brigand",
@@ -10426,7 +10426,7 @@
     {
       "name": "Bonders\u0027 Enclave",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Bonds of Faith",
@@ -10766,7 +10766,7 @@
     {
       "name": "Boreal Shelf",
       "type_line": "Snow Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Born to Drive",
@@ -10816,12 +10816,12 @@
     {
       "name": "Boros Garrison",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Boros Guildgate",
       "type_line": "Land \u2014 Gate",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Boros Guildmage",
@@ -10931,7 +10931,7 @@
     {
       "name": "Botanical Plaza",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Botanical Sanctum",
@@ -11046,7 +11046,7 @@
     {
       "name": "Bountiful Landscape",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Bounty Agent",
@@ -11236,7 +11236,7 @@
     {
       "name": "Branch of Vitu-Ghazi",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Branchblight Stalker",
@@ -11256,7 +11256,7 @@
     {
       "name": "Branchloft Pathway // Boulderloft Pathway",
       "type_line": "Land // Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Brandywine Farmer",
@@ -11296,7 +11296,7 @@
     {
       "name": "Brass\u0027s Tunnel-Grinder // Tecutlan, the Searing Rift",
       "type_line": "Legendary Artifact // Legendary Land \u2014 Cave",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Brave the Elements",
@@ -11496,12 +11496,12 @@
     {
       "name": "Breeding Pool",
       "type_line": "Land \u2014 Forest Island",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Bretagard Stronghold",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Breya\u0027s Apprentice",
@@ -11571,7 +11571,7 @@
     {
       "name": "Bridgeworks Battle // Tanglespan Bridgeworks",
       "type_line": "Sorcery // Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Bridled Bighorn",
@@ -11591,7 +11591,7 @@
     {
       "name": "Brightclimb Pathway // Grimclimb Pathway",
       "type_line": "Land // Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Brightfield Glider",
@@ -11806,7 +11806,7 @@
     {
       "name": "Bristling Backwoods",
       "type_line": "Land \u2014 Desert",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Bristling Boar",
@@ -12006,7 +12006,7 @@
     {
       "name": "Brotherhood Headquarters",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Brotherhood Patriarch",
@@ -12081,7 +12081,7 @@
     {
       "name": "Brushland",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Brushstrider",
@@ -12151,7 +12151,7 @@
     {
       "name": "Bucolic Ranch",
       "type_line": "Land \u2014 Desert",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Budoka Gardener // Dokai, Weaver of Life",
@@ -12286,7 +12286,7 @@
     {
       "name": "Buried Ruin",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Buried Treasure",
@@ -12626,7 +12626,7 @@
     {
       "name": "Cabal Coffers",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Cabal Evangel",
@@ -12646,7 +12646,7 @@
     {
       "name": "Cabal Stronghold",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Cabal Therapist",
@@ -12806,7 +12806,7 @@
     {
       "name": "Calciform Pools",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Calcite Snapper",
@@ -13166,7 +13166,7 @@
     {
       "name": "Canopy Vista",
       "type_line": "Land \u2014 Forest Plains",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Canyon Crab",
@@ -13196,7 +13196,7 @@
     {
       "name": "Canyon Slough",
       "type_line": "Land \u2014 Swamp Mountain",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Canyon Vaulter",
@@ -13226,7 +13226,7 @@
     {
       "name": "Capital City",
       "type_line": "Land \u2014 Town",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Caprichrome",
@@ -13296,7 +13296,7 @@
     {
       "name": "Captivating Cave",
       "type_line": "Land \u2014 Cave",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Captivating Crew",
@@ -13606,7 +13606,7 @@
     {
       "name": "Cascade Bluffs",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Cascade Seer",
@@ -13616,7 +13616,7 @@
     {
       "name": "Cascading Cataracts",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Case File Auditor",
@@ -13736,22 +13736,22 @@
     {
       "name": "Castle Ardenvale",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Castle Embereth",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Castle Garenbrig",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Castle Locthwain",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Castle Raptors",
@@ -13761,7 +13761,7 @@
     {
       "name": "Castle Vantress",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Casualties of War",
@@ -13891,7 +13891,7 @@
     {
       "name": "Cathedral of War",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Cathodion",
@@ -14031,12 +14031,12 @@
     {
       "name": "Cave of Temptation",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Cave of the Frost Dragon",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Cavern Lampad",
@@ -14066,12 +14066,12 @@
     {
       "name": "Cavernous Maw",
       "type_line": "Land \u2014 Cave",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Caves of Koilos",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Cease // Desist",
@@ -14116,7 +14116,7 @@
     {
       "name": "Celestial Colonnade",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Celestial Crusader",
@@ -14311,7 +14311,7 @@
     {
       "name": "Cephalid Coliseum",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Cephalid Constable",
@@ -15371,7 +15371,7 @@
     {
       "name": "Choked Estuary",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Choking Fumes",
@@ -15596,7 +15596,7 @@
     {
       "name": "Cinder Barrens",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Cinder Elemental",
@@ -15606,7 +15606,7 @@
     {
       "name": "Cinder Glade",
       "type_line": "Land \u2014 Mountain Forest",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Cinder Hellion",
@@ -15786,7 +15786,7 @@
     {
       "name": "City of Brass",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "City on Fire",
@@ -16051,7 +16051,7 @@
     {
       "name": "Clearwater Pathway // Murkwater Pathway",
       "type_line": "Land // Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Cleaver Riot",
@@ -16156,7 +16156,7 @@
     {
       "name": "Clifftop Retreat",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Cling to Dust",
@@ -16191,7 +16191,7 @@
     {
       "name": "Clive\u0027s Hideaway",
       "type_line": "Land \u2014 Town",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Clive, Ifrit\u0027s Dominant // Ifrit, Warden of Inferno",
@@ -16356,7 +16356,7 @@
     {
       "name": "Cloudcrest Lake",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Cloudcrown Oak",
@@ -16531,7 +16531,7 @@
     {
       "name": "Coastal Tower",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Coastline Chimera",
@@ -16976,12 +16976,12 @@
     {
       "name": "Command Bridge",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Command Tower",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Command Tower // Command Tower",
@@ -17026,7 +17026,7 @@
     {
       "name": "Commercial District",
       "type_line": "Land \u2014 Mountain Forest",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Commit // Memory",
@@ -17271,7 +17271,7 @@
     {
       "name": "Conduit Pylons",
       "type_line": "Land \u2014 Desert",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Conduit of Ruin",
@@ -17406,7 +17406,7 @@
     {
       "name": "Conqueror\u0027s Galleon // Conqueror\u0027s Foothold",
       "type_line": "Artifact \u2014 Vehicle // Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Conqueror\u0027s Pledge",
@@ -17671,7 +17671,7 @@
     {
       "name": "Contaminated Aquifer",
       "type_line": "Land \u2014 Island Swamp",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Contaminated Bond",
@@ -17686,7 +17686,7 @@
     {
       "name": "Contaminated Landscape",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Contentious Plan",
@@ -17701,7 +17701,7 @@
     {
       "name": "Contested War Zone",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Contingency Plan",
@@ -17851,7 +17851,7 @@
     {
       "name": "Copperline Gorge",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Copy Enchantment",
@@ -17931,7 +17931,7 @@
     {
       "name": "Cori Mountain Monastery",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Cori Mountain Stalwart",
@@ -18091,7 +18091,7 @@
     {
       "name": "Corrupted Crossroads",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Corrupted Grafstone",
@@ -18301,7 +18301,7 @@
     {
       "name": "Country Roads",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Countryside Crusher",
@@ -18561,7 +18561,7 @@
     {
       "name": "Cradle of the Accursed",
       "type_line": "Land \u2014 Desert",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Cradle to Grave",
@@ -18586,7 +18586,7 @@
     {
       "name": "Cragcrown Pathway // Timbercrown Pathway",
       "type_line": "Land // Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Cragganwick Cremator",
@@ -18711,7 +18711,7 @@
     {
       "name": "Crawling Barrens",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Crawling Chorus",
@@ -18816,7 +18816,7 @@
     {
       "name": "Creosote Heath",
       "type_line": "Land \u2014 Desert",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Crescent Island Temple",
@@ -19016,7 +19016,7 @@
     {
       "name": "Crucible of the Spirit Dragon",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Cruel Administrator",
@@ -19116,12 +19116,12 @@
     {
       "name": "Crumbling Necropolis",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Crumbling Vestige",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Crusader of Odric",
@@ -19266,12 +19266,12 @@
     {
       "name": "Crypt of Agadeem",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Crypt of the Eternals",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Cryptborn Horror",
@@ -19301,7 +19301,7 @@
     {
       "name": "Cryptic Caves",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Cryptic Coat",
@@ -19376,7 +19376,7 @@
     {
       "name": "Crystal Grotto",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Crystal Rod",
@@ -20081,7 +20081,7 @@
     {
       "name": "Daily Bugle Building",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Daily Bugle Reporters",
@@ -20101,7 +20101,7 @@
     {
       "name": "Dakmor Salvage",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Dakra Mystic",
@@ -20116,7 +20116,7 @@
     {
       "name": "Dalkovan Encampment",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Dalkovan Packbeasts",
@@ -20446,7 +20446,7 @@
     {
       "name": "Darkbore Pathway // Slitherbore Pathway",
       "type_line": "Land // Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Darkheart Sliver",
@@ -20461,7 +20461,7 @@
     {
       "name": "Darkmoss Bridge",
       "type_line": "Artifact Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Darkness",
@@ -20476,7 +20476,7 @@
     {
       "name": "Darkslick Shores",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Darkstar Augur",
@@ -20496,7 +20496,7 @@
     {
       "name": "Darksteel Citadel",
       "type_line": "Artifact Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Darksteel Colossus",
@@ -21276,7 +21276,7 @@
     {
       "name": "Deathcap Glade",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Deathcap Marionette",
@@ -21456,7 +21456,7 @@
     {
       "name": "Deceptive Landscape",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Decimator Beetle",
@@ -21986,7 +21986,7 @@
     {
       "name": "Demolition Field",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Demolition Stomper",
@@ -22161,7 +22161,7 @@
     {
       "name": "Den of the Bugbear",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Denethor, Ruling Steward",
@@ -22366,7 +22366,7 @@
     {
       "name": "Desert",
       "type_line": "Land \u2014 Desert",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Desert Cerodon",
@@ -22376,27 +22376,27 @@
     {
       "name": "Desert of the Fervent",
       "type_line": "Land \u2014 Desert",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Desert of the Glorified",
       "type_line": "Land \u2014 Desert",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Desert of the Indomitable",
       "type_line": "Land \u2014 Desert",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Desert of the Mindful",
       "type_line": "Land \u2014 Desert",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Desert of the True",
       "type_line": "Land \u2014 Desert",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Desert\u0027s Due",
@@ -22411,12 +22411,12 @@
     {
       "name": "Deserted Beach",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Deserted Temple",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Deserter\u0027s Disciple",
@@ -22441,7 +22441,7 @@
     {
       "name": "Desolate Lighthouse",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Desolation Giant",
@@ -22586,7 +22586,7 @@
     {
       "name": "Detection Tower",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Detective\u0027s Phoenix",
@@ -22966,7 +22966,7 @@
     {
       "name": "Dimension X",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Dimensional Exile",
@@ -22991,7 +22991,7 @@
     {
       "name": "Dimir Aqueduct",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Dimir Charm",
@@ -23016,7 +23016,7 @@
     {
       "name": "Dimir Guildgate",
       "type_line": "Land \u2014 Gate",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Dimir Guildmage",
@@ -23406,7 +23406,7 @@
     {
       "name": "Dismal Backwater",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Dismal Failure",
@@ -24316,12 +24316,12 @@
     {
       "name": "Dowsing Dagger // Lost Vale",
       "type_line": "Artifact \u2014 Equipment // Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Dowsing Device // Geode Grotto",
       "type_line": "Artifact // Land \u2014 Cave",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Dowsing Shaman",
@@ -24701,7 +24701,7 @@
     {
       "name": "Dragonskull Summit",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Dragonsoul Knight",
@@ -24871,7 +24871,7 @@
     {
       "name": "Drannith Ruins",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Drannith Stinger",
@@ -24956,7 +24956,7 @@
     {
       "name": "Dread Statuary",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Dread Summons",
@@ -25046,7 +25046,7 @@
     {
       "name": "Dreadship Reef",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Dreadwaters",
@@ -25171,7 +25171,7 @@
     {
       "name": "Dreamroot Cascade",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Dreams of Laguna",
@@ -25486,7 +25486,7 @@
     {
       "name": "Drossforge Bridge",
       "type_line": "Artifact Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Drove of Elves",
@@ -25526,7 +25526,7 @@
     {
       "name": "Drowned Catacomb",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Drowned Rusalka",
@@ -25581,7 +25581,7 @@
     {
       "name": "Drownyard Temple",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Drowsing Tyrannodon",
@@ -25861,7 +25861,7 @@
     {
       "name": "Dunes of the Dead",
       "type_line": "Land \u2014 Desert",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Dungeon Crawler",
@@ -25871,7 +25871,7 @@
     {
       "name": "Dungeon Descent",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Dungeon Geists",
@@ -26016,7 +26016,7 @@
     {
       "name": "Duskmantle, House of Shadow",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Duskmourn\u0027s Domination",
@@ -26141,7 +26141,7 @@
     {
       "name": "Dwarven Mine",
       "type_line": "Land \u2014 Mountain",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Dwarven Priest",
@@ -26541,7 +26541,7 @@
     {
       "name": "Echoing Deeps",
       "type_line": "Land \u2014 Cave",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Echoing Return",
@@ -26591,7 +26591,7 @@
     {
       "name": "Eden, Seat of the Sanctum",
       "type_line": "Land \u2014 Town",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Edgar\u0027s Awakening",
@@ -26761,7 +26761,7 @@
     {
       "name": "Eiganjo Castle",
       "type_line": "Legendary Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Eiganjo Exemplar",
@@ -26781,7 +26781,7 @@
     {
       "name": "Eiganjo, Seat of the Empire",
       "type_line": "Legendary Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Eight-and-a-Half-Tails",
@@ -26951,7 +26951,7 @@
     {
       "name": "Eldrazi Temple",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Eldritch Evolution",
@@ -27141,7 +27141,7 @@
     {
       "name": "Elfhame Palace",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Elfhame Wurm",
@@ -27716,7 +27716,7 @@
     {
       "name": "Emergence Zone",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Emergency Eject",
@@ -27771,12 +27771,12 @@
     {
       "name": "Emeria\u0027s Call // Emeria, Shattered Skyclave",
       "type_line": "Sorcery // Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Emeria, the Sky Ruin",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Emeritus of Abundance // Regrowth",
@@ -28016,7 +28016,7 @@
     {
       "name": "Encroaching Wastes",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Encrust",
@@ -28081,7 +28081,7 @@
     {
       "name": "Endless Sands",
       "type_line": "Land \u2014 Desert",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Endless Swarm",
@@ -28696,7 +28696,7 @@
     {
       "name": "Eroded Canyon",
       "type_line": "Land \u2014 Desert",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Eron the Relentless",
@@ -28866,7 +28866,7 @@
     {
       "name": "Esper Panorama",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Esper Sentinel",
@@ -29036,7 +29036,7 @@
     {
       "name": "Etched Cornfield",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Etched Familiar",
@@ -29296,7 +29296,7 @@
     {
       "name": "Evendo, Waking Haven",
       "type_line": "Land \u2014 Planet",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Ever After",
@@ -29626,7 +29626,7 @@
     {
       "name": "Exotic Orchard",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Exotic Pets",
@@ -30176,7 +30176,7 @@
     {
       "name": "Faceless Haven",
       "type_line": "Snow Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Facet Reader",
@@ -30236,7 +30236,7 @@
     {
       "name": "Faerie Conclave",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Faerie Dreamthief",
@@ -31416,7 +31416,7 @@
     {
       "name": "Fell the Profane // Fell Mire",
       "type_line": "Instant // Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Felling Blow",
@@ -31591,7 +31591,7 @@
     {
       "name": "Fertile Thicket",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Fertilid",
@@ -31656,7 +31656,7 @@
     {
       "name": "Festering Gulch",
       "type_line": "Land \u2014 Desert",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Festering March",
@@ -31706,7 +31706,7 @@
     {
       "name": "Fetid Heath",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Fetid Imp",
@@ -31716,7 +31716,7 @@
     {
       "name": "Fetid Pools",
       "type_line": "Land \u2014 Island Swamp",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Fettergeist",
@@ -31771,7 +31771,7 @@
     {
       "name": "Field of Ruin",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Fieldmist Borderpost",
@@ -31781,7 +31781,7 @@
     {
       "name": "Fields of Strife",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Fiend Artisan",
@@ -32166,7 +32166,7 @@
     {
       "name": "Fire Nation Palace",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Fire Nation Raider",
@@ -32236,7 +32236,7 @@
     {
       "name": "Fire-Lit Thicket",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Fire-Rim Form",
@@ -32541,7 +32541,7 @@
     {
       "name": "Flagstones of Trokair",
       "type_line": "Legendary Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Flame Blitz",
@@ -33141,7 +33141,7 @@
     {
       "name": "Flooded Grove",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Flooded Strand",
@@ -33151,7 +33151,7 @@
     {
       "name": "Floodfarm Verge",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Floodhound",
@@ -33426,7 +33426,7 @@
     {
       "name": "Foggy Bottom Swamp",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Foggy Swamp Hunters",
@@ -33481,7 +33481,7 @@
     {
       "name": "Fomori Vault",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Font of Agonies",
@@ -33551,7 +33551,7 @@
     {
       "name": "Foot Headquarters",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Foot Mystic",
@@ -33621,7 +33621,7 @@
     {
       "name": "Forbidden Orchard",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Forbidding Spirit",
@@ -33631,7 +33631,7 @@
     {
       "name": "Forbidding Watchtower",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Force Away",
@@ -33706,12 +33706,12 @@
     {
       "name": "Foreboding Landscape",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Foreboding Ruins",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Foreboding Statue // Forsaken Thresher",
@@ -33766,7 +33766,7 @@
     {
       "name": "Forest",
       "type_line": "Basic Land \u2014 Forest",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Forest // Forest",
@@ -33831,7 +33831,7 @@
     {
       "name": "Forgotten Cave",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Forgotten Creation",
@@ -33841,7 +33841,7 @@
     {
       "name": "Forgotten Monument",
       "type_line": "Land \u2014 Cave",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Forgotten Sentinel",
@@ -33876,7 +33876,7 @@
     {
       "name": "Forlorn Flats",
       "type_line": "Land \u2014 Desert",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Forlorn Pseudamma",
@@ -33936,7 +33936,7 @@
     {
       "name": "Forsaken Sanctuary",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Forsworn Paladin",
@@ -33946,7 +33946,7 @@
     {
       "name": "Fortified Beachhead",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Fortified Rampart",
@@ -33956,7 +33956,7 @@
     {
       "name": "Fortified Village",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Fortify",
@@ -34021,7 +34021,7 @@
     {
       "name": "Forum of Amity",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Fossil Find",
@@ -34041,7 +34041,7 @@
     {
       "name": "Foul Orchard",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Foul Play",
@@ -34056,7 +34056,7 @@
     {
       "name": "Foul Roads",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Foul Watcher",
@@ -34131,7 +34131,7 @@
     {
       "name": "Foundry of the Consuls",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Fountain of Ichor",
@@ -34151,7 +34151,7 @@
     {
       "name": "Fountainport",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Fountainport Bell",
@@ -34526,7 +34526,7 @@
     {
       "name": "Frontier Bivouac",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Frontier Guide",
@@ -34601,7 +34601,7 @@
     {
       "name": "Frost Marsh",
       "type_line": "Snow Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Frost Ogre",
@@ -34631,7 +34631,7 @@
     {
       "name": "Frostboil Snarl",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Frostbridge Guard",
@@ -34676,7 +34676,7 @@
     {
       "name": "Frostwalk Bastion",
       "type_line": "Snow Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Frostwalla",
@@ -34851,7 +34851,7 @@
     {
       "name": "Fungal Reaches",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Fungal Rebirth",
@@ -35011,7 +35011,7 @@
     {
       "name": "Furycalm Snarl",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Furystoke Giant",
@@ -35331,7 +35331,7 @@
     {
       "name": "Game Trail",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Game-Trail Changeling",
@@ -35401,7 +35401,7 @@
     {
       "name": "Gargoyle Castle",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Gargoyle Sentinel",
@@ -35621,12 +35621,12 @@
     {
       "name": "Gates of Istfell",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Gateway Plaza",
       "type_line": "Land \u2014 Gate",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Gateway Shade",
@@ -35716,7 +35716,7 @@
     {
       "name": "Gavony Township",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Gavony Trapper",
@@ -35781,7 +35781,7 @@
     {
       "name": "Geier Reach Sanitarium",
       "type_line": "Legendary Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Geist Snatch",
@@ -35901,7 +35901,7 @@
     {
       "name": "Gemstone Caverns",
       "type_line": "Legendary Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Gemstone Mine",
@@ -36076,7 +36076,7 @@
     {
       "name": "Geothermal Bog",
       "type_line": "Land \u2014 Swamp Mountain",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Geothermal Kami",
@@ -36291,7 +36291,7 @@
     {
       "name": "Ghitu Encampment",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Ghitu Firebreathing",
@@ -36336,7 +36336,7 @@
     {
       "name": "Ghost Quarter",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Ghost Ship",
@@ -36956,7 +36956,7 @@
     {
       "name": "Gilt-Leaf Palace",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Gilt-Leaf Seer",
@@ -37001,7 +37001,7 @@
     {
       "name": "Gingerbread Cabin",
       "type_line": "Land \u2014 Forest",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Gingerbread Hunter // Puny Snack",
@@ -37136,12 +37136,12 @@
     {
       "name": "Glacial Floodplain",
       "type_line": "Snow Land \u2014 Plains Island",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Glacial Fortress",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Glacial Grasp",
@@ -37301,7 +37301,7 @@
     {
       "name": "Glasswing Grace // Age-Graced Chapel",
       "type_line": "Enchantment \u2014 Aura // Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Glassworks // Shattered Yard",
@@ -37441,12 +37441,12 @@
     {
       "name": "Glimmerpost",
       "type_line": "Land \u2014 Locus",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Glimmervoid",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Glimpse of Freedom",
@@ -37661,7 +37661,7 @@
     {
       "name": "Gloomlake Verge",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Gloomlance",
@@ -37941,7 +37941,7 @@
     {
       "name": "Gnottvold Slumbermound",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Go Blank",
@@ -38556,7 +38556,7 @@
     {
       "name": "Godless Shrine",
       "type_line": "Land \u2014 Plains Swamp",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Godo\u0027s Irregulars",
@@ -38576,7 +38576,7 @@
     {
       "name": "Gods\u0027 Eye, Gate to the Reikai",
       "type_line": "Legendary Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Gods\u0027 Hall Guardian",
@@ -38611,7 +38611,7 @@
     {
       "name": "Gohn, Town of Ruin",
       "type_line": "Land \u2014 Town",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Golbez, Crystal Collector",
@@ -38751,7 +38751,7 @@
     {
       "name": "Goldmire Bridge",
       "type_line": "Artifact Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Goldnight Castigator",
@@ -38841,7 +38841,7 @@
     {
       "name": "Golgari Guildgate",
       "type_line": "Land \u2014 Gate",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Golgari Guildmage",
@@ -38871,7 +38871,7 @@
     {
       "name": "Golgari Rot Farm",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Golgari Rotwurm",
@@ -38946,7 +38946,7 @@
     {
       "name": "Gongaga, Reactor Town",
       "type_line": "Land \u2014 Town",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Gonti\u0027s Aether Heart",
@@ -39326,7 +39326,7 @@
     {
       "name": "Grasping Dunes",
       "type_line": "Land \u2014 Desert",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Grasping Giant",
@@ -39346,7 +39346,7 @@
     {
       "name": "Grasping Shadows // Shadows\u0027 Lair",
       "type_line": "Enchantment // Land \u2014 Cave",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Grasping Thrull",
@@ -39481,7 +39481,7 @@
     {
       "name": "Graven Cairns",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Graven Dominator",
@@ -39586,7 +39586,7 @@
     {
       "name": "Graypelt Refuge",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Grayscaled Gharial",
@@ -39626,7 +39626,7 @@
     {
       "name": "Great Arashin City",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Great Desert Prospector",
@@ -39641,17 +39641,17 @@
     {
       "name": "Great Hall of Starnheim",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Great Hall of the Biblioplex",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Great Hall of the Citadel",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Great Hart",
@@ -39931,7 +39931,7 @@
     {
       "name": "Grim Backwoods",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Grim Bauble",
@@ -40201,7 +40201,7 @@
     {
       "name": "Grixis Panorama",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Grixis Slavedriver",
@@ -40361,12 +40361,12 @@
     {
       "name": "Grove of the Burnwillows",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Grove of the Guardian",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Grovetender Druids",
@@ -40396,7 +40396,7 @@
     {
       "name": "Growing Rites of Itlimoc // Itlimoc, Cradle of the Sun",
       "type_line": "Legendary Enchantment // Legendary Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Growth Curve",
@@ -40511,7 +40511,7 @@
     {
       "name": "Gruul Guildgate",
       "type_line": "Land \u2014 Gate",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Gruul Guildmage",
@@ -40556,7 +40556,7 @@
     {
       "name": "Gruul Turf",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Gruul War Chant",
@@ -40601,7 +40601,7 @@
     {
       "name": "Guadosalam, Farplane Gateway",
       "type_line": "Land \u2014 Town",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Guard Duty",
@@ -40831,7 +40831,7 @@
     {
       "name": "Guildmages\u0027 Forum",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Guildpact Informant",
@@ -41106,7 +41106,7 @@
     {
       "name": "Hadana\u0027s Climb // Winged Temple of Orazca",
       "type_line": "Legendary Enchantment // Legendary Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Hag Hedge-Mage",
@@ -41136,7 +41136,7 @@
     {
       "name": "Hagra Mauling // Hagra Broodpit",
       "type_line": "Instant // Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Hagra Sharpshooter",
@@ -41196,7 +41196,7 @@
     {
       "name": "Halimar Depths",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Halimar Excavator",
@@ -41231,22 +41231,22 @@
     {
       "name": "Hall of Heliod\u0027s Generosity",
       "type_line": "Legendary Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Hall of Oracles",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Hall of Storm Giants",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Hall of Tagsin",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Hall of Triumph",
@@ -41276,7 +41276,7 @@
     {
       "name": "Hallowed Fountain",
       "type_line": "Land \u2014 Plains Island",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Hallowed Fountain // Hallowed Fountain",
@@ -41486,7 +41486,7 @@
     {
       "name": "Hanweir Battlements",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Hanweir Garrison",
@@ -41876,7 +41876,7 @@
     {
       "name": "Hashep Oasis",
       "type_line": "Land \u2014 Desert",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Haste Magic",
@@ -41941,7 +41941,7 @@
     {
       "name": "Haunted Fengraf",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Haunted Guardian",
@@ -41956,7 +41956,7 @@
     {
       "name": "Haunted Mire",
       "type_line": "Land \u2014 Swamp Forest",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Haunted Plate Mail",
@@ -41966,7 +41966,7 @@
     {
       "name": "Haunted Ridge",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Haunted Screen",
@@ -42006,7 +42006,7 @@
     {
       "name": "Haven of the Spirit Dragon",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Havengul Lich",
@@ -42426,7 +42426,7 @@
     {
       "name": "Hedge Maze",
       "type_line": "Land \u2014 Forest Island",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Hedge Shredder",
@@ -42666,7 +42666,7 @@
     {
       "name": "Hellion Crucible",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Hellion Eruption",
@@ -42806,7 +42806,7 @@
     {
       "name": "Hengegate Pathway // Mistgate Pathway",
       "type_line": "Land // Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Henrika Domnathi // Henrika, Infernal Seer",
@@ -43176,12 +43176,12 @@
     {
       "name": "Hidden Cataract",
       "type_line": "Land \u2014 Cave",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Hidden Courtyard",
       "type_line": "Land \u2014 Cave",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Hidden Dragonslayer",
@@ -43196,7 +43196,7 @@
     {
       "name": "Hidden Grotto",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Hidden Herbalists",
@@ -43211,12 +43211,12 @@
     {
       "name": "Hidden Necropolis",
       "type_line": "Land \u2014 Cave",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Hidden Nursery",
       "type_line": "Land \u2014 Cave",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Hidden Stockpile",
@@ -43231,7 +43231,7 @@
     {
       "name": "Hidden Volcano",
       "type_line": "Land \u2014 Cave",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Hide // Seek",
@@ -43381,7 +43381,7 @@
     {
       "name": "Highland Forest",
       "type_line": "Snow Land \u2014 Mountain Forest",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Highland Game",
@@ -43391,12 +43391,12 @@
     {
       "name": "Highland Lake",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Highland Weald",
       "type_line": "Snow Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Highspire Artisan",
@@ -43496,7 +43496,7 @@
     {
       "name": "Hinterland Harbor",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Hinterland Hermit // Hinterland Scourge",
@@ -43571,7 +43571,7 @@
     {
       "name": "Hissing Quagmire",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Historian of Zhalfir",
@@ -43621,7 +43621,7 @@
     {
       "name": "Hive of the Eye Tyrant",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Hiveheart Shaman",
@@ -43761,7 +43761,7 @@
     {
       "name": "Holdout Settlement",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Hollow Dogs",
@@ -44311,7 +44311,7 @@
     {
       "name": "Hostile Desert",
       "type_line": "Land \u2014 Desert",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Hostile Hostel // Creeping Inn",
@@ -44551,7 +44551,7 @@
     {
       "name": "Howltooth Hollow",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Huatli\u0027s Final Strike",
@@ -44971,7 +44971,7 @@
     {
       "name": "Hushwood Verge",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Huskburster Swarm",
@@ -45171,7 +45171,7 @@
     {
       "name": "Ice Tunnel",
       "type_line": "Snow Land \u2014 Island Swamp",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Ice-Fang Coatl",
@@ -45361,12 +45361,12 @@
     {
       "name": "Idyllic Beachfront",
       "type_line": "Land \u2014 Plains Island",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Idyllic Grange",
       "type_line": "Land \u2014 Plains",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Idyllic Tutor",
@@ -45376,7 +45376,7 @@
     {
       "name": "Ifnir Deadlands",
       "type_line": "Land \u2014 Desert",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Igneous Cur",
@@ -45476,7 +45476,7 @@
     {
       "name": "Illegitimate Business",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Illicit Masquerade",
@@ -45616,7 +45616,7 @@
     {
       "name": "Immersturm Skullcairn",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Immerwolf",
@@ -46111,7 +46111,7 @@
     {
       "name": "Indatha Triome",
       "type_line": "Land \u2014 Plains Swamp Forest",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Indebted Samurai",
@@ -46776,7 +46776,7 @@
     {
       "name": "Insomnia, Crown City",
       "type_line": "Land \u2014 Town",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Inspiration",
@@ -46956,7 +46956,7 @@
     {
       "name": "Interplanar Beacon",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Interpret the Signs",
@@ -47401,7 +47401,7 @@
     {
       "name": "Inventors\u0027 Fair",
       "type_line": "Legendary Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Invert // Invent",
@@ -47551,7 +47551,7 @@
     {
       "name": "Ipnu Rivulet",
       "type_line": "Land \u2014 Desert",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Irascible Wolverine",
@@ -47771,7 +47771,7 @@
     {
       "name": "Irrigated Farmland",
       "type_line": "Land \u2014 Plains Island",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Isamaru, Hound of Konda",
@@ -47791,7 +47791,7 @@
     {
       "name": "Ishgard, the Holy See // Faith \u0026 Grief",
       "type_line": "Land \u2014 Town // Sorcery \u2014 Adventure",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Ishi-Ishi, Akki Crackshot",
@@ -47811,7 +47811,7 @@
     {
       "name": "Island",
       "type_line": "Basic Land \u2014 Island",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Island // Island",
@@ -47836,7 +47836,7 @@
     {
       "name": "Isolated Chapel",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Isolation Cell",
@@ -48011,7 +48011,7 @@
     {
       "name": "Izzet Boilerworks",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Izzet Charm",
@@ -48036,7 +48036,7 @@
     {
       "name": "Izzet Guildgate",
       "type_line": "Land \u2014 Gate",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Izzet Guildmage",
@@ -48336,7 +48336,7 @@
     {
       "name": "Jagged Barrens",
       "type_line": "Land \u2014 Desert",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Jagged Poppet",
@@ -48396,7 +48396,7 @@
     {
       "name": "Jasmine Dragon Tea Shop",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Jaspera Sentinel",
@@ -48641,7 +48641,7 @@
     {
       "name": "Jetmir\u0027s Garden",
       "type_line": "Land \u2014 Mountain Forest Plains",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Jetmir, Nexus of Revels",
@@ -48731,7 +48731,7 @@
     {
       "name": "Jidoor, Aristocratic Capital // Overture",
       "type_line": "Land \u2014 Town // Sorcery \u2014 Adventure",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Jill, Shiva\u0027s Dominant // Shiva, Warden of Ice",
@@ -48976,7 +48976,7 @@
     {
       "name": "Journey to Eternity // Atzal, Cave of Eternity",
       "type_line": "Legendary Enchantment \u2014 Aura // Legendary Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Journey to Nowhere",
@@ -49131,7 +49131,7 @@
     {
       "name": "Jund Panorama",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Jund Sojourners",
@@ -49156,12 +49156,12 @@
     {
       "name": "Jungle Hollow",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Jungle Shrine",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Jungle Weaver",
@@ -49251,12 +49251,12 @@
     {
       "name": "Jwar Isle Refuge",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Jwari Disruption // Jwari Ruins",
       "type_line": "Instant // Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Jwari Scuttler",
@@ -49296,7 +49296,7 @@
     {
       "name": "Kabira Crossroads",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Kabira Evangel",
@@ -49311,7 +49311,7 @@
     {
       "name": "Kabira Takedown // Kabira Plateau",
       "type_line": "Instant // Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Kabira Vindicator",
@@ -49731,7 +49731,7 @@
     {
       "name": "Karn\u0027s Bastion",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Karn\u0027s Sylex",
@@ -49771,7 +49771,7 @@
     {
       "name": "Karplusan Forest",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Karplusan Hound",
@@ -49931,7 +49931,7 @@
     {
       "name": "Kavaron, Memorial World",
       "type_line": "Land \u2014 Planet",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Kavu Climber",
@@ -50031,7 +50031,7 @@
     {
       "name": "Kazandu Refuge",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Kazandu Stomper",
@@ -50056,7 +50056,7 @@
     {
       "name": "Kazuul\u0027s Fury // Kazuul\u0027s Cliffs",
       "type_line": "Instant // Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Kazuul\u0027s Toll Collector",
@@ -50206,7 +50206,7 @@
     {
       "name": "Keldon Megaliths",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Keldon Overseer",
@@ -50381,7 +50381,7 @@
     {
       "name": "Kessig Wolf Run",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Kessig Wolfrider",
@@ -50411,7 +50411,7 @@
     {
       "name": "Ketria Triome",
       "type_line": "Land \u2014 Forest Island Mountain",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Key to the City",
@@ -50431,12 +50431,12 @@
     {
       "name": "Khalni Ambush // Khalni Territory",
       "type_line": "Instant // Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Khalni Garden",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Khalni Gem",
@@ -50476,7 +50476,7 @@
     {
       "name": "Kher Keep",
       "type_line": "Legendary Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Kheru Bloodsucker",
@@ -50836,7 +50836,7 @@
     {
       "name": "Kishla Village",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Kiss of the Amesha",
@@ -52151,7 +52151,7 @@
     {
       "name": "Kyoshi Village",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Kyoshi Warriors",
@@ -52206,7 +52206,7 @@
     {
       "name": "Labyrinth of Skophos",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Lace with Moonglove",
@@ -52281,7 +52281,7 @@
     {
       "name": "Lair of the Hydra",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Lairwatch Giant",
@@ -52291,7 +52291,7 @@
     {
       "name": "Lakeside Shack",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Lambholt Elder // Silverpelt Werewolf",
@@ -52401,7 +52401,7 @@
     {
       "name": "Lantern-Lit Graveyard",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Lapse of Certainty",
@@ -52626,7 +52626,7 @@
     {
       "name": "Lavaclaw Reaches",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Lavacore Elemental",
@@ -52956,7 +52956,7 @@
     {
       "name": "Leechridden Swamp",
       "type_line": "Land \u2014 Swamp",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Leering Emblem",
@@ -52996,7 +52996,7 @@
     {
       "name": "Legion Leadership // Legion Stronghold",
       "type_line": "Instant // Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Legion Lieutenant",
@@ -53036,7 +53036,7 @@
     {
       "name": "Legion\u0027s Landing // Adanto, the First Fort",
       "type_line": "Legendary Enchantment // Legendary Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Legions to Ashes",
@@ -54016,7 +54016,7 @@
     {
       "name": "Lilypad Village",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Lilysplash Mentor",
@@ -54036,7 +54036,7 @@
     {
       "name": "Lindblum, Industrial Regency // Mage Siege",
       "type_line": "Land \u2014 Town // Instant \u2014 Adventure",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Linden, the Steadfast Queen",
@@ -54161,7 +54161,7 @@
     {
       "name": "Littjara Mirrorlake",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Liturgy of Blood",
@@ -54316,7 +54316,7 @@
     {
       "name": "Llanowar Reborn",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Llanowar Scout",
@@ -54346,7 +54346,7 @@
     {
       "name": "Llanowar Wastes",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Lluwen, Exchange Student // Pest Friend",
@@ -54546,12 +54546,12 @@
     {
       "name": "Lonely Arroyo",
       "type_line": "Land \u2014 Desert",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Lonely Sandbar",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Lonesome Unicorn // Rider in Need",
@@ -54651,7 +54651,7 @@
     {
       "name": "Looming Spires",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Loot, Exuberant Explorer",
@@ -54781,7 +54781,7 @@
     {
       "name": "Lorehold Campus",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Lorehold Charm",
@@ -55191,7 +55191,7 @@
     {
       "name": "Lumbering Falls",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Lumbering Laundry",
@@ -55361,7 +55361,7 @@
     {
       "name": "Lupinflower Village",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Lurching Rotbeast",
@@ -55426,12 +55426,12 @@
     {
       "name": "Lush Oasis",
       "type_line": "Land \u2014 Desert",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Lush Portico",
       "type_line": "Land \u2014 Forest Plains",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Lust for War",
@@ -55601,7 +55601,7 @@
     {
       "name": "Madblind Mountain",
       "type_line": "Land \u2014 Mountain",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Madcap Experiment",
@@ -55656,7 +55656,7 @@
     {
       "name": "Maelstrom of the Spirit Dragon",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Maestros Ascendancy",
@@ -55736,7 +55736,7 @@
     {
       "name": "Mage-Ring Network",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Mage-Ring Responder",
@@ -55951,7 +55951,7 @@
     {
       "name": "Magosi, the Waterveil",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Magus of the Abyss",
@@ -56176,7 +56176,7 @@
     {
       "name": "Makindi Stampede // Makindi Mesas",
       "type_line": "Sorcery // Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Malach of the Dawn",
@@ -56211,7 +56211,7 @@
     {
       "name": "Malakir Rebirth // Malakir Mire",
       "type_line": "Instant // Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Malakir Soothsayer",
@@ -57516,7 +57516,7 @@
     {
       "name": "Matzalantli, the Great Door // The Core",
       "type_line": "Legendary Artifact // Legendary Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Mauh\u00FAr, Uruk-hai Captain",
@@ -57681,7 +57681,7 @@
     {
       "name": "Maze\u0027s End",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Maze\u0027s Mantle",
@@ -57701,7 +57701,7 @@
     {
       "name": "Meandering River",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Meandering Towershell",
@@ -57726,7 +57726,7 @@
     {
       "name": "Mech Hangar",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Mechan Assembler",
@@ -57796,7 +57796,7 @@
     {
       "name": "Meditation Pools",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Meditation Puzzle",
@@ -57966,27 +57966,27 @@
     {
       "name": "Memorial to Folly",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Memorial to Genius",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Memorial to Glory",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Memorial to Unity",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Memorial to War",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Memoricide",
@@ -58541,7 +58541,7 @@
     {
       "name": "Meticulous Archive",
       "type_line": "Land \u2014 Plains Island",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Meticulous Artisan",
@@ -58626,7 +58626,7 @@
     {
       "name": "Midgar, City of Mako // Reactor Raid",
       "type_line": "Land \u2014 Town // Sorcery \u2014 Adventure",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Midnight Assassin",
@@ -58851,7 +58851,7 @@
     {
       "name": "Mikokoro, Center of the Sea",
       "type_line": "Legendary Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Mila, Crafty Companion // Lukka, Wayward Bonder",
@@ -58961,12 +58961,12 @@
     {
       "name": "Minamo, School at Water\u0027s Edge",
       "type_line": "Legendary Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Minas Tirith",
       "type_line": "Legendary Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Minas Tirith Garrison",
@@ -59296,7 +59296,7 @@
     {
       "name": "Mines of Moria",
       "type_line": "Legendary Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Mineshaft Spider",
@@ -59441,7 +59441,7 @@
     {
       "name": "Miren, the Moaning Well",
       "type_line": "Legendary Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Miriam, Herd Whisperer",
@@ -59501,7 +59501,7 @@
     {
       "name": "Mirrex",
       "type_line": "Land \u2014 Sphere",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Mirri the Cursed",
@@ -59526,7 +59526,7 @@
     {
       "name": "Mirrodin\u0027s Core",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Mirror Box",
@@ -59631,7 +59631,7 @@
     {
       "name": "Mirrorpool",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Mirrorshell Crab",
@@ -59706,12 +59706,12 @@
     {
       "name": "Mishra\u0027s Factory",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Mishra\u0027s Foundry",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Mishra\u0027s Juggernaut",
@@ -59881,7 +59881,7 @@
     {
       "name": "Mistrise Village",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Mists of Littjara",
@@ -59891,12 +59891,12 @@
     {
       "name": "Mistvault Bridge",
       "type_line": "Artifact Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Mistveil Plains",
       "type_line": "Land \u2014 Plains",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Mistvein Borderpost",
@@ -59916,7 +59916,7 @@
     {
       "name": "Misty Palms Oasis",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Misty Rainforest",
@@ -60051,7 +60051,7 @@
     {
       "name": "Mobilized District",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Mobilizer Mech",
@@ -60306,12 +60306,12 @@
     {
       "name": "Molten Slagheap",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Molten Tributary",
       "type_line": "Land \u2014 Island Mountain",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Molten Vortex",
@@ -60566,7 +60566,7 @@
     {
       "name": "Monumental Henge",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Moodmark Painter",
@@ -60676,7 +60676,7 @@
     {
       "name": "Moonring Island",
       "type_line": "Land \u2014 Island",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Moonring Mirror",
@@ -60751,7 +60751,7 @@
     {
       "name": "Moorland Haunt",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Moorland Inquisitor",
@@ -60966,7 +60966,7 @@
     {
       "name": "Mortuary Mire",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Mortus Strider",
@@ -61036,7 +61036,7 @@
     {
       "name": "Mosswort Bridge",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Most Valuable Slayer",
@@ -61081,7 +61081,7 @@
     {
       "name": "Mountain",
       "type_line": "Basic Land \u2014 Mountain",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Mountain // Mountain",
@@ -61151,7 +61151,7 @@
     {
       "name": "Mouth of Ronom",
       "type_line": "Snow Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Mouth of the Storm",
@@ -61236,7 +61236,7 @@
     {
       "name": "Mudflat Village",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Muerra, Trash Tactician",
@@ -61326,7 +61326,7 @@
     {
       "name": "Muraganda Raceway",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Murasa Behemoth",
@@ -61426,12 +61426,12 @@
     {
       "name": "Murky Sewer",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Murmuring Bosk",
       "type_line": "Land \u2014 Forest",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Murmuring Mystic",
@@ -61516,7 +61516,7 @@
     {
       "name": "Mutant Town",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Mutant Town Musicians",
@@ -61806,7 +61806,7 @@
     {
       "name": "Mystic Gate",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Mystic Genesis",
@@ -61826,7 +61826,7 @@
     {
       "name": "Mystic Monastery",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Mystic Redaction",
@@ -61901,7 +61901,7 @@
     {
       "name": "Mystifying Maze",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Myth Realized",
@@ -62356,7 +62356,7 @@
     {
       "name": "Naya Panorama",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Naya Sojourners",
@@ -62421,7 +62421,7 @@
     {
       "name": "Necroblossom Snarl",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Necrodominance",
@@ -62606,7 +62606,7 @@
     {
       "name": "Needle Spires",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Needle Storm",
@@ -62646,7 +62646,7 @@
     {
       "name": "Needleverge Pathway // Pillarverge Pathway",
       "type_line": "Land // Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Nef-Crop Entangler",
@@ -62671,7 +62671,7 @@
     {
       "name": "Neglected Manor",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Neheb, Dreadhorde Champion",
@@ -62746,12 +62746,12 @@
     {
       "name": "Nephalia Academy",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Nephalia Drownyard",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Nephalia Moondrakes",
@@ -62851,7 +62851,7 @@
     {
       "name": "Nesting Grounds",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Netcaster Spider",
@@ -63036,7 +63036,7 @@
     {
       "name": "New Benalia",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "New Generation\u0027s Technique",
@@ -63576,7 +63576,7 @@
     {
       "name": "Nimbus Maze",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Nimbus Naiad",
@@ -63851,7 +63851,7 @@
     {
       "name": "Nivix, Aerie of the Firemind",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Nivmagus Elemental",
@@ -63971,7 +63971,7 @@
     {
       "name": "Nomad Outpost",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Nomads\u0027 Assembly",
@@ -64031,7 +64031,7 @@
     {
       "name": "North Pole Gates",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "North Pole Patrol",
@@ -64046,7 +64046,7 @@
     {
       "name": "Northampton Farm",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Northern Air Temple",
@@ -64151,7 +64151,7 @@
     {
       "name": "Novijen, Heart of Progress",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Now for Wrath, Now for Ruin!",
@@ -64331,7 +64331,7 @@
     {
       "name": "Nykthos, Shrine to Nyx",
       "type_line": "Legendary Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Nylea\u0027s Disciple",
@@ -64516,7 +64516,7 @@
     {
       "name": "Oakhollow Village",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Oakshade Stalker // Moonlit Ambusher",
@@ -64746,7 +64746,7 @@
     {
       "name": "Oboro, Palace in the Clouds",
       "type_line": "Legendary Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Obosh, the Preypiercer",
@@ -65186,7 +65186,7 @@
     {
       "name": "Okina, Temple to the Grandfathers",
       "type_line": "Legendary Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Okk",
@@ -65336,7 +65336,7 @@
     {
       "name": "Omashu City",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Omega Myr",
@@ -65401,7 +65401,7 @@
     {
       "name": "Ominous Asylum",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Ominous Parcel",
@@ -65526,7 +65526,7 @@
     {
       "name": "Ondu Inversion // Ondu Skyruins",
       "type_line": "Sorcery // Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Ondu Knotmaster // Throw a Line",
@@ -65796,7 +65796,7 @@
     {
       "name": "Opulent Palace",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Oracle of Bones",
@@ -65876,7 +65876,7 @@
     {
       "name": "Oran-Rief, the Vastwood",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Orator of Ojutai",
@@ -66251,7 +66251,7 @@
     {
       "name": "Orzhov Basilica",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Orzhov Charm",
@@ -66276,7 +66276,7 @@
     {
       "name": "Orzhov Guildgate",
       "type_line": "Land \u2014 Gate",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Orzhov Guildmage",
@@ -66311,12 +66311,12 @@
     {
       "name": "Orzhova, the Church of Deals",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Oscorp Industries",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Oscorp Research Team",
@@ -66361,7 +66361,7 @@
     {
       "name": "Otawara, Soaring City",
       "type_line": "Legendary Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Oteclan Landmark // Oteclan Levitator",
@@ -66596,7 +66596,7 @@
     {
       "name": "Overgrown Farmland",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Overgrown Pest",
@@ -66606,7 +66606,7 @@
     {
       "name": "Overgrown Tomb",
       "type_line": "Land \u2014 Swamp Forest",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Overgrown Tomb // Overgrown Tomb",
@@ -66961,7 +66961,7 @@
     {
       "name": "Painted Bluffs",
       "type_line": "Land \u2014 Desert",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Painter\u0027s Servant",
@@ -67171,7 +67171,7 @@
     {
       "name": "Paradox Gardens",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Paradox Haze",
@@ -67461,7 +67461,7 @@
     {
       "name": "Path of Mettle // Metzali, Tower of Triumph",
       "type_line": "Legendary Enchantment // Legendary Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Path of Peril",
@@ -67661,7 +67661,7 @@
     {
       "name": "Peculiar Lighthouse",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Pedal to the Metal",
@@ -67731,7 +67731,7 @@
     {
       "name": "Pelakka Predation // Pelakka Caverns",
       "type_line": "Sorcery // Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Pelakka Wurm",
@@ -67751,7 +67751,7 @@
     {
       "name": "Pendelhaven",
       "type_line": "Legendary Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Pendelhaven Elder",
@@ -67861,7 +67861,7 @@
     {
       "name": "Perilous Landscape",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Perilous Myr",
@@ -68091,7 +68091,7 @@
     {
       "name": "Petrified Hamlet",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Petrified Plating",
@@ -68381,7 +68381,7 @@
     {
       "name": "Phyrexia\u0027s Core",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Phyrexian Archivist",
@@ -68771,7 +68771,7 @@
     {
       "name": "Pillar of the Paruns",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Pillardrop Rescuer",
@@ -68811,7 +68811,7 @@
     {
       "name": "Pinecrest Ridge",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Pinion Feast",
@@ -68891,7 +68891,7 @@
     {
       "name": "Piranha Marsh",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Pirate Hat",
@@ -68961,7 +68961,7 @@
     {
       "name": "Pit of Offerings",
       "type_line": "Land \u2014 Cave",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Pitchburn Devils",
@@ -69116,7 +69116,7 @@
     {
       "name": "Plains",
       "type_line": "Basic Land \u2014 Plains",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Plains // Plains",
@@ -69296,12 +69296,12 @@
     {
       "name": "Plaza of Harmony",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Plaza of Heroes",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Plea for Guidance",
@@ -69621,12 +69621,12 @@
     {
       "name": "Port Town",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Port of Karfell",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Portable Hole",
@@ -69756,7 +69756,7 @@
     {
       "name": "Power Depot",
       "type_line": "Artifact Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Power Plant Worker",
@@ -69836,7 +69836,7 @@
     {
       "name": "Prahv, Spires of Order",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Prairie Dog",
@@ -69846,7 +69846,7 @@
     {
       "name": "Prairie Stream",
       "type_line": "Land \u2014 Plains Island",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Prakhata Club Security",
@@ -70191,7 +70191,7 @@
     {
       "name": "Primal Amulet // Primal Wellspring",
       "type_line": "Artifact // Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Primal Bellow",
@@ -70201,7 +70201,7 @@
     {
       "name": "Primal Beyond",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Primal Clay",
@@ -70376,7 +70376,7 @@
     {
       "name": "Prismari Campus",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Prismari Charm",
@@ -70556,7 +70556,7 @@
     {
       "name": "Profane Procession // Tomb of the Dusk Rose",
       "type_line": "Legendary Enchantment // Legendary Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Profane Tutor",
@@ -70681,7 +70681,7 @@
     {
       "name": "Promising Vein",
       "type_line": "Land \u2014 Cave",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Prompto Argentum",
@@ -71091,7 +71091,7 @@
     {
       "name": "Public Thoroughfare",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Puca\u0027s Mischief",
@@ -71646,7 +71646,7 @@
     {
       "name": "Quandrix Campus",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Quandrix Charm",
@@ -71876,7 +71876,7 @@
     {
       "name": "Quicksand",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Quicksand Whirlpool",
@@ -72056,7 +72056,7 @@
     {
       "name": "Rabanastre, Royal City",
       "type_line": "Land \u2014 Town",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Rabaroo Troop",
@@ -72116,7 +72116,7 @@
     {
       "name": "Racers\u0027 Ring",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Racers\u0027 Scoreboard",
@@ -72171,7 +72171,7 @@
     {
       "name": "Radiant Fountain",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Radiant Grace // Radiant Restraints",
@@ -72181,7 +72181,7 @@
     {
       "name": "Radiant Grove",
       "type_line": "Land \u2014 Forest Plains",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Radiant Lotus",
@@ -72246,7 +72246,7 @@
     {
       "name": "Raffine\u0027s Tower",
       "type_line": "Land \u2014 Plains Island Swamp",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Raffine, Scheming Seer",
@@ -72391,7 +72391,7 @@
     {
       "name": "Raging Ravine",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Raging Redcap",
@@ -72536,7 +72536,7 @@
     {
       "name": "Rakdos Carnarium",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Rakdos Charm",
@@ -72561,7 +72561,7 @@
     {
       "name": "Rakdos Guildgate",
       "type_line": "Land \u2014 Gate",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Rakdos Guildmage",
@@ -72991,7 +72991,7 @@
     {
       "name": "Ramunap Ruins",
       "type_line": "Land \u2014 Desert",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Ran and Shaw",
@@ -73261,7 +73261,7 @@
     {
       "name": "Raucous Carnival",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Raucous Entertainer",
@@ -73271,7 +73271,7 @@
     {
       "name": "Raucous Theater",
       "type_line": "Land \u2014 Swamp Mountain",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Raugrin Crystal",
@@ -73281,7 +73281,7 @@
     {
       "name": "Raugrin Triome",
       "type_line": "Land \u2014 Island Mountain Plains",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Ravager Wurm",
@@ -73561,7 +73561,7 @@
     {
       "name": "Razorgrass Ambush // Razorgrass Field",
       "type_line": "Instant // Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Razorgrass Screen",
@@ -73596,7 +73596,7 @@
     {
       "name": "Razortide Bridge",
       "type_line": "Artifact Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Razortip Whip",
@@ -73611,12 +73611,12 @@
     {
       "name": "Razortrap Gorge",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Razorverge Thicket",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Razzle-Dazzler",
@@ -73711,7 +73711,7 @@
     {
       "name": "Realm of Koh",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Realm-Cloaked Giant // Cast Off",
@@ -74256,7 +74256,7 @@
     {
       "name": "Reef Roads",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Reef Worm",
@@ -74651,7 +74651,7 @@
     {
       "name": "Reliquary Tower",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Relive the Past",
@@ -75201,7 +75201,7 @@
     {
       "name": "Restless Anchorage",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Restless Apparition",
@@ -75211,7 +75211,7 @@
     {
       "name": "Restless Bivouac",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Restless Bloodseeker // Bloodsoaked Reveler",
@@ -75226,42 +75226,42 @@
     {
       "name": "Restless Cottage",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Restless Fortress",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Restless Prairie",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Restless Reef",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Restless Ridgeline",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Restless Spire",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Restless Vents",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Restless Vinestalk",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Restock",
@@ -75621,7 +75621,7 @@
     {
       "name": "Revitalizing Repast // Old-Growth Grove",
       "type_line": "Instant // Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Revival // Revenge",
@@ -76076,7 +76076,7 @@
     {
       "name": "Rimewood Falls",
       "type_line": "Snow Land \u2014 Forest Island",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Rimrock Knight // Boulder Rush",
@@ -76251,7 +76251,7 @@
     {
       "name": "Riptide Laboratory",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Riptide Pilferer",
@@ -76536,7 +76536,7 @@
     {
       "name": "Rivendell",
       "type_line": "Legendary Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "River Bear",
@@ -76596,7 +76596,7 @@
     {
       "name": "River of Tears",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "River\u0027s Grasp",
@@ -76621,12 +76621,12 @@
     {
       "name": "Riverglide Pathway // Lavaglide Pathway",
       "type_line": "Land // Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Riverpyre Verge",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Riverwalk Technique",
@@ -76691,7 +76691,7 @@
     {
       "name": "Rix Maadi, Dungeon Palace",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Road // Ruin",
@@ -76716,7 +76716,7 @@
     {
       "name": "Roadside Reliquary",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Roalesk, Apex Hybrid",
@@ -76871,12 +76871,12 @@
     {
       "name": "Rockface Village",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Rockfall Vale",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Rockslide Elemental",
@@ -76901,7 +76901,7 @@
     {
       "name": "Rocky Roads",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Rod of Ruin",
@@ -76936,7 +76936,7 @@
     {
       "name": "Rogue\u0027s Passage",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Rogues\u0027 Gallery",
@@ -77171,7 +77171,7 @@
     {
       "name": "Rootbound Crag",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Rootbreaker Wurm",
@@ -77586,12 +77586,12 @@
     {
       "name": "Rugged Highlands",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Rugged Prairie",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Ruin Crab",
@@ -77681,7 +77681,7 @@
     {
       "name": "Ruins of Oran-Rief",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Rukh Egg",
@@ -77701,7 +77701,7 @@
     {
       "name": "Rumble Arena",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Rumbling Aftershocks",
@@ -77956,7 +77956,7 @@
     {
       "name": "Rupture Spire",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Rural Recruit",
@@ -77996,7 +77996,7 @@
     {
       "name": "Rush of Inspiration // Crackling Falls",
       "type_line": "Instant // Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Rush of Vitality",
@@ -78081,7 +78081,7 @@
     {
       "name": "Rustic Clachan",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Rustler Rampage",
@@ -78106,7 +78106,7 @@
     {
       "name": "Rustvale Bridge",
       "type_line": "Artifact Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Rustvine Cultivator",
@@ -78276,7 +78276,7 @@
     {
       "name": "Sacred Foundry",
       "type_line": "Land \u2014 Mountain Plains",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Sacred Ground",
@@ -78296,7 +78296,7 @@
     {
       "name": "Sacred Peaks",
       "type_line": "Land \u2014 Mountain Plains",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Sacred Wolf",
@@ -78611,7 +78611,7 @@
     {
       "name": "Salt Marsh",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Salt Road Ambushers",
@@ -78646,7 +78646,7 @@
     {
       "name": "Saltcrusted Steppe",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Saltfield Recluse",
@@ -78941,7 +78941,7 @@
     {
       "name": "Sanctum of Ugin",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Sand Strangler",
@@ -79001,7 +79001,7 @@
     {
       "name": "Sandsteppe Citadel",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Sandsteppe Mastodon",
@@ -79021,7 +79021,7 @@
     {
       "name": "Sandstone Bridge",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Sandstone Warrior",
@@ -79046,7 +79046,7 @@
     {
       "name": "Sandstorm Verge",
       "type_line": "Land \u2014 Desert",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Sandworm",
@@ -79186,7 +79186,7 @@
     {
       "name": "Sapseep Forest",
       "type_line": "Land \u2014 Forest",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Saradoc, Master of Buckland",
@@ -79471,12 +79471,12 @@
     {
       "name": "Savage Lands",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Savage Mansion",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Savage Punch",
@@ -79551,7 +79551,7 @@
     {
       "name": "Savai Triome",
       "type_line": "Land \u2014 Mountain Plains Swamp",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Savannah Lions",
@@ -79876,7 +79876,7 @@
     {
       "name": "Scattered Groves",
       "type_line": "Land \u2014 Forest Plains",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Scattered Thoughts",
@@ -79906,7 +79906,7 @@
     {
       "name": "Scavenger Grounds",
       "type_line": "Land \u2014 Desert",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Scavenger Regent // Exude Toxin",
@@ -79941,7 +79941,7 @@
     {
       "name": "Scene of the Crime",
       "type_line": "Artifact Land \u2014 Clue",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Scepter of Dominance",
@@ -80181,7 +80181,7 @@
     {
       "name": "Scoured Barrens",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Scourge Devil",
@@ -80531,7 +80531,7 @@
     {
       "name": "Scrying Sheets",
       "type_line": "Snow Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Sculpted Perfection",
@@ -80681,7 +80681,7 @@
     {
       "name": "Sea Gate Restoration // Sea Gate, Reborn",
       "type_line": "Sorcery // Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Sea Gate Stormcaller",
@@ -80691,7 +80691,7 @@
     {
       "name": "Sea Gate Wreckage",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Sea God\u0027s Revenge",
@@ -80726,7 +80726,7 @@
     {
       "name": "Seachrome Coast",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Seacoast Drake",
@@ -80806,7 +80806,7 @@
     {
       "name": "Search for Azcanta // Azcanta, the Sunken Ruin",
       "type_line": "Legendary Enchantment // Legendary Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Search for Glory",
@@ -80891,7 +80891,7 @@
     {
       "name": "Seaside Citadel",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Season of Gathering",
@@ -80961,22 +80961,22 @@
     {
       "name": "Secluded Courtyard",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Secluded Glen",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Secluded Starforge",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Secluded Steppe",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Second Breakfast",
@@ -81031,7 +81031,7 @@
     {
       "name": "Secret Tunnel",
       "type_line": "Land \u2014 Cave",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Secret of Bloodbending",
@@ -81266,7 +81266,7 @@
     {
       "name": "Seething Landscape",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Seething Pathblazer",
@@ -81396,17 +81396,17 @@
     {
       "name": "Sejiri Refuge",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Sejiri Shelter // Sejiri Glacier",
       "type_line": "Instant // Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Sejiri Steppe",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Sek\u0027Kuar, Deathkeeper",
@@ -81451,7 +81451,7 @@
     {
       "name": "Selesnya Guildgate",
       "type_line": "Land \u2014 Gate",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Selesnya Guildmage",
@@ -81476,7 +81476,7 @@
     {
       "name": "Selesnya Sanctuary",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Selesnya Sentry",
@@ -81771,7 +81771,7 @@
     {
       "name": "Sequestered Stash",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Serah Farron // Crystallized Serah",
@@ -81781,7 +81781,7 @@
     {
       "name": "Seraph Sanctuary",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Seraph of Dawn",
@@ -81871,7 +81871,7 @@
     {
       "name": "Serpent\u0027s Pass",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Serpent-Blade Assailant",
@@ -82366,7 +82366,7 @@
     {
       "name": "Shadowy Backstreet",
       "type_line": "Land \u2014 Plains Swamp",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Shadrix Silverquill",
@@ -82496,7 +82496,7 @@
     {
       "name": "Shambling Vent",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Shanna, Purifying Blade",
@@ -82656,7 +82656,7 @@
     {
       "name": "Sharlayan, Nation of Scholars",
       "type_line": "Land \u2014 Town",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Sharp-Eyed Rookie",
@@ -82721,7 +82721,7 @@
     {
       "name": "Shattered Landscape",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Shattered Perception",
@@ -82731,7 +82731,7 @@
     {
       "name": "Shattered Sanctum",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Shattered Seraph",
@@ -82776,7 +82776,7 @@
     {
       "name": "Shatterskull Smashing // Shatterskull, the Hammer Pass",
       "type_line": "Sorcery // Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Shatterstorm",
@@ -82811,7 +82811,7 @@
     {
       "name": "Shefet Dunes",
       "type_line": "Land \u2014 Desert",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Shefet Monitor",
@@ -82836,7 +82836,7 @@
     {
       "name": "Shelldock Isle",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Shelob\u0027s Ambush",
@@ -82861,7 +82861,7 @@
     {
       "name": "Sheltered Thicket",
       "type_line": "Land \u2014 Mountain Forest",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Sheltered by Ghosts",
@@ -82881,7 +82881,7 @@
     {
       "name": "Sheltering Landscape",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Sheltering Light",
@@ -83061,7 +83061,7 @@
     {
       "name": "Shifting Woodland",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Shigeki, Jukai Visionary",
@@ -83116,7 +83116,7 @@
     {
       "name": "Shimmering Grotto",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Shimmering Wings",
@@ -83166,7 +83166,7 @@
     {
       "name": "Shineshadow Snarl",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Shinewend",
@@ -83196,7 +83196,7 @@
     {
       "name": "Shinka, the Bloodsoaked Keep",
       "type_line": "Legendary Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Shinra Reinforcements",
@@ -83221,7 +83221,7 @@
     {
       "name": "Shipwreck Marsh",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Shipwreck Moray",
@@ -83256,7 +83256,7 @@
     {
       "name": "Shire Terrace",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Shirei, Shizo\u0027s Caretaker",
@@ -83306,12 +83306,12 @@
     {
       "name": "Shivan Oasis",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Shivan Reef",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Shivan Sand-Mage",
@@ -83326,7 +83326,7 @@
     {
       "name": "Shizo, Death\u0027s Storehouse",
       "type_line": "Legendary Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Shizuko, Caller of Autumn",
@@ -83641,7 +83641,7 @@
     {
       "name": "Shrine of the Forsaken Gods",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Shrivel",
@@ -83736,7 +83736,7 @@
     {
       "name": "Sidequest: Catch a Fish // Cooking Campsite",
       "type_line": "Enchantment // Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Sidequest: Hunt the Mark // Yiazmat, Ultimate Mark",
@@ -84241,7 +84241,7 @@
     {
       "name": "Silundi Vision // Silundi Isle",
       "type_line": "Instant // Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Silver Bolt",
@@ -84311,7 +84311,7 @@
     {
       "name": "Silverbluff Bridge",
       "type_line": "Artifact Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Silverchase Fox",
@@ -84366,7 +84366,7 @@
     {
       "name": "Silverquill Campus",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Silverquill Charm",
@@ -84461,12 +84461,12 @@
     {
       "name": "Simic Growth Chamber",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Simic Guildgate",
       "type_line": "Land \u2014 Gate",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Simic Guildmage",
@@ -84576,7 +84576,7 @@
     {
       "name": "Sinister Hideout",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Sinister Monolith",
@@ -84601,7 +84601,7 @@
     {
       "name": "Sink into Stupor // Soporific Springs",
       "type_line": "Instant // Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Sink into Takenuma",
@@ -84781,7 +84781,7 @@
     {
       "name": "Skarrg, the Rage Pits",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Skarrgan Firebird",
@@ -84871,7 +84871,7 @@
     {
       "name": "Skemfar Elderhall",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Skemfar Shadowsage",
@@ -85261,7 +85261,7 @@
     {
       "name": "Skybridge Towers",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Skycat Sovereign",
@@ -85336,7 +85336,7 @@
     {
       "name": "Skycoach Waypoint",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Skycrash",
@@ -85401,7 +85401,7 @@
     {
       "name": "Skyline Cascade",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Skyline Predator",
@@ -85621,7 +85621,7 @@
     {
       "name": "Slagwoods Bridge",
       "type_line": "Artifact Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Slagwurm Armor",
@@ -85746,7 +85746,7 @@
     {
       "name": "Slayers\u0027 Stronghold",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Slaying Fire",
@@ -85986,7 +85986,7 @@
     {
       "name": "Sliver Hive",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Sliver Hivelord",
@@ -86221,12 +86221,12 @@
     {
       "name": "Smoldering Marsh",
       "type_line": "Land \u2014 Swamp Mountain",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Smoldering Spires",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Smoldering Werewolf // Erupting Dreadwolf",
@@ -86426,37 +86426,37 @@
     {
       "name": "Snow-Covered Forest",
       "type_line": "Basic Snow Land \u2014 Forest",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Snow-Covered Island",
       "type_line": "Basic Snow Land \u2014 Island",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Snow-Covered Mountain",
       "type_line": "Basic Snow Land \u2014 Mountain",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Snow-Covered Plains",
       "type_line": "Basic Snow Land \u2014 Plains",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Snow-Covered Swamp",
       "type_line": "Basic Snow Land \u2014 Swamp",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Snow-Covered Wastes",
       "type_line": "Basic Snow Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Snowfield Sinkhole",
       "type_line": "Snow Land \u2014 Plains Swamp",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Snowhorn Rider",
@@ -86501,7 +86501,7 @@
     {
       "name": "Soaring Seacliff",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Soaring Stoneglider",
@@ -86556,7 +86556,7 @@
     {
       "name": "Sokenzan, Crucible of Defiance",
       "type_line": "Legendary Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Sokka\u0027s Haiku",
@@ -86796,7 +86796,7 @@
     {
       "name": "Song-Mad Treachery // Song-Mad Ruins",
       "type_line": "Sorcery // Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Songcrafter Mage",
@@ -87361,7 +87361,7 @@
     {
       "name": "Soulstone Sanctuary",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Soulsurge Elemental",
@@ -87391,7 +87391,7 @@
     {
       "name": "Soured Springs",
       "type_line": "Land \u2014 Desert",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "South Pole Voyager",
@@ -87461,7 +87461,7 @@
     {
       "name": "Spara\u0027s Headquarters",
       "type_line": "Land \u2014 Forest Plains Island",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Spare Dagger",
@@ -87611,7 +87611,7 @@
     {
       "name": "Spawning Bed",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Spawning Breath",
@@ -87626,7 +87626,7 @@
     {
       "name": "Spawning Pool",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Spawnsire of Ulamog",
@@ -87691,7 +87691,7 @@
     {
       "name": "Spectacle Summit",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Spectacular Pileup",
@@ -88336,7 +88336,7 @@
     {
       "name": "Spikefield Hazard // Spikefield Cave",
       "type_line": "Instant // Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Spikeshell Harrier",
@@ -88446,7 +88446,7 @@
     {
       "name": "Spinerock Knoll",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Spinerock Tyrant",
@@ -88551,7 +88551,7 @@
     {
       "name": "Spire of Industry",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Spirebluff Canal",
@@ -89056,7 +89056,7 @@
     {
       "name": "Springjack Pasture",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Springjack Shepherd",
@@ -89406,7 +89406,7 @@
     {
       "name": "Stalking Stones",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Stalking Tiger",
@@ -89676,7 +89676,7 @@
     {
       "name": "Starting Town",
       "type_line": "Land \u2014 Town",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Startle",
@@ -89866,7 +89866,7 @@
     {
       "name": "Steam Vents",
       "type_line": "Land \u2014 Island Mountain",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Steam Vents // Steam Vents",
@@ -90041,7 +90041,7 @@
     {
       "name": "Stensia Bloodhall",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Stensia Innkeeper",
@@ -90271,7 +90271,7 @@
     {
       "name": "Stirring Wildwood",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Stitch in Time",
@@ -90411,7 +90411,7 @@
     {
       "name": "Stomping Ground",
       "type_line": "Land \u2014 Mountain Forest",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Stomping Slabs",
@@ -90451,7 +90451,7 @@
     {
       "name": "Stone Quarry",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Stone Rain",
@@ -90716,7 +90716,7 @@
     {
       "name": "Storm the Vault // Vault of Catlacan",
       "type_line": "Legendary Enchantment // Legendary Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Storm\u0027s Wrath",
@@ -90766,7 +90766,7 @@
     {
       "name": "Stormcarved Coast",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Stormcatch Mentor",
@@ -90946,7 +90946,7 @@
     {
       "name": "Strangled Cemetery",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Strangleroot Geist",
@@ -91101,7 +91101,7 @@
     {
       "name": "Strength of the Harvest // Haven of the Harvest",
       "type_line": "Enchantment \u2014 Aura // Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Strength of the Pack",
@@ -91351,7 +91351,7 @@
     {
       "name": "Stump Stomp // Burnwillow Clearing",
       "type_line": "Sorcery // Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Stun",
@@ -91411,7 +91411,7 @@
     {
       "name": "Submerged Boneyard",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Subterranean Schooner",
@@ -91441,7 +91441,7 @@
     {
       "name": "Suburban Sanctuary",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Subway Train",
@@ -91571,7 +91571,7 @@
     {
       "name": "Sulfur Falls",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Sulfurous Blast",
@@ -91581,12 +91581,12 @@
     {
       "name": "Sulfurous Mire",
       "type_line": "Snow Land \u2014 Swamp Mountain",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Sulfurous Springs",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Sultai Ascendancy",
@@ -91836,7 +91836,7 @@
     {
       "name": "Sun-Blessed Peak",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Sun-Collared Raptor",
@@ -91876,7 +91876,7 @@
     {
       "name": "Sunbillow Verge",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Sunbird Standard // Sunbird Effigy",
@@ -91956,7 +91956,7 @@
     {
       "name": "Sundering Eruption // Volcanic Fissure",
       "type_line": "Sorcery // Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Sundering Growth",
@@ -91991,7 +91991,7 @@
     {
       "name": "Sundown Pass",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Sunfall",
@@ -92046,7 +92046,7 @@
     {
       "name": "Sunhome, Fortress of the Legion",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Sunken Citadel",
@@ -92056,7 +92056,7 @@
     {
       "name": "Sunken Hollow",
       "type_line": "Land \u2014 Island Swamp",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Sunken Hope",
@@ -92066,7 +92066,7 @@
     {
       "name": "Sunken Ruins",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Sunlance",
@@ -92081,7 +92081,7 @@
     {
       "name": "Sunlit Marsh",
       "type_line": "Land \u2014 Plains Swamp",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Sunmane Pegasus",
@@ -92096,7 +92096,7 @@
     {
       "name": "Sunpetal Grove",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Sunrise Cavalier",
@@ -92301,7 +92301,7 @@
     {
       "name": "Suppression Ray // Orderly Plaza",
       "type_line": "Sorcery // Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Supreme Exemplar",
@@ -92486,7 +92486,7 @@
     {
       "name": "Surtland Frostpyre",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Surtr, Fiery J\u00F6tun",
@@ -92541,7 +92541,7 @@
     {
       "name": "Survivors\u0027 Encampment",
       "type_line": "Land \u2014 Desert",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Suspend",
@@ -92581,7 +92581,7 @@
     {
       "name": "Susur Secundi, Void Altar",
       "type_line": "Land \u2014 Planet",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Susurian Dirgecraft",
@@ -92616,7 +92616,7 @@
     {
       "name": "Svogthos, the Restless Tomb",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Svyelun of Sea and Sky",
@@ -92651,7 +92651,7 @@
     {
       "name": "Swamp",
       "type_line": "Basic Land \u2014 Swamp",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Swamp // Swamp",
@@ -92736,7 +92736,7 @@
     {
       "name": "Swarmyard",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Swashbuckler\u0027s Whip",
@@ -92866,7 +92866,7 @@
     {
       "name": "Swiftwater Cliffs",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Swiftwing Assailant",
@@ -93321,7 +93321,7 @@
     {
       "name": "TCRI Building",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Tablet of Compleation",
@@ -93571,7 +93571,7 @@
     {
       "name": "Takenuma, Abandoned Mire",
       "type_line": "Legendary Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Talara\u0027s Bane",
@@ -93876,7 +93876,7 @@
     {
       "name": "Tangled Islet",
       "type_line": "Land \u2014 Forest Island",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Tangled Skyline",
@@ -93886,7 +93886,7 @@
     {
       "name": "Tanglepool Bridge",
       "type_line": "Artifact Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Tangleroot",
@@ -93991,7 +93991,7 @@
     {
       "name": "Tarrian\u0027s Journal // The Tomb of Aclazotz",
       "type_line": "Legendary Artifact // Legendary Land \u2014 Cave",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Tarrian\u0027s Soulcleaver",
@@ -94231,7 +94231,7 @@
     {
       "name": "Tectonic Edge",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Tectonic Fiend",
@@ -94266,7 +94266,7 @@
     {
       "name": "Teetering Peaks",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Teeterpeak Ambusher",
@@ -94546,7 +94546,7 @@
     {
       "name": "Temple Garden",
       "type_line": "Land \u2014 Forest Plains",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Temple Garden // Temple Garden",
@@ -94561,52 +94561,52 @@
     {
       "name": "Temple of Abandon",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Temple of Deceit",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Temple of Enlightenment",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Temple of Epiphany",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Temple of Malady",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Temple of Malice",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Temple of Mystery",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Temple of Plenty",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Temple of Silence",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Temple of Triumph",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Temple of the Dragon Queen",
@@ -94791,7 +94791,7 @@
     {
       "name": "Tendo Ice Bridge",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Tendril of the Mycotyrant",
@@ -95371,7 +95371,7 @@
     {
       "name": "Thaumatic Compass // Spires of Orazca",
       "type_line": "Artifact // Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Thaumaton Torpedo",
@@ -95426,7 +95426,7 @@
     {
       "name": "The Autonomous Furnace",
       "type_line": "Land \u2014 Sphere",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "The Balrog, Durin\u0027s Bane",
@@ -95461,7 +95461,7 @@
     {
       "name": "The Biblioplex",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "The Binding of the Titans",
@@ -95596,7 +95596,7 @@
     {
       "name": "The Dross Pits",
       "type_line": "Land \u2014 Sphere",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "The Earth Crystal",
@@ -95656,12 +95656,12 @@
     {
       "name": "The Everflowing Well // The Myriad Pools",
       "type_line": "Legendary Artifact // Legendary Artifact Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "The Fair Basilica",
       "type_line": "Land \u2014 Sphere",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "The Fall of Kroog",
@@ -95726,7 +95726,7 @@
     {
       "name": "The Gold Saucer",
       "type_line": "Land \u2014 Town",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "The Goose Mother",
@@ -95746,7 +95746,7 @@
     {
       "name": "The Grey Havens",
       "type_line": "Legendary Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "The Haunt of Hightower",
@@ -95766,7 +95766,7 @@
     {
       "name": "The Hunter Maze",
       "type_line": "Land \u2014 Sphere",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "The Huntsman\u0027s Redemption",
@@ -95921,7 +95921,7 @@
     {
       "name": "The Monumental Facade",
       "type_line": "Land \u2014 Sphere",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "The Mouth of Sauron",
@@ -95931,7 +95931,7 @@
     {
       "name": "The Mycosynth Gardens",
       "type_line": "Land \u2014 Sphere",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "The Mycotyrant",
@@ -96046,7 +96046,7 @@
     {
       "name": "The Seedcore",
       "type_line": "Land \u2014 Sphere",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "The Seriema",
@@ -96061,7 +96061,7 @@
     {
       "name": "The Shire",
       "type_line": "Legendary Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "The Sibsig Ceremony",
@@ -96116,7 +96116,7 @@
     {
       "name": "The Surgical Bay",
       "type_line": "Land \u2014 Sphere",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "The Swarmweaver",
@@ -96231,7 +96231,7 @@
     {
       "name": "The World Tree",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Theater of Horrors",
@@ -96276,7 +96276,7 @@
     {
       "name": "Thespian\u0027s Stage",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "They Went This Way",
@@ -96531,7 +96531,7 @@
     {
       "name": "Thornglint Bridge",
       "type_line": "Artifact Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Thornhide Wolves",
@@ -96561,7 +96561,7 @@
     {
       "name": "Thornspire Verge",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Thorntooth Witch",
@@ -96586,7 +96586,7 @@
     {
       "name": "Thornwood Falls",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Those Who Serve",
@@ -96736,7 +96736,7 @@
     {
       "name": "Thousand Moons Smithy // Barracks of the Thousand",
       "type_line": "Legendary Artifact // Legendary Artifact Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Thousand Winds",
@@ -96951,7 +96951,7 @@
     {
       "name": "Three Tree City",
       "type_line": "Legendary Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Three Tree Mascot",
@@ -97071,7 +97071,7 @@
     {
       "name": "Throne of Makindi",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Throne of the God-Pharaoh",
@@ -97586,7 +97586,7 @@
     {
       "name": "Timber Gorge",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Timber Protector",
@@ -97831,7 +97831,7 @@
     {
       "name": "Titan\u0027s Grave",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Titan\u0027s Presence",
@@ -97956,7 +97956,7 @@
     {
       "name": "Tocasia\u0027s Dig Site",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Tocasia\u0027s Onulet",
@@ -98006,7 +98006,7 @@
     {
       "name": "Tolaria West",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Tolarian Contempt",
@@ -98101,12 +98101,12 @@
     {
       "name": "Tomb of Urami",
       "type_line": "Legendary Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Tomb of the Spirit Dragon",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Tombstalker",
@@ -98516,7 +98516,7 @@
     {
       "name": "Tournament Grounds",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Tovolar\u0027s Huntmaster // Tovolar\u0027s Packleader",
@@ -98831,17 +98831,17 @@
     {
       "name": "Tramway Station",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Tranquil Cove",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Tranquil Expanse",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Tranquil Frillback",
@@ -98851,17 +98851,17 @@
     {
       "name": "Tranquil Garden",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Tranquil Landscape",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Tranquil Thicket",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Tranquilize",
@@ -98906,7 +98906,7 @@
     {
       "name": "Transguild Promenade",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Transit Mage",
@@ -99131,7 +99131,7 @@
     {
       "name": "Treasure Map // Treasure Cove",
       "type_line": "Artifact // Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Treasure Trove",
@@ -99141,7 +99141,7 @@
     {
       "name": "Treasure Vault",
       "type_line": "Artifact Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Treasured Find",
@@ -99216,7 +99216,7 @@
     {
       "name": "Treetop Village",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Trelasarra, Moon Dancer",
@@ -99236,7 +99236,7 @@
     {
       "name": "Treno, Dark City",
       "type_line": "Land \u2014 Town",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Trepanation Blade",
@@ -99261,7 +99261,7 @@
     {
       "name": "Tresserhorn Sinks",
       "type_line": "Snow Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Tresserhorn Skyknight",
@@ -99926,7 +99926,7 @@
     {
       "name": "Turntimber Grove",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Turntimber Ranger",
@@ -99936,7 +99936,7 @@
     {
       "name": "Turntimber Symbiosis // Turntimber, Serpentine Wood",
       "type_line": "Sorcery // Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Turret Ogre",
@@ -99951,7 +99951,7 @@
     {
       "name": "Turtle Lair",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Turtle Power!",
@@ -100016,7 +100016,7 @@
     {
       "name": "Twilight Mire",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Twilight Panther",
@@ -100166,7 +100166,7 @@
     {
       "name": "Twisted Landscape",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Twisted Reflection",
@@ -100186,7 +100186,7 @@
     {
       "name": "Twists and Turns // Mycoid Maze",
       "type_line": "Enchantment // Land \u2014 Cave",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Twitch",
@@ -100296,7 +100296,7 @@
     {
       "name": "Tyrite Sanctum",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Tyrox, Saurid Tyrant",
@@ -100381,7 +100381,7 @@
     {
       "name": "Ugin\u0027s Labyrinth",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Ugin\u0027s Nexus",
@@ -100736,7 +100736,7 @@
     {
       "name": "Unclaimed Territory",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Uncle Iroh",
@@ -100871,7 +100871,7 @@
     {
       "name": "Undercity Sewers",
       "type_line": "Land \u2014 Island Swamp",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Undercity Shade",
@@ -100926,7 +100926,7 @@
     {
       "name": "Underground River",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Undergrowth Champion",
@@ -101216,12 +101216,12 @@
     {
       "name": "University Campus",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Unknown Shores",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Unleash Fury",
@@ -101431,7 +101431,7 @@
     {
       "name": "Unstable Frontier",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Unstable Glyphbridge // Sandswirl Wanderglyph",
@@ -101636,7 +101636,7 @@
     {
       "name": "Urban Retreat",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Urban Utopia",
@@ -101671,7 +101671,7 @@
     {
       "name": "Urborg Volcano",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Urborg, Tomb of Yawgmoth",
@@ -101751,7 +101751,7 @@
     {
       "name": "Urza\u0027s Cave",
       "type_line": "Land \u2014 Urza\u0027s Cave",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Urza\u0027s Command",
@@ -101761,7 +101761,7 @@
     {
       "name": "Urza\u0027s Factory",
       "type_line": "Land \u2014 Urza\u0027s",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Urza\u0027s Incubator",
@@ -101776,7 +101776,7 @@
     {
       "name": "Urza\u0027s Power Plant",
       "type_line": "Land \u2014 Urza\u0027s Power-Plant",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Urza\u0027s Rage",
@@ -101796,7 +101796,7 @@
     {
       "name": "Urza\u0027s Saga",
       "type_line": "Enchantment Land \u2014 Urza\u0027s Saga",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Urza\u0027s Sylex",
@@ -101861,7 +101861,7 @@
     {
       "name": "Uthros, Titanic Godcore",
       "type_line": "Land \u2014 Planet",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Utility Knife",
@@ -101966,7 +101966,7 @@
     {
       "name": "Valakut Awakening // Valakut Stoneforge",
       "type_line": "Instant // Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Valakut Exploration",
@@ -102336,7 +102336,7 @@
     {
       "name": "Vance\u0027s Blasting Cannons // Spitfire Bastion",
       "type_line": "Legendary Enchantment // Legendary Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Vandalblast",
@@ -102501,7 +102501,7 @@
     {
       "name": "Vastwood Fortification // Vastwood Thicket",
       "type_line": "Instant // Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Vastwood Gorger",
@@ -102556,7 +102556,7 @@
     {
       "name": "Vault of the Archangel",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Vaultborn Tyrant",
@@ -102606,7 +102606,7 @@
     {
       "name": "Vector, Imperial Capital",
       "type_line": "Land \u2014 Town",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Vedalken Aethermage",
@@ -103731,7 +103731,7 @@
     {
       "name": "Vineglimmer Snarl",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Vinelasher Kudzu",
@@ -104046,7 +104046,7 @@
     {
       "name": "Vitu-Ghazi, the City-Tree",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Vivi Ornitier",
@@ -104056,27 +104056,27 @@
     {
       "name": "Vivid Crag",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Vivid Creek",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Vivid Grove",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Vivid Marsh",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Vivid Meadow",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Vivid Revival",
@@ -104411,12 +104411,12 @@
     {
       "name": "Volatile Fault",
       "type_line": "Land \u2014 Cave",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Volatile Fjord",
       "type_line": "Snow Land \u2014 Island Mountain",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Volatile Rig",
@@ -104526,7 +104526,7 @@
     {
       "name": "Voldaren Estate",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Voldaren Pariah // Abolisher of Bloodlines",
@@ -105301,7 +105301,7 @@
     {
       "name": "Wandering Fumarole",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Wandering Goblins",
@@ -105361,7 +105361,7 @@
     {
       "name": "Wanderwine Hub",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Wanderwine Prophets",
@@ -105706,7 +105706,7 @@
     {
       "name": "Warped Landscape",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Warped Physique",
@@ -105851,7 +105851,7 @@
     {
       "name": "Wastes",
       "type_line": "Basic Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Wastescape Battlemage",
@@ -105981,7 +105981,7 @@
     {
       "name": "Waterfront District",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Waterkin Shaman",
@@ -106006,7 +106006,7 @@
     {
       "name": "Waterlogged Teachings // Inundated Archive",
       "type_line": "Instant // Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Waterspout Warden",
@@ -106026,7 +106026,7 @@
     {
       "name": "Waterveil Cavern",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Waterwhirl",
@@ -106046,7 +106046,7 @@
     {
       "name": "Watery Grave",
       "type_line": "Land \u2014 Island Swamp",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Wave-Wing Elemental",
@@ -106761,7 +106761,7 @@
     {
       "name": "White Lotus Hideout",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "White Lotus Reinforcements",
@@ -106996,7 +106996,7 @@
     {
       "name": "Wild Roads",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Wild Shape",
@@ -107201,7 +107201,7 @@
     {
       "name": "Willowrush Verge",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Wilt",
@@ -107256,7 +107256,7 @@
     {
       "name": "Wind-Scarred Crag",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Windborn Muse",
@@ -107271,7 +107271,7 @@
     {
       "name": "Windbrisk Heights",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Windbrisk Raptor",
@@ -107361,7 +107361,7 @@
     {
       "name": "Windurst, Federation Center",
       "type_line": "Land \u2014 Town",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Windwright Mage",
@@ -107661,7 +107661,7 @@
     {
       "name": "Witch\u0027s Cottage",
       "type_line": "Land \u2014 Swamp",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Witch\u0027s Familiar",
@@ -107751,7 +107751,7 @@
     {
       "name": "Witherbloom Campus",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Witherbloom Charm",
@@ -108036,7 +108036,7 @@
     {
       "name": "Wooded Bastion",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Wooded Foothills",
@@ -108046,7 +108046,7 @@
     {
       "name": "Wooded Ridgeline",
       "type_line": "Land \u2014 Mountain Forest",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Wooden Sphere",
@@ -108076,7 +108076,7 @@
     {
       "name": "Woodland Cemetery",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Woodland Champion",
@@ -108091,7 +108091,7 @@
     {
       "name": "Woodland Chasm",
       "type_line": "Snow Land \u2014 Swamp Forest",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Woodland Guidance",
@@ -108116,7 +108116,7 @@
     {
       "name": "Woodland Stream",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Woodland Wanderer",
@@ -108566,7 +108566,7 @@
     {
       "name": "Xander\u0027s Lounge",
       "type_line": "Land \u2014 Island Swamp Mountain",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Xathrid Demon",
@@ -108706,7 +108706,7 @@
     {
       "name": "Yavimaya Coast",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Yavimaya Dryad",
@@ -109071,7 +109071,7 @@
     {
       "name": "Zagoth Triome",
       "type_line": "Land \u2014 Swamp Forest Island",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Zagras, Thief of Heartbeats",
@@ -109101,7 +109101,7 @@
     {
       "name": "Zanarkand, Ancient Metropolis // Lasting Fayth",
       "type_line": "Land \u2014 Town // Sorcery \u2014 Adventure",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Zanikev Locust",
@@ -109311,7 +109311,7 @@
     {
       "name": "Zhalfirin Void",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Zhao, Ruthless Admiral",
@@ -109351,7 +109351,7 @@
     {
       "name": "Ziatora\u0027s Proving Ground",
       "type_line": "Land \u2014 Swamp Mountain Forest",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Ziatora, the Incinerator",
@@ -109416,7 +109416,7 @@
     {
       "name": "Zoetic Cavern",
       "type_line": "Land",
-      "tier": "Unimplemented"
+      "tier": "KeywordOnly"
     },
     {
       "name": "Zoetic Glyph",
@@ -109426,7 +109426,7 @@
     {
       "name": "Zof Consumption // Zof Bloodbog",
       "type_line": "Sorcery // Land",
-      "tier": "Unimplemented"
+      "tier": "Vanilla"
     },
     {
       "name": "Zof Shade",

@@ -1,8 +1,8 @@
 # Modern Coverage
 
-> **Headline (auto, 2026-05-24):** Raw 23.8% (5210 / 21879) ·
-> Tournament-weighted 68.3% (`docs/meta-modern-snapshot.json`, 163 staples) ·
-> Top-20 most-played 16 / 20 (80%).
+> **Headline (auto, 2026-05-24):** Raw 27.4% (5994 / 21879) ·
+> Tournament-weighted 89.2% (`docs/meta-modern-snapshot.json`, 163 staples) ·
+> Top-20 most-played 20 / 20 (100%).
 >
 > **Auto-computed numbers live in [`docs/COVERAGE_MODERN.md`](docs/COVERAGE_MODERN.md)** —
 > regenerate with `dotnet run --project Majik.Console -- coverage --modern
