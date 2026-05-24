@@ -104,8 +104,9 @@ public static class MizziumMortarsFactory
     /// CR 702.96b — the overload decision is locked in when the spell is
     /// cast (CR 601.2b). Until overload is a real primitive wired
     /// through <see cref="Majik.Core.Services.SpellCastFlow"/>, the flag
-    /// is supplied by the caller (mirrors the not-yet-wired Kicker
-    /// branch in <see cref="BurstLightningFactory.BuildSpellDefinition"/>).
+    /// is supplied by the caller (kicker has since shipped as a real
+    /// primitive — see <see cref="Costs.KickerAdditionalCost"/>; overload
+    /// remains structural-flag-only).
     /// </summary>
     /// <param name="controller">Spell controller — used to scope the
     /// overloaded sweep to creatures the controller does NOT control
