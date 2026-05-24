@@ -3152,6 +3152,22 @@ public static class NamedCardFactory
             // (owner, triggers) overload for bus-driven trigger firing.
             "Strangleroot Geist" => StrangleRootGeistFactory.Create(owner),
 
+            // Creature — Human Monk {R} 1/2 (SoulScarMageFactory). Amonkhet.
+            // Prowess (CR 702.108) — wired via ProwessFactory.Build when a
+            // ContinuousEffectsService is supplied. Damage → -1/-1 counters
+            // replacement (CR 614): "If a source you control would deal
+            // noncombat damage to a creature an opponent controls, put that
+            // many -1/-1 counters on that creature instead." Registered as
+            // a SoulScarMageDamageReplacement on the ReplacementBus when
+            // supplied; self-gates on Soul-Scar Mage being on the
+            // battlefield (CR 614.6) so flicker / LTB lifts the rider
+            // naturally without explicit unregister. The single-arg
+            // dispatcher path produces the correct card shape without
+            // Prowess or replacement wiring — mirrors Anger of the Gods's
+            // shape-only posture; use the (owner, effects, replacements,
+            // triggers) overload for fully-wired behavior.
+            "Soul-Scar Mage" => SoulScarMageFactory.Create(owner),
+
             // Enchantment — Class {U}{R} (StormchasersTalentFactory).
             // Modern Horizons 3. ETB trigger (CR 603.6a) creates a 1/1
             // Mercenary creature token with a "Prowess" KeywordAbility
