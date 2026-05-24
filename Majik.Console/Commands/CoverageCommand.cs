@@ -53,6 +53,9 @@ public static class CoverageCommand
         ("--pauper",    MtgFormat.Pauper),
     };
 
+    /// <summary>Default snapshot path resolved relative to repo root.</summary>
+    public const string DefaultMetaSnapshotPath = "docs/meta-modern-snapshot.json";
+
     public static async Task<int> RunAsync(string[] args)
     {
         ArgumentNullException.ThrowIfNull(args);
@@ -63,6 +66,24 @@ public static class CoverageCommand
         var mdOut = ParseFlagValue(args, "--md-out");
         var dedupByName = !args.Any(a => a.Equals("--no-dedup", StringComparison.OrdinalIgnoreCase));
         var topN = ParseIntFlag(args, "--top", defaultValue: 20);
+
+        // --weighted [<path>] — optional positional value for snapshot path.
+        IReadOnlyDictionary<string, double>? frequencyWeights = null;
+        string? snapshotPath = null;
+        if (TryResolveWeightedFlag(args, out snapshotPath))
+        {
+            snapshotPath ??= DefaultMetaSnapshotPath;
+            if (!File.Exists(snapshotPath))
+            {
+                SysConsole.Error.WriteLine(
+                    $"--weighted snapshot not found: {snapshotPath}");
+                return 1;
+            }
+            var loaded = TournamentFrequencySource.LoadFromSnapshot(snapshotPath);
+            frequencyWeights = new Dictionary<string, double>(loaded, StringComparer.Ordinal);
+            SysConsole.WriteLine(
+                $"Loaded tournament-frequency snapshot: {Path.GetFullPath(snapshotPath)} ({frequencyWeights.Count} cards).");
+        }
 
         // Load decklist first — drives both the scope label and the name filter.
         IReadOnlyDictionary<string, int>? weights = null;
@@ -105,7 +126,13 @@ public static class CoverageCommand
         var classifier = new CoverageClassifier(factory, stubCaster);
 
         var scope = BuildScopeLabel(format, decklistPath, dedupByName);
-        var report = CoverageReportV2.Build(scope, entities, classifier, weights, topUnimplemented: topN);
+        var report = CoverageReportV2.Build(
+            scope,
+            entities,
+            classifier,
+            weights,
+            topUnimplemented: topN,
+            frequencyWeights: frequencyWeights);
 
         PrintConsoleSummary(report, weights is not null);
 
@@ -163,6 +190,28 @@ public static class CoverageCommand
         return string.Join(", ", parts);
     }
 
+    /// <summary>
+    /// Parse the optional <c>--weighted [path]</c> flag. Returns true when
+    /// the flag is present; <paramref name="snapshotPath"/> is non-null
+    /// iff the user passed an explicit value (otherwise the caller falls
+    /// back to <see cref="DefaultMetaSnapshotPath"/>).
+    /// </summary>
+    internal static bool TryResolveWeightedFlag(string[] args, out string? snapshotPath)
+    {
+        snapshotPath = null;
+        var idx = Array.FindIndex(args, a => a.Equals("--weighted", StringComparison.OrdinalIgnoreCase));
+        if (idx < 0) return false;
+        if (idx + 1 < args.Length)
+        {
+            var next = args[idx + 1];
+            if (!string.IsNullOrWhiteSpace(next) && !next.StartsWith("--", StringComparison.Ordinal))
+            {
+                snapshotPath = next;
+            }
+        }
+        return true;
+    }
+
     private static void PrintConsoleSummary(CoverageReportV2 report, bool decklistMode)
     {
         SysConsole.WriteLine($"Engine coverage ({report.Scope}):");
@@ -176,7 +225,22 @@ public static class CoverageCommand
         else
         {
             SysConsole.WriteLine(
-                $"  Coverage: {report.CoveredPercent,5:F1}% ({report.CoveredCards} / {report.TotalCards} cards)");
+                $"  Raw:      {report.CoveredPercent,5:F1}% ({report.CoveredCards} / {report.TotalCards} cards)");
+        }
+
+        if (report.FrequencyWeightedByTier is not null)
+        {
+            SysConsole.WriteLine(
+                $"  Weighted: {report.FrequencyWeightedCoveredPercent,5:F1}% (by tournament play-rate, {report.FrequencyTotalWeight:F0} matched weight)");
+            if (report.TopMetaTotal > 0)
+            {
+                var n = Math.Min(report.TopMetaTotal, 20);
+                var topN = report.TopMeta!.Take(n).ToList();
+                var covered = topN.Count(r => r.Tier != CoverageTier.Unimplemented);
+                var pct = n == 0 ? 0.0 : 100.0 * covered / n;
+                SysConsole.WriteLine(
+                    $"  Top-{n} most-played: {covered} / {n} covered ({pct:F0}%)");
+            }
         }
 
         SysConsole.WriteLine();
@@ -221,8 +285,21 @@ public static class CoverageCommand
             covered_percent = Math.Round(report.CoveredPercent, 2),
             weighted_covered = report.WeightedCovered,
             weighted_covered_percent = Math.Round(report.WeightedCoveredPercent, 2),
+            frequency_total_weight = Math.Round(report.FrequencyTotalWeight, 2),
+            frequency_weighted_covered = Math.Round(report.FrequencyWeightedCovered, 2),
+            frequency_weighted_covered_percent = Math.Round(report.FrequencyWeightedCoveredPercent, 2),
+            top_meta_covered = report.TopMetaCovered,
+            top_meta_total = report.TopMetaTotal,
             counts_by_tier = report.CountsByTier.ToDictionary(kv => kv.Key.ToString(), kv => kv.Value),
             weighted_by_tier = report.WeightedByTier.ToDictionary(kv => kv.Key.ToString(), kv => kv.Value),
+            frequency_weighted_by_tier = report.FrequencyWeightedByTier?
+                .ToDictionary(kv => kv.Key.ToString(), kv => Math.Round(kv.Value, 2)),
+            top_meta = report.TopMeta?.Select(r => new
+            {
+                name = r.Name,
+                weight = Math.Round(r.Weight, 2),
+                tier = r.Tier.ToString(),
+            }).ToList(),
             top_unimplemented = report.TopUnimplemented
                 .Select(r => new { name = r.Name, weight = r.Weight })
                 .ToList(),
@@ -255,6 +332,18 @@ public static class CoverageCommand
             sb.AppendLine($"- **Weighted coverage:** {report.WeightedCoveredPercent:F1}% ({report.WeightedCovered} / {report.TotalWeight})");
         }
         sb.AppendLine($"- **Distinct coverage:** {report.CoveredPercent:F1}% ({report.CoveredCards} / {report.TotalCards})");
+        if (report.FrequencyWeightedByTier is not null)
+        {
+            sb.AppendLine($"- **Tournament-weighted coverage:** {report.FrequencyWeightedCoveredPercent:F1}% (by play-rate; matched weight {report.FrequencyTotalWeight:F0})");
+            if (report.TopMetaTotal > 0)
+            {
+                var n = Math.Min(report.TopMetaTotal, 20);
+                var topN = report.TopMeta!.Take(n).ToList();
+                var covered = topN.Count(r => r.Tier != CoverageTier.Unimplemented);
+                var pct = n == 0 ? 0.0 : 100.0 * covered / n;
+                sb.AppendLine($"- **Top-{n} most-played covered:** {covered} / {n} ({pct:F0}%)");
+            }
+        }
         sb.AppendLine();
         sb.AppendLine("## Tier breakdown");
         sb.AppendLine();
@@ -265,6 +354,19 @@ public static class CoverageCommand
             var n = report.CountsByTier[tier];
             var pct = report.TotalCards == 0 ? 0.0 : 100.0 * n / report.TotalCards;
             sb.AppendLine($"| {tier} | {n} | {pct:F1}% |");
+        }
+
+        if (report.TopMeta is not null && report.TopMeta.Count > 0)
+        {
+            sb.AppendLine();
+            sb.AppendLine($"## Top-{report.TopMeta.Count} most-played cards");
+            sb.AppendLine();
+            sb.AppendLine("| Weight | Card | Tier |");
+            sb.AppendLine("|---:|---|---|");
+            foreach (var row in report.TopMeta)
+            {
+                sb.AppendLine($"| {row.Weight:F1} | {row.Name} | {row.Tier} |");
+            }
         }
 
         if (report.TopUnimplemented.Count > 0)

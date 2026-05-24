@@ -1,12 +1,17 @@
 {
   "scope": "format=modern, dedup-by-name",
-  "generated_utc": "2026-05-24T17:51:12.9622263Z",
+  "generated_utc": "2026-05-24T18:30:35.3395765Z",
   "total_cards": 21879,
   "total_weight": 21879,
   "covered_cards": 5210,
   "covered_percent": 23.81,
   "weighted_covered": 5210,
   "weighted_covered_percent": 23.81,
+  "frequency_total_weight": 19250,
+  "frequency_weighted_covered": 13150,
+  "frequency_weighted_covered_percent": 68.31,
+  "top_meta_covered": 16,
+  "top_meta_total": 20,
   "counts_by_tier": {
     "NamedFactory": 240,
     "SpellBound": 3708,
@@ -21,6 +26,115 @@
     "Vanilla": 552,
     "Unimplemented": 16669
   },
+  "frequency_weighted_by_tier": {
+    "NamedFactory": 11680,
+    "SpellBound": 1470,
+    "KeywordOnly": 0,
+    "Vanilla": 0,
+    "Unimplemented": 6100
+  },
+  "top_meta": [
+    {
+      "name": "Consign to Memory",
+      "weight": 530,
+      "tier": "NamedFactory"
+    },
+    {
+      "name": "Mystical Dispute",
+      "weight": 530,
+      "tier": "NamedFactory"
+    },
+    {
+      "name": "Island",
+      "weight": 480,
+      "tier": "Unimplemented"
+    },
+    {
+      "name": "Misty Rainforest",
+      "weight": 450,
+      "tier": "NamedFactory"
+    },
+    {
+      "name": "Verdant Catacombs",
+      "weight": 420,
+      "tier": "NamedFactory"
+    },
+    {
+      "name": "Marsh Flats",
+      "weight": 400,
+      "tier": "NamedFactory"
+    },
+    {
+      "name": "Force of Negation",
+      "weight": 360,
+      "tier": "NamedFactory"
+    },
+    {
+      "name": "Bloodstained Mire",
+      "weight": 350,
+      "tier": "NamedFactory"
+    },
+    {
+      "name": "Windswept Heath",
+      "weight": 350,
+      "tier": "NamedFactory"
+    },
+    {
+      "name": "Wooded Foothills",
+      "weight": 350,
+      "tier": "NamedFactory"
+    },
+    {
+      "name": "Swamp",
+      "weight": 340,
+      "tier": "Unimplemented"
+    },
+    {
+      "name": "Vexing Bauble",
+      "weight": 340,
+      "tier": "NamedFactory"
+    },
+    {
+      "name": "Arid Mesa",
+      "weight": 330,
+      "tier": "NamedFactory"
+    },
+    {
+      "name": "Lightning Bolt",
+      "weight": 300,
+      "tier": "SpellBound"
+    },
+    {
+      "name": "Damping Sphere",
+      "weight": 290,
+      "tier": "NamedFactory"
+    },
+    {
+      "name": "Polluted Delta",
+      "weight": 290,
+      "tier": "NamedFactory"
+    },
+    {
+      "name": "Steam Vents",
+      "weight": 280,
+      "tier": "Unimplemented"
+    },
+    {
+      "name": "Watery Grave",
+      "weight": 280,
+      "tier": "Unimplemented"
+    },
+    {
+      "name": "Flooded Strand",
+      "weight": 270,
+      "tier": "NamedFactory"
+    },
+    {
+      "name": "Thoughtseize",
+      "weight": 270,
+      "tier": "SpellBound"
+    }
+  ],
   "top_unimplemented": [
     {
       "name": "\u002B2 Mace",

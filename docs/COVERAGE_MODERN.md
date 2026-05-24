@@ -1,9 +1,11 @@
 # Engine coverage report
 
 - **Scope:** format=modern, dedup-by-name
-- **Generated:** 2026-05-24 17:51 UTC
+- **Generated:** 2026-05-24 18:30 UTC
 - **Total cards:** 21879
 - **Distinct coverage:** 23.8% (5210 / 21879)
+- **Tournament-weighted coverage:** 68.3% (by play-rate; matched weight 19250)
+- **Top-20 most-played covered:** 16 / 20 (80%)
 
 ## Tier breakdown
 
@@ -14,6 +16,31 @@
 | KeywordOnly | 710 | 3.2% |
 | Vanilla | 552 | 2.5% |
 | Unimplemented | 16669 | 76.2% |
+
+## Top-20 most-played cards
+
+| Weight | Card | Tier |
+|---:|---|---|
+| 530.0 | Consign to Memory | NamedFactory |
+| 530.0 | Mystical Dispute | NamedFactory |
+| 480.0 | Island | Unimplemented |
+| 450.0 | Misty Rainforest | NamedFactory |
+| 420.0 | Verdant Catacombs | NamedFactory |
+| 400.0 | Marsh Flats | NamedFactory |
+| 360.0 | Force of Negation | NamedFactory |
+| 350.0 | Bloodstained Mire | NamedFactory |
+| 350.0 | Windswept Heath | NamedFactory |
+| 350.0 | Wooded Foothills | NamedFactory |
+| 340.0 | Swamp | Unimplemented |
+| 340.0 | Vexing Bauble | NamedFactory |
+| 330.0 | Arid Mesa | NamedFactory |
+| 300.0 | Lightning Bolt | SpellBound |
+| 290.0 | Damping Sphere | NamedFactory |
+| 290.0 | Polluted Delta | NamedFactory |
+| 280.0 | Steam Vents | Unimplemented |
+| 280.0 | Watery Grave | Unimplemented |
+| 270.0 | Flooded Strand | NamedFactory |
+| 270.0 | Thoughtseize | SpellBound |
 
 ## Top unimplemented (20)
 

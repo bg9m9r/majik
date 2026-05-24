@@ -1,8 +1,16 @@
 # Modern Coverage
 
+> **Headline (auto, 2026-05-24):** Raw 23.8% (5210 / 21879) ·
+> Tournament-weighted 68.3% (`docs/meta-modern-snapshot.json`, 163 staples) ·
+> Top-20 most-played 16 / 20 (80%).
+>
 > **Auto-computed numbers live in [`docs/COVERAGE_MODERN.md`](docs/COVERAGE_MODERN.md)** —
 > regenerate with `dotnet run --project Majik.Console -- coverage --modern
-> --md-out docs/COVERAGE_MODERN.md --json-out docs/coverage-modern.json`.
+> --weighted --md-out docs/COVERAGE_MODERN.md --json-out docs/coverage-modern.json`.
+> The `--weighted` flag pulls play-rate weights from
+> [`docs/meta-modern-snapshot.json`](docs/meta-modern-snapshot.json) (curated +
+> MTGGoldfish staples scrape). Refresh the snapshot quarterly via
+> `scripts/refresh-meta-snapshot.sh`.
 > The classifier source is `Majik.Core/CardData/Coverage/`. The hand-maintained
 > archetype rollups below remain for narrative context on recent PRs; raw tier
 > totals + the unimplemented backlog are the canonical responsibility of the
