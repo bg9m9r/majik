@@ -1218,5 +1218,19 @@ public static class SeedImplementedCards
         // Its controller creates a 3/3 green Beast creature token (CR 111.4).
         // Token colour (green) deferred — same gap as Pact of the Titan.
         "Beast Within",
+
+        // ---- Modern graveyard-hate artifacts shipped in the feat/relic-nihil-spellbomb bump ----
+
+        // Artifact — {1} (RelicOfProgenitusFactory). Shards of Alara / reprints.
+        // {T}: target player exiles a card from their graveyard (1..1 TargetRequest,
+        // v1 auto-pick first card). {1}, Exile ~: exile all cards from all
+        // graveyards; draw a card (all-graveyards sweep requires allPlayersResolver).
+        "Relic of Progenitus",
+
+        // Artifact — {B} (NihilSpellbombFactory). Scars of Mirrodin / reprints.
+        // {T}, Sacrifice ~: exile all cards from target player's graveyard.
+        // Dies trigger (CR 603.6c): may pay {B}; if you do, draw a card
+        // (v1 auto-pays when mana pool has {B}).
+        "Nihil Spellbomb",
     };
 }

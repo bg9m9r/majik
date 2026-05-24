@@ -2960,6 +2960,26 @@ public static class NamedCardFactory
             // Pact of the Titan / Crashing Footfalls).
             "Beast Within" => BeastWithinFactory.Create(owner),
 
+            // Artifact — {1} (RelicOfProgenitusFactory). Shards of Alara / reprints.
+            // Common Modern graveyard-hate. {T}: target player exiles a card from
+            // their graveyard (1..1 TargetRequest; v1 auto-pick first card).
+            // {1}, Exile Relic: exile all cards from all graveyards; draw a card.
+            // Self-exile cost performed by effect closure (stub pattern mirrors
+            // Mishra's Bauble / Engineered Explosives). The single-arg dispatcher
+            // path sweeps only the controller's graveyard; use the
+            // (owner, allPlayersResolver) overload for full all-graveyards sweep.
+            "Relic of Progenitus" => RelicOfProgenitusFactory.Create(owner),
+
+            // Artifact — {B} (NihilSpellbombFactory). Scars of Mirrodin / reprints.
+            // Common Modern graveyard-hate. {T}, Sacrifice ~: exile all cards from
+            // target player's graveyard (1..1 TargetRequest; v1 auto-pick target
+            // from ChosenTargets). Dies trigger (CR 603.6c): may pay {B}; if you
+            // do, draw a card — v1 auto-pays when pool has {B}. Single-arg
+            // dispatcher path attaches the trigger without TriggerManager
+            // registration; use the (owner, triggers) overload for bus-driven
+            // trigger firing.
+            "Nihil Spellbomb" => NihilSpellbombFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
