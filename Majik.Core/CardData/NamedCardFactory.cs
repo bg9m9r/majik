@@ -2001,6 +2001,18 @@ public static class NamedCardFactory
             // Pithing Needle / Cavern of Souls.
             "Plague Engineer" => PlagueEngineerFactory.Create(owner),
 
+            // Enchantment — {2}{B} (EngineeredPlagueFactory). Urza's Legacy.
+            // "As Engineered Plague enters the battlefield, choose a creature
+            //  type. All creatures of the chosen type get -1/-1."
+            // Debuffs ALL players' creatures of the chosen type (unlike Plague
+            // Engineer's opponents-only restriction). Wired via
+            // LordStaticEffect with opponentsOnly: false when the runtime
+            // (owner, continuousEffects, typeChooser) overload is used. The
+            // single-arg dispatcher path here produces the correct card shape
+            // only (no live debuff). Agent-prompt integration (ChooseSubtype)
+            // deferred — same queue as Pithing Needle / Cavern of Souls.
+            "Engineered Plague" => EngineeredPlagueFactory.Create(owner),
+
             // Legendary Artifact — {5} (PyromancersGogglesFactory). Magic Origins.
             // "{T}: Add {R}. When you spend this mana to cast an instant or
             //  sorcery spell, copy that spell. You may choose new targets for
