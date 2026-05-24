@@ -53,6 +53,7 @@ A line missing all three = essentially absent.
 | Protection — from creatures / from non-colour qualities | partial | – | – | `Protection.HasProtectionFromCardType` exists; not enforced in combat/targeting yet (only colour is). |
 | Hexproof from colour ("Hexproof from red") | – | – | – | Subtype of hexproof; not modelled. |
 | Counter target spell **unless** controller pays X | partial | partial | – | Binder matches the regex but the "unless pay" prompt isn't wired (currently just counters). |
+| Ascend / city's blessing (CR 702.131) | – | – | – | "Once you control 10+ permanents, you have the city's blessing for the rest of the game." No `Player.HasCitysBlessing` latch yet. First card touching this gate: **Ocelot Pride** (MH3) — its attack trigger ships with the gate stubbed (always 1 Cat token; the "if you have the city's blessing, instead create two" half is deferred). Future blockers: any other Ascend card (Pride Sovereign, Slaughter the Strong, Etrata-adjacent printings). |
 
 ## P2 — additional cost / alternative cost surface
 

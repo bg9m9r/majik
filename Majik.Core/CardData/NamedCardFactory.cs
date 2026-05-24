@@ -117,6 +117,19 @@ public static class NamedCardFactory
             // ETB damage trigger + opponent-draw watcher + amass Orcs 1 deferred.
             "Orcish Bowmasters" => OrcishBowmastersFactory.Create(owner),
 
+            // Legendary Creature — Cat {W} 1/1 (OcelotPrideFactory).
+            // Lifelink keyword marker (CR 702.15) wired. Attack trigger
+            // (CR 508.1f) creates a 1/1 white Cat token via TokenFactory;
+            // city's blessing doubling (Ascend, CR 702.131) is stubbed
+            // until an Ascend primitive lands. End-step flicker trigger
+            // (CR 500.4 / CR 701.20) exile-and-returns the card when a
+            // creature you controlled dealt combat damage to a player
+            // this turn — the per-turn latch + flicker move both gate on
+            // the (owner, zoneService, eventBus, triggers) overload. The
+            // single-arg dispatcher path attaches the keyword + both
+            // triggers structurally without TriggerManager / bus wiring.
+            "Ocelot Pride" => OcelotPrideFactory.Create(owner),
+
             // Artifact — {2} (AgathasSoulCauldronFactory).
             // {T}: Exile first card from controller's graveyard; if creature, +1/+1 counter
             // on first creature on controller's battlefield — wired (v1 auto-pick).
@@ -824,6 +837,17 @@ public static class NamedCardFactory
             //  PumpUntilEndOfTurnEffect in DismemberFactory.BuildDefinition.
             "Dismember" => DismemberFactory.Create(owner),
 
+            // Instant — {G/P} (MutagenicGrowthFactory). New Phyrexia.
+            // "({G/P} can be paid with either {G} or 2 life.)
+            //  Target creature gets +2/+2 until end of turn." Main cost {G};
+            //  Phyrexian alt-cost (2 life) via
+            //  MutagenicGrowthFactory.PhyrexianAlternativeCost. +2/+2 EOT
+            //  via PumpUntilEndOfTurnEffect in
+            //  MutagenicGrowthFactory.BuildDefinition. Sibling of
+            //  GutShotFactory (single {X/P} pip) and DismemberFactory
+            //  (pump-EOT resolve shape).
+            "Mutagenic Growth" => MutagenicGrowthFactory.Create(owner),
+
             // Sorcery — {2}{R} (RiftBoltFactory). 3 damage to any target;
             // Suspend 1—{R} (CR 702.62). Spell-def and suspend alt cost
             // built on demand via RiftBoltFactory.BuildSpellDefinition /
@@ -1092,6 +1116,34 @@ public static class NamedCardFactory
             // for generic mana (CR 702.66). Bot-side delve discovery deferred — same
             // gap as Treasure Cruise / Murktide Regent.
             "Gurmag Angler" => GurmagAnglerFactory.Create(owner),
+
+            // Creature — Spirit Cleric {W} 1/2 (GuideOfSoulsFactory).
+            // Modern Horizons 3. "Whenever Guide of Souls or another
+            // creature you control with power 2 or less enters, you
+            // get {E}. Pay {E}{E}: Target creature gains flying and
+            // gets +1/+1 until end of turn."
+            // ETB triggered ability (CR 603.6a + CR 106.13) wired over
+            // CardMovedEvent → Battlefield filtered to (Creature +
+            // controller-matches + BasePower ≤ 2); includes Guide
+            // itself (printed 1 ≤ 2 — the "or another" disjunction).
+            // On trigger, Player.GainEnergy(1). v1 reads BasePower
+            // (printed) not effective power — promoting to live
+            // effective power would require threading a
+            // ContinuousEffectsService through the factory (same
+            // posture as Champion of the Parish's printed-subtype
+            // predicate). Activated ability {E}{E}: target creature
+            // gains Flying (Layer 6) + +1/+1 (Layer 7c) EOT — wired
+            // via a 1..1 "target creature" TargetRequest, a new
+            // private PayEnergyCost(2) sibling of RemoveVoidCounterCost,
+            // and EOT-scoped GrantKeywordUntilEndOfTurnEffect("Flying")
+            // + PumpUntilEndOfTurnEffect(+1,+1) registered against the
+            // target's ActiveEffects (no-op if null — shape-only).
+            // Single-arg dispatcher attaches the trigger structurally
+            // (no TriggerManager registration — same posture as
+            // AetherHubFactory.Create(Player)); energy cost gate is
+            // always live since energy lives on Player. Anchors the
+            // Modern Boros Energy / Boros Convoke axis.
+            "Guide of Souls" => GuideOfSoulsFactory.Create(owner),
 
             // Enchantment — {1}{U} (DressDownFactory). Flash. CR 613.6 + 613.7b:
             // "Creatures lose all abilities and have base power and toughness
@@ -2735,6 +2787,17 @@ public static class NamedCardFactory
             // Functional reprint of Wrath of God in black; resolve effect
             // delegates to WrathOfGodFactory.BuildResolveEffect.
             "Damnation" => DamnationFactory.Create(owner),
+
+            // Sorcery — {X}{W}{W} (WrathOfTheSkiesFactory). Modern Horizons 3.
+            // "You may pay {E}{E}{E}{E} rather than pay this spell's mana
+            // cost. Destroy each nonland permanent with mana value X or
+            // less." Card shape only at the dispatcher; the resolve
+            // effect (all-battlefields nonland mv-≤-X sweep) is built on
+            // demand via WrathOfTheSkiesFactory.BuildResolveEffect, and
+            // the printed energy alt-cost (CR 118.9 + CR 106.13) via
+            // WrathOfTheSkiesFactory.BuildAlternativeCost — the first
+            // card to wire the new EnergyAlternativeCost surface.
+            "Wrath of the Skies" => WrathOfTheSkiesFactory.Create(owner),
 
             // Instant — {4}{B} (MurderousCutFactory). Khans of Tarkir.
             // CR 702.66 — Delve. "Delve" marker keyword wired; the cost
