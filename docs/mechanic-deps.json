@@ -1,0 +1,1825 @@
+{
+  "generated_utc": "2026-05-24T18:31:49.6017226Z",
+  "scanned_dir": "/home/brett/Projects/majik.project/majik.core/.claude/worktrees/agent-a6a9323cefcd8c2d2/Majik.Core/CardData/Factories",
+  "total_mentions": 247,
+  "distinct_factories": 154,
+  "cluster_count": 17,
+  "unclustered_count": 131,
+  "clusters": [
+    {
+      "primitive_id": "agent-prompt-targeting",
+      "display_name": "Agent-prompt targeting MVP",
+      "implementation_hint": "IPlayerAgent needs ChooseTarget / ChooseYesNo surfaces; many spell factories punt on real targeting prompts.",
+      "factory_count": 25,
+      "mention_count": 32,
+      "factories": [
+        "AetherVialFactory",
+        "AgathasSoulCauldronFactory",
+        "AjaniNacatlPariahFactory",
+        "CoriSteelCutterFactory",
+        "DauthiVoidwalkerFactory",
+        "EldritchEvolutionFactory",
+        "EsikasChariotFactory",
+        "FaithlessLootingFactory",
+        "FaithlessSalvagingFactory",
+        "GoblinLackeyFactory",
+        "GoblinPiledriverFactory",
+        "MysticSanctuaryFactory",
+        "NihilSpellbombFactory",
+        "PriestOfFellRitesFactory",
+        "PrimevalTitanFactory",
+        "PsychicFrogFactory",
+        "RelicOfProgenitusFactory",
+        "SilvergillAdeptFactory",
+        "SkyclaveApparitionFactory",
+        "SpellQuellerFactory",
+        "SunTitanFactory",
+        "SwordOfFeastAndFamineFactory",
+        "TerritorialKavuFactory",
+        "UroTitanFactory",
+        "YawgmothFactory"
+      ],
+      "mentions": [
+        {
+          "factory": "NihilSpellbombFactory",
+          "file": "NihilSpellbombFactory.cs",
+          "line": 13,
+          "sentence": "Full agent-prompt targeting deferred."
+        },
+        {
+          "factory": "EsikasChariotFactory",
+          "file": "EsikasChariotFactory.cs",
+          "line": 12,
+          "sentence": "Token-copy targeting auto-picks the first eligible token-creature the controller controls; agent-driven targeting is deferred."
+        },
+        {
+          "factory": "MysticSanctuaryFactory",
+          "file": "MysticSanctuaryFactory.cs",
+          "line": 12,
+          "sentence": "\u003Cb\u003E\u0022You may\u0022 prompt\u003C/b\u003E: auto-takes the action when a target was supplied; agent-driven decline deferred (same posture as Snapcaster Mage / Tireless Tracker / Valakut)."
+        },
+        {
+          "factory": "AgathasSoulCauldronFactory",
+          "file": "AgathasSoulCauldronFactory.cs",
+          "line": 10,
+          "sentence": "(Full targeting deferred \u2014 see below."
+        },
+        {
+          "factory": "AgathasSoulCauldronFactory",
+          "file": "AgathasSoulCauldronFactory.cs",
+          "line": 65,
+          "sentence": "Full targeting deferred (see xmldoc above)."
+        },
+        {
+          "factory": "SpellQuellerFactory",
+          "file": "SpellQuellerFactory.cs",
+          "line": 15,
+          "sentence": "A \u0022pick a spell from the stack\u0022 prompt is part of the broader agent-prompt MVP and is deferred."
+        },
+        {
+          "factory": "SkyclaveApparitionFactory",
+          "file": "SkyclaveApparitionFactory.cs",
+          "line": 13,
+          "sentence": "SetChosenTargets\u0022/\u003E; the agent prompt is deferred."
+        },
+        {
+          "factory": "TerritorialKavuFactory",
+          "file": "TerritorialKavuFactory.cs",
+          "line": 12,
+          "sentence": "If the controller has a card in hand: discard the first card (v1 deterministic; CR 701.16a agent-driven choice deferred \u2014 same posture as \u003Csee cref=\u0022PsychicFrogFactory\u0022/\u003E / Faithless Looting), then draw one.",
+          "cr": "CR 701.16a"
+        },
+        {
+          "factory": "TerritorialKavuFactory",
+          "file": "TerritorialKavuFactory.cs",
+          "line": 12,
+          "sentence": "\u003Cb\u003EDiscard prompt\u003C/b\u003E: v1 deterministically discards the first card in hand; agent-driven \u0022choose which card to discard\u0022 deferred behind the same gate as Liliana / Faithless Looting / Psychic Frog."
+        },
+        {
+          "factory": "TerritorialKavuFactory",
+          "file": "TerritorialKavuFactory.cs",
+          "line": 159,
+          "sentence": "v1 first-card-in-hand pick (CR 701.16a \u2014 agent-driven choice deferred).",
+          "cr": "CR 701.16a"
+        },
+        {
+          "factory": "PriestOfFellRitesFactory",
+          "file": "PriestOfFellRitesFactory.cs",
+          "line": 12,
+          "sentence": "\u003Cb\u003E\u0022You may\u0022 prompt\u003C/b\u003E: the ETB trigger autopicks the first eligible creature card; declining and target-selection are deferred to the agent-prompt MVP."
+        },
+        {
+          "factory": "EldritchEvolutionFactory",
+          "file": "EldritchEvolutionFactory.cs",
+          "line": 14,
+          "sentence": "Full agent-driven sacrifice-target prompting requires the ITarget / TargetResolver pipeline (deferred \u2014 same gap noted on \u003Csee cref=\u0022SacrificeAnotherCreatureCost\u0022/\u003E)."
+        },
+        {
+          "factory": "PsychicFrogFactory",
+          "file": "PsychicFrogFactory.cs",
+          "line": 15,
+          "sentence": "Agent-driven prompts are deferred behind the same queue as Liliana of the Veil \u002B Faithless Looting \u002B Sword of Feast and Famine."
+        },
+        {
+          "factory": "PsychicFrogFactory",
+          "file": "PsychicFrogFactory.cs",
+          "line": 145,
+          "sentence": "v1 deterministic first-card-in-hand pick per discard (CR 701.16a \u2014 agent-driven choice deferred).",
+          "cr": "CR 701.16a"
+        },
+        {
+          "factory": "FaithlessSalvagingFactory",
+          "file": "FaithlessSalvagingFactory.cs",
+          "line": 11,
+          "sentence": "Real agent-driven \u0022choose a card to discard\u0022 prompt deferred behind the same queue as Faithless Looting / Liliana of the Veil / Connive / Psychic Frog."
+        },
+        {
+          "factory": "FaithlessSalvagingFactory",
+          "file": "FaithlessSalvagingFactory.cs",
+          "line": 109,
+          "sentence": "Real agent-driven choice deferred."
+        },
+        {
+          "factory": "PrimevalTitanFactory",
+          "file": "PrimevalTitanFactory.cs",
+          "line": 11,
+          "sentence": "A first-class yes/no agent prompt is deferred (see \u003Cc\u003EStoneforgeMystic\u003C/c\u003E for the same gap)."
+        },
+        {
+          "factory": "RelicOfProgenitusFactory",
+          "file": "RelicOfProgenitusFactory.cs",
+          "line": 12,
+          "sentence": "Agent prompt deferred."
+        },
+        {
+          "factory": "RelicOfProgenitusFactory",
+          "file": "RelicOfProgenitusFactory.cs",
+          "line": 12,
+          "sentence": "Full agent-prompt targeting deferred."
+        },
+        {
+          "factory": "FaithlessLootingFactory",
+          "file": "FaithlessLootingFactory.cs",
+          "line": 119,
+          "sentence": "Real agent-driven choice deferred."
+        },
+        {
+          "factory": "UroTitanFactory",
+          "file": "UroTitanFactory.cs",
+          "line": 12,
+          "sentence": "v1 always plays the first land in hand when one exists; a first-class yes/no agent prompt is deferred (same gap as Sun Titan / Primeval Titan / Stoneforge Mystic)."
+        },
+        {
+          "factory": "DauthiVoidwalkerFactory",
+          "file": "DauthiVoidwalkerFactory.cs",
+          "line": 13,
+          "sentence": "Wiring an agent prompt mirrors the rest of the v1 factories (deferred)."
+        },
+        {
+          "factory": "SilvergillAdeptFactory",
+          "file": "SilvergillAdeptFactory.cs",
+          "line": 10,
+          "sentence": "The actual enforcement at cast-time (agent prompt: reveal a Merfolk card from hand OR pay {3} as an additional cost) is deferred until the additional-cost framework supports reveal-based alternatives."
+        },
+        {
+          "factory": "GoblinPiledriverFactory",
+          "file": "GoblinPiledriverFactory.cs",
+          "line": 10,
+          "sentence": "Same shape as Primeval Titan\u0027s \u003Cc\u003Eselector\u003C/c\u003E \u002B Plague Engineer\u0027s \u003Cc\u003EtypeChooser\u003C/c\u003E \u2014 agent-prompt integration is deferred."
+        },
+        {
+          "factory": "SwordOfFeastAndFamineFactory",
+          "file": "SwordOfFeastAndFamineFactory.cs",
+          "line": 14,
+          "sentence": "the damaged player discards a card \u2014 v1 deterministically picks the first card in hand (same v1 policy as \u003Csee cref=\u0022LilianaOfTheVeilFactory\u0022/\u003E\u0027s \u002B1 each-player-discards and \u003Csee cref=\u0022FaithlessLootingFactory\u0022/\u003E\u0027s last-2-in-hand; agent prompt deferred); 2."
+        },
+        {
+          "factory": "SwordOfFeastAndFamineFactory",
+          "file": "SwordOfFeastAndFamineFactory.cs",
+          "line": 14,
+          "sentence": "Agent-driven \u0022you choose which card you discard\u0022 (CR 701.16a \u2014 damaged player chooses) is deferred behind the same prompt queue as Liliana of the Veil \u002B Faithless Looting.",
+          "cr": "CR 701.16a"
+        },
+        {
+          "factory": "YawgmothFactory",
+          "file": "YawgmothFactory.cs",
+          "line": 121,
+          "sentence": "Full targeting deferred."
+        },
+        {
+          "factory": "AetherVialFactory",
+          "file": "AetherVialFactory.cs",
+          "line": 12,
+          "sentence": "\u003Cb\u003E\u0022You may\u0022 prompts\u003C/b\u003E: both abilities auto-accept; declining and target-selection are deferred to the agent-prompt MVP."
+        },
+        {
+          "factory": "GoblinLackeyFactory",
+          "file": "GoblinLackeyFactory.cs",
+          "line": 12,
+          "sentence": "\u003Cb\u003E\u0022You may\u0022 prompt\u003C/b\u003E: v1 auto-accepts when an eligible Goblin creature card exists in hand (same approach as Aether Vial\u0027s tap activated ability \u2014 declining the optional is deferred to the agent-prompt MVP)."
+        },
+        {
+          "factory": "AjaniNacatlPariahFactory",
+          "file": "AjaniNacatlPariahFactory.cs",
+          "line": 11,
+          "sentence": "A real agent-driven yes/no \u002B target prompt is deferred \u2014 same queue as Sun Titan / Stoneforge Mystic."
+        },
+        {
+          "factory": "SunTitanFactory",
+          "file": "SunTitanFactory.cs",
+          "line": 11,
+          "sentence": "The v1 effect always reanimates the first eligible permanent card when one exists; a first-class yes/no agent prompt is deferred (mirrors Priest of Fell Rites / Primeval Titan)."
+        },
+        {
+          "factory": "CoriSteelCutterFactory",
+          "file": "CoriSteelCutterFactory.cs",
+          "line": 15,
+          "sentence": "A real prompt-driven flow (and the \u0022to it\u0022 bookkeeping that pins attachment to *that specific* token rather than any creature) is deferred behind the broader agent-prompt surface \u2014 same posture as Eternal Witness / Snapcaster Mage."
+        }
+      ]
+    },
+    {
+      "primitive_id": "library-shuffle",
+      "display_name": "Library shuffle (CR 701.20)",
+      "comp_rules_citation": "CR 701.20",
+      "implementation_hint": "Add IZone.Shuffle / ZoneService.ShuffleLibrary. Tutor-family factories all block on this single primitive.",
+      "factory_count": 12,
+      "mention_count": 17,
+      "factories": [
+        "AssassinsTrophyFactory",
+        "EldritchEvolutionFactory",
+        "GoblinEngineerFactory",
+        "GoblinMatronFactory",
+        "GreenSunsZenithFactory",
+        "PonderFactory",
+        "PrimevalTitanFactory",
+        "ScapeshiftFactory",
+        "SearchForTomorrowFactory",
+        "StoneforgeMysticFactory",
+        "TrinketMageFactory",
+        "WishclawTalismanFactory"
+      ],
+      "mentions": [
+        {
+          "factory": "ScapeshiftFactory",
+          "file": "ScapeshiftFactory.cs",
+          "line": 10,
+          "sentence": "Library shuffle (CR 701.19c) deferred \u2014 no IZone.",
+          "cr": "CR 701.19c"
+        },
+        {
+          "factory": "ScapeshiftFactory",
+          "file": "ScapeshiftFactory.cs",
+          "line": 175,
+          "sentence": "CR 701.19c \u2014 shuffle deferred (same rationale as SearchSpellFactory / PrimevalTitanFactory).",
+          "cr": "CR 701.19c"
+        },
+        {
+          "factory": "WishclawTalismanFactory",
+          "file": "WishclawTalismanFactory.cs",
+          "line": 146,
+          "sentence": "CR 701.19c \u2014 shuffle deferred (no IZone.",
+          "cr": "CR 701.19c"
+        },
+        {
+          "factory": "StoneforgeMysticFactory",
+          "file": "StoneforgeMysticFactory.cs",
+          "line": 99,
+          "sentence": "Shuffle and reveal- event emission are deferred (see class xmldoc)."
+        },
+        {
+          "factory": "StoneforgeMysticFactory",
+          "file": "StoneforgeMysticFactory.cs",
+          "line": 119,
+          "sentence": "CR 701.19c shuffle deferred \u2014 see class xmldoc.",
+          "cr": "CR 701.19c"
+        },
+        {
+          "factory": "AssassinsTrophyFactory",
+          "file": "AssassinsTrophyFactory.cs",
+          "line": 11,
+          "sentence": "Shuffle deferred \u2014 same MVP gap as every other tutor (\u003Csee cref=\u0022PathToExileFactory\u0022/\u003E)."
+        },
+        {
+          "factory": "GreenSunsZenithFactory",
+          "file": "GreenSunsZenithFactory.cs",
+          "line": 14,
+          "sentence": "## Deferred (v1 gaps)  - \u003Cb\u003ELibrary shuffle\u003C/b\u003E (CR 701.20a).",
+          "cr": "CR 701.20a"
+        },
+        {
+          "factory": "GreenSunsZenithFactory",
+          "file": "GreenSunsZenithFactory.cs",
+          "line": 185,
+          "sentence": "Shuffle randomization itself is deferred (same gap as SearchSpellFactory)."
+        },
+        {
+          "factory": "EldritchEvolutionFactory",
+          "file": "EldritchEvolutionFactory.cs",
+          "line": 182,
+          "sentence": "CR 701.19c \u2014 shuffle after a search effect (deferred \u2014 see class xmldoc / SearchSpellFactory).",
+          "cr": "CR 701.19c"
+        },
+        {
+          "factory": "GoblinEngineerFactory",
+          "file": "GoblinEngineerFactory.cs",
+          "line": 111,
+          "sentence": "\u0022 v1: deterministic \u2014 take the first artifact card in the library; shuffle and reveal-event emission deferred (see class xmldoc)."
+        },
+        {
+          "factory": "GoblinEngineerFactory",
+          "file": "GoblinEngineerFactory.cs",
+          "line": 132,
+          "sentence": "CR 701.19c shuffle deferred \u2014 see class xmldoc.",
+          "cr": "CR 701.19c"
+        },
+        {
+          "factory": "PrimevalTitanFactory",
+          "file": "PrimevalTitanFactory.cs",
+          "line": 101,
+          "sentence": "CR 701.19a (search), CR 701.19c (shuffle deferred \u2014 see xmldoc).",
+          "cr": "CR 701.19a"
+        },
+        {
+          "factory": "SearchForTomorrowFactory",
+          "file": "SearchForTomorrowFactory.cs",
+          "line": 10,
+          "sentence": "Library shuffle deferred \u2014 same gap as every other search effect in \u003Csee cref=\u0022SearchSpellFactory\u0022/\u003E (no IZone."
+        },
+        {
+          "factory": "GoblinMatronFactory",
+          "file": "GoblinMatronFactory.cs",
+          "line": 138,
+          "sentence": "CR 701.19c shuffle deferred \u2014 see class xmldoc.",
+          "cr": "CR 701.19c"
+        },
+        {
+          "factory": "TrinketMageFactory",
+          "file": "TrinketMageFactory.cs",
+          "line": 77,
+          "sentence": "Shuffle and reveal-event emission are deferred (see class xmldoc)."
+        },
+        {
+          "factory": "TrinketMageFactory",
+          "file": "TrinketMageFactory.cs",
+          "line": 99,
+          "sentence": "CR 701.19c shuffle deferred \u2014 see class xmldoc.",
+          "cr": "CR 701.19c"
+        },
+        {
+          "factory": "PonderFactory",
+          "file": "PonderFactory.cs",
+          "line": 58,
+          "sentence": "The \u0022may shuffle\u0022 rider is deferred (no-op)."
+        }
+      ]
+    },
+    {
+      "primitive_id": "token-colour-identity",
+      "display_name": "Token colour identity (CR 105 / CR 903.4)",
+      "comp_rules_citation": "CR 105",
+      "implementation_hint": "TokenFactory needs an explicit Colors field separate from mana cost; today tokens default to colourless.",
+      "factory_count": 11,
+      "mention_count": 21,
+      "factories": [
+        "BeastWithinFactory",
+        "BridgeFromBelowFactory",
+        "CoriSteelCutterFactory",
+        "CrashingFootfallsFactory",
+        "EsikasChariotFactory",
+        "GoblinRabblemasterFactory",
+        "MonasteryMentorFactory",
+        "OcelotPrideFactory",
+        "SkyclaveApparitionFactory",
+        "StormchasersTalentFactory",
+        "YoungPyromancerFactory"
+      ],
+      "mentions": [
+        {
+          "factory": "BridgeFromBelowFactory",
+          "file": "BridgeFromBelowFactory.cs",
+          "line": 12,
+          "sentence": "## Deferred (v1 gaps)  - \u003Cb\u003EToken-creature colour identity\u003C/b\u003E: tokens carry subtype \u002B keywords but no explicit colour today (same scope decision as Crashing Footfalls\u0027 \u0022green\u0022 Rhinos, Wurmcoil\u0027s \u0022colorless\u0022 Wurms)."
+        },
+        {
+          "factory": "BridgeFromBelowFactory",
+          "file": "BridgeFromBelowFactory.cs",
+          "line": 198,
+          "sentence": "Colour identity (\u0022black\u0022) is documented but the runtime token has no colour stamp (same gap as Crashing Footfalls / Pact of the Titan / Wurmcoil Engine)."
+        },
+        {
+          "factory": "StormchasersTalentFactory",
+          "file": "StormchasersTalentFactory.cs",
+          "line": 12,
+          "sentence": "\u003Cb\u003EToken colour identity (blue \u002B red)\u003C/b\u003E: Mercenary token is created as colourless under the v1 token shape \u2014 same gap as Esika\u0027s Chariot\u0027s green Cats, Crashing Footfalls\u0027 green Rhinos, Pact of the Titan\u0027s red Giant."
+        },
+        {
+          "factory": "StormchasersTalentFactory",
+          "file": "StormchasersTalentFactory.cs",
+          "line": 120,
+          "sentence": "\u0022 Token colour identity (blue \u002B red) deferred \u2014 see class xmldoc."
+        },
+        {
+          "factory": "StormchasersTalentFactory",
+          "file": "StormchasersTalentFactory.cs",
+          "line": 145,
+          "sentence": "Token colour identity (blue \u002B red) deferred (see class xmldoc); Prowess pump on the token deferred (see class xmldoc)."
+        },
+        {
+          "factory": "EsikasChariotFactory",
+          "file": "EsikasChariotFactory.cs",
+          "line": 12,
+          "sentence": "\u003Cb\u003EToken colour identity (green)\u003C/b\u003E: Cat tokens are created as colourless under the v1 token shape \u2014 same gap as Crashing Footfalls\u0027 green Rhinos and Wurmcoil\u0027s colourless Wurms."
+        },
+        {
+          "factory": "EsikasChariotFactory",
+          "file": "EsikasChariotFactory.cs",
+          "line": 129,
+          "sentence": "\u0022 Token colour identity (green) deferred \u2014 see class xmldoc."
+        },
+        {
+          "factory": "EsikasChariotFactory",
+          "file": "EsikasChariotFactory.cs",
+          "line": 174,
+          "sentence": "Token colour identity (green) is deferred (see class xmldoc)."
+        },
+        {
+          "factory": "MonasteryMentorFactory",
+          "file": "MonasteryMentorFactory.cs",
+          "line": 15,
+          "sentence": "Token colour identity (white): tokens are created as colourless under the v1 token shape \u2014 same gap as Crashing Footfalls / Goblin Rabblemaster."
+        },
+        {
+          "factory": "SkyclaveApparitionFactory",
+          "file": "SkyclaveApparitionFactory.cs",
+          "line": 13,
+          "sentence": "v1 does not inject colour identity into tokens \u2014 the engine\u0027s token colour system (same gap as Crashing Footfalls\u0027 green Rhinos, Pact of the Titan\u0027s red Giant)."
+        },
+        {
+          "factory": "SkyclaveApparitionFactory",
+          "file": "SkyclaveApparitionFactory.cs",
+          "line": 199,
+          "sentence": "NOTE (v1): token colour (blue) is not wired \u2014 same gap as Crashing Footfalls\u0027 green Rhinos / Pact of the Titan\u0027s red Giant."
+        },
+        {
+          "factory": "GoblinRabblemasterFactory",
+          "file": "GoblinRabblemasterFactory.cs",
+          "line": 12,
+          "sentence": "\u003Cb\u003EToken colour identity (red)\u003C/b\u003E: tokens are created as colourless under the v1 token shape \u2014 same gap as Pact of the Titan\u0027s \u0022red\u0022 Giant and Crashing Footfalls\u0027 \u0022green\u0022 Rhinos."
+        },
+        {
+          "factory": "CrashingFootfallsFactory",
+          "file": "CrashingFootfallsFactory.cs",
+          "line": 15,
+          "sentence": "The Trample \u002B creature-type assignments match the printed text; the green colour identity is a downstream concern (same gap as Wurmcoil\u0027s \u0022colorless\u0022 tokens, Solitude\u0027s \u0022white\u0022 creatures, etc."
+        },
+        {
+          "factory": "YoungPyromancerFactory",
+          "file": "YoungPyromancerFactory.cs",
+          "line": 13,
+          "sentence": "Token colour identity (red): tokens are created as colourless under the v1 token shape \u2014 same gap as Goblin Rabblemaster / Crashing Footfalls."
+        },
+        {
+          "factory": "BeastWithinFactory",
+          "file": "BeastWithinFactory.cs",
+          "line": 12,
+          "sentence": "The token is a 3/3 green Beast creature token (CR 111.4 \u2014 token characteristics include colour; token \u0022green\u0022 colour identity deferred \u2014 same gap as Crashing Footfalls\u0027 green Rhinos; token enters with \u003Cc\u003EHasSummoningSickness = true\u003C/c\u003E via \u003Csee cref=\u0022TokenFactory\u0022/\u003E).",
+          "cr": "CR 111.4"
+        },
+        {
+          "factory": "BeastWithinFactory",
+          "file": "BeastWithinFactory.cs",
+          "line": 12,
+          "sentence": "\u003Cb\u003EToken colour (green)\u003C/b\u003E: TokenFactory does not yet model token colour identity (same gap as Pact of the Titan\u0027s \u0022red\u0022 Giant token, Crashing Footfalls\u0027 \u0022green\u0022 Rhino tokens)."
+        },
+        {
+          "factory": "BeastWithinFactory",
+          "file": "BeastWithinFactory.cs",
+          "line": 129,
+          "sentence": "Token colour (green) deferred \u2014 same gap as Pact of the Titan / Crashing Footfalls."
+        },
+        {
+          "factory": "OcelotPrideFactory",
+          "file": "OcelotPrideFactory.cs",
+          "line": 14,
+          "sentence": "\u003Cb\u003EToken colour identity (white)\u003C/b\u003E: Cat tokens are created as colourless under the v1 token shape \u2014 same gap as Esika\u0027s Chariot Cats / Crashing Footfalls Rhinos."
+        },
+        {
+          "factory": "OcelotPrideFactory",
+          "file": "OcelotPrideFactory.cs",
+          "line": 200,
+          "sentence": "Token colour identity (white) is deferred (see class xmldoc)."
+        },
+        {
+          "factory": "CoriSteelCutterFactory",
+          "file": "CoriSteelCutterFactory.cs",
+          "line": 15,
+          "sentence": "\u003Cb\u003EToken colour identity (white)\u003C/b\u003E: Monk token is colourless under the v1 token shape \u2014 same gap as Esika\u0027s Chariot\u0027s green Cats / Crashing Footfalls\u0027 green Rhinos / Pact of the Titan\u0027s red Giant."
+        },
+        {
+          "factory": "CoriSteelCutterFactory",
+          "file": "CoriSteelCutterFactory.cs",
+          "line": 187,
+          "sentence": "Token colour identity (white) deferred \u2014 see class xmldoc."
+        }
+      ]
+    },
+    {
+      "primitive_id": "sorcery-speed-gate",
+      "display_name": "\u0022Activate only as a sorcery\u0022 gate (CR 117.1a)",
+      "comp_rules_citation": "CR 117.1a",
+      "implementation_hint": "ActionValidator-side check: ability/spell flagged sorcery-speed only legal during own main phase with empty stack.",
+      "factory_count": 9,
+      "mention_count": 12,
+      "factories": [
+        "ColossusHammerFactory",
+        "CoriSteelCutterFactory",
+        "SkullclampFactory",
+        "SwordOfFeastAndFamineFactory",
+        "SwordOfFireAndIceFactory",
+        "TasigurTheGoldenFangFactory",
+        "TirelessTrackerFactory",
+        "UmezawasJitteFactory",
+        "WishclawTalismanFactory"
+      ],
+      "mentions": [
+        {
+          "factory": "SwordOfFireAndIceFactory",
+          "file": "SwordOfFireAndIceFactory.cs",
+          "line": 209,
+          "sentence": "Sorcery-speed restriction deferred (see class xmldoc)."
+        },
+        {
+          "factory": "WishclawTalismanFactory",
+          "file": "WishclawTalismanFactory.cs",
+          "line": 110,
+          "sentence": "CR 117.1a sorcery-speed restriction deferred (see class xmldoc).",
+          "cr": "CR 117.1a"
+        },
+        {
+          "factory": "SkullclampFactory",
+          "file": "SkullclampFactory.cs",
+          "line": 13,
+          "sentence": "## Deferred  - \u003Cb\u003ESorcery-speed restriction\u003C/b\u003E on Equip activation (CR 702.6a) \u2014 same gap as \u003Csee cref=\u0022ColossusHammerFactory\u0022/\u003E.",
+          "cr": "CR 702.6a"
+        },
+        {
+          "factory": "SkullclampFactory",
+          "file": "SkullclampFactory.cs",
+          "line": 159,
+          "sentence": "Sorcery-speed restriction deferred (see class xmldoc)."
+        },
+        {
+          "factory": "ColossusHammerFactory",
+          "file": "ColossusHammerFactory.cs",
+          "line": 111,
+          "sentence": "Sorcery-speed restriction deferred (see class xmldoc)."
+        },
+        {
+          "factory": "UmezawasJitteFactory",
+          "file": "UmezawasJitteFactory.cs",
+          "line": 16,
+          "sentence": "## Deferred  - \u003Cb\u003ESorcery-speed restriction\u003C/b\u003E on Equip activation (CR 702.6a) \u2014 same gap as \u003Csee cref=\u0022ColossusHammerFactory\u0022/\u003E.",
+          "cr": "CR 702.6a"
+        },
+        {
+          "factory": "UmezawasJitteFactory",
+          "file": "UmezawasJitteFactory.cs",
+          "line": 246,
+          "sentence": "Sorcery-speed restriction deferred (see class xmldoc)."
+        },
+        {
+          "factory": "TirelessTrackerFactory",
+          "file": "TirelessTrackerFactory.cs",
+          "line": 14,
+          "sentence": "\u003Cb\u003E\u0022Activate only as a sorcery\u0022\u003C/b\u003E \u2014 Tireless Tracker\u0027s printed activated ability has NO sorcery-speed restriction (instant speed on the official card), so nothing is deferred here for this card."
+        },
+        {
+          "factory": "TasigurTheGoldenFangFactory",
+          "file": "TasigurTheGoldenFangFactory.cs",
+          "line": 114,
+          "sentence": "CR 117.1a sorcery-speed restriction deferred (see class xmldoc).",
+          "cr": "CR 117.1a"
+        },
+        {
+          "factory": "SwordOfFeastAndFamineFactory",
+          "file": "SwordOfFeastAndFamineFactory.cs",
+          "line": 14,
+          "sentence": "## Deferred  - \u003Cb\u003ESorcery-speed restriction\u003C/b\u003E on Equip activation (CR 702.6a) \u2014 same gap as the rest of the equipment cycle; enforcement belongs in an action-validator gate, not on the ability itself.",
+          "cr": "CR 702.6a"
+        },
+        {
+          "factory": "SwordOfFeastAndFamineFactory",
+          "file": "SwordOfFeastAndFamineFactory.cs",
+          "line": 244,
+          "sentence": "Sorcery-speed restriction deferred (see class xmldoc)."
+        },
+        {
+          "factory": "CoriSteelCutterFactory",
+          "file": "CoriSteelCutterFactory.cs",
+          "line": 225,
+          "sentence": "Sorcery-speed restriction deferred (see class xmldoc)."
+        }
+      ]
+    },
+    {
+      "primitive_id": "regeneration",
+      "display_name": "Regeneration shield (CR 701.15)",
+      "comp_rules_citation": "CR 701.15",
+      "implementation_hint": "ReplacementBus filter on ZoneMoveIntent battlefield\u2192graveyard, gated by sourceCard.HasAbility(\u0022Regenerate\u0022).",
+      "factory_count": 6,
+      "mention_count": 8,
+      "factories": [
+        "BeastWithinFactory",
+        "DrownInTheLochFactory",
+        "EmberethShieldbreakerFactory",
+        "MurderousCutFactory",
+        "MurderousRiderFactory",
+        "TerminateFactory"
+      ],
+      "mentions": [
+        {
+          "factory": "DrownInTheLochFactory",
+          "file": "DrownInTheLochFactory.cs",
+          "line": 12,
+          "sentence": "Indestructible / regeneration riders are deferred (same gap as \u003Csee cref=\u0022SlaughterPactFactory\u0022/\u003E and the rest of the single-target destroy family)."
+        },
+        {
+          "factory": "DrownInTheLochFactory",
+          "file": "DrownInTheLochFactory.cs",
+          "line": 210,
+          "sentence": "CR 701.7 \u2014 destroy \u2192 owner\u0027s graveyard (Indestructible / regeneration deferred, same gap as SlaughterPactFactory).",
+          "cr": "CR 701.7"
+        },
+        {
+          "factory": "TerminateFactory",
+          "file": "TerminateFactory.cs",
+          "line": 58,
+          "sentence": "The \u0022it can\u0027t be regenerated\u0022 rider is deferred \u2014 the engine has no regeneration shield surface in v1 (see class xmldoc)."
+        },
+        {
+          "factory": "TerminateFactory",
+          "file": "TerminateFactory.cs",
+          "line": 100,
+          "sentence": "\u0022It can\u0027t be regenerated\u0022 rider is deferred \u2014 no regeneration shield surface in the engine yet (same gap as Wrath of God / Day of Judgment\u0027s can\u0027t-regenerate clause)."
+        },
+        {
+          "factory": "MurderousRiderFactory",
+          "file": "MurderousRiderFactory.cs",
+          "line": 147,
+          "sentence": "Indestructible / regeneration deferred (same gap as SlaughterPact)."
+        },
+        {
+          "factory": "MurderousCutFactory",
+          "file": "MurderousCutFactory.cs",
+          "line": 11,
+          "sentence": "1 target-creature request; \u0022indestructible\u0022 \u002B \u0022can\u0027t be regenerated\u0022 riders deferred \u2014 same lossy MVP as \u003Cc\u003EDestroySpellFactory."
+        },
+        {
+          "factory": "BeastWithinFactory",
+          "file": "BeastWithinFactory.cs",
+          "line": 124,
+          "sentence": "Indestructible / regeneration rider deferred (same gap as Terminate / Abrupt Decay / Slaughter Pact)."
+        },
+        {
+          "factory": "EmberethShieldbreakerFactory",
+          "file": "EmberethShieldbreakerFactory.cs",
+          "line": 126,
+          "sentence": "Indestructible / regeneration deferred (same gap as SlaughterPact)."
+        }
+      ]
+    },
+    {
+      "primitive_id": "indestructible-bypass",
+      "display_name": "Indestructible bypass on destroy (CR 702.12)",
+      "comp_rules_citation": "CR 702.12",
+      "implementation_hint": "Destroy intent should consult a HasIndestructible() predicate before issuing ZoneMoveIntent \u2192 graveyard.",
+      "factory_count": 6,
+      "mention_count": 7,
+      "factories": [
+        "AbruptDecayFactory",
+        "AssassinsTrophyFactory",
+        "BeastWithinFactory",
+        "KolaghansCommandFactory",
+        "TerminateFactory",
+        "WrathOfTheSkiesFactory"
+      ],
+      "mentions": [
+        {
+          "factory": "TerminateFactory",
+          "file": "TerminateFactory.cs",
+          "line": 11,
+          "sentence": "\u003Cb\u003EIndestructible\u003C/b\u003E: the destroy call moves the creature to the graveyard without checking for Indestructible \u2014 same gap as every other single-target destroy template."
+        },
+        {
+          "factory": "KolaghansCommandFactory",
+          "file": "KolaghansCommandFactory.cs",
+          "line": 249,
+          "sentence": "Indestructible rider deferred."
+        },
+        {
+          "factory": "AssassinsTrophyFactory",
+          "file": "AssassinsTrophyFactory.cs",
+          "line": 11,
+          "sentence": "\u003Cb\u003EIndestructible\u003C/b\u003E: the destroy call moves the permanent to the graveyard without checking for Indestructible (same gap as every other single-target destroy template \u2014 Terminate, Abrupt Decay, Slaughter Pact)."
+        },
+        {
+          "factory": "AssassinsTrophyFactory",
+          "file": "AssassinsTrophyFactory.cs",
+          "line": 133,
+          "sentence": "Indestructible rider deferred (same gap as Terminate / Abrupt Decay / Slaughter Pact)."
+        },
+        {
+          "factory": "WrathOfTheSkiesFactory",
+          "file": "WrathOfTheSkiesFactory.cs",
+          "line": 12,
+          "sentence": "## v1 simplifications  - \u003Cb\u003EIndestructible bypass\u003C/b\u003E: same gap as \u003Csee cref=\u0022WrathOfGodFactory\u0022/\u003E / \u003Csee cref=\u0022EngineeredExplosivesFactory\u0022/\u003E \u2014 \u003Csee cref=\u0022OracleSpellBinder."
+        },
+        {
+          "factory": "BeastWithinFactory",
+          "file": "BeastWithinFactory.cs",
+          "line": 12,
+          "sentence": "\u003Cb\u003EIndestructible / regeneration\u003C/b\u003E: the destroy call moves the permanent to the graveyard without checking for Indestructible or an active regeneration shield (same gap as every other single-target destroy template \u2014 Terminate, Abrupt Decay, Slaughter Pact)."
+        },
+        {
+          "factory": "AbruptDecayFactory",
+          "file": "AbruptDecayFactory.cs",
+          "line": 11,
+          "sentence": "\u003Cb\u003EIndestructible\u003C/b\u003E: the destroy call moves the permanent to the graveyard without checking for Indestructible \u2014 same gap as every other single-target destroy template (Slaughter Pact, Force of Vigor destroy path, etc."
+        }
+      ]
+    },
+    {
+      "primitive_id": "layer6-ability-grant",
+      "display_name": "Layer-6 ability-grant subsystem (CR 613.1f)",
+      "comp_rules_citation": "CR 613.1f",
+      "implementation_hint": "ContinuousEffectsService needs an \u0027ability grant\u0027 layer so \u0027gains \u003Cability\u003E\u0027 effects flow through GetAbilities() at read time.",
+      "factory_count": 3,
+      "mention_count": 5,
+      "factories": [
+        "AgathasSoulCauldronFactory",
+        "BloodghastFactory",
+        "SwordOfFireAndIceFactory"
+      ],
+      "mentions": [
+        {
+          "factory": "SwordOfFireAndIceFactory",
+          "file": "SwordOfFireAndIceFactory.cs",
+          "line": 146,
+          "sentence": "\u0022 (CR 702.16) Markers ride on the equipment card itself; a Layer 6 grant re-projecting them onto the equipped creature is deferred (see class xmldoc).",
+          "cr": "CR 702.16"
+        },
+        {
+          "factory": "AgathasSoulCauldronFactory",
+          "file": "AgathasSoulCauldronFactory.cs",
+          "line": 10,
+          "sentence": "The layer-6 continuous effect that actually grants those abilities to battlefield creatures is deferred until the layer-6 ability-grant subsystem is in place."
+        },
+        {
+          "factory": "AgathasSoulCauldronFactory",
+          "file": "AgathasSoulCauldronFactory.cs",
+          "line": 88,
+          "sentence": "CR 702.49 \u2014 imprint: record this creature card on the Cauldron so the ability-grant static ability can reference it later (layer-6 grant deferred; storage wired here).",
+          "cr": "CR 702.49"
+        },
+        {
+          "factory": "BloodghastFactory",
+          "file": "BloodghastFactory.cs",
+          "line": 14,
+          "sentence": "A proper continuous effect (Layer 6 keyword grant gated on a live life-total predicate) is deferred until the conditional-keyword CDA surface exists."
+        },
+        {
+          "factory": "BloodghastFactory",
+          "file": "BloodghastFactory.cs",
+          "line": 126,
+          "sentence": "A full dynamic Layer 6 conditional keyword grant is deferred \u2014 see class xmldoc."
+        }
+      ]
+    },
+    {
+      "primitive_id": "escape",
+      "display_name": "Escape alt-cost (CR 702.143)",
+      "comp_rules_citation": "CR 702.143",
+      "implementation_hint": "Cast-from-graveyard alt cost that additionally exiles N cards. Sibling of Flashback\u0027s cast-from-graveyard, but with the extra exile-cost rider.",
+      "factory_count": 2,
+      "mention_count": 2,
+      "factories": [
+        "ClingToDustFactory",
+        "UroTitanFactory"
+      ],
+      "mentions": [
+        {
+          "factory": "ClingToDustFactory",
+          "file": "ClingToDustFactory.cs",
+          "line": 11,
+          "sentence": "## Deferred (v1 gaps)  - Escape alt-cost ({2}{B}, exile two other graveyard cards \u2014 CR 702.143) deferred \u2014 same gap as Uro / Phlage, blocked on the missing graveyard-cast alt-cost \u002B multi-card-exile additional-cost primitive.",
+          "cr": "CR 702.143"
+        },
+        {
+          "factory": "UroTitanFactory",
+          "file": "UroTitanFactory.cs",
+          "line": 12,
+          "sentence": "The printed \u0022unless it escaped\u0022 rider is structurally collapsed \u2014 Escape (CR 702.143) is not wired in v1 (see deferred section), so a hardcast Uro is always sacrificed by this trigger, faithful to the printed text in the non-escape case.",
+          "cr": "CR 702.143"
+        }
+      ]
+    },
+    {
+      "primitive_id": "kicker",
+      "display_name": "Kicker alt-cost (CR 702.33)",
+      "comp_rules_citation": "CR 702.33",
+      "implementation_hint": "Optional additive cast cost on a spell; flips a runtime \u0027kicked\u0027 flag the rest of the spell pipeline can branch on.",
+      "factory_count": 2,
+      "mention_count": 2,
+      "factories": [
+        "BurstLightningFactory",
+        "SlickshotShowOffFactory"
+      ],
+      "mentions": [
+        {
+          "factory": "SlickshotShowOffFactory",
+          "file": "SlickshotShowOffFactory.cs",
+          "line": 10,
+          "sentence": "Same posture as \u003Csee cref=\u0022BurstLightningFactory\u0022/\u003E\u0027s deferred Kicker rider \u2014 ship the printed shape \u002B the most common triggered/static body, defer the alt-cost mechanic until its primitive lands."
+        },
+        {
+          "factory": "BurstLightningFactory",
+          "file": "BurstLightningFactory.cs",
+          "line": 10,
+          "sentence": "\u0022  ## Implementation (v1 \u2014 kicker primitive deferred)  CR 702.33 \u2014 Kicker is an additional cost (not an alternative cost) that modifies the spell\u0027s effect when paid.",
+          "cr": "CR 702.33"
+        }
+      ]
+    },
+    {
+      "primitive_id": "class-leveling",
+      "display_name": "Class leveling (CR 716)",
+      "comp_rules_citation": "CR 716",
+      "implementation_hint": "Class enchantment level-up cost \u002B per-level static/triggered ability accretion.",
+      "factory_count": 1,
+      "mention_count": 2,
+      "factories": [
+        "StormchasersTalentFactory"
+      ],
+      "mentions": [
+        {
+          "factory": "StormchasersTalentFactory",
+          "file": "StormchasersTalentFactory.cs",
+          "line": 12,
+          "sentence": "\u003Cb\u003ELevel 2 cast-trigger\u003C/b\u003E (\u0022Whenever you cast a noncreature spell, the Mercenary deals 1 damage to any target\u0022): DEFERRED with the leveling primitive."
+        },
+        {
+          "factory": "StormchasersTalentFactory",
+          "file": "StormchasersTalentFactory.cs",
+          "line": 12,
+          "sentence": "\u003Cb\u003ELevel 3 cast-trigger\u003C/b\u003E (\u0022Whenever you cast a noncreature spell, draw a card, then discard a card\u0022): DEFERRED with the leveling primitive."
+        }
+      ]
+    },
+    {
+      "primitive_id": "manifest-dread",
+      "display_name": "Manifest dread (CR 701.59)",
+      "comp_rules_citation": "CR 701.59",
+      "implementation_hint": "Manifest the top card face-down \u002B scry-style discard rider. Sibling of vanilla Manifest with an added zone-choice prompt.",
+      "factory_count": 1,
+      "mention_count": 2,
+      "factories": [
+        "AbhorrentOculusFactory"
+      ],
+      "mentions": [
+        {
+          "factory": "AbhorrentOculusFactory",
+          "file": "AbhorrentOculusFactory.cs",
+          "line": 13,
+          "sentence": "## Deferred (v1 gaps \u2014 manifest dread is a stub)  - \u003Cb\u003EManifest dread\u003C/b\u003E (CR 701.59 / Duskmourn): the printed resolution effect \u2014 look at top two of library, put one onto the battlefield face down as a 2/2 manifest creature and the other into your graveyard \u2014 is wired as a structural stub.",
+          "cr": "CR 701.59"
+        },
+        {
+          "factory": "AbhorrentOculusFactory",
+          "file": "AbhorrentOculusFactory.cs",
+          "line": 13,
+          "sentence": "CR rule references: 205.3m (Eye subtype), 601.2f (additional cost), 603.1 / 500.4 (upkeep trigger), 702.9 (Flying), 701.59 (manifest dread \u2014 deferred)."
+        }
+      ]
+    },
+    {
+      "primitive_id": "ascend",
+      "display_name": "Ascend / city\u0027s blessing (CR 702.131)",
+      "comp_rules_citation": "CR 702.131",
+      "implementation_hint": "Per-player flag \u002B state-based check (\u226510 permanents). Static abilities then key off blessing-active predicate.",
+      "factory_count": 1,
+      "mention_count": 1,
+      "factories": [
+        "OcelotPrideFactory"
+      ],
+      "mentions": [
+        {
+          "factory": "OcelotPrideFactory",
+          "file": "OcelotPrideFactory.cs",
+          "line": 14,
+          "sentence": "The attack trigger ships with the gate stubbed (always 1 token); the \u0022doubled to 2\u0022 half of the printed text is deferred until an Ascend primitive lands."
+        }
+      ]
+    },
+    {
+      "primitive_id": "cast-marker",
+      "display_name": "Cast-marker on Card",
+      "implementation_hint": "Persistent \u0027this object was cast (vs. put onto the battlefield)\u0027 flag \u2014 Bloodghast, The One Ring, Pact triggers all key off it.",
+      "factory_count": 1,
+      "mention_count": 1,
+      "factories": [
+        "TheOneRingFactory"
+      ],
+      "mentions": [
+        {
+          "factory": "TheOneRingFactory",
+          "file": "TheOneRingFactory.cs",
+          "line": 15,
+          "sentence": "The effect body is a no-op \u2014 the \u0022if you cast it\u0022 intervening-if clause, the \u0022until your next turn\u0022 expiry, and the \u0022protection from everything\u0022 player-scoped grant are all deferred (no cast-marker on Card, no per-player delayed cleanup, no Player."
+        }
+      ]
+    },
+    {
+      "primitive_id": "companion",
+      "display_name": "Companion (CR 702.139)",
+      "comp_rules_citation": "CR 702.139",
+      "implementation_hint": "Deck-construction check \u002B \u0027cast from outside the game\u0027 once-per-game pipeline.",
+      "factory_count": 1,
+      "mention_count": 1,
+      "factories": [
+        "LurrusOfTheDreamDenFactory"
+      ],
+      "mentions": [
+        {
+          "factory": "LurrusOfTheDreamDenFactory",
+          "file": "LurrusOfTheDreamDenFactory.cs",
+          "line": 12,
+          "sentence": "## Companion (DEFERRED) The companion deck-construction rule (CR 702.139 \u2014 \u0022Each permanent card in your starting deck has mana value 2 or less\u0022) is foundational to the deck-builder, not the runtime, and is intentionally NOT enforced here.",
+          "cr": "CR 702.139"
+        }
+      ]
+    },
+    {
+      "primitive_id": "equip-primitive",
+      "display_name": "Equip activated-ability primitive (CR 702.6)",
+      "comp_rules_citation": "CR 702.6",
+      "implementation_hint": "EquipActivatedAbility \u2014 sorcery-speed activation, attaches/re-attaches Equipment to a chosen creature.",
+      "factory_count": 1,
+      "mention_count": 1,
+      "factories": [
+        "PuresteelPaladinFactory"
+      ],
+      "mentions": [
+        {
+          "factory": "PuresteelPaladinFactory",
+          "file": "PuresteelPaladinFactory.cs",
+          "line": 11,
+          "sentence": "## Deferred (v1 gaps)  - \u003Cb\u003EEquip-ability primitive\u003C/b\u003E: the engine has no \u003Cc\u003EEquipActivatedAbility\u003C/c\u003E primitive yet \u2014 Equipment cards currently don\u0027t model their printed \u0022Equip {N}\u0022 activated ability at all (Stoneforge Mystic\u0027s activated ability is a separate \u0022put-an-Equipment-from-hand\u0022 effect, not an equip activati\u2026"
+        }
+      ]
+    },
+    {
+      "primitive_id": "gift",
+      "display_name": "Gift (Bloomburrow)",
+      "implementation_hint": "Cast-time choice: a static/triggered side effect granting an opponent a defined gift (treasure, draw, etc.).",
+      "factory_count": 1,
+      "mention_count": 1,
+      "factories": [
+        "IntoTheFloodMawFactory"
+      ],
+      "mentions": [
+        {
+          "factory": "IntoTheFloodMawFactory",
+          "file": "IntoTheFloodMawFactory.cs",
+          "line": 12,
+          "sentence": "## Deferred (v1 gaps) \u2014 Gift mechanic (CR 701.59 in the 2024 errata) The \u0022Gift a tapped Fish\u0022 clause is a cast-time choice that lets the caster promise an opponent a gift; if promised, the opponent creates a tapped 1/1 blue Fish creature token BEFORE the spell\u0027s other effects, and Into the Flood Maw\u0027s target predicate \u2026",
+          "cr": "CR 701.59"
+        }
+      ]
+    },
+    {
+      "primitive_id": "suspend",
+      "display_name": "Suspend alt-cost (CR 702.61)",
+      "comp_rules_citation": "CR 702.61",
+      "implementation_hint": "Exile-from-hand alt cost with time counters; upkeep auto-cast when last counter is removed.",
+      "factory_count": 1,
+      "mention_count": 1,
+      "factories": [
+        "UroTitanFactory"
+      ],
+      "mentions": [
+        {
+          "factory": "UroTitanFactory",
+          "file": "UroTitanFactory.cs",
+          "line": 12,
+          "sentence": "Same shape as the deferred Boromir / suspend cost primitives."
+        }
+      ]
+    }
+  ],
+  "unclustered": [
+    {
+      "factory": "SplinterTwinFactory",
+      "file": "SplinterTwinFactory.cs",
+      "line": 16,
+      "sentence": "## Deferred (v1 gaps)  - \u003Cb\u003ELayer 1 copy effect\u003C/b\u003E: the token\u0027s P/T \u002B keywords are snapshotted at the moment the ability resolves; if the bearer\u0027s characteristics change later (counters, \u002B1/\u002B1 boost, lord anthems), the token does NOT track them."
+    },
+    {
+      "factory": "ScapeshiftFactory",
+      "file": "ScapeshiftFactory.cs",
+      "line": 10,
+      "sentence": "## v1 gaps - \u003Cb\u003E\u0022Any number\u0022 prompt\u003C/b\u003E: the engine has no first-class \u0022pick a subset of permanents to sacrifice\u0022 agent hook."
+    },
+    {
+      "factory": "ScapeshiftFactory",
+      "file": "ScapeshiftFactory.cs",
+      "line": 10,
+      "sentence": "\u003Cb\u003ELibrary shuffle\u003C/b\u003E (CR 701.19c) \u2014 same gap as the rest of the tutor surface.",
+      "cr": "CR 701.19c"
+    },
+    {
+      "factory": "TheOneRingFactory",
+      "file": "TheOneRingFactory.cs",
+      "line": 121,
+      "sentence": "\u0022 Structural: \u0022if you cast it\u0022 \u002B \u0022until your next turn\u0022 expiry deferred \u2014 see class xmldoc."
+    },
+    {
+      "factory": "StormchasersTalentFactory",
+      "file": "StormchasersTalentFactory.cs",
+      "line": 12,
+      "sentence": "Blockers: (1) no per-activated-ability sorcery-speed gate yet (same gap as Tasigur, the Golden Fang\u0027s {B}{G}{U} activation, Wishclaw Talisman\u0027s tutor, Priest of Fell Rites\u0027 reanimate); (2) no Class-level tracker bound to the card via a binder analogous to \u003Csee cref=\u0022CardData."
+    },
+    {
+      "factory": "StormchasersTalentFactory",
+      "file": "StormchasersTalentFactory.cs",
+      "line": 12,
+      "sentence": "Same v1 gap as \u003Csee cref=\u0022MonasteryMentorFactory\u0022/\u003E\u0027s spawned Monk tokens (see that factory\u0027s xmldoc for the broader plan)."
+    },
+    {
+      "factory": "StormchasersTalentFactory",
+      "file": "StormchasersTalentFactory.cs",
+      "line": 120,
+      "sentence": "Prowess pump on token deferred \u2014 keyword marker only, see class xmldoc."
+    },
+    {
+      "factory": "NihilSpellbombFactory",
+      "file": "NihilSpellbombFactory.cs",
+      "line": 13,
+      "sentence": "Real prompt deferred until IPlayerAgent grows a ChooseYesNoAsync surface."
+    },
+    {
+      "factory": "SwordOfFireAndIceFactory",
+      "file": "SwordOfFireAndIceFactory.cs",
+      "line": 15,
+      "sentence": "The shipped markers are inspectable on the card so tests \u002B bot heuristics can read intent, with full DEBT-A enforcement (CR 702.16e \u2014 damage / enchanting / equipping / blocking / targeting) deferred behind that grant-on-attach work.",
+      "cr": "CR 702.16e"
+    },
+    {
+      "factory": "SwordOfFireAndIceFactory",
+      "file": "SwordOfFireAndIceFactory.cs",
+      "line": 15,
+      "sentence": "\u003Cb\u003ESorcery-speed restriction\u003C/b\u003E on Equip activation (CR 702.6a) \u2014 same gap as \u003Csee cref=\u0022ColossusHammerFactory\u0022/\u003E.",
+      "cr": "CR 702.6a"
+    },
+    {
+      "factory": "TerminateFactory",
+      "file": "TerminateFactory.cs",
+      "line": 11,
+      "sentence": "\u003Cb\u003E\u0022It can\u0027t be regenerated\u0022\u003C/b\u003E: the engine has no regeneration shield surface in v1 (same gap as Wrath of God\u0027s and DayOfJudgment\u0027s can\u0027t-be-regenerated rider, and SlaughterPact\u0027s indestructible/regeneration note)."
+    },
+    {
+      "factory": "IzzetCharmFactory",
+      "file": "IzzetCharmFactory.cs",
+      "line": 211,
+      "sentence": "Real agent- driven \u0022choose 2 cards to discard\u0022 prompt is deferred \u2014 same queue as Faithless Looting / Liliana / Connive."
+    },
+    {
+      "factory": "ConversionFactory",
+      "file": "ConversionFactory.cs",
+      "line": 54,
+      "sentence": "The upkeep sacrifice clause is deferred \u2014 only the type-change is live."
+    },
+    {
+      "factory": "MysticSanctuaryFactory",
+      "file": "MysticSanctuaryFactory.cs",
+      "line": 12,
+      "sentence": "CanBePutOnStack\u0022/\u003E runs it at stack-push time; a second recheck at resolution is deferred."
+    },
+    {
+      "factory": "AshiokDreamRenderFactory",
+      "file": "AshiokDreamRenderFactory.cs",
+      "line": 11,
+      "sentence": "Enforcement at the actual library-search sites is DEFERRED (same gap as \u003Csee cref=\u0022LeoninArbiterSearchRestrictionEffect\u0022/\u003E): the engine currently lacks a unified library-search surface that enforcement could hook."
+    },
+    {
+      "factory": "AshiokDreamRenderFactory",
+      "file": "AshiokDreamRenderFactory.cs",
+      "line": 11,
+      "sentence": "MoveCardTo\u0022/\u003E and consult the \u003Csee cref=\u0022ReplacementBus\u0022/\u003E \u2014 every direct-zone-mutation path that bypasses the bus also bypasses this rider, same gap as Anger of the Gods / Containment Priest."
+    },
+    {
+      "factory": "AshiokDreamRenderFactory",
+      "file": "AshiokDreamRenderFactory.cs",
+      "line": 146,
+      "sentence": "\u0022 -------------------- Structural marker on the ContinuousEffectsService \u2014 enforcement at library-search sites is deferred (see xmldoc note above and LeoninArbiterSearchRestrictionEffect\u0027s parallel gap)."
+    },
+    {
+      "factory": "AshiokDreamRenderFactory",
+      "file": "AshiokDreamRenderFactory.cs",
+      "line": 183,
+      "sentence": "The \u003Cem\u003Eenforcement\u003C/em\u003E of the search restriction is DEFERRED \u2014 the engine presently lacks a unified library-search surface to hook (same gap as \u003Csee cref=\u0022LeoninArbiterSearchRestrictionEffect\u0022/\u003E)."
+    },
+    {
+      "factory": "AgathasSoulCauldronFactory",
+      "file": "AgathasSoulCauldronFactory.cs",
+      "line": 10,
+      "sentence": ")  ## Deferred (v1 gaps)"
+    },
+    {
+      "factory": "CreepingTarPitFactory",
+      "file": "CreepingTarPitFactory.cs",
+      "line": 11,
+      "sentence": "Without the bus (single-arg dispatcher path), the land enters untapped \u2014 deferred to the production binder layer (mirrors every other always-tapped factory path in this codebase)."
+    },
+    {
+      "factory": "MonasteryMentorFactory",
+      "file": "MonasteryMentorFactory.cs",
+      "line": 15,
+      "sentence": "Monk tokens are \u0022with prowess\u0022 \u2014 prowess on the token is deferred (same gap as Goblin Rabblemaster\u0027s token keyword wiring)."
+    },
+    {
+      "factory": "MonasteryMentorFactory",
+      "file": "MonasteryMentorFactory.cs",
+      "line": 162,
+      "sentence": "\u0022With prowess\u0022 on the token is deferred \u2014 see factory xmldoc."
+    },
+    {
+      "factory": "WastewoodVergeFactory",
+      "file": "WastewoodVergeFactory.cs",
+      "line": 8,
+      "sentence": "{T}: Add {B} mana ability \u2014 wired (restriction deferred; see below)."
+    },
+    {
+      "factory": "WastewoodVergeFactory",
+      "file": "WastewoodVergeFactory.cs",
+      "line": 47,
+      "sentence": "\u0022 v1: restriction deferred \u2014 ability activates unconditionally."
+    },
+    {
+      "factory": "TendrilsOfAgonyFactory",
+      "file": "TendrilsOfAgonyFactory.cs",
+      "line": 10,
+      "sentence": "CR 702.40a\u0027s \u0022you may choose new targets for the copies\u0022 rider is deferred (see \u003Csee cref=\u0022StormHelper\u0022/\u003E \u002B \u003Csee cref=\u0022Majik.",
+      "cr": "CR 702.40a"
+    },
+    {
+      "factory": "TendrilsOfAgonyFactory",
+      "file": "TendrilsOfAgonyFactory.cs",
+      "line": 10,
+      "sentence": "\u003Cb\u003EAction validator filtering\u003C/b\u003E: target list is \u0022target opponent\u0022; the agent\u0027s pick is honoured verbatim (no extra opponent-only filtering yet \u2014 same gap as \u003Csee cref=\u0022GriefFactory\u0022/\u003E)."
+    },
+    {
+      "factory": "AngerOfTheGodsFactory",
+      "file": "AngerOfTheGodsFactory.cs",
+      "line": 10,
+      "sentence": "## Why a named factory (over the existing template) The shared \u003Cc\u003EDealsDamageEachCreatureTemplate\u003C/c\u003E already binds the first sentence of Anger of the Gods by shape, but it (a) scans only the caster\u0027s battlefield (same gap as Pyroclasm \u2014 see that factory) and (b) doesn\u0027t carry the \u0022would die \u2192 exile\u0022 rider at all."
+    },
+    {
+      "factory": "NecrodominanceFactory",
+      "file": "NecrodominanceFactory.cs",
+      "line": 15,
+      "sentence": "Same v1 gap as the discard\u2192exile marker on Necropotence: shape-correct, not live."
+    },
+    {
+      "factory": "NecrodominanceFactory",
+      "file": "NecrodominanceFactory.cs",
+      "line": 15,
+      "sentence": "Cards in exile are inspectable to all observers in v1, so this clause is a no-op gain \u2014 same gap as Dauthi Voidwalker."
+    },
+    {
+      "factory": "NecrodominanceFactory",
+      "file": "NecrodominanceFactory.cs",
+      "line": 155,
+      "sentence": "Face-down exile is deferred \u2014 engine has no face-down flag."
+    },
+    {
+      "factory": "MalevolentRumbleFactory",
+      "file": "MalevolentRumbleFactory.cs",
+      "line": 10,
+      "sentence": "Peek up to top 4 cards of the caster\u0027s library (CR 701.15 reveal is folded into the same peek \u2014 no \u003Cc\u003ECardsRevealedEvent\u003C/c\u003E fires yet; same gap as Ancient Stirrings / Atraxa / Goblin Matron).",
+      "cr": "CR 701.15"
+    },
+    {
+      "factory": "VeilOfSummerFactory",
+      "file": "VeilOfSummerFactory.cs",
+      "line": 13,
+      "sentence": "Player-side hexproof (the \u0022you\u0022 half of the clause) requires player-keyword infrastructure not in the engine today and is deferred."
+    },
+    {
+      "factory": "SpellQuellerFactory",
+      "file": "SpellQuellerFactory.cs",
+      "line": 137,
+      "sentence": "The \u0022pick a spell from the stack\u0022 prompt is deferred to the agent MVP."
+    },
+    {
+      "factory": "TerritorialKavuFactory",
+      "file": "TerritorialKavuFactory.cs",
+      "line": 12,
+      "sentence": "\u003Cb\u003E\u0022You may\u0022 prompt on the attack trigger\u003C/b\u003E: v1 always takes the loot when a card is available; an explicit yes/no prompt is deferred."
+    },
+    {
+      "factory": "GristFactory",
+      "file": "GristFactory.cs",
+      "line": 7,
+      "sentence": "## V1 simplification The \u0022not on the battlefield\u0022 conditional is deferred."
+    },
+    {
+      "factory": "GristFactory",
+      "file": "GristFactory.cs",
+      "line": 7,
+      "sentence": "The conditional layer-4 effect (\u0022only when not on battlefield\u0022) is documented but deferred to a future slice."
+    },
+    {
+      "factory": "GristFactory",
+      "file": "GristFactory.cs",
+      "line": 50,
+      "sentence": "The oracle-text restriction (\u0022as long as \u2026 isn\u0027t on the battlefield\u0022) is a conditional layer-4 effect \u2014 deferred."
+    },
+    {
+      "factory": "KarnLiberatedFactory",
+      "file": "KarnLiberatedFactory.cs",
+      "line": 140,
+      "sentence": "v1 DEFERRED \u2014 shipped as a no-op so the loyalty change (and \u0022this card is a legal -14 ability\u0022) still apply (CR 606.3).",
+      "cr": "CR 606.3"
+    },
+    {
+      "factory": "AmpedRaptorFactory",
+      "file": "AmpedRaptorFactory.cs",
+      "line": 252,
+      "sentence": ") \u2014 same gap as every \u0022cast for free from exile\u0022 hook today."
+    },
+    {
+      "factory": "NobleHierarchFactory",
+      "file": "NobleHierarchFactory.cs",
+      "line": 12,
+      "sentence": "\u003Cb\u003ELive combat-attackers provider\u003C/b\u003E: same gap as Goblin Piledriver."
+    },
+    {
+      "factory": "MurderousRiderFactory",
+      "file": "MurderousRiderFactory.cs",
+      "line": 12,
+      "sentence": "\u0022 (LTB exile clause deferred \u2014 see Deferred section."
+    },
+    {
+      "factory": "MurderousRiderFactory",
+      "file": "MurderousRiderFactory.cs",
+      "line": 12,
+      "sentence": "Adding this requires the same replacement-effect surface used by the Anger of the Gods exile rider (see \u003Csee cref=\u0022AngerOfTheGodsFactory\u0022/\u003E); deferred to keep the v1 ship minimal."
+    },
+    {
+      "factory": "MurderousRiderFactory",
+      "file": "MurderousRiderFactory.cs",
+      "line": 12,
+      "sentence": "MoveToGraveyard\u0022/\u003E; same gap as \u003Csee cref=\u0022SlaughterPactFactory\u0022/\u003E and the rest of the single-target destroy family."
+    },
+    {
+      "factory": "PriestOfFellRitesFactory",
+      "file": "PriestOfFellRitesFactory.cs",
+      "line": 12,
+      "sentence": "\u003C/para\u003E  ## Deferred (v1 gaps)"
+    },
+    {
+      "factory": "PriestOfFellRitesFactory",
+      "file": "PriestOfFellRitesFactory.cs",
+      "line": 132,
+      "sentence": "Guard: only fire when the Priest is currently in its owner\u0027s graveyard, so spurious activations from other zones are no-op-shaped while engine zone-scoping is deferred."
+    },
+    {
+      "factory": "PriestOfFellRitesFactory",
+      "file": "PriestOfFellRitesFactory.cs",
+      "line": 152,
+      "sentence": "Skip if not currently in graveyard \u2014 activation is illegal from other zones (engine gating deferred; the guard keeps shape tests honest)."
+    },
+    {
+      "factory": "ThroughTheBreachFactory",
+      "file": "ThroughTheBreachFactory.cs",
+      "line": 12,
+      "sentence": "Through the Breach is still castable for its printed cost; the splice rider is structural-only on the oracle text and will be added when the engine has an Arcane- spell awareness pass (same gap as every other Splice card)."
+    },
+    {
+      "factory": "LilianaOfTheVeilFactory",
+      "file": "LilianaOfTheVeilFactory.cs",
+      "line": 118,
+      "sentence": "v1 deferred \u2014 loyalty change applies with an empty body so the cost is still paid."
+    },
+    {
+      "factory": "ReflectorMageFactory",
+      "file": "ReflectorMageFactory.cs",
+      "line": 149,
+      "sentence": "DEFERRED: \u0022That creature\u0027s owner can\u0027t cast spells with the same name as that creature until your next turn."
+    },
+    {
+      "factory": "WrennsResolveFactory",
+      "file": "WrennsResolveFactory.cs",
+      "line": 11,
+      "sentence": "Multi-player turn-skipping nuances deferred."
+    },
+    {
+      "factory": "WallOfRootsFactory",
+      "file": "WallOfRootsFactory.cs",
+      "line": 11,
+      "sentence": "No deferred work; behaviour matches the printed card."
+    },
+    {
+      "factory": "SylvanScryingFactory",
+      "file": "SylvanScryingFactory.cs",
+      "line": 8,
+      "sentence": "The picked land moves Library \u2192 Hand without publishing a reveal event; same gap as Stoneforge Mystic\u0027s ETB tutor."
+    },
+    {
+      "factory": "MasterOfThePearlTridentFactory",
+      "file": "MasterOfThePearlTridentFactory.cs",
+      "line": 9,
+      "sentence": "The combat-validator enforcement of Islandwalk (\u0022creature can\u0027t be blocked as long as the defending player controls an Island\u0022) is deferred \u2014 same posture as Intimidate / Menace enforcement."
+    },
+    {
+      "factory": "PerniciousDeedFactory",
+      "file": "PerniciousDeedFactory.cs",
+      "line": 10,
+      "sentence": "\u003C/item\u003E \u003C/list\u003E  ## Deferred (v1 gaps)"
+    },
+    {
+      "factory": "SigardasAidFactory",
+      "file": "SigardasAidFactory.cs",
+      "line": 11,
+      "sentence": "\u003Cb\u003ETarget creature prompt\u003C/b\u003E: \u0022target creature you control\u0022 auto-picks the first controller-side creature (CR 701.3a target prompt is deferred \u2014 same v1 simplification as Stoneforge Mystic\u0027s attach step).",
+      "cr": "CR 701.3a"
+    },
+    {
+      "factory": "SigardasAidFactory",
+      "file": "SigardasAidFactory.cs",
+      "line": 145,
+      "sentence": "\u0022target creature you control\u0022 \u2014 v1 auto-picks the first creature on the controller\u0027s battlefield (CR 701.3a prompt deferred \u2014 same simplification as Stoneforge Mystic\u0027s attach step).",
+      "cr": "CR 701.3a"
+    },
+    {
+      "factory": "ChordOfCallingFactory",
+      "file": "ChordOfCallingFactory.cs",
+      "line": 14,
+      "sentence": "## Deferred (v1 gaps)  - \u003Cb\u003EConvoke cost reduction\u003C/b\u003E."
+    },
+    {
+      "factory": "DryadArborFactory",
+      "file": "DryadArborFactory.cs",
+      "line": 7,
+      "sentence": "Green Sun\u0027s Zenith interaction (can be fetched as a Forest creature \u2014 deferred to the targeting / land-subtype search slice)."
+    },
+    {
+      "factory": "SpriteDragonFactory",
+      "file": "SpriteDragonFactory.cs",
+      "line": 12,
+      "sentence": "## Deferred (v1 gaps)  - \u003Cb\u003EContinuous P/T recomputation\u003C/b\u003E \u2014 Sprite Dragon\u0027s effective P/T is derived from base 1/1 plus \u002B1/\u002B1 counters via the standard \u003Csee cref=\u0022CounterCollection\u0022/\u003E path (CR 613.4 layer 7d), inherited from every other \u002B1/\u002B1-counter user (Psychic Frog activated ability, Ledger Shredder surveil ride\u2026",
+      "cr": "CR 613.4"
+    },
+    {
+      "factory": "PsychicFrogFactory",
+      "file": "PsychicFrogFactory.cs",
+      "line": 15,
+      "sentence": "## Deferred (v1 gaps)  - \u003Cb\u003EDiscard prompt\u003C/b\u003E on the loot half and the activation cost (CR 701.16a \u2014 discarding player chooses) \u2014 v1 deterministically picks the first card in hand.",
+      "cr": "CR 701.16a"
+    },
+    {
+      "factory": "LeoninArbiterFactory",
+      "file": "LeoninArbiterFactory.cs",
+      "line": 80,
+      "sentence": "Actual search enforcement is deferred pending a unified library-search hook (see class xmldoc)."
+    },
+    {
+      "factory": "FuryFactory",
+      "file": "FuryFactory.cs",
+      "line": 13,
+      "sentence": "\u003Cb\u003ECard-source threading on damage events\u003C/b\u003E: emitting \u003Csee cref=\u0022DamageDealtEvent\u0022/\u003E with a proper source card requires plumbing the resolving permanent into the trigger effect \u2014 deferred for parity with Solitude\u0027s lifelink wiring."
+    },
+    {
+      "factory": "FaithlessSalvagingFactory",
+      "file": "FaithlessSalvagingFactory.cs",
+      "line": 11,
+      "sentence": "\u0022Discard a creature card\u0022 pick prompt \u2014 same gap as the resolve-time discard."
+    },
+    {
+      "factory": "RoilingVortexFactory",
+      "file": "RoilingVortexFactory.cs",
+      "line": 17,
+      "sentence": "The sacrifice payment in the current \u003Csee cref=\u0022AdditionalCost\u0022/\u003E implementation is a no-op stub (zone move deferred to a future zone-service refactor \u2014 same gap noted on \u003Csee cref=\u0022RelicOfProgenitusFactory\u0022/\u003E) so the activated ability does NOT move Vortex to its owner\u0027s graveyard in v1."
+    },
+    {
+      "factory": "RoilingVortexFactory",
+      "file": "RoilingVortexFactory.cs",
+      "line": 215,
+      "sentence": "The sacrifice payment is a no-op stub in v1 (same gap as Relic of Progenitus / Nihil Spellbomb), so the activated ability does not actually graveyard Vortex; future zone-service refactor unifies it."
+    },
+    {
+      "factory": "MysticalTutorFactory",
+      "file": "MysticalTutorFactory.cs",
+      "line": 13,
+      "sentence": "The picked card moves Library \u2192 top-of-Library without publishing a reveal event; same gap as the other search factories."
+    },
+    {
+      "factory": "ColossusHammerFactory",
+      "file": "ColossusHammerFactory.cs",
+      "line": 10,
+      "sentence": "Real targeting prompt deferred."
+    },
+    {
+      "factory": "ManamorphoseFactory",
+      "file": "ManamorphoseFactory.cs",
+      "line": 9,
+      "sentence": "Net mana-effect bookkeeping for cost-reduction restrictions (CR 106.11b \u2014 Manamorphose generates two mana while costing two, so it is net-zero) isn\u0027t tracked because the engine has no mana-provenance ledger yet (same gap as Cavern of Souls\u0027 spend-restriction).",
+      "cr": "CR 106.11b"
+    },
+    {
+      "factory": "AnimateDeadFactory",
+      "file": "AnimateDeadFactory.cs",
+      "line": 14,
+      "sentence": "## Deferred (v1 gaps)  - \u003Cb\u003EReal \u0022Enchant creature card in a graveyard\u0022 cast-target API\u003C/b\u003E: the engine\u0027s Aura target plumbing is \u003Csee cref=\u0022Permanent\u0022/\u003E-typed (CR 303.4a), so the graveyard target is surfaced via a bespoke \u003Csee cref=\u0022TargetRequest\u0022/\u003E populated with \u003Csee cref=\u0022Creature\u0022/\u003E \u003Ci\u003Ecards\u003C/i\u003E.",
+      "cr": "CR 303.4a"
+    },
+    {
+      "factory": "AnimateDeadFactory",
+      "file": "AnimateDeadFactory.cs",
+      "line": 14,
+      "sentence": "\u003Cb\u003ESorcery-speed cast restriction\u003C/b\u003E: not enforced \u2014 same gap as every other Aura factory in this repo."
+    },
+    {
+      "factory": "ManaVaultFactory",
+      "file": "ManaVaultFactory.cs",
+      "line": 110,
+      "sentence": "The v1 \u0022may\u0022 collapses to \u0022pay-if-able\u0022; the prompt surface to decline is the same gap shared with the pact-cycle factories."
+    },
+    {
+      "factory": "RelicOfProgenitusFactory",
+      "file": "RelicOfProgenitusFactory.cs",
+      "line": 79,
+      "sentence": "On resolve: auto-pick first card from target player\u0027s graveyard and exile it (v1 deterministic; real agent-pick deferred)."
+    },
+    {
+      "factory": "PactOfNegationFactory",
+      "file": "PactOfNegationFactory.cs",
+      "line": 14,
+      "sentence": "Multi-player turn-skipping nuances deferred."
+    },
+    {
+      "factory": "UroTitanFactory",
+      "file": "UroTitanFactory.cs",
+      "line": 12,
+      "sentence": "(\u0022Elder\u0022 creature subtype is not yet in \u003Csee cref=\u0022CardSubtype\u0022/\u003E \u2014 Giant is wired; Elder is deferred \u2014 see gaps below."
+    },
+    {
+      "factory": "UroTitanFactory",
+      "file": "UroTitanFactory.cs",
+      "line": 12,
+      "sentence": "\u003Csee cref=\u0022CardSubtype\u0022/\u003E only carries Giant; Elder is not yet in the enum, mirroring the same gap for other \u0022Elder X\u0022 creatures (Elder Dragons etc)."
+    },
+    {
+      "factory": "BloodghastFactory",
+      "file": "BloodghastFactory.cs",
+      "line": 14,
+      "sentence": "\u0022You may\u0022 prompt: auto-accepted (same gap as Arclight Phoenix / Sneak Attack / Tireless Tracker)."
+    },
+    {
+      "factory": "KarnScionOfUrzaFactory",
+      "file": "KarnScionOfUrzaFactory.cs",
+      "line": 12,
+      "sentence": "\u003Cb\u003E-1\u003C/b\u003E: DEFERRED to a no-op body (loyalty change still applies per CR 606.3).",
+      "cr": "CR 606.3"
+    },
+    {
+      "factory": "KarnScionOfUrzaFactory",
+      "file": "KarnScionOfUrzaFactory.cs",
+      "line": 12,
+      "sentence": "TargetRequest\u0022/\u003Es yet, so the opponent picker for the \u002B1 isn\u0027t agent-driven (same gap as \u003Csee cref=\u0022WrennAndRealmbreakerFactory\u0022/\u003E)."
+    },
+    {
+      "factory": "KarnScionOfUrzaFactory",
+      "file": "KarnScionOfUrzaFactory.cs",
+      "line": 12,
+      "sentence": "\u003Cb\u003EToken colour\u003C/b\u003E: Construct token is created with no colour-set primitive (matches Wurmcoil Engine \u002B Crashing Footfalls token v1 gap \u2014 \u0060CardColors."
+    },
+    {
+      "factory": "KarnScionOfUrzaFactory",
+      "file": "KarnScionOfUrzaFactory.cs",
+      "line": 168,
+      "sentence": "DEFERRED \u2014 requires \u0022exiled with this source\u0022 tag tracking on exiled cards."
+    },
+    {
+      "factory": "NecropotenceFactory",
+      "file": "NecropotenceFactory.cs",
+      "line": 14,
+      "sentence": "Auto-cleanup mirrors the \u003Csee cref=\u0022DauthiVoidwalkerFactory\u0022/\u003E v1 gap."
+    },
+    {
+      "factory": "NecropotenceFactory",
+      "file": "NecropotenceFactory.cs",
+      "line": 163,
+      "sentence": "Face-down exile is deferred \u2014 engine has no face-down flag."
+    },
+    {
+      "factory": "MishrasBaubleFactory",
+      "file": "MishrasBaubleFactory.cs",
+      "line": 12,
+      "sentence": "Multi-player turn-skipping semantics deferred."
+    },
+    {
+      "factory": "BadgermoleCubFactory",
+      "file": "BadgermoleCubFactory.cs",
+      "line": 51,
+      "sentence": "No abilities attached in v1 \u2014 both are deferred (see xmldoc above)."
+    },
+    {
+      "factory": "DauthiVoidwalkerFactory",
+      "file": "DauthiVoidwalkerFactory.cs",
+      "line": 13,
+      "sentence": "Cleanup) and is deferred until a cast-permission flag is added."
+    },
+    {
+      "factory": "DauthiVoidwalkerFactory",
+      "file": "DauthiVoidwalkerFactory.cs",
+      "line": 117,
+      "sentence": "Unregister{TIntent}\u0022/\u003E when Voidwalker leaves the battlefield (v1 \u2014 automatic leave-cleanup deferred)."
+    },
+    {
+      "factory": "DauthiVoidwalkerFactory",
+      "file": "DauthiVoidwalkerFactory.cs",
+      "line": 140,
+      "sentence": "Combat ability: can block / be blocked only by creatures with Shadow."
+    },
+    {
+      "factory": "GoblinMatronFactory",
+      "file": "GoblinMatronFactory.cs",
+      "line": 12,
+      "sentence": "The picked card moves Library \u2192 Hand without publishing a CardRevealedEvent; same gap as the other tutor factories."
+    },
+    {
+      "factory": "AbruptDecayFactory",
+      "file": "AbruptDecayFactory.cs",
+      "line": 11,
+      "sentence": "\u003Cb\u003ECan\u0027t be countered\u003C/b\u003E \u2014 a \u003Csee cref=\u0022KeywordAbility\u0022/\u003E marker \u0022Can\u0027t Be Countered\u0022 is attached to the card shape (structural; actual enforcement via SpellCaster / StackResolver is deferred \u2014 same posture as Veil of Summer\u0027s turn-scoped uncounterable rider and Force of Will\u0027s text interaction)."
+    },
+    {
+      "factory": "AbruptDecayFactory",
+      "file": "AbruptDecayFactory.cs",
+      "line": 11,
+      "sentence": "\u003C/item\u003E \u003C/list\u003E  ## Deferred (v1 gaps)"
+    },
+    {
+      "factory": "AbruptDecayFactory",
+      "file": "AbruptDecayFactory.cs",
+      "line": 57,
+      "sentence": "Enforcement is deferred \u2014 see xmldoc."
+    },
+    {
+      "factory": "BrainFreezeFactory",
+      "file": "BrainFreezeFactory.cs",
+      "line": 10,
+      "sentence": "CR 702.40a\u0027s \u0022you may choose new targets for the copies\u0022 rider is deferred (see \u003Csee cref=\u0022StormHelper\u0022/\u003E \u002B \u003Csee cref=\u0022Majik.",
+      "cr": "CR 702.40a"
+    },
+    {
+      "factory": "SilvergillAdeptFactory",
+      "file": "SilvergillAdeptFactory.cs",
+      "line": 10,
+      "sentence": "No reveal event is emitted in v1 (same gap as other reveal-cost cards)."
+    },
+    {
+      "factory": "SilvergillAdeptFactory",
+      "file": "SilvergillAdeptFactory.cs",
+      "line": 79,
+      "sentence": "\u0022 v1: structural-only keyword marker; actual cost enforcement at cast-time is deferred."
+    },
+    {
+      "factory": "SpellskiteFactory",
+      "file": "SpellskiteFactory.cs",
+      "line": 11,
+      "sentence": "## Deferred (v1 gaps)  - \u003Cb\u003EAbility targets\u003C/b\u003E: Spellskite\u0027s printed clause is \u0022target spell or ability with a single target\u0022."
+    },
+    {
+      "factory": "MeddlingMageFactory",
+      "file": "MeddlingMageFactory.cs",
+      "line": 9,
+      "sentence": "\u003Cb\u003E\u0022nonland card name\u0022 validation\u003C/b\u003E: the chosen name is accepted as a raw string; enforcement that it isn\u0027t a basic land name is deferred (rules-layer validation, not mechanical)."
+    },
+    {
+      "factory": "VampiricTutorFactory",
+      "file": "VampiricTutorFactory.cs",
+      "line": 12,
+      "sentence": "The picked card moves Library \u2192 top-of-Library without publishing a reveal event; same gap as the other search factories."
+    },
+    {
+      "factory": "YawgmothsWillFactory",
+      "file": "YawgmothsWillFactory.cs",
+      "line": 10,
+      "sentence": "A bus-aware overload could clear it; deferred."
+    },
+    {
+      "factory": "EmberethShieldbreakerFactory",
+      "file": "EmberethShieldbreakerFactory.cs",
+      "line": 12,
+      "sentence": "MoveToGraveyard\u0022/\u003E; same gap as \u003Csee cref=\u0022SlaughterPactFactory\u0022/\u003E and the rest of the single-target destroy family."
+    },
+    {
+      "factory": "GoblinWelderFactory",
+      "file": "GoblinWelderFactory.cs",
+      "line": 12,
+      "sentence": "A formal stack / target-snapshot path is deferred to the targeting MVP."
+    },
+    {
+      "factory": "MoxAmberFactory",
+      "file": "MoxAmberFactory.cs",
+      "line": 9,
+      "sentence": "\u003Cb\u003ESingle modal-colour ability\u003C/b\u003E: the engine has no \u0022pick a colour at activation\u0022 mana-ability primitive yet \u2014 same gap as Delighted Halfling / City of Brass / Mox Opal."
+    },
+    {
+      "factory": "InkmothNexusFactory",
+      "file": "InkmothNexusFactory.cs",
+      "line": 206,
+      "sentence": "Keyword grants \u2014 the Infect marker is a no-op on the combat pipeline today (mechanic deferred), but Flying gates blocking legality and both will light up correctly once the Infect damage-replacement primitive lands."
+    },
+    {
+      "factory": "KraulHarpoonerFactory",
+      "file": "KraulHarpoonerFactory.cs",
+      "line": 10,
+      "sentence": "\u003Cb\u003E\u0022You may\u0022 prompt\u003C/b\u003E: the fight is optional; deferred alongside targeting."
+    },
+    {
+      "factory": "KraulHarpoonerFactory",
+      "file": "KraulHarpoonerFactory.cs",
+      "line": 60,
+      "sentence": "Targeting \u002B fight step deferred (see xmldoc above)."
+    },
+    {
+      "factory": "ShowAndTellFactory",
+      "file": "ShowAndTellFactory.cs",
+      "line": 10,
+      "sentence": "Real \u0022any of N choices \u002B opt-out\u0022 prompt deferred (same queue as Stoneforge Mystic / Sun Titan)."
+    },
+    {
+      "factory": "MishrasWorkshopFactory",
+      "file": "MishrasWorkshopFactory.cs",
+      "line": 8,
+      "sentence": "Per the same gap acknowledged across the codebase, the v1 shell ships the structural mana amount without the artifact-only gate; once a provenance ledger lands, wire the restriction here as a \u003Cc\u003EspendableForPredicate\u003C/c\u003E-style hook on the \u003Cc\u003EManaAbility\u003C/c\u003E."
+    },
+    {
+      "factory": "YawgmothFactory",
+      "file": "YawgmothFactory.cs",
+      "line": 10,
+      "sentence": "Effect 4: Controller draws a card  ## Deferred (v1 gaps)"
+    },
+    {
+      "factory": "YawgmothFactory",
+      "file": "YawgmothFactory.cs",
+      "line": 10,
+      "sentence": "\u003Cb\u003EDiscard \u2014 first non-land preference\u003C/b\u003E: v1 picks the first card in hand regardless of card type; full oracle-compliant discard is deferred."
+    },
+    {
+      "factory": "YawgmothFactory",
+      "file": "YawgmothFactory.cs",
+      "line": 82,
+      "sentence": "Put a -1/-1 counter on up to one target creature (DEFERRED) 4."
+    },
+    {
+      "factory": "YawgmothFactory",
+      "file": "YawgmothFactory.cs",
+      "line": 82,
+      "sentence": "Draw a card  Opponent iteration deferred when opponentsResolver is null \u2014 see class xmldoc."
+    },
+    {
+      "factory": "YawgmothFactory",
+      "file": "YawgmothFactory.cs",
+      "line": 142,
+      "sentence": "DEFERRED \u2014 requires ITarget / TargetResolver infrastructure."
+    },
+    {
+      "factory": "MutavaultFactory",
+      "file": "MutavaultFactory.cs",
+      "line": 11,
+      "sentence": "## \u0022Every creature type\u0022 simplification (v1 gap) CR 205.3m enumerates ~250 creature subtypes; the engine\u0027s \u003Csee cref=\u0022CardSubtype\u0022/\u003E enum lists ~50 of them.",
+      "cr": "CR 205.3m"
+    },
+    {
+      "factory": "MutavaultFactory",
+      "file": "MutavaultFactory.cs",
+      "line": 11,
+      "sentence": "\u003Cb\u003ECombat math through Compute\u003C/b\u003E: same gap as Karn\u0027s animate- artifact (\u003Csee cref=\u0022KarnAnimateArtifactEffect\u0022/\u003E)."
+    },
+    {
+      "factory": "MutavaultFactory",
+      "file": "MutavaultFactory.cs",
+      "line": 11,
+      "sentence": "Mutavault was on the battlefield long enough but its Creature-ness is fresh \u2014 the intricate \u0022had Creature type continuously since untap step\u0022 bookkeeping is deferred; the test suite asserts shape, not attack legality."
+    },
+    {
+      "factory": "FetchLandCycleFactory",
+      "file": "FetchLandCycleFactory.cs",
+      "line": 11,
+      "sentence": "Shuffle\u003C/c\u003E entry point yet \u2014 same gap as every other tutor in the codebase."
+    },
+    {
+      "factory": "AtraxaGrandUnifierFactory",
+      "file": "AtraxaGrandUnifierFactory.cs",
+      "line": 10,
+      "sentence": "No live observer cares yet (same gap as the rest of the reveal-and-pick factories \u2014 Ancient Stirrings, Goblin Matron, Mystical Tutor)."
+    },
+    {
+      "factory": "CavernOfSoulsFactory",
+      "file": "CavernOfSoulsFactory.cs",
+      "line": 120,
+      "sentence": "Spend-restriction (\u0022only to cast a creature spell of the chosen type\u0022) \u002B uncounterable rider are deferred \u2014 see class xmldoc."
+    },
+    {
+      "factory": "GoblinLackeyFactory",
+      "file": "GoblinLackeyFactory.cs",
+      "line": 12,
+      "sentence": "Wire a selector callback when the multi-candidate \u0022choose a card to put onto the battlefield\u0022 prompt ships (mirrors the same gap on Stoneforge Mystic\u0027s tutor)."
+    },
+    {
+      "factory": "DazeFactory",
+      "file": "DazeFactory.cs",
+      "line": 11,
+      "sentence": "A bot-side probe (mirror of \u003Cc\u003EPitchAltCostProbe\u003C/c\u003E) is deferred \u2014 Daze\u0027s pitch always pays so the probe shape is just \u0022for each Island controlled, yield one candidate\u0022 and lives outside this factory\u0027s surface in v1."
+    },
+    {
+      "factory": "PhoenixOfAshFactory",
+      "file": "PhoenixOfAshFactory.cs",
+      "line": 8,
+      "sentence": "The printed \u0022can attack as though it didn\u0027t have summoning sickness as long as it has haste\u0022 rider collapses observationally to the Haste keyword in v1 \u2014 CR 702.10b already lets a creature with haste attack the turn it came under its controller\u0027s control, so the additional clause only matters when Haste is granted-then\u2026",
+      "cr": "CR 702.10b"
+    },
+    {
+      "factory": "PhoenixOfAshFactory",
+      "file": "PhoenixOfAshFactory.cs",
+      "line": 8,
+      "sentence": "Distinct behaviour only manifests if Haste is removed mid-turn after the controller has owned Phoenix of Ash for less than a full turn \u2014 no keyword-removal surface yet, same gap as Goblin Chieftain\u0027s Haste-loss interactions."
+    },
+    {
+      "factory": "AjaniNacatlPariahFactory",
+      "file": "AjaniNacatlPariahFactory.cs",
+      "line": 11,
+      "sentence": "The MdfcState flip is the v1 observation surface \u2014 combat / loyalty interactions on the back face are deferred."
+    },
+    {
+      "factory": "AjaniNacatlPariahFactory",
+      "file": "AjaniNacatlPariahFactory.cs",
+      "line": 105,
+      "sentence": "The Creature object stays in place \u2014 full Layer 0 / per-face hot-swap is deferred."
+    },
+    {
+      "factory": "CoriSteelCutterFactory",
+      "file": "CoriSteelCutterFactory.cs",
+      "line": 15,
+      "sentence": "## Deferred (v1 gaps)  - \u003Cb\u003EProwess pump on the spawned Monk token\u003C/b\u003E: the \u003Cc\u003E\u0022Prowess\u0022\u003C/c\u003E keyword marker is attached to the Monk token so shape inspection sees the printed reminder text, but the \u003Csee cref=\u0022Majik."
+    },
+    {
+      "factory": "CoriSteelCutterFactory",
+      "file": "CoriSteelCutterFactory.cs",
+      "line": 15,
+      "sentence": "Same v1 gap as \u003Csee cref=\u0022StormchasersTalentFactory\u0022/\u003E\u0027s Mercenary tokens and \u003Csee cref=\u0022MonasteryMentorFactory\u0022/\u003E\u0027s Monk tokens."
+    },
+    {
+      "factory": "CoriSteelCutterFactory",
+      "file": "CoriSteelCutterFactory.cs",
+      "line": 15,
+      "sentence": "\u003Cb\u003ESorcery-speed restriction on Equip activation (CR 702.6a)\u003C/b\u003E \u2014 same gap as \u003Csee cref=\u0022ColossusHammerFactory\u0022/\u003E / \u003Csee cref=\u0022SwordOfFireAndIceFactory\u0022/\u003E.",
+      "cr": "CR 702.6a"
+    },
+    {
+      "factory": "LordOfAtlantisFactory",
+      "file": "LordOfAtlantisFactory.cs",
+      "line": 9,
+      "sentence": "The combat-validator enforcement of Islandwalk (\u0022creature can\u0027t be blocked as long as the defending player controls an Island\u0022) is deferred \u2014 same posture as Intimidate / Menace enforcement."
+    },
+    {
+      "factory": "HogaakFactory",
+      "file": "HogaakFactory.cs",
+      "line": 11,
+      "sentence": "## Deferred (v1 gaps)  - \u003Cb\u003E\u0022This spell can\u0027t be cast unless \u2026\u0022 gate\u003C/b\u003E: layered as the \u003Csee cref=\u0022ExileCreaturesFromGraveyardAdditionalCost."
+    },
+    {
+      "factory": "HogaakFactory",
+      "file": "HogaakFactory.cs",
+      "line": 11,
+      "sentence": "\u003Cb\u003EConvoke reduction integration\u003C/b\u003E: same gap as Chord of Calling \u2014 \u003Csee cref=\u0022ConvokeAlternativeCost."
+    },
+    {
+      "factory": "DampingSphereFactory",
+      "file": "DampingSphereFactory.cs",
+      "line": 9,
+      "sentence": "ManaPaymentResolver\u0022/\u003E is not yet updated to plumb this through automatically \u2014 listed as a deferred gap."
+    },
+    {
+      "factory": "CursecatcherFactory",
+      "file": "CursecatcherFactory.cs",
+      "line": 12,
+      "sentence": "No deferred work needed here."
+    }
+  ]
+}
