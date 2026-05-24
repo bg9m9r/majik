@@ -27,10 +27,13 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="BuildResolveEffect"/> so tests/integrations can pass it
 ///   to a <c>SpellDefinition</c>.
 ///
-/// ## Deferred (v1 gaps)
-/// - Bot-side <c>IAlternativeCostProbe</c>-style discovery for Delve is
-///   not yet wired; the heuristic bot won't proactively delve. Parallels
-///   the Snapcaster Mage v1 PR which deferred bot probe wiring.
+/// ## Bot-side discovery
+/// - <see cref="Majik.Core.Players.Agents.DelveAltCostProbe"/> surfaces
+///   Treasure Cruise to the heuristic bot's
+///   <see cref="Majik.Core.Players.Agents.IAlternativeCostProbe"/> stream
+///   via the Delve <see cref="KeywordAbility"/> marker. The probe yields a
+///   <see cref="Majik.Core.Costs.DelveAlternativeCost"/> that reduces the
+///   generic mana cost by the graveyard exiles the bot selects.
 /// </summary>
 public static class TreasureCruiseFactory
 {
