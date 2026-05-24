@@ -3164,6 +3164,31 @@ public static class NamedCardFactory
             // trigger firing.
             "Nihil Spellbomb" => NihilSpellbombFactory.Create(owner),
 
+            // Enchantment — {2}{W} (StaticPrisonFactory). Modern Horizons 3.
+            // "When Static Prison enters, you get {E}{E}, then put a stasis
+            //  counter on Static Prison for each energy you have. Then if
+            //  Static Prison has no stasis counters on it, exile it.
+            //  Static Prison has 'Permanents enter tapped' as long as it has
+            //  a stasis counter on it.
+            //  At the beginning of each upkeep, remove a stasis counter
+            //  from Static Prison."
+            // ETB trigger (CR 603.6a): gain {E}{E} → stasis counters =
+            // controller's post-gain energy → self-exile (CR 701.21) if 0.
+            // Each-upkeep trigger removes one stasis counter (CR 500.4 —
+            // scoped to BOTH players' upkeeps, not just controller's; raw
+            // EventTriggerCondition<StepStartedEvent>, not the
+            // Triggers.OnStepBegin controller-filtered helper). Introduces
+            // CounterType.Stasis. While stasis > 0, a global
+            // LambdaReplacement<ZoneMoveIntent> on the supplied
+            // ReplacementBus rewrites every battlefield-entering permanent
+            // (other than Static Prison itself) with EntersTapped=true
+            // (CR 614.1c). Single-arg dispatcher path attaches the two
+            // triggers structurally without TriggerManager registration
+            // and without the global tap-replacement; use the
+            // (owner, replacements, eventBus, triggers) overload for fully-
+            // wired behavior.
+            "Static Prison" => StaticPrisonFactory.Create(owner),
+
             // Creature — Spirit {G}{G} 2/1 (StrangleRootGeistFactory).
             // Dark Ascension. Haste (CR 702.10) + Undying (CR 702.93)
             // keyword markers wired. Undying trigger built via the canonical
