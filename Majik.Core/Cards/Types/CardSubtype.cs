@@ -106,6 +106,9 @@ public enum CardSubtype
     /// <summary>Kavu creature subtype — Territorial Kavu, Shivan Wurm's body type.
     /// CR 205.3m.</summary>
     Kavu,
+    /// <summary>Druid creature subtype — Noble Hierarch, Fyndhorn Elder,
+    /// Devoted Druid. CR 205.3m.</summary>
+    Druid,
 
     // Land subtypes (examples)
     Forest,

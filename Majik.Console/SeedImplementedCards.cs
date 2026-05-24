@@ -1044,5 +1044,10 @@ public static class SeedImplementedCards
         // Controller-only: other Merfolk you control get +1/+1 and have Islandwalk.
         // Islandwalk keyword marker wired; combat-validator enforcement deferred.
         "Master of the Pearl Trident",
+
+        // Creature — Human Druid {G} 0/1 (NobleHierarchFactory). Conflux / MH2.
+        // Exalted (CR 702.90) — whenever a creature you control attacks alone,
+        // that creature gets +1/+1 until end of turn. {T}: Add {G}, {W}, or {U}.
+        "Noble Hierarch",
     };
 }
