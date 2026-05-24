@@ -1074,6 +1074,17 @@ public static class SeedImplementedCards
         // Counter target spell unless its controller pays {3}.
         "Mana Leak",
 
+        // ---- Modern Merfolk shipped in the feat/merfolk-adept-cursecatcher bump ----
+
+        // Creature — Merfolk Wizard {1}{U} 2/1 (SilvergillAdeptFactory). Lorwyn.
+        // RevealMerfolkOrPay3 additional cast cost marker (enforcement deferred).
+        // ETB trigger: controller draws a card (CR 603.6a).
+        "Silvergill Adept",
+        // Creature — Merfolk Wizard {U} 1/1 (CursecatcherFactory). Shadowmoor.
+        // Activated: Sacrifice ~: Counter target spell unless its controller pays {1}.
+        // Sacrifice-in-effect + counter-unless-pay wired (v1 auto-resolve payment).
+        "Cursecatcher",
+
         // ---- Humans-lords shipped in the humans-lords bump ----
 
         // Creature — Human Soldier {W} 1/1 (ChampionOfTheParishFactory). Innistrad.

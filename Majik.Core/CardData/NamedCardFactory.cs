@@ -2741,6 +2741,24 @@ public static class NamedCardFactory
             // stack). Mirrors DazeFactory's "unless pay" pattern with N=3.
             "Mana Leak" => ManaLeakFactory.Create(owner),
 
+            // Creature — Merfolk Wizard {1}{U} 2/1 (SilvergillAdeptFactory).
+            // Lorwyn / various reprints. As an additional cost to cast this
+            // spell, reveal a Merfolk card from your hand or pay {3}
+            // (v1: RevealMerfolkOrPay3 keyword marker — enforcement deferred).
+            // ETB trigger: controller draws a card (CR 603.6a). Single-arg
+            // dispatcher path attaches the ETB trigger; use the
+            // (owner, eventBus, triggers) overload for bus-driven firing.
+            "Silvergill Adept" => SilvergillAdeptFactory.Create(owner),
+
+            // Creature — Merfolk Wizard {U} 1/1 (CursecatcherFactory).
+            // Shadowmoor / various reprints. Activated ability — Sacrifice
+            // Cursecatcher: Counter target spell unless its controller pays
+            // {1}. Sacrifice-in-effect + counter-unless-pay wired (v1:
+            // auto-resolve payment, no agent prompt). Single-arg dispatcher
+            // path passes no live stack; use the (owner, stack) overload for
+            // a fully-wired counter effect.
+            "Cursecatcher" => CursecatcherFactory.Create(owner),
+
             // Creature — Human Soldier {W} 1/1 (ChampionOfTheParishFactory).
             // Innistrad. "Whenever another Human enters the battlefield under
             // your control, put a +1/+1 counter on Champion of the Parish."
