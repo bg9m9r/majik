@@ -109,6 +109,9 @@ public enum CardSubtype
     /// <summary>Druid creature subtype — Noble Hierarch, Fyndhorn Elder,
     /// Devoted Druid. CR 205.3m.</summary>
     Druid,
+    /// <summary>Ouphe creature subtype — Kitchen Finks (Shadowmoor / Modern
+    /// Horizons 2), Witchstalker. CR 205.3m.</summary>
+    Ouphe,
 
     // Land subtypes (examples)
     Forest,
