@@ -1,7 +1,7 @@
 # Engine coverage report
 
 - **Scope:** format=modern, dedup-by-name
-- **Generated:** 2026-05-24 06:13 UTC
+- **Generated:** 2026-05-24 17:51 UTC
 - **Total cards:** 21879
 - **Distinct coverage:** 23.8% (5210 / 21879)
 

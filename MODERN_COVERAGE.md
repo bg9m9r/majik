@@ -26,9 +26,9 @@ Living tracker for Modern-format card + mechanic implementation in the Majik eng
 
 | Metric | Count |
 |---|---|
-| Named factories | 296 |
-| Named factories | 296 |
-| Named factories | 296 |
+| Named factories | 295 |
+| Named factories | 295 |
+| Named factories | 295 |
 | Bespoke templates | 28 |
 | Generic templates | 94 |
 | JSON-defined cards | 18 |
@@ -541,6 +541,24 @@ After merging a card-shipping PR:
 After merging a mechanic-infra PR:
 1. Flip the relevant row in **Costs**, **Effects**, **Keywords**, or **Targeting / cast flow** to **Done (#PR)**.
 2. If a top-20 entry's blocker is resolved, drop its difficulty one tier in the priority table.
+
+### Multi-`[CardName]` for functional reprints
+
+When two cards share an **identical resolve body** (e.g. Wrath of God +
+Damnation — same sweep, different printed cost/colour), don't write two
+factories. Stack multiple `[CardName]` attributes on the canonical factory
+and expose a `public static <Card> Create(Player owner, string cardName)`
+overload that branches on the requested name to produce the right printed
+name + cost. The source generator
+(`Majik.Core.SourceGen.NamedCardFactoryGenerator`) detects the second-arg
+overload and dispatches each `[CardName]` through `Create(owner, name)`;
+the plain `Create(owner)` overload stays as a convenience for callers
+that don't care about the reprint variant. Headline factory-count drops
+by one per collapsed wrapper — that's expected and the script handles it.
+
+Don't apply this to **parametric cycles** (fetchlands, pact cycle, Mox
+cycle) — those have per-card numeric or per-card-flavour differences and
+stay as their own factories.
 
 CI/pre-commit can call `./scripts/update-coverage-headline.sh --check` to fail when the headline counts drift from on-disk reality.
 
