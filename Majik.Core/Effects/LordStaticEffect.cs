@@ -73,6 +73,10 @@ public sealed class LordStaticEffect : ContinuousEffect
             // No controller filter — effect applies to ALL creatures of the
             // matching subtype regardless of controller. Used by Engineered
             // Plague ("All creatures of the chosen type get -1/-1.").
+            // includeSelf is still honoured: Lord of Atlantis says "Other
+            // Merfolk" (allPlayers: true, includeSelf: false) so it must
+            // exclude itself from its own buff.
+            if (!_includeSelf && ReferenceEquals(creature, _source)) return false;
             return creature.HasSubtype(_subtype);
         }
         var sameController = ReferenceEquals(creature.Controller, _source.Controller);
