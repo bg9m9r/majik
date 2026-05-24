@@ -1614,6 +1614,27 @@ public static class NamedCardFactory
             // overload for live boost / lose-flying registration.
             "Colossus Hammer" => ColossusHammerFactory.Create(owner),
 
+            // Artifact — Equipment {1}{R} (CoriSteelCutterFactory). Tarkir:
+            // Dragonstorm. Static "equipped creature gets +1/+1 and has
+            // trample and haste" via paired AttachedBoostEffect registrations
+            // (Layer 7c for the +1/+1, Layer 6 for the granted "Trample" +
+            // "Haste" keyword names). Flurry — second-spell-each-turn trigger
+            // (closure counter shared with a TurnStartedEvent reset handler,
+            // mirrors LedgerShredderFactory's predicate shape) spawns a 1/1
+            // Monk creature token with a "Prowess" KeywordAbility marker
+            // (white colour + live prowess pump on the token deferred —
+            // same gaps as StormchasersTalentFactory's Mercenary token and
+            // MonasteryMentorFactory's Monk tokens) and auto-attaches
+            // Cori-Steel Cutter to it (may-clause auto-accepted at v1).
+            // Equip {1}{R} activated ability wired (sorcery-speed gate +
+            // attach-target prompt deferred — same gaps as the Colossus
+            // Hammer / Sword of Fire and Ice equipment cycle). The single-
+            // arg dispatcher path produces the correct card shape only;
+            // use the (owner, continuousEffects, zoneService, eventBus,
+            // triggers) overload for live boost / keyword grant / Flurry
+            // bus-driven firing.
+            "Cori-Steel Cutter" => CoriSteelCutterFactory.Create(owner),
+
             // Artifact — Equipment {1} (SkullclampFactory). Darksteel.
             // Static "equipped creature gets +1/-1" + dies trigger (CR 603.6c /
             // CR 700.4): "Whenever equipped creature dies, draw two cards."
@@ -2409,6 +2430,20 @@ public static class NamedCardFactory
             // (poison counters + creature damage as -1/-1 counters) is a
             // keyword marker only in v1 — see InkmothNexusFactory xmldoc.
             "Inkmoth Nexus" => InkmothNexusFactory.Create(owner),
+
+            // Instant — {U} (IntoTheFloodMawFactory). Bloomburrow.
+            // "Gift a tapped Fish (...). Return target creature an opponent
+            //  controls to its owner's hand. If the gift was promised,
+            //  instead return target nonland permanent an opponent controls
+            //  to its owner's hand." v1 ships the printed base mode only
+            //  (no-gift bounce target creature an opponent controls). Gift
+            //  cast-time prompt + conditional target predicate are DEFERRED
+            //  pending SpellCastFlow gift-promise hook + TargetRequest
+            //  conditional-predicate primitive. Single-arg dispatcher
+            //  produces the correct card shape; pass (caster, zoneService)
+            //  to BuildDefinition for the opponent-control gate +
+            //  replacement-bus-aware zone moves.
+            "Into the Flood Maw" => IntoTheFloodMawFactory.Create(owner),
 
             // Creature — Human Wizard {2}{U} 2/2 (TrinketMageFactory).
             // ETB tutor: search library for an artifact card with mana
