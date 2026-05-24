@@ -117,6 +117,19 @@ public static class NamedCardFactory
             // ETB damage trigger + opponent-draw watcher + amass Orcs 1 deferred.
             "Orcish Bowmasters" => OrcishBowmastersFactory.Create(owner),
 
+            // Legendary Creature — Cat {W} 1/1 (OcelotPrideFactory).
+            // Lifelink keyword marker (CR 702.15) wired. Attack trigger
+            // (CR 508.1f) creates a 1/1 white Cat token via TokenFactory;
+            // city's blessing doubling (Ascend, CR 702.131) is stubbed
+            // until an Ascend primitive lands. End-step flicker trigger
+            // (CR 500.4 / CR 701.20) exile-and-returns the card when a
+            // creature you controlled dealt combat damage to a player
+            // this turn — the per-turn latch + flicker move both gate on
+            // the (owner, zoneService, eventBus, triggers) overload. The
+            // single-arg dispatcher path attaches the keyword + both
+            // triggers structurally without TriggerManager / bus wiring.
+            "Ocelot Pride" => OcelotPrideFactory.Create(owner),
+
             // Artifact — {2} (AgathasSoulCauldronFactory).
             // {T}: Exile first card from controller's graveyard; if creature, +1/+1 counter
             // on first creature on controller's battlefield — wired (v1 auto-pick).
