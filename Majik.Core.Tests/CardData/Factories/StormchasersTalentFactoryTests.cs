@@ -18,12 +18,12 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// <summary>
 /// Unit tests for <see cref="StormchasersTalentFactory"/>.
 ///
-/// Covers (v1 ETB-only fallback scope — Class leveling deferred, see factory
-/// xmldoc for the deferred surface):
+/// Covers (full Class leveling — CR 716 — see <c>ClassLevelingTests</c> for
+/// the per-level activation + cast-trigger behavioural sweep):
 /// - Card identity (name, Enchantment type, Class subtype, mana cost, owner/
 ///   controller).
-/// - Ability set: a single ETB <see cref="TriggeredAbility"/> (no leveling
-///   activations, no Level 2 / Level 3 cast-triggers in v1).
+/// - Ability set: the ETB <see cref="TriggeredAbility"/> + two level-up
+///   <see cref="ActivatedAbility"/>s + two per-level cast triggers.
 /// - ETB resolution: spawns a 1/1 Mercenary creature token with a
 ///   <c>"Prowess"</c> <see cref="KeywordAbility"/> marker under the
 ///   controller's battlefield.
@@ -86,23 +86,36 @@ public class StormchasersTalentFactoryTests
     // -----------------------------------------------------------------------
 
     [Fact]
-    public void StormchasersTalent_HasExactlyOneTriggeredAbility()
+    public void StormchasersTalent_HasThreeTriggeredAbilities_EtbPlusTwoCastTriggers()
     {
         var c = StormchasersTalentFactory.Create(_alice);
 
-        c.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1,
-            "v1 ships only the ETB Mercenary-token trigger; Level 2 / Level 3 " +
-            "cast-triggers are deferred with the Class leveling primitive");
+        c.Abilities.OfType<TriggeredAbility>().Should().HaveCount(3,
+            "the ETB Mercenary-token trigger + the Level-2 and Level-3 " +
+            "noncreature-spell-cast triggers (gated by ClassState.CurrentLevel)");
     }
 
     [Fact]
-    public void StormchasersTalent_HasNoActivatedAbilitiesInV1()
+    public void StormchasersTalent_HasTwoLevelUpActivatedAbilities_BothSorcerySpeed()
     {
         var c = StormchasersTalentFactory.Create(_alice);
 
-        c.Abilities.OfType<ActivatedAbility>().Should().BeEmpty(
-            "v1 defers both level-up activated abilities ({1}{U}{R}: Level 2 " +
-            "and {3}{U}{R}: Level 3) — see factory xmldoc deferred surface");
+        var levelUps = c.Abilities.OfType<ActivatedAbility>().ToList();
+        levelUps.Should().HaveCount(2,
+            "CR 716 — one level-up activated ability per printed level above 1 " +
+            "({1}{U}{R}: Level 2 and {3}{U}{R}: Level 3)");
+        levelUps.Should().OnlyContain(a => a.IsSorcerySpeed,
+            "CR 716.3 / CR 307.5 — Class level-up activations are sorcery-speed only");
+    }
+
+    [Fact]
+    public void StormchasersTalent_ClassStateAttached_LevelOne_MaxThree()
+    {
+        var c = StormchasersTalentFactory.Create(_alice);
+        ((Majik.Core.Cards.Permanent)c).ClassState.Should().NotBeNull(
+            "CR 716 — Class enchantments carry a leveling tracker (mirrors SagaState)");
+        ((Majik.Core.Cards.Permanent)c).ClassState!.CurrentLevel.Should().Be(1);
+        ((Majik.Core.Cards.Permanent)c).ClassState!.MaxLevel.Should().Be(3);
     }
 
     // -----------------------------------------------------------------------
@@ -174,7 +187,10 @@ public class StormchasersTalentFactoryTests
         talent.SetZone(ZoneType.Battlefield);
         _alice.Zones.Battlefield.AddCard(talent);
 
-        var etb = talent.Abilities.OfType<TriggeredAbility>().Single();
+        // The ETB trigger is the one whose condition is OnEnterBattlefieldSelf —
+        // the two cast-triggers also live on the card now (gated by Level >= N).
+        // The ETB sits first; we identify it positionally + by zone-active filter.
+        var etb = talent.Abilities.OfType<TriggeredAbility>().First();
         foreach (var effect in etb.Effects)
         {
             effect.Execute();
@@ -205,7 +221,9 @@ public class StormchasersTalentFactoryTests
         card.HasSubtype(CardSubtype.Class).Should().BeTrue(
             "the dispatcher returns a fully-wired card with the Class subtype");
 
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1,
-            "the dispatcher attaches the ETB Mercenary-token trigger");
+        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(3,
+            "the dispatcher attaches the ETB trigger + Level-2 + Level-3 cast triggers");
+        card.Abilities.OfType<ActivatedAbility>().Should().HaveCount(2,
+            "the dispatcher attaches both level-up activated abilities (Level 2 + Level 3)");
     }
 }

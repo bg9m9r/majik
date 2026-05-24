@@ -48,6 +48,10 @@ public enum EventType
     ManaAdded,
     ManaSpent,
 
+    // CR 716 — Class enchantment leveled up (level-up activated ability
+    // resolved, CurrentLevel incremented).
+    ClassLeveledUp,
+
     // Diagnostics — engine-meta events surfaced to the UI / logs without
     // being part of game-state changes. The vanilla-shell graceful-degrade
     // path uses this to tell the portal "the bot encountered an

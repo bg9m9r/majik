@@ -465,7 +465,7 @@ Per-keyword action helpers under `Majik.Core/Keywords/`:
 | Storm | Done (TBD) | `Keywords/StormHelper.cs` | Brain Freeze |
 | Affinity | TODO | — | — |
 | Bloodthirst / Echo / Buyback | TODO | — | — |
-| Class (leveling) | Partial | `CardData/Classes/ClassState.cs` | Stormchaser's Talent (ETB-only — Level 2 / Level 3 deferred, needs per-activated-ability sorcery-speed gate + ClassState ↔ Permanent binder) |
+| Class (leveling) | Done (TBD PR) | `CardData/Classes/ClassState.cs` + `Cards/Permanent.cs::ClassState/AttachClassState` + `Events/ClassLevelUpEvent.cs` | `ClassState` extended with `LevelUpCosts[]` + `CurrentLevel` + sequential `LevelUpTo(N)` (CR 716.4) + `OnLevelUp` event callback; attached to `Permanent` via `AttachClassState` (mirrors `SagaState` side-table). Stormchaser's Talent retrofit ships both level-up activated abilities (`{1}{U}{R}: Level 2`, `{3}{U}{R}: Level 3` — `sorcerySpeed: true` enforced by `ActionValidator` per PR #460) + the Level-2 trigger ("Whenever you cast a noncreature spell, the Mercenary deals 1 damage to any target") + the Level-3 trigger ("draw a card, then discard a card"), both gated by `TriggeredAbility.InterveningIf` on `ClassState.CurrentLevel >= N` (CR 603.4). "The Mercenary" referent captured via a per-Class spawned-token holder. "Any target" picker is the v1 deterministic resolver (`opponentResolver` closure — first opponent); the Level-3 loot discard is the deterministic last-in-hand picker (same posture as Faithless Looting). Live Prowess pump on the token + true agent-driven any-target prompt remain deferred behind the broader token-keyword + prompt surfaces. |
 
 ### Targeting / cast flow
 
