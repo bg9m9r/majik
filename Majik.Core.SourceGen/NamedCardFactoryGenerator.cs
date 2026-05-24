@@ -31,6 +31,28 @@ namespace Majik.Core.SourceGen;
 /// form <c>"Damnation" =&gt; F.Create(owner, "Damnation")</c>; single-name
 /// factories without the overload continue to use the plain
 /// <c>F.Create(owner)</c> shape unchanged.
+///
+/// ## Parametric cycle factories
+///
+/// When the same shape repeats across an MTG card cycle (e.g. fetchlands,
+/// horizon lands) with per-card constants — basic-land subtypes, mana
+/// colours, etc. — a factory can declare a
+/// <c>Create(Player owner, string[] args)</c> overload and carry one
+/// <c>[CardName(name, payload...)]</c> attribute per cycle member with
+/// the per-card payload after the name. At dispatch time the generator
+/// forwards the args array as <c>[name, payload...]</c> so the factory
+/// can identify which cycle member is being built. Example:
+/// <code>
+/// [CardName("Bloodstained Mire", "Swamp", "Mountain")]
+/// [CardName("Arid Mesa",         "Plains", "Mountain")]
+/// public static class FetchLandCycleFactory
+/// {
+///     public static Land Create(Player owner) => Create(owner, new[] { ... });
+///     public static Land Create(Player owner, string[] args) { /* args[0] = name */ }
+/// }
+/// </code>
+/// The args-aware overload wins when both it and the named overload are
+/// present.
 /// </summary>
 [Generator(LanguageNames.CSharp)]
 public sealed class NamedCardFactoryGenerator : IIncrementalGenerator
@@ -84,31 +106,45 @@ public sealed class NamedCardFactoryGenerator : IIncrementalGenerator
         var displayName = cls.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat);
         var location = cls.Locations.FirstOrDefault();
 
-        var names = ImmutableArray.CreateBuilder<string>();
+        var registrations = ImmutableArray.CreateBuilder<CardRegistration>();
         foreach (var attr in ctx.Attributes)
         {
             if (attr.ConstructorArguments.Length == 0) continue;
-            var arg = attr.ConstructorArguments[0];
-            if (arg.Value is string s && !string.IsNullOrWhiteSpace(s))
+            var nameArg = attr.ConstructorArguments[0];
+            if (nameArg.Value is not string s || string.IsNullOrWhiteSpace(s)) continue;
+
+            // The attribute's second ctor parameter is `params string[] args`.
+            // Roslyn surfaces it as either an array TypedConstant or no value
+            // when the caller omitted it.
+            var argsBuilder = ImmutableArray.CreateBuilder<string>();
+            if (attr.ConstructorArguments.Length >= 2)
             {
-                names.Add(s);
+                var argsArg = attr.ConstructorArguments[1];
+                if (!argsArg.IsNull && argsArg.Kind == TypedConstantKind.Array)
+                {
+                    foreach (var v in argsArg.Values)
+                    {
+                        argsBuilder.Add(v.Value as string ?? string.Empty);
+                    }
+                }
             }
+
+            registrations.Add(new CardRegistration(s, argsBuilder.ToImmutable()));
         }
 
-        if (names.Count == 0)
+        if (registrations.Count == 0)
         {
             return null;
         }
 
-        // Look for a callable `Create(Player owner)` overload — single-arg
-        // or any overload whose remaining parameters all have defaults.
-        // Separately detect a `Create(Player owner, string cardName, ...)`
-        // overload (name as the second positional parameter, any remaining
-        // parameters defaulted). When present, multi-[CardName] factories
-        // dispatch through it so the canonical factory can produce the
-        // right printed name for each functional reprint.
+        // Look for callable Create overloads. Three shapes accepted:
+        //   1. Create(Player owner)                          → plain
+        //   2. Create(Player owner, string cardName, ...)    → reprint
+        //   3. Create(Player owner, string[] args)           → parametric cycle
+        // The args[] overload wins when present (most general).
         var hasCreate = false;
         var hasNamedCreate = false;
+        var hasArgsCreate = false;
         foreach (var member in cls.GetMembers("Create"))
         {
             if (member is not IMethodSymbol m) continue;
@@ -117,6 +153,15 @@ public sealed class NamedCardFactoryGenerator : IIncrementalGenerator
             if (m.Parameters.Length == 0) continue;
             var first = m.Parameters[0];
             if (first.Type.Name != "Player") continue;
+
+            // Args[] overload — Create(Player, string[]).
+            if (m.Parameters.Length == 2
+                && m.Parameters[1].Type is IArrayTypeSymbol arr
+                && arr.ElementType.SpecialType == SpecialType.System_String)
+            {
+                hasArgsCreate = true;
+                continue;
+            }
 
             // Plain `Create(Player owner, [defaults...])`.
             var restOk = true;
@@ -142,20 +187,20 @@ public sealed class NamedCardFactoryGenerator : IIncrementalGenerator
         return new FactoryEntry(
             fullyQualifiedName,
             displayName,
-            names.ToImmutable(),
+            registrations.ToImmutable(),
             hasCreate,
             hasNamedCreate,
+            hasArgsCreate,
             location);
     }
 
     private static void Emit(SourceProductionContext spc, ImmutableArray<FactoryEntry> entries)
     {
-        // Diagnostic — missing Create overload. Either the plain
-        // `Create(Player)` or the named `Create(Player, string, ...)` form
-        // satisfies dispatch.
+        // Diagnostic — missing Create overload. Any of plain / named /
+        // args-aware satisfies dispatch.
         foreach (var entry in entries)
         {
-            if (!entry.HasCreateOverload && !entry.HasNamedCreateOverload)
+            if (!entry.HasCreateOverload && !entry.HasNamedCreateOverload && !entry.HasArgsCreateOverload)
             {
                 spc.ReportDiagnostic(Diagnostic.Create(
                     MissingCreateDescriptor,
@@ -164,31 +209,27 @@ public sealed class NamedCardFactoryGenerator : IIncrementalGenerator
             }
         }
 
-        // Build name → factory map, reporting duplicates. A factory is
-        // eligible if it has either the plain `Create(Player)` overload
-        // or the named `Create(Player, string, ...)` overload — the
-        // dispatcher picks the latter when available so multi-[CardName]
-        // factories can produce the correct printed name per reprint.
-        var map = new SortedDictionary<string, FactoryEntry>(StringComparer.Ordinal);
+        // Build name → (factory, args) map, reporting duplicates.
+        var map = new SortedDictionary<string, DispatchArm>(StringComparer.Ordinal);
         var duplicates = new Dictionary<string, List<FactoryEntry>>(StringComparer.Ordinal);
 
         foreach (var entry in entries)
         {
-            if (!entry.HasCreateOverload && !entry.HasNamedCreateOverload) continue;
-            foreach (var name in entry.CardNames)
+            if (!entry.HasCreateOverload && !entry.HasNamedCreateOverload && !entry.HasArgsCreateOverload) continue;
+            foreach (var reg in entry.Registrations)
             {
-                if (map.TryGetValue(name, out var existing))
+                if (map.TryGetValue(reg.Name, out var existing))
                 {
-                    if (!duplicates.TryGetValue(name, out var list))
+                    if (!duplicates.TryGetValue(reg.Name, out var list))
                     {
-                        list = new List<FactoryEntry> { existing };
-                        duplicates[name] = list;
+                        list = new List<FactoryEntry> { existing.Entry };
+                        duplicates[reg.Name] = list;
                     }
                     list.Add(entry);
                 }
                 else
                 {
-                    map[name] = entry;
+                    map[reg.Name] = new DispatchArm(entry, reg.Args);
                 }
             }
         }
@@ -230,14 +271,31 @@ public sealed class NamedCardFactoryGenerator : IIncrementalGenerator
         foreach (var kvp in map)
         {
             var literal = SymbolDisplay.FormatLiteral(kvp.Key, true);
-            // Prefer the `Create(Player, string)` overload when the factory
-            // exposes one — multi-[CardName] factories use the second
-            // argument to produce the correct printed name per reprint.
-            // Fall back to the plain `Create(Player)` otherwise so existing
-            // single-name factories stay unchanged.
-            var call = kvp.Value.HasNamedCreateOverload
-                ? $"{kvp.Value.FullyQualifiedName}.Create(owner, {literal})"
-                : $"{kvp.Value.FullyQualifiedName}.Create(owner)";
+            var arm = kvp.Value;
+            string call;
+
+            if (arm.Entry.HasArgsCreateOverload)
+            {
+                // Parametric cycle factory — emit args[] with the printed
+                // name as args[0] and the per-card payload as args[1..].
+                var allArgs = new List<string> { kvp.Key };
+                allArgs.AddRange(arm.Args);
+                var argList = string.Join(
+                    ", ",
+                    allArgs.Select(a => SymbolDisplay.FormatLiteral(a, true)));
+                call = $"{arm.Entry.FullyQualifiedName}.Create(owner, new[] {{ {argList} }})";
+            }
+            else if (arm.Entry.HasNamedCreateOverload)
+            {
+                // Multi-[CardName] reprint factory — pass the printed name
+                // so the canonical factory can mint each reprint distinctly.
+                call = $"{arm.Entry.FullyQualifiedName}.Create(owner, {literal})";
+            }
+            else
+            {
+                call = $"{arm.Entry.FullyQualifiedName}.Create(owner)";
+            }
+
             sb.AppendLine($"            {literal} => {call},");
         }
         sb.AppendLine("            _ => null,");
@@ -248,11 +306,16 @@ public sealed class NamedCardFactoryGenerator : IIncrementalGenerator
         spc.AddSource("NamedCardFactory.Generated.g.cs", sb.ToString());
     }
 
+    private sealed record CardRegistration(string Name, ImmutableArray<string> Args);
+
     private sealed record FactoryEntry(
         string FullyQualifiedName,
         string DisplayName,
-        ImmutableArray<string> CardNames,
+        ImmutableArray<CardRegistration> Registrations,
         bool HasCreateOverload,
         bool HasNamedCreateOverload,
+        bool HasArgsCreateOverload,
         Location? Location);
+
+    private sealed record DispatchArm(FactoryEntry Entry, ImmutableArray<string> Args);
 }

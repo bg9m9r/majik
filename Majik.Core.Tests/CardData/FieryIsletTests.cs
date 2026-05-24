@@ -11,7 +11,7 @@ using Xunit;
 namespace Majik.Core.Tests.CardData;
 
 /// <summary>
-/// Unit tests for <see cref="FieryIsletFactory"/>.
+/// Unit tests for <see cref="HorizonLandCycleFactory"/>.
 ///
 /// Covers:
 /// - Card identity (name, Land type, non-legendary)
@@ -31,7 +31,7 @@ public class FieryIsletTests
     [Fact]
     public void FieryIslet_IsLand()
     {
-        var land = FieryIsletFactory.Create(_alice);
+        var land = HorizonLandCycleFactory.Create(_alice, new[] { "Fiery Islet", "U", "R" });
 
         land.HasType(CardType.Land).Should().BeTrue();
     }
@@ -39,7 +39,7 @@ public class FieryIsletTests
     [Fact]
     public void FieryIslet_NameIsCorrect()
     {
-        var land = FieryIsletFactory.Create(_alice);
+        var land = HorizonLandCycleFactory.Create(_alice, new[] { "Fiery Islet", "U", "R" });
 
         land.Name.Should().Be("Fiery Islet");
     }
@@ -47,7 +47,7 @@ public class FieryIsletTests
     [Fact]
     public void FieryIslet_OwnerAndControllerAreSet()
     {
-        var land = FieryIsletFactory.Create(_alice);
+        var land = HorizonLandCycleFactory.Create(_alice, new[] { "Fiery Islet", "U", "R" });
 
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
@@ -56,7 +56,7 @@ public class FieryIsletTests
     [Fact]
     public void FieryIslet_IsNotLegendary()
     {
-        var land = FieryIsletFactory.Create(_alice);
+        var land = HorizonLandCycleFactory.Create(_alice, new[] { "Fiery Islet", "U", "R" });
 
         land.HasSupertype(CardSupertype.Legendary).Should().BeFalse();
     }
@@ -68,7 +68,7 @@ public class FieryIsletTests
     [Fact]
     public void FieryIslet_HasExactlyTwoManaAbilities()
     {
-        var land = FieryIsletFactory.Create(_alice);
+        var land = HorizonLandCycleFactory.Create(_alice, new[] { "Fiery Islet", "U", "R" });
 
         land.Abilities.OfType<ManaAbility>().Should().HaveCount(2,
             "one for {U} and one for {R}");
@@ -77,7 +77,7 @@ public class FieryIsletTests
     [Fact]
     public void FieryIslet_HasBlueManaAbility()
     {
-        var land = FieryIsletFactory.Create(_alice);
+        var land = HorizonLandCycleFactory.Create(_alice, new[] { "Fiery Islet", "U", "R" });
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Blue == 1 && m.ManaGenerated.Red == 0);
@@ -86,7 +86,7 @@ public class FieryIsletTests
     [Fact]
     public void FieryIslet_HasRedManaAbility()
     {
-        var land = FieryIsletFactory.Create(_alice);
+        var land = HorizonLandCycleFactory.Create(_alice, new[] { "Fiery Islet", "U", "R" });
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Red == 1 && m.ManaGenerated.Blue == 0);
@@ -96,7 +96,7 @@ public class FieryIsletTests
     public void FieryIslet_ManaActivation_ReducesLifeByOne()
     {
         var alice = new Player("Alice", 20);
-        var land = FieryIsletFactory.Create(alice);
+        var land = HorizonLandCycleFactory.Create(alice, new[] { "Fiery Islet", "U", "R" });
         var blue = land.Abilities.OfType<ManaAbility>().Single(m => m.ManaGenerated.Blue == 1);
 
         blue.Activate();
@@ -109,7 +109,7 @@ public class FieryIsletTests
     public void FieryIslet_ManaActivation_TapsTheLand()
     {
         var alice = new Player("Alice", 20);
-        var land = FieryIsletFactory.Create(alice);
+        var land = HorizonLandCycleFactory.Create(alice, new[] { "Fiery Islet", "U", "R" });
         var red = land.Abilities.OfType<ManaAbility>().Single(m => m.ManaGenerated.Red == 1);
 
         red.Activate();
@@ -122,7 +122,7 @@ public class FieryIsletTests
     {
         // CR 119.4 — players can't pay more life than they have.
         var alice = new Player("Alice", 1);
-        var land = FieryIsletFactory.Create(alice);
+        var land = HorizonLandCycleFactory.Create(alice, new[] { "Fiery Islet", "U", "R" });
         var blue = land.Abilities.OfType<ManaAbility>().Single(m => m.ManaGenerated.Blue == 1);
 
         blue.CanActivate().Should().BeFalse(
@@ -133,7 +133,7 @@ public class FieryIsletTests
     public void FieryIslet_CannotActivateManaWhenTapped()
     {
         var alice = new Player("Alice", 20);
-        var land = FieryIsletFactory.Create(alice);
+        var land = HorizonLandCycleFactory.Create(alice, new[] { "Fiery Islet", "U", "R" });
         var blue = land.Abilities.OfType<ManaAbility>().Single(m => m.ManaGenerated.Blue == 1);
 
         blue.Activate();
@@ -149,7 +149,7 @@ public class FieryIsletTests
     [Fact]
     public void FieryIslet_HasExactlyOneActivatedAbility()
     {
-        var land = FieryIsletFactory.Create(_alice);
+        var land = HorizonLandCycleFactory.Create(_alice, new[] { "Fiery Islet", "U", "R" });
 
         land.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1);
     }
@@ -157,7 +157,7 @@ public class FieryIsletTests
     [Fact]
     public void FieryIslet_SacDrawAbility_HasThreeCosts()
     {
-        var land = FieryIsletFactory.Create(_alice);
+        var land = HorizonLandCycleFactory.Create(_alice, new[] { "Fiery Islet", "U", "R" });
         var ability = land.Abilities.OfType<ActivatedAbility>().Single();
 
         ability.Costs.Should().HaveCount(3, "{1} + tap + sacrifice");
@@ -166,7 +166,7 @@ public class FieryIsletTests
     [Fact]
     public void FieryIslet_SacDrawAbility_HasManaCostOf1Generic()
     {
-        var land = FieryIsletFactory.Create(_alice);
+        var land = HorizonLandCycleFactory.Create(_alice, new[] { "Fiery Islet", "U", "R" });
         var ability = land.Abilities.OfType<ActivatedAbility>().Single();
         var mana = ability.Costs.OfType<ManaCostCost>().Single().Cost;
 
@@ -176,7 +176,7 @@ public class FieryIsletTests
     [Fact]
     public void FieryIslet_SacDrawAbility_HasTapAndSacrificeCosts()
     {
-        var land = FieryIsletFactory.Create(_alice);
+        var land = HorizonLandCycleFactory.Create(_alice, new[] { "Fiery Islet", "U", "R" });
         var ability = land.Abilities.OfType<ActivatedAbility>().Single();
 
         ability.Costs.OfType<AdditionalCost>()
@@ -193,7 +193,7 @@ public class FieryIsletTests
         alice.Zones.Library.AddCard(topCard);
         topCard.SetZone(ZoneType.Library);
 
-        var land = FieryIsletFactory.Create(alice);
+        var land = HorizonLandCycleFactory.Create(alice, new[] { "Fiery Islet", "U", "R" });
         var ability = land.Abilities.OfType<ActivatedAbility>().Single();
         foreach (var effect in ability.Effects) effect.Execute();
 
@@ -206,7 +206,7 @@ public class FieryIsletTests
     public void FieryIslet_SacDrawEffect_EmptyLibrary_DoesNotThrow()
     {
         var alice = new Player("Alice", 20);
-        var land = FieryIsletFactory.Create(alice);
+        var land = HorizonLandCycleFactory.Create(alice, new[] { "Fiery Islet", "U", "R" });
         var ability = land.Abilities.OfType<ActivatedAbility>().Single();
 
         var act = () => { foreach (var effect in ability.Effects) effect.Execute(); };
@@ -217,7 +217,7 @@ public class FieryIsletTests
     [Fact]
     public void FieryIslet_HasNoTriggeredAbilities()
     {
-        var land = FieryIsletFactory.Create(_alice);
+        var land = HorizonLandCycleFactory.Create(_alice, new[] { "Fiery Islet", "U", "R" });
 
         land.Abilities.OfType<TriggeredAbility>().Should().BeEmpty();
     }
