@@ -2950,6 +2950,18 @@ public static class NamedCardFactory
             // triggers) overload for fully-wired behavior.
             "Young Pyromancer" => YoungPyromancerFactory.Create(owner),
 
+            // Creature — Wolf {G} 1/1 (YoungWolfFactory). Innistrad.
+            // Undying keyword marker (CR 702.93). Undying triggered ability
+            // (CR 702.93b) wired via UndyingFactory.Build — fires on
+            // Battlefield → Graveyard CardMovedEvent with intervening-if
+            // "no +1/+1 counters at death" (CR 603.4); on resolve raw-moves
+            // graveyard → battlefield, clears counters (CR 121.2), and adds
+            // one +1/+1 counter. The single-arg dispatcher path attaches the
+            // trigger without TriggerManager registration. Use the (owner,
+            // triggers) overload for bus-driven trigger firing (mirrors
+            // NihilSpellbombFactory's two-arg pattern).
+            "Young Wolf" => YoungWolfFactory.Create(owner),
+
             // Creature — Human Monk {2}{W} 2/2 (MonasteryMentorFactory).
             // Fate Reforged. Prowess (CR 702.108) — whenever you cast a
             // noncreature spell, +1/+1 until end of turn (wired via

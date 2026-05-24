@@ -10,7 +10,7 @@ Living tracker for Modern-format card + mechanic implementation in the Majik eng
 
 | Metric | Count |
 |---|---|
-| Named factories | 255 |
+| Named factories | 256 |
 | Bespoke templates | 28 |
 | Generic templates | 94 |
 | JSON-defined cards | 18 |
@@ -251,6 +251,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Yavimaya, Cradle of Growth | Land | #158 | grant Forest to all lands |
 | Yawgmoth, Thran Physician | Creature | — | pay life + sac → discard/draw |
 | Yawgmoth's Will | Sorcery | TBD | {2}{B} — until EOT, play cards from your graveyard (stamp Card.RuntimeGraveyardCastCost on every card in controller's graveyard) + EOT-expirable controller-grave→exile ZoneMoveIntent replacement (CR 614) |
+| Young Wolf | Creature | TBD | {G} Wolf 1/1 (ISD) — Undying keyword marker (CR 702.93) + Undying triggered ability wired via `UndyingFactory.Build` (CR 702.93b — Battlefield → Graveyard `CardMovedEvent` with intervening-if "no +1/+1 counters at death"; on resolve raw-moves graveyard → battlefield, clears the counter bag CR 121.2, then adds one +1/+1 counter). `activeZones = {Battlefield, Graveyard}` so the trigger evaluates after ZoneService stamps Zone = Graveyard before publishing. Bounce / exile bypass Undying (only graveyard transitions are "dies" per CR 700.4). Single-arg dispatcher path attaches the trigger to the card shape; `(owner, triggers)` overload registers with TriggerManager (mirrors Nihil Spellbomb's two-arg pattern). Introduces `CardSubtype.Wolf`. Yawgmoth-combo / Modern G-x sac value piece |
 
 ### Template-covered (notable)
 
