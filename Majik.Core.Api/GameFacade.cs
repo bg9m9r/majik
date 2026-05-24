@@ -104,6 +104,16 @@ public sealed class GameFacade
     /// </summary>
     public ContinuousEffectsService ContinuousEffects { get; } = new();
 
+    /// <summary>
+    /// CR 305.2 — per-turn land-drop counter. Shared between the legacy
+    /// single-round <see cref="StartAsync"/> path and the
+    /// <see cref="StartFullGameAsync"/> driver loop so both enforce the
+    /// one-land-per-turn cap against the same instance. Without this
+    /// sharing, the priority loop would have no tracker and bots could
+    /// play multiple lands per turn.
+    /// </summary>
+    public LandDropTracker LandDrops { get; } = new();
+
     private GameFacade(Player alice, Player bob)
     {
         _alice = alice;
@@ -278,6 +288,10 @@ public sealed class GameFacade
             agents: agents,
             turnNumberAccessor: () => 1,
             phaseAccessor: () => PhaseStateType.Main,
+            // CR 305.2 — share the facade's per-turn land-drop counter so
+            // PlayLandCommand submissions are gated on the same instance
+            // a subsequent StartFullGameAsync run also uses.
+            landDropTracker: LandDrops,
             castDispatcher: DispatchCast,
             activateDispatcher: DispatchActivate,
             manaAbilityDispatcher: DispatchManaAbility);
@@ -484,7 +498,11 @@ public sealed class GameFacade
             combatFlow: _combatFlow,
             eventBus: _bus,
             spellDefinitionResolver: BuildSpellDefinitionResolver(),
-            continuousEffects: ContinuousEffects);
+            continuousEffects: ContinuousEffects,
+            // CR 305.2 — TurnDriver resets the tracker per turn and the
+            // PriorityLoop it builds each round consults the same instance
+            // to gate PlayLand actions.
+            landDropTracker: LandDrops);
 
         var settled = _nextPromptSignal.Task;
         _fullGameTask = driver.RunGameAsync(maxTurns, ct);
