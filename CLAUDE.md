@@ -34,7 +34,7 @@ dotnet run --project Majik.Console -- analyze-keywords --from-database         [
 dotnet run --project Majik.Console -- ingest-claude-results <path-to-jsonl>
 ```
 
-`--use-claude` requires `ANTHROPIC_API_KEY` env var or a `.env` file in the repo root (loaded by `DotNetEnv`; the console walks up dirs looking for it). Optional `CLAUDE_MODEL` overrides the default model in `ClaudeKeywordAnalyzer.cs`. See `CLAUDE_SETUP.md` for full setup.
+`--use-claude` requires `ANTHROPIC_API_KEY` env var or a `.env` file in the repo root (loaded by `DotNetEnv`; the console walks up dirs looking for it). Optional `CLAUDE_MODEL` overrides the default model in `ClaudeKeywordAnalyzer.cs`. See `docs/archive/CLAUDE_SETUP.md` for full setup.
 
 ## Card database
 
@@ -96,4 +96,4 @@ xUnit + FluentAssertions + Moq. Tests mirror source folder layout under `Majik.C
 
 ## Planning docs
 
-Lots of `PHASE*_PLAN.md` / `PHASE*_COMPLETE.md` / `KEYWORDS_*.md` files at the repo root document historical implementation phases. They are useful for context on prior decisions but are NOT authoritative — when they conflict with the code, the code wins. Don't update or create new phase docs unless the user explicitly asks.
+Historical implementation-phase docs (`KEYWORDS_*.md`, `MECHANICS_GAP.md`, `ROADMAP.md`, etc.) live under `docs/archive/`. They document prior decisions but are NOT authoritative — when they conflict with the code, the code wins. Don't update or create new phase docs unless the user explicitly asks.

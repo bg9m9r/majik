@@ -35,7 +35,7 @@ dotnet run --project Majik.Console -- analyze-keywords --from-database [--use-cl
 dotnet run --project Majik.Console -- ingest-claude-results <jsonl>
 ```
 
-`--use-claude` needs `ANTHROPIC_API_KEY` (env var or `.env` walked up from cwd). See [`CLAUDE_SETUP.md`](./CLAUDE_SETUP.md).
+`--use-claude` needs `ANTHROPIC_API_KEY` (env var or `.env` walked up from cwd). See [`docs/archive/CLAUDE_SETUP.md`](./docs/archive/CLAUDE_SETUP.md).
 
 ## Architecture
 
@@ -147,4 +147,4 @@ Cards SQLite is bootstrapped automatically on container boot via [`Majik.Server/
 
 ## Historical docs
 
-`PHASE*_PLAN.md` / `PHASE*_COMPLETE.md` / `KEYWORDS_*.md` at the root document prior implementation work. They're useful for context but **not authoritative** — when they conflict with the code, the code wins. Don't update or create new phase docs unless asked.
+`KEYWORDS_*.md`, `MECHANICS_GAP.md`, `ROADMAP.md`, and similar phase docs live under [`docs/archive/`](./docs/archive/). They document prior implementation work and are **not authoritative** — when they conflict with the code, the code wins. Don't update or create new phase docs unless asked.
