@@ -22,6 +22,7 @@ public sealed class LoseAllAbilitiesEffect : ContinuousEffect
     private readonly Permanent _source;
     private readonly IReadOnlyList<Creature> _pool;
     private readonly Func<Creature, bool> _predicate;
+    private readonly bool _expiresAtEndOfTurn;
 
     /// <param name="source">The permanent generating this effect (e.g. Humility itself).</param>
     /// <param name="pool">
@@ -34,20 +35,30 @@ public sealed class LoseAllAbilitiesEffect : ContinuousEffect
     /// Narrower printed forms (e.g. activated-ability removal) pass a tighter
     /// filter.
     /// </param>
+    /// <param name="expiresAtEndOfTurn">
+    /// CR 514.2 — when true, the effect expires in the cleanup step (e.g.
+    /// Merfolk Trickster's "loses all abilities until end of turn" rider).
+    /// Defaults to false (Humility / Dress Down static-while-on-bf shape).
+    /// </param>
     public LoseAllAbilitiesEffect(
         Permanent source,
         IReadOnlyList<Creature> pool,
-        Func<Creature, bool>? predicate = null)
+        Func<Creature, bool>? predicate = null,
+        bool expiresAtEndOfTurn = false)
     {
         _source = source ?? throw new ArgumentNullException(nameof(source));
         _pool = pool ?? throw new ArgumentNullException(nameof(pool));
         _predicate = predicate ?? (_ => true);
+        _expiresAtEndOfTurn = expiresAtEndOfTurn;
     }
 
     public override Layer Layer => Layer.Abilities;
 
     /// <summary>CR 613.1g — the permanent generating this effect.</summary>
     public override Permanent? Source => _source;
+
+    /// <summary>CR 514.2 — until-end-of-turn instances drop in the cleanup step.</summary>
+    public override bool ExpiresAtEndOfTurn => _expiresAtEndOfTurn;
 
     public override bool IsActive() =>
         _source.Zone == Majik.Core.Zones.ZoneType.Battlefield;
