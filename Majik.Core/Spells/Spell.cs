@@ -65,6 +65,22 @@ public class Spell : ISpell
     /// </summary>
     public bool WasFreeCast { get; set; }
 
+    /// <summary>
+    /// CR 702.138b — "escaped" runtime sentinel. Stamped <c>true</c> by
+    /// <see cref="Majik.Core.Game.SpellCastFlow"/> when the cast used an
+    /// <see cref="Majik.Core.Costs.EscapeAlternativeCost"/> alt-cost.
+    /// Read by downstream gates that branch on "escaped"-ness:
+    /// <see cref="Majik.Core.CardData.Factories.UroTitanFactory"/>'s
+    /// "sacrifice it unless it escaped" trigger is the canonical
+    /// consumer; future <em>escapes with [counters]</em> wiring
+    /// (CR 702.138c) reads the same flag on the resolving spell to gate
+    /// the ETB-with-counters replacement.
+    ///
+    /// Defaults to <c>false</c> so hand-built test spells without an
+    /// explicit stamp are treated as normal (non-escape) casts.
+    /// </summary>
+    public bool WasCastForEscape { get; set; }
+
     public Spell(ICard card, Player controller, IEnumerable<ITarget>? targets = null, IEnumerable<ICost>? costs = null, IEnumerable<IEffect>? effects = null)
     {
         if (card == null)

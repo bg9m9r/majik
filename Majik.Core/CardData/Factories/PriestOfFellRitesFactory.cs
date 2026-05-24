@@ -51,12 +51,8 @@ namespace Majik.Core.CardData.Factories;
 ///   </para>
 ///
 /// ## Deferred (v1 gaps)
-/// - <b>Activate only as a sorcery</b>: CR 117.1a — the activation
-///   restriction is not enforced. There is no per-activated-ability
-///   sorcery-speed gate yet; only spell-casting goes through
-///   <see cref="CastingRestrictions"/> via the
-///   <see cref="SorcerySpeedRestrictionEffect"/>. Tests do not exercise
-///   the timing gate.
+/// (The activate-as-sorcery timing window is now enforced via the
+/// ActionValidator gate; see "Implemented" above.)
 /// - <b>"You may" prompt</b>: the ETB trigger autopicks the first
 ///   eligible creature card; declining and target-selection are
 ///   deferred to the agent-prompt MVP.
@@ -167,11 +163,15 @@ public static class PriestOfFellRitesFactory
                 ReanimatePick(owner, zoneService, maxManaValue: null);
             });
 
+        // CR 117.1a / 307.5 — "Activate only as a sorcery". The timing
+        // gate runs unconditionally regardless of source zone (graveyard-
+        // zone scoping is still future work — see class xmldoc).
         var activatedAbility = new ActivatedAbility(
             source: card,
             controller: owner,
             costs: new ICost[] { new ManaCostCost("{2}{W}{B}") },
-            effects: new IEffect[] { activatedEffect });
+            effects: new IEffect[] { activatedEffect },
+            sorcerySpeed: true);
 
         card.AddAbility(activatedAbility);
 

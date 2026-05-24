@@ -77,8 +77,6 @@ namespace Majik.Core.CardData.Factories;
 ///
 /// ## Deferred
 ///
-/// - <b>Sorcery-speed restriction</b> on Equip activation (CR 702.6a) —
-///   same gap as <see cref="ColossusHammerFactory"/>.
 /// - <b>Attach-target prompt</b> for Equip — v1 picks first creature
 ///   deterministically.
 /// - <b>Native modal activated abilities</b> — the engine routes mode
@@ -248,7 +246,8 @@ public static class UmezawasJitteFactory
         //   "{2}: Attach to target creature you control. Activate only
         //    as a sorcery."
         // v1 picker: deterministic first controller-side creature.
-        // Sorcery-speed restriction deferred (see class xmldoc).
+        // CR 117.1a / 307.5 sorcery-speed restriction enforced via
+        // ActionValidator (sorcerySpeed: true below).
         // --------------------------------------------------------------
         var equipEffect = new Effect(
             $"{CardName}: equip — attach to a creature you control",
@@ -264,7 +263,8 @@ public static class UmezawasJitteFactory
             source: card,
             controller: owner,
             costs: new ICost[] { new ManaCostCost(EquipCost) },
-            effects: new IEffect[] { equipEffect });
+            effects: new IEffect[] { equipEffect },
+            sorcerySpeed: true);
         card.AddAbility(equipAbility);
 
         return card;

@@ -131,6 +131,20 @@ public class ActionValidator
                 new RuleViolation("602.5c", "name-targeted activated-ability suppression"));
         }
 
+        // CR 117.1a / 307.5 — "Activate only as a sorcery" rider.
+        // Sorcery-speed-only activations require the controller's main
+        // phase with an empty stack. Caller marks the timing window via
+        // SorcerySpeedAvailable, mirroring the spell-cast surface
+        // (CastSpellAction). The validator stays stateless — it doesn't
+        // introspect the game loop.
+        if (action.Ability.IsSorcerySpeed && !action.SorcerySpeedAvailable)
+        {
+            var sourceName = (action.Ability.Source as Cards.ICard)?.Name ?? "<unknown>";
+            return ValidationResult.Invalid(
+                $"{sourceName}'s ability can only be activated as a sorcery",
+                new RuleViolation("307.5", "activate-only-as-a-sorcery"));
+        }
+
         return ValidationResult.Valid();
     }
 
@@ -248,10 +262,29 @@ public class ActivateAbilityAction : PlayerAction
     public IActivatedAbility Ability { get; }
     public Player Player { get; }
 
+    /// <summary>
+    /// True when sorcery-speed timing is currently legal (CR 117.1a /
+    /// 307.5): the activating player's main phase + empty stack. Caller
+    /// must supply when activating a sorcery-speed-only ability
+    /// (<see cref="IActivatedAbility.IsSorcerySpeed"/>); the validator
+    /// doesn't introspect the game loop. Mirrors
+    /// <see cref="CastSpellAction.SorcerySpeedAvailable"/>. Defaults to
+    /// true for backward compatibility with the (many) callers that
+    /// don't yet stamp a timing window — instant-speed activations are
+    /// unaffected regardless of this flag.
+    /// </summary>
+    public bool SorcerySpeedAvailable { get; }
+
     public ActivateAbilityAction(IActivatedAbility ability, Player player)
+        : this(ability, player, sorcerySpeedAvailable: true)
+    {
+    }
+
+    public ActivateAbilityAction(IActivatedAbility ability, Player player, bool sorcerySpeedAvailable)
     {
         Ability = ability;
         Player = player;
+        SorcerySpeedAvailable = sorcerySpeedAvailable;
     }
 }
 

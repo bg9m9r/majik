@@ -40,10 +40,6 @@ namespace Majik.Core.CardData.Factories;
 ///   <b>Pay 3 life</b> uses <see cref="AdditionalCost.PayLife"/>.
 ///
 /// ## Deferred (v1 gaps)
-/// - <b>Activate only as a sorcery</b>: CR 117.1a / 307.4. The engine
-///   has no per-activated-ability sorcery-speed gate yet (only spell-
-///   casting consults <see cref="Rules.CastingRestrictions"/>). Same
-///   deferral pattern as Priest of Fell Rites + Walking Ballista.
 /// - <b>Opponent-choice prompt for control change</b>: "An opponent
 ///   gains control" should prompt the controller to choose among
 ///   opponents (CR 800.4 / 113.6). The single-arg dispatcher path does
@@ -111,10 +107,11 @@ public static class WishclawTalismanFactory
         //   Activate only as a sorcery.
         //
         // CR 605 — not a mana ability (effect is library access + control
-        // swap, neither produces mana). CR 117.1a sorcery-speed restriction
-        // deferred (see class xmldoc). CR 701.19a — tutor any card to
-        // hand; CR 613.2 — Layer 2 control-change effect for the give-
-        // away clause.
+        // swap, neither produces mana). CR 117.1a / 307.5 — sorcery-speed
+        // restriction enforced via ActionValidator
+        // (sorcerySpeed: true on the activated ability below). CR 701.19a
+        // — tutor any card to hand; CR 613.2 — Layer 2 control-change
+        // effect for the give-away clause.
         // ----------------------------------------------------------------
         var tutorEffect = new Effect(
             "Wishclaw Talisman: tutor any card → hand",
@@ -168,7 +165,8 @@ public static class WishclawTalismanFactory
                 AdditionalCost.Tap(card),
                 AdditionalCost.PayLife(3),
             },
-            effects: new IEffect[] { tutorEffect, giveAwayEffect });
+            effects: new IEffect[] { tutorEffect, giveAwayEffect },
+            sorcerySpeed: true);
 
         card.AddAbility(activated);
 

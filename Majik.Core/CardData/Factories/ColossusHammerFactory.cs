@@ -48,12 +48,12 @@ namespace Majik.Core.CardData.Factories;
 ///
 /// ## Deferred
 ///
-/// - <b>Sorcery-speed restriction</b> on Equip activation (CR 702.6a)
-///   would be enforced by an action-validator gate; the activated
-///   ability itself does not carry a speed marker. Same shape as
-///   <see cref="StoneforgeMysticFactory"/>'s {1}{W}, {T} activation.
 /// - <b>Attach-target prompt</b> for "creature you control" (CR 702.6b)
 ///   — v1 picks the first controller-side creature deterministically.
+///
+/// CR 117.1a / 307.5 sorcery-speed restriction is now enforced via the
+/// ActionValidator gate (<c>sorcerySpeed: true</c> on the Equip
+/// activation).
 /// </summary>
 [CardName("Colossus Hammer")]
 public static class ColossusHammerFactory
@@ -113,7 +113,8 @@ public static class ColossusHammerFactory
         //   "{8}: Attach to target creature you control. Activate only
         //    as a sorcery."
         // v1 picker: deterministic first controller-side creature.
-        // Sorcery-speed restriction deferred (see class xmldoc).
+        // CR 117.1a / 307.5 sorcery-speed restriction enforced via
+        // ActionValidator (sorcerySpeed: true below).
         // --------------------------------------------------------------
         var equipEffect = new Effect(
             $"{CardName}: equip — attach to a creature you control",
@@ -130,7 +131,8 @@ public static class ColossusHammerFactory
             source: card,
             controller: owner,
             costs: new ICost[] { new ManaCostCost(EquipCost) },
-            effects: new IEffect[] { equipEffect });
+            effects: new IEffect[] { equipEffect },
+            sorcerySpeed: true);
 
         card.AddAbility(equipAbility);
 

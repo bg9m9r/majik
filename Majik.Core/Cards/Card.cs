@@ -257,6 +257,31 @@ public class Card : ICard
     }
 
     /// <summary>
+    /// CR 702.138b — "escaped" runtime sentinel propagated from the
+    /// resolving <see cref="Majik.Core.Spells.Spell.WasCastForEscape"/>
+    /// onto the card itself, so battlefield-resident triggers
+    /// (Uro's "sacrifice it unless it escaped" trigger; future
+    /// <em>escapes with [counters]</em> riders per CR 702.138c) can
+    /// read the flag from the source card without plumbing the spell
+    /// reference across the spell → permanent boundary. Stamped at
+    /// cast time by <see cref="Majik.Core.Game.SpellCastFlow"/>; the
+    /// flag persists across the card's current battlefield stint and
+    /// is cleared when the card leaves the battlefield (any
+    /// destination), mirroring CR 400.7's "new object" rule so a
+    /// re-cast / blink / token copy doesn't inherit the prior
+    /// escape posture.
+    /// </summary>
+    public bool WasCastForEscape { get; private set; }
+
+    /// <summary>Stamp the escape sentinel. Called by
+    /// <see cref="Majik.Core.Game.SpellCastFlow"/> when the cast used
+    /// an <see cref="Majik.Core.Costs.EscapeAlternativeCost"/>.</summary>
+    public void SetWasCastForEscape(bool value)
+    {
+        WasCastForEscape = value;
+    }
+
+    /// <summary>
     /// CR 601.2f — when this card is currently being cast as a spell, the
     /// set of targets the agent picked during target selection (one inner
     /// list per <see cref="Majik.Core.Game.TargetRequest"/>, mirroring

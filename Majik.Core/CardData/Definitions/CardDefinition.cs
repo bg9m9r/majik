@@ -86,10 +86,12 @@ public sealed class ManaAbilityDefinition : AbilityDefinition
 /// stack (mana abilities do not — CR 605.1). Cost / effect variants
 /// live under <see cref="CostDefinition"/> + <see cref="EffectDefinition"/>.
 ///
-/// <see cref="SorcerySpeed"/>: per CR 307.4 / 606.4, an "Activate only
-/// as a sorcery" rider. Currently informational — the runtime activator
-/// doesn't yet gate on it; the JSON faithfully records the intent so
-/// the gate lands cleanly when the activator learns the flag.
+/// <see cref="SorcerySpeed"/>: CR 117.1a / 307.5 — "Activate only as a
+/// sorcery" rider. Threaded onto the runtime
+/// <see cref="Majik.Core.Abilities.ActivatedAbility.IsSorcerySpeed"/> by
+/// <see cref="CardDefinitionFactory"/>; <c>ActionValidator</c> rejects
+/// activations outside the controller's main phase / empty-stack
+/// window.
 /// </summary>
 public sealed class ActivatedAbilityDefinition : AbilityDefinition
 {
