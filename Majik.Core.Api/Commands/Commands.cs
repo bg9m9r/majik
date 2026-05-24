@@ -23,6 +23,7 @@ namespace Majik.Core.Api.Commands;
 [JsonDerivedType(typeof(DeclareAttackersCommand), "attackers")]
 [JsonDerivedType(typeof(DeclareBlockersCommand), "blockers")]
 [JsonDerivedType(typeof(ChooseCardsToBottomCommand), "bottom")]
+[JsonDerivedType(typeof(ChooseLibraryPickCommand), "chooseLibraryPick")]
 public abstract record GameCommand
 {
     /// <summary>The player who submitted the command.</summary>
@@ -81,3 +82,15 @@ public sealed record DeclareBlockersCommand(
 public sealed record BlockerDeclarationDto(Guid BlockerInstanceId, Guid AttackerInstanceId);
 
 public sealed record ChooseCardsToBottomCommand(IReadOnlyList<Guid> CardInstanceIds) : GameCommand;
+
+/// <summary>
+/// CR 701.19a — response to a library-search prompt
+/// (<see cref="Majik.Core.Players.Agents.IPlayerAgent.ChooseLibraryPickAsync"/>).
+/// <see cref="SelectedInstanceId"/> is the <c>InstanceId</c> of the card the
+/// player chose from the prompt's candidate list, or <see langword="null"/>
+/// to model "find nothing" (legal under CR 701.19a — a player may decline
+/// to choose a card from a successful search). The engine rejects
+/// instance IDs that aren't in the candidate set with a clear error so the
+/// client can never silently smuggle a non-matching pick through.
+/// </summary>
+public sealed record ChooseLibraryPickCommand(Guid? SelectedInstanceId) : GameCommand;

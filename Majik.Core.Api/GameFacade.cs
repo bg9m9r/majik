@@ -637,8 +637,8 @@ public sealed class GameFacade
     public IDisposable SubscribePrompts(Action<PromptDto> handler)
     {
         ArgumentNullException.ThrowIfNull(handler);
-        Action<IReadOnlyList<Type>> aliceHandler = kinds => handler(BuildPrompt(_alice, kinds));
-        Action<IReadOnlyList<Type>> bobHandler = kinds => handler(BuildPrompt(_bob, kinds));
+        Action<IReadOnlyList<Type>> aliceHandler = kinds => handler(BuildPrompt(_alice, _aliceAgent, kinds));
+        Action<IReadOnlyList<Type>> bobHandler = kinds => handler(BuildPrompt(_bob, _bobAgent, kinds));
         _aliceAgent.PromptRequested += aliceHandler;
         _bobAgent.PromptRequested += bobHandler;
         return new Subscription(() =>
@@ -648,8 +648,21 @@ public sealed class GameFacade
         });
     }
 
-    private PromptDto BuildPrompt(Player player, IReadOnlyList<Type> kinds)
-        => new(GameId, player.Id, kinds.Select(t => t.Name).ToList());
+    // Forward the agent's per-prompt payload (currently: library-search
+    // candidate list + label, see RemoteAgent.ChooseLibraryPickAsync) onto
+    // the wire PromptDto. Read synchronously inside PromptRequested —
+    // RemoteAgent stashes PendingPayload before invoking the observer, so
+    // the field is populated for the kinds that need it (null otherwise).
+    private PromptDto BuildPrompt(Player player, RemoteAgent agent, IReadOnlyList<Type> kinds)
+    {
+        var payload = agent.PendingPayload;
+        return new PromptDto(
+            GameId: GameId,
+            PlayerId: player.Id,
+            ExpectedKinds: kinds.Select(t => t.Name).ToList(),
+            Candidates: payload?.Candidates,
+            Label: payload?.Label);
+    }
 
     private void BridgeEvent(GameEvent e)
     {
