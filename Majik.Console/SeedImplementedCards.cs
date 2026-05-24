@@ -1192,5 +1192,18 @@ public static class SeedImplementedCards
         // prowess on token deferred — same gap as Crashing Footfalls /
         // Goblin Rabblemaster. Single-arg path: card shape only.
         "Monastery Mentor",
+
+        // ---- Return to Ravnica guild spells shipped in the feat/izzet-charm-staticaster bump ----
+
+        // Instant — {U}{R} (IzzetCharmFactory). Return to Ravnica.
+        // CR 700.2d — modal "Choose one —":
+        // (0) counter noncreature spell unless pay {2} (v1 auto-resolve),
+        // (1) deal 2 damage to any target,
+        // (2) draw two cards, then discard two cards (v1 deterministic last-2-in-hand).
+        "Izzet Charm",
+        // Creature — Human Wizard {1}{U}{R} 0/3 (IzzetStaticasterFactory). Return to Ravnica.
+        // Flash keyword wired. {T}: 1 damage to target creature and each other
+        // creature with the same name as that creature (name-sweep via allCreaturesResolver).
+        "Izzet Staticaster",
     };
 }
