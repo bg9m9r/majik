@@ -3,7 +3,9 @@ using Majik.Core.Abilities;
 using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Effects;
 using Majik.Core.Players;
+using Majik.Core.ValueObjects;
 using Xunit;
 
 namespace Majik.Core.Tests.CardData.Definitions;
@@ -280,6 +282,184 @@ public class CardDefTests
 
         var effects = CardDefRuntime.BuildSpellResolveEffects(def, _alice, t => t);
         effects.Should().BeEmpty();
+    }
+
+    // ---- Stub-fill: DestroyTarget / Counter / PumpUntilEndOfTurn / CreateToken
+
+    [Fact]
+    public void Resolve_DestroyTarget_MovesCreatureToGraveyard()
+    {
+        // Murder-shape: destroy target creature.
+        CardDef def = CardDef
+            .Instant("Murder", "{1}{B}{B}")
+            .Resolve(c => c.DestroyTarget(TargetKind.Creature));
+
+        var target = new Creature("Bear", "{1}{G}", 2, 2);
+        target.SetOwner(_bob); target.SetController(_bob);
+        _bob.Zones.Battlefield.AddCard(target);
+        target.SetZone(global::Majik.Core.Zones.ZoneType.Battlefield);
+
+        var effects = CardDefRuntime.BuildSpellResolveEffects(
+            def, _alice, t => t, chosenTarget: target);
+        effects[0].Execute();
+
+        target.Zone.Should().Be(global::Majik.Core.Zones.ZoneType.Graveyard);
+        _bob.Zones.Graveyard.GetCards().Should().Contain(target);
+    }
+
+    [Fact]
+    public void Resolve_DestroyTarget_IndestructibleCancels()
+    {
+        // CR 702.12b — indestructible permanents can't be destroyed.
+        CardDef def = CardDef
+            .Instant("Murder", "{1}{B}{B}")
+            .Resolve(c => c.DestroyTarget(TargetKind.Creature));
+
+        var target = new Creature("Darksteel Bear", "{1}{G}", 2, 2);
+        target.SetOwner(_bob); target.SetController(_bob);
+        target.AddAbility(new KeywordAbility("Indestructible", target, _bob));
+        _bob.Zones.Battlefield.AddCard(target);
+        target.SetZone(global::Majik.Core.Zones.ZoneType.Battlefield);
+
+        var effects = CardDefRuntime.BuildSpellResolveEffects(
+            def, _alice, t => t, chosenTarget: target);
+        effects[0].Execute();
+
+        target.Zone.Should().Be(global::Majik.Core.Zones.ZoneType.Battlefield);
+        _bob.Zones.Battlefield.GetCards().Should().Contain(target);
+    }
+
+    [Fact]
+    public void Resolve_DestroyTarget_RegenerationShieldConsumed()
+    {
+        // CR 701.15c — regeneration shield consumed; permanent stays.
+        CardDef def = CardDef
+            .Instant("Murder", "{1}{B}{B}")
+            .Resolve(c => c.DestroyTarget(TargetKind.Creature));
+
+        var target = new Creature("Bear", "{1}{G}", 2, 2);
+        target.SetOwner(_bob); target.SetController(_bob);
+        target.AddRegenerationShield();
+        _bob.Zones.Battlefield.AddCard(target);
+        target.SetZone(global::Majik.Core.Zones.ZoneType.Battlefield);
+
+        var effects = CardDefRuntime.BuildSpellResolveEffects(
+            def, _alice, t => t, chosenTarget: target);
+        effects[0].Execute();
+
+        target.Zone.Should().Be(global::Majik.Core.Zones.ZoneType.Battlefield);
+        target.HasRegenerationShield.Should().BeFalse("shield was consumed");
+    }
+
+    [Fact]
+    public void Resolve_PumpUntilEndOfTurn_RegistersLayer7c()
+    {
+        CardDef def = CardDef
+            .Instant("Giant Growth", "{G}")
+            .Resolve(c => c.PumpUntilEndOfTurn(3, 3).To(TargetKind.Creature));
+
+        var target = new Creature("Bear", "{1}{G}", 2, 2);
+        target.SetOwner(_alice); target.SetController(_alice);
+        target.ActiveEffects = new ContinuousEffectsService();
+        _alice.Zones.Battlefield.AddCard(target);
+        target.SetZone(global::Majik.Core.Zones.ZoneType.Battlefield);
+
+        var effects = CardDefRuntime.BuildSpellResolveEffects(
+            def, _alice, t => t, chosenTarget: target);
+        effects[0].Execute();
+
+        target.Power.Should().Be(5);
+        target.Toughness.Should().Be(5);
+    }
+
+    [Fact]
+    public void Resolve_Counter_RemovesSpellFromStackAndGraveyards()
+    {
+        // CR 701.5 — Counterspell shape.
+        CardDef def = CardDef
+            .Instant("Counterspell", "{U}{U}")
+            .Resolve(c => c.Counter());
+
+        var bobsBolt = new Instant("Lightning Bolt", "{R}");
+        bobsBolt.SetOwner(_bob); bobsBolt.SetController(_bob);
+        bobsBolt.SetZone(global::Majik.Core.Zones.ZoneType.Stack);
+        var spell = new global::Majik.Core.Spells.Spell(bobsBolt, _bob);
+        var stack = new global::Majik.Core.Stack.Stack();
+        stack.Push(spell);
+
+        var effects = CardDefRuntime.BuildSpellResolveEffects(
+            def, _alice, t => t, chosenTarget: spell, stack: stack);
+        effects[0].Execute();
+
+        stack.IsEmpty.Should().BeTrue();
+        bobsBolt.Zone.Should().Be(global::Majik.Core.Zones.ZoneType.Graveyard);
+    }
+
+    [Fact]
+    public void Resolve_Counter_NoncreatureSpellFilter_GatesCreatureSpells()
+    {
+        // Negate shape — creature spell on stack is an illegal target,
+        // effect does nothing.
+        CardDef def = CardDef
+            .Instant("Negate", "{1}{U}")
+            .Resolve(c => c.Counter(TargetKind.NoncreatureSpell));
+
+        var creature = new Creature("Goblin", "{R}", 1, 1);
+        creature.SetOwner(_bob); creature.SetController(_bob);
+        creature.SetZone(global::Majik.Core.Zones.ZoneType.Stack);
+        var spell = new global::Majik.Core.Spells.Spell(creature, _bob);
+        var stack = new global::Majik.Core.Stack.Stack();
+        stack.Push(spell);
+
+        var effects = CardDefRuntime.BuildSpellResolveEffects(
+            def, _alice, t => t, chosenTarget: spell, stack: stack);
+        effects[0].Execute();
+
+        stack.IsEmpty.Should().BeFalse("creature spell is an illegal target for Negate");
+    }
+
+    [Fact]
+    public void Resolve_CreateToken_PutsTokenOnBattlefield()
+    {
+        // CR 111 — Raise the Alarm-shape: create two 1/1 white Soldier tokens.
+        CardDef def = CardDef
+            .Sorcery("Raise the Alarm", "{1}{W}")
+            .Resolve(c => c
+                .CreateToken("Soldier", 1, 1, CardSubtype.Soldier).Colors(ManaColor.White)
+                .CreateToken("Soldier", 1, 1, CardSubtype.Soldier).Colors(ManaColor.White));
+
+        var effects = CardDefRuntime.BuildSpellResolveEffects(def, _alice, t => t);
+        effects.Should().HaveCount(2);
+        foreach (var e in effects) e.Execute();
+
+        var soldiers = _alice.Zones.Battlefield.GetCards()
+            .OfType<Creature>()
+            .Where(c => c.HasSubtype(CardSubtype.Soldier))
+            .ToList();
+        soldiers.Should().HaveCount(2);
+        soldiers[0].BasePower.Should().Be(1);
+        soldiers[0].BaseToughness.Should().Be(1);
+    }
+
+    [Fact]
+    public void Resolve_CreateToken_WithKeyword_AttachesKeyword()
+    {
+        // Lingering Souls-shape: 1/1 white Spirit with flying.
+        CardDef def = CardDef
+            .Sorcery("Spirit Token Maker", "{2}{W}")
+            .Resolve(c => c
+                .CreateToken("Spirit", 1, 1, CardSubtype.Spirit)
+                    .Colors(ManaColor.White)
+                    .WithKeyword("Flying"));
+
+        var effects = CardDefRuntime.BuildSpellResolveEffects(def, _alice, t => t);
+        effects[0].Execute();
+
+        var spirit = _alice.Zones.Battlefield.GetCards()
+            .OfType<Creature>()
+            .Single(c => c.HasSubtype(CardSubtype.Spirit));
+        spirit.Abilities.OfType<KeywordAbility>()
+            .Should().ContainSingle(k => k.Keyword == "Flying");
     }
 
     // ---- Source generator: Define()-only path ----------------------------
