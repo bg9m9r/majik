@@ -2945,6 +2945,21 @@ public static class NamedCardFactory
             // behavior.
             "Monastery Mentor" => MonasteryMentorFactory.Create(owner),
 
+            // Instant — {B}{G} (AssassinsTrophyFactory). Guilds of Ravnica.
+            // "Destroy target permanent an opponent controls. Its controller
+            //  searches their library for a basic land card, puts it onto
+            //  the battlefield, then shuffles." Resolve-time opponent check
+            // enforced; library shuffle deferred (same gap as PathToExile /
+            // SearchForTomorrow).
+            "Assassin's Trophy" => AssassinsTrophyFactory.Create(owner),
+
+            // Instant — {2}{G} (BeastWithinFactory). New Phyrexia / various.
+            // "Destroy target permanent. Its controller creates a 3/3 green
+            //  Beast creature token." Any permanent is a legal target —
+            // including your own. Token colour (green) deferred (same gap as
+            // Pact of the Titan / Crashing Footfalls).
+            "Beast Within" => BeastWithinFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
