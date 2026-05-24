@@ -1361,6 +1361,21 @@ public static class NamedCardFactory
             // willCast, onCascadeResolved) overload to drive the free cast.
             "Crashing Footfalls" => CrashingFootfallsFactory.Create(owner),
 
+            // Creature — Dinosaur {1}{R} 3/1 (AmpedRaptorFactory). Modern Horizons 3.
+            // Trample keyword marker (CR 702.19) wired. ETB triggered
+            // ability (CR 603.6a): exile the top four cards of controller's
+            // library, then "you may cast a spell with mana value 2 or less
+            // from among them without paying its mana cost." The single-arg
+            // dispatcher path attaches Trample + the ETB trigger
+            // structurally for shape inspection; the effect is a no-op
+            // without a SpellCastFlow binding. Use the (owner, triggers,
+            // chooseSpell, onEtbResolved) overload to drive the free cast
+            // via CastFromExileAlternativeCost + SpellCastFlow (mirrors
+            // CrashingFootfallsFactory's cascade-resolved hook). Cards
+            // not cast stay in exile — printed oracle, distinct from
+            // Cascade's bottom-the-rest step.
+            "Amped Raptor" => AmpedRaptorFactory.Create(owner),
+
             // Creature — Giant {4}{G}{G} 6/6 (PrimevalTitanFactory).
             // Trample keyword wired. ETB + attack triggered abilities both
             // tutor up to two lands → battlefield tapped (CR 603.1, CR
@@ -3161,6 +3176,46 @@ public static class NamedCardFactory
             // card shape without TriggerManager registration; use the
             // (owner, triggers) overload for bus-driven trigger firing.
             "Strangleroot Geist" => StrangleRootGeistFactory.Create(owner),
+
+            // Creature — Human Monk {R} 1/2 (SoulScarMageFactory). Amonkhet.
+            // Prowess (CR 702.108) — wired via ProwessFactory.Build when a
+            // ContinuousEffectsService is supplied. Damage → -1/-1 counters
+            // replacement (CR 614): "If a source you control would deal
+            // noncombat damage to a creature an opponent controls, put that
+            // many -1/-1 counters on that creature instead." Registered as
+            // a SoulScarMageDamageReplacement on the ReplacementBus when
+            // supplied; self-gates on Soul-Scar Mage being on the
+            // battlefield (CR 614.6) so flicker / LTB lifts the rider
+            // naturally without explicit unregister. The single-arg
+            // dispatcher path produces the correct card shape without
+            // Prowess or replacement wiring — mirrors Anger of the Gods's
+            // shape-only posture; use the (owner, effects, replacements,
+            // triggers) overload for fully-wired behavior.
+            "Soul-Scar Mage" => SoulScarMageFactory.Create(owner),
+
+            // Enchantment — Class {U}{R} (StormchasersTalentFactory).
+            // Modern Horizons 3. ETB trigger (CR 603.6a) creates a 1/1
+            // Mercenary creature token with a "Prowess" KeywordAbility
+            // marker (CR 702.108) via TokenFactory.CreateOnBattlefield.
+            // Single-arg dispatcher path attaches the trigger to the card
+            // shape without ZoneService / TriggerManager wiring; use the
+            // (owner, zoneService, triggers) overload for bus-driven
+            // firing + ZoneService-routed token entry. Class leveling
+            // (CR 716) DEFERRED — {1}{U}{R}: Level 2 and {3}{U}{R}: Level 3
+            // activated abilities are not wired (blocked on per-activated-
+            // ability sorcery-speed gate + ClassState binder hook + the
+            // sequential-level cost restriction; same gap as Tasigur's
+            // {B}{G}{U} on the sorcery-speed axis). Level 2 cast-trigger
+            // (Mercenary deals 1 damage) and Level 3 loot trigger DEFERRED
+            // with the leveling primitive — both are simple bodies that
+            // mirror PsychicFrog / FaithlessLooting / LedgerShredder once
+            // the level gate exists. Token colour identity (blue + red)
+            // deferred — same gap as Esika's Chariot's green Cats.
+            // Prowess pump on the token deferred — KeywordAbility marker
+            // attached but no live ContinuousEffectsService is threaded
+            // through TokenFactory (same posture as MonasteryMentor's
+            // Monk tokens).
+            "Stormchaser's Talent" => StormchasersTalentFactory.Create(owner),
 
             _ => new Card(name, ""),
         };
