@@ -276,6 +276,29 @@ public static class NamedCardFactory
             // Same shape as Fiery Islet; only colour differs.
             "Sunbaked Canyon" => SunbakedCanyonFactory.Create(owner),
 
+            // Land — Hour of Devastation (SunscorchedDesertFactory).
+            // Oracle: "Sunscorched Desert enters tapped. When this land
+            // enters, it deals 1 damage to any target. {T}: Add {C}."
+            // Unconditional ETB-tapped replacement (CR 614.1c) via
+            // EntersTappedReplacement on the supplied ReplacementBus
+            // (mirrors Geralf's Messenger's unconditional ETB-tapped
+            // wiring). ETB triggered ability (CR 603.6a) wired via
+            // Triggers.OnEnterBattlefieldSelf with a 1..1 "any target"
+            // TargetRequest; on resolution deals 1 damage via
+            // SearingBlazeFactory.DealDamageWithPlaneswalker (Player /
+            // Creature / Planeswalker — CR 306.7). The single-arg
+            // dispatcher path attaches the ETB trigger + mana ability
+            // for shape (the ETB-tapped replacement is omitted because
+            // no ReplacementBus is available at dispatch — the Desert
+            // enters untapped in that posture, mirroring how every
+            // other always-tapped factory defers the restriction to
+            // the binder layer for shape-only construction). Use the
+            // (owner, eventBus, triggers, replacements) overload for
+            // fully-wired behaviour. Agent-driven "any target" prompt
+            // deferred — v1 honours pre-set ChosenTargets and absent a
+            // target the damage no-ops cleanly (CR 608.2b).
+            "Sunscorched Desert" => SunscorchedDesertFactory.Create(owner),
+
             // U/R surveil land — Foundations (ThunderingFallsFactory).
             // {T}: Add {U} or {R} — two ManaAbility instances wired.
             // ETB trigger: surveil 1 — default-all-graveyard decision wired.
@@ -585,6 +608,20 @@ public static class NamedCardFactory
             // alongside the existing Underground Mortuary / Thundering
             // Falls / Elegant Parlor surveil-lands.
             "Library Surveyor" => LibrarySurveyorFactory.Create(owner),
+
+            // Creature — Faerie Dragon {U}{R} 1/1 (SpriteDragonFactory).
+            // Ikoria: Lair of Behemoths. Flying KeywordAbility marker
+            // (CR 702.9). Cast-noncreature-spell trigger (CR 603.1 / 122.1)
+            // fires on a SpellCastEvent whose ISpell.Controller matches
+            // Sprite Dragon's controller AND whose ISpell.Card lacks
+            // CardType.Creature; effect adds a CounterType.PlusOnePlusOne
+            // counter on Sprite Dragon (same predicate shape as
+            // ProwessFactory, but counters instead of pump — accumulates
+            // across turns with no per-turn cap). Single-arg dispatcher
+            // path attaches the trigger without TriggerManager registration;
+            // (owner, triggers) overload wires bus-driven firing.
+            // Introduces CardSubtype.Faerie (Dragon already present).
+            "Sprite Dragon" => SpriteDragonFactory.Create(owner),
 
             // Creature — Bird Advisor {1}{U} 1/3 (LedgerShredderFactory).
             // Flying keyword wired. Two triggered abilities surfaced on the
@@ -3035,6 +3072,19 @@ public static class NamedCardFactory
             // (owner, eventBus, triggers, effects) overload for fully-wired
             // behavior.
             "Monastery Mentor" => MonasteryMentorFactory.Create(owner),
+
+            // Creature — Human Monk {R} 1/2 (MonasterySwiftspearFactory).
+            // Khans of Tarkir + many reprints. Haste (CR 702.10) +
+            // Prowess (CR 702.108) — "Whenever you cast a noncreature
+            // spell, this creature gets +1/+1 until end of turn." Haste +
+            // Prowess KeywordAbility markers always attached for shape
+            // inspection. Prowess mechanic itself wired via
+            // ProwessFactory.Build when a ContinuousEffectsService is
+            // supplied. The single-arg dispatcher path produces the
+            // correct card shape without trigger-manager or effects
+            // wiring. Use the (owner, eventBus, triggers, effects)
+            // overload for fully-wired behavior.
+            "Monastery Swiftspear" => MonasterySwiftspearFactory.Create(owner),
 
             // Instant — {B}{G} (AssassinsTrophyFactory). Guilds of Ravnica.
             // "Destroy target permanent an opponent controls. Its controller
