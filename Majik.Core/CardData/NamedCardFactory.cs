@@ -207,6 +207,21 @@ public static class NamedCardFactory
             // (CR 702.74b).
             "Endurance" => EnduranceFactory.Create(owner),
 
+            // Creature — Human Shaman {1}{G}{G} 2/1 (EternalWitnessFactory).
+            // Fifth Dawn + many reprints. ETB triggered ability (CR 603.6a)
+            // wired via Triggers.OnEnterBattlefieldSelf with a bespoke 1..1
+            // "target card in your graveyard" TargetRequest (ANY card type,
+            // distinct from Animate Dead's creature-only graveyard target).
+            // On resolution returns the chosen card Graveyard → Hand;
+            // single-arg dispatcher path falls back to first-card-in-grave
+            // pick when no agent-set target is present (mirrors Wishclaw
+            // Talisman / Tasigur). Empty graveyard / illegal target → clean
+            // no-op (CR 608.2b). "You may" auto-accepted at v1 (same
+            // posture as Tireless Tracker / Phlage / Snapcaster Mage).
+            // Use the (owner, zoneService, eventBus, triggers) overload
+            // for bus-driven firing + ZoneService-routed return.
+            "Eternal Witness" => EternalWitnessFactory.Create(owner),
+
             // Legendary Artifact — Vehicle {3}{G} 4/4 (EsikasChariotFactory).
             // Kaldheim. ETB trigger: create two 2/2 Cat creature tokens.
             // Attack trigger: create a token that's a copy of target token
@@ -851,6 +866,22 @@ public static class NamedCardFactory
             // artifact lands both count); opponent permanents and non-
             // artifact/land creatures are excluded.
             "Galvanic Discharge" => GalvanicDischargeFactory.Create(owner),
+
+            // Creature — Zombie {B}{B}{B} 3/2 (GeralfsMessengerFactory).
+            // Dark Ascension. "Geralf's Messenger enters tapped. When
+            // Geralf's Messenger enters, target opponent loses 2 life.
+            // Undying." (CR 614.1c + CR 603.6a + CR 119.3 + CR 702.93.)
+            // ETB-tapped replacement registered via EntersTappedReplacement
+            // on the supplied ReplacementBus (single-arg dispatcher path
+            // omits the replacement — Messenger enters untapped on shape-
+            // only paths, mirroring Creeping Tar Pit / Valakut). ETB
+            // triggered ability with a 1..1 "target opponent" TargetRequest
+            // (mirrors Hidetsugu's Second Rite). Undying via the shared
+            // UndyingFactory.Build helper. Undying return re-applies the
+            // enters-tapped replacement per CR 614.1c. Use the
+            // (owner, eventBus, triggers, replacements) overload for fully-
+            // wired behavior.
+            "Geralf's Messenger" => GeralfsMessengerFactory.Create(owner),
 
             // Sorcery — {1}{R} (TribalFlamesFactory). Onslaught / Modern Horizons 2.
             // "Tribal Flames deals X damage to any target, where X is the
@@ -2967,6 +2998,18 @@ public static class NamedCardFactory
             // without trigger-manager wiring. Use the (owner, eventBus,
             // triggers) overload for fully-wired behavior.
             "Young Pyromancer" => YoungPyromancerFactory.Create(owner),
+
+            // Creature — Wolf {G} 1/1 (YoungWolfFactory). Innistrad.
+            // Undying keyword marker (CR 702.93). Undying triggered ability
+            // (CR 702.93b) wired via UndyingFactory.Build — fires on
+            // Battlefield → Graveyard CardMovedEvent with intervening-if
+            // "no +1/+1 counters at death" (CR 603.4); on resolve raw-moves
+            // graveyard → battlefield, clears counters (CR 121.2), and adds
+            // one +1/+1 counter. The single-arg dispatcher path attaches the
+            // trigger without TriggerManager registration. Use the (owner,
+            // triggers) overload for bus-driven trigger firing (mirrors
+            // NihilSpellbombFactory's two-arg pattern).
+            "Young Wolf" => YoungWolfFactory.Create(owner),
 
             // Creature — Human Monk {2}{W} 2/2 (MonasteryMentorFactory).
             // Fate Reforged. Prowess (CR 702.108) — whenever you cast a

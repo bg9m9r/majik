@@ -127,6 +127,9 @@ public enum CardSubtype
     /// keyword but the subtype itself is mechanically inert; the Defender
     /// keyword is what blocks combat (CR 702.3). CR 205.3m.</summary>
     Wall,
+    /// <summary>Wolf creature subtype — Young Wolf (Innistrad), Strangleroot Geist,
+    /// Master of the Wild Hunt. CR 205.3m.</summary>
+    Wolf,
 
     // Land subtypes (examples)
     Forest,
