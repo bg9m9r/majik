@@ -3399,6 +3399,28 @@ public static class NamedCardFactory
             // Monk tokens).
             "Stormchaser's Talent" => StormchasersTalentFactory.Create(owner),
 
+            // ---- Modern fetchlands — Onslaught + Zendikar cycles (group B) ----
+            // Each fetchland has no mana ability and one activated ability:
+            // {T}, Pay 1 life, Sacrifice this land: search library for a land
+            // with the appropriate basic land subtypes, put it onto the
+            // battlefield (untapped). Shuffle deferred (same gap as all other
+            // tutors — no IZone.Shuffle entry point yet). CR 701.19a / CR 305.6.
+
+            // Land — Onslaught (PollutedDeltaFactory). Fetches Island or Swamp.
+            "Polluted Delta" => PollutedDeltaFactory.Create(owner),
+
+            // Land — Onslaught (WindsweptHeathFactory). Fetches Forest or Plains.
+            "Windswept Heath" => WindsweptHeathFactory.Create(owner),
+
+            // Land — Zendikar (AridMesaFactory). Fetches Plains or Mountain.
+            "Arid Mesa" => AridMesaFactory.Create(owner),
+
+            // Land — Onslaught (BloodstainedMireFactory). Fetches Swamp or Mountain.
+            "Bloodstained Mire" => BloodstainedMireFactory.Create(owner),
+
+            // Land — Onslaught (WoodedFoothillsFactory). Fetches Mountain or Forest.
+            "Wooded Foothills" => WoodedFoothillsFactory.Create(owner),
+
             _ => new Card(name, ""),
         };
 
