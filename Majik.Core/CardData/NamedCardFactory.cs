@@ -713,6 +713,21 @@ public static class NamedCardFactory
             // demand via TemurBattleRageFactory.BuildSpellDefinition.
             "Temur Battle Rage" => TemurBattleRageFactory.Create(owner),
 
+            // Instant — {R} (ViolentUrgeFactory). Duskmourn: House of Horror.
+            // "Target creature gets +1/+0 and gains first strike until end
+            //  of turn. Delirium — If there are four or more card types
+            //  among cards in your graveyard, that creature gains double
+            //  strike until end of turn."
+            // Card shape only here; the resolve-time SpellDefinition
+            // (pump + first-strike grant + delirium-conditional double-
+            // strike grant — both keyword grants Layer 6, pump Layer 7c
+            // per CR 613.1c; delirium sampled at resolution per CR 702.105
+            // via the shared Tarmogoyf distinct-card-type helper Unholy
+            // Heat already routes through) is built on demand via
+            // ViolentUrgeFactory.BuildSpellDefinition. Illegal-target /
+            // no-ActiveEffects fallbacks no-op cleanly.
+            "Violent Urge" => ViolentUrgeFactory.Create(owner),
+
             // Instant — {1}{U} (NegateFactory). Various sets.
             // "Counter target noncreature spell."
             // Card shape only here; the resolve-time SpellDefinition
