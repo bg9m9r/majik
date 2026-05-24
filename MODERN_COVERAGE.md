@@ -42,7 +42,7 @@ One row per file under `Majik.Core/CardData/Factories/`. PR column is the most r
 | Badgermole Cub | Creature | — | earthbend shell |
 | Blood Moon | Enchantment | #156 | nonbasic-to-Mountain Layer 4 |
 | Blooming Marsh | Land | — | B/G fastland |
-| Bonecrusher Giant | Creature | TBD | 4/3 Giant {2}{R} + targeted-by-spell trigger deals 2 to spell's controller (Adventure / Stomp half deferred) |
+| Bonecrusher Giant | Creature | TBD | 4/3 Giant {2}{R} + targeted-by-spell trigger deals 2 to spell's controller. Stomp Adventure half ({1}{R} Instant — "Stomp deals 2 damage to any target") wired through the CR 715 cast pipeline (`AdventureAlternativeCost` + `Card.AdventureSpec` → exile on resolve + runtime exile-cast grant for printed creature face). Damage-can't-be-prevented rider still deferred (no prevention infra). |
 | Boros Reckoner | Creature | TBD | 3/3 Minotaur Wizard {R/W}{R/W}{R/W} + first strike + damage-received trigger redirecting that much damage to any target (v1 triggered, not the printed *replacement* effect — damage still resolves on Boros Reckoner before the redirect fires, and the redirect goes on the stack). Hybrid {R/W} parses via ManaCost.Parse's HybridPip path |
 | Boseiju, Who Endures | Land | — | channel destroy stub |
 | Botanical Sanctum | Land | — | G/U fastland |
@@ -329,6 +329,7 @@ Cards under `Majik.Core/CardData/Cards/*.json`:
 | Bot-side alt-cost discovery (probe registry) | Done (TBD) | `Players/Agents/AlternativeCostProbeRegistry.cs` + `PitchAltCostProbe`, `DelveAltCostProbe`, `OverloadAltCostProbe`, `CascadeAltCostProbe`; pluggable via `Register(probe)` |
 | Cast-from-exile | Done | `Costs/CastFromExileAlternativeCost.cs` (suspend resolution) |
 | Cast-from-graveyard (Lurrus) | Done (TBD PR) | `Costs/GraveyardCastAlternativeCost.cs` + `CardData/Factories/LurrusOfTheDreamDenFactory.cs` (per-turn gate, mv ≤ 2, permanent-only) |
+| Adventure (CR 715) | Done (TBD PR) | `Costs/AdventureAlternativeCost.cs` + `CardData/Adventures/AdventureSpec.cs` + `Card.AdventureSpec`. Cast-as-Adventure from hand routes through `SpellCastFlow` with the Adventure mana cost (sorcery-speed gate enforced for sorcery Adventures via `IsLegalInContext`); on resolve `Spell.PostResolutionZoneOverride = Exile` re-routes the card to exile (CR 715.3d) instead of the printed-type default (battlefield for creatures), and `AdventureAlternativeCost.OnResolved` stamps a runtime exile-cast grant via `Card.GrantRuntimeExileCast` so the owner may cast the creature face from exile via `ExileCastAlternativeCost` for the printed cost. Bonecrusher Giant / Murderous Rider / Embereth Shieldbreaker factories rewired through this surface. |
 | Sacrifice-self | Done | `Costs/SacrificeAnotherCreatureCost.cs`, `SacrificeCreatureCost.cs`, `SacrificeBasicLandCost.cs` |
 | Discard-self | Done | `Costs/DiscardSelfCost.cs` |
 | Remove-counter | Done | `Costs/RemovePlusOnePlusOneCounterCost.cs` |

@@ -87,6 +87,22 @@ public sealed class SpellCastFlow
                 $"Cannot cast {card.Name} via pitch: it is the caster's own turn (CR 118.9 timing gate).");
         }
 
+        // CR 117.1 + CR 715.3b — Adventure alt-cost. A sorcery-typed
+        // Adventure ("while on the stack as an Adventure, the spell has
+        // only its alternative characteristics") must be cast at sorcery
+        // speed even though the printed card is a Creature. SpellCastFlow
+        // already skips the generic CastingPermission gate when an alt-cost
+        // is supplied (per the alternativeCost == null check above), so the
+        // Adventure-shaped sorcery-speed re-check lives here — same shape
+        // PitchAlternativeCost uses for its activePlayer gate. Instant
+        // Adventures return true unconditionally.
+        if (alternativeCost is AdventureAlternativeCost adv
+            && !adv.IsLegalInContext(ctx.ActivePlayer, ctx.CurrentPhase, _stack.IsEmpty, caster))
+        {
+            throw new InvalidOperationException(
+                $"Cannot cast {card.Name} as Adventure: sorcery-speed restriction (CR 117.1 / 715.3b).");
+        }
+
         // CR 601.2f — additional costs first, before mana payment.
         // Merge the caller-supplied list with any costs the card itself
         // declares via SpellDefinition.AdditionalCosts (template-bound
@@ -231,6 +247,18 @@ public sealed class SpellCastFlow
         }
 
         var spell = new Spells.Spell(card, caster, effects: finalEffects);
+
+        // CR 608.2 / CR 715.3d — let the alt-cost re-route the post-
+        // resolution destination away from the printed-type default
+        // (Adventure exiles a Creature card; future "exile if it would
+        // be put in graveyard" riders can reuse the same hook). The
+        // StackResolver reads this in preference to the printed-type
+        // check when deciding where the card lands after Spell.Resolve().
+        if (alternativeCost?.PostResolutionZone is { } overrideZone)
+        {
+            spell.PostResolutionZoneOverride = overrideZone;
+        }
+
         _stack.Push(spell);
         _eventBus.Publish(new SpellCastEvent(spell));
 

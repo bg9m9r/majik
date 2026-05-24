@@ -247,6 +247,21 @@ public class Card : ICard
     /// </summary>
     public Majik.Core.CardData.MDFCs.MdfcState? MdfcState { get; set; }
 
+    /// <summary>
+    /// CR 715 — Adventure half descriptor. Non-null on adventurer cards
+    /// (Bonecrusher Giant, Murderous Rider, Embereth Shieldbreaker, …);
+    /// null on single-face cards. Attached by the card's factory at build
+    /// time and read by <see cref="Majik.Core.Costs.AdventureAlternativeCost"/>
+    /// when the caster picks the Adventure cast path.
+    ///
+    /// While exiled by a resolved Adventure (CR 715.3d), the printed-side
+    /// "may cast from exile" permission is stamped on the card via the
+    /// existing <see cref="GrantRuntimeExileCast"/> surface — same probe
+    /// surface as Ragavan / Cascade — so no Adventure-specific cast-from-
+    /// exile alt-cost is required.
+    /// </summary>
+    public Majik.Core.CardData.Adventures.AdventureSpec? AdventureSpec { get; set; }
+
     public Card(string name, string manaCost = "", IEnumerable<CardType>? cardTypes = null, IEnumerable<CardSupertype>? supertypes = null, IEnumerable<CardSubtype>? subtypes = null)
     {
         if (string.IsNullOrWhiteSpace(name))

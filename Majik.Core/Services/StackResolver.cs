@@ -137,9 +137,23 @@ public class StackResolver
     /// <summary>
     /// Get the zone the spell should move to after resolution.
     /// Permanents go to battlefield, instants/sorceries go to graveyard (Rule 608.2).
+    /// An alt-cost may override this via <see cref="Spell.PostResolutionZoneOverride"/>
+    /// (CR 715.3d — Adventure spells exile instead of going to graveyard /
+    /// battlefield; the override is stamped by <see cref="Game.SpellCastFlow"/>
+    /// from <see cref="Costs.IAlternativeCost.PostResolutionZone"/>).
     /// </summary>
     private ZoneType GetSpellDestinationZone(ISpell spell)
     {
+        // CR 715.3d / Flashback / similar — alt-cost-supplied destination
+        // override wins over the printed-type default. We consult Spell
+        // directly here (rather than re-threading the alt-cost through
+        // StackResolver) because Spell is the only object on the stack
+        // and SpellCastFlow already stamps the field at cast time.
+        if (spell is Majik.Core.Spells.Spell concrete && concrete.PostResolutionZoneOverride.HasValue)
+        {
+            return concrete.PostResolutionZoneOverride.Value;
+        }
+
         var card = spell.Card;
 
         // Permanents go to battlefield
