@@ -1880,6 +1880,23 @@ public static class NamedCardFactory
             // 701.19c) deferred — same rationale as SearchSpellFactory.
             "Chord of Calling" => ChordOfCallingFactory.Create(owner),
 
+            // Sorcery — {X}{G} (GreenSunsZenithFactory). Mirrodin Besieged /
+            // Modern Horizons 2. "Search your library for a green creature
+            // card with mana value X or less, put it onto the battlefield,
+            // then shuffle. Shuffle Green Sun's Zenith into its owner's
+            // library." CR 701.19a tutor + CR 105.2a green colour predicate
+            // via CardColors.GetColors + CR 608.2c self-shuffle override of
+            // the default sorcery-to-graveyard destination. Card shape only
+            // here; the resolve-time spell definition (HasVariableX = true,
+            // tutor green creature mv ≤ X → battlefield, then move self to
+            // owner's library) is built on demand via
+            // GreenSunsZenithFactory.BuildSpellDefinition(caster, card,
+            // zoneService) so ETB triggers fire on the tutored permanent
+            // when a ZoneService is wired (mirrors ChordOfCallingFactory /
+            // EldritchEvolutionFactory wiring). Library shuffle (CR 701.20a)
+            // deferred — same rationale as SearchSpellFactory.
+            "Green Sun's Zenith" => GreenSunsZenithFactory.Create(owner),
+
             // Artifact — {X} (EngineeredExplosivesFactory). Fifth Dawn / Modern
             // Horizons. Sunburst ETB → enters with X charge counters
             // (CR 702.43a — non-creature variant). v1 approximation: the
