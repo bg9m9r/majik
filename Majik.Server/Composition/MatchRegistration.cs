@@ -1,4 +1,5 @@
 using Majik.Server.Matches;
+using Microsoft.Extensions.Logging;
 
 namespace Majik.Server.Composition;
 
@@ -26,6 +27,14 @@ public static class MatchRegistration
         // (scoped) — every match attaches once at facade-create and
         // detaches at terminal state.
         services.AddSingleton<MatchFacadeBridge>();
+        // Bot-match scheduler: drives the bot's roll + play/draw follow-up
+        // with brief delays so the SignalR-fed UI lingers on Rolling long
+        // enough for the user to see the dice. Singleton so the same set
+        // of scheduled callbacks is shared across requests (matches the
+        // pattern used by MatchTimeoutScheduler).
+        services.AddSingleton<IBotMatchScheduler>(sp => new BotMatchScheduler(
+            sp,
+            sp.GetService<ILogger<BotMatchScheduler>>()));
         services.AddSingleton(sp => new MatchTimeoutScheduler(
             async (matchId, holder, ct) =>
             {
