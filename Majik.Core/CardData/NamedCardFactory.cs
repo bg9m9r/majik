@@ -2544,6 +2544,17 @@ public static class NamedCardFactory
             // ChosenTargets and auto-accepts the may).
             "Valakut, the Molten Pinnacle" => ValakutTheMoltenPinnacleFactory.Create(owner),
 
+            // Land — Island (MysticSanctuaryFactory). Modern Horizons 2.
+            // "{T}: Add {U}. When Mystic Sanctuary enters the battlefield,
+            //  if you control three or more other Islands, put target instant
+            //  or sorcery card from your graveyard on top of your library."
+            // CR 603.4 (intervening-if: 3+ other Islands) + CR 608.2b
+            // (illegal-on-resolution guard). Single-arg dispatcher path
+            // attaches the {T}: Add {U} mana ability + ETB trigger for
+            // shape; use MysticSanctuaryFactory.Create(owner, triggers)
+            // for bus-driven trigger registration.
+            "Mystic Sanctuary" => MysticSanctuaryFactory.Create(owner),
+
             // Sorcery — {1}{R} (MizziumMortarsFactory). Return to Ravnica.
             // CR 702.96 — Overload. Default printed cast deals 4 damage to
             // target creature; the overload alt-cost {4}{R}{R} rewrites
