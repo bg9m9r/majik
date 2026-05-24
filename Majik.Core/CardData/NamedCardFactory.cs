@@ -2824,6 +2824,26 @@ public static class NamedCardFactory
             // for the wired form.
             "Leonin Arbiter" => LeoninArbiterFactory.Create(owner),
 
+            // Instant — {B}{G} (AbruptDecayFactory). Return to Ravnica.
+            // "This spell can't be countered. Destroy target nonland
+            //  permanent with mana value 3 or less." (CR 701.7 / CR 202.3.)
+            // "Can't Be Countered" keyword marker attached for structural
+            // observability; enforcement deferred (same posture as
+            // Veil of Summer / Cavern of Souls). Card shape only here;
+            // the resolve-time SpellDefinition (mv ≤ 3 gate + destroy)
+            // is built on demand via
+            // AbruptDecayFactory.BuildSpellDefinition.
+            "Abrupt Decay" => AbruptDecayFactory.Create(owner),
+
+            // Instant — {B}{R} (TerminateFactory). Planeshift / various reprints.
+            // "Destroy target creature. It can't be regenerated." (CR 701.7.)
+            // Card shape only here; the resolve-time SpellDefinition
+            // (target-creature request + destroy) is built on demand via
+            // TerminateFactory.BuildSpellDefinition. "Can't be regenerated"
+            // rider deferred — no regeneration shield surface in the engine
+            // yet (same gap as Wrath of God / Day of Judgment).
+            "Terminate" => TerminateFactory.Create(owner),
+
             // Instant — {1}{B}{R} (KolaghansCommandFactory). Dragons of Tarkir.
             // CR 700.2e — modal "Choose two —" with 4 printed modes
             // (return creature from graveyard to hand / 2 damage to any target /
