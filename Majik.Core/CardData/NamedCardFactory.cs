@@ -117,6 +117,19 @@ public static class NamedCardFactory
             // ETB damage trigger + opponent-draw watcher + amass Orcs 1 deferred.
             "Orcish Bowmasters" => OrcishBowmastersFactory.Create(owner),
 
+            // Legendary Creature — Cat {W} 1/1 (OcelotPrideFactory).
+            // Lifelink keyword marker (CR 702.15) wired. Attack trigger
+            // (CR 508.1f) creates a 1/1 white Cat token via TokenFactory;
+            // city's blessing doubling (Ascend, CR 702.131) is stubbed
+            // until an Ascend primitive lands. End-step flicker trigger
+            // (CR 500.4 / CR 701.20) exile-and-returns the card when a
+            // creature you controlled dealt combat damage to a player
+            // this turn — the per-turn latch + flicker move both gate on
+            // the (owner, zoneService, eventBus, triggers) overload. The
+            // single-arg dispatcher path attaches the keyword + both
+            // triggers structurally without TriggerManager / bus wiring.
+            "Ocelot Pride" => OcelotPrideFactory.Create(owner),
+
             // Artifact — {2} (AgathasSoulCauldronFactory).
             // {T}: Exile first card from controller's graveyard; if creature, +1/+1 counter
             // on first creature on controller's battlefield — wired (v1 auto-pick).
@@ -823,6 +836,17 @@ public static class NamedCardFactory
             //  DismemberFactory.PhyrexianAlternativeCost. -5/-5 EOT via
             //  PumpUntilEndOfTurnEffect in DismemberFactory.BuildDefinition.
             "Dismember" => DismemberFactory.Create(owner),
+
+            // Instant — {G/P} (MutagenicGrowthFactory). New Phyrexia.
+            // "({G/P} can be paid with either {G} or 2 life.)
+            //  Target creature gets +2/+2 until end of turn." Main cost {G};
+            //  Phyrexian alt-cost (2 life) via
+            //  MutagenicGrowthFactory.PhyrexianAlternativeCost. +2/+2 EOT
+            //  via PumpUntilEndOfTurnEffect in
+            //  MutagenicGrowthFactory.BuildDefinition. Sibling of
+            //  GutShotFactory (single {X/P} pip) and DismemberFactory
+            //  (pump-EOT resolve shape).
+            "Mutagenic Growth" => MutagenicGrowthFactory.Create(owner),
 
             // Sorcery — {2}{R} (RiftBoltFactory). 3 damage to any target;
             // Suspend 1—{R} (CR 702.62). Spell-def and suspend alt cost
@@ -1589,6 +1613,27 @@ public static class NamedCardFactory
             // correct card shape only; use the (owner, continuousEffects)
             // overload for live boost / lose-flying registration.
             "Colossus Hammer" => ColossusHammerFactory.Create(owner),
+
+            // Artifact — Equipment {1}{R} (CoriSteelCutterFactory). Tarkir:
+            // Dragonstorm. Static "equipped creature gets +1/+1 and has
+            // trample and haste" via paired AttachedBoostEffect registrations
+            // (Layer 7c for the +1/+1, Layer 6 for the granted "Trample" +
+            // "Haste" keyword names). Flurry — second-spell-each-turn trigger
+            // (closure counter shared with a TurnStartedEvent reset handler,
+            // mirrors LedgerShredderFactory's predicate shape) spawns a 1/1
+            // Monk creature token with a "Prowess" KeywordAbility marker
+            // (white colour + live prowess pump on the token deferred —
+            // same gaps as StormchasersTalentFactory's Mercenary token and
+            // MonasteryMentorFactory's Monk tokens) and auto-attaches
+            // Cori-Steel Cutter to it (may-clause auto-accepted at v1).
+            // Equip {1}{R} activated ability wired (sorcery-speed gate +
+            // attach-target prompt deferred — same gaps as the Colossus
+            // Hammer / Sword of Fire and Ice equipment cycle). The single-
+            // arg dispatcher path produces the correct card shape only;
+            // use the (owner, continuousEffects, zoneService, eventBus,
+            // triggers) overload for live boost / keyword grant / Flurry
+            // bus-driven firing.
+            "Cori-Steel Cutter" => CoriSteelCutterFactory.Create(owner),
 
             // Artifact — Equipment {1} (SkullclampFactory). Darksteel.
             // Static "equipped creature gets +1/-1" + dies trigger (CR 603.6c /
@@ -2374,6 +2419,20 @@ public static class NamedCardFactory
             // keyword marker only in v1 — see InkmothNexusFactory xmldoc.
             "Inkmoth Nexus" => InkmothNexusFactory.Create(owner),
 
+            // Instant — {U} (IntoTheFloodMawFactory). Bloomburrow.
+            // "Gift a tapped Fish (...). Return target creature an opponent
+            //  controls to its owner's hand. If the gift was promised,
+            //  instead return target nonland permanent an opponent controls
+            //  to its owner's hand." v1 ships the printed base mode only
+            //  (no-gift bounce target creature an opponent controls). Gift
+            //  cast-time prompt + conditional target predicate are DEFERRED
+            //  pending SpellCastFlow gift-promise hook + TargetRequest
+            //  conditional-predicate primitive. Single-arg dispatcher
+            //  produces the correct card shape; pass (caster, zoneService)
+            //  to BuildDefinition for the opponent-control gate +
+            //  replacement-bus-aware zone moves.
+            "Into the Flood Maw" => IntoTheFloodMawFactory.Create(owner),
+
             // Creature — Human Wizard {2}{U} 2/2 (TrinketMageFactory).
             // ETB tutor: search library for an artifact card with mana
             // value 1 or less → hand (deterministic first-match; shuffle
@@ -2742,6 +2801,17 @@ public static class NamedCardFactory
             // Functional reprint of Wrath of God in black; resolve effect
             // delegates to WrathOfGodFactory.BuildResolveEffect.
             "Damnation" => DamnationFactory.Create(owner),
+
+            // Sorcery — {X}{W}{W} (WrathOfTheSkiesFactory). Modern Horizons 3.
+            // "You may pay {E}{E}{E}{E} rather than pay this spell's mana
+            // cost. Destroy each nonland permanent with mana value X or
+            // less." Card shape only at the dispatcher; the resolve
+            // effect (all-battlefields nonland mv-≤-X sweep) is built on
+            // demand via WrathOfTheSkiesFactory.BuildResolveEffect, and
+            // the printed energy alt-cost (CR 118.9 + CR 106.13) via
+            // WrathOfTheSkiesFactory.BuildAlternativeCost — the first
+            // card to wire the new EnergyAlternativeCost surface.
+            "Wrath of the Skies" => WrathOfTheSkiesFactory.Create(owner),
 
             // Instant — {4}{B} (MurderousCutFactory). Khans of Tarkir.
             // CR 702.66 — Delve. "Delve" marker keyword wired; the cost
