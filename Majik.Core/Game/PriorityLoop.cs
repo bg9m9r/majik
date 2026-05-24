@@ -26,7 +26,7 @@ public sealed class PriorityLoop
     private readonly IReadOnlyDictionary<Player, IPlayerAgent> _agents;
     private readonly Func<int> _turnNumberAccessor;
     private readonly Func<PhaseStateType?> _phaseAccessor;
-    private readonly LandDropTracker? _landDropTracker;
+    private readonly LandDropTracker _landDropTracker;
     private readonly Func<Player, PriorityAction.CastSpell, GameContext, Task>? _castDispatcher;
     private readonly Func<Player, PriorityAction.ActivateAbility, GameContext, Task>? _activateDispatcher;
     private readonly Action<Player, PriorityAction.ActivateManaAbility>? _manaAbilityDispatcher;
@@ -41,7 +41,7 @@ public sealed class PriorityLoop
         IReadOnlyDictionary<Player, IPlayerAgent> agents,
         Func<int> turnNumberAccessor,
         Func<PhaseStateType?> phaseAccessor,
-        LandDropTracker? landDropTracker = null,
+        LandDropTracker landDropTracker,
         Func<Player, PriorityAction.CastSpell, GameContext, Task>? castDispatcher = null,
         Func<Player, PriorityAction.ActivateAbility, GameContext, Task>? activateDispatcher = null,
         Action<Player, PriorityAction.ActivateManaAbility>? manaAbilityDispatcher = null)
@@ -57,7 +57,11 @@ public sealed class PriorityLoop
         _agents = agents ?? throw new ArgumentNullException(nameof(agents));
         _turnNumberAccessor = turnNumberAccessor;
         _phaseAccessor = phaseAccessor;
-        _landDropTracker = landDropTracker;
+        // CR 305.2 — the per-turn one-land cap is engine-level and unconditional.
+        // PriorityLoop must always own a tracker so PlayLand consumption is gated
+        // uniformly for every actor (bot or human). Callers that don't otherwise
+        // need a tracker should instantiate a fresh one.
+        _landDropTracker = landDropTracker ?? throw new ArgumentNullException(nameof(landDropTracker));
     }
 
     /// <summary>
@@ -132,7 +136,9 @@ public sealed class PriorityLoop
         switch (action)
         {
             case PriorityAction.PlayLand land:
-                if (_landDropTracker != null && _activePlayer != null)
+                if (_activePlayer == null)
+                    throw new InvalidOperationException(
+                        "PriorityLoop received PlayLand before RunUntilRoundEndsAsync set an active player.");
                 {
                     var phase = _phaseAccessor() ?? PhaseStateType.Main;
                     if (!_landDropTracker.CanPlayLand(
@@ -149,9 +155,9 @@ public sealed class PriorityLoop
                             $"PriorityLoop: rejected PlayLand({land.Land.Name}) by {actor.Name}: {reason}");
                         break;
                     }
+                    _zoneService.MoveCardTo(land.Land, ZoneType.Battlefield, controller: actor);
                     _landDropTracker.RecordLandPlayed(actor);
                 }
-                _zoneService.MoveCardTo(land.Land, ZoneType.Battlefield, controller: actor);
                 break;
             case PriorityAction.CastSpell cast:
                 if (_castDispatcher == null)

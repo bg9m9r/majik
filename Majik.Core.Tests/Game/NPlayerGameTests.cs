@@ -70,7 +70,8 @@ public class NPlayerGameTests
             p => p, p => (IPlayerAgent)new DeterministicBotAgent());
         var loop = new PriorityLoop(
             players, actualPriority, stack, resolver, zones, agents,
-            () => 1, () => Majik.Core.StateMachine.PhaseStateType.Main);
+            () => 1, () => Majik.Core.StateMachine.PhaseStateType.Main,
+            new LandDropTracker());
 
         await loop.RunUntilRoundEndsAsync(players[0]);
 

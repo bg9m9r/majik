@@ -38,7 +38,7 @@ public sealed class TurnDriver
     private readonly CombatFlow _combatFlow;
     private readonly Majik.Core.Effects.ContinuousEffectsService? _continuousEffects;
     private readonly Majik.Core.Effects.ReplacementBus? _replacements;
-    private readonly LandDropTracker? _landDropTracker;
+    private readonly LandDropTracker _landDropTracker;
     private readonly AdditionalCombatQueue _additionalCombats = new();
     private PhaseStateType _currentPhase;
     private int _currentTurnNumber;
@@ -76,7 +76,10 @@ public sealed class TurnDriver
     {
         _continuousEffects = continuousEffects;
         _replacements = replacements;
-        _landDropTracker = landDropTracker;
+        // CR 305.2 — PriorityLoop requires a non-null LandDropTracker. Callers
+        // that don't supply one get a fresh per-driver instance; the rule is
+        // enforced uniformly regardless.
+        _landDropTracker = landDropTracker ?? new LandDropTracker();
         _eventBus = eventBus;
         _spellDefResolver = spellDefinitionResolver;
         _players = players ?? throw new ArgumentNullException(nameof(players));
@@ -155,7 +158,7 @@ public sealed class TurnDriver
         _eventBus?.Publish(new Majik.Core.Events.TurnStartedEvent(activePlayer, turnNumber));
 
         // CR 305.2 — land drops reset at turn start.
-        _landDropTracker?.ResetTurn();
+        _landDropTracker.ResetTurn();
 
         // CR 119.3 — per-player life-loss counters reset at turn start.
         // Consulted by Spectacle alt-cost, Revolt, "if you lost life this

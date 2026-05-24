@@ -91,4 +91,20 @@ public class PriorityLoopLandDropTests
         l2.Zone.Should().Be(ZoneType.Hand, "rejected PlayLand should leave the land in hand");
         tracker.DropsUsedThisTurn(_alice).Should().Be(1, "rejected play must not increment the counter");
     }
+
+    [Fact]
+    public void Ctor_NullLandDropTracker_Throws()
+    {
+        // CR 305.2 — the per-turn one-land cap is engine-level and unconditional.
+        // PriorityLoop refuses to construct without a tracker so no caller can
+        // accidentally fall into a "no tracker = no rule" code path.
+        var act = () => new PriorityLoop(
+            new[] { _alice, _bob }, _priority, _stack, _resolver, _zones,
+            new Dictionary<Player, IPlayerAgent>
+            { [_alice] = new ScriptedAgent(), [_bob] = new ScriptedAgent() },
+            () => 1, () => PhaseStateType.Main, landDropTracker: null!);
+
+        act.Should().Throw<ArgumentNullException>()
+            .And.ParamName.Should().Be("landDropTracker");
+    }
 }
