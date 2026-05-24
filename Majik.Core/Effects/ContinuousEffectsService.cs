@@ -332,6 +332,30 @@ public sealed class ContinuousEffectsService
     }
 
     /// <summary>
+    /// CR 602.5 / 605.1a — true iff any registered
+    /// <see cref="ActivationRestrictionEffect"/> matches
+    /// <paramref name="permanent"/>. Consulted by the activation path
+    /// before pushing an ability to the stack.
+    ///
+    /// When <paramref name="isManaAbility"/> is true, restrictions whose
+    /// <see cref="ActivationRestrictionEffect.ExcludesManaAbilities"/> is
+    /// true do not match — mana abilities (CR 605) bypass the "can't
+    /// activate non-mana abilities" lockout.
+    /// </summary>
+    public bool HasActivationRestriction(Permanent permanent, bool isManaAbility = false)
+    {
+        if (permanent == null) throw new ArgumentNullException(nameof(permanent));
+        foreach (var e in _effects)
+        {
+            if (e is not ActivationRestrictionEffect r) continue;
+            if (!r.IsActive()) continue;
+            if (isManaAbility && r.ExcludesManaAbilities) continue;
+            if (r.Target == null || ReferenceEquals(r.Target, permanent)) return true;
+        }
+        return false;
+    }
+
+    /// <summary>
     /// CR 613.2 — current controller of a permanent after applying any
     /// active Layer 2 control-change effects (latest-timestamp wins). Falls
     /// back to <see cref="Permanent.Controller"/> when no override is active.

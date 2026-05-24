@@ -1,21 +1,21 @@
 # Engine coverage report
 
 - **Scope:** format=modern, dedup-by-name
-- **Generated:** 2026-05-24 19:53 UTC
+- **Generated:** 2026-05-24 20:17 UTC
 - **Total cards:** 21879
-- **Distinct coverage:** 27.4% (5994 / 21879)
-- **Tournament-weighted coverage:** 89.2% (by play-rate; matched weight 19250)
+- **Distinct coverage:** 27.4% (5998 / 21879)
+- **Tournament-weighted coverage:** 92.3% (by play-rate; matched weight 19250)
 - **Top-20 most-played covered:** 20 / 20 (100%)
 
 ## Tier breakdown
 
 | Tier | Count | Share |
 |---|---:|---:|
-| NamedFactory | 240 | 1.1% |
+| NamedFactory | 244 | 1.1% |
 | SpellBound | 3708 | 16.9% |
 | KeywordOnly | 1417 | 6.5% |
 | Vanilla | 629 | 2.9% |
-| Unimplemented | 15885 | 72.6% |
+| Unimplemented | 15881 | 72.6% |
 
 ## Top-20 most-played cards
 
