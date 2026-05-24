@@ -684,6 +684,17 @@ public static class NamedCardFactory
             // and SuspendedCardRegistry.
             "Rift Bolt" => RiftBoltFactory.Create(owner),
 
+            // Sorcery — {2}{G} (SearchForTomorrowFactory). Time Spiral.
+            // "Search your library for a basic land card, put it onto
+            //  the battlefield, then shuffle your library.
+            //  Suspend 2—{G}." (CR 702.62). The land enters untapped
+            // (unlike Path to Exile / Scapeshift). Spell-def and suspend
+            // alt cost built on demand via
+            // SearchForTomorrowFactory.BuildSpellDefinition /
+            // BuildSuspendCost. Library shuffle deferred — same gap as
+            // other search effects (no IZone.Shuffle).
+            "Search for Tomorrow" => SearchForTomorrowFactory.Create(owner),
+
             // Instant — {W} (PathToExileFactory). Conflux. "Exile target
             // creature. Its controller may search their library for a
             // basic land card, put that card onto the battlefield
