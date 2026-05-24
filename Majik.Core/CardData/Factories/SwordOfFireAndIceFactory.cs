@@ -81,8 +81,6 @@ namespace Majik.Core.CardData.Factories;
 ///   not yet implemented. Damage-prevention / target-illegality /
 ///   block-restrictions for "red or blue" sources against the equipped
 ///   creature do not fire.
-/// - <b>Sorcery-speed restriction</b> on Equip activation (CR 702.6a) —
-///   same gap as <see cref="ColossusHammerFactory"/>.
 /// - <b>Attach-target prompt</b> for Equip — v1 picks the first
 ///   controller-side creature deterministically.
 /// - <b>Real "any target" prompt</b> for the combat trigger — v1
@@ -211,7 +209,8 @@ public static class SwordOfFireAndIceFactory
         //   "{2}: Attach to target creature you control. Activate only
         //    as a sorcery."
         // v1 picker: deterministic first controller-side creature.
-        // Sorcery-speed restriction deferred (see class xmldoc).
+        // CR 117.1a / 307.5 sorcery-speed restriction enforced via
+        // ActionValidator (sorcerySpeed: true below).
         // --------------------------------------------------------------
         var equipEffect = new Effect(
             $"{CardName}: equip — attach to a creature you control",
@@ -228,7 +227,8 @@ public static class SwordOfFireAndIceFactory
             source: card,
             controller: owner,
             costs: new ICost[] { new ManaCostCost(EquipCost) },
-            effects: new IEffect[] { equipEffect });
+            effects: new IEffect[] { equipEffect },
+            sorcerySpeed: true);
 
         card.AddAbility(equipAbility);
 

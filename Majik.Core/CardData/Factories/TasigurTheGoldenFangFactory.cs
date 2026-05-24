@@ -38,11 +38,8 @@ namespace Majik.Core.CardData.Factories;
 ///   graveyard". Empty graveyard → clean no-op.
 ///
 /// ## Deferred (v1 gaps)
-/// - <b>Activate only as a sorcery</b>: CR 117.1a. The engine has no
-///   per-activated-ability sorcery-speed gate yet (only spell-casting
-///   consults <see cref="Rules.CastingRestrictions"/>). Same deferral
-///   pattern as Wishclaw Talisman / Priest of Fell Rites / Walking
-///   Ballista — noted in the activated ability comment.
+/// (The activate-as-sorcery timing window for the {B}{G}{U} ability is
+/// now enforced via the ActionValidator gate; see "Implemented" above.)
 /// - <b>Mana cost {B}{G}{U}</b> on the activated ability is modelled as
 ///   <see cref="ManaCostCost"/> with the printed cost string; the
 ///   payment surface itself is handled by the activation flow and the
@@ -117,10 +114,12 @@ public static class TasigurTheGoldenFangFactory
         //   Return that card to your hand. Activate only as a sorcery.
         //
         // CR 605 — not a mana ability (effect is zone movement, not mana
-        // production). CR 117.1a sorcery-speed restriction deferred (see
-        // class xmldoc). CR 113.3 — the opponent makes the choice via
-        // their agent; controller routes through ChooseLibraryPickAsync
-        // (closest existing "agent picks one card from a list" prompt).
+        // production). CR 117.1a / 307.5 — sorcery-speed restriction
+        // enforced via ActionValidator (sorcerySpeed: true on the
+        // activated ability below). CR 113.3 — the opponent makes the
+        // choice via their agent; controller routes through
+        // ChooseLibraryPickAsync (closest existing "agent picks one card
+        // from a list" prompt).
         // ----------------------------------------------------------------
 
         var returnEffect = new Effect(
@@ -181,7 +180,8 @@ public static class TasigurTheGoldenFangFactory
             {
                 new ManaCostCost("{B}{G}{U}"),
             },
-            effects: new IEffect[] { returnEffect });
+            effects: new IEffect[] { returnEffect },
+            sorcerySpeed: true);
 
         card.AddAbility(activated);
         return card;

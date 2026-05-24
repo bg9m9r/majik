@@ -23,4 +23,14 @@ public interface IActivatedAbility : IStackObject, IAbility
     /// The costs paid for this ability.
     /// </summary>
     IReadOnlyList<ICost> Costs { get; }
+
+    /// <summary>
+    /// True when this activated ability carries an "Activate only as a
+    /// sorcery" rider (CR 117.1a / 307.5). The action validator gates
+    /// activations on this flag — the ability is only legal during the
+    /// controller's main phase with an empty stack. Default false
+    /// (any-time activation, subject only to the usual instant-speed
+    /// timing rules).
+    /// </summary>
+    bool IsSorcerySpeed { get; }
 }

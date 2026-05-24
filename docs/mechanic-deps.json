@@ -1,10 +1,10 @@
 {
-  "generated_utc": "2026-05-24T18:34:51.8750064Z",
-  "scanned_dir": "/home/brett/Projects/majik.project/majik.core/.claude/worktrees/agent-a6a9323cefcd8c2d2/Majik.Core/CardData/Factories",
-  "total_mentions": 247,
-  "distinct_factories": 154,
+  "generated_utc": "2026-05-24T19:20:20.6486777Z",
+  "scanned_dir": "/home/brett/Projects/majik.project/majik.core/.claude/worktrees/agent-a0dac5ee3cc669569/Majik.Core/CardData/Factories",
+  "total_mentions": 231,
+  "distinct_factories": 149,
   "cluster_count": 17,
-  "unclustered_count": 131,
+  "unclustered_count": 126,
   "clusters": [
     {
       "primitive_id": "agent-prompt-targeting",
@@ -277,7 +277,7 @@
         {
           "factory": "WishclawTalismanFactory",
           "file": "WishclawTalismanFactory.cs",
-          "line": 146,
+          "line": 145,
           "sentence": "CR 701.19c \u2014 shuffle deferred (no IZone.",
           "cr": "CR 701.19c"
         },
@@ -519,106 +519,8 @@
         {
           "factory": "CoriSteelCutterFactory",
           "file": "CoriSteelCutterFactory.cs",
-          "line": 187,
+          "line": 184,
           "sentence": "Token colour identity (white) deferred \u2014 see class xmldoc."
-        }
-      ]
-    },
-    {
-      "primitive_id": "sorcery-speed-gate",
-      "display_name": "\u0022Activate only as a sorcery\u0022 gate (CR 117.1a)",
-      "comp_rules_citation": "CR 117.1a",
-      "implementation_hint": "ActionValidator-side check: ability/spell flagged sorcery-speed only legal during own main phase with empty stack.",
-      "factory_count": 9,
-      "mention_count": 12,
-      "factories": [
-        "ColossusHammerFactory",
-        "CoriSteelCutterFactory",
-        "SkullclampFactory",
-        "SwordOfFeastAndFamineFactory",
-        "SwordOfFireAndIceFactory",
-        "TasigurTheGoldenFangFactory",
-        "TirelessTrackerFactory",
-        "UmezawasJitteFactory",
-        "WishclawTalismanFactory"
-      ],
-      "mentions": [
-        {
-          "factory": "SwordOfFireAndIceFactory",
-          "file": "SwordOfFireAndIceFactory.cs",
-          "line": 209,
-          "sentence": "Sorcery-speed restriction deferred (see class xmldoc)."
-        },
-        {
-          "factory": "WishclawTalismanFactory",
-          "file": "WishclawTalismanFactory.cs",
-          "line": 110,
-          "sentence": "CR 117.1a sorcery-speed restriction deferred (see class xmldoc).",
-          "cr": "CR 117.1a"
-        },
-        {
-          "factory": "SkullclampFactory",
-          "file": "SkullclampFactory.cs",
-          "line": 13,
-          "sentence": "## Deferred  - \u003Cb\u003ESorcery-speed restriction\u003C/b\u003E on Equip activation (CR 702.6a) \u2014 same gap as \u003Csee cref=\u0022ColossusHammerFactory\u0022/\u003E.",
-          "cr": "CR 702.6a"
-        },
-        {
-          "factory": "SkullclampFactory",
-          "file": "SkullclampFactory.cs",
-          "line": 159,
-          "sentence": "Sorcery-speed restriction deferred (see class xmldoc)."
-        },
-        {
-          "factory": "ColossusHammerFactory",
-          "file": "ColossusHammerFactory.cs",
-          "line": 111,
-          "sentence": "Sorcery-speed restriction deferred (see class xmldoc)."
-        },
-        {
-          "factory": "UmezawasJitteFactory",
-          "file": "UmezawasJitteFactory.cs",
-          "line": 16,
-          "sentence": "## Deferred  - \u003Cb\u003ESorcery-speed restriction\u003C/b\u003E on Equip activation (CR 702.6a) \u2014 same gap as \u003Csee cref=\u0022ColossusHammerFactory\u0022/\u003E.",
-          "cr": "CR 702.6a"
-        },
-        {
-          "factory": "UmezawasJitteFactory",
-          "file": "UmezawasJitteFactory.cs",
-          "line": 246,
-          "sentence": "Sorcery-speed restriction deferred (see class xmldoc)."
-        },
-        {
-          "factory": "TirelessTrackerFactory",
-          "file": "TirelessTrackerFactory.cs",
-          "line": 14,
-          "sentence": "\u003Cb\u003E\u0022Activate only as a sorcery\u0022\u003C/b\u003E \u2014 Tireless Tracker\u0027s printed activated ability has NO sorcery-speed restriction (instant speed on the official card), so nothing is deferred here for this card."
-        },
-        {
-          "factory": "TasigurTheGoldenFangFactory",
-          "file": "TasigurTheGoldenFangFactory.cs",
-          "line": 114,
-          "sentence": "CR 117.1a sorcery-speed restriction deferred (see class xmldoc).",
-          "cr": "CR 117.1a"
-        },
-        {
-          "factory": "SwordOfFeastAndFamineFactory",
-          "file": "SwordOfFeastAndFamineFactory.cs",
-          "line": 14,
-          "sentence": "## Deferred  - \u003Cb\u003ESorcery-speed restriction\u003C/b\u003E on Equip activation (CR 702.6a) \u2014 same gap as the rest of the equipment cycle; enforcement belongs in an action-validator gate, not on the ability itself.",
-          "cr": "CR 702.6a"
-        },
-        {
-          "factory": "SwordOfFeastAndFamineFactory",
-          "file": "SwordOfFeastAndFamineFactory.cs",
-          "line": 244,
-          "sentence": "Sorcery-speed restriction deferred (see class xmldoc)."
-        },
-        {
-          "factory": "CoriSteelCutterFactory",
-          "file": "CoriSteelCutterFactory.cs",
-          "line": 225,
-          "sentence": "Sorcery-speed restriction deferred (see class xmldoc)."
         }
       ]
     },
@@ -641,7 +543,7 @@
         {
           "factory": "DrownInTheLochFactory",
           "file": "DrownInTheLochFactory.cs",
-          "line": 12,
+          "line": 13,
           "sentence": "Indestructible / regeneration riders are deferred (same gap as \u003Csee cref=\u0022SlaughterPactFactory\u0022/\u003E and the rest of the single-target destroy family)."
         },
         {
@@ -765,7 +667,7 @@
         {
           "factory": "SwordOfFireAndIceFactory",
           "file": "SwordOfFireAndIceFactory.cs",
-          "line": 146,
+          "line": 144,
           "sentence": "\u0022 (CR 702.16) Markers ride on the equipment card itself; a Layer 6 grant re-projecting them onto the equipped creature is deferred (see class xmldoc).",
           "cr": "CR 702.16"
         },
@@ -845,7 +747,7 @@
         {
           "factory": "BurstLightningFactory",
           "file": "BurstLightningFactory.cs",
-          "line": 10,
+          "line": 11,
           "sentence": "\u0022  ## Implementation (v1 \u2014 kicker primitive deferred)  CR 702.33 \u2014 Kicker is an additional cost (not an alternative cost) that modifies the spell\u0027s effect when paid.",
           "cr": "CR 702.33"
         }
@@ -998,6 +900,25 @@
       ]
     },
     {
+      "primitive_id": "sorcery-speed-gate",
+      "display_name": "\u0022Activate only as a sorcery\u0022 gate (CR 117.1a)",
+      "comp_rules_citation": "CR 117.1a",
+      "implementation_hint": "ActionValidator-side check: ability/spell flagged sorcery-speed only legal during own main phase with empty stack.",
+      "factory_count": 1,
+      "mention_count": 1,
+      "factories": [
+        "TirelessTrackerFactory"
+      ],
+      "mentions": [
+        {
+          "factory": "TirelessTrackerFactory",
+          "file": "TirelessTrackerFactory.cs",
+          "line": 14,
+          "sentence": "\u003Cb\u003E\u0022Activate only as a sorcery\u0022\u003C/b\u003E \u2014 Tireless Tracker\u0027s printed activated ability has NO sorcery-speed restriction (instant speed on the official card), so nothing is deferred here for this card."
+        }
+      ]
+    },
+    {
       "primitive_id": "suspend",
       "display_name": "Suspend alt-cost (CR 702.61)",
       "comp_rules_citation": "CR 702.61",
@@ -1075,13 +996,6 @@
       "cr": "CR 702.16e"
     },
     {
-      "factory": "SwordOfFireAndIceFactory",
-      "file": "SwordOfFireAndIceFactory.cs",
-      "line": 15,
-      "sentence": "\u003Cb\u003ESorcery-speed restriction\u003C/b\u003E on Equip activation (CR 702.6a) \u2014 same gap as \u003Csee cref=\u0022ColossusHammerFactory\u0022/\u003E.",
-      "cr": "CR 702.6a"
-    },
-    {
       "factory": "TerminateFactory",
       "file": "TerminateFactory.cs",
       "line": 11,
@@ -1104,6 +1018,12 @@
       "file": "MysticSanctuaryFactory.cs",
       "line": 12,
       "sentence": "CanBePutOnStack\u0022/\u003E runs it at stack-push time; a second recheck at resolution is deferred."
+    },
+    {
+      "factory": "WishclawTalismanFactory",
+      "file": "WishclawTalismanFactory.cs",
+      "line": 11,
+      "sentence": "## Deferred (v1 gaps) (No remaining gaps for the printed activated ability \u2014 see \u0022Implemented\u0022 above for the timing-gate wiring."
     },
     {
       "factory": "AshiokDreamRenderFactory",
@@ -1230,20 +1150,14 @@
     {
       "factory": "GristFactory",
       "file": "GristFactory.cs",
-      "line": 7,
+      "line": 8,
       "sentence": "## V1 simplification The \u0022not on the battlefield\u0022 conditional is deferred."
     },
     {
       "factory": "GristFactory",
       "file": "GristFactory.cs",
-      "line": 7,
-      "sentence": "The conditional layer-4 effect (\u0022only when not on battlefield\u0022) is documented but deferred to a future slice."
-    },
-    {
-      "factory": "GristFactory",
-      "file": "GristFactory.cs",
-      "line": 50,
-      "sentence": "The oracle-text restriction (\u0022as long as \u2026 isn\u0027t on the battlefield\u0022) is a conditional layer-4 effect \u2014 deferred."
+      "line": 36,
+      "sentence": "The oracle-text restriction is a deferred conditional layer-4 effect."
     },
     {
       "factory": "KarnLiberatedFactory",
@@ -1286,18 +1200,18 @@
       "factory": "PriestOfFellRitesFactory",
       "file": "PriestOfFellRitesFactory.cs",
       "line": 12,
-      "sentence": "\u003C/para\u003E  ## Deferred (v1 gaps)"
+      "sentence": "\u003C/para\u003E  ## Deferred (v1 gaps) (The activate-as-sorcery timing window is now enforced via the ActionValidator gate; see \u0022Implemented\u0022 above."
     },
     {
       "factory": "PriestOfFellRitesFactory",
       "file": "PriestOfFellRitesFactory.cs",
-      "line": 132,
+      "line": 128,
       "sentence": "Guard: only fire when the Priest is currently in its owner\u0027s graveyard, so spurious activations from other zones are no-op-shaped while engine zone-scoping is deferred."
     },
     {
       "factory": "PriestOfFellRitesFactory",
       "file": "PriestOfFellRitesFactory.cs",
-      "line": 152,
+      "line": 148,
       "sentence": "Skip if not currently in graveyard \u2014 activation is illegal from other zones (engine gating deferred; the guard keeps shape tests honest)."
     },
     {
@@ -1530,12 +1444,6 @@
       "sentence": "Multi-player turn-skipping semantics deferred."
     },
     {
-      "factory": "BadgermoleCubFactory",
-      "file": "BadgermoleCubFactory.cs",
-      "line": 51,
-      "sentence": "No abilities attached in v1 \u2014 both are deferred (see xmldoc above)."
-    },
-    {
       "factory": "DauthiVoidwalkerFactory",
       "file": "DauthiVoidwalkerFactory.cs",
       "line": 13,
@@ -1558,6 +1466,12 @@
       "file": "GoblinMatronFactory.cs",
       "line": 12,
       "sentence": "The picked card moves Library \u2192 Hand without publishing a CardRevealedEvent; same gap as the other tutor factories."
+    },
+    {
+      "factory": "TasigurTheGoldenFangFactory",
+      "file": "TasigurTheGoldenFangFactory.cs",
+      "line": 11,
+      "sentence": "## Deferred (v1 gaps) (The activate-as-sorcery timing window for the {B}{G}{U} ability is now enforced via the ActionValidator gate; see \u0022Implemented\u0022 above."
     },
     {
       "factory": "AbruptDecayFactory",
@@ -1663,12 +1577,6 @@
       "sentence": "Real \u0022any of N choices \u002B opt-out\u0022 prompt deferred (same queue as Stoneforge Mystic / Sun Titan)."
     },
     {
-      "factory": "MishrasWorkshopFactory",
-      "file": "MishrasWorkshopFactory.cs",
-      "line": 8,
-      "sentence": "Per the same gap acknowledged across the codebase, the v1 shell ships the structural mana amount without the artifact-only gate; once a provenance ledger lands, wire the restriction here as a \u003Cc\u003EspendableForPredicate\u003C/c\u003E-style hook on the \u003Cc\u003EManaAbility\u003C/c\u003E."
-    },
-    {
       "factory": "YawgmothFactory",
       "file": "YawgmothFactory.cs",
       "line": 10,
@@ -1748,19 +1656,6 @@
       "sentence": "A bot-side probe (mirror of \u003Cc\u003EPitchAltCostProbe\u003C/c\u003E) is deferred \u2014 Daze\u0027s pitch always pays so the probe shape is just \u0022for each Island controlled, yield one candidate\u0022 and lives outside this factory\u0027s surface in v1."
     },
     {
-      "factory": "PhoenixOfAshFactory",
-      "file": "PhoenixOfAshFactory.cs",
-      "line": 8,
-      "sentence": "The printed \u0022can attack as though it didn\u0027t have summoning sickness as long as it has haste\u0022 rider collapses observationally to the Haste keyword in v1 \u2014 CR 702.10b already lets a creature with haste attack the turn it came under its controller\u0027s control, so the additional clause only matters when Haste is granted-then\u2026",
-      "cr": "CR 702.10b"
-    },
-    {
-      "factory": "PhoenixOfAshFactory",
-      "file": "PhoenixOfAshFactory.cs",
-      "line": 8,
-      "sentence": "Distinct behaviour only manifests if Haste is removed mid-turn after the controller has owned Phoenix of Ash for less than a full turn \u2014 no keyword-removal surface yet, same gap as Goblin Chieftain\u0027s Haste-loss interactions."
-    },
-    {
       "factory": "AjaniNacatlPariahFactory",
       "file": "AjaniNacatlPariahFactory.cs",
       "line": 11,
@@ -1783,13 +1678,6 @@
       "file": "CoriSteelCutterFactory.cs",
       "line": 15,
       "sentence": "Same v1 gap as \u003Csee cref=\u0022StormchasersTalentFactory\u0022/\u003E\u0027s Mercenary tokens and \u003Csee cref=\u0022MonasteryMentorFactory\u0022/\u003E\u0027s Monk tokens."
-    },
-    {
-      "factory": "CoriSteelCutterFactory",
-      "file": "CoriSteelCutterFactory.cs",
-      "line": 15,
-      "sentence": "\u003Cb\u003ESorcery-speed restriction on Equip activation (CR 702.6a)\u003C/b\u003E \u2014 same gap as \u003Csee cref=\u0022ColossusHammerFactory\u0022/\u003E / \u003Csee cref=\u0022SwordOfFireAndIceFactory\u0022/\u003E.",
-      "cr": "CR 702.6a"
     },
     {
       "factory": "LordOfAtlantisFactory",

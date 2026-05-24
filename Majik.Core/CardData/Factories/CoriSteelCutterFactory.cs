@@ -82,9 +82,6 @@ namespace Majik.Core.CardData.Factories;
 ///   bookkeeping that pins attachment to *that specific* token rather
 ///   than any creature) is deferred behind the broader agent-prompt
 ///   surface — same posture as Eternal Witness / Snapcaster Mage.
-/// - <b>Sorcery-speed restriction on Equip activation (CR 702.6a)</b> —
-///   same gap as <see cref="ColossusHammerFactory"/> /
-///   <see cref="SwordOfFireAndIceFactory"/>.
 /// - <b>Attach-target prompt for Equip</b> — v1 picks the first
 ///   controller-side creature deterministically.
 /// </summary>
@@ -227,7 +224,8 @@ public static class CoriSteelCutterFactory
         //   "{1}{R}: Attach to target creature you control. Activate only
         //    as a sorcery."
         // v1 picker: deterministic first controller-side creature.
-        // Sorcery-speed restriction deferred (see class xmldoc).
+        // CR 117.1a / 307.5 sorcery-speed restriction enforced via
+        // ActionValidator (sorcerySpeed: true below).
         // --------------------------------------------------------------
         var equipEffect = new Effect(
             $"{CardName}: equip — attach to a creature you control",
@@ -244,7 +242,8 @@ public static class CoriSteelCutterFactory
             source: card,
             controller: owner,
             costs: new ICost[] { new ManaCostCost(EquipCost) },
-            effects: new IEffect[] { equipEffect });
+            effects: new IEffect[] { equipEffect },
+            sorcerySpeed: true);
 
         card.AddAbility(equipAbility);
 

@@ -75,9 +75,6 @@ namespace Majik.Core.CardData.Factories;
 ///
 /// ## Deferred
 ///
-/// - <b>Sorcery-speed restriction</b> on Equip activation (CR 702.6a) —
-///   same gap as the rest of the equipment cycle; enforcement belongs in
-///   an action-validator gate, not on the ability itself.
 /// - <b>Attach-target prompt</b> for "target creature you control"
 ///   (CR 702.6b) — v1 deterministic first creature.
 /// - <b>Discard prompt</b> — v1 picks the first card in the damaged
@@ -246,10 +243,11 @@ public static class SwordOfFeastAndFamineFactory
         //   "{2}: Attach to target creature you control. Activate only
         //    as a sorcery."
         // v1 picker: deterministic first controller-side creature.
-        // Sorcery-speed restriction deferred (see class xmldoc). The
-        // attach-resolution path also calls Sync() on the protection
-        // lifecycles so test/non-bus paths see the grant immediately
-        // after a re-equip.
+        // CR 117.1a / 307.5 sorcery-speed restriction enforced via
+        // ActionValidator (sorcerySpeed: true below). The attach-
+        // resolution path also calls Sync() on the protection lifecycles
+        // so test/non-bus paths see the grant immediately after a
+        // re-equip.
         // ----------------------------------------------------------------
         var equipEffect = new Effect(
             $"{CardName}: equip — attach to a creature you control",
@@ -268,7 +266,8 @@ public static class SwordOfFeastAndFamineFactory
             source: card,
             controller: owner,
             costs: new ICost[] { new ManaCostCost(EquipCost) },
-            effects: new IEffect[] { equipEffect });
+            effects: new IEffect[] { equipEffect },
+            sorcerySpeed: true);
 
         card.AddAbility(equipAbility);
 
