@@ -1126,5 +1126,15 @@ public static class SeedImplementedCards
         // registered when wired overload is used; enforcement deferred
         // (no unified search-library surface yet).
         "Leonin Arbiter",
+
+        // ---- Modern staples shipped in the feat/temur-battle-rage-negate bump ----
+
+        // Instant — {1}{R} (TemurBattleRageFactory). Khans of Tarkir.
+        // Target creature gains double strike until end of turn.
+        // Ferocious — also gains trample if you control a power-4+ creature.
+        "Temur Battle Rage",
+        // Instant — {1}{U} (NegateFactory). Various sets.
+        // Counter target noncreature spell.
+        "Negate",
     };
 }

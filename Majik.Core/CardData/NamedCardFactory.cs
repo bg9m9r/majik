@@ -621,6 +621,22 @@ public static class NamedCardFactory
             // target check at resolution).
             "Force of Negation" => ForceOfNegationFactory.Create(owner),
 
+            // Instant — {1}{R} (TemurBattleRageFactory). Khans of Tarkir.
+            // "Target creature gains double strike until end of turn.
+            //  Ferocious — That creature also gains trample until end of
+            //  turn if you control a creature with power 4 or greater."
+            // Card shape only here; the resolve-time SpellDefinition
+            // (double-strike grant + ferocious trample rider) is built on
+            // demand via TemurBattleRageFactory.BuildSpellDefinition.
+            "Temur Battle Rage" => TemurBattleRageFactory.Create(owner),
+
+            // Instant — {1}{U} (NegateFactory). Various sets.
+            // "Counter target noncreature spell."
+            // Card shape only here; the resolve-time SpellDefinition
+            // (counter target noncreature spell) is built on demand via
+            // NegateFactory.BuildSpellDefinition.
+            "Negate" => NegateFactory.Create(owner),
+
             // Instant — {2}{G}{G} (ForceOfVigorFactory).
             // "If it's not your turn, you may exile a green card from your
             //  hand rather than pay this spell's mana cost. Destroy up to
