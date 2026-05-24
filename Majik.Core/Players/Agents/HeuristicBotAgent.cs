@@ -103,12 +103,28 @@ public sealed class HeuristicBotAgent : IPlayerAgent
 
         // 1. Land drop, if we have one and haven't dropped this turn.
         //    Land drops are sorcery-speed only.
+        //
+        //    CR 305.2 — the engine's LandDropTracker is the authoritative
+        //    gate on the per-turn cap (one normally, more with effects like
+        //    Azusa / Exploration). The bot doesn't replicate that check
+        //    here; instead it re-uses the standard failed-proposal memo:
+        //    if a previously-proposed land got rejected by PriorityLoop
+        //    (cap reached, stack non-empty, wrong phase), the dispatcher
+        //    left it in hand and the same per-turn memo populated above
+        //    will short-circuit re-proposing it. Filtering on
+        //    _failedThisTurn lets the bot move on to spells instead of
+        //    spinning on the rejected land until the action-count safety
+        //    cap kicks in. Recording _lastProposed enables the
+        //    "still-in-hand → mark failed" sweep at the top of the next
+        //    ChoosePriorityActionAsync call.
         if (sorceryWindow)
         {
             var land = ctx.Self.Zones.Hand.GetCards()
-                .FirstOrDefault(c => c.HasType(CardType.Land));
+                .FirstOrDefault(c => c.HasType(CardType.Land)
+                    && !_failedThisTurn.Contains(c.InstanceId));
             if (land != null)
             {
+                _lastProposed = land.InstanceId;
                 return Task.FromResult<PriorityAction>(new PriorityAction.PlayLand(land));
             }
         }

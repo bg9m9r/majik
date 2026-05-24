@@ -49,19 +49,29 @@ public sealed class GameDriver
         Majik.Core.Random.GameRandom? rng = null,
         Majik.Core.Events.IEventBus? eventBus = null,
         Func<Majik.Core.Cards.ICard, Player, Majik.Core.Stack.Stack?, SpellDefinition?>? spellDefinitionResolver = null,
-        Majik.Core.Effects.ContinuousEffectsService? continuousEffects = null)
+        Majik.Core.Effects.ContinuousEffectsService? continuousEffects = null,
+        LandDropTracker? landDropTracker = null)
     {
         _players = players ?? throw new ArgumentNullException(nameof(players));
         _agents = agents ?? throw new ArgumentNullException(nameof(agents));
         _sba = stateBasedActions ?? throw new ArgumentNullException(nameof(stateBasedActions));
         _rng = rng ?? new Majik.Core.Random.GameRandom();
 
+        // CR 305.2 — a full game ALWAYS needs a LandDropTracker so the
+        // per-turn one-land cap is enforced in PriorityLoop. Default-
+        // construct one when callers don't supply one (older call sites
+        // pre-date the param). Without this, bots — whose PlayLand
+        // proposals are validated only inside PriorityLoop against this
+        // tracker — could play unbounded lands in a single main phase.
+        var tracker = landDropTracker ?? new LandDropTracker();
+
         _turnDriver = new TurnDriver(
             players, agents, stack, zoneService, triggerManager,
             stackResolver, stateBasedActions, priorityManager, combatFlow,
             eventBus: eventBus,
             spellDefinitionResolver: spellDefinitionResolver,
-            continuousEffects: continuousEffects);
+            continuousEffects: continuousEffects,
+            landDropTracker: tracker);
     }
 
     public async Task<GameResult> RunGameAsync(int maxTurns = 30, CancellationToken ct = default)

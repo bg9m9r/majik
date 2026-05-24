@@ -138,8 +138,16 @@ public sealed class PriorityLoop
                     if (!_landDropTracker.CanPlayLand(
                         actor, _activePlayer, phase, _stack.IsEmpty, out var reason))
                     {
-                        throw new InvalidOperationException(
-                            $"Cannot play {land.Land.Name}: {reason}");
+                        // CR 305.2 — illegal land proposal. Mirror the
+                        // cast/activate paths' swallow-and-log posture so
+                        // a misbehaving agent (or an over-eager bot that
+                        // doesn't pre-check the per-turn cap) can't crash
+                        // the whole turn. The land stays in hand;
+                        // HeuristicBotAgent's per-turn failed-proposal
+                        // memo will skip it on the next priority opportunity.
+                        System.Console.Error.WriteLine(
+                            $"PriorityLoop: rejected PlayLand({land.Land.Name}) by {actor.Name}: {reason}");
+                        break;
                     }
                     _landDropTracker.RecordLandPlayed(actor);
                 }

@@ -461,6 +461,14 @@ public sealed class TurnDriver
             agents: _agents,
             turnNumberAccessor: () => _currentTurnNumber,
             phaseAccessor: () => _currentPhase,
+            // CR 305.2 — every priority round in this turn must consult the
+            // same LandDropTracker the driver reset at turn-start; otherwise
+            // the per-turn one-land cap is unenforced and a bot proposing
+            // PlayLand twice in one main phase succeeds twice. The tracker
+            // is optional (null in test harnesses that construct TurnDriver
+            // without one), in which case PriorityLoop falls back to its
+            // old no-op behaviour.
+            landDropTracker: _landDropTracker,
             castDispatcher: DispatchCast,
             activateDispatcher: DispatchActivate,
             manaAbilityDispatcher: DispatchManaAbility);

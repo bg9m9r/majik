@@ -59,8 +59,12 @@ public class PriorityLoopLandDropTests
     }
 
     [Fact]
-    public async Task PlayLand_SecondDropOfTurn_Throws()
+    public async Task PlayLand_SecondDropOfTurn_IsRejectedAndLandStaysInHand()
     {
+        // CR 305.2 — over-cap PlayLand is rejected by the priority loop
+        // (swallowed + logged, mirroring the cast/activate posture so a
+        // misbehaving agent can't crash the turn). The land stays in
+        // hand and the counter does NOT increment.
         var l1 = NamedCardFactory.Create("Mountain", _alice);
         var l2 = NamedCardFactory.Create("Mountain", _alice);
         l1.SetZone(ZoneType.Hand); l2.SetZone(ZoneType.Hand);
@@ -71,7 +75,10 @@ public class PriorityLoopLandDropTests
 
         var aliceAgent = new ScriptedAgent();
         aliceAgent.QueuePriority(new PriorityAction.PlayLand(l2));
+        aliceAgent.QueuePriority(PriorityAction.Pass);
         var bobAgent = new ScriptedAgent();
+        bobAgent.QueuePriority(PriorityAction.Pass);
+        bobAgent.QueuePriority(PriorityAction.Pass);
 
         var loop = new PriorityLoop(
             new[] { _alice, _bob }, _priority, _stack, _resolver, _zones,
@@ -79,9 +86,9 @@ public class PriorityLoopLandDropTests
             { [_alice] = aliceAgent, [_bob] = bobAgent },
             () => 1, () => PhaseStateType.Main, tracker);
 
-        var act = async () => await loop.RunUntilRoundEndsAsync(_alice);
+        await loop.RunUntilRoundEndsAsync(_alice);
 
-        await act.Should().ThrowAsync<System.InvalidOperationException>()
-            .WithMessage("*already played*");
+        l2.Zone.Should().Be(ZoneType.Hand, "rejected PlayLand should leave the land in hand");
+        tracker.DropsUsedThisTurn(_alice).Should().Be(1, "rejected play must not increment the counter");
     }
 }
