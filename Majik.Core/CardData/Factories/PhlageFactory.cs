@@ -1,10 +1,12 @@
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Costs;
 using Majik.Core.Domain.DomainEvents;
 using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
+using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
@@ -28,15 +30,12 @@ namespace Majik.Core.CardData.Factories;
 ///   (CR 119.3) as part of the same resolution. Same shape as Lightning
 ///   Helix's resolve, lifted into a triggered ability on a creature ETB.
 ///
-/// ## Deferred (v1 gaps)
-/// - <b>Escape (CR 702.143)</b>: cast-from-graveyard alt cost with the
-///   "exile three other cards from your graveyard" rider. Engine has
-///   <see cref="Costs.CastFromExileAlternativeCost"/> for cast-from-exile
-///   only; no graveyard variant + multi-card-exile additional-cost
-///   primitive yet. Same gap as Uro, Titan of Nature's Wrath (see
-///   <see cref="UroTitanFactory"/>). Once Escape ships, Phlage's ETB
-///   trigger body is unchanged — escape only changes how the spell is
-///   cast, not the on-resolution effect.
+/// - <b>Escape (CR 702.138) — wired via
+///   <see cref="EscapeAlternativeCost"/></b>: cast-from-graveyard alt
+///   cost with the "exile five other cards from your graveyard"
+///   rider. <see cref="BuildAlternativeCost"/> returns the bound
+///   alt-cost instance. The ETB trigger body is unchanged — Escape
+///   only changes how the spell is cast, not the on-resolution effect.
 /// </summary>
 [CardName("Phlage, Titan of Fire's Fury")]
 public static class PhlageFactory
@@ -44,8 +43,24 @@ public static class PhlageFactory
     public const string CardName = "Phlage, Titan of Fire's Fury";
     public const string PrintedManaCost = "{2}{R}{W}";
 
+    /// <summary>CR 702.138 — printed Escape mana cost: {R}{R}{W}{W}.</summary>
+    public const string EscapeManaCost = "{R}{R}{W}{W}";
+
+    /// <summary>CR 702.138a — Escape rider: exile five OTHER cards from
+    /// your graveyard.</summary>
+    public const int EscapeExileCount = 5;
+
     public const int DamageAmount = 3;
     public const int LifeGainAmount = 3;
+
+    /// <summary>
+    /// CR 702.138 — Phlage's printed Escape alt-cost ({2}{R}{W}, exile
+    /// three OTHER graveyard cards). The cast pipeline picks this up
+    /// from <see cref="EscapeAltCostProbe"/> / direct
+    /// <c>SpellCaster</c> calls; ETB resolution is unchanged.
+    /// </summary>
+    public static EscapeAlternativeCost BuildAlternativeCost() =>
+        new(ValueObjects.ManaCost.Parse(EscapeManaCost), EscapeExileCount);
 
     /// <summary>
     /// Construct Phlage owned and controlled by <paramref name="owner"/>.

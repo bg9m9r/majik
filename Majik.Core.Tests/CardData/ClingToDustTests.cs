@@ -228,4 +228,20 @@ public class ClingToDustTests
         bears.Zone.Should().Be(ZoneType.Battlefield);
         _alice.LifeTotal.Should().Be(aliceLifeBefore);
     }
+
+    // -----------------------------------------------------------------
+    // BuildAlternativeCost — CR 702.138 Escape factory exposure
+    // -----------------------------------------------------------------
+
+    [Fact]
+    public void ClingToDust_BuildAlternativeCost_ReturnsEscapeAltCost_WithPrintedShape()
+    {
+        var cost = ClingToDustFactory.BuildAlternativeCost();
+
+        cost.ExileFromGraveyardCount.Should().Be(5,
+            "Cling to Dust's printed Escape rider exiles 5 OTHER graveyard cards");
+        // {3}{B} = 3 generic + 1 black.
+        cost.AlternativeManaCost.Generic.Should().Be(3);
+        cost.AlternativeManaCost.Black.Should().Be(1);
+    }
 }
