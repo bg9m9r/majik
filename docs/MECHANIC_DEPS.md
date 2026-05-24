@@ -5,11 +5,11 @@ Scanner output: every `*Factory.cs` xmldoc / inline comment mentioning
 engine primitive. Each row answers: "if we ship primitive _X_, which factory
 xmldocs flagged that they're blocked on it?"
 
-- **Generated:** 2026-05-24 18:34 UTC
+- **Generated:** 2026-05-24 19:11 UTC
 - **Scanned dir:** `Majik.Core/CardData/Factories`
-- **Total mentions:** 247
+- **Total mentions:** 238
 - **Clusters:** 17
-- **Unclustered (need new registry pattern):** 131
+- **Unclustered (need new registry pattern):** 124
 
 Regenerate with `dotnet run --project Majik.Console -- mechanic-deps --md-out docs/MECHANIC_DEPS.md --json-out docs/mechanic-deps.json`.
 
@@ -20,10 +20,10 @@ Regenerate with `dotnet run --project Majik.Console -- mechanic-deps --md-out do
 | 1 | Agent-prompt targeting MVP | — | 25 | 32 |
 | 2 | Library shuffle (CR 701.20) | CR 701.20 | 12 | 17 |
 | 3 | Token colour identity (CR 105 / CR 903.4) | CR 105 | 11 | 21 |
-| 4 | "Activate only as a sorcery" gate (CR 117.1a) | CR 117.1a | 9 | 12 |
+| 4 | "Activate only as a sorcery" gate (CR 117.1a) | CR 117.1a | 8 | 11 |
 | 5 | Regeneration shield (CR 701.15) | CR 701.15 | 6 | 8 |
 | 6 | Indestructible bypass on destroy (CR 702.12) | CR 702.12 | 6 | 7 |
-| 7 | Layer-6 ability-grant subsystem (CR 613.1f) | CR 613.1f | 3 | 5 |
+| 7 | Layer-6 ability-grant subsystem (CR 613.1f) | CR 613.1f | 2 | 4 |
 | 8 | Escape alt-cost (CR 702.143) | CR 702.143 | 2 | 2 |
 | 9 | Kicker alt-cost (CR 702.33) | CR 702.33 | 2 | 2 |
 | 10 | Class leveling (CR 716) | CR 716 | 1 | 2 |
@@ -206,13 +206,11 @@ Mentions:
 ### 4. "Activate only as a sorcery" gate (CR 117.1a)
 
 - **CR citation:** CR 117.1a
-- **Blocks:** 9 factories (12 mentions)
+- **Blocks:** 8 factories (11 mentions)
 - **Implementation hint:** ActionValidator-side check: ability/spell flagged sorcery-speed only legal during own main phase with empty stack.
 
 Mentions:
 
-- `SwordOfFireAndIceFactory` (`SwordOfFireAndIceFactory.cs:209`)
-  > Sorcery-speed restriction deferred (see class xmldoc).
 - `WishclawTalismanFactory` (`WishclawTalismanFactory.cs:110`)
   > CR 117.1a sorcery-speed restriction deferred (see class xmldoc).
 - `SkullclampFactory` (`SkullclampFactory.cs:13`)
@@ -244,7 +242,7 @@ Mentions:
 
 Mentions:
 
-- `DrownInTheLochFactory` (`DrownInTheLochFactory.cs:12`)
+- `DrownInTheLochFactory` (`DrownInTheLochFactory.cs:13`)
   > Indestructible / regeneration riders are deferred (same gap as <see cref="SlaughterPactFactory"/> and the rest of the single-target destroy family).
 - `DrownInTheLochFactory` (`DrownInTheLochFactory.cs:210`)
   > CR 701.7 — destroy → owner's graveyard (Indestructible / regeneration deferred, same gap as SlaughterPactFactory).
@@ -287,13 +285,11 @@ Mentions:
 ### 7. Layer-6 ability-grant subsystem (CR 613.1f)
 
 - **CR citation:** CR 613.1f
-- **Blocks:** 3 factories (5 mentions)
+- **Blocks:** 2 factories (4 mentions)
 - **Implementation hint:** ContinuousEffectsService needs an 'ability grant' layer so 'gains <ability>' effects flow through GetAbilities() at read time.
 
 Mentions:
 
-- `SwordOfFireAndIceFactory` (`SwordOfFireAndIceFactory.cs:146`)
-  > " (CR 702.16) Markers ride on the equipment card itself; a Layer 6 grant re-projecting them onto the equipped creature is deferred (see class xmldoc).
 - `AgathasSoulCauldronFactory` (`AgathasSoulCauldronFactory.cs:10`)
   > The layer-6 continuous effect that actually grants those abilities to battlefield creatures is deferred until the layer-6 ability-grant subsystem is in place.
 - `AgathasSoulCauldronFactory` (`AgathasSoulCauldronFactory.cs:88`)
@@ -326,7 +322,7 @@ Mentions:
 
 - `SlickshotShowOffFactory` (`SlickshotShowOffFactory.cs:10`)
   > Same posture as <see cref="BurstLightningFactory"/>'s deferred Kicker rider — ship the printed shape + the most common triggered/static body, defer the alt-cost mechanic until its primitive lands.
-- `BurstLightningFactory` (`BurstLightningFactory.cs:10`)
+- `BurstLightningFactory` (`BurstLightningFactory.cs:11`)
   > "  ## Implementation (v1 — kicker primitive deferred)  CR 702.33 — Kicker is an additional cost (not an alternative cost) that modifies the spell's effect when paid.
 
 ### 10. Class leveling (CR 716)
@@ -437,10 +433,6 @@ Mentions:
   > Prowess pump on token deferred — keyword marker only, see class xmldoc.
 - `NihilSpellbombFactory` (`NihilSpellbombFactory.cs:13`)
   > Real prompt deferred until IPlayerAgent grows a ChooseYesNoAsync surface.
-- `SwordOfFireAndIceFactory` (`SwordOfFireAndIceFactory.cs:15`)
-  > The shipped markers are inspectable on the card so tests + bot heuristics can read intent, with full DEBT-A enforcement (CR 702.16e — damage / enchanting / equipping / blocking / targeting) deferred behind that grant-on-attach work.
-- `SwordOfFireAndIceFactory` (`SwordOfFireAndIceFactory.cs:15`)
-  > <b>Sorcery-speed restriction</b> on Equip activation (CR 702.6a) — same gap as <see cref="ColossusHammerFactory"/>.
 - `TerminateFactory` (`TerminateFactory.cs:11`)
   > <b>"It can't be regenerated"</b>: the engine has no regeneration shield surface in v1 (same gap as Wrath of God's and DayOfJudgment's can't-be-regenerated rider, and SlaughterPact's indestructible/regeneration note).
 - `IzzetCharmFactory` (`IzzetCharmFactory.cs:211`)
@@ -489,12 +481,10 @@ Mentions:
   > The "pick a spell from the stack" prompt is deferred to the agent MVP.
 - `TerritorialKavuFactory` (`TerritorialKavuFactory.cs:12`)
   > <b>"You may" prompt on the attack trigger</b>: v1 always takes the loot when a card is available; an explicit yes/no prompt is deferred.
-- `GristFactory` (`GristFactory.cs:7`)
+- `GristFactory` (`GristFactory.cs:8`)
   > ## V1 simplification The "not on the battlefield" conditional is deferred.
-- `GristFactory` (`GristFactory.cs:7`)
-  > The conditional layer-4 effect ("only when not on battlefield") is documented but deferred to a future slice.
-- `GristFactory` (`GristFactory.cs:50`)
-  > The oracle-text restriction ("as long as … isn't on the battlefield") is a conditional layer-4 effect — deferred.
+- `GristFactory` (`GristFactory.cs:36`)
+  > The oracle-text restriction is a deferred conditional layer-4 effect.
 - `KarnLiberatedFactory` (`KarnLiberatedFactory.cs:140`)
   > v1 DEFERRED — shipped as a no-op so the loyalty change (and "this card is a legal -14 ability") still apply (CR 606.3).
 - `AmpedRaptorFactory` (`AmpedRaptorFactory.cs:252`)
@@ -587,8 +577,6 @@ Mentions:
   > Face-down exile is deferred — engine has no face-down flag.
 - `MishrasBaubleFactory` (`MishrasBaubleFactory.cs:12`)
   > Multi-player turn-skipping semantics deferred.
-- `BadgermoleCubFactory` (`BadgermoleCubFactory.cs:51`)
-  > No abilities attached in v1 — both are deferred (see xmldoc above).
 - `DauthiVoidwalkerFactory` (`DauthiVoidwalkerFactory.cs:13`)
   > Cleanup) and is deferred until a cast-permission flag is added.
 - `DauthiVoidwalkerFactory` (`DauthiVoidwalkerFactory.cs:117`)
@@ -631,8 +619,6 @@ Mentions:
   > Targeting + fight step deferred (see xmldoc above).
 - `ShowAndTellFactory` (`ShowAndTellFactory.cs:10`)
   > Real "any of N choices + opt-out" prompt deferred (same queue as Stoneforge Mystic / Sun Titan).
-- `MishrasWorkshopFactory` (`MishrasWorkshopFactory.cs:8`)
-  > Per the same gap acknowledged across the codebase, the v1 shell ships the structural mana amount without the artifact-only gate; once a provenance ledger lands, wire the restriction here as a <c>spendableForPredicate</c>-style hook on the <c>ManaAbility</c>.
 - `YawgmothFactory` (`YawgmothFactory.cs:10`)
   > Effect 4: Controller draws a card  ## Deferred (v1 gaps)
 - `YawgmothFactory` (`YawgmothFactory.cs:10`)
@@ -659,10 +645,6 @@ Mentions:
   > Wire a selector callback when the multi-candidate "choose a card to put onto the battlefield" prompt ships (mirrors the same gap on Stoneforge Mystic's tutor).
 - `DazeFactory` (`DazeFactory.cs:11`)
   > A bot-side probe (mirror of <c>PitchAltCostProbe</c>) is deferred — Daze's pitch always pays so the probe shape is just "for each Island controlled, yield one candidate" and lives outside this factory's surface in v1.
-- `PhoenixOfAshFactory` (`PhoenixOfAshFactory.cs:8`)
-  > The printed "can attack as though it didn't have summoning sickness as long as it has haste" rider collapses observationally to the Haste keyword in v1 — CR 702.10b already lets a creature with haste attack the turn it came under its controller's control, so the additional clause only matters when Haste is granted-then…
-- `PhoenixOfAshFactory` (`PhoenixOfAshFactory.cs:8`)
-  > Distinct behaviour only manifests if Haste is removed mid-turn after the controller has owned Phoenix of Ash for less than a full turn — no keyword-removal surface yet, same gap as Goblin Chieftain's Haste-loss interactions.
 - `AjaniNacatlPariahFactory` (`AjaniNacatlPariahFactory.cs:11`)
   > The MdfcState flip is the v1 observation surface — combat / loyalty interactions on the back face are deferred.
 - `AjaniNacatlPariahFactory` (`AjaniNacatlPariahFactory.cs:105`)

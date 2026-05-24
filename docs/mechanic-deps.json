@@ -1,10 +1,10 @@
 {
-  "generated_utc": "2026-05-24T18:34:51.8750064Z",
-  "scanned_dir": "/home/brett/Projects/majik.project/majik.core/.claude/worktrees/agent-a6a9323cefcd8c2d2/Majik.Core/CardData/Factories",
-  "total_mentions": 247,
-  "distinct_factories": 154,
+  "generated_utc": "2026-05-24T19:11:53.3581029Z",
+  "scanned_dir": "/home/brett/Projects/majik.project/majik.core/Majik.Core/CardData/Factories",
+  "total_mentions": 238,
+  "distinct_factories": 149,
   "cluster_count": 17,
-  "unclustered_count": 131,
+  "unclustered_count": 124,
   "clusters": [
     {
       "primitive_id": "agent-prompt-targeting",
@@ -529,26 +529,19 @@
       "display_name": "\u0022Activate only as a sorcery\u0022 gate (CR 117.1a)",
       "comp_rules_citation": "CR 117.1a",
       "implementation_hint": "ActionValidator-side check: ability/spell flagged sorcery-speed only legal during own main phase with empty stack.",
-      "factory_count": 9,
-      "mention_count": 12,
+      "factory_count": 8,
+      "mention_count": 11,
       "factories": [
         "ColossusHammerFactory",
         "CoriSteelCutterFactory",
         "SkullclampFactory",
         "SwordOfFeastAndFamineFactory",
-        "SwordOfFireAndIceFactory",
         "TasigurTheGoldenFangFactory",
         "TirelessTrackerFactory",
         "UmezawasJitteFactory",
         "WishclawTalismanFactory"
       ],
       "mentions": [
-        {
-          "factory": "SwordOfFireAndIceFactory",
-          "file": "SwordOfFireAndIceFactory.cs",
-          "line": 209,
-          "sentence": "Sorcery-speed restriction deferred (see class xmldoc)."
-        },
         {
           "factory": "WishclawTalismanFactory",
           "file": "WishclawTalismanFactory.cs",
@@ -641,7 +634,7 @@
         {
           "factory": "DrownInTheLochFactory",
           "file": "DrownInTheLochFactory.cs",
-          "line": 12,
+          "line": 13,
           "sentence": "Indestructible / regeneration riders are deferred (same gap as \u003Csee cref=\u0022SlaughterPactFactory\u0022/\u003E and the rest of the single-target destroy family)."
         },
         {
@@ -754,21 +747,13 @@
       "display_name": "Layer-6 ability-grant subsystem (CR 613.1f)",
       "comp_rules_citation": "CR 613.1f",
       "implementation_hint": "ContinuousEffectsService needs an \u0027ability grant\u0027 layer so \u0027gains \u003Cability\u003E\u0027 effects flow through GetAbilities() at read time.",
-      "factory_count": 3,
-      "mention_count": 5,
+      "factory_count": 2,
+      "mention_count": 4,
       "factories": [
         "AgathasSoulCauldronFactory",
-        "BloodghastFactory",
-        "SwordOfFireAndIceFactory"
+        "BloodghastFactory"
       ],
       "mentions": [
-        {
-          "factory": "SwordOfFireAndIceFactory",
-          "file": "SwordOfFireAndIceFactory.cs",
-          "line": 146,
-          "sentence": "\u0022 (CR 702.16) Markers ride on the equipment card itself; a Layer 6 grant re-projecting them onto the equipped creature is deferred (see class xmldoc).",
-          "cr": "CR 702.16"
-        },
         {
           "factory": "AgathasSoulCauldronFactory",
           "file": "AgathasSoulCauldronFactory.cs",
@@ -845,7 +830,7 @@
         {
           "factory": "BurstLightningFactory",
           "file": "BurstLightningFactory.cs",
-          "line": 10,
+          "line": 11,
           "sentence": "\u0022  ## Implementation (v1 \u2014 kicker primitive deferred)  CR 702.33 \u2014 Kicker is an additional cost (not an alternative cost) that modifies the spell\u0027s effect when paid.",
           "cr": "CR 702.33"
         }
@@ -1068,20 +1053,6 @@
       "sentence": "Real prompt deferred until IPlayerAgent grows a ChooseYesNoAsync surface."
     },
     {
-      "factory": "SwordOfFireAndIceFactory",
-      "file": "SwordOfFireAndIceFactory.cs",
-      "line": 15,
-      "sentence": "The shipped markers are inspectable on the card so tests \u002B bot heuristics can read intent, with full DEBT-A enforcement (CR 702.16e \u2014 damage / enchanting / equipping / blocking / targeting) deferred behind that grant-on-attach work.",
-      "cr": "CR 702.16e"
-    },
-    {
-      "factory": "SwordOfFireAndIceFactory",
-      "file": "SwordOfFireAndIceFactory.cs",
-      "line": 15,
-      "sentence": "\u003Cb\u003ESorcery-speed restriction\u003C/b\u003E on Equip activation (CR 702.6a) \u2014 same gap as \u003Csee cref=\u0022ColossusHammerFactory\u0022/\u003E.",
-      "cr": "CR 702.6a"
-    },
-    {
       "factory": "TerminateFactory",
       "file": "TerminateFactory.cs",
       "line": 11,
@@ -1230,20 +1201,14 @@
     {
       "factory": "GristFactory",
       "file": "GristFactory.cs",
-      "line": 7,
+      "line": 8,
       "sentence": "## V1 simplification The \u0022not on the battlefield\u0022 conditional is deferred."
     },
     {
       "factory": "GristFactory",
       "file": "GristFactory.cs",
-      "line": 7,
-      "sentence": "The conditional layer-4 effect (\u0022only when not on battlefield\u0022) is documented but deferred to a future slice."
-    },
-    {
-      "factory": "GristFactory",
-      "file": "GristFactory.cs",
-      "line": 50,
-      "sentence": "The oracle-text restriction (\u0022as long as \u2026 isn\u0027t on the battlefield\u0022) is a conditional layer-4 effect \u2014 deferred."
+      "line": 36,
+      "sentence": "The oracle-text restriction is a deferred conditional layer-4 effect."
     },
     {
       "factory": "KarnLiberatedFactory",
@@ -1530,12 +1495,6 @@
       "sentence": "Multi-player turn-skipping semantics deferred."
     },
     {
-      "factory": "BadgermoleCubFactory",
-      "file": "BadgermoleCubFactory.cs",
-      "line": 51,
-      "sentence": "No abilities attached in v1 \u2014 both are deferred (see xmldoc above)."
-    },
-    {
       "factory": "DauthiVoidwalkerFactory",
       "file": "DauthiVoidwalkerFactory.cs",
       "line": 13,
@@ -1663,12 +1622,6 @@
       "sentence": "Real \u0022any of N choices \u002B opt-out\u0022 prompt deferred (same queue as Stoneforge Mystic / Sun Titan)."
     },
     {
-      "factory": "MishrasWorkshopFactory",
-      "file": "MishrasWorkshopFactory.cs",
-      "line": 8,
-      "sentence": "Per the same gap acknowledged across the codebase, the v1 shell ships the structural mana amount without the artifact-only gate; once a provenance ledger lands, wire the restriction here as a \u003Cc\u003EspendableForPredicate\u003C/c\u003E-style hook on the \u003Cc\u003EManaAbility\u003C/c\u003E."
-    },
-    {
       "factory": "YawgmothFactory",
       "file": "YawgmothFactory.cs",
       "line": 10,
@@ -1746,19 +1699,6 @@
       "file": "DazeFactory.cs",
       "line": 11,
       "sentence": "A bot-side probe (mirror of \u003Cc\u003EPitchAltCostProbe\u003C/c\u003E) is deferred \u2014 Daze\u0027s pitch always pays so the probe shape is just \u0022for each Island controlled, yield one candidate\u0022 and lives outside this factory\u0027s surface in v1."
-    },
-    {
-      "factory": "PhoenixOfAshFactory",
-      "file": "PhoenixOfAshFactory.cs",
-      "line": 8,
-      "sentence": "The printed \u0022can attack as though it didn\u0027t have summoning sickness as long as it has haste\u0022 rider collapses observationally to the Haste keyword in v1 \u2014 CR 702.10b already lets a creature with haste attack the turn it came under its controller\u0027s control, so the additional clause only matters when Haste is granted-then\u2026",
-      "cr": "CR 702.10b"
-    },
-    {
-      "factory": "PhoenixOfAshFactory",
-      "file": "PhoenixOfAshFactory.cs",
-      "line": 8,
-      "sentence": "Distinct behaviour only manifests if Haste is removed mid-turn after the controller has owned Phoenix of Ash for less than a full turn \u2014 no keyword-removal surface yet, same gap as Goblin Chieftain\u0027s Haste-loss interactions."
     },
     {
       "factory": "AjaniNacatlPariahFactory",
