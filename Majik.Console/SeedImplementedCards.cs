@@ -1175,5 +1175,22 @@ public static class SeedImplementedCards
         // Colour-identity of animated form (blue + black) deferred — no Layer 5
         // colour-set primitive yet. Combat math via Compute deferred — same gap as Mutavault.
         "Creeping Tar Pit",
+
+        // ---- Modern staples shipped in the feat/young-pyromancer-monastery-mentor bump ----
+
+        // Creature — Human Shaman {1}{R} 2/1 (YoungPyromancerFactory).
+        // Magic 2014. Whenever you cast an instant or sorcery spell, create a
+        // 1/1 red Elemental creature token. Token colour (red) deferred —
+        // same gap as Goblin Rabblemaster. Single-arg path: card shape only.
+        "Young Pyromancer",
+
+        // Creature — Human Monk {2}{W} 2/2 (MonasteryMentorFactory).
+        // Fate Reforged. Prowess (whenever you cast a noncreature spell,
+        // +1/+1 EOT) wired via ProwessFactory when runtime effects service
+        // is supplied. Whenever you cast a noncreature spell, create a 1/1
+        // white Monk creature token with prowess. Token colour (white) and
+        // prowess on token deferred — same gap as Crashing Footfalls /
+        // Goblin Rabblemaster. Single-arg path: card shape only.
+        "Monastery Mentor",
     };
 }
