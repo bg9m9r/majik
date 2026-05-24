@@ -45,6 +45,62 @@ public class Permanent : Card
     public void MarkAsToken() => IsToken = true;
 
     // -----------------------------------------------------------------------
+    // CR 708 — Face-down spells / permanents (Morph / Manifest / Disguise /
+    // Cloak family). Minimal primitive shipped for Manifest dread
+    // (CR 701.59) — see <see cref="MarkFaceDown"/> / <see cref="TurnFaceUp"/>.
+    // -----------------------------------------------------------------------
+
+    /// <summary>
+    /// CR 708.2 — true while this permanent is face-down. Face-down
+    /// permanents are 2/2 colourless creatures with no name, mana cost,
+    /// or abilities (CR 708.2). Effective P/T overrides on
+    /// <see cref="Creature.GetPower"/> / <see cref="Creature.GetToughness"/>
+    /// consult this flag.
+    /// </summary>
+    public bool IsFaceDown { get; private set; }
+
+    /// <summary>
+    /// CR 708.2 — flip this permanent to face-down. Native abilities are
+    /// suppressed via the <see cref="IsFaceDown"/> gate (callers read
+    /// <see cref="EffectiveAbilities"/>); P/T overrides to 2/2. Idempotent.
+    /// </summary>
+    public void MarkFaceDown()
+    {
+        IsFaceDown = true;
+    }
+
+    /// <summary>
+    /// CR 708.6 — turn this permanent face-up, restoring native
+    /// characteristics. Idempotent. Caller (typically the
+    /// "turn face up for mana cost" activated ability resolution body)
+    /// is responsible for paying any cost; this method only flips the
+    /// flag.
+    /// </summary>
+    public void TurnFaceUp()
+    {
+        IsFaceDown = false;
+    }
+
+    /// <summary>
+    /// CR 708.2 — abilities visible to the engine for this permanent.
+    /// While <see cref="IsFaceDown"/> is true, this returns the empty
+    /// set even if native abilities are attached, AND any abilities
+    /// granted by manifest / morph (e.g. "turn face up for cost")
+    /// remain queryable via <see cref="Abilities"/> — those are the
+    /// face-down permanent's *only* abilities. Callers that need to
+    /// query a face-down permanent's playable abilities should use
+    /// the face-down-aware ability filter rather than
+    /// <see cref="Card.Abilities"/> directly.
+    /// </summary>
+    public IReadOnlyList<Majik.Core.Abilities.IAbility> EffectiveAbilities
+        => IsFaceDown
+            ? Abilities
+                .Where(a => a is Majik.Core.Abilities.FaceDownActivatedAbility)
+                .ToList()
+                .AsReadOnly()
+            : Abilities;
+
+    // -----------------------------------------------------------------------
     // CR 702.49 — Imprint
     // -----------------------------------------------------------------------
 

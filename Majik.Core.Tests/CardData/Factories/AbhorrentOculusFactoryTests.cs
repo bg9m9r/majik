@@ -246,30 +246,43 @@ public class AbhorrentOculusFactoryTests
     }
 
     [Fact]
-    public void OpponentUpkeepTrigger_ManifestDreadEffect_IsNoOpStubAtV1()
+    public void OpponentUpkeepTrigger_ManifestDreadEffect_ResolvesManifestDread()
     {
-        // Documented v1 gap — manifest dread (CR 701.59) is wired as a
-        // structural stub. The trigger should fire + the effect should
-        // execute, but no library reveal / face-down token / graveyard
-        // move happens at v1. This test pins the documented behaviour so
-        // a future real implementation of manifest dread breaks this
-        // test and updates this assertion deliberately.
+        // CR 701.59 — manifest dread retrofit. Trigger now invokes the
+        // real ManifestDreadEffect: top of Alice's library becomes a
+        // face-down 2/2 ManifestedCreature on her battlefield; the
+        // second-from-top goes to her graveyard.
         var oculus = AbhorrentOculusFactory.Create(_alice);
         _alice.Zones.Battlefield.AddCard(oculus);
         oculus.SetZone(ZoneType.Battlefield);
 
+        // Stock Alice's library with two specific cards so the test
+        // observes the manifest pick. Zone.AddCard appends to the end
+        // and GetCards() / Fx.LookAtTopN read in insertion order with
+        // index 0 = "top", so add the intended top first.
+        var topCard = new Creature("Top Card Creature", "{1}{G}", 3, 3);
+        topCard.SetOwner(_alice);
+        var secondCard = new Card("Second Card", "{R}");
+        secondCard.SetOwner(_alice);
+        _alice.Zones.Library.AddCard(topCard);
+        _alice.Zones.Library.AddCard(secondCard);
+
         var aliceLibraryBefore = _alice.Zones.Library.GetCards().Count();
-        var aliceGraveBefore = _alice.Zones.Graveyard.GetCards().Count();
         var aliceBattlefieldBefore = _alice.Zones.Battlefield.GetCards().Count();
 
         var upkeep = oculus.Abilities.OfType<TriggeredAbility>().Single();
         foreach (var e in upkeep.Effects) e.Execute();
 
-        _alice.Zones.Library.GetCards().Count().Should().Be(aliceLibraryBefore,
-            "manifest dread v1 stub: no library mutation");
-        _alice.Zones.Graveyard.GetCards().Count().Should().Be(aliceGraveBefore,
-            "manifest dread v1 stub: no graveyard mutation");
-        _alice.Zones.Battlefield.GetCards().Count().Should().Be(aliceBattlefieldBefore,
-            "manifest dread v1 stub: no face-down 2/2 token created");
+        _alice.Zones.Library.GetCards().Count().Should().Be(aliceLibraryBefore - 2,
+            "manifest dread looks at + consumes top 2 of library");
+        _alice.Zones.Graveyard.GetCards().Should().Contain(secondCard,
+            "second-of-two looked-at card goes to graveyard");
+        _alice.Zones.Battlefield.GetCards().Count().Should().Be(aliceBattlefieldBefore + 1,
+            "manifested wrapper joins the battlefield as a face-down 2/2");
+
+        var wrapper = _alice.Zones.Battlefield.GetCards()
+            .OfType<Majik.Core.Cards.ManifestedCreature>().Single();
+        wrapper.IsFaceDown.Should().BeTrue();
+        wrapper.UnderlyingCard.Should().BeSameAs(topCard);
     }
 }

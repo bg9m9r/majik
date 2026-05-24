@@ -46,30 +46,32 @@ namespace Majik.Core.CardData.Factories;
 ///   future multiplayer setups all fire independently — same shape as
 ///   Sheoldred's draw-trigger controller filter, inverted).
 ///
-/// ## Deferred (v1 gaps — manifest dread is a stub)
+/// ## Manifest dread (CR 701.59)
 ///
-/// - <b>Manifest dread</b> (CR 701.59 / Duskmourn): the printed
-///   resolution effect — look at top two of library, put one onto the
-///   battlefield face down as a 2/2 manifest creature and the other
-///   into your graveyard — is wired as a structural stub. The
-///   triggered ability's body executes a no-op
-///   <see cref="ManifestDreadStub"/> effect that documents the gap;
-///   no library reveal, no face-down 2/2 token, no graveyard placement
-///   happens at v1. Blockers: (a) no face-down / morph / manifest
-///   primitive on the engine yet (no `Permanent.IsFaceDown` flag, no
-///   "turn face up for mana cost" activated ability); (b) no agent-
-///   side "look at N cards and choose which goes to battlefield vs
-///   graveyard" prompt — same queue as Brainstorm / Ponder's pick
-///   loops. The trigger itself is fully wired so once manifest dread
-///   becomes a real primitive, only the effect body needs to swap to
-///   a real implementation.
-/// - <b>"Turn it face up any time for its mana cost if it's a
-///   creature card"</b>: dependent on the manifest dread primitive
-///   above. Not implemented.
+/// The opponent-upkeep trigger now resolves real manifest dread via
+/// <see cref="ManifestDreadEffect.Resolve(Majik.Core.Players.Player, ZoneService?)"/>:
+/// look at the top two cards of the controller's library, manifest the
+/// first as a face-down 2/2 <see cref="Majik.Core.Cards.ManifestedCreature"/>
+/// wrapper on the battlefield, and put the second into the controller's
+/// graveyard. The wrapper preserves a reference to the underlying card
+/// so the granted "turn face up for its mana cost" activated ability
+/// (CR 708.6) can swap the wrapper out for the printed creature on
+/// resolution.
+///
+/// ## Deferred (v1 gaps — small)
+///
+/// - <b>Agent prompt for pick-one-of-two:</b> v1 deterministically
+///   manifests the top-of-library card; the second goes to graveyard.
+///   Future agent prompt (mirror of Brainstorm / Ponder pick loops)
+///   will let the controller's agent pick which goes where.
+/// - <b>Non-creature underlying card:</b> if the manifested card is not
+///   a creature, no face-up ability is granted (CR 701.59c — "if it's
+///   a creature card"). The face-down 2/2 stays face-down indefinitely;
+///   this matches the printed rule.
 ///
 /// CR rule references: 205.3m (Eye subtype), 601.2f (additional cost),
 /// 603.1 / 500.4 (upkeep trigger), 702.9 (Flying), 701.59 (manifest
-/// dread — deferred).
+/// dread), 708.2 / 708.6 (face-down permanents + turn-face-up).
 /// </summary>
 [CardName("Abhorrent Oculus")]
 public static class AbhorrentOculusFactory
@@ -86,13 +88,21 @@ public static class AbhorrentOculusFactory
     /// wired. The opponent-upkeep trigger is attached to the card
     /// shape; pass <paramref name="triggers"/> to register it with the
     /// supplied <see cref="TriggerManager"/> for bus-driven firing.
+    /// Pass <paramref name="zones"/> for ZoneService-routed manifest
+    /// dread (ETB / LTB triggers fire); otherwise raw-zone moves are
+    /// used.
     /// </summary>
     /// <param name="owner">Card owner / initial controller.</param>
     /// <param name="triggers">Optional trigger manager. When supplied,
     /// the opponent-upkeep trigger is registered so
     /// <see cref="StepStartedEvent"/>s on opponents' upkeeps surface
-    /// the manifest-dread (stub) trigger on the stack automatically.</param>
-    public static Creature Create(Player owner, TriggerManager? triggers = null)
+    /// the manifest-dread trigger on the stack automatically.</param>
+    /// <param name="zones">Optional <see cref="ZoneService"/> for
+    /// event-routed manifest dread resolution.</param>
+    public static Creature Create(
+        Player owner,
+        TriggerManager? triggers = null,
+        Majik.Core.Services.ZoneService? zones = null)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -126,9 +136,18 @@ public static class AbhorrentOculusFactory
                 e.StepType == PhaseStateType.Upkeep
                 && !ReferenceEquals(e.Player, card.Controller ?? owner));
 
+        // CR 701.59 — resolve manifest dread for the trigger's
+        // controller (Oculus's controller, not the player whose upkeep
+        // fired). Capture `card` so we read the live controller at
+        // resolve time rather than at construction (handles control
+        // changes between triggering + resolution).
+        var capturedCard = card;
+        var capturedZones = zones;
         var manifestDreadEffect = new Effect(
-            $"{CardName}: manifest dread (v1 stub — see factory xmldoc)",
-            ManifestDreadStub);
+            $"{CardName}: manifest dread (CR 701.59)",
+            () => ManifestDreadEffect.Resolve(
+                capturedCard.Controller ?? owner,
+                capturedZones));
 
         var opponentUpkeepTrigger = new TriggeredAbility(
             source: card,
@@ -154,25 +173,4 @@ public static class AbhorrentOculusFactory
     public static ExileCardsFromGraveyardAdditionalCost
         BuildExileSixCardsAdditionalCost() => new(count: ExileCostCount);
 
-    /// <summary>
-    /// v1 manifest dread placeholder. Documented as a no-op so the
-    /// triggered ability has an observable resolution shape today (the
-    /// stack push + resolve path still exercises the trigger plumbing).
-    /// Swap for a real manifest-dread effect once the primitive ships.
-    /// </summary>
-    internal static void ManifestDreadStub()
-    {
-        // CR 701.59 — manifest dread. Real implementation:
-        //   1. Look at the top two cards of the controller's library.
-        //   2. Agent picks one to manifest (face-down 2/2 creature
-        //      token on battlefield) and the other to put into the
-        //      graveyard.
-        //   3. The manifested permanent can be turned face up at any
-        //      time by paying its mana cost if it's a creature card
-        //      (CR 701.59c, CR 702.36 morph-like rules).
-        // Blocked on: face-down / manifest primitives + agent-side
-        // pick-one-of-two prompt. v1 is intentionally a no-op so the
-        // trigger fires + resolves cleanly without observable side
-        // effects.
-    }
 }
