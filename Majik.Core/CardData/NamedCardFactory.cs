@@ -2335,6 +2335,18 @@ public static class NamedCardFactory
             // produces the correct card shape only.
             "Anger of the Gods" => AngerOfTheGodsFactory.Create(owner),
 
+            // Sorcery — {X}{R} (MeltdownFactory). Urza's Destiny.
+            // "Destroy each artifact with mana value X or less." Card shape
+            // only on the dispatcher path; the resolve effect is built on
+            // demand via MeltdownFactory.BuildResolveEffect(caster,
+            // allPlayers, x). Effect snapshots every supplied player's
+            // battlefield, filters to Artifact cards with mv ≤ X, HashSet-
+            // dedupes, and routes each victim to its owner's graveyard via
+            // OracleSpellBinder.MoveToGraveyard (CR 701.7). Indestructible
+            // bypass is the same lossy gap as SlaughterPactFactory and the
+            // rest of the destroy family.
+            "Meltdown" => MeltdownFactory.Create(owner),
+
             // Instant — {1}{U} (DazeFactory). Nemesis.
             // "You may return an Island you control to its owner's hand
             //  rather than pay this spell's mana cost. Counter target spell
