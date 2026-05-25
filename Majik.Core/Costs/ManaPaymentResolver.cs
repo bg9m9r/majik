@@ -29,8 +29,27 @@ public sealed class ManaPaymentResolver
         _layers = layers;
     }
 
-    public bool Pay(Player payer, ManaCost cost, ManaPayment payment)
+    public bool Pay(Player payer, ManaCost cost, ManaPayment payment) =>
+        Pay(payer, cost, payment, out _);
+
+    /// <summary>
+    /// CR 702.44b — overload that also reports the distinct colors of
+    /// mana actually spent on this payment. "Spent" = the colored portion
+    /// of the player's pool that was consumed (colored pips + colored
+    /// mana used to cover generic), computed by diffing pool-before-spend
+    /// (pre-existing-floating-mana + mana produced by tapped sources)
+    /// against pool-after-spend. Empty when payment failed OR when no
+    /// colored mana was spent (e.g. paying {2} entirely from generic
+    /// floating mana). Order is deterministic WUBRG to match the engine's
+    /// canonical color iteration order.
+    /// </summary>
+    public bool Pay(
+        Player payer,
+        ManaCost cost,
+        ManaPayment payment,
+        out IReadOnlyList<ValueObjects.ManaColor> colorsSpent)
     {
+        colorsSpent = Array.Empty<ValueObjects.ManaColor>();
         if (payer == null) throw new ArgumentNullException(nameof(payer));
         if (cost == null) throw new ArgumentNullException(nameof(cost));
         if (payment == null) throw new ArgumentNullException(nameof(payment));
@@ -98,6 +117,13 @@ public sealed class ManaPaymentResolver
             return false;
         }
 
+        // Snapshot the player's pool BEFORE we tap producers + pay, so
+        // we can diff the colored buckets post-spend to compute Sunburst-
+        // style "colors of mana spent" (CR 702.44b). Pool-before-spend +
+        // produced mana = pool-with-sources; subtract pool-after-pay to
+        // get the actually-consumed delta per color.
+        var poolBefore = payer.ManaPool;
+
         // Commit: actually tap each source and add to real pool, then pay.
         foreach (var ab in abilities)
         {
@@ -107,6 +133,30 @@ public sealed class ManaPaymentResolver
         {
             payer.AddManaToPool(p);
         }
-        return payer.PayMana(cost);
+        var ok = payer.PayMana(cost);
+        if (!ok) return false;
+
+        var poolAfter = payer.ManaPool;
+        var availableW = poolBefore.White;
+        var availableU = poolBefore.Blue;
+        var availableB = poolBefore.Black;
+        var availableR = poolBefore.Red;
+        var availableG = poolBefore.Green;
+        foreach (var p in produced)
+        {
+            availableW += p.White;
+            availableU += p.Blue;
+            availableB += p.Black;
+            availableR += p.Red;
+            availableG += p.Green;
+        }
+        var spent = new List<ValueObjects.ManaColor>(5);
+        if (availableW - poolAfter.White > 0) spent.Add(ValueObjects.ManaColor.White);
+        if (availableU - poolAfter.Blue  > 0) spent.Add(ValueObjects.ManaColor.Blue);
+        if (availableB - poolAfter.Black > 0) spent.Add(ValueObjects.ManaColor.Black);
+        if (availableR - poolAfter.Red   > 0) spent.Add(ValueObjects.ManaColor.Red);
+        if (availableG - poolAfter.Green > 0) spent.Add(ValueObjects.ManaColor.Green);
+        colorsSpent = spent;
+        return true;
     }
 }
