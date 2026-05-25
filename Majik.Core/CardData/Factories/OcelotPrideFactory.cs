@@ -27,12 +27,14 @@ namespace Majik.Core.CardData.Factories;
 /// - <see cref="KeywordAbility"/> Lifelink marker (CR 702.15), consumed by
 ///   the standard combat-damage life-gain pipeline.
 /// - <b>Attack trigger</b> (CR 508.1f / CR 603.1): "Whenever Ocelot Pride
-///   attacks, create a 1/1 white Cat creature token." Wired via
+///   attacks, create a 1/1 white Cat creature token. If you have the
+///   city's blessing, instead create two of those tokens." Wired via
 ///   <see cref="Triggers.OnAttackSelf"/>. Tokens are built via
 ///   <see cref="TokenFactory.CreateOnBattlefield"/> with
 ///   <see cref="CardSubtype.Cat"/> and route through <see cref="ZoneService"/>
 ///   when supplied so <see cref="CardMovedEvent"/> fires for downstream
-///   ETB listeners.
+///   ETB listeners. The doubled branch reads <see cref="Player.HasCitysBlessing"/>
+///   (CR 702.131) at resolution.
 /// - <b>End-step flicker trigger</b> (CR 500.4 / CR 603.1 + CR 701.20
 ///   exile / CR 110.2 owner-control): "At the beginning of your end step,
 ///   if a creature you controlled dealt combat damage to a player this
@@ -52,13 +54,6 @@ namespace Majik.Core.CardData.Factories;
 ///   enters" pair fires through ZoneService.MoveCard).
 ///
 /// ## Deferred (v1 gaps)
-/// - <b>City's blessing (Ascend, CR 702.131)</b>: the engine has no Ascend
-///   / "controller controls 10+ permanents" primitive yet — neither a
-///   <c>Player.HasCitysBlessing</c> latch nor any factory-side gate. The
-///   attack trigger ships with the gate stubbed (always 1 token); the
-///   "doubled to 2" half of the printed text is deferred until an Ascend
-///   primitive lands. Documented in <c>MECHANICS_GAP.md</c> as the first
-///   Ascend-bearing card to land in the engine.
 /// - <b>True new-object flicker semantics</b>: CR 701.20a treats the
 ///   returning permanent as a new object. v1 returns the same
 ///   <see cref="Card"/> instance (preserves abilities + Lifelink marker)
@@ -121,15 +116,16 @@ public static class OcelotPrideFactory
         //   "Whenever Ocelot Pride attacks, create a 1/1 white Cat creature
         //    token. If you have the city's blessing, instead create two of
         //    those tokens."
-        // City's blessing (Ascend, CR 702.131) gate is stubbed — always
-        // creates 1 token (see class xmldoc).
+        // City's blessing (Ascend, CR 702.131) reads
+        // Player.HasCitysBlessing at resolution — latched true once the
+        // controller has had 10+ permanents at any point in the game.
         // ----------------------------------------------------------------
         var attackEffect = new Effect(
-            $"{CardName}: create a 1/1 white Cat creature token on attack",
+            $"{CardName}: create a 1/1 white Cat creature token on attack (two with the city's blessing)",
             () =>
             {
                 var controller = card.Controller ?? owner;
-                CreateCatTokens(controller, count: HasCitysBlessing(controller) ? 2 : 1, zoneService);
+                CreateCatTokens(controller, count: controller.HasCitysBlessing ? 2 : 1, zoneService);
             });
 
         var attackTrigger = new TriggeredAbility(
@@ -214,14 +210,6 @@ public static class OcelotPrideFactory
             TokenFactory.CreateOnBattlefield(spec, controller, zones);
         }
     }
-
-    /// <summary>
-    /// CR 702.131 — Ascend / city's blessing gate. Stubbed at v1: no
-    /// engine-level <c>Player.HasCitysBlessing</c> primitive yet, so the
-    /// gate always reports false and the attack trigger always creates 1
-    /// token. Documented in <c>MECHANICS_GAP.md</c>.
-    /// </summary>
-    private static bool HasCitysBlessing(Player _) => false;
 
     /// <summary>
     /// CR 701.20 — exile then return under owner's control. Mirrors the
