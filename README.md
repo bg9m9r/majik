@@ -6,103 +6,92 @@ Authoritative rules source: [`MagicCompRules 20251114.txt`](./MagicCompRules%202
 
 ## Projects
 
+Solution: `Majik.sln`.
+
 | Project | Role |
 |---|---|
-| `Majik.Core` | Engine library — state machines, stack, priority, SBAs, abilities, effects, zones, cards |
-| `Majik.Core.Api` | DTOs + JSON contracts shared between server and clients |
-| `Majik.Server` | ASP.NET Core host — REST endpoints (`/cards`, `/decks`, `/me`, `/matches`), SignalR `/hubs/match`, OpenAPI at `/openapi/v1.json` |
-| `Majik.Console` | Diagnostic CLI: `play-triggers` (triggered-ability playground) + `export-modern-cards` (regenerates the embedded Modern card seed). Not a gameplay UI. |
-| `Majik.Tools` | One-off scripts |
-| `Majik.*.Tests` | xUnit + FluentAssertions + Moq |
+| `Majik.Core` | Engine library. State machines, stack, priority, SBAs, abilities, effects, zones, cards. Ships the Modern-legal card pool embedded as `CardData/Embedded/modern-cards.json.gz`. |
+| `Majik.Core.Api` | DTOs + JSON contracts shared between server and clients. |
+| `Majik.Core.SourceGen` | Roslyn source generator — emits the dispatch table that maps `[CardName]` attributes on factory classes to their card names. |
+| `Majik.Server` | ASP.NET Core host — REST (`/cards`, `/decks`, `/me`, `/matches`), SignalR `/hubs/match`, OpenAPI at `/openapi/v1.json`. |
+| `Majik.Bot` | Game-playing bot (EV search, decision policies). |
+| `Majik.Console` | Diagnostic CLI. Two commands: `play-triggers` (triggered-ability playground) and `export-modern-cards` (regenerates the embedded card seed). Not a gameplay UI. |
+| `Majik.*.Tests` | xUnit + FluentAssertions + Moq. ~5,975 tests across `Majik.Core.Tests`, `Majik.Core.Api.Tests`, `Majik.Server.Tests`, `Majik.Bot.Tests`. (`Majik.Bot.Tests.Integration` exists but is mostly skipped — bot-vs-bot smoke.) |
 
 ## Common commands
 
 ```bash
-# Build / restore (run from this directory)
 dotnet build Majik.sln
-dotnet restore Majik.sln
+dotnet test  Majik.sln
+dotnet test  --filter "FullyQualifiedName~StateBasedActionsTests.LegendRule"
 
-# Tests
-dotnet test Majik.sln
-dotnet test --filter "FullyQualifiedName~StateBasedActionsTests.LegendRule"
+# Server (local dev — needs mongo, see "Local dev" below)
+dotnet run --project Majik.Server                   # http://localhost:5057
 
-# Server (local dev)
-dotnet run --project Majik.Server                                # http://localhost:5057
-
-# Engine triggered-ability playground
+# Triggered-ability playground
 dotnet run --project Majik.Console -- play-triggers [etb|apnap|intervening-if|delayed|all]
 
-# Regenerate the embedded Modern card pool (see "Updating card data" below)
+# Regenerate the embedded Modern card pool (see "Updating card data")
 dotnet run --project Majik.Console -- export-modern-cards <scryfall-all-cards.json>
 ```
 
-## Updating card data
-
-The engine's Modern-legal card pool ships as a gzipped JSON resource at
-`Majik.Core/CardData/Embedded/modern-cards.json.gz` (~22k rows, ~2 MB),
-loaded in-process by `EmbeddedCardRepository` — no database, no HTTP hop.
-To refresh it from a new Scryfall bulk export:
+## Local dev
 
 ```bash
-# 1. Fetch Scryfall's "all-cards" bulk (~500 MB JSON)
+# 1. Mongo (profiles, decks, matches)
+docker compose -f docker-compose.dev.yml up -d
+
+# 2. Server. Card pool is embedded — no seed step required.
+dotnet run --project Majik.Server
+# -> http://localhost:5057  (REST + /hubs/match + /openapi/v1.json)
+```
+
+## Adding a card
+
+The common contributor task. Per-card behaviour lives in a named factory under `Majik.Core/CardData/Factories/`:
+
+```csharp
+[CardName("Lightning Bolt")]
+public sealed class LightningBoltFactory : NamedCardFactory
+{
+    public override Card Build(CardEntity entity) => /* ... */;
+}
+```
+
+`Majik.Core.SourceGen.NamedCardFactoryGenerator` picks up the `[CardName]` attribute at build time and wires the factory into the dispatch table. Many simple spells don't need a hand-written factory at all — the spell-template binders under `Majik.Core/CardData/SpellTemplates/` cover patterns like "deal N damage to any target" via oracle-text matching.
+
+After adding a factory, refresh the embedded seed so `IsImplemented` flips on for the card. See **Updating card data** below.
+
+## Updating card data
+
+The engine's Modern-legal pool ships as `Majik.Core/CardData/Embedded/modern-cards.json.gz` (~22k rows, ~1.8 MB), loaded in-process by `EmbeddedCardRepository` — no database, no HTTP hop. Refresh from a Scryfall bulk export:
+
+```bash
+# 1. Fetch Scryfall's "all-cards" bulk (~500 MB JSON).
 curl -o /tmp/scryfall.json \
   $(curl -s https://api.scryfall.com/bulk-data \
     | jq -r '.data[] | select(.type=="all_cards") | .download_uri')
 
-# 2. Regenerate the seed (filters to modern legal/restricted, dedupes
-#    by name preferring the highest released_at, flags rows backed by a
-#    [CardName] factory as isImplemented, and round-trips through
-#    EmbeddedCardRepository as a sanity check)
+# 2. Regenerate the seed. Filters to modern legal/restricted, dedupes by
+#    name (highest released_at wins), flags rows with a [CardName] factory
+#    as IsImplemented, and round-trips through EmbeddedCardRepository as a
+#    sanity check. Non-zero exit means the round-trip failed.
 dotnet run --project Majik.Console -- export-modern-cards /tmp/scryfall.json
 
-# 3. Commit + push
+# 3. Commit.
 git add Majik.Core/CardData/Embedded/modern-cards.json.gz
 git commit -m "chore(cards): refresh modern-cards seed (Scryfall YYYY-MM-DD)"
 ```
 
-The CLI exits non-zero if the round-trip verification fails, so a green
-exit is a sufficient gate for committing the regenerated file.
+## Architecture (where things live)
 
-## Architecture
-
-### State machines (hierarchical, three levels)
-
-- `GameStateMachine` — `Initializing | Mulligan | Playing | GameOver`
-- `TurnStateMachine` — `Beginning | PreCombatMain | Combat | PostCombatMain | Ending`
-- `PhaseStateMachine` — steps within phases (`Untap`, `Upkeep`, `Draw`, main, combat steps, `End`, `Cleanup`)
-
-Phases are pluggable (`Majik.Core/Game/Phases/`). The phase sequence supports extra-turn / extra-phase / extra-step insertion per Rule 500.7–9. Flow is coordinated by `PhaseSequence` + `TurnManager` + `PhaseManager` + `PriorityManager`.
-
-### Aggregate root
-
-`Majik.Core.Domain.Aggregates.Game` owns the players, state machines, stack, managers (`TurnManager`, `PhaseManager`, `PriorityManager`, `StackResolver`, `CombatManager`), `StateBasedActions`, and the `EventBus`. New gameplay surfaces go through `Game`, not direct wiring.
-
-### Event bus
-
-`IEventBus` / `EventBus` in `Majik.Core/Events/`. Gameplay state changes emit `GameEvent` subclasses (`CardDrawnEvent`, `PhaseChangedEvent`, `LifeChangedEvent`, etc). Domain-internal events under `Majik.Core/Domain/DomainEvents/` (`SpellCastEvent`, `PriorityPassedEvent`, etc). Engine has no UI dependency — any client subscribes.
-
-### Stack, priority, SBAs
-
-- `Majik.Core/Stack/Stack.cs` — spell/ability stack with `IStackObject` items.
-- `PriorityManager` + `StackResolver` — priority-passing + resolution loop.
-- `Majik.Core/Rules/StateBasedActions.cs` — SBAs (Rule 704), run before any player gets priority.
-- `Majik.Core/Rules/ActionValidator.cs` + `RulesEngine.cs` — action validation.
-
-### Abilities + effects
-
-`Majik.Core/Abilities/` — the four ability shapes: `ActivatedAbility`, `TriggeredAbility` (+ `TriggerManager`), `StaticAbility` (+ `StaticAbilityManager`), `ReplacementEffect` (+ `ReplacementEffectManager`), plus `ManaAbility`. Effects decoupled via `Majik.Core/Effects/EffectLibrary.cs` + `EffectFactory.cs`. Costs (`Majik.Core/Costs/`), targeting (`Majik.Core/Targeting/`), and spells (`Majik.Core/Spells/`) are separate subsystems composed by `SpellCaster`, `AbilityActivator`, `ManaAbilityActivator`.
-
-### Cards + zones
-
-Card hierarchy: `Card` → `Permanent` → `Creature` / `Artifact` / `Enchantment` / `Land` / `Planeswalker`, plus `Instant` / `Sorcery`. Zones (`Majik.Core/Zones/`) are managed by `ZoneManager` + `ZoneService` — all movement goes through these so events fire.
-
-### Keyword parsing (data side, not gameplay)
-
-`Majik.Core/CardData/Parsing/`:
-- `KeywordRegistry` — catalog of known keywords (Official / Parameterized / Custom / CardName).
-- `KeywordParser` — lightweight tokenizer used by the binders to recognize keyword lines on Scryfall oracle text.
-
-Per-card behaviour is wired in the named factories under `Majik.Core/CardData/Factories/` (dispatched via `[CardName]` attributes + `Majik.Core.SourceGen.NamedCardFactoryGenerator`) and the spell templates under `Majik.Core/CardData/SpellTemplates/`.
+- **Aggregate root:** `Majik.Core.Domain.Aggregates.Game` — owns players, state machines, stack, the managers (`TurnManager`, `PhaseManager`, `PriorityManager`, `StackResolver`, `CombatManager`), `StateBasedActions`, and the `EventBus`. New gameplay surfaces go through `Game`.
+- **State machines** (`Majik.Core/StateMachine/` + `Majik.Core/Game/`): `GameStateMachine` (Initializing / Mulligan / Playing / GameOver), `TurnStateMachine`, `PhaseStateMachine`. Pluggable phases support extra-turn / extra-phase / extra-step insertion (Rule 500.7–9).
+- **Stack, priority, SBAs:** `Majik.Core/Stack/Stack.cs`, `PriorityManager` + `StackResolver` in `Majik.Core/Services/`, `Majik.Core/Rules/StateBasedActions.cs` (Rule 704), `ActionValidator.cs` + `RulesEngine.cs`.
+- **Abilities + effects** (`Majik.Core/Abilities/`, `Majik.Core/Effects/`): `ActivatedAbility`, `TriggeredAbility`, `StaticAbility`, `ReplacementEffect`, `ManaAbility`. `EffectLibrary` + `EffectFactory` produce `IEffect`s. Composed by `SpellCaster`, `AbilityActivator`, `ManaAbilityActivator`.
+- **Events:** `IEventBus` / `EventBus` in `Majik.Core/Events/`. Public `GameEvent` subclasses (`CardDrawnEvent`, `PhaseChangedEvent`, …). Domain-internal events under `Majik.Core/Domain/DomainEvents/`.
+- **Cards + zones:** `Card` -> `Permanent` -> `Creature` / `Artifact` / `Enchantment` / `Land` / `Planeswalker`; plus `Instant` / `Sorcery`. Zones managed by `ZoneManager` + `ZoneService` so all movement fires events.
+- **Card data layer:** `Majik.Core/CardData/EmbeddedCardRepository.cs` (the only `ICardRepository`), `Factories/` (named factories), `SpellTemplates/` (oracle-text binders), `Parsing/` (`KeywordRegistry`, `KeywordParser`).
 
 ## Server
 
@@ -110,47 +99,34 @@ Per-card behaviour is wired in the named factories under `Majik.Core/CardData/Fa
 
 | Endpoint | Purpose |
 |---|---|
-| `GET /healthz` | Liveness probe (anonymous) |
-| `GET /openapi/v1.json` | OpenAPI document — portal regenerates its TypeScript client from this |
-| `GET /whoami` | Identity introspection (requires auth) |
-| `GET /me` / `PUT /me` | User profile (handle, etc) |
-| `GET /cards/*` | Card catalog (read-only) |
-| `GET /decks` / `POST /decks` / `PUT /decks/:id` / `DELETE /decks/:id` / `POST /decks/parse` | Deck CRUD + Arena/MTGO text import |
-| `POST /matches` / `GET /matches/:id` / `POST /matches/:id/seats/:seat/claim` | Match lifecycle |
-| `MapHub /hubs/match` | SignalR — live match state, player actions, prompts |
+| `GET /healthz` | Liveness probe. |
+| `GET /openapi/v1.json` | OpenAPI document — portal regenerates its TypeScript client from this. |
+| `GET /whoami` | Identity introspection. |
+| `GET /me` / `PUT /me` | User profile (handle, etc). |
+| `GET /cards/*` | Card catalog (read-only). |
+| `GET /decks` / `POST /decks` / `PUT /decks/:id` / `DELETE /decks/:id` / `POST /decks/parse` | Deck CRUD + Arena/MTGO text import. |
+| `POST /matches` / `GET /matches/:id` / `POST /matches/:id/seats/:seat/claim` | Match lifecycle. |
+| `MapHub /hubs/match` | SignalR — live match state, player actions, prompts. |
 
-### Storage
+Storage:
 
-| Data | Store | Why |
-|---|---|---|
-| Cards (Modern-legal pool) | Embedded gzipped JSON in `Majik.Core` (`CardData/Embedded/modern-cards.json.gz`, ~22k rows, ~1.8 MB) | Loaded in-process by `EmbeddedCardRepository`. Refresh via `Majik.Console -- export-modern-cards` — see "Updating card data" above. |
-| Profiles, decks, matches | MongoDB | Mutable user-scoped data |
-
-### Local dev
-
-```bash
-# 1. Mongo (Docker)
-docker compose -f docker-compose.dev.yml up -d
-
-# 2. Server (card pool is embedded — no seed step required)
-dotnet run --project Majik.Server
-# → http://localhost:5057 (REST + /hubs/match + /openapi/v1.json)
-```
-
-## Testing
-
-xUnit + FluentAssertions + Moq. Tests mirror source layout under `Majik.Core.Tests/`. Shared fixtures: `TestDataBuilder` and `TestEventBus` — use these instead of hand-rolling setup. Rules-engine tests live under `Majik.Core.Tests/Rules/`.
+| Data | Store |
+|---|---|
+| Cards (Modern-legal pool) | Embedded gzipped JSON in `Majik.Core`. Loaded in-process by `EmbeddedCardRepository`. Refresh via `Majik.Console -- export-modern-cards`. |
+| Profiles, decks, matches | MongoDB. |
 
 ## Deploy
 
 Render Blueprint in [`render.yaml`](./render.yaml) provisions:
-- `majik-api` — Docker web service (this server). Card pool ships inside the image via the embedded resource — no persistent disk for cards.
-- `majik-mongo` — `mongo:7` private service with persistent disk
 
-Bootstrap procedure, env var contract, and operations in the umbrella repo's `docs/`:
-- [`RENDER_ENV.md`](https://github.com/bg9m9r/majik.project/blob/main/docs/RENDER_ENV.md)
-- [`RENDER_MONGO_SETUP.md`](https://github.com/bg9m9r/majik.project/blob/main/docs/RENDER_MONGO_SETUP.md)
+- `majik-api` — Docker web service (this server). Card pool ships inside the image; no persistent disk needed.
+- `majik-mongo` — `mongo:7` private service with a persistent disk.
+
+Env var contract + operations live in the umbrella repo:
+
+- [`docs/RENDER_ENV.md`](https://github.com/bg9m9r/majik.project/blob/main/docs/RENDER_ENV.md)
+- [`docs/RENDER_MONGO_SETUP.md`](https://github.com/bg9m9r/majik.project/blob/main/docs/RENDER_MONGO_SETUP.md)
 
 ## Historical docs
 
-`KEYWORDS_*.md`, `MECHANICS_GAP.md`, `ROADMAP.md`, and similar phase docs live under [`docs/archive/`](./docs/archive/). They document prior implementation work and are **not authoritative** — when they conflict with the code, the code wins. Don't update or create new phase docs unless asked.
+`KEYWORDS_*.md`, `MECHANICS_GAP.md`, `ROADMAP.md`, and similar phase docs live under [`docs/archive/`](./docs/archive/). They are **not authoritative** — code wins when they disagree. Don't update or create new phase docs unless asked.
