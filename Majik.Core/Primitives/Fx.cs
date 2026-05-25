@@ -358,7 +358,11 @@ public static class Fx
         if (stack is null) throw new ArgumentNullException(nameof(stack));
         if (spell is null) throw new ArgumentNullException(nameof(spell));
 
-        OracleSpellBinder.RemoveFromStack(stack, spell);
+        // CR 701.5b — uncounterable spells stay on the stack. RemoveFromStack
+        // signals the veto by returning false; skip the graveyard tail so the
+        // spell's card tracking zone stays aligned with the live stack
+        // (the spell will resolve normally).
+        if (!OracleSpellBinder.RemoveFromStack(stack, spell)) return;
         spell.Card.SetZone(ZoneType.Graveyard);
     }
 

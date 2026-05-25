@@ -25,7 +25,8 @@ internal static class CounterSpellFactory
                 var isCreature = spell.Card.HasType(Majik.Core.Cards.Types.CardType.Creature);
                 if (requireCreature && !isCreature) return;
                 if (requireNonCreature && isCreature) return;
-                OracleSpellBinder.RemoveFromStack(stack, spell);
+                // CR 701.5b — uncounterable spells survive the attempt.
+                if (!OracleSpellBinder.RemoveFromStack(stack, spell)) return;
                 spell.Card.SetZone(ZoneType.Graveyard);
             }) };
         });
@@ -39,7 +40,8 @@ internal static class CounterSpellFactory
             return new IEffect[] { new Effect("counter target spell", () =>
             {
                 if (stack == null || target is not ISpell spell) return;
-                OracleSpellBinder.RemoveFromStack(stack, spell);
+                // CR 701.5b — uncounterable spells survive the attempt.
+                if (!OracleSpellBinder.RemoveFromStack(stack, spell)) return;
                 spell.Card.SetZone(ZoneType.Graveyard);
             }) };
         });
@@ -81,7 +83,8 @@ internal static class CounterSpellFactory
                 {
                     return;
                 }
-                OracleSpellBinder.RemoveFromStack(stack, spell);
+                // CR 701.5b — uncounterable spells survive the attempt.
+                if (!OracleSpellBinder.RemoveFromStack(stack, spell)) return;
                 spell.Card.SetZone(ZoneType.Graveyard);
             }) };
         });
