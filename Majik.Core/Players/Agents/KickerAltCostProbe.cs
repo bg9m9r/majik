@@ -99,6 +99,7 @@ public sealed class KickerAltCostProbe : IAlternativeCostProbe
         return card.Name switch
         {
             "Burst Lightning" => ManaCost.Parse("{4}"),
+            "Goblin Bushwhacker" => ManaCost.Parse("{R}"),
             _ => null,
         };
     }
