@@ -8,13 +8,12 @@ using Xunit;
 namespace Majik.Core.Tests.CardData;
 
 /// <summary>
-/// Unit tests for <see cref="OrcishBowmastersFactory"/>.
+/// Legacy shape tests for <see cref="OrcishBowmastersFactory"/>. Covers:
+/// card identity (name, Creature type, subtypes, power/toughness), owner
+/// + controller assignment, Flash keyword wiring, no activated abilities.
 ///
-/// Covers:
-/// - Card identity (name, Creature type, subtypes, power/toughness)
-/// - Owner and controller assignment
-/// - Flash keyword ability wired
-/// - No triggered abilities in v1 (ETB/draw-watcher deferred)
+/// The v2 ETB + opponent-draw + Amass Orcs 1 trigger coverage lives in
+/// <see cref="Majik.Core.Tests.CardData.Factories.OrcishBowmastersFactoryTests"/>.
 /// </summary>
 public class OrcishBowmastersTests
 {
@@ -82,16 +81,20 @@ public class OrcishBowmastersTests
     }
 
     // -----------------------------------------------------------------------
-    // Deferred abilities not yet wired
+    // Triggered + activated ability shape (v2)
     // -----------------------------------------------------------------------
 
     [Fact]
-    public void OrcishBowmasters_HasNoTriggeredAbilities_InV1()
+    public void OrcishBowmasters_HasTwoTriggeredAbilities_V2()
     {
         var ob = OrcishBowmastersFactory.Create(_alice);
 
-        ob.Abilities.OfType<TriggeredAbility>().Should().BeEmpty(
-            "ETB damage trigger and opponent-draw watcher are deferred in v1");
+        // The single printed line is wired as TWO sibling triggers — one
+        // for ETB (CardMovedEvent) and one for the opponent-draw clause
+        // (CardDrawnEvent) — to satisfy the TriggerManager's
+        // subscribe-by-EventType contract. Both share the resolve body.
+        ob.Abilities.OfType<TriggeredAbility>().Should().HaveCount(2,
+            "ETB + opponent-draw triggers are the v2 wiring");
     }
 
     [Fact]
