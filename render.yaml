@@ -12,11 +12,8 @@
 #     MONGO_INITDB_ROOT_PASSWORD  auto-generated below
 #
 # Card data: bundled in-process via EmbeddedCardRepository (gzipped
-# modern-cards.json.gz baked into the Majik.Core assembly). The previous
-# majik-cards private service + its SQLite disk have been removed.
-# NOTE: removing a service from this blueprint does NOT delete it on
-# Render — go to the dashboard and deactivate `majik-cards` + release
-# the `cards-server-data` disk separately.
+# modern-cards.json.gz baked into the Majik.Core assembly). No separate
+# cards service, no persistent disk for cards.
 
 services:
   - type: web
@@ -35,9 +32,9 @@ services:
     # autoDeploy intentionally omitted — manage deploys manually in the Render
     # dashboard. Constant auto-deploys made prod validation impractical; flip
     # back to `autoDeploy: true` when iteration cadence calms down.
-    # No `disk:` — card lookups are now in-process via the embedded
-    # modern-cards.json.gz resource, no filesystem dependency, no internal
-    # HTTP hop. This is what unblocks horizontal scaling.
+    # No `disk:` — card lookups are in-process via the embedded
+    # modern-cards.json.gz resource. No filesystem dependency, no internal
+    # HTTP hop, safe to scale horizontally.
     envVars:
       - key: ASPNETCORE_ENVIRONMENT
         value: Production

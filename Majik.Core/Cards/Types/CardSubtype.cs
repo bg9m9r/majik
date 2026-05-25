@@ -184,6 +184,9 @@ public enum CardSubtype
     /// Devastation), Lorthos, the Tidemaker, Quest for Ula's Temple
     /// payoffs. CR 205.3m.</summary>
     Serpent,
+    /// <summary>Imp creature subtype — Vault Skirge (New Phyrexia), Ravenous Rats'
+    /// adjacent imp lineage (Hypnotic Specter / Mind Twist-adjacent). CR 205.3m.</summary>
+    Imp,
 
     // Land subtypes (examples)
     Forest,
