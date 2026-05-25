@@ -18,6 +18,7 @@ public class Card : ICard
     private readonly List<CardSupertype> _supertypes = new();
     private readonly List<CardSubtype> _subtypes = new();
     private readonly List<IAbility> _abilities = new();
+    private readonly List<ZoneType> _restrictedCastZones = new();
 
     public Guid InstanceId { get; } = Guid.NewGuid();
     public string Name { get; }
@@ -690,6 +691,43 @@ public class Card : ICard
         if (subtypes != null)
         {
             _subtypes.AddRange(subtypes);
+        }
+    }
+
+    /// <summary>
+    /// CR 601.2a / CR 117.6 — zones from which this card can't be cast as
+    /// a spell, baked onto the card itself (printed restriction, not an
+    /// external rules attachment). The canonical consumer is Hogaak,
+    /// Arisen Necropolis ("Hogaak, Arisen Necropolis can't be cast from
+    /// your hand."): the factory stamps <c>ZoneType.Hand</c> here, and
+    /// <see cref="Majik.Core.Rules.ActionValidator.ValidateAction"/>
+    /// rejects a <see cref="Majik.Core.Rules.CastSpellAction"/> whose
+    /// <see cref="Majik.Core.Rules.CastSpellAction.FromZone"/> matches.
+    ///
+    /// <para>Inverse of <see cref="Majik.Core.Rules.CastingRestrictions.MustCastFromHand"/>
+    /// (Drannith Magistrate's "your opponents can't cast spells from
+    /// anywhere other than their hands"): that restriction is keyed by
+    /// the casting player and allows only Hand; this list is keyed by
+    /// the card and forbids the listed zones. Both gates run
+    /// independently and either can reject a cast.</para>
+    ///
+    /// <para>Empty for the overwhelming majority of cards; populated only
+    /// by named-card factories that print a zone-of-cast restriction.</para>
+    /// </summary>
+    public IReadOnlyList<ZoneType> RestrictedCastZones => _restrictedCastZones.AsReadOnly();
+
+    /// <summary>
+    /// Add <paramref name="zone"/> to the list of zones this card can't be
+    /// cast from. Idempotent — adding the same zone twice is a no-op.
+    /// Called by named-card factories at card construction (e.g.
+    /// <see cref="Majik.Core.CardData.Factories.HogaakFactory.Create"/>
+    /// stamps <c>ZoneType.Hand</c>).
+    /// </summary>
+    public void AddRestrictedCastZone(ZoneType zone)
+    {
+        if (!_restrictedCastZones.Contains(zone))
+        {
+            _restrictedCastZones.Add(zone);
         }
     }
 

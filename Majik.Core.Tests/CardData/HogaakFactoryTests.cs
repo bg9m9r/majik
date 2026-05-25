@@ -7,6 +7,7 @@ using Majik.Core.Cards.Types;
 using Majik.Core.Combat;
 using Majik.Core.Costs;
 using Majik.Core.Players;
+using Majik.Core.Rules;
 using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
 using Xunit;
@@ -168,6 +169,86 @@ public class HogaakFactoryTests
 
         bear.Zone.Should().Be(ZoneType.Exile);
         elf.Zone.Should().Be(ZoneType.Exile);
+    }
+
+    // -----------------------------------------------------------------------
+    // Cast-from-zone restriction (CR 601.2a / CR 117.6)
+    // "Hogaak, Arisen Necropolis can't be cast from your hand."
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void Hogaak_StampsCantBeCastFromHand_RestrictedCastZone()
+    {
+        var c = HogaakFactory.Create(_alice);
+
+        c.RestrictedCastZones.Should().Contain(ZoneType.Hand,
+            "CR 601.2a — 'Hogaak, Arisen Necropolis can't be cast from your hand.'");
+        c.RestrictedCastZones.Should().HaveCount(1,
+            "the printed restriction names only Hand");
+    }
+
+    [Fact]
+    public void Hogaak_CastFromHand_RejectedByActionValidator()
+    {
+        var hogaak = HogaakFactory.Create(_alice);
+        var validator = new ActionValidator();
+
+        var action = new CastSpellAction(
+            card: hogaak,
+            player: _alice,
+            sorcerySpeedAvailable: true,
+            fromZone: ZoneType.Hand);
+
+        var result = validator.ValidateAction(action);
+
+        result.IsValid.Should().BeFalse();
+        result.Violation.Should().NotBeNull();
+        result.Violation!.RuleNumber.Should().Be("601.2a");
+        result.Violation.Description.Should().Contain("Hogaak");
+    }
+
+    [Fact]
+    public void Hogaak_CastFromGraveyard_AllowedByActionValidator()
+    {
+        // The printed alt-cost (exile 2 creatures + Convoke) routes Hogaak
+        // through the cast flow with FromZone = Graveyard; the cast-zone
+        // restriction must NOT fire on that path.
+        var hogaak = HogaakFactory.Create(_alice);
+        var validator = new ActionValidator();
+
+        var action = new CastSpellAction(
+            card: hogaak,
+            player: _alice,
+            sorcerySpeedAvailable: true,
+            fromZone: ZoneType.Graveyard);
+
+        var result = validator.ValidateAction(action);
+
+        result.IsValid.Should().BeTrue(
+            "CR 601.2a only forbids the Hand zone — Graveyard / Exile / Library are legal cast zones");
+    }
+
+    [Fact]
+    public void Card_WithoutRestriction_CastFromHand_AllowedByActionValidator()
+    {
+        // Sanity check: a plain creature carries no RestrictedCastZones,
+        // so the new gate is a no-op for normal cards cast from hand.
+        var bear = new Creature("Bear", "1G", 2, 2);
+        bear.SetOwner(_alice);
+        bear.SetController(_alice);
+        var validator = new ActionValidator();
+
+        var action = new CastSpellAction(
+            card: bear,
+            player: _alice,
+            sorcerySpeedAvailable: true,
+            fromZone: ZoneType.Hand);
+
+        var result = validator.ValidateAction(action);
+
+        result.IsValid.Should().BeTrue(
+            "Bear has no printed cast-zone restriction — the new gate must not affect normal casts");
+        bear.RestrictedCastZones.Should().BeEmpty();
     }
 
     [Fact]
