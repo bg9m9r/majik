@@ -107,8 +107,12 @@ public static class CoverageCommand
         await db.Database.EnsureCreatedAsync();
         await CardDataSchemaPatcher.PatchAsync(db.Database.GetDbConnection(), CancellationToken.None);
 
-        // Pull the entity set this run cares about.
-        var entities = await LoadEntitiesAsync(db, format, weights);
+        // Pull the entity set this run cares about. When a meta-frequency
+        // snapshot is supplied we also force-include its named cards even
+        // when the format filter would otherwise exclude them (banned /
+        // not_legal), so the tournament-weighted rollup reflects the full
+        // snapshot rather than silently dropping ban-list entries.
+        var entities = await LoadEntitiesAsync(db, format, weights, frequencyWeights);
         if (dedupByName)
         {
             entities = entities
@@ -154,7 +158,10 @@ public static class CoverageCommand
     }
 
     private static async Task<List<CardEntity>> LoadEntitiesAsync(
-        CardDbContext db, string? format, IReadOnlyDictionary<string, int>? deckWeights)
+        CardDbContext db,
+        string? format,
+        IReadOnlyDictionary<string, int>? deckWeights,
+        IReadOnlyDictionary<string, double>? frequencyWeights = null)
     {
         IQueryable<CardEntity> query = db.Cards.AsNoTracking();
 
@@ -169,12 +176,49 @@ public static class CoverageCommand
         if (format is not null)
         {
             var formatKey = format.ToLowerInvariant();
-            query =
+            var legalCards = await (
                 from c in query
                 join l in db.CardLegalities.AsNoTracking()
                     on c.Id equals l.CardId
                 where l.Format == formatKey && l.Status == MtgLegalityStatus.Legal
-                select c;
+                select c).ToListAsync();
+
+            if (frequencyWeights is null || frequencyWeights.Count == 0)
+            {
+                return legalCards;
+            }
+
+            // Force-include every snapshot card. Banned / not_legal /
+            // wrong-format entries still belong in the report when the
+            // meta snapshot names them — otherwise tournament-weighted
+            // coverage silently under-counts ban-list staples. Match by
+            // exact name OR by the front-face of a DFC/adventure name
+            // (e.g. snapshot "Sink into Stupor" → DB row
+            // "Sink into Stupor // Soporific Springs").
+            var snapshotNames = frequencyWeights.Keys
+                .Where(n => !string.IsNullOrWhiteSpace(n))
+                .ToHashSet(StringComparer.Ordinal);
+
+            // Filter happens client-side after the .ToListAsync because
+            // EF can't translate the front-face string-split predicate.
+            // The DB row count is small (~30k) and we already pull the
+            // full Cards table in many paths, so the cost is acceptable.
+            var have = legalCards.Select(c => c.Name).ToHashSet(StringComparer.Ordinal);
+            var missing = await db.Cards.AsNoTracking()
+                .Where(c => !have.Contains(c.Name))
+                .ToListAsync();
+
+            foreach (var row in missing)
+            {
+                if (snapshotNames.Contains(row.Name)
+                    || snapshotNames.Contains(CoverageReportV2.FrontFace(row.Name)))
+                {
+                    legalCards.Add(row);
+                    have.Add(row.Name);
+                }
+            }
+
+            return legalCards;
         }
 
         return await query.ToListAsync();
@@ -241,6 +285,15 @@ public static class CoverageCommand
                 SysConsole.WriteLine(
                     $"  Top-{n} most-played: {covered} / {n} covered ({pct:F0}%)");
             }
+            if (report.NotInSet is not null && report.NotInSet.Count > 0)
+            {
+                SysConsole.WriteLine(
+                    $"  NotInSet: {report.NotInSet.Count} snapshot cards unmatched ({report.NotInSetWeight:F0} weight)");
+                foreach (var row in report.NotInSet.Take(10))
+                {
+                    SysConsole.WriteLine($"    - {row.Weight,4:F0}  {row.Name}");
+                }
+            }
         }
 
         SysConsole.WriteLine();
@@ -300,6 +353,12 @@ public static class CoverageCommand
                 weight = Math.Round(r.Weight, 2),
                 tier = r.Tier.ToString(),
             }).ToList(),
+            not_in_set = report.NotInSet?.Select(r => new
+            {
+                name = r.Name,
+                weight = Math.Round(r.Weight, 2),
+            }).ToList(),
+            not_in_set_weight = Math.Round(report.NotInSetWeight, 2),
             top_unimplemented = report.TopUnimplemented
                 .Select(r => new { name = r.Name, weight = r.Weight })
                 .ToList(),
@@ -366,6 +425,21 @@ public static class CoverageCommand
             foreach (var row in report.TopMeta)
             {
                 sb.AppendLine($"| {row.Weight:F1} | {row.Name} | {row.Tier} |");
+            }
+        }
+
+        if (report.NotInSet is not null && report.NotInSet.Count > 0)
+        {
+            sb.AppendLine();
+            sb.AppendLine($"## Not in set ({report.NotInSet.Count})");
+            sb.AppendLine();
+            sb.AppendLine($"Snapshot entries with no matching classified entity (combined weight {report.NotInSetWeight:F0}). Usually a missing card import or a snapshot name-shape mismatch.");
+            sb.AppendLine();
+            sb.AppendLine("| Weight | Card |");
+            sb.AppendLine("|---:|---|");
+            foreach (var row in report.NotInSet)
+            {
+                sb.AppendLine($"| {row.Weight:F0} | {row.Name} |");
             }
         }
 
