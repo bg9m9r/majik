@@ -70,24 +70,22 @@ namespace Majik.Core.CardData.Factories;
 ///   field directly, which is the pure-{W} count and excludes hybrid /
 ///   Phyrexian {W} contributions). Heliod itself contributes 2 (its own
 ///   cost has two {W} pips), so two more white permanents are typically
-///   enough to flip him on. The "isn't a creature" Layer 4 type-strip is
-///   DEFERRED — see Deferred section below; Heliod always reports as a
-///   Creature in v1. <see cref="ComputeDevotionToWhite"/> is exposed
-///   publicly so tests + bots can inspect the live count without going
-///   through the type-strip layer.
+///   enough to flip him on. <see cref="ComputeDevotionToWhite"/> is
+///   exposed publicly so tests + bots can inspect the live count
+///   directly.
+/// - <b>Layer 4 devotion-gated type-strip (CR 205.2 / 613.1d)</b>: when
+///   the <c>(owner, triggers, effects)</c> overload is invoked with a
+///   <see cref="ContinuousEffectsService"/>, a
+///   <see cref="Layer4TypeStripEffect"/> is registered on Heliod with
+///   predicate <c>ComputeDevotionToWhite(controller) &lt; 5</c>. The
+///   predicate is re-evaluated on every layer-system Compute, so
+///   devotion bumps / drops flip Heliod's effective Creature type
+///   without re-registering the effect. While the predicate is true,
+///   Heliod's layered characteristics drop Creature — he can't be
+///   targeted by creature-only spells, can't attack, and can't be
+///   declared as a blocker.
 ///
 /// ## Deferred (v1 gaps)
-/// - <b>Layer 4 type-strip when devotion &lt; 5</b>: the printed clause
-///   "Heliod isn't a creature" should drop the Creature type via a Layer 4
-///   continuous effect (CR 613.1d) while controller-side devotion is
-///   below 5, then add it back when devotion meets the threshold.
-///   <see cref="Effects.ContinuousEffectsService"/> exposes a
-///   per-permanent layered-effects substrate today but does NOT yet carry
-///   a Layer 4 type-strip primitive — same gap as Mutavault / Inkmoth
-///   Nexus's combat math (they animate into creatures via Layer 4 add but
-///   the substrate doesn't surface for combat). v1 ships the devotion
-///   COUNTER so card-shape / bot decision code can read the threshold,
-///   and the printed Creature type stays present regardless of devotion.
 /// - <b>Hybrid / Phyrexian {W} contributions</b>: CR 700.5a counts every
 ///   mana symbol in a permanent's mana cost that includes {W} toward
 ///   devotion to white. v1 reads
@@ -129,17 +127,46 @@ public static class HeliodSunCrownedFactory
     /// tests — tests fire the triggered ability by invoking its effect
     /// directly.
     /// </summary>
-    public static Creature Create(Player owner) => Create(owner, triggers: null);
+    public static Creature Create(Player owner) => Create(owner, triggers: null, effects: null);
+
+    /// <summary>
+    /// Trigger-manager-only overload (kept for back-compat with callers
+    /// that wire triggers without a layer-system service). Equivalent to
+    /// <see cref="Create(Player, TriggerManager?, ContinuousEffectsService?)"/>
+    /// with <c>effects: null</c>.
+    /// </summary>
+    public static Creature Create(Player owner, TriggerManager? triggers)
+        => Create(owner, triggers, effects: null);
 
     /// <summary>
     /// Construct Heliod, Sun-Crowned with the lifegain trigger registered
-    /// against <paramref name="triggers"/> when supplied. Lifelink-grant
-    /// activated ability is structurally identical across both overloads;
-    /// it consults the target creature's
+    /// against <paramref name="triggers"/> when supplied, and the Layer 4
+    /// devotion-gated type-strip registered against
+    /// <paramref name="effects"/> when supplied.
+    ///
+    /// <para>When <paramref name="effects"/> is non-null:</para>
+    /// <list type="bullet">
+    ///   <item>The service is stamped onto Heliod's
+    ///   <see cref="Creature.ActiveEffects"/> so downstream P/T + type
+    ///   lookups route through the layer system.</item>
+    ///   <item>A <see cref="Layer4TypeStripEffect"/> is registered with
+    ///   predicate <c>ComputeDevotionToWhite(controller) &lt; 5</c>
+    ///   (CR 205.2 / 613.1d). While the predicate is true, Heliod's
+    ///   layered characteristics drop the Creature type — he can't be
+    ///   targeted by creature-only spells, can't attack, can't block.
+    ///   When devotion bumps to 5+, the predicate flips false and
+    ///   Heliod's printed Creature type surfaces again.</item>
+    /// </list>
+    ///
+    /// Lifelink-grant activated ability is structurally identical across
+    /// all overloads; it consults the target creature's
     /// <see cref="Creature.ActiveEffects"/> on resolve (silent no-op when
     /// missing, matching Guide of Souls' posture).
     /// </summary>
-    public static Creature Create(Player owner, TriggerManager? triggers)
+    public static Creature Create(
+        Player owner,
+        TriggerManager? triggers,
+        ContinuousEffectsService? effects)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -258,6 +285,26 @@ public static class HeliodSunCrownedFactory
             });
 
         card.AddAbility(lifelinkGrantAbility);
+
+        // ----------------------------------------------------------------
+        // Layer 4 devotion-gated type-strip — CR 205.2 / 613.1d.
+        //   "As long as your devotion to white is less than five, Heliod
+        //    isn't a creature."
+        // Registers a Layer4TypeStripEffect on the supplied service with
+        // a live devotion predicate. Predicate is re-evaluated on every
+        // Compute pass, so devotion bumps (cast another white permanent)
+        // / drops (white permanent LTB's) flip Heliod's effective
+        // Creature type without re-registering the effect. Effect is
+        // source-anchored — when Heliod LTB's, the effect ends.
+        // ----------------------------------------------------------------
+        if (effects != null)
+        {
+            card.ActiveEffects = effects;
+            effects.Register(new Layer4TypeStripEffect(
+                source: card,
+                predicate: () =>
+                    ComputeDevotionToWhite(card.Controller!) < DevotionToWhiteThreshold));
+        }
 
         return card;
     }
