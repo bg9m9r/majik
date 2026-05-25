@@ -1,8 +1,8 @@
 {
-  "generated_utc": "2026-05-25T03:46:30.5099885Z",
-  "scanned_dir": "/home/brett/Projects/majik.project/majik.core/.claude/worktrees/agent-a02d08bc9ef871028/Majik.Core/CardData/Factories",
+  "generated_utc": "2026-05-25T03:51:18.1209500Z",
+  "scanned_dir": "/home/brett/Projects/majik.project/majik.core/.claude/worktrees/agent-a842268fdfb834776/Majik.Core/CardData/Factories",
   "total_mentions": 208,
-  "distinct_factories": 138,
+  "distinct_factories": 140,
   "cluster_count": 7,
   "unclustered_count": 163,
   "clusters": [
@@ -801,6 +801,12 @@
       "sentence": "## Deferred (v1 gaps)  - \u003Cb\u003EConvoke cost reduction\u003C/b\u003E."
     },
     {
+      "factory": "SlogurkTheOverslimeFactory",
+      "file": "SlogurkTheOverslimeFactory.cs",
+      "line": 191,
+      "sentence": "Mana cost is empty; counter-removal cost is documented in the description-only path (cost-primitive deferred)."
+    },
+    {
       "factory": "DryadArborFactory",
       "file": "DryadArborFactory.cs",
       "line": 7,
@@ -810,26 +816,7 @@
       "factory": "ArcboundRavagerFactory",
       "file": "ArcboundRavagerFactory.cs",
       "line": 14,
-      "sentence": "## Deferred (v1 gaps)  - \u003Cb\u003ETarget prompt for Modular bestowal\u003C/b\u003E: oracle says \u0022target artifact creature\u0022 \u2014 v1 picks the first artifact creature deterministically (excluding Arcbound Ravager)."
-    },
-    {
-      "factory": "ArcboundRavagerFactory",
-      "file": "ArcboundRavagerFactory.cs",
-      "line": 14,
-      "sentence": "TargetRequests\u0022/\u003E; same gap as Stoneforge Mystic\u0027s \u0022attach to a creature you control\u0022."
-    },
-    {
-      "factory": "ArcboundRavagerFactory",
-      "file": "ArcboundRavagerFactory.cs",
-      "line": 14,
-      "sentence": "Arcbound Ravager is the only Modular card in the immediate roadmap; promotion to a shared primitive is deferred until a second Modular card lands (Arcbound Crusher / Worker / etc."
-    },
-    {
-      "factory": "ArcboundRavagerFactory",
-      "file": "ArcboundRavagerFactory.cs",
-      "line": 234,
-      "sentence": "CR 702.43b\u0027s \u0022target artifact creature\u0022 is not controller-restricted; opponent-side scans are deferred until the engine exposes a cross-battlefield enumerator (no \u003Cc\u003EPlayer.",
-      "cr": "CR 702.43b"
+      "sentence": "## Deferred (v1 gaps)  - Per-target prompt for the Modular bestowal (deterministic first- artifact-creature pick in v1 \u2014 same gap as Stoneforge Mystic\u0027s tutor)."
     },
     {
       "factory": "SpriteDragonFactory",
@@ -1156,6 +1143,20 @@
       "file": "ShowAndTellFactory.cs",
       "line": 11,
       "sentence": "Real \u0022any of N choices \u002B opt-out\u0022 prompt deferred (same queue as Stoneforge Mystic / Sun Titan)."
+    },
+    {
+      "factory": "GoryosVengeanceFactory",
+      "file": "GoryosVengeanceFactory.cs",
+      "line": 14,
+      "sentence": "Printed Arcane subtype is omitted from the runtime card (CR 205.3 \u2014 Arcane is a spell subtype; the engine\u0027s \u003Csee cref=\u0022CardSubtype\u0022/\u003E enum doesn\u0027t yet carry an Arcane member, same gap as Through the Breach.",
+      "cr": "CR 205.3"
+    },
+    {
+      "factory": "GoryosVengeanceFactory",
+      "file": "GoryosVengeanceFactory.cs",
+      "line": 14,
+      "sentence": "\u003Cb\u003ESplice onto Arcane (CR 702.46)\u003C/b\u003E: the splice alt-cost primitive isn\u0027t in the engine yet \u2014 same gap as Through the Breach.",
+      "cr": "CR 702.46"
     },
     {
       "factory": "YawgmothFactory",

@@ -4,7 +4,7 @@ using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
 using Majik.Core.Counters;
 using Majik.Core.Effects;
-using Majik.Core.Events;
+using Majik.Core.Keywords;
 using Majik.Core.Players;
 using Majik.Core.Services;
 using Majik.Core.Zones;
@@ -24,59 +24,33 @@ namespace Majik.Core.CardData.Factories;
 ///
 /// - 0/0 Artifact Creature — Beast (multi-type via
 ///   <see cref="Card.AddCardType"/>), mana cost {2}, owner/controller wired.
-/// - <b>Modular 1 — ETB +1/+1 counter (CR 702.43a / CR 614.1d)</b>:
-///   wired through an <see cref="EntersWithCountersReplacement"/>
-///   registered on the supplied <see cref="ReplacementBus"/>. The
-///   <see cref="Services.ZoneService"/> ETB pipeline reads
-///   <see cref="ZoneMoveIntent.PlusOneCountersOnEnter"/> and stamps the
-///   counter after landing. When no bus is supplied, the
-///   <see cref="MarkEntersWithCounter"/> fallback manually stamps the
-///   counter so shape-only tests still see the Modular 1 entry value.
-/// - <b>Modular 1 — death trigger (CR 702.43b)</b>: a
-///   <see cref="TriggeredAbility"/> fires on the
-///   <see cref="Triggers.OnDies"/> transition (Battlefield → Graveyard).
-///   The trigger's effect picks the first artifact creature on the
-///   battlefield (deterministic v1 target — same posture as Stoneforge
-///   Mystic's tutor pick) excluding Arcbound Ravager itself, then moves
-///   every +1/+1 counter from Arcbound Ravager's graveyard-object
-///   <see cref="Permanent.Counters"/> bag onto the chosen artifact
-///   creature. The bag's value on the graveyard object survives the zone
-///   move (Undying-shape — counters live on the card object until cleared
-///   on its next entry), so the count at trigger-resolution time
-///   accurately reflects what Arcbound Ravager had when it died.
+/// - <b>Modular 1 (CR 702.43)</b>: wired via the shared
+///   <see cref="ModularFactory.Build"/> primitive (promoted out of this
+///   factory in the Modular-promotion PR after Arcbound Worker + Arcbound
+///   Stinger joined the roadmap). The primitive attaches:
+///     - A <see cref="KeywordAbility"/> "Modular 1" marker.
+///     - The ETB +1/+1-counter replacement (CR 702.43a / CR 614.1d) routed
+///       through <see cref="CountersService.Add"/> so Hardened Scales bumps
+///       apply (PR #494).
+///     - The Battlefield -> Graveyard death trigger (CR 702.43b) that moves
+///       the source's +1/+1 counters to a target artifact creature on the
+///       controller's battlefield. Snapshot-counts off the graveyard object
+///       (Undying-shape — bag survives the zone move).
 /// - <b>Activated ability — sacrifice an artifact: +1/+1 counter</b>:
-///   wired via <see cref="ActivatedAbility"/> with a
-///   <see cref="SacrificeAnArtifactCost"/>. The cost picks the
-///   first artifact on the controller's battlefield (deterministic v1 —
-///   mirrors <see cref="SacrificeAnotherCreatureCost"/>). Arcbound
-///   Ravager is itself an artifact, so the activation is self-fueling
-///   when no other artifacts are available (the cost picker will choose
-///   Arcbound Ravager — sacrificing it before the resolution effect lands
-///   the counter is a known interaction: the counter is added to the
-///   graveyard object, then the death trigger above fires and can move
-///   it to another artifact creature). The activation is mana-free —
-///   only the sacrifice is required.
+///   Ravager-specific, stays here. Wired via <see cref="ActivatedAbility"/>
+///   with a <see cref="SacrificeAnArtifactCost"/>. The activation is mana-
+///   free; only the sacrifice is required. The counter add is routed via
+///   <see cref="CountersService.Add"/> so Hardened Scales bumps it too.
 ///
 /// ## Deferred (v1 gaps)
 ///
-/// - <b>Target prompt for Modular bestowal</b>: oracle says "target
-///   artifact creature" — v1 picks the first artifact creature
-///   deterministically (excluding Arcbound Ravager). Full prompting
-///   requires threading <see cref="Players.Agents.TargetRequest"/>
-///   through <see cref="TriggeredAbility.TargetRequests"/>; same gap as
-///   Stoneforge Mystic's "attach to a creature you control".
-/// - <b>"You may" Modular opt-out</b>: oracle says "you MAY put". v1
-///   always moves the counters when a legal artifact-creature target
-///   exists. A future agent-prompt path can surface the may-decline.
-/// - <b>Artifact picker for sacrifice cost</b>: deterministic — chooses
-///   the first artifact on the controller's battlefield. A full agent-
-///   driven picker would let the controller pick which artifact to feed.
-/// - <b>Modular N general primitive</b>: this factory wires Modular 1
-///   inline rather than extracting a <c>ModularFactory.Build(creature,
-///   n, ...)</c> primitive. Arcbound Ravager is the only Modular card in
-///   the immediate roadmap; promotion to a shared primitive is deferred
-///   until a second Modular card lands (Arcbound Crusher / Worker / etc.
-///   are unlikely Modern staples).
+/// - Per-target prompt for the Modular bestowal (deterministic first-
+///   artifact-creature pick in v1 — same gap as Stoneforge Mystic's tutor).
+/// - Cross-battlefield target enumeration (CR 702.43b is not controller-
+///   restricted; v1 only scans the controller's battlefield until a
+///   <c>Player.Opponents</c>-style enumerator lands).
+/// - Artifact picker for the sacrifice cost (deterministic — chooses the
+///   first artifact on the controller's battlefield).
 /// </summary>
 [CardName("Arcbound Ravager")]
 public static class ArcboundRavagerFactory
@@ -103,13 +77,13 @@ public static class ArcboundRavagerFactory
     /// Construct Arcbound Ravager with optional runtime services.
     /// </summary>
     /// <param name="owner">Card owner / initial controller.</param>
-    /// <param name="replacements">ReplacementBus to register the ETB
-    /// +1/+1-counter replacement against (CR 614.1d). May be null — no
-    /// replacement is registered; callers can stamp the counter manually
-    /// via <see cref="MarkEntersWithCounter"/>.</param>
-    /// <param name="triggers">TriggerManager for the Modular death
-    /// trigger (CR 702.43b). May be null — the trigger is still attached
-    /// to the card shape so dispatcher / shape tests can observe it.</param>
+    /// <param name="replacements">ReplacementBus to register the Modular
+    /// ETB +1/+1-counter replacement against (CR 614.1d). May be null —
+    /// callers can stamp the counter manually via
+    /// <see cref="MarkEntersWithCounter"/>.</param>
+    /// <param name="triggers">TriggerManager for the Modular death trigger
+    /// (CR 702.43b). May be null — the trigger is still attached to the
+    /// card shape so dispatcher / shape tests can observe it.</param>
     public static Creature Create(
         Player owner,
         ReplacementBus? replacements,
@@ -134,72 +108,19 @@ public static class ArcboundRavagerFactory
         card.SetController(owner);
 
         // ----------------------------------------------------------------
-        // Modular 1 — "enters with a +1/+1 counter on it" (CR 702.43a +
-        // CR 614.1d). The replacement watches Arcbound Ravager's own ETB
-        // ZoneMoveIntent and stamps PlusOneCountersOnEnter so the
-        // ZoneService applies the counter after landing.
+        // Modular 1 — keyword marker + ETB +1/+1 replacement + death
+        // trigger, all from the shared primitive (CR 702.43).
         // ----------------------------------------------------------------
-        if (replacements != null)
-        {
-            replacements.Register<ZoneMoveIntent>(
-                new EntersWithCountersReplacement(card, ModularValue));
-        }
-
-        // ----------------------------------------------------------------
-        // Modular 1 — "When it dies, you may put its +1/+1 counters on
-        // target artifact creature." (CR 702.43b).
-        //
-        // Fires on Battlefield → Graveyard for Arcbound Ravager. The
-        // counters live on the card object's Counters bag — same shape
-        // as Undying — so the counter count at resolution time reflects
-        // what Arcbound Ravager had on it at the moment of death. v1
-        // target pick is deterministic: first artifact creature on either
-        // player's battlefield, excluding Arcbound Ravager itself. The
-        // active-zones set includes Graveyard so the trigger remains
-        // registered after the move (Graveyard is the source's current
-        // zone at resolution time).
-        // ----------------------------------------------------------------
-        var modularDeathEffect = new Effect(
-            $"{CardName}: move its +1/+1 counters to target artifact creature",
-            () =>
-            {
-                var counters = card.Counters.Count(CounterType.PlusOnePlusOne);
-                if (counters <= 0) return;
-
-                // v1 deterministic pick — first artifact creature on the
-                // battlefield, excluding Arcbound Ravager itself (which
-                // is now in the graveyard, so this is defensive).
-                var target = FindArtifactCreatureTarget(owner, card);
-                if (target == null) return;
-
-                // CR 121.2 — counters left the battlefield when Arcbound
-                // Ravager died, but they're still recorded on the card
-                // object so we can read the count. Remove them from the
-                // graveyard object (so a subsequent flicker / Undying
-                // return doesn't double-stamp) and add them to the chosen
-                // artifact creature.
-                card.Counters.Remove(CounterType.PlusOnePlusOne, counters);
-                CountersService.Add(target, CounterType.PlusOnePlusOne, counters, replacements);
-            });
-
-        var modularDeathTrigger = new TriggeredAbility(
+        ModularFactory.Build(
             source: card,
-            controller: owner,
-            condition: Triggers.OnDies(card),
-            effects: new IEffect[] { modularDeathEffect },
-            activeZones: new[] { ZoneType.Battlefield, ZoneType.Graveyard });
-
-        card.AddAbility(modularDeathTrigger);
-        triggers?.RegisterTriggeredAbility(modularDeathTrigger);
+            n: ModularValue,
+            effects: null,
+            replacements: replacements,
+            triggers: triggers);
 
         // ----------------------------------------------------------------
         // Activated ability — "Sacrifice an artifact: Put a +1/+1 counter
         // on this creature." (no mana cost, just the sacrifice).
-        // The SacrificeAnArtifactCost picks the first artifact on the
-        // controller's battlefield deterministically (v1 — same posture
-        // as SacrificeAnotherCreatureCost). excludeSource is null —
-        // Arcbound Ravager is an artifact and self-sacrifice is legal
-        // when no other artifact is available.
         // ----------------------------------------------------------------
         var activatedEffect = new Effect(
             $"{CardName}: +1/+1 counter for sacrificed artifact",
@@ -221,30 +142,11 @@ public static class ArcboundRavagerFactory
     /// the supplied instance. Used by shape-only tests that put Arcbound
     /// Ravager on the battlefield without funnelling through a
     /// <see cref="Services.ZoneService"/> + <see cref="ReplacementBus"/>
-    /// pipeline. No-op if the counter has already been added (the
-    /// bag's Add is unconditional, so this overload only stamps once
-    /// per call — callers are expected to invoke once at "ETB time").
+    /// pipeline. Delegates to <see cref="ModularFactory.MarkEntersWithCounters"/>.
     /// </summary>
     public static void MarkEntersWithCounter(Creature ravager)
     {
         if (ravager == null) throw new ArgumentNullException(nameof(ravager));
-        ravager.Counters.Add(CounterType.PlusOnePlusOne, ModularValue);
+        ModularFactory.MarkEntersWithCounters(ravager, ModularValue);
     }
-
-    /// <summary>
-    /// Find a legal Modular bestowal target — an artifact creature on
-    /// the controller's battlefield, excluding <paramref name="self"/>.
-    /// v1 deterministic — returns the first match. CR 702.43b's "target
-    /// artifact creature" is not controller-restricted; opponent-side
-    /// scans are deferred until the engine exposes a cross-battlefield
-    /// enumerator (no <c>Player.Opponents</c> in v1 — the common case
-    /// is an Affinity / Hardened Scales deck packed with the controller's
-    /// own artifact creatures). Promotion to a full
-    /// <see cref="Players.Agents.TargetRequest"/> prompt is the next step.
-    /// </summary>
-    private static Creature? FindArtifactCreatureTarget(Player owner, Creature self) =>
-        owner.Zones.Battlefield.GetCards()
-            .OfType<Creature>()
-            .Where(c => !ReferenceEquals(c, self) && c.HasType(CardType.Artifact))
-            .FirstOrDefault();
 }
