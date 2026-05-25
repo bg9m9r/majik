@@ -267,4 +267,110 @@ public class HeliodSunCrownedTests
 
         HeliodSunCrownedFactory.ComputeDevotionToWhite(_alice).Should().Be(0);
     }
+
+    // -----------------------------------------------------------------------
+    // Layer 4 devotion-gated type-strip (CR 205.2 / 613.1d) — "As long as
+    // your devotion to white is less than five, Heliod isn't a creature."
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void Heliod_WithDevotionFour_LosesCreatureType()
+    {
+        // Heliod alone on battlefield → devotion = 2 ({W}{W}). Add a 2-pip
+        // white permanent so devotion = 4 (just below the threshold).
+        // Layer 4 type-strip should fire; Heliod's layered characteristics
+        // should NOT include Creature.
+        var service = new ContinuousEffectsService();
+        var heliod = HeliodSunCrownedFactory.Create(_alice, triggers: null, effects: service);
+        _alice.Zones.Battlefield.AddCard(heliod);
+        heliod.SetZone(ZoneType.Battlefield);
+
+        var twoPipWhite = new Creature("Soldier-2W", "{W}{W}", 2, 2);
+        twoPipWhite.SetOwner(_alice);
+        twoPipWhite.SetController(_alice);
+        _alice.Zones.Battlefield.AddCard(twoPipWhite);
+        twoPipWhite.SetZone(ZoneType.Battlefield);
+
+        HeliodSunCrownedFactory.ComputeDevotionToWhite(_alice).Should().Be(4);
+
+        var chars = service.Compute((Permanent)heliod);
+        chars.Types.Should().NotContain(CardType.Creature);
+        // Enchantment (printed) is preserved — strip is creature-only.
+        chars.Types.Should().Contain(CardType.Enchantment);
+    }
+
+    [Fact]
+    public void Heliod_NotCreature_IneligibleAsDoomBladeTarget()
+    {
+        // Doom Blade reads "Destroy target nonblack creature." A creature-only
+        // target predicate must filter Heliod out when his effective types
+        // (after Layer 4 strip) lack Creature.
+        var service = new ContinuousEffectsService();
+        var heliod = HeliodSunCrownedFactory.Create(_alice, triggers: null, effects: service);
+        _alice.Zones.Battlefield.AddCard(heliod);
+        heliod.SetZone(ZoneType.Battlefield);
+        // Devotion = 2 (Heliod alone) → strip active.
+
+        bool IsLegalDoomBladeTarget(Permanent p)
+        {
+            var chars = (p is Creature c && c.ActiveEffects != null)
+                ? c.ActiveEffects.Compute(p)
+                : new PermanentCharacteristics();
+            return chars.Types.Contains(CardType.Creature);
+        }
+
+        IsLegalDoomBladeTarget(heliod).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Heliod_DevotionBumpsToFive_BecomesCreatureAgain()
+    {
+        // Heliod alone → devotion = 2 → not a creature. Cast a 3-pip white
+        // permanent → devotion = 5 → predicate flips false → Creature
+        // type is restored on the next Compute pass without re-registering
+        // the effect.
+        var service = new ContinuousEffectsService();
+        var heliod = HeliodSunCrownedFactory.Create(_alice, triggers: null, effects: service);
+        _alice.Zones.Battlefield.AddCard(heliod);
+        heliod.SetZone(ZoneType.Battlefield);
+
+        service.Compute((Permanent)heliod).Types.Should().NotContain(CardType.Creature);
+
+        var triplePip = new Creature("White Knight 3W", "{W}{W}{W}", 2, 2);
+        triplePip.SetOwner(_alice);
+        triplePip.SetController(_alice);
+        _alice.Zones.Battlefield.AddCard(triplePip);
+        triplePip.SetZone(ZoneType.Battlefield);
+
+        HeliodSunCrownedFactory.ComputeDevotionToWhite(_alice)
+            .Should().BeGreaterOrEqualTo(HeliodSunCrownedFactory.DevotionToWhiteThreshold);
+
+        service.Compute((Permanent)heliod).Types.Should().Contain(CardType.Creature);
+    }
+
+    [Fact]
+    public void Heliod_DevotionDropsBelowFive_LosesCreatureTypeAgain()
+    {
+        // Devotion hits 5 (Heliod + 3-pip white) → Creature.
+        // White permanent LTB → devotion drops to 2 → not a Creature.
+        var service = new ContinuousEffectsService();
+        var heliod = HeliodSunCrownedFactory.Create(_alice, triggers: null, effects: service);
+        _alice.Zones.Battlefield.AddCard(heliod);
+        heliod.SetZone(ZoneType.Battlefield);
+
+        var triplePip = new Creature("White Knight 3W", "{W}{W}{W}", 2, 2);
+        triplePip.SetOwner(_alice);
+        triplePip.SetController(_alice);
+        _alice.Zones.Battlefield.AddCard(triplePip);
+        triplePip.SetZone(ZoneType.Battlefield);
+
+        service.Compute((Permanent)heliod).Types.Should().Contain(CardType.Creature);
+
+        // White permanent LTB's — drop from battlefield + clear zone.
+        _alice.Zones.Battlefield.RemoveCard(triplePip);
+        triplePip.SetZone(ZoneType.Graveyard);
+
+        HeliodSunCrownedFactory.ComputeDevotionToWhite(_alice).Should().Be(2);
+        service.Compute((Permanent)heliod).Types.Should().NotContain(CardType.Creature);
+    }
 }
