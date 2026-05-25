@@ -1,4 +1,5 @@
 using Majik.Core.Effects;
+using Majik.Core.Events;
 using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
 
@@ -165,6 +166,71 @@ public class Player
     {
         ArgumentNullException.ThrowIfNull(bus);
         Replacements = bus;
+    }
+
+    // ── CR 702.131 — Ascend / city's blessing ───────────────────────────────
+
+    private bool _hasCitysBlessing;
+    private IEventBus? _citysBlessingBus;
+
+    /// <summary>
+    /// CR 702.131c — once the player has had 10 or more permanents at the
+    /// same time, they have the city's blessing "for the rest of the game".
+    /// Latched: once true, never returns to false. Updated on every
+    /// battlefield ETB/LTB tick when <see cref="AttachEventBus"/> has
+    /// wired the listener.
+    /// </summary>
+    public bool HasCitysBlessing
+    {
+        get => _hasCitysBlessing;
+        private set => _hasCitysBlessing = value;
+    }
+
+    /// <summary>
+    /// Attach the game's event bus so the player can listen for
+    /// <see cref="CardMovedEvent"/>s involving the battlefield and
+    /// re-evaluate Ascend / city's blessing (CR 702.131). Idempotent —
+    /// subsequent calls with the same bus are a no-op; calling with a
+    /// different bus rewires to the new one. Also primes the latch from
+    /// the player's current battlefield count so attaching post-ETB still
+    /// catches up.
+    /// </summary>
+    public void AttachEventBus(IEventBus bus)
+    {
+        ArgumentNullException.ThrowIfNull(bus);
+        if (ReferenceEquals(_citysBlessingBus, bus))
+        {
+            EvaluateCitysBlessing();
+            return;
+        }
+
+        _citysBlessingBus = bus;
+        bus.Subscribe<CardMovedEvent>(OnCardMovedForCitysBlessing);
+        EvaluateCitysBlessing();
+    }
+
+    /// <summary>
+    /// Manually re-evaluate the Ascend latch — called by
+    /// <see cref="OnCardMovedForCitysBlessing"/> and exposed for tests /
+    /// callers that mutate the battlefield directly without going through
+    /// the event bus (e.g. raw <c>Zone.AddCard</c>).
+    /// </summary>
+    public void EvaluateCitysBlessing()
+    {
+        if (_hasCitysBlessing) return;
+        if (Zones.Battlefield.Count < 10) return;
+
+        _hasCitysBlessing = true;
+        _citysBlessingBus?.Publish(new GainedCitysBlessingEvent(this));
+    }
+
+    private void OnCardMovedForCitysBlessing(CardMovedEvent e)
+    {
+        if (_hasCitysBlessing) return;
+        // Only re-evaluate on moves involving the battlefield + this player.
+        if (e.ToZone != ZoneType.Battlefield && e.FromZone != ZoneType.Battlefield) return;
+        if (!ReferenceEquals(e.Card.Controller, this)) return;
+        EvaluateCitysBlessing();
     }
 
     public Player(string name, int startingLife = 20, ZoneManager? zoneManager = null)

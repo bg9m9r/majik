@@ -1,18 +1,19 @@
 {
-  "generated_utc": "2026-05-24T20:16:08.1870277Z",
-  "scanned_dir": "/home/brett/Projects/majik.project/majik.core/.claude/worktrees/agent-aab575e131cb44566/Majik.Core/CardData/Factories",
-  "total_mentions": 173,
+  "generated_utc": "2026-05-25T01:38:12.6657556Z",
+  "scanned_dir": "/home/brett/Projects/majik.project/majik.core/.claude/worktrees/agent-af4dadcdc0b68610c/Majik.Core/CardData/Factories",
+  "total_mentions": 172,
   "distinct_factories": 124,
-  "cluster_count": 10,
-  "unclustered_count": 123,
+  "cluster_count": 7,
+  "unclustered_count": 125,
   "clusters": [
     {
       "primitive_id": "agent-prompt-targeting",
       "display_name": "Agent-prompt targeting MVP",
       "implementation_hint": "IPlayerAgent needs ChooseTarget / ChooseYesNo surfaces; many spell factories punt on real targeting prompts.",
-      "factory_count": 26,
-      "mention_count": 33,
+      "factory_count": 28,
+      "mention_count": 35,
       "factories": [
+        "AbhorrentOculusFactory",
         "AetherVialFactory",
         "AgathasSoulCauldronFactory",
         "AjaniNacatlPariahFactory",
@@ -37,6 +38,7 @@
         "SunTitanFactory",
         "SwordOfFeastAndFamineFactory",
         "TerritorialKavuFactory",
+        "TormodsCryptFactory",
         "UroTitanFactory",
         "YawgmothFactory"
       ],
@@ -110,6 +112,12 @@
           "sentence": "\u003Cb\u003E\u0022You may\u0022 prompt\u003C/b\u003E: the ETB trigger autopicks the first eligible creature card; declining and target-selection are deferred to the agent-prompt MVP."
         },
         {
+          "factory": "AbhorrentOculusFactory",
+          "file": "AbhorrentOculusFactory.cs",
+          "line": 13,
+          "sentence": "## Deferred (v1 gaps \u2014 small)  - \u003Cb\u003EAgent prompt for pick-one-of-two:\u003C/b\u003E v1 deterministically manifests the top-of-library card; the second goes to graveyard."
+        },
+        {
           "factory": "EldritchEvolutionFactory",
           "file": "EldritchEvolutionFactory.cs",
           "line": 14,
@@ -161,7 +169,7 @@
         {
           "factory": "FaithlessLootingFactory",
           "file": "FaithlessLootingFactory.cs",
-          "line": 119,
+          "line": 111,
           "sentence": "Real agent-driven choice deferred."
         },
         {
@@ -179,7 +187,7 @@
         {
           "factory": "PonderFactory",
           "file": "PonderFactory.cs",
-          "line": 114,
+          "line": 107,
           "sentence": "Shuffle primitive is now wired (CR 701.20), but Ponder\u0027s \u0022may\u0022 rider is a yes/no agent prompt \u2014 deferred behind the agent-prompt MVP (rank #1 in MECHANIC_DEPS).",
           "cr": "CR 701.20"
         },
@@ -207,6 +215,12 @@
           "line": 14,
           "sentence": "Agent-driven \u0022you choose which card you discard\u0022 (CR 701.16a \u2014 damaged player chooses) is deferred behind the same prompt queue as Liliana of the Veil \u002B Faithless Looting.",
           "cr": "CR 701.16a"
+        },
+        {
+          "factory": "TormodsCryptFactory",
+          "file": "TormodsCryptFactory.cs",
+          "line": 11,
+          "sentence": "Full agent-prompt targeting is deferred."
         },
         {
           "factory": "YawgmothFactory",
@@ -284,7 +298,7 @@
         {
           "factory": "PonderFactory",
           "file": "PonderFactory.cs",
-          "line": 58,
+          "line": 51,
           "sentence": "The \u0022may shuffle\u0022 rider is deferred (no-op)."
         }
       ]
@@ -329,78 +343,6 @@
       ]
     },
     {
-      "primitive_id": "kicker",
-      "display_name": "Kicker alt-cost (CR 702.33)",
-      "comp_rules_citation": "CR 702.33",
-      "implementation_hint": "Optional additive cast cost on a spell; flips a runtime \u0027kicked\u0027 flag the rest of the spell pipeline can branch on.",
-      "factory_count": 2,
-      "mention_count": 2,
-      "factories": [
-        "BurstLightningFactory",
-        "SlickshotShowOffFactory"
-      ],
-      "mentions": [
-        {
-          "factory": "SlickshotShowOffFactory",
-          "file": "SlickshotShowOffFactory.cs",
-          "line": 10,
-          "sentence": "Same posture as \u003Csee cref=\u0022BurstLightningFactory\u0022/\u003E\u0027s deferred Kicker rider \u2014 ship the printed shape \u002B the most common triggered/static body, defer the alt-cost mechanic until its primitive lands."
-        },
-        {
-          "factory": "BurstLightningFactory",
-          "file": "BurstLightningFactory.cs",
-          "line": 11,
-          "sentence": "\u0022  ## Implementation (v1 \u2014 kicker primitive deferred)  CR 702.33 \u2014 Kicker is an additional cost (not an alternative cost) that modifies the spell\u0027s effect when paid.",
-          "cr": "CR 702.33"
-        }
-      ]
-    },
-    {
-      "primitive_id": "manifest-dread",
-      "display_name": "Manifest dread (CR 701.59)",
-      "comp_rules_citation": "CR 701.59",
-      "implementation_hint": "Manifest the top card face-down \u002B scry-style discard rider. Sibling of vanilla Manifest with an added zone-choice prompt.",
-      "factory_count": 1,
-      "mention_count": 2,
-      "factories": [
-        "AbhorrentOculusFactory"
-      ],
-      "mentions": [
-        {
-          "factory": "AbhorrentOculusFactory",
-          "file": "AbhorrentOculusFactory.cs",
-          "line": 13,
-          "sentence": "## Deferred (v1 gaps \u2014 manifest dread is a stub)  - \u003Cb\u003EManifest dread\u003C/b\u003E (CR 701.59 / Duskmourn): the printed resolution effect \u2014 look at top two of library, put one onto the battlefield face down as a 2/2 manifest creature and the other into your graveyard \u2014 is wired as a structural stub.",
-          "cr": "CR 701.59"
-        },
-        {
-          "factory": "AbhorrentOculusFactory",
-          "file": "AbhorrentOculusFactory.cs",
-          "line": 13,
-          "sentence": "CR rule references: 205.3m (Eye subtype), 601.2f (additional cost), 603.1 / 500.4 (upkeep trigger), 702.9 (Flying), 701.59 (manifest dread \u2014 deferred)."
-        }
-      ]
-    },
-    {
-      "primitive_id": "ascend",
-      "display_name": "Ascend / city\u0027s blessing (CR 702.131)",
-      "comp_rules_citation": "CR 702.131",
-      "implementation_hint": "Per-player flag \u002B state-based check (\u226510 permanents). Static abilities then key off blessing-active predicate.",
-      "factory_count": 1,
-      "mention_count": 1,
-      "factories": [
-        "OcelotPrideFactory"
-      ],
-      "mentions": [
-        {
-          "factory": "OcelotPrideFactory",
-          "file": "OcelotPrideFactory.cs",
-          "line": 14,
-          "sentence": "The attack trigger ships with the gate stubbed (always 1 token); the \u0022doubled to 2\u0022 half of the printed text is deferred until an Ascend primitive lands."
-        }
-      ]
-    },
-    {
       "primitive_id": "cast-marker",
       "display_name": "Cast-marker on Card",
       "implementation_hint": "Persistent \u0027this object was cast (vs. put onto the battlefield)\u0027 flag \u2014 Bloodghast, The One Ring, Pact triggers all key off it.",
@@ -419,22 +361,21 @@
       ]
     },
     {
-      "primitive_id": "companion",
-      "display_name": "Companion (CR 702.139)",
-      "comp_rules_citation": "CR 702.139",
-      "implementation_hint": "Deck-construction check \u002B \u0027cast from outside the game\u0027 once-per-game pipeline.",
+      "primitive_id": "cycling-from-hand",
+      "display_name": "Cycling-style activated-from-hand (CR 702.32 / Channel CR 702.74)",
+      "comp_rules_citation": "CR 702.32",
+      "implementation_hint": "Generic \u0027pay X, discard ~: \u003Ceffect\u003E\u0027 from hand. Shape covers Cycling, Channel, Forecast.",
       "factory_count": 1,
       "mention_count": 1,
       "factories": [
-        "LurrusOfTheDreamDenFactory"
+        "ChannelLandCycleFactory"
       ],
       "mentions": [
         {
-          "factory": "LurrusOfTheDreamDenFactory",
-          "file": "LurrusOfTheDreamDenFactory.cs",
+          "factory": "ChannelLandCycleFactory",
+          "file": "ChannelLandCycleFactory.cs",
           "line": 12,
-          "sentence": "## Companion (DEFERRED) The companion deck-construction rule (CR 702.139 \u2014 \u0022Each permanent card in your starting deck has mana value 2 or less\u0022) is foundational to the deck-builder, not the runtime, and is intentionally NOT enforced here.",
-          "cr": "CR 702.139"
+          "sentence": "Sokenzan, Crucible of Defiance \u2014 deferred (its Channel produces two 1/1 Spirit tokens with haste; requires a Spirit-token shape not yet in \u003Cc\u003ETokenFactory\u003C/c\u003E)."
         }
       ]
     },
@@ -705,6 +646,12 @@
       "sentence": ") \u2014 same gap as every \u0022cast for free from exile\u0022 hook today."
     },
     {
+      "factory": "LurrusOfTheDreamDenFactory",
+      "file": "LurrusOfTheDreamDenFactory.cs",
+      "line": 13,
+      "sentence": "The runtime \u0022cast from outside the game\u0022 pipeline is still deferred \u2014 the engine has no sideboard zone yet (see \u003Csee cref=\u0022Majik."
+    },
+    {
       "factory": "NobleHierarchFactory",
       "file": "NobleHierarchFactory.cs",
       "line": 12,
@@ -777,6 +724,12 @@
       "sentence": "Multi-player turn-skipping nuances deferred."
     },
     {
+      "factory": "ChannelLandCycleFactory",
+      "file": "ChannelLandCycleFactory.cs",
+      "line": 217,
+      "sentence": "Combat-state gating is deferred \u2014 v1 destroys any creature passed in."
+    },
+    {
       "factory": "WallOfRootsFactory",
       "file": "WallOfRootsFactory.cs",
       "line": 11,
@@ -785,7 +738,7 @@
     {
       "factory": "SylvanScryingFactory",
       "file": "SylvanScryingFactory.cs",
-      "line": 8,
+      "line": 9,
       "sentence": "The picked land moves Library \u2192 Hand without publishing a reveal event; same gap as Stoneforge Mystic\u0027s ETB tutor."
     },
     {
@@ -873,7 +826,7 @@
     {
       "factory": "MysticalTutorFactory",
       "file": "MysticalTutorFactory.cs",
-      "line": 13,
+      "line": 14,
       "sentence": "The picked card moves Library \u2192 top-of-Library without publishing a reveal event; same gap as the other search factories."
     },
     {
@@ -1008,13 +961,13 @@
     {
       "factory": "AbruptDecayFactory",
       "file": "AbruptDecayFactory.cs",
-      "line": 11,
+      "line": 12,
       "sentence": "\u003Cb\u003ECan\u0027t be countered\u003C/b\u003E \u2014 a \u003Csee cref=\u0022KeywordAbility\u0022/\u003E marker \u0022Can\u0027t Be Countered\u0022 is attached to the card shape (structural; actual enforcement via SpellCaster / StackResolver is deferred \u2014 same posture as Veil of Summer\u0027s turn-scoped uncounterable rider and Force of Will\u0027s text interaction)."
     },
     {
       "factory": "AbruptDecayFactory",
       "file": "AbruptDecayFactory.cs",
-      "line": 58,
+      "line": 59,
       "sentence": "Enforcement is deferred \u2014 see xmldoc."
     },
     {
@@ -1051,7 +1004,7 @@
     {
       "factory": "VampiricTutorFactory",
       "file": "VampiricTutorFactory.cs",
-      "line": 12,
+      "line": 13,
       "sentence": "The picked card moves Library \u2192 top-of-Library without publishing a reveal event; same gap as the other search factories."
     },
     {

@@ -5,11 +5,11 @@ Scanner output: every `*Factory.cs` xmldoc / inline comment mentioning
 engine primitive. Each row answers: "if we ship primitive _X_, which factory
 xmldocs flagged that they're blocked on it?"
 
-- **Generated:** 2026-05-24 20:16 UTC
+- **Generated:** 2026-05-25 01:38 UTC
 - **Scanned dir:** `Majik.Core/CardData/Factories`
-- **Total mentions:** 173
-- **Clusters:** 10
-- **Unclustered (need new registry pattern):** 123
+- **Total mentions:** 172
+- **Clusters:** 7
+- **Unclustered (need new registry pattern):** 125
 
 Regenerate with `dotnet run --project Majik.Console -- mechanic-deps --md-out docs/MECHANIC_DEPS.md --json-out docs/mechanic-deps.json`.
 
@@ -17,22 +17,19 @@ Regenerate with `dotnet run --project Majik.Console -- mechanic-deps --md-out do
 
 | Rank | Primitive | CR | Factories | Mentions |
 |---:|---|---|---:|---:|
-| 1 | Agent-prompt targeting MVP | — | 26 | 33 |
+| 1 | Agent-prompt targeting MVP | — | 28 | 35 |
 | 2 | Library shuffle (CR 701.20) | CR 701.20 | 4 | 4 |
 | 3 | Layer-6 ability-grant subsystem (CR 613.1f) | CR 613.1f | 2 | 4 |
-| 4 | Kicker alt-cost (CR 702.33) | CR 702.33 | 2 | 2 |
-| 5 | Manifest dread (CR 701.59) | CR 701.59 | 1 | 2 |
-| 6 | Ascend / city's blessing (CR 702.131) | CR 702.131 | 1 | 1 |
-| 7 | Cast-marker on Card | — | 1 | 1 |
-| 8 | Companion (CR 702.139) | CR 702.139 | 1 | 1 |
-| 9 | Gift (Bloomburrow) | — | 1 | 1 |
-| 10 | "Activate only as a sorcery" gate (CR 117.1a) | CR 117.1a | 1 | 1 |
+| 4 | Cast-marker on Card | — | 1 | 1 |
+| 5 | Cycling-style activated-from-hand (CR 702.32 / Channel CR 702.74) | CR 702.32 | 1 | 1 |
+| 6 | Gift (Bloomburrow) | — | 1 | 1 |
+| 7 | "Activate only as a sorcery" gate (CR 117.1a) | CR 117.1a | 1 | 1 |
 
 ## Cluster detail
 
 ### 1. Agent-prompt targeting MVP
 
-- **Blocks:** 26 factories (33 mentions)
+- **Blocks:** 28 factories (35 mentions)
 - **Implementation hint:** IPlayerAgent needs ChooseTarget / ChooseYesNo surfaces; many spell factories punt on real targeting prompts.
 
 Mentions:
@@ -59,6 +56,8 @@ Mentions:
   > v1 first-card-in-hand pick (CR 701.16a — agent-driven choice deferred).
 - `PriestOfFellRitesFactory` (`PriestOfFellRitesFactory.cs:12`)
   > <b>"You may" prompt</b>: the ETB trigger autopicks the first eligible creature card; declining and target-selection are deferred to the agent-prompt MVP.
+- `AbhorrentOculusFactory` (`AbhorrentOculusFactory.cs:13`)
+  > ## Deferred (v1 gaps — small)  - <b>Agent prompt for pick-one-of-two:</b> v1 deterministically manifests the top-of-library card; the second goes to graveyard.
 - `EldritchEvolutionFactory` (`EldritchEvolutionFactory.cs:14`)
   > Full agent-driven sacrifice-target prompting requires the ITarget / TargetResolver pipeline (deferred — same gap noted on <see cref="SacrificeAnotherCreatureCost"/>).
 - `PsychicFrogFactory` (`PsychicFrogFactory.cs:15`)
@@ -75,13 +74,13 @@ Mentions:
   > Agent prompt deferred.
 - `RelicOfProgenitusFactory` (`RelicOfProgenitusFactory.cs:12`)
   > Full agent-prompt targeting deferred.
-- `FaithlessLootingFactory` (`FaithlessLootingFactory.cs:119`)
+- `FaithlessLootingFactory` (`FaithlessLootingFactory.cs:111`)
   > Real agent-driven choice deferred.
 - `UroTitanFactory` (`UroTitanFactory.cs:14`)
   > v1 always plays the first land in hand when one exists; a first-class yes/no agent prompt is deferred (same gap as Sun Titan / Primeval Titan / Stoneforge Mystic).
 - `DauthiVoidwalkerFactory` (`DauthiVoidwalkerFactory.cs:13`)
   > Wiring an agent prompt mirrors the rest of the v1 factories (deferred).
-- `PonderFactory` (`PonderFactory.cs:114`)
+- `PonderFactory` (`PonderFactory.cs:107`)
   > Shuffle primitive is now wired (CR 701.20), but Ponder's "may" rider is a yes/no agent prompt — deferred behind the agent-prompt MVP (rank #1 in MECHANIC_DEPS).
 - `SilvergillAdeptFactory` (`SilvergillAdeptFactory.cs:10`)
   > The actual enforcement at cast-time (agent prompt: reveal a Merfolk card from hand OR pay {3} as an additional cost) is deferred until the additional-cost framework supports reveal-based alternatives.
@@ -91,6 +90,8 @@ Mentions:
   > the damaged player discards a card — v1 deterministically picks the first card in hand (same v1 policy as <see cref="LilianaOfTheVeilFactory"/>'s +1 each-player-discards and <see cref="FaithlessLootingFactory"/>'s last-2-in-hand; agent prompt deferred); 2.
 - `SwordOfFeastAndFamineFactory` (`SwordOfFeastAndFamineFactory.cs:14`)
   > Agent-driven "you choose which card you discard" (CR 701.16a — damaged player chooses) is deferred behind the same prompt queue as Liliana of the Veil + Faithless Looting.
+- `TormodsCryptFactory` (`TormodsCryptFactory.cs:11`)
+  > Full agent-prompt targeting is deferred.
 - `YawgmothFactory` (`YawgmothFactory.cs:121`)
   > Full targeting deferred.
 - `AetherVialFactory` (`AetherVialFactory.cs:12`)
@@ -118,7 +119,7 @@ Mentions:
   > " v1: deterministic — take the first artifact card in the library; reveal-event emission deferred (see class xmldoc); CR 701.20a shuffle is now wired via LibraryShuffle.
 - `TrinketMageFactory` (`TrinketMageFactory.cs:74`)
   > Reveal-event emission is deferred (see class xmldoc); CR 701.20a shuffle now wired via LibraryShuffle.
-- `PonderFactory` (`PonderFactory.cs:58`)
+- `PonderFactory` (`PonderFactory.cs:51`)
   > The "may shuffle" rider is deferred (no-op).
 
 ### 3. Layer-6 ability-grant subsystem (CR 613.1f)
@@ -138,44 +139,7 @@ Mentions:
 - `BloodghastFactory` (`BloodghastFactory.cs:126`)
   > A full dynamic Layer 6 conditional keyword grant is deferred — see class xmldoc.
 
-### 4. Kicker alt-cost (CR 702.33)
-
-- **CR citation:** CR 702.33
-- **Blocks:** 2 factories (2 mentions)
-- **Implementation hint:** Optional additive cast cost on a spell; flips a runtime 'kicked' flag the rest of the spell pipeline can branch on.
-
-Mentions:
-
-- `SlickshotShowOffFactory` (`SlickshotShowOffFactory.cs:10`)
-  > Same posture as <see cref="BurstLightningFactory"/>'s deferred Kicker rider — ship the printed shape + the most common triggered/static body, defer the alt-cost mechanic until its primitive lands.
-- `BurstLightningFactory` (`BurstLightningFactory.cs:11`)
-  > "  ## Implementation (v1 — kicker primitive deferred)  CR 702.33 — Kicker is an additional cost (not an alternative cost) that modifies the spell's effect when paid.
-
-### 5. Manifest dread (CR 701.59)
-
-- **CR citation:** CR 701.59
-- **Blocks:** 1 factories (2 mentions)
-- **Implementation hint:** Manifest the top card face-down + scry-style discard rider. Sibling of vanilla Manifest with an added zone-choice prompt.
-
-Mentions:
-
-- `AbhorrentOculusFactory` (`AbhorrentOculusFactory.cs:13`)
-  > ## Deferred (v1 gaps — manifest dread is a stub)  - <b>Manifest dread</b> (CR 701.59 / Duskmourn): the printed resolution effect — look at top two of library, put one onto the battlefield face down as a 2/2 manifest creature and the other into your graveyard — is wired as a structural stub.
-- `AbhorrentOculusFactory` (`AbhorrentOculusFactory.cs:13`)
-  > CR rule references: 205.3m (Eye subtype), 601.2f (additional cost), 603.1 / 500.4 (upkeep trigger), 702.9 (Flying), 701.59 (manifest dread — deferred).
-
-### 6. Ascend / city's blessing (CR 702.131)
-
-- **CR citation:** CR 702.131
-- **Blocks:** 1 factories (1 mentions)
-- **Implementation hint:** Per-player flag + state-based check (≥10 permanents). Static abilities then key off blessing-active predicate.
-
-Mentions:
-
-- `OcelotPrideFactory` (`OcelotPrideFactory.cs:14`)
-  > The attack trigger ships with the gate stubbed (always 1 token); the "doubled to 2" half of the printed text is deferred until an Ascend primitive lands.
-
-### 7. Cast-marker on Card
+### 4. Cast-marker on Card
 
 - **Blocks:** 1 factories (1 mentions)
 - **Implementation hint:** Persistent 'this object was cast (vs. put onto the battlefield)' flag — Bloodghast, The One Ring, Pact triggers all key off it.
@@ -185,18 +149,18 @@ Mentions:
 - `TheOneRingFactory` (`TheOneRingFactory.cs:15`)
   > The effect body is a no-op — the "if you cast it" intervening-if clause, the "until your next turn" expiry, and the "protection from everything" player-scoped grant are all deferred (no cast-marker on Card, no per-player delayed cleanup, no Player.
 
-### 8. Companion (CR 702.139)
+### 5. Cycling-style activated-from-hand (CR 702.32 / Channel CR 702.74)
 
-- **CR citation:** CR 702.139
+- **CR citation:** CR 702.32
 - **Blocks:** 1 factories (1 mentions)
-- **Implementation hint:** Deck-construction check + 'cast from outside the game' once-per-game pipeline.
+- **Implementation hint:** Generic 'pay X, discard ~: <effect>' from hand. Shape covers Cycling, Channel, Forecast.
 
 Mentions:
 
-- `LurrusOfTheDreamDenFactory` (`LurrusOfTheDreamDenFactory.cs:12`)
-  > ## Companion (DEFERRED) The companion deck-construction rule (CR 702.139 — "Each permanent card in your starting deck has mana value 2 or less") is foundational to the deck-builder, not the runtime, and is intentionally NOT enforced here.
+- `ChannelLandCycleFactory` (`ChannelLandCycleFactory.cs:12`)
+  > Sokenzan, Crucible of Defiance — deferred (its Channel produces two 1/1 Spirit tokens with haste; requires a Spirit-token shape not yet in <c>TokenFactory</c>).
 
-### 9. Gift (Bloomburrow)
+### 6. Gift (Bloomburrow)
 
 - **Blocks:** 1 factories (1 mentions)
 - **Implementation hint:** Cast-time choice: a static/triggered side effect granting an opponent a defined gift (treasure, draw, etc.).
@@ -206,7 +170,7 @@ Mentions:
 - `IntoTheFloodMawFactory` (`IntoTheFloodMawFactory.cs:12`)
   > ## Deferred (v1 gaps) — Gift mechanic (CR 701.59 in the 2024 errata) The "Gift a tapped Fish" clause is a cast-time choice that lets the caster promise an opponent a gift; if promised, the opponent creates a tapped 1/1 blue Fish creature token BEFORE the spell's other effects, and Into the Flood Maw's target predicate …
 
-### 10. "Activate only as a sorcery" gate (CR 117.1a)
+### 7. "Activate only as a sorcery" gate (CR 117.1a)
 
 - **CR citation:** CR 117.1a
 - **Blocks:** 1 factories (1 mentions)
@@ -293,6 +257,8 @@ Mentions:
   > v1 DEFERRED — shipped as a no-op so the loyalty change (and "this card is a legal -14 ability") still apply (CR 606.3).
 - `AmpedRaptorFactory` (`AmpedRaptorFactory.cs:252`)
   > ) — same gap as every "cast for free from exile" hook today.
+- `LurrusOfTheDreamDenFactory` (`LurrusOfTheDreamDenFactory.cs:13`)
+  > The runtime "cast from outside the game" pipeline is still deferred — the engine has no sideboard zone yet (see <see cref="Majik.
 - `NobleHierarchFactory` (`NobleHierarchFactory.cs:12`)
   > <b>Live combat-attackers provider</b>: same gap as Goblin Piledriver.
 - `MurderousRiderFactory` (`MurderousRiderFactory.cs:12`)
@@ -317,9 +283,11 @@ Mentions:
   > DEFERRED: "That creature's owner can't cast spells with the same name as that creature until your next turn.
 - `WrennsResolveFactory` (`WrennsResolveFactory.cs:11`)
   > Multi-player turn-skipping nuances deferred.
+- `ChannelLandCycleFactory` (`ChannelLandCycleFactory.cs:217`)
+  > Combat-state gating is deferred — v1 destroys any creature passed in.
 - `WallOfRootsFactory` (`WallOfRootsFactory.cs:11`)
   > No deferred work; behaviour matches the printed card.
-- `SylvanScryingFactory` (`SylvanScryingFactory.cs:8`)
+- `SylvanScryingFactory` (`SylvanScryingFactory.cs:9`)
   > The picked land moves Library → Hand without publishing a reveal event; same gap as Stoneforge Mystic's ETB tutor.
 - `MasterOfThePearlTridentFactory` (`MasterOfThePearlTridentFactory.cs:9`)
   > The combat-validator enforcement of Islandwalk ("creature can't be blocked as long as the defending player controls an Island") is deferred — same posture as Intimidate / Menace enforcement.
@@ -347,7 +315,7 @@ Mentions:
   > The sacrifice payment in the current <see cref="AdditionalCost"/> implementation is a no-op stub (zone move deferred to a future zone-service refactor — same gap noted on <see cref="RelicOfProgenitusFactory"/>) so the activated ability does NOT move Vortex to its owner's graveyard in v1.
 - `RoilingVortexFactory` (`RoilingVortexFactory.cs:215`)
   > The sacrifice payment is a no-op stub in v1 (same gap as Relic of Progenitus / Nihil Spellbomb), so the activated ability does not actually graveyard Vortex; future zone-service refactor unifies it.
-- `MysticalTutorFactory` (`MysticalTutorFactory.cs:13`)
+- `MysticalTutorFactory` (`MysticalTutorFactory.cs:14`)
   > The picked card moves Library → top-of-Library without publishing a reveal event; same gap as the other search factories.
 - `ColossusHammerFactory` (`ColossusHammerFactory.cs:10`)
   > Real targeting prompt deferred.
@@ -391,9 +359,9 @@ Mentions:
   > The picked card moves Library → Hand without publishing a CardRevealedEvent; same gap as the other tutor factories.
 - `TasigurTheGoldenFangFactory` (`TasigurTheGoldenFangFactory.cs:11`)
   > ## Deferred (v1 gaps) (The activate-as-sorcery timing window for the {B}{G}{U} ability is now enforced via the ActionValidator gate; see "Implemented" above.
-- `AbruptDecayFactory` (`AbruptDecayFactory.cs:11`)
+- `AbruptDecayFactory` (`AbruptDecayFactory.cs:12`)
   > <b>Can't be countered</b> — a <see cref="KeywordAbility"/> marker "Can't Be Countered" is attached to the card shape (structural; actual enforcement via SpellCaster / StackResolver is deferred — same posture as Veil of Summer's turn-scoped uncounterable rider and Force of Will's text interaction).
-- `AbruptDecayFactory` (`AbruptDecayFactory.cs:58`)
+- `AbruptDecayFactory` (`AbruptDecayFactory.cs:59`)
   > Enforcement is deferred — see xmldoc.
 - `BrainFreezeFactory` (`BrainFreezeFactory.cs:10`)
   > CR 702.40a's "you may choose new targets for the copies" rider is deferred (see <see cref="StormHelper"/> + <see cref="Majik.
@@ -405,7 +373,7 @@ Mentions:
   > ## Deferred (v1 gaps)  - <b>Ability targets</b>: Spellskite's printed clause is "target spell or ability with a single target".
 - `MeddlingMageFactory` (`MeddlingMageFactory.cs:9`)
   > <b>"nonland card name" validation</b>: the chosen name is accepted as a raw string; enforcement that it isn't a basic land name is deferred (rules-layer validation, not mechanical).
-- `VampiricTutorFactory` (`VampiricTutorFactory.cs:12`)
+- `VampiricTutorFactory` (`VampiricTutorFactory.cs:13`)
   > The picked card moves Library → top-of-Library without publishing a reveal event; same gap as the other search factories.
 - `YawgmothsWillFactory` (`YawgmothsWillFactory.cs:10`)
   > A bus-aware overload could clear it; deferred.

@@ -351,6 +351,20 @@ public sealed class SpellCastFlow
             }
         }
 
+        // CR 702.62d / 702.62g — stamp the "cast via suspend" sentinel on
+        // the resolving spell + underlying card whenever the alt-cost is
+        // the suspend "cast for free" payoff. The Card-side mirror lets
+        // resolve-body reads (creature haste gate; future "if cast via
+        // suspend" triggers) consult the flag without the spell handle.
+        if (alternativeCost is CastFromExileAlternativeCost { IsSuspendCast: true })
+        {
+            spell.WasCastFromSuspend = true;
+            if (card is Card concreteForSuspend)
+            {
+                concreteForSuspend.SetWasCastFromSuspend(true);
+            }
+        }
+
         // CR 702.33b — mirror the kicked posture onto the resolving
         // stack object so stack-side gates that don't have the card
         // reference handy (downstream triggers, future "casts a
