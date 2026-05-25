@@ -1,37 +1,37 @@
 {
   "scope": "format=modern, dedup-by-name",
-  "generated_utc": "2026-05-25T03:13:19.8976476Z",
+  "generated_utc": "2026-05-25T03:17:58.0885456Z",
   "total_cards": 21917,
   "total_weight": 21917,
-  "covered_cards": 6017,
-  "covered_percent": 27.45,
-  "weighted_covered": 6017,
-  "weighted_covered_percent": 27.45,
+  "covered_cards": 6022,
+  "covered_percent": 27.48,
+  "weighted_covered": 6022,
+  "weighted_covered_percent": 27.48,
   "frequency_total_weight": 20390,
-  "frequency_weighted_covered": 19710,
-  "frequency_weighted_covered_percent": 96.67,
+  "frequency_weighted_covered": 19880,
+  "frequency_weighted_covered_percent": 97.5,
   "top_meta_covered": 20,
   "top_meta_total": 20,
   "counts_by_tier": {
-    "NamedFactory": 269,
+    "NamedFactory": 274,
     "SpellBound": 3708,
     "KeywordOnly": 1411,
     "Vanilla": 629,
-    "Unimplemented": 15900
+    "Unimplemented": 15895
   },
   "weighted_by_tier": {
-    "NamedFactory": 269,
+    "NamedFactory": 274,
     "SpellBound": 3708,
     "KeywordOnly": 1411,
     "Vanilla": 629,
-    "Unimplemented": 15900
+    "Unimplemented": 15895
   },
   "frequency_weighted_by_tier": {
-    "NamedFactory": 14460,
+    "NamedFactory": 14630,
     "SpellBound": 1470,
     "KeywordOnly": 3400,
     "Vanilla": 380,
-    "Unimplemented": 680
+    "Unimplemented": 510
   },
   "top_meta": [
     {
@@ -20868,7 +20868,7 @@
     {
       "name": "Daybreak Coronet",
       "type_line": "Enchantment \u2014 Aura",
-      "tier": "Unimplemented"
+      "tier": "NamedFactory"
     },
     {
       "name": "Daybreak Ranger // Nightfall Predator",
@@ -41693,7 +41693,7 @@
     {
       "name": "Hardened Scales",
       "type_line": "Enchantment",
-      "tier": "Unimplemented"
+      "tier": "NamedFactory"
     },
     {
       "name": "Hardened Tactician",
@@ -53468,7 +53468,7 @@
     {
       "name": "Leyline of the Void",
       "type_line": "Enchantment",
-      "tier": "Unimplemented"
+      "tier": "NamedFactory"
     },
     {
       "name": "Lhurgoyf",
@@ -75318,7 +75318,7 @@
     {
       "name": "Rest in Peace",
       "type_line": "Enchantment",
-      "tier": "Unimplemented"
+      "tier": "NamedFactory"
     },
     {
       "name": "Restart Sequence",
@@ -109038,7 +109038,7 @@
     {
       "name": "Yorion, Sky Nomad",
       "type_line": "Legendary Creature \u2014 Bird Serpent",
-      "tier": "Unimplemented"
+      "tier": "NamedFactory"
     },
     {
       "name": "Yorvo, Lord of Garenbrig",
