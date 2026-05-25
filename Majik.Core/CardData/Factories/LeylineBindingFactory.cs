@@ -104,16 +104,13 @@ public static class LeylineBindingFactory
         card.SetController(owner);
 
         // CR 702.16 (Domain) + CR 117.7 — "This spell costs {1} less to
-        // cast for each basic land type among lands you control." Whole-
-        // reducer shape: TribalFlamesFactory.CountDomain returns the
-        // number of DISTINCT basic land types (max 5; Wastes excluded);
-        // Leyline Binding's per-type reduction is {1} (compare Scion of
-        // Draco's {2}). Floor-at-zero is enforced by
-        // CostReduction.GetEffectiveCost; the four W pips after the first
+        // cast for each basic land type among lands you control."
+        // Declarative DomainCostReductionAbility wraps the canonical
+        // Domain.CountTypes primitive (max 5 distinct types; Wastes
+        // excluded — CR 305.6) and multiplies by 1. Floor-at-zero is
+        // enforced by CostReduction.GetEffectiveCost; the five W pips
         // are coloured (CR 117.7c) and never reduce.
-        card.AddAbility(new CostReductionAbility(
-            totalReducer: caster => TribalFlamesFactory.CountDomain(caster, effects: null),
-            description: "Domain — costs {1} less per basic land type you control"));
+        card.AddAbility(new DomainCostReductionAbility(multiplier: 1));
 
         if (eventBus != null)
         {
