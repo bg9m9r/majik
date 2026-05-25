@@ -74,6 +74,23 @@ public class ActionValidator
                 new RuleViolation("117.1a", "external sorcery-speed restriction"));
         }
 
+        // CR 601.2a / CR 117.6 — printed cast-from-zone restriction baked
+        // onto the card itself (Hogaak, Arisen Necropolis: "Hogaak,
+        // Arisen Necropolis can't be cast from your hand."). When the
+        // caller declares a source zone and that zone is in the card's
+        // RestrictedCastZones list, reject. Inverse of the Drannith
+        // Magistrate gate below: that one is keyed by player and allows
+        // only Hand; this one is keyed by card and forbids the listed
+        // zones. Both gates run independently.
+        if (action.Card is Card concreteCard
+            && action.FromZone.HasValue
+            && concreteCard.RestrictedCastZones.Contains(action.FromZone.Value))
+        {
+            return ValidationResult.Invalid(
+                $"{action.Card.Name} can't be cast from {action.FromZone.Value}",
+                new RuleViolation("601.2a", $"{action.Card.Name} can't be cast from {action.FromZone.Value}"));
+        }
+
         // CR 113.6 / 601.3 — external cast-from-hand-only restrictions
         // (e.g. Drannith Magistrate: "Your opponents can't cast spells
         // from anywhere other than their hands."). When the casting

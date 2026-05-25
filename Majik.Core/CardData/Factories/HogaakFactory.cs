@@ -47,6 +47,17 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="ExileCreaturesFromGraveyardAdditionalCost"/>. Picks
 ///   deterministically (first two creature cards in the controller's
 ///   graveyard) when no agent prompt for graveyard pick exists.
+/// - <b>"Can't be cast from your hand" (CR 601.2a / CR 117.6)</b>:
+///   wired via the <see cref="Card.RestrictedCastZones"/> primitive —
+///   the factory stamps <c>ZoneType.Hand</c> and
+///   <see cref="Majik.Core.Rules.ActionValidator"/> rejects any
+///   <see cref="Majik.Core.Rules.CastSpellAction"/> whose
+///   <see cref="Majik.Core.Rules.CastSpellAction.FromZone"/> is Hand
+///   with <see cref="RuleViolation"/> 601.2a. The alt-cost
+///   (exile 2 creature cards + Convoke) remains the only path —
+///   Hogaak is castable only from a zone the engine reaches via a
+///   non-hand cast permission (Sneak Attack-style alt-zone casts,
+///   CR 117.6).
 ///
 /// ## Deferred (v1 gaps)
 ///
@@ -56,13 +67,6 @@ namespace Majik.Core.CardData.Factories;
 ///   engine consults <see cref="IAdditionalCost.CanPay"/> from
 ///   <see cref="Services.SpellCastFlow"/> (mirrors Cabal Therapy
 ///   flashback's sacrifice precondition).
-/// - <b>"Can't be cast from your hand"</b>: no cast-zone restriction
-///   primitive yet. Documented but unenforced — Hogaak still casts
-///   from hand if a caller routes it there. Real wiring needs a
-///   "legal cast zones" predicate on <see cref="SpellDefinition"/>;
-///   when implemented, Hogaak's allowed cast zones become
-///   {Graveyard, Library, Exile, …} via Sneak Attack / Show and Tell
-///   entry (CR 117.6 — alt-zone casts).
 /// - <b>"Hogaak's mana value is 8"</b>: requires a name-keyed
 ///   characteristic override applied at every layer-7 query for mana
 ///   value. Engine has no such override surface yet. v1 reports
@@ -104,6 +108,15 @@ public static class HogaakFactory
 
         card.SetOwner(owner);
         card.SetController(owner);
+
+        // CR 601.2a / CR 117.6 — "Hogaak, Arisen Necropolis can't be cast
+        // from your hand." Stamps the printed cast-zone restriction onto
+        // the card; ActionValidator.ValidateCastSpell rejects any
+        // CastSpellAction whose FromZone is ZoneType.Hand. The alt-cost
+        // (exile 2 creatures from graveyard + Convoke) remains the only
+        // legal path: from Graveyard / Exile / Library via an effect that
+        // grants a cast-from-non-hand permission.
+        card.AddRestrictedCastZone(ZoneType.Hand);
 
         // CR 702.19 — Trample keyword marker.
         card.AddAbility(new KeywordAbility("Trample", card, owner));
