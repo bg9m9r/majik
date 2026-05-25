@@ -180,6 +180,10 @@ public enum CardSubtype
     /// <summary>Ape creature subtype — Treetop Village (Urza's Legacy) animated
     /// form, Kird Ape (Arabian Nights / many reprints). CR 205.3m.</summary>
     Ape,
+    /// <summary>Serpent creature subtype — Striped Riverwinder (Hour of
+    /// Devastation), Lorthos, the Tidemaker, Quest for Ula's Temple
+    /// payoffs. CR 205.3m.</summary>
+    Serpent,
 
     // Land subtypes (examples)
     Forest,
