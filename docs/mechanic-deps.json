@@ -1,10 +1,10 @@
 {
-  "generated_utc": "2026-05-25T03:49:22.8709446Z",
+  "generated_utc": "2026-05-25T03:51:30.2000637Z",
   "scanned_dir": "/home/brett/Projects/majik.project/majik.core/.claude/worktrees/agent-afe00b204d43e5a62/Majik.Core/CardData/Factories",
-  "total_mentions": 209,
-  "distinct_factories": 139,
+  "total_mentions": 212,
+  "distinct_factories": 141,
   "cluster_count": 7,
-  "unclustered_count": 163,
+  "unclustered_count": 166,
   "clusters": [
     {
       "primitive_id": "agent-prompt-targeting",
@@ -152,7 +152,7 @@
         {
           "factory": "PsychicFrogFactory",
           "file": "PsychicFrogFactory.cs",
-          "line": 145,
+          "line": 148,
           "sentence": "v1 deterministic first-card-in-hand pick per discard (CR 701.16a \u2014 agent-driven choice deferred).",
           "cr": "CR 701.16a"
         },
@@ -384,7 +384,7 @@
         {
           "factory": "TirelessTrackerFactory",
           "file": "TirelessTrackerFactory.cs",
-          "line": 14,
+          "line": 15,
           "sentence": "\u003Cb\u003E\u0022Activate only as a sorcery\u0022\u003C/b\u003E \u2014 Tireless Tracker\u0027s printed activated ability has NO sorcery-speed restriction (instant speed on the official card), so nothing is deferred here for this card."
         }
       ]
@@ -498,7 +498,7 @@
     {
       "factory": "KappaCannoneerFactory",
       "file": "KappaCannoneerFactory.cs",
-      "line": 190,
+      "line": 195,
       "sentence": "WardEffect exists as a standalone helper (BuildWardEffect bounds an instance to the live card) but the battlefield-attached triggered-ability surface is deferred \u2014 see class xmldoc."
     },
     {
@@ -808,6 +808,12 @@
       "sentence": "## Deferred (v1 gaps)  - \u003Cb\u003EConvoke cost reduction\u003C/b\u003E."
     },
     {
+      "factory": "SlogurkTheOverslimeFactory",
+      "file": "SlogurkTheOverslimeFactory.cs",
+      "line": 191,
+      "sentence": "Mana cost is empty; counter-removal cost is documented in the description-only path (cost-primitive deferred)."
+    },
+    {
       "factory": "DryadArborFactory",
       "file": "DryadArborFactory.cs",
       "line": 7,
@@ -816,32 +822,32 @@
     {
       "factory": "ArcboundRavagerFactory",
       "file": "ArcboundRavagerFactory.cs",
-      "line": 13,
+      "line": 14,
       "sentence": "## Deferred (v1 gaps)  - \u003Cb\u003ETarget prompt for Modular bestowal\u003C/b\u003E: oracle says \u0022target artifact creature\u0022 \u2014 v1 picks the first artifact creature deterministically (excluding Arcbound Ravager)."
     },
     {
       "factory": "ArcboundRavagerFactory",
       "file": "ArcboundRavagerFactory.cs",
-      "line": 13,
+      "line": 14,
       "sentence": "TargetRequests\u0022/\u003E; same gap as Stoneforge Mystic\u0027s \u0022attach to a creature you control\u0022."
     },
     {
       "factory": "ArcboundRavagerFactory",
       "file": "ArcboundRavagerFactory.cs",
-      "line": 13,
+      "line": 14,
       "sentence": "Arcbound Ravager is the only Modular card in the immediate roadmap; promotion to a shared primitive is deferred until a second Modular card lands (Arcbound Crusher / Worker / etc."
     },
     {
       "factory": "ArcboundRavagerFactory",
       "file": "ArcboundRavagerFactory.cs",
-      "line": 233,
+      "line": 234,
       "sentence": "CR 702.43b\u0027s \u0022target artifact creature\u0022 is not controller-restricted; opponent-side scans are deferred until the engine exposes a cross-battlefield enumerator (no \u003Cc\u003EPlayer.",
       "cr": "CR 702.43b"
     },
     {
       "factory": "SpriteDragonFactory",
       "file": "SpriteDragonFactory.cs",
-      "line": 12,
+      "line": 13,
       "sentence": "## Deferred (v1 gaps)  - \u003Cb\u003EContinuous P/T recomputation\u003C/b\u003E \u2014 Sprite Dragon\u0027s effective P/T is derived from base 1/1 plus \u002B1/\u002B1 counters via the standard \u003Csee cref=\u0022CounterCollection\u0022/\u003E path (CR 613.4 layer 7d), inherited from every other \u002B1/\u002B1-counter user (Psychic Frog activated ability, Ledger Shredder surveil ride\u2026",
       "cr": "CR 613.4"
     },
@@ -1163,6 +1169,20 @@
       "file": "ShowAndTellFactory.cs",
       "line": 11,
       "sentence": "Real \u0022any of N choices \u002B opt-out\u0022 prompt deferred (same queue as Stoneforge Mystic / Sun Titan)."
+    },
+    {
+      "factory": "GoryosVengeanceFactory",
+      "file": "GoryosVengeanceFactory.cs",
+      "line": 14,
+      "sentence": "Printed Arcane subtype is omitted from the runtime card (CR 205.3 \u2014 Arcane is a spell subtype; the engine\u0027s \u003Csee cref=\u0022CardSubtype\u0022/\u003E enum doesn\u0027t yet carry an Arcane member, same gap as Through the Breach.",
+      "cr": "CR 205.3"
+    },
+    {
+      "factory": "GoryosVengeanceFactory",
+      "file": "GoryosVengeanceFactory.cs",
+      "line": 14,
+      "sentence": "\u003Cb\u003ESplice onto Arcane (CR 702.46)\u003C/b\u003E: the splice alt-cost primitive isn\u0027t in the engine yet \u2014 same gap as Through the Breach.",
+      "cr": "CR 702.46"
     },
     {
       "factory": "YawgmothFactory",

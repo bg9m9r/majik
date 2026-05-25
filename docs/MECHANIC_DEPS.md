@@ -5,11 +5,11 @@ Scanner output: every `*Factory.cs` xmldoc / inline comment mentioning
 engine primitive. Each row answers: "if we ship primitive _X_, which factory
 xmldocs flagged that they're blocked on it?"
 
-- **Generated:** 2026-05-25 03:49 UTC
+- **Generated:** 2026-05-25 03:51 UTC
 - **Scanned dir:** `Majik.Core/CardData/Factories`
-- **Total mentions:** 209
+- **Total mentions:** 212
 - **Clusters:** 7
-- **Unclustered (need new registry pattern):** 163
+- **Unclustered (need new registry pattern):** 166
 
 Regenerate with `dotnet run --project Majik.Console -- mechanic-deps --md-out docs/MECHANIC_DEPS.md --json-out docs/mechanic-deps.json`.
 
@@ -68,7 +68,7 @@ Mentions:
   > Tests + bots pre-select the creature list, mirroring the deferred agent prompt pattern used by <see cref="KappaCannoneerFactory.
 - `PsychicFrogFactory` (`PsychicFrogFactory.cs:15`)
   > Agent-driven prompts are deferred behind the same queue as Liliana of the Veil + Faithless Looting + Sword of Feast and Famine.
-- `PsychicFrogFactory` (`PsychicFrogFactory.cs:145`)
+- `PsychicFrogFactory` (`PsychicFrogFactory.cs:148`)
   > v1 deterministic first-card-in-hand pick per discard (CR 701.16a — agent-driven choice deferred).
 - `FaithlessSalvagingFactory` (`FaithlessSalvagingFactory.cs:11`)
   > Real agent-driven "choose a card to discard" prompt deferred behind the same queue as Faithless Looting / Liliana of the Veil / Connive / Psychic Frog.
@@ -167,7 +167,7 @@ Mentions:
 
 Mentions:
 
-- `TirelessTrackerFactory` (`TirelessTrackerFactory.cs:14`)
+- `TirelessTrackerFactory` (`TirelessTrackerFactory.cs:15`)
   > <b>"Activate only as a sorcery"</b> — Tireless Tracker's printed activated ability has NO sorcery-speed restriction (instant speed on the official card), so nothing is deferred here for this card.
 
 ### 7. Token colour identity (CR 105 / CR 903.4)
@@ -211,7 +211,7 @@ Mentions:
   > ## Deferred (v1 gaps)  - <b>Ward {4} trigger wiring</b>: <see cref="WardEffect"/> is a standalone check helper, not yet plumbed onto a battlefield-attached triggered ability.
 - `KappaCannoneerFactory` (`KappaCannoneerFactory.cs:121`)
   > v1 exposes this as a builder so the spell-resolution path can opt-in once the Ward trigger primitive lands (see class xmldoc for the deferred wiring gap).
-- `KappaCannoneerFactory` (`KappaCannoneerFactory.cs:190`)
+- `KappaCannoneerFactory` (`KappaCannoneerFactory.cs:195`)
   > WardEffect exists as a standalone helper (BuildWardEffect bounds an instance to the live card) but the battlefield-attached triggered-ability surface is deferred — see class xmldoc.
 - `IzzetCharmFactory` (`IzzetCharmFactory.cs:211`)
   > Real agent- driven "choose 2 cards to discard" prompt is deferred — same queue as Faithless Looting / Liliana / Connive.
@@ -313,17 +313,19 @@ Mentions:
   > "target creature you control" — v1 auto-picks the first creature on the controller's battlefield (CR 701.3a prompt deferred — same simplification as Stoneforge Mystic's attach step).
 - `ChordOfCallingFactory` (`ChordOfCallingFactory.cs:14`)
   > ## Deferred (v1 gaps)  - <b>Convoke cost reduction</b>.
+- `SlogurkTheOverslimeFactory` (`SlogurkTheOverslimeFactory.cs:191`)
+  > Mana cost is empty; counter-removal cost is documented in the description-only path (cost-primitive deferred).
 - `DryadArborFactory` (`DryadArborFactory.cs:7`)
   > Green Sun's Zenith interaction (can be fetched as a Forest creature — deferred to the targeting / land-subtype search slice).
-- `ArcboundRavagerFactory` (`ArcboundRavagerFactory.cs:13`)
+- `ArcboundRavagerFactory` (`ArcboundRavagerFactory.cs:14`)
   > ## Deferred (v1 gaps)  - <b>Target prompt for Modular bestowal</b>: oracle says "target artifact creature" — v1 picks the first artifact creature deterministically (excluding Arcbound Ravager).
-- `ArcboundRavagerFactory` (`ArcboundRavagerFactory.cs:13`)
+- `ArcboundRavagerFactory` (`ArcboundRavagerFactory.cs:14`)
   > TargetRequests"/>; same gap as Stoneforge Mystic's "attach to a creature you control".
-- `ArcboundRavagerFactory` (`ArcboundRavagerFactory.cs:13`)
+- `ArcboundRavagerFactory` (`ArcboundRavagerFactory.cs:14`)
   > Arcbound Ravager is the only Modular card in the immediate roadmap; promotion to a shared primitive is deferred until a second Modular card lands (Arcbound Crusher / Worker / etc.
-- `ArcboundRavagerFactory` (`ArcboundRavagerFactory.cs:233`)
+- `ArcboundRavagerFactory` (`ArcboundRavagerFactory.cs:234`)
   > CR 702.43b's "target artifact creature" is not controller-restricted; opponent-side scans are deferred until the engine exposes a cross-battlefield enumerator (no <c>Player.
-- `SpriteDragonFactory` (`SpriteDragonFactory.cs:12`)
+- `SpriteDragonFactory` (`SpriteDragonFactory.cs:13`)
   > ## Deferred (v1 gaps)  - <b>Continuous P/T recomputation</b> — Sprite Dragon's effective P/T is derived from base 1/1 plus +1/+1 counters via the standard <see cref="CounterCollection"/> path (CR 613.4 layer 7d), inherited from every other +1/+1-counter user (Psychic Frog activated ability, Ledger Shredder surveil ride…
 - `PsychicFrogFactory` (`PsychicFrogFactory.cs:15`)
   > ## Deferred (v1 gaps)  - <b>Discard prompt</b> on the loot half and the activation cost (CR 701.16a — discarding player chooses) — v1 deterministically picks the first card in hand.
@@ -429,6 +431,10 @@ Mentions:
   > Targeting + fight step deferred (see xmldoc above).
 - `ShowAndTellFactory` (`ShowAndTellFactory.cs:11`)
   > Real "any of N choices + opt-out" prompt deferred (same queue as Stoneforge Mystic / Sun Titan).
+- `GoryosVengeanceFactory` (`GoryosVengeanceFactory.cs:14`)
+  > Printed Arcane subtype is omitted from the runtime card (CR 205.3 — Arcane is a spell subtype; the engine's <see cref="CardSubtype"/> enum doesn't yet carry an Arcane member, same gap as Through the Breach.
+- `GoryosVengeanceFactory` (`GoryosVengeanceFactory.cs:14`)
+  > <b>Splice onto Arcane (CR 702.46)</b>: the splice alt-cost primitive isn't in the engine yet — same gap as Through the Breach.
 - `YawgmothFactory` (`YawgmothFactory.cs:10`)
   > Effect 4: Controller draws a card  ## Deferred (v1 gaps)
 - `YawgmothFactory` (`YawgmothFactory.cs:10`)

@@ -5,6 +5,7 @@ using Majik.Core.Counters;
 using Majik.Core.Domain.DomainEvents;
 using Majik.Core.Effects;
 using Majik.Core.Players;
+using Majik.Core.Services;
 using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
@@ -69,15 +70,19 @@ public static class SpriteDragonFactory
     /// tests.
     /// </summary>
     public static Creature Create(Player owner)
-        => Create(owner, triggers: null);
+        => Create(owner, triggers: null, replacements: null);
 
     /// <summary>
     /// Constructs Sprite Dragon. When <paramref name="triggers"/> is
     /// supplied, the cast-noncreature trigger is registered so a
     /// <see cref="SpellCastEvent"/> from a noncreature spell cast by
     /// Sprite Dragon's controller automatically queues the ability.
+    /// When <paramref name="replacements"/> is supplied, the +1/+1 counter
+    /// placement is routed through <see cref="CountersService.Add"/> so
+    /// Hardened Scales / Doubling Season replacements can rewrite the count
+    /// (CR 614).
     /// </summary>
-    public static Creature Create(Player owner, TriggerManager? triggers)
+    public static Creature Create(Player owner, TriggerManager? triggers, ReplacementBus? replacements = null)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -107,7 +112,7 @@ public static class SpriteDragonFactory
         // ----------------------------------------------------------------
         var counterEffect = new Effect(
             $"{CardName}: put a +1/+1 counter on it (cast noncreature spell)",
-            () => card.Counters.Add(CounterType.PlusOnePlusOne));
+            () => CountersService.Add(card, CounterType.PlusOnePlusOne, 1, replacements));
 
         var trigger = new TriggeredAbility(
             source: card,

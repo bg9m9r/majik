@@ -2,8 +2,10 @@ using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Counters;
+using Majik.Core.Effects;
 using Majik.Core.Events;
 using Majik.Core.Players;
+using Majik.Core.Services;
 using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
@@ -64,14 +66,19 @@ public static class ThaliaLieutenantFactory
     /// structural / dispatch tests.
     /// </summary>
     public static Creature Create(Player owner) =>
-        Create(owner, triggers: null);
+        Create(owner, triggers: null, replacements: null);
 
     /// <summary>
     /// Construct Thalia's Lieutenant with optional trigger manager. When
     /// <paramref name="triggers"/> is supplied, both triggered abilities are
     /// registered so qualifying events automatically queue the abilities.
+    /// When <paramref name="replacements"/> is supplied, both +1/+1 counter
+    /// placements (ETB-other-Humans and the self-bump on subsequent Human
+    /// ETBs) are routed through <see cref="CountersService.Add"/> so Hardened
+    /// Scales / Doubling Season style replacements can rewrite the count
+    /// (CR 614).
     /// </summary>
-    public static Creature Create(Player owner, TriggerManager? triggers)
+    public static Creature Create(Player owner, TriggerManager? triggers, ReplacementBus? replacements = null)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -106,7 +113,7 @@ public static class ThaliaLieutenantFactory
 
                 foreach (var human in humans)
                 {
-                    human.Counters.Add(CounterType.PlusOnePlusOne, 1);
+                    CountersService.Add(human, CounterType.PlusOnePlusOne, 1, replacements);
                 }
             });
 
@@ -133,7 +140,7 @@ public static class ThaliaLieutenantFactory
         // ----------------------------------------------------------------
         var humanEtbCounterEffect = new Effect(
             "Thalia's Lieutenant: put a +1/+1 counter on it (another Human entered)",
-            () => card.Counters.Add(CounterType.PlusOnePlusOne, 1));
+            () => CountersService.Add(card, CounterType.PlusOnePlusOne, 1, replacements));
 
         var humanEtbTrigger = new TriggeredAbility(
             source: card,

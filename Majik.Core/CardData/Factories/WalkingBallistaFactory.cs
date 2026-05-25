@@ -1,5 +1,6 @@
 using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
+using Majik.Core.Effects;
 using Majik.Core.Players;
 
 namespace Majik.Core.CardData.Factories;
@@ -48,5 +49,15 @@ public static class WalkingBallistaFactory
     /// 302.1) and both activated abilities described in the class xmldoc.
     /// </summary>
     public static Creature Create(Player owner) =>
-        (Creature)CardDefinitionFactory.Build(Definition, owner);
+        Create(owner, replacements: null);
+
+    /// <summary>
+    /// Construct Walking Ballista with optional replacement-bus wiring.
+    /// When <paramref name="replacements"/> is supplied, the JSON-driven
+    /// {4}-put-+1/+1-counter activated ability is routed through
+    /// <see cref="Services.CountersService.Add"/> so Hardened Scales /
+    /// Doubling Season replacements can rewrite the count (CR 614).
+    /// </summary>
+    public static Creature Create(Player owner, ReplacementBus? replacements) =>
+        (Creature)CardDefinitionFactory.Build(Definition, owner, replacements);
 }

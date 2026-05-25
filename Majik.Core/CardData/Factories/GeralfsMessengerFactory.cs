@@ -172,7 +172,10 @@ public static class GeralfsMessengerFactory
         // ----------------------------------------------------------------
         card.AddAbility(new KeywordAbility("Undying", card, owner));
 
-        var undyingTrigger = UndyingFactory.Build(card);
+        // Undying-return +1/+1 counter routes through the same
+        // ReplacementBus the enters-tapped replacement uses, so Hardened
+        // Scales / Doubling Season can rewrite the return-side count.
+        var undyingTrigger = UndyingFactory.Build(card, replacements);
         card.AddAbility(undyingTrigger);
         triggers?.RegisterTriggeredAbility(undyingTrigger);
 

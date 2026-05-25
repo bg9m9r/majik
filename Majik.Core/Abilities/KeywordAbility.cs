@@ -16,9 +16,19 @@ public sealed class KeywordAbility : IStaticAbility
     public string Keyword { get; }
     public object Source { get; }
     public Player? Controller { get; }
-    public string Description => Keyword;
+    public string Description => Arg is int n ? $"{Keyword} {n}" : Keyword;
 
-    public KeywordAbility(string keyword, object? source = null, Player? controller = null)
+    /// <summary>
+    /// Optional numeric parameter for parameterised keywords (CR 702.x —
+    /// e.g. Annihilator N, Ward N, Fading N, Vanishing N, Bushido N). Null
+    /// for non-parameterised keywords (Flying, Trample, Haste, etc.).
+    /// Read by the keyword's wiring factory (e.g. <c>AnnihilatorFactory</c>
+    /// reads <c>Arg</c> off the marker to decide how many permanents the
+    /// defending player must sacrifice on attack).
+    /// </summary>
+    public int? Arg { get; }
+
+    public KeywordAbility(string keyword, object? source = null, Player? controller = null, int? arg = null)
     {
         if (string.IsNullOrWhiteSpace(keyword))
         {
@@ -27,6 +37,7 @@ public sealed class KeywordAbility : IStaticAbility
         Keyword = keyword;
         Source = source ?? new object();
         Controller = controller;
+        Arg = arg;
     }
 
     Player IStaticAbility.Controller => Controller!;
