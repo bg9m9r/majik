@@ -1,17 +1,17 @@
 {
-  "generated_utc": "2026-05-25T03:09:36.4078103Z",
-  "scanned_dir": "/home/brett/Projects/majik.project/majik.core/.claude/worktrees/agent-aea171d949b60662a/Majik.Core/CardData/Factories",
-  "total_mentions": 192,
-  "distinct_factories": 130,
+  "generated_utc": "2026-05-25T03:46:30.5099885Z",
+  "scanned_dir": "/home/brett/Projects/majik.project/majik.core/.claude/worktrees/agent-a02d08bc9ef871028/Majik.Core/CardData/Factories",
+  "total_mentions": 208,
+  "distinct_factories": 138,
   "cluster_count": 7,
-  "unclustered_count": 148,
+  "unclustered_count": 163,
   "clusters": [
     {
       "primitive_id": "agent-prompt-targeting",
       "display_name": "Agent-prompt targeting MVP",
       "implementation_hint": "IPlayerAgent needs ChooseTarget / ChooseYesNo surfaces; many spell factories punt on real targeting prompts.",
-      "factory_count": 28,
-      "mention_count": 35,
+      "factory_count": 29,
+      "mention_count": 36,
       "factories": [
         "AbhorrentOculusFactory",
         "AetherVialFactory",
@@ -40,7 +40,8 @@
         "TerritorialKavuFactory",
         "TormodsCryptFactory",
         "UroTitanFactory",
-        "YawgmothFactory"
+        "YawgmothFactory",
+        "YorionSkyNomadFactory"
       ],
       "mentions": [
         {
@@ -144,7 +145,7 @@
         {
           "factory": "PsychicFrogFactory",
           "file": "PsychicFrogFactory.cs",
-          "line": 145,
+          "line": 148,
           "sentence": "v1 deterministic first-card-in-hand pick per discard (CR 701.16a \u2014 agent-driven choice deferred).",
           "cr": "CR 701.16a"
         },
@@ -238,6 +239,13 @@
           "file": "GoblinLackeyFactory.cs",
           "line": 12,
           "sentence": "\u003Cb\u003E\u0022You may\u0022 prompt\u003C/b\u003E: v1 auto-accepts when an eligible Goblin creature card exists in hand (same approach as Aether Vial\u0027s tap activated ability \u2014 declining the optional is deferred to the agent-prompt MVP)."
+        },
+        {
+          "factory": "YorionSkyNomadFactory",
+          "file": "YorionSkyNomadFactory.cs",
+          "line": 14,
+          "sentence": "## Deferred (v1 gaps)  - \u003Cb\u003E\u0022Any number\u0022 agent prompt\u003C/b\u003E: CR 700.2 \u2014 the controller chooses any number of qualifying permanents at resolution.",
+          "cr": "CR 700.2"
         },
         {
           "factory": "AjaniNacatlPariahFactory",
@@ -369,7 +377,7 @@
         {
           "factory": "TirelessTrackerFactory",
           "file": "TirelessTrackerFactory.cs",
-          "line": 14,
+          "line": 15,
           "sentence": "\u003Cb\u003E\u0022Activate only as a sorcery\u0022\u003C/b\u003E \u2014 Tireless Tracker\u0027s printed activated ability has NO sorcery-speed restriction (instant speed on the official card), so nothing is deferred here for this card."
         }
       ]
@@ -433,6 +441,18 @@
       "sentence": "The \u0022until your next turn\u0022 expiry and the player-scoped protection grant remain deferred \u2014 see class xmldoc."
     },
     {
+      "factory": "HardenedScalesFactory",
+      "file": "HardenedScalesFactory.cs",
+      "line": 10,
+      "sentence": "## Deferred (v1 gaps)  - \u003Cb\u003EDirect-add retrofit\u003C/b\u003E: existing factories that call \u003Cc\u003ECounters."
+    },
+    {
+      "factory": "HardenedScalesFactory",
+      "file": "HardenedScalesFactory.cs",
+      "line": 10,
+      "sentence": "The bus applies in registration order today (same gap as every other replacement)."
+    },
+    {
       "factory": "StormchasersTalentFactory",
       "file": "StormchasersTalentFactory.cs",
       "line": 16,
@@ -471,7 +491,7 @@
     {
       "factory": "KappaCannoneerFactory",
       "file": "KappaCannoneerFactory.cs",
-      "line": 190,
+      "line": 195,
       "sentence": "WardEffect exists as a standalone helper (BuildWardEffect bounds an instance to the live card) but the battlefield-attached triggered-ability surface is deferred \u2014 see class xmldoc."
     },
     {
@@ -594,6 +614,13 @@
       "file": "NecrodominanceFactory.cs",
       "line": 155,
       "sentence": "Face-down exile is deferred \u2014 engine has no face-down flag."
+    },
+    {
+      "factory": "DaybreakCoronetFactory",
+      "file": "DaybreakCoronetFactory.cs",
+      "line": 9,
+      "sentence": "## Deferred (v1 gaps)  - \u003Cb\u003ESBA-driven fall-off check\u003C/b\u003E: if every other aura attached to the enchanted creature leaves the battlefield, Daybreak Coronet\u0027s printed \u0022Enchant creature with another Aura attached to it\u0022 requirement is no longer met \u2192 CR 704.5n SBA destroys the Coronet.",
+      "cr": "CR 704.5n"
     },
     {
       "factory": "MalevolentRumbleFactory",
@@ -782,32 +809,32 @@
     {
       "factory": "ArcboundRavagerFactory",
       "file": "ArcboundRavagerFactory.cs",
-      "line": 13,
+      "line": 14,
       "sentence": "## Deferred (v1 gaps)  - \u003Cb\u003ETarget prompt for Modular bestowal\u003C/b\u003E: oracle says \u0022target artifact creature\u0022 \u2014 v1 picks the first artifact creature deterministically (excluding Arcbound Ravager)."
     },
     {
       "factory": "ArcboundRavagerFactory",
       "file": "ArcboundRavagerFactory.cs",
-      "line": 13,
+      "line": 14,
       "sentence": "TargetRequests\u0022/\u003E; same gap as Stoneforge Mystic\u0027s \u0022attach to a creature you control\u0022."
     },
     {
       "factory": "ArcboundRavagerFactory",
       "file": "ArcboundRavagerFactory.cs",
-      "line": 13,
+      "line": 14,
       "sentence": "Arcbound Ravager is the only Modular card in the immediate roadmap; promotion to a shared primitive is deferred until a second Modular card lands (Arcbound Crusher / Worker / etc."
     },
     {
       "factory": "ArcboundRavagerFactory",
       "file": "ArcboundRavagerFactory.cs",
-      "line": 233,
+      "line": 234,
       "sentence": "CR 702.43b\u0027s \u0022target artifact creature\u0022 is not controller-restricted; opponent-side scans are deferred until the engine exposes a cross-battlefield enumerator (no \u003Cc\u003EPlayer.",
       "cr": "CR 702.43b"
     },
     {
       "factory": "SpriteDragonFactory",
       "file": "SpriteDragonFactory.cs",
-      "line": 12,
+      "line": 13,
       "sentence": "## Deferred (v1 gaps)  - \u003Cb\u003EContinuous P/T recomputation\u003C/b\u003E \u2014 Sprite Dragon\u0027s effective P/T is derived from base 1/1 plus \u002B1/\u002B1 counters via the standard \u003Csee cref=\u0022CounterCollection\u0022/\u003E path (CR 613.4 layer 7d), inherited from every other \u002B1/\u002B1-counter user (Psychic Frog activated ability, Ledger Shredder surveil ride\u2026",
       "cr": "CR 613.4"
     },
@@ -823,6 +850,12 @@
       "file": "LeoninArbiterFactory.cs",
       "line": 80,
       "sentence": "Actual search enforcement is deferred pending a unified library-search hook (see class xmldoc)."
+    },
+    {
+      "factory": "RealitySmasherFactory",
+      "file": "RealitySmasherFactory.cs",
+      "line": 49,
+      "sentence": "Carried as a documentation constant; see class xmldoc for the deferred wiring gap."
     },
     {
       "factory": "BlastZoneFactory",
@@ -905,10 +938,30 @@
       "sentence": "On resolve: auto-pick first card from target player\u0027s graveyard and exile it (v1 deterministic; real agent-pick deferred)."
     },
     {
+      "factory": "RestInPeaceFactory",
+      "file": "RestInPeaceFactory.cs",
+      "line": 12,
+      "sentence": "## Deferred (v1 gaps)  - \u003Cb\u003EToken \u0022put into a graveyard\u0022 branch\u003C/b\u003E: the printed \u0022card or token\u0022 oracle includes tokens, but tokens that \u0022die\u0022 cease to exist via SBA (CR 704.5d \u2192 token destroyed \u2192 CR 704.5e moves it to graveyard then it ceases to exist) \u2014 they never settle in a graveyard.",
+      "cr": "CR 704.5d"
+    },
+    {
+      "factory": "RestInPeaceFactory",
+      "file": "RestInPeaceFactory.cs",
+      "line": 12,
+      "sentence": "Bus applies in registration order today \u2014 same gap as Anger of the Gods / Leyline of the Void / every other replacement."
+    },
+    {
       "factory": "PactOfNegationFactory",
       "file": "PactOfNegationFactory.cs",
       "line": 14,
       "sentence": "Multi-player turn-skipping nuances deferred."
+    },
+    {
+      "factory": "SteelOverseerFactory",
+      "file": "SteelOverseerFactory.cs",
+      "line": 12,
+      "sentence": "## Deferred (v1 gaps)  - \u003Cb\u003EOrder-of-operations\u003C/b\u003E: when multiple replacements interact (Hardened Scales \u002B Doubling Season \u002B Vorinclex), the replacement bus already orders them per CR 616 \u2014 Steel Overseer just calls \u003Csee cref=\u0022CountersService.",
+      "cr": "CR 616"
     },
     {
       "factory": "UroTitanFactory",
@@ -1154,6 +1207,26 @@
       "sentence": "Mutavault was on the battlefield long enough but its Creature-ness is fresh \u2014 the intricate \u0022had Creature type continuously since untap step\u0022 bookkeeping is deferred; the test suite asserts shape, not attack legality."
     },
     {
+      "factory": "LeylineOfTheVoidFactory",
+      "file": "LeylineOfTheVoidFactory.cs",
+      "line": 9,
+      "sentence": "\u0022  ## Implementation  Static replacement (CR 614) only \u2014 the opening-hand alt-cost branch (CR 702.95 \u2014 Leyline keyword) is DEFERRED because the engine has no opening-hand reveal hook today (no \u003Cc\u003EOpeningHandCheckEvent\u003C/c\u003E or similar surface).",
+      "cr": "CR 614"
+    },
+    {
+      "factory": "LeylineOfTheVoidFactory",
+      "file": "LeylineOfTheVoidFactory.cs",
+      "line": 9,
+      "sentence": "## Deferred (v1 gaps)  - \u003Cb\u003EOpening-hand alt-cost\u003C/b\u003E (CR 702.95 \u2014 Leyline keyword): no opening-hand hook in the engine.",
+      "cr": "CR 702.95"
+    },
+    {
+      "factory": "LeylineOfTheVoidFactory",
+      "file": "LeylineOfTheVoidFactory.cs",
+      "line": 9,
+      "sentence": "Affected-player choice deferred."
+    },
+    {
       "factory": "AtraxaGrandUnifierFactory",
       "file": "AtraxaGrandUnifierFactory.cs",
       "line": 10,
@@ -1268,6 +1341,36 @@
       "line": 100,
       "sentence": "\u003Csummary\u003E CR 702.138 \u2014 Nethergoyf\u0027s printed Escape alt-cost ({2}{B}, exile four OTHER graveyard cards in v1; see class xmldoc for the any-number / 4-types-among-them deferred surface).",
       "cr": "CR 702.138"
+    },
+    {
+      "factory": "QuantumRiddlerFactory",
+      "file": "QuantumRiddlerFactory.cs",
+      "line": 11,
+      "sentence": "Mechanic deferred \u2014 same posture as \u003Csee cref=\u0022PinnacleEmissaryFactory\u0022/\u003E."
+    },
+    {
+      "factory": "QuantumRiddlerFactory",
+      "file": "QuantumRiddlerFactory.cs",
+      "line": 11,
+      "sentence": "Same v1 gap as Necrodominance \u2014 see \u003Csee cref=\u0022NecrodominanceFactory\u0022/\u003E\u0027s \u0022skip additional draws\u0022 marker."
+    },
+    {
+      "factory": "QuantumRiddlerFactory",
+      "file": "QuantumRiddlerFactory.cs",
+      "line": 11,
+      "sentence": "\u2014 new Edge of Eternities keyword)\u003C/b\u003E: deferred infra."
+    },
+    {
+      "factory": "QuantumRiddlerFactory",
+      "file": "QuantumRiddlerFactory.cs",
+      "line": 108,
+      "sentence": "The mechanic (alt-cost \u002B exile-at-end-step \u002B cast-from-exile-later) is deferred; the marker surfaces the keyword for card-text inspection \u2014 same posture as PinnacleEmissaryFactory."
+    },
+    {
+      "factory": "QuantumRiddlerFactory",
+      "file": "QuantumRiddlerFactory.cs",
+      "line": 116,
+      "sentence": "Same v1 gap as Necrodominance\u0027s \u0022skip additional draws\u0022 clause."
     },
     {
       "factory": "LordOfAtlantisFactory",
