@@ -293,7 +293,7 @@ public sealed class GameFacade
             zoneService: _zones,
             agents: agents,
             turnNumberAccessor: () => 1,
-            phaseAccessor: () => PhaseStateType.Main,
+            phaseAccessor: () => _currentPhase,
             // CR 305.2 — share the facade's per-turn land-drop counter so
             // PlayLandCommand submissions are gated on the same instance
             // a subsequent StartFullGameAsync run also uses.
