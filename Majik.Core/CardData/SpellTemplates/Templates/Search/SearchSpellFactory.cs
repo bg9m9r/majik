@@ -122,6 +122,105 @@ internal static class SearchSpellFactory
         }) });
 
     /// <summary>
+    /// Cultivate / Kodama's Reach template — "Search your library for up
+    /// to two basic land cards, reveal those cards, put one onto the
+    /// battlefield tapped and the other into your hand, then shuffle."
+    /// (CR 701.19a search + CR 701.20a post-search shuffle.)
+    ///
+    /// Resolution shape:
+    ///  - Prompt the caster's agent for the first basic land card. Agent
+    ///    may decline (return null) — that's a legal "up to two" no-op.
+    ///  - Prompt again for the second basic land card (excluding the
+    ///    first pick). Agent may decline.
+    ///  - Of the picks made, the FIRST pick goes to the battlefield
+    ///    tapped (the prompt label calls this out explicitly so the
+    ///    agent can score it as the BF slot) and the SECOND pick goes
+    ///    to hand. When only one pick is made it goes to the battlefield
+    ///    tapped (matches the bot's typical greedy ramp preference and
+    ///    is one of the legal partitions of an "up to two" cast where
+    ///    the player chose one card).
+    ///  - The library is shuffled once at the end (CR 701.20a — a single
+    ///    search effect performs one shuffle even when finding multiple
+    ///    cards).
+    ///
+    /// The deterministic fallback (no agent registered) takes the first
+    /// two basic land candidates from the library in iteration order —
+    /// mirrors the <see cref="VeteranExplorerFactory"/> shape so the
+    /// shape-only test path produces stable observations.
+    /// </summary>
+    internal static SpellDefinition SearchUpToTwoBasicsBattlefieldAndHandSpell(
+        Player caster, string effectLabel) => new(
+        Modes: Array.Empty<string>(), HasVariableX: false,
+        TargetRequests: Array.Empty<TargetRequest>(),
+        EffectFactory: p => new IEffect[] { new Effect($"{effectLabel}: up to two basics -> battlefield-tapped + hand", () =>
+        {
+            bool IsBasicLand(ICard c) => c.HasType(CardType.Land) && BasicLandNames.Contains(c.Name);
+
+            var agent = AgentRegistry.Get(caster);
+            var pickCtx = BuildPickContext(caster, p);
+            var picks = new List<ICard>(capacity: 2);
+
+            // First pick — destined for the battlefield (tapped).
+            var firstCandidates = caster.Zones.Library.GetCards().Where(IsBasicLand).ToList();
+            if (firstCandidates.Count > 0)
+            {
+                ICard? first = agent != null
+                    ? agent.ChooseLibraryPickAsync(pickCtx, firstCandidates,
+                        "basic land card to put onto the battlefield tapped")
+                        .GetAwaiter().GetResult()
+                    : firstCandidates[0];
+                if (first != null) picks.Add(first);
+            }
+
+            // Second pick — destined for hand. Agent may decline ("up to two").
+            var secondCandidates = caster.Zones.Library.GetCards()
+                .Where(c => IsBasicLand(c) && !ReferenceEquals(c, picks.Count > 0 ? picks[0] : null))
+                .ToList();
+            if (secondCandidates.Count > 0)
+            {
+                ICard? second = agent != null
+                    ? agent.ChooseLibraryPickAsync(pickCtx, secondCandidates,
+                        "basic land card to put into your hand")
+                        .GetAwaiter().GetResult()
+                    : secondCandidates[0];
+                if (second != null) picks.Add(second);
+            }
+
+            // Move the first pick to battlefield tapped (when present).
+            // Second pick to hand (when present). When only one pick was
+            // made it goes to the battlefield tapped — see class docs.
+            if (picks.Count >= 1)
+            {
+                var bfPick = picks[0];
+                var zones = ZoneServiceRegistry.Get(caster);
+                if (zones != null)
+                {
+                    zones.MoveCard(bfPick, ZoneType.Library, ZoneType.Battlefield, caster);
+                    if (bfPick is Permanent permTapped && !permTapped.IsTapped)
+                        permTapped.Tap();
+                }
+                else
+                {
+                    caster.Zones.Library.RemoveCard(bfPick);
+                    caster.Zones.Battlefield.AddCard(bfPick);
+                    bfPick.SetZone(ZoneType.Battlefield);
+                    if (bfPick is Permanent perm) perm.Tap();
+                }
+            }
+            if (picks.Count >= 2)
+            {
+                var handPick = picks[1];
+                caster.Zones.Library.RemoveCard(handPick);
+                caster.Zones.Hand.AddCard(handPick);
+                handPick.SetZone(ZoneType.Hand);
+            }
+
+            // CR 701.20a — shuffle once after the search effect, even
+            // when zero cards were found (the search still happened).
+            LibraryShuffle.ShuffleLibrary(caster, $"search-two-basics/{effectLabel}");
+        }) });
+
+    /// <summary>
     /// Green Sun's Zenith template — {X}{G} sorcery (Rule 107.4b X cost).
     /// Tutors the first library card whose color matches <paramref name="colorRaw"/> and
     /// whose mana value ≤ X, placing it directly onto the battlefield (CR 701.19a).
