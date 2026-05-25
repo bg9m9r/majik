@@ -212,6 +212,42 @@ public static class TokenFactory
         return token;
     }
 
+    /// <summary>Blood (CR 111.10 / Innistrad: Crimson Vow): red artifact
+    /// token with "{1}, {T}, Discard a card, Sacrifice this artifact: Draw
+    /// a card." Voldaren Estate's red-mana-flavoured Treasure cousin —
+    /// produced by Voldaren Epicure / Bloodtithe Harvester / Voldaren
+    /// Bloodcaster and consumed by Falkenrath Pit Fighter, Voldaren Pariah's
+    /// Anointed Deacon transform clause, and the broader Crimson Vow
+    /// "sacrifice a Blood token" payoff family. Bound as a 4-cost activated
+    /// ability ({1} mana + {T} tap + DiscardACard + sacrifice-self) with a
+    /// single draw-one effect — same compositional shape as
+    /// <see cref="CreateClue"/> / <see cref="CreateFood"/>. The
+    /// <see cref="CardSubtype.Blood"/> subtype is stamped so Falkenrath Pit
+    /// Fighter's "sacrifice another creature or Blood token" cost gate +
+    /// the broader Blood-counts-as-X type predicates pick it up.</summary>
+    public static Artifact CreateBlood(Player controller, ZoneService? zones = null)
+    {
+        if (controller == null) throw new ArgumentNullException(nameof(controller));
+        var token = new Artifact("Blood", "",
+            subtypes: new[] { CardSubtype.Blood })
+        {
+            Owner = controller,
+            Controller = controller,
+            IsToken = true,
+        };
+        // CR 111.10 — Blood tokens are red artifacts (the printed token frame
+        // is red and the flavour text-box is treated as red mana for the
+        // CardColors / colour-matters surface). Single-colour list per the
+        // TokenSpec.Colors convention used by Stormchaser's Talent Mercenary.
+        token.SetTokenColors(new[] { ManaColor.Red });
+
+        // {1}, {T}, Discard a card, Sacrifice this artifact: Draw a card.
+        token.AddAbility(BuildBloodDiscardDrawAbility(token, controller));
+
+        PutOnBattlefield(token, controller, zones);
+        return token;
+    }
+
     /// <summary>Powerstone (CR 111.10 / The Brothers' War): colourless
     /// artifact token with "{T}: Add {C}. This mana can't be spent to cast
     /// a nonartifact spell." (Reckoner Bankbuster, Thran Spider, Loran's
@@ -335,6 +371,57 @@ public static class TokenFactory
         var effects = new IEffect[]
         {
             new Effect("Food: gain 3 life", () => controller.GainLife(3)),
+        };
+        return new ActivatedAbility(source, controller, costs: costs, effects: effects);
+    }
+
+    /// <summary>"{1}, {T}, Discard a card, Sacrifice this artifact: Draw a
+    /// card." — Blood ability. Four costs in cost-list declaration order
+    /// (mana, tap, discard, sacrifice); the sacrifice payment is performed
+    /// inside the effect closure because the generic
+    /// <see cref="AdditionalCost.Sacrifice"/> payment is a no-op stub
+    /// (mirrors Caustic Caterpillar / Insolent Neonate / Aether Spellbomb).
+    /// The draw is one card from the top of the controller's library — empty
+    /// library flags the SBA loss via
+    /// <see cref="Player.MarkTriedToDrawFromEmptyLibrary"/> (CR 704.5b),
+    /// matching the Clue / Food posture.</summary>
+    private static ActivatedAbility BuildBloodDiscardDrawAbility(Artifact source, Player controller)
+    {
+        var costs = new ICost[]
+        {
+            new ManaCostCost(ValueObjects.ManaCost.Parse("1")),
+            AdditionalCost.Tap(source),
+            new DiscardACardCost(),
+            AdditionalCost.Sacrifice(source),
+        };
+        var effects = new IEffect[]
+        {
+            new Effect("Blood: sacrifice self + draw a card", () =>
+            {
+                // Sacrifice payment — AdditionalCost.Sacrifice is a no-op
+                // stub (see Insolent Neonate / Caustic Caterpillar
+                // precedent), so we route the battlefield → graveyard move
+                // here. CR 701.16 — idempotent re-entry guard.
+                if (source.Zone == ZoneType.Battlefield)
+                {
+                    controller.Zones.Battlefield.RemoveCard(source);
+                    controller.Zones.Graveyard.AddCard(source);
+                    source.SetZone(ZoneType.Graveyard);
+                }
+
+                // CR 121.1 — draw one card from top of library. Empty
+                // library flags the SBA loss via the standard helper
+                // (Insolent Neonate / Faithless Looting parity).
+                var top = controller.Zones.Library.GetCards().FirstOrDefault();
+                if (top == null)
+                {
+                    controller.MarkTriedToDrawFromEmptyLibrary();
+                    return;
+                }
+                controller.Zones.Library.RemoveCard(top);
+                controller.Zones.Hand.AddCard(top);
+                top.SetZone(ZoneType.Hand);
+            }),
         };
         return new ActivatedAbility(source, controller, costs: costs, effects: effects);
     }
