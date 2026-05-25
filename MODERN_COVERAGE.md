@@ -111,10 +111,10 @@ Living tracker for Modern-format card + mechanic implementation in the Majik eng
 
 | Metric | Count |
 |---|---|
-| Named factories | 436 |
-| Named factories | 436 |
-| Named factories | 436 |
-| Named factories | 436 |
+| Named factories | 484 |
+| Named factories | 484 |
+| Named factories | 484 |
+| Named factories | 484 |
 | Bespoke templates | 28 |
 | Generic templates | 97 |
 | JSON-defined cards | 18 |
