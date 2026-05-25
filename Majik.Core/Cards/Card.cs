@@ -243,6 +243,48 @@ public class Card : ICard
     }
 
     /// <summary>
+    /// CR 305.9 / 113.6c — runtime "you may play this land card from your
+    /// graveyard" permission. Stamped by static abilities such as Crucible
+    /// of Worlds, Ramunap Excavator, Conduit of Worlds, and the World
+    /// Breaker emblem clauses that let a player play lands from a zone
+    /// other than their hand. When true, agents / the engine may surface
+    /// this land as a legal target for
+    /// <see cref="Majik.Core.Players.Agents.PriorityAction.PlayLand"/>
+    /// even though the card is in the graveyard. The standard land-play
+    /// gate (per-turn cap, main phase, stack empty, controller-on-turn —
+    /// see <see cref="Majik.Core.Game.LandDropTracker.CanPlayLand"/>) still
+    /// applies; only the source-zone restriction is waived.
+    ///
+    /// <para>
+    /// The flag is set on the LAND CARD, not the player, so multiple
+    /// permission sources (Crucible + Ramunap Excavator) are idempotent
+    /// and don't need a per-player ledger. Once stamped, the flag stays
+    /// until explicitly cleared; the agent layer is expected to also
+    /// gate on the live presence of a permission source (Crucible on
+    /// the battlefield) so a lingering flag after the source leaves
+    /// doesn't enable a phantom play. v1 doesn't model the LTB clear
+    /// — see <see cref="Majik.Core.CardData.Factories.CrucibleOfWorldsFactory"/>
+    /// xmldoc.
+    /// </para>
+    /// </summary>
+    public bool MayPlayFromGraveyard { get; private set; }
+
+    /// <summary>
+    /// Stamp the runtime "may play this land card from the graveyard" flag.
+    /// Idempotent. See <see cref="MayPlayFromGraveyard"/> for semantics.
+    /// </summary>
+    public void GrantPlayLandFromGraveyard()
+    {
+        MayPlayFromGraveyard = true;
+    }
+
+    /// <summary>Clear the runtime "may play from graveyard" flag.</summary>
+    public void ClearPlayLandFromGraveyard()
+    {
+        MayPlayFromGraveyard = false;
+    }
+
+    /// <summary>
     /// CR 702.66 — when this card was cast paying delve, the number of cards
     /// that were exiled from its caster's graveyard as part of the delve
     /// payment. Set by <see cref="Majik.Core.Game.SpellCastFlow"/> right after
