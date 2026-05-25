@@ -84,6 +84,13 @@ public enum BotIntent : ulong
     /// <see cref="Discard"/> because the CHOOSER is not the card's owner —
     /// heuristic bots score these as removal of the opponent's best card.</summary>
     HandHate     = 1UL << 24,
+
+    /// <summary>"Begin the game with this Leyline on the battlefield?"
+    /// CR 702.95 opening-hand alt-cost prompt. Pure upside — the card
+    /// is on the battlefield turn 0 instead of being a {4}-mana enchant.
+    /// Heuristic bots accept by default (classified under the upside-tag
+    /// branch alongside <see cref="CheatIntoPlay"/>).</summary>
+    OpeningHandLeyline = 1UL << 25,
 }
 
 public static class BotIntentExtensions

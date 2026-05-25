@@ -208,7 +208,8 @@ public interface IPlayerAgent
                           | BotIntent.Draw
                           | BotIntent.Reanimate
                           | BotIntent.CheatIntoPlay
-                          | BotIntent.Token))
+                          | BotIntent.Token
+                          | BotIntent.OpeningHandLeyline))
         {
             return Task.FromResult(true);
         }
