@@ -75,4 +75,15 @@ public sealed record CounterType(string Name)
     /// deactivates (the gate consults the live count).
     /// </summary>
     public static readonly CounterType Stasis = new("Stasis");
+
+    /// <summary>
+    /// CR 122 — Quest counters. Card-specific marker used by Pyromancer
+    /// Ascension (Zendikar). Whenever the controller casts an instant or
+    /// sorcery with the same name as a card in their graveyard, they may
+    /// put a quest counter on Pyromancer Ascension; while it has two or
+    /// more quest counters on it, instant / sorcery spells the controller
+    /// casts are copied. Counter accumulation and threshold are checked via
+    /// <see cref="CounterCollection.Count"/>.
+    /// </summary>
+    public static readonly CounterType Quest = new("Quest");
 }
