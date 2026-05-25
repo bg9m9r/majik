@@ -199,6 +199,9 @@ public enum CardSubtype
     /// Sai, Master Thopterist, Thopter Foundry / Sword of the Meek, Whirler
     /// Rogue tokens. CR 205.3m.</summary>
     Thopter,
+    /// <summary>Pest creature subtype — Signal Pest (Mirrodin Besieged),
+    /// Pest Infestation, Witherbloom Pest tokens (Strixhaven). CR 205.3m.</summary>
+    Pest,
     /// <summary>Treefolk creature subtype — Generous Ent (The Lord of the
     /// Rings: Tales of Middle-earth), Treefolk Harbinger, Doran, the
     /// Siege Tower. Historically paired with Forestcycling and
