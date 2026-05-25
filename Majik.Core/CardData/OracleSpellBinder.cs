@@ -1,5 +1,5 @@
 using System.Text.Json;
-using Majik.Core.CardData.Database;
+using Majik.Core.CardData;
 using Majik.Core.CardData.SpellTemplates;
 using Majik.Core.Cards;
 using Majik.Core.Game;

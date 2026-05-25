@@ -1,6 +1,5 @@
 using FluentAssertions;
 using Majik.Core.CardData;
-using Majik.Core.CardData.Database;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Players;
@@ -115,9 +114,9 @@ public class SagaBinderNamedCardsTests
     [Fact]
     public void Fable_FrontFaceNameAlsoBinds()
     {
-        // Lookups via DbCardRepository alias the front-face name to the
-        // composite row, but SagaBinder is also called against the bare
-        // front-face name in some test paths — keep both cases wired.
+        // Lookups via EmbeddedCardRepository alias the front-face name
+        // to the composite row, but SagaBinder is also called against
+        // the bare front-face name in some test paths — keep both wired.
         var (owner, saga) = MakeSaga("Fable of the Mirror-Breaker");
         SagaBinder.Bind(saga, MakeEntity(saga.Name)).Should().BeTrue();
 

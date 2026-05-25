@@ -6,9 +6,12 @@ namespace Majik.Core.Cards;
 /// without parsing oracle text. Flags compose for spells whose effect
 /// crosses categories (e.g. Searing Blaze = Burn | CombatTrick).
 ///
-/// Source of truth: <c>ISpellTemplate.Intent</c>. Persisted on
-/// <c>CompiledSpellTemplateEntity.Intent</c>. Bubbled through
-/// <c>SpellDefinition.ModeIntents</c> and <c>TargetRequest.Intent</c>.
+/// Source of truth: <c>ISpellTemplate.Intent</c>. The offline
+/// compiled-template cache that previously persisted this per-card was
+/// retired along with the SQLite backing store; intents now resolve via
+/// the live <c>SpellTemplateRegistry</c> walk at cast time. Bubbled
+/// through <c>SpellDefinition.ModeIntents</c> and
+/// <c>TargetRequest.Intent</c>.
 ///
 /// See <c>docs/superpowers/specs/2026-05-22-bot-intent-classifier-design.md</c>
 /// for the per-directory template→intent mapping table.

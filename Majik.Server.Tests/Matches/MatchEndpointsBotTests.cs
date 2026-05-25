@@ -5,7 +5,6 @@ using FluentAssertions;
 using Majik.Bot.Decks;
 using Majik.Core.Api.Dtos;
 using Majik.Core.CardData;
-using Majik.Core.CardData.Database;
 using Majik.Server.Decks;
 using Majik.Server.Matches;
 using Majik.Server.Profiles;

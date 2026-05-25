@@ -1,7 +1,6 @@
 using FluentAssertions;
 using Majik.Bot.Decks;
 using Majik.Core.CardData;
-using Majik.Core.CardData.Database;
 using Majik.Core.CardData.SpellTemplates;
 using Majik.Core.Players;
 using Xunit;
@@ -13,9 +12,12 @@ namespace Majik.Bot.Tests.Decks;
 /// Diagnostic test that prints, per bot deck, which cards bind via the
 /// OracleSpellBinder registry today vs. need bespoke implementation.
 /// Run with `dotnet test --filter DeckBindingAuditTests -l "console;verbosity=detailed"`
-/// to see the report. The assertion is just that every deck card resolves
-/// to a DB row (deck-spelling sanity check) — runs against the user's local
-/// cards.db so it's skipped if that file is absent.
+/// to see the report. The assertion is that every deck card resolves to
+/// a row in the embedded card pool (deck-spelling sanity check).
+///
+/// Pre-cards.db-deletion this hit the user's local SQLite DB; now it
+/// runs against the bundled embedded seed and so always executes — no
+/// filesystem skip path needed.
 /// </summary>
 public class DeckBindingAuditTests
 {
@@ -26,33 +28,7 @@ public class DeckBindingAuditTests
     [Fact]
     public void Audit_PrintsBindingsPerDeck()
     {
-        var dbPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "Majik", "cards.db");
-        if (!File.Exists(dbPath))
-        {
-            // Linux fallback — match CardDbContext default location.
-            var xdg = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                ".config", "Majik", "cards.db");
-            if (!File.Exists(xdg))
-            {
-                _out.WriteLine($"cards.db not found at {dbPath} or {xdg} — skipping audit");
-                return;
-            }
-        }
-
-        // File-existence alone isn't enough: other tests / the test host can
-        // leave an empty SQLite file at this path with no Cards table. Skip
-        // when the schema isn't populated.
-        if (!HasCardsTable(dbPath))
-        {
-            _out.WriteLine($"cards.db at {dbPath} has no Cards table — skipping audit");
-            return;
-        }
-
-        using var db = new CardDbContext();
-        var repo = new DbCardRepository(db);
+        var repo = new EmbeddedCardRepository();
         var synth = new Player("Synth", 20);
 
         foreach (var archetype in BotDeckCatalog.Archetypes.OrderBy(a => a))
@@ -91,24 +67,7 @@ public class DeckBindingAuditTests
             .Where(n => repo.GetByName(n) is null)
             .Distinct()
             .ToList();
-        missing.Should().BeEmpty("every bot-deck card must resolve to a DB row");
-    }
-
-    private static bool HasCardsTable(string dbPath)
-    {
-        try
-        {
-            using var conn = new Microsoft.Data.Sqlite.SqliteConnection(
-                $"Data Source={dbPath};Mode=ReadOnly");
-            conn.Open();
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText =
-                "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='Cards'";
-            return Convert.ToInt32(cmd.ExecuteScalar()) == 1;
-        }
-        catch
-        {
-            return false;
-        }
+        missing.Should().BeEmpty(
+            "every bot-deck card must resolve to a row in the embedded pool");
     }
 }

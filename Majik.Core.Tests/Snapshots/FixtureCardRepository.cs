@@ -1,6 +1,5 @@
 using System.Text.Json;
 using Majik.Core.CardData;
-using Majik.Core.CardData.Database;
 using Majik.Core.Cards;
 
 namespace Majik.Core.Tests.Snapshots;

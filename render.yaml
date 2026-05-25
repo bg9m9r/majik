@@ -1,4 +1,4 @@
-# Render Blueprint — Majik backend (API + Cards + MongoDB)
+# Render Blueprint — Majik backend (API + MongoDB)
 # Deploy: connect this repo (github.com/bg9m9r/majik) as a Blueprint on Render.
 #
 # Secrets to set after first sync (Render dashboard or REST API):
@@ -7,18 +7,16 @@
 #     Auth__Audience            <DESCOPE_PROJECT_ID>
 #     Mongo__ConnectionString   mongodb://<user>:<pass>@majik-mongo:27017/?authSource=admin
 #     Cors__AllowedOrigins__0   https://majik-portal.onrender.com  (or custom domain)
-#     Cards__BaseUrl            http://majik-cards:10000           (intra-Render DNS)
-#     Cards__InternalToken      must match majik-cards' Cards__InternalToken
-#   majik-cards:
-#     Cards__InternalToken      shared secret with majik-api (any high-entropy string)
 #   majik-mongo:
 #     MONGO_INITDB_ROOT_USERNAME  pick one (e.g. majik)
 #     MONGO_INITDB_ROOT_PASSWORD  auto-generated below
 #
-# Cards-extraction rollout status: majik-cards owns the SQLite disk, majik-api
-# is diskless and talks to it over HTTP. MajikEngineRegistration requires
-# Cards:BaseUrl at startup — no in-process SQLite fallback. Local dev points
-# at a locally-running majik-cards (see appsettings.Development.json).
+# Card data: bundled in-process via EmbeddedCardRepository (gzipped
+# modern-cards.json.gz baked into the Majik.Core assembly). The previous
+# majik-cards private service + its SQLite disk have been removed.
+# NOTE: removing a service from this blueprint does NOT delete it on
+# Render — go to the dashboard and deactivate `majik-cards` + release
+# the `cards-server-data` disk separately.
 
 services:
   - type: web
@@ -37,9 +35,9 @@ services:
     # autoDeploy intentionally omitted — manage deploys manually in the Render
     # dashboard. Constant auto-deploys made prod validation impractical; flip
     # back to `autoDeploy: true` when iteration cadence calms down.
-    # No `disk:` — majik-api is fully diskless after the cards extraction.
-    # Card lookups happen over HTTP via Cards__BaseUrl. Removing the disk is
-    # what unblocks horizontal scaling (Render disks are single-instance).
+    # No `disk:` — card lookups are now in-process via the embedded
+    # modern-cards.json.gz resource, no filesystem dependency, no internal
+    # HTTP hop. This is what unblocks horizontal scaling.
     envVars:
       - key: ASPNETCORE_ENVIRONMENT
         value: Production
@@ -54,37 +52,6 @@ services:
       - key: Mongo__ConnectionString
         sync: false
       - key: Cors__AllowedOrigins__0
-        sync: false
-      - key: Cards__BaseUrl
-        sync: false
-      - key: Cards__InternalToken
-        sync: false
-
-  - type: pserv
-    name: majik-cards
-    runtime: docker
-    plan: starter
-    region: oregon
-    rootDir: .
-    dockerfilePath: ./Majik.CardsServer/Dockerfile
-    dockerContext: .
-    # autoDeploy intentionally omitted — see comment on majik-api above.
-    disk:
-      # Owns the SQLite cards.db file. Single-instance by Render policy; this
-      # is fine because reads are cacheable on the majik-api side via the
-      # in-process CachingCardRepository decorator.
-      name: cards-server-data
-      mountPath: /root/.config/Majik
-      sizeGB: 2
-    envVars:
-      - key: ASPNETCORE_ENVIRONMENT
-        value: Production
-      - key: ASPNETCORE_URLS
-        value: http://0.0.0.0:10000
-      - key: CARDS_SEED_TAG
-        # Bump to a new release tag to trigger a fresh download on next deploy.
-        value: cards-seed-2026-05-23l
-      - key: Cards__InternalToken
         sync: false
 
   - type: pserv

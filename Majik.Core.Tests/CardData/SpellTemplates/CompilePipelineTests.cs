@@ -1,6 +1,6 @@
 using System.Text.Json;
 using FluentAssertions;
-using Majik.Core.CardData.Database;
+using Majik.Core.CardData;
 using Majik.Core.CardData.SpellTemplates;
 using Majik.Core.CardData.SpellTemplates.Templates.Counter;
 using Majik.Core.Players;

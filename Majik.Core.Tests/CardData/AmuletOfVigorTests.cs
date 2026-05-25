@@ -75,7 +75,7 @@ public class AmuletOfVigorTests
         var boseiju = NamedCardFactory.Create("Boseiju, Who Endures", _alice);
         _alice.Zones.Hand.AddCard(boseiju);
         boseiju.SetZone(ZoneType.Hand);
-        var entity = new Majik.Core.CardData.Database.CardEntity
+        var entity = new Majik.Core.CardData.CardEntity
         {
             Name = "Boseiju, Who Endures",
             OracleText = "Boseiju, Who Endures enters tapped unless you control two or fewer other lands.",

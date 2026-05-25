@@ -1,5 +1,4 @@
 using Majik.Core.CardData;
-using Majik.Core.CardData.Database;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 

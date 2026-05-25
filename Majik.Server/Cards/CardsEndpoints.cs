@@ -1,5 +1,4 @@
 using Majik.Core.CardData;
-using Majik.Core.CardData.Database;
 using Majik.Server.Composition;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -117,8 +116,8 @@ public static class CardsEndpoints
             catch (Exception ex)
             {
                 logger.LogError(ex,
-                    "ToDto failed for card '{Name}' (id={Id}). Skipping.",
-                    c.Name, c.Id);
+                    "ToDto failed for card '{Name}'. Skipping.",
+                    c.Name);
             }
         }
 
