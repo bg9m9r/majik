@@ -117,30 +117,7 @@ public sealed class SacrificeAnArtifactAdditionalCost : IAdditionalCost
     }
 }
 
-/// <summary>
-/// "As an additional cost to cast this spell, pay N life." Life payment
-/// is deducted from the caster on <see cref="Pay"/>. Used by Hatred,
-/// Toxic Deluge, Bond of Agony, etc. — those cards pay X life where X
-/// equals the spell's X cost; the resolver passes the X value to the
-/// constructor.
-/// </summary>
-public sealed class PayLifeAdditionalCost : IAdditionalCost
-{
-    private readonly int _amount;
-
-    public PayLifeAdditionalCost(int amount)
-    {
-        _amount = amount;
-    }
-
-    public string Description => $"pay {_amount} life";
-
-    public bool CanPay(Player caster) => caster != null && caster.LifeTotal >= _amount;
-
-    public bool Pay(Player caster)
-    {
-        if (!CanPay(caster)) return false;
-        caster.LoseLife(_amount);
-        return true;
-    }
-}
+// PayLifeAdditionalCost moved to its own file (Costs/PayLifeAdditionalCost.cs)
+// with both fixed-amount and variable-X flavours wired through
+// Card.PendingCastX for Toxic Deluge / Hatred / Bond of Agony-style
+// "pay X life" riders. See that file for full xmldoc.

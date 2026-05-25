@@ -3,8 +3,15 @@ using Majik.Core.CardData;
 using Majik.Core.CardData.Factories;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Costs;
 using Majik.Core.Effects;
+using Majik.Core.Events;
+using Majik.Core.Game;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
+using Majik.Core.Services;
+using Majik.Core.StateMachine;
+using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
 using Xunit;
 
@@ -171,6 +178,78 @@ public class ToxicDelugeTests
 
         act.Should().Throw<ArgumentOutOfRangeException>(
             "X must be non-negative — CR 107.1b");
+    }
+
+    // -----------------------------------------------------------------------
+    // End-to-end via SpellCastFlow — PayLifeAdditionalCost retrofit
+    // (X paid at cast time per CR 601.2f, not folded into resolve)
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task SpellCastFlow_ToxicDeluge_X5_DeductsFiveLifeAtCast_SweepsMinus5OnResolve()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var flow = new SpellCastFlow(stack, new ZoneService(bus), bus);
+
+        var bear = NewCreatureOnBattlefield(_alice, "Grizzly Bears", "{1}{G}", 2, 2);
+        var sengir = NewCreatureOnBattlefield(_bob, "Sengir Vampire", "{3}{B}{B}", 4, 4);
+        var djinn = NewCreatureOnBattlefield(_bob, "Mahamoti Djinn", "{4}{U}{U}", 5, 6);
+
+        var deluge = ToxicDelugeFactory.Create(_alice);
+        deluge.SetZone(ZoneType.Hand);
+        _alice.Zones.Hand.AddCard(deluge);
+
+        var agent = new ScriptedAgent();
+        agent.QueueX(5);                         // agent picks X = 5
+        agent.QueueMana(ManaPayment.Empty);      // mana skipped — test focuses on life
+
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, stack);
+
+        var def = ToxicDelugeFactory.BuildSpellDefinition(deluge);
+        var spell = await flow.CastAsync(_alice, deluge, def, agent, ctx);
+
+        // Cast-time: X = 5 deducted from Alice BEFORE the spell hit the stack.
+        _alice.LifeTotal.Should().Be(15, "20 - 5 = 15, paid at cast time (CR 601.2f)");
+        stack.Count.Should().Be(1);
+
+        // Resolve: -5/-5 sweep, no second life deduction (back-compat path
+        // gated on caster: null inside BuildSpellDefinition's EffectFactory).
+        spell.Resolve();
+        _alice.LifeTotal.Should().Be(15, "no double-charge on resolve");
+        bear.IsDead().Should().BeTrue("2 - 5 = -3, toughness 0 SBA");
+        sengir.IsDead().Should().BeTrue("4 - 5 = -1, toughness 0 SBA");
+        djinn.IsDead().Should().BeFalse("6 - 5 = 1, alive");
+        djinn.Toughness.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task SpellCastFlow_ToxicDeluge_RejectsCast_WhenCasterShortOfLife()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var flow = new SpellCastFlow(stack, new ZoneService(bus), bus);
+
+        _alice.LoseLife(17); // Alice = 3 life
+
+        var deluge = ToxicDelugeFactory.Create(_alice);
+        deluge.SetZone(ZoneType.Hand);
+        _alice.Zones.Hand.AddCard(deluge);
+
+        var agent = new ScriptedAgent();
+        agent.QueueX(7); // X = 7, but caster only has 3 life
+        agent.QueueMana(ManaPayment.Empty);
+
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, stack);
+
+        var def = ToxicDelugeFactory.BuildSpellDefinition(deluge);
+        var act = async () => await flow.CastAsync(_alice, deluge, def, agent, ctx);
+
+        await act.Should().ThrowAsync<InvalidOperationException>(
+            "CR 119.4 — Alice has 3 life, can't pay X = 7");
+        _alice.LifeTotal.Should().Be(3, "no partial payment (CR 601.2g)");
+        deluge.Zone.Should().Be(ZoneType.Hand, "cast rewound — card stays in hand");
+        stack.Count.Should().Be(0);
     }
 
     // -----------------------------------------------------------------------

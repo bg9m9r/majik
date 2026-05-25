@@ -233,6 +233,35 @@ public sealed class SpellCastFlow
             mergedAdditional.AddRange(additionalCosts);
         }
 
+        // CR 601.2b — choose X up-front, BEFORE the additional-cost loop.
+        // Originally X was prompted after additional costs, but the
+        // PayLifeAdditionalCost(variableX: true) primitive needs to read
+        // the chosen X off Card.PendingCastX at Pay() time (Toxic Deluge:
+        // "as an additional cost to cast this spell, pay X life"). The
+        // prompt + stamp happens here so the additional-cost pre-check
+        // can see the real amount and the cast is rejected up front when
+        // the caster lacks the life total to pay X (CR 119.4 / 601.2g —
+        // no partial payment). Non-PayLife additional costs are unaffected
+        // by the reorder; they don't read PendingCastX.
+        int? xValue = null;
+        if (definition.HasVariableX)
+        {
+            xValue = await agent.ChooseXAsync(ctx, card, ct);
+
+            // CR 202.3b — stamp the chosen X on the card itself so
+            // permanents whose ETB references X (Chalice of the Void's
+            // "enters with X charge counters", Walking Ballista, …) can
+            // read the value without us threading ChosenSpellParams.X
+            // through the spell → permanent boundary. Consumed + cleared
+            // by the ETB effect (same pattern Murktide Regent uses for
+            // PendingDelveExiledCount). Also the read site for
+            // PayLifeAdditionalCost's variable-X flavour.
+            if (card is Card concreteForX && xValue.HasValue)
+            {
+                concreteForX.SetPendingCastX(xValue.Value);
+            }
+        }
+
         // Pre-check legality so we fail BEFORE mutating any zone — CR
         // 601.2g requires that if any cost can't be paid the cast is
         // illegal and the game is rewound. v1 short-circuit: if any cost
@@ -290,23 +319,9 @@ public sealed class SpellCastFlow
             mode = await agent.ChooseModeAsync(ctx, definition.Modes, definition.ModeIntents, ct);
         }
 
-        int? xValue = null;
-        if (definition.HasVariableX)
-        {
-            xValue = await agent.ChooseXAsync(ctx, card, ct);
-
-            // CR 202.3b — stamp the chosen X on the card itself so
-            // permanents whose ETB references X (Chalice of the Void's
-            // "enters with X charge counters", Walking Ballista, …) can
-            // read the value without us threading ChosenSpellParams.X
-            // through the spell → permanent boundary. Consumed + cleared
-            // by the ETB effect (same pattern Murktide Regent uses for
-            // PendingDelveExiledCount).
-            if (card is Card concreteForX && xValue.HasValue)
-            {
-                concreteForX.SetPendingCastX(xValue.Value);
-            }
-        }
+        // (X was prompted + stamped above, before the additional-cost
+        // pass — see CR 601.2b comment up-flow. The xValue local is
+        // already populated at this point.)
 
         var collectedTargets = new List<IReadOnlyList<object>>(definition.TargetRequests.Count);
         foreach (var req in definition.TargetRequests)
