@@ -159,4 +159,222 @@ public class OracleTextNormalizerTests
         OracleTextNormalizer.Normalize("").Should().Be("");
         OracleTextNormalizer.Normalize(null!).Should().BeNull();
     }
+
+    // -- New behaviour: mid-text paren reminders are stripped ---------------
+
+    [Fact]
+    public void Normalize_StripsMidTextParenReminder()
+    {
+        var input = "Trample (This creature can deal excess combat damage to defending player.)";
+
+        OracleTextNormalizer.Normalize(input).Should().Be("Trample");
+    }
+
+    [Fact]
+    public void Normalize_StripsMultipleMidTextParenReminders()
+    {
+        var input =
+            "When ~ enters, draw a card. Cycling {2} (You may pay this and discard this card to draw a card.)";
+
+        OracleTextNormalizer.Normalize(input)
+            .Should().Be("When ~ enters, draw a card. Cycling {2}");
+    }
+
+    // -- New behaviour: en-dash / double-hyphen / horizontal-bar → em-dash --
+
+    [Theory]
+    [InlineData("Strive – This spell costs {1} more.\nDraw a card.", "Draw a card.")]
+    [InlineData("Strive -- This spell costs {1} more.\nDraw a card.", "Draw a card.")]
+    [InlineData("Strive ― This spell costs {1} more.\nDraw a card.", "Draw a card.")]
+    public void Normalize_RewritesDashVariantsToEmDashAndStripsStrive(string input, string expected)
+    {
+        OracleTextNormalizer.Normalize(input).Should().Be(expected);
+    }
+
+    [Fact]
+    public void Normalize_RewritesEnDashInBody()
+    {
+        var input = "Choose one – Destroy target creature.";
+
+        OracleTextNormalizer.Normalize(input)
+            .Should().Be("Choose one — Destroy target creature.");
+    }
+
+    // -- New behaviour: curly quotes → ASCII ---------------------------------
+
+    [Fact]
+    public void Normalize_RewritesCurlyQuotesToAscii()
+    {
+        var input = "Cast “Golem” and ‘activate’ it.";
+
+        OracleTextNormalizer.Normalize(input)
+            .Should().Be("Cast \"Golem\" and 'activate' it.");
+    }
+
+    // -- New behaviour: whitespace collapse ----------------------------------
+
+    [Fact]
+    public void Normalize_CollapsesWhitespaceAndTrims()
+    {
+        var input = "   Destroy   target\ncreature.\n  ";
+
+        OracleTextNormalizer.Normalize(input).Should().Be("Destroy target creature.");
+    }
+
+    // -- New leading-prefix coverage -----------------------------------------
+
+    [Fact]
+    public void Normalize_StripsCasualty()
+    {
+        var input =
+            "Casualty 2 (As you cast this spell, you may sacrifice a creature with power 2 or greater. When you do, copy this spell.)\n" +
+            "Counter target spell.";
+
+        OracleTextNormalizer.Normalize(input).Should().Be("Counter target spell.");
+    }
+
+    [Fact]
+    public void Normalize_StripsDemonstrate()
+    {
+        var input =
+            "Demonstrate (When you cast this spell, you may copy it. If you do, choose an opponent to also copy it.)\n" +
+            "Target player draws two cards.";
+
+        OracleTextNormalizer.Normalize(input).Should().Be("Target player draws two cards.");
+    }
+
+    [Fact]
+    public void Normalize_StripsDisturbCost()
+    {
+        var input =
+            "Disturb {1}{W} (You may cast this card from your graveyard transformed for its disturb cost.)\n" +
+            "Target creature gets +2/+2 until end of turn.";
+
+        OracleTextNormalizer.Normalize(input)
+            .Should().Be("Target creature gets +2/+2 until end of turn.");
+    }
+
+    [Fact]
+    public void Normalize_StripsForetell()
+    {
+        var input =
+            "Foretell {1}{U} (During your turn, you may pay {2} and exile this card from your hand face down. Cast it on a later turn for its foretell cost.)\n" +
+            "Draw two cards.";
+
+        OracleTextNormalizer.Normalize(input).Should().Be("Draw two cards.");
+    }
+
+    [Fact]
+    public void Normalize_StripsReplicate()
+    {
+        var input =
+            "Replicate {1}{R} (When you cast this spell, copy it for each time you paid its replicate cost. You may choose new targets for the copies.)\n" +
+            "~ deals 2 damage to any target.";
+
+        OracleTextNormalizer.Normalize(input)
+            .Should().Be("~ deals 2 damage to any target.");
+    }
+
+    [Fact]
+    public void Normalize_StripsBuyback()
+    {
+        var input =
+            "Buyback {3} (You may pay an additional {3} as you cast this spell. If you do, put it into its owner's hand as it resolves.)\n" +
+            "Counter target spell.";
+
+        OracleTextNormalizer.Normalize(input).Should().Be("Counter target spell.");
+    }
+
+    [Fact]
+    public void Normalize_StripsStorm()
+    {
+        var input =
+            "Storm (When you cast this spell, copy it for each spell cast before it this turn. You may choose new targets for the copies.)\n" +
+            "~ deals 3 damage to any target.";
+
+        OracleTextNormalizer.Normalize(input)
+            .Should().Be("~ deals 3 damage to any target.");
+    }
+
+    [Fact]
+    public void Normalize_StripsOverload()
+    {
+        var input =
+            "Overload {4}{R}{R} (You may cast this spell for its overload cost. If you do, change its text by replacing all instances of \"target\" with \"each.\")\n" +
+            "~ deals 3 damage to target creature.";
+
+        OracleTextNormalizer.Normalize(input)
+            .Should().Be("~ deals 3 damage to target creature.");
+    }
+
+    [Fact]
+    public void Normalize_StripsSpree()
+    {
+        var input =
+            "Spree (Choose one or more additional costs.)\n" +
+            "+ {1} — Target creature gets +1/+1.";
+
+        OracleTextNormalizer.Normalize(input)
+            .Should().Be("+ {1} — Target creature gets +1/+1.");
+    }
+
+    [Fact]
+    public void Normalize_StripsSurge()
+    {
+        var input =
+            "Surge {R} (You may cast this spell for its surge cost if you or a teammate has cast another spell this turn.)\n" +
+            "~ deals 4 damage to target creature.";
+
+        OracleTextNormalizer.Normalize(input)
+            .Should().Be("~ deals 4 damage to target creature.");
+    }
+
+    // -- New behaviour: NormalizeForCard substitutes card name with "~" ------
+
+    [Fact]
+    public void NormalizeForCard_ReplacesPrintedNameWithTilde()
+    {
+        var input = "Whenever Goblin Guide attacks, defending player reveals the top card of their library.";
+
+        OracleTextNormalizer.NormalizeForCard(input, "Goblin Guide")
+            .Should().Be("Whenever ~ attacks, defending player reveals the top card of their library.");
+    }
+
+    [Fact]
+    public void NormalizeForCard_ReplacesShortNameBeforeComma()
+    {
+        // Adventure-style "Front, Back" name — the printed body uses the
+        // short (pre-comma) form. Both should rewrite to ~.
+        var input = "Bonecrusher Giant deals 2 damage to any target. Bonecrusher Giant gets +1/+0.";
+
+        OracleTextNormalizer.NormalizeForCard(input, "Bonecrusher Giant, Stomp")
+            .Should().Be("~ deals 2 damage to any target. ~ gets +1/+0.");
+    }
+
+    [Fact]
+    public void NormalizeForCard_IsCaseInsensitive()
+    {
+        var input = "lightning bolt deals 3 damage. LIGHTNING BOLT is fast.";
+
+        OracleTextNormalizer.NormalizeForCard(input, "Lightning Bolt")
+            .Should().Be("~ deals 3 damage. ~ is fast.");
+    }
+
+    [Fact]
+    public void NormalizeForCard_HandlesNullName()
+    {
+        var input = "Destroy target creature.";
+
+        OracleTextNormalizer.NormalizeForCard(input, null)
+            .Should().Be("Destroy target creature.");
+    }
+
+    [Fact]
+    public void NormalizeForCard_LeavesUnrelatedTextAlone()
+    {
+        var input = "Counter target spell.";
+
+        OracleTextNormalizer.NormalizeForCard(input, "Cancel")
+            .Should().Be("Counter target spell.");
+    }
 }
