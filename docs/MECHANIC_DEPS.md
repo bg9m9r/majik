@@ -5,7 +5,7 @@ Scanner output: every `*Factory.cs` xmldoc / inline comment mentioning
 engine primitive. Each row answers: "if we ship primitive _X_, which factory
 xmldocs flagged that they're blocked on it?"
 
-- **Generated:** 2026-05-25 03:46 UTC
+- **Generated:** 2026-05-25 03:51 UTC
 - **Scanned dir:** `Majik.Core/CardData/Factories`
 - **Total mentions:** 208
 - **Clusters:** 7
@@ -311,16 +311,12 @@ Mentions:
   > "target creature you control" — v1 auto-picks the first creature on the controller's battlefield (CR 701.3a prompt deferred — same simplification as Stoneforge Mystic's attach step).
 - `ChordOfCallingFactory` (`ChordOfCallingFactory.cs:14`)
   > ## Deferred (v1 gaps)  - <b>Convoke cost reduction</b>.
+- `SlogurkTheOverslimeFactory` (`SlogurkTheOverslimeFactory.cs:191`)
+  > Mana cost is empty; counter-removal cost is documented in the description-only path (cost-primitive deferred).
 - `DryadArborFactory` (`DryadArborFactory.cs:7`)
   > Green Sun's Zenith interaction (can be fetched as a Forest creature — deferred to the targeting / land-subtype search slice).
 - `ArcboundRavagerFactory` (`ArcboundRavagerFactory.cs:14`)
-  > ## Deferred (v1 gaps)  - <b>Target prompt for Modular bestowal</b>: oracle says "target artifact creature" — v1 picks the first artifact creature deterministically (excluding Arcbound Ravager).
-- `ArcboundRavagerFactory` (`ArcboundRavagerFactory.cs:14`)
-  > TargetRequests"/>; same gap as Stoneforge Mystic's "attach to a creature you control".
-- `ArcboundRavagerFactory` (`ArcboundRavagerFactory.cs:14`)
-  > Arcbound Ravager is the only Modular card in the immediate roadmap; promotion to a shared primitive is deferred until a second Modular card lands (Arcbound Crusher / Worker / etc.
-- `ArcboundRavagerFactory` (`ArcboundRavagerFactory.cs:234`)
-  > CR 702.43b's "target artifact creature" is not controller-restricted; opponent-side scans are deferred until the engine exposes a cross-battlefield enumerator (no <c>Player.
+  > ## Deferred (v1 gaps)  - Per-target prompt for the Modular bestowal (deterministic first- artifact-creature pick in v1 — same gap as Stoneforge Mystic's tutor).
 - `SpriteDragonFactory` (`SpriteDragonFactory.cs:13`)
   > ## Deferred (v1 gaps)  - <b>Continuous P/T recomputation</b> — Sprite Dragon's effective P/T is derived from base 1/1 plus +1/+1 counters via the standard <see cref="CounterCollection"/> path (CR 613.4 layer 7d), inherited from every other +1/+1-counter user (Psychic Frog activated ability, Ledger Shredder surveil ride…
 - `PsychicFrogFactory` (`PsychicFrogFactory.cs:15`)
@@ -427,6 +423,10 @@ Mentions:
   > Targeting + fight step deferred (see xmldoc above).
 - `ShowAndTellFactory` (`ShowAndTellFactory.cs:11`)
   > Real "any of N choices + opt-out" prompt deferred (same queue as Stoneforge Mystic / Sun Titan).
+- `GoryosVengeanceFactory` (`GoryosVengeanceFactory.cs:14`)
+  > Printed Arcane subtype is omitted from the runtime card (CR 205.3 — Arcane is a spell subtype; the engine's <see cref="CardSubtype"/> enum doesn't yet carry an Arcane member, same gap as Through the Breach.
+- `GoryosVengeanceFactory` (`GoryosVengeanceFactory.cs:14`)
+  > <b>Splice onto Arcane (CR 702.46)</b>: the splice alt-cost primitive isn't in the engine yet — same gap as Through the Breach.
 - `YawgmothFactory` (`YawgmothFactory.cs:10`)
   > Effect 4: Controller draws a card  ## Deferred (v1 gaps)
 - `YawgmothFactory` (`YawgmothFactory.cs:10`)
