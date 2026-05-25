@@ -584,6 +584,44 @@ public class Card : ICard
     }
 
     /// <summary>
+    /// CR 702.115 — "Surge" runtime sentinel. Stamped <c>true</c> by
+    /// <see cref="Majik.Core.Costs.SurgeAlternativeCost"/> at cast time
+    /// (during <see cref="Majik.Core.Game.SpellCastFlow"/>'s alt-cost
+    /// branch) when the caster pays the surge cost rather than the printed
+    /// mana cost. Read by the resolving spell's effect body to branch on
+    /// the "if its surge cost was paid" rider (Reckless Bushwhacker's
+    /// haste + +1/+0 swarm rider is the canonical consumer).
+    ///
+    /// <para>Mirrors the established sentinel pattern (<see cref="WasKicked"/> /
+    /// <see cref="WasCastForEscape"/>): cleared via
+    /// <see cref="Majik.Core.Game.SpellCastFlow"/> after the printed body
+    /// resolves so a later re-cast / blink / token copy / on-battlefield
+    /// permanent doesn't inherit the prior surge posture (CR 400.7 — new
+    /// object on each zone change). Defaults to <c>false</c> so hand-built
+    /// test cards without an explicit stamp are treated as non-surge casts.</para>
+    /// </summary>
+    public bool WasCastForSurge { get; private set; }
+
+    /// <summary>Stamp the surge sentinel. Called by
+    /// <see cref="Majik.Core.Costs.SurgeAlternativeCost.OnResolved"/>
+    /// (and mirrored at announce time by
+    /// <see cref="Majik.Core.Game.SpellCastFlow"/> when the alt-cost is a
+    /// Surge cost, so resolve-time reads see the flag).</summary>
+    public void SetWasCastForSurge(bool value)
+    {
+        WasCastForSurge = value;
+    }
+
+    /// <summary>Clear the surge sentinel. Called by
+    /// <see cref="Majik.Core.Game.SpellCastFlow"/> via a cleanup effect
+    /// appended after the spell's printed body so the flag doesn't leak
+    /// past resolution (CR 400.7). Idempotent.</summary>
+    public void ClearWasCastForSurge()
+    {
+        WasCastForSurge = false;
+    }
+
+    /// <summary>
     /// CR 601.2f — when this card is currently being cast as a spell, the
     /// set of targets the agent picked during target selection (one inner
     /// list per <see cref="Majik.Core.Game.TargetRequest"/>, mirroring
