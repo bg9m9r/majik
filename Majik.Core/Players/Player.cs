@@ -90,6 +90,20 @@ public class Player
         LifeLostThisTurn = 0;
     }
 
+    /// <summary>
+    /// CR 702.11 — player-hexproof query. True iff at least one active
+    /// player-hexproof grant (registered through
+    /// <see cref="Majik.Core.Rules.PlayerStaticAbilities"/>) targets this
+    /// player. Lights up while Leyline of Sanctity (or any future player-
+    /// hexproof source) is on the battlefield. Consulted by
+    /// <see cref="Majik.Core.Rules.ActionValidator"/> at cast / activation
+    /// time and by <see cref="Majik.Core.Targeting.TargetLegality"/> at
+    /// resolution time (CR 608.2b) to reject opponent-controlled spells
+    /// and abilities that name this player as a target.
+    /// </summary>
+    public bool HasHexproof =>
+        Majik.Core.Rules.PlayerStaticAbilities.HasHexproof(this);
+
     /// <summary>CR 704.5c — poison counters; 10+ → lose.</summary>
     public int PoisonCounters { get; internal set; }
 

@@ -30,6 +30,20 @@ public static class TargetLegality
     {
         if (!spec.Matches(candidate)) return false;
 
+        // CR 702.11 / CR 113.5 — player-hexproof. A player with hexproof
+        // can't be the target of spells or abilities controlled by
+        // opponents (Leyline of Sanctity / True Believer / Aegis of the
+        // Gods). Same-controller targeting (self-target Healing Salve,
+        // self-mill, etc.) is unaffected.
+        if (candidate is Player playerCandidate)
+        {
+            if (Majik.Core.Rules.PlayerStaticAbilities.HasHexproof(playerCandidate)
+                && !ReferenceEquals(playerCandidate, caster))
+            {
+                return false;
+            }
+        }
+
         if (candidate is Creature creature)
         {
             // Must still be on the battlefield (CR 115.5).
