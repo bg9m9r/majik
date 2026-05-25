@@ -1,3 +1,4 @@
+using Majik.Core.Cards;
 using Majik.Core.Players;
 using Majik.Core.ValueObjects;
 
@@ -42,6 +43,15 @@ public sealed class TurnState
     // control this turn?" at spell resolution rather than via a printed
     // landfall trigger.
     private readonly Dictionary<Guid, int> _landsEnteredByController = new();
+
+    // Per-permanent set of references that entered the battlefield this turn.
+    // Read by "creatures that entered the battlefield this turn" effects
+    // (Force of Despair — CR 109.5 / CR 700.6) at spell resolution. Reference
+    // equality (HashSet default) is the right comparer because the rule
+    // text targets the SPECIFIC permanent that ETB'd this turn — a creature
+    // that left + re-entered counts only for its newest ETB (cleared via
+    // re-ETB; see RecordPermanentEnteredBattlefield).
+    private readonly HashSet<Permanent> _permanentsEnteredThisTurn = new();
 
     /// <summary>
     /// How many creatures controlled by <paramref name="player"/> died this turn.
@@ -157,6 +167,38 @@ public sealed class TurnState
         LandsEnteredByController(player) > 0;
 
     /// <summary>
+    /// Called when a permanent enters the battlefield. Records the specific
+    /// <see cref="Permanent"/> reference in the per-turn ETB set so
+    /// resolution-time scans ("creatures that entered the battlefield this
+    /// turn" — Force of Despair) can filter precisely. Idempotent: adding
+    /// the same reference twice is a no-op (HashSet semantics).
+    /// </summary>
+    public void RecordPermanentEnteredBattlefield(Permanent permanent)
+    {
+        if (permanent == null) return;
+        _permanentsEnteredThisTurn.Add(permanent);
+    }
+
+    /// <summary>
+    /// Snapshot of all permanents that entered the battlefield this turn,
+    /// regardless of controller / current zone. Callers filter further
+    /// (e.g. Force of Despair — still on battlefield + Creature card type).
+    /// Returned as a read-only view; mutating the underlying set requires
+    /// going through <see cref="RecordPermanentEnteredBattlefield"/> /
+    /// <see cref="Reset"/>.
+    /// </summary>
+    public IReadOnlyCollection<Permanent> PermanentsEnteredThisTurn =>
+        _permanentsEnteredThisTurn;
+
+    /// <summary>
+    /// Convenience predicate: did <paramref name="permanent"/> enter the
+    /// battlefield this turn? Reference-equality check against the per-turn
+    /// ETB set.
+    /// </summary>
+    public bool DidEnterThisTurn(Permanent permanent) =>
+        permanent != null && _permanentsEnteredThisTurn.Contains(permanent);
+
+    /// <summary>
     /// Number of spells <paramref name="player"/> has cast this turn (CR 700.6
     /// per-turn tally). Read by Damping Sphere's "+{1} per other spell cast
     /// this turn" rider — cost calculation runs before the rider increments
@@ -201,5 +243,6 @@ public sealed class TurnState
         _spellColorsCastByPlayer.Clear();
         _spellsCastByPlayer.Clear();
         _landsEnteredByController.Clear();
+        _permanentsEnteredThisTurn.Clear();
     }
 }

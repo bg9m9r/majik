@@ -113,6 +113,14 @@ public sealed class TurnDriver
             TurnState.RecordLandEnteredBattlefield(e.Card.Controller);
         }
 
+        // Per-permanent ETB-this-turn ledger (CR 700.6 — read by
+        // Force of Despair's "creatures that entered the battlefield this
+        // turn" filter at resolution).
+        if (e.ToZone == ZoneType.Battlefield && e.Card is Majik.Core.Cards.Permanent permanent)
+        {
+            TurnState.RecordPermanentEnteredBattlefield(permanent);
+        }
+
         // Only track permanents leaving the battlefield (Rule 702.104).
         if (e.FromZone != ZoneType.Battlefield) return;
 
