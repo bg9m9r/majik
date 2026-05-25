@@ -162,13 +162,22 @@ public class GenerousEntFactoryTests
     }
 
     [Fact]
-    public void GenerousEnt_Cycling_EndToEnd_PublishesCardCycledEvent()
+    public void GenerousEnt_Forestcycling_EndToEnd_TutorsForestAndPublishesCardCycledEvent()
     {
-        // Seed library with one card so the draw resolves.
-        var topCard = new Instant("Lightning Bolt", "{R}");
-        topCard.SetOwner(_alice);
-        _alice.Zones.Library.AddCard(topCard);
-        topCard.SetZone(ZoneType.Library);
+        // Seed library with a Forest + an Instant. Forestcycling should
+        // tutor the Forest (CR 702.32d), not the Instant.
+        var forest = new Land(
+            "Forest",
+            supertypes: new[] { CardSupertype.Basic },
+            subtypes: new[] { CardSubtype.Forest });
+        forest.SetOwner(_alice);
+        _alice.Zones.Library.AddCard(forest);
+        forest.SetZone(ZoneType.Library);
+
+        var noise = new Instant("Lightning Bolt", "{R}");
+        noise.SetOwner(_alice);
+        _alice.Zones.Library.AddCard(noise);
+        noise.SetZone(ZoneType.Library);
 
         var bus = new EventBus();
         CardCycledEvent? captured = null;
@@ -190,7 +199,12 @@ public class GenerousEntFactoryTests
 
         foreach (var effect in cycling.Effects) effect.Execute();
 
-        _alice.Zones.Hand.GetCards().Should().Contain(topCard, "cycling drew a card");
+        _alice.Zones.Hand.GetCards().Should().Contain(forest,
+            "Forestcycling tutors a Forest card (CR 702.32d)");
+        _alice.Zones.Hand.GetCards().Should().NotContain(noise,
+            "Forestcycling filters to Forest subtype only");
+        forest.Zone.Should().Be(ZoneType.Hand);
+
         captured.Should().NotBeNull("CR 702.32d publication");
         captured!.Card.Should().BeSameAs(ent);
         captured.Player.Should().BeSameAs(_alice);
