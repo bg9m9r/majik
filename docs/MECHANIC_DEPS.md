@@ -5,11 +5,11 @@ Scanner output: every `*Factory.cs` xmldoc / inline comment mentioning
 engine primitive. Each row answers: "if we ship primitive _X_, which factory
 xmldocs flagged that they're blocked on it?"
 
-- **Generated:** 2026-05-25 03:52 UTC
+- **Generated:** 2026-05-25 04:43 UTC
 - **Scanned dir:** `Majik.Core/CardData/Factories`
-- **Total mentions:** 209
+- **Total mentions:** 229
 - **Clusters:** 7
-- **Unclustered (need new registry pattern):** 163
+- **Unclustered (need new registry pattern):** 180
 
 Regenerate with `dotnet run --project Majik.Console -- mechanic-deps --md-out docs/MECHANIC_DEPS.md --json-out docs/mechanic-deps.json`.
 
@@ -17,7 +17,7 @@ Regenerate with `dotnet run --project Majik.Console -- mechanic-deps --md-out do
 
 | Rank | Primitive | CR | Factories | Mentions |
 |---:|---|---|---:|---:|
-| 1 | Agent-prompt targeting MVP | — | 30 | 37 |
+| 1 | Agent-prompt targeting MVP | — | 33 | 40 |
 | 2 | Layer-6 ability-grant subsystem (CR 613.1f) | CR 613.1f | 2 | 4 |
 | 3 | Cycling-style activated-from-hand (CR 702.32 / Channel CR 702.74) | CR 702.32 | 1 | 1 |
 | 4 | Equip activated-ability primitive (CR 702.6) | CR 702.6 | 1 | 1 |
@@ -29,7 +29,7 @@ Regenerate with `dotnet run --project Majik.Console -- mechanic-deps --md-out do
 
 ### 1. Agent-prompt targeting MVP
 
-- **Blocks:** 30 factories (37 mentions)
+- **Blocks:** 33 factories (40 mentions)
 - **Implementation hint:** IPlayerAgent needs ChooseTarget / ChooseYesNo surfaces; many spell factories punt on real targeting prompts.
 
 Mentions:
@@ -58,6 +58,8 @@ Mentions:
   > <b>Discard prompt</b>: v1 deterministically discards the first card in hand; agent-driven "choose which card to discard" deferred behind the same gate as Liliana / Faithless Looting / Psychic Frog.
 - `TerritorialKavuFactory` (`TerritorialKavuFactory.cs:159`)
   > v1 first-card-in-hand pick (CR 701.16a — agent-driven choice deferred).
+- `BojukaBogFactory` (`BojukaBogFactory.cs:14`)
+  > Full agent-driven targeting deferred (same posture as Tormod's Crypt / Nihil Spellbomb / Relic of Progenitus).
 - `PriestOfFellRitesFactory` (`PriestOfFellRitesFactory.cs:12`)
   > <b>"You may" prompt</b>: the ETB trigger autopicks the first eligible creature card; declining and target-selection are deferred to the agent-prompt MVP.
 - `AbhorrentOculusFactory` (`AbhorrentOculusFactory.cs:13`)
@@ -70,6 +72,8 @@ Mentions:
   > Agent-driven prompts are deferred behind the same queue as Liliana of the Veil + Faithless Looting + Sword of Feast and Famine.
 - `PsychicFrogFactory` (`PsychicFrogFactory.cs:148`)
   > v1 deterministic first-card-in-hand pick per discard (CR 701.16a — agent-driven choice deferred).
+- `RangerCaptainOfEosFactory` (`RangerCaptainOfEosFactory.cs:13`)
+  > v1 picker is the deterministic first-eligible-card pattern Stoneforge Mystic / Eldritch Evolution use; agent-driven "you may" + reveal-event emission deferred alongside the rest of the tutor family.
 - `FaithlessSalvagingFactory` (`FaithlessSalvagingFactory.cs:11`)
   > Real agent-driven "choose a card to discard" prompt deferred behind the same queue as Faithless Looting / Liliana of the Veil / Connive / Psychic Frog.
 - `FaithlessSalvagingFactory` (`FaithlessSalvagingFactory.cs:109`)
@@ -108,6 +112,8 @@ Mentions:
   > The v1 effect always reanimates the first eligible permanent card when one exists; a first-class yes/no agent prompt is deferred (mirrors Priest of Fell Rites / Primeval Titan).
 - `CoriSteelCutterFactory` (`CoriSteelCutterFactory.cs:15`)
   > A real prompt-driven flow (and the "to it" bookkeeping that pins attachment to *that specific* token rather than any creature) is deferred behind the broader agent-prompt surface — same posture as Eternal Witness / Snapcaster Mage.
+- `FaerieMacabreFactory` (`FaerieMacabreFactory.cs:11`)
+  > Full agent-driven targeting deferred.
 
 ### 2. Layer-6 ability-grant subsystem (CR 613.1f)
 
@@ -219,6 +225,20 @@ Mentions:
   > The upkeep sacrifice clause is deferred — only the type-change is live.
 - `MysticSanctuaryFactory` (`MysticSanctuaryFactory.cs:12`)
   > CanBePutOnStack"/> runs it at stack-push time; a second recheck at resolution is deferred.
+- `HeliodSunCrownedFactory` (`HeliodSunCrownedFactory.cs:14`)
+  > The "isn't a creature" Layer 4 type-strip is DEFERRED — see Deferred section below; Heliod always reports as a Creature in v1.
+- `HeliodSunCrownedFactory` (`HeliodSunCrownedFactory.cs:14`)
+  > ContinuousEffectsService"/> exposes a per-permanent layered-effects substrate today but does NOT yet carry a Layer 4 type-strip primitive — same gap as Mutavault / Inkmoth Nexus's combat math (they animate into creatures via Layer 4 add but the substrate doesn't surface for combat).
+- `HeliodSunCrownedFactory` (`HeliodSunCrownedFactory.cs:14`)
+  > LegalCandidates"/> being populated by a live battlefield gather — same deferred plumbing the rest of the target-restricted family lives with.
+- `HeliodSunCrownedFactory` (`HeliodSunCrownedFactory.cs:217`)
+  > "Another" enforced at resolve via identity check vs source (CR 608.2b posture — same as Solitude / Earthshaker Khenra's deferred choose-time filter).
+- `HeliodSunCrownedFactory` (`HeliodSunCrownedFactory.cs:265`)
+  > White"/>; hybrid / Phyrexian {W} contributions are DEFERRED (CR 700.5a — every mana symbol that includes {W} counts) pending the <see cref="ValueObjects.
+- `HeliodSunCrownedFactory` (`HeliodSunCrownedFactory.cs:265`)
+  > Tokens count when their token-spec mana cost carries {W} pips (Soldier tokens with cost <c>""</c> contribute 0; spirit tokens minted from white-coloured spells contribute 0 unless the spec was stamped with a parsed mana cost — same gap as the rest of the token / colour-identity surface).
+- `HeliodSunCrownedFactory` (`HeliodSunCrownedFactory.cs:265`)
+  > Exposed publicly so bots / tests can read the live count without going through the (deferred) Layer-4 type-strip path.
 - `AshiokDreamRenderFactory` (`AshiokDreamRenderFactory.cs:11`)
   > Enforcement at the actual library-search sites is DEFERRED (same gap as <see cref="LeoninArbiterSearchRestrictionEffect"/>): the engine currently lacks a unified library-search surface that enforcement could hook.
 - `AshiokDreamRenderFactory` (`AshiokDreamRenderFactory.cs:11`)
@@ -293,6 +313,8 @@ Mentions:
   > Through the Breach is still castable for its printed cost; the splice rider is structural-only on the oracle text and will be added when the engine has an Arcane- spell awareness pass (same gap as every other Splice card).
 - `LilianaOfTheVeilFactory` (`LilianaOfTheVeilFactory.cs:151`)
   > v1 deferred — loyalty change applies with an empty body so the cost is still paid.
+- `EtchedOracleFactory` (`EtchedOracleFactory.cs:14`)
+  > <b>Counter-removal additional cost</b>: same gap shape as the sacrifice / discard cost family.
 - `ReflectorMageFactory` (`ReflectorMageFactory.cs:149`)
   > DEFERRED: "That creature's owner can't cast spells with the same name as that creature until your next turn.
 - `WrennsResolveFactory` (`WrennsResolveFactory.cs:11`)
@@ -307,6 +329,8 @@ Mentions:
   > The combat-validator enforcement of Islandwalk ("creature can't be blocked as long as the defending player controls an Island") is deferred — same posture as Intimidate / Menace enforcement.
 - `PerniciousDeedFactory` (`PerniciousDeedFactory.cs:10`)
   > </item> </list>  ## Deferred (v1 gaps)
+- `LeylineOfLightningFactory` (`LeylineOfLightningFactory.cs:9`)
+  > OnSpellCastByController</c>), but a "first-only" gate keyed off <c>TurnState</c> doesn't yet — deferred.
 - `SigardasAidFactory` (`SigardasAidFactory.cs:11`)
   > <b>Target creature prompt</b>: "target creature you control" auto-picks the first controller-side creature (CR 701.3a target prompt is deferred — same v1 simplification as Stoneforge Mystic's attach step).
 - `SigardasAidFactory` (`SigardasAidFactory.cs:145`)
@@ -349,6 +373,8 @@ Mentions:
   > ## Deferred (v1 gaps)  - <b>Real "Enchant creature card in a graveyard" cast-target API</b>: the engine's Aura target plumbing is <see cref="Permanent"/>-typed (CR 303.4a), so the graveyard target is surfaced via a bespoke <see cref="TargetRequest"/> populated with <see cref="Creature"/> <i>cards</i>.
 - `AnimateDeadFactory` (`AnimateDeadFactory.cs:14`)
   > <b>Sorcery-speed cast restriction</b>: not enforced — same gap as every other Aura factory in this repo.
+- `EyeOfUginFactory` (`EyeOfUginFactory.cs:13`)
+  > <b>Reveal event</b>: the tutor moves the picked card from Library → Hand without publishing a reveal event; same gap as every other tutor factory (Mystical Tutor, Stoneforge Mystic, …).
 - `ManaVaultFactory` (`ManaVaultFactory.cs:110`)
   > The v1 "may" collapses to "pay-if-able"; the prompt surface to decline is the same gap shared with the pact-cycle factories.
 - `RelicOfProgenitusFactory` (`RelicOfProgenitusFactory.cs:79`)
@@ -405,6 +431,12 @@ Mentions:
   > TargetRequests"/>; same gap as Stoneforge Mystic's "attach to a creature you control".
 - `EmryLurkerOfTheLochFactory` (`EmryLurkerOfTheLochFactory.cs:11`)
   > A bus-aware overload could subscribe to <c>TurnEndedEvent</c> and clear the stamp; deferred.
+- `EldraziTempleFactory` (`EldraziTempleFactory.cs:10`)
+  > ## Spend-restriction (v1 data, payment-gate deferred)
+- `EldraziTempleFactory` (`EldraziTempleFactory.cs:10`)
+  > <b>Payment-gate enforcement</b> (filtering tagged pool entries when paying a non-Eldrazi cost) is deferred until <see cref="ManaPool"/> grows per-slot tags — today the pool stores bucketed colour/generic counts only.
+- `EldraziTempleFactory` (`EldraziTempleFactory.cs:72`)
+  > Payment-gate side is still deferred (see class xmldoc) — the rider is observational metadata on the ability until ManaPool grows per-slot tag awareness.
 - `SpellskiteFactory` (`SpellskiteFactory.cs:11`)
   > ## Deferred (v1 gaps)  - <b>Ability targets</b>: Spellskite's printed clause is "target spell or ability with a single target".
 - `MeddlingMageFactory` (`MeddlingMageFactory.cs:9`)
@@ -445,16 +477,24 @@ Mentions:
   > <b>Combat math through Compute</b>: same gap as Karn's animate- artifact (<see cref="KarnAnimateArtifactEffect"/>).
 - `MutavaultFactory` (`MutavaultFactory.cs:11`)
   > Mutavault was on the battlefield long enough but its Creature-ness is fresh — the intricate "had Creature type continuously since untap step" bookkeeping is deferred; the test suite asserts shape, not attack legality.
-- `LeylineOfTheVoidFactory` (`LeylineOfTheVoidFactory.cs:9`)
-  > "  ## Implementation  Static replacement (CR 614) only — the opening-hand alt-cost branch (CR 702.95 — Leyline keyword) is DEFERRED because the engine has no opening-hand reveal hook today (no <c>OpeningHandCheckEvent</c> or similar surface).
-- `LeylineOfTheVoidFactory` (`LeylineOfTheVoidFactory.cs:9`)
-  > ## Deferred (v1 gaps)  - <b>Opening-hand alt-cost</b> (CR 702.95 — Leyline keyword): no opening-hand hook in the engine.
-- `LeylineOfTheVoidFactory` (`LeylineOfTheVoidFactory.cs:9`)
+- `LeylineOfTheVoidFactory` (`LeylineOfTheVoidFactory.cs:11`)
+  > ## Deferred (v1 gaps)  - <b>Replacement-ordering prompt</b> (CR 616.1): bus applies in registration order — overlapping with Rest in Peace, Anafenza, or another Leyline of the Void picks the registration order today.
+- `LeylineOfTheVoidFactory` (`LeylineOfTheVoidFactory.cs:11`)
   > Affected-player choice deferred.
+- `UrzasBaubleFactory` (`UrzasBaubleFactory.cs:12`)
+  > Awaits the agent-prompt targeting system used by other v1 factories (same gap as Mishra's Bauble).
+- `UrzasBaubleFactory` (`UrzasBaubleFactory.cs:12`)
+  > Multi-player turn-skipping semantics deferred.
+- `UrzasBaubleFactory` (`UrzasBaubleFactory.cs:97`)
+  > FirstOrDefault as a deterministic stand-in for "random" (real random-pick prompt deferred — see class xmldoc).
 - `AtraxaGrandUnifierFactory` (`AtraxaGrandUnifierFactory.cs:10`)
   > No live observer cares yet (same gap as the rest of the reveal-and-pick factories — Ancient Stirrings, Goblin Matron, Mystical Tutor).
-- `CavernOfSoulsFactory` (`CavernOfSoulsFactory.cs:120`)
-  > Spend-restriction ("only to cast a creature spell of the chosen type") + uncounterable rider are deferred — see class xmldoc.
+- `CavernOfSoulsFactory` (`CavernOfSoulsFactory.cs:10`)
+  > ## Spend-restriction (v1 data, payment-gate deferred)
+- `CavernOfSoulsFactory` (`CavernOfSoulsFactory.cs:10`)
+  > <b>Payment-gate enforcement</b> (filtering tagged pool entries when paying a non-matching cost) is deferred until <see cref="ManaPool"/> grows per-slot tags — today the pool stores bucketed colour counts only.
+- `CavernOfSoulsFactory` (`CavernOfSoulsFactory.cs:130`)
+  > The uncounterable rider is deferred — see class xmldoc.
 - `GoblinLackeyFactory` (`GoblinLackeyFactory.cs:12`)
   > Wire a selector callback when the multi-candidate "choose a card to put onto the battlefield" prompt ships (mirrors the same gap on Stoneforge Mystic's tutor).
 - `DazeFactory` (`DazeFactory.cs:11`)

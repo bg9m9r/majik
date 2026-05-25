@@ -1,6 +1,7 @@
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Mana;
 using Majik.Core.Players;
 using Majik.Core.ValueObjects;
 
@@ -36,15 +37,24 @@ namespace Majik.Core.CardData.Factories;
 ///   mana picker chooses whichever colour is needed when paying spell
 ///   costs.
 ///
-/// ## Deferred (v1 gaps)
+/// ## Spend-restriction (v1 data, payment-gate deferred)
 /// - <b>"Spend this mana only to cast a creature spell of the chosen
-///   type"</b>: enforcement requires per-mana-pool entry tagging and a
-///   spend-restriction check in the cast-payment flow. The engine has no
-///   <c>ManaProvenanceLedger</c> today — <see cref="ManaPool"/> stores
-///   bare colour counts without provenance, so any restriction would have
-///   to be threaded through a new ledger before this gate can land. Same
-///   deferral note as Delighted Halfling's "spend only on a legendary
-///   spell".
+///   type"</b>: the five "any colour" <see cref="ManaAbility"/> instances
+///   stamp a <see cref="Majik.Core.Mana.SpendRestriction"/> with the
+///   predicate <c>spell => spell.Card.HasType(Creature) &amp;&amp;
+///   spell.Card.HasSubtype(chosenType)</c> (or just "creature spell"
+///   when no type was chosen at factory time). When the chosen type is
+///   resolved post-factory, the restriction always evaluates as
+///   "creature spell" — the subtype refinement only kicks in when the
+///   ETB choice was eagerly resolved. The {T}: Add {C} ability is
+///   <b>unrestricted</b> per the printed oracle (the restriction rider
+///   only applies to the second activated mana ability).
+///
+///   <b>Payment-gate enforcement</b> (filtering tagged pool entries
+///   when paying a non-matching cost) is deferred until
+///   <see cref="ManaPool"/> grows per-slot tags — today the pool stores
+///   bucketed colour counts only. The restriction is observational
+///   metadata on the ability until the resolver wires it up.
 /// - <b>"That spell can't be countered"</b>: requires flagging the spell
 ///   object at cast time (when one of Cavern's mana entries pays a pip on
 ///   a chosen-type creature spell) and gating counter-spells in
@@ -118,18 +128,38 @@ public static class CavernOfSoulsFactory
         land.AddAbility(new ManaAbility(land, owner, ManaCost.Parse("C")));
 
         // ----------------------------------------------------------------
-        // {T}: Add one mana of any color
+        // {T}: Add one mana of any color. Spend this mana only to cast a
+        //   creature spell of the chosen type, and that spell can't be
+        //   countered.
         //   Modelled as 5 ManaAbility instances (one per WUBRG) — same
         //   pattern as Delighted Halfling and the Treasure token. The
         //   source-picker satisfies any single colour pip via this land.
         //
-        //   Spend-restriction ("only to cast a creature spell of the
-        //   chosen type") + uncounterable rider are deferred — see class
-        //   xmldoc.
+        //   Each instance stamps a SpendRestriction so that — once the
+        //   payment resolver grows tag-awareness — the generated mana
+        //   only pays a pip on a creature spell of the chosen type. When
+        //   the type was eagerly resolved at factory time the predicate
+        //   tightens to "creature spell of <chosenType>"; otherwise the
+        //   predicate stays "creature spell" (still strictly narrower
+        //   than vanilla mana — Lightning Bolt still gets rejected).
+        //   The uncounterable rider is deferred — see class xmldoc.
         // ----------------------------------------------------------------
+        var chosenType = _chosenType.TryGetValue(land, out var box) ? (CardSubtype?)box.Value : null;
+        var restriction = chosenType.HasValue
+            ? new SpendRestriction(
+                $"creature spell of the chosen type ({chosenType.Value})",
+                spell => spell.Card.HasType(CardType.Creature)
+                         && spell.Card.HasSubtype(chosenType.Value))
+            : new SpendRestriction(
+                "creature spell",
+                spell => spell.Card.HasType(CardType.Creature));
+
         foreach (var color in new[] { "W", "U", "B", "R", "G" })
         {
-            land.AddAbility(new ManaAbility(land, owner, ManaCost.Parse(color)));
+            land.AddAbility(new ManaAbility(
+                land, owner, ManaCost.Parse(color),
+                canActivateCheck: null,
+                spendRestriction: restriction));
         }
 
         return land;
