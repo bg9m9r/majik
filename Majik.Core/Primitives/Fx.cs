@@ -116,6 +116,18 @@ public static class Fx
     /// <see cref="Player.MarkTriedToDrawFromEmptyLibrary"/> (CR 120.3 /
     /// 704.5b). Returns the cards actually drawn in draw order.
     /// Returns empty for <paramref name="count"/> ≤ 0 (no-op).
+    ///
+    /// <para>
+    /// CR 614 — when <paramref name="player"/> has a
+    /// <see cref="Majik.Core.Effects.ReplacementBus"/> attached, each
+    /// individual draw is routed through it via a
+    /// <see cref="Majik.Core.Effects.DrawCardIntent"/>. Replacement
+    /// effects (Dredge — CR 702.52, future "instead reveal" replacements)
+    /// can cancel the draw outright by returning null; cancelled draws
+    /// are NOT included in the returned list. The remaining draws in the
+    /// loop continue to fire — a Dredge return that consumes draw #1
+    /// does not short-circuit a "draw 3" effect.
+    /// </para>
     /// </summary>
     public static IReadOnlyList<ICard> DrawCards(Player player, int count)
     {
@@ -125,6 +137,20 @@ public static class Fx
         var drawn = new List<ICard>(count);
         for (var i = 0; i < count; i++)
         {
+            // CR 614 — route the would-draw through the replacement bus
+            // when one is attached. A null result means a replacement
+            // (e.g. Dredge) consumed the draw; skip the library→hand
+            // move for THIS draw only — the loop continues for the next.
+            if (player.Replacements != null)
+            {
+                var intent = new Majik.Core.Effects.DrawCardIntent(player);
+                var replaced = player.Replacements.Apply(intent);
+                if (replaced is null)
+                {
+                    continue;
+                }
+            }
+
             var top = player.Zones.Library.GetCards().FirstOrDefault();
             if (top is null)
             {
