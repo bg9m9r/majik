@@ -29,7 +29,7 @@ namespace Majik.Core.Effects;
 public sealed class LordStaticEffect : ContinuousEffect
 {
     private readonly Permanent _source;
-    private readonly CardSubtype _subtype;
+    private readonly IReadOnlyList<CardSubtype> _subtypes;
     private readonly int _power;
     private readonly int _toughness;
     private readonly IReadOnlyList<string> _grantedKeywords;
@@ -46,9 +46,40 @@ public sealed class LordStaticEffect : ContinuousEffect
         bool includeSelf = false,
         bool opponentsOnly = false,
         bool allPlayers = false)
+        : this(
+            source,
+            new[] { matchingSubtype },
+            power,
+            toughness,
+            grantedKeywords,
+            includeSelf,
+            opponentsOnly,
+            allPlayers)
+    {
+    }
+
+    /// <summary>
+    /// Multi-subtype overload — matches any creature whose subtypes
+    /// intersect with <paramref name="matchingSubtypes"/>. Used by
+    /// "Other Cat, Elemental, Nightmare, Dinosaur, and Beast creatures
+    /// you control get +1/+1" (Kaheera, the Orphanguard) and similar
+    /// disjunctive lord shapes.
+    /// </summary>
+    public LordStaticEffect(
+        Permanent source,
+        IReadOnlyList<CardSubtype> matchingSubtypes,
+        int power = 1,
+        int toughness = 1,
+        IReadOnlyList<string>? grantedKeywords = null,
+        bool includeSelf = false,
+        bool opponentsOnly = false,
+        bool allPlayers = false)
     {
         _source = source ?? throw new ArgumentNullException(nameof(source));
-        _subtype = matchingSubtype;
+        if (matchingSubtypes == null) throw new ArgumentNullException(nameof(matchingSubtypes));
+        if (matchingSubtypes.Count == 0)
+            throw new ArgumentException("At least one subtype required.", nameof(matchingSubtypes));
+        _subtypes = matchingSubtypes;
         _power = power;
         _toughness = toughness;
         _grantedKeywords = grantedKeywords ?? Array.Empty<string>();
@@ -77,7 +108,7 @@ public sealed class LordStaticEffect : ContinuousEffect
             // Merfolk" (allPlayers: true, includeSelf: false) so it must
             // exclude itself from its own buff.
             if (!_includeSelf && ReferenceEquals(creature, _source)) return false;
-            return creature.HasSubtype(_subtype);
+            return MatchesAnySubtype(creature);
         }
         var sameController = ReferenceEquals(creature.Controller, _source.Controller);
         if (_opponentsOnly)
@@ -91,7 +122,16 @@ public sealed class LordStaticEffect : ContinuousEffect
             if (!sameController) return false;
             if (!_includeSelf && ReferenceEquals(creature, _source)) return false;
         }
-        return creature.HasSubtype(_subtype);
+        return MatchesAnySubtype(creature);
+    }
+
+    private bool MatchesAnySubtype(Creature creature)
+    {
+        for (var i = 0; i < _subtypes.Count; i++)
+        {
+            if (creature.HasSubtype(_subtypes[i])) return true;
+        }
+        return false;
     }
 
     public override void Apply(CreatureCharacteristics chars)
