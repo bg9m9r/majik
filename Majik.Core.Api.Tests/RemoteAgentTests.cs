@@ -808,6 +808,174 @@ public class RemoteAgentTests
         await Task.CompletedTask;
     }
 
+    // ── ActivateAbility (non-mana) — fetchland-shape regression ──
+    //
+    // Fetchlands like Polluted Delta print "{T}, Pay 1 life, Sacrifice this:
+    // Search your library …". The ability is an IActivatedAbility (NOT
+    // IManaAbility — it doesn't add mana to the pool; it uses the stack).
+    // Before the fix BuildPriorityKinds only advertised mana abilities, so
+    // the remote (human) client never received ActivateAbilityCommand in
+    // the prompt's kinds and the portal couldn't surface the fetch action,
+    // making the entire fetchland archetype unusable from the UI.
+
+    [Fact]
+    public async Task PriorityKinds_HasNonManaActivatedAbility_AdvertisesActivateAbility()
+    {
+        // Fetchland shape: a permanent with a printed non-mana activated
+        // ability. The ability's costs / effects are irrelevant to this
+        // gate — BuildPriorityKinds is intentionally permissive, advertising
+        // the kind whenever any controlled permanent carries one. Legality
+        // (cost-payability, sorcery-speed, etc.) is engine-side on submit.
+        var fetch = new Land("Polluted Delta");
+        fetch.SetOwner(_alice);
+        fetch.ChangeController(_alice);
+        fetch.AddAbility(new ActivatedAbility(fetch, _alice));
+        _alice.Zones.Battlefield.AddCard(fetch);
+
+        var agent = new RemoteAgent(_alice);
+        var ctx = NewContext();
+
+        _ = agent.ChoosePriorityActionAsync(ctx);
+
+        agent.ExpectedCommandKinds.Should().Contain(typeof(ActivateAbilityCommand));
+    }
+
+    [Fact]
+    public async Task PriorityKinds_OnlyManaAbility_OmitsActivateAbility()
+    {
+        // Sanity: a permanent whose only activated ability is a ManaAbility
+        // (basic land) must NOT surface ActivateAbilityCommand — that kind
+        // is for the non-mana branch only. ActivateManaAbilityCommand
+        // continues to cover the tap-for-mana path.
+        var mountain = new Land(
+            "Mountain",
+            supertypes: new[] { Majik.Core.Cards.Types.CardSupertype.Basic },
+            subtypes: new[] { Majik.Core.Cards.Types.CardSubtype.Mountain });
+        mountain.SetOwner(_alice);
+        mountain.ChangeController(_alice);
+        Majik.Core.CardData.OracleManaBinder.BindBasicLandMana(mountain, _alice);
+        _alice.Zones.Battlefield.AddCard(mountain);
+
+        var agent = new RemoteAgent(_alice);
+        var ctx = NewContext();
+
+        _ = agent.ChoosePriorityActionAsync(ctx);
+
+        agent.ExpectedCommandKinds.Should().NotContain(typeof(ActivateAbilityCommand));
+        agent.ExpectedCommandKinds.Should().Contain(typeof(ActivateManaAbilityCommand));
+    }
+
+    [Fact]
+    public async Task PriorityKinds_EmptyBattlefield_OmitsActivateAbility()
+    {
+        // No permanents → nothing to activate. The kind must stay off the
+        // list so the portal's "true pass-only" auto-pass gate isn't broken
+        // by a stray affordance with no source.
+        var agent = new RemoteAgent(_alice);
+        var ctx = NewContext();
+
+        _ = agent.ChoosePriorityActionAsync(ctx);
+
+        agent.ExpectedCommandKinds.Should().NotContain(typeof(ActivateAbilityCommand));
+        await Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task ActivateAbility_Submitted_ResolvesToPriorityActionWithAbility()
+    {
+        // Round-trip the wire command through Resolve: the submitted
+        // (PermanentInstanceId, AbilityId) pair must map back to the
+        // same IActivatedAbility instance the engine sees on the permanent,
+        // surfaced as PriorityAction.ActivateAbility.
+        var fetch = new Land("Polluted Delta");
+        fetch.SetOwner(_alice);
+        fetch.ChangeController(_alice);
+        var ability = new ActivatedAbility(fetch, _alice);
+        fetch.AddAbility(ability);
+        _alice.Zones.Battlefield.AddCard(fetch);
+
+        var agent = new RemoteAgent(_alice,
+            cardLookup: id => id == fetch.InstanceId ? (ICard)fetch : null);
+        var ctx = NewContext();
+
+        var task = agent.ChoosePriorityActionAsync(ctx);
+        agent.Submit(new ActivateAbilityCommand(fetch.InstanceId, ability.Id)
+        {
+            PlayerId = _alice.Id,
+        });
+
+        var action = await task;
+        var act = action.Should().BeOfType<PriorityAction.ActivateAbility>().Subject;
+        act.Ability.Should().BeSameAs(ability);
+    }
+
+    [Fact]
+    public async Task ActivateAbility_UnknownAbilityId_Throws()
+    {
+        // Defence: client must not be able to smuggle an AbilityId that
+        // doesn't correspond to an actual non-mana activated ability on
+        // the named permanent. Throwing here keeps the engine's invariants
+        // intact (no null ability reaches DispatchActivate).
+        var fetch = new Land("Polluted Delta");
+        fetch.SetOwner(_alice);
+        fetch.ChangeController(_alice);
+        fetch.AddAbility(new ActivatedAbility(fetch, _alice));
+        _alice.Zones.Battlefield.AddCard(fetch);
+
+        var agent = new RemoteAgent(_alice,
+            cardLookup: id => id == fetch.InstanceId ? (ICard)fetch : null);
+        var ctx = NewContext();
+
+        _ = agent.ChoosePriorityActionAsync(ctx);
+
+        var act = () => agent.Submit(new ActivateAbilityCommand(fetch.InstanceId, Guid.NewGuid())
+        {
+            PlayerId = _alice.Id,
+        });
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*no non-mana activated ability*");
+        await Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task ActivateAbility_OpponentControlled_Throws()
+    {
+        // Alice needs to control SOMETHING with a non-mana activated
+        // ability so the ExpectedCommandKinds gate even lets the command
+        // through to Resolve; the wrong-kind check would otherwise fire
+        // first and mask the controller assertion under test.
+        var bob = new Player("Bob", 20);
+        var aliceFetch = new Land("Misty Rainforest");
+        aliceFetch.SetOwner(_alice);
+        aliceFetch.ChangeController(_alice);
+        aliceFetch.AddAbility(new ActivatedAbility(aliceFetch, _alice));
+        _alice.Zones.Battlefield.AddCard(aliceFetch);
+
+        var bobFetch = new Land("Polluted Delta");
+        bobFetch.SetOwner(bob);
+        bobFetch.ChangeController(bob);
+        bobFetch.AddAbility(new ActivatedAbility(bobFetch, bob));
+        bob.Zones.Battlefield.AddCard(bobFetch);
+
+        var agent = new RemoteAgent(_alice,
+            cardLookup: id => id == bobFetch.InstanceId ? (ICard)bobFetch
+                : id == aliceFetch.InstanceId ? (ICard)aliceFetch
+                : null);
+        var ctx = NewContext();
+
+        _ = agent.ChoosePriorityActionAsync(ctx);
+
+        var act = () => agent.Submit(new ActivateAbilityCommand(bobFetch.InstanceId, Guid.NewGuid())
+        {
+            PlayerId = _alice.Id,
+        });
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*does not control*");
+        await Task.CompletedTask;
+    }
+
     [Fact]
     public async Task ChooseLibraryPick_Submit_ResolvesToPickedCard()
     {
