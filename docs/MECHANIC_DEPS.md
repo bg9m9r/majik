@@ -5,9 +5,9 @@ Scanner output: every `*Factory.cs` xmldoc / inline comment mentioning
 engine primitive. Each row answers: "if we ship primitive _X_, which factory
 xmldocs flagged that they're blocked on it?"
 
-- **Generated:** 2026-05-25 03:51 UTC
+- **Generated:** 2026-05-25 03:52 UTC
 - **Scanned dir:** `Majik.Core/CardData/Factories`
-- **Total mentions:** 208
+- **Total mentions:** 209
 - **Clusters:** 7
 - **Unclustered (need new registry pattern):** 163
 
@@ -17,7 +17,7 @@ Regenerate with `dotnet run --project Majik.Console -- mechanic-deps --md-out do
 
 | Rank | Primitive | CR | Factories | Mentions |
 |---:|---|---|---:|---:|
-| 1 | Agent-prompt targeting MVP | — | 29 | 36 |
+| 1 | Agent-prompt targeting MVP | — | 30 | 37 |
 | 2 | Layer-6 ability-grant subsystem (CR 613.1f) | CR 613.1f | 2 | 4 |
 | 3 | Cycling-style activated-from-hand (CR 702.32 / Channel CR 702.74) | CR 702.32 | 1 | 1 |
 | 4 | Equip activated-ability primitive (CR 702.6) | CR 702.6 | 1 | 1 |
@@ -29,7 +29,7 @@ Regenerate with `dotnet run --project Majik.Console -- mechanic-deps --md-out do
 
 ### 1. Agent-prompt targeting MVP
 
-- **Blocks:** 29 factories (36 mentions)
+- **Blocks:** 30 factories (37 mentions)
 - **Implementation hint:** IPlayerAgent needs ChooseTarget / ChooseYesNo surfaces; many spell factories punt on real targeting prompts.
 
 Mentions:
@@ -64,6 +64,8 @@ Mentions:
   > ## Deferred (v1 gaps — small)  - <b>Agent prompt for pick-one-of-two:</b> v1 deterministically manifests the top-of-library card; the second goes to graveyard.
 - `EldritchEvolutionFactory` (`EldritchEvolutionFactory.cs:14`)
   > Full agent-driven sacrifice-target prompting requires the ITarget / TargetResolver pipeline (deferred — same gap noted on <see cref="SacrificeAnotherCreatureCost"/>).
+- `ChordOfCallingFactory` (`ChordOfCallingFactory.cs:105`)
+  > Tests + bots pre-select the creature list, mirroring the deferred agent prompt pattern used by <see cref="KappaCannoneerFactory.
 - `PsychicFrogFactory` (`PsychicFrogFactory.cs:15`)
   > Agent-driven prompts are deferred behind the same queue as Liliana of the Veil + Faithless Looting + Sword of Feast and Famine.
 - `PsychicFrogFactory` (`PsychicFrogFactory.cs:148`)

@@ -27,15 +27,19 @@ namespace Majik.Core.CardData.SpellTemplates.Templates.Bespoke;
 ///         that future cost-reduction wiring can hook into.</item>
 /// </list>
 ///
-/// <para><b>v1 is intentionally lossy.</b> The Convoke cost reduction
-/// machinery lives in <see cref="Majik.Core.Costs.ConvokeAlternativeCost"/>
-/// but is NOT yet consulted by <see cref="SpellCastFlow"/>. Casters of
-/// Convoke spells still pay the full printed mana cost. Follow-ups will:
-///   <list type="bullet">
-///     <item>Prompt the agent to choose untapped creatures to tap.</item>
-///     <item>Reduce the spell's effective cost per CR 702.51b.</item>
-///     <item>Tap the chosen creatures as part of cost payment.</item>
-///   </list></para>
+/// <para><b>Convoke cost-reduction is now wired end-to-end.</b> The
+/// machinery lives in <see cref="Majik.Core.Costs.ConvokeAdditionalCost"/>
+/// (the working primitive routed through <see cref="SpellCastFlow"/>'s
+/// CR 601.2f additional-cost rail — taps the chosen creatures and folds
+/// the per-tap reduction into the mana cost) and
+/// <see cref="Majik.Core.Costs.ConvokeAlternativeCost"/> (the discovery
+/// shim used by the bot's alt-cost probe surface). This template still
+/// only sets the inline Convoke <see cref="KeywordAbility"/> marker on
+/// templated cards — callers who want per-cast reduction pre-select the
+/// creatures via the relevant factory's <c>BuildAdditionalCost</c>
+/// (mirroring <see cref="Majik.Core.CardData.Factories.ChordOfCallingFactory.BuildAdditionalCost"/>).
+/// An agent-prompt for template-bound Convoke cards remains deferred —
+/// same posture as the Improvise agent-prompt gap.</para>
 ///
 /// <para>Priority 95: high enough to beat the catch-all
 /// <c>ClauseCompositionTemplate</c> (priority 10) and the generic

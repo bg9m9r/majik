@@ -1,8 +1,8 @@
 {
-  "generated_utc": "2026-05-25T03:51:18.1209500Z",
-  "scanned_dir": "/home/brett/Projects/majik.project/majik.core/.claude/worktrees/agent-a842268fdfb834776/Majik.Core/CardData/Factories",
-  "total_mentions": 208,
-  "distinct_factories": 140,
+  "generated_utc": "2026-05-25T03:52:18.2015761Z",
+  "scanned_dir": "/home/brett/Projects/majik.project/majik.core/.claude/worktrees/agent-afe00b204d43e5a62/Majik.Core/CardData/Factories",
+  "total_mentions": 209,
+  "distinct_factories": 141,
   "cluster_count": 7,
   "unclustered_count": 163,
   "clusters": [
@@ -10,13 +10,14 @@
       "primitive_id": "agent-prompt-targeting",
       "display_name": "Agent-prompt targeting MVP",
       "implementation_hint": "IPlayerAgent needs ChooseTarget / ChooseYesNo surfaces; many spell factories punt on real targeting prompts.",
-      "factory_count": 29,
-      "mention_count": 36,
+      "factory_count": 30,
+      "mention_count": 37,
       "factories": [
         "AbhorrentOculusFactory",
         "AetherVialFactory",
         "AgathasSoulCauldronFactory",
         "AjaniNacatlPariahFactory",
+        "ChordOfCallingFactory",
         "CoriSteelCutterFactory",
         "DauthiVoidwalkerFactory",
         "EldritchEvolutionFactory",
@@ -135,6 +136,12 @@
           "file": "EldritchEvolutionFactory.cs",
           "line": 14,
           "sentence": "Full agent-driven sacrifice-target prompting requires the ITarget / TargetResolver pipeline (deferred \u2014 same gap noted on \u003Csee cref=\u0022SacrificeAnotherCreatureCost\u0022/\u003E)."
+        },
+        {
+          "factory": "ChordOfCallingFactory",
+          "file": "ChordOfCallingFactory.cs",
+          "line": 105,
+          "sentence": "Tests \u002B bots pre-select the creature list, mirroring the deferred agent prompt pattern used by \u003Csee cref=\u0022KappaCannoneerFactory."
         },
         {
           "factory": "PsychicFrogFactory",
