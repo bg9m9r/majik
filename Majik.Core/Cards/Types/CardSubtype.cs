@@ -147,6 +147,10 @@ public enum CardSubtype
     /// <summary>Eye creature subtype — Abhorrent Oculus (Duskmourn: House of Horror).
     /// CR 205.3m.</summary>
     Eye,
+    /// <summary>Turtle creature subtype — Kappa Cannoneer (Commander Legends:
+    /// Battle for Baldur's Gate), Cosima, God of the Voyage's adjacent
+    /// shellfolk. CR 205.3m.</summary>
+    Turtle,
 
     // Land subtypes (examples)
     Forest,
