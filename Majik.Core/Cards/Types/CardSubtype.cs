@@ -160,6 +160,10 @@ public enum CardSubtype
     /// <summary>Drone creature subtype — Pinnacle Emissary's 1/1 colorless
     /// Drone artifact creature tokens (Edge of Eternities). CR 205.3m.</summary>
     Drone,
+    /// <summary>Sphinx creature subtype — Quantum Riddler (Edge of
+    /// Eternities) and the broader blue Sphinx tribe (Sphinx of the Steel
+    /// Wind, Consecrated Sphinx, Sphinx of Foresight). CR 205.3m.</summary>
+    Sphinx,
 
     // Land subtypes (examples)
     Forest,
