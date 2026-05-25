@@ -435,6 +435,14 @@ public sealed class SpellCastFlow
             effects = combined;
         }
 
+        // CR 601.2 / CR 113.5 — capture the source zone BEFORE the Hand →
+        // Stack move so the "cast from hand" sentinel can branch on it.
+        // Bedlam Reveler's ETB intervening-if reads this off the resolving
+        // spell / card via Card.WasCastFromHand. Distinct from Card.WasCast
+        // (any cast — flashback / suspend / from-graveyard included): this
+        // flag is the strict "source zone was Hand" gate.
+        var sourceZoneAtCast = card.Zone;
+
         // If casting via alternative cost (e.g. Flashback), card may not be in
         // hand — move it from whatever zone it's in.
         _zoneService.MoveCard(card, card.Zone, ZoneType.Stack, controller: caster);
@@ -597,6 +605,23 @@ public sealed class SpellCastFlow
         if (card is Card concreteForCast)
         {
             concreteForCast.SetWasCast(true);
+        }
+
+        // CR 601.2 / CR 113.5 — stamp the strict "cast from hand" sentinel
+        // when the source zone captured before the stack-push was Hand.
+        // Read by ETB intervening-if clauses keyed on "if you cast it from
+        // your hand" (Bedlam Reveler). Distinct from Card.WasCast which
+        // fires on any cast — flashback / suspend / from-graveyard / from-
+        // exile all set WasCast but leave WasCastFromHand false. The flag
+        // is cleared by ZoneService on battlefield exit (any destination),
+        // mirroring WasCast's CR 400.7 lifecycle.
+        if (sourceZoneAtCast == ZoneType.Hand)
+        {
+            spell.WasCastFromHand = true;
+            if (card is Card concreteForHandCast)
+            {
+                concreteForHandCast.SetWasCastFromHand(true);
+            }
         }
 
         _stack.Push(spell);

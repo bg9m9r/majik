@@ -498,6 +498,53 @@ public class Card : ICard
     }
 
     /// <summary>
+    /// CR 601.2 / CR 113.5 — "cast from hand" runtime sentinel. Stamped
+    /// <c>true</c> by <see cref="Majik.Core.Game.SpellCastFlow"/> when the
+    /// resolving spell's source zone (the zone the card was in immediately
+    /// before moving to the stack) was <see cref="Majik.Core.Zones.ZoneType.Hand"/>.
+    /// Read by ETB intervening-if clauses that gate on the "if you cast it
+    /// from your hand" branch — Bedlam Reveler's
+    /// <c>"When this creature enters, if you cast it from your hand,
+    /// discard your hand, then draw three cards."</c> is the canonical
+    /// consumer, distinct from The One Ring's <see cref="WasCast"/> gate
+    /// which fires on any cast (flashback / suspend / from-graveyard
+    /// included).
+    ///
+    /// <para>Survives Stack → Battlefield so ETB triggers fired off the
+    /// resulting permanent's entry still observe the stamp. Cleared on
+    /// battlefield exit (any destination) by
+    /// <see cref="Majik.Core.Services.ZoneService"/>, matching CR 400.7
+    /// — the card is a "new object" on each subsequent zone change and
+    /// a re-cast / blink / token copy must not inherit the prior
+    /// cast-from-hand posture.</para>
+    ///
+    /// <para>Mirrors <see cref="Majik.Core.Spells.Spell.WasCastFromHand"/>
+    /// on the resolving stack object for resolve-body reads that don't
+    /// have the spell reference handy.</para>
+    ///
+    /// <para>Defaults to <c>false</c> so hand-built test cards without an
+    /// explicit stamp are treated as non-cast.</para>
+    /// </summary>
+    public bool WasCastFromHand { get; private set; }
+
+    /// <summary>Stamp the cast-from-hand sentinel. Called by
+    /// <see cref="Majik.Core.Game.SpellCastFlow"/> immediately before the
+    /// card moves Hand → Stack (CR 601.2i).</summary>
+    public void SetWasCastFromHand(bool value)
+    {
+        WasCastFromHand = value;
+    }
+
+    /// <summary>Clear the cast-from-hand sentinel. Called by
+    /// <see cref="Majik.Core.Services.ZoneService"/> when a permanent leaves
+    /// the battlefield to any other zone (CR 400.7 — new object on each
+    /// zone change). Idempotent.</summary>
+    public void ClearWasCastFromHand()
+    {
+        WasCastFromHand = false;
+    }
+
+    /// <summary>
     /// CR 702.33b — "kicked" runtime sentinel. Stamped <c>true</c> by
     /// <see cref="Majik.Core.Costs.KickerAdditionalCost.Pay"/> at cast
     /// announcement when the caster pays the optional kicker mana
