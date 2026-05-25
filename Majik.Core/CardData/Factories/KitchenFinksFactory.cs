@@ -1,9 +1,8 @@
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
-using Majik.Core.Counters;
-using Majik.Core.Domain.DomainEvents;
 using Majik.Core.Events;
+using Majik.Core.Keywords;
 using Majik.Core.Players;
 using Majik.Core.Zones;
 
@@ -31,30 +30,12 @@ namespace Majik.Core.CardData.Factories;
 ///   including on a Persist return, so an already-countered Finks that returns
 ///   still yields 2 life (the ETB is independent of Persist).
 ///
-/// - <b>Persist (CR 702.78)</b>: "When this creature dies, if it had no -1/-1
-///   counters on it, return it to the battlefield under its owner's control
-///   with a -1/-1 counter on it." Implemented via a <see cref="TriggeredAbility"/>
-///   that:
-///   1. Triggers on a <see cref="CardMovedEvent"/> from Battlefield to Graveyard
-///      for this specific card.
-///   2. Applies an <see cref="TriggeredAbility.InterveningIf"/> check (CR 603.4)
-///      that verifies <em>no</em> <see cref="CounterType.MinusOneMinusOne"/>
-///      counters are present at resolution time.
-///   3. On resolution moves Finks from Graveyard → Battlefield (same raw zone-
-///      move used by UndyingFactory), clears the counter bag (CR 121.2 — counters
-///      do not persist across zone changes), then adds exactly one
-///      <see cref="CounterType.MinusOneMinusOne"/> counter.
-///
-/// <c>activeZones</c> for the Persist trigger is {Battlefield, Graveyard}:
-/// Graveyard must be included so that the trigger evaluates while Finks is in
-/// the graveyard (ZoneService sets the card's zone before publishing the event).
-///
-/// ## Comparison with Undying (CR 702.93)
-/// Persist is the mirror of Undying — returns on death <em>without the
-/// corresponding counter type</em> and adds one of that counter. Undying uses
-/// <see cref="CounterType.PlusOnePlusOne"/> and fires when the creature has
-/// zero +1/+1 counters; Persist uses <see cref="CounterType.MinusOneMinusOne"/>
-/// and fires when the creature has zero -1/-1 counters.
+/// - <b>Persist (CR 702.79)</b>: wired via the shared
+///   <see cref="PersistFactory.Build(Creature)"/> primitive (promoted out of
+///   this factory once Murderous Redcap + Glen Elendra Archmage joined the
+///   roadmap). The primitive attaches the keyword marker + the
+///   Battlefield → Graveyard death trigger with the "no -1/-1 counter"
+///   interveningIf gate.
 /// </summary>
 [CardName("Kitchen Finks")]
 public static class KitchenFinksFactory
@@ -88,7 +69,10 @@ public static class KitchenFinksFactory
         // ----------------------------------------------------------------
         // ETB triggered ability — CR 603.6a + CR 119.3.
         //   "When Kitchen Finks enters the battlefield, you gain 2 life."
-        // Fires on every ETB, including returns via Persist.
+        // Fires on every ETB, including returns via Persist (when the
+        // return is routed through ZoneService — the PersistFactory raw
+        // zone-move does NOT republish CardMovedEvent, so this trigger
+        // does not auto-fire on the in-effect return).
         // ----------------------------------------------------------------
         var etbCondition = new EventTriggerCondition<CardMovedEvent>(
             (e, _) => ReferenceEquals(e.Card, card) && e.ToZone == ZoneType.Battlefield);
@@ -112,64 +96,10 @@ public static class KitchenFinksFactory
         card.AddAbility(etbTrigger);
 
         // ----------------------------------------------------------------
-        // Persist trigger — CR 702.78.
-        //   "When this creature dies, if it had no -1/-1 counters on it,
-        //    return it to the battlefield under its owner's control with a
-        //    -1/-1 counter on it."
-        //
-        // Implementation mirrors UndyingFactory (CR 702.93) with the counter
-        // polarity inverted: PlusOnePlusOne → MinusOneMinusOne.
+        // Persist (CR 702.79) — keyword marker + death trigger, all from
+        // the shared primitive.
         // ----------------------------------------------------------------
-        var persistCondition = new EventTriggerCondition<CardMovedEvent>((e, _) =>
-            ReferenceEquals(e.Card, card)
-            && e.FromZone == ZoneType.Battlefield
-            && e.ToZone == ZoneType.Graveyard);
-
-        var persistEffect = new Effect("Persist — return to battlefield with -1/-1 counter", () =>
-        {
-            // Guard: Finks must still be in the graveyard at resolution time.
-            // A replacement effect could have moved it elsewhere (unusual but correct).
-            if (card.Zone != ZoneType.Graveyard) return;
-
-            var cardOwner = card.Owner;
-            if (cardOwner == null) return;
-
-            // Move from graveyard to battlefield (CR 702.78).
-            cardOwner.Zones.Graveyard.RemoveCard(card);
-            cardOwner.Zones.Battlefield.AddCard(card);
-            card.SetZone(ZoneType.Battlefield);
-            card.SetController(cardOwner);
-
-            // CR 121.2 — counters do not persist when a permanent changes zones.
-            // Clear the bag so subsequent deaths accurately reflect the card's
-            // counter state (i.e. the returned Finks enters with exactly one
-            // -1/-1 counter, and a third death will correctly not trigger again).
-            foreach (var entry in card.Counters.All.ToList())
-            {
-                card.Counters.Remove(entry.Key, entry.Value);
-            }
-
-            // Persist grant: one -1/-1 counter (CR 702.78).
-            card.Counters.Add(CounterType.MinusOneMinusOne, 1);
-
-            // Bookkeeping: re-mark battlefield entry timestamp / summoning-sickness
-            // reset (same as UndyingFactory).
-            card.MarkEnteredBattlefield();
-        });
-
-        // InterveningIf — CR 603.4 / CR 702.78: "if it had no -1/-1 counters."
-        // Checked when the trigger would be put on the stack; counters survive
-        // on the graveyard card object so this accurately reflects the state at
-        // the moment of death.
-        var persistTrigger = new TriggeredAbility(
-            source: card,
-            controller: owner,
-            condition: persistCondition,
-            effects: new[] { persistEffect },
-            interveningIf: () => card.Counters.Count(CounterType.MinusOneMinusOne) == 0,
-            activeZones: new[] { ZoneType.Battlefield, ZoneType.Graveyard });
-
-        card.AddAbility(persistTrigger);
+        PersistFactory.Build(card);
 
         return card;
     }

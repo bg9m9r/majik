@@ -289,6 +289,7 @@ public class UlamogTheCeaselessHungerFactoryTests
             Array.Empty<Majik.Core.Targeting.ITarget>();
         public IReadOnlyList<Majik.Core.Costs.ICost> Costs { get; } =
             Array.Empty<Majik.Core.Costs.ICost>();
+        public bool CannotBeCountered => false;
         public void Resolve() { }
     }
 }

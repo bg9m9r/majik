@@ -164,6 +164,9 @@ public enum CardSubtype
     /// Eternities) and the broader blue Sphinx tribe (Sphinx of the Steel
     /// Wind, Consecrated Sphinx, Sphinx of Foresight). CR 205.3m.</summary>
     Sphinx,
+    /// <summary>Assassin creature subtype — Murderous Redcap (Shadowmoor),
+    /// Royal Assassin, Garna, Bloodfist of Keral. CR 205.3m.</summary>
+    Assassin,
 
     // Land subtypes (examples)
     Forest,
