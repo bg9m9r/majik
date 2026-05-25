@@ -77,8 +77,10 @@ public static class TrinketMageFactory
         //    artifact card with mana value 1 or less, reveal that card,
         //    put it into your hand, then shuffle."
         // v1: deterministic — take the first artifact card in the library
-        // whose mana value is ≤ 1. Reveal-event emission is deferred (see
-        // class xmldoc); CR 701.20a shuffle now wired via LibraryShuffle.
+        // whose mana value is ≤ 1. CR 701.20a shuffle is wired via
+        // LibraryShuffle (publishes a LibraryShuffledEvent when an EventBus
+        // is registered). Reveal-event emission is the only outstanding
+        // gap (see class xmldoc).
         // ----------------------------------------------------------------
         var etbEffect = new Effect(
             "Trinket Mage: tutor an artifact with mana value 1 or less to hand",

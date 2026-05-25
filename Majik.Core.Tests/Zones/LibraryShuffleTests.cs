@@ -12,6 +12,7 @@ namespace Majik.Core.Tests.Zones;
 /// CR 701.20 — coverage for the library-shuffle primitive: IZone.Shuffle,
 /// GameRandomRegistry, EventBusRegistry, and the LibraryShuffle helper.
 /// </summary>
+[Collection(nameof(StaticRegistryCollection))]
 public class LibraryShuffleTests : IDisposable
 {
     public LibraryShuffleTests()

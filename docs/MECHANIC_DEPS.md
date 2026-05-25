@@ -5,11 +5,11 @@ Scanner output: every `*Factory.cs` xmldoc / inline comment mentioning
 engine primitive. Each row answers: "if we ship primitive _X_, which factory
 xmldocs flagged that they're blocked on it?"
 
-- **Generated:** 2026-05-25 03:02 UTC
+- **Generated:** 2026-05-25 03:09 UTC
 - **Scanned dir:** `Majik.Core/CardData/Factories`
-- **Total mentions:** 193
+- **Total mentions:** 192
 - **Clusters:** 7
-- **Unclustered (need new registry pattern):** 146
+- **Unclustered (need new registry pattern):** 148
 
 Regenerate with `dotnet run --project Majik.Console -- mechanic-deps --md-out docs/MECHANIC_DEPS.md --json-out docs/mechanic-deps.json`.
 
@@ -18,9 +18,9 @@ Regenerate with `dotnet run --project Majik.Console -- mechanic-deps --md-out do
 | Rank | Primitive | CR | Factories | Mentions |
 |---:|---|---|---:|---:|
 | 1 | Agent-prompt targeting MVP | — | 28 | 35 |
-| 2 | Library shuffle (CR 701.20) | CR 701.20 | 4 | 4 |
-| 3 | Layer-6 ability-grant subsystem (CR 613.1f) | CR 613.1f | 2 | 4 |
-| 4 | Cycling-style activated-from-hand (CR 702.32 / Channel CR 702.74) | CR 702.32 | 1 | 1 |
+| 2 | Layer-6 ability-grant subsystem (CR 613.1f) | CR 613.1f | 2 | 4 |
+| 3 | Cycling-style activated-from-hand (CR 702.32 / Channel CR 702.74) | CR 702.32 | 1 | 1 |
+| 4 | Equip activated-ability primitive (CR 702.6) | CR 702.6 | 1 | 1 |
 | 5 | Escape alt-cost (CR 702.143) | CR 702.143 | 1 | 1 |
 | 6 | "Activate only as a sorcery" gate (CR 117.1a) | CR 117.1a | 1 | 1 |
 | 7 | Token colour identity (CR 105 / CR 903.4) | CR 105 | 1 | 1 |
@@ -44,6 +44,8 @@ Mentions:
   > Token-copy targeting auto-picks the first eligible token-creature the controller controls; agent-driven targeting is deferred.
 - `MysticSanctuaryFactory` (`MysticSanctuaryFactory.cs:12`)
   > <b>"You may" prompt</b>: auto-takes the action when a target was supplied; agent-driven decline deferred (same posture as Snapcaster Mage / Tireless Tracker / Valakut).
+- `SpringleafDrumFactory` (`SpringleafDrumFactory.cs:9`)
+  > ## Deferred (v1 gaps)  - <b>Agent prompt for which creature to tap</b> — the cost falls back to the first eligible (untapped, no summoning sickness, not the drum itself) creature on the controller's battlefield via <see cref="TapAnotherUntappedCreatureCost"/>'s deterministic pick.
 - `AgathasSoulCauldronFactory` (`AgathasSoulCauldronFactory.cs:10`)
   > (Full targeting deferred — see below.
 - `AgathasSoulCauldronFactory` (`AgathasSoulCauldronFactory.cs:65`)
@@ -80,8 +82,6 @@ Mentions:
   > v1 always plays the first land in hand when one exists; a first-class yes/no agent prompt is deferred (same gap as Sun Titan / Primeval Titan / Stoneforge Mystic).
 - `DauthiVoidwalkerFactory` (`DauthiVoidwalkerFactory.cs:13`)
   > Wiring an agent prompt mirrors the rest of the v1 factories (deferred).
-- `PonderFactory` (`PonderFactory.cs:107`)
-  > Shuffle primitive is now wired (CR 701.20), but Ponder's "may" rider is a yes/no agent prompt — deferred behind the agent-prompt MVP (rank #1 in MECHANIC_DEPS).
 - `SilvergillAdeptFactory` (`SilvergillAdeptFactory.cs:10`)
   > The actual enforcement at cast-time (agent prompt: reveal a Merfolk card from hand OR pay {3} as an additional cost) is deferred until the additional-cost framework supports reveal-based alternatives.
 - `GoblinPiledriverFactory` (`GoblinPiledriverFactory.cs:10`)
@@ -105,24 +105,7 @@ Mentions:
 - `CoriSteelCutterFactory` (`CoriSteelCutterFactory.cs:15`)
   > A real prompt-driven flow (and the "to it" bookkeeping that pins attachment to *that specific* token rather than any creature) is deferred behind the broader agent-prompt surface — same posture as Eternal Witness / Snapcaster Mage.
 
-### 2. Library shuffle (CR 701.20)
-
-- **CR citation:** CR 701.20
-- **Blocks:** 4 factories (4 mentions)
-- **Implementation hint:** Add IZone.Shuffle / ZoneService.ShuffleLibrary. Tutor-family factories all block on this single primitive.
-
-Mentions:
-
-- `StoneforgeMysticFactory` (`StoneforgeMysticFactory.cs:96`)
-  > Reveal-event emission is deferred (see class xmldoc); CR 701.20a shuffle now wired via LibraryShuffle.
-- `GoblinEngineerFactory` (`GoblinEngineerFactory.cs:108`)
-  > " v1: deterministic — take the first artifact card in the library; reveal-event emission deferred (see class xmldoc); CR 701.20a shuffle is now wired via LibraryShuffle.
-- `TrinketMageFactory` (`TrinketMageFactory.cs:74`)
-  > Reveal-event emission is deferred (see class xmldoc); CR 701.20a shuffle now wired via LibraryShuffle.
-- `PonderFactory` (`PonderFactory.cs:51`)
-  > The "may shuffle" rider is deferred (no-op).
-
-### 3. Layer-6 ability-grant subsystem (CR 613.1f)
+### 2. Layer-6 ability-grant subsystem (CR 613.1f)
 
 - **CR citation:** CR 613.1f
 - **Blocks:** 2 factories (4 mentions)
@@ -139,7 +122,7 @@ Mentions:
 - `BloodghastFactory` (`BloodghastFactory.cs:143`)
   > A full dynamic Layer 6 conditional keyword grant is deferred — see class xmldoc.
 
-### 4. Cycling-style activated-from-hand (CR 702.32 / Channel CR 702.74)
+### 3. Cycling-style activated-from-hand (CR 702.32 / Channel CR 702.74)
 
 - **CR citation:** CR 702.32
 - **Blocks:** 1 factories (1 mentions)
@@ -149,6 +132,17 @@ Mentions:
 
 - `ChannelLandCycleFactory` (`ChannelLandCycleFactory.cs:12`)
   > Sokenzan, Crucible of Defiance — deferred (its Channel produces two 1/1 Spirit tokens with haste; requires a Spirit-token shape not yet in <c>TokenFactory</c>).
+
+### 4. Equip activated-ability primitive (CR 702.6)
+
+- **CR citation:** CR 702.6
+- **Blocks:** 1 factories (1 mentions)
+- **Implementation hint:** EquipActivatedAbility — sorcery-speed activation, attaches/re-attaches Equipment to a chosen creature.
+
+Mentions:
+
+- `HammerOfNazahnFactory` (`HammerOfNazahnFactory.cs:14`)
+  > ## Deferred  - <b>Attach-target prompt</b> for the ETB trigger and the Equip activation — v1 picks the first controller-side creature deterministically (same gap as the rest of the equipment cycle).
 
 ### 5. Escape alt-cost (CR 702.143)
 
@@ -451,6 +445,10 @@ Mentions:
   > <para>v1 gaps:</para> <list type="bullet"> <item>Printed "This token can block only creatures with flying" blocking restriction is NOT enforced — no combat-block restriction primitive for "can only block X" yet.
 - `PinnacleEmissaryFactory` (`PinnacleEmissaryFactory.cs:175`)
   > Keywords"/>; the restriction rider is documented but deferred.
+- `CranialPlatingFactory` (`CranialPlatingFactory.cs:12`)
+  > ## Deferred  - <b>Attach-target prompt</b> for both attach abilities — v1 picks the first controller-side creature deterministically (same gap as the rest of the equipment cycle).
+- `CranialPlatingFactory` (`CranialPlatingFactory.cs:12`)
+  > Phased-out artifacts (CR 702.26) and face-down morph artifacts would currently miscount; same gap as Mox Opal's "metalcraft" predicate (no shared "artifact-count helper" yet).
 - `AjaniNacatlPariahFactory` (`AjaniNacatlPariahFactory.cs:11`)
   > The MdfcState flip is the v1 observation surface — combat / loyalty interactions on the back face are deferred.
 - `AjaniNacatlPariahFactory` (`AjaniNacatlPariahFactory.cs:105`)

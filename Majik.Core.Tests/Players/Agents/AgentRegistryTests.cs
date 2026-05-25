@@ -19,6 +19,7 @@ namespace Majik.Core.Tests.Players.Agents;
 /// effect closures consult the registered agent instead of hard-coding the
 /// default decision.
 /// </summary>
+[Collection(nameof(StaticRegistryCollection))]
 public class AgentRegistryTests : IDisposable
 {
     private readonly Player _alice = new("Alice", 20);

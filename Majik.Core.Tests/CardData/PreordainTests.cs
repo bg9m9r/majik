@@ -28,6 +28,7 @@ namespace Majik.Core.Tests.CardData;
 ///   - Resolve on empty library — scry short-circuits and the draw flags
 ///     the player without throwing.
 /// </summary>
+[Collection(nameof(StaticRegistryCollection))]
 public class PreordainTests : IDisposable
 {
     private readonly Player _alice = new("Alice", 20);

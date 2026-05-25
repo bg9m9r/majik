@@ -1,10 +1,10 @@
 {
-  "generated_utc": "2026-05-25T03:02:53.3767311Z",
-  "scanned_dir": "/home/brett/Projects/majik.project/majik.core/.claude/worktrees/agent-addb844ebc300c76c/Majik.Core/CardData/Factories",
-  "total_mentions": 193,
-  "distinct_factories": 131,
+  "generated_utc": "2026-05-25T03:09:36.4078103Z",
+  "scanned_dir": "/home/brett/Projects/majik.project/majik.core/.claude/worktrees/agent-aea171d949b60662a/Majik.Core/CardData/Factories",
+  "total_mentions": 192,
+  "distinct_factories": 130,
   "cluster_count": 7,
-  "unclustered_count": 146,
+  "unclustered_count": 148,
   "clusters": [
     {
       "primitive_id": "agent-prompt-targeting",
@@ -27,13 +27,13 @@
         "KappaCannoneerFactory",
         "MysticSanctuaryFactory",
         "NihilSpellbombFactory",
-        "PonderFactory",
         "PriestOfFellRitesFactory",
         "PrimevalTitanFactory",
         "PsychicFrogFactory",
         "RelicOfProgenitusFactory",
         "SilvergillAdeptFactory",
         "SkyclaveApparitionFactory",
+        "SpringleafDrumFactory",
         "StormchasersTalentFactory",
         "SunTitanFactory",
         "SwordOfFeastAndFamineFactory",
@@ -72,6 +72,12 @@
           "file": "MysticSanctuaryFactory.cs",
           "line": 12,
           "sentence": "\u003Cb\u003E\u0022You may\u0022 prompt\u003C/b\u003E: auto-takes the action when a target was supplied; agent-driven decline deferred (same posture as Snapcaster Mage / Tireless Tracker / Valakut)."
+        },
+        {
+          "factory": "SpringleafDrumFactory",
+          "file": "SpringleafDrumFactory.cs",
+          "line": 9,
+          "sentence": "## Deferred (v1 gaps)  - \u003Cb\u003EAgent prompt for which creature to tap\u003C/b\u003E \u2014 the cost falls back to the first eligible (untapped, no summoning sickness, not the drum itself) creature on the controller\u0027s battlefield via \u003Csee cref=\u0022TapAnotherUntappedCreatureCost\u0022/\u003E\u0027s deterministic pick."
         },
         {
           "factory": "AgathasSoulCauldronFactory",
@@ -185,13 +191,6 @@
           "sentence": "Wiring an agent prompt mirrors the rest of the v1 factories (deferred)."
         },
         {
-          "factory": "PonderFactory",
-          "file": "PonderFactory.cs",
-          "line": 107,
-          "sentence": "Shuffle primitive is now wired (CR 701.20), but Ponder\u0027s \u0022may\u0022 rider is a yes/no agent prompt \u2014 deferred behind the agent-prompt MVP (rank #1 in MECHANIC_DEPS).",
-          "cr": "CR 701.20"
-        },
-        {
           "factory": "SilvergillAdeptFactory",
           "file": "SilvergillAdeptFactory.cs",
           "line": 10,
@@ -261,49 +260,6 @@
       ]
     },
     {
-      "primitive_id": "library-shuffle",
-      "display_name": "Library shuffle (CR 701.20)",
-      "comp_rules_citation": "CR 701.20",
-      "implementation_hint": "Add IZone.Shuffle / ZoneService.ShuffleLibrary. Tutor-family factories all block on this single primitive.",
-      "factory_count": 4,
-      "mention_count": 4,
-      "factories": [
-        "GoblinEngineerFactory",
-        "PonderFactory",
-        "StoneforgeMysticFactory",
-        "TrinketMageFactory"
-      ],
-      "mentions": [
-        {
-          "factory": "StoneforgeMysticFactory",
-          "file": "StoneforgeMysticFactory.cs",
-          "line": 96,
-          "sentence": "Reveal-event emission is deferred (see class xmldoc); CR 701.20a shuffle now wired via LibraryShuffle.",
-          "cr": "CR 701.20a"
-        },
-        {
-          "factory": "GoblinEngineerFactory",
-          "file": "GoblinEngineerFactory.cs",
-          "line": 108,
-          "sentence": "\u0022 v1: deterministic \u2014 take the first artifact card in the library; reveal-event emission deferred (see class xmldoc); CR 701.20a shuffle is now wired via LibraryShuffle.",
-          "cr": "CR 701.20a"
-        },
-        {
-          "factory": "TrinketMageFactory",
-          "file": "TrinketMageFactory.cs",
-          "line": 74,
-          "sentence": "Reveal-event emission is deferred (see class xmldoc); CR 701.20a shuffle now wired via LibraryShuffle.",
-          "cr": "CR 701.20a"
-        },
-        {
-          "factory": "PonderFactory",
-          "file": "PonderFactory.cs",
-          "line": 51,
-          "sentence": "The \u0022may shuffle\u0022 rider is deferred (no-op)."
-        }
-      ]
-    },
-    {
       "primitive_id": "layer6-ability-grant",
       "display_name": "Layer-6 ability-grant subsystem (CR 613.1f)",
       "comp_rules_citation": "CR 613.1f",
@@ -358,6 +314,25 @@
           "file": "ChannelLandCycleFactory.cs",
           "line": 12,
           "sentence": "Sokenzan, Crucible of Defiance \u2014 deferred (its Channel produces two 1/1 Spirit tokens with haste; requires a Spirit-token shape not yet in \u003Cc\u003ETokenFactory\u003C/c\u003E)."
+        }
+      ]
+    },
+    {
+      "primitive_id": "equip-primitive",
+      "display_name": "Equip activated-ability primitive (CR 702.6)",
+      "comp_rules_citation": "CR 702.6",
+      "implementation_hint": "EquipActivatedAbility \u2014 sorcery-speed activation, attaches/re-attaches Equipment to a chosen creature.",
+      "factory_count": 1,
+      "mention_count": 1,
+      "factories": [
+        "HammerOfNazahnFactory"
+      ],
+      "mentions": [
+        {
+          "factory": "HammerOfNazahnFactory",
+          "file": "HammerOfNazahnFactory.cs",
+          "line": 14,
+          "sentence": "## Deferred  - \u003Cb\u003EAttach-target prompt\u003C/b\u003E for the ETB trigger and the Equip activation \u2014 v1 picks the first controller-side creature deterministically (same gap as the rest of the equipment cycle)."
         }
       ]
     },
@@ -1231,6 +1206,19 @@
       "file": "PinnacleEmissaryFactory.cs",
       "line": 175,
       "sentence": "Keywords\u0022/\u003E; the restriction rider is documented but deferred."
+    },
+    {
+      "factory": "CranialPlatingFactory",
+      "file": "CranialPlatingFactory.cs",
+      "line": 12,
+      "sentence": "## Deferred  - \u003Cb\u003EAttach-target prompt\u003C/b\u003E for both attach abilities \u2014 v1 picks the first controller-side creature deterministically (same gap as the rest of the equipment cycle)."
+    },
+    {
+      "factory": "CranialPlatingFactory",
+      "file": "CranialPlatingFactory.cs",
+      "line": 12,
+      "sentence": "Phased-out artifacts (CR 702.26) and face-down morph artifacts would currently miscount; same gap as Mox Opal\u0027s \u0022metalcraft\u0022 predicate (no shared \u0022artifact-count helper\u0022 yet).",
+      "cr": "CR 702.26"
     },
     {
       "factory": "AjaniNacatlPariahFactory",

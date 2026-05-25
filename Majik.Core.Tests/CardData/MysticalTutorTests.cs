@@ -29,6 +29,7 @@ namespace Majik.Core.Tests.CardData;
 ///  - Agent decline (returns null) → no-op even when candidates exist
 ///    (CR 701.19a explicitly allows declining).
 /// </summary>
+[Collection(nameof(StaticRegistryCollection))]
 public class MysticalTutorTests
 {
     private static ChosenSpellParams EmptyChoices() =>

@@ -110,9 +110,11 @@ public static class GoblinEngineerFactory
         //   "When Goblin Engineer enters, you may search your library for
         //    an artifact card, then put that card into your graveyard. If
         //    you do, shuffle."
-        // v1: deterministic — take the first artifact card in the library;
-        // reveal-event emission deferred (see class xmldoc); CR 701.20a
-        // shuffle is now wired via LibraryShuffle.
+        // v1: deterministic — take the first artifact card in the library.
+        // CR 701.20a shuffle is wired via LibraryShuffle (publishes a
+        // LibraryShuffledEvent when an EventBus is registered). The
+        // reveal-event emission rider is the only outstanding gap (see
+        // class xmldoc).
         // Destination is graveyard (NOT hand) — distinguishes from
         // TrinketMageFactory / GoblinMatronFactory.
         // ----------------------------------------------------------------

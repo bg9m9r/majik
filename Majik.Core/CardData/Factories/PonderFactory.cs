@@ -6,6 +6,9 @@ using Majik.Core.Players;
 using Majik.Core.Players.Agents;
 using Majik.Core.Zones;
 
+// Resolve the LibraryShuffle helper via fully-qualified name to keep the
+// import set minimal.
+
 namespace Majik.Core.CardData.Factories;
 
 /// <summary>
@@ -21,19 +24,19 @@ namespace Majik.Core.CardData.Factories;
 ///   cards off the top of the controller's library, asks the registered
 ///   <see cref="IPlayerAgent"/> for a reorder via <see cref="ScryAction"/>
 ///   semantics (<c>ToBottom</c> must be empty — Ponder puts all peeked
-///   cards back on top), then draws a card.
+///   cards back on top), then resolves the "you may shuffle your library"
+///   rider via <see cref="IPlayerAgent.ChooseYesNoAsync"/> tagged with
+///   <see cref="BotIntent.LibraryReorder"/> (CR 701.20 — shuffle routes
+///   through <see cref="LibraryShuffle.ShuffleLibrary"/>), then draws a
+///   card.
 /// - With no agent registered, the default keeps the peeked cards in their
 ///   original order (pre-agent legacy behaviour — same shape as
-///   <see cref="ConsiderFactory"/>'s default-surveil fallback).
+///   <see cref="ConsiderFactory"/>'s default-surveil fallback) and the
+///   yes/no shuffle prompt falls through the default heuristic accept
+///   branch (auto-shuffle, matching the legacy posture).
 /// - Empty library: the peek short-circuits and the subsequent draw flags
 ///   the player for the standard draw-from-empty-library penalty
 ///   (CR 704.5b) via <see cref="Player.MarkTriedToDrawFromEmptyLibrary"/>.
-///
-/// ## Deferred (v1 gaps)
-/// - The "may shuffle your library" rider is a no-op in v1 — there is no
-///   <c>IZone.Shuffle</c> entry point yet (same rationale as
-///   <c>SearchSpellFactory</c>). The decision is not yet sourced from an
-///   agent prompt.
 /// </summary>
 [CardName("Ponder")]
 public static class PonderFactory
@@ -50,8 +53,11 @@ public static class PonderFactory
 
     /// <summary>
     /// Build Ponder's resolve effect — peek top 3, reorder via the registered
-    /// agent (or keep the original order if none), then draw a card. The
-    /// "may shuffle" rider is deferred (no-op).
+    /// agent (or keep the original order if none), resolve the "you may
+    /// shuffle your library" rider via <see cref="IPlayerAgent.ChooseYesNoAsync"/>
+    /// tagged with <see cref="BotIntent.LibraryReorder"/> (CR 701.20a —
+    /// shuffle routes through <see cref="LibraryShuffle.ShuffleLibrary"/>),
+    /// then draw a card.
     /// </summary>
     public static IReadOnlyList<IEffect> BuildResolveEffect(Player caster)
     {
@@ -104,12 +110,30 @@ public static class PonderFactory
                     ScryAction.Apply(caster, peeked.Count, decision);
                 }
 
-                // "You may shuffle your library." The IZone.Shuffle primitive
-                // is now wired (CR 701.20), but Ponder's "may" rider is a
-                // yes/no agent prompt — deferred behind the agent-prompt MVP
-                // (rank #1 in MECHANIC_DEPS). v1 auto-declines, leaving the
-                // (possibly reordered) top three on top.
-                //
+                // "You may shuffle your library." CR 701.20 — route the
+                // yes/no through IPlayerAgent.ChooseYesNoAsync tagged with
+                // BotIntent.LibraryReorder; on accept, the actual shuffle is
+                // performed via LibraryShuffle.ShuffleLibrary so the
+                // registered RNG + LibraryShuffledEvent fire (same path the
+                // tutor factories use). With no agent registered the
+                // IPlayerAgent default-heuristic accept branch fires, so
+                // legacy callers get the historical auto-shuffle posture.
+                var shuffleAgent = AgentRegistry.Get(caster);
+                if (shuffleAgent != null)
+                {
+                    // TODO: drop sync-over-async once IEffect.Execute becomes async.
+                    var shouldShuffle = shuffleAgent.ChooseYesNoAsync(
+                        "Shuffle your library?",
+                        BotIntent.LibraryReorder).GetAwaiter().GetResult();
+                    if (shouldShuffle)
+                    {
+                        Majik.Core.Zones.LibraryShuffle.ShuffleLibrary(caster, "ponder");
+                    }
+                }
+                // No agent registered → leave the (possibly reordered) top
+                // three on top, mirroring the pre-agent legacy posture used
+                // by every test fixture written before this prompt shipped.
+
                 // "Draw a card." Simple top-of-library draw; empty library
                 // flags the player for the SBA-driven loss (CR 704.5b) via
                 // MarkTriedToDrawFromEmptyLibrary.

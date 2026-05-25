@@ -28,6 +28,7 @@ namespace Majik.Core.Tests.CardData;
 ///   - Resolve on empty library — peek short-circuits and the draw flags
 ///     the player without throwing.
 /// </summary>
+[Collection(nameof(StaticRegistryCollection))]
 public class PonderTests : IDisposable
 {
     private readonly Player _alice = new("Alice", 20);
@@ -99,6 +100,10 @@ public class PonderTests : IDisposable
         agent.QueueScryDecision(new ScryAction.ScryDecision(
             ToBottom: Array.Empty<ICard>(),
             TopOrder: new ICard[] { c, b, a }));
+        // Ponder's "may shuffle" rider now consults ChooseYesNoAsync
+        // (CR 701.20 + BotIntent.LibraryReorder). Decline so the reorder
+        // assertion below still observes the post-reorder top.
+        agent.QueueYesNo(false);
         AgentRegistry.Set(_alice, agent);
 
         var effect = PonderFactory.BuildResolveEffect(_alice).Single();

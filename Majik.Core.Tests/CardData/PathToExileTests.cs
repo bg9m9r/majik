@@ -30,6 +30,7 @@ namespace Majik.Core.Tests.CardData;
 ///   - Empty library: tutor is a legal no-op when there are no basics
 ///     to find (CR 701.19a).
 /// </summary>
+[Collection(nameof(StaticRegistryCollection))]
 public class PathToExileTests : IDisposable
 {
     private readonly EventBus _bus = new();
