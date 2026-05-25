@@ -68,8 +68,17 @@ public sealed class EscapeAltCostProbe : IAlternativeCostProbe
 
     /// <summary>
     /// Built-in lookup that recognizes the ship-list of named Escape cards
-    /// by name. Wired by callers that don't have a richer per-card
-    /// metadata source. Per Scryfall printings:
+    /// by name AND honours any runtime Escape grant stamped via
+    /// <see cref="Majik.Core.Cards.Card.GrantRuntimeEscape"/> (Underworld
+    /// Breach's static "Each nonland card in your graveyard has escape …"
+    /// grant). The runtime stamp takes precedence over the printed ship
+    /// list so a card that already has printed escape but also receives a
+    /// runtime grant is surfaced under the granted cost (the printed shape
+    /// remains available for direct cost construction via the card's
+    /// factory <c>BuildAlternativeCost()</c>).
+    ///
+    /// Wired by callers that don't have a richer per-card metadata source.
+    /// Per Scryfall printings:
     /// <list type="bullet">
     ///   <item>Uro, Titan of Nature's Wrath: <c>{G}{G}{U}{U}</c> + 5 exile</item>
     ///   <item>Phlage, Titan of Fire's Fury: <c>{R}{R}{W}{W}</c> + 5 exile</item>
@@ -79,6 +88,18 @@ public sealed class EscapeAltCostProbe : IAlternativeCostProbe
     /// </summary>
     public static EscapeDescriptor? DefaultLookup(ICard card)
     {
+        // Runtime grant (CR 702.143 — Underworld Breach et al.) takes
+        // precedence over the printed ship list. Underworld Breach stamps
+        // every nonland graveyard card with GrantRuntimeEscape(
+        // card.printedCost, 3); the probe surfaces the stamped cost +
+        // count directly.
+        if (card is Majik.Core.Cards.Card concrete
+            && concrete.RuntimeEscapeCost is { } cost
+            && concrete.RuntimeEscapeExileCount is { } count)
+        {
+            return new EscapeDescriptor(cost, count);
+        }
+
         return card.Name switch
         {
             "Uro, Titan of Nature's Wrath" => new EscapeDescriptor(ManaCost.Parse("{G}{G}{U}{U}"), 5),
