@@ -39,6 +39,10 @@ public enum CardSubtype
     Archer,
     Army,
     Advisor,
+    /// <summary>Noble creature subtype — Muxus, Goblin Grandee, Goblin
+    /// Trashmaster. CR 205.3m. Added to support Muxus's "Goblin Noble"
+    /// printed line; pairs naturally with the Goblin subtype.</summary>
+    Noble,
     /// <summary>Modern Horizons 2 incarnation cycle (Solitude, Endurance,
     /// Fury, Grief, Subtlety). CR 205.3m — creature subtype.</summary>
     Incarnation,
