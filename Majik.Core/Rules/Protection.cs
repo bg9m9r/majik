@@ -67,11 +67,24 @@ public static class Protection
         if (source == null) throw new ArgumentNullException(nameof(source));
         foreach (var p in card.Abilities.OfType<ProtectionAbility>())
         {
+            // Skip conditional clauses whose gate is currently false
+            // (Etched Champion outside Metalcraft).
+            if (!p.IsCurrentlyActive) continue;
             if (p.SpellPredicate is { } pred && pred(source)) return true;
         }
         return false;
     }
 
+    /// <summary>
+    /// Active-only qualities scan — conditional protection clauses
+    /// (e.g. Etched Champion's Metalcraft rider) whose
+    /// <see cref="ProtectionAbility.IsActive"/> closure currently returns
+    /// false are filtered out, so the colour / type lookups behave as if
+    /// the clause is not in effect. Always-on protections (IsActive
+    /// null) are unaffected.
+    /// </summary>
     private static IEnumerable<string> Qualities(ICard card) =>
-        card.Abilities.OfType<ProtectionAbility>().Select(p => p.Quality);
+        card.Abilities.OfType<ProtectionAbility>()
+            .Where(p => p.IsCurrentlyActive)
+            .Select(p => p.Quality);
 }
