@@ -11,10 +11,11 @@ namespace Majik.Server.Matches;
 /// opens a fresh DI scope to resolve <see cref="MatchService"/> (which is
 /// scoped) before invoking the public API.
 ///
-/// <para>Default delays — 600ms before the bot rolls, 800ms before the bot
+/// <para>Default delays — 600ms before the bot rolls, 3000ms before the bot
 /// chooses play/draw — are tuned so the user has time to read the rolling
-/// state ("…") and the resolved dice values before the match transitions
-/// into Playing. Override via constructor params for tests or tuning.</para>
+/// state ("…") and, crucially, to see the "Winner: X" announcement long
+/// enough to register before the match transitions into Playing. Override
+/// via constructor params for tests or tuning.</para>
 /// </summary>
 public sealed class BotMatchScheduler : IBotMatchScheduler
 {
@@ -32,7 +33,7 @@ public sealed class BotMatchScheduler : IBotMatchScheduler
         _services = services;
         _logger = logger;
         _rollDelay = rollDelay ?? TimeSpan.FromMilliseconds(600);
-        _playDrawDelay = playDrawDelay ?? TimeSpan.FromMilliseconds(800);
+        _playDrawDelay = playDrawDelay ?? TimeSpan.FromMilliseconds(3000);
     }
 
     public void ScheduleBotRoll(Guid matchId, string botSub)
