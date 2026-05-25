@@ -39,6 +39,93 @@ public sealed class SpellCastFlow
         _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
     }
 
+    /// <summary>
+    /// CR 702.139c — Companion "cast from outside the game" entry path.
+    ///
+    /// Resolves the once-per-game tax portion of the companion rule: as a
+    /// special action, the controller pays {3} to move their nominated
+    /// companion from the sideboard zone to their hand. From there the
+    /// card is cast normally via <see cref="CastAsync"/> on the same turn
+    /// (the printed mana cost is paid then; the {3} here is the
+    /// sideboard → hand tax, not the spell's cost).
+    ///
+    /// Preconditions enforced here:
+    /// <list type="bullet">
+    /// <item><see cref="Player.CompanionUsedThisGame"/> is false (once-per-game).</item>
+    /// <item>The card is currently in the player's sideboard zone.</item>
+    /// <item>It is the player's own turn, in a main phase, with an empty
+    ///       stack (CR 702.139c — "any time you could cast a sorcery").</item>
+    /// <item>The controller can pay the {3} tax from their mana pool.</item>
+    /// </list>
+    ///
+    /// On success: the {3} is deducted, the card is moved sideboard → hand,
+    /// and <see cref="Player.MarkCompanionUsed"/> latches the once-per-game
+    /// ledger. The caller is then expected to invoke <see cref="CastAsync"/>
+    /// with the printed mana cost to actually cast the companion.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when any precondition fails.
+    /// </exception>
+    public Task CastCompanionAsync(
+        Player caster,
+        ICard card,
+        GameContext ctx,
+        CancellationToken ct = default)
+    {
+        if (caster == null) throw new ArgumentNullException(nameof(caster));
+        if (card == null) throw new ArgumentNullException(nameof(card));
+        if (ctx == null) throw new ArgumentNullException(nameof(ctx));
+
+        // CR 702.139c — once-per-game gate.
+        if (caster.CompanionUsedThisGame)
+        {
+            throw new InvalidOperationException(
+                $"Cannot move companion {card.Name} from sideboard: "
+                + "the once-per-game companion cast has already been used.");
+        }
+
+        // Must be in the player's sideboard.
+        if (card.Zone != ZoneType.Sideboard)
+        {
+            throw new InvalidOperationException(
+                $"Cannot move companion {card.Name} from sideboard: "
+                + $"card is in {card.Zone}, not Sideboard.");
+        }
+        if (!ReferenceEquals(card.Owner, caster))
+        {
+            throw new InvalidOperationException(
+                $"Cannot move companion {card.Name} from sideboard: "
+                + "card is not in the casting player's sideboard.");
+        }
+
+        // CR 702.139c — sorcery-speed restriction. Only legal during the
+        // controller's own main phase with an empty stack.
+        if (!ReferenceEquals(ctx.ActivePlayer, caster)
+            || !_stack.IsEmpty
+            || ctx.CurrentPhase != StateMachine.PhaseStateType.Main)
+        {
+            throw new InvalidOperationException(
+                $"Cannot move companion {card.Name} from sideboard: "
+                + "sorcery-speed restriction (CR 702.139c — only on your "
+                + "own main phase with an empty stack).");
+        }
+
+        // CR 702.139c — pay the {3} tax. Atomic — if the pool can't cover
+        // it, refuse the move entirely.
+        if (!caster.PayMana(ValueObjects.ManaCost.Parse("{3}")))
+        {
+            throw new InvalidOperationException(
+                $"Cannot move companion {card.Name} from sideboard: "
+                + "controller cannot pay the {3} companion tax.");
+        }
+
+        // Move sideboard → hand, then latch the once-per-game ledger.
+        _zoneService.MoveCard(card, ZoneType.Sideboard, ZoneType.Hand, controller: caster);
+        caster.MarkCompanionUsed();
+
+        return Task.CompletedTask;
+    }
+
     public async Task<Spells.Spell> CastAsync(
         Player caster,
         ICard card,
