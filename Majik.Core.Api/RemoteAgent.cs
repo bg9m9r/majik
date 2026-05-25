@@ -207,6 +207,44 @@ public sealed class RemoteAgent : IPlayerAgent
                     new PriorityAction.ActivateManaAbility(permanent, chosen));
                 break;
             }
+            case ActivateAbilityCommand aac:
+            {
+                // CR 602 — translate the wire command into the engine's
+                // PriorityAction.ActivateAbility. Validate locally only the
+                // bits that gate command-routing (source exists, is a
+                // permanent the caller controls, has the named activated
+                // ability). Cost-payability, zone gates, sorcery-speed
+                // riders, target legality, etc. are all engine concerns
+                // and are validated by AbilityActivator / ActionValidator
+                // when GameFacade.DispatchActivate runs the activation.
+                var source = ResolveCard(aac.PermanentInstanceId);
+                if (source is not Permanent permanent)
+                {
+                    throw new InvalidOperationException(
+                        $"ActivateAbilityCommand source {aac.PermanentInstanceId} is not a Permanent ({source.GetType().Name}).");
+                }
+                if (permanent.Controller != null && !ReferenceEquals(permanent.Controller, _player))
+                {
+                    throw new InvalidOperationException(
+                        $"Player {_player.Id} does not control permanent {permanent.Name}.");
+                }
+                var ability = permanent.Abilities
+                    .OfType<IActivatedAbility>()
+                    .Where(a => a is not IManaAbility)
+                    .FirstOrDefault(a => a.Id == aac.AbilityId);
+                if (ability == null)
+                {
+                    throw new InvalidOperationException(
+                        $"Permanent {permanent.Name} has no non-mana activated ability with id {aac.AbilityId}.");
+                }
+                // Targets are not pre-resolved here — the activation flow
+                // re-prompts via ChooseTargetsAsync (mirrors the
+                // CastSpellCommand posture above; CR 602.1b chooses targets
+                // as part of activation, not the priority command).
+                ((TaskCompletionSource<PriorityAction>)tcs).SetResult(
+                    new PriorityAction.ActivateAbility(ability, Array.Empty<object>()));
+                break;
+            }
             case OrderTriggersCommand ot:
                 // CR 603.3b — APNAP-controller orders their own simultaneous
                 // triggers onto the stack. The wire command carries only
@@ -407,6 +445,25 @@ public sealed class RemoteAgent : IPlayerAgent
         if (hasManaSource)
         {
             kinds.Add(typeof(ActivateManaAbilityCommand));
+        }
+
+        // CR 602.1a — non-mana activated abilities (fetchland sacrifice,
+        // equip, planeswalker loyalty, "tap: do X", etc.) are activated
+        // whenever their controller has priority and the sorcery-speed
+        // rider (if any) is satisfied. The check here is intentionally
+        // permissive: advertise the kind whenever the player controls
+        // any permanent carrying at least one non-mana IActivatedAbility.
+        // ActionValidator + ActivatedAbilityRestrictions enforce the rest
+        // (CanActivate, sorcery-speed rider, cost-payability, target
+        // legality) on submit — false negatives here would lock the user
+        // out of fetchlands / equip / loyalty entirely, which is the
+        // catastrophic class this method's contract calls out.
+        var hasActivatedAbility = battlefield.Any(c =>
+            c.Abilities.OfType<Majik.Core.Abilities.IActivatedAbility>()
+                .Any(a => a is not Majik.Core.Abilities.IManaAbility));
+        if (hasActivatedAbility)
+        {
+            kinds.Add(typeof(ActivateAbilityCommand));
         }
 
         return kinds.ToArray();

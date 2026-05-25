@@ -19,6 +19,7 @@ namespace Majik.Core.Api.Commands;
 [JsonDerivedType(typeof(ChooseManaCommand), "mana")]
 [JsonDerivedType(typeof(CancelCastCommand), "cancelCast")]
 [JsonDerivedType(typeof(ActivateManaAbilityCommand), "activateManaAbility")]
+[JsonDerivedType(typeof(ActivateAbilityCommand), "activateAbility")]
 [JsonDerivedType(typeof(OrderTriggersCommand), "order-triggers")]
 [JsonDerivedType(typeof(DeclareAttackersCommand), "attackers")]
 [JsonDerivedType(typeof(DeclareBlockersCommand), "blockers")]
@@ -68,6 +69,21 @@ public sealed record CancelCastCommand() : GameCommand;
 /// string is allowed for sources with exactly one mana ability.
 /// </summary>
 public sealed record ActivateManaAbilityCommand(Guid PermanentInstanceId, string Color) : GameCommand;
+
+/// <summary>
+/// Activate a non-mana activated ability of a permanent the player controls
+/// (CR 602 — costs paid, then the ability goes on the stack). The
+/// <see cref="PermanentInstanceId"/> identifies the source; the
+/// <see cref="AbilityId"/> is the <see cref="Majik.Core.Stack.IStackObject.Id"/>
+/// of the specific <see cref="Majik.Core.Abilities.IActivatedAbility"/> on
+/// that permanent (needed when a card has more than one activated ability —
+/// e.g. fetchlands carry their {T}, Pay 1 life, Sacrifice ability alongside
+/// any printed mana abilities). The engine validates legality (controller,
+/// zone, sorcery-speed rider, cost-payability) on submit; this command is
+/// the wire shape for the existing <see cref="Majik.Core.Players.Agents.PriorityAction.ActivateAbility"/>
+/// dispatch path.
+/// </summary>
+public sealed record ActivateAbilityCommand(Guid PermanentInstanceId, Guid AbilityId) : GameCommand;
 
 public sealed record OrderTriggersCommand(IReadOnlyList<Guid> StackObjectIdsInOrder) : GameCommand;
 
