@@ -18,6 +18,7 @@ public enum CardSubtype
     Angel,
     Demon,
     Zombie,
+    Skeleton,
     Beast,
     Bird,
     Cat,
