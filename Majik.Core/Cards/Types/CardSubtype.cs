@@ -207,6 +207,10 @@ public enum CardSubtype
     /// <summary>Naga creature subtype — Ramunap Excavator (Hour of Devastation),
     /// Hapatra, Vizier of Poisons, the Amonkhet snake-people lineage. CR 205.3m.</summary>
     Naga,
+    /// <summary>Vedalken creature subtype — Master of Etherium (Shards of
+    /// Alara), Vedalken Shackles, Trinket Mage's adjacent Mirrodin /
+    /// Alara blue-aligned artificer lineage. CR 205.3m.</summary>
+    Vedalken,
     /// <summary>Arcane spell subtype — Champions of Kamigawa block (Desperate
     /// Ritual, Goryo's Vengeance, Through the Breach, Glacial Ray, …). The
     /// only subtype that exists for instant / sorcery spells in the engine;
