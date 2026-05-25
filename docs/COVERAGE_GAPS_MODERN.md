@@ -1,13 +1,13 @@
 # Coverage gaps — mechanic-cluster backlog
 
 - **Scope:** format=modern, dedup-by-name
-- **Generated:** 2026-05-24 19:53 UTC
-- **Unimplemented total:** 15885
+- **Generated:** 2026-05-25 03:13 UTC
+- **Unimplemented total:** 15868
 - **Min cluster size:** 5
 - **Clusters ≥ threshold:** 205 (rendering top 50)
-- **Cards in above-threshold clusters:** 2177 (13.7% of unimplemented)
-- **Cards in rendered top-50:** 1191 (7.5% of unimplemented)
-- **Long-tail cards (below threshold):** 13708
+- **Cards in above-threshold clusters:** 2176 (13.7% of unimplemented)
+- **Cards in rendered top-50:** 1190 (7.5% of unimplemented)
+- **Long-tail cards (below threshold):** 13692
 
 ## Ranked clusters
 
@@ -27,7 +27,7 @@
 | 12 | 29 | _(none)_ | `~ can't be blocked` |
 | 13 | 26 | _(none)_ | `creatures you control get +n/+n until end of turn` |
 | 14 | 26 | EtbGenericTriggerBinder | `when ~ enters, you get {cost}` |
-| 15 | 25 | EtbDrawCardTriggerBinder | `when ~ enters, draw a card` |
+| 15 | 24 | EtbDrawCardTriggerBinder | `when ~ enters, draw a card` |
 | 16 | 24 | _(none)_ | `{cost}, {cost}: tap target creature` |
 | 17 | 20 | ActivatedGenericBinder | `{cost}: regenerate ~` |
 | 18 | 19 | _(none)_ | `enchant creature enchanted creature gets -n/-n` |
@@ -483,7 +483,7 @@
   - Tempest Harvester
   - Thriving Grubs
 
-### 15. 25 cards — `when ~ enters, draw a card`
+### 15. 24 cards — `when ~ enters, draw a card`
 
 - **Suggested binder:** `EtbDrawCardTriggerBinder` — ETB triggered ability — draw one card
 - **Trigger signature:** `when ~ enters,`
@@ -508,11 +508,11 @@
   - Masked Admirers
   - Merchant of Secrets
   - Nimble Innovator
-  - Omnath, Locus of Creation
   - Pond Prophet
   - Proft's Eidetic Memory
   - Rhox Oracle
   - Sarulf's Packmate
+  - Shaman of Spring
 
 ### 16. 24 cards — `{cost}, {cost}: tap target creature`
 
