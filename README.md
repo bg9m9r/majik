@@ -119,14 +119,6 @@ Per-card behaviour is wired in the named factories under `Majik.Core/CardData/Fa
 | `POST /matches` / `GET /matches/:id` / `POST /matches/:id/seats/:seat/claim` | Match lifecycle |
 | `MapHub /hubs/match` | SignalR — live match state, player actions, prompts |
 
-### Auth
-
-OIDC bearer tokens, validated against Descope. Server-side:
-- `Auth:Authority = https://api.descope.com/<PROJECT_ID>` — JwtBearer discovers keys via `{authority}/.well-known/openid-configuration`.
-- `Auth:Audience = <PROJECT_ID>`.
-- [`DescopeTokenValidator`](./Majik.Server/Auth/DescopeTokenValidator.cs) accepts both direct and OIDC-app issuer shapes, requires a non-empty `sub`, lifts `discordUserId` from a direct claim or the nested `customAttributes` JSON.
-- Disable auth (dev) by leaving `Auth:Authority` empty.
-
 ### Storage
 
 | Data | Store | Why |
@@ -144,8 +136,6 @@ docker compose -f docker-compose.dev.yml up -d
 dotnet run --project Majik.Server
 # → http://localhost:5057 (REST + /hubs/match + /openapi/v1.json)
 ```
-
-Auth defaults to disabled when `Auth:Authority` is unset, so the server starts with no IdP configured. To exercise the auth-gated paths locally, point at a Descope project via `appsettings.Development.json` or env vars.
 
 ## Testing
 
