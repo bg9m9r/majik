@@ -151,6 +151,15 @@ public enum CardSubtype
     /// Battle for Baldur's Gate), Cosima, God of the Voyage's adjacent
     /// shellfolk. CR 205.3m.</summary>
     Turtle,
+    /// <summary>Beholder creature subtype — Hive of the Eye Tyrant (Adventures
+    /// in the Forgotten Realms manland cycle). CR 205.3m.</summary>
+    Beholder,
+    /// <summary>Robot creature subtype — Pinnacle Emissary (Edge of Eternities)
+    /// and the EOE robot lineage. CR 205.3m.</summary>
+    Robot,
+    /// <summary>Drone creature subtype — Pinnacle Emissary's 1/1 colorless
+    /// Drone artifact creature tokens (Edge of Eternities). CR 205.3m.</summary>
+    Drone,
 
     // Land subtypes (examples)
     Forest,
