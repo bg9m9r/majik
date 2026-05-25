@@ -260,4 +260,64 @@ internal static class DamageSpellFactory
                 EmitDamageDealt(bus, caster, creature, amount);
             }) };
         });
+
+    /// <summary>
+    /// "~ deals N damage divided as you choose among up to <c>maxTargets</c>
+    /// targets" — Arc Lightning (3 / up to 3 creatures), Chandra's Pyrohelix
+    /// (2 / up to 2), Boulderfall (5 / any number), etc.
+    /// <para>
+    /// V1 lossy: we accept 1..maxTargets distinct targets and split N as
+    /// evenly as possible across them (excess goes to the first). The real
+    /// rule lets the caster pick the distribution at cast time, but the
+    /// even-split is a reasonable default for the bot and is the only
+    /// behaviour reachable without a target-distribution UI.
+    /// </para>
+    /// <para>
+    /// <paramref name="targetType"/> selects whether the targets are
+    /// creatures, players, or any. Defaults to "any target" since most
+    /// divided-damage spells in Modern accept any-target.
+    /// </para>
+    /// </summary>
+    internal static SpellDefinition DamageDividedAmongAnyTargetsSpell(
+        int n, int maxTargets, Func<object, object> resolver,
+        ReplacementBus? replacements, Player? caster, IEventBus? bus) => new(
+        Modes: Array.Empty<string>(), HasVariableX: false,
+        TargetRequests: new[] { new TargetRequest("any target", 1, maxTargets, Array.Empty<object>()) },
+        EffectFactory: p =>
+        {
+            var slots = p.Targets.Count > 0 ? p.Targets[0] : Array.Empty<object>();
+            var targets = slots.Select(s => resolver(s)).Where(t => t is not null).ToList();
+            return new IEffect[] { new Effect($"deal {n} divided among {targets.Count}", () =>
+            {
+                if (targets.Count == 0 || n <= 0) return;
+                // Even split (remainder front-loaded). With one target this
+                // degenerates to full N — same as the single-target variant.
+                var baseShare = n / targets.Count;
+                var remainder = n % targets.Count;
+                for (int i = 0; i < targets.Count; i++)
+                {
+                    var share = baseShare + (i < remainder ? 1 : 0);
+                    if (share <= 0) continue;
+                    var target = targets[i]!;
+                    var amount = Filter(replacements, (object?)caster ?? target, target, share);
+                    if (amount <= 0) continue;
+                    OracleSpellBinder.DealDamage(target, amount);
+                    EmitDamageDealt(bus, caster, target, amount);
+                }
+            }) };
+        });
+
+    /// <summary>
+    /// "~ deals N damage to each player" — Flame Rift family. Hits every
+    /// player including the caster (CR 109.5 — "each player" is inclusive).
+    /// </summary>
+    internal static SpellDefinition DamageEachPlayerSpell(int n, Player caster) => new(
+        Modes: Array.Empty<string>(), HasVariableX: false,
+        TargetRequests: Array.Empty<TargetRequest>(),
+        EffectFactory: p => new IEffect[] { new Effect($"each player takes {n}", () =>
+        {
+            var all = p.AllPlayers;
+            if (all == null) { caster.LoseLife(n); return; }
+            foreach (var pl in all) pl.LoseLife(n);
+        }) });
 }

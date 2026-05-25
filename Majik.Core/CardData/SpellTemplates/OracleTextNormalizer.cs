@@ -117,6 +117,77 @@ public static class OracleTextNormalizer
     // Collapse any run of whitespace (incl. newlines) to a single space.
     private static readonly Regex MultiWhitespace = new(@"\s+", RegexOptions.Compiled);
 
+    // ---------- Folding-pass patterns (PR-B) -------------------------------
+    //
+    // Two extra passes folded into NormalizeFolded so templates can opt into
+    // a more aggressive view of the body. They are NOT applied by the
+    // backwards-compatible Normalize entry-point.
+
+    // A single mana symbol: a pip inside {…}. The grammar of a mana pip is
+    // limited — basic colour (W/U/B/R/G/C), generic (digits or X/Y/Z),
+    // snow (S), half-mana (H), hybrid (X/Y), Phyrexian (X/P). Tap "{T}",
+    // untap "{Q}" and other non-mana brace markers are intentionally NOT
+    // covered: they aren't mana costs, and folding them as "{cost}" would
+    // mask abilities like "{T}: Add {G}." The character class is precise on
+    // purpose so a future printing that introduces a non-mana glyph cannot
+    // be silently swept into the fold.
+    //
+    // The pip body, before the closing brace, may be:
+    //   * "\d+"        — generic mana ({2}, {15}).
+    //   * Single colour W|U|B|R|G|C|X|Y|Z|S|H.
+    //   * Hybrid "<X>/<Y>" where each side is one of the above (e.g. {W/U},
+    //     {2/W}, {G/P}). Phyrexian is hybrid with the second side P.
+    private const string ManaPipBody =
+        @"(?:\d+|[WUBRGCXYZSH])(?:/[WUBRGCXYZSHP0-9])?";
+
+    // One or more adjacent mana pips, whitespace allowed between (Scryfall
+    // never inserts whitespace between adjacent pips, but tolerate it for
+    // robustness). Anchoring on "two or more" would miss "{R}" payments;
+    // we fold single pips too — a single mana payment is still a cost.
+    private static readonly Regex ManaCostRun = new(
+        @"\{" + ManaPipBody + @"\}(?:\s*\{" + ManaPipBody + @"\})*",
+        RegexOptions.Compiled);
+
+    // Standalone integer counts in the prose. Captured contexts:
+    //   * P/T deltas:   +1/+1, -2/-0, +0/+3.
+    //   * "N damage":   "deals 3 damage", "5 damage to".
+    //   * "N card(s)":  "draw 2 cards", "discards 3 cards".
+    //   * "N life":     "loses 4 life", "gain 2 life".
+    //   * "N counter(s)" optional — covered by the +N/+N P/T case for
+    //     creature pumps; cumulative counters of other kinds are folded by
+    //     the explicit N-counter sub-pattern below.
+    //
+    // The folded view replaces each captured integer with the literal "n"
+    // so templates that match on "deals n damage to any target" handle every
+    // value of N. Templates that care about N's actual value MUST read it
+    // from the un-folded ctx.Text (or ctx.RawText) using a separate scoped
+    // regex; the fold is for matching, not for value extraction.
+
+    // +N/+N or -N/-N power/toughness deltas (and 0/+N / +N/0 mixes).
+    private static readonly Regex PtDelta = new(
+        @"([+-])\d+/([+-])\d+",
+        RegexOptions.Compiled);
+
+    // "<verb> N <noun>" patterns. Each is anchored on a specific noun so the
+    // fold doesn't accidentally swallow numbers in unrelated contexts
+    // (e.g. "Choose 2 — Destroy target creature." — Scryfall doesn't write
+    // this, but the regex is conservative regardless).
+    //
+    // Word-boundaries on both sides keep the digit standalone — multi-digit
+    // costs like "10 damage" still fold to "n damage".
+    private static readonly Regex NDamage = new(
+        @"\b\d+\s+damage\b",
+        RegexOptions.Compiled);
+    private static readonly Regex NCards = new(
+        @"\b\d+\s+cards?\b",
+        RegexOptions.Compiled);
+    private static readonly Regex NLife = new(
+        @"\b\d+\s+life\b",
+        RegexOptions.Compiled);
+    private static readonly Regex NCounters = new(
+        @"\b\d+\s+(?<kind>\+1/\+1|-1/-1|charge|loyalty|time|fade|age|verse)\s+counters?\b",
+        RegexOptions.Compiled);
+
     /// <summary>
     /// Strip recognised leading prefixes from <paramref name="text"/> plus
     /// the additional cleanups described on the type. Does NOT substitute
@@ -191,6 +262,75 @@ public static class OracleTextNormalizer
 
         var s = ReplaceCardName(text, cardName);
         return Normalize(s);
+    }
+
+    /// <summary>
+    /// PR-B: an additionally-folded view of the oracle body. Runs the same
+    /// passes as <see cref="NormalizeForCard"/>, then folds two additional
+    /// classes of trivial variant into stable tokens so a single template
+    /// regex can match an entire family of cards:
+    ///
+    ///   1. Consecutive mana-cost pip runs collapse to the literal
+    ///      "{cost}" token. Examples:
+    ///        "{2}{W}{W}"   → "{cost}"
+    ///        "{X}{R}"      → "{cost}"
+    ///        "{T}, Pay {2}" → "{T}, Pay {cost}"  (Tap is NOT mana — left alone)
+    ///
+    ///   2. Standalone integer counts in a known noun context fold to the
+    ///      literal "n" token. Examples:
+    ///        "+1/+1"                 → "+n/+n"
+    ///        "deals 3 damage"        → "deals n damage"
+    ///        "draw 2 cards"          → "draw n cards"
+    ///        "target opponent loses 4 life" → "target opponent loses n life"
+    ///        "two +1/+1 counters"    → "two +n/+n counters" (delta first, then noun untouched)
+    ///
+    /// Lossy by design: the folded view loses the original numeric value.
+    /// Templates that need the value match the folded text first (cheap
+    /// reject), then run a scoped regex over the un-folded
+    /// <see cref="SpellBindContext.Text"/> to pull out the actual digits.
+    ///
+    /// Backwards-compatible: existing templates that consult
+    /// <see cref="SpellBindContext.Text"/> see the un-folded text and keep
+    /// working unchanged. Templates that opt in read
+    /// <see cref="SpellBindContext.TextFolded"/>.
+    /// </summary>
+    public static string NormalizeFolded(string text, string? cardName)
+    {
+        var s = NormalizeForCard(text, cardName);
+        if (string.IsNullOrEmpty(s)) return s;
+        return FoldTokens(s);
+    }
+
+    /// <summary>
+    /// Applies the PR-B folding passes only — caller is responsible for
+    /// running <see cref="Normalize"/> / <see cref="NormalizeForCard"/>
+    /// first. Exposed for unit-test surface; production templates should
+    /// reach for <see cref="NormalizeFolded"/> or
+    /// <see cref="SpellBindContext.TextFolded"/>.
+    /// </summary>
+    public static string FoldTokens(string normalized)
+    {
+        if (string.IsNullOrEmpty(normalized)) return normalized;
+
+        // Pass A: mana-cost run → {cost}. Done first because a run can
+        // contain digits ({2}) that the numeric fold would otherwise eat
+        // if it ran prior.
+        var s = ManaCostRun.Replace(normalized, "{cost}");
+
+        // Pass B: numeric folds. Each scoped regex is run in turn. Order
+        // matters only between PT-delta (consumes "+1/+1") and the generic
+        // N-counters pattern (uses "+1/+1" as its counter-kind anchor) —
+        // we run delta last so the counter-kind anchor can still see the
+        // raw "+1/+1" / "-1/-1". After NCounters folds the integer in
+        // front of the counter kind, PtDelta then folds the counter-kind
+        // P/T marker itself.
+        s = NCounters.Replace(s, m => "n " + m.Groups["kind"].Value + (m.Value.EndsWith('s') ? " counters" : " counter"));
+        s = PtDelta.Replace(s, m => m.Groups[1].Value + "n/" + m.Groups[2].Value + "n");
+        s = NDamage.Replace(s, "n damage");
+        s = NCards.Replace(s, m => m.Value.EndsWith('s') ? "n cards" : "n card");
+        s = NLife.Replace(s, "n life");
+
+        return s;
     }
 
     private static string ReplaceCardName(string text, string cardName)
