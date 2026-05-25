@@ -281,5 +281,10 @@ public enum CardSubtype
     Ugin,
     Bolas,
     Wrenn,
-    Oko
+    Oko,
+
+    /// <summary>Homarid creature subtype — Hedron Crab, Homarid. CR 205.3m.
+    /// Crustacean-flavoured creature type that originated in Fallen Empires
+    /// and was reused by Zendikar's Hedron Crab.</summary>
+    Homarid
 }
