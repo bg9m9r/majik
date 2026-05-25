@@ -182,7 +182,12 @@ public sealed class HeuristicBotAgent : IPlayerAgent
             }
             var vanillaPenalty = card.IsVanillaShell ? -100 : 0;
 
-            var printedCost = Majik.Core.Costs.CostReduction.GetEffectiveCost(card, ctx.Self);
+            // CR 117.7 / 601.2f — bot affordability must mirror the real cast
+            // pipeline. Three-arg overload also walks each player's battlefield
+            // for SpellCostIncreaseAbility riders (Sphere of Resistance,
+            // Trinisphere, Thalia, Damping Sphere) so the bot's bid pool
+            // doesn't propose casts it can't actually afford under a tax.
+            var printedCost = Majik.Core.Costs.CostReduction.GetEffectiveCost(card, ctx.Self, ctx.AllPlayers);
             var inHand = card.Zone == ZoneType.Hand;
 
             // Alt-cost bids (probe may yield 0..N candidates per card).
