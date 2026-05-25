@@ -29,7 +29,8 @@ namespace Majik.Core.CardData.Factories;
 ///   Hammer / Skullclamp / Jitte / Sword of Fire and Ice.
 /// - <b>Damage-doubling replacements</b> (CR 614 / CR 510.1c) — two
 ///   <see cref="DamageDoubleReplacement"/> registrations on the supplied
-///   <see cref="ReplacementBus"/>:
+///   <see cref="ReplacementBus"/>, each composed with a Flail-specific
+///   predicate:
 ///     1. <i>Source-side</i> — when the Flail's
 ///        <see cref="Permanent.AttachedTo"/> creature is the
 ///        <see cref="DamageIntent.Source"/> AND the intent is combat
@@ -94,71 +95,34 @@ public static class InquisitorsFlailFactory
         // Damage-doubling replacements — gated on the Flail being on
         // the battlefield AND attached, then on the intent being combat
         // damage AND the equipped creature being the source / target.
+        // Generic DamageDoubleReplacement primitive (Majik.Core/Effects/),
+        // composed here with Flail-specific predicates. Per-effect dedup
+        // in the bus (CR 616.1c) lets both registrations fire on a
+        // single intent — e.g. mirror-match face-bite where the equipped
+        // creature deals combat damage to itself.
         // --------------------------------------------------------------
         if (replacements != null)
         {
-            replacements.Register<DamageIntent>(
-                new DamageDoubleReplacement(card, source: true));
-            replacements.Register<DamageIntent>(
-                new DamageDoubleReplacement(card, source: false));
+            // Source-side: "If equipped creature would deal combat damage,
+            // it deals double that damage instead."
+            replacements.Register<DamageIntent>(new DamageDoubleReplacement(
+                intent =>
+                    intent.IsCombatDamage
+                    && card.Zone == ZoneType.Battlefield
+                    && card.AttachedTo is { } eq
+                    && ReferenceEquals(intent.Source, eq)));
+
+            // Target-side: "If a source would deal combat damage to
+            // equipped creature, it deals double that damage instead."
+            replacements.Register<DamageIntent>(new DamageDoubleReplacement(
+                intent =>
+                    intent.IsCombatDamage
+                    && card.Zone == ZoneType.Battlefield
+                    && card.AttachedTo is { } eq
+                    && intent.TargetCreature is not null
+                    && ReferenceEquals(intent.TargetCreature, eq)));
         }
 
         return card;
     }
-}
-
-/// <summary>
-/// CR 614 replacement: when a <see cref="DamageIntent"/> is combat damage
-/// (CR 510.1) and the Flail's currently-equipped creature is either the
-/// source or the target (selected by the <see cref="_sourceSide"/> ctor
-/// flag), double the amount. Backs both printed Inquisitor's Flail
-/// replacements.
-///
-/// Gates on the Flail sitting on the battlefield AND
-/// <see cref="Permanent.AttachedTo"/> being non-null, so detach / blink /
-/// bounce automatically suspend doubling without explicit
-/// deregistration. Each registration is one-side-only (source xor
-/// target) so <see cref="ReplacementBus"/>'s per-effect dedup (CR 616.1c)
-/// still lets both replacements fire on a single intent when the same
-/// creature deals combat damage to itself (e.g. mirror-match face-bite).
-/// </summary>
-public sealed class DamageDoubleReplacement : IReplacementEffect<DamageIntent>
-{
-    private readonly Permanent _equipment;
-    private readonly bool _sourceSide;
-
-    public DamageDoubleReplacement(Permanent equipment, bool source)
-    {
-        _equipment = equipment ?? throw new ArgumentNullException(nameof(equipment));
-        _sourceSide = source;
-    }
-
-    public bool OneShot => false;
-    public object? Tag => this;
-
-    public bool Applies(DamageIntent intent, IReadOnlyList<object> history)
-    {
-        if (!intent.IsCombatDamage) return false;
-        if (intent.Amount <= 0) return false;
-        if (_equipment.Zone != ZoneType.Battlefield) return false;
-
-        var equipped = _equipment.AttachedTo;
-        if (equipped == null) return false;
-
-        if (_sourceSide)
-        {
-            // "If equipped creature would deal combat damage, it deals
-            // double that damage instead."
-            return ReferenceEquals(intent.Source, equipped);
-        }
-
-        // "If a source would deal combat damage to equipped creature,
-        // it deals double that damage instead." — target-side gate only
-        // fires when the equipped creature is the damage target.
-        return intent.TargetCreature is not null
-            && ReferenceEquals(intent.TargetCreature, equipped);
-    }
-
-    public DamageIntent? Replace(DamageIntent intent, IReadOnlyList<object> history)
-        => intent with { Amount = intent.Amount * 2 };
 }
