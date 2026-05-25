@@ -76,6 +76,37 @@ public class ManaAbility : IManaAbility
     }
 
     /// <summary>
+    /// Construct a mana ability whose generated mana amount is sampled
+    /// dynamically AND whose activation pays an additional non-mana cost
+    /// beyond {T}. Nykthos, Shrine to Nyx is the canonical shape:
+    ///   "{2}, {T}: Choose a color. Add an amount of mana of that color
+    ///    equal to your devotion to that color."
+    /// The <paramref name="manaGenerator"/> samples devotion at
+    /// activation time; the <paramref name="additionalCostPayer"/> pays
+    /// the {2}; the <paramref name="canActivateCheck"/> gates legality
+    /// (e.g. untapped + can afford {2} + devotion > 0).
+    ///
+    /// CR 605.1b — the ability remains a mana ability (could produce
+    /// mana, no target, doesn't trigger when activated); the extra cost
+    /// is part of activation, not a resolution effect.
+    /// </summary>
+    public ManaAbility(
+        object source,
+        Player controller,
+        Func<ManaCost> manaGenerator,
+        Func<bool> canActivateCheck,
+        Action<Player> additionalCostPayer)
+    {
+        Source = source ?? throw new ArgumentNullException(nameof(source));
+        Controller = controller ?? throw new ArgumentNullException(nameof(controller));
+        _manaGenerator = manaGenerator ?? throw new ArgumentNullException(nameof(manaGenerator));
+        _canActivateCheck = canActivateCheck ?? throw new ArgumentNullException(nameof(canActivateCheck));
+        _additionalCostPayer = additionalCostPayer ?? throw new ArgumentNullException(nameof(additionalCostPayer));
+        ManaGenerated = ManaCost.Zero; // Will be set when activated
+        _tapsAsCost = true;
+    }
+
+    /// <summary>
     /// Construct a mana ability whose activation also pays an additional
     /// non-mana cost beyond {T} — Horizon Canopy cycle "Pay 1 life",
     /// painlands' "deals N damage to you", etc. The
