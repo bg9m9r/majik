@@ -1,17 +1,17 @@
 {
-  "generated_utc": "2026-05-25T03:07:20.1786111Z",
+  "generated_utc": "2026-05-25T03:09:36.4078103Z",
   "scanned_dir": "/home/brett/Projects/majik.project/majik.core/.claude/worktrees/agent-aea171d949b60662a/Majik.Core/CardData/Factories",
-  "total_mentions": 188,
-  "distinct_factories": 128,
+  "total_mentions": 192,
+  "distinct_factories": 130,
   "cluster_count": 7,
-  "unclustered_count": 145,
+  "unclustered_count": 148,
   "clusters": [
     {
       "primitive_id": "agent-prompt-targeting",
       "display_name": "Agent-prompt targeting MVP",
       "implementation_hint": "IPlayerAgent needs ChooseTarget / ChooseYesNo surfaces; many spell factories punt on real targeting prompts.",
-      "factory_count": 27,
-      "mention_count": 34,
+      "factory_count": 28,
+      "mention_count": 35,
       "factories": [
         "AbhorrentOculusFactory",
         "AetherVialFactory",
@@ -33,6 +33,7 @@
         "RelicOfProgenitusFactory",
         "SilvergillAdeptFactory",
         "SkyclaveApparitionFactory",
+        "SpringleafDrumFactory",
         "StormchasersTalentFactory",
         "SunTitanFactory",
         "SwordOfFeastAndFamineFactory",
@@ -71,6 +72,12 @@
           "file": "MysticSanctuaryFactory.cs",
           "line": 12,
           "sentence": "\u003Cb\u003E\u0022You may\u0022 prompt\u003C/b\u003E: auto-takes the action when a target was supplied; agent-driven decline deferred (same posture as Snapcaster Mage / Tireless Tracker / Valakut)."
+        },
+        {
+          "factory": "SpringleafDrumFactory",
+          "file": "SpringleafDrumFactory.cs",
+          "line": 9,
+          "sentence": "## Deferred (v1 gaps)  - \u003Cb\u003EAgent prompt for which creature to tap\u003C/b\u003E \u2014 the cost falls back to the first eligible (untapped, no summoning sickness, not the drum itself) creature on the controller\u0027s battlefield via \u003Csee cref=\u0022TapAnotherUntappedCreatureCost\u0022/\u003E\u0027s deterministic pick."
         },
         {
           "factory": "AgathasSoulCauldronFactory",
@@ -292,24 +299,6 @@
       ]
     },
     {
-      "primitive_id": "cast-marker",
-      "display_name": "Cast-marker on Card",
-      "implementation_hint": "Persistent \u0027this object was cast (vs. put onto the battlefield)\u0027 flag \u2014 Bloodghast, The One Ring, Pact triggers all key off it.",
-      "factory_count": 1,
-      "mention_count": 1,
-      "factories": [
-        "TheOneRingFactory"
-      ],
-      "mentions": [
-        {
-          "factory": "TheOneRingFactory",
-          "file": "TheOneRingFactory.cs",
-          "line": 15,
-          "sentence": "The effect body is a no-op \u2014 the \u0022if you cast it\u0022 intervening-if clause, the \u0022until your next turn\u0022 expiry, and the \u0022protection from everything\u0022 player-scoped grant are all deferred (no cast-marker on Card, no per-player delayed cleanup, no Player."
-        }
-      ]
-    },
-    {
       "primitive_id": "cycling-from-hand",
       "display_name": "Cycling-style activated-from-hand (CR 702.32 / Channel CR 702.74)",
       "comp_rules_citation": "CR 702.32",
@@ -325,6 +314,25 @@
           "file": "ChannelLandCycleFactory.cs",
           "line": 12,
           "sentence": "Sokenzan, Crucible of Defiance \u2014 deferred (its Channel produces two 1/1 Spirit tokens with haste; requires a Spirit-token shape not yet in \u003Cc\u003ETokenFactory\u003C/c\u003E)."
+        }
+      ]
+    },
+    {
+      "primitive_id": "equip-primitive",
+      "display_name": "Equip activated-ability primitive (CR 702.6)",
+      "comp_rules_citation": "CR 702.6",
+      "implementation_hint": "EquipActivatedAbility \u2014 sorcery-speed activation, attaches/re-attaches Equipment to a chosen creature.",
+      "factory_count": 1,
+      "mention_count": 1,
+      "factories": [
+        "HammerOfNazahnFactory"
+      ],
+      "mentions": [
+        {
+          "factory": "HammerOfNazahnFactory",
+          "file": "HammerOfNazahnFactory.cs",
+          "line": 14,
+          "sentence": "## Deferred  - \u003Cb\u003EAttach-target prompt\u003C/b\u003E for the ETB trigger and the Equip activation \u2014 v1 picks the first controller-side creature deterministically (same gap as the rest of the equipment cycle)."
         }
       ]
     },
@@ -415,8 +423,14 @@
     {
       "factory": "TheOneRingFactory",
       "file": "TheOneRingFactory.cs",
-      "line": 121,
-      "sentence": "\u0022 Structural: \u0022if you cast it\u0022 \u002B \u0022until your next turn\u0022 expiry deferred \u2014 see class xmldoc."
+      "line": 15,
+      "sentence": "The \u0022until your next turn\u0022 expiry and the player-scoped \u0022protection from everything\u0022 grant remain deferred (no per-player delayed cleanup, no Player."
+    },
+    {
+      "factory": "TheOneRingFactory",
+      "file": "TheOneRingFactory.cs",
+      "line": 123,
+      "sentence": "The \u0022until your next turn\u0022 expiry and the player-scoped protection grant remain deferred \u2014 see class xmldoc."
     },
     {
       "factory": "StormchasersTalentFactory",
@@ -1192,6 +1206,19 @@
       "file": "PinnacleEmissaryFactory.cs",
       "line": 175,
       "sentence": "Keywords\u0022/\u003E; the restriction rider is documented but deferred."
+    },
+    {
+      "factory": "CranialPlatingFactory",
+      "file": "CranialPlatingFactory.cs",
+      "line": 12,
+      "sentence": "## Deferred  - \u003Cb\u003EAttach-target prompt\u003C/b\u003E for both attach abilities \u2014 v1 picks the first controller-side creature deterministically (same gap as the rest of the equipment cycle)."
+    },
+    {
+      "factory": "CranialPlatingFactory",
+      "file": "CranialPlatingFactory.cs",
+      "line": 12,
+      "sentence": "Phased-out artifacts (CR 702.26) and face-down morph artifacts would currently miscount; same gap as Mox Opal\u0027s \u0022metalcraft\u0022 predicate (no shared \u0022artifact-count helper\u0022 yet).",
+      "cr": "CR 702.26"
     },
     {
       "factory": "AjaniNacatlPariahFactory",

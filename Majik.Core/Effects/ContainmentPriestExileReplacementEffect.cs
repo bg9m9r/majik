@@ -24,15 +24,19 @@ namespace Majik.Core.Effects;
 /// When all four conditions hold the destination is rewritten to
 /// <see cref="ZoneType.Exile"/>.
 ///
-/// ## V1 enforcement gap
-/// <see cref="ZoneMoveIntent.WasCast"/> is stamped by
-/// <see cref="Majik.Core.Game.SpellCastFlow"/> at cast time. Call sites
-/// that put permanents onto the battlefield without going through
+/// ## Cast-marker sourcing (CR 113.5 / CR 400.7)
+/// <see cref="ZoneMoveIntent.WasCast"/> is populated by
+/// <see cref="Majik.Core.Services.ZoneService"/> from the persistent
+/// <see cref="Majik.Core.Cards.Card.WasCast"/> flag stamped at cast
+/// time by <see cref="Majik.Core.Game.SpellCastFlow"/>. Call sites that
+/// put permanents onto the battlefield without going through
 /// SpellCastFlow (Reanimate, Sneak Attack, Through the Breach, Aether
-/// Vial, token creation) leave WasCast = false (the record default), so
-/// this effect will fire correctly on all those paths once the ReplacementBus
-/// is plumbed through ZoneService. ZoneService presently does not consult
-/// the ReplacementBus for most paths, so enforcement is structural in v1.
+/// Vial, token creation, Show and Tell, blink reappearance) leave
+/// <c>Card.WasCast</c> = false and therefore <c>intent.WasCast</c> =
+/// false, so this replacement fires for them. ZoneService funnels every
+/// zone move through its injected ReplacementBus (when one is supplied),
+/// so enforcement is end-to-end once a shared bus is wired into both
+/// ZoneService and the priest's factory.
 ///
 /// Lifecycle mirrors <see cref="PithingNeedleStaticEffect"/>:
 /// <list type="bullet">

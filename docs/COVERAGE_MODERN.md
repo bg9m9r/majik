@@ -1,21 +1,21 @@
 # Engine coverage report
 
 - **Scope:** format=modern, dedup-by-name
-- **Generated:** 2026-05-24 20:17 UTC
-- **Total cards:** 21879
-- **Distinct coverage:** 27.4% (5998 / 21879)
-- **Tournament-weighted coverage:** 92.3% (by play-rate; matched weight 19250)
+- **Generated:** 2026-05-25 03:06 UTC
+- **Total cards:** 21917
+- **Distinct coverage:** 27.4% (6011 / 21917)
+- **Tournament-weighted coverage:** 95.5% (by play-rate; matched weight 20390)
 - **Top-20 most-played covered:** 20 / 20 (100%)
 
 ## Tier breakdown
 
 | Tier | Count | Share |
 |---|---:|---:|
-| NamedFactory | 244 | 1.1% |
+| NamedFactory | 263 | 1.2% |
 | SpellBound | 3708 | 16.9% |
-| KeywordOnly | 1417 | 6.5% |
+| KeywordOnly | 1411 | 6.4% |
 | Vanilla | 629 | 2.9% |
-| Unimplemented | 15881 | 72.6% |
+| Unimplemented | 15906 | 72.6% |
 
 ## Top-20 most-played cards
 
@@ -31,6 +31,7 @@
 | 350.0 | Bloodstained Mire | NamedFactory |
 | 350.0 | Windswept Heath | NamedFactory |
 | 350.0 | Wooded Foothills | NamedFactory |
+| 340.0 | Sink into Stupor | Vanilla |
 | 340.0 | Swamp | KeywordOnly |
 | 340.0 | Vexing Bauble | NamedFactory |
 | 330.0 | Arid Mesa | NamedFactory |
@@ -40,7 +41,6 @@
 | 280.0 | Steam Vents | KeywordOnly |
 | 280.0 | Watery Grave | KeywordOnly |
 | 270.0 | Flooded Strand | NamedFactory |
-| 270.0 | Thoughtseize | SpellBound |
 
 ## Top unimplemented (20)
 

@@ -5,11 +5,11 @@ Scanner output: every `*Factory.cs` xmldoc / inline comment mentioning
 engine primitive. Each row answers: "if we ship primitive _X_, which factory
 xmldocs flagged that they're blocked on it?"
 
-- **Generated:** 2026-05-25 03:07 UTC
+- **Generated:** 2026-05-25 03:09 UTC
 - **Scanned dir:** `Majik.Core/CardData/Factories`
-- **Total mentions:** 188
+- **Total mentions:** 192
 - **Clusters:** 7
-- **Unclustered (need new registry pattern):** 145
+- **Unclustered (need new registry pattern):** 148
 
 Regenerate with `dotnet run --project Majik.Console -- mechanic-deps --md-out docs/MECHANIC_DEPS.md --json-out docs/mechanic-deps.json`.
 
@@ -17,10 +17,10 @@ Regenerate with `dotnet run --project Majik.Console -- mechanic-deps --md-out do
 
 | Rank | Primitive | CR | Factories | Mentions |
 |---:|---|---|---:|---:|
-| 1 | Agent-prompt targeting MVP | — | 27 | 34 |
+| 1 | Agent-prompt targeting MVP | — | 28 | 35 |
 | 2 | Layer-6 ability-grant subsystem (CR 613.1f) | CR 613.1f | 2 | 4 |
-| 3 | Cast-marker on Card | — | 1 | 1 |
-| 4 | Cycling-style activated-from-hand (CR 702.32 / Channel CR 702.74) | CR 702.32 | 1 | 1 |
+| 3 | Cycling-style activated-from-hand (CR 702.32 / Channel CR 702.74) | CR 702.32 | 1 | 1 |
+| 4 | Equip activated-ability primitive (CR 702.6) | CR 702.6 | 1 | 1 |
 | 5 | Escape alt-cost (CR 702.143) | CR 702.143 | 1 | 1 |
 | 6 | "Activate only as a sorcery" gate (CR 117.1a) | CR 117.1a | 1 | 1 |
 | 7 | Token colour identity (CR 105 / CR 903.4) | CR 105 | 1 | 1 |
@@ -29,7 +29,7 @@ Regenerate with `dotnet run --project Majik.Console -- mechanic-deps --md-out do
 
 ### 1. Agent-prompt targeting MVP
 
-- **Blocks:** 27 factories (34 mentions)
+- **Blocks:** 28 factories (35 mentions)
 - **Implementation hint:** IPlayerAgent needs ChooseTarget / ChooseYesNo surfaces; many spell factories punt on real targeting prompts.
 
 Mentions:
@@ -44,6 +44,8 @@ Mentions:
   > Token-copy targeting auto-picks the first eligible token-creature the controller controls; agent-driven targeting is deferred.
 - `MysticSanctuaryFactory` (`MysticSanctuaryFactory.cs:12`)
   > <b>"You may" prompt</b>: auto-takes the action when a target was supplied; agent-driven decline deferred (same posture as Snapcaster Mage / Tireless Tracker / Valakut).
+- `SpringleafDrumFactory` (`SpringleafDrumFactory.cs:9`)
+  > ## Deferred (v1 gaps)  - <b>Agent prompt for which creature to tap</b> — the cost falls back to the first eligible (untapped, no summoning sickness, not the drum itself) creature on the controller's battlefield via <see cref="TapAnotherUntappedCreatureCost"/>'s deterministic pick.
 - `AgathasSoulCauldronFactory` (`AgathasSoulCauldronFactory.cs:10`)
   > (Full targeting deferred — see below.
 - `AgathasSoulCauldronFactory` (`AgathasSoulCauldronFactory.cs:65`)
@@ -120,17 +122,7 @@ Mentions:
 - `BloodghastFactory` (`BloodghastFactory.cs:143`)
   > A full dynamic Layer 6 conditional keyword grant is deferred — see class xmldoc.
 
-### 3. Cast-marker on Card
-
-- **Blocks:** 1 factories (1 mentions)
-- **Implementation hint:** Persistent 'this object was cast (vs. put onto the battlefield)' flag — Bloodghast, The One Ring, Pact triggers all key off it.
-
-Mentions:
-
-- `TheOneRingFactory` (`TheOneRingFactory.cs:15`)
-  > The effect body is a no-op — the "if you cast it" intervening-if clause, the "until your next turn" expiry, and the "protection from everything" player-scoped grant are all deferred (no cast-marker on Card, no per-player delayed cleanup, no Player.
-
-### 4. Cycling-style activated-from-hand (CR 702.32 / Channel CR 702.74)
+### 3. Cycling-style activated-from-hand (CR 702.32 / Channel CR 702.74)
 
 - **CR citation:** CR 702.32
 - **Blocks:** 1 factories (1 mentions)
@@ -140,6 +132,17 @@ Mentions:
 
 - `ChannelLandCycleFactory` (`ChannelLandCycleFactory.cs:12`)
   > Sokenzan, Crucible of Defiance — deferred (its Channel produces two 1/1 Spirit tokens with haste; requires a Spirit-token shape not yet in <c>TokenFactory</c>).
+
+### 4. Equip activated-ability primitive (CR 702.6)
+
+- **CR citation:** CR 702.6
+- **Blocks:** 1 factories (1 mentions)
+- **Implementation hint:** EquipActivatedAbility — sorcery-speed activation, attaches/re-attaches Equipment to a chosen creature.
+
+Mentions:
+
+- `HammerOfNazahnFactory` (`HammerOfNazahnFactory.cs:14`)
+  > ## Deferred  - <b>Attach-target prompt</b> for the ETB trigger and the Equip activation — v1 picks the first controller-side creature deterministically (same gap as the rest of the equipment cycle).
 
 ### 5. Escape alt-cost (CR 702.143)
 
@@ -184,8 +187,10 @@ Mentions:
   > <b>Live "each opponent" / "each planeswalker you don't control" enumeration without resolvers</b>: same gap as Sheoldred / Meathook Massacre — <see cref="Player"/> doesn't expose opponent list at construction time.
 - `BridgeFromBelowFactory` (`BridgeFromBelowFactory.cs:12`)
   > ## Deferred (v1 gaps)  - <b>APNAP simultaneous-trigger ordering</b>: when one creature dies to a chained event (combat damage, board wipe), CR 603.3b sorts pending triggers by APNAP and within each player by the player's choice.
-- `TheOneRingFactory` (`TheOneRingFactory.cs:121`)
-  > " Structural: "if you cast it" + "until your next turn" expiry deferred — see class xmldoc.
+- `TheOneRingFactory` (`TheOneRingFactory.cs:15`)
+  > The "until your next turn" expiry and the player-scoped "protection from everything" grant remain deferred (no per-player delayed cleanup, no Player.
+- `TheOneRingFactory` (`TheOneRingFactory.cs:123`)
+  > The "until your next turn" expiry and the player-scoped protection grant remain deferred — see class xmldoc.
 - `StormchasersTalentFactory` (`StormchasersTalentFactory.cs:16`)
   > <b>Prowess pump on the Mercenary token</b>: still keyword-marker-only (same gap as Cori-Steel Cutter / Monastery Mentor — TokenFactory doesn't thread ContinuousEffectsService for token-resident keywords yet).
 - `StormchasersTalentFactory` (`StormchasersTalentFactory.cs:159`)
@@ -440,6 +445,10 @@ Mentions:
   > <para>v1 gaps:</para> <list type="bullet"> <item>Printed "This token can block only creatures with flying" blocking restriction is NOT enforced — no combat-block restriction primitive for "can only block X" yet.
 - `PinnacleEmissaryFactory` (`PinnacleEmissaryFactory.cs:175`)
   > Keywords"/>; the restriction rider is documented but deferred.
+- `CranialPlatingFactory` (`CranialPlatingFactory.cs:12`)
+  > ## Deferred  - <b>Attach-target prompt</b> for both attach abilities — v1 picks the first controller-side creature deterministically (same gap as the rest of the equipment cycle).
+- `CranialPlatingFactory` (`CranialPlatingFactory.cs:12`)
+  > Phased-out artifacts (CR 702.26) and face-down morph artifacts would currently miscount; same gap as Mox Opal's "metalcraft" predicate (no shared "artifact-count helper" yet).
 - `AjaniNacatlPariahFactory` (`AjaniNacatlPariahFactory.cs:11`)
   > The MdfcState flip is the v1 observation surface — combat / loyalty interactions on the back face are deferred.
 - `AjaniNacatlPariahFactory` (`AjaniNacatlPariahFactory.cs:105`)

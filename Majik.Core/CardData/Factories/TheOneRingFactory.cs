@@ -30,16 +30,21 @@ namespace Majik.Core.CardData.Factories;
 ///   skips destruction (read by
 ///   <see cref="Majik.Core.Combat.CombatAbilities.HasIndestructible"/> +
 ///   <see cref="Majik.Core.Rules.Sba.Checks.CreatureDeathCheck"/>).
-/// - <b>ETB trigger</b> (CR 603.1): "When The One Ring enters, if you cast
-///   it, you gain protection from everything until your next turn." Wired
-///   structurally as a self-ETB <see cref="TriggeredAbility"/>. The effect
-///   body is a no-op — the "if you cast it" intervening-if clause, the
-///   "until your next turn" expiry, and the "protection from everything"
-///   player-scoped grant are all deferred (no cast-marker on Card, no
-///   per-player delayed cleanup, no Player.AddAbility surface and no
-///   player-scoped protection layer in the damage / targeting / blocking
-///   pipelines). The trigger exists so the card has the right ability
-///   shape for inspection and future wiring.
+/// - <b>ETB trigger</b> (CR 603.1, CR 113.5): "When The One Ring enters,
+///   if you cast it, you gain protection from everything until your next
+///   turn." Wired as a self-ETB <see cref="TriggeredAbility"/>. The "if
+///   you cast it" intervening-if clause now gates on the persistent
+///   <see cref="Majik.Core.Cards.Card.WasCast"/> stamp written by
+///   <see cref="Majik.Core.Game.SpellCastFlow"/> at stack push, so the
+///   effect body short-circuits when the Ring entered the battlefield
+///   via Show and Tell / reanimation / blink / etc. The "until your
+///   next turn" expiry and the player-scoped "protection from
+///   everything" grant remain deferred (no per-player delayed cleanup,
+///   no Player.AddAbility surface and no player-scoped protection layer
+///   in the damage / targeting / blocking pipelines yet); the effect
+///   body is still a no-op on the protection side, but the cast gate
+///   itself is now load-bearing for any future caller that wires the
+///   protection layer in.
 /// - <b>Upkeep trigger</b> (CR 500.4 / CR 603.1): "At the beginning of
 ///   your upkeep, you lose 1 life for each burden counter on The One
 ///   Ring." Wired via <see cref="Triggers.OnStepBegin"/> filtered to
@@ -64,9 +69,6 @@ namespace Majik.Core.CardData.Factories;
 /// the actual oracle — poison-counter accrual is out of scope.
 ///
 /// ## Deferred (v1 gaps)
-/// - <b>"If you cast it" gate</b>: no cast-marker on Card yet, so the
-///   ETB protection trigger would fire for any ETB (blink/animate/etc.).
-///   The trigger ships as a no-op for now.
 /// - <b>"Until your next turn" expiry</b>: no per-player delayed
 ///   cleanup primitive yet.
 /// - <b>"Protection from everything" semantics</b>: ProtectionAbility
@@ -119,19 +121,28 @@ public static class TheOneRingFactory
         ring.AddAbility(new KeywordAbility("Indestructible", ring, owner));
 
         // ----------------------------------------------------------------
-        // ETB trigger — CR 603.1.
+        // ETB trigger — CR 603.1, CR 113.5.
         //   "When The One Ring enters, if you cast it, you gain protection
         //    from everything until your next turn."
-        // Structural: "if you cast it" + "until your next turn" expiry
-        // deferred — see class xmldoc.
+        // The "if you cast it" intervening-if clause now gates on the
+        // persistent <see cref="Card.WasCast"/> stamp (SpellCastFlow
+        // writes it at stack push; ZoneService clears it on LTB). The
+        // "until your next turn" expiry and the player-scoped
+        // protection grant remain deferred — see class xmldoc.
         // ----------------------------------------------------------------
         var etbEffect = new Effect(
-            "The One Ring: grant controller protection from everything (structural)",
+            "The One Ring: grant controller protection from everything (gated on WasCast)",
             () =>
             {
+                // CR 113.5 — intervening-if check. Skip when the Ring
+                // arrived on the battlefield via a non-cast path
+                // (Show and Tell, reanimation, blink, etc.).
+                if (!ring.WasCast) return;
+
                 // Structural-only — no player-scoped protection surface
-                // exists yet. The trigger fires for shape; the effect is
-                // a no-op until the player-protection layer ships.
+                // exists yet. The cast gate is now real; the protection
+                // grant is still a no-op until the player-protection
+                // layer ships.
                 _ = ring.Controller ?? owner;
             });
 

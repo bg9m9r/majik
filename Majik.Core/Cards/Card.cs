@@ -257,6 +257,58 @@ public class Card : ICard
     }
 
     /// <summary>
+    /// CR 113.5 / CR 400.7 — persistent "this permanent was cast"
+    /// marker. Stamped <c>true</c> by
+    /// <see cref="Majik.Core.Game.SpellCastFlow"/> at the moment the
+    /// spell is pushed onto the stack (any cost — printed, alternative,
+    /// reduced, additional). Survives resolution so ETB-resident
+    /// triggers ("when ~ enters, if you cast it, ...") and
+    /// battlefield-entry replacements ("if a nontoken permanent would
+    /// enter the battlefield and it wasn't cast, exile it instead" —
+    /// Containment Priest, CR 614) can both read it.
+    ///
+    /// <para>Cleared when the permanent leaves the battlefield to any
+    /// other zone (CR 400.7 — the card becomes a "new object" on each
+    /// zone change). The flag is NOT cleared while transitioning Stack
+    /// → Battlefield, so ETB triggers resolving immediately after the
+    /// move still see <c>true</c>. Non-cast battlefield entries
+    /// (reanimation, Show and Tell, Sneak Attack, Through the Breach,
+    /// blink reappearance, token-copy ETB, Aether Vial put, …) leave
+    /// the flag <c>false</c>.</para>
+    ///
+    /// <para>Mirrors <see cref="Majik.Core.Effects.ZoneMoveIntent.WasCast"/>,
+    /// which is the in-flight intent-side mirror used by
+    /// <see cref="ReplacementBus"/> consumers. The
+    /// <see cref="Majik.Core.Services.ZoneService"/> populates that
+    /// field from this property when building the intent for the
+    /// Stack → Battlefield move, so any consumer that prefers the
+    /// intent record (ContainmentPriest's replacement) and any
+    /// consumer that prefers the live card field (TheOneRing's ETB
+    /// gate) both see the same truth.</para>
+    ///
+    /// <para>Defaults to <c>false</c> so hand-built test cards without
+    /// an explicit stamp are treated as non-cast.</para>
+    /// </summary>
+    public bool WasCast { get; private set; }
+
+    /// <summary>Stamp the cast marker. Called by
+    /// <see cref="Majik.Core.Game.SpellCastFlow"/> immediately before
+    /// the resolving spell is pushed onto the stack (CR 601.2i).</summary>
+    public void SetWasCast(bool value)
+    {
+        WasCast = value;
+    }
+
+    /// <summary>Clear the cast marker. Called by
+    /// <see cref="Majik.Core.Services.ZoneService"/> when a permanent
+    /// leaves the battlefield to any other zone (CR 400.7 — new
+    /// object on each zone change). Idempotent.</summary>
+    public void ClearWasCast()
+    {
+        WasCast = false;
+    }
+
+    /// <summary>
     /// CR 702.138b — "escaped" runtime sentinel propagated from the
     /// resolving <see cref="Majik.Core.Spells.Spell.WasCastForEscape"/>
     /// onto the card itself, so battlefield-resident triggers

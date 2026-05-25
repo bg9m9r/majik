@@ -47,7 +47,17 @@ public class ZoneService
         }
 
         // CR 614 — funnel intent through replacement bus.
-        var intent = new ZoneMoveIntent(card, fromZone, toZone, controller);
+        // CR 113.5 — mirror the live <see cref="Card.WasCast"/> stamp
+        // onto the intent so battlefield-entry replacements (Containment
+        // Priest's "if it wasn't cast, exile it instead") can read the
+        // cast posture off the in-flight intent without re-fetching the
+        // card. SpellCastFlow sets Card.WasCast at stack push time, so
+        // the Stack → Battlefield move propagates true; non-cast paths
+        // (reanimation, Sneak Attack, Show and Tell, blink, token ETB,
+        // Aether Vial) leave Card.WasCast = false and the intent
+        // mirrors that.
+        var wasCast = (card as Card)?.WasCast ?? false;
+        var intent = new ZoneMoveIntent(card, fromZone, toZone, controller, WasCast: wasCast);
         if (_replacements != null)
         {
             var replaced = _replacements.Apply(intent);
@@ -94,7 +104,20 @@ public class ZoneService
             card.Owner.Zones.MoveCard(card, fromZone, finalToZone);
         }
 
+        // CR 400.7 — the card becomes a "new object" on every zone change.
+        // For the cast-marker we clear only on actual battlefield exits
+        // (Battlefield → anything-else) so that ETB triggers fired off
+        // the Stack → Battlefield move and LTB-event subscribers can
+        // still read the in-flight stamp earlier in this method. We
+        // publish CardMovedEvent FIRST so any LTB subscriber that wants
+        // to consult Card.WasCast can do so before the clear runs.
         _eventBus?.Publish(new CardMovedEvent(card, fromZone, finalToZone));
+
+        if (fromZone == ZoneType.Battlefield && finalToZone != ZoneType.Battlefield
+            && card is Card concreteForCastClear)
+        {
+            concreteForCastClear.ClearWasCast();
+        }
     }
 
     /// <summary>
