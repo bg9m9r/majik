@@ -235,6 +235,11 @@ public enum CardSubtype
     Aura,
     Saga,
     Shrine,
+    /// <summary>Curse enchantment subtype — CR 205.3h. Aura subtype shared
+    /// by the Innistrad/Shadows-over-Innistrad Curse cycle (Trespasser's
+    /// Curse, Curse of Misfortunes, ...). Always paired with the
+    /// Enchantment type + Aura subtype.</summary>
+    Curse,
     /// <summary>Class enchantment subtype — CR 716. Multi-level enchantment
     /// shape (Stormchaser's Talent, Modern Horizons 3 and the Adventures in
     /// the Forgotten Realms cycle). CR 205.3h.</summary>
