@@ -250,20 +250,38 @@ public sealed class TurnDriver
 
     private void UntapStep(Player active)
     {
-        foreach (var card in active.Zones.Battlefield.GetCards().OfType<Permanent>().ToList())
+        var permanents = active.Zones.Battlefield.GetCards().OfType<Permanent>().ToList();
+
+        // CR 502.1 — first pass: collect tapped permanents not already
+        // gated by ShouldSkipUntap (Mana Vault self-skip, Choke symmetric
+        // subtype filter, Stasis-style global skip). These are the
+        // "candidates" the count caps then thin further.
+        var candidates = new List<Permanent>();
+        foreach (var card in permanents)
         {
-            // CR 502.1 — "doesn't untap during your untap step" filters
-            // (Mana Vault self-skip, Choke's symmetric Island filter,
-            // future Stasis / Smoke). Query the per-permanent registry
-            // before untapping; on a hit, skip Untap but still reset the
-            // turn-state flags (summoning sickness etc. clear normally).
+            if (!card.IsTapped) continue;
+            if (Majik.Core.Effects.UntapStepRestrictions.ShouldSkipUntap(card, active)) continue;
+            candidates.Add(card);
+        }
+
+        // CR 502.1 — second pass: apply count caps (Static Orb / Winter
+        // Orb / Smoke "can't untap more than N <filter>"). Returns the
+        // set of permanents blocked by at least one active cap; remaining
+        // candidates untap normally. Empty set when no caps registered.
+        var blockedByCap = Majik.Core.Effects.UntapStepRestrictions
+            .ApplyCountCaps(candidates, active);
+
+        foreach (var card in permanents)
+        {
             if (card.IsTapped
-                && !Majik.Core.Effects.UntapStepRestrictions.ShouldSkipUntap(card, active))
+                && !Majik.Core.Effects.UntapStepRestrictions.ShouldSkipUntap(card, active)
+                && !blockedByCap.Contains(card))
             {
                 card.Untap();
             }
             // CR 502 — clears summoning sickness, loyalty-once-per-turn,
-            // and any other turn-scoped per-permanent flags.
+            // and any other turn-scoped per-permanent flags. Always runs,
+            // even for permanents whose untap was gated by a skip or cap.
             card.ResetTurnState();
         }
     }
