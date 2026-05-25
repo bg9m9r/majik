@@ -45,6 +45,46 @@ public class StateTurnPhaseTrackingTests
 
         facade.GetState().Phase.Should().Be(PhaseStateType.DeclareAttackers.ToString());
     }
+
+    // CR 505 — the engine's PhaseStateMachine collapses both main phases
+    // into PhaseStateType.Main. The outer TurnStateMachine is the only
+    // place that distinguishes pre vs post combat, so the snapshot has to
+    // consult the tracked TurnStateType to recover the CR 505 wire labels.
+    [Fact]
+    public void GetState_Phase_Main_DisambiguatesToPreCombatMain_WhenTurnStatePreCombat()
+    {
+        var facade = GameFacade.Create("Alice", "Bob", Array.Empty<ICard>(), Array.Empty<ICard>());
+        var alice = new Player("Alice");
+
+        facade.EventBus_Publish(new TurnStateChangedEvent(TurnStateType.TurnBeginning, TurnStateType.PreCombatMain));
+        facade.EventBus_Publish(new StepStartedEvent(PhaseStateType.Main, alice));
+
+        facade.GetState().Phase.Should().Be(PhaseLabelResolver.PreCombatMain);
+    }
+
+    [Fact]
+    public void GetState_Phase_Main_DisambiguatesToPostCombatMain_WhenTurnStatePostCombat()
+    {
+        var facade = GameFacade.Create("Alice", "Bob", Array.Empty<ICard>(), Array.Empty<ICard>());
+        var alice = new Player("Alice");
+
+        facade.EventBus_Publish(new TurnStateChangedEvent(TurnStateType.Combat, TurnStateType.PostCombatMain));
+        facade.EventBus_Publish(new StepStartedEvent(PhaseStateType.Main, alice));
+
+        facade.GetState().Phase.Should().Be(PhaseLabelResolver.PostCombatMain);
+    }
+
+    [Fact]
+    public void GetState_Phase_NonMain_IgnoresTurnState()
+    {
+        var facade = GameFacade.Create("Alice", "Bob", Array.Empty<ICard>(), Array.Empty<ICard>());
+        var alice = new Player("Alice");
+
+        facade.EventBus_Publish(new TurnStateChangedEvent(TurnStateType.TurnBeginning, TurnStateType.PreCombatMain));
+        facade.EventBus_Publish(new StepStartedEvent(PhaseStateType.Upkeep, alice));
+
+        facade.GetState().Phase.Should().Be(PhaseStateType.Upkeep.ToString());
+    }
 }
 
 /// <summary>Test seam — the facade's bus is private. This file-scoped

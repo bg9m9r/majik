@@ -24,7 +24,8 @@ public static class StateSnapshotter
         Player activePlayer,
         IReadOnlyList<Player> players,
         Majik.Core.Stack.Stack stack,
-        Player? viewer = null)
+        Player? viewer = null,
+        TurnStateType? turnState = null)
     {
         if (players == null) throw new ArgumentNullException(nameof(players));
         if (activePlayer == null) throw new ArgumentNullException(nameof(activePlayer));
@@ -33,7 +34,7 @@ public static class StateSnapshotter
         return new GameStateDto(
             GameId: gameId,
             TurnNumber: turnNumber,
-            Phase: phase?.ToString(),
+            Phase: PhaseLabelResolver.Resolve(phase, turnState),
             ActivePlayerId: activePlayer.Id,
             Players: players.Select(p => SnapshotPlayer(p, viewer)).ToList(),
             Stack: stack.GetAll().Select(SnapshotStackObject).ToList());

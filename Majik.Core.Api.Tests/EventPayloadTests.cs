@@ -339,4 +339,83 @@ public class EventPayloadTests
         payload.ValueKind.Should().Be(System.Text.Json.JsonValueKind.Object);
         payload.EnumerateObject().Should().BeEmpty();
     }
+
+    // CR 505 — PhaseStateType.Main covers both pre- and post-combat main
+    // phases. EventPayloadBuilder uses the supplied TurnStateType context
+    // to lift the ambiguous "Main" wire label into the disambiguated form
+    // the frontend phase bar expects.
+    [Fact]
+    public void StepStartedEvent_Main_WithPreCombatTurnState_EmitsPreCombatMain()
+    {
+        var alice = new Player("Alice");
+        var e = new StepStartedEvent(Majik.Core.StateMachine.PhaseStateType.Main, alice);
+
+        var payload = EventPayloadBuilder.Build(e, viewer: null,
+            turnState: Majik.Core.StateMachine.TurnStateType.PreCombatMain);
+
+        payload.GetProperty("step").GetString().Should().Be(PhaseLabelResolver.PreCombatMain);
+    }
+
+    [Fact]
+    public void StepStartedEvent_Main_WithPostCombatTurnState_EmitsPostCombatMain()
+    {
+        var alice = new Player("Alice");
+        var e = new StepStartedEvent(Majik.Core.StateMachine.PhaseStateType.Main, alice);
+
+        var payload = EventPayloadBuilder.Build(e, viewer: null,
+            turnState: Majik.Core.StateMachine.TurnStateType.PostCombatMain);
+
+        payload.GetProperty("step").GetString().Should().Be(PhaseLabelResolver.PostCombatMain);
+    }
+
+    [Fact]
+    public void StepStartedEvent_NonMain_IgnoresTurnState()
+    {
+        var alice = new Player("Alice");
+        var e = new StepStartedEvent(Majik.Core.StateMachine.PhaseStateType.Upkeep, alice);
+
+        var payload = EventPayloadBuilder.Build(e, viewer: null,
+            turnState: Majik.Core.StateMachine.TurnStateType.PreCombatMain);
+
+        payload.GetProperty("step").GetString().Should().Be("Upkeep");
+    }
+
+    [Fact]
+    public void StepStartedEvent_Main_WithoutTurnState_RetainsLegacyMainLabel()
+    {
+        // Old callers that don't supply a TurnStateType (and test fixtures
+        // that don't drive the turn state machine) keep the previous
+        // PhaseStateType.ToString() behavior.
+        var alice = new Player("Alice");
+        var e = new StepStartedEvent(Majik.Core.StateMachine.PhaseStateType.Main, alice);
+
+        var payload = EventPayloadBuilder.Build(e);
+
+        payload.GetProperty("step").GetString().Should().Be("Main");
+    }
+
+    [Fact]
+    public void PhaseChangedEvent_MainLabel_RemappedAgainstTurnState()
+    {
+        var e = new PhaseChangedEvent(previousPhase: "Draw", currentPhase: "Main");
+
+        var payload = EventPayloadBuilder.Build(e, viewer: null,
+            turnState: Majik.Core.StateMachine.TurnStateType.PreCombatMain);
+
+        payload.GetProperty("from").GetString().Should().Be("Draw");
+        payload.GetProperty("to").GetString().Should().Be(PhaseLabelResolver.PreCombatMain);
+    }
+
+    [Fact]
+    public void TurnStateChangedEvent_EmitsFromAndToTurnStateNames()
+    {
+        var e = new TurnStateChangedEvent(
+            Majik.Core.StateMachine.TurnStateType.TurnBeginning,
+            Majik.Core.StateMachine.TurnStateType.PreCombatMain);
+
+        var payload = EventPayloadBuilder.Build(e);
+
+        payload.GetProperty("from").GetString().Should().Be("TurnBeginning");
+        payload.GetProperty("to").GetString().Should().Be("PreCombatMain");
+    }
 }
