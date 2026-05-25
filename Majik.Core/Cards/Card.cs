@@ -199,6 +199,50 @@ public class Card : ICard
     }
 
     /// <summary>
+    /// CR 702.143 — runtime Escape grant. When non-null, the card has
+    /// Escape while in its owner's graveyard, with this mana cost as the
+    /// alt-cost mana payment and <see cref="RuntimeEscapeExileCount"/> as
+    /// the "exile N other cards from your graveyard" rider. Stamped by
+    /// effects such as Underworld Breach ("Each nonland card in your
+    /// graveyard has escape and 'Escape—[printed mana cost], exile three
+    /// other cards from your graveyard.'"). The
+    /// <see cref="Majik.Core.Players.Agents.EscapeAltCostProbe.DefaultLookup"/>
+    /// consults this field so a granted escape surfaces to the bot's
+    /// alt-cost enumeration alongside the printed-escape ship list.
+    /// </summary>
+    public ValueObjects.ManaCost? RuntimeEscapeCost { get; private set; }
+
+    /// <summary>
+    /// The "exile N other cards from your graveyard" rider count tied to
+    /// <see cref="RuntimeEscapeCost"/>. Underworld Breach stamps 3; future
+    /// runtime-grant escape effects can pick their own count. Null when
+    /// no runtime escape grant is in place.
+    /// </summary>
+    public int? RuntimeEscapeExileCount { get; private set; }
+
+    /// <summary>
+    /// Stamp a runtime Escape grant on this card. Used by Underworld
+    /// Breach's static-while-on-battlefield grant (CR 702.143) on every
+    /// nonland card in the controller's graveyard. Idempotent — later
+    /// grants overwrite earlier ones; cleared by the granting effect's
+    /// bookkeeping (typically when the granter leaves the battlefield).
+    /// </summary>
+    public void GrantRuntimeEscape(ValueObjects.ManaCost cost, int exileCount)
+    {
+        if (cost == null) throw new ArgumentNullException(nameof(cost));
+        if (exileCount <= 0) throw new ArgumentOutOfRangeException(nameof(exileCount));
+        RuntimeEscapeCost = cost;
+        RuntimeEscapeExileCount = exileCount;
+    }
+
+    /// <summary>Clear any runtime Escape grant on this card.</summary>
+    public void ClearRuntimeEscape()
+    {
+        RuntimeEscapeCost = null;
+        RuntimeEscapeExileCount = null;
+    }
+
+    /// <summary>
     /// CR 702.66 — when this card was cast paying delve, the number of cards
     /// that were exiled from its caster's graveyard as part of the delve
     /// payment. Set by <see cref="Majik.Core.Game.SpellCastFlow"/> right after
