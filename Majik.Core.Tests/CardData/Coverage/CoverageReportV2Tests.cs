@@ -140,6 +140,157 @@ public class CoverageReportV2Tests
         cls.Classify(FakeBolt).Should().Be(CoverageTier.NamedFactory);
     }
 
+    [Fact]
+    public void FrontFace_StripsDoubleSlashSuffix_OrReturnsInput()
+    {
+        // Scryfall DFC / adventure / split / MDFC naming convention.
+        CoverageReportV2.FrontFace("Sink into Stupor // Soporific Springs")
+            .Should().Be("Sink into Stupor");
+        CoverageReportV2.FrontFace("Grief // Grief").Should().Be("Grief");
+        CoverageReportV2.FrontFace("Lightning Bolt").Should().Be("Lightning Bolt");
+        CoverageReportV2.FrontFace("").Should().Be("");
+    }
+
+    [Fact]
+    public void Frequency_DfcEntity_MatchesSnapshot_ByFrontFace()
+    {
+        // Snapshot lists the card by its printed front-face name only.
+        // The DB row carries the full "Front // Back" string. The report
+        // must still credit the snapshot weight to the front-face entity.
+        var dfc = new CardEntity
+        {
+            Name = "Sink into Stupor // Soporific Springs",
+            TypeLine = "Instant // Land",
+            ManaCost = "{1}{U}",
+            OracleText = "Tap target creature. It doesn't untap during its controller's next untap step.",
+        };
+        var entities = new[] { dfc };
+        var cls = BuildClassifier(entities);
+
+        var freq = new Dictionary<string, double>(StringComparer.Ordinal)
+        {
+            ["Sink into Stupor"] = 340.0,
+        };
+
+        var report = CoverageReportV2.Build("test", entities, cls,
+            frequencyWeights: freq);
+
+        report.FrequencyTotalWeight.Should().Be(340.0);
+        report.NotInSet.Should().NotBeNull().And.BeEmpty();
+        report.NotInSetWeight.Should().Be(0.0);
+        // The TopMeta row is keyed by the snapshot name (what the user knows).
+        report.TopMeta!.Should().ContainSingle(r => r.Name == "Sink into Stupor");
+    }
+
+    [Fact]
+    public void Frequency_ExactNameWins_OverDfcMirror_NoDoubleCount()
+    {
+        // Snapshot lists "Lightning Bolt". The DB has both a real
+        // "Lightning Bolt" row and a stray "Lightning Bolt // Lightning Bolt"
+        // mirror row (some printings collapse to this). The snapshot
+        // weight must be counted exactly once, against the exact-name row.
+        var exact = new CardEntity
+        {
+            Name = "Lightning Bolt",
+            TypeLine = "Instant",
+            ManaCost = "{R}",
+            OracleText = "Lightning Bolt deals 3 damage to any target.",
+        };
+        var mirror = new CardEntity
+        {
+            Name = "Lightning Bolt // Lightning Bolt",
+            TypeLine = "Instant",
+            ManaCost = "{R}",
+            OracleText = "Whatever weird thing.",
+        };
+        var entities = new[] { mirror, exact }; // mirror iterates first.
+        var cls = BuildClassifier(entities);
+
+        var freq = new Dictionary<string, double>(StringComparer.Ordinal)
+        {
+            ["Lightning Bolt"] = 300.0,
+        };
+
+        var report = CoverageReportV2.Build("test", entities, cls,
+            frequencyWeights: freq);
+
+        report.FrequencyTotalWeight.Should().Be(300.0); // not 600.
+        report.NotInSetWeight.Should().Be(0.0);
+    }
+
+    [Fact]
+    public void Frequency_UnmatchedSnapshotCard_LandsInNotInSet()
+    {
+        // Snapshot has a card the entity pool does not — surface it via
+        // NotInSet so callers can see what's missing.
+        var entities = new[] { FakeBolt };
+        var cls = BuildClassifier(entities);
+
+        var freq = new Dictionary<string, double>(StringComparer.Ordinal)
+        {
+            ["Fake Bolt"] = 100.0,
+            ["Missing Card"] = 50.0,
+        };
+
+        var report = CoverageReportV2.Build("test", entities, cls,
+            frequencyWeights: freq);
+
+        report.NotInSet.Should().NotBeNull();
+        report.NotInSet!.Should().ContainSingle();
+        report.NotInSet![0].Name.Should().Be("Missing Card");
+        report.NotInSet![0].Weight.Should().Be(50.0);
+        report.NotInSetWeight.Should().Be(50.0);
+        report.FrequencyTotalWeight.Should().Be(100.0);
+    }
+
+    [Fact]
+    public void Frequency_Idempotent_RunsTwice_SameNotInSet()
+    {
+        var entities = new[] { FakeBolt };
+        var cls = BuildClassifier(entities);
+        var freq = new Dictionary<string, double>(StringComparer.Ordinal)
+        {
+            ["Fake Bolt"] = 100.0,
+            ["Missing A"] = 50.0,
+            ["Missing B"] = 25.0,
+        };
+
+        var first = CoverageReportV2.Build("test", entities, cls, frequencyWeights: freq);
+        var second = CoverageReportV2.Build("test", entities, cls, frequencyWeights: freq);
+
+        first.NotInSet!.Count.Should().Be(second.NotInSet!.Count);
+        first.NotInSetWeight.Should().Be(second.NotInSetWeight);
+        first.FrequencyTotalWeight.Should().Be(second.FrequencyTotalWeight);
+        first.NotInSet.Select(r => r.Name).Should()
+            .Equal(second.NotInSet.Select(r => r.Name));
+    }
+
+    [Fact]
+    public void Frequency_CaseInsensitive_FallbackMatch()
+    {
+        var entity = new CardEntity
+        {
+            Name = "the one ring", // mismatched casing vs snapshot
+            TypeLine = "Legendary Artifact",
+            ManaCost = "{4}",
+            OracleText = "Indestructible.",
+            Keywords = "[\"Indestructible\"]",
+        };
+        var entities = new[] { entity };
+        var cls = BuildClassifier(entities);
+
+        var freq = new Dictionary<string, double>(StringComparer.Ordinal)
+        {
+            ["The One Ring"] = 220.0,
+        };
+
+        var report = CoverageReportV2.Build("test", entities, cls,
+            frequencyWeights: freq);
+
+        report.FrequencyTotalWeight.Should().Be(220.0);
+        report.NotInSetWeight.Should().Be(0.0);
+    }
+
     private sealed class FakeRepo : ICardRepository
     {
         private readonly Dictionary<string, CardEntity> _by;
