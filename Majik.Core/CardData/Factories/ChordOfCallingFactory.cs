@@ -173,13 +173,15 @@ public static class ChordOfCallingFactory
                             : candidates[0];
                         if (pick == null) return;
 
-                        if (zones != null)
+                        // CR 603.6a — prefer the caller-supplied ZoneService;
+                        // fall back to ZoneServiceRegistry so the
+                        // dispatcher-driven cast flow (which calls
+                        // BuildSpellDefinition without a service ref) still
+                        // routes through the live ZoneService.
+                        var effectiveZones = zones ?? Majik.Core.Services.ZoneServiceRegistry.Get(caster);
+                        if (effectiveZones != null)
                         {
-                            // Live ZoneService — publishes CardMovedEvent
-                            // so ETB triggers on the tutored creature fire
-                            // (CR 603.6a — mirrors LivingEnd / PrimevalTitan
-                            // PR #165 / #174 wiring).
-                            zones.MoveCard(pick, ZoneType.Library, ZoneType.Battlefield, caster);
+                            effectiveZones.MoveCard(pick, ZoneType.Library, ZoneType.Battlefield, caster);
                         }
                         else
                         {

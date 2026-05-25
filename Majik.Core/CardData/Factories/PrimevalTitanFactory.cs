@@ -200,16 +200,41 @@ public static class PrimevalTitanFactory
     /// Move <paramref name="pick"/> from the library to
     /// <paramref name="caster"/>'s battlefield tapped (CR 701.19a + CR
     /// 305 — lands enter tapped per the printed instruction).
+    /// <para>
+    /// CR 603.6a / CR 614 — when a live <see cref="ZoneService"/> is
+    /// registered for the caster, the Library → Battlefield move routes
+    /// through it so <see cref="Majik.Core.Events.CardMovedEvent"/>
+    /// publishes and ETB-tapped / "untap on ETB tapped" replacements +
+    /// triggers fire (bounce-land bounce, Amulet of Vigor untap).
+    /// We tap the card AFTER the move so any ETB-tapped replacement
+    /// (bounce lands, shock lands) has already run; double-tapping is
+    /// a no-op so this is safe. An Amulet-of-Vigor trigger that already
+    /// went pending off the move's CardMovedEvent stays pending — the
+    /// post-move tap doesn't suppress it because the trigger ran its
+    /// condition at event-publish time.
+    /// </para>
     /// </summary>
     private static void MoveToBattlefieldTapped(Player caster, ICard pick)
     {
-        caster.Zones.Library.RemoveCard(pick);
-        caster.Zones.Battlefield.AddCard(pick);
-        pick.SetZone(ZoneType.Battlefield);
-        pick.SetController(caster);
-        if (pick is Permanent perm)
+        var zones = ZoneServiceRegistry.Get(caster);
+        if (zones != null)
         {
-            perm.Tap();
+            zones.MoveCard(pick, ZoneType.Library, ZoneType.Battlefield, caster);
+            if (pick is Permanent perm && !perm.IsTapped)
+            {
+                perm.Tap();
+            }
+        }
+        else
+        {
+            caster.Zones.Library.RemoveCard(pick);
+            caster.Zones.Battlefield.AddCard(pick);
+            pick.SetZone(ZoneType.Battlefield);
+            pick.SetController(caster);
+            if (pick is Permanent perm)
+            {
+                perm.Tap();
+            }
         }
     }
 }

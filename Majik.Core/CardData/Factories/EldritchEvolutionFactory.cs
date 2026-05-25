@@ -163,9 +163,16 @@ public static class EldritchEvolutionFactory
                         // CR 701.19a — agent may decline to find.
                         if (pick == null) return;
 
-                        if (zoneService != null)
+                        // CR 603.6a — prefer caller-supplied zoneService;
+                        // fall back to ZoneServiceRegistry so the
+                        // dispatcher-driven cast flow routes through the
+                        // live ZoneService even when BuildSpellDefinition
+                        // is invoked without an explicit service ref.
+                        var effectiveZones = zoneService
+                            ?? Majik.Core.Services.ZoneServiceRegistry.Get(caster);
+                        if (effectiveZones != null)
                         {
-                            zoneService.MoveCard(
+                            effectiveZones.MoveCard(
                                 pick, ZoneType.Library, ZoneType.Battlefield, caster);
                         }
                         else

@@ -234,9 +234,15 @@ public static class UroTitanFactory
             .FirstOrDefault(c => c.HasType(CardType.Land));
         if (land == null) return;
 
-        if (zoneService != null)
+        // CR 603.6a — prefer the caller-supplied zoneService; fall back
+        // to ZoneServiceRegistry so the dispatcher path also publishes
+        // CardMovedEvent for the played land (drives bounce-land ETB
+        // bounce + Amulet of Vigor untap triggers).
+        var effectiveZones = zoneService
+            ?? Majik.Core.Services.ZoneServiceRegistry.Get(controller);
+        if (effectiveZones != null)
         {
-            zoneService.MoveCard(land, ZoneType.Hand, ZoneType.Battlefield, controller);
+            effectiveZones.MoveCard(land, ZoneType.Hand, ZoneType.Battlefield, controller);
         }
         else
         {

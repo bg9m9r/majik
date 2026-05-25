@@ -73,12 +73,26 @@ public sealed class GameDriver
             {
                 Majik.Core.Events.EventBusRegistry.Set(p, _eventBus);
             }
+            // CR 603.6a / CR 614 — register the live ZoneService so tutor
+            // / fetch effect closures (PrimevalTitan, Scapeshift,
+            // fetchlands, SearchForTomorrow, GreenSunsZenith,
+            // ChordOfCalling, EldritchEvolution, …) can route their
+            // library → battlefield moves through ZoneService.MoveCard
+            // instead of raw zone mutation, so ETB triggers fire and
+            // enters-tapped replacements run on tutored permanents.
+            Majik.Core.Services.ZoneServiceRegistry.Set(p, _zoneService);
         }
         Majik.Core.Random.GameRandomRegistry.SetDefault(_rng);
         if (_eventBus is not null)
         {
             Majik.Core.Events.EventBusRegistry.SetDefault(_eventBus);
         }
+        // NB: deliberately no ZoneServiceRegistry.SetDefault() — per-player
+        // registration above is sufficient for tutor closures (they look up
+        // by the resolving player's id), and skipping the default keeps
+        // unrelated tests (which build a fresh Player and don't seed the
+        // registry) from inadvertently inheriting a stale ZoneService from
+        // a concurrently-running test collection.
 
         // CR 305.2 — a full game ALWAYS needs a LandDropTracker so the
         // per-turn one-land cap is enforced in PriorityLoop. Default-

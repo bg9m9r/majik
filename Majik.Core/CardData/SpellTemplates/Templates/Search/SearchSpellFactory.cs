@@ -4,6 +4,7 @@ using Majik.Core.Cards.Types;
 using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
+using Majik.Core.Services;
 using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
 
@@ -88,11 +89,34 @@ internal static class SearchSpellFactory
                     .GetAwaiter().GetResult()
                 : candidates[0];
             if (pick == null) return;
-            caster.Zones.Library.RemoveCard(pick);
-            caster.Zones.Battlefield.AddCard(pick);
-            pick.SetZone(ZoneType.Battlefield);
-            if (tapped && pick is Permanent perm)
-                perm.Tap();
+            // CR 603.6a / CR 614 — route through ZoneService so ETB
+            // triggers (bounce-land bounce, Amulet of Vigor untap) and
+            // enters-tapped replacements fire on the tutored land. The
+            // registry lookup falls back to raw mutation when no live
+            // service is wired (shape / dispatcher-test path).
+            var zones = ZoneServiceRegistry.Get(caster);
+            if (zones != null)
+            {
+                zones.MoveCard(pick, ZoneType.Library, ZoneType.Battlefield, caster);
+                if (tapped && pick is Permanent permTapped && !permTapped.IsTapped)
+                {
+                    // Printed "tapped" rider — tap AFTER ZoneService.MoveCard
+                    // so any ETB-tapped replacement (shock lands, bounce
+                    // lands) has already applied. Double-tapping a tapped
+                    // permanent is a no-op; an Amulet-of-Vigor untap trigger
+                    // is already pending from the move, so the post-move
+                    // tap doesn't suppress it.
+                    permTapped.Tap();
+                }
+            }
+            else
+            {
+                caster.Zones.Library.RemoveCard(pick);
+                caster.Zones.Battlefield.AddCard(pick);
+                pick.SetZone(ZoneType.Battlefield);
+                if (tapped && pick is Permanent perm)
+                    perm.Tap();
+            }
             // CR 701.20a — shuffle after a search effect (see SearchLibrarySpell).
             LibraryShuffle.ShuffleLibrary(caster, $"search-land/{kindRaw}");
         }) });
@@ -145,9 +169,19 @@ internal static class SearchSpellFactory
                         .GetAwaiter().GetResult()
                     : candidates[0];
                 if (pick == null) return;
-                caster.Zones.Library.RemoveCard(pick);
-                caster.Zones.Battlefield.AddCard(pick);
-                pick.SetZone(ZoneType.Battlefield);
+                // CR 603.6a — route through ZoneService so ETB triggers
+                // on the tutored creature fire.
+                var zones = ZoneServiceRegistry.Get(caster);
+                if (zones != null)
+                {
+                    zones.MoveCard(pick, ZoneType.Library, ZoneType.Battlefield, caster);
+                }
+                else
+                {
+                    caster.Zones.Library.RemoveCard(pick);
+                    caster.Zones.Battlefield.AddCard(pick);
+                    pick.SetZone(ZoneType.Battlefield);
+                }
                 // CR 701.20a — shuffle after a search effect.
                 LibraryShuffle.ShuffleLibrary(caster, "green-suns-zenith");
             }) };

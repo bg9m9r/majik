@@ -4,6 +4,7 @@ using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
+using Majik.Core.Services;
 using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
@@ -180,10 +181,25 @@ public static class FetchLandCycleFactory
             : candidates[0];
         if (pick == null) return;
 
-        player.Zones.Library.RemoveCard(pick);
-        player.Zones.Battlefield.AddCard(pick);
-        pick.SetZone(ZoneType.Battlefield);
-        pick.SetController(player);
+        // CR 603.6a / CR 614 — route the Library → Battlefield move
+        // through ZoneService when a live service is registered so the
+        // tutored land's CardMovedEvent fires (drives bounce-land ETB
+        // bounce + Amulet of Vigor untap) and ETB-tapped replacements
+        // (shock lands paying 2 life, bounce lands always tapped) run.
+        // Falls back to raw zone mutation for shape / dispatcher-test
+        // paths with no registered service.
+        var zones = ZoneServiceRegistry.Get(player);
+        if (zones != null)
+        {
+            zones.MoveCard(pick, ZoneType.Library, ZoneType.Battlefield, player);
+        }
+        else
+        {
+            player.Zones.Library.RemoveCard(pick);
+            player.Zones.Battlefield.AddCard(pick);
+            pick.SetZone(ZoneType.Battlefield);
+            pick.SetController(player);
+        }
         // CR 701.20a — shuffle library after search.
         Majik.Core.Zones.LibraryShuffle.ShuffleLibrary(player, "fetch-land");
     }
