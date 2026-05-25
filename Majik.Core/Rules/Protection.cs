@@ -49,6 +49,29 @@ public static class Protection
         return Qualities(card).Any(q => q == plural);
     }
 
+    /// <summary>
+    /// CR 702.16 — true if any <see cref="ProtectionAbility"/> on
+    /// <paramref name="card"/> matches the resolving
+    /// <paramref name="source"/> spell via its
+    /// <see cref="ProtectionAbility.SpellPredicate"/> (used by
+    /// "protection from coloured spells" / "from multicoloured spells"
+    /// shapes where the colour / type / name string surface doesn't
+    /// reduce the clause to a single token). Plain colour / type / name
+    /// protections without a predicate are skipped here — callers fall
+    /// back to <see cref="HasProtectionFromColor"/> /
+    /// <see cref="HasProtectionFromCardType"/> for those.
+    /// </summary>
+    public static bool HasProtectionFromSpell(ICard card, Majik.Core.Spells.ISpell source)
+    {
+        if (card == null) throw new ArgumentNullException(nameof(card));
+        if (source == null) throw new ArgumentNullException(nameof(source));
+        foreach (var p in card.Abilities.OfType<ProtectionAbility>())
+        {
+            if (p.SpellPredicate is { } pred && pred(source)) return true;
+        }
+        return false;
+    }
+
     private static IEnumerable<string> Qualities(ICard card) =>
         card.Abilities.OfType<ProtectionAbility>().Select(p => p.Quality);
 }

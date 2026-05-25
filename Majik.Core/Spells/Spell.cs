@@ -127,6 +127,21 @@ public class Spell : ISpell
     /// </summary>
     public Player? GiftRecipient { get; set; }
 
+    /// <summary>
+    /// CR 701.5b — "an uncounterable spell can't be countered". Stamped
+    /// <c>true</c> by <see cref="Majik.Core.Game.SpellCastFlow"/> when the
+    /// resolving card carries a
+    /// <see cref="Majik.Core.Abilities.KeywordAbility"/>("Uncounterable")
+    /// marker (Emrakul, the Aeons Torn / Apocalypse Hydra cycle); read by
+    /// <see cref="Majik.Core.CardData.OracleSpellBinder.RemoveFromStack"/>
+    /// so a counter-spell targeting the spell becomes a no-op (the spell
+    /// is not removed from the stack and resolves normally).
+    ///
+    /// Defaults to <c>false</c> so hand-built test spells without an
+    /// explicit stamp behave as normal (counterable) casts.
+    /// </summary>
+    public bool CannotBeCountered { get; set; }
+
     public Spell(ICard card, Player controller, IEnumerable<ITarget>? targets = null, IEnumerable<ICost>? costs = null, IEnumerable<IEffect>? effects = null)
     {
         if (card == null)
