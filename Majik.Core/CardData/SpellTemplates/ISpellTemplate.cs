@@ -125,7 +125,7 @@ public sealed record SpellBindContext(
     Majik.Core.Events.IEventBus? EventBus = null,
     Majik.Core.Services.ZoneService? Zones = null)
 {
-    public string Text => OracleTextNormalizer.Normalize(Entity.OracleText ?? string.Empty);
+    public string Text => OracleTextNormalizer.NormalizeForCard(Entity.OracleText ?? string.Empty, Entity.Name);
 
     /// <summary>
     /// Raw oracle text BEFORE <see cref="OracleTextNormalizer"/> strips

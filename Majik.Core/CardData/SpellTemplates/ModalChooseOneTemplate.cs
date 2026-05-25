@@ -42,9 +42,13 @@ public sealed class ModalChooseOneTemplate : ISpellTemplate
         @"choose\s+(?<pick>one\s+or\s+more|one\s+or\s+both|one|two|three)\s*[—-]\s*",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+    // Bullet marker is the canonical mode separator. Match the bullet
+    // anywhere (start-of-line OR mid-text), because the
+    // <see cref="OracleTextNormalizer"/> whitespace pass collapses Scryfall's
+    // line breaks before bullets to spaces.
     private static readonly Regex BulletSplit = new(
-        @"^\s*[•·]\s*",
-        RegexOptions.Multiline | RegexOptions.Compiled);
+        @"\s*[•·]\s*",
+        RegexOptions.Compiled);
 
     private static readonly Regex ReminderText = new(@"\([^)]*\)", RegexOptions.Compiled);
 
