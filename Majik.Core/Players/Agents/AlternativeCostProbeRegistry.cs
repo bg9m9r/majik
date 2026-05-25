@@ -116,6 +116,7 @@ public sealed class AlternativeCostProbeRegistry : IAlternativeCostProbe
             .Register(new CascadeAltCostProbe())
             .Register(new EnergyAltCostProbe(EnergyAltCostProbe.DefaultLookup))
             .Register(new EscapeAltCostProbe(EscapeAltCostProbe.DefaultLookup))
-            .Register(new KickerAltCostProbe(KickerAltCostProbe.DefaultLookup));
+            .Register(new KickerAltCostProbe(KickerAltCostProbe.DefaultLookup))
+            .Register(new SuspendAltCostProbe(SuspendAltCostProbe.DefaultLookup));
     }
 }

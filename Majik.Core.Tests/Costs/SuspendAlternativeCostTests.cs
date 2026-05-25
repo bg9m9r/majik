@@ -2,6 +2,7 @@ using FluentAssertions;
 using Majik.Core.Cards;
 using Majik.Core.Costs;
 using Majik.Core.Counters;
+using Majik.Core.Effects;
 using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.StateMachine;
@@ -201,5 +202,131 @@ public class SuspendAlternativeCostTests
         // Sanity: CounterType.Time is defined and reachable from consumers.
         CounterType.Time.Should().NotBeNull();
         CounterType.Time.Name.Should().Be("Time");
+    }
+
+    [Fact]
+    public void TickUpkeep_PublishesSuspendCounterDrainedEvent_AtCounterZero()
+    {
+        // CR 702.62d — when the last time counter is removed, the registry
+        // publishes a SuspendCounterDrainedEvent BEFORE firing the ready
+        // callback. Diagnostic hook independent of the cast pipeline.
+        var bus = new EventBus();
+        var bolt = new Sorcery("Rift Bolt", "{2}{R}");
+        bolt.SetOwner(_alice);
+        bolt.SetZone(ZoneType.Hand);
+        _alice.Zones.Hand.AddCard(bolt);
+
+        SuspendCounterDrainedEvent? captured = null;
+        bus.Subscribe<SuspendCounterDrainedEvent>(e => captured = e);
+
+        var fired = 0;
+        var registry = new SuspendedCardRegistry(bus, (_, _) => fired++);
+        var suspend = new SuspendAlternativeCost(1, ManaCost.Parse("R"));
+        suspend.ApplySuspend(bolt, _alice, registry);
+
+        bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _alice));
+
+        captured.Should().NotBeNull();
+        captured!.Card.Should().BeSameAs(bolt);
+        captured.Owner.Should().BeSameAs(_alice);
+        fired.Should().Be(1, "ready callback still fires after the drain event");
+    }
+
+    [Fact]
+    public void TickUpkeep_DoesNotPublishDrainEvent_WhileCountersRemain()
+    {
+        var bus = new EventBus();
+        var bolt = new Sorcery("Rift Bolt", "{2}{R}");
+        bolt.SetOwner(_alice);
+        bolt.SetZone(ZoneType.Hand);
+        _alice.Zones.Hand.AddCard(bolt);
+
+        var drained = 0;
+        bus.Subscribe<SuspendCounterDrainedEvent>(_ => drained++);
+
+        var registry = new SuspendedCardRegistry(bus, (_, _) => { });
+        var suspend = new SuspendAlternativeCost(2, ManaCost.Parse("R"));
+        suspend.ApplySuspend(bolt, _alice, registry);
+
+        // First upkeep: 2 → 1, no drain event.
+        bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _alice));
+        drained.Should().Be(0, "the card still has 1 counter");
+
+        // Second upkeep: 1 → 0, drain fires exactly once.
+        bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _alice));
+        drained.Should().Be(1);
+    }
+
+    [Fact]
+    public void CastFromExileAlternativeCost_IsSuspendCast_DefaultsFalse()
+    {
+        var alt = new CastFromExileAlternativeCost("Generic", ManaCost.Parse("0"));
+        alt.IsSuspendCast.Should().BeFalse();
+    }
+
+    [Fact]
+    public void CastFromExileAlternativeCost_IsSuspendCast_HonoursConstructorFlag()
+    {
+        var alt = new CastFromExileAlternativeCost(
+            "Suspend resolved (CR 702.62d)", ManaCost.Parse("0"), isSuspendCast: true);
+        alt.IsSuspendCast.Should().BeTrue();
+    }
+
+    [Fact]
+    public void SuspendHasteEffect_GrantsHaste_WhileCreatureOnBattlefield()
+    {
+        // CR 702.62g — a creature cast via suspend gains haste until it
+        // leaves the battlefield. The continuous effect grants Haste in
+        // Layer 6 (Abilities) while target.Zone == Battlefield.
+        var grizzly = new Creature("Grizzly Bears", "{1}{G}", 2, 2);
+        grizzly.SetOwner(_alice);
+        grizzly.SetController(_alice);
+        grizzly.SetZone(ZoneType.Battlefield);
+
+        var effects = new ContinuousEffectsService();
+        grizzly.ActiveEffects = effects;
+        effects.Register(new SuspendHasteEffect(grizzly));
+
+        var chars = effects.Compute(grizzly);
+        chars.Keywords.Should().Contain("Haste",
+            "the haste grant is active while the creature is on the battlefield (CR 702.62g).");
+    }
+
+    [Fact]
+    public void SuspendHasteEffect_DropsOnLeaveBattlefield()
+    {
+        var grizzly = new Creature("Grizzly Bears", "{1}{G}", 2, 2);
+        grizzly.SetOwner(_alice);
+        grizzly.SetController(_alice);
+        grizzly.SetZone(ZoneType.Battlefield);
+
+        var effects = new ContinuousEffectsService();
+        grizzly.ActiveEffects = effects;
+        var haste = new SuspendHasteEffect(grizzly);
+        effects.Register(haste);
+
+        effects.Compute(grizzly).Keywords.Should().Contain("Haste");
+
+        // Creature dies → goes to graveyard. The effect self-deactivates
+        // via IsActive(); Prune drops it.
+        grizzly.SetZone(ZoneType.Graveyard);
+        haste.IsActive().Should().BeFalse();
+
+        effects.Prune();
+        effects.Compute(grizzly).Keywords.Should().NotContain("Haste");
+    }
+
+    [Fact]
+    public void SuspendHasteEffect_StaysActive_WhileOnStack()
+    {
+        // Pre-resolve: the spell is on the stack. The grant attaches at
+        // cast time so it's in place the instant the permanent ETBs.
+        var grizzly = new Creature("Grizzly Bears", "{1}{G}", 2, 2);
+        grizzly.SetOwner(_alice);
+        grizzly.SetController(_alice);
+        grizzly.SetZone(ZoneType.Stack);
+
+        var haste = new SuspendHasteEffect(grizzly);
+        haste.IsActive().Should().BeTrue("the grant rides from the spell into the permanent (CR 702.62g).");
     }
 }
