@@ -16,12 +16,13 @@ namespace Majik.Core.CardData.Factories;
 /// Creature — Elemental Incarnation 3/4. Oracle text:
 ///   "Flash
 ///    Reach
+///    Trample
 ///    When this creature enters, target player shuffles their graveyard into
 ///    their library.
 ///    Evoke—Exile a green card from your hand."
 ///
 /// ## Implemented (v1)
-/// - 3/4 Elemental Incarnation with Flash + Reach + Evoke keyword markers
+/// - 3/4 Elemental Incarnation with Flash + Reach + Trample + Evoke keyword markers
 ///   (<see cref="KeywordAbility"/> entries attached inline for the
 ///   <see cref="NamedCardFactory"/> path; the data-driven load route gets
 ///   them via <see cref="Majik.Core.CardData.Parsing.KeywordBinder"/>).
@@ -61,14 +62,15 @@ public static class EnduranceFactory
         card.SetController(owner);
 
         // ----------------------------------------------------------------
-        // Keyword markers — CR 702.8 (Flash), CR 702.9 (Reach), CR 702.74
-        // (Evoke). When this factory is used directly (test /
-        // NamedCardFactory path) the markers aren't supplied by
+        // Keyword markers — CR 702.8 (Flash), CR 702.9 (Reach), CR 702.19
+        // (Trample), CR 702.74 (Evoke). When this factory is used directly
+        // (test / NamedCardFactory path) the markers aren't supplied by
         // KeywordBinder, so attach them inline for consistency with
         // SolitudeFactory / GriefFactory.
         // ----------------------------------------------------------------
         card.AddAbility(new KeywordAbility("Flash", card, owner));
         card.AddAbility(new KeywordAbility("Reach", card, owner));
+        card.AddAbility(new KeywordAbility("Trample", card, owner));
         card.AddAbility(new KeywordAbility("Evoke", card, owner));
 
         // ----------------------------------------------------------------

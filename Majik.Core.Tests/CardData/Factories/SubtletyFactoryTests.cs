@@ -60,7 +60,7 @@ public class SubtletyFactoryTests
 
         var keywordNames = subtlety.Abilities.OfType<KeywordAbility>()
             .Select(k => k.Keyword).ToList();
-        keywordNames.Should().Contain(new[] { "Flash", "Evoke" });
+        keywordNames.Should().Contain(new[] { "Flash", "Flying", "Evoke" });
 
         // Two triggered abilities: ETB bounce + Evoke sacrifice.
         subtlety.Abilities.OfType<TriggeredAbility>().Should().HaveCount(2);
@@ -75,6 +75,32 @@ public class SubtletyFactoryTests
         card.Name.Should().Be("Subtlety");
         card.HasSubtype(CardSubtype.Elemental).Should().BeTrue();
         card.HasSubtype(CardSubtype.Incarnation).Should().BeTrue();
+    }
+
+    [Fact]
+    public void Create_HasPrintedFlyingKeyword()
+    {
+        // CR 702.9 — printed Flying. Regression for the keyword-grant gap
+        // where Subtlety only attached Flash + Evoke markers despite the
+        // MH2 print listing Flash AND Flying.
+        var subtlety = SubtletyFactory.Create(_alice);
+
+        var keywordNames = subtlety.Abilities.OfType<KeywordAbility>()
+            .Select(k => k.Keyword).ToList();
+        keywordNames.Should().Contain("Flying");
+    }
+
+    [Fact]
+    public void Create_HasPrintedManaCost_3UU()
+    {
+        // MH2 print: {3}{U}{U} (5 mana, double-blue pip — mirrors the rest
+        // of the incarnation cycle: Solitude {3}{W}{W}, Grief {2}{B}{B},
+        // Fury {3}{R}{R}, Endurance {1}{G}{G}{G}). Regression for the
+        // single-pip {3}{U} typo.
+        var subtlety = SubtletyFactory.Create(_alice);
+
+        subtlety.ManaCost.Should().Be("{3}{U}{U}");
+        SubtletyFactory.PrintedManaCost.Should().Be("{3}{U}{U}");
     }
 
     // ── ETB bounce target shapes ──────────────────────────────────────────────

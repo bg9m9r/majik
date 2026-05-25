@@ -64,7 +64,7 @@ public class EnduranceTests
 
         var keywordNames = endurance.Abilities.OfType<KeywordAbility>()
             .Select(k => k.Keyword).ToList();
-        keywordNames.Should().Contain(new[] { "Flash", "Reach", "Evoke" });
+        keywordNames.Should().Contain(new[] { "Flash", "Reach", "Trample", "Evoke" });
 
         // Two triggered abilities: ETB graveyard-to-library + Evoke sacrifice.
         endurance.Abilities.OfType<TriggeredAbility>().Should().HaveCount(2);
@@ -85,7 +85,20 @@ public class EnduranceTests
 
         var keywordNames = creature.Abilities.OfType<KeywordAbility>()
             .Select(k => k.Keyword).ToList();
-        keywordNames.Should().Contain(new[] { "Flash", "Reach", "Evoke" });
+        keywordNames.Should().Contain(new[] { "Flash", "Reach", "Trample", "Evoke" });
+    }
+
+    [Fact]
+    public void Create_HasPrintedTrampleKeyword()
+    {
+        // CR 702.19 — printed Trample. Regression for the keyword-grant gap
+        // where Endurance only attached Flash + Reach + Evoke markers
+        // despite the MH2 print listing Flash, Reach, AND Trample.
+        var endurance = EnduranceFactory.Create(_alice);
+
+        var keywordNames = endurance.Abilities.OfType<KeywordAbility>()
+            .Select(k => k.Keyword).ToList();
+        keywordNames.Should().Contain("Trample");
     }
 
     // ── ETB targeting ────────────────────────────────────────────────────────
