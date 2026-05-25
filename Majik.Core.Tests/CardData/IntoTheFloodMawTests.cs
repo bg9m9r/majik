@@ -75,7 +75,10 @@ public class IntoTheFloodMawTests
     {
         var dispatched = NamedCardFactory.Create("Into the Flood Maw", _alice);
 
-        dispatched.Should().BeOfType<Instant>();
+        dispatched.Should().BeAssignableTo<Instant>(
+            because: "Into the Flood Maw is now backed by the IGiftClause-implementing " +
+                     "IntoTheFloodMawCard subclass — the dispatcher still hands back an " +
+                     "Instant by static type but the runtime type is the gift-aware subclass.");
         dispatched.Name.Should().Be("Into the Flood Maw");
         dispatched.HasType(CardType.Instant).Should().BeTrue();
     }

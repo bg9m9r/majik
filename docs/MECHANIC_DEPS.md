@@ -5,11 +5,11 @@ Scanner output: every `*Factory.cs` xmldoc / inline comment mentioning
 engine primitive. Each row answers: "if we ship primitive _X_, which factory
 xmldocs flagged that they're blocked on it?"
 
-- **Generated:** 2026-05-25 01:38 UTC
+- **Generated:** 2026-05-25 01:48 UTC
 - **Scanned dir:** `Majik.Core/CardData/Factories`
-- **Total mentions:** 172
-- **Clusters:** 7
-- **Unclustered (need new registry pattern):** 125
+- **Total mentions:** 178
+- **Clusters:** 6
+- **Unclustered (need new registry pattern):** 132
 
 Regenerate with `dotnet run --project Majik.Console -- mechanic-deps --md-out docs/MECHANIC_DEPS.md --json-out docs/mechanic-deps.json`.
 
@@ -22,8 +22,7 @@ Regenerate with `dotnet run --project Majik.Console -- mechanic-deps --md-out do
 | 3 | Layer-6 ability-grant subsystem (CR 613.1f) | CR 613.1f | 2 | 4 |
 | 4 | Cast-marker on Card | — | 1 | 1 |
 | 5 | Cycling-style activated-from-hand (CR 702.32 / Channel CR 702.74) | CR 702.32 | 1 | 1 |
-| 6 | Gift (Bloomburrow) | — | 1 | 1 |
-| 7 | "Activate only as a sorcery" gate (CR 117.1a) | CR 117.1a | 1 | 1 |
+| 6 | "Activate only as a sorcery" gate (CR 117.1a) | CR 117.1a | 1 | 1 |
 
 ## Cluster detail
 
@@ -160,17 +159,7 @@ Mentions:
 - `ChannelLandCycleFactory` (`ChannelLandCycleFactory.cs:12`)
   > Sokenzan, Crucible of Defiance — deferred (its Channel produces two 1/1 Spirit tokens with haste; requires a Spirit-token shape not yet in <c>TokenFactory</c>).
 
-### 6. Gift (Bloomburrow)
-
-- **Blocks:** 1 factories (1 mentions)
-- **Implementation hint:** Cast-time choice: a static/triggered side effect granting an opponent a defined gift (treasure, draw, etc.).
-
-Mentions:
-
-- `IntoTheFloodMawFactory` (`IntoTheFloodMawFactory.cs:12`)
-  > ## Deferred (v1 gaps) — Gift mechanic (CR 701.59 in the 2024 errata) The "Gift a tapped Fish" clause is a cast-time choice that lets the caster promise an opponent a gift; if promised, the opponent creates a tapped 1/1 blue Fish creature token BEFORE the spell's other effects, and Into the Flood Maw's target predicate …
-
-### 7. "Activate only as a sorcery" gate (CR 117.1a)
+### 6. "Activate only as a sorcery" gate (CR 117.1a)
 
 - **CR citation:** CR 117.1a
 - **Blocks:** 1 factories (1 mentions)
@@ -301,6 +290,14 @@ Mentions:
   > ## Deferred (v1 gaps)  - <b>Convoke cost reduction</b>.
 - `DryadArborFactory` (`DryadArborFactory.cs:7`)
   > Green Sun's Zenith interaction (can be fetched as a Forest creature — deferred to the targeting / land-subtype search slice).
+- `ArcboundRavagerFactory` (`ArcboundRavagerFactory.cs:13`)
+  > ## Deferred (v1 gaps)  - <b>Target prompt for Modular bestowal</b>: oracle says "target artifact creature" — v1 picks the first artifact creature deterministically (excluding Arcbound Ravager).
+- `ArcboundRavagerFactory` (`ArcboundRavagerFactory.cs:13`)
+  > TargetRequests"/>; same gap as Stoneforge Mystic's "attach to a creature you control".
+- `ArcboundRavagerFactory` (`ArcboundRavagerFactory.cs:13`)
+  > Arcbound Ravager is the only Modular card in the immediate roadmap; promotion to a shared primitive is deferred until a second Modular card lands (Arcbound Crusher / Worker / etc.
+- `ArcboundRavagerFactory` (`ArcboundRavagerFactory.cs:233`)
+  > CR 702.43b's "target artifact creature" is not controller-restricted; opponent-side scans are deferred until the engine exposes a cross-battlefield enumerator (no <c>Player.
 - `SpriteDragonFactory` (`SpriteDragonFactory.cs:12`)
   > ## Deferred (v1 gaps)  - <b>Continuous P/T recomputation</b> — Sprite Dragon's effective P/T is derived from base 1/1 plus +1/+1 counters via the standard <see cref="CounterCollection"/> path (CR 613.4 layer 7d), inherited from every other +1/+1-counter user (Psychic Frog activated ability, Ledger Shredder surveil ride…
 - `PsychicFrogFactory` (`PsychicFrogFactory.cs:15`)
@@ -369,6 +366,12 @@ Mentions:
   > No reveal event is emitted in v1 (same gap as other reveal-cost cards).
 - `SilvergillAdeptFactory` (`SilvergillAdeptFactory.cs:79`)
   > " v1: structural-only keyword marker; actual cost enforcement at cast-time is deferred.
+- `EmryLurkerOfTheLochFactory` (`EmryLurkerOfTheLochFactory.cs:11`)
+  > ## Deferred (v1 gaps)  - <b>Target prompt for the activated ability</b>: oracle says "choose target artifact card in your graveyard" — v1 picks the first artifact card in the controller's graveyard.
+- `EmryLurkerOfTheLochFactory` (`EmryLurkerOfTheLochFactory.cs:11`)
+  > TargetRequests"/>; same gap as Stoneforge Mystic's "attach to a creature you control".
+- `EmryLurkerOfTheLochFactory` (`EmryLurkerOfTheLochFactory.cs:11`)
+  > A bus-aware overload could subscribe to <c>TurnEndedEvent</c> and clear the stamp; deferred.
 - `SpellskiteFactory` (`SpellskiteFactory.cs:11`)
   > ## Deferred (v1 gaps)  - <b>Ability targets</b>: Spellskite's printed clause is "target spell or ability with a single target".
 - `MeddlingMageFactory` (`MeddlingMageFactory.cs:9`)

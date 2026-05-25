@@ -392,6 +392,44 @@ public class Card : ICard
     }
 
     /// <summary>
+    /// CR 701.59 — "Gift" cast-time sentinel (Bloomburrow). Stamped
+    /// <c>true</c> by <see cref="Majik.Core.Game.SpellCastFlow"/> when
+    /// the caster opts into a gift promise during the cast flow.
+    /// Resolve bodies of <see cref="Majik.Core.Spells.IGiftClause"/>
+    /// implementors (e.g.
+    /// <see cref="Majik.Core.CardData.Factories.IntoTheFloodMawFactory"/>)
+    /// branch on this flag to apply the upgraded printed effect (Flood
+    /// Maw's "instead return target nonland permanent"). Mirrors
+    /// <see cref="Majik.Core.Spells.Spell.GiftRecipient"/> on the
+    /// resolving spell for resolve-body reads that don't have the
+    /// spell reference handy.
+    ///
+    /// <para>Cleared by <see cref="Majik.Core.Game.SpellCastFlow"/> via
+    /// a cleanup effect appended after the spell's printed body so the
+    /// flag doesn't leak past resolution (CR 400.7 — new object on
+    /// each zone change). Defaults to <c>false</c> so hand-built test
+    /// cards without an explicit stamp are treated as non-gifted casts.</para>
+    /// </summary>
+    public bool HasGiftPromised { get; private set; }
+
+    /// <summary>Stamp the gift-promise sentinel. Called by
+    /// <see cref="Majik.Core.Game.SpellCastFlow"/> when the caster
+    /// opts into a cast-time gift promise.</summary>
+    public void SetHasGiftPromised(bool value)
+    {
+        HasGiftPromised = value;
+    }
+
+    /// <summary>Clear the gift-promise sentinel. Called by
+    /// <see cref="Majik.Core.Game.SpellCastFlow"/> via a cleanup
+    /// effect appended after the spell's printed body so the flag
+    /// doesn't leak past resolution (CR 400.7).</summary>
+    public void ClearHasGiftPromised()
+    {
+        HasGiftPromised = false;
+    }
+
+    /// <summary>
     /// CR 711 — double-faced / transform card face tracker. Non-null on
     /// DFC cards; tracks which face (front / back) is currently active and
     /// exposes <see cref="Majik.Core.CardData.MDFCs.MdfcState.Transform"/>

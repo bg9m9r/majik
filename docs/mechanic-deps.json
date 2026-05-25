@@ -1,10 +1,10 @@
 {
-  "generated_utc": "2026-05-25T01:38:12.6657556Z",
-  "scanned_dir": "/home/brett/Projects/majik.project/majik.core/.claude/worktrees/agent-af4dadcdc0b68610c/Majik.Core/CardData/Factories",
-  "total_mentions": 172,
-  "distinct_factories": 124,
-  "cluster_count": 7,
-  "unclustered_count": 125,
+  "generated_utc": "2026-05-25T01:48:13.9113707Z",
+  "scanned_dir": "/home/brett/Projects/majik.project/majik.core/.claude/worktrees/agent-adc18013320f37f58/Majik.Core/CardData/Factories",
+  "total_mentions": 178,
+  "distinct_factories": 125,
+  "cluster_count": 6,
+  "unclustered_count": 132,
   "clusters": [
     {
       "primitive_id": "agent-prompt-targeting",
@@ -376,25 +376,6 @@
           "file": "ChannelLandCycleFactory.cs",
           "line": 12,
           "sentence": "Sokenzan, Crucible of Defiance \u2014 deferred (its Channel produces two 1/1 Spirit tokens with haste; requires a Spirit-token shape not yet in \u003Cc\u003ETokenFactory\u003C/c\u003E)."
-        }
-      ]
-    },
-    {
-      "primitive_id": "gift",
-      "display_name": "Gift (Bloomburrow)",
-      "implementation_hint": "Cast-time choice: a static/triggered side effect granting an opponent a defined gift (treasure, draw, etc.).",
-      "factory_count": 1,
-      "mention_count": 1,
-      "factories": [
-        "IntoTheFloodMawFactory"
-      ],
-      "mentions": [
-        {
-          "factory": "IntoTheFloodMawFactory",
-          "file": "IntoTheFloodMawFactory.cs",
-          "line": 12,
-          "sentence": "## Deferred (v1 gaps) \u2014 Gift mechanic (CR 701.59 in the 2024 errata) The \u0022Gift a tapped Fish\u0022 clause is a cast-time choice that lets the caster promise an opponent a gift; if promised, the opponent creates a tapped 1/1 blue Fish creature token BEFORE the spell\u0027s other effects, and Into the Flood Maw\u0027s target predicate \u2026",
-          "cr": "CR 701.59"
         }
       ]
     },
@@ -780,6 +761,31 @@
       "sentence": "Green Sun\u0027s Zenith interaction (can be fetched as a Forest creature \u2014 deferred to the targeting / land-subtype search slice)."
     },
     {
+      "factory": "ArcboundRavagerFactory",
+      "file": "ArcboundRavagerFactory.cs",
+      "line": 13,
+      "sentence": "## Deferred (v1 gaps)  - \u003Cb\u003ETarget prompt for Modular bestowal\u003C/b\u003E: oracle says \u0022target artifact creature\u0022 \u2014 v1 picks the first artifact creature deterministically (excluding Arcbound Ravager)."
+    },
+    {
+      "factory": "ArcboundRavagerFactory",
+      "file": "ArcboundRavagerFactory.cs",
+      "line": 13,
+      "sentence": "TargetRequests\u0022/\u003E; same gap as Stoneforge Mystic\u0027s \u0022attach to a creature you control\u0022."
+    },
+    {
+      "factory": "ArcboundRavagerFactory",
+      "file": "ArcboundRavagerFactory.cs",
+      "line": 13,
+      "sentence": "Arcbound Ravager is the only Modular card in the immediate roadmap; promotion to a shared primitive is deferred until a second Modular card lands (Arcbound Crusher / Worker / etc."
+    },
+    {
+      "factory": "ArcboundRavagerFactory",
+      "file": "ArcboundRavagerFactory.cs",
+      "line": 233,
+      "sentence": "CR 702.43b\u0027s \u0022target artifact creature\u0022 is not controller-restricted; opponent-side scans are deferred until the engine exposes a cross-battlefield enumerator (no \u003Cc\u003EPlayer.",
+      "cr": "CR 702.43b"
+    },
+    {
       "factory": "SpriteDragonFactory",
       "file": "SpriteDragonFactory.cs",
       "line": 12,
@@ -988,6 +994,24 @@
       "file": "SilvergillAdeptFactory.cs",
       "line": 79,
       "sentence": "\u0022 v1: structural-only keyword marker; actual cost enforcement at cast-time is deferred."
+    },
+    {
+      "factory": "EmryLurkerOfTheLochFactory",
+      "file": "EmryLurkerOfTheLochFactory.cs",
+      "line": 11,
+      "sentence": "## Deferred (v1 gaps)  - \u003Cb\u003ETarget prompt for the activated ability\u003C/b\u003E: oracle says \u0022choose target artifact card in your graveyard\u0022 \u2014 v1 picks the first artifact card in the controller\u0027s graveyard."
+    },
+    {
+      "factory": "EmryLurkerOfTheLochFactory",
+      "file": "EmryLurkerOfTheLochFactory.cs",
+      "line": 11,
+      "sentence": "TargetRequests\u0022/\u003E; same gap as Stoneforge Mystic\u0027s \u0022attach to a creature you control\u0022."
+    },
+    {
+      "factory": "EmryLurkerOfTheLochFactory",
+      "file": "EmryLurkerOfTheLochFactory.cs",
+      "line": 11,
+      "sentence": "A bus-aware overload could subscribe to \u003Cc\u003ETurnEndedEvent\u003C/c\u003E and clear the stamp; deferred."
     },
     {
       "factory": "SpellskiteFactory",
