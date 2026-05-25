@@ -167,6 +167,9 @@ public enum CardSubtype
     /// <summary>Assassin creature subtype — Murderous Redcap (Shadowmoor),
     /// Royal Assassin, Garna, Bloodfist of Keral. CR 205.3m.</summary>
     Assassin,
+    /// <summary>Berserker creature subtype — Bloodbraid Elf (Alara Reborn /
+    /// Modern Horizons 2), Goblin Berserker, Lovisa Coldeyes. CR 205.3m.</summary>
+    Berserker,
 
     // Land subtypes (examples)
     Forest,
