@@ -130,3 +130,17 @@ Env var contract + operations live in the umbrella repo:
 ## Historical docs
 
 `KEYWORDS_*.md`, `MECHANICS_GAP.md`, `ROADMAP.md`, and similar phase docs live under [`docs/archive/`](./docs/archive/). They are **not authoritative** — code wins when they disagree. Don't update or create new phase docs unless asked.
+
+## Contributing
+
+See [`CONTRIBUTING.md`](./CONTRIBUTING.md). All commits must carry a DCO `Signed-off-by` trailer (`git commit -s`).
+
+## License
+
+Source code is licensed under the [Apache License, Version 2.0](./LICENSE). Third-party attributions — including the bundled Comprehensive Rules text and Scryfall-sourced card metadata — live in [`NOTICE`](./NOTICE).
+
+### Magic: The Gathering Fan Content
+
+Majik is unofficial Fan Content permitted under the [Wizards Fan Content Policy](https://company.wizards.com/en/legal/fancontentpolicy). Not approved or endorsed by Wizards. Portions of the materials used are property of Wizards of the Coast. © Wizards of the Coast LLC.
+
+"Magic: The Gathering" and all related card names, mana symbols, set symbols, and rules text are trademarks and/or copyrighted material of Wizards of the Coast LLC. The bundled `MagicCompRules 20251114.txt` and `modern-cards.json.gz` seed (Scryfall metadata) reproduce Wizards material under the Fan Content Policy; this project does not re-license that material.

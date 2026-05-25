@@ -1,0 +1,44 @@
+Majik - engine + server
+Copyright 2026 Brett Gamerson
+
+This product includes software developed as part of the Majik project
+(https://github.com/bg9m9r/majik).
+
+----------------------------------------------------------------------
+
+Magic: The Gathering Fan Content Notice
+
+Majik is unofficial Fan Content permitted under the Wizards of the Coast
+Fan Content Policy (https://company.wizards.com/en/legal/fancontentpolicy).
+Not approved or endorsed by Wizards. Portions of the materials used are
+property of Wizards of the Coast. (c) Wizards of the Coast LLC.
+
+"Magic: The Gathering" and all related card names, mana symbols, set
+symbols, and rules text referenced by this project are trademarks and/or
+copyrighted material of Wizards of the Coast LLC. Use of these marks in
+this project is descriptive and nominative; no affiliation, sponsorship,
+or endorsement is claimed or implied.
+
+----------------------------------------------------------------------
+
+Third-Party Components
+
+Comprehensive Rules
+  File:    MagicCompRules 20251114.txt
+  Source:  https://magic.wizards.com/en/rules
+  Notice:  (c) Wizards of the Coast LLC. The Comprehensive Rules text is
+           the property of Wizards of the Coast and is included verbatim
+           as a reference document under Fan Content Policy. It is not
+           re-licensed by this project.
+
+Modern card pool (embedded seed)
+  File:    Majik.Core/CardData/Embedded/modern-cards.json.gz
+  Source:  Scryfall bulk data (https://scryfall.com/docs/api)
+  Notice:  Card metadata published by Scryfall under CC0 1.0 Universal
+           (https://creativecommons.org/publicdomain/zero/1.0/). Card
+           names, oracle text, and any reproduced rules text remain
+           (c) Wizards of the Coast LLC and are included under the
+           Fan Content Policy.
+
+.NET dependencies (NuGet) carry their own licenses; see the LICENSE
+metadata in each package or the project's restored package graph.
