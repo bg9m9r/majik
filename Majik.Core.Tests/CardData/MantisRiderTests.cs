@@ -3,7 +3,9 @@ using Majik.Core.Abilities;
 using Majik.Core.CardData.Factories;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Events;
 using Majik.Core.Players;
+using Majik.Core.Rules;
 using Majik.Core.Zones;
 using Xunit;
 
@@ -271,5 +273,103 @@ public class MantisRiderTests
             "the already-dead creature is not bounced to hand");
         bob.Zones.Graveyard.GetCards().Should().Contain(target,
             "the creature stays in the graveyard (it was already there)");
+    }
+
+    // -----------------------------------------------------------------------
+    // Reflector Mage — per-player name restriction (CR 601.3)
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void ReflectorMage_EtbEffect_RegistersPerPlayerNameBan()
+    {
+        try
+        {
+            var alice = new Player("Alice", 20);
+            var bob = new Player("Bob", 20);
+
+            // Use a unique card name so concurrently-running test classes
+            // that share the process-static CastingRestrictions table
+            // (RangerCaptain / Teferi / Drannith / Containment / Veil-of-Summer
+            // each `Clear()` on setup/teardown) can't trample our assertions.
+            var uniqueName = "Reflector Mage Test Bears " + Guid.NewGuid();
+            var target = new Creature(uniqueName, "1G", 2, 2);
+            target.SetOwner(bob);
+            target.SetController(bob);
+            bob.Zones.Battlefield.AddCard(target);
+            target.SetZone(ZoneType.Battlefield);
+
+            var mage = ReflectorMageFactory.Create(alice);
+            var etb = mage.Abilities.OfType<TriggeredAbility>().Single();
+            etb.SetChosenTargets(new IReadOnlyList<object>[]
+            {
+                new object[] { target },
+            });
+            foreach (var effect in etb.Effects) effect.Execute();
+
+            CastingRestrictions.IsCardNameBlockedForPlayer(bob, uniqueName)
+                .Should().BeTrue("Reflector Mage bans the bounced creature's name for its owner.");
+            CastingRestrictions.IsCardNameBlockedForPlayer(alice, uniqueName)
+                .Should().BeFalse("the ban is per-player — Alice (controller) is not affected.");
+            // Global rail must NOT be set — Meddling Mage's global rail is
+            // a different surface.
+            CastingRestrictions.IsCardNameBlocked(uniqueName).Should().BeFalse(
+                "Reflector Mage uses the per-player rail, not the global one.");
+
+            // Teardown — token-scoped removal leaves no leakage even if
+            // sibling tests don't Clear before us.
+            CastingRestrictions.RemoveNamedCardBlock(mage);
+        }
+        finally
+        {
+            // Belt + braces.
+            CastingRestrictions.Clear();
+        }
+    }
+
+    [Fact]
+    public void ReflectorMage_EtbEffect_NameBan_LiftsOnControllersNextTurn_WithEventBus()
+    {
+        try
+        {
+            var alice = new Player("Alice", 20);
+            var bob = new Player("Bob", 20);
+            var bus = new EventBus();
+
+            var uniqueName = "Reflector Mage Test Bears " + Guid.NewGuid();
+            var target = new Creature(uniqueName, "1G", 2, 2);
+            target.SetOwner(bob);
+            target.SetController(bob);
+            bob.Zones.Battlefield.AddCard(target);
+            target.SetZone(ZoneType.Battlefield);
+
+            var mage = ReflectorMageFactory.Create(alice, zoneService: null, eventBus: bus, triggers: null);
+            var etb = mage.Abilities.OfType<TriggeredAbility>().Single();
+            etb.SetChosenTargets(new IReadOnlyList<object>[]
+            {
+                new object[] { target },
+            });
+            foreach (var effect in etb.Effects) effect.Execute();
+
+            CastingRestrictions.IsCardNameBlockedForPlayer(bob, uniqueName).Should().BeTrue();
+
+            // Bob's turn starts — ban still in place (CR 702 "your next turn"
+            // reads as the controller's next turn, not the affected player's).
+            bus.Publish(new TurnStartedEvent(bob, 2));
+            CastingRestrictions.IsCardNameBlockedForPlayer(bob, uniqueName).Should().BeTrue(
+                "Bob's turn is not Alice's — ban remains.");
+
+            // Alice's NEXT turn — ban lifts. Reflector Mage's resolve happens
+            // during the controller's CURRENT turn, so the TurnStartedEvent
+            // for that turn has already been published before the cleanup
+            // subscription; the first delivered matching event is the
+            // controller's next turn.
+            bus.Publish(new TurnStartedEvent(alice, 3));
+            CastingRestrictions.IsCardNameBlockedForPlayer(bob, uniqueName).Should().BeFalse(
+                "Alice's next turn — Reflector Mage's name ban expires (CR 702 'until your next turn').");
+        }
+        finally
+        {
+            CastingRestrictions.Clear();
+        }
     }
 }

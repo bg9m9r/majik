@@ -120,6 +120,20 @@ public class ActionValidator
                 new RuleViolation("601.3", "named-card cast restriction"));
         }
 
+        // CR 601.3 — per-player named-card cast block (Reflector Mage:
+        // "That player can't cast spells with the same name as that
+        // creature until your next turn"). Reject a cast when the casting
+        // player has a per-player block registered against the spell's
+        // card name.
+        if (action.Card != null
+            && action.Player != null
+            && CastingRestrictions.IsCardNameBlockedForPlayer(action.Player, action.Card.Name))
+        {
+            return ValidationResult.Invalid(
+                $"{action.Player.Name} can't cast {action.Card.Name} (Reflector Mage / per-player name block)",
+                new RuleViolation("601.3", "per-player named-card cast restriction"));
+        }
+
         // CR 601.3 — turn-scoped noncreature-spell restriction
         // (Ranger-Captain of Eos: "Your opponents can't cast noncreature
         // spells this turn."). Reject a noncreature cast when the casting

@@ -5,6 +5,7 @@ using Majik.Core.Domain.DomainEvents;
 using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
+using Majik.Core.Rules;
 using Majik.Core.Services;
 using Majik.Core.Zones;
 
@@ -32,12 +33,19 @@ namespace Majik.Core.CardData.Factories;
 ///   - CR 608.2b: if the target is no longer on the battlefield at resolution,
 ///     the effect does nothing.
 ///
-/// ## Deferred (v1 gaps)
-/// - "That creature's owner can't cast spells with the same name as that
-///   creature until your next turn" — name-based cast restriction needs a
-///   delayed-until-next-turn removal surface (no NamedCastRestriction +
-///   TurnBoundaryCleanup infrastructure yet). The bounce half ships fully;
-///   the name-restriction half is a no-op commented below.
+/// ## Implemented (v2)
+/// - <b>Name restriction</b> — "That player can't cast spells with the
+///   same name as that creature until your next turn" wired via
+///   <see cref="CastingRestrictions.AddNamedCardBlockForPlayer"/> (the
+///   new per-player name-block rail; distinct from the global
+///   Meddling-Mage rail). The ban is keyed by the Reflector Mage instance
+///   so a follow-up cleanup tears it down via
+///   <see cref="CastingRestrictions.RemoveNamedCardBlock"/>. When an
+///   <see cref="IEventBus"/> is supplied, the factory subscribes a
+///   one-shot <see cref="TurnStartedEvent"/> handler that fires on the
+///   controller's NEXT turn-start (CR 702 — "until your next turn")
+///   and removes the ban. <see cref="ActionValidator"/> consults the
+///   per-player rail and rejects banned casts (CR 601.3).
 ///
 /// ## Overloads
 /// - <see cref="Create(Player)"/> — card shape + ETB trigger attached for
@@ -146,15 +154,41 @@ public static class ReflectorMageFactory
                     target.SetController(targetOwner);
                 }
 
-                // DEFERRED: "That creature's owner can't cast spells with the
-                // same name as that creature until your next turn." This requires
-                // a NamedCastRestriction keyed on the bounced card's name + a
-                // delayed-until-next-turn removal trigger. No TurnBoundaryCleanup
-                // surface for name-based restrictions exists in v1 — the bounce
-                // half ships fully; the name restriction is a no-op.
-                //
-                // Follow-up: wire a NameCastRestriction effect + DelayedTriggeredAbility
-                // over TurnStartedEvent (owner's next turn) to remove it.
+                // CR 601.3 — per-player name restriction. "That player
+                // can't cast spells with the same name as that creature
+                // until your next turn." Wired via the per-player
+                // named-card-block rail (distinct from the Meddling Mage
+                // global rail). The card instance is the source-token so
+                // the cleanup hook below tears it down with a single
+                // RemoveNamedCardBlock call.
+                var bouncedName = target.Name;
+                if (!string.IsNullOrEmpty(bouncedName))
+                {
+                    CastingRestrictions.AddNamedCardBlockForPlayer(card, targetOwner, bouncedName);
+
+                    // "Until your next turn" — schedule removal on the
+                    // controller's next turn-start. v2 wiring: one-shot
+                    // TurnStartedEvent subscription when an event bus was
+                    // supplied. Reflector Mage resolves during the
+                    // controller's CURRENT turn, so the TurnStartedEvent
+                    // for that turn has already been published before this
+                    // subscription. The first matching event the handler
+                    // receives is therefore the controller's NEXT turn
+                    // (CR 702 — "your next turn" reads as the controller's,
+                    // not the affected player's).
+                    if (eventBus != null)
+                    {
+                        var benController = card.Controller ?? owner;
+                        Action<TurnStartedEvent>? handler = null;
+                        handler = ev =>
+                        {
+                            if (!ReferenceEquals(ev.Player, benController)) return;
+                            CastingRestrictions.RemoveNamedCardBlock(card);
+                            if (handler != null) eventBus.Unsubscribe<TurnStartedEvent>(handler);
+                        };
+                        eventBus.Subscribe<TurnStartedEvent>(handler);
+                    }
+                }
             });
 
         etbTrigger = new TriggeredAbility(

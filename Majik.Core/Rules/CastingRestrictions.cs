@@ -44,6 +44,14 @@ public static class CastingRestrictions
     // (token, cardName) entries; a name is blocked while at least one entry
     // targeting it exists.
     private static readonly List<(object Token, string Name)> _namedCardBlocks = new();
+    // CR 601.3 — per-player named-card block (Reflector Mage: "That player
+    // can't cast spells with the same name as that creature until your
+    // next turn"). Stored as (token, playerId, cardName); a name is
+    // blocked for a player while at least one entry matching their id +
+    // that name exists. Distinct from the global _namedCardBlocks rail
+    // above (which gates the name for every player — Meddling Mage's
+    // shape) so the two surfaces compose without trampling each other.
+    private static readonly List<(object Token, Guid PlayerId, string Name)> _namedCardBlocksByPlayer = new();
     // CR 601.3 — turn-scoped "<player> can't cast noncreature spells this
     // turn" rider (Ranger-Captain of Eos's sacrifice ability). Stored as a
     // flat set of player IDs; cleared by the caller (or via
@@ -224,7 +232,10 @@ public static class CastingRestrictions
     /// <summary>
     /// Remove every named-card block registered under
     /// <paramref name="token"/>. Used when the Meddling Mage (or similar
-    /// source) leaves the battlefield.
+    /// source) leaves the battlefield. Clears entries on both the global
+    /// rail (<see cref="AddNamedCardBlock"/>) and the per-player rail
+    /// (<see cref="AddNamedCardBlockForPlayer"/>) keyed by the same token,
+    /// so a single source-token cleanup tears down both shapes.
     /// </summary>
     public static void RemoveNamedCardBlock(object token)
     {
@@ -232,6 +243,7 @@ public static class CastingRestrictions
         lock (_gate)
         {
             _namedCardBlocks.RemoveAll(e => ReferenceEquals(e.Token, token));
+            _namedCardBlocksByPlayer.RemoveAll(e => ReferenceEquals(e.Token, token));
         }
     }
 
@@ -247,6 +259,61 @@ public static class CastingRestrictions
             foreach (var entry in _namedCardBlocks)
             {
                 if (string.Equals(entry.Name, cardName,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Register a per-player "spells with name <paramref name="cardName"/>
+    /// can't be cast" restriction (CR 601.3 — Reflector Mage shape),
+    /// keyed by <paramref name="token"/>. Idempotent for the same
+    /// (token, player, name) triple. Distinct from
+    /// <see cref="AddNamedCardBlock"/>, which blocks the name globally
+    /// (Meddling Mage's shape) — Reflector Mage's restriction only binds
+    /// the bounced creature's owner. The name comparison is
+    /// ordinal-case-insensitive.
+    /// </summary>
+    public static void AddNamedCardBlockForPlayer(object token, Player player, string cardName)
+    {
+        ArgumentNullException.ThrowIfNull(token);
+        ArgumentNullException.ThrowIfNull(player);
+        if (string.IsNullOrEmpty(cardName)) return;
+        lock (_gate)
+        {
+            foreach (var entry in _namedCardBlocksByPlayer)
+            {
+                if (ReferenceEquals(entry.Token, token)
+                    && entry.PlayerId == player.Id
+                    && string.Equals(entry.Name, cardName,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    return;
+                }
+            }
+            _namedCardBlocksByPlayer.Add((token, player.Id, cardName));
+        }
+    }
+
+    /// <summary>
+    /// True if at least one registered per-player block currently prevents
+    /// <paramref name="player"/> from casting a spell named
+    /// <paramref name="cardName"/> (CR 601.3 — Reflector Mage shape).
+    /// </summary>
+    public static bool IsCardNameBlockedForPlayer(Player player, string cardName)
+    {
+        if (player == null) return false;
+        if (string.IsNullOrEmpty(cardName)) return false;
+        lock (_gate)
+        {
+            foreach (var entry in _namedCardBlocksByPlayer)
+            {
+                if (entry.PlayerId == player.Id
+                    && string.Equals(entry.Name, cardName,
                         StringComparison.OrdinalIgnoreCase))
                 {
                     return true;
@@ -300,6 +367,7 @@ public static class CastingRestrictions
             _uncounterableControllers.Clear();
             _castFromHandOnly.Clear();
             _namedCardBlocks.Clear();
+            _namedCardBlocksByPlayer.Clear();
             _noncreatureRestrictedPlayers.Clear();
         }
     }
