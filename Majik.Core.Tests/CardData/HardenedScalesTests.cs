@@ -1,12 +1,15 @@
 using FluentAssertions;
+using Majik.Core.Abilities;
 using Majik.Core.CardData;
 using Majik.Core.CardData.Factories;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Counters;
+using Majik.Core.Domain.DomainEvents;
 using Majik.Core.Effects;
 using Majik.Core.Players;
 using Majik.Core.Services;
+using Majik.Core.Spells;
 using Majik.Core.Zones;
 using Xunit;
 
@@ -258,8 +261,102 @@ public class HardenedScalesTests
     }
 
     // -----------------------------------------------------------------------
-    // Helpers
+    // Retrofit regression — factory call-sites route through CountersService
+    // so Hardened Scales' +1/+1 bump propagates to direct-add factory effects.
     // -----------------------------------------------------------------------
+
+    [Fact]
+    public void Retrofit_ChampionOfTheParish_HumanEtbTrigger_BumpsByOne()
+    {
+        var bus = new ReplacementBus();
+        var scales = HardenedScalesFactory.Create(_alice, bus);
+        PlaceOnBattlefield(scales, _alice);
+
+        var champion = ChampionOfTheParishFactory.Create(_alice, triggers: null, replacements: bus);
+        champion.SetController(_alice);
+        _alice.Zones.Battlefield.AddCard(champion);
+        champion.SetZone(ZoneType.Battlefield);
+
+        // Another Human ETBs under Alice's control — Champion's trigger fires.
+        var human = new Creature("Elite Vanguard", "{W}", 2, 1,
+            subtypes: new[] { CardSubtype.Human, CardSubtype.Soldier });
+        human.SetOwner(_alice);
+        human.SetController(_alice);
+
+        var trigger = champion.Abilities.OfType<TriggeredAbility>().Single();
+        foreach (var effect in trigger.Effects) effect.Execute();
+
+        champion.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(2,
+            "1 from the ETB-other-Human trigger + 1 from Hardened Scales = 2");
+    }
+
+    [Fact]
+    public void Retrofit_ChampionOfTheParish_NoBus_NoBump()
+    {
+        // No bus on Champion — Hardened Scales not consulted, only 1 counter.
+        var champion = ChampionOfTheParishFactory.Create(_alice);
+        champion.SetController(_alice);
+        _alice.Zones.Battlefield.AddCard(champion);
+        champion.SetZone(ZoneType.Battlefield);
+
+        var trigger = champion.Abilities.OfType<TriggeredAbility>().Single();
+        foreach (var effect in trigger.Effects) effect.Execute();
+
+        champion.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(1,
+            "without a ReplacementBus, the retrofit falls through to a direct add");
+    }
+
+    [Fact]
+    public void Retrofit_WalkingBallista_ActivatedPlusOne_BumpsByOne()
+    {
+        var bus = new ReplacementBus();
+        var scales = HardenedScalesFactory.Create(_alice, bus);
+        PlaceOnBattlefield(scales, _alice);
+
+        var ballista = WalkingBallistaFactory.Create(_alice, bus);
+        ballista.SetController(_alice);
+        _alice.Zones.Battlefield.AddCard(ballista);
+        ballista.SetZone(ZoneType.Battlefield);
+
+        // Find the {4}: put-counter activated ability and execute its effect.
+        // (The other activated ability is the remove-counter ping stub.)
+        var putCounterAbility = ballista.Abilities
+            .OfType<ActivatedAbility>()
+            .First(a => a.Effects.Any(e => e.Description.Contains("+1/+1")));
+
+        foreach (var effect in putCounterAbility.Effects) effect.Execute();
+
+        ballista.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(2,
+            "{4}: put counter places 1 + Hardened Scales bumps to 2");
+    }
+
+    [Fact]
+    public void Retrofit_SpriteDragon_NoncreatureCast_BumpsByOne()
+    {
+        var bus = new ReplacementBus();
+        var scales = HardenedScalesFactory.Create(_alice, bus);
+        PlaceOnBattlefield(scales, _alice);
+
+        var sprite = SpriteDragonFactory.Create(_alice, triggers: null, replacements: bus);
+        sprite.SetController(_alice);
+        _alice.Zones.Battlefield.AddCard(sprite);
+        sprite.SetZone(ZoneType.Battlefield);
+
+        // Execute the trigger's counter effect directly (mirrors existing
+        // factory tests; the predicate-side closure capture isn't on the
+        // critical path for retrofit verification).
+        var trigger = sprite.Abilities.OfType<TriggeredAbility>().Single();
+        foreach (var effect in trigger.Effects) effect.Execute();
+
+        sprite.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(2,
+            "noncreature-cast trigger places 1 + Hardened Scales bumps to 2");
+
+        // Cast again — Sprite Dragon should bump by another +2 per Scales.
+        foreach (var effect in trigger.Effects) effect.Execute();
+
+        sprite.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(4,
+            "second cast → +2 more (1 + 1 from Scales each time)");
+    }
 
     private static void PlaceOnBattlefield(Enchantment scales, Player owner)
     {

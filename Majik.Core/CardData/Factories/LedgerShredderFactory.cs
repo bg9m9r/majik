@@ -3,9 +3,11 @@ using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Counters;
 using Majik.Core.Domain.DomainEvents;
+using Majik.Core.Effects;
 using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
+using Majik.Core.Services;
 
 namespace Majik.Core.CardData.Factories;
 
@@ -64,7 +66,7 @@ public static class LedgerShredderFactory
     /// invoking the (owner, bus, triggers) overload).
     /// </summary>
     public static Creature Create(Player owner) =>
-        Create(owner, eventBus: null, triggers: null);
+        Create(owner, eventBus: null, triggers: null, replacements: null);
 
     /// <summary>
     /// Construct Ledger Shredder with optional event bus + trigger
@@ -72,9 +74,12 @@ public static class LedgerShredderFactory
     /// <see cref="TurnStartedEvent"/> handler resets the per-turn cast
     /// count (CR 500.1). When <paramref name="triggers"/> is supplied,
     /// both triggered abilities are registered so the bus surfaces them
-    /// as pending.
+    /// as pending. When <paramref name="replacements"/> is supplied, the
+    /// surveil-self +1/+1 counter placement is routed through
+    /// <see cref="CountersService.Add"/> so Hardened Scales / Doubling
+    /// Season replacements can rewrite the count (CR 614).
     /// </summary>
-    public static Creature Create(Player owner, IEventBus? eventBus, TriggerManager? triggers)
+    public static Creature Create(Player owner, IEventBus? eventBus, TriggerManager? triggers, ReplacementBus? replacements = null)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -103,7 +108,7 @@ public static class LedgerShredderFactory
         // CR 122.1 — counters are placed on the permanent in real time.
         var counterEffect = new Effect(
             "Ledger Shredder: put a +1/+1 counter on it (whenever it surveils)",
-            () => card.Counters.Add(CounterType.PlusOnePlusOne, 1));
+            () => CountersService.Add(card, CounterType.PlusOnePlusOne, 1, replacements));
 
         // Trigger 2 surfaces on the card as a shape-only ability — its
         // condition matches no real event, since there is no SurveilEvent

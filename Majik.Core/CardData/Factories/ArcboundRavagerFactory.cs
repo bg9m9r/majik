@@ -6,6 +6,7 @@ using Majik.Core.Counters;
 using Majik.Core.Effects;
 using Majik.Core.Events;
 using Majik.Core.Players;
+using Majik.Core.Services;
 using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
@@ -178,7 +179,7 @@ public static class ArcboundRavagerFactory
                 // return doesn't double-stamp) and add them to the chosen
                 // artifact creature.
                 card.Counters.Remove(CounterType.PlusOnePlusOne, counters);
-                target.Counters.Add(CounterType.PlusOnePlusOne, counters);
+                CountersService.Add(target, CounterType.PlusOnePlusOne, counters, replacements);
             });
 
         var modularDeathTrigger = new TriggeredAbility(
@@ -202,7 +203,7 @@ public static class ArcboundRavagerFactory
         // ----------------------------------------------------------------
         var activatedEffect = new Effect(
             $"{CardName}: +1/+1 counter for sacrificed artifact",
-            () => card.Counters.Add(CounterType.PlusOnePlusOne, 1));
+            () => CountersService.Add(card, CounterType.PlusOnePlusOne, 1, replacements));
 
         var activatedAbility = new ActivatedAbility(
             source: card,

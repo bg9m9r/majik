@@ -73,7 +73,7 @@ public static class StrangleRootGeistFactory
     /// not yet registered for bus-driven firing.
     /// </summary>
     public static Creature Create(Player owner) =>
-        Create(owner, triggers: null);
+        Create(owner, triggers: null, replacements: null);
 
     /// <summary>
     /// Construct Strangleroot Geist with optional <see cref="TriggerManager"/>
@@ -81,9 +81,12 @@ public static class StrangleRootGeistFactory
     /// trigger is registered so a qualifying
     /// <see cref="Majik.Core.Events.CardMovedEvent"/> (Battlefield →
     /// Graveyard, source matches this card) automatically queues the
-    /// ability on death.
+    /// ability on death. When <paramref name="replacements"/> is supplied,
+    /// the Undying-return +1/+1 counter placement is routed through
+    /// <see cref="Majik.Core.Services.CountersService.Add"/> so Hardened
+    /// Scales / Doubling Season replacements can rewrite the count (CR 614).
     /// </summary>
-    public static Creature Create(Player owner, TriggerManager? triggers)
+    public static Creature Create(Player owner, TriggerManager? triggers, Majik.Core.Effects.ReplacementBus? replacements = null)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -111,7 +114,7 @@ public static class StrangleRootGeistFactory
         // CardMovedEvent Battlefield→Graveyard condition, same
         // counters-zero interveningIf at stack-entry, same return-with-
         // +1/+1 counter resolution body.
-        var undyingTrigger = UndyingFactory.Build(card);
+        var undyingTrigger = UndyingFactory.Build(card, replacements);
         card.AddAbility(undyingTrigger);
 
         // Optional bus-driven wiring — when a TriggerManager is supplied

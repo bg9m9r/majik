@@ -3,7 +3,9 @@ using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
 using Majik.Core.Counters;
+using Majik.Core.Effects;
 using Majik.Core.Players;
+using Majik.Core.Services;
 using Majik.Core.ValueObjects;
 
 namespace Majik.Core.CardData.Definitions;
@@ -25,7 +27,17 @@ public static class CardDefinitionFactory
     /// <see cref="Card.AddCardType"/> so multi-type cards (Artifact
     /// Creature, …) work correctly.
     /// </summary>
-    public static ICard Build(CardDefinition definition, Player owner)
+    public static ICard Build(CardDefinition definition, Player owner) =>
+        Build(definition, owner, replacements: null);
+
+    /// <summary>
+    /// Materialize a card for the supplied owner, optionally routing
+    /// JSON-driven +1/+1 counter placements through the supplied
+    /// <see cref="ReplacementBus"/> (CR 614). When <paramref name="replacements"/>
+    /// is null, counter placements fall through to a direct add — same
+    /// behaviour as today's untouched callers.
+    /// </summary>
+    public static ICard Build(CardDefinition definition, Player owner, ReplacementBus? replacements)
     {
         ArgumentNullException.ThrowIfNull(definition);
         ArgumentNullException.ThrowIfNull(owner);
@@ -74,27 +86,27 @@ public static class CardDefinitionFactory
 
         foreach (var ability in definition.Abilities)
         {
-            card.AddAbility(BuildAbility(ability, card, owner));
+            card.AddAbility(BuildAbility(ability, card, owner, replacements));
         }
 
         return card;
     }
 
-    private static IAbility BuildAbility(AbilityDefinition definition, ICard card, Player controller) =>
+    private static IAbility BuildAbility(AbilityDefinition definition, ICard card, Player controller, ReplacementBus? replacements) =>
         definition switch
         {
             ManaAbilityDefinition mana => new ManaAbility(card, controller, ManaCost.Parse(mana.Produces)),
-            ActivatedAbilityDefinition activated => BuildActivatedAbility(activated, card, controller),
-            TriggeredAbilityDefinition triggered => BuildTriggeredAbility(triggered, card, controller),
+            ActivatedAbilityDefinition activated => BuildActivatedAbility(activated, card, controller, replacements),
+            TriggeredAbilityDefinition triggered => BuildTriggeredAbility(triggered, card, controller, replacements),
             _ => throw new NotSupportedException(
                 $"Ability '{definition.GetType().Name}' is not yet supported by CardDefinitionFactory."),
         };
 
     private static TriggeredAbility BuildTriggeredAbility(
-        TriggeredAbilityDefinition definition, ICard card, Player controller)
+        TriggeredAbilityDefinition definition, ICard card, Player controller, ReplacementBus? replacements)
     {
         var condition = BuildTrigger(definition.Trigger, card);
-        var effects = definition.Effects.Select(e => BuildEffect(e, card, controller)).ToArray();
+        var effects = definition.Effects.Select(e => BuildEffect(e, card, controller, replacements)).ToArray();
         return new TriggeredAbility(
             source: card,
             controller: controller,
@@ -130,10 +142,10 @@ public static class CardDefinitionFactory
     }
 
     private static ActivatedAbility BuildActivatedAbility(
-        ActivatedAbilityDefinition definition, ICard card, Player controller)
+        ActivatedAbilityDefinition definition, ICard card, Player controller, ReplacementBus? replacements)
     {
         var costs = definition.Costs.Select(c => BuildCost(c, card)).ToArray();
-        var effects = definition.Effects.Select(e => BuildEffect(e, card, controller)).ToArray();
+        var effects = definition.Effects.Select(e => BuildEffect(e, card, controller, replacements)).ToArray();
         // CR 117.1a / 307.5 — "Activate only as a sorcery" rider is
         // threaded from the definition onto the runtime ActivatedAbility
         // so ActionValidator can gate activation on the controller's
@@ -199,10 +211,10 @@ public static class CardDefinitionFactory
         return new RemovePlusOnePlusOneCounterCost(permanent, def.Amount);
     }
 
-    private static IEffect BuildEffect(EffectDefinition definition, ICard card, Player controller) =>
+    private static IEffect BuildEffect(EffectDefinition definition, ICard card, Player controller, ReplacementBus? replacements) =>
         definition switch
         {
-            PutCounterEffectDef put => BuildPutCounterEffect(put, card),
+            PutCounterEffectDef put => BuildPutCounterEffect(put, card, replacements),
             DealDamageStubEffectDef stub => BuildDealDamageStubEffect(stub, card),
             DrawCardEffectDef draw => BuildDrawCardEffect(draw, card, controller),
             SurveilSelfEffectDef surveil => BuildSurveilSelfEffect(surveil, card, controller),
@@ -331,7 +343,7 @@ public static class CardDefinitionFactory
             });
     }
 
-    private static IEffect BuildPutCounterEffect(PutCounterEffectDef def, ICard card)
+    private static IEffect BuildPutCounterEffect(PutCounterEffectDef def, ICard card, ReplacementBus? replacements)
     {
         if (!string.Equals(def.Target, "self", StringComparison.OrdinalIgnoreCase))
         {
@@ -346,7 +358,17 @@ public static class CardDefinitionFactory
             {
                 if (card is Permanent permanent)
                 {
-                    permanent.Counters.Add(counterType, amount);
+                    // CR 614 — only +1/+1 counter placement currently has
+                    // replacements wired (Hardened Scales / Doubling Season).
+                    // Other counter types fall through to a direct add.
+                    if (counterType == CounterType.PlusOnePlusOne)
+                    {
+                        CountersService.Add(permanent, counterType, amount, replacements);
+                    }
+                    else
+                    {
+                        permanent.Counters.Add(counterType, amount);
+                    }
                 }
             });
     }
