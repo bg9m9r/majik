@@ -345,8 +345,13 @@ public sealed class SpellCastFlow
 
         // Cost — printed + X, OR alternative cost when supplied. CR 117.7:
         // also subtract any CostReductionAbility on the card (Affinity etc.).
+        // CR 117.7 / 601.2f — pass the live player roster so the three-arg
+        // overload also folds in SpellCostIncreaseAbility riders from every
+        // player's battlefield (Sphere of Resistance, Trinisphere, Thalia,
+        // Damping Sphere). The two-arg overload silently skips those riders
+        // and is reserved for unit tests / cost previews.
         var totalCost = alternativeCost?.AlternativeManaCost
-            ?? Majik.Core.Costs.CostReduction.GetEffectiveCost(card, caster);
+            ?? Majik.Core.Costs.CostReduction.GetEffectiveCost(card, caster, ctx.AllPlayers);
         if (xValue.HasValue && xValue.Value > 0)
         {
             totalCost = totalCost.AddGenericCost(xValue.Value);
