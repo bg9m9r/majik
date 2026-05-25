@@ -8,7 +8,9 @@
   "supertypes": [
     "Snow"
   ],
-  "subtypes": [],
+  "subtypes": [
+    "Snake"
+  ],
   "power": 2,
   "toughness": 6,
   "loyalty": null,
