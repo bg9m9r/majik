@@ -178,6 +178,66 @@ public class RiftBoltTests
     }
 
     [Fact]
+    public async Task Suspend_FreeCast_WithSuspendFlag_StampsWasCastFromSuspendOnSpellAndCard()
+    {
+        // CR 702.62d / 702.62g — when SpellCastFlow sees a
+        // CastFromExileAlternativeCost with IsSuspendCast=true, both the
+        // resolving Spell and the underlying Card get the
+        // WasCastFromSuspend sentinel stamped so creature-haste riders and
+        // future "if cast via suspend" gates can branch.
+        var rb = RiftBoltFactory.Create(_alice);
+        rb.SetZone(ZoneType.Exile);
+        _alice.Zones.Exile.AddCard(rb);
+
+        var agent = new ScriptedAgent();
+        agent.QueueTargets(new object[] { _bob });
+        agent.QueueMana(ManaPayment.Empty);
+
+        var ctx = new GameContext(_alice, new[] { _alice, _bob },
+            _alice, 2, PhaseStateType.Upkeep, _stack);
+        var freeCast = new CastFromExileAlternativeCost(
+            "Suspend resolved (CR 702.62d)", ManaCost.Parse("0"), isSuspendCast: true);
+
+        var spell = await _flow.CastAsync(
+            _alice, rb,
+            RiftBoltFactory.BuildSpellDefinition(t => t),
+            agent, ctx,
+            alternativeCost: freeCast);
+
+        spell.WasCastFromSuspend.Should().BeTrue();
+        rb.WasCastFromSuspend.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Suspend_FreeCast_WithoutSuspendFlag_DoesNotStampSentinel()
+    {
+        // Symmetry: a plain CastFromExileAlternativeCost without
+        // IsSuspendCast leaves the sentinel false (Cascade / Plot / impulse
+        // draw cast-from-exile paths use the no-flag overload).
+        var rb = RiftBoltFactory.Create(_alice);
+        rb.SetZone(ZoneType.Exile);
+        _alice.Zones.Exile.AddCard(rb);
+
+        var agent = new ScriptedAgent();
+        agent.QueueTargets(new object[] { _bob });
+        agent.QueueMana(ManaPayment.Empty);
+
+        var ctx = new GameContext(_alice, new[] { _alice, _bob },
+            _alice, 2, PhaseStateType.Upkeep, _stack);
+        var freeCast = new CastFromExileAlternativeCost(
+            "Generic cast from exile", ManaCost.Parse("0"));
+
+        var spell = await _flow.CastAsync(
+            _alice, rb,
+            RiftBoltFactory.BuildSpellDefinition(t => t),
+            agent, ctx,
+            alternativeCost: freeCast);
+
+        spell.WasCastFromSuspend.Should().BeFalse();
+        rb.WasCastFromSuspend.Should().BeFalse();
+    }
+
+    [Fact]
     public void Sanity_UntrackedCard_DoesNotTriggerFreeCastOnUpkeep()
     {
         // A card never suspended (no time counters, not in the registry)

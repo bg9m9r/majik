@@ -282,6 +282,44 @@ public class Card : ICard
     }
 
     /// <summary>
+    /// CR 702.62d / 702.62g — "cast via suspend" runtime sentinel.
+    /// Stamped <c>true</c> by <see cref="Majik.Core.Game.SpellCastFlow"/>
+    /// when the cast used a <see cref="Majik.Core.Costs.CastFromExileAlternativeCost"/>
+    /// with its <see cref="Majik.Core.Costs.CastFromExileAlternativeCost.IsSuspendCast"/>
+    /// flag set (i.e. the "cast for free" payoff fired by
+    /// <see cref="Majik.Core.Costs.SuspendedCardRegistry"/> when the last
+    /// time counter is removed). Read by:
+    ///   - The creature-haste rider in <see cref="Majik.Core.Game.SpellCastFlow"/>,
+    ///     which registers a <see cref="Majik.Core.Effects.SuspendHasteEffect"/>
+    ///     on the resolving permanent for as long as it stays on the
+    ///     battlefield (CR 702.62g — "gains haste until you lose control of
+    ///     the spell or the permanent it becomes").
+    ///   - Future "if [card] was cast via suspend" triggers / replacements.
+    ///
+    /// <para>Mirrors <see cref="Majik.Core.Spells.Spell.WasCastFromSuspend"/>
+    /// on the resolving stack object for resolve-body reads that don't
+    /// have the spell reference handy.</para>
+    ///
+    /// <para>Defaults to <c>false</c>. The flag is NOT cleared on zone
+    /// change — the haste-grant continuous effect carries its own
+    /// LTB-revoke lifecycle via <see cref="Majik.Core.Effects.SuspendHasteEffect.IsActive"/>,
+    /// and the underlying card object is replaced on the next cast (CR
+    /// 400.7 — new object on each zone change) so the stale stamp can't
+    /// survive a real re-cast.</para>
+    /// </summary>
+    public bool WasCastFromSuspend { get; private set; }
+
+    /// <summary>Stamp the cast-from-suspend sentinel. Called by
+    /// <see cref="Majik.Core.Game.SpellCastFlow"/> when the cast used a
+    /// <see cref="Majik.Core.Costs.CastFromExileAlternativeCost"/> with
+    /// <see cref="Majik.Core.Costs.CastFromExileAlternativeCost.IsSuspendCast"/>
+    /// set.</summary>
+    public void SetWasCastFromSuspend(bool value)
+    {
+        WasCastFromSuspend = value;
+    }
+
+    /// <summary>
     /// CR 702.33b — "kicked" runtime sentinel. Stamped <c>true</c> by
     /// <see cref="Majik.Core.Costs.KickerAdditionalCost.Pay"/> at cast
     /// announcement when the caster pays the optional kicker mana
