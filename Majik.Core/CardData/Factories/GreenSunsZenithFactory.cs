@@ -150,13 +150,16 @@ public static class GreenSunsZenithFactory
                             : candidates[0];
                         if (pick == null) return;
 
-                        if (zoneService != null)
+                        // CR 603.6a — prefer caller-supplied zoneService;
+                        // fall back to ZoneServiceRegistry so the
+                        // dispatcher-driven cast flow routes through the
+                        // live ZoneService even when BuildSpellDefinition
+                        // is invoked without an explicit service ref.
+                        var effectiveZones = zoneService
+                            ?? Majik.Core.Services.ZoneServiceRegistry.Get(caster);
+                        if (effectiveZones != null)
                         {
-                            // Live ZoneService — publishes CardMovedEvent
-                            // so ETB triggers on the tutored creature fire
-                            // (CR 603.6a — mirrors ChordOfCallingFactory /
-                            // EldritchEvolutionFactory wiring).
-                            zoneService.MoveCard(
+                            effectiveZones.MoveCard(
                                 pick, ZoneType.Library, ZoneType.Battlefield, caster);
                         }
                         else

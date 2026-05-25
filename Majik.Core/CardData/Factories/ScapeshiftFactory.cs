@@ -3,6 +3,7 @@ using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
+using Majik.Core.Services;
 using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
@@ -60,8 +61,9 @@ namespace Majik.Core.CardData.Factories;
 ///   bound of "any number" per CR 119.x).
 /// - <b>Untapped vs. tapped</b>: lands enter untapped per the printed
 ///   oracle. Lands with their own ETB-tapped replacements (shock lands,
-///   etc.) are not yet wired through ZoneService.MoveCard, so v1 uses
-///   raw zone mutation — same simplification as PrimevalTitan's tutor.
+///   bounce lands) ride through <see cref="ZoneServiceRegistry"/> when a
+///   live <see cref="ZoneService"/> is registered for the caster, so
+///   their ETB-tapped replacements + ETB triggers fire on tutored arrival.
 /// </summary>
 [CardName("Scapeshift")]
 public static class ScapeshiftFactory
@@ -197,14 +199,31 @@ public static class ScapeshiftFactory
 
     /// <summary>
     /// Move <paramref name="pick"/> from <paramref name="caster"/>'s
-    /// library to their battlefield untapped. Mirrors the raw zone-move
-    /// pattern in PrimevalTitanFactory without the tap step.
+    /// library to their battlefield untapped.
+    /// <para>
+    /// CR 603.6a / CR 614 — routes through
+    /// <see cref="ZoneServiceRegistry"/> when a live
+    /// <see cref="ZoneService"/> is registered for the caster so
+    /// <see cref="Majik.Core.Events.CardMovedEvent"/> publishes and ETB
+    /// triggers (bounce-land bounce, Amulet of Vigor untap) +
+    /// enters-tapped replacements (shock lands, bounce lands) fire on
+    /// the tutored land. Falls back to raw zone mutation when no live
+    /// service is registered (shape / dispatcher-test path).
+    /// </para>
     /// </summary>
     private static void MoveLibraryToBattlefield(Player caster, ICard pick)
     {
-        caster.Zones.Library.RemoveCard(pick);
-        caster.Zones.Battlefield.AddCard(pick);
-        pick.SetZone(ZoneType.Battlefield);
-        pick.SetController(caster);
+        var zones = ZoneServiceRegistry.Get(caster);
+        if (zones != null)
+        {
+            zones.MoveCard(pick, ZoneType.Library, ZoneType.Battlefield, caster);
+        }
+        else
+        {
+            caster.Zones.Library.RemoveCard(pick);
+            caster.Zones.Battlefield.AddCard(pick);
+            pick.SetZone(ZoneType.Battlefield);
+            pick.SetController(caster);
+        }
     }
 }
