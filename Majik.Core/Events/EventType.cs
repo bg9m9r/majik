@@ -56,5 +56,10 @@ public enum EventType
     // being part of game-state changes. The vanilla-shell graceful-degrade
     // path uses this to tell the portal "the bot encountered an
     // unimplemented card; EV from here on is unreliable for that card".
-    UnimplementedCardEncountered
+    UnimplementedCardEncountered,
+
+    // CR 702.62d — the last time counter on a suspended card has been
+    // removed; the registry will cast the card for free immediately
+    // after the event is published.
+    SuspendCounterDrained
 }
