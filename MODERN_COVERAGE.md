@@ -1,40 +1,16 @@
 # Modern Coverage
 
-> **Headline (auto, 2026-05-25):** Raw 27.5% (6022 / 21917) ·
-> Tournament-weighted 97.5% (`docs/meta-modern-snapshot.json`, 163 staples) ·
-> Top-20 most-played 20 / 20 (100%).
+> **Headline (manual, 2026-05-25):** Raw 27.5% (6022 / 21917) ·
+> Top-20 most-played 20 / 20 (100%). Refresh the on-disk factory / template
+> counts in the table below with `./scripts/update-coverage-headline.sh`
+> (CI hook: `--check` exits non-zero on drift).
 >
-> **Auto-computed numbers live in [`docs/COVERAGE_MODERN.md`](docs/COVERAGE_MODERN.md)** —
-> regenerate with `dotnet run --project Majik.Console -- coverage --modern
-> --weighted --md-out docs/COVERAGE_MODERN.md --json-out docs/coverage-modern.json`.
-> The `--weighted` flag pulls play-rate weights from
-> [`docs/meta-modern-snapshot.json`](docs/meta-modern-snapshot.json) (curated +
-> MTGGoldfish staples scrape). Refresh the snapshot quarterly via
-> `scripts/refresh-meta-snapshot.sh`.
-> The classifier source is `Majik.Core/CardData/Coverage/`. The hand-maintained
-> archetype rollups below remain for narrative context on recent PRs; raw tier
-> totals + the unimplemented backlog are the canonical responsibility of the
-> generated doc (followup: retire the archetype rollups once the auto-report
-> grows archetype tagging).
->
-> **Ranked binder-promotion backlog:** [`docs/COVERAGE_GAPS_MODERN.md`](docs/COVERAGE_GAPS_MODERN.md)
-> — Unimplemented cards clustered by oracle-text shape so binder/template work
-> can be prioritised by leverage. Regenerate with
-> `dotnet run --project Majik.Console -- coverage-gaps --modern
-> --md-out docs/COVERAGE_GAPS_MODERN.md --json-out docs/coverage-gaps-modern.json`.
->
-> **Mechanic-dependency DAG:** [`docs/MECHANIC_DEPS.md`](docs/MECHANIC_DEPS.md)
-> — Deferred-rider mentions in `*Factory.cs` xmldocs scanned + clustered onto
-> canonical engine primitives. Each row answers "build primitive X →
-> unblock N factories' riders" so engine-primitive PRs can be sequenced
-> by impact. Regenerate with
-> `dotnet run --project Majik.Console -- mechanic-deps
-> --md-out docs/MECHANIC_DEPS.md --json-out docs/mechanic-deps.json`.
->
-> **Unified status page:** [`docs/DASHBOARD.md`](docs/DASHBOARD.md) — consolidates
-> the headline tier numbers, mechanic-deps queue, gap clusters, shipping velocity
-> (last 7 days of `feat(*)` commits), and archetype rollups into one auto-generated
-> page. Regenerate with `dotnet run --project Majik.Console -- dashboard`.
+> The card pool itself ships embedded in `Majik.Core` as
+> `CardData/Embedded/modern-cards.json.gz`. Regenerate from a fresh
+> Scryfall bulk export via
+> `dotnet run --project Majik.Console -- export-modern-cards <scryfall.json>`
+> — the exporter flags `IsImplemented` by reflecting over `[CardName]`
+> factories, so factory PRs flow into the seed on the next refresh.
 
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
