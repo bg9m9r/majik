@@ -83,7 +83,8 @@ public class ZoneService
             }
         }
         else if (finalToZone is ZoneType.Hand or ZoneType.Library
-                 or ZoneType.Graveyard or ZoneType.Exile)
+                 or ZoneType.Graveyard or ZoneType.Exile
+                 or ZoneType.Sideboard)
         {
             card.SetController(card.Owner);
         }

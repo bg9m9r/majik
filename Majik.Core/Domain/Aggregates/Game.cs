@@ -1,3 +1,4 @@
+using Majik.Core.Cards;
 using Majik.Core.Combat;
 using Majik.Core.Domain.Exceptions;
 using Majik.Core.Events;
@@ -7,6 +8,7 @@ using Majik.Core.Rules;
 using Majik.Core.Services;
 using Majik.Core.Stack;
 using Majik.Core.StateMachine;
+using Majik.Core.Zones;
 
 namespace Majik.Core.Domain.Aggregates;
 
@@ -201,6 +203,42 @@ public class Game
             _stateChecker?.CheckStateBasedActions();
             
             _eventBus.Publish(new GameStartedEvent());
+    }
+
+    /// <summary>
+    /// CR 702.139a — register a player's nominated companion in their
+    /// sideboard zone. Stamps owner/controller + zone on the card and
+    /// inserts it into the player's <see cref="ZoneType.Sideboard"/>
+    /// collection. Idempotent only by zone state — calling twice with
+    /// the same card is a no-op once the card has already been placed;
+    /// passing a different companion adds another card to the sideboard.
+    /// The once-per-game cast slot is gated by
+    /// <see cref="Player.CompanionUsedThisGame"/>, latched by
+    /// <see cref="Majik.Core.Game.SpellCastFlow.CastCompanionAsync"/>.
+    /// </summary>
+    public void RegisterCompanion(Player owner, Majik.Core.Cards.ICard companion)
+    {
+        if (owner == null) throw new ArgumentNullException(nameof(owner));
+        if (companion == null) throw new ArgumentNullException(nameof(companion));
+        if (!_players.Contains(owner))
+        {
+            throw new InvalidGameStateException(
+                "Cannot register companion for a player not in this game.");
+        }
+
+        // Idempotent: if the same card is already in this player's
+        // sideboard, do nothing.
+        if (companion.Zone == ZoneType.Sideboard
+            && ReferenceEquals(companion.Owner, owner)
+            && owner.Zones.Sideboard.ContainsCard(companion))
+        {
+            return;
+        }
+
+        companion.SetOwner(owner);
+        companion.SetController(owner);
+        companion.SetZone(ZoneType.Sideboard);
+        owner.Zones.Sideboard.AddCard(companion);
     }
 
     /// <summary>

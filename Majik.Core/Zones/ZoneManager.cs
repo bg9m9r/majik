@@ -31,6 +31,7 @@ public class ZoneManager
         _zones[ZoneType.Exile] = new Zone(ZoneType.Exile, $"{_player.Name}'s Exile");
         _zones[ZoneType.Stack] = new Zone(ZoneType.Stack, $"{_player.Name}'s Stack");
         _zones[ZoneType.Command] = new Zone(ZoneType.Command, $"{_player.Name}'s Command");
+        _zones[ZoneType.Sideboard] = new Zone(ZoneType.Sideboard, $"{_player.Name}'s Sideboard");
     }
 
     /// <summary>
@@ -90,4 +91,12 @@ public class ZoneManager
     /// Get the command zone.
     /// </summary>
     public IZone Command => _zones[ZoneType.Command];
+
+    /// <summary>
+    /// CR 100.4 / CR 702.139 — The sideboard zone. Holds the up-to-15
+    /// card sideboard alongside the player's nominated Companion slot.
+    /// Sourced by the Companion cast-from-outside-the-game pipeline
+    /// (<see cref="Majik.Core.Game.SpellCastFlow.CastCompanionAsync"/>).
+    /// </summary>
+    public IZone Sideboard => _zones[ZoneType.Sideboard];
 }

@@ -250,7 +250,7 @@ public static class MechanicPrimitiveRegistry
             }),
         new("companion", "Companion runtime cast-from-outside (CR 702.139)",
             "CR 702.139",
-            "Deck-construction predicate shipped via ICompanionRestriction + CompanionValidator. Remaining gap: 'cast from outside the game' once-per-game pipeline (needs a sideboard zone + Player.CompanionUsedThisGame ledger).",
+            "Deck-construction predicate via ICompanionRestriction + CompanionValidator. Runtime cast-from-outside-the-game pipeline shipped: ZoneType.Sideboard, Player.CompanionUsedThisGame ledger, Game.RegisterCompanion, SpellCastFlow.CastCompanionAsync ({3} tax + sideboard → hand at sorcery speed, once per game). Caller invokes the normal CastAsync afterward to put the spell on the stack at its printed cost.",
             new[]
             {
                 Rx(@"companion\b.{0,80}\bdefer"),

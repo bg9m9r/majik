@@ -120,6 +120,30 @@ public class Player
         return true;
     }
 
+    /// <summary>
+    /// CR 702.139c — Companion once-per-game ledger. Set to <c>true</c>
+    /// by <see cref="Majik.Core.Game.SpellCastFlow.CastCompanionAsync"/>
+    /// when the player pays the {3} tax to move the nominated companion
+    /// from sideboard to hand. Once latched, subsequent attempts to cast
+    /// the companion from outside the game are rejected.
+    /// </summary>
+    public bool CompanionUsedThisGame { get; private set; }
+
+    /// <summary>
+    /// Mark that this player has used their once-per-game companion
+    /// cast-from-outside-the-game slot (CR 702.139c). Idempotent — once
+    /// latched the flag never returns to <c>false</c> for the remainder
+    /// of the game.
+    /// </summary>
+    public void MarkCompanionUsed() => CompanionUsedThisGame = true;
+
+    /// <summary>
+    /// CR 702.139 / CR 100.4 — the player's sideboard zone (holds the
+    /// nominated companion plus any 15-card MTG sideboard). Convenience
+    /// proxy to <see cref="ZoneManager.Sideboard"/>.
+    /// </summary>
+    public Majik.Core.Zones.IZone Sideboard => Zones.Sideboard;
+
     /// <summary>CR 903 — per-player commander tracking. Set by Commander
     /// format setup via <see cref="AssignCommander"/>; null otherwise.</summary>
     public Majik.Core.Formats.Commander.CommanderState? Commander { get; internal set; }
