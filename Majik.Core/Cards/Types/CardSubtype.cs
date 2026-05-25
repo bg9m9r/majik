@@ -245,6 +245,10 @@ public enum CardSubtype
     /// the Mirrodin Myr cycle. Always paired with the Artifact type.
     /// CR 205.3g + CR 205.3m.</summary>
     Myr,
+    /// <summary>Servo creature/artifact subtype — Kaladesh Servo tokens
+    /// (Animation Module, Whirlermaker, Visionary Augmenter). Always paired
+    /// with the Artifact type. CR 205.3g + CR 205.3m.</summary>
+    Servo,
 
     // Eldrazi creature subtypes (CR 205.3m)
     Eldrazi,

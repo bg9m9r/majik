@@ -168,4 +168,27 @@ public static class Triggers
         return new EventTriggerCondition<SurveilEvent>((e, _) =>
             ReferenceEquals(e.Player, player));
     }
+
+    /// <summary>
+    /// CR 121 / CR 603.6 — "Whenever one or more +1/+1 counters are put on a
+    /// permanent you control, …" trigger. Fires on
+    /// <see cref="CounterAddedEvent"/> where the event's
+    /// <see cref="CounterAddedEvent.Controller"/> matches
+    /// <paramref name="controller"/> AND the placed counter type matches
+    /// <paramref name="type"/>. Used by Animation Module's "may pay {1} →
+    /// Servo token" rider (CR 603.1) and the broader counters-matter
+    /// payoff family (Conclave Mentor, Winding Constrictor's symmetric
+    /// rider). Fires once per <see cref="Majik.Core.Services.CountersService.Add"/>
+    /// call regardless of count — the printed "one or more" floor is
+    /// implicit (the service only publishes the event when amount &gt; 0).
+    /// </summary>
+    public static ITriggerCondition OnCounterAddedToPermanentYouControl(
+        Player controller, Majik.Core.Counters.CounterType type)
+    {
+        if (controller == null) throw new ArgumentNullException(nameof(controller));
+        if (type == null) throw new ArgumentNullException(nameof(type));
+        return new EventTriggerCondition<CounterAddedEvent>((e, _) =>
+            ReferenceEquals(e.Controller, controller)
+            && e.CounterType == type);
+    }
 }
