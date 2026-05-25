@@ -2,6 +2,7 @@ using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
+using Majik.Core.Effects;
 using Majik.Core.Mana;
 using Majik.Core.Players;
 using Majik.Core.Services;
@@ -95,6 +96,55 @@ public static class TokenFactory
         }
 
         return token;
+    }
+
+    /// <summary>
+    /// CR 111 / CR 614 — bus-aware "create one or more tokens" entry point.
+    /// Publishes a <see cref="TokenCreationIntent"/> through
+    /// <paramref name="replacements"/> (when supplied) so token-doubling
+    /// replacements (Doubling Season, Parallel Lives, Anointed Procession)
+    /// can rewrite the count before any token is minted, then mints the
+    /// post-replacement <c>Count</c> copies via
+    /// <see cref="CreateOnBattlefield(TokenSpec, Player, ZoneService?)"/>.
+    ///
+    /// Returns the list of minted tokens (empty when the intent was
+    /// cancelled or its count fell to zero). Callers that need a single
+    /// token can continue calling the single-token overload directly;
+    /// this overload is the recommended path whenever the number of
+    /// tokens shipped is part of the printed effect ("Create two 1/1
+    /// Soldier tokens", etc.).
+    ///
+    /// CR 616.1c — each registered doubler fires at most once per intent;
+    /// two Parallel Lives stack multiplicatively (1 → 2 → 4).
+    /// </summary>
+    public static IReadOnlyList<Creature> CreateOnBattlefield(
+        TokenSpec spec,
+        Player controller,
+        int count,
+        ZoneService? zones,
+        ReplacementBus? replacements)
+    {
+        if (spec == null) throw new ArgumentNullException(nameof(spec));
+        if (controller == null) throw new ArgumentNullException(nameof(controller));
+        if (count <= 0) return Array.Empty<Creature>();
+
+        var intent = new TokenCreationIntent(controller, spec, count);
+
+        if (replacements != null)
+        {
+            var replaced = replacements.Apply(intent);
+            if (replaced == null) return Array.Empty<Creature>();
+            intent = replaced;
+        }
+
+        if (intent.Count <= 0) return Array.Empty<Creature>();
+
+        var minted = new List<Creature>(intent.Count);
+        for (int i = 0; i < intent.Count; i++)
+        {
+            minted.Add(CreateOnBattlefield(intent.Spec, intent.Controller, zones));
+        }
+        return minted;
     }
 
     /// <summary>Amass token (CR 701.49). Creates a 0/0 black [tribe] Army

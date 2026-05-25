@@ -205,10 +205,12 @@ public static class OcelotPrideFactory
             // CR 105 / CR 111.4 — printed "1/1 white Cat creature token".
             Colors: new[] { Majik.Core.ValueObjects.ManaColor.White });
 
-        for (var i = 0; i < count; i++)
-        {
-            TokenFactory.CreateOnBattlefield(spec, controller, zones);
-        }
+        // CR 614 — route the N-token ship through TokenCreationIntent so
+        // token doublers (Doubling Season / Parallel Lives / Anointed
+        // Procession) can rewrite the count. When zones carries no
+        // ReplacementBus this falls back to a plain N-mint loop.
+        TokenFactory.CreateOnBattlefield(
+            spec, controller, count, zones, zones?.Replacements);
     }
 
     /// <summary>
