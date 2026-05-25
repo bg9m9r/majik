@@ -396,9 +396,43 @@ public static class Fx
     /// with <see cref="ZoneMoveReason.Sacrifice"/> so the binder skips
     /// the Indestructible (CR 702.12b) / regeneration (CR 701.15c)
     /// gates — sacrifice is not a "destroy" effect.
+    ///
+    /// <para>The single-arg overload assumes the sacrifice is self-driven
+    /// (no opponent-controlled source forcing it) — additional costs paid
+    /// by the controller and sacrifice-yourself effects on your own
+    /// permanents land here. Use the
+    /// <see cref="Sacrifice(ICard, ICard)"/> overload when an opponent-
+    /// controlled spell or ability is the source so the Sigarda-style
+    /// <see cref="Majik.Core.Rules.SacrificeRestriction"/> gate is
+    /// consulted.</para>
     /// </summary>
     public static void Sacrifice(ICard permanent)
         => OracleSpellBinder.MoveToGraveyard(permanent, ZoneMoveReason.Sacrifice);
+
+    /// <summary>
+    /// CR 701.16 — sacrifice <paramref name="permanent"/> as the result of
+    /// <paramref name="requestingSource"/>'s effect. Consults
+    /// <see cref="Majik.Core.Rules.SacrificeRestriction"/>: if the
+    /// permanent's controller is currently protected against forced
+    /// sacrifice (Sigarda, Host of Herons) and the requesting source is
+    /// controlled by a different player, the sacrifice is silently
+    /// no-op'd (CR 109.5 — "your opponents control"). Otherwise the move
+    /// goes through exactly as the single-arg overload.
+    /// </summary>
+    public static void Sacrifice(ICard permanent, ICard requestingSource)
+    {
+        if (permanent == null) throw new ArgumentNullException(nameof(permanent));
+        if (requestingSource == null) throw new ArgumentNullException(nameof(requestingSource));
+
+        var owner = permanent.Controller;
+        if (owner != null
+            && owner.IsProtectedFromForcedSacrifice(requestingSource))
+        {
+            return;
+        }
+
+        OracleSpellBinder.MoveToGraveyard(permanent, ZoneMoveReason.Sacrifice);
+    }
 
     // ------------------------------------------------------------------
     // Stack (CR 701.5) — counter target spell/ability.

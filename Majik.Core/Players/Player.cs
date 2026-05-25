@@ -104,6 +104,18 @@ public class Player
     public bool HasHexproof =>
         Majik.Core.Rules.PlayerStaticAbilities.HasHexproof(this);
 
+    /// <summary>
+    /// CR 701.16 / CR 109.5 — proxy for
+    /// <see cref="Majik.Core.Rules.SacrificeRestriction.IsProtectedFromForcedSacrifice(Player, Majik.Core.Cards.ICard)"/>.
+    /// True iff this player has a "can't be forced to sacrifice" grant
+    /// active (Sigarda, Host of Herons; future sources) AND
+    /// <paramref name="requestingSource"/> is controlled by a player other
+    /// than this one. Returns false for the player's own spells / abilities
+    /// (Sigarda only blocks opponent-driven sacrifice).
+    /// </summary>
+    public bool IsProtectedFromForcedSacrifice(Majik.Core.Cards.ICard? requestingSource) =>
+        Majik.Core.Rules.SacrificeRestriction.IsProtectedFromForcedSacrifice(this, requestingSource);
+
     /// <summary>CR 704.5c — poison counters; 10+ → lose.</summary>
     public int PoisonCounters { get; internal set; }
 

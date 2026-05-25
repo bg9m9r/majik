@@ -400,11 +400,19 @@ public static class OracleSpellBinder
     {
         // Creature path goes through CombatAbilities so layer-system
         // grants (CR 613.1f) are picked up; non-creature permanents
-        // (Darksteel Citadel, The One Ring under its mark, etc.) fall
-        // back to the printed KeywordAbility marker.
+        // (Darksteel Citadel, lands granted Indestructible by Avacyn-style
+        // anthems, etc.) consult the layer system directly when the
+        // permanent is wired into one, then fall back to the printed
+        // KeywordAbility marker.
         if (permanent is Creature creature)
         {
             return Majik.Core.Combat.CombatAbilities.HasIndestructible(creature);
+        }
+
+        if (permanent.ActiveEffects != null)
+        {
+            var chars = permanent.ActiveEffects.Compute(permanent);
+            if (chars.Keywords.Contains("Indestructible")) return true;
         }
 
         return permanent.Abilities

@@ -22,6 +22,24 @@ public class Permanent : Card
     /// </summary>
     public Majik.Core.Counters.CounterCollection Counters { get; } = new();
 
+    /// <summary>
+    /// CR 613 — optional reference to the
+    /// <see cref="Majik.Core.Effects.ContinuousEffectsService"/> that owns
+    /// this permanent. Mirrors <see cref="Creature.ActiveEffects"/>, lifted
+    /// to the <see cref="Permanent"/> level so non-creature permanents
+    /// (Darksteel Citadel-shaped artifacts, lands granted Indestructible by
+    /// Avacyn-style anthems) can have layer-system keyword grants consulted
+    /// from the destroy-gate path. <see cref="Creature.ActiveEffects"/>
+    /// shadows this property with a creature-specific setter that callers
+    /// have always used; both refer to the same underlying field.
+    ///
+    /// Null when the permanent isn't wired into a live layer system —
+    /// callers must null-check before consulting (matching the existing
+    /// <see cref="Creature.GetPower"/> / <see cref="Creature.GetToughness"/>
+    /// pattern).
+    /// </summary>
+    public Majik.Core.Effects.ContinuousEffectsService? ActiveEffects { get; set; }
+
     /// <summary>True if this is a token (CR 111). Tokens cease to exist
     /// off battlefield via SBA 704.5d. Set via <see cref="MarkAsToken"/>.</summary>
     public bool IsToken { get; internal set; }

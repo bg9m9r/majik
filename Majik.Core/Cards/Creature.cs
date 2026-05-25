@@ -80,13 +80,6 @@ public class Creature : Permanent
         _damage = 0;
     }
 
-    /// <summary>
-    /// Optional reference to the <see cref="Majik.Core.Effects.ContinuousEffectsService"/>
-    /// that owns this creature. When set, P/T and keyword lookups consult
-    /// it (CR 613 layer system). When null, base values are returned.
-    /// </summary>
-    public Majik.Core.Effects.ContinuousEffectsService? ActiveEffects { get; set; }
-
     /// <summary>Get the current power after applying continuous effects.
     /// CR 708.2 — face-down creatures are 2/2 with no other characteristics,
     /// short-circuited before consulting the layer system.</summary>

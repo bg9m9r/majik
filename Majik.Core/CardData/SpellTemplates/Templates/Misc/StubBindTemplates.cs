@@ -234,6 +234,7 @@ public sealed class TargetPlayerSacrificesCreatureTemplate : ISpellTemplate
     public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx)
     {
         var resolver = ctx.Resolver;
+        var caster = ctx.Caster;
         return new SpellDefinition(
             Modes: Array.Empty<string>(),
             HasVariableX: false,
@@ -244,6 +245,16 @@ public sealed class TargetPlayerSacrificesCreatureTemplate : ISpellTemplate
                 return new IEffect[] { new Effect("edict", () =>
                 {
                     if (target is not Player tp) return;
+                    // CR 701.16 / Sigarda — opponent-driven forced
+                    // sacrifice is gated by SacrificeRestriction. If the
+                    // target is protected and the caster is an opponent,
+                    // the edict silently no-ops (its only effect would
+                    // have been to force the sac).
+                    if (Majik.Core.Rules.SacrificeRestriction
+                            .IsProtectedFromForcedSacrificeBy(tp, caster))
+                    {
+                        return;
+                    }
                     var pick = tp.Zones.Battlefield.GetCards()
                         .OfType<Creature>()
                         .FirstOrDefault();
@@ -768,6 +779,13 @@ public sealed class EachOpponentSacrificesCreatureTemplate : ISpellTemplate
                     foreach (var pl in allPlayers)
                     {
                         if (ReferenceEquals(pl, caster)) continue;
+                        // CR 701.16 / Sigarda — Sigarda-protected opponents
+                        // skip the forced sacrifice silently.
+                        if (Majik.Core.Rules.SacrificeRestriction
+                                .IsProtectedFromForcedSacrificeBy(pl, caster))
+                        {
+                            continue;
+                        }
                         var pick = pl.Zones.Battlefield.GetCards()
                             .OfType<Creature>()
                             .FirstOrDefault();
