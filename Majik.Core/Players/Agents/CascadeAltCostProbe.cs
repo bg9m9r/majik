@@ -62,9 +62,9 @@ public sealed class CascadeAltCostProbe : IAlternativeCostProbe
 
     /// <summary>
     /// Built-in name-based lookup for shipped cascade cards. Crashing
-    /// Footfalls and Living End are the canonical ship-list entries;
-    /// when Shardless Agent / Bloodbraid Elf / Violent Outburst etc. land,
-    /// add them here.
+    /// Footfalls, Living End, and Shardless Agent are the current ship
+    /// list; when Bloodbraid Elf / Violent Outburst etc. land, add them
+    /// here.
     /// </summary>
     public static bool DefaultIsCascadeCard(ICard card)
     {
@@ -73,6 +73,7 @@ public sealed class CascadeAltCostProbe : IAlternativeCostProbe
         {
             "Crashing Footfalls" => true,
             "Living End" => true,
+            "Shardless Agent" => true,
             _ => false,
         };
     }
