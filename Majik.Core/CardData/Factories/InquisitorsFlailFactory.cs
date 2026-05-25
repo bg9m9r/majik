@@ -1,7 +1,9 @@
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Effects;
 using Majik.Core.Players;
+using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
 
@@ -15,7 +17,8 @@ namespace Majik.Core.CardData.Factories;
 ///    double that damage instead."
 ///   "Equip {2}."
 ///
-/// ## Implemented (v1)
+/// ## Implementation
+///
 /// - Card identity (Artifact + Equipment subtype, mana cost {2}, owner /
 ///   controller wiring).
 /// - <b>Equip {2}</b> — activated ability (CR 702.6) via the shared
@@ -24,24 +27,22 @@ namespace Majik.Core.CardData.Factories;
 ///   "creature you control" target gathering, and attach-on-resolve are
 ///   encapsulated by the primitive; same wiring as Bone Saw / Colossus
 ///   Hammer / Skullclamp / Jitte / Sword of Fire and Ice.
-///
-/// ## Deferred (v1 gaps)
-/// - <b>Damage-doubling replacement</b> (CR 614 / CR 615) — both printed
-///   replacements ("If equipped creature would deal combat damage, it deals
-///   double that damage instead" and the symmetric incoming clause).
-///   <see cref="Majik.Core.Effects.ReplacementBus"/> + <see cref="Majik.Core.Effects.DamageIntent"/>
-///   are the right entry point — combat damage already flows through
-///   <c>CombatFlow.Apply{ToCreature|ToPlaneswalker|ToPlayer}</c> as a
-///   <c>DamageIntent</c> — but the intent today carries no
-///   <c>IsCombatDamage</c> discriminator (CR 510.1c), so a clean
-///   "combat-damage only" filter would either misfire on non-combat damage
-///   from creature sources (e.g. {T} ping abilities reusing the bus) or
-///   require widening the intent record. Same deferred bucket as
-///   Sword of Fire and Ice's DEBT-A protection scoping when this factory
-///   first shipped — the structural shape (Equipment {2} + Equip {2}) is
-///   live so Stoneforge Mystic can tutor it, Puresteel zero-equip flows
-///   through, and the attach mechanics work; the damage doubling rider is
-///   pending an <c>IsCombat</c> flag on <c>DamageIntent</c>.
+/// - <b>Damage-doubling replacements</b> (CR 614 / CR 510.1c) — two
+///   <see cref="DamageDoubleReplacement"/> registrations on the supplied
+///   <see cref="ReplacementBus"/>:
+///     1. <i>Source-side</i> — when the Flail's
+///        <see cref="Permanent.AttachedTo"/> creature is the
+///        <see cref="DamageIntent.Source"/> AND the intent is combat
+///        damage, double the amount.
+///     2. <i>Target-side</i> — when the Flail's
+///        <see cref="Permanent.AttachedTo"/> creature is the
+///        <see cref="DamageIntent.TargetCreature"/> AND the intent is
+///        combat damage, double the amount.
+///   The replacements gate on the Flail being on the battlefield AND
+///   currently attached, so detach / blink / bounce automatically
+///   suspends doubling without explicit deregistration. Non-combat
+///   damage paths (spells, ping abilities) leave
+///   <see cref="DamageIntent.IsCombatDamage"/> false and are skipped.
 /// </summary>
 [CardName("Inquisitor's Flail")]
 public static class InquisitorsFlailFactory
@@ -51,12 +52,20 @@ public static class InquisitorsFlailFactory
     public const string EquipCost = "{2}";
 
     /// <summary>
-    /// Construct Inquisitor's Flail. Single overload — no
-    /// <see cref="Majik.Core.Effects.ContinuousEffectsService"/> wiring is
-    /// required because the damage-doubling replacements are deferred (no
-    /// continuous effect to register today).
+    /// Constructs an Inquisitor's Flail with card identity + Equip {2}
+    /// only — no damage-doubling replacements registered. Suitable for
+    /// shape / dispatcher tests.
     /// </summary>
     public static Artifact Create(Player owner)
+        => Create(owner, replacements: null);
+
+    /// <summary>
+    /// Constructs an Inquisitor's Flail. When <paramref name="replacements"/>
+    /// is supplied, the two combat-damage doubling replacements
+    /// (source-side + target-side) are registered against it; otherwise
+    /// only the structural shape + Equip {2} are wired.
+    /// </summary>
+    public static Artifact Create(Player owner, ReplacementBus? replacements)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -81,6 +90,75 @@ public static class InquisitorsFlailFactory
 
         card.AddAbility(equipAbility);
 
+        // --------------------------------------------------------------
+        // Damage-doubling replacements — gated on the Flail being on
+        // the battlefield AND attached, then on the intent being combat
+        // damage AND the equipped creature being the source / target.
+        // --------------------------------------------------------------
+        if (replacements != null)
+        {
+            replacements.Register<DamageIntent>(
+                new DamageDoubleReplacement(card, source: true));
+            replacements.Register<DamageIntent>(
+                new DamageDoubleReplacement(card, source: false));
+        }
+
         return card;
     }
+}
+
+/// <summary>
+/// CR 614 replacement: when a <see cref="DamageIntent"/> is combat damage
+/// (CR 510.1) and the Flail's currently-equipped creature is either the
+/// source or the target (selected by the <see cref="_sourceSide"/> ctor
+/// flag), double the amount. Backs both printed Inquisitor's Flail
+/// replacements.
+///
+/// Gates on the Flail sitting on the battlefield AND
+/// <see cref="Permanent.AttachedTo"/> being non-null, so detach / blink /
+/// bounce automatically suspend doubling without explicit
+/// deregistration. Each registration is one-side-only (source xor
+/// target) so <see cref="ReplacementBus"/>'s per-effect dedup (CR 616.1c)
+/// still lets both replacements fire on a single intent when the same
+/// creature deals combat damage to itself (e.g. mirror-match face-bite).
+/// </summary>
+public sealed class DamageDoubleReplacement : IReplacementEffect<DamageIntent>
+{
+    private readonly Permanent _equipment;
+    private readonly bool _sourceSide;
+
+    public DamageDoubleReplacement(Permanent equipment, bool source)
+    {
+        _equipment = equipment ?? throw new ArgumentNullException(nameof(equipment));
+        _sourceSide = source;
+    }
+
+    public bool OneShot => false;
+    public object? Tag => this;
+
+    public bool Applies(DamageIntent intent, IReadOnlyList<object> history)
+    {
+        if (!intent.IsCombatDamage) return false;
+        if (intent.Amount <= 0) return false;
+        if (_equipment.Zone != ZoneType.Battlefield) return false;
+
+        var equipped = _equipment.AttachedTo;
+        if (equipped == null) return false;
+
+        if (_sourceSide)
+        {
+            // "If equipped creature would deal combat damage, it deals
+            // double that damage instead."
+            return ReferenceEquals(intent.Source, equipped);
+        }
+
+        // "If a source would deal combat damage to equipped creature,
+        // it deals double that damage instead." — target-side gate only
+        // fires when the equipped creature is the damage target.
+        return intent.TargetCreature is not null
+            && ReferenceEquals(intent.TargetCreature, equipped);
+    }
+
+    public DamageIntent? Replace(DamageIntent intent, IReadOnlyList<object> history)
+        => intent with { Amount = intent.Amount * 2 };
 }
