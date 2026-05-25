@@ -44,6 +44,12 @@ public static class CastingRestrictions
     // (token, cardName) entries; a name is blocked while at least one entry
     // targeting it exists.
     private static readonly List<(object Token, string Name)> _namedCardBlocks = new();
+    // CR 601.3 — turn-scoped "<player> can't cast noncreature spells this
+    // turn" rider (Ranger-Captain of Eos's sacrifice ability). Stored as a
+    // flat set of player IDs; cleared by the caller (or via
+    // <see cref="Clear"/> in tests). Same lifecycle posture as the
+    // turn-scoped uncounterable rider.
+    private static readonly HashSet<Guid> _noncreatureRestrictedPlayers = new();
     private static readonly object _gate = new();
 
     /// <summary>
@@ -250,6 +256,41 @@ public static class CastingRestrictions
         }
     }
 
+    /// <summary>
+    /// Register a turn-scoped "noncreature spells <paramref name="player"/>
+    /// casts are prohibited" rider (CR 601.3 — Ranger-Captain of Eos's
+    /// sacrifice ability: "Your opponents can't cast noncreature spells
+    /// this turn."). Cleared by the caller at end of turn via
+    /// <see cref="ClearNoncreatureRestrictionForTurn"/> (or
+    /// <see cref="Clear"/> in tests). Idempotent.
+    /// </summary>
+    public static void AddNoncreatureSpellRestrictionForTurn(Player player)
+    {
+        ArgumentNullException.ThrowIfNull(player);
+        lock (_gate) _noncreatureRestrictedPlayers.Add(player.Id);
+    }
+
+    /// <summary>
+    /// True if a turn-scoped noncreature-spell restriction is currently
+    /// active against <paramref name="player"/> (CR 601.3 — Ranger-Captain
+    /// of Eos). Consulted by <see cref="ActionValidator.ValidateCastSpell"/>.
+    /// </summary>
+    public static bool CannotCastNoncreatureSpell(Player player)
+    {
+        if (player == null) return false;
+        lock (_gate) return _noncreatureRestrictedPlayers.Contains(player.Id);
+    }
+
+    /// <summary>
+    /// Clear the turn-scoped noncreature-spell restriction set. Called at
+    /// end of turn / cleanup; tests may also call this directly via
+    /// <see cref="Clear"/>.
+    /// </summary>
+    public static void ClearNoncreatureRestrictionForTurn()
+    {
+        lock (_gate) _noncreatureRestrictedPlayers.Clear();
+    }
+
     /// <summary>Reset the registry. Test-only.</summary>
     public static void Clear()
     {
@@ -259,6 +300,7 @@ public static class CastingRestrictions
             _uncounterableControllers.Clear();
             _castFromHandOnly.Clear();
             _namedCardBlocks.Clear();
+            _noncreatureRestrictedPlayers.Clear();
         }
     }
 }

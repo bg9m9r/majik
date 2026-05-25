@@ -157,6 +157,13 @@ public enum CardSubtype
     /// <summary>Robot creature subtype — Pinnacle Emissary (Edge of Eternities)
     /// and the EOE robot lineage. CR 205.3m.</summary>
     Robot,
+    /// <summary>God creature subtype — Heliod, Sun-Crowned (Theros Beyond
+    /// Death) and the rest of the Theros / Amonkhet / Kaldheim God cycles.
+    /// CR 205.3m.</summary>
+    God,
+    /// <summary>Ranger creature subtype — Ranger-Captain of Eos (Modern
+    /// Horizons), Ranger of Eos (Shards of Alara). CR 205.3m.</summary>
+    Ranger,
     /// <summary>Drone creature subtype — Pinnacle Emissary's 1/1 colorless
     /// Drone artifact creature tokens (Edge of Eternities). CR 205.3m.</summary>
     Drone,
