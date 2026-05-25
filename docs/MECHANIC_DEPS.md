@@ -5,11 +5,11 @@ Scanner output: every `*Factory.cs` xmldoc / inline comment mentioning
 engine primitive. Each row answers: "if we ship primitive _X_, which factory
 xmldocs flagged that they're blocked on it?"
 
-- **Generated:** 2026-05-25 03:51 UTC
+- **Generated:** 2026-05-25 03:52 UTC
 - **Scanned dir:** `Majik.Core/CardData/Factories`
-- **Total mentions:** 212
+- **Total mentions:** 209
 - **Clusters:** 7
-- **Unclustered (need new registry pattern):** 166
+- **Unclustered (need new registry pattern):** 163
 
 Regenerate with `dotnet run --project Majik.Console -- mechanic-deps --md-out docs/MECHANIC_DEPS.md --json-out docs/mechanic-deps.json`.
 
@@ -318,13 +318,7 @@ Mentions:
 - `DryadArborFactory` (`DryadArborFactory.cs:7`)
   > Green Sun's Zenith interaction (can be fetched as a Forest creature — deferred to the targeting / land-subtype search slice).
 - `ArcboundRavagerFactory` (`ArcboundRavagerFactory.cs:14`)
-  > ## Deferred (v1 gaps)  - <b>Target prompt for Modular bestowal</b>: oracle says "target artifact creature" — v1 picks the first artifact creature deterministically (excluding Arcbound Ravager).
-- `ArcboundRavagerFactory` (`ArcboundRavagerFactory.cs:14`)
-  > TargetRequests"/>; same gap as Stoneforge Mystic's "attach to a creature you control".
-- `ArcboundRavagerFactory` (`ArcboundRavagerFactory.cs:14`)
-  > Arcbound Ravager is the only Modular card in the immediate roadmap; promotion to a shared primitive is deferred until a second Modular card lands (Arcbound Crusher / Worker / etc.
-- `ArcboundRavagerFactory` (`ArcboundRavagerFactory.cs:234`)
-  > CR 702.43b's "target artifact creature" is not controller-restricted; opponent-side scans are deferred until the engine exposes a cross-battlefield enumerator (no <c>Player.
+  > ## Deferred (v1 gaps)  - Per-target prompt for the Modular bestowal (deterministic first- artifact-creature pick in v1 — same gap as Stoneforge Mystic's tutor).
 - `SpriteDragonFactory` (`SpriteDragonFactory.cs:13`)
   > ## Deferred (v1 gaps)  - <b>Continuous P/T recomputation</b> — Sprite Dragon's effective P/T is derived from base 1/1 plus +1/+1 counters via the standard <see cref="CounterCollection"/> path (CR 613.4 layer 7d), inherited from every other +1/+1-counter user (Psychic Frog activated ability, Ledger Shredder surveil ride…
 - `PsychicFrogFactory` (`PsychicFrogFactory.cs:15`)

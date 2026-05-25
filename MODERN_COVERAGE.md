@@ -479,6 +479,7 @@ Per-keyword action helpers under `Majik.Core/Keywords/`:
 | Landfall | Done | `Keywords/LandfallFactory.cs` | — |
 | Prowess | Done | `Keywords/ProwessFactory.cs` | Monastery Swiftspear |
 | Undying | Done | `Keywords/UndyingFactory.cs` | Young Wolf, etc. |
+| Modular | Done | `Keywords/ModularFactory.cs` (CR 702.43) — promoted out of `ArcboundRavagerFactory` once a second + third Modular card landed. Attaches a `KeywordAbility "Modular N"` marker, registers `EntersWithCountersReplacement(card, N)` against the supplied ReplacementBus so the ETB +1/+1 stamp routes through `ZoneService` → `CountersService.Add` (Hardened Scales bumps apply — PR #494), and wires the Battlefield → Graveyard death trigger that snapshot-reads the dying permanent's +1/+1 counter total off the graveyard object (Undying-shape) and routes the bestowal through `CountersService.Add` onto the controller-side first-artifact-creature target. The "you may" rider consults `IPlayerAgent.ChooseYesNoAsync(BotIntent.CardAdvantage)` — default = yes. Deferred: per-target prompt (deterministic v1 pick), cross-battlefield target enumeration (controller-only scan in v1). | Arcbound Ravager, Arcbound Worker, Arcbound Stinger |
 | Ward | Done | `Keywords/WardEffect.cs` | — |
 | Convoke | Done (cost-reduction wired) | `Costs/ConvokeAdditionalCost.cs` + `Costs/ConvokeAlternativeCost.cs` shim + `Players/Agents/ConvokeAltCostProbe.cs` + `Bespoke/ConvokeTemplate.cs` | Chord of Calling |
 | Delirium | Done (#190) | (in `UnholyHeatFactory`; no shared helper yet) | Unholy Heat |

@@ -1,10 +1,10 @@
 {
-  "generated_utc": "2026-05-25T03:51:30.2000637Z",
+  "generated_utc": "2026-05-25T03:52:18.2015761Z",
   "scanned_dir": "/home/brett/Projects/majik.project/majik.core/.claude/worktrees/agent-afe00b204d43e5a62/Majik.Core/CardData/Factories",
-  "total_mentions": 212,
+  "total_mentions": 209,
   "distinct_factories": 141,
   "cluster_count": 7,
-  "unclustered_count": 166,
+  "unclustered_count": 163,
   "clusters": [
     {
       "primitive_id": "agent-prompt-targeting",
@@ -823,26 +823,7 @@
       "factory": "ArcboundRavagerFactory",
       "file": "ArcboundRavagerFactory.cs",
       "line": 14,
-      "sentence": "## Deferred (v1 gaps)  - \u003Cb\u003ETarget prompt for Modular bestowal\u003C/b\u003E: oracle says \u0022target artifact creature\u0022 \u2014 v1 picks the first artifact creature deterministically (excluding Arcbound Ravager)."
-    },
-    {
-      "factory": "ArcboundRavagerFactory",
-      "file": "ArcboundRavagerFactory.cs",
-      "line": 14,
-      "sentence": "TargetRequests\u0022/\u003E; same gap as Stoneforge Mystic\u0027s \u0022attach to a creature you control\u0022."
-    },
-    {
-      "factory": "ArcboundRavagerFactory",
-      "file": "ArcboundRavagerFactory.cs",
-      "line": 14,
-      "sentence": "Arcbound Ravager is the only Modular card in the immediate roadmap; promotion to a shared primitive is deferred until a second Modular card lands (Arcbound Crusher / Worker / etc."
-    },
-    {
-      "factory": "ArcboundRavagerFactory",
-      "file": "ArcboundRavagerFactory.cs",
-      "line": 234,
-      "sentence": "CR 702.43b\u0027s \u0022target artifact creature\u0022 is not controller-restricted; opponent-side scans are deferred until the engine exposes a cross-battlefield enumerator (no \u003Cc\u003EPlayer.",
-      "cr": "CR 702.43b"
+      "sentence": "## Deferred (v1 gaps)  - Per-target prompt for the Modular bestowal (deterministic first- artifact-creature pick in v1 \u2014 same gap as Stoneforge Mystic\u0027s tutor)."
     },
     {
       "factory": "SpriteDragonFactory",
