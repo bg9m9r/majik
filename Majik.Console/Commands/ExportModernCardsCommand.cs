@@ -218,11 +218,11 @@ public static class ExportModernCardsCommand
     /// Skips the opening <c>[</c>, then on each call materializes the next
     /// element into a standalone <see cref="JsonDocument"/>. Buffer grows
     /// on demand for any card whose JSON exceeds the initial window.</summary>
-    private sealed class ScryfallObjectPump
+    internal sealed class ScryfallObjectPump
     {
-        private const int InitialBufferSize = 64 * 1024;
+        internal const int DefaultInitialBufferSize = 64 * 1024;
         private readonly Stream _input;
-        private byte[] _buffer = new byte[InitialBufferSize];
+        private byte[] _buffer;
         private int _bufferEnd;
         private bool _isEof;
         private bool _arrayStarted;
@@ -233,7 +233,20 @@ public static class ExportModernCardsCommand
             CommentHandling = JsonCommentHandling.Skip,
         });
 
-        public ScryfallObjectPump(Stream input) { _input = input; }
+        public ScryfallObjectPump(Stream input)
+            : this(input, DefaultInitialBufferSize) { }
+
+        /// <summary>Test hook: small initial buffer forces the
+        /// boundary-crossing + grow paths on payloads the production
+        /// 64 KB window would swallow whole.</summary>
+        internal ScryfallObjectPump(Stream input, int initialBufferSize)
+        {
+            if (initialBufferSize < 16)
+                throw new ArgumentOutOfRangeException(nameof(initialBufferSize),
+                    "buffer must hold at least the opening '[' plus a small card prefix");
+            _input = input;
+            _buffer = new byte[initialBufferSize];
+        }
 
         public bool TryReadNextCardObject(out CardDocumentHandle handle)
         {
@@ -315,7 +328,14 @@ public static class ExportModernCardsCommand
                     if (_isEof)
                         throw new InvalidOperationException(
                             "Scryfall bulk input ended mid-card object.");
-                    GrowOrAdvance((int)startOffset);
+                    // Preserve the entire partial-object prefix (including
+                    // any inter-element whitespace / comma before the
+                    // StartObject at startOffset) so the saved _state — which
+                    // still reflects "between array elements" — stays aligned
+                    // with buffer[0]. Dropping bytes before startOffset would
+                    // skip the comma the reader's state machine expects,
+                    // surfacing later as "'{' is invalid after a value".
+                    GrowOrAdvance(0);
                     continue;
                 }
 
@@ -385,11 +405,32 @@ public static class ExportModernCardsCommand
     /// <summary>Owned <see cref="JsonDocument"/> handle so callers can
     /// dispose deterministically. Disposing releases the document's
     /// pooled buffers.</summary>
-    private readonly struct CardDocumentHandle : IDisposable
+    internal readonly struct CardDocumentHandle : IDisposable
     {
         public JsonDocument Document { get; }
         public CardDocumentHandle(JsonDocument doc) { Document = doc; }
         public void Dispose() => Document?.Dispose();
+    }
+
+    /// <summary>Test entry point: streams every card object out of
+    /// <paramref name="input"/> using an arbitrarily small buffer so the
+    /// grow + boundary-crossing branches in <see cref="ScryfallObjectPump"/>
+    /// are exercised. Returns the raw card JSON strings — name extraction
+    /// is delegated to the caller so the assertion stays close to the
+    /// actual bytes that crossed the boundary.</summary>
+    internal static List<string> StreamCardJsonForTesting(
+        Stream input, int initialBufferSize)
+    {
+        var pump = new ScryfallObjectPump(input, initialBufferSize);
+        var results = new List<string>();
+        while (pump.TryReadNextCardObject(out var handle))
+        {
+            using (handle)
+            {
+                results.Add(handle.Document.RootElement.GetRawText());
+            }
+        }
+        return results;
     }
 
     internal static ExportRow? ProjectIfModernLegal(JsonElement card)
