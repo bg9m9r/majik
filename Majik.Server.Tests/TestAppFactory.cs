@@ -20,10 +20,9 @@ public sealed class TestAppFactory : WebApplicationFactory<Program>
     {
         builder.UseEnvironment("Testing");
 
-        // Cards:BaseUrl is required by MajikEngineRegistration. Tests that
-        // need a real ICardRepository override it via ConfigureTestServices;
-        // this stub URL just lets DI satisfy the HttpClient registration.
-        builder.UseSetting("Cards:BaseUrl", "http://test.invalid");
+        // ICardRepository is now satisfied by the in-process
+        // EmbeddedCardRepository — no Cards:BaseUrl HTTP target needed.
+        // Tests that want a stub repo still override via ConfigureTestServices.
 
         builder.ConfigureTestServices(services =>
         {

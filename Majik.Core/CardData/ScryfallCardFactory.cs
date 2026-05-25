@@ -1,4 +1,3 @@
-using Majik.Core.CardData.Database;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Game;
@@ -19,14 +18,12 @@ public sealed class ScryfallCardFactory
     private readonly ICardRepository _repo;
     private readonly Majik.Core.Effects.ReplacementBus? _replacements;
     private readonly Majik.Core.Effects.ContinuousEffectsService? _effects;
-    private readonly ICompiledSpellTemplateRepository? _compiledRepo;
     private readonly Majik.Core.Abilities.TriggerManager? _triggers;
     private readonly Majik.Core.Events.IEventBus? _eventBus;
     private readonly Majik.Core.Services.ZoneService? _zones;
 
     public ScryfallCardFactory(ICardRepository repo,
         Majik.Core.Effects.ReplacementBus? replacements = null,
-        ICompiledSpellTemplateRepository? compiledSpellRepo = null,
         Majik.Core.Effects.ContinuousEffectsService? effects = null,
         Majik.Core.Abilities.TriggerManager? triggers = null,
         Majik.Core.Events.IEventBus? eventBus = null,
@@ -35,7 +32,6 @@ public sealed class ScryfallCardFactory
         _repo = repo ?? throw new ArgumentNullException(nameof(repo));
         _replacements = replacements;
         _effects = effects;
-        _compiledRepo = compiledSpellRepo;
         _triggers = triggers;
         _eventBus = eventBus;
         _zones = zones;
@@ -168,23 +164,27 @@ public sealed class ScryfallCardFactory
 
         if (isInstantOrSorcery)
         {
-            // No compiled template = engine can't bind the effect; spell
-            // will resolve as a vanilla / no-op spell. Live template walk
-            // could still match at cast time, but the compiled table is the
-            // SpellBound source of truth for the current production layout.
-            // Conservative: tag when no compiled row exists, untag at cast
-            // time if Bind() actually returns a non-null SpellDefinition
-            // (see ClearVanillaShellOnSpellBind below — call site is the
-            // production resolver in TurnDriver).
-            return _compiledRepo?.Lookup(entity.Name) is null;
+            // Compiled spell-template cache was removed when the SQLite
+            // backing store was deleted. The bot now relies on the
+            // resolver to clear the vanilla-shell flag when a live
+            // template walk binds (see ClearVanillaShellOnSpellBind on
+            // the production TurnDriver path). Default to NOT tagging
+            // instants/sorceries as vanilla shells — the live walk
+            // covers them at cast time.
+            return false;
         }
 
-        // Permanent path: has at least one ability OR oracle text is purely
-        // keyword markers + reminder text → engine covers it. Otherwise, the
-        // card prints rules that we didn't bind → vanilla shell.
+        // Permanent path: has at least one ability → engine covers it.
+        // The previous "keyword-only oracle text" fast path lived in
+        // CoverageClassifier and consumed the Scryfall `keywords` JSON
+        // array — that array is not carried by the embedded seed, so
+        // tagging on oracle-text emptiness alone would over-flag cards
+        // whose abilities are bound entirely from keywords. Be
+        // conservative and only flag when there are no abilities AND no
+        // oracle text at all (vanilla creatures / lands).
         var hasAnyAbility = card.Abilities.Count > 0;
         if (hasAnyAbility) return false;
-        return !Majik.Core.CardData.Coverage.CoverageClassifier.IsKeywordOnlyOracleText(entity);
+        return !string.IsNullOrWhiteSpace(entity.OracleText);
     }
 
     /// <summary>
@@ -201,23 +201,11 @@ public sealed class ScryfallCardFactory
         var entity = _repo.GetByName(name);
         if (entity == null) return null;
 
-        // Phase 2 fast path: if the offline compile pipeline has a row for
-        // this card, route through Rehydrate instead of walking the regex
-        // registry. Falls back to the live walk when the compiled table is
-        // unwired (no repo configured), the card has no compiled row, or
-        // the stored template doesn't resolve in this build's Registry.
-        var compiled = _compiledRepo?.Lookup(entity.Name);
-        if (compiled is not null)
-        {
-            var fast = OracleSpellBinder.BindCompiled(
-                compiled.TemplateName,
-                compiled.ParamsJson,
-                entity, caster, targetResolver,
-                effects: _effects, stack, replacements: _replacements,
-                triggers: _triggers, eventBus: _eventBus, zones: _zones);
-            if (fast is not null) return fast;
-        }
-
+        // The offline compiled-template cache (DbCompiledSpellTemplateRepository)
+        // was deleted along with the SQLite backing store. Every cast now
+        // walks the live SpellTemplateRegistry — measured cost is sub-ms
+        // per cast on the bounded template set, and the cache hit-rate was
+        // already low after the registry grew beyond the cached snapshot.
         return OracleSpellBinder.Bind(
             entity, caster, targetResolver,
             effects: _effects, stack, replacements: _replacements,

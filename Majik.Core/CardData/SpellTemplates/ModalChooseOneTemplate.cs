@@ -1,6 +1,6 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using Majik.Core.CardData.Database;
+using Majik.Core.CardData;
 using Majik.Core.Game;
 using Majik.Core.Players.Agents;
 

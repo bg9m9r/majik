@@ -2,7 +2,6 @@ using FluentAssertions;
 using Majik.Core.Api;
 using Majik.Core.Api.Commands;
 using Majik.Core.CardData;
-using Majik.Core.CardData.Database;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Players;

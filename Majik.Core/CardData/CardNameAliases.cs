@@ -2,9 +2,10 @@ namespace Majik.Core.CardData;
 
 /// <summary>
 /// Maps alternate printings/Secret-Lair renames to their canonical
-/// implemented card name. Consulted by <see cref="DbCardRepository.GetByName"/>
-/// when an exact-name lookup misses — the alias points back at the row
-/// with the wired-up oracle text.
+/// implemented card name. Consulted by
+/// <see cref="EmbeddedCardRepository.GetByName"/> when an exact-name
+/// lookup misses — the alias points back at the row with the wired-up
+/// oracle text.
 ///
 /// Add an entry when a Universes-Beyond / Secret-Lair reprint has a
 /// different display name but is functionally identical to a card already

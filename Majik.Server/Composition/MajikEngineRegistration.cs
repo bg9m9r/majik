@@ -2,7 +2,6 @@ using Majik.Bot.Diagnostics;
 using Majik.Core.Api;
 using Majik.Core.CardData;
 using Majik.Core.Events;
-using Majik.Server.Cards;
 
 namespace Majik.Server.Composition;
 
@@ -11,15 +10,17 @@ namespace Majik.Server.Composition;
 /// container. The engine itself stays free of ASP.NET dependencies —
 /// this file is the only place where the two worlds meet.
 ///
-/// Scope decisions (Phase 3 v1):
+/// Scope decisions:
 /// - GameRegistry singleton: one process, many games, in-memory only.
 /// - EventBus is per-game (a facade owns its own bus), so no global bus
 ///   is registered here.
 ///
-/// Cards backing store: <see cref="HttpCardRepository"/> against the
-/// majik-cards private service. <c>Cards:BaseUrl</c> is required —
-/// startup throws if unset. Tests override <see cref="ICardRepository"/>
-/// via <c>ConfigureTestServices</c> to point at an in-memory SQLite.
+/// Cards backing store: <see cref="EmbeddedCardRepository"/> against the
+/// gzipped Modern-legal JSON resource bundled into <c>Majik.Core</c>.
+/// In-process, no SQLite, no internal HTTP hop. The repository handles
+/// its own thread-safe lazy load + per-name caching, so the previous
+/// CachingCardRepository decorator was deleted along with the HTTP and
+/// SQLite repositories.
 /// </summary>
 public static class MajikEngineRegistration
 {
@@ -27,29 +28,7 @@ public static class MajikEngineRegistration
     {
         services.AddSingleton<GameRegistry>();
 
-        var cardsBaseUrl = configuration["Cards:BaseUrl"];
-        var cardsToken = configuration["Cards:InternalToken"];
-
-        if (string.IsNullOrWhiteSpace(cardsBaseUrl))
-        {
-            throw new InvalidOperationException(
-                "Cards:BaseUrl is required. Point Majik.Server at the majik-cards " +
-                "private service (e.g. http://majik-cards:10000 in prod, " +
-                "http://localhost:5180 in local dev).");
-        }
-
-        services.AddHttpClient<HttpCardRepository>(client =>
-        {
-            client.BaseAddress = new Uri(cardsBaseUrl);
-            client.Timeout = TimeSpan.FromSeconds(15);
-            if (!string.IsNullOrEmpty(cardsToken))
-            {
-                client.DefaultRequestHeaders.Add(InternalTokenHeader.Name, cardsToken);
-            }
-        });
-
-        services.AddSingleton<ICardRepository>(sp =>
-            new CachingCardRepository(sp.GetRequiredService<HttpCardRepository>()));
+        services.AddSingleton<ICardRepository>(_ => new EmbeddedCardRepository());
 
         // Optional decision-logging sink for the bot. Default off in prod
         // (zero overhead — BotConfig falls back to NullBotDecisionSink).
@@ -67,10 +46,6 @@ public static class MajikEngineRegistration
         // ServerGameFactory takes ICardRepository so it can run the full binder
         // pipeline at game-start. Registered after ICardRepository so the DI
         // container can satisfy the constructor dependency.
-        // botDecisionLoggingEnabled propagates the same flag MatchService
-        // reads when deciding whether to compose a per-match
-        // SignalrBotDecisionSink — keeps the wire channel + stdout logger
-        // in lockstep instead of letting them drift apart.
         services.AddSingleton<ServerGameFactory>(sp =>
             new ServerGameFactory(
                 sp.GetRequiredService<GameRegistry>(),
@@ -85,10 +60,4 @@ public static class MajikEngineRegistration
 
         return services;
     }
-}
-
-/// <summary>Header name shared between Majik.Server and Majik.CardsServer.</summary>
-internal static class InternalTokenHeader
-{
-    public const string Name = "X-Internal-Token";
 }

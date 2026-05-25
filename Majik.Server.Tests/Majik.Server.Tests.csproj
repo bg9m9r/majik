@@ -24,7 +24,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Majik.Server\Majik.Server.csproj" />
-    <ProjectReference Include="..\Majik.CardsServer\Majik.CardsServer.csproj" />
     <ProjectReference Include="..\Majik.Core.Api\Majik.Core.Api.csproj" />
   </ItemGroup>
 
