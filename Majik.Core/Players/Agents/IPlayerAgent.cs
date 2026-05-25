@@ -255,4 +255,33 @@ public interface IPlayerAgent
         BotIntent intent,
         CancellationToken ct = default)
         => Task.FromResult<ICard?>(candidates.Count > 0 ? candidates[0] : null);
+
+    /// <summary>
+    /// Pick exactly one permanent from a candidate set on the
+    /// <paramref name="chooser"/>'s battlefield (or any pre-filtered
+    /// battlefield subset the calling effect produced). Used by:
+    ///   - Sacrifice prompts (Annihilator N — CR 702.86, Smallpox,
+    ///     Innocent Blood, Plaguecrafter) — <see cref="BotIntent.Removal"/> /
+    ///     <see cref="BotIntent.DiscardCost"/>.
+    /// <para>
+    /// <paramref name="candidates"/> is pre-filtered by the calling effect
+    /// to legal picks only (e.g. permanents the chooser controls for an
+    /// Annihilator sacrifice). The agent picks zero or one. Returning
+    /// <see langword="null"/> is only legal when the calling effect treats
+    /// the choice as "may" (CR 117.x). Annihilator-style mandatory
+    /// sacrifices treat <see langword="null"/> as "no eligible permanents,
+    /// no-op" — the candidate list is empty in that case anyway.
+    /// </para>
+    /// <para>
+    /// Default implementation: return the first candidate (deterministic
+    /// pre-agent behaviour, matching <see cref="ChooseFromHandAsync"/>).
+    /// Empty candidate list returns <see langword="null"/>.
+    /// </para>
+    /// </summary>
+    Task<ICard?> ChooseFromBattlefieldAsync(
+        Player chooser,
+        IReadOnlyList<ICard> candidates,
+        BotIntent intent,
+        CancellationToken ct = default)
+        => Task.FromResult<ICard?>(candidates.Count > 0 ? candidates[0] : null);
 }
