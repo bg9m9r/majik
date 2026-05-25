@@ -177,6 +177,9 @@ public enum CardSubtype
     /// <summary>Berserker creature subtype — Bloodbraid Elf (Alara Reborn /
     /// Modern Horizons 2), Goblin Berserker, Lovisa Coldeyes. CR 205.3m.</summary>
     Berserker,
+    /// <summary>Ape creature subtype — Treetop Village (Urza's Legacy) animated
+    /// form, Kird Ape (Arabian Nights / many reprints). CR 205.3m.</summary>
+    Ape,
 
     // Land subtypes (examples)
     Forest,
