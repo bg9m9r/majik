@@ -541,6 +541,19 @@ public sealed class SpellCastFlow
             spell.WasKicked = true;
         }
 
+        // CR 701.5b — "An uncounterable spell can't be countered." Cards
+        // that print "this spell can't be countered" (Emrakul, the Aeons
+        // Torn; Apocalypse Hydra; …) carry a
+        // <see cref="KeywordAbility"/>("Uncounterable") marker; the
+        // resolving spell mirrors the flag so
+        // <see cref="Majik.Core.CardData.OracleSpellBinder.RemoveFromStack"/>
+        // can veto the counter-attempt without re-reading the card's
+        // abilities at counter resolution time.
+        if (HasUncounterableMarker(card))
+        {
+            spell.CannotBeCountered = true;
+        }
+
         // CR 701.59 — stamp the Gift recipient onto the resolving spell
         // and deliver the promised gift NOW (cast-time delivery — see
         // IGiftClause xmldoc for the v1 deviation from strict CR 701.59
@@ -580,4 +593,18 @@ public sealed class SpellCastFlow
 
         return spell;
     }
+
+    /// <summary>
+    /// CR 701.5b helper — scan <paramref name="card"/>'s static abilities for
+    /// a <see cref="KeywordAbility"/>("Uncounterable") marker. Matches the
+    /// pattern used elsewhere in the engine for keyword discoverability
+    /// (Annihilator, Indestructible, etc.) so future per-cast stamp sites
+    /// (Vexing Shusher's "counter target spell that targets a green spell
+    /// you control" trigger; deck-level riders) can reuse the same shape.
+    /// Case-insensitive on the keyword string.
+    /// </summary>
+    private static bool HasUncounterableMarker(ICard card) =>
+        card.Abilities
+            .OfType<KeywordAbility>()
+            .Any(k => string.Equals(k.Keyword, "Uncounterable", StringComparison.OrdinalIgnoreCase));
 }

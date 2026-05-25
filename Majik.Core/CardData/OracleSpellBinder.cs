@@ -409,8 +409,30 @@ public static class OracleSpellBinder
             .Any(k => string.Equals(k.Keyword, "Indestructible", StringComparison.OrdinalIgnoreCase));
     }
 
-    internal static void RemoveFromStack(Majik.Core.Stack.Stack stack, IStackObject spell)
+    /// <summary>
+    /// CR 701.5 — pop <paramref name="spell"/> off <paramref name="stack"/>
+    /// (the canonical "counter target spell" mechanic). Returns
+    /// <c>true</c> when the spell was actually removed; <c>false</c> when
+    /// the counter-attempt was vetoed by CR 701.5b — i.e. the target
+    /// carries the cast-time <see cref="ISpell.CannotBeCountered"/>
+    /// sentinel (stamped by <see cref="Majik.Core.Game.SpellCastFlow"/>
+    /// off a <see cref="Majik.Core.Abilities.KeywordAbility"/>("Uncounterable")
+    /// marker — Emrakul, the Aeons Torn cycle).
+    ///
+    /// Callers that pair the pop with a "card → graveyard" zone tail
+    /// (<see cref="Majik.Core.Primitives.Fx.Counter"/> + every counter
+    /// template) MUST gate that tail on this return so an uncounterable
+    /// spell stays on the stack and resolves normally instead of being
+    /// silently sent to the graveyard while the stack still references it.
+    /// </summary>
+    internal static bool RemoveFromStack(Majik.Core.Stack.Stack stack, IStackObject spell)
     {
+        // CR 701.5b — "An uncounterable spell can't be countered."
+        if (spell is Majik.Core.Spells.ISpell typed && typed.CannotBeCountered)
+        {
+            return false;
+        }
+
         var keep = new List<IStackObject>();
         while (!stack.IsEmpty)
         {
@@ -421,5 +443,6 @@ public static class OracleSpellBinder
         {
             stack.Push(keep[i]);
         }
+        return true;
     }
 }
