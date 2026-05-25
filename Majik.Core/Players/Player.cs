@@ -158,6 +158,22 @@ public class Player
     /// </summary>
     public Majik.Core.Zones.IZone Sideboard => Zones.Sideboard;
 
+    /// <summary>
+    /// CR 408 / CR 100.4 — the player's wishboard: the queryable surface
+    /// for wish-tutor effects ("a card you own from outside the game")
+    /// such as Burning Wish, Cunning Wish, Glittering Wish, Living Wish,
+    /// Mastermind's Acquisition mode 2, and Karn, the Great Creator's
+    /// -2. Physically the same pile as <see cref="Sideboard"/> — the
+    /// distinction is semantic, not structural: the deck-builder is
+    /// responsible for marking which cards are in the sideboard, and
+    /// every card in the sideboard is automatically reachable as part
+    /// of the wishboard pool. Distinct from the Companion slot (CR
+    /// 702.139c — once-per-game tax to bring a single nominated
+    /// sideboard card into hand) which has its own latching ledger via
+    /// <see cref="CompanionUsedThisGame"/>.
+    /// </summary>
+    public Majik.Core.Zones.IZone Wishboard => Zones.Sideboard;
+
     /// <summary>CR 903 — per-player commander tracking. Set by Commander
     /// format setup via <see cref="AssignCommander"/>; null otherwise.</summary>
     public Majik.Core.Formats.Commander.CommanderState? Commander { get; internal set; }

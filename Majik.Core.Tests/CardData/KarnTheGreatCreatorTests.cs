@@ -410,6 +410,57 @@ public class KarnTheGreatCreatorTests : IDisposable
     }
 
     // -----------------------------------------------------------------------
+    // -2 — wishboard retrofit (WishTutorEffect, no explicit selector)
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void Minus2_NoSelector_PicksArtifactFromWishboard_ToHand()
+    {
+        // Alice's sideboard / wishboard contains an artifact and a
+        // non-artifact. With no explicit selector, the -2 falls through
+        // to WishTutorEffect filtered by ArtifactCard → only the artifact
+        // is eligible, deterministic first-pick picks it.
+        var bolt = new Instant("Lightning Bolt", "{R}") { Owner = _alice };
+        var solRing = new Artifact("Sol Ring", "{1}") { Owner = _alice };
+        _alice.Wishboard.AddCard(bolt);
+        _alice.Wishboard.AddCard(solRing);
+
+        var karn = KarnTheGreatCreatorFactory.Create(_alice);
+
+        var minus2 = karn.Abilities.OfType<LoyaltyAbility>()
+            .Single(a => a.LoyaltyChange == -2);
+        minus2.Activate();
+
+        karn.Loyalty.Should().Be(3);
+        _alice.Zones.Hand.GetCards().Should().Contain(solRing,
+            "-2 wishboard auto-fetches an artifact card from sideboard");
+        _alice.Zones.Hand.GetCards().Should().NotContain(bolt,
+            "the artifact-only predicate filters Bolt out");
+        _alice.Wishboard.GetCards().Should().Contain(bolt);
+        _alice.Wishboard.GetCards().Should().NotContain(solRing);
+        solRing.Zone.Should().Be(ZoneType.Hand);
+    }
+
+    [Fact]
+    public void Minus2_NoSelector_NoArtifactInWishboard_NoOp()
+    {
+        // Wishboard has only a non-artifact — predicate filters everything
+        // out → no-op, but loyalty still decrements (CR 606.3).
+        var bolt = new Instant("Lightning Bolt", "{R}") { Owner = _alice };
+        _alice.Wishboard.AddCard(bolt);
+
+        var karn = KarnTheGreatCreatorFactory.Create(_alice);
+
+        var minus2 = karn.Abilities.OfType<LoyaltyAbility>()
+            .Single(a => a.LoyaltyChange == -2);
+        minus2.Activate();
+
+        karn.Loyalty.Should().Be(3);
+        _alice.Zones.Hand.GetCards().Should().BeEmpty();
+        _alice.Wishboard.GetCards().Should().Contain(bolt);
+    }
+
+    // -----------------------------------------------------------------------
     // Helpers
     // -----------------------------------------------------------------------
 

@@ -52,6 +52,16 @@ namespace Majik.Core.CardData.Factories;
 ///   exiled artifact owned by the controller. The chosen card is moved
 ///   into the controller's hand. If the selector returns null or no
 ///   selector is wired, the loyalty change still applies (CR 606.3).
+///   <b>Wishboard auto-wiring (PR for `WishTutorEffect`)</b>: when the
+///   caller doesn't supply a <c>wishSelector</c>, the -2 falls through
+///   to <see cref="WishTutorEffect"/> filtered by
+///   <see cref="WishTutorEffect.Predicates.ArtifactCard"/> against
+///   <see cref="Player.Wishboard"/>. This means a factory consumer that
+///   has populated the controller's sideboard with the deck's wish-pool
+///   gets the -2 wish for free without supplying an explicit selector.
+///   The exile-zone reach (face-up artifact in exile owned by the
+///   controller) still requires the explicit selector — wishboard
+///   auto-wiring only covers the sideboard half.
 ///
 /// ## Deferred (v1 gaps)
 /// - <b>"Until your next turn" precise duration</b>: collapsed to
@@ -165,28 +175,50 @@ public static class KarnTheGreatCreatorFactory
         }));
 
         // -- -2 ability: wishboard fetch --------------------------------
+        // CR 606.3 — loyalty cost is paid regardless of whether the body
+        // finds a target. Two paths:
+        //   1. Caller supplied an explicit <c>wishSelector</c> — preserves
+        //      pre-PR test posture, with extra reach into the face-up
+        //      exile artifact pool the simplified selector model covers.
+        //   2. No selector — fall through to the new
+        //      <see cref="WishTutorEffect"/> primitive filtered to
+        //      artifact cards in <see cref="Player.Wishboard"/>. Lets
+        //      callers that populate the sideboard get the wishboard
+        //      half of the printed ability "for free" (CR 408).
         karn.AddAbility(new LoyaltyAbility(karn, -2, () =>
         {
-            if (wishSelector == null) return;
-            var chosen = wishSelector(owner);
-            if (chosen == null) return;
-
-            // Source-side removal: if the chosen card was a face-up
-            // artifact in the controller's exile, pull it out of exile
-            // first (CR 406.3). "Outside the game" cards have no engine-
-            // tracked zone — they appear in tests / bots as raw
-            // <see cref="ICard"/> instances and we just route them into
-            // the controller's hand.
-            if (chosen is Card card && card.Zone == ZoneType.Exile)
+            if (wishSelector != null)
             {
-                owner.Zones.Exile.RemoveCard(card);
+                var chosen = wishSelector(owner);
+                if (chosen == null) return;
+
+                // Source-side removal: if the chosen card was a face-up
+                // artifact in the controller's exile, pull it out of exile
+                // first (CR 406.3). "Outside the game" cards have no engine-
+                // tracked zone — they appear in tests / bots as raw
+                // <see cref="ICard"/> instances and we just route them into
+                // the controller's hand.
+                if (chosen is Card card && card.Zone == ZoneType.Exile)
+                {
+                    owner.Zones.Exile.RemoveCard(card);
+                }
+
+                owner.Zones.Hand.AddCard(chosen);
+                if (chosen is Card cc)
+                {
+                    cc.SetZone(ZoneType.Hand);
+                }
+                return;
             }
 
-            owner.Zones.Hand.AddCard(chosen);
-            if (chosen is Card cc)
-            {
-                cc.SetZone(ZoneType.Hand);
-            }
+            // No explicit selector → wishboard tutor primitive (CR 408).
+            // Predicate gates on Artifact (CR 301.1); the printed text's
+            // "you own" clause is implicit — the wishboard is by definition
+            // the controller's own outside-the-game pool.
+            new WishTutorEffect(
+                predicate: WishTutorEffect.Predicates.ArtifactCard,
+                pileLabel: "an artifact card you own from outside the game")
+                .Resolve(owner);
         }));
 
         return karn;
