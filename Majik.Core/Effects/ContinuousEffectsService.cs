@@ -326,6 +326,14 @@ public sealed class ContinuousEffectsService
             if (e is not CombatRestrictionEffect r) continue;
             if (!r.IsActive()) continue;
             if (r.Restriction != restriction) continue;
+            // Predicate mode (Ensnaring Bridge): evaluate against the queried
+            // creature directly so dynamic conditions (power > controller's
+            // hand size, etc.) are recomputed every validation pass.
+            if (r.Predicate != null)
+            {
+                if (r.Predicate(creature)) return true;
+                continue;
+            }
             if (r.Target == null || ReferenceEquals(r.Target, creature)) return true;
         }
         return false;
