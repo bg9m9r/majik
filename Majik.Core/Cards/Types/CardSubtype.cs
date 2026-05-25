@@ -263,6 +263,10 @@ public enum CardSubtype
     Spawn,
     Scion,
 
+    /// <summary>Spike creature subtype — Spike Feeder, Spike Weaver,
+    /// the Tempest Spike cycle. CR 205.3m.</summary>
+    Spike,
+
     // Planeswalker subtypes (examples)
     Ajani,
     Ashiok,
