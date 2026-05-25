@@ -1,17 +1,17 @@
 {
-  "generated_utc": "2026-05-25T01:48:13.9113707Z",
-  "scanned_dir": "/home/brett/Projects/majik.project/majik.core/.claude/worktrees/agent-adc18013320f37f58/Majik.Core/CardData/Factories",
-  "total_mentions": 178,
-  "distinct_factories": 125,
-  "cluster_count": 6,
-  "unclustered_count": 132,
+  "generated_utc": "2026-05-25T03:07:20.1786111Z",
+  "scanned_dir": "/home/brett/Projects/majik.project/majik.core/.claude/worktrees/agent-aea171d949b60662a/Majik.Core/CardData/Factories",
+  "total_mentions": 188,
+  "distinct_factories": 128,
+  "cluster_count": 7,
+  "unclustered_count": 145,
   "clusters": [
     {
       "primitive_id": "agent-prompt-targeting",
       "display_name": "Agent-prompt targeting MVP",
       "implementation_hint": "IPlayerAgent needs ChooseTarget / ChooseYesNo surfaces; many spell factories punt on real targeting prompts.",
-      "factory_count": 28,
-      "mention_count": 35,
+      "factory_count": 27,
+      "mention_count": 34,
       "factories": [
         "AbhorrentOculusFactory",
         "AetherVialFactory",
@@ -21,13 +21,12 @@
         "DauthiVoidwalkerFactory",
         "EldritchEvolutionFactory",
         "EsikasChariotFactory",
-        "FaithlessLootingFactory",
         "FaithlessSalvagingFactory",
         "GoblinLackeyFactory",
         "GoblinPiledriverFactory",
+        "KappaCannoneerFactory",
         "MysticSanctuaryFactory",
         "NihilSpellbombFactory",
-        "PonderFactory",
         "PriestOfFellRitesFactory",
         "PrimevalTitanFactory",
         "PsychicFrogFactory",
@@ -54,6 +53,12 @@
           "file": "NihilSpellbombFactory.cs",
           "line": 13,
           "sentence": "Full agent-prompt targeting deferred."
+        },
+        {
+          "factory": "KappaCannoneerFactory",
+          "file": "KappaCannoneerFactory.cs",
+          "line": 106,
+          "sentence": "Tests \u002B bots pre-select the artifact list, mirroring the deferred agent prompt pattern used for \u003Csee cref=\u0022DelveCost\u0022/\u003E."
         },
         {
           "factory": "EsikasChariotFactory",
@@ -167,12 +172,6 @@
           "sentence": "Full agent-prompt targeting deferred."
         },
         {
-          "factory": "FaithlessLootingFactory",
-          "file": "FaithlessLootingFactory.cs",
-          "line": 111,
-          "sentence": "Real agent-driven choice deferred."
-        },
-        {
           "factory": "UroTitanFactory",
           "file": "UroTitanFactory.cs",
           "line": 14,
@@ -183,13 +182,6 @@
           "file": "DauthiVoidwalkerFactory.cs",
           "line": 13,
           "sentence": "Wiring an agent prompt mirrors the rest of the v1 factories (deferred)."
-        },
-        {
-          "factory": "PonderFactory",
-          "file": "PonderFactory.cs",
-          "line": 107,
-          "sentence": "Shuffle primitive is now wired (CR 701.20), but Ponder\u0027s \u0022may\u0022 rider is a yes/no agent prompt \u2014 deferred behind the agent-prompt MVP (rank #1 in MECHANIC_DEPS).",
-          "cr": "CR 701.20"
         },
         {
           "factory": "SilvergillAdeptFactory",
@@ -261,49 +253,6 @@
       ]
     },
     {
-      "primitive_id": "library-shuffle",
-      "display_name": "Library shuffle (CR 701.20)",
-      "comp_rules_citation": "CR 701.20",
-      "implementation_hint": "Add IZone.Shuffle / ZoneService.ShuffleLibrary. Tutor-family factories all block on this single primitive.",
-      "factory_count": 4,
-      "mention_count": 4,
-      "factories": [
-        "GoblinEngineerFactory",
-        "PonderFactory",
-        "StoneforgeMysticFactory",
-        "TrinketMageFactory"
-      ],
-      "mentions": [
-        {
-          "factory": "StoneforgeMysticFactory",
-          "file": "StoneforgeMysticFactory.cs",
-          "line": 96,
-          "sentence": "Reveal-event emission is deferred (see class xmldoc); CR 701.20a shuffle now wired via LibraryShuffle.",
-          "cr": "CR 701.20a"
-        },
-        {
-          "factory": "GoblinEngineerFactory",
-          "file": "GoblinEngineerFactory.cs",
-          "line": 108,
-          "sentence": "\u0022 v1: deterministic \u2014 take the first artifact card in the library; reveal-event emission deferred (see class xmldoc); CR 701.20a shuffle is now wired via LibraryShuffle.",
-          "cr": "CR 701.20a"
-        },
-        {
-          "factory": "TrinketMageFactory",
-          "file": "TrinketMageFactory.cs",
-          "line": 74,
-          "sentence": "Reveal-event emission is deferred (see class xmldoc); CR 701.20a shuffle now wired via LibraryShuffle.",
-          "cr": "CR 701.20a"
-        },
-        {
-          "factory": "PonderFactory",
-          "file": "PonderFactory.cs",
-          "line": 51,
-          "sentence": "The \u0022may shuffle\u0022 rider is deferred (no-op)."
-        }
-      ]
-    },
-    {
       "primitive_id": "layer6-ability-grant",
       "display_name": "Layer-6 ability-grant subsystem (CR 613.1f)",
       "comp_rules_citation": "CR 613.1f",
@@ -331,13 +280,13 @@
         {
           "factory": "BloodghastFactory",
           "file": "BloodghastFactory.cs",
-          "line": 14,
+          "line": 15,
           "sentence": "A proper continuous effect (Layer 6 keyword grant gated on a live life-total predicate) is deferred until the conditional-keyword CDA surface exists."
         },
         {
           "factory": "BloodghastFactory",
           "file": "BloodghastFactory.cs",
-          "line": 126,
+          "line": 143,
           "sentence": "A full dynamic Layer 6 conditional keyword grant is deferred \u2014 see class xmldoc."
         }
       ]
@@ -380,6 +329,25 @@
       ]
     },
     {
+      "primitive_id": "escape",
+      "display_name": "Escape alt-cost (CR 702.143)",
+      "comp_rules_citation": "CR 702.143",
+      "implementation_hint": "Cast-from-graveyard alt cost that additionally exiles N cards. Sibling of Flashback\u0027s cast-from-graveyard, but with the extra exile-cost rider.",
+      "factory_count": 1,
+      "mention_count": 1,
+      "factories": [
+        "NethergoyfFactory"
+      ],
+      "mentions": [
+        {
+          "factory": "NethergoyfFactory",
+          "file": "NethergoyfFactory.cs",
+          "line": 12,
+          "sentence": "## Deferred (v1 gaps)  - \u003Cb\u003EEscape exile rider\u0027s \u0022any-number with 4\u002B types among them\u0022 predicate\u003C/b\u003E: the v1 fixed-4 exile count is observationally close (four monotype cards in the graveyard satisfy the rider), but the \u0022any-number\u0022 surface needs an agent-pick over graveyard subsets that collectively reach the 4-type t\u2026"
+        }
+      ]
+    },
+    {
       "primitive_id": "sorcery-speed-gate",
       "display_name": "\u0022Activate only as a sorcery\u0022 gate (CR 117.1a)",
       "comp_rules_citation": "CR 117.1a",
@@ -395,6 +363,25 @@
           "file": "TirelessTrackerFactory.cs",
           "line": 14,
           "sentence": "\u003Cb\u003E\u0022Activate only as a sorcery\u0022\u003C/b\u003E \u2014 Tireless Tracker\u0027s printed activated ability has NO sorcery-speed restriction (instant speed on the official card), so nothing is deferred here for this card."
+        }
+      ]
+    },
+    {
+      "primitive_id": "token-colour-identity",
+      "display_name": "Token colour identity (CR 105 / CR 903.4)",
+      "comp_rules_citation": "CR 105",
+      "implementation_hint": "TokenFactory needs an explicit Colors field separate from mana cost; today tokens default to colourless.",
+      "factory_count": 1,
+      "mention_count": 1,
+      "factories": [
+        "HiveOfTheEyeTyrantFactory"
+      ],
+      "mentions": [
+        {
+          "factory": "HiveOfTheEyeTyrantFactory",
+          "file": "HiveOfTheEyeTyrantFactory.cs",
+          "line": 12,
+          "sentence": "\u003Cb\u003EBlack colour identity of the animated form\u003C/b\u003E \u2014 same gap as Creeping Tar Pit: the engine\u0027s colour layer (Layer 5) has no colour-setting effect primitive yet."
         }
       ]
     }
@@ -454,6 +441,24 @@
       "file": "NihilSpellbombFactory.cs",
       "line": 13,
       "sentence": "Real prompt deferred until IPlayerAgent grows a ChooseYesNoAsync surface."
+    },
+    {
+      "factory": "KappaCannoneerFactory",
+      "file": "KappaCannoneerFactory.cs",
+      "line": 16,
+      "sentence": "## Deferred (v1 gaps)  - \u003Cb\u003EWard {4} trigger wiring\u003C/b\u003E: \u003Csee cref=\u0022WardEffect\u0022/\u003E is a standalone check helper, not yet plumbed onto a battlefield-attached triggered ability."
+    },
+    {
+      "factory": "KappaCannoneerFactory",
+      "file": "KappaCannoneerFactory.cs",
+      "line": 121,
+      "sentence": "v1 exposes this as a builder so the spell-resolution path can opt-in once the Ward trigger primitive lands (see class xmldoc for the deferred wiring gap)."
+    },
+    {
+      "factory": "KappaCannoneerFactory",
+      "file": "KappaCannoneerFactory.cs",
+      "line": 190,
+      "sentence": "WardEffect exists as a standalone helper (BuildWardEffect bounds an instance to the live card) but the battlefield-attached triggered-ability surface is deferred \u2014 see class xmldoc."
     },
     {
       "factory": "IzzetCharmFactory",
@@ -683,13 +688,13 @@
     {
       "factory": "ThroughTheBreachFactory",
       "file": "ThroughTheBreachFactory.cs",
-      "line": 12,
+      "line": 13,
       "sentence": "Through the Breach is still castable for its printed cost; the splice rider is structural-only on the oracle text and will be added when the engine has an Arcane- spell awareness pass (same gap as every other Splice card)."
     },
     {
       "factory": "LilianaOfTheVeilFactory",
       "file": "LilianaOfTheVeilFactory.cs",
-      "line": 118,
+      "line": 151,
       "sentence": "v1 deferred \u2014 loyalty change applies with an empty body so the cost is still paid."
     },
     {
@@ -806,6 +811,18 @@
       "sentence": "Actual search enforcement is deferred pending a unified library-search hook (see class xmldoc)."
     },
     {
+      "factory": "BlastZoneFactory",
+      "file": "BlastZoneFactory.cs",
+      "line": 13,
+      "sentence": "\u003C/item\u003E \u003C/list\u003E  ## Deferred (v1 gaps)"
+    },
+    {
+      "factory": "BlastZoneFactory",
+      "file": "BlastZoneFactory.cs",
+      "line": 13,
+      "sentence": "\u003Cb\u003ECharge-counter activation X-value provenance\u003C/b\u003E: same gap as Engineered Explosives\u0027 Sunburst \u2014 no per-activation X ledger."
+    },
+    {
       "factory": "FuryFactory",
       "file": "FuryFactory.cs",
       "line": 13,
@@ -894,7 +911,7 @@
     {
       "factory": "BloodghastFactory",
       "file": "BloodghastFactory.cs",
-      "line": 14,
+      "line": 15,
       "sentence": "\u0022You may\u0022 prompt: auto-accepted (same gap as Arclight Phoenix / Sneak Attack / Tireless Tracker)."
     },
     {
@@ -1070,7 +1087,7 @@
     {
       "factory": "ShowAndTellFactory",
       "file": "ShowAndTellFactory.cs",
-      "line": 10,
+      "line": 11,
       "sentence": "Real \u0022any of N choices \u002B opt-out\u0022 prompt deferred (same queue as Stoneforge Mystic / Sun Titan)."
     },
     {
@@ -1147,6 +1164,36 @@
       "sentence": "A bot-side probe (mirror of \u003Cc\u003EPitchAltCostProbe\u003C/c\u003E) is deferred \u2014 Daze\u0027s pitch always pays so the probe shape is just \u0022for each Island controlled, yield one candidate\u0022 and lives outside this factory\u0027s surface in v1."
     },
     {
+      "factory": "HiveOfTheEyeTyrantFactory",
+      "file": "HiveOfTheEyeTyrantFactory.cs",
+      "line": 12,
+      "sentence": "\u003Cb\u003ECombat math through Compute\u003C/b\u003E: same gap as Mutavault / Creeping Tar Pit / Inkmoth \u2014 until \u003Csee cref=\u0022ContinuousEffectsService."
+    },
+    {
+      "factory": "PinnacleEmissaryFactory",
+      "file": "PinnacleEmissaryFactory.cs",
+      "line": 13,
+      "sentence": "Flagged in \u003Csee cref=\u0022CreateDroneToken\u0022/\u003E\u0027s xmldoc as deferred \u2014 same posture as Inkmoth Nexus\u0027 Infect marker (keyword on the card; mechanic pipeline not wired)."
+    },
+    {
+      "factory": "PinnacleEmissaryFactory",
+      "file": "PinnacleEmissaryFactory.cs",
+      "line": 127,
+      "sentence": "The mechanic (alt-cost \u002B exile-at-end-step \u002B cast-from-exile-later) is deferred; the marker surfaces the keyword for card-text inspection, parity with Improvise / Convoke / Delve markers."
+    },
+    {
+      "factory": "PinnacleEmissaryFactory",
+      "file": "PinnacleEmissaryFactory.cs",
+      "line": 175,
+      "sentence": "\u003Cpara\u003Ev1 gaps:\u003C/para\u003E \u003Clist type=\u0022bullet\u0022\u003E \u003Citem\u003EPrinted \u0022This token can block only creatures with flying\u0022 blocking restriction is NOT enforced \u2014 no combat-block restriction primitive for \u0022can only block X\u0022 yet."
+    },
+    {
+      "factory": "PinnacleEmissaryFactory",
+      "file": "PinnacleEmissaryFactory.cs",
+      "line": 175,
+      "sentence": "Keywords\u0022/\u003E; the restriction rider is documented but deferred."
+    },
+    {
       "factory": "AjaniNacatlPariahFactory",
       "file": "AjaniNacatlPariahFactory.cs",
       "line": 11,
@@ -1175,6 +1222,25 @@
       "file": "CoriSteelCutterFactory.cs",
       "line": 179,
       "sentence": "Prowess pump on the token is deferred \u2014 see class xmldoc."
+    },
+    {
+      "factory": "NethergoyfFactory",
+      "file": "NethergoyfFactory.cs",
+      "line": 12,
+      "sentence": "The richer \u0022any-number-with-N-types-among-them\u0022 predicate is deferred \u2014 see gaps below; same posture as Cabal Therapy\u0027s flashback-sacrifice rider being shipped paired-and-noted."
+    },
+    {
+      "factory": "NethergoyfFactory",
+      "file": "NethergoyfFactory.cs",
+      "line": 91,
+      "sentence": "The printed text is \u0022exile any number of other cards from your graveyard with four or more card types \u003Cem\u003Eamong them\u003C/em\u003E\u0022; v1 ships a fixed N=4 stub (see class xmldoc for the deferred any-number / type-collective predicate gap)."
+    },
+    {
+      "factory": "NethergoyfFactory",
+      "file": "NethergoyfFactory.cs",
+      "line": 100,
+      "sentence": "\u003Csummary\u003E CR 702.138 \u2014 Nethergoyf\u0027s printed Escape alt-cost ({2}{B}, exile four OTHER graveyard cards in v1; see class xmldoc for the any-number / 4-types-among-them deferred surface).",
+      "cr": "CR 702.138"
     },
     {
       "factory": "LordOfAtlantisFactory",

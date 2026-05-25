@@ -68,6 +68,14 @@ public enum BotIntent : ulong
     /// paying its mana cost" (Sneak Attack / Through the Breach / Show and
     /// Tell). Heuristic bot accepts when the candidate is high-impact.</summary>
     CheatIntoPlay = 1UL << 22,
+
+    /// <summary>Optional "you may shuffle your library" rider on a library
+    /// reorder (Ponder, Brainstorm-style cantrips, Sensei's Divining Top).
+    /// Decision is neutral (depends on whether the just-seen top is
+    /// keepable), so the default heuristic falls through to the
+    /// neutral-accept branch — matches the legacy "auto-shuffle" posture
+    /// used before this prompt shipped.</summary>
+    LibraryReorder = 1UL << 23,
 }
 
 public static class BotIntentExtensions

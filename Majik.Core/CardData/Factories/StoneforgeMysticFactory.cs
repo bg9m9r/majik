@@ -99,9 +99,10 @@ public static class StoneforgeMysticFactory
         //    an Equipment card, reveal it, put it into your hand, then
         //    shuffle."
         // v1: deterministic — take the first Equipment card in the library
-        // (Artifact whose subtypes include Equipment). Reveal-event emission
-        // is deferred (see class xmldoc); CR 701.20a shuffle now wired via
-        // LibraryShuffle.
+        // (Artifact whose subtypes include Equipment). CR 701.20a shuffle is
+        // wired via LibraryShuffle (publishes a LibraryShuffledEvent when an
+        // EventBus is registered). Reveal-event emission is the only
+        // outstanding gap (see class xmldoc).
         // ----------------------------------------------------------------
         var etbEffect = new Effect(
             "Stoneforge Mystic: tutor an Equipment to hand",

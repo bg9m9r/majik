@@ -25,6 +25,7 @@ namespace Majik.Core.Tests.CardData;
 ///   - ETB tutor no-op when the library has no Goblins.
 ///   - ETB tutor agent decline (returns null) is a legal no-op (CR 701.19a).
 /// </summary>
+[Collection(nameof(StaticRegistryCollection))]
 public class GoblinMatronTests
 {
     private readonly Player _alice = new("Alice", 20);

@@ -34,6 +34,7 @@ namespace Majik.Core.Tests.CardData;
 ///   - {1}, {T} on an empty library: draw flags MarkTriedToDrawFromEmptyLibrary
 ///     and Top still moves to library top.
 /// </summary>
+[Collection(nameof(StaticRegistryCollection))]
 public class SenseisDiviningTopTests : IDisposable
 {
     private readonly Player _alice = new("Alice", 20);
