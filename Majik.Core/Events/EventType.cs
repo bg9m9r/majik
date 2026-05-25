@@ -72,5 +72,11 @@ public enum EventType
     // the first turn begins. Carries the opening-hand snapshot so
     // alt-cost surfaces (Leyline keyword, Gemstone Caverns, Chancellor
     // cycle) can prompt the player.
-    OpeningHandCheck
+    OpeningHandCheck,
+
+    // CR 702.32d — a card's Cycling activated ability has resolved
+    // (cost paid + card discarded + replacement card drawn). The hook
+    // "Whenever a player cycles a card" triggers (Lightning Rift,
+    // Astral Slide, Decree of Justice, etc.) subscribe to.
+    CardCycled,
 }
