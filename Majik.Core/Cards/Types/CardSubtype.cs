@@ -187,6 +187,10 @@ public enum CardSubtype
     /// <summary>Imp creature subtype — Vault Skirge (New Phyrexia), Ravenous Rats'
     /// adjacent imp lineage (Hypnotic Specter / Mind Twist-adjacent). CR 205.3m.</summary>
     Imp,
+    /// <summary>Thopter artifact-creature subtype — Ornithopter (Antiquities),
+    /// Sai, Master Thopterist, Thopter Foundry / Sword of the Meek, Whirler
+    /// Rogue tokens. CR 205.3m.</summary>
+    Thopter,
 
     // Land subtypes (examples)
     Forest,

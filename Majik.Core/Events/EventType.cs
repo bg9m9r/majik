@@ -79,4 +79,10 @@ public enum EventType
     // "Whenever a player cycles a card" triggers (Lightning Rift,
     // Astral Slide, Decree of Justice, etc.) subscribe to.
     CardCycled,
+
+    // CR 701.42 — a player surveiled (peeked top N, partitioned into
+    // graveyard-bound and library-top-bound). The hook "Whenever you
+    // surveil" / "Whenever ~ surveils" triggers (Ledger Shredder,
+    // Glimpse the Unthinkable, etc.) subscribe to.
+    Surveil,
 }

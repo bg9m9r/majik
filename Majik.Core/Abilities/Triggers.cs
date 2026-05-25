@@ -152,4 +152,20 @@ public static class Triggers
         return new EventTriggerCondition<LifeChangedEvent>((e, _) =>
             ReferenceEquals(e.Player, player) && e.NewLife > e.PreviousLife);
     }
+
+    /// <summary>
+    /// CR 701.42 — "Whenever you surveil, …" trigger. Fires on
+    /// <see cref="SurveilEvent"/> where <paramref name="player"/>
+    /// matches the surveiling player. Used by Ledger Shredder's
+    /// "Whenever Ledger Shredder surveils, put a +1/+1 counter on it"
+    /// (where "you surveil" and "Ledger Shredder surveils" coincide
+    /// because the surveil is always controller-scoped) and the
+    /// surveil-payoff family generally.
+    /// </summary>
+    public static ITriggerCondition OnSurveil(Player player)
+    {
+        if (player == null) throw new ArgumentNullException(nameof(player));
+        return new EventTriggerCondition<SurveilEvent>((e, _) =>
+            ReferenceEquals(e.Player, player));
+    }
 }
