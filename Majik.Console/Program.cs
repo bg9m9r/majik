@@ -1,20 +1,25 @@
 using DotNetEnv;
+using Majik.Console.Commands;
 
 namespace Majik.Console;
 
 /// <summary>
-/// Diagnostic CLI shell. The Scryfall import + keyword-analysis
-/// commands have been removed along with the SQLite cards.db backend
-/// (replaced by the embedded modern-cards.json.gz resource loaded
-/// in-process by <c>Majik.Core.CardData.EmbeddedCardRepository</c>).
-///
-/// What's left is a triggers playground that exercises the engine's
-/// triggered-ability pipeline without spinning up a server — useful
-/// for ad-hoc engine smoke checks during local development.
+/// Diagnostic CLI shell. Hosts:
+/// <list type="bullet">
+/// <item><c>play-triggers</c> — engine triggered-ability playground.</item>
+/// <item><c>export-modern-cards</c> — regenerates the
+///   <c>Majik.Core/CardData/Embedded/modern-cards.json.gz</c> seed from a
+///   Scryfall bulk export. Replaces the one-shot SQLite dump from
+///   PR #511 with a repeatable workflow.</item>
+/// </list>
+/// The SQLite + EF Core backed card import / keyword-analysis commands
+/// were retired alongside the cards.db file in PR #511 — the engine now
+/// reads its Modern-legal pool from the embedded gzipped JSON resource
+/// in-process via <c>Majik.Core.CardData.EmbeddedCardRepository</c>.
 /// </summary>
 class Program
 {
-    static Task Main(string[] args)
+    static async Task<int> Main(string[] args)
     {
         // Load .env if present (legacy hook; nothing in this shell reads
         // it any more, but keep the side-effect so future commands can
@@ -36,18 +41,28 @@ class Program
         {
             var scenario = args.Length > 1 ? args[1] : "all";
             TriggerPlayground.Run(scenario);
-            return Task.CompletedTask;
+            return 0;
+        }
+
+        if (args.Length > 0 &&
+            args[0].Equals("export-modern-cards", StringComparison.OrdinalIgnoreCase))
+        {
+            if (args.Length < 2)
+            {
+                System.Console.WriteLine(ExportModernCardsCommand.HelpText);
+                return 1;
+            }
+            var output = args.Length >= 3 ? args[2] : null;
+            return await ExportModernCardsCommand.RunAsync(args[1], output);
         }
 
         System.Console.WriteLine("Usage:");
         System.Console.WriteLine("  Majik.Console play-triggers [etb|apnap|intervening-if|delayed|all]");
+        System.Console.WriteLine("  Majik.Console export-modern-cards <scryfall-all-cards.json> [output-path]");
         System.Console.WriteLine();
-        System.Console.WriteLine(
-            "Card-data import / keyword-analysis / coverage commands have " +
-            "been retired; the embedded modern-cards.json.gz resource in " +
-            "Majik.Core ships the full Modern-legal pool in-process.");
+        System.Console.WriteLine(ExportModernCardsCommand.HelpText);
         System.Console.WriteLine();
         TriggerPlayground.PrintScenarios();
-        return Task.CompletedTask;
+        return 0;
     }
 }
