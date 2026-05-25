@@ -99,6 +99,18 @@ public class Spell : ISpell
     /// </summary>
     public bool WasKicked { get; set; }
 
+    /// <summary>
+    /// CR 701.59 — the opponent who was promised this spell's gift
+    /// (Bloomburrow "Gift" mechanic, e.g. Into the Flood Maw).
+    /// Stamped by <see cref="Majik.Core.Game.SpellCastFlow"/> when the
+    /// caster opts into the cast-time gift promise. Non-null means the
+    /// spell was cast with a gift promised; the resolving effect should
+    /// branch on the promise (see
+    /// <see cref="Majik.Core.Cards.Card.HasGiftPromised"/> mirror flag
+    /// for resolve-body reads that don't have the spell handy).
+    /// </summary>
+    public Player? GiftRecipient { get; set; }
+
     public Spell(ICard card, Player controller, IEnumerable<ITarget>? targets = null, IEnumerable<ICost>? costs = null, IEnumerable<IEffect>? effects = null)
     {
         if (card == null)

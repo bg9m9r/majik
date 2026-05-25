@@ -138,4 +138,35 @@ public interface IPlayerAgent
         // Default: pick the first candidate (legacy pre-agent behavior).
         // Smart bots override with heuristics; remote agents prompt the UI.
         => Task.FromResult<ICard?>(candidates.Count > 0 ? candidates[0] : null);
+
+    /// <summary>
+    /// CR 701.59 — Bloomburrow "Gift" cast-time prompt. Called by
+    /// <see cref="Majik.Core.Game.SpellCastFlow"/> when the spell being
+    /// cast implements <see cref="Majik.Core.Spells.IGiftClause"/>. The
+    /// agent may decline (return <see langword="null"/>) or pick exactly
+    /// one of the supplied <paramref name="opponents"/> as the gift
+    /// recipient.
+    /// <para>
+    /// <paramref name="giftDescription"/> is the human-readable gift
+    /// label sourced from <see cref="Majik.Core.Spells.IGiftClause.Description"/>
+    /// ("a tapped 1/1 blue Fish creature token"). Surfaced verbatim by
+    /// remote-agent UIs in the prompt ("Promise <em>{description}</em>
+    /// to an opponent?"); ignored by deterministic / scripted agents.
+    /// </para>
+    /// <para>
+    /// Default: decline the gift (returns <see langword="null"/>) — the
+    /// most conservative posture for legacy agents that pre-date this
+    /// prompt. Smart bots override with heuristics (HeuristicBotAgent
+    /// promises by default when the gift unlocks a strictly better
+    /// effect — same most-aggressive posture as the Ascend / Spectacle
+    /// alt-cost prompts); scripted-test agents return their queued pick.
+    /// </para>
+    /// </summary>
+    Task<Player?> ChooseGiftRecipientAsync(
+        GameContext ctx,
+        ICard source,
+        string giftDescription,
+        IReadOnlyList<Player> opponents,
+        CancellationToken ct = default)
+        => Task.FromResult<Player?>(null);
 }

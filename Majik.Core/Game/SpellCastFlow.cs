@@ -157,6 +157,35 @@ public sealed class SpellCastFlow
             }
         }
 
+        // CR 701.59 — Bloomburrow Gift cast-time prompt. If the card
+        // carries an IGiftClause (Into the Flood Maw etc.) the caster
+        // may promise an opponent the named gift. The promise must be
+        // recorded BEFORE target collection because Gift spells upgrade
+        // their target predicate when promised (Flood Maw flips
+        // "target creature an opponent controls" → "target nonland
+        // permanent an opponent controls"); the resolve body branches
+        // on Card.HasGiftPromised which is stamped here. Gift delivery
+        // is a cast-time side-effect in v1 — see IGiftClause xmldoc for
+        // the deviation from CR 701.59's resolve-time delivery (kept so
+        // the gift survives a countered Gift spell, matching the engine
+        // simplification documented in the test spec).
+        Player? giftRecipient = null;
+        if (card is IGiftClause giftClause && card is Card giftCardForPrompt)
+        {
+            var opponents = ctx.AllPlayers
+                .Where(p => !ReferenceEquals(p, caster))
+                .ToList();
+            if (opponents.Count > 0)
+            {
+                giftRecipient = await agent.ChooseGiftRecipientAsync(
+                    ctx, card, giftClause.Description, opponents, ct);
+                if (giftRecipient != null)
+                {
+                    giftCardForPrompt.SetHasGiftPromised(true);
+                }
+            }
+        }
+
         int? mode = null;
         if (definition.Modes.Count > 0)
         {
@@ -313,6 +342,25 @@ public sealed class SpellCastFlow
             finalEffects = withKickerCleanup;
         }
 
+        // CR 701.59 — Gift cleanup. After the printed body runs (and
+        // its resolve-time branch has read Card.HasGiftPromised), clear
+        // the sentinel so a later re-cast / blink / token copy doesn't
+        // inherit the prior promise (CR 400.7 — new object per zone
+        // change). Mirrors the Kicker cleanup append directly above.
+        if (giftRecipient != null)
+        {
+            var withGiftCleanup = finalEffects.Append(new Effect(
+                "Gift cleanup — clear Card.HasGiftPromised",
+                () =>
+                {
+                    if (card is Card concreteForGift)
+                    {
+                        concreteForGift.ClearHasGiftPromised();
+                    }
+                })).ToList();
+            finalEffects = withGiftCleanup;
+        }
+
         var spell = new Spells.Spell(card, caster, effects: finalEffects);
 
         // CR 608.2 / CR 715.3d — let the alt-cost re-route the post-
@@ -358,6 +406,18 @@ public sealed class SpellCastFlow
         if (hasKickerPayment)
         {
             spell.WasKicked = true;
+        }
+
+        // CR 701.59 — stamp the Gift recipient onto the resolving spell
+        // and deliver the promised gift NOW (cast-time delivery — see
+        // IGiftClause xmldoc for the v1 deviation from strict CR 701.59
+        // resolve-time delivery; the engine simplification keeps the
+        // gift in the recipient's hand even when the gift-bearing spell
+        // is later countered, matching the test spec).
+        if (giftRecipient != null && card is IGiftClause giftClauseForDelivery)
+        {
+            spell.GiftRecipient = giftRecipient;
+            giftClauseForDelivery.DeliverTo(giftRecipient, spell);
         }
 
         _stack.Push(spell);
