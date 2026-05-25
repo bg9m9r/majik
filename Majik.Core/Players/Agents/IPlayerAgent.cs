@@ -284,4 +284,43 @@ public interface IPlayerAgent
         BotIntent intent,
         CancellationToken ct = default)
         => Task.FromResult<ICard?>(candidates.Count > 0 ? candidates[0] : null);
+
+    /// <summary>
+    /// Pick exactly one card from a generic "pile" of candidates that does
+    /// not live in one of the engine-tracked hand / battlefield / library
+    /// zones — most notably the wishboard (sideboard treated as the
+    /// "outside the game" pool that wish-tutor effects draw from per
+    /// CR 408 / CR 100.4). Used by:
+    ///   - <see cref="Majik.Core.Effects.WishTutorEffect"/> (Burning Wish /
+    ///     Cunning Wish / Glittering Wish / Living Wish / Mastermind's
+    ///     Acquisition mode 2 / Karn, the Great Creator's -2).
+    /// <para>
+    /// <paramref name="candidates"/> is pre-filtered by the calling effect
+    /// to legal picks only (e.g. artifact cards in sideboard for Karn's -2,
+    /// any owned card in sideboard for Mastermind's Acquisition). The agent
+    /// picks zero or one. Returning <see langword="null"/> is treated as
+    /// "find nothing" — legal whenever the calling effect treats the choice
+    /// as optional (CR 117.x / CR 408 — wish effects let you "reveal a
+    /// card you own from outside the game", which is itself a may-style
+    /// gesture once you have legal candidates).
+    /// </para>
+    /// <para>
+    /// <paramref name="pileLabel"/> is human-readable ("your sideboard",
+    /// "your wishboard", "an artifact card from outside the game") for
+    /// prompt UIs.
+    /// </para>
+    /// <para>
+    /// Default implementation: return the first candidate (deterministic
+    /// pre-agent behaviour, matching <see cref="ChooseFromHandAsync"/> /
+    /// <see cref="ChooseFromBattlefieldAsync"/>). Empty candidate list
+    /// returns <see langword="null"/>.
+    /// </para>
+    /// </summary>
+    Task<ICard?> ChooseFromPileAsync(
+        Player chooser,
+        IReadOnlyList<ICard> candidates,
+        string pileLabel,
+        BotIntent intent,
+        CancellationToken ct = default)
+        => Task.FromResult<ICard?>(candidates.Count > 0 ? candidates[0] : null);
 }

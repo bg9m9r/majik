@@ -29,6 +29,7 @@ public sealed class ScriptedAgent : IPlayerAgent
     private readonly Queue<bool> _yesNoAnswers = new();
     private readonly Queue<Func<IReadOnlyList<ICard>, ICard?>> _fromHandChoices = new();
     private readonly Queue<Func<IReadOnlyList<ICard>, ICard?>> _fromBattlefieldChoices = new();
+    private readonly Queue<Func<IReadOnlyList<ICard>, ICard?>> _fromPileChoices = new();
 
     public void QueuePriority(PriorityAction a) => _priorityActions.Enqueue(a);
     public void QueueMulligan(MulliganDecision d) => _mulligans.Enqueue(d);
@@ -73,6 +74,17 @@ public sealed class ScriptedAgent : IPlayerAgent
     public void QueueFromBattlefield(Func<IReadOnlyList<ICard>, ICard?> chooser) => _fromBattlefieldChoices.Enqueue(chooser);
     /// <summary>Convenience: pre-queue a single fixed battlefield pick (or decline-null).</summary>
     public void QueueFromBattlefield(ICard? pick) => _fromBattlefieldChoices.Enqueue(_ => pick);
+    /// <summary>Pre-queue a pile-pick chooser for the next
+    /// <see cref="IPlayerAgent.ChooseFromPileAsync"/> call; the chooser
+    /// receives the live candidate list and returns the picked card or
+    /// <c>null</c> to decline. Falls back to deterministic first-pick
+    /// when no chooser is queued (matches the default interface
+    /// implementation). Used by wish-tutor (CR 408) and other "card from
+    /// outside the game" surfaces (Burning Wish / Mastermind's Acquisition
+    /// mode 2 / Karn the Great Creator's -2).</summary>
+    public void QueueFromPile(Func<IReadOnlyList<ICard>, ICard?> chooser) => _fromPileChoices.Enqueue(chooser);
+    /// <summary>Convenience: pre-queue a single fixed pile pick (or decline-null).</summary>
+    public void QueueFromPile(ICard? pick) => _fromPileChoices.Enqueue(_ => pick);
 
     public Task<PriorityAction> ChoosePriorityActionAsync(GameContext ctx, CancellationToken ct = default)
         => Task.FromResult(Pop(_priorityActions, "priority"));
@@ -168,6 +180,20 @@ public sealed class ScriptedAgent : IPlayerAgent
             return Task.FromResult<ICard?>(candidates.Count > 0 ? candidates[0] : null);
         }
         var chooserFn = _fromBattlefieldChoices.Dequeue();
+        return Task.FromResult(chooserFn(candidates));
+    }
+
+    public Task<ICard?> ChooseFromPileAsync(
+        Player chooser, IReadOnlyList<ICard> candidates, string pileLabel, BotIntent intent, CancellationToken ct = default)
+    {
+        if (_fromPileChoices.Count == 0)
+        {
+            // No script entry queued — fall back to the deterministic
+            // default (first candidate, or null when empty). Matches the
+            // IPlayerAgent default.
+            return Task.FromResult<ICard?>(candidates.Count > 0 ? candidates[0] : null);
+        }
+        var chooserFn = _fromPileChoices.Dequeue();
         return Task.FromResult(chooserFn(candidates));
     }
 
