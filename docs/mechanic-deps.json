@@ -1,27 +1,29 @@
 {
-  "generated_utc": "2026-05-25T03:52:18.2015761Z",
-  "scanned_dir": "/home/brett/Projects/majik.project/majik.core/.claude/worktrees/agent-afe00b204d43e5a62/Majik.Core/CardData/Factories",
-  "total_mentions": 209,
-  "distinct_factories": 141,
+  "generated_utc": "2026-05-25T04:43:45.8276087Z",
+  "scanned_dir": "/home/brett/Projects/majik.project/majik.core/.claude/worktrees/agent-ae72fa253baf9c11a/Majik.Core/CardData/Factories",
+  "total_mentions": 229,
+  "distinct_factories": 150,
   "cluster_count": 7,
-  "unclustered_count": 163,
+  "unclustered_count": 180,
   "clusters": [
     {
       "primitive_id": "agent-prompt-targeting",
       "display_name": "Agent-prompt targeting MVP",
       "implementation_hint": "IPlayerAgent needs ChooseTarget / ChooseYesNo surfaces; many spell factories punt on real targeting prompts.",
-      "factory_count": 30,
-      "mention_count": 37,
+      "factory_count": 33,
+      "mention_count": 40,
       "factories": [
         "AbhorrentOculusFactory",
         "AetherVialFactory",
         "AgathasSoulCauldronFactory",
         "AjaniNacatlPariahFactory",
+        "BojukaBogFactory",
         "ChordOfCallingFactory",
         "CoriSteelCutterFactory",
         "DauthiVoidwalkerFactory",
         "EldritchEvolutionFactory",
         "EsikasChariotFactory",
+        "FaerieMacabreFactory",
         "FaithlessSalvagingFactory",
         "GoblinLackeyFactory",
         "GoblinPiledriverFactory",
@@ -31,6 +33,7 @@
         "PriestOfFellRitesFactory",
         "PrimevalTitanFactory",
         "PsychicFrogFactory",
+        "RangerCaptainOfEosFactory",
         "RelicOfProgenitusFactory",
         "SilvergillAdeptFactory",
         "SkyclaveApparitionFactory",
@@ -120,6 +123,12 @@
           "cr": "CR 701.16a"
         },
         {
+          "factory": "BojukaBogFactory",
+          "file": "BojukaBogFactory.cs",
+          "line": 14,
+          "sentence": "Full agent-driven targeting deferred (same posture as Tormod\u0027s Crypt / Nihil Spellbomb / Relic of Progenitus)."
+        },
+        {
           "factory": "PriestOfFellRitesFactory",
           "file": "PriestOfFellRitesFactory.cs",
           "line": 12,
@@ -155,6 +164,12 @@
           "line": 148,
           "sentence": "v1 deterministic first-card-in-hand pick per discard (CR 701.16a \u2014 agent-driven choice deferred).",
           "cr": "CR 701.16a"
+        },
+        {
+          "factory": "RangerCaptainOfEosFactory",
+          "file": "RangerCaptainOfEosFactory.cs",
+          "line": 13,
+          "sentence": "v1 picker is the deterministic first-eligible-card pattern Stoneforge Mystic / Eldritch Evolution use; agent-driven \u0022you may\u0022 \u002B reveal-event emission deferred alongside the rest of the tutor family."
         },
         {
           "factory": "FaithlessSalvagingFactory",
@@ -271,6 +286,12 @@
           "file": "CoriSteelCutterFactory.cs",
           "line": 15,
           "sentence": "A real prompt-driven flow (and the \u0022to it\u0022 bookkeeping that pins attachment to *that specific* token rather than any creature) is deferred behind the broader agent-prompt surface \u2014 same posture as Eternal Witness / Snapcaster Mage."
+        },
+        {
+          "factory": "FaerieMacabreFactory",
+          "file": "FaerieMacabreFactory.cs",
+          "line": 11,
+          "sentence": "Full agent-driven targeting deferred."
         }
       ]
     },
@@ -520,6 +541,50 @@
       "sentence": "CanBePutOnStack\u0022/\u003E runs it at stack-push time; a second recheck at resolution is deferred."
     },
     {
+      "factory": "HeliodSunCrownedFactory",
+      "file": "HeliodSunCrownedFactory.cs",
+      "line": 14,
+      "sentence": "The \u0022isn\u0027t a creature\u0022 Layer 4 type-strip is DEFERRED \u2014 see Deferred section below; Heliod always reports as a Creature in v1."
+    },
+    {
+      "factory": "HeliodSunCrownedFactory",
+      "file": "HeliodSunCrownedFactory.cs",
+      "line": 14,
+      "sentence": "ContinuousEffectsService\u0022/\u003E exposes a per-permanent layered-effects substrate today but does NOT yet carry a Layer 4 type-strip primitive \u2014 same gap as Mutavault / Inkmoth Nexus\u0027s combat math (they animate into creatures via Layer 4 add but the substrate doesn\u0027t surface for combat)."
+    },
+    {
+      "factory": "HeliodSunCrownedFactory",
+      "file": "HeliodSunCrownedFactory.cs",
+      "line": 14,
+      "sentence": "LegalCandidates\u0022/\u003E being populated by a live battlefield gather \u2014 same deferred plumbing the rest of the target-restricted family lives with."
+    },
+    {
+      "factory": "HeliodSunCrownedFactory",
+      "file": "HeliodSunCrownedFactory.cs",
+      "line": 217,
+      "sentence": "\u0022Another\u0022 enforced at resolve via identity check vs source (CR 608.2b posture \u2014 same as Solitude / Earthshaker Khenra\u0027s deferred choose-time filter).",
+      "cr": "CR 608.2b"
+    },
+    {
+      "factory": "HeliodSunCrownedFactory",
+      "file": "HeliodSunCrownedFactory.cs",
+      "line": 265,
+      "sentence": "White\u0022/\u003E; hybrid / Phyrexian {W} contributions are DEFERRED (CR 700.5a \u2014 every mana symbol that includes {W} counts) pending the \u003Csee cref=\u0022ValueObjects.",
+      "cr": "CR 700.5a"
+    },
+    {
+      "factory": "HeliodSunCrownedFactory",
+      "file": "HeliodSunCrownedFactory.cs",
+      "line": 265,
+      "sentence": "Tokens count when their token-spec mana cost carries {W} pips (Soldier tokens with cost \u003Cc\u003E\u0022\u0022\u003C/c\u003E contribute 0; spirit tokens minted from white-coloured spells contribute 0 unless the spec was stamped with a parsed mana cost \u2014 same gap as the rest of the token / colour-identity surface)."
+    },
+    {
+      "factory": "HeliodSunCrownedFactory",
+      "file": "HeliodSunCrownedFactory.cs",
+      "line": 265,
+      "sentence": "Exposed publicly so bots / tests can read the live count without going through the (deferred) Layer-4 type-strip path."
+    },
+    {
       "factory": "AshiokDreamRenderFactory",
       "file": "AshiokDreamRenderFactory.cs",
       "line": 11,
@@ -746,6 +811,12 @@
       "sentence": "v1 deferred \u2014 loyalty change applies with an empty body so the cost is still paid."
     },
     {
+      "factory": "EtchedOracleFactory",
+      "file": "EtchedOracleFactory.cs",
+      "line": 14,
+      "sentence": "\u003Cb\u003ECounter-removal additional cost\u003C/b\u003E: same gap shape as the sacrifice / discard cost family."
+    },
+    {
       "factory": "ReflectorMageFactory",
       "file": "ReflectorMageFactory.cs",
       "line": 149,
@@ -786,6 +857,12 @@
       "file": "PerniciousDeedFactory.cs",
       "line": 10,
       "sentence": "\u003C/item\u003E \u003C/list\u003E  ## Deferred (v1 gaps)"
+    },
+    {
+      "factory": "LeylineOfLightningFactory",
+      "file": "LeylineOfLightningFactory.cs",
+      "line": 9,
+      "sentence": "OnSpellCastByController\u003C/c\u003E), but a \u0022first-only\u0022 gate keyed off \u003Cc\u003ETurnState\u003C/c\u003E doesn\u0027t yet \u2014 deferred."
     },
     {
       "factory": "SigardasAidFactory",
@@ -918,6 +995,12 @@
       "file": "AnimateDeadFactory.cs",
       "line": 14,
       "sentence": "\u003Cb\u003ESorcery-speed cast restriction\u003C/b\u003E: not enforced \u2014 same gap as every other Aura factory in this repo."
+    },
+    {
+      "factory": "EyeOfUginFactory",
+      "file": "EyeOfUginFactory.cs",
+      "line": 13,
+      "sentence": "\u003Cb\u003EReveal event\u003C/b\u003E: the tutor moves the picked card from Library \u2192 Hand without publishing a reveal event; same gap as every other tutor factory (Mystical Tutor, Stoneforge Mystic, \u2026)."
     },
     {
       "factory": "ManaVaultFactory",
@@ -1092,6 +1175,24 @@
       "sentence": "A bus-aware overload could subscribe to \u003Cc\u003ETurnEndedEvent\u003C/c\u003E and clear the stamp; deferred."
     },
     {
+      "factory": "EldraziTempleFactory",
+      "file": "EldraziTempleFactory.cs",
+      "line": 10,
+      "sentence": "## Spend-restriction (v1 data, payment-gate deferred)"
+    },
+    {
+      "factory": "EldraziTempleFactory",
+      "file": "EldraziTempleFactory.cs",
+      "line": 10,
+      "sentence": "\u003Cb\u003EPayment-gate enforcement\u003C/b\u003E (filtering tagged pool entries when paying a non-Eldrazi cost) is deferred until \u003Csee cref=\u0022ManaPool\u0022/\u003E grows per-slot tags \u2014 today the pool stores bucketed colour/generic counts only."
+    },
+    {
+      "factory": "EldraziTempleFactory",
+      "file": "EldraziTempleFactory.cs",
+      "line": 72,
+      "sentence": "Payment-gate side is still deferred (see class xmldoc) \u2014 the rider is observational metadata on the ability until ManaPool grows per-slot tag awareness."
+    },
+    {
       "factory": "SpellskiteFactory",
       "file": "SpellskiteFactory.cs",
       "line": 11,
@@ -1217,22 +1318,33 @@
     {
       "factory": "LeylineOfTheVoidFactory",
       "file": "LeylineOfTheVoidFactory.cs",
-      "line": 9,
-      "sentence": "\u0022  ## Implementation  Static replacement (CR 614) only \u2014 the opening-hand alt-cost branch (CR 702.95 \u2014 Leyline keyword) is DEFERRED because the engine has no opening-hand reveal hook today (no \u003Cc\u003EOpeningHandCheckEvent\u003C/c\u003E or similar surface).",
-      "cr": "CR 614"
+      "line": 11,
+      "sentence": "## Deferred (v1 gaps)  - \u003Cb\u003EReplacement-ordering prompt\u003C/b\u003E (CR 616.1): bus applies in registration order \u2014 overlapping with Rest in Peace, Anafenza, or another Leyline of the Void picks the registration order today.",
+      "cr": "CR 616.1"
     },
     {
       "factory": "LeylineOfTheVoidFactory",
       "file": "LeylineOfTheVoidFactory.cs",
-      "line": 9,
-      "sentence": "## Deferred (v1 gaps)  - \u003Cb\u003EOpening-hand alt-cost\u003C/b\u003E (CR 702.95 \u2014 Leyline keyword): no opening-hand hook in the engine.",
-      "cr": "CR 702.95"
-    },
-    {
-      "factory": "LeylineOfTheVoidFactory",
-      "file": "LeylineOfTheVoidFactory.cs",
-      "line": 9,
+      "line": 11,
       "sentence": "Affected-player choice deferred."
+    },
+    {
+      "factory": "UrzasBaubleFactory",
+      "file": "UrzasBaubleFactory.cs",
+      "line": 12,
+      "sentence": "Awaits the agent-prompt targeting system used by other v1 factories (same gap as Mishra\u0027s Bauble)."
+    },
+    {
+      "factory": "UrzasBaubleFactory",
+      "file": "UrzasBaubleFactory.cs",
+      "line": 12,
+      "sentence": "Multi-player turn-skipping semantics deferred."
+    },
+    {
+      "factory": "UrzasBaubleFactory",
+      "file": "UrzasBaubleFactory.cs",
+      "line": 97,
+      "sentence": "FirstOrDefault as a deterministic stand-in for \u0022random\u0022 (real random-pick prompt deferred \u2014 see class xmldoc)."
     },
     {
       "factory": "AtraxaGrandUnifierFactory",
@@ -1243,8 +1355,20 @@
     {
       "factory": "CavernOfSoulsFactory",
       "file": "CavernOfSoulsFactory.cs",
-      "line": 120,
-      "sentence": "Spend-restriction (\u0022only to cast a creature spell of the chosen type\u0022) \u002B uncounterable rider are deferred \u2014 see class xmldoc."
+      "line": 10,
+      "sentence": "## Spend-restriction (v1 data, payment-gate deferred)"
+    },
+    {
+      "factory": "CavernOfSoulsFactory",
+      "file": "CavernOfSoulsFactory.cs",
+      "line": 10,
+      "sentence": "\u003Cb\u003EPayment-gate enforcement\u003C/b\u003E (filtering tagged pool entries when paying a non-matching cost) is deferred until \u003Csee cref=\u0022ManaPool\u0022/\u003E grows per-slot tags \u2014 today the pool stores bucketed colour counts only."
+    },
+    {
+      "factory": "CavernOfSoulsFactory",
+      "file": "CavernOfSoulsFactory.cs",
+      "line": 130,
+      "sentence": "The uncounterable rider is deferred \u2014 see class xmldoc."
     },
     {
       "factory": "GoblinLackeyFactory",

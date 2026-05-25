@@ -1,3 +1,4 @@
+using Majik.Core.Mana;
 using Majik.Core.Players;
 using Majik.Core.ValueObjects;
 
@@ -18,7 +19,42 @@ public class ManaAbility : IManaAbility
     public Player Controller { get; }
     public ManaCost ManaGenerated { get; private set; }
 
+    /// <summary>
+    /// Optional spend-restriction stamped on every unit of mana this
+    /// ability generates (Cavern of Souls' chosen-type rider, Eldrazi
+    /// Temple's "spend only on Eldrazi spells/abilities", Mishra's
+    /// Workshop's artifact-only rider, …). <c>null</c> ⇒ vanilla mana.
+    /// CR 106.4 — the restriction is part of the mana's provenance, not
+    /// the ability itself, and applies at spend time.
+    ///
+    /// <para>v1 of the spend-restriction primitive ships the data only:
+    /// the rider lives here so factories can stamp it, and the payment
+    /// resolver will consult it once
+    /// <see cref="Majik.Core.ValueObjects.ManaPool"/> grows per-slot
+    /// provenance (today's pool stores bucketed colour counts, no tags).
+    /// Until then, restriction is observational metadata.</para>
+    /// </summary>
+    public SpendRestriction? SpendRestriction { get; }
+
     public ManaAbility(object source, Player controller, ManaCost manaGenerated, Func<bool>? canActivateCheck = null)
+        : this(source, controller, manaGenerated, canActivateCheck, spendRestriction: null)
+    {
+    }
+
+    /// <summary>
+    /// Construct a mana ability whose generated mana carries a
+    /// spend-restriction (Cavern of Souls, Eldrazi Temple, future
+    /// Mishra's Workshop). <see cref="SpendRestriction"/> is stamped on
+    /// every unit produced; the payment-gate enforcement is deferred
+    /// until <see cref="Majik.Core.ValueObjects.ManaPool"/> grows
+    /// per-slot tags (see property xmldoc).
+    /// </summary>
+    public ManaAbility(
+        object source,
+        Player controller,
+        ManaCost manaGenerated,
+        Func<bool>? canActivateCheck,
+        SpendRestriction? spendRestriction)
     {
         Source = source ?? throw new ArgumentNullException(nameof(source));
         Controller = controller ?? throw new ArgumentNullException(nameof(controller));
@@ -26,6 +62,7 @@ public class ManaAbility : IManaAbility
         _canActivateCheck = canActivateCheck;
         _manaGenerator = () => manaGenerated;
         _tapsAsCost = true;
+        SpendRestriction = spendRestriction;
     }
 
     public ManaAbility(object source, Player controller, Func<ManaCost> manaGenerator, Func<bool>? canActivateCheck = null)
