@@ -1,6 +1,7 @@
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Costs;
 using Majik.Core.Counters;
 using Majik.Core.Effects;
 using Majik.Core.Events;
@@ -33,13 +34,15 @@ namespace Majik.Core.CardData.Factories;
 ///   Draco / Esika's Chariot / Wurmcoil Engine's multi-type shape).
 ///
 /// - <b>Improvise (CR 702.127)</b>: wired as a
-///   <see cref="KeywordAbility"/> marker — same posture as
-///   <see cref="TreasureCruiseFactory"/>'s Delve marker and
-///   <see cref="ChordOfCallingFactory"/>'s Convoke marker. The cost-side
-///   primitive (an <c>ImproviseAlternativeCost</c> tap-artifacts-to-pay
-///   resolver) does not exist yet — the marker lets downstream cost-
-///   reduction discovery probes light up once the primitive ships
-///   (deferred — see gaps below).
+///   <see cref="KeywordAbility"/> marker PLUS the working cost-side
+///   primitive — <see cref="BuildAdditionalCost"/> builds an
+///   <see cref="ImproviseAdditionalCost"/> bound to the caller-selected
+///   untapped artifacts. The cast flow's CR 601.2f additional-cost loop
+///   taps the chosen artifacts and the post-improvise generic reduction
+///   folds into the mana payment (see
+///   <see cref="Majik.Core.Game.SpellCastFlow"/>). The
+///   <see cref="Majik.Core.Players.Agents.ImproviseAltCostProbe"/>
+///   surfaces this on the bot-discovery rail.
 ///
 /// - <b>Ward {4} (CR 702.21)</b>: wired as a
 ///   <see cref="KeywordAbility"/> marker. The
@@ -71,12 +74,6 @@ namespace Majik.Core.CardData.Factories;
 ///
 /// ## Deferred (v1 gaps)
 ///
-/// - <b>Improvise cost-reduction primitive</b>: same gap as Convoke
-///   (see <see cref="ChordOfCallingFactory"/>'s
-///   <c>ConvokeAlternativeCost</c> deferred surface). The keyword marker
-///   surfaces the ability to downstream probes; once the primitive ships
-///   the discovery path lights up automatically.
-///
 /// - <b>Ward {4} trigger wiring</b>: <see cref="WardEffect"/> is a
 ///   standalone check helper, not yet plumbed onto a
 ///   battlefield-attached triggered ability. v1 ships the marker +
@@ -105,6 +102,21 @@ public static class KappaCannoneerFactory
 
     /// <summary>CR 702.21 — printed Ward cost: {4}.</summary>
     public const string WardCost = "{4}";
+
+    /// <summary>
+    /// CR 702.127 — build the Improvise additional cost for this Kappa
+    /// Cannoneer spell with the caller-selected untapped artifacts. The
+    /// caller threads the returned cost through
+    /// <see cref="Majik.Core.Game.SpellCastFlow.CastAsync"/>'s
+    /// <c>additionalCosts</c> parameter; the cast flow taps the chosen
+    /// artifacts and folds {1} of generic reduction per tap into the mana
+    /// payment (coloured pips preserved per CR 702.127). Tests + bots
+    /// pre-select the artifact list, mirroring the deferred agent prompt
+    /// pattern used for <see cref="DelveCost"/>.
+    /// </summary>
+    public static ImproviseAdditionalCost BuildAdditionalCost(
+        ICard card, IReadOnlyList<Permanent> tappedArtifacts) =>
+        new(card, tappedArtifacts);
 
     /// <summary>
     /// CR 702.21 — Kappa Cannoneer's printed Ward {4} effect, bound to
@@ -164,11 +176,14 @@ public static class KappaCannoneerFactory
         card.SetController(owner);
 
         // ----------------------------------------------------------------
-        // Improvise (CR 702.127) — marker keyword. The cost-reduction
-        // primitive does not exist yet; the marker surfaces the ability
-        // to downstream cost-discovery probes once the primitive ships.
-        // Same posture as TreasureCruise's Delve marker + ChordOfCalling's
-        // Convoke marker.
+        // Improvise (CR 702.127) — marker keyword + working cost-side
+        // primitive. The marker keeps the discovery surface uniform with
+        // TreasureCruise's Delve / ChordOfCalling's Convoke (probes scan
+        // for KeywordAbility "Improvise"); the actual cost-reduction
+        // wiring is supplied by BuildAdditionalCost above, which the
+        // caster (test, bot, or future agent prompt) threads through the
+        // SpellCastFlow additional-cost loop with a pre-selected list of
+        // untapped artifacts to tap.
         // ----------------------------------------------------------------
         card.AddAbility(new KeywordAbility("Improvise", card, owner));
 
