@@ -293,7 +293,13 @@ public sealed class SpellCastFlow
         int? xValue = null;
         if (definition.HasVariableX)
         {
-            xValue = await agent.ChooseXAsync(ctx, card, ct);
+            // CR 107.3b — alt-cost may fix X without prompting the agent
+            // (Disrupting Shoal's mv-matched pitch). When the alt cost
+            // supplies OverrideX, use it verbatim AND skip the X-generic
+            // add to total cost below — the pitch IS the entire cost
+            // (CR 118.9).
+            xValue = alternativeCost?.OverrideX
+                ?? await agent.ChooseXAsync(ctx, card, ct);
 
             // CR 202.3b — stamp the chosen X on the card itself so
             // permanents whose ETB references X (Chalice of the Void's
@@ -347,7 +353,11 @@ public sealed class SpellCastFlow
         // also subtract any CostReductionAbility on the card (Affinity etc.).
         var totalCost = alternativeCost?.AlternativeManaCost
             ?? Majik.Core.Costs.CostReduction.GetEffectiveCost(card, caster);
-        if (xValue.HasValue && xValue.Value > 0)
+        // CR 107.3b / CR 118.9 — when the alt cost supplies its own X via
+        // OverrideX (Disrupting Shoal pitches a blue card whose mv IS X),
+        // the pitch is the entire mana cost — don't add X-generic on top.
+        // Otherwise the agent-chosen X is added as generic mana.
+        if (xValue.HasValue && xValue.Value > 0 && alternativeCost?.OverrideX == null)
         {
             totalCost = totalCost.AddGenericCost(xValue.Value);
         }

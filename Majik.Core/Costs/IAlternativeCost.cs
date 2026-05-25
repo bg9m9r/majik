@@ -31,4 +31,16 @@ public interface IAlternativeCost
     /// every pre-existing alt-cost type still returns null).
     /// </summary>
     ZoneType? PostResolutionZone => null;
+
+    /// <summary>
+    /// Optional X-value override for X-cost spells cast via this alt cost.
+    /// CR 107.3b — the alt-cost may fix X without an agent prompt; e.g.
+    /// Disrupting Shoal's mv-matched pitch sets X = pitched card's mana value.
+    /// When non-null, <see cref="Majik.Core.Game.SpellCastFlow"/> uses this
+    /// instead of calling <see cref="Majik.Core.Players.Agents.IPlayerAgent.ChooseXAsync"/>
+    /// and does NOT add X to the total mana cost (the pitch IS the entire
+    /// cost — CR 118.9). Null = honour the printed X-cost path (the
+    /// historical behaviour; every pre-existing alt-cost type returns null).
+    /// </summary>
+    int? OverrideX => null;
 }
