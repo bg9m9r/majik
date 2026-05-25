@@ -31,18 +31,45 @@ public sealed class ProtectionAbility : IAbility
     /// </summary>
     public Func<Majik.Core.Spells.ISpell, bool>? SpellPredicate { get; }
 
+    /// <summary>
+    /// Optional "is this protection currently active?" gate — used for
+    /// conditional protection clauses like Etched Champion's Metalcraft
+    /// rider ("As long as you control three or more artifacts, Etched
+    /// Champion has protection from all colors"). Null means
+    /// "always active" — the legacy default that every plain protection
+    /// rider (Goblin Piledriver / Sword of Fire and Ice / Emrakul) uses.
+    /// When supplied, every Protection-helper read (colour / type / spell
+    /// predicate) skips this ability when the gate returns false.
+    /// </summary>
+    public Func<bool>? IsActive { get; }
+
     public ProtectionAbility(string quality)
-        : this(quality, spellPredicate: null) { }
+        : this(quality, spellPredicate: null, isActive: null) { }
 
     public ProtectionAbility(
         string quality,
         Func<Majik.Core.Spells.ISpell, bool>? spellPredicate)
+        : this(quality, spellPredicate, isActive: null) { }
+
+    public ProtectionAbility(
+        string quality,
+        Func<Majik.Core.Spells.ISpell, bool>? spellPredicate,
+        Func<bool>? isActive)
     {
         if (string.IsNullOrWhiteSpace(quality))
             throw new ArgumentException("quality required", nameof(quality));
         Quality = quality.Trim().ToLowerInvariant();
         SpellPredicate = spellPredicate;
+        IsActive = isActive;
     }
+
+    /// <summary>
+    /// True when this protection clause is currently active — every
+    /// always-on protection returns true; conditional shapes (Etched
+    /// Champion's Metalcraft) defer to their <see cref="IsActive"/>
+    /// closure.
+    /// </summary>
+    public bool IsCurrentlyActive => IsActive?.Invoke() ?? true;
 
     public string Description => $"Protection from {Quality}";
 }

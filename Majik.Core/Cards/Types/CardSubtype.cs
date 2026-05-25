@@ -180,6 +180,9 @@ public enum CardSubtype
     /// <summary>Ape creature subtype — Treetop Village (Urza's Legacy) animated
     /// form, Kird Ape (Arabian Nights / many reprints). CR 205.3m.</summary>
     Ape,
+    /// <summary>Imp creature subtype — Vault Skirge (New Phyrexia), Ravenous Rats'
+    /// adjacent imp lineage (Hypnotic Specter / Mind Twist-adjacent). CR 205.3m.</summary>
+    Imp,
 
     // Land subtypes (examples)
     Forest,
