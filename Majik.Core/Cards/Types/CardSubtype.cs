@@ -12,6 +12,7 @@ public enum CardSubtype
     Dryad,
     Dwarf,
     Phyrexian,
+    Germ,
     Elf,
     Goblin,
     Dragon,
