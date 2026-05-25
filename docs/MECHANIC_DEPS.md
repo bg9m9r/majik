@@ -5,7 +5,7 @@ Scanner output: every `*Factory.cs` xmldoc / inline comment mentioning
 engine primitive. Each row answers: "if we ship primitive _X_, which factory
 xmldocs flagged that they're blocked on it?"
 
-- **Generated:** 2026-05-25 01:44 UTC
+- **Generated:** 2026-05-25 01:45 UTC
 - **Scanned dir:** `Majik.Core/CardData/Factories`
 - **Total mentions:** 171
 - **Clusters:** 6

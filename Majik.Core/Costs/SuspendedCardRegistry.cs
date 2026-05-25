@@ -46,6 +46,7 @@ public sealed class SuspendedCardRegistry
 
     private readonly List<Entry> _entries = new();
     private readonly Action<ICard, Player>? _defaultOnReady;
+    private readonly IEventBus? _eventBus;
 
     /// <summary>
     /// Construct a registry with no event-bus wiring. Drive
@@ -57,6 +58,7 @@ public sealed class SuspendedCardRegistry
     public SuspendedCardRegistry(Action<ICard, Player>? defaultOnReady = null)
     {
         _defaultOnReady = defaultOnReady;
+        _eventBus = null;
     }
 
     /// <summary>
@@ -66,11 +68,16 @@ public sealed class SuspendedCardRegistry
     /// active player (CR 702.62c — "at the beginning of each of your
     /// upkeeps"). Entries reaching zero fire <paramref name="defaultOnReady"/>
     /// (or the per-card callback supplied to <see cref="Suspend(ICard, Player, int, Action{ICard, Player})"/>).
+    /// The same bus is used to publish a <see cref="SuspendCounterDrainedEvent"/>
+    /// for each entry whose counter reaches zero, BEFORE the ready
+    /// callback fires (CR 702.62d) — diagnostic hook independent of the
+    /// cast pipeline.
     /// </summary>
     public SuspendedCardRegistry(IEventBus eventBus, Action<ICard, Player>? defaultOnReady = null)
     {
         if (eventBus == null) throw new ArgumentNullException(nameof(eventBus));
         _defaultOnReady = defaultOnReady;
+        _eventBus = eventBus;
         eventBus.Subscribe<StepStartedEvent>(e =>
         {
             if (e.StepType == PhaseStateType.Upkeep) TickUpkeep(e.Player);
@@ -152,6 +159,10 @@ public sealed class SuspendedCardRegistry
             if (entry.Counters.Count(CounterType.Time) == 0)
             {
                 _entries.Remove(entry);
+                // CR 702.62d — publish the drain BEFORE the cast callback
+                // fires so diagnostics see counter-zero as a discrete step
+                // even when the callback throws or short-circuits the cast.
+                _eventBus?.Publish(new SuspendCounterDrainedEvent(entry.Card, entry.Owner));
                 entry.OnReady(entry.Card, entry.Owner);
             }
         }

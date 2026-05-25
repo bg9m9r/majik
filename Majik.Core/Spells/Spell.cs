@@ -82,6 +82,22 @@ public class Spell : ISpell
     public bool WasCastForEscape { get; set; }
 
     /// <summary>
+    /// CR 702.62d / 702.62g — "cast via suspend" runtime sentinel on
+    /// the resolving spell. Stamped <c>true</c> by
+    /// <see cref="Majik.Core.Game.SpellCastFlow"/> when the cast used a
+    /// <see cref="Majik.Core.Costs.CastFromExileAlternativeCost"/> whose
+    /// <see cref="Majik.Core.Costs.CastFromExileAlternativeCost.IsSuspendCast"/>
+    /// flag is set. Read by downstream gates that branch on the
+    /// suspend-cast posture; the matching
+    /// <see cref="Majik.Core.Cards.Card.WasCastFromSuspend"/> mirror
+    /// stamps the underlying card for resolve-body reads.
+    ///
+    /// Defaults to <c>false</c> so hand-built test spells without an
+    /// explicit stamp are treated as non-suspend casts.
+    /// </summary>
+    public bool WasCastFromSuspend { get; set; }
+
+    /// <summary>
     /// CR 702.33b — "kicked" runtime sentinel on the resolving spell.
     /// Stamped <c>true</c> by <see cref="Majik.Core.Game.SpellCastFlow"/>
     /// when the cast layered a paid
