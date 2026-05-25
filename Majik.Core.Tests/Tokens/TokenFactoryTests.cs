@@ -135,4 +135,51 @@ public class TokenFactoryTests
 
         alice.LifeTotal.Should().Be(23);
     }
+
+    // ── Blood token (Crimson Vow) ─────────────────────────────────────────────
+
+    [Fact]
+    public void CreateBlood_PutsArtifactTokenOnBattlefield_WithBloodSubtype()
+    {
+        var blood = TokenFactory.CreateBlood(_alice, _zones);
+
+        blood.Should().NotBeNull();
+        blood.IsToken.Should().BeTrue();
+        blood.HasType(CardType.Artifact).Should().BeTrue();
+        blood.Subtypes.Should().Contain(CardSubtype.Blood);
+        blood.Zone.Should().Be(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.GetCards().Should().Contain(blood);
+    }
+
+    [Fact]
+    public void CreateBlood_HasManaTapDiscardSacForDrawAbility()
+    {
+        var alice = new Player("Alice", 20);
+        var blood = TokenFactory.CreateBlood(alice);
+
+        blood.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1);
+        var ability = blood.Abilities.OfType<ActivatedAbility>().Single();
+        // Printed costs: {1} + {T} + Discard a card + Sacrifice this artifact.
+        ability.Costs.Should().HaveCount(4);
+        ability.Effects.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public void CreateBlood_DrawAbility_DrawsACardOnResolution()
+    {
+        var alice = new Player("Alice", 20);
+        var topCard = new Card("Top Card", "");
+        alice.Zones.Library.AddCard(topCard);
+        topCard.SetZone(ZoneType.Library);
+
+        var blood = TokenFactory.CreateBlood(alice);
+        var ability = blood.Abilities.OfType<ActivatedAbility>().Single();
+
+        // Execute effects only — skip cost payment to keep the test pure
+        // (matches the Clue draw test posture).
+        foreach (var e in ability.Effects) e.Execute();
+
+        alice.Zones.Hand.GetCards().Should().Contain(topCard);
+        alice.Zones.Library.GetCards().Should().NotContain(topCard);
+    }
 }

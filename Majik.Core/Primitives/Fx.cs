@@ -490,6 +490,13 @@ public static class Fx
     public static Artifact CreateFood(Player controller, ZoneService? zones = null)
         => TokenFactory.CreateFood(controller, zones);
 
+    /// <summary>CR 111 — create a Blood token. Aliases
+    /// <see cref="TokenFactory.CreateBlood"/> (Crimson Vow looting
+    /// artifact: "{1}, {T}, Discard a card, Sacrifice this artifact:
+    /// Draw a card.").</summary>
+    public static Artifact CreateBlood(Player controller, ZoneService? zones = null)
+        => TokenFactory.CreateBlood(controller, zones);
+
     /// <summary>CR 111 — create an Eldrazi Spawn token. Aliases
     /// <see cref="TokenFactory.CreateEldraziSpawn"/>.</summary>
     public static Creature CreateEldraziSpawn(Player controller, ZoneService? zones = null)

@@ -212,6 +212,35 @@ public static class TokenFactory
         return token;
     }
 
+    /// <summary>Blood (CR 111.10 / Innistrad: Crimson Vow): colourless
+    /// artifact token with "{1}, {T}, Discard a card, Sacrifice this
+    /// artifact: Draw a card." Bound as a single
+    /// <see cref="ActivatedAbility"/> with mana + tap + discard +
+    /// self-sacrifice costs and a draw-one effect. Same wiring shape as
+    /// <see cref="CreateClue"/> / <see cref="CreateFood"/>; discard
+    /// payment uses <see cref="DiscardACardCost"/> so the deferred
+    /// agent-driven discard-target prompt is shared with the wider
+    /// looting family.</summary>
+    public static Artifact CreateBlood(Player controller, ZoneService? zones = null)
+    {
+        if (controller == null) throw new ArgumentNullException(nameof(controller));
+        var token = new Artifact("Blood", "",
+            subtypes: new[] { CardSubtype.Blood })
+        {
+            Owner = controller,
+            Controller = controller,
+            IsToken = true,
+        };
+        // CR 111.10 — Blood tokens are colourless artifacts.
+        token.SetTokenColors(Array.Empty<ManaColor>());
+
+        // {1}, {T}, Discard a card, Sacrifice this artifact: Draw a card.
+        token.AddAbility(BuildBloodLootAbility(token, controller));
+
+        PutOnBattlefield(token, controller, zones);
+        return token;
+    }
+
     /// <summary>Powerstone (CR 111.10 / The Brothers' War): colourless
     /// artifact token with "{T}: Add {C}. This mana can't be spent to cast
     /// a nonartifact spell." (Reckoner Bankbuster, Thran Spider, Loran's
@@ -319,6 +348,28 @@ public static class TokenFactory
         var effects = new IEffect[]
         {
             new Effect("draw 1 from Clue", () => DrawOneCard(controller)),
+        };
+        return new ActivatedAbility(source, controller, costs: costs, effects: effects);
+    }
+
+    /// <summary>"{1}, {T}, Discard a card, Sacrifice this artifact: Draw a
+    /// card." — Blood ability (CR 111.10 / Innistrad: Crimson Vow). Wired
+    /// as a single <see cref="ActivatedAbility"/> with the four costs in
+    /// the printed order; resolution draws one card for the controller
+    /// (empty-library no-op, SBA-driven loss flag is owned by
+    /// <see cref="Player.DrawCard"/>).</summary>
+    private static ActivatedAbility BuildBloodLootAbility(Artifact source, Player controller)
+    {
+        var costs = new ICost[]
+        {
+            new ManaCostCost(ValueObjects.ManaCost.Parse("1")),
+            AdditionalCost.Tap(source),
+            new DiscardACardCost(),
+            AdditionalCost.Sacrifice(source),
+        };
+        var effects = new IEffect[]
+        {
+            new Effect("draw 1 from Blood", () => DrawOneCard(controller)),
         };
         return new ActivatedAbility(source, controller, costs: costs, effects: effects);
     }
