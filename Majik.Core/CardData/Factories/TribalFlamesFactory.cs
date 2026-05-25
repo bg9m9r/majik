@@ -7,6 +7,7 @@ using Majik.Core.Primitives;
 using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
+using DomainRule = Majik.Core.Rules.Domain;
 
 namespace Majik.Core.CardData.Factories;
 
@@ -50,19 +51,12 @@ public static class TribalFlamesFactory
 
     /// <summary>
     /// The five basic land subtypes that contribute to Domain
-    /// (CR 702.16 / CR 205.3i / 305.6). Wastes is not a basic LAND TYPE
-    /// for Domain purposes — it's a basic land without a basic land
-    /// type. Kept in sync with the printed-subtype audit in
-    /// <see cref="LandSubtypes"/>.
+    /// (CR 702.16 / CR 205.3i / 305.6). Forwarded to
+    /// <see cref="Domain.BasicLandTypes"/> — the canonical primitive.
+    /// Kept here as a back-compat surface for callers / tests pinned to
+    /// the old factory-local handle.
     /// </summary>
-    public static readonly IReadOnlySet<CardSubtype> BasicLandTypes = new HashSet<CardSubtype>
-    {
-        CardSubtype.Plains,
-        CardSubtype.Island,
-        CardSubtype.Swamp,
-        CardSubtype.Mountain,
-        CardSubtype.Forest,
-    };
+    public static IReadOnlySet<CardSubtype> BasicLandTypes => DomainRule.BasicLandTypes;
 
     /// <summary>CardDef DSL — card shape only. Domain-driven damage body
     /// is built via <see cref="BuildSpellDefinition"/>.</summary>
@@ -108,7 +102,7 @@ public static class TribalFlamesFactory
                 {
                     Fx.Inline("Tribal Flames: deal Domain damage", () =>
                     {
-                        var amount = CountDomain(controller, effects);
+                        var amount = DomainRule.CountTypes(controller, effects);
                         Fx.DealDamage(target, amount);
                     }),
                 };
@@ -117,32 +111,13 @@ public static class TribalFlamesFactory
 
     /// <summary>
     /// CR 702.16 — number of distinct basic land types among lands the
-    /// controller controls. When <paramref name="effects"/> is supplied
-    /// the count uses effective subtypes from the CR 613 layer pipeline;
-    /// otherwise printed subtypes are used.
+    /// controller controls. Thin shim over the canonical
+    /// <see cref="DomainRule.CountTypes(Player, ContinuousEffectsService?)"/>
+    /// primitive; preserved here as a back-compat surface for callers /
+    /// tests pinned to the old factory-local handle. New code should
+    /// call <see cref="DomainRule.CountTypes(Player, ContinuousEffectsService?)"/>
+    /// directly.
     /// </summary>
-    public static int CountDomain(Player controller, ContinuousEffectsService? effects)
-    {
-        ArgumentNullException.ThrowIfNull(controller);
-
-        var seen = new HashSet<CardSubtype>();
-        foreach (var card in controller.Zones.Battlefield.GetCards())
-        {
-            if (card is not Land land) continue;
-
-            IEnumerable<CardSubtype> subtypes = effects is not null
-                ? effects.Compute(land).Subtypes
-                : land.Subtypes;
-
-            foreach (var st in subtypes)
-            {
-                if (BasicLandTypes.Contains(st))
-                {
-                    seen.Add(st);
-                    if (seen.Count == BasicLandTypes.Count) return seen.Count;
-                }
-            }
-        }
-        return seen.Count;
-    }
+    public static int CountDomain(Player controller, ContinuousEffectsService? effects) =>
+        DomainRule.CountTypes(controller, effects);
 }

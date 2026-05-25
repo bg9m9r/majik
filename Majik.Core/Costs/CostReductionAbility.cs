@@ -27,7 +27,7 @@ namespace Majik.Core.Costs;
 ///    reduction is "{N} per distinct basic land type" rather than per
 ///    instance.
 /// </summary>
-public sealed class CostReductionAbility : IAbility
+public class CostReductionAbility : IAbility
 {
     /// <summary>How many generic mana to remove per matching object the
     /// caster controls. Zero when <see cref="TotalReducer"/> is used.</summary>
