@@ -2,6 +2,7 @@ using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.CardData;
 using Majik.Core.Counters;
+using Majik.Core.Events;
 using Majik.Core.Keywords;
 using Majik.Core.Players;
 using Majik.Core.Services;
@@ -194,9 +195,40 @@ public static class Fx
     public static void Scry(Player player, int n, ScryAction.ScryDecision decision)
         => ScryAction.Apply(player, n, decision);
 
-    /// <summary>CR 701.42 — see <see cref="SurveilAction.Apply"/>.</summary>
+    /// <summary>
+    /// CR 701.42 — surveil <paramref name="n"/> for <paramref name="player"/>
+    /// using the pre-resolved <paramref name="decision"/>. Captures the
+    /// peeked cards before the surveil applies, runs
+    /// <see cref="SurveilAction.Apply"/>, then publishes a
+    /// <see cref="SurveilEvent"/> against the player's registered bus
+    /// (looked up via <see cref="EventBusRegistry.Get(Player?)"/>) so
+    /// "Whenever you surveil" / "Whenever ~ surveils" triggers fire.
+    /// Bus is best-effort — no publish if none is registered.
+    /// </summary>
     public static void Surveil(Player player, int n, SurveilAction.SurveilDecision decision)
-        => SurveilAction.Apply(player, n, decision);
+        => Surveil(player, n, decision, eventBus: null);
+
+    /// <summary>
+    /// CR 701.42 — surveil <paramref name="n"/> with an explicit
+    /// <paramref name="eventBus"/>. When supplied, the bus receives the
+    /// <see cref="SurveilEvent"/> directly; otherwise the player's
+    /// registered bus (via <see cref="EventBusRegistry"/>) is used.
+    /// Pass-through overload for factories that already own a bus
+    /// reference and don't want to depend on the registry being primed.
+    /// </summary>
+    public static void Surveil(Player player, int n, SurveilAction.SurveilDecision decision, IEventBus? eventBus)
+    {
+        if (player is null) throw new ArgumentNullException(nameof(player));
+
+        // Snapshot the peeked cards BEFORE Apply mutates the library
+        // ordering, so the SurveilEvent carries the cards the player
+        // actually saw (matches "look at the top N cards" wording).
+        var peeked = SurveilAction.Peek(player, n);
+        SurveilAction.Apply(player, n, decision);
+
+        var bus = eventBus ?? EventBusRegistry.Get(player);
+        bus?.Publish(new SurveilEvent(player, n, peeked));
+    }
 
     // ------------------------------------------------------------------
     // Zone moves (CR 400.7 / 701.20) — aliases for the helpers that

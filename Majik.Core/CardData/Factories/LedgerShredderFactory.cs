@@ -21,19 +21,19 @@ namespace Majik.Core.CardData.Factories;
 ///
 /// ## Implemented (v1)
 /// - 1/3 Bird Advisor with Flying (<see cref="KeywordAbility"/>).
-/// - Two triggered abilities surfaced on the card so structural shape
-///   tests can observe both oracle clauses:
+/// - Two triggered abilities, both wired through the trigger pipeline:
 ///     1. SpellCast watcher — fires on the controller's 2nd cast each turn
-///        (CR 603.2). Effect = surveil 1 (CR 701.42).
-///     2. Self-surveil reaction — fires when Ledger Shredder surveils.
-///        Effect = put a +1/+1 counter on it (CR 122).
+///        (CR 603.2). Effect = surveil 1 (CR 701.42), routed through
+///        <see cref="Majik.Core.Primitives.Fx.Surveil"/> so a
+///        <see cref="SurveilEvent"/> is published on the bus.
+///     2. Self-surveil reaction — proper
+///        <see cref="Triggers.OnSurveil"/> condition over
+///        <see cref="SurveilEvent"/>. Effect = put a +1/+1 counter on it
+///        (CR 122). Picks up surveils from any source (Consider, Dragon's
+///        Rage Channeler, etc.), not just Ledger Shredder's own.
 /// - Per-turn count is held in a closure private to this card instance and
 ///   reset by a <see cref="TurnStartedEvent"/> subscription when an event
 ///   bus is supplied (CR 500.1).
-/// - No <c>SurveilEvent</c> exists in the engine yet, so trigger 2 chains
-///   off trigger 1's effect directly: after the surveil decision is
-///   applied, the counter effect runs immediately. Both abilities are
-///   still present on the card so the oracle shape is preserved.
 /// - Surveil decision routes through the registered
 ///   <see cref="IPlayerAgent.ChooseSurveilDecisionAsync"/> when one is
 ///   bound to the controller; otherwise falls back to all-to-graveyard
@@ -46,13 +46,6 @@ namespace Majik.Core.CardData.Factories;
 ///   second-spell-each-turn rider but means callers exercising the trigger
 ///   manually must publish a SpellCastEvent for the first spell too. Tests
 ///   below do this.
-/// - The "Whenever Ledger Shredder surveils" trigger is currently chained
-///   inside the effect rather than via the trigger pipeline because there
-///   is no SurveilEvent on the bus. Once a SurveilEvent ships, the second
-///   trigger can move to a proper <see cref="EventTriggerCondition{T}"/>
-///   and pick up surveils from sources other than Ledger Shredder itself
-///   (relevant if Ledger Shredder is ever in a deck with extra-surveil
-///   replacement effects — none exist as of CR 2025-11-14).
 /// </summary>
 [CardName("Ledger Shredder")]
 public static class LedgerShredderFactory
@@ -103,21 +96,18 @@ public static class LedgerShredderFactory
         var spellsCastThisTurn = new int[] { 0 };
 
         // Trigger 2: "Whenever Ledger Shredder surveils, put a +1/+1
-        // counter on it." Built first so trigger 1's effect can call its
-        // single effect directly when a surveil resolves on this card.
-        // CR 122.1 — counters are placed on the permanent in real time.
+        // counter on it." CR 122.1 — counters are placed on the permanent
+        // in real time. Surveil event fires for any of the controller's
+        // surveils (CR 701.42); since Ledger Shredder's own surveil
+        // trigger surveils for `owner`, this condition catches it.
         var counterEffect = new Effect(
             "Ledger Shredder: put a +1/+1 counter on it (whenever it surveils)",
             () => CountersService.Add(card, CounterType.PlusOnePlusOne, 1, replacements));
 
-        // Trigger 2 surfaces on the card as a shape-only ability — its
-        // condition matches no real event, since there is no SurveilEvent
-        // on the bus. The actual mechanic runs via the counterEffect
-        // closure invoked from trigger 1's effect.
         var surveilSelfTrigger = new TriggeredAbility(
             source: card,
             controller: owner,
-            condition: new EventTriggerCondition<GameEvent>((_, _) => false),
+            condition: Triggers.OnSurveil(owner),
             effects: new IEffect[] { counterEffect });
 
         // Trigger 1: "Whenever you cast the second spell each turn,
@@ -138,28 +128,34 @@ public static class LedgerShredderFactory
             () =>
             {
                 var peeked = Majik.Core.Keywords.SurveilAction.Peek(owner, 1);
-                if (peeked.Count != 0)
+                if (peeked.Count == 0)
                 {
-                    var agent = AgentRegistry.Get(owner);
-                    Majik.Core.Keywords.SurveilAction.SurveilDecision decision;
-                    if (agent != null)
-                    {
-                        decision = agent.ChooseSurveilDecisionAsync(null, peeked)
-                            .GetAwaiter().GetResult();
-                    }
-                    else
-                    {
-                        decision = new Majik.Core.Keywords.SurveilAction.SurveilDecision(
-                            ToGraveyard: peeked.ToList(),
-                            TopOrder: Array.Empty<Majik.Core.Cards.ICard>());
-                    }
-                    Majik.Core.Keywords.SurveilAction.Apply(owner, 1, decision);
+                    // Empty library — the surveil attempt still counts
+                    // as a surveil event per CR 701.42a. Publish so the
+                    // self-trigger fires; no library mutation needed.
+                    eventBus?.Publish(new SurveilEvent(owner, 1, Array.Empty<ICard>()));
+                    return;
                 }
 
-                // CR 603.2 — chain "whenever Ledger Shredder surveils" off
-                // the surveil action. Until a SurveilEvent exists on the
-                // bus, the counter trigger fires inline.
-                counterEffect.Execute();
+                var agent = AgentRegistry.Get(owner);
+                Majik.Core.Keywords.SurveilAction.SurveilDecision decision;
+                if (agent != null)
+                {
+                    decision = agent.ChooseSurveilDecisionAsync(null, peeked)
+                        .GetAwaiter().GetResult();
+                }
+                else
+                {
+                    decision = new Majik.Core.Keywords.SurveilAction.SurveilDecision(
+                        ToGraveyard: peeked.ToList(),
+                        TopOrder: Array.Empty<Majik.Core.Cards.ICard>());
+                }
+
+                // Fx.Surveil applies the decision AND publishes
+                // SurveilEvent on the supplied bus — the self-trigger
+                // (Triggers.OnSurveil) picks it up via the trigger
+                // pipeline so the +1/+1 counter chains naturally.
+                Majik.Core.Primitives.Fx.Surveil(owner, 1, decision, eventBus);
             });
 
         var secondSpellTrigger = new TriggeredAbility(
@@ -177,9 +173,9 @@ public static class LedgerShredderFactory
             eventBus.Subscribe<TurnStartedEvent>(_ => spellsCastThisTurn[0] = 0);
         }
 
-        // Live trigger registration. surveilSelfTrigger has a never-matching
-        // condition; registering it is harmless (it never fires) and keeps
-        // ability-shape observability consistent.
+        // Live trigger registration. surveilSelfTrigger now uses a real
+        // EventTriggerCondition<SurveilEvent> so the bus surfaces it as
+        // pending when Fx.Surveil publishes (or any other surveil source).
         triggers?.RegisterTriggeredAbility(secondSpellTrigger);
         triggers?.RegisterTriggeredAbility(surveilSelfTrigger);
 
