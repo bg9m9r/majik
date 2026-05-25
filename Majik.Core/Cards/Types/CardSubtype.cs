@@ -257,6 +257,9 @@ public enum CardSubtype
     /// (Animation Module, Whirlermaker, Visionary Augmenter). Always paired
     /// with the Artifact type. CR 205.3g + CR 205.3m.</summary>
     Servo,
+    /// <summary>Pest creature subtype — Mirrodin Besieged's Signal Pest,
+    /// Strixhaven's Pest tokens. CR 205.3m.</summary>
+    Pest,
 
     // Eldrazi creature subtypes (CR 205.3m)
     Eldrazi,
