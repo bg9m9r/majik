@@ -32,17 +32,22 @@ namespace Majik.Core.CardData.Factories;
 ///   where ToZone = Battlefield, Card is a Creature, card is not a token,
 ///   and <see cref="Majik.Core.Effects.ZoneMoveIntent.WasCast"/> = false.
 ///
+/// ## Cast-marker wiring (CR 113.5 / CR 400.7)
+/// The "wasn't cast" predicate reads
+/// <see cref="Majik.Core.Effects.ZoneMoveIntent.WasCast"/>, which
+/// <see cref="Majik.Core.Services.ZoneService"/> populates from the
+/// persistent <see cref="Majik.Core.Cards.Card.WasCast"/> stamp set by
+/// <see cref="Majik.Core.Game.SpellCastFlow"/> at the moment the spell
+/// hits the stack. Permanents arriving via non-cast paths (Reanimate,
+/// Sneak Attack, Through the Breach, Show and Tell, Aether Vial put,
+/// blink reappearance, token-copy ETB) leave <c>Card.WasCast</c> =
+/// false and therefore the replacement fires.
+///
 /// ## Deferred (v1 gaps)
-/// - <b>ZoneService ReplacementBus plumbing</b>: ZoneService's
-///   <c>MoveCard</c> path does not yet consult the ReplacementBus for
-///   most move calls, so the exile replacement is structural only in v1.
-///   When ZoneService is wired to push every battlefield-entry through
-///   the bus, the effect will fire automatically for Sneak Attack /
-///   Through the Breach / Animate Dead / Aether Vial / etc.
-/// - <b>WasCast stamping coverage</b>:
-///   <see cref="Majik.Core.Effects.ZoneMoveIntent.WasCast"/> is false on
-///   all intents not constructed explicitly with <c>WasCast: true</c>.
-///   SpellCastFlow should stamp it once it builds its ZoneMoveIntent.
+/// - <b>"Creature" vs "permanent" scope</b>: the printed oracle text is
+///   "if a nontoken creature would enter", so the predicate filters to
+///   <see cref="CardType.Creature"/> only. Non-creature reanimation
+///   (artifact/enchantment reanimator targets) is correctly ignored.
 /// </summary>
 [CardName("Containment Priest")]
 public static class ContainmentPriestFactory
