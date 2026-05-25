@@ -251,6 +251,10 @@ public enum CardSubtype
     Treasure,
     Clue,
     Construct,
+    /// <summary>Golem creature/artifact subtype — Sundering Titan, Wurmcoil
+    /// Engine, Triskelion. Almost always paired with the Artifact type.
+    /// CR 205.3g + CR 205.3m.</summary>
+    Golem,
     Blood,
     Powerstone,
     /// <summary>Myr creature/artifact subtype — Myr Enforcer, Myr Retriever,
