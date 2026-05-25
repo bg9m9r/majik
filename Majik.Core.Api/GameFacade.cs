@@ -74,6 +74,11 @@ public sealed class GameFacade
     private int _currentTurn = 1;
     private PhaseStateType _currentPhase = PhaseStateType.Main;
     private Player? _currentActivePlayer;
+    // PhaseStateType.Main covers both pre- and post-combat main phases.
+    // Track the outer TurnStateMachine state via TurnStateChangedEvent so
+    // GetState + BridgeEvent can disambiguate "Main" into the CR 505 step
+    // names the wire/UI expect.
+    private TurnStateType? _currentTurnState;
 
     public Guid GameId { get; } = Guid.NewGuid();
 
@@ -141,6 +146,7 @@ public sealed class GameFacade
         _bus.Subscribe<TurnStartedEvent>(e => { _currentTurn = e.TurnNumber; _currentActivePlayer = e.Player; });
         _bus.Subscribe<PhaseStartedEvent>(e => { _currentPhase = e.PhaseType; });
         _bus.Subscribe<StepStartedEvent>(e => { _currentPhase = e.StepType; });
+        _bus.Subscribe<TurnStateChangedEvent>(e => { _currentTurnState = e.CurrentState; });
     }
 
     private PriorityLoop BuildPriorityLoop()
@@ -596,7 +602,8 @@ public sealed class GameFacade
         GameId, turnNumber: _currentTurn, phase: _currentPhase,
         activePlayer: _currentActivePlayer ?? _priority.CurrentPlayer ?? _alice,
         players: new[] { _alice, _bob },
-        stack: _stack);
+        stack: _stack,
+        turnState: _currentTurnState);
 
     /// <summary>Per-player snapshot. CR 706 hidden information (opponent
     /// hand) is masked. Pass the requesting player's id; returns null
@@ -611,7 +618,8 @@ public sealed class GameFacade
             activePlayer: _currentActivePlayer ?? _priority.CurrentPlayer ?? _alice,
             players: new[] { _alice, _bob },
             stack: _stack,
-            viewer: viewer);
+            viewer: viewer,
+            turnState: _currentTurnState);
     }
 
     private Player? ResolveSlot(Guid id)
@@ -685,11 +693,15 @@ public sealed class GameFacade
     private void BridgeEvent(GameEvent e)
     {
         var type = e.GetType().Name;
+        // Snapshot the currently-tracked turn state so the payload builder
+        // can disambiguate PhaseStateType.Main into the CR 505 wire names
+        // (PreCombatMain / PostCombatMain) on phase / step events.
+        var turnState = _currentTurnState;
         var publicDto = new EventDto(
             EventId: e.EventId,
             Type: type,
             At: e.Timestamp,
-            Payload: EventPayloadBuilder.Build(e, viewer: null));
+            Payload: EventPayloadBuilder.Build(e, viewer: null, turnState: turnState));
 
         IReadOnlyDictionary<Guid, EventDto>? perPlayer = null;
         if (EventPayloadBuilder.RequiresPerViewerMasking(e))
@@ -706,12 +718,12 @@ public sealed class GameFacade
                     EventId: e.EventId,
                     Type: type,
                     At: e.Timestamp,
-                    Payload: EventPayloadBuilder.Build(e, _alice)),
+                    Payload: EventPayloadBuilder.Build(e, _alice, turnState)),
                 [_bob.Id] = new EventDto(
                     EventId: e.EventId,
                     Type: type,
                     At: e.Timestamp,
-                    Payload: EventPayloadBuilder.Build(e, _bob)),
+                    Payload: EventPayloadBuilder.Build(e, _bob, turnState)),
             };
         }
 

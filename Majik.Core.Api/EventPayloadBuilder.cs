@@ -6,6 +6,7 @@ using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Spells;
 using Majik.Core.Stack;
+using Majik.Core.StateMachine;
 using Majik.Core.Zones;
 
 namespace Majik.Core.Api;
@@ -42,13 +43,23 @@ public static class EventPayloadBuilder
     /// <summary>Full-reveal payload (no viewer scoping). Used for the
     /// spectator broadcast and any consumer outside the per-recipient
     /// SignalR routing path.</summary>
-    public static JsonElement Build(GameEvent e) => Build(e, viewer: null);
+    public static JsonElement Build(GameEvent e) => Build(e, viewer: null, turnState: null);
 
     /// <summary>Viewer-scoped payload. <paramref name="viewer"/> = null
     /// means full reveal (spectator). Non-null applies CR 706 masking
     /// rules to <see cref="CardMovedEvent"/> / <see cref="CardDrawnEvent"/>;
     /// the rest of the payload set is public and ignores the viewer.</summary>
-    public static JsonElement Build(GameEvent e, Player? viewer) => e switch
+    public static JsonElement Build(GameEvent e, Player? viewer) => Build(e, viewer, turnState: null);
+
+    /// <summary>Viewer-scoped payload with turn-state context. The
+    /// <paramref name="turnState"/> argument lets the builder disambiguate
+    /// <see cref="PhaseStateType.Main"/> into the wire labels
+    /// "PreCombatMain" / "PostCombatMain" on phase / step events — the
+    /// engine's PhaseStateMachine collapses both into <c>Main</c>, so the
+    /// caller (typically <see cref="GameFacade"/>) supplies the outer
+    /// TurnStateMachine state it tracks via <see cref="TurnStateChangedEvent"/>.
+    /// Pass <c>null</c> to keep the legacy "Main" label.</summary>
+    public static JsonElement Build(GameEvent e, Player? viewer, TurnStateType? turnState) => e switch
     {
         CardMovedEvent x => BuildCardMoved(x, viewer),
         CardDrawnEvent x => BuildCardDrawn(x, viewer),
@@ -71,27 +82,32 @@ public static class EventPayloadBuilder
         }),
         PhaseStartedEvent x => Serialize(new
         {
-            phase = x.PhaseType.ToString(),
+            phase = PhaseLabelResolver.Resolve(x.PhaseType, turnState),
             playerId = x.Player.Id,
         }),
         PhaseEndedEvent x => Serialize(new
         {
-            phase = x.PhaseType.ToString(),
+            phase = PhaseLabelResolver.Resolve(x.PhaseType, turnState),
             playerId = x.Player.Id,
         }),
         PhaseChangedEvent x => Serialize(new
         {
-            from = x.PreviousPhase,
-            to = x.CurrentPhase,
+            from = RemapMainLabel(x.PreviousPhase, turnState),
+            to = RemapMainLabel(x.CurrentPhase, turnState),
+        }),
+        TurnStateChangedEvent x => Serialize(new
+        {
+            from = x.PreviousState?.ToString(),
+            to = x.CurrentState.ToString(),
         }),
         StepStartedEvent x => Serialize(new
         {
-            step = x.StepType.ToString(),
+            step = PhaseLabelResolver.Resolve(x.StepType, turnState),
             playerId = x.Player.Id,
         }),
         StepEndedEvent x => Serialize(new
         {
-            step = x.StepType.ToString(),
+            step = PhaseLabelResolver.Resolve(x.StepType, turnState),
             playerId = x.Player.Id,
         }),
         TurnStartedEvent x => Serialize(new
@@ -249,6 +265,17 @@ public static class EventPayloadBuilder
         => JsonSerializer.SerializeToElement(value, Opts);
 
     private static JsonElement Empty() => JsonDocument.Parse("{}").RootElement;
+
+    // PhaseChangedEvent carries the raw IState.Name string from either the
+    // TurnStateMachine ("PreCombatMain", "Combat", …) or the
+    // PhaseStateMachine ("Main", "Untap", …). When we see the ambiguous
+    // "Main" label and the caller has supplied a TurnStateType, lift the
+    // wire string into the disambiguated form the frontend expects.
+    private static string? RemapMainLabel(string? raw, TurnStateType? turnState)
+    {
+        if (raw != PhaseStateType.Main.ToString()) return raw;
+        return PhaseLabelResolver.Resolve(PhaseStateType.Main, turnState);
+    }
 
     // The next two helpers must stay aligned with
     // StateSnapshotter.SnapshotStackObject — the wire-format `kind` +
