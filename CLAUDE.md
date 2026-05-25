@@ -6,8 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Majik** — open-source Magic: The Gathering rules engine in C# / .NET 8. UI-agnostic, event-driven, state-machine based. Solution: `Majik.sln` with three projects:
 
-- `Majik.Core/` — engine library
-- `Majik.Console/` — CLI for card-data import + keyword analysis (NOT a gameplay UI)
+- `Majik.Core/` — engine library (ships the embedded Modern card pool at `CardData/Embedded/modern-cards.json.gz`)
+- `Majik.Console/` — diagnostic CLI: `play-triggers` (triggered-ability playground) + `export-modern-cards` (regenerates the embedded seed from a Scryfall bulk export). Not a gameplay UI.
 - `Majik.Core.Tests/` — xUnit + FluentAssertions + Moq
 
 ## Common commands
@@ -27,21 +27,26 @@ dotnet test Majik.Core.Tests/Majik.Core.Tests.csproj
 dotnet test --filter "FullyQualifiedName~StateBasedActionsTests.LegendRule"
 dotnet test --filter "FullyQualifiedName=Majik.Core.Tests.Rules.LegendRuleTests.LegendRule_AppliesOnlyToCreaturesAndPlaneswalkers"
 
-# Console tool (Scryfall import + keyword analysis)
-dotnet run --project Majik.Console -- import <path-to-scryfall-all-cards.json>
-dotnet run --project Majik.Console -- analyze-keywords <path-to-csv>           [--use-claude]
-dotnet run --project Majik.Console -- analyze-keywords --from-database         [--use-claude]
-dotnet run --project Majik.Console -- ingest-claude-results <path-to-jsonl>
+# Diagnostic console
+dotnet run --project Majik.Console -- play-triggers [etb|apnap|intervening-if|delayed|all]
+dotnet run --project Majik.Console -- export-modern-cards <path-to-scryfall-all-cards.json>
 ```
 
-`--use-claude` requires `ANTHROPIC_API_KEY` env var or a `.env` file in the repo root (loaded by `DotNetEnv`; the console walks up dirs looking for it). Optional `CLAUDE_MODEL` overrides the default model in `ClaudeKeywordAnalyzer.cs`. See `docs/archive/CLAUDE_SETUP.md` for full setup.
+## Card data
 
-## Card database
+The engine reads its Modern-legal card pool from a gzipped JSON resource embedded in `Majik.Core`:
 
-SQLite via EF Core (`Microsoft.EntityFrameworkCore.Sqlite`). Path:
-`%APPDATA%/Majik/cards.db` (Linux: `~/.config/Majik/cards.db`). DbContext: `Majik.Core/CardData/Database/CardDbContext.cs`. Tables: `Cards`, `CardAbilities`, `EffectReferences`, `CardAbilityEffects`, `KeywordMetadata`, `ClaudeRequestCache`.
+- Resource: `Majik.Core/CardData/Embedded/modern-cards.json.gz` (~22k rows, ~1.8 MB compressed).
+- Loader: `Majik.Core/CardData/EmbeddedCardRepository.cs` — the only `ICardRepository` implementation; reads the gzipped JSON into an in-memory `Dictionary<string, CardEntity>` once at startup. No SQLite, no EF Core, no HTTP hop.
+- `IsImplemented` is baked into the seed at export time via reflection over `Majik.Core` for `[CardName]`-attributed factories — there is no runtime mutation surface.
 
-Schema is created via `EnsureCreatedAsync()` + ad-hoc `CREATE TABLE IF NOT EXISTS` / `ALTER TABLE` patches in `Program.EnsureKeywordMetadataTableExistsAsync` — no EF migrations in repo. When adding columns to `KeywordMetadata`, mirror the change in both `KeywordMetadataEntity` and that bootstrap method, or older DBs will be missing the column.
+To refresh the seed from a new Scryfall bulk export:
+
+```bash
+dotnet run --project Majik.Console -- export-modern-cards <path-to-scryfall-all-cards.json>
+```
+
+`Majik.Console/Commands/ExportModernCardsCommand.cs` filters to Modern legal/restricted, dedupes by name (highest `released_at` wins), flags `IsImplemented`, writes the gzipped JSON, and round-trips through `EmbeddedCardRepository` as a sanity check. Commit the regenerated `.json.gz` and ship.
 
 ## Rules authority
 
@@ -80,15 +85,13 @@ Phases are pluggable (`Majik.Core/Game/Phases/`) and the sequence supports MTG's
 
 Card hierarchy: `Card` → `Permanent` → `Creature` / `Artifact` / `Enchantment` / `Land` / `Planeswalker`; plus `Instant` / `Sorcery`. Types under `Majik.Core/Cards/Types/`. Zones (`Majik.Core/Zones/`) are managed by `ZoneManager` + `ZoneService`; movement always goes through these so events fire.
 
-### Keyword pipeline (data side, not gameplay)
+### Keyword parsing (data side, not gameplay)
 
 `Majik.Core/CardData/Parsing/`:
-1. `OracleTextParser` + `KeywordAbilityParser` + `PatternBasedParser` extract abilities from Scryfall oracle text.
-2. `KeywordRegistry` is the catalog of known keywords.
-3. `KeywordAnalyzer` categorizes keywords from CSV or DB (Official / Parameterized / Custom / CardName / Unknown).
-4. `ClaudeKeywordAnalyzer` calls the Anthropic API (Batches API for bulk) to enrich unknowns + generate implementation notes. Responses are cached in `ClaudeRequestCache` by request-hash to avoid re-billing the same prompt.
+- `KeywordRegistry` — catalog of known keywords (Official / Parameterized / Custom / CardName).
+- `KeywordParser` — lightweight tokenizer used by the binders to recognize keyword lines on Scryfall oracle text.
 
-`ingest-claude-results` exists because batch results can be downloaded manually; it parses the JSONL, hydrates the cache, and updates `KeywordMetadata` rows.
+Per-card behaviour lives in the named factories under `Majik.Core/CardData/Factories/` (dispatched via `[CardName]` attributes + source generator) and the spell templates under `Majik.Core/CardData/SpellTemplates/`.
 
 ## Testing
 

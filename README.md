@@ -11,7 +11,7 @@ Authoritative rules source: [`MagicCompRules 20251114.txt`](./MagicCompRules%202
 | `Majik.Core` | Engine library — state machines, stack, priority, SBAs, abilities, effects, zones, cards |
 | `Majik.Core.Api` | DTOs + JSON contracts shared between server and clients |
 | `Majik.Server` | ASP.NET Core host — REST endpoints (`/cards`, `/decks`, `/me`, `/matches`), SignalR `/hubs/match`, OpenAPI at `/openapi/v1.json` |
-| `Majik.Console` | CLI for Scryfall import + keyword analysis (not a gameplay UI) |
+| `Majik.Console` | Diagnostic CLI: `play-triggers` (triggered-ability playground) + `export-modern-cards` (regenerates the embedded Modern card seed). Not a gameplay UI. |
 | `Majik.Tools` | One-off scripts |
 | `Majik.*.Tests` | xUnit + FluentAssertions + Moq |
 
@@ -96,13 +96,13 @@ Phases are pluggable (`Majik.Core/Game/Phases/`). The phase sequence supports ex
 
 Card hierarchy: `Card` → `Permanent` → `Creature` / `Artifact` / `Enchantment` / `Land` / `Planeswalker`, plus `Instant` / `Sorcery`. Zones (`Majik.Core/Zones/`) are managed by `ZoneManager` + `ZoneService` — all movement goes through these so events fire.
 
-### Keyword pipeline (data side, not gameplay)
+### Keyword parsing (data side, not gameplay)
 
 `Majik.Core/CardData/Parsing/`:
-1. `OracleTextParser` + `KeywordAbilityParser` + `PatternBasedParser` — extract abilities from Scryfall oracle text.
-2. `KeywordRegistry` — catalog of known keywords.
-3. `KeywordAnalyzer` — categorize keywords (Official / Parameterized / Custom / CardName / Unknown).
-4. `ClaudeKeywordAnalyzer` — calls the Anthropic Batches API to enrich unknowns + generate implementation notes. Responses cached in `ClaudeRequestCache` by request-hash.
+- `KeywordRegistry` — catalog of known keywords (Official / Parameterized / Custom / CardName).
+- `KeywordParser` — lightweight tokenizer used by the binders to recognize keyword lines on Scryfall oracle text.
+
+Per-card behaviour is wired in the named factories under `Majik.Core/CardData/Factories/` (dispatched via `[CardName]` attributes + `Majik.Core.SourceGen.NamedCardFactoryGenerator`) and the spell templates under `Majik.Core/CardData/SpellTemplates/`.
 
 ## Server
 
@@ -131,7 +131,7 @@ OIDC bearer tokens, validated against Descope. Server-side:
 
 | Data | Store | Why |
 |---|---|---|
-| Cards (Scryfall) | SQLite at `~/.config/Majik/cards.db` (Linux) | Bulk, immutable, ~550 MB. Shipped via GitHub Release in prod — see [`docs/RENDER_CARDS_SEED.md`](../docs/RENDER_CARDS_SEED.md). |
+| Cards (Modern-legal pool) | Embedded gzipped JSON in `Majik.Core` (`CardData/Embedded/modern-cards.json.gz`, ~22k rows, ~1.8 MB) | Loaded in-process by `EmbeddedCardRepository`. Refresh via `Majik.Console -- export-modern-cards` — see "Updating card data" above. |
 | Profiles, decks, matches | MongoDB | Mutable user-scoped data |
 
 ### Local dev
@@ -140,10 +140,7 @@ OIDC bearer tokens, validated against Descope. Server-side:
 # 1. Mongo (Docker)
 docker compose -f docker-compose.dev.yml up -d
 
-# 2. Cards SQLite — one-time, takes a while
-dotnet run --project Majik.Console -- import path/to/scryfall-all-cards.json
-
-# 3. Server
+# 2. Server (card pool is embedded — no seed step required)
 dotnet run --project Majik.Server
 # → http://localhost:5057 (REST + /hubs/match + /openapi/v1.json)
 ```
@@ -154,22 +151,15 @@ Auth defaults to disabled when `Auth:Authority` is unset, so the server starts w
 
 xUnit + FluentAssertions + Moq. Tests mirror source layout under `Majik.Core.Tests/`. Shared fixtures: `TestDataBuilder` and `TestEventBus` — use these instead of hand-rolling setup. Rules-engine tests live under `Majik.Core.Tests/Rules/`.
 
-## Card database schema notes
-
-EF Core (`Microsoft.EntityFrameworkCore.Sqlite`). DbContext: `Majik.Core/CardData/Database/CardDbContext.cs`. Tables: `Cards`, `CardAbilities`, `EffectReferences`, `CardAbilityEffects`, `KeywordMetadata`, `ClaudeRequestCache`. Schema created via `EnsureCreatedAsync()` + ad-hoc `CREATE TABLE IF NOT EXISTS` / `ALTER TABLE` patches in `Program.EnsureKeywordMetadataTableExistsAsync` — no EF migrations. When adding columns to `KeywordMetadata`, mirror the change in `KeywordMetadataEntity` AND that bootstrap method, or older DBs will be missing the column.
-
 ## Deploy
 
 Render Blueprint in [`render.yaml`](./render.yaml) provisions:
-- `majik-api` — Docker web service (this server)
+- `majik-api` — Docker web service (this server). Card pool ships inside the image via the embedded resource — no persistent disk for cards.
 - `majik-mongo` — `mongo:7` private service with persistent disk
 
 Bootstrap procedure, env var contract, and operations in the umbrella repo's `docs/`:
 - [`RENDER_ENV.md`](https://github.com/bg9m9r/majik.project/blob/main/docs/RENDER_ENV.md)
 - [`RENDER_MONGO_SETUP.md`](https://github.com/bg9m9r/majik.project/blob/main/docs/RENDER_MONGO_SETUP.md)
-- [`RENDER_CARDS_SEED.md`](https://github.com/bg9m9r/majik.project/blob/main/docs/RENDER_CARDS_SEED.md)
-
-Cards SQLite is bootstrapped automatically on container boot via [`Majik.Server/docker-entrypoint.sh`](./Majik.Server/docker-entrypoint.sh) — pulls the seed from a GitHub Release when `CARDS_SEED_TAG` changes.
 
 ## Historical docs
 
