@@ -92,13 +92,32 @@ public static class ChordOfCallingFactory
     }
 
     /// <summary>
-    /// Build the <see cref="ConvokeAlternativeCost"/> the cast flow consults
-    /// to surface Convoke on this card. v1 returns the printed cost
-    /// unchanged — see <see cref="ConvokeAlternativeCost"/> for the open
-    /// reduction-hook work.
+    /// Build the legacy marker-only <see cref="ConvokeAlternativeCost"/>
+    /// that surfaces Convoke on this card without an attached creature
+    /// selection. Returns the printed cost unchanged — useful for
+    /// shape / template tests that just need a Convoke alt-cost marker.
+    /// For actual per-cast reduction wire <see cref="BuildAdditionalCost"/>
+    /// instead.
     /// </summary>
     public static ConvokeAlternativeCost BuildAlternativeCost() =>
         new(ManaCost.Parse(PrintedManaCost));
+
+    /// <summary>
+    /// CR 702.51 — build the Convoke additional cost for this Chord of
+    /// Calling spell with the caller-selected untapped creatures. The
+    /// caller threads the returned cost through
+    /// <see cref="Majik.Core.Game.SpellCastFlow.CastAsync"/>'s
+    /// <c>additionalCosts</c> parameter; the cast flow taps the chosen
+    /// creatures and folds the per-tap reduction (generic OR a coloured
+    /// pip matching the creature's colour, per CR 702.51b) into the mana
+    /// payment. Tests + bots pre-select the creature list, mirroring the
+    /// deferred agent prompt pattern used by
+    /// <see cref="KappaCannoneerFactory.BuildAdditionalCost"/> for
+    /// Improvise.
+    /// </summary>
+    public static ConvokeAdditionalCost BuildAdditionalCost(
+        ICard card, IReadOnlyList<Creature> tappedCreatures) =>
+        new(card, tappedCreatures);
 
     /// <summary>
     /// Build the <see cref="SpellDefinition"/> Chord of Calling uses on

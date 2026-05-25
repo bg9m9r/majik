@@ -386,6 +386,21 @@ public sealed class SpellCastFlow
             }
         }
 
+        // CR 702.51 — Convoke. "Each creature you tap while casting this
+        // spell pays for {1} or one mana of that creature's color." Same
+        // timing shape as Improvise: the chosen creatures were already
+        // tapped in the CR 601.2f additional-cost loop above, and here we
+        // fold the per-tap reduction (generic OR creature-coloured pip,
+        // per CR 702.51b) into the mana cost before the agent's mana-
+        // source prompt fires (CR 605.1 — mana abilities settled by then).
+        foreach (var addCost in mergedAdditional)
+        {
+            if (addCost is ConvokeAdditionalCost convoke && convoke.ReductionAmount > 0)
+            {
+                totalCost = convoke.ApplyTo(totalCost);
+            }
+        }
+
         // CR 601.2g — mana sourcing. When the caller has already prompted +
         // paid mana (TurnDriver does this so a failed pay can rotate the
         // hand instead of mutating the stack), reuse that ManaPayment as

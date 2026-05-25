@@ -42,6 +42,10 @@ namespace Majik.Core.Players.Agents;
 ///   Wrapped as a discovery-friendly <see cref="ImproviseAlternativeCost"/>
 ///   shim (the underlying <see cref="ImproviseAdditionalCost"/> rides on
 ///   the additional-cost rail at cast time).</item>
+///   <item><see cref="ConvokeAltCostProbe"/> — CR 702.51 Convoke.
+///   Wrapped as a discovery-friendly <see cref="ConvokeAlternativeCost"/>
+///   shim (the underlying <see cref="ConvokeAdditionalCost"/> rides on
+///   the additional-cost rail at cast time).</item>
 /// </list>
 ///
 /// <para>Card factories that need a per-card probe (a "this specific card
@@ -122,6 +126,7 @@ public sealed class AlternativeCostProbeRegistry : IAlternativeCostProbe
             .Register(new EscapeAltCostProbe(EscapeAltCostProbe.DefaultLookup))
             .Register(new KickerAltCostProbe(KickerAltCostProbe.DefaultLookup))
             .Register(new SuspendAltCostProbe(SuspendAltCostProbe.DefaultLookup))
-            .Register(new ImproviseAltCostProbe());
+            .Register(new ImproviseAltCostProbe())
+            .Register(new ConvokeAltCostProbe());
     }
 }
