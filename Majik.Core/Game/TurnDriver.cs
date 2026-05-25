@@ -252,7 +252,16 @@ public sealed class TurnDriver
     {
         foreach (var card in active.Zones.Battlefield.GetCards().OfType<Permanent>().ToList())
         {
-            if (card.IsTapped) card.Untap();
+            // CR 502.1 — "doesn't untap during your untap step" filters
+            // (Mana Vault self-skip, Choke's symmetric Island filter,
+            // future Stasis / Smoke). Query the per-permanent registry
+            // before untapping; on a hit, skip Untap but still reset the
+            // turn-state flags (summoning sickness etc. clear normally).
+            if (card.IsTapped
+                && !Majik.Core.Effects.UntapStepRestrictions.ShouldSkipUntap(card, active))
+            {
+                card.Untap();
+            }
             // CR 502 — clears summoning sickness, loyalty-once-per-turn,
             // and any other turn-scoped per-permanent flags.
             card.ResetTurnState();

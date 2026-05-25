@@ -1,5 +1,6 @@
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
+using Majik.Core.Effects;
 using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.StateMachine;
@@ -37,17 +38,19 @@ namespace Majik.Core.CardData.Factories;
 ///   every other pact-style "pay {X} or else" the engine already ships
 ///   (Slaughter Pact / Pact of Negation / Pact of the Titan).
 ///
+/// - <b>"Doesn't untap during your untap step" static (CR 502.1)</b>:
+///   wired via <see cref="DoesNotUntapStaticEffect"/>. On enter-the-
+///   battlefield the lifecycle registers a per-permanent skip with
+///   <see cref="UntapStepRestrictions"/>; TurnDriver's UntapStep
+///   consults the registry and skips this permanent. On LTB the
+///   registration is removed. Pass an <see cref="IEventBus"/> to
+///   <see cref="Create(Player, TriggerManager?, IEventBus?)"/> to
+///   activate the lifecycle (it sync-attaches via
+///   <see cref="CardMovedEvent"/>); the no-arg overloads still build
+///   shape without auto-attaching so existing structural tests keep
+///   working unchanged.
+///
 /// ## Deferred (v1 gaps)
-/// - <b>"Doesn't untap during your untap step" static</b>: there is no
-///   `SkipNextUntap` / `DoesntUntapDuringUntapStep` engine surface today
-///   (grep for "SkipNextUntap"/"DoesntUntap"/"doesn't untap" — nothing in
-///   <c>Majik.Core/</c>). Adding one is a real chunk of work (UntapStep
-///   filter + per-permanent stash + interaction with effects like Voltaic
-///   Key that explicitly untap something else). Per the planning note,
-///   we ship the mana ability + upkeep cost first and defer the skip-
-///   untap clause. Practical impact: until the static lands, Mana Vault
-///   will untap normally on its controller's untap step and the upkeep
-///   "if tapped" gate won't fire — playable but not yet Vintage-correct.
 /// - <b>Cost-payment prompt</b>: same surface gap as Slaughter Pact /
 ///   Pact of Negation — there's no agent prompt yet for "do you want to
 ///   pay this {4}?", so production callers pre-stage the controller's
@@ -74,7 +77,7 @@ public static class ManaVaultFactory
     /// <see cref="TriggerManager"/> via the overload.
     /// </summary>
     public static Artifact Create(Player owner) =>
-        Create(owner, triggers: null);
+        Create(owner, triggers: null, eventBus: null);
 
     /// <summary>
     /// Construct Mana Vault with optional trigger-manager wiring. When
@@ -82,7 +85,17 @@ public static class ManaVaultFactory
     /// ability is registered so an Upkeep <see cref="StepStartedEvent"/>
     /// for the controller surfaces it as pending.
     /// </summary>
-    public static Artifact Create(Player owner, TriggerManager? triggers)
+    public static Artifact Create(Player owner, TriggerManager? triggers) =>
+        Create(owner, triggers, eventBus: null);
+
+    /// <summary>
+    /// Construct Mana Vault with optional trigger-manager + event-bus
+    /// wiring. When <paramref name="eventBus"/> is supplied, the
+    /// <see cref="DoesNotUntapStaticEffect"/> lifecycle is attached so
+    /// the printed "Mana Vault doesn't untap during your untap step"
+    /// clause activates on ETB and lifts on LTB (CR 502.1).
+    /// </summary>
+    public static Artifact Create(Player owner, TriggerManager? triggers, IEventBus? eventBus)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -135,6 +148,17 @@ public static class ManaVaultFactory
             source: card,
             controller: owner,
             manaGenerated: ManaCost.Parse("CCC")));
+
+        // ----------------------------------------------------------------
+        // CR 502.1 — "Mana Vault doesn't untap during your untap step."
+        // Wired via the lifecycle binder; only attaches when an event bus
+        // is supplied so the shape-only constructors stay zero-side-
+        // effect for structural tests that don't drive zone moves.
+        // ----------------------------------------------------------------
+        if (eventBus != null)
+        {
+            new DoesNotUntapStaticEffect(card, eventBus).Attach();
+        }
 
         return card;
     }
