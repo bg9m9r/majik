@@ -1,12 +1,14 @@
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Costs;
 using Majik.Core.Effects;
 using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Primitives;
 using Majik.Core.Services;
 using Majik.Core.StateMachine;
+using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
@@ -99,12 +101,39 @@ public static class GoryosVengeanceFactory
     {
         ArgumentNullException.ThrowIfNull(owner);
 
-        var card = new Instant(CardName, PrintedManaCost);
+        // CR 205.3k — Arcane spell subtype. Required for
+        // SpliceOntoArcaneCost.CanPay to gate splice riders onto this
+        // card as a target Arcane spell.
+        var card = new Instant(CardName, PrintedManaCost,
+            subtypes: new[] { CardSubtype.Arcane });
 
         card.SetOwner(owner);
         card.SetController(owner);
         return card;
     }
+
+    /// <summary>
+    /// CR 702.46 — build the Splice onto Arcane rider for this card.
+    /// Caller supplies the Arcane spell being cast (<paramref name="arcaneTarget"/>)
+    /// and this card (the spliced source); the resulting
+    /// <see cref="SpliceOntoArcaneCost"/> drops into
+    /// <see cref="Majik.Core.Game.SpellCastFlow"/>'s <c>additionalCosts</c>
+    /// list. Splice cost is the printed <see cref="SpliceOntoArcaneManaCost"/>
+    /// (<c>{2}{B}</c>); the rider's effect builder calls
+    /// <see cref="BuildResolveEffect"/> so the spliced rider produces
+    /// the same reanimate / haste / delayed-exile body the printed
+    /// cast would. Optional <paramref name="zoneService"/> +
+    /// <paramref name="triggers"/> thread the same service handles the
+    /// printed cast uses.
+    /// </summary>
+    public static SpliceOntoArcaneCost BuildSpliceCost(
+        ICard arcaneTarget,
+        ICard splicedCard,
+        ZoneService? zoneService = null,
+        TriggerManager? triggers = null) =>
+        new(arcaneTarget, splicedCard,
+            ManaCost.Parse(SpliceOntoArcaneManaCost),
+            controller => BuildResolveEffect(controller, zoneService, triggers));
 
     /// <summary>
     /// Build Goryo's Vengeance's resolve effect. On resolution

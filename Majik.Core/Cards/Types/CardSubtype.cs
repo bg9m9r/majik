@@ -206,6 +206,13 @@ public enum CardSubtype
     /// <summary>Naga creature subtype — Ramunap Excavator (Hour of Devastation),
     /// Hapatra, Vizier of Poisons, the Amonkhet snake-people lineage. CR 205.3m.</summary>
     Naga,
+    /// <summary>Arcane spell subtype — Champions of Kamigawa block (Desperate
+    /// Ritual, Goryo's Vengeance, Through the Breach, Glacial Ray, …). The
+    /// only subtype that exists for instant / sorcery spells in the engine;
+    /// gates <see cref="Majik.Core.Costs.SpliceOntoArcaneCost"/> (CR 702.46 —
+    /// splice rider may only attach to spells with the Arcane subtype).
+    /// CR 205.3k.</summary>
+    Arcane,
 
     // Land subtypes (examples)
     Forest,

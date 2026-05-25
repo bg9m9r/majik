@@ -415,6 +415,26 @@ public sealed class SpellCastFlow
             AdditionalCostPayments: mergedAdditional.Count > 0 ? mergedAdditional : null);
         var effects = definition.EffectFactory(chosen);
 
+        // CR 702.46 — Splice onto Arcane. After the Arcane spell's printed
+        // body resolves we run each spliced rider's effects in announcement
+        // order (CR 702.46b — multiple splice riders concatenate in the
+        // order the caster announced them). The splice cost was already
+        // paid in the CR 601.2f additional-cost loop above (mana drained,
+        // Arcane + hand-residence gate enforced); here we only fold the
+        // pre-built effect chain in. The spliced card itself stays in the
+        // caster's hand (CR 702.46a — "the card stays in your hand"); no
+        // zone move is performed for it.
+        var spliceRiders = mergedAdditional.OfType<SpliceOntoArcaneCost>().ToList();
+        if (spliceRiders.Count > 0)
+        {
+            var combined = effects.ToList();
+            foreach (var rider in spliceRiders)
+            {
+                combined.AddRange(rider.BuildSplicedEffects(caster));
+            }
+            effects = combined;
+        }
+
         // If casting via alternative cost (e.g. Flashback), card may not be in
         // hand — move it from whatever zone it's in.
         _zoneService.MoveCard(card, card.Zone, ZoneType.Stack, controller: caster);

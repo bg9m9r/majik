@@ -1,6 +1,8 @@
 using Majik.Core.Abilities;
 using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
+using Majik.Core.Cards.Types;
+using Majik.Core.Costs;
 using Majik.Core.Players;
 using Majik.Core.ValueObjects;
 
@@ -72,8 +74,27 @@ public static class DesperateRitualFactory
     /// <summary>CardDef DSL — card shape only. <see cref="BuildResolveEffect"/>
     /// supplies the resolve-time {R}{R}{R} mana production. Splice onto
     /// Arcane is attached structurally as a <see cref="KeywordAbility"/>
-    /// marker by <see cref="Create"/>.</summary>
-    public static CardDef Define() => CardDef.Instant(CardName, PrintedManaCost);
+    /// marker by <see cref="Create"/>; the Arcane subtype (CR 205.3k) is
+    /// stamped here so <see cref="SpliceOntoArcaneCost.CanPay"/> finds
+    /// it when an Arcane spell is cast.</summary>
+    public static CardDef Define() => CardDef.Instant(CardName, PrintedManaCost)
+        .WithSubtype(CardSubtype.Arcane);
+
+    /// <summary>
+    /// CR 702.46 — build the Splice onto Arcane rider for this card.
+    /// Caller supplies the Arcane spell being cast (<paramref name="arcaneTarget"/>)
+    /// and this card (the spliced source); the resulting
+    /// <see cref="SpliceOntoArcaneCost"/> drops into
+    /// <see cref="Majik.Core.Game.SpellCastFlow"/>'s <c>additionalCosts</c>
+    /// list. Splice cost is the printed <see cref="SpliceCostText"/>
+    /// (<c>{1}{R}</c>); the rider's effect builder calls
+    /// <see cref="BuildResolveEffect"/> so the spliced rider produces
+    /// the same {R}{R}{R} the printed cast would.
+    /// </summary>
+    public static SpliceOntoArcaneCost BuildSpliceCost(ICard arcaneTarget, ICard splicedCard) =>
+        new(arcaneTarget, splicedCard,
+            ManaCost.Parse(SpliceCostText),
+            controller => BuildResolveEffect(controller));
 
     public static Instant Create(Player owner)
     {
