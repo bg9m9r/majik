@@ -160,6 +160,18 @@ public static class BloodghastFactory
         //   - ToZone == Battlefield
         //   - card is a Land (CR 205.3f)
         //   - card.Controller == owner (entering under your control)
+        //
+        // Cast-marker note (CR 113.5 / CR 400.7): the printed return-trigger
+        // does NOT itself care whether the triggering land was cast — any
+        // land ETB triggers it. The reason the cast-marker primitive
+        // matters for Bloodghast is the reverse direction: when Bloodghast
+        // itself returns to the battlefield via this trigger, its
+        // Card.WasCast remains false (it's a put-onto-battlefield path,
+        // not a cast), so a future Containment Priest sitting opposite
+        // would correctly exile the return. The clear-on-LTB in
+        // ZoneService also means a previously-cast Bloodghast loses its
+        // WasCast stamp on the way to the graveyard, so the subsequent
+        // landfall return starts with a clean WasCast = false.
         // ----------------------------------------------------------------
         var returnEffect = new Effect(
             $"{CardName}: return from graveyard to battlefield (landfall trigger)",

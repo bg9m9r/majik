@@ -5,11 +5,11 @@ Scanner output: every `*Factory.cs` xmldoc / inline comment mentioning
 engine primitive. Each row answers: "if we ship primitive _X_, which factory
 xmldocs flagged that they're blocked on it?"
 
-- **Generated:** 2026-05-25 01:48 UTC
+- **Generated:** 2026-05-25 03:02 UTC
 - **Scanned dir:** `Majik.Core/CardData/Factories`
-- **Total mentions:** 178
-- **Clusters:** 6
-- **Unclustered (need new registry pattern):** 132
+- **Total mentions:** 193
+- **Clusters:** 7
+- **Unclustered (need new registry pattern):** 146
 
 Regenerate with `dotnet run --project Majik.Console -- mechanic-deps --md-out docs/MECHANIC_DEPS.md --json-out docs/mechanic-deps.json`.
 
@@ -20,9 +20,10 @@ Regenerate with `dotnet run --project Majik.Console -- mechanic-deps --md-out do
 | 1 | Agent-prompt targeting MVP | — | 28 | 35 |
 | 2 | Library shuffle (CR 701.20) | CR 701.20 | 4 | 4 |
 | 3 | Layer-6 ability-grant subsystem (CR 613.1f) | CR 613.1f | 2 | 4 |
-| 4 | Cast-marker on Card | — | 1 | 1 |
-| 5 | Cycling-style activated-from-hand (CR 702.32 / Channel CR 702.74) | CR 702.32 | 1 | 1 |
+| 4 | Cycling-style activated-from-hand (CR 702.32 / Channel CR 702.74) | CR 702.32 | 1 | 1 |
+| 5 | Escape alt-cost (CR 702.143) | CR 702.143 | 1 | 1 |
 | 6 | "Activate only as a sorcery" gate (CR 117.1a) | CR 117.1a | 1 | 1 |
+| 7 | Token colour identity (CR 105 / CR 903.4) | CR 105 | 1 | 1 |
 
 ## Cluster detail
 
@@ -37,6 +38,8 @@ Mentions:
   > Real agent-driven any-target prompt (creature / planeswalker / battle / player) is deferred behind the broader prompt surface — same posture as Lightning Bolt.
 - `NihilSpellbombFactory` (`NihilSpellbombFactory.cs:13`)
   > Full agent-prompt targeting deferred.
+- `KappaCannoneerFactory` (`KappaCannoneerFactory.cs:106`)
+  > Tests + bots pre-select the artifact list, mirroring the deferred agent prompt pattern used for <see cref="DelveCost"/>.
 - `EsikasChariotFactory` (`EsikasChariotFactory.cs:12`)
   > Token-copy targeting auto-picks the first eligible token-creature the controller controls; agent-driven targeting is deferred.
 - `MysticSanctuaryFactory` (`MysticSanctuaryFactory.cs:12`)
@@ -73,8 +76,6 @@ Mentions:
   > Agent prompt deferred.
 - `RelicOfProgenitusFactory` (`RelicOfProgenitusFactory.cs:12`)
   > Full agent-prompt targeting deferred.
-- `FaithlessLootingFactory` (`FaithlessLootingFactory.cs:111`)
-  > Real agent-driven choice deferred.
 - `UroTitanFactory` (`UroTitanFactory.cs:14`)
   > v1 always plays the first land in hand when one exists; a first-class yes/no agent prompt is deferred (same gap as Sun Titan / Primeval Titan / Stoneforge Mystic).
 - `DauthiVoidwalkerFactory` (`DauthiVoidwalkerFactory.cs:13`)
@@ -133,22 +134,12 @@ Mentions:
   > The layer-6 continuous effect that actually grants those abilities to battlefield creatures is deferred until the layer-6 ability-grant subsystem is in place.
 - `AgathasSoulCauldronFactory` (`AgathasSoulCauldronFactory.cs:88`)
   > CR 702.49 — imprint: record this creature card on the Cauldron so the ability-grant static ability can reference it later (layer-6 grant deferred; storage wired here).
-- `BloodghastFactory` (`BloodghastFactory.cs:14`)
+- `BloodghastFactory` (`BloodghastFactory.cs:15`)
   > A proper continuous effect (Layer 6 keyword grant gated on a live life-total predicate) is deferred until the conditional-keyword CDA surface exists.
-- `BloodghastFactory` (`BloodghastFactory.cs:126`)
+- `BloodghastFactory` (`BloodghastFactory.cs:143`)
   > A full dynamic Layer 6 conditional keyword grant is deferred — see class xmldoc.
 
-### 4. Cast-marker on Card
-
-- **Blocks:** 1 factories (1 mentions)
-- **Implementation hint:** Persistent 'this object was cast (vs. put onto the battlefield)' flag — Bloodghast, The One Ring, Pact triggers all key off it.
-
-Mentions:
-
-- `TheOneRingFactory` (`TheOneRingFactory.cs:15`)
-  > The effect body is a no-op — the "if you cast it" intervening-if clause, the "until your next turn" expiry, and the "protection from everything" player-scoped grant are all deferred (no cast-marker on Card, no per-player delayed cleanup, no Player.
-
-### 5. Cycling-style activated-from-hand (CR 702.32 / Channel CR 702.74)
+### 4. Cycling-style activated-from-hand (CR 702.32 / Channel CR 702.74)
 
 - **CR citation:** CR 702.32
 - **Blocks:** 1 factories (1 mentions)
@@ -158,6 +149,17 @@ Mentions:
 
 - `ChannelLandCycleFactory` (`ChannelLandCycleFactory.cs:12`)
   > Sokenzan, Crucible of Defiance — deferred (its Channel produces two 1/1 Spirit tokens with haste; requires a Spirit-token shape not yet in <c>TokenFactory</c>).
+
+### 5. Escape alt-cost (CR 702.143)
+
+- **CR citation:** CR 702.143
+- **Blocks:** 1 factories (1 mentions)
+- **Implementation hint:** Cast-from-graveyard alt cost that additionally exiles N cards. Sibling of Flashback's cast-from-graveyard, but with the extra exile-cost rider.
+
+Mentions:
+
+- `NethergoyfFactory` (`NethergoyfFactory.cs:12`)
+  > ## Deferred (v1 gaps)  - <b>Escape exile rider's "any-number with 4+ types among them" predicate</b>: the v1 fixed-4 exile count is observationally close (four monotype cards in the graveyard satisfy the rider), but the "any-number" surface needs an agent-pick over graveyard subsets that collectively reach the 4-type t…
 
 ### 6. "Activate only as a sorcery" gate (CR 117.1a)
 
@@ -170,6 +172,17 @@ Mentions:
 - `TirelessTrackerFactory` (`TirelessTrackerFactory.cs:14`)
   > <b>"Activate only as a sorcery"</b> — Tireless Tracker's printed activated ability has NO sorcery-speed restriction (instant speed on the official card), so nothing is deferred here for this card.
 
+### 7. Token colour identity (CR 105 / CR 903.4)
+
+- **CR citation:** CR 105
+- **Blocks:** 1 factories (1 mentions)
+- **Implementation hint:** TokenFactory needs an explicit Colors field separate from mana cost; today tokens default to colourless.
+
+Mentions:
+
+- `HiveOfTheEyeTyrantFactory` (`HiveOfTheEyeTyrantFactory.cs:12`)
+  > <b>Black colour identity of the animated form</b> — same gap as Creeping Tar Pit: the engine's colour layer (Layer 5) has no colour-setting effect primitive yet.
+
 ## Unclustered (need new registry pattern)
 
 - `SplinterTwinFactory` (`SplinterTwinFactory.cs:16`)
@@ -180,8 +193,10 @@ Mentions:
   > <b>Live "each opponent" / "each planeswalker you don't control" enumeration without resolvers</b>: same gap as Sheoldred / Meathook Massacre — <see cref="Player"/> doesn't expose opponent list at construction time.
 - `BridgeFromBelowFactory` (`BridgeFromBelowFactory.cs:12`)
   > ## Deferred (v1 gaps)  - <b>APNAP simultaneous-trigger ordering</b>: when one creature dies to a chained event (combat damage, board wipe), CR 603.3b sorts pending triggers by APNAP and within each player by the player's choice.
-- `TheOneRingFactory` (`TheOneRingFactory.cs:121`)
-  > " Structural: "if you cast it" + "until your next turn" expiry deferred — see class xmldoc.
+- `TheOneRingFactory` (`TheOneRingFactory.cs:15`)
+  > The "until your next turn" expiry and the player-scoped "protection from everything" grant remain deferred (no per-player delayed cleanup, no Player.
+- `TheOneRingFactory` (`TheOneRingFactory.cs:123`)
+  > The "until your next turn" expiry and the player-scoped protection grant remain deferred — see class xmldoc.
 - `StormchasersTalentFactory` (`StormchasersTalentFactory.cs:16`)
   > <b>Prowess pump on the Mercenary token</b>: still keyword-marker-only (same gap as Cori-Steel Cutter / Monastery Mentor — TokenFactory doesn't thread ContinuousEffectsService for token-resident keywords yet).
 - `StormchasersTalentFactory` (`StormchasersTalentFactory.cs:159`)
@@ -190,6 +205,12 @@ Mentions:
   > Colors"/>; Prowess pump on the token deferred (see class xmldoc).
 - `NihilSpellbombFactory` (`NihilSpellbombFactory.cs:13`)
   > Real prompt deferred until IPlayerAgent grows a ChooseYesNoAsync surface.
+- `KappaCannoneerFactory` (`KappaCannoneerFactory.cs:16`)
+  > ## Deferred (v1 gaps)  - <b>Ward {4} trigger wiring</b>: <see cref="WardEffect"/> is a standalone check helper, not yet plumbed onto a battlefield-attached triggered ability.
+- `KappaCannoneerFactory` (`KappaCannoneerFactory.cs:121`)
+  > v1 exposes this as a builder so the spell-resolution path can opt-in once the Ward trigger primitive lands (see class xmldoc for the deferred wiring gap).
+- `KappaCannoneerFactory` (`KappaCannoneerFactory.cs:190`)
+  > WardEffect exists as a standalone helper (BuildWardEffect bounds an instance to the live card) but the battlefield-attached triggered-ability surface is deferred — see class xmldoc.
 - `IzzetCharmFactory` (`IzzetCharmFactory.cs:211`)
   > Real agent- driven "choose 2 cards to discard" prompt is deferred — same queue as Faithless Looting / Liliana / Connive.
 - `ConversionFactory` (`ConversionFactory.cs:54`)
@@ -264,9 +285,9 @@ Mentions:
   > Guard: only fire when the Priest is currently in its owner's graveyard, so spurious activations from other zones are no-op-shaped while engine zone-scoping is deferred.
 - `PriestOfFellRitesFactory` (`PriestOfFellRitesFactory.cs:148`)
   > Skip if not currently in graveyard — activation is illegal from other zones (engine gating deferred; the guard keeps shape tests honest).
-- `ThroughTheBreachFactory` (`ThroughTheBreachFactory.cs:12`)
+- `ThroughTheBreachFactory` (`ThroughTheBreachFactory.cs:13`)
   > Through the Breach is still castable for its printed cost; the splice rider is structural-only on the oracle text and will be added when the engine has an Arcane- spell awareness pass (same gap as every other Splice card).
-- `LilianaOfTheVeilFactory` (`LilianaOfTheVeilFactory.cs:118`)
+- `LilianaOfTheVeilFactory` (`LilianaOfTheVeilFactory.cs:151`)
   > v1 deferred — loyalty change applies with an empty body so the cost is still paid.
 - `ReflectorMageFactory` (`ReflectorMageFactory.cs:149`)
   > DEFERRED: "That creature's owner can't cast spells with the same name as that creature until your next turn.
@@ -304,6 +325,10 @@ Mentions:
   > ## Deferred (v1 gaps)  - <b>Discard prompt</b> on the loot half and the activation cost (CR 701.16a — discarding player chooses) — v1 deterministically picks the first card in hand.
 - `LeoninArbiterFactory` (`LeoninArbiterFactory.cs:80`)
   > Actual search enforcement is deferred pending a unified library-search hook (see class xmldoc).
+- `BlastZoneFactory` (`BlastZoneFactory.cs:13`)
+  > </item> </list>  ## Deferred (v1 gaps)
+- `BlastZoneFactory` (`BlastZoneFactory.cs:13`)
+  > <b>Charge-counter activation X-value provenance</b>: same gap as Engineered Explosives' Sunburst — no per-activation X ledger.
 - `FuryFactory` (`FuryFactory.cs:13`)
   > <b>Card-source threading on damage events</b>: emitting <see cref="DamageDealtEvent"/> with a proper source card requires plumbing the resolving permanent into the trigger effect — deferred for parity with Solitude's lifelink wiring.
 - `FaithlessSalvagingFactory` (`FaithlessSalvagingFactory.cs:11`)
@@ -332,7 +357,7 @@ Mentions:
   > ("Elder" creature subtype is not yet in <see cref="CardSubtype"/> — Giant is wired; Elder is deferred — see gaps below.
 - `UroTitanFactory` (`UroTitanFactory.cs:14`)
   > <see cref="CardSubtype"/> only carries Giant; Elder is not yet in the enum, mirroring the same gap for other "Elder X" creatures (Elder Dragons etc).
-- `BloodghastFactory` (`BloodghastFactory.cs:14`)
+- `BloodghastFactory` (`BloodghastFactory.cs:15`)
   > "You may" prompt: auto-accepted (same gap as Arclight Phoenix / Sneak Attack / Tireless Tracker).
 - `KarnScionOfUrzaFactory` (`KarnScionOfUrzaFactory.cs:12`)
   > <b>-1</b>: DEFERRED to a no-op body (loyalty change still applies per CR 606.3).
@@ -390,7 +415,7 @@ Mentions:
   > <b>"You may" prompt</b>: the fight is optional; deferred alongside targeting.
 - `KraulHarpoonerFactory` (`KraulHarpoonerFactory.cs:60`)
   > Targeting + fight step deferred (see xmldoc above).
-- `ShowAndTellFactory` (`ShowAndTellFactory.cs:10`)
+- `ShowAndTellFactory` (`ShowAndTellFactory.cs:11`)
   > Real "any of N choices + opt-out" prompt deferred (same queue as Stoneforge Mystic / Sun Titan).
 - `YawgmothFactory` (`YawgmothFactory.cs:10`)
   > Effect 4: Controller draws a card  ## Deferred (v1 gaps)
@@ -416,6 +441,16 @@ Mentions:
   > Wire a selector callback when the multi-candidate "choose a card to put onto the battlefield" prompt ships (mirrors the same gap on Stoneforge Mystic's tutor).
 - `DazeFactory` (`DazeFactory.cs:11`)
   > A bot-side probe (mirror of <c>PitchAltCostProbe</c>) is deferred — Daze's pitch always pays so the probe shape is just "for each Island controlled, yield one candidate" and lives outside this factory's surface in v1.
+- `HiveOfTheEyeTyrantFactory` (`HiveOfTheEyeTyrantFactory.cs:12`)
+  > <b>Combat math through Compute</b>: same gap as Mutavault / Creeping Tar Pit / Inkmoth — until <see cref="ContinuousEffectsService.
+- `PinnacleEmissaryFactory` (`PinnacleEmissaryFactory.cs:13`)
+  > Flagged in <see cref="CreateDroneToken"/>'s xmldoc as deferred — same posture as Inkmoth Nexus' Infect marker (keyword on the card; mechanic pipeline not wired).
+- `PinnacleEmissaryFactory` (`PinnacleEmissaryFactory.cs:127`)
+  > The mechanic (alt-cost + exile-at-end-step + cast-from-exile-later) is deferred; the marker surfaces the keyword for card-text inspection, parity with Improvise / Convoke / Delve markers.
+- `PinnacleEmissaryFactory` (`PinnacleEmissaryFactory.cs:175`)
+  > <para>v1 gaps:</para> <list type="bullet"> <item>Printed "This token can block only creatures with flying" blocking restriction is NOT enforced — no combat-block restriction primitive for "can only block X" yet.
+- `PinnacleEmissaryFactory` (`PinnacleEmissaryFactory.cs:175`)
+  > Keywords"/>; the restriction rider is documented but deferred.
 - `AjaniNacatlPariahFactory` (`AjaniNacatlPariahFactory.cs:11`)
   > The MdfcState flip is the v1 observation surface — combat / loyalty interactions on the back face are deferred.
 - `AjaniNacatlPariahFactory` (`AjaniNacatlPariahFactory.cs:105`)
@@ -426,6 +461,12 @@ Mentions:
   > Same v1 gap as <see cref="StormchasersTalentFactory"/>'s Mercenary tokens and <see cref="MonasteryMentorFactory"/>'s Monk tokens.
 - `CoriSteelCutterFactory` (`CoriSteelCutterFactory.cs:179`)
   > Prowess pump on the token is deferred — see class xmldoc.
+- `NethergoyfFactory` (`NethergoyfFactory.cs:12`)
+  > The richer "any-number-with-N-types-among-them" predicate is deferred — see gaps below; same posture as Cabal Therapy's flashback-sacrifice rider being shipped paired-and-noted.
+- `NethergoyfFactory` (`NethergoyfFactory.cs:91`)
+  > The printed text is "exile any number of other cards from your graveyard with four or more card types <em>among them</em>"; v1 ships a fixed N=4 stub (see class xmldoc for the deferred any-number / type-collective predicate gap).
+- `NethergoyfFactory` (`NethergoyfFactory.cs:100`)
+  > <summary> CR 702.138 — Nethergoyf's printed Escape alt-cost ({2}{B}, exile four OTHER graveyard cards in v1; see class xmldoc for the any-number / 4-types-among-them deferred surface).
 - `LordOfAtlantisFactory` (`LordOfAtlantisFactory.cs:9`)
   > The combat-validator enforcement of Islandwalk ("creature can't be blocked as long as the defending player controls an Island") is deferred — same posture as Intimidate / Menace enforcement.
 - `HogaakFactory` (`HogaakFactory.cs:11`)

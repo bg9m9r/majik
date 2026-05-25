@@ -538,6 +538,19 @@ public sealed class SpellCastFlow
             giftClauseForDelivery.DeliverTo(giftRecipient, spell);
         }
 
+        // CR 113.5 / CR 400.7 — stamp the persistent cast marker on the
+        // underlying card just before the spell hits the stack. The flag
+        // survives Stack → Battlefield so ETB triggers ("when ~ enters,
+        // if you cast it, …" — The One Ring) and battlefield-entry
+        // replacements ("if it wasn't cast" — Containment Priest, via
+        // ZoneMoveIntent.WasCast which ZoneService populates from this
+        // field) read the same truth. ZoneService clears the flag when
+        // the permanent later leaves the battlefield.
+        if (card is Card concreteForCast)
+        {
+            concreteForCast.SetWasCast(true);
+        }
+
         _stack.Push(spell);
         _eventBus.Publish(new SpellCastEvent(spell));
 
