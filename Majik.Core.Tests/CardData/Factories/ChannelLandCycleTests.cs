@@ -37,9 +37,10 @@ public class ChannelLandCycleTests
     public static IEnumerable<object[]> AllChannelLands => new[]
     {
         // cardName, producedColor, channelGeneric, channelColored
-        new object[] { "Otawara, Soaring City",       "U", 2, 1 }, // channel = {2}{U}
-        new object[] { "Eiganjo, Seat of the Empire", "W", 1, 1 }, // channel = {1}{W}
-        new object[] { "Takenuma, Abandoned Mire",    "B", 2, 1 }, // channel = {2}{B}
+        new object[] { "Otawara, Soaring City",          "U", 2, 1 }, // channel = {2}{U}
+        new object[] { "Eiganjo, Seat of the Empire",    "W", 1, 1 }, // channel = {1}{W}
+        new object[] { "Takenuma, Abandoned Mire",       "B", 2, 1 }, // channel = {2}{B}
+        new object[] { "Sokenzan, Crucible of Defiance", "R", 2, 1 }, // channel = {2}{R}
     };
 
     [Theory]
@@ -256,6 +257,35 @@ public class ChannelLandCycleTests
         _alice.Zones.Hand.GetCards().Should().BeEmpty(
             "no creature/planeswalker in the top 4 → nothing to hand");
         _alice.Zones.Graveyard.GetCards().Should().Contain(new ICard[] { inst, sorc });
+    }
+
+    // -----------------------------------------------------------------------
+    // Sokenzan — create two 1/1 red Spirit creature tokens with haste
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void Sokenzan_Channel_CreatesTwoRedSpiritTokensWithHaste()
+    {
+        var sokenzan = (Land)NamedCardFactory.Create("Sokenzan, Crucible of Defiance", _alice);
+
+        var channel = sokenzan.Abilities.OfType<ActivatedAbility>().Single();
+        channel.Resolve();
+
+        var spirits = _alice.Zones.Battlefield.GetCards()
+            .OfType<Creature>()
+            .Where(c => c.IsToken)
+            .ToList();
+
+        spirits.Should().HaveCount(2, "Sokenzan's Channel creates two Spirit tokens");
+        foreach (var spirit in spirits)
+        {
+            spirit.Power.Should().Be(1);
+            spirit.Toughness.Should().Be(1);
+            spirit.HasSubtype(CardSubtype.Spirit).Should().BeTrue();
+            spirit.Abilities.OfType<KeywordAbility>()
+                .Should().Contain(k => k.Keyword == "Haste",
+                    "Sokenzan's Spirit tokens have haste (CR 702.10)");
+        }
     }
 
     // -----------------------------------------------------------------------

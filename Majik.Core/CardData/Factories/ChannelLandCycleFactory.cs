@@ -19,9 +19,10 @@ namespace Majik.Core.CardData.Factories;
 /// Channel mana cost, and the Channel effect body differ across members,
 /// so one factory class handles the cycle:
 /// <code>
-/// [CardName("Otawara, Soaring City",   "U", "2U", "bounce-nonland")]
-/// [CardName("Eiganjo, Seat of the Empire", "W", "1W", "destroy-attacking-blocking")]
-/// [CardName("Takenuma, Abandoned Mire", "B", "2B", "dig-4-creature-pw")]
+/// [CardName("Otawara, Soaring City",          "U", "2U", "bounce-nonland")]
+/// [CardName("Eiganjo, Seat of the Empire",    "W", "1W", "destroy-attacking-blocking")]
+/// [CardName("Takenuma, Abandoned Mire",       "B", "2B", "dig-4-creature-pw")]
+/// [CardName("Sokenzan, Crucible of Defiance", "R", "2R", "two-spirit-haste-tokens")]
 /// </code>
 ///
 /// Args layout (forwarded by the source generator at dispatch time):
@@ -72,6 +73,14 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="IPlayerAgent.ChooseLibraryPickAsync"/>) to move one
 ///   creature or planeswalker card to hand; the rest go to graveyard.
 ///   Falls back to the first matching card when no agent is registered.
+/// - Sokenzan — no targets; on resolve, creates two 1/1 red Spirit
+///   creature tokens with haste under the controller via
+///   <see cref="Tokens.TokenFactory.CreateOnBattlefield"/>
+///   (<see cref="CardSubtype.Spirit"/> + <c>"Haste"</c> keyword stamp;
+///   <see cref="ManaColor.Red"/> colour identity). Per-token routing
+///   through <see cref="ZoneService"/> is deferred — the v1 factory
+///   does not have a <c>ZoneService</c> reference at activation time
+///   (mirrors Takenuma's raw-zone resolve body).
 ///
 /// ## Deferred (v1 gaps)
 /// - Eiganjo combat-state target gate: live "attacking or blocking" set
@@ -86,13 +95,11 @@ namespace Majik.Core.CardData.Factories;
 /// - Boseiju, Who Endures — shipped via the JSON-driven
 ///   <see cref="BoseijuFactory"/> (different effect body — destroy
 ///   target artifact / enchantment / nonbasic land).
-/// - Sokenzan, Crucible of Defiance — deferred (its Channel produces
-///   two 1/1 Spirit tokens with haste; requires a Spirit-token shape
-///   not yet in <c>TokenFactory</c>).
 /// </summary>
-[CardName("Otawara, Soaring City",       "U", "2U", "bounce-nonland")]
-[CardName("Eiganjo, Seat of the Empire", "W", "1W", "destroy-attacking-blocking")]
-[CardName("Takenuma, Abandoned Mire",    "B", "2B", "dig-4-creature-pw")]
+[CardName("Otawara, Soaring City",          "U", "2U", "bounce-nonland")]
+[CardName("Eiganjo, Seat of the Empire",    "W", "1W", "destroy-attacking-blocking")]
+[CardName("Takenuma, Abandoned Mire",       "B", "2B", "dig-4-creature-pw")]
+[CardName("Sokenzan, Crucible of Defiance", "R", "2R", "two-spirit-haste-tokens")]
 public static class ChannelLandCycleFactory
 {
     /// <summary>
@@ -158,6 +165,7 @@ public static class ChannelLandCycleFactory
             "bounce-nonland" => BuildBounceNonland(land, () => channel!),
             "destroy-attacking-blocking" => BuildDestroyAttackingBlocking(land, () => channel!),
             "dig-4-creature-pw" => BuildDigForCreatureOrPlaneswalker(land, controller),
+            "two-spirit-haste-tokens" => BuildTwoSpiritHasteTokens(land, controller),
             _ => throw new ArgumentException(
                 $"ChannelLandCycleFactory: unknown effect tag '{effectTag}'.",
                 nameof(effectTag)),
@@ -289,6 +297,41 @@ public static class ChannelLandCycleFactory
                         controller.Zones.Graveyard.AddCard(card);
                         card.SetZone(ZoneType.Graveyard);
                     }
+                }
+            });
+
+        return (effect, Array.Empty<TargetRequest>());
+    }
+
+    /// <summary>
+    /// Sokenzan, Crucible of Defiance — "Create two 1/1 red Spirit
+    /// creature tokens with haste." No targets. On resolve creates two
+    /// independent Spirit tokens under <paramref name="controller"/> via
+    /// <see cref="Tokens.TokenFactory.CreateOnBattlefield"/> (CR 111.1 /
+    /// CR 111.6 — token enters as a new object, sickness flag stamped by
+    /// TokenFactory; Haste lifts the can't-attack rider per CR 702.10c).
+    /// </summary>
+    private static (IEffect effect, TargetRequest[] requests) BuildTwoSpiritHasteTokens(
+        Land land, Player controller)
+    {
+        var effect = new Effect(
+            $"{land.Name} (Channel): create two 1/1 red Spirit creature tokens with haste",
+            () =>
+            {
+                // Two independent token instances — each token is a
+                // distinct game object (CR 111.1) so a Doubling Season /
+                // Parallel Lives doubler stacks per-creation event.
+                for (var i = 0; i < 2; i++)
+                {
+                    Majik.Core.Tokens.TokenFactory.CreateOnBattlefield(
+                        new Majik.Core.Tokens.TokenFactory.TokenSpec(
+                            Name: "Spirit",
+                            Power: 1,
+                            Toughness: 1,
+                            Subtypes: new[] { CardSubtype.Spirit },
+                            Keywords: new[] { "Haste" },
+                            Colors: new[] { ManaColor.Red }),
+                        controller);
                 }
             });
 

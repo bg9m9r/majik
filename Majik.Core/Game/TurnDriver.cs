@@ -370,8 +370,12 @@ public sealed class TurnDriver
             // flashback / spectacle / evoke / pitch), it REPLACES the
             // printed cost and bypasses cost-reduction; otherwise apply
             // CR 117.7 Affinity / cost-reducers on the printed cost.
+            // CR 117.7 / 601.2f — pass the live player roster so the
+            // three-arg overload folds in SpellCostIncreaseAbility riders
+            // from every player's battlefield (Sphere of Resistance,
+            // Trinisphere, Thalia, Damping Sphere).
             var cost = cast.AlternativeCost?.AlternativeManaCost
-                ?? Majik.Core.Costs.CostReduction.GetEffectiveCost(cast.Card, actor);
+                ?? Majik.Core.Costs.CostReduction.GetEffectiveCost(cast.Card, actor, _players);
 
             // CR 601.2g + CR 106.4 — pay from the player's already-floating
             // mana pool first. When the pool fully covers the cost we don't
