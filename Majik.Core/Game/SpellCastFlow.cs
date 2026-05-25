@@ -369,6 +369,23 @@ public sealed class SpellCastFlow
             }
         }
 
+        // CR 702.127 — Improvise. "Each artifact you tap after you're done
+        // activating mana abilities pays for {1}." The Improvise cost
+        // already tapped the chosen artifacts in the CR 601.2f additional-
+        // cost loop above; here we fold the generic-mana reduction into
+        // the cost before the agent is prompted for the remaining mana
+        // payment (CR 605.1 — mana abilities are settled by the time
+        // ChooseManaSourcesAsync fires, satisfying the
+        // "after you're done activating mana abilities" timing rule).
+        // Coloured pips are preserved per CR 702.127.
+        foreach (var addCost in mergedAdditional)
+        {
+            if (addCost is ImproviseAdditionalCost improvise && improvise.ReductionAmount > 0)
+            {
+                totalCost = improvise.ApplyTo(totalCost);
+            }
+        }
+
         // CR 601.2g — mana sourcing. When the caller has already prompted +
         // paid mana (TurnDriver does this so a failed pay can rotate the
         // hand instead of mutating the stack), reuse that ManaPayment as

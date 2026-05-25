@@ -38,6 +38,10 @@ namespace Majik.Core.Players.Agents;
 ///   exposes <see cref="KickerAltCostProbe.KickerCostFor"/> +
 ///   <see cref="KickerAltCostProbe.BuildAdditionalCost"/> for the
 ///   bot's "should I pay the kicker?" decision.</item>
+///   <item><see cref="ImproviseAltCostProbe"/> — CR 702.127 Improvise.
+///   Wrapped as a discovery-friendly <see cref="ImproviseAlternativeCost"/>
+///   shim (the underlying <see cref="ImproviseAdditionalCost"/> rides on
+///   the additional-cost rail at cast time).</item>
 /// </list>
 ///
 /// <para>Card factories that need a per-card probe (a "this specific card
@@ -117,6 +121,7 @@ public sealed class AlternativeCostProbeRegistry : IAlternativeCostProbe
             .Register(new EnergyAltCostProbe(EnergyAltCostProbe.DefaultLookup))
             .Register(new EscapeAltCostProbe(EscapeAltCostProbe.DefaultLookup))
             .Register(new KickerAltCostProbe(KickerAltCostProbe.DefaultLookup))
-            .Register(new SuspendAltCostProbe(SuspendAltCostProbe.DefaultLookup));
+            .Register(new SuspendAltCostProbe(SuspendAltCostProbe.DefaultLookup))
+            .Register(new ImproviseAltCostProbe());
     }
 }
