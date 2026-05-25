@@ -125,6 +125,11 @@ class Program
                 Environment.Exit(await ScaffoldFactoryCommand.RunAsync(args));
                 return;
             }
+            else if (args[0].Equals("dashboard", StringComparison.OrdinalIgnoreCase))
+            {
+                Environment.Exit(await DashboardCommand.RunAsync(args));
+                return;
+            }
         }
 
         System.Console.WriteLine("Usage:");
@@ -141,6 +146,7 @@ class Program
         System.Console.WriteLine("  Majik.Console compile-templates");
         System.Console.WriteLine("  Majik.Console mechanic-deps [--top N] [--json-out <path>] [--md-out <path>] [--factories-dir <path>]");
         System.Console.WriteLine("  Majik.Console scaffold-factory <Card Name> [--out <path>] [--force]");
+        System.Console.WriteLine("  Majik.Console dashboard [--out <path>] [--modern|--full]");
         System.Console.WriteLine();
         TriggerPlayground.PrintScenarios();
     }
