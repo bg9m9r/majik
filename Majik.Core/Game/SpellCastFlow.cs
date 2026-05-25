@@ -274,9 +274,28 @@ public sealed class SpellCastFlow
         }
 
         int? mode = null;
+        IReadOnlyList<int>? modeIndexes = null;
         if (definition.Modes.Count > 0)
         {
-            mode = await agent.ChooseModeAsync(ctx, definition.Modes, definition.ModeIntents, ct);
+            if (definition.RequiredModeCount > 1)
+            {
+                // CR 700.2d — multi-pick "Choose N —" prompt. Aggregate
+                // per-mode intents into a single prompt intent (OR-mask)
+                // so the heuristic bot's scoring path has signal even on
+                // the interface-level (ctx-less) overload.
+                var promptIntent = BotIntent.None;
+                var miList = definition.ModeIntentsOrEmpty;
+                for (var i = 0; i < miList.Count; i++) promptIntent |= miList[i];
+                modeIndexes = await agent.ChooseModeAsync(
+                    definition.Modes, promptIntent, definition.RequiredModeCount, ct);
+                mode = modeIndexes.Count > 0 ? modeIndexes[0] : (int?)null;
+            }
+            else
+            {
+                mode = await agent.ChooseModeAsync(
+                    ctx, definition.Modes, definition.ModeIntents, ct);
+                modeIndexes = mode.HasValue ? new[] { mode.Value } : null;
+            }
         }
 
         int? xValue = null;
@@ -411,7 +430,7 @@ public sealed class SpellCastFlow
 
         var chosen = new ChosenSpellParams(
             mode, xValue, collectedTargets, mana, ctx.AllPlayers,
-            ModeIndexes: null,
+            ModeIndexes: modeIndexes,
             AdditionalCostPayments: mergedAdditional.Count > 0 ? mergedAdditional : null);
         var effects = definition.EffectFactory(chosen);
 

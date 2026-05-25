@@ -812,6 +812,57 @@ public sealed class HeuristicBotAgent : IPlayerAgent
         return score;
     }
 
+    /// <summary>
+    /// CR 700.2d "Choose N —" prompt. Score each mode by label sniffing
+    /// (the interface-level overload has no live ctx for board-state
+    /// scoring), apply a small bias toward earlier modes (printed order =
+    /// designer-intended default), promote modes whose label matches the
+    /// prompt-wide intent, then take the top <paramref name="requiredCount"/>
+    /// distinct indices in printed order.
+    /// </summary>
+    public Task<IReadOnlyList<int>> ChooseModeAsync(
+        IReadOnlyList<string> modes,
+        BotIntent intent,
+        int requiredCount = 1,
+        CancellationToken ct = default)
+    {
+        if (modes.Count == 0 || requiredCount <= 0)
+        {
+            return Task.FromResult<IReadOnlyList<int>>(Array.Empty<int>());
+        }
+        var capped = Math.Min(requiredCount, modes.Count);
+
+        var scored = new List<(int idx, int score)>(modes.Count);
+        for (var i = 0; i < modes.Count; i++)
+        {
+            // Best-effort label sniff without live ctx; mirrors the
+            // ctx-less degenerate path used by the legacy single-mode
+            // ChooseModeAsync (which folds in board state when present).
+            var s = LegacyScoreLabel(modes[i], oppHasCreature: true, ourCreatureCount: 1, ourLifeLow: false);
+            // Tiny printed-order tiebreaker so the first mode wins among
+            // equal-scored picks.
+            s += (modes.Count - i);
+            if (intent != BotIntent.None
+                && intent.HasAny(BotIntent.Removal | BotIntent.Burn | BotIntent.Counter | BotIntent.Bounce))
+            {
+                var lbl = modes[i].ToLowerInvariant();
+                if (lbl.Contains("counter") || lbl.Contains("destroy")
+                    || lbl.Contains("return") || lbl.Contains("damage"))
+                {
+                    s += 5;
+                }
+            }
+            scored.Add((i, s));
+        }
+        var picks = scored
+            .OrderByDescending(t => t.score)
+            .Take(capped)
+            .Select(t => t.idx)
+            .OrderBy(i => i)
+            .ToList();
+        return Task.FromResult<IReadOnlyList<int>>(picks);
+    }
+
     private static int ScoreIntentForState(
         BotIntent intent, bool oppHasCreature, int ourCreatureCount, bool ourLifeLow)
     {

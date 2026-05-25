@@ -57,6 +57,16 @@ public class ArchmagesCharmTests
     }
 
     [Fact]
+    public void BuildDefinition_RequiredModeCount_IsOne()
+    {
+        var def = ArchmagesCharmFactory.BuildDefinition(_alice, o => o, _stack);
+
+        def.RequiredModeCount.Should().Be(1,
+            because: "CR 700.2d — Archmage's Charm's printed pick is \"Choose one —\"");
+        def.RequiredModeCount.Should().Be(ArchmagesCharmFactory.PickCount);
+    }
+
+    [Fact]
     public void BuildDefinition_ExposesThreeModes_WithPerModeIntents()
     {
         var def = ArchmagesCharmFactory.BuildDefinition(_alice, o => o, _stack);

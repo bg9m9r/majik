@@ -45,6 +45,31 @@ public class TriggeredAbility : ITriggeredAbility
     public IReadOnlyList<TargetRequest> TargetRequests { get; }
 
     /// <summary>
+    /// CR 700.2d — modal-trigger mode labels (e.g. Deceiver Exarch's two
+    /// ETB modes). Empty for non-modal triggers. When populated,
+    /// <see cref="TriggerManager.PutPendingTriggersOnStackAsync"/> prompts
+    /// the controller's agent via the list-returning
+    /// <see cref="IPlayerAgent.ChooseModeAsync(IReadOnlyList{string}, BotIntent, int, CancellationToken)"/>
+    /// before pushing the ability on the stack.
+    /// </summary>
+    public IReadOnlyList<string> Modes { get; }
+
+    /// <summary>Per-mode intent (parallel to <see cref="Modes"/>), or
+    /// <see cref="BotIntent.None"/> when unclassified. OR-combined into
+    /// a prompt-level intent at trigger-resolve time.</summary>
+    public IReadOnlyList<BotIntent> ModeIntents { get; }
+
+    /// <summary>Required count of distinct mode picks (CR 700.2d).
+    /// Defaults to 1 for "Choose one —".</summary>
+    public int RequiredModeCount { get; }
+
+    /// <summary>The chosen mode indices, populated by
+    /// <see cref="SetChosenModes"/> before resolution. Empty for non-
+    /// modal triggers. Effect closures read this to branch their body
+    /// per chosen mode.</summary>
+    public IReadOnlyList<int> ChosenModes { get; private set; } = Array.Empty<int>();
+
+    /// <summary>
     /// The targets chosen by the controller's agent (parallel list-of-lists
     /// matching <see cref="TargetRequests"/>). Populated by
     /// <see cref="SetChosenTargets"/> before the ability is pushed onto the
@@ -61,11 +86,18 @@ public class TriggeredAbility : ITriggeredAbility
         IEnumerable<IEffect>? effects = null,
         Func<bool>? interveningIf = null,
         IEnumerable<ZoneType>? activeZones = null,
-        IEnumerable<TargetRequest>? targetRequests = null)
+        IEnumerable<TargetRequest>? targetRequests = null,
+        IReadOnlyList<string>? modes = null,
+        IReadOnlyList<BotIntent>? modeIntents = null,
+        int requiredModeCount = 1)
     {
         Source = source ?? throw new ArgumentNullException(nameof(source));
         Controller = controller ?? throw new ArgumentNullException(nameof(controller));
         Condition = condition ?? throw new ArgumentNullException(nameof(condition));
+
+        Modes = modes ?? Array.Empty<string>();
+        ModeIntents = modeIntents ?? Array.Empty<BotIntent>();
+        RequiredModeCount = requiredModeCount;
 
         Id = Guid.NewGuid();
         Timestamp = DateTime.UtcNow;
@@ -98,6 +130,17 @@ public class TriggeredAbility : ITriggeredAbility
     public void SetChosenTargets(IReadOnlyList<IReadOnlyList<object>> chosen)
     {
         _chosenTargets = chosen ?? Array.Empty<IReadOnlyList<object>>();
+    }
+
+    /// <summary>
+    /// Store the mode indices chosen by the controller's agent
+    /// (CR 700.2d). Called by
+    /// <see cref="TriggerManager.PutPendingTriggersOnStackAsync"/> before
+    /// pushing a modal trigger onto the stack.
+    /// </summary>
+    public void SetChosenModes(IReadOnlyList<int> chosen)
+    {
+        ChosenModes = chosen ?? Array.Empty<int>();
     }
 
     public bool IsTriggered(GameEvent e)

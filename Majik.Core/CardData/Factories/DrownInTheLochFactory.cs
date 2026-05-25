@@ -160,6 +160,10 @@ public static class DrownInTheLochFactory
                 BotIntent.Counter,
                 BotIntent.Removal,
             },
+            // CR 700.2d — "Choose one —" single-pick. RequiredModeCount=1
+            // keeps SpellCastFlow on the scalar prompt (intent-aware via
+            // the legacy single-mode overload).
+            RequiredModeCount: PickCount,
             EffectFactory: p =>
             {
                 // Honour either the multi-pick list (first entry wins

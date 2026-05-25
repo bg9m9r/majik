@@ -61,6 +61,48 @@ public interface IPlayerAgent
         CancellationToken ct = default);
 
     /// <summary>
+    /// CR 700.2d — modal "Choose N —" prompt. Pick exactly
+    /// <paramref name="requiredCount"/> distinct mode indices out of
+    /// <paramref name="modes"/>. Used by:
+    ///   - Multi-mode "Choose two —" spells (Cryptic Command, Mystic
+    ///     Confluence) where two distinct indices fire.
+    ///   - Single-mode modal triggers / spells (DeceiverExarch ETB,
+    ///     DrownInTheLoch, ArchmagesCharm) where a one-element list
+    ///     carries the chosen index without the fused-predicate
+    ///     workaround.
+    /// <para>
+    /// <paramref name="intent"/> is the prompt's overall strategic
+    /// intent — combined with per-mode label scoring by smart bots to
+    /// rank picks. Pass <see cref="BotIntent.None"/> when unclassified.
+    /// </para>
+    /// <para>
+    /// Implementations MUST return exactly <paramref name="requiredCount"/>
+    /// distinct indices, each in <c>[0, modes.Count)</c>. The default
+    /// implementation returns <c>0..requiredCount-1</c> — deterministic
+    /// pre-agent behaviour. Smart bots override with intent-aware label
+    /// scoring; remote agents prompt the UI.
+    /// </para>
+    /// </summary>
+    Task<IReadOnlyList<int>> ChooseModeAsync(
+        IReadOnlyList<string> modes,
+        BotIntent intent,
+        int requiredCount = 1,
+        CancellationToken ct = default)
+    {
+        // Default: pick the first requiredCount indices (deterministic
+        // legacy posture used by every factory written before this prompt
+        // shipped).
+        if (modes.Count == 0 || requiredCount <= 0)
+        {
+            return Task.FromResult<IReadOnlyList<int>>(Array.Empty<int>());
+        }
+        var capped = Math.Min(requiredCount, modes.Count);
+        var picks = new int[capped];
+        for (var i = 0; i < capped; i++) picks[i] = i;
+        return Task.FromResult<IReadOnlyList<int>>(picks);
+    }
+
+    /// <summary>
     /// Sub-order the player's own triggers when multiple fired at once
     /// (Rule 603.3b — APNAP, then controller chooses within their group).
     /// </summary>

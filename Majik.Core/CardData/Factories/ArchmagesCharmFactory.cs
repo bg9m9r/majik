@@ -126,6 +126,8 @@ public static class ArchmagesCharmFactory
                 BotIntent.Draw,
                 BotIntent.Removal, // gain-control is removal-adjacent (opponent loses permanent)
             },
+            // CR 700.2d — "Choose one —" single-pick (PickCount = 1).
+            RequiredModeCount: PickCount,
             EffectFactory: p =>
             {
                 // Honor either the multi-pick list (first entry wins for a

@@ -29,7 +29,8 @@ public sealed record SpellDefinition(
     IReadOnlyList<TargetRequest> TargetRequests,
     Func<ChosenSpellParams, IReadOnlyList<IEffect>> EffectFactory,
     IReadOnlyList<BotIntent>? ModeIntents = null,
-    IReadOnlyList<IAdditionalCost>? AdditionalCosts = null)
+    IReadOnlyList<IAdditionalCost>? AdditionalCosts = null,
+    int RequiredModeCount = 1)
 {
     /// <summary>
     /// Non-null view of <see cref="ModeIntents"/> — empty when no per-mode

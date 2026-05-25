@@ -214,6 +214,81 @@ public class DeceiverExarchFactoryTests
     }
 
     [Fact]
+    public void DeceiverExarch_Etb_DeclaresTwoModes_ForChooseModePrompt()
+    {
+        var ex = DeceiverExarchFactory.Create(_alice);
+
+        var etb = ex.Abilities.OfType<TriggeredAbility>().Single();
+        etb.Modes.Should().HaveCount(2,
+            because: "CR 700.2d — printed \"Choose one —\" exposes two modes to the agent");
+        etb.Modes[DeceiverExarchFactory.ModeUntapOpponent]
+            .Should().Contain("opponent");
+        etb.Modes[DeceiverExarchFactory.ModeUntapOwnNoncreature]
+            .Should().Contain("noncreature");
+        etb.RequiredModeCount.Should().Be(1,
+            because: "single mode pick — \"Choose one —\"");
+    }
+
+    [Fact]
+    public void DeceiverExarch_Etb_ChosenMode_NarrowsLegality_RejectsOppPermanent_WhenModeIsOwnNoncreature()
+    {
+        var ex = DeceiverExarchFactory.Create(_alice);
+
+        // Bob's tapped permanent — would be legal under mode 0 but
+        // illegal under mode 1 (own noncreature only).
+        var bobsIsland = NamedCardFactory.Create("Island", _bob);
+        if (bobsIsland is not Permanent isle)
+        {
+            Assert.Fail("Island should be a Permanent"); return;
+        }
+        isle.SetController(_bob);
+        isle.SetZone(ZoneType.Battlefield);
+        _bob.Zones.Battlefield.AddCard(isle);
+        isle.Tap();
+
+        var etb = ex.Abilities.OfType<TriggeredAbility>().Single();
+        etb.SetChosenTargets(new IReadOnlyList<object>[]
+        {
+            new object[] { isle },
+        });
+        // Caster chose mode 1 (own noncreature) — Bob's island is illegal.
+        etb.SetChosenModes(new[] { DeceiverExarchFactory.ModeUntapOwnNoncreature });
+
+        foreach (var eff in etb.Effects) eff.Execute();
+
+        isle.IsTapped.Should().BeTrue(
+            "chosen mode narrows legality to own noncreature; opp's land is illegal → no untap");
+    }
+
+    [Fact]
+    public void DeceiverExarch_Etb_ChosenMode_AppliesOppModeLegality()
+    {
+        var ex = DeceiverExarchFactory.Create(_alice);
+
+        var bobsIsland = NamedCardFactory.Create("Island", _bob);
+        if (bobsIsland is not Permanent isle)
+        {
+            Assert.Fail("Island should be a Permanent"); return;
+        }
+        isle.SetController(_bob);
+        isle.SetZone(ZoneType.Battlefield);
+        _bob.Zones.Battlefield.AddCard(isle);
+        isle.Tap();
+
+        var etb = ex.Abilities.OfType<TriggeredAbility>().Single();
+        etb.SetChosenTargets(new IReadOnlyList<object>[]
+        {
+            new object[] { isle },
+        });
+        etb.SetChosenModes(new[] { DeceiverExarchFactory.ModeUntapOpponent });
+
+        foreach (var eff in etb.Effects) eff.Execute();
+
+        isle.IsTapped.Should().BeFalse(
+            "mode 0 — untap an opponent's permanent");
+    }
+
+    [Fact]
     public void DeceiverExarch_NamedCardFactory_Dispatch()
     {
         var card = NamedCardFactory.Create("Deceiver Exarch", _alice);

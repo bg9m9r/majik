@@ -36,6 +36,19 @@ public class DrownInTheLochTests
     }
 
     [Fact]
+    public void BuildDefinition_RequiredModeCount_IsOne()
+    {
+        var def = DrownInTheLochFactory.BuildDefinition(_alice, o => o, _stack);
+
+        def.RequiredModeCount.Should().Be(1,
+            because: "CR 700.2d — Drown in the Loch's printed pick is \"Choose one —\"");
+        def.RequiredModeCount.Should().Be(DrownInTheLochFactory.PickCount);
+        def.ModeIntentsOrEmpty.Should().HaveCount(2);
+        def.ModeIntentsOrEmpty[DrownInTheLochFactory.ModeCounter].Should().Be(BotIntent.Counter);
+        def.ModeIntentsOrEmpty[DrownInTheLochFactory.ModeDestroy].Should().Be(BotIntent.Removal);
+    }
+
+    [Fact]
     public void Create_HasInstantShape_ManaValueTwo()
     {
         var card = DrownInTheLochFactory.Create(_alice);

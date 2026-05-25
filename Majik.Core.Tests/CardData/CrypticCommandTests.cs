@@ -59,6 +59,16 @@ public class CrypticCommandTests
     }
 
     [Fact]
+    public void BuildDefinition_RequiredModeCount_IsTwo()
+    {
+        var def = CrypticCommandFactory.BuildDefinition(_alice, o => o, _stack);
+
+        def.RequiredModeCount.Should().Be(2,
+            because: "CR 700.2d — Cryptic Command's printed pick is \"Choose two —\"");
+        def.RequiredModeCount.Should().Be(CrypticCommandFactory.PickCount);
+    }
+
+    [Fact]
     public void BuildDefinition_ExposesFourModes_WithPerModeIntents()
     {
         var def = CrypticCommandFactory.BuildDefinition(_alice, o => o, _stack);

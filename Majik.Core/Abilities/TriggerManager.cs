@@ -274,6 +274,30 @@ public class TriggerManager
 
             foreach (var ability in mine)
             {
+                // CR 700.2d — modal-trigger mode prompt (Deceiver Exarch
+                // ETB "Choose one — Untap opp / Untap own noncreature").
+                // Run BEFORE the target prompt so the chosen mode can
+                // narrow target legality in the effect closure.
+                if (ability is TriggeredAbility taModal && taModal.Modes.Count > 0)
+                {
+                    if (agent != null)
+                    {
+                        var promptIntent = Majik.Core.Cards.BotIntent.None;
+                        foreach (var mi in taModal.ModeIntents) promptIntent |= mi;
+                        var picks = await agent.ChooseModeAsync(
+                            taModal.Modes, promptIntent, taModal.RequiredModeCount, ct);
+                        taModal.SetChosenModes(picks);
+                    }
+                    else
+                    {
+                        // Deterministic fallback for no-agent contexts.
+                        var capped = Math.Min(taModal.RequiredModeCount, taModal.Modes.Count);
+                        var fallback = new int[capped];
+                        for (var i = 0; i < capped; i++) fallback[i] = i;
+                        taModal.SetChosenModes(fallback);
+                    }
+                }
+
                 // Prompt for targets if the concrete ability has declared any
                 // TargetRequests (Rule 603.3). Abilities without requests skip
                 // straight to the push.

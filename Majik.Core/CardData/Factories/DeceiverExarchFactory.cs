@@ -79,6 +79,16 @@ public static class DeceiverExarchFactory
     /// callers that want bus-driven firing register the returned
     /// <see cref="TriggeredAbility"/> with their <see cref="TriggerManager"/>
     /// (same shape as SnapcasterMage / Subtlety).</summary>
+    public const int ModeUntapOpponent = 0;
+    public const int ModeUntapOwnNoncreature = 1;
+
+    /// <summary>Printed mode labels, in oracle order.</summary>
+    public static IReadOnlyList<string> Modes => new[]
+    {
+        "Untap target permanent an opponent controls.",
+        "Untap target noncreature permanent you control.",
+    };
+
     public static Creature Create(Player owner)
     {
         ArgumentNullException.ThrowIfNull(owner);
@@ -97,18 +107,20 @@ public static class DeceiverExarchFactory
         card.AddAbility(new KeywordAbility("Flash", card, owner));
 
         // ----------------------------------------------------------------
-        // CR 603.6a — ETB modal trigger. Both modes share the same
-        // effect (untap target ~), differing only in legality predicate:
-        //   mode 0 — opponent's permanent
-        //   mode 1 — your noncreature permanent
-        // v1 fuses the predicates into a single union TargetRequest and
-        // re-checks the legality at resolution (CR 608.2b).
+        // CR 603.6a + CR 700.2d — ETB modal trigger. Each printed mode is
+        // exposed to the agent via the list-returning ChooseModeAsync
+        // prompt; the resolved closure reads ChosenModes[0] and applies
+        // the per-mode legality predicate (mode 0 — opponent's permanent;
+        // mode 1 — your noncreature permanent). The TargetRequest stays
+        // a union predicate so the agent's target prompt covers both
+        // modes' legal pools; resolve-time legality narrows by chosen
+        // mode (CR 608.2b — illegal target → no-op).
         // ----------------------------------------------------------------
         TriggeredAbility? etbTrigger = null;
         var condition = Triggers.OnEnterBattlefieldSelf(card);
 
         var etbEffect = new Effect(
-            $"{CardName} — untap target permanent (opponent's, or your noncreature)",
+            $"{CardName} — untap target permanent (modal — opp's, or own noncreature)",
             () =>
             {
                 if (etbTrigger == null) return;
@@ -121,18 +133,42 @@ public static class DeceiverExarchFactory
                 // be on the battlefield.
                 if (target.Zone != ZoneType.Battlefield) return;
 
-                // Resolve-time legality: opponent's permanent (any type)
-                // OR your noncreature permanent. v1 collapses CR 700.2d
-                // chosen-mode legality into a union predicate.
-                var isOpponentsPermanent =
-                    target.Controller != null
-                    && !ReferenceEquals(target.Controller, owner);
+                // CR 700.2d — read the chosen mode and apply that mode's
+                // legality predicate. Fall back to the union predicate
+                // when no mode was picked (legacy callers / tests that
+                // pre-date SetChosenModes).
+                var modeIndex = etbTrigger.ChosenModes.Count > 0
+                    ? etbTrigger.ChosenModes[0]
+                    : -1;
 
-                var isOwnNoncreaturePermanent =
-                    ReferenceEquals(target.Controller, owner)
-                    && !target.HasType(CardType.Creature);
+                bool legalUnderMode;
+                switch (modeIndex)
+                {
+                    case ModeUntapOpponent:
+                        legalUnderMode =
+                            target.Controller != null
+                            && !ReferenceEquals(target.Controller, owner);
+                        break;
+                    case ModeUntapOwnNoncreature:
+                        legalUnderMode =
+                            ReferenceEquals(target.Controller, owner)
+                            && !target.HasType(CardType.Creature);
+                        break;
+                    default:
+                        // Legacy fused-predicate fallback (preserves the
+                        // pre-modal behaviour the existing test suite
+                        // depends on — every permanent legal under either
+                        // printed mode passes).
+                        var isOpponents = target.Controller != null
+                            && !ReferenceEquals(target.Controller, owner);
+                        var isOwnNoncreature =
+                            ReferenceEquals(target.Controller, owner)
+                            && !target.HasType(CardType.Creature);
+                        legalUnderMode = isOpponents || isOwnNoncreature;
+                        break;
+                }
 
-                if (!isOpponentsPermanent && !isOwnNoncreaturePermanent) return;
+                if (!legalUnderMode) return;
 
                 // CR 701.27 — untap. Idempotent: already-untapped → no-op.
                 if (target.IsTapped) target.Untap();
@@ -152,7 +188,14 @@ public static class DeceiverExarchFactory
                     MinTargets: 1,
                     MaxTargets: 1,
                     LegalCandidates: Array.Empty<object>()),
-            });
+            },
+            modes: Modes,
+            modeIntents: new[]
+            {
+                BotIntent.None,    // mode 0 — context-dependent
+                BotIntent.None,    // mode 1 — context-dependent
+            },
+            requiredModeCount: 1);
 
         card.AddAbility(etbTrigger);
 

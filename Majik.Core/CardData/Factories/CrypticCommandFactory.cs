@@ -123,6 +123,10 @@ public static class CrypticCommandFactory
                 BotIntent.Removal, // mass-tap is removal-adjacent (opponent attackers locked)
                 BotIntent.Draw,
             },
+            // CR 700.2d — "Choose two —" multi-pick. SpellCastFlow routes
+            // through the list-returning IPlayerAgent.ChooseModeAsync
+            // when RequiredModeCount > 1.
+            RequiredModeCount: PickCount,
             EffectFactory: p =>
             {
                 // Multi-pick — prefer ModeIndexes; fall back to legacy
