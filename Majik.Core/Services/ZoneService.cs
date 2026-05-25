@@ -117,6 +117,12 @@ public class ZoneService
             && card is Card concreteForCastClear)
         {
             concreteForCastClear.ClearWasCast();
+            // CR 400.7 — mirror cast-from-hand sentinel lifecycle. The flag
+            // survives Stack → Battlefield (ETB intervening-if reads it)
+            // but a subsequent battlefield exit makes the card a new
+            // object; a later re-cast / blink / token copy must start
+            // from a clean slate. Mirrors WasCast's lifecycle above.
+            concreteForCastClear.ClearWasCastFromHand();
         }
     }
 
