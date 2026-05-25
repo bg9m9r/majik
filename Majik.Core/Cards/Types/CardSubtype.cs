@@ -190,6 +190,10 @@ public enum CardSubtype
     /// <summary>Imp creature subtype — Vault Skirge (New Phyrexia), Ravenous Rats'
     /// adjacent imp lineage (Hypnotic Specter / Mind Twist-adjacent). CR 205.3m.</summary>
     Imp,
+    /// <summary>Troll creature subtype — Golgari Grave-Troll (Ravnica: City
+    /// of Guilds), Trygon Predator-adjacent Golgari lineage, Phyrexian
+    /// Obliterator-pair Phyrexian Troll synergies. CR 205.3m.</summary>
+    Troll,
     /// <summary>Thopter artifact-creature subtype — Ornithopter (Antiquities),
     /// Sai, Master Thopterist, Thopter Foundry / Sword of the Meek, Whirler
     /// Rogue tokens. CR 205.3m.</summary>
