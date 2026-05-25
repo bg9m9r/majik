@@ -182,8 +182,12 @@ public sealed class GameFacade
             }
 
             var agent = agents[actor];
+            // CR 117.7 / 601.2f — pass the live player roster so the
+            // three-arg overload folds in SpellCostIncreaseAbility riders
+            // (Sphere of Resistance, Trinisphere, Thalia, Damping Sphere)
+            // at cast-time, matching TurnDriver.PriorityRound.
             var cost = cast.AlternativeCost?.AlternativeManaCost
-                ?? Majik.Core.Costs.CostReduction.GetEffectiveCost(cast.Card, actor);
+                ?? Majik.Core.Costs.CostReduction.GetEffectiveCost(cast.Card, actor, ctx.AllPlayers);
 
             // CR 601.2g + CR 106.4 — pay from floating pool first when it
             // fully covers the cost (drag-to-cast UX: float via
