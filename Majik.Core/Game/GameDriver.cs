@@ -29,6 +29,7 @@ public sealed class GameDriver
     private readonly StateBasedActions _sba;
     private readonly Majik.Core.Random.GameRandom _rng;
     private readonly Majik.Core.Events.IEventBus? _eventBus;
+    private readonly ZoneService _zoneService;
     private readonly ExtraTurnQueue _extraTurns = new();
 
     /// <summary>Effects that grant an extra turn enqueue here; the loop
@@ -58,6 +59,7 @@ public sealed class GameDriver
         _sba = stateBasedActions ?? throw new ArgumentNullException(nameof(stateBasedActions));
         _rng = rng ?? new Majik.Core.Random.GameRandom();
         _eventBus = eventBus;
+        _zoneService = zoneService ?? throw new ArgumentNullException(nameof(zoneService));
 
         // CR 701.20 — register the game RNG + bus so factory closures
         // (e.g. SearchSpellFactory's tutor effects) can resolve the
@@ -116,6 +118,30 @@ public sealed class GameDriver
                 p, _players, startingPlayer, 0, PhaseStateType.Untap,
                 new Majik.Core.Stack.Stack());
             await mulligan.RunAsync(p, _agents[p], ctx, ct: ct);
+        }
+
+        // CR 103.5 — opening-hand check. Fired AFTER all mulligans
+        // resolve, in starting-player-first turn order. The Leyline
+        // cycle's opening-hand alt-cost (CR 702.95) subscribes to this
+        // event via OpeningHandLeylineAlternativeCost; the subscriber
+        // walks each player's hand for KeywordAbility("OpeningHandLeyline")
+        // markers and prompts via IPlayerAgent.ChooseYesNoAsync.
+        if (_eventBus is not null)
+        {
+            var leylineAltCost = new OpeningHandLeylineAlternativeCost(
+                _zoneService, _agents);
+            leylineAltCost.Attach(_eventBus);
+
+            // Publish in turn order: starting player first, then the
+            // remaining seats cycling forward. Matches CR 103.5
+            // ("starting with the starting player").
+            for (var i = 0; i < _players.Count; i++)
+            {
+                var seat = _players[(startingIndex + i) % _players.Count];
+                var snapshot = seat.Zones.Hand.GetCards().ToList();
+                await _eventBus.PublishAsync(
+                    new Majik.Core.Events.OpeningHandCheckEvent(seat, snapshot));
+            }
         }
 
         var turnNumber = 0;

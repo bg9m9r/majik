@@ -65,5 +65,12 @@ public enum EventType
     // CR 702.62d — the last time counter on a suspended card has been
     // removed; the registry will cast the card for free immediately
     // after the event is published.
-    SuspendCounterDrained
+    SuspendCounterDrained,
+
+    // CR 103.5 — opening-hand check. Fired once per player at game
+    // start AFTER the initial draw + mulligan resolution but BEFORE
+    // the first turn begins. Carries the opening-hand snapshot so
+    // alt-cost surfaces (Leyline keyword, Gemstone Caverns, Chancellor
+    // cycle) can prompt the player.
+    OpeningHandCheck
 }

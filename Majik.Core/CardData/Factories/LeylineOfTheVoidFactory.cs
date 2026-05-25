@@ -1,6 +1,8 @@
+using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Effects;
+using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Zones;
 
@@ -18,11 +20,17 @@ namespace Majik.Core.CardData.Factories;
 ///
 /// ## Implementation
 ///
-/// Static replacement (CR 614) only — the opening-hand alt-cost
-/// branch (CR 702.95 — Leyline keyword) is DEFERRED because the
-/// engine has no opening-hand reveal hook today (no
-/// <c>OpeningHandCheckEvent</c> or similar surface). The static half
-/// is the gameplay-active portion of the card and ships now.
+/// Two halves:
+/// 1. <b>Opening-hand alt-cost</b> (CR 702.95 — Leyline keyword) via the
+///    shared <see cref="OpeningHandLeylineAlternativeCost"/> subscriber:
+///    the factory stamps a <see cref="KeywordAbility"/> with marker
+///    <c>"OpeningHandLeyline"</c> (
+///    <see cref="OpeningHandLeylineAlternativeCost.LeylineKeyword"/>),
+///    which the subscriber scans for on the
+///    <see cref="Majik.Core.Events.OpeningHandCheckEvent"/> fired by
+///    <see cref="GameDriver"/> AFTER the mulligan loop resolves.
+/// 2. <b>Static replacement</b> (CR 614) — opponent-graveyard rewrites
+///    to exile while Leyline is on the battlefield.
 ///
 /// The replacement is scoped to opponents of Leyline's controller:
 /// any <see cref="ZoneMoveIntent"/> headed to
@@ -50,10 +58,6 @@ namespace Majik.Core.CardData.Factories;
 ///
 /// ## Deferred (v1 gaps)
 ///
-/// - <b>Opening-hand alt-cost</b> (CR 702.95 — Leyline keyword): no
-///   opening-hand hook in the engine. Once a hook lands, the alt-cost
-///   surface should grow a <c>LeylineOpeningHandBattlefieldPut</c>
-///   primitive shared across all 10 Leylines.
 /// - <b>Replacement-ordering prompt</b> (CR 616.1): bus applies in
 ///   registration order — overlapping with Rest in Peace, Anafenza,
 ///   or another Leyline of the Void picks the registration order
@@ -90,6 +94,11 @@ public static class LeylineOfTheVoidFactory
             subtypes: null);
         card.SetOwner(owner);
         card.SetController(owner);
+
+        // CR 702.95 — Leyline keyword marker. Scanned by
+        // OpeningHandLeylineAlternativeCost on OpeningHandCheckEvent.
+        card.AddAbility(new KeywordAbility(
+            OpeningHandLeylineAlternativeCost.LeylineKeyword, card, owner));
 
         if (replacements != null)
         {
