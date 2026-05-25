@@ -2,6 +2,7 @@ using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
 using Majik.Core.Services;
 using Majik.Core.Zones;
 
@@ -101,9 +102,33 @@ public static class ShowAndTellFactory
     public static IReadOnlyList<IEffect> BuildResolveEffect(
         IReadOnlyList<Player> allPlayers,
         ZoneService? zoneService = null,
-        Func<Player, IReadOnlyList<Permanent>, Permanent?>? picker = null)
+        Func<Player, IReadOnlyList<Permanent>, Permanent?>? picker = null,
+        Func<Player, IPlayerAgent?>? agentSelector = null)
     {
         ArgumentNullException.ThrowIfNull(allPlayers);
+
+        // Agent-prompt MVP wiring: when no explicit picker is supplied but
+        // an agentSelector is, route per-player picks through
+        // IPlayerAgent.ChooseYesNoAsync(CheatIntoPlay) +
+        // ChooseFromHandAsync(CheatIntoPlay). Tests / production callers
+        // wanting raw control supply their own picker (takes precedence).
+        if (picker == null && agentSelector != null)
+        {
+            picker = (pl, cands) =>
+            {
+                var agent = agentSelector(pl);
+                if (agent == null) return cands.FirstOrDefault();
+                if (cands.Count == 0) return null;
+                var yes = agent.ChooseYesNoAsync(
+                    "Put a permanent card from your hand onto the battlefield?",
+                    BotIntent.CheatIntoPlay).GetAwaiter().GetResult();
+                if (!yes) return null;
+                var chosen = agent.ChooseFromHandAsync(
+                    pl, cands.Cast<ICard>().ToList(), BotIntent.CheatIntoPlay)
+                    .GetAwaiter().GetResult();
+                return chosen as Permanent;
+            };
+        }
 
         picker ??= DefaultPicker;
 

@@ -5,6 +5,7 @@ using Majik.Core.Costs;
 using Majik.Core.Effects;
 using Majik.Core.Events;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
 using Majik.Core.Services;
 using Majik.Core.StateMachine;
 using Majik.Core.Zones;
@@ -54,10 +55,13 @@ namespace Majik.Core.CardData.Factories;
 ///      Splinter Twin / Through the Breach).
 ///
 /// ## Deferred (v1 gaps)
-/// - <b>"You may" prompt</b>: defaults to taking the action when an
-///   eligible creature exists in hand (matches Aether Vial / Through the
-///   Breach / Goblin Lackey v1 prompt behavior). Real agent-driven yes/no
-///   + creature-pick awaits the prompt MVP.
+/// - <b>"You may" prompt</b>: consults the optional
+///   <see cref="IPlayerAgent"/> via
+///   <see cref="IPlayerAgent.ChooseYesNoAsync"/>
+///   (<see cref="BotIntent.CheatIntoPlay"/>) +
+///   <see cref="IPlayerAgent.ChooseFromHandAsync"/>; with no agent passed
+///   the legacy deterministic first-creature pick + auto-accept posture
+///   remains (Aether Vial / Goblin Lackey shape).
 /// - <b>Empty-hand / no-creature-in-hand</b>: clean no-op. The ability
 ///   still resolves and the {R} is still paid (CR 117.6 / 602.5b — an
 ///   activation that produces no effect is legal); no creature is put
@@ -90,7 +94,7 @@ public static class SneakAttackFactory
     /// Suitable for shape / dispatcher tests.
     /// </summary>
     public static Enchantment Create(Player owner)
-        => Create(owner, zoneService: null, triggers: null);
+        => Create(owner, zoneService: null, triggers: null, agent: null);
 
     /// <summary>
     /// Construct a fully-wired Sneak Attack. When
@@ -104,6 +108,19 @@ public static class SneakAttackFactory
         Player owner,
         ZoneService? zoneService,
         TriggerManager? triggers)
+        => Create(owner, zoneService, triggers, agent: null);
+
+    /// <summary>
+    /// Construct a fully-wired Sneak Attack with agent-prompt wiring.
+    /// <paramref name="agent"/> is consulted at resolution time for the
+    /// "you may" + creature pick — see class xmldoc. Null preserves the
+    /// legacy deterministic v1 behavior.
+    /// </summary>
+    public static Enchantment Create(
+        Player owner,
+        ZoneService? zoneService,
+        TriggerManager? triggers,
+        IPlayerAgent? agent)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -124,7 +141,7 @@ public static class SneakAttackFactory
         // ----------------------------------------------------------------
         var effect = new Effect(
             $"{CardName}: put creature from hand → battlefield, haste, sac next end step",
-            () => ResolveActivation(card, owner, zoneService, triggers));
+            () => ResolveActivation(card, owner, zoneService, triggers, agent));
 
         var ability = new ActivatedAbility(
             source: card,
@@ -148,16 +165,44 @@ public static class SneakAttackFactory
         Enchantment source,
         Player controller,
         ZoneService? zoneService,
-        TriggerManager? triggers)
+        TriggerManager? triggers,
+        IPlayerAgent? agent)
     {
         // -------------------------------------------------------------------
         // "You may put a creature card from your hand onto the battlefield."
-        // v1 deterministic: first creature in hand. No creature → no-op.
+        // Agent path (prompts MVP): ChooseYesNoAsync(CheatIntoPlay) +
+        // ChooseFromHandAsync. No agent → deterministic v1 first-creature
+        // pick + auto-accept (preserves Aether Vial / Goblin Lackey shape).
+        // No creature in hand → no-op.
         // -------------------------------------------------------------------
-        var pick = controller.Zones.Hand.GetCards()
+        var creatures = controller.Zones.Hand.GetCards()
             .OfType<Creature>()
-            .FirstOrDefault();
-        if (pick == null) return;
+            .Cast<ICard>()
+            .ToList();
+        if (creatures.Count == 0) return;
+
+        Creature? pick;
+        if (agent != null)
+        {
+            // CR 117.x — "you may" prompt. Decline = no-op (the {R} was
+            // still paid for the activation).
+            var yes = agent.ChooseYesNoAsync(
+                "Put a creature card from your hand onto the battlefield?",
+                BotIntent.CheatIntoPlay).GetAwaiter().GetResult();
+            if (!yes) return;
+
+            var chosen = agent.ChooseFromHandAsync(
+                controller, creatures, BotIntent.CheatIntoPlay)
+                .GetAwaiter().GetResult();
+            if (chosen is not Creature c) return;
+            // Sanity — pick must still be in hand.
+            if (c.Zone != ZoneType.Hand) return;
+            pick = c;
+        }
+        else
+        {
+            pick = (Creature)creatures[0];
+        }
 
         // -------------------------------------------------------------------
         // Hand → Battlefield. Routes through ZoneService when supplied so

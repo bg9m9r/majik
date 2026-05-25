@@ -26,6 +26,8 @@ public sealed class ScriptedAgent : IPlayerAgent
     private readonly Queue<ScryAction.ScryDecision> _scryDecisions = new();
     private readonly Queue<SurveilAction.SurveilDecision> _surveilDecisions = new();
     private readonly Queue<Func<IReadOnlyList<Player>, Player?>> _giftRecipients = new();
+    private readonly Queue<bool> _yesNoAnswers = new();
+    private readonly Queue<Func<IReadOnlyList<ICard>, ICard?>> _fromHandChoices = new();
 
     public void QueuePriority(PriorityAction a) => _priorityActions.Enqueue(a);
     public void QueueMulligan(MulliganDecision d) => _mulligans.Enqueue(d);
@@ -48,6 +50,19 @@ public sealed class ScriptedAgent : IPlayerAgent
     public void QueueGiftRecipient(Func<IReadOnlyList<Player>, Player?> chooser) => _giftRecipients.Enqueue(chooser);
     /// <summary>Convenience: pre-queue a single fixed gift recipient (or decline-null).</summary>
     public void QueueGiftRecipient(Player? recipient) => _giftRecipients.Enqueue(_ => recipient);
+    /// <summary>Pre-queue a Yes/No answer for the next
+    /// <see cref="IPlayerAgent.ChooseYesNoAsync"/> call. Throws if the
+    /// queue is empty — a missing entry is almost always a test bug.</summary>
+    public void QueueYesNo(bool answer) => _yesNoAnswers.Enqueue(answer);
+    /// <summary>Pre-queue a hand-pick chooser for the next
+    /// <see cref="IPlayerAgent.ChooseFromHandAsync"/> call; the chooser
+    /// receives the live candidate list and returns the picked card or
+    /// <c>null</c> to decline. Falls back to deterministic first-pick
+    /// when no chooser is queued (matches the default interface
+    /// implementation).</summary>
+    public void QueueFromHand(Func<IReadOnlyList<ICard>, ICard?> chooser) => _fromHandChoices.Enqueue(chooser);
+    /// <summary>Convenience: pre-queue a single fixed hand pick (or decline-null).</summary>
+    public void QueueFromHand(ICard? pick) => _fromHandChoices.Enqueue(_ => pick);
 
     public Task<PriorityAction> ChoosePriorityActionAsync(GameContext ctx, CancellationToken ct = default)
         => Task.FromResult(Pop(_priorityActions, "priority"));
@@ -112,6 +127,25 @@ public sealed class ScriptedAgent : IPlayerAgent
     public Task<ICard?> ChooseLibraryPickAsync(
         GameContext? ctx, IReadOnlyList<ICard> candidates, string kindLabel, CancellationToken ct = default)
         => Task.FromResult<ICard?>(candidates.Count > 0 ? candidates[0] : null);
+
+    public Task<bool> ChooseYesNoAsync(
+        string question, BotIntent intent, CancellationToken ct = default)
+        => Task.FromResult(Pop(_yesNoAnswers, "yes/no"));
+
+    public Task<ICard?> ChooseFromHandAsync(
+        Player chooser, IReadOnlyList<ICard> candidates, BotIntent intent, CancellationToken ct = default)
+    {
+        if (_fromHandChoices.Count == 0)
+        {
+            // No script entry queued — fall back to the deterministic
+            // default (first candidate, or null when empty). Matches the
+            // IPlayerAgent default and the pre-agent behaviour every
+            // retrofitted factory used.
+            return Task.FromResult<ICard?>(candidates.Count > 0 ? candidates[0] : null);
+        }
+        var chooserFn = _fromHandChoices.Dequeue();
+        return Task.FromResult(chooserFn(candidates));
+    }
 
     public Task<Player?> ChooseGiftRecipientAsync(
         GameContext ctx, ICard source, string giftDescription,

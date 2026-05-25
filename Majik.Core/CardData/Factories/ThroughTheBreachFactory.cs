@@ -3,6 +3,7 @@ using Majik.Core.Cards;
 using Majik.Core.Effects;
 using Majik.Core.Events;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
 using Majik.Core.Services;
 using Majik.Core.StateMachine;
 using Majik.Core.Zones;
@@ -109,7 +110,8 @@ public static class ThroughTheBreachFactory
     public static IReadOnlyList<IEffect> BuildResolveEffect(
         Player caster,
         ZoneService? zoneService = null,
-        TriggerManager? triggers = null)
+        TriggerManager? triggers = null,
+        IPlayerAgent? agent = null)
     {
         ArgumentNullException.ThrowIfNull(caster);
 
@@ -117,7 +119,7 @@ public static class ThroughTheBreachFactory
         {
             new Effect(
                 "Through the Breach: put creature from hand → battlefield, haste EOT, sac next end step.",
-                () => ResolveBody(caster, zoneService, triggers)),
+                () => ResolveBody(caster, zoneService, triggers, agent)),
         };
     }
 
@@ -131,16 +133,39 @@ public static class ThroughTheBreachFactory
     private static void ResolveBody(
         Player caster,
         ZoneService? zoneService,
-        TriggerManager? triggers)
+        TriggerManager? triggers,
+        IPlayerAgent? agent)
     {
         // -------------------------------------------------------------------
         // "You may put a creature card from your hand onto the battlefield."
-        // v1 deterministic: first creature in hand. No creature → no-op.
+        // With an agent supplied: ChooseYesNoAsync(CheatIntoPlay) +
+        // ChooseFromHandAsync. Without: deterministic v1 first-creature
+        // pick + auto-accept. No creature in hand → no-op.
         // -------------------------------------------------------------------
-        var pick = caster.Zones.Hand.GetCards()
+        var creatures = caster.Zones.Hand.GetCards()
             .OfType<Creature>()
-            .FirstOrDefault();
-        if (pick == null) return;
+            .Cast<ICard>()
+            .ToList();
+        if (creatures.Count == 0) return;
+
+        Creature? pick;
+        if (agent != null)
+        {
+            var yes = agent.ChooseYesNoAsync(
+                "Put a creature card from your hand onto the battlefield?",
+                BotIntent.CheatIntoPlay).GetAwaiter().GetResult();
+            if (!yes) return;
+            var chosen = agent.ChooseFromHandAsync(
+                caster, creatures, BotIntent.CheatIntoPlay)
+                .GetAwaiter().GetResult();
+            if (chosen is not Creature c) return;
+            if (c.Zone != ZoneType.Hand) return;
+            pick = c;
+        }
+        else
+        {
+            pick = (Creature)creatures[0];
+        }
 
         // -------------------------------------------------------------------
         // Hand → Battlefield. Routes through ZoneService when supplied so

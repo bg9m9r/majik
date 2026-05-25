@@ -1246,4 +1246,90 @@ public sealed class HeuristicBotAgent : IPlayerAgent
             return Task.FromResult<Player?>(null);
         return Task.FromResult<Player?>(opponents[0]);
     }
+
+    /// <summary>
+    /// Smarter Yes/No heuristics, intent-keyed. Upside intents always
+    /// accept; downside intents always decline; CostToDecline accepts only
+    /// when the cost looks affordable (heuristic: accept). CheatIntoPlay
+    /// accepts (the spec is "you may put a big creature for free" which is
+    /// almost never a mistake — same rationale as the bot's Sneak Attack
+    /// posture). Falls back to the legacy auto-accept default for unknown
+    /// intent.
+    /// </summary>
+    public Task<bool> ChooseYesNoAsync(
+        string question,
+        BotIntent intent,
+        CancellationToken ct = default)
+    {
+        // Aggressive accept on net-upside intents (subsumes the default).
+        if (intent.HasAny(BotIntent.CardAdvantage
+                          | BotIntent.Buff
+                          | BotIntent.Heal
+                          | BotIntent.Tutor
+                          | BotIntent.Draw
+                          | BotIntent.Reanimate
+                          | BotIntent.CheatIntoPlay
+                          | BotIntent.Token
+                          | BotIntent.Ramp))
+        {
+            return Task.FromResult(true);
+        }
+        // Hard decline on pure-downside intents.
+        if (intent.HasAny(BotIntent.LoseLife | BotIntent.DiscardCost))
+        {
+            return Task.FromResult(false);
+        }
+        // CostToDecline ("unless you pay X") — pay only when the tax is
+        // small (≤ 2 mana). The factory passes the relevant question
+        // string through; richer cost-aware logic ships when the cost is
+        // threaded into the prompt signature. v1 declines (i.e. doesn't
+        // pay) → the active player takes the trigger's stated penalty.
+        if (intent.HasAny(BotIntent.CostToDecline))
+        {
+            return Task.FromResult(false);
+        }
+        // Neutral / unclassified — accept (legacy auto-accept posture).
+        return Task.FromResult(true);
+    }
+
+    /// <summary>
+    /// Smarter hand-pick: for <see cref="BotIntent.Discard"/> the bot
+    /// pitches the highest-CMC card (excess mana value, less playable
+    /// late-game); for <see cref="BotIntent.CheatIntoPlay"/> the bot picks
+    /// the highest-CMC creature in the candidate list (biggest cheat).
+    /// For everything else falls back to the deterministic first-card
+    /// pick used by the default interface implementation.
+    /// </summary>
+    public Task<ICard?> ChooseFromHandAsync(
+        Player chooser,
+        IReadOnlyList<ICard> candidates,
+        BotIntent intent,
+        CancellationToken ct = default)
+    {
+        if (candidates == null || candidates.Count == 0)
+            return Task.FromResult<ICard?>(null);
+
+        if (intent.HasAny(BotIntent.Discard | BotIntent.DiscardCost))
+        {
+            // Pitch the highest-mana-value card — biggest excess MV that
+            // we're least likely to cast organically next few turns.
+            var pick = candidates
+                .OrderByDescending(c => Majik.Core.ValueObjects.ManaCost.Parse(c.ManaCost ?? "").TotalValue)
+                .First();
+            return Task.FromResult<ICard?>(pick);
+        }
+
+        if (intent.HasAny(BotIntent.CheatIntoPlay))
+        {
+            // Cheat the biggest creature / permanent: bigger MV ≈ bigger
+            // tempo swing when bypassing the mana cost.
+            var pick = candidates
+                .OrderByDescending(c => Majik.Core.ValueObjects.ManaCost.Parse(c.ManaCost ?? "").TotalValue)
+                .First();
+            return Task.FromResult<ICard?>(pick);
+        }
+
+        // Fallback to deterministic first pick.
+        return Task.FromResult<ICard?>(candidates[0]);
+    }
 }

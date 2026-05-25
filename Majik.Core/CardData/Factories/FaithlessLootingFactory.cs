@@ -4,6 +4,7 @@ using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
 using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
 
@@ -80,7 +81,7 @@ public static class FaithlessLootingFactory
     /// cast — flashback's post-resolve exile is performed by
     /// <see cref="FlashbackAlternativeCost.OnResolved"/>, not here.
     /// </summary>
-    public static IReadOnlyList<IEffect> BuildResolveEffect(Player caster)
+    public static IReadOnlyList<IEffect> BuildResolveEffect(Player caster, IPlayerAgent? agent = null)
     {
         ArgumentNullException.ThrowIfNull(caster);
         return new IEffect[]
@@ -109,11 +110,11 @@ public static class FaithlessLootingFactory
                 }
 
                 // ----------------------------------------------------------
-                // CR 701.16 — "Discard two cards." Pick the last two cards
-                // in hand (deterministic v1 policy; mirrors ConniveAction).
-                // The most-recent positions in the hand list are typically
-                // the just-drawn cards when the controller had a small or
-                // empty starting hand. Real agent-driven choice deferred.
+                // CR 701.16 — "Discard two cards." Agent path: consult
+                // ChooseFromHandAsync(BotIntent.Discard) for each pick;
+                // the heuristic bot's override pitches the highest-MV card
+                // each pass. Default path (no agent): last-card-in-hand
+                // (deterministic v1 policy mirroring ConniveAction).
                 //
                 // If the hand has fewer than two cards (e.g. drew on an
                 // empty library mid-resolve), discard what is available —
@@ -122,8 +123,24 @@ public static class FaithlessLootingFactory
                 // ----------------------------------------------------------
                 for (var i = 0; i < 2; i++)
                 {
-                    var pick = caster.Zones.Hand.GetCards().LastOrDefault();
-                    if (pick == null) break;
+                    var hand = caster.Zones.Hand.GetCards().ToList();
+                    if (hand.Count == 0) break;
+                    ICard? pick;
+                    if (agent != null)
+                    {
+                        pick = agent.ChooseFromHandAsync(caster, hand, BotIntent.Discard)
+                            .GetAwaiter().GetResult();
+                        // null = decline. "Discard a card" is mandatory
+                        // (not "may"); fall back to the deterministic pick
+                        // so the rules-effect remains observable. Same
+                        // posture as ScryDecision's fallback.
+                        if (pick == null || pick.Zone != ZoneType.Hand)
+                            pick = hand[^1];
+                    }
+                    else
+                    {
+                        pick = hand[^1];
+                    }
                     caster.Zones.Hand.RemoveCard(pick);
                     caster.Zones.Graveyard.AddCard(pick);
                     pick.SetZone(ZoneType.Graveyard);

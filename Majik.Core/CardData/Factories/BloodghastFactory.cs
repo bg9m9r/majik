@@ -5,6 +5,7 @@ using Majik.Core.Combat;
 using Majik.Core.Effects;
 using Majik.Core.Events;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
 using Majik.Core.Services;
 using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
@@ -71,7 +72,7 @@ public static class BloodghastFactory
     /// <see cref="TriggerManager"/>.
     /// </summary>
     public static Creature Create(Player owner) =>
-        Create(owner, effects: null, zoneService: null, triggers: null, opponentLifeProvider: null);
+        Create(owner, effects: null, zoneService: null, triggers: null, opponentLifeProvider: null, agent: null);
 
     /// <summary>
     /// Construct Bloodghast with full runtime wiring.
@@ -96,6 +97,22 @@ public static class BloodghastFactory
         ZoneService? zoneService,
         TriggerManager? triggers,
         Func<int>? opponentLifeProvider)
+        => Create(owner, effects, zoneService, triggers, opponentLifeProvider, agent: null);
+
+    /// <summary>
+    /// Construct Bloodghast with the agent-prompt MVP wiring. When
+    /// <paramref name="agent"/> is non-null the landfall "you may return"
+    /// trigger consults <see cref="IPlayerAgent.ChooseYesNoAsync"/>
+    /// (<see cref="BotIntent.Reanimate"/>); false declines the return.
+    /// Null preserves the legacy auto-accept v1 posture.
+    /// </summary>
+    public static Creature Create(
+        Player owner,
+        ContinuousEffectsService? effects,
+        ZoneService? zoneService,
+        TriggerManager? triggers,
+        Func<int>? opponentLifeProvider,
+        IPlayerAgent? agent)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -149,9 +166,17 @@ public static class BloodghastFactory
             () =>
             {
                 // CR 603.6d — re-check zone at resolution.
-                // "You may" auto-accepted (v1).
+                // "You may" — when an agent is wired, consult
+                // ChooseYesNoAsync(Reanimate); else legacy auto-accept.
                 if (card.Zone != ZoneType.Graveyard) return;
                 if (!owner.Zones.Graveyard.GetCards().Contains(card)) return;
+                if (agent != null)
+                {
+                    var yes = agent.ChooseYesNoAsync(
+                        "Return Bloodghast from graveyard to battlefield?",
+                        BotIntent.Reanimate).GetAwaiter().GetResult();
+                    if (!yes) return;
+                }
 
                 if (zoneService != null)
                 {
