@@ -1,37 +1,37 @@
 {
   "scope": "format=modern, dedup-by-name",
-  "generated_utc": "2026-05-25T03:17:58.0885456Z",
+  "generated_utc": "2026-05-25T03:46:20.7296566Z",
   "total_cards": 21917,
   "total_weight": 21917,
-  "covered_cards": 6022,
-  "covered_percent": 27.48,
-  "weighted_covered": 6022,
-  "weighted_covered_percent": 27.48,
+  "covered_cards": 6027,
+  "covered_percent": 27.5,
+  "weighted_covered": 6027,
+  "weighted_covered_percent": 27.5,
   "frequency_total_weight": 20390,
-  "frequency_weighted_covered": 19880,
-  "frequency_weighted_covered_percent": 97.5,
+  "frequency_weighted_covered": 20070,
+  "frequency_weighted_covered_percent": 98.43,
   "top_meta_covered": 20,
   "top_meta_total": 20,
   "counts_by_tier": {
-    "NamedFactory": 274,
+    "NamedFactory": 279,
     "SpellBound": 3708,
     "KeywordOnly": 1411,
     "Vanilla": 629,
-    "Unimplemented": 15895
+    "Unimplemented": 15890
   },
   "weighted_by_tier": {
-    "NamedFactory": 274,
+    "NamedFactory": 279,
     "SpellBound": 3708,
     "KeywordOnly": 1411,
     "Vanilla": 629,
-    "Unimplemented": 15895
+    "Unimplemented": 15890
   },
   "frequency_weighted_by_tier": {
-    "NamedFactory": 14630,
+    "NamedFactory": 14820,
     "SpellBound": 1470,
     "KeywordOnly": 3400,
     "Vanilla": 380,
-    "Unimplemented": 510
+    "Unimplemented": 320
   },
   "top_meta": [
     {
@@ -34523,7 +34523,7 @@
     {
       "name": "Frogmite",
       "type_line": "Artifact Creature \u2014 Frog",
-      "tier": "Unimplemented"
+      "tier": "NamedFactory"
     },
     {
       "name": "Frogmyr Enforcer",
@@ -61733,7 +61733,7 @@
     {
       "name": "Myr Enforcer",
       "type_line": "Artifact Creature \u2014 Myr",
-      "tier": "Unimplemented"
+      "tier": "NamedFactory"
     },
     {
       "name": "Myr Galvanizer",
@@ -71793,7 +71793,7 @@
     {
       "name": "Quantum Riddler",
       "type_line": "Creature \u2014 Sphinx",
-      "tier": "Unimplemented"
+      "tier": "NamedFactory"
     },
     {
       "name": "Quantum Riddler // Quantum Riddler",
@@ -90053,7 +90053,7 @@
     {
       "name": "Steel Overseer",
       "type_line": "Artifact Creature \u2014 Construct",
-      "tier": "Unimplemented"
+      "tier": "NamedFactory"
     },
     {
       "name": "Steel Sabotage",
@@ -100578,7 +100578,7 @@
     {
       "name": "Ulamog\u0027s Crusher",
       "type_line": "Creature \u2014 Eldrazi",
-      "tier": "Unimplemented"
+      "tier": "NamedFactory"
     },
     {
       "name": "Ulamog\u0027s Despoiler",
