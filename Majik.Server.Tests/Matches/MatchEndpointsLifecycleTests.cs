@@ -5,7 +5,6 @@ using System.Security.Claims;
 using System.Text.Encodings.Web;
 using FluentAssertions;
 using Majik.Core.CardData;
-using Majik.Core.CardData.Database;
 using Majik.Server.Decks;
 using Majik.Server.Matches;
 using Majik.Server.Profiles;

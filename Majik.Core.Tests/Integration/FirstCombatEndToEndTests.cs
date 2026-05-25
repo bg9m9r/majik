@@ -74,7 +74,7 @@ public class FirstCombatEndToEndTests
         var ctx = new GameContext(alice, new[] { alice, bob }, alice, 1, PhaseStateType.Main, stack);
 
         var def = Majik.Core.CardData.OracleSpellBinder.Bind(
-            new Majik.Core.CardData.Database.CardEntity
+            new Majik.Core.CardData.CardEntity
             {
                 Name = "Lightning Bolt",
                 ManaCost = "{R}",

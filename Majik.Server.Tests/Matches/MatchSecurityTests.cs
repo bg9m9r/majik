@@ -4,7 +4,6 @@ using System.Net.Http.Json;
 using FluentAssertions;
 using Majik.Core.Api.Dtos;
 using Majik.Core.CardData;
-using Majik.Core.CardData.Database;
 using Majik.Server.Decks;
 using Majik.Server.Matches;
 using Majik.Server.Profiles;

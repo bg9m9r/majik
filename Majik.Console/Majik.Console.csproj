@@ -5,6 +5,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="DotNetEnv" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Majik.Core\Majik.Core.csproj" />
   </ItemGroup>
 

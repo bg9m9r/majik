@@ -2,7 +2,6 @@ using FluentAssertions;
 using Majik.Bot.Decks;
 using Majik.Core.Cards;
 using Majik.Core.CardData;
-using Majik.Core.CardData.Database;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 

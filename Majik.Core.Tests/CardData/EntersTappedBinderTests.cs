@@ -1,6 +1,5 @@
 using FluentAssertions;
 using Majik.Core.CardData;
-using Majik.Core.CardData.Database;
 using Majik.Core.Cards;
 using Majik.Core.Effects;
 using Majik.Core.Events;

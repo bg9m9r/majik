@@ -1,6 +1,5 @@
 using Majik.Core.Abilities;
 using Majik.Core.CardData;
-using Majik.Core.CardData.Database;
 using Majik.Core.Cards;
 using Majik.Core.Domain.DomainEvents;
 using Majik.Core.Events;
@@ -279,17 +278,9 @@ internal static class TriggerPlayground
     {
         Banner("Scenario: Load real Scryfall cards + play one slice");
 
-        var dbPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "Majik", "cards.db");
-        if (!File.Exists(dbPath))
-        {
-            Log($"Scryfall DB missing at {dbPath} — skipping.");
-            return;
-        }
-
-        using var db = new CardDbContext();
-        var factory = new ScryfallCardFactory(new DbCardRepository(db));
+        // Embedded card pool: ships in Majik.Core, no SQLite. Loaded
+        // on first lookup, so the cost is amortised across the run.
+        var factory = new ScryfallCardFactory(new EmbeddedCardRepository());
 
         var bus = new EventBus();
         AttachTrace(bus);
@@ -477,18 +468,9 @@ internal static class TriggerPlayground
     {
         Banner("Scenario: Modern face-off — Boros Energy vs Eldrazi/Affinity");
 
-        var dbPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "Majik", "cards.db");
-        if (!File.Exists(dbPath))
-        {
-            Log($"Scryfall DB missing at {dbPath} — skipping.");
-            Log("Run `dotnet run --project Majik.Console -- import <scryfall-all-cards.json>` first.");
-            return;
-        }
-
-        using var db = new CardDbContext();
-        var factory = new ScryfallCardFactory(new DbCardRepository(db));
+        // Embedded card pool: ships in Majik.Core, no SQLite. The
+        // pre-import skip branch is gone — the seed is always available.
+        var factory = new ScryfallCardFactory(new EmbeddedCardRepository());
 
         var alice = new Player("Alice", 20);
         var bob = new Player("Bob", 20);

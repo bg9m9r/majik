@@ -1,7 +1,6 @@
 using System.Text.Json;
 using FluentAssertions;
 using Majik.Core.CardData;
-using Majik.Core.CardData.Database;
 using Majik.Core.Effects;
 using Majik.Core.Players;
 using Xunit;

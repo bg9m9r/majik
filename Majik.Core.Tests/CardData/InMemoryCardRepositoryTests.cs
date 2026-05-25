@@ -1,13 +1,13 @@
 using FluentAssertions;
 using Majik.Core.CardData;
-using Majik.Core.CardData.Database;
 using Xunit;
 
 namespace Majik.Core.Tests.CardData;
 
 /// <summary>
-/// Tests for the abstraction itself via an inline impl; the EF-backed
-/// <see cref="DbCardRepository"/> is exercised by the live DB integration test.
+/// Tests for the abstraction itself via an inline implementation. The
+/// production impl <see cref="EmbeddedCardRepository"/> is covered
+/// separately in <c>EmbeddedCardRepositoryTests</c>.
 /// </summary>
 public class InMemoryCardRepositoryTests
 {

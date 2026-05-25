@@ -1,6 +1,5 @@
 using FluentAssertions;
 using Majik.Core.CardData;
-using Majik.Core.CardData.Database;
 using Majik.Core.CardData.SpellTemplates;
 using Majik.Core.Players;
 using Xunit;
