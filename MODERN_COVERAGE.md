@@ -30,6 +30,11 @@
 > by impact. Regenerate with
 > `dotnet run --project Majik.Console -- mechanic-deps
 > --md-out docs/MECHANIC_DEPS.md --json-out docs/mechanic-deps.json`.
+>
+> **Unified status page:** [`docs/DASHBOARD.md`](docs/DASHBOARD.md) — consolidates
+> the headline tier numbers, mechanic-deps queue, gap clusters, shipping velocity
+> (last 7 days of `feat(*)` commits), and archetype rollups into one auto-generated
+> page. Regenerate with `dotnet run --project Majik.Console -- dashboard`.
 
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 
