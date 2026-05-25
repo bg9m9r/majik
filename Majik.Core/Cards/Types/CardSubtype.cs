@@ -194,6 +194,11 @@ public enum CardSubtype
     /// Sai, Master Thopterist, Thopter Foundry / Sword of the Meek, Whirler
     /// Rogue tokens. CR 205.3m.</summary>
     Thopter,
+    /// <summary>Treefolk creature subtype — Generous Ent (The Lord of the
+    /// Rings: Tales of Middle-earth), Treefolk Harbinger, Doran, the
+    /// Siege Tower. Historically paired with Forestcycling and
+    /// toughness-matters payoffs. CR 205.3m.</summary>
+    Treefolk,
 
     // Land subtypes (examples)
     Forest,
