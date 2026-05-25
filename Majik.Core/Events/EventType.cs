@@ -85,4 +85,14 @@ public enum EventType
     // surveil" / "Whenever ~ surveils" triggers (Ledger Shredder,
     // Glimpse the Unthinkable, etc.) subscribe to.
     Surveil,
+
+    // CR 121 / CR 614 — one or more counters have been placed on a
+    // permanent (after all replacement effects have been applied; the
+    // event carries the actual amount committed). The hook "Whenever
+    // one or more +1/+1 counters are put on a permanent you control"
+    // (Animation Module, Hardened Scales rider tests, etc.) subscribes
+    // to this — Hardened Scales itself is a REPLACEMENT effect that
+    // rewrites the intent BEFORE commit, so it runs first and the
+    // amount on this event already reflects its bump.
+    CounterAdded,
 }
