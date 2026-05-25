@@ -12,4 +12,11 @@
     <ProjectReference Include="..\Majik.Core\Majik.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Exposes ExportModernCardsCommand internals (PrefersReplacement,
+         LoadImplementedNames, etc.) to the test project so the seed-export
+         CLI can be unit-tested without leaking helpers to a public API. -->
+    <InternalsVisibleTo Include="Majik.Core.Tests" />
+  </ItemGroup>
+
 </Project>

@@ -29,13 +29,39 @@ dotnet test --filter "FullyQualifiedName~StateBasedActionsTests.LegendRule"
 # Server (local dev)
 dotnet run --project Majik.Server                                # http://localhost:5057
 
-# Scryfall import + keyword analysis
-dotnet run --project Majik.Console -- import <scryfall-all-cards.json>
-dotnet run --project Majik.Console -- analyze-keywords --from-database [--use-claude]
-dotnet run --project Majik.Console -- ingest-claude-results <jsonl>
+# Engine triggered-ability playground
+dotnet run --project Majik.Console -- play-triggers [etb|apnap|intervening-if|delayed|all]
+
+# Regenerate the embedded Modern card pool (see "Updating card data" below)
+dotnet run --project Majik.Console -- export-modern-cards <scryfall-all-cards.json>
 ```
 
-`--use-claude` needs `ANTHROPIC_API_KEY` (env var or `.env` walked up from cwd). See [`docs/archive/CLAUDE_SETUP.md`](./docs/archive/CLAUDE_SETUP.md).
+## Updating card data
+
+The engine's Modern-legal card pool ships as a gzipped JSON resource at
+`Majik.Core/CardData/Embedded/modern-cards.json.gz` (~22k rows, ~2 MB),
+loaded in-process by `EmbeddedCardRepository` — no database, no HTTP hop.
+To refresh it from a new Scryfall bulk export:
+
+```bash
+# 1. Fetch Scryfall's "all-cards" bulk (~500 MB JSON)
+curl -o /tmp/scryfall.json \
+  $(curl -s https://api.scryfall.com/bulk-data \
+    | jq -r '.data[] | select(.type=="all_cards") | .download_uri')
+
+# 2. Regenerate the seed (filters to modern legal/restricted, dedupes
+#    by name preferring the highest released_at, flags rows backed by a
+#    [CardName] factory as isImplemented, and round-trips through
+#    EmbeddedCardRepository as a sanity check)
+dotnet run --project Majik.Console -- export-modern-cards /tmp/scryfall.json
+
+# 3. Commit + push
+git add Majik.Core/CardData/Embedded/modern-cards.json.gz
+git commit -m "chore(cards): refresh modern-cards seed (Scryfall YYYY-MM-DD)"
+```
+
+The CLI exits non-zero if the round-trip verification fails, so a green
+exit is a sufficient gate for committing the regenerated file.
 
 ## Architecture
 
