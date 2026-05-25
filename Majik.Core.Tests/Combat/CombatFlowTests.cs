@@ -2,6 +2,7 @@ using FluentAssertions;
 using Majik.Core.CardData;
 using Majik.Core.Cards;
 using Majik.Core.Combat;
+using Majik.Core.Effects;
 using Majik.Core.Events;
 using Majik.Core.Game;
 using Majik.Core.Players;
@@ -92,6 +93,41 @@ public class CombatFlowTests
         _bob.LifeTotal.Should().Be(20);
         atk.Zone.Should().Be(ZoneType.Graveyard);
         blk.Zone.Should().Be(ZoneType.Graveyard);
+    }
+
+    [Fact]
+    public async Task CombatDamageIntent_IsStampedWithIsCombatDamage()
+    {
+        // CR 510.1c — combat damage must be discriminable from non-combat
+        // damage at the replacement layer. CombatFlow stamps
+        // DamageIntent.IsCombatDamage = true on every intent it pumps
+        // through the ReplacementBus (covers all three Apply{ToCreature
+        // |ToPlaneswalker|ToPlayer} routes).
+        var replacements = new ReplacementBus();
+        var captured = new List<DamageIntent>();
+        replacements.Register<DamageIntent>(new LambdaReplacement<DamageIntent>(
+            (i, _) => { captured.Add(i); return false; },
+            (i, _) => i));
+
+        var bear = (Creature)NamedCardFactory.Create("Grizzly Bears", _alice);
+        bear.SetZone(ZoneType.Battlefield);
+        bear.HasSummoningSickness = false;
+        var flow = new CombatFlow(_bus, _sba, replacements);
+        var aliceAgent = new ScriptedAgent();
+        aliceAgent.QueueAttackers(new CombatPlan(new[] {
+            new Majik.Core.Players.Agents.AttackerDeclaration(bear, _bob) }));
+        var bobAgent = new ScriptedAgent();
+        bobAgent.QueueBlockers(BlockPlan.None);
+
+        await flow.RunCombatAsync(
+            attacker: _alice, defender: _bob,
+            attackerAgent: aliceAgent, defenderAgent: bobAgent,
+            attackers: new[] { bear }, blockers: Array.Empty<Creature>(),
+            ctx: NewContext());
+
+        captured.Should().NotBeEmpty("CombatFlow pushed the player-damage intent through the bus");
+        captured.Should().OnlyContain(i => i.IsCombatDamage,
+            "every intent CombatFlow emits is combat damage (CR 510.1)");
     }
 
     private GameContext NewContext() =>

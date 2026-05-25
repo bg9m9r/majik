@@ -189,7 +189,9 @@ public sealed class CombatFlow
         // matching the quality. Check colour-quality before mutating state.
         if (HasProtectionFromSource(target, source)) return;
 
-        var intent = new Majik.Core.Effects.DamageIntent(source, amount, TargetCreature: target);
+        var intent = new Majik.Core.Effects.DamageIntent(
+            source, amount, TargetCreature: target)
+        { IsCombatDamage = true };
         intent = _replacements?.Apply(intent) ?? intent;
         if (intent == null || intent.Amount <= 0) return;
 
@@ -207,7 +209,9 @@ public sealed class CombatFlow
 
     private void DealDamageToPlaneswalker(Creature source, Planeswalker target, int amount)
     {
-        var intent = new Majik.Core.Effects.DamageIntent(source, amount, TargetPlaneswalker: target);
+        var intent = new Majik.Core.Effects.DamageIntent(
+            source, amount, TargetPlaneswalker: target)
+        { IsCombatDamage = true };
         intent = _replacements?.Apply(intent) ?? intent;
         if (intent == null || intent.Amount <= 0) return;
 
@@ -223,7 +227,9 @@ public sealed class CombatFlow
     {
         if (target.HasLost) return; // CR 104.2 — game over for this player
 
-        var intent = new Majik.Core.Effects.DamageIntent(source, amount, TargetPlayer: target);
+        var intent = new Majik.Core.Effects.DamageIntent(
+            source, amount, TargetPlayer: target)
+        { IsCombatDamage = true };
         intent = _replacements?.Apply(intent) ?? intent;
         if (intent == null || intent.Amount <= 0) return;
 
