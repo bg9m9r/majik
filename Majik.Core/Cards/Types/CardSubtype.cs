@@ -203,6 +203,9 @@ public enum CardSubtype
     /// Siege Tower. Historically paired with Forestcycling and
     /// toughness-matters payoffs. CR 205.3m.</summary>
     Treefolk,
+    /// <summary>Naga creature subtype — Ramunap Excavator (Hour of Devastation),
+    /// Hapatra, Vizier of Poisons, the Amonkhet snake-people lineage. CR 205.3m.</summary>
+    Naga,
 
     // Land subtypes (examples)
     Forest,
