@@ -1,37 +1,37 @@
 {
   "scope": "format=modern, dedup-by-name",
-  "generated_utc": "2026-05-25T03:06:09.7876249Z",
+  "generated_utc": "2026-05-25T03:13:19.8976476Z",
   "total_cards": 21917,
   "total_weight": 21917,
-  "covered_cards": 6011,
-  "covered_percent": 27.43,
-  "weighted_covered": 6011,
-  "weighted_covered_percent": 27.43,
+  "covered_cards": 6017,
+  "covered_percent": 27.45,
+  "weighted_covered": 6017,
+  "weighted_covered_percent": 27.45,
   "frequency_total_weight": 20390,
-  "frequency_weighted_covered": 19480,
-  "frequency_weighted_covered_percent": 95.54,
+  "frequency_weighted_covered": 19710,
+  "frequency_weighted_covered_percent": 96.67,
   "top_meta_covered": 20,
   "top_meta_total": 20,
   "counts_by_tier": {
-    "NamedFactory": 263,
+    "NamedFactory": 269,
     "SpellBound": 3708,
     "KeywordOnly": 1411,
     "Vanilla": 629,
-    "Unimplemented": 15906
+    "Unimplemented": 15900
   },
   "weighted_by_tier": {
-    "NamedFactory": 263,
+    "NamedFactory": 269,
     "SpellBound": 3708,
     "KeywordOnly": 1411,
     "Vanilla": 629,
-    "Unimplemented": 15906
+    "Unimplemented": 15900
   },
   "frequency_weighted_by_tier": {
-    "NamedFactory": 14230,
+    "NamedFactory": 14460,
     "SpellBound": 1470,
     "KeywordOnly": 3400,
     "Vanilla": 380,
-    "Unimplemented": 910
+    "Unimplemented": 680
   },
   "top_meta": [
     {
@@ -26778,7 +26778,7 @@
     {
       "name": "Eidolon of the Great Revel",
       "type_line": "Enchantment Creature \u2014 Spirit",
-      "tier": "Unimplemented"
+      "tier": "NamedFactory"
     },
     {
       "name": "Eiganjo Castle",
@@ -53663,7 +53663,7 @@
     {
       "name": "Light Up the Stage",
       "type_line": "Sorcery",
-      "tier": "Unimplemented"
+      "tier": "NamedFactory"
     },
     {
       "name": "Light from Within",
@@ -71573,7 +71573,7 @@
     {
       "name": "Pyrite Spellbomb",
       "type_line": "Artifact",
-      "tier": "Unimplemented"
+      "tier": "NamedFactory"
     },
     {
       "name": "Pyroceratops",
@@ -73818,7 +73818,7 @@
     {
       "name": "Reality Smasher",
       "type_line": "Creature \u2014 Eldrazi",
-      "tier": "Unimplemented"
+      "tier": "NamedFactory"
     },
     {
       "name": "Reality Spasm",
@@ -96813,7 +96813,7 @@
     {
       "name": "Thought-Knot Seer",
       "type_line": "Creature \u2014 Eldrazi",
-      "tier": "Unimplemented"
+      "tier": "NamedFactory"
     },
     {
       "name": "Thought-Stalker Warlock",
@@ -100598,7 +100598,7 @@
     {
       "name": "Ulamog, the Ceaseless Hunger",
       "type_line": "Legendary Creature \u2014 Eldrazi",
-      "tier": "Unimplemented"
+      "tier": "NamedFactory"
     },
     {
       "name": "Ulamog, the Ceaseless Hunger // Ulamog, the Ceaseless Hunger",

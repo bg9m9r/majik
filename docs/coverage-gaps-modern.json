@@ -1,12 +1,12 @@
 {
   "scope": "format=modern, dedup-by-name",
-  "generated_utc": "2026-05-24T19:53:38.5615352Z",
-  "total_unimplemented": 15885,
+  "generated_utc": "2026-05-25T03:13:29.7188454Z",
+  "total_unimplemented": 15868,
   "min_cluster_size": 5,
   "clusters_above_threshold": 205,
-  "cards_above_threshold": 2177,
-  "cards_below_threshold": 13708,
-  "cards_rendered_in_top": 1191,
+  "cards_above_threshold": 2176,
+  "cards_below_threshold": 13692,
+  "cards_rendered_in_top": 1190,
   "cards_rendered_percent": 7.5,
   "clusters": [
     {
@@ -459,7 +459,7 @@
       "first_sentence_signature": "when ~ enters, draw a card",
       "trigger_signature": "when ~ enters,",
       "effect_verb_signature": "draw a card",
-      "member_count": 25,
+      "member_count": 24,
       "canonical_card_name": "Conciliator\u0027s Duelist",
       "canonical_oracle_text": "When this creature enters, draw a card. Each player loses 1 life. Repartee \u2014 Whenever you cast an instant or sorcery spell that targets a creature, exile up to one target creature. Return that card to the battlefield under its owner\u0027s control at the beginning of the next end step.",
       "example_card_names": [
@@ -478,11 +478,11 @@
         "Masked Admirers",
         "Merchant of Secrets",
         "Nimble Innovator",
-        "Omnath, Locus of Creation",
         "Pond Prophet",
         "Proft\u0027s Eidetic Memory",
         "Rhox Oracle",
-        "Sarulf\u0027s Packmate"
+        "Sarulf\u0027s Packmate",
+        "Shaman of Spring"
       ],
       "suggested_binder_name": "EtbDrawCardTriggerBinder",
       "suggested_binder_notes": "ETB triggered ability \u2014 draw one card",

@@ -76,6 +76,14 @@ public enum BotIntent : ulong
     /// neutral-accept branch — matches the legacy "auto-shuffle" posture
     /// used before this prompt shipped.</summary>
     LibraryReorder = 1UL << 23,
+
+    /// <summary>Look at / exile a card from an opponent's hand
+    /// (Thought-Knot Seer's ETB pick, Cabal Therapy's revealed-name picker
+    /// from the casting controller's perspective, future Hymn-to-Tourach
+    /// style "reveal X cards, you pick" surfaces). Distinct from
+    /// <see cref="Discard"/> because the CHOOSER is not the card's owner —
+    /// heuristic bots score these as removal of the opponent's best card.</summary>
+    HandHate     = 1UL << 24,
 }
 
 public static class BotIntentExtensions
