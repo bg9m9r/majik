@@ -3,6 +3,7 @@ using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
 using Majik.Core.Counters;
+using Majik.Core.Effects;
 using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Services;
@@ -63,7 +64,7 @@ public static class TirelessTrackerFactory
     /// ZoneService. Suitable for shape / dispatcher tests.
     /// </summary>
     public static Creature Create(Player owner) =>
-        Create(owner, zoneService: null, triggers: null);
+        Create(owner, zoneService: null, triggers: null, replacements: null);
 
     /// <summary>
     /// Construct Tireless Tracker. When <paramref name="zoneService"/> is
@@ -72,11 +73,16 @@ public static class TirelessTrackerFactory
     /// observe the Clue's arrival). When <paramref name="triggers"/> is
     /// supplied the landfall trigger is registered with the bus so a
     /// CardMovedEvent for a land automatically queues the ability.
+    /// When <paramref name="replacements"/> is supplied the sac-Clue +1/+1
+    /// counter placement is routed through <see cref="CountersService.Add"/>
+    /// so Hardened Scales / Doubling Season replacements can rewrite the
+    /// count (CR 614).
     /// </summary>
     public static Creature Create(
         Player owner,
         ZoneService? zoneService,
-        TriggerManager? triggers)
+        TriggerManager? triggers,
+        ReplacementBus? replacements = null)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -91,7 +97,7 @@ public static class TirelessTrackerFactory
         card.SetController(owner);
 
         AttachLandfallClueTrigger(card, owner, zoneService, triggers);
-        AttachSacClueGrowAbility(card, owner);
+        AttachSacClueGrowAbility(card, owner, replacements);
 
         return card;
     }
@@ -131,13 +137,13 @@ public static class TirelessTrackerFactory
     /// <summary>
     /// "{2}, Sacrifice a Clue: Put a +1/+1 counter on Tireless Tracker."
     /// </summary>
-    private static void AttachSacClueGrowAbility(Creature card, Player owner)
+    private static void AttachSacClueGrowAbility(Creature card, Player owner, ReplacementBus? replacements)
     {
         var sacCost = new SacrificeAClueCost();
 
         var counterEffect = new Effect(
             "Tireless Tracker — put a +1/+1 counter on itself",
-            () => card.Counters.Add(CounterType.PlusOnePlusOne, 1));
+            () => CountersService.Add(card, CounterType.PlusOnePlusOne, 1, replacements));
 
         var ability = new TirelessTrackerActivatedAbility(
             source: card,

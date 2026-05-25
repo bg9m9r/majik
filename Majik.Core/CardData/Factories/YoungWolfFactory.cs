@@ -60,17 +60,22 @@ public static class YoungWolfFactory
     /// Suitable for shape / dispatcher tests.
     /// </summary>
     public static Creature Create(Player owner) =>
-        Create(owner, triggers: null);
+        Create(owner, triggers: null, replacements: null);
 
     /// <summary>
     /// Construct Young Wolf with optional <see cref="TriggerManager"/>
     /// wiring. When <paramref name="triggers"/> is supplied, the Undying
     /// trigger is registered so a Battlefield → Graveyard
     /// <see cref="CardMovedEvent"/> places it on the stack automatically.
+    /// When <paramref name="replacements"/> is supplied, the Undying-return
+    /// +1/+1 counter placement is routed through
+    /// <see cref="Majik.Core.Services.CountersService.Add"/> so Hardened
+    /// Scales / Doubling Season replacements can rewrite the count (CR 614).
     /// </summary>
     public static Creature Create(
         Player owner,
-        TriggerManager? triggers)
+        TriggerManager? triggers,
+        Majik.Core.Effects.ReplacementBus? replacements = null)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -92,7 +97,7 @@ public static class YoungWolfFactory
 
         // CR 702.93b — Undying triggered ability. Returns Young Wolf to the
         // battlefield with a +1/+1 counter when it dies without one.
-        var undying = UndyingFactory.Build(card);
+        var undying = UndyingFactory.Build(card, replacements);
         card.AddAbility(undying);
         triggers?.RegisterTriggeredAbility(undying);
 

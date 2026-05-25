@@ -1,7 +1,9 @@
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Counters;
+using Majik.Core.Effects;
 using Majik.Core.Events;
+using Majik.Core.Services;
 using Majik.Core.Zones;
 
 namespace Majik.Core.Keywords;
@@ -32,7 +34,18 @@ namespace Majik.Core.Keywords;
 /// </summary>
 public static class UndyingFactory
 {
-    public static TriggeredAbility Build(Creature source)
+    public static TriggeredAbility Build(Creature source) =>
+        Build(source, replacements: null);
+
+    /// <summary>
+    /// Build the Undying triggered ability for <paramref name="source"/>,
+    /// optionally routing the "+1/+1 counter on it" return-side placement
+    /// through the supplied <see cref="ReplacementBus"/> so replacements
+    /// such as Hardened Scales / Doubling Season can rewrite the count
+    /// (CR 614). When <paramref name="replacements"/> is null the counter
+    /// is placed directly — same behaviour as today's untouched callers.
+    /// </summary>
+    public static TriggeredAbility Build(Creature source, ReplacementBus? replacements)
     {
         if (source == null) throw new ArgumentNullException(nameof(source));
 
@@ -63,8 +76,10 @@ public static class UndyingFactory
                 source.Counters.Remove(entry.Key, entry.Value);
             }
 
-            // Undying grant: one +1/+1 counter (CR 702.93b).
-            source.Counters.Add(CounterType.PlusOnePlusOne, 1);
+            // Undying grant: one +1/+1 counter (CR 702.93b). Routed via
+            // CountersService so Hardened Scales / Doubling Season can
+            // rewrite the count on the return (CR 614).
+            CountersService.Add(source, CounterType.PlusOnePlusOne, 1, replacements);
 
             // Permanent ETB bookkeeping (summoning sickness is already true
             // from construction; re-mark the entry timestamp).

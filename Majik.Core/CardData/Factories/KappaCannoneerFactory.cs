@@ -135,7 +135,7 @@ public static class KappaCannoneerFactory
     /// effects service. Suitable for dispatcher / structural tests.
     /// </summary>
     public static Creature Create(Player owner) =>
-        Create(owner, eventBus: null, triggers: null, continuousEffects: null);
+        Create(owner, eventBus: null, triggers: null, continuousEffects: null, replacements: null);
 
     /// <summary>
     /// Construct Kappa Cannoneer with optional runtime services.
@@ -149,11 +149,16 @@ public static class KappaCannoneerFactory
     /// <param name="continuousEffects">ContinuousEffectsService for the
     /// EOT "can't be blocked this turn" rider. May be null — the rider
     /// is skipped on the shape-only path.</param>
+    /// <param name="replacements">ReplacementBus for routing the +1/+1
+    /// counter placement through <see cref="CountersService.Add"/> so
+    /// Hardened Scales / Doubling Season replacements can rewrite the
+    /// count (CR 614). May be null — the counter is placed directly.</param>
     public static Creature Create(
         Player owner,
         IEventBus? eventBus,
         TriggerManager? triggers,
-        ContinuousEffectsService? continuousEffects)
+        ContinuousEffectsService? continuousEffects,
+        ReplacementBus? replacements = null)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -229,8 +234,10 @@ public static class KappaCannoneerFactory
             {
                 if (card.Zone != ZoneType.Battlefield) return;
 
-                // CR 122.1c — counter placement.
-                card.Counters.Add(CounterType.PlusOnePlusOne, 1);
+                // CR 122.1c — counter placement (routed through
+                // CountersService so Hardened Scales / Doubling Season
+                // replacements observe the intent — CR 614).
+                CountersService.Add(card, CounterType.PlusOnePlusOne, 1, replacements);
 
                 // CR 702.x — "can't be blocked this turn" registered as a
                 // per-turn combat restriction. Consulted by the combat
