@@ -199,6 +199,10 @@ public enum CardSubtype
     Construct,
     Blood,
     Powerstone,
+    /// <summary>Myr creature/artifact subtype — Myr Enforcer, Myr Retriever,
+    /// the Mirrodin Myr cycle. Always paired with the Artifact type.
+    /// CR 205.3g + CR 205.3m.</summary>
+    Myr,
 
     // Eldrazi creature subtypes (CR 205.3m)
     Eldrazi,

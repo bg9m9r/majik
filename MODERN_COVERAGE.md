@@ -420,7 +420,7 @@ Cards under `Majik.Core/CardData/Cards/*.json`:
 | Cycling | Partial | `Keywords/CyclingAbility.cs` (no enforced restriction tests; per-card hookup) |
 | Echo | TODO | — |
 | Kicker | TODO | — |
-| Affinity | TODO | `OracleTextNormalizer` strips prefix (#136), no live cost reduction |
+| Affinity | Done | `Costs/CostReductionAbility.cs::AffinityFor` + `CardData/AffinityBinder.cs` (reminder-text regex); shipped on Emry, Cranial Plating, Frogmite, Myr Enforcer |
 | Bargain | TODO | normalizer strips (#136) |
 
 ### Effects / layer system
@@ -481,7 +481,7 @@ Per-keyword action helpers under `Majik.Core/Keywords/`:
 | Mobilize | TODO | — | — |
 | Cascade | Done (TBD) | `Keywords/CascadeAction.cs` | Crashing Footfalls |
 | Storm | Done (TBD) | `Keywords/StormHelper.cs` | Brain Freeze |
-| Affinity | TODO | — | — |
+| Affinity | Done | `Costs/CostReductionAbility.cs::AffinityFor` + `CardData/AffinityBinder.cs` | Frogmite, Myr Enforcer, Emry, Cranial Plating |
 | Bloodthirst / Echo / Buyback | TODO | — | — |
 | Class (leveling) | Done (TBD PR) | `CardData/Classes/ClassState.cs` + `Cards/Permanent.cs::ClassState/AttachClassState` + `Events/ClassLevelUpEvent.cs` | `ClassState` extended with `LevelUpCosts[]` + `CurrentLevel` + sequential `LevelUpTo(N)` (CR 716.4) + `OnLevelUp` event callback; attached to `Permanent` via `AttachClassState` (mirrors `SagaState` side-table). Stormchaser's Talent retrofit ships both level-up activated abilities (`{1}{U}{R}: Level 2`, `{3}{U}{R}: Level 3` — `sorcerySpeed: true` enforced by `ActionValidator` per PR #460) + the Level-2 trigger ("Whenever you cast a noncreature spell, the Mercenary deals 1 damage to any target") + the Level-3 trigger ("draw a card, then discard a card"), both gated by `TriggeredAbility.InterveningIf` on `ClassState.CurrentLevel >= N` (CR 603.4). "The Mercenary" referent captured via a per-Class spawned-token holder. "Any target" picker is the v1 deterministic resolver (`opponentResolver` closure — first opponent); the Level-3 loot discard is the deterministic last-in-hand picker (same posture as Faithless Looting). Live Prowess pump on the token + true agent-driven any-target prompt remain deferred behind the broader token-keyword + prompt surfaces. |
 
