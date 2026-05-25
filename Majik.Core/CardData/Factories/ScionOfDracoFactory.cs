@@ -1,3 +1,4 @@
+using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
@@ -73,14 +74,14 @@ public static class ScionOfDracoFactory
         card.SetController(owner);
 
         // CR 702.16 (Domain) + CR 117.7 — "This spell costs {2} less to
-        // cast for each basic land type among lands you control." Whole-
-        // reducer shape: TribalFlamesFactory.CountDomain returns the
-        // number of DISTINCT basic land types (max 5; Wastes excluded),
-        // and we multiply by 2 here. Floor-at-zero is enforced by
-        // CostReduction.GetEffectiveCost.
-        card.AddAbility(new CostReductionAbility(
-            totalReducer: caster => 2 * TribalFlamesFactory.CountDomain(caster, effects: null),
-            description: "Domain — costs {2} less per basic land type you control"));
+        // cast for each basic land type among lands you control."
+        // Declarative DomainCostReductionAbility wraps the canonical
+        // Domain.CountTypes primitive (max 5 distinct types; Wastes
+        // excluded — CR 305.6) and multiplies by 2. Floor-at-zero is
+        // enforced by CostReduction.GetEffectiveCost; the printed cost
+        // is {10} generic so all five basics drives effective cost to
+        // exactly 0.
+        card.AddAbility(new DomainCostReductionAbility(multiplier: 2));
 
         return card;
     }
