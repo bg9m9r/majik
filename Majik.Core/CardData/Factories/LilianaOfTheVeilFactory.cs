@@ -2,6 +2,7 @@ using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
 using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
@@ -56,7 +57,8 @@ public static class LilianaOfTheVeilFactory
     /// and -2 effects no-op; loyalty changes still apply. Suitable for
     /// shape / dispatcher tests.
     /// </summary>
-    public static Planeswalker Create(Player owner) => Create(owner, allPlayersResolver: null);
+    public static Planeswalker Create(Player owner)
+        => Create(owner, allPlayersResolver: null, agentSelector: null);
 
     /// <summary>
     /// Construct Liliana of the Veil. When
@@ -67,6 +69,19 @@ public static class LilianaOfTheVeilFactory
     public static Planeswalker Create(
         Player owner,
         Func<IReadOnlyList<Player>>? allPlayersResolver)
+        => Create(owner, allPlayersResolver, agentSelector: null);
+
+    /// <summary>
+    /// Construct Liliana of the Veil with optional per-player
+    /// <see cref="IPlayerAgent"/> selector. When supplied, the +1 ability
+    /// consults <see cref="IPlayerAgent.ChooseFromHandAsync"/>
+    /// (<see cref="BotIntent.Discard"/>) per player for the discard pick.
+    /// Null preserves the legacy first-card-in-hand pick (CR 701.16a).
+    /// </summary>
+    public static Planeswalker Create(
+        Player owner,
+        Func<IReadOnlyList<Player>>? allPlayersResolver,
+        Func<Player, IPlayerAgent?>? agentSelector)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -81,14 +96,32 @@ public static class LilianaOfTheVeilFactory
         liliana.SetController(owner);
 
         // -- +1: Each player discards a card. -------------------------------
+        // CR 701.16a — each player chooses their own card to discard.
+        // Agent path (per-player IPlayerAgent via selector): consult
+        // ChooseFromHandAsync(BotIntent.Discard); the heuristic bot's
+        // override pitches the highest-MV card. No-agent path: first card
+        // in hand (legacy deterministic v1 — matches Yawgmoth shape).
         liliana.AddAbility(new LoyaltyAbility(liliana, +1, () =>
         {
             var players = allPlayersResolver?.Invoke();
             if (players == null) return;
             foreach (var p in players)
             {
-                var pick = p.Zones.Hand.GetCards().FirstOrDefault();
-                if (pick == null) continue;
+                var hand = p.Zones.Hand.GetCards().ToList();
+                if (hand.Count == 0) continue;
+                var agent = agentSelector?.Invoke(p);
+                ICard? pick;
+                if (agent != null)
+                {
+                    pick = agent.ChooseFromHandAsync(p, hand, BotIntent.Discard)
+                        .GetAwaiter().GetResult();
+                    if (pick == null || pick.Zone != ZoneType.Hand)
+                        pick = hand[0];
+                }
+                else
+                {
+                    pick = hand[0];
+                }
                 p.Zones.Hand.RemoveCard(pick);
                 p.Zones.Graveyard.AddCard(pick);
                 pick.SetZone(ZoneType.Graveyard);

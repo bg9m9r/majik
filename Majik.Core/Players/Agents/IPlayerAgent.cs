@@ -169,4 +169,89 @@ public interface IPlayerAgent
         IReadOnlyList<Player> opponents,
         CancellationToken ct = default)
         => Task.FromResult<Player?>(null);
+
+    /// <summary>
+    /// Generic Yes/No prompt for optional "may" clauses (CR 117.x / 605.1).
+    /// Returns <see langword="true"/> to take the action, <see langword="false"/>
+    /// to decline.
+    /// <para>
+    /// <paramref name="question"/> is a human-readable label surfaced verbatim
+    /// by remote-agent UIs ("Promise the gift?", "Pay {2} to keep your
+    /// graveyard?"). Deterministic / scripted agents ignore it.
+    /// </para>
+    /// <para>
+    /// <paramref name="intent"/> is the heuristic classification the prompt
+    /// represents (CardAdvantage / LoseLife / DiscardCost / CostToDecline /
+    /// CheatIntoPlay etc.) — see <see cref="BotIntent"/>. Smart bots key
+    /// their default posture off this; remote agents ignore it.
+    /// </para>
+    /// <para>
+    /// Default implementation (used by ScriptedAgent / DeterministicBotAgent
+    /// when not overridden): a tiny three-way heuristic over intent —
+    /// accept upside-tagged prompts (Buff / CardAdvantage / Heal / Tutor /
+    /// Draw / Reanimate), decline downside-tagged prompts (LoseLife /
+    /// DiscardCost / CostToDecline) and accept everything else. This
+    /// preserves the legacy "auto-accept may-clauses" posture used by every
+    /// factory written before this prompt shipped.
+    /// </para>
+    /// </summary>
+    Task<bool> ChooseYesNoAsync(
+        string question,
+        BotIntent intent,
+        CancellationToken ct = default)
+    {
+        // Upside intents — always yes.
+        if (intent.HasAny(BotIntent.CardAdvantage
+                          | BotIntent.Buff
+                          | BotIntent.Heal
+                          | BotIntent.Tutor
+                          | BotIntent.Draw
+                          | BotIntent.Reanimate
+                          | BotIntent.CheatIntoPlay
+                          | BotIntent.Token))
+        {
+            return Task.FromResult(true);
+        }
+        // Downside intents — always no.
+        if (intent.HasAny(BotIntent.LoseLife
+                          | BotIntent.DiscardCost
+                          | BotIntent.CostToDecline))
+        {
+            return Task.FromResult(false);
+        }
+        // Neutral / unclassified — match the legacy "auto-accept may"
+        // posture used by every factory written before this prompt shipped
+        // (Sneak Attack / Through the Breach / Arclight Phoenix / Aether
+        // Vial / Bloodghast etc.).
+        return Task.FromResult(true);
+    }
+
+    /// <summary>
+    /// Pick exactly one card from a candidate set in
+    /// <paramref name="chooser"/>'s hand, or return <see langword="null"/>
+    /// to decline (only legal when the calling effect treats the choice as
+    /// "may" — see CR 117.x). Used by:
+    ///   - Discard prompts (Liliana of the Veil +1, Faithless Looting,
+    ///     Yawgmoth) — <see cref="BotIntent.Discard"/>.
+    ///   - Cheat-into-play prompts (Sneak Attack, Through the Breach,
+    ///     Show and Tell) — <see cref="BotIntent.CheatIntoPlay"/>.
+    /// <para>
+    /// <paramref name="candidates"/> is pre-filtered by the calling effect
+    /// to legal picks only (e.g. creatures in hand for Sneak Attack,
+    /// permanents in hand for Show and Tell, any card for Liliana's
+    /// discard). The agent picks zero or one.
+    /// </para>
+    /// <para>
+    /// Default implementation: return the first candidate (deterministic
+    /// pre-agent behaviour). When the candidate list is empty, returns
+    /// <see langword="null"/> — every retrofitted factory treats null as
+    /// "no eligible card in hand, no-op".
+    /// </para>
+    /// </summary>
+    Task<ICard?> ChooseFromHandAsync(
+        Player chooser,
+        IReadOnlyList<ICard> candidates,
+        BotIntent intent,
+        CancellationToken ct = default)
+        => Task.FromResult<ICard?>(candidates.Count > 0 ? candidates[0] : null);
 }

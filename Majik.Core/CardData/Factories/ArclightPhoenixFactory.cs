@@ -4,6 +4,7 @@ using Majik.Core.Cards.Types;
 using Majik.Core.Domain.DomainEvents;
 using Majik.Core.Events;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
 using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
@@ -70,7 +71,7 @@ public static class ArclightPhoenixFactory
     /// effect directly. Suitable for shape / dispatcher tests.
     /// </summary>
     public static Creature Create(Player owner) =>
-        Create(owner, eventBus: null, triggers: null);
+        Create(owner, eventBus: null, triggers: null, agent: null);
 
     /// <summary>
     /// Construct Arclight Phoenix with optional event bus + trigger manager.
@@ -84,6 +85,21 @@ public static class ArclightPhoenixFactory
     /// on the controller's turn automatically places it on the stack.
     /// </summary>
     public static Creature Create(Player owner, IEventBus? eventBus, TriggerManager? triggers)
+        => Create(owner, eventBus, triggers, agent: null);
+
+    /// <summary>
+    /// Construct Arclight Phoenix with the agent-prompt MVP wiring. When
+    /// <paramref name="agent"/> is supplied, the "you may return" trigger
+    /// consults <see cref="IPlayerAgent.ChooseYesNoAsync"/>
+    /// (<see cref="BotIntent.Reanimate"/> | <see cref="BotIntent.CardAdvantage"/>);
+    /// false declines and leaves the Phoenix in the graveyard. Null
+    /// preserves the legacy auto-accept posture.
+    /// </summary>
+    public static Creature Create(
+        Player owner,
+        IEventBus? eventBus,
+        TriggerManager? triggers,
+        IPlayerAgent? agent)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -140,8 +156,18 @@ public static class ArclightPhoenixFactory
             () =>
             {
                 // CR 603.10 — intervening "if". Re-check the count at
-                // resolve time. "May" auto-accepted at v1.
+                // resolve time. "May" prompt: when an agent is wired,
+                // consult ChooseYesNoAsync(Reanimate | CardAdvantage)
+                // before the return. No agent → legacy auto-accept.
                 if (instantSorceryCastsThisTurn[0] < 3) return;
+                if (agent != null)
+                {
+                    var yes = agent.ChooseYesNoAsync(
+                        "Return Arclight Phoenix from graveyard to battlefield?",
+                        BotIntent.Reanimate | BotIntent.CardAdvantage)
+                        .GetAwaiter().GetResult();
+                    if (!yes) return;
+                }
 
                 // CR 603.6d — the ability functions from graveyard. Guard
                 // against the Phoenix having moved out of the graveyard

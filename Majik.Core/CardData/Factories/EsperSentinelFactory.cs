@@ -4,6 +4,7 @@ using Majik.Core.Cards.Types;
 using Majik.Core.Domain.DomainEvents;
 using Majik.Core.Events;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
 using Majik.Core.Primitives;
 using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
@@ -67,7 +68,7 @@ public static class EsperSentinelFactory
     /// invoking the (owner, bus, triggers) overload).
     /// </summary>
     public static Creature Create(Player owner) =>
-        Create(owner, eventBus: null, triggers: null);
+        Create(owner, eventBus: null, triggers: null, opponentAgentSelector: null);
 
     /// <summary>
     /// Construct Esper Sentinel with optional event bus + trigger manager.
@@ -78,6 +79,24 @@ public static class EsperSentinelFactory
     /// <see cref="SpellCastEvent"/> automatically places it on the stack.
     /// </summary>
     public static Creature Create(Player owner, IEventBus? eventBus, TriggerManager? triggers)
+        => Create(owner, eventBus, triggers, opponentAgentSelector: null);
+
+    /// <summary>
+    /// Construct Esper Sentinel with the agent-prompt MVP wiring. The
+    /// optional <paramref name="opponentAgentSelector"/> is called at
+    /// resolution time with the opponent who cast the spell; when it
+    /// returns a non-null <see cref="IPlayerAgent"/>, the resolve body
+    /// consults <see cref="IPlayerAgent.ChooseYesNoAsync"/>
+    /// (<see cref="BotIntent.CostToDecline"/>) to decide whether to pay
+    /// {X}. If declined, controller draws. If accepted, the engine still
+    /// requires the pool to cover the cost (CR 117.5 — pays {0} trivially).
+    /// Null selector preserves the legacy auto-pay-from-pool posture.
+    /// </summary>
+    public static Creature Create(
+        Player owner,
+        IEventBus? eventBus,
+        TriggerManager? triggers,
+        Func<Player, IPlayerAgent?>? opponentAgentSelector)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -143,6 +162,24 @@ public static class EsperSentinelFactory
                 // change. The Sentinel's draw is then suppressed.
                 if (x <= 0)
                 {
+                    return;
+                }
+
+                // Agent path: prompt the opponent's IPlayerAgent for the
+                // pay-or-decline decision (CR 117.5 / 700.5 — taxed costs
+                // are an optional may-pay). Bot's CostToDecline intent
+                // declines by default (the controller draws — Sentinel's
+                // upside). Without an agent, fall back to the v1 auto-pay-
+                // from-pool posture (Daze / Mana Leak / Cursecatcher).
+                var oppAgent = opponentAgentSelector?.Invoke(caster);
+                if (oppAgent != null)
+                {
+                    var pay = oppAgent.ChooseYesNoAsync(
+                        $"Pay {{{x}}} to suppress Esper Sentinel's draw?",
+                        BotIntent.CostToDecline).GetAwaiter().GetResult();
+                    if (pay && caster.PayMana(ManaCost.Zero.AddGenericCost(x)))
+                        return;
+                    Fx.DrawCards(owner, 1);
                     return;
                 }
 

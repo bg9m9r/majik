@@ -90,8 +90,31 @@ public static class AetherGustFactory
     public static SpellDefinition BuildDefinition(
         Func<object, object> targetResolver,
         Majik.Core.Stack.Stack? stack,
-        Func<Player, bool>? topChooser = null) =>
-        new(
+        Func<Player, bool>? topChooser = null,
+        Func<Player, IPlayerAgent?>? agentSelector = null)
+    {
+        // Agent-prompt MVP: when no explicit topChooser is supplied but an
+        // agentSelector is, route the top/bottom decision through
+        // IPlayerAgent.ChooseYesNoAsync — "true" = top, "false" = bottom.
+        // CR 109.4 / 701.20a — the choice is made by the card's owner.
+        // BotIntent.None classifies the prompt as neutral (no clear upside
+        // or downside in isolation — the agent decides based on whether
+        // burying the card disrupts the owner's plan); the heuristic bot
+        // falls through its accept-by-default branch. Tests can supply
+        // either hook for fine-grained control.
+        if (topChooser == null && agentSelector != null)
+        {
+            topChooser = pl =>
+            {
+                var agent = agentSelector(pl);
+                if (agent == null) return false;
+                return agent.ChooseYesNoAsync(
+                    "Put the target on the top of its owner's library? (No = bottom)",
+                    BotIntent.None).GetAwaiter().GetResult();
+            };
+        }
+
+        return new(
             Modes: Array.Empty<string>(),
             HasVariableX: false,
             TargetRequests: new[]
@@ -111,6 +134,7 @@ public static class AetherGustFactory
                         () => Resolve(resolved, stack, topChooser)),
                 };
             });
+    }
 
     private static void Resolve(
         object resolved,
