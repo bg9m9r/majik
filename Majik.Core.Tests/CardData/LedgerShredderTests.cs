@@ -126,9 +126,15 @@ public class LedgerShredderTests
         bus.Publish(new SpellCastEvent(NewSpell(_alice, "Second")));
         triggers.PendingCount.Should().Be(1);
 
+        // Resolve the surveil trigger; its body publishes SurveilEvent
+        // which queues the self-trigger (Triggers.OnSurveil) as pending.
         triggers.PutPendingTriggersOnStack(_alice);
-        var trig = stack.Pop()!;
-        trig.Resolve();
+        stack.Pop()!.Resolve();
+
+        // SurveilEvent → self-trigger pending. Resolve it for the counter.
+        triggers.PendingCount.Should().Be(1);
+        triggers.PutPendingTriggersOnStack(_alice);
+        stack.Pop()!.Resolve();
 
         // No agent registered → surveiled card goes to graveyard.
         _alice.Zones.Graveyard.GetCards().Should().Equal(new[] { top });
@@ -151,6 +157,9 @@ public class LedgerShredderTests
 
         bus.Publish(new SpellCastEvent(NewSpell(_alice, "S1"))); // no trigger
         bus.Publish(new SpellCastEvent(NewSpell(_alice, "S2"))); // triggers
+        triggers.PutPendingTriggersOnStack(_alice);
+        stack.Pop()!.Resolve();
+        // Drain the chained self-surveil trigger (+1/+1 counter).
         triggers.PutPendingTriggersOnStack(_alice);
         stack.Pop()!.Resolve();
 
@@ -181,6 +190,9 @@ public class LedgerShredderTests
         bus.Publish(new SpellCastEvent(NewSpell(_alice, "T1S2")));
         triggers.PutPendingTriggersOnStack(_alice);
         stack.Pop()!.Resolve();
+        // Drain self-surveil chain.
+        triggers.PutPendingTriggersOnStack(_alice);
+        stack.Pop()!.Resolve();
         ls.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(1);
 
         // Turn boundary — fires TurnStartedEvent, reset closure count.
@@ -192,6 +204,9 @@ public class LedgerShredderTests
 
         bus.Publish(new SpellCastEvent(NewSpell(_alice, "T2S2")));
         triggers.PendingCount.Should().Be(1);
+        triggers.PutPendingTriggersOnStack(_alice);
+        stack.Pop()!.Resolve();
+        // Drain self-surveil chain.
         triggers.PutPendingTriggersOnStack(_alice);
         stack.Pop()!.Resolve();
 
