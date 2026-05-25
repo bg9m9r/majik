@@ -128,6 +128,19 @@ public sealed record SpellBindContext(
     public string Text => OracleTextNormalizer.NormalizeForCard(Entity.OracleText ?? string.Empty, Entity.Name);
 
     /// <summary>
+    /// PR-B: extra-folded view of <see cref="Text"/> in which:
+    ///   * adjacent mana-pip runs collapse to the literal "{cost}";
+    ///   * standalone integer counts in known noun contexts collapse to
+    ///     the literal "n".
+    /// Templates that match on a family that varies only in numeric value
+    /// (e.g. "deals N damage to any target" across Lightning Bolt /
+    /// Burst Lightning / Lava Spike) anchor on this view, then capture the
+    /// concrete N from <see cref="Text"/> with a scoped regex. See
+    /// <see cref="OracleTextNormalizer.NormalizeFolded"/>.
+    /// </summary>
+    public string TextFolded => OracleTextNormalizer.NormalizeFolded(Entity.OracleText ?? string.Empty, Entity.Name);
+
+    /// <summary>
     /// Raw oracle text BEFORE <see cref="OracleTextNormalizer"/> strips
     /// any leading passive-keyword / additional-cost prefixes. Bespoke
     /// templates that need to detect those stripped prefixes (e.g.

@@ -377,4 +377,137 @@ public class OracleTextNormalizerTests
         OracleTextNormalizer.NormalizeForCard(input, "Cancel")
             .Should().Be("Counter target spell.");
     }
+
+    // -- PR-B: mana-cost token fold -----------------------------------------
+
+    [Theory]
+    [InlineData("{X}{R}",              "{cost}")]
+    [InlineData("{2}{W}{W}",           "{cost}")]
+    [InlineData("{R}",                 "{cost}")]
+    [InlineData("{G/U}{2/W}",          "{cost}")]
+    [InlineData("{X}{G/P}{B}",         "{cost}")]
+    public void FoldTokens_CollapsesAdjacentManaPipsTo_cost(string input, string expected)
+    {
+        OracleTextNormalizer.FoldTokens(input).Should().Be(expected);
+    }
+
+    [Fact]
+    public void FoldTokens_LeavesTapAlone()
+    {
+        // Tap "{T}" is not a mana cost. Single-pip mana payments do fold
+        // ({2} below), but {T} must stay verbatim so activated-ability
+        // patterns like "{T}: Add {G}." keep their shape.
+        OracleTextNormalizer.FoldTokens("{T}, Pay {2}: Draw a card.")
+            .Should().Be("{T}, Pay {cost}: Draw a card.");
+    }
+
+    [Fact]
+    public void FoldTokens_LeavesUntapQAlone()
+    {
+        // "{Q}" is the untap symbol — not mana. Must not fold to {cost}.
+        OracleTextNormalizer.FoldTokens("{Q}: Add {W}.")
+            .Should().Be("{Q}: Add {cost}.");
+    }
+
+    [Fact]
+    public void FoldTokens_FoldsHybridAndPhyrexianRuns()
+    {
+        OracleTextNormalizer.FoldTokens("Cast for {2}{W/U}{B/P}.")
+            .Should().Be("Cast for {cost}.");
+    }
+
+    [Fact]
+    public void FoldTokens_LeavesNonManaBraceGroupsAlone()
+    {
+        // "{E}" is energy (not mana — it's an energy counter spend in some
+        // cards' costs; the pip-body grammar excludes E by design so it
+        // doesn't get folded as mana).
+        OracleTextNormalizer.FoldTokens("Pay {E}{E}: Draw a card.")
+            .Should().Be("Pay {E}{E}: Draw a card.");
+    }
+
+    // -- PR-B: numeric "n" token fold ---------------------------------------
+
+    [Theory]
+    [InlineData("Target creature gets +1/+1 until end of turn.",
+                "Target creature gets +n/+n until end of turn.")]
+    [InlineData("Target creature gets -2/-1 until end of turn.",
+                "Target creature gets -n/-n until end of turn.")]
+    [InlineData("Target creature gets +0/+3 until end of turn.",
+                "Target creature gets +n/+n until end of turn.")]
+    public void FoldTokens_FoldsPtDeltaToPlusN(string input, string expected)
+    {
+        OracleTextNormalizer.FoldTokens(input).Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData("~ deals 3 damage to any target.",  "~ deals n damage to any target.")]
+    [InlineData("~ deals 5 damage to target creature.",  "~ deals n damage to target creature.")]
+    [InlineData("~ deals 10 damage to each opponent.",  "~ deals n damage to each opponent.")]
+    public void FoldTokens_FoldsNDamage(string input, string expected)
+    {
+        OracleTextNormalizer.FoldTokens(input).Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData("Draw 2 cards.",                 "Draw n cards.")]
+    [InlineData("Draw 4 cards.",                 "Draw n cards.")]
+    [InlineData("Target player discards 1 card.",  "Target player discards n card.")]
+    public void FoldTokens_FoldsNCards(string input, string expected)
+    {
+        OracleTextNormalizer.FoldTokens(input).Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData("Target opponent loses 4 life.",  "Target opponent loses n life.")]
+    [InlineData("You gain 5 life.",               "You gain n life.")]
+    public void FoldTokens_FoldsNLife(string input, string expected)
+    {
+        OracleTextNormalizer.FoldTokens(input).Should().Be(expected);
+    }
+
+    [Fact]
+    public void FoldTokens_LeavesNumbersInsideManaCostsAlone()
+    {
+        // The "2" inside {2}{R} is part of the mana cost — it should be
+        // consumed by the {cost} fold, not the numeric fold, and the
+        // resulting "{cost}" must NOT then be re-folded.
+        OracleTextNormalizer.FoldTokens("Cast {2}{R}: ~ deals 3 damage.")
+            .Should().Be("Cast {cost}: ~ deals n damage.");
+    }
+
+    [Fact]
+    public void NormalizeFolded_RunsFullPipelineWithCardNameSubstitution()
+    {
+        // End-to-end: card-name → ~, parens stripped, dashes folded, mana
+        // → {cost}, and "3 damage" → "n damage". This is the production
+        // entry-point templates consume via SpellBindContext.TextFolded.
+        var input = "Lightning Bolt deals 3 damage to any target.";
+        OracleTextNormalizer.NormalizeFolded(input, "Lightning Bolt")
+            .Should().Be("~ deals n damage to any target.");
+    }
+
+    [Fact]
+    public void NormalizeFolded_LeavesNonMatchingTextAlone()
+    {
+        // Sanity: prose with no numeric or mana payload is untouched.
+        OracleTextNormalizer.NormalizeFolded("Counter target spell.", "Cancel")
+            .Should().Be("Counter target spell.");
+    }
+
+    [Fact]
+    public void NormalizeFolded_HandlesNullAndEmpty()
+    {
+        OracleTextNormalizer.NormalizeFolded("", "Whatever").Should().Be("");
+        OracleTextNormalizer.NormalizeFolded(null!, "Whatever").Should().BeNull();
+    }
+
+    [Fact]
+    public void FoldTokens_LeavesNumbersThatLookLikeDigitsInRandomContext()
+    {
+        // "2 or more" — the numeric fold is anchored on known nouns only,
+        // so prose numbers without a recognised noun stay verbatim.
+        OracleTextNormalizer.FoldTokens("Choose a number 2 or greater.")
+            .Should().Be("Choose a number 2 or greater.");
+    }
 }
