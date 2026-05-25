@@ -257,6 +257,45 @@ public class Card : ICard
     }
 
     /// <summary>
+    /// CR 702.44 — distinct colors of mana actually spent to pay this
+    /// card's cast cost (colored pips + colored mana used to satisfy
+    /// generic). Stamped by
+    /// <see cref="Majik.Core.Game.TurnDriver"/> at cast time right after
+    /// mana payment commits (parallels <see cref="PendingCastX"/>);
+    /// read by Sunburst ETB effects ("enters with a +1/+1 counter / charge
+    /// counter for each color of mana spent to cast it"). The set is
+    /// authoritative for "colors spent" — it diffs the player's mana pool
+    /// across the spend (see
+    /// <see cref="Majik.Core.Costs.ManaPaymentResolver"/>),
+    /// so generic-mana paid with colored mana counts toward Sunburst's
+    /// color-count (CR 702.44b — "if one or more colored mana was spent
+    /// on its costs"). Null when the card was not cast via a colored-mana
+    /// payment path, or has already been consumed/cleared. Cleared post-
+    /// resolve so a later non-cast battlefield entry (blink, token copy)
+    /// doesn't reuse the previous cast's colors.
+    /// </summary>
+    public IReadOnlyList<ManaColor>? PendingCastColors { get; private set; }
+
+    /// <summary>Stamp the distinct colors paid for this card's cast.
+    /// Called by <see cref="Majik.Core.Game.TurnDriver"/> right after
+    /// the mana resolver commits payment. Empty list = no colored mana
+    /// was spent (CR 702.44b — Sunburst yields zero counters in that
+    /// case). Null is reserved for "no cast has happened yet"; pass an
+    /// empty list to explicitly record "cast but no colors paid".</summary>
+    public void SetPendingCastColors(IReadOnlyList<ManaColor> colors)
+    {
+        PendingCastColors = colors ?? throw new ArgumentNullException(nameof(colors));
+    }
+
+    /// <summary>Clear the stamped colors-paid ledger. Called by any ETB
+    /// consumer (e.g. SunburstFactory's ETB effect) once it has used the
+    /// value, so a later non-cast battlefield entry doesn't reuse it.</summary>
+    public void ClearPendingCastColors()
+    {
+        PendingCastColors = null;
+    }
+
+    /// <summary>
     /// CR 113.5 / CR 400.7 — persistent "this permanent was cast"
     /// marker. Stamped <c>true</c> by
     /// <see cref="Majik.Core.Game.SpellCastFlow"/> at the moment the

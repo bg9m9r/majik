@@ -118,6 +118,27 @@ public class ActionValidator
                 new RuleViolation("601.3", "noncreature-spell restriction"));
         }
 
+        // CR 702.11 / CR 113.5 — player-hexproof gate. When the cast
+        // names one or more player targets, reject the cast if any
+        // target is a player who has hexproof and isn't the caster.
+        // Self-targeting (e.g. casting Healing Salve on yourself) is
+        // explicitly allowed — hexproof only blocks spells controlled
+        // by opponents.
+        if (action.Targets != null && action.Player != null)
+        {
+            foreach (var target in action.Targets)
+            {
+                if (target is Player targetPlayer
+                    && targetPlayer.HasHexproof
+                    && !ReferenceEquals(targetPlayer, action.Player))
+                {
+                    return ValidationResult.Invalid(
+                        $"{targetPlayer.Name} has hexproof",
+                        new RuleViolation("702.11", "player-hexproof"));
+                }
+            }
+        }
+
         return ValidationResult.Valid();
     }
 
@@ -158,6 +179,27 @@ public class ActionValidator
             return ValidationResult.Invalid(
                 $"{sourceName}'s ability can only be activated as a sorcery",
                 new RuleViolation("307.5", "activate-only-as-a-sorcery"));
+        }
+
+        // CR 702.11 / CR 113.5 — player-hexproof gate. When the
+        // activation names one or more player targets, reject the
+        // activation if any target is a player who has hexproof and
+        // isn't the activator. Self-targeting (e.g. activating a
+        // "you gain N life" ability on yourself) is explicitly allowed
+        // — hexproof only blocks abilities controlled by opponents.
+        if (action.Targets != null && action.Player != null)
+        {
+            foreach (var target in action.Targets)
+            {
+                if (target is Player targetPlayer
+                    && targetPlayer.HasHexproof
+                    && !ReferenceEquals(targetPlayer, action.Player))
+                {
+                    return ValidationResult.Invalid(
+                        $"{targetPlayer.Name} has hexproof",
+                        new RuleViolation("702.11", "player-hexproof"));
+                }
+            }
         }
 
         return ValidationResult.Valid();
@@ -255,17 +297,42 @@ public class CastSpellAction : PlayerAction
     /// </summary>
     public ZoneType? FromZone { get; }
 
+    /// <summary>
+    /// CR 115 / 601.2c — the targets chosen at cast time, in declaration
+    /// order. Used by the <see cref="ActionValidator"/> player-hexproof
+    /// gate (CR 702.11) to reject opponent-controlled spells naming a
+    /// hexproof player. Null = unspecified (no target-axis validation —
+    /// matches the legacy posture for the many callers that don't
+    /// stamp targets). The validator only inspects entries that are
+    /// <see cref="Player"/> instances; permanent / creature targets are
+    /// still routed through
+    /// <see cref="Majik.Core.Targeting.TargetLegality"/> at cast and at
+    /// resolution time.
+    /// </summary>
+    public IReadOnlyList<object>? Targets { get; }
+
     public CastSpellAction(ICard card, Player player, bool sorcerySpeedAvailable = true)
-        : this(card, player, sorcerySpeedAvailable, fromZone: null)
+        : this(card, player, sorcerySpeedAvailable, fromZone: null, targets: null)
     {
     }
 
     public CastSpellAction(ICard card, Player player, bool sorcerySpeedAvailable, ZoneType? fromZone)
+        : this(card, player, sorcerySpeedAvailable, fromZone, targets: null)
+    {
+    }
+
+    public CastSpellAction(
+        ICard card,
+        Player player,
+        bool sorcerySpeedAvailable,
+        ZoneType? fromZone,
+        IReadOnlyList<object>? targets)
     {
         Card = card;
         Player = player;
         SorcerySpeedAvailable = sorcerySpeedAvailable;
         FromZone = fromZone;
+        Targets = targets;
     }
 }
 
@@ -290,16 +357,35 @@ public class ActivateAbilityAction : PlayerAction
     /// </summary>
     public bool SorcerySpeedAvailable { get; }
 
+    /// <summary>
+    /// CR 115 / 602.1b — the targets chosen at activation time, in
+    /// declaration order. Used by the <see cref="ActionValidator"/>
+    /// player-hexproof gate (CR 702.11) to reject opponent-controlled
+    /// activations naming a hexproof player. Null = unspecified — see
+    /// <see cref="CastSpellAction.Targets"/> for the same posture.
+    /// </summary>
+    public IReadOnlyList<object>? Targets { get; }
+
     public ActivateAbilityAction(IActivatedAbility ability, Player player)
-        : this(ability, player, sorcerySpeedAvailable: true)
+        : this(ability, player, sorcerySpeedAvailable: true, targets: null)
     {
     }
 
     public ActivateAbilityAction(IActivatedAbility ability, Player player, bool sorcerySpeedAvailable)
+        : this(ability, player, sorcerySpeedAvailable, targets: null)
+    {
+    }
+
+    public ActivateAbilityAction(
+        IActivatedAbility ability,
+        Player player,
+        bool sorcerySpeedAvailable,
+        IReadOnlyList<object>? targets)
     {
         Ability = ability;
         Player = player;
         SorcerySpeedAvailable = sorcerySpeedAvailable;
+        Targets = targets;
     }
 }
 
