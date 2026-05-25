@@ -138,4 +138,18 @@ public static class Triggers
             e.StepType == step
             && ReferenceEquals(e.Player, controller));
     }
+
+    /// <summary>
+    /// CR 119.3 — "Whenever you gain life, …" trigger. Fires on
+    /// <see cref="LifeChangedEvent"/> where <paramref name="player"/>
+    /// matches the event's player AND the life total strictly increased
+    /// (NewLife &gt; PreviousLife). Used by Heliod, Sun-Crowned's lifegain
+    /// trigger and other "whenever you gain life" effects.
+    /// </summary>
+    public static ITriggerCondition OnLifeGainedByPlayer(Player player)
+    {
+        if (player == null) throw new ArgumentNullException(nameof(player));
+        return new EventTriggerCondition<LifeChangedEvent>((e, _) =>
+            ReferenceEquals(e.Player, player) && e.NewLife > e.PreviousLife);
+    }
 }

@@ -103,6 +103,21 @@ public class ActionValidator
                 new RuleViolation("601.3", "named-card cast restriction"));
         }
 
+        // CR 601.3 — turn-scoped noncreature-spell restriction
+        // (Ranger-Captain of Eos: "Your opponents can't cast noncreature
+        // spells this turn."). Reject a noncreature cast when the casting
+        // player is currently restricted. Creature spells pass through —
+        // CardType.Creature is the only exemption.
+        if (action.Card != null
+            && action.Player != null
+            && !action.Card.HasType(Cards.Types.CardType.Creature)
+            && CastingRestrictions.CannotCastNoncreatureSpell(action.Player))
+        {
+            return ValidationResult.Invalid(
+                $"{action.Player.Name} can't cast noncreature spells this turn",
+                new RuleViolation("601.3", "noncreature-spell restriction"));
+        }
+
         // CR 702.11 / CR 113.5 — player-hexproof gate. When the cast
         // names one or more player targets, reject the cast if any
         // target is a player who has hexproof and isn't the caster.
