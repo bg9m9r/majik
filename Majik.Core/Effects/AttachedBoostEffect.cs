@@ -16,8 +16,8 @@ namespace Majik.Core.Effects;
 public sealed class AttachedBoostEffect : ContinuousEffect
 {
     private readonly Permanent _source;
-    private readonly int _power;
-    private readonly int _toughness;
+    private readonly Func<int> _powerFn;
+    private readonly Func<int> _toughnessFn;
     private readonly IReadOnlyList<string> _grantedKeywords;
     private readonly Layer _layer;
 
@@ -31,8 +31,32 @@ public sealed class AttachedBoostEffect : ContinuousEffect
         Layer layer = Effects.Layer.PT_Modify)
     {
         _source = source ?? throw new ArgumentNullException(nameof(source));
-        _power = power;
-        _toughness = toughness;
+        _powerFn = () => power;
+        _toughnessFn = () => toughness;
+        _grantedKeywords = grantedKeywords ?? Array.Empty<string>();
+        _layer = layer;
+    }
+
+    /// <summary>
+    /// Dynamic-N constructor — power and toughness are sampled at each
+    /// layer pass via the supplied closures. Models "equipped creature
+    /// gets +N/+0 for each &lt;condition&gt;" boosts (e.g. Cranial Plating
+    /// reading the controller's live artifact count). The closures are
+    /// invoked from the layer-pass <see cref="Apply"/> hook so they observe
+    /// the post-other-Layer-6 working state and stay consistent with the
+    /// dynamic source-of-truth pattern used by
+    /// <see cref="Majik.Core.Effects.CdaPowerToughnessEffect"/>.
+    /// </summary>
+    public AttachedBoostEffect(
+        Permanent source,
+        Func<int> powerFn,
+        Func<int> toughnessFn,
+        IReadOnlyList<string>? grantedKeywords = null,
+        Layer layer = Effects.Layer.PT_Modify)
+    {
+        _source = source ?? throw new ArgumentNullException(nameof(source));
+        _powerFn = powerFn ?? throw new ArgumentNullException(nameof(powerFn));
+        _toughnessFn = toughnessFn ?? throw new ArgumentNullException(nameof(toughnessFn));
         _grantedKeywords = grantedKeywords ?? Array.Empty<string>();
         _layer = layer;
     }
@@ -47,8 +71,8 @@ public sealed class AttachedBoostEffect : ContinuousEffect
 
     public override void Apply(CreatureCharacteristics chars)
     {
-        chars.Power += _power;
-        chars.Toughness += _toughness;
+        chars.Power += _powerFn();
+        chars.Toughness += _toughnessFn();
         foreach (var kw in _grantedKeywords) chars.Keywords.Add(kw);
     }
 }

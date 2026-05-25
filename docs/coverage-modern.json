@@ -1,37 +1,37 @@
 {
   "scope": "format=modern, dedup-by-name",
-  "generated_utc": "2026-05-24T20:17:19.1396728Z",
-  "total_cards": 21879,
-  "total_weight": 21879,
-  "covered_cards": 5998,
-  "covered_percent": 27.41,
-  "weighted_covered": 5998,
-  "weighted_covered_percent": 27.41,
-  "frequency_total_weight": 19250,
-  "frequency_weighted_covered": 17770,
-  "frequency_weighted_covered_percent": 92.31,
+  "generated_utc": "2026-05-25T03:06:09.7876249Z",
+  "total_cards": 21917,
+  "total_weight": 21917,
+  "covered_cards": 6011,
+  "covered_percent": 27.43,
+  "weighted_covered": 6011,
+  "weighted_covered_percent": 27.43,
+  "frequency_total_weight": 20390,
+  "frequency_weighted_covered": 19480,
+  "frequency_weighted_covered_percent": 95.54,
   "top_meta_covered": 20,
   "top_meta_total": 20,
   "counts_by_tier": {
-    "NamedFactory": 244,
+    "NamedFactory": 263,
     "SpellBound": 3708,
-    "KeywordOnly": 1417,
+    "KeywordOnly": 1411,
     "Vanilla": 629,
-    "Unimplemented": 15881
+    "Unimplemented": 15906
   },
   "weighted_by_tier": {
-    "NamedFactory": 244,
+    "NamedFactory": 263,
     "SpellBound": 3708,
-    "KeywordOnly": 1417,
+    "KeywordOnly": 1411,
     "Vanilla": 629,
-    "Unimplemented": 15881
+    "Unimplemented": 15906
   },
   "frequency_weighted_by_tier": {
-    "NamedFactory": 12270,
+    "NamedFactory": 14230,
     "SpellBound": 1470,
-    "KeywordOnly": 4030,
-    "Vanilla": 0,
-    "Unimplemented": 1480
+    "KeywordOnly": 3400,
+    "Vanilla": 380,
+    "Unimplemented": 910
   },
   "top_meta": [
     {
@@ -85,6 +85,11 @@
       "tier": "NamedFactory"
     },
     {
+      "name": "Sink into Stupor",
+      "weight": 340,
+      "tier": "Vanilla"
+    },
+    {
       "name": "Swamp",
       "weight": 340,
       "tier": "KeywordOnly"
@@ -128,13 +133,10 @@
       "name": "Flooded Strand",
       "weight": 270,
       "tier": "NamedFactory"
-    },
-    {
-      "name": "Thoughtseize",
-      "weight": 270,
-      "tier": "SpellBound"
     }
   ],
+  "not_in_set": [],
+  "not_in_set_weight": 0,
   "top_unimplemented": [
     {
       "name": "\u002B2 Mace",
@@ -3971,7 +3973,7 @@
     {
       "name": "Arcbound Ravager",
       "type_line": "Artifact Creature \u2014 Beast",
-      "tier": "Unimplemented"
+      "tier": "NamedFactory"
     },
     {
       "name": "Arcbound Reclaimer",
@@ -5352,6 +5354,11 @@
       "name": "Atraxa, Grand Unifier",
       "type_line": "Legendary Creature \u2014 Phyrexian Angel",
       "tier": "NamedFactory"
+    },
+    {
+      "name": "Atraxa, Grand Unifier // Atraxa, Grand Unifier",
+      "type_line": "Card // Card",
+      "tier": "Unimplemented"
     },
     {
       "name": "Atris, Oracle of Half-Truths",
@@ -8806,7 +8813,12 @@
     {
       "name": "Blast Zone",
       "type_line": "Land",
-      "tier": "KeywordOnly"
+      "tier": "NamedFactory"
+    },
+    {
+      "name": "Blast Zone // Blast Zone",
+      "type_line": "Card // Card",
+      "tier": "Unimplemented"
     },
     {
       "name": "Blast of Genius",
@@ -14459,6 +14471,11 @@
       "tier": "NamedFactory"
     },
     {
+      "name": "Chalice of the Void // Chalice of the Void",
+      "type_line": "Card // Card",
+      "tier": "Unimplemented"
+    },
+    {
       "name": "Chalk Outline",
       "type_line": "Enchantment",
       "tier": "Unimplemented"
@@ -18621,7 +18638,7 @@
     {
       "name": "Cranial Plating",
       "type_line": "Artifact \u2014 Equipment",
-      "tier": "Unimplemented"
+      "tier": "NamedFactory"
     },
     {
       "name": "Cranial Ram",
@@ -24544,6 +24561,11 @@
       "tier": "NamedFactory"
     },
     {
+      "name": "Dragon\u0027s Rage Channeler // Dragon\u0027s Rage Channeler",
+      "type_line": "Card // Card",
+      "tier": "Unimplemented"
+    },
+    {
       "name": "Dragon-Scarred Bear",
       "type_line": "Creature \u2014 Bear",
       "tier": "Unimplemented"
@@ -26781,7 +26803,7 @@
     {
       "name": "Eiganjo, Seat of the Empire",
       "type_line": "Legendary Land",
-      "tier": "KeywordOnly"
+      "tier": "NamedFactory"
     },
     {
       "name": "Eight-and-a-Half-Tails",
@@ -27951,6 +27973,11 @@
     {
       "name": "Emry, Lurker of the Loch",
       "type_line": "Legendary Creature \u2014 Merfolk Wizard",
+      "tier": "NamedFactory"
+    },
+    {
+      "name": "Emry, Lurker of the Loch // Emry, Lurker of the Loch",
+      "type_line": "Card // Card",
       "tier": "Unimplemented"
     },
     {
@@ -30407,6 +30434,11 @@
       "name": "Faithful Mending",
       "type_line": "Instant",
       "tier": "SpellBound"
+    },
+    {
+      "name": "Faithful Mending // Faithful Mending",
+      "type_line": "Card // Card",
+      "tier": "Unimplemented"
     },
     {
       "name": "Faithful Squire // Kaiso, Memory of Loyalty",
@@ -33149,6 +33181,11 @@
       "tier": "NamedFactory"
     },
     {
+      "name": "Flooded Strand // Flooded Strand",
+      "type_line": "Card // Card",
+      "tier": "Unimplemented"
+    },
+    {
       "name": "Floodfarm Verge",
       "type_line": "Land",
       "tier": "KeywordOnly"
@@ -34984,6 +35021,11 @@
       "tier": "Unimplemented"
     },
     {
+      "name": "Fury",
+      "type_line": "Creature \u2014 Elemental Incarnation",
+      "tier": "NamedFactory"
+    },
+    {
       "name": "Fury Charm",
       "type_line": "Instant",
       "tier": "SpellBound"
@@ -36337,6 +36379,11 @@
       "name": "Ghost Quarter",
       "type_line": "Land",
       "tier": "KeywordOnly"
+    },
+    {
+      "name": "Ghost Quarter // Ghost Quarter",
+      "type_line": "Card // Card",
+      "tier": "Unimplemented"
     },
     {
       "name": "Ghost Ship",
@@ -39874,6 +39921,16 @@
       "tier": "SpellBound"
     },
     {
+      "name": "Grief",
+      "type_line": "Creature \u2014 Elemental Incarnation",
+      "tier": "NamedFactory"
+    },
+    {
+      "name": "Grief // Grief",
+      "type_line": "Card // Card",
+      "tier": "Unimplemented"
+    },
+    {
       "name": "Grief Tyrant",
       "type_line": "Creature \u2014 Horror",
       "tier": "Unimplemented"
@@ -41382,6 +41439,11 @@
       "name": "Hammer of Bogardan",
       "type_line": "Sorcery",
       "tier": "SpellBound"
+    },
+    {
+      "name": "Hammer of Nazahn",
+      "type_line": "Legendary Artifact \u2014 Equipment",
+      "tier": "NamedFactory"
     },
     {
       "name": "Hammer of Purphoros",
@@ -43621,7 +43683,12 @@
     {
       "name": "Hive of the Eye Tyrant",
       "type_line": "Land",
-      "tier": "KeywordOnly"
+      "tier": "NamedFactory"
+    },
+    {
+      "name": "Hive of the Eye Tyrant // Hive of the Eye Tyrant",
+      "type_line": "Card // Card",
+      "tier": "Unimplemented"
     },
     {
       "name": "Hiveheart Shaman",
@@ -46654,6 +46721,11 @@
       "tier": "SpellBound"
     },
     {
+      "name": "Inquisition of Kozilek // Inquisition of Kozilek",
+      "type_line": "Card // Card",
+      "tier": "Unimplemented"
+    },
+    {
       "name": "Inquisitive Glimmer",
       "type_line": "Enchantment Creature \u2014 Fox Glimmer",
       "tier": "Unimplemented"
@@ -49606,7 +49678,7 @@
     {
       "name": "Kappa Cannoneer",
       "type_line": "Artifact Creature \u2014 Turtle Warrior",
-      "tier": "Unimplemented"
+      "tier": "NamedFactory"
     },
     {
       "name": "Kappa Tech-Wrecker",
@@ -53694,6 +53766,11 @@
       "tier": "SpellBound"
     },
     {
+      "name": "Lightning Bolt // Lightning Bolt",
+      "type_line": "Card // Card",
+      "tier": "Unimplemented"
+    },
+    {
       "name": "Lightning Coils",
       "type_line": "Artifact",
       "tier": "Unimplemented"
@@ -53882,6 +53959,11 @@
       "name": "Liliana of the Veil",
       "type_line": "Legendary Planeswalker \u2014 Liliana",
       "tier": "NamedFactory"
+    },
+    {
+      "name": "Liliana of the Veil // Liliana of the Veil",
+      "type_line": "Card // Card",
+      "tier": "Unimplemented"
     },
     {
       "name": "Liliana\u0027s Caress",
@@ -61034,6 +61116,11 @@
       "tier": "Vanilla"
     },
     {
+      "name": "Mosswood Dreadknight // Mosswood Dreadknight",
+      "type_line": "Card // Card",
+      "tier": "Unimplemented"
+    },
+    {
       "name": "Mosswort Bridge",
       "type_line": "Land",
       "tier": "KeywordOnly"
@@ -61422,6 +61509,11 @@
       "name": "Murktide Regent",
       "type_line": "Creature \u2014 Dragon",
       "tier": "NamedFactory"
+    },
+    {
+      "name": "Murktide Regent // Murktide Regent",
+      "type_line": "Card // Card",
+      "tier": "Unimplemented"
     },
     {
       "name": "Murky Sewer",
@@ -62881,7 +62973,7 @@
     {
       "name": "Nethergoyf",
       "type_line": "Creature \u2014 Lhurgoyf",
-      "tier": "Unimplemented"
+      "tier": "NamedFactory"
     },
     {
       "name": "Nethroi, Apex of Death",
@@ -65434,6 +65526,11 @@
       "tier": "NamedFactory"
     },
     {
+      "name": "Omnath, Locus of Creation // Omnath, Locus of Creation",
+      "type_line": "Card // Card",
+      "tier": "Unimplemented"
+    },
+    {
       "name": "Omnath, Locus of Mana",
       "type_line": "Legendary Creature \u2014 Elemental",
       "tier": "Unimplemented"
@@ -66361,7 +66458,7 @@
     {
       "name": "Otawara, Soaring City",
       "type_line": "Legendary Land",
-      "tier": "KeywordOnly"
+      "tier": "NamedFactory"
     },
     {
       "name": "Oteclan Landmark // Oteclan Levitator",
@@ -67474,6 +67571,11 @@
       "tier": "NamedFactory"
     },
     {
+      "name": "Path to Exile // Path to Exile",
+      "type_line": "Card // Card",
+      "tier": "Unimplemented"
+    },
+    {
       "name": "Path to Redemption",
       "type_line": "Enchantment \u2014 Aura",
       "tier": "Unimplemented"
@@ -68329,6 +68431,11 @@
       "tier": "NamedFactory"
     },
     {
+      "name": "Phlage, Titan of Fire\u0027s Fury // Phlage, Titan of Fire\u0027s Fury",
+      "type_line": "Card // Card",
+      "tier": "Unimplemented"
+    },
+    {
       "name": "Phobian Phantasm",
       "type_line": "Creature \u2014 Illusion",
       "tier": "Unimplemented"
@@ -68821,7 +68928,7 @@
     {
       "name": "Pinnacle Emissary",
       "type_line": "Artifact Creature \u2014 Robot",
-      "tier": "Unimplemented"
+      "tier": "NamedFactory"
     },
     {
       "name": "Pinnacle Kill-Ship",
@@ -70404,6 +70511,11 @@
       "tier": "NamedFactory"
     },
     {
+      "name": "Prismatic Ending // Prismatic Ending",
+      "type_line": "Card // Card",
+      "tier": "Unimplemented"
+    },
+    {
       "name": "Prismatic Lens",
       "type_line": "Artifact",
       "tier": "Unimplemented"
@@ -70957,6 +71069,11 @@
       "name": "Psychic Frog",
       "type_line": "Creature \u2014 Frog",
       "tier": "NamedFactory"
+    },
+    {
+      "name": "Psychic Frog // Psychic Frog",
+      "type_line": "Card // Card",
+      "tier": "Unimplemented"
     },
     {
       "name": "Psychic Intrusion",
@@ -71679,6 +71796,11 @@
       "tier": "Unimplemented"
     },
     {
+      "name": "Quantum Riddler // Quantum Riddler",
+      "type_line": "Card // Card",
+      "tier": "Unimplemented"
+    },
+    {
       "name": "Quarantine Field",
       "type_line": "Enchantment",
       "tier": "Unimplemented"
@@ -72282,6 +72404,11 @@
       "name": "Ragavan, Nimble Pilferer",
       "type_line": "Legendary Creature \u2014 Monkey Pirate",
       "tier": "NamedFactory"
+    },
+    {
+      "name": "Ragavan, Nimble Pilferer // Ragavan, Nimble Pilferer",
+      "type_line": "Card // Card",
+      "tier": "Unimplemented"
     },
     {
       "name": "Rage Extractor",
@@ -82929,6 +83056,11 @@
       "tier": "NamedFactory"
     },
     {
+      "name": "Sheoldred, the Apocalypse // Sheoldred, the Apocalypse",
+      "type_line": "Card // Card",
+      "tier": "Unimplemented"
+    },
+    {
       "name": "Shepherd of Heroes",
       "type_line": "Creature \u2014 Angel Cleric",
       "tier": "Unimplemented"
@@ -89071,7 +89203,7 @@
     {
       "name": "Springleaf Drum",
       "type_line": "Artifact",
-      "tier": "Unimplemented"
+      "tier": "NamedFactory"
     },
     {
       "name": "Springmane Cervin",
@@ -91439,6 +91571,11 @@
       "tier": "NamedFactory"
     },
     {
+      "name": "Subtlety // Subtlety",
+      "type_line": "Card // Card",
+      "tier": "Unimplemented"
+    },
+    {
       "name": "Suburban Sanctuary",
       "type_line": "Land",
       "tier": "KeywordOnly"
@@ -92999,6 +93136,11 @@
       "tier": "Unimplemented"
     },
     {
+      "name": "Swords to Plowshares",
+      "type_line": "Instant",
+      "tier": "NamedFactory"
+    },
+    {
       "name": "Swordsworn Cavalier",
       "type_line": "Creature \u2014 Human Knight",
       "tier": "Unimplemented"
@@ -93571,7 +93713,7 @@
     {
       "name": "Takenuma, Abandoned Mire",
       "type_line": "Legendary Land",
-      "tier": "KeywordOnly"
+      "tier": "NamedFactory"
     },
     {
       "name": "Talara\u0027s Bane",
@@ -93786,6 +93928,11 @@
     {
       "name": "Tamiyo, Field Researcher",
       "type_line": "Legendary Planeswalker \u2014 Tamiyo",
+      "tier": "Unimplemented"
+    },
+    {
+      "name": "Tamiyo, Inquisitive Student // Tamiyo, Inquisitive Student",
+      "type_line": "Card // Card",
       "tier": "Unimplemented"
     },
     {
@@ -95947,6 +96094,11 @@
       "name": "The Neutrinos",
       "type_line": "Legendary Creature \u2014 Elf Rebel",
       "tier": "Unimplemented"
+    },
+    {
+      "name": "The One Ring",
+      "type_line": "Legendary Artifact",
+      "tier": "NamedFactory"
     },
     {
       "name": "The Ooze",
@@ -101564,6 +101716,11 @@
       "tier": "Unimplemented"
     },
     {
+      "name": "Up the Beanstalk",
+      "type_line": "Enchantment",
+      "tier": "NamedFactory"
+    },
+    {
       "name": "Updraft Elemental",
       "type_line": "Creature \u2014 Elemental",
       "tier": "KeywordOnly"
@@ -101796,7 +101953,7 @@
     {
       "name": "Urza\u0027s Saga",
       "type_line": "Enchantment Land \u2014 Urza\u0027s Saga",
-      "tier": "KeywordOnly"
+      "tier": "NamedFactory"
     },
     {
       "name": "Urza\u0027s Sylex",
@@ -103772,6 +103929,11 @@
       "name": "Violent Impact",
       "type_line": "Sorcery",
       "tier": "SpellBound"
+    },
+    {
+      "name": "Violent Outburst",
+      "type_line": "Instant",
+      "tier": "Unimplemented"
     },
     {
       "name": "Violent Ultimatum",
@@ -107359,6 +107521,11 @@
       "tier": "NamedFactory"
     },
     {
+      "name": "Windswept Heath // Windswept Heath",
+      "type_line": "Card // Card",
+      "tier": "Unimplemented"
+    },
+    {
       "name": "Windurst, Federation Center",
       "type_line": "Land \u2014 Town",
       "tier": "KeywordOnly"
@@ -108434,6 +108601,11 @@
       "tier": "NamedFactory"
     },
     {
+      "name": "Wrenn and Realmbreaker // Wrenn and Realmbreaker",
+      "type_line": "Card // Card",
+      "tier": "Unimplemented"
+    },
+    {
       "name": "Wrenn and Seven",
       "type_line": "Legendary Planeswalker \u2014 Wrenn",
       "tier": "Unimplemented"
@@ -108442,6 +108614,11 @@
       "name": "Wrenn and Six",
       "type_line": "Legendary Planeswalker \u2014 Wrenn",
       "tier": "NamedFactory"
+    },
+    {
+      "name": "Wrenn and Six // Wrenn and Six",
+      "type_line": "Card // Card",
+      "tier": "Unimplemented"
     },
     {
       "name": "Wrenn\u0027s Resolve",
@@ -108522,6 +108699,11 @@
       "name": "Wurmcoil Engine",
       "type_line": "Artifact Creature \u2014 Phyrexian Wurm",
       "tier": "NamedFactory"
+    },
+    {
+      "name": "Wurmcoil Engine // Wurmcoil Engine",
+      "type_line": "Card // Card",
+      "tier": "Unimplemented"
     },
     {
       "name": "Wurmcoil Larva",
@@ -108769,6 +108951,11 @@
       "tier": "NamedFactory"
     },
     {
+      "name": "Yawgmoth, Thran Physician // Yawgmoth, Thran Physician",
+      "type_line": "Card // Card",
+      "tier": "Unimplemented"
+    },
+    {
       "name": "Yawning Fissure",
       "type_line": "Sorcery",
       "tier": "Unimplemented"
@@ -108846,6 +109033,11 @@
     {
       "name": "Yore-Tiller Nephilim",
       "type_line": "Creature \u2014 Nephilim",
+      "tier": "Unimplemented"
+    },
+    {
+      "name": "Yorion, Sky Nomad",
+      "type_line": "Legendary Creature \u2014 Bird Serpent",
       "tier": "Unimplemented"
     },
     {
