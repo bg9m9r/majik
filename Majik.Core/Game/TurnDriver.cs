@@ -96,6 +96,7 @@ public sealed class TurnDriver
         _eventBus?.Subscribe<CardMovedEvent>(OnCardMoved);
         _eventBus?.Subscribe<CardDrawnEvent>(OnCardDrawn);
         _eventBus?.Subscribe<Majik.Core.Domain.DomainEvents.SpellCastEvent>(OnSpellCast);
+        _eventBus?.Subscribe<CardCycledEvent>(OnCardCycled);
     }
 
     // -----------------------------------------------------------------
@@ -104,6 +105,19 @@ public sealed class TurnDriver
 
     private void OnCardMoved(CardMovedEvent e)
     {
+        // CR 701.16a — Hand → Graveyard moves are discards. Track the
+        // discarder (= moved card's owner) for "for each card you've
+        // discarded this turn" reducers (Hollow One). Counts every
+        // hand → graveyard move regardless of source — player discard,
+        // opponent-forced discard, "discard a card" cost payments all
+        // qualify per CR 701.16a. Spells leaving the hand to the stack
+        // do NOT match this branch (they move Hand → Stack), so casting
+        // Hollow One itself does not pre-bump its own reducer.
+        if (e.FromZone == ZoneType.Hand && e.ToZone == ZoneType.Graveyard)
+        {
+            TurnState.RecordCardDiscarded(e.Card.Owner);
+        }
+
         // Track lands entering under a player's control this turn (CR 702.142
         // landfall + landfall-conditional spells like Searing Blaze). This
         // fires off the same CardMovedEvent funnel as the leavers below; the
@@ -144,6 +158,20 @@ public sealed class TurnDriver
     private void OnCardDrawn(CardDrawnEvent e)
     {
         TurnState.RecordCardDrawn(e.Player);
+    }
+
+    private void OnCardCycled(CardCycledEvent e)
+    {
+        // CR 702.32 — record a cycle for the cycling player. Read by Hollow
+        // One's self-cost-reduction reducer ("for each card you've cycled
+        // or discarded this turn"). Note: the cycled card also moves
+        // Hand → Graveyard which OnCardMoved counts as a discard — Hollow
+        // One's reducer reads cycles + discards as DISTINCT counters per
+        // the printed oracle text ("cycled OR discarded"), so the same
+        // act of cycling contributes to BOTH tallies. Real card matches
+        // (see Hollow One rulings — cycling counts as both a cycle and a
+        // discard for cards that reference either).
+        TurnState.RecordCardCycled(e.Player);
     }
 
     private void OnSpellCast(Majik.Core.Domain.DomainEvents.SpellCastEvent e)

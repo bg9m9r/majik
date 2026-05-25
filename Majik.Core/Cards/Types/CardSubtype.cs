@@ -257,6 +257,11 @@ public enum CardSubtype
     /// (Animation Module, Whirlermaker, Visionary Augmenter). Always paired
     /// with the Artifact type. CR 205.3g + CR 205.3m.</summary>
     Servo,
+    /// <summary>Golem creature/artifact subtype — Hollow One, Wurmcoil Engine's
+    /// Wurm tokens' sibling type, Lifecrafter's Bestiary's Golem cycle, the
+    /// Mirrodin Golem block. Typically paired with the Artifact type
+    /// (Artifact Creature — Golem). CR 205.3g + CR 205.3m.</summary>
+    Golem,
 
     // Eldrazi creature subtypes (CR 205.3m)
     Eldrazi,
