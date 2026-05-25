@@ -174,6 +174,17 @@ public sealed class SpellCastFlow
                 $"Cannot cast {card.Name} via pitch: it is the caster's own turn (CR 118.9 timing gate).");
         }
 
+        // CR 702.115a — Surge alt-cost. Gated on "you or a teammate has
+        // cast another spell this turn". v1 has no team modelling, so the
+        // SurgeAlternativeCost reads the controller's per-turn spell tally
+        // off the live TurnState reference it was constructed with.
+        if (alternativeCost is SurgeAlternativeCost surge
+            && !surge.IsLegalInContext(caster))
+        {
+            throw new InvalidOperationException(
+                $"Cannot cast {card.Name} via surge: caster has not cast another spell this turn (CR 702.115a).");
+        }
+
         // CR 117.1 + CR 715.3b — Adventure alt-cost. A sorcery-typed
         // Adventure ("while on the stack as an Adventure, the spell has
         // only its alternative characteristics") must be cast at sorcery
@@ -489,6 +500,26 @@ public sealed class SpellCastFlow
             finalEffects = withKickerCleanup;
         }
 
+        // CR 702.115 / CR 400.7 — Surge cleanup. After the printed body
+        // runs (and its resolve-time branch has read Card.WasCastForSurge),
+        // clear the sentinel so a later re-cast / blink / token copy
+        // doesn't inherit the prior surge posture (CR 400.7 — new object
+        // per zone change). Mirrors the Kicker cleanup append directly
+        // above.
+        if (alternativeCost is SurgeAlternativeCost)
+        {
+            var withSurgeCleanup = finalEffects.Append(new Effect(
+                "Surge cleanup — clear Card.WasCastForSurge",
+                () =>
+                {
+                    if (card is Card concreteForSurgeCleanup)
+                    {
+                        concreteForSurgeCleanup.ClearWasCastForSurge();
+                    }
+                })).ToList();
+            finalEffects = withSurgeCleanup;
+        }
+
         // CR 701.59 — Gift cleanup. After the printed body runs (and
         // its resolve-time branch has read Card.HasGiftPromised), clear
         // the sentinel so a later re-cast / blink / token copy doesn't
@@ -567,6 +598,21 @@ public sealed class SpellCastFlow
         if (hasKickerPayment)
         {
             spell.WasKicked = true;
+        }
+
+        // CR 702.115 — Surge sentinel. Mirror the surge posture onto the
+        // underlying card at announce time so resolve-body branches
+        // ("if its surge cost was paid" — Reckless Bushwhacker) can read
+        // the flag even before SurgeAlternativeCost.OnResolved fires.
+        // The OnResolved cleanup pass appended above still stamps the
+        // flag (idempotent set), and the clear-on-resolve cleanup
+        // appended below wipes the sentinel after the printed body runs
+        // so a later re-cast / blink / token copy doesn't inherit the
+        // prior surge posture (CR 400.7 — new object on each zone change).
+        if (alternativeCost is SurgeAlternativeCost
+            && card is Card concreteForSurge)
+        {
+            concreteForSurge.SetWasCastForSurge(true);
         }
 
         // CR 701.5b — "An uncounterable spell can't be countered." Cards
