@@ -1,9 +1,9 @@
 {
-  "generated_utc": "2026-05-25T01:39:35.1263625Z",
+  "generated_utc": "2026-05-25T01:44:18.1758333Z",
   "scanned_dir": "/home/brett/Projects/majik.project/majik.core/.claude/worktrees/agent-adc18013320f37f58/Majik.Core/CardData/Factories",
-  "total_mentions": 172,
-  "distinct_factories": 124,
-  "cluster_count": 7,
+  "total_mentions": 171,
+  "distinct_factories": 123,
+  "cluster_count": 6,
   "unclustered_count": 125,
   "clusters": [
     {
@@ -339,25 +339,6 @@
           "file": "BloodghastFactory.cs",
           "line": 126,
           "sentence": "A full dynamic Layer 6 conditional keyword grant is deferred \u2014 see class xmldoc."
-        }
-      ]
-    },
-    {
-      "primitive_id": "ascend",
-      "display_name": "Ascend / city\u0027s blessing (CR 702.131)",
-      "comp_rules_citation": "CR 702.131",
-      "implementation_hint": "Per-player flag \u002B state-based check (\u226510 permanents). Static abilities then key off blessing-active predicate.",
-      "factory_count": 1,
-      "mention_count": 1,
-      "factories": [
-        "OcelotPrideFactory"
-      ],
-      "mentions": [
-        {
-          "factory": "OcelotPrideFactory",
-          "file": "OcelotPrideFactory.cs",
-          "line": 14,
-          "sentence": "The attack trigger ships with the gate stubbed (always 1 token); the \u0022doubled to 2\u0022 half of the printed text is deferred until an Ascend primitive lands."
         }
       ]
     },

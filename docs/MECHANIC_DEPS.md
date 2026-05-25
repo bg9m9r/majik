@@ -5,10 +5,10 @@ Scanner output: every `*Factory.cs` xmldoc / inline comment mentioning
 engine primitive. Each row answers: "if we ship primitive _X_, which factory
 xmldocs flagged that they're blocked on it?"
 
-- **Generated:** 2026-05-25 01:39 UTC
+- **Generated:** 2026-05-25 01:44 UTC
 - **Scanned dir:** `Majik.Core/CardData/Factories`
-- **Total mentions:** 172
-- **Clusters:** 7
+- **Total mentions:** 171
+- **Clusters:** 6
 - **Unclustered (need new registry pattern):** 125
 
 Regenerate with `dotnet run --project Majik.Console -- mechanic-deps --md-out docs/MECHANIC_DEPS.md --json-out docs/mechanic-deps.json`.
@@ -20,10 +20,9 @@ Regenerate with `dotnet run --project Majik.Console -- mechanic-deps --md-out do
 | 1 | Agent-prompt targeting MVP | — | 28 | 35 |
 | 2 | Library shuffle (CR 701.20) | CR 701.20 | 4 | 4 |
 | 3 | Layer-6 ability-grant subsystem (CR 613.1f) | CR 613.1f | 2 | 4 |
-| 4 | Ascend / city's blessing (CR 702.131) | CR 702.131 | 1 | 1 |
-| 5 | Cast-marker on Card | — | 1 | 1 |
-| 6 | Cycling-style activated-from-hand (CR 702.32 / Channel CR 702.74) | CR 702.32 | 1 | 1 |
-| 7 | "Activate only as a sorcery" gate (CR 117.1a) | CR 117.1a | 1 | 1 |
+| 4 | Cast-marker on Card | — | 1 | 1 |
+| 5 | Cycling-style activated-from-hand (CR 702.32 / Channel CR 702.74) | CR 702.32 | 1 | 1 |
+| 6 | "Activate only as a sorcery" gate (CR 117.1a) | CR 117.1a | 1 | 1 |
 
 ## Cluster detail
 
@@ -139,18 +138,7 @@ Mentions:
 - `BloodghastFactory` (`BloodghastFactory.cs:126`)
   > A full dynamic Layer 6 conditional keyword grant is deferred — see class xmldoc.
 
-### 4. Ascend / city's blessing (CR 702.131)
-
-- **CR citation:** CR 702.131
-- **Blocks:** 1 factories (1 mentions)
-- **Implementation hint:** Per-player flag + state-based check (≥10 permanents). Static abilities then key off blessing-active predicate.
-
-Mentions:
-
-- `OcelotPrideFactory` (`OcelotPrideFactory.cs:14`)
-  > The attack trigger ships with the gate stubbed (always 1 token); the "doubled to 2" half of the printed text is deferred until an Ascend primitive lands.
-
-### 5. Cast-marker on Card
+### 4. Cast-marker on Card
 
 - **Blocks:** 1 factories (1 mentions)
 - **Implementation hint:** Persistent 'this object was cast (vs. put onto the battlefield)' flag — Bloodghast, The One Ring, Pact triggers all key off it.
@@ -160,7 +148,7 @@ Mentions:
 - `TheOneRingFactory` (`TheOneRingFactory.cs:15`)
   > The effect body is a no-op — the "if you cast it" intervening-if clause, the "until your next turn" expiry, and the "protection from everything" player-scoped grant are all deferred (no cast-marker on Card, no per-player delayed cleanup, no Player.
 
-### 6. Cycling-style activated-from-hand (CR 702.32 / Channel CR 702.74)
+### 5. Cycling-style activated-from-hand (CR 702.32 / Channel CR 702.74)
 
 - **CR citation:** CR 702.32
 - **Blocks:** 1 factories (1 mentions)
@@ -171,7 +159,7 @@ Mentions:
 - `ChannelLandCycleFactory` (`ChannelLandCycleFactory.cs:12`)
   > Sokenzan, Crucible of Defiance — deferred (its Channel produces two 1/1 Spirit tokens with haste; requires a Spirit-token shape not yet in <c>TokenFactory</c>).
 
-### 7. "Activate only as a sorcery" gate (CR 117.1a)
+### 6. "Activate only as a sorcery" gate (CR 117.1a)
 
 - **CR citation:** CR 117.1a
 - **Blocks:** 1 factories (1 mentions)

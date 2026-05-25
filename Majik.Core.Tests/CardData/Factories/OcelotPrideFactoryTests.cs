@@ -130,13 +130,11 @@ public class OcelotPrideFactoryTests
     }
 
     [Fact]
-    public void OcelotPride_Attack_TenPermanents_StillOneToken_AscendDeferred()
+    public void OcelotPride_Attack_WithCitysBlessing_CreatesTwoCatTokens()
     {
-        // Even with 10+ permanents on the battlefield (the printed Ascend
-        // threshold per CR 702.131), the engine has no city's-blessing
-        // primitive yet — Ocelot Pride still spawns 1 token, not 2. This
-        // test pins the v1 stubbed gate so a future Ascend implementation
-        // breaks this test and forces the doubling wire-up.
+        // CR 702.131 — once the controller has had 10+ permanents the
+        // city's blessing latches, and the attack trigger creates two 1/1
+        // Cat tokens instead of one.
         var alice = new Player("Alice", 20);
         for (var i = 0; i < 10; i++)
         {
@@ -148,6 +146,9 @@ public class OcelotPrideFactoryTests
             dummy.SetZone(ZoneType.Battlefield);
             alice.Zones.Battlefield.AddCard(dummy);
         }
+        alice.EvaluateCitysBlessing();
+        alice.HasCitysBlessing.Should().BeTrue(
+            "10 permanents pushes the controller past the Ascend threshold (CR 702.131)");
 
         var ocelot = OcelotPrideFactory.Create(alice);
         alice.Zones.Battlefield.AddCard(ocelot);
@@ -163,9 +164,16 @@ public class OcelotPrideFactoryTests
             .Where(c => c.IsToken && c.Name == "Cat")
             .ToList();
 
-        cats.Should().HaveCount(1,
-            "v1 Ascend gate is stubbed — controller-permanent count does " +
-            "not yet unlock the doubled 2-token branch");
+        cats.Should().HaveCount(2,
+            "with the city's blessing the attack trigger doubles to two " +
+            "1/1 Cat tokens (CR 702.131)");
+        cats.Should().AllSatisfy(c =>
+        {
+            c.BasePower.Should().Be(1);
+            c.BaseToughness.Should().Be(1);
+            c.HasSubtype(CardSubtype.Cat).Should().BeTrue();
+            c.Controller.Should().BeSameAs(alice);
+        });
     }
 
     // ------------------------------------------------------------------
