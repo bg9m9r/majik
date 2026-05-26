@@ -282,6 +282,11 @@ public enum CardSubtype
     Spawn,
     Scion,
 
+    /// <summary>Spike creature subtype — Urza's Saga / Exodus cycle of
+    /// counter-shifting creatures (Spike Feeder, Spike Weaver, Spike
+    /// Tiller). CR 205.3m.</summary>
+    Spike,
+
     // Planeswalker subtypes (examples)
     Ajani,
     Ashiok,
