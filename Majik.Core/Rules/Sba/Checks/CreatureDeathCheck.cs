@@ -20,6 +20,10 @@ public sealed class CreatureDeathCheck : IStateBasedActionCheck
         {
             if (creature.Zone != ZoneType.Battlefield) continue;
             if (CombatAbilities.HasIndestructible(creature)) continue;
+            // CR 702.12 / 613.1f — creatures granted indestructible by an
+            // external anthem (Darksteel Forge on an Artifact Creature)
+            // also resist the lethal-damage / zero-toughness destroy SBA.
+            if (Majik.Core.Rules.IndestructibleGrantRegistry.HasGrantedIndestructible(creature)) continue;
 
             var dies = creature.IsDead() || creature.MarkedForDestructionByDeathtouch;
             if (!dies) continue;
