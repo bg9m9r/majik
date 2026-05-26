@@ -1,4 +1,5 @@
 using Majik.Core.Cards;
+using Majik.Core.Effects;
 
 namespace Majik.Core.Combat;
 
@@ -51,8 +52,35 @@ public static class BlockLegality
             reason = "attacker has flying; blocker lacks flying or reach";
             return false;
         }
+
+        // CR 509.1b — any "can't be blocked except by …" restriction on the
+        // attacker must be satisfied. Restrictions intersect: a would-be
+        // blocker must satisfy EVERY active CantBeBlockedExceptByEffect
+        // attached to this attacker. The effect is queried via the
+        // attacker's ActiveEffects service (CR 613); attackers without an
+        // attached service simply have no such restrictions.
+        if (!CantBeBlockedExceptBySatisfied(attacker, blocker))
+        {
+            reason = "attacker has \"can't be blocked except by …\" restriction not satisfied";
+            return false;
+        }
+
         reason = string.Empty;
         return true;
+    }
+
+    /// <summary>
+    /// CR 509.1b — walks the attacker's <see cref="Creature.ActiveEffects"/>
+    /// for every active <see cref="CantBeBlockedExceptByEffect"/> and returns
+    /// true iff EVERY predicate accepts <paramref name="blocker"/>. Multiple
+    /// restrictions intersect — any single one rejecting the blocker forbids
+    /// the block.
+    /// </summary>
+    public static bool CantBeBlockedExceptBySatisfied(Creature attacker, Creature blocker)
+    {
+        var svc = attacker.ActiveEffects;
+        if (svc == null) return true;
+        return svc.CanBlockUnderExceptByRestrictions(attacker, blocker);
     }
 
     /// <summary>
