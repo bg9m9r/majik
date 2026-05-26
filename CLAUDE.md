@@ -54,7 +54,7 @@ After adding a factory, regenerate the embedded seed (above) so `IsImplemented` 
 
 ## Rules authority
 
-`MagicCompRules 20251114.txt` (the official Comp Rules, 2025-11-14) is the source of truth for game-logic decisions. `RULES_REFERENCE.md` indexes the most-touched rules. Cite rule numbers (e.g. `Rule 704.5j`) when implementing or reviewing rules code.
+The official Magic: The Gathering Comprehensive Rules (2025-11-14) are the source of truth for game-logic decisions. The text is **not redistributed in this repository** — it is copyrighted by Wizards of the Coast LLC. Download the latest TXT from <https://magic.wizards.com/en/rules> and (optionally) place it at `MagicCompRules 20251114.txt` (gitignored). `RULES_REFERENCE.md` indexes the most-touched rules. Cite rule numbers (e.g. `Rule 704.5j`) when implementing or reviewing rules code.
 
 ## Architecture
 
