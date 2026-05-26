@@ -17,6 +17,10 @@ public enum CardSubtype
     Dragon,
     Angel,
     Demon,
+    /// <summary>Devil creature subtype — Mayhem Devil (War of the Spark),
+    /// Hellrider, Devil Token (Bedevil / Maelstrom Pulse adjacent printings).
+    /// CR 205.3m.</summary>
+    Devil,
     Zombie,
     Beast,
     Bird,
