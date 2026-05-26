@@ -8,19 +8,25 @@ using Majik.Core.Costs;
 using Majik.Core.Players;
 using Majik.Core.Zones;
 using Xunit;
+using Creature = Majik.Core.Cards.Creature;
 
 namespace Majik.Core.Tests.CardData;
 
 /// <summary>
-/// Tests for <see cref="FanaticalFirebrandFactory"/> — 1/1 Goblin Pirate {R}
-/// with Haste + "{T}, Sacrifice ~: ~ deals 1 damage to any target."
+/// Tests for <see cref="FanaticalFirebrandFactory"/>.
+///
+/// Fanatical Firebrand (Dominaria, {R}):
+///   Creature — Goblin Pirate 1/1.
+///   Haste.
+///   {T}, Sacrifice this creature: It deals 1 damage to any target.
 ///
 /// Covers:
-/// - Identity (Creature, {R}, 1/1, Goblin Pirate, owner/controller).
-/// - NamedCardFactory dispatch.
-/// - Haste keyword marker present.
-/// - Activated-ability shape: tap + sacrifice + 1..1 any target.
-/// - Resolution: damage to player / creature / planeswalker; sac happens.
+///   - Identity (Goblin Pirate 1/1, {R}, owner/controller).
+///   - <see cref="NamedCardFactory"/> dispatch.
+///   - Haste keyword marker.
+///   - Activated ability shape: {T} + Sacrifice + one any-target request.
+///   - Resolution: 1 damage to player / creature target; planeswalker target
+///     routes through loyalty removal (CR 306.7); Firebrand sacrificed.
 /// </summary>
 public class FanaticalFirebrandTests
 {
@@ -28,45 +34,46 @@ public class FanaticalFirebrandTests
     private readonly Player _bob = new("Bob", 20);
 
     // -----------------------------------------------------------------------
-    // Card identity + dispatch
+    // Identity + dispatch
     // -----------------------------------------------------------------------
 
     [Fact]
-    public void FanaticalFirebrand_IsRedGoblinPirate_OneOne_ForR()
+    public void FanaticalFirebrand_Identity()
     {
         var fb = FanaticalFirebrandFactory.Create(_alice);
 
-        fb.HasType(CardType.Creature).Should().BeTrue();
         fb.Name.Should().Be("Fanatical Firebrand");
         fb.ManaCost.Should().Be("{R}");
-        fb.Power.Should().Be(1);
-        fb.Toughness.Should().Be(1);
+        fb.HasType(CardType.Creature).Should().BeTrue();
         fb.HasSubtype(CardSubtype.Goblin).Should().BeTrue();
         fb.HasSubtype(CardSubtype.Pirate).Should().BeTrue();
+        fb.BasePower.Should().Be(1);
+        fb.BaseToughness.Should().Be(1);
         fb.Owner.Should().BeSameAs(_alice);
         fb.Controller.Should().BeSameAs(_alice);
     }
 
     [Fact]
-    public void NamedCardFactory_Dispatches_FanaticalFirebrand()
+    public void FanaticalFirebrand_DispatchesViaNamedCardFactory()
     {
         var card = NamedCardFactory.Create("Fanatical Firebrand", _alice);
 
         card.Should().BeOfType<Creature>();
         card.Name.Should().Be("Fanatical Firebrand");
-        card.HasType(CardType.Creature).Should().BeTrue();
+        card.HasSubtype(CardSubtype.Goblin).Should().BeTrue();
+        card.HasSubtype(CardSubtype.Pirate).Should().BeTrue();
+        ((Creature)card).BasePower.Should().Be(1);
+        ((Creature)card).BaseToughness.Should().Be(1);
     }
-
-    // -----------------------------------------------------------------------
-    // Haste marker (CR 702.10)
-    // -----------------------------------------------------------------------
 
     [Fact]
     public void FanaticalFirebrand_HasHasteKeywordMarker()
     {
         var fb = FanaticalFirebrandFactory.Create(_alice);
+
         fb.Abilities.OfType<KeywordAbility>()
-            .Should().Contain(k => string.Equals(k.Keyword, "Haste", StringComparison.OrdinalIgnoreCase));
+            .Select(k => k.Keyword).Should().Contain("Haste",
+                "CR 702.10 — Haste marker for CombatAbilities.HasHaste");
     }
 
     // -----------------------------------------------------------------------
@@ -74,7 +81,7 @@ public class FanaticalFirebrandTests
     // -----------------------------------------------------------------------
 
     [Fact]
-    public void Ability_HasTap_AndSacrifice_AndOneAnyTarget()
+    public void FanaticalFirebrand_ActivatedAbility_HasTap_AndSacrifice_AndOneAnyTarget()
     {
         var fb = FanaticalFirebrandFactory.Create(_alice);
 
@@ -82,10 +89,10 @@ public class FanaticalFirebrandTests
 
         ability.Costs.OfType<AdditionalCost>()
             .Should().ContainSingle(c => c.CostType == AdditionalCostType.Tap,
-                "the activation taps the firebrand");
+                "the ping ability costs {T}");
         ability.Costs.OfType<AdditionalCost>()
             .Should().ContainSingle(c => c.CostType == AdditionalCostType.Sacrifice,
-                "the activation sacrifices the firebrand");
+                "the ping ability sacrifices Firebrand");
 
         ability.TargetRequests.Should().HaveCount(1);
         ability.TargetRequests[0].MinTargets.Should().Be(1);
@@ -98,7 +105,7 @@ public class FanaticalFirebrandTests
     // -----------------------------------------------------------------------
 
     [Fact]
-    public void Activate_DealsOneToPlayerTarget_AndSacrifices()
+    public void Activate_Ping_DealsOneToPlayerTarget_AndSacrificesFirebrand()
     {
         var fb = FanaticalFirebrandFactory.Create(_alice);
         _alice.Zones.Battlefield.AddCard(fb);
@@ -113,13 +120,15 @@ public class FanaticalFirebrandTests
         ability.Resolve();
 
         _bob.LifeTotal.Should().Be(19, "1 damage to Bob");
+        _bob.LifeLostThisTurn.Should().Be(1);
+
         _alice.Zones.Graveyard.GetCards().Should().Contain(fb);
         _alice.Zones.Battlefield.GetCards().Should().NotContain(fb);
         fb.Zone.Should().Be(ZoneType.Graveyard);
     }
 
     [Fact]
-    public void Activate_DealsOneToCreatureTarget()
+    public void Activate_Ping_DealsOneToCreatureTarget()
     {
         var bears = new Creature("Grizzly Bears", "{1}{G}", 2, 2);
         bears.SetOwner(_bob);
@@ -139,15 +148,14 @@ public class FanaticalFirebrandTests
 
         ability.Resolve();
 
-        bears.Damage.Should().Be(1);
+        bears.Damage.Should().Be(1, "1 marked damage on the bears");
         _alice.Zones.Graveyard.GetCards().Should().Contain(fb);
     }
 
     [Fact]
-    public void Activate_PlaneswalkerTarget_RoutesToLoyaltyRemoval()
+    public void Activate_Ping_PlaneswalkerTarget_RoutesToLoyaltyRemoval()
     {
-        // CR 306.7 — damage to a planeswalker removes that many loyalty
-        // counters. Fx.DealDamageAny routes Planeswalker → RemoveLoyalty.
+        // CR 306.7 — damage to a planeswalker removes loyalty counters.
         var pw = new Planeswalker("Test Walker", "{3}", startingLoyalty: 4,
             subtypes: new[] { CardSubtype.Chandra });
         pw.SetOwner(_bob);
