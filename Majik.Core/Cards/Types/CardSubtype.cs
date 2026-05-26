@@ -251,6 +251,11 @@ public enum CardSubtype
     Treasure,
     Clue,
     Construct,
+    /// <summary>Assembly-Worker creature subtype — Mishra's Factory and the
+    /// Antiquities Assembly-Worker cycle. CR 205.3m. Engine spelling uses
+    /// the unhyphenated identifier; observable card text still reads
+    /// "Assembly-Worker".</summary>
+    AssemblyWorker,
     Blood,
     Powerstone,
     /// <summary>Myr creature/artifact subtype — Myr Enforcer, Myr Retriever,
