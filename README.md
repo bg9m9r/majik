@@ -2,7 +2,7 @@
 
 Open-source Magic: The Gathering rules engine in C# / .NET 10. UI-agnostic, event-driven, state-machine based. Pairs with [`majik.portal`](https://github.com/bg9m9r/majik.portal) (Angular web client) — together they back [majik.tech](https://majik.tech), a free 1v1 client.
 
-Authoritative rules source: [`MagicCompRules 20251114.txt`](./MagicCompRules%2020251114.txt). [`RULES_REFERENCE.md`](./RULES_REFERENCE.md) indexes the most-touched rules.
+Authoritative rules source: Wizards of the Coast's [Comprehensive Rules](https://magic.wizards.com/en/rules) (this repo targets the **2025-11-14** release). The Comp Rules text is **not redistributed here** — download the TXT from that page and (optionally) drop it at `MagicCompRules 20251114.txt` (gitignored) for local searching. [`RULES_REFERENCE.md`](./RULES_REFERENCE.md) indexes the most-touched rules.
 
 ## Projects
 
@@ -137,10 +137,10 @@ See [`CONTRIBUTING.md`](./CONTRIBUTING.md). All commits must carry a DCO `Signed
 
 ## License
 
-Source code is licensed under the [Apache License, Version 2.0](./LICENSE). Third-party attributions — including the bundled Comprehensive Rules text and Scryfall-sourced card metadata — live in [`NOTICE`](./NOTICE).
+Source code is licensed under the [Apache License, Version 2.0](./LICENSE). Third-party attributions — including the Scryfall-sourced card metadata — live in [`NOTICE`](./NOTICE).
 
 ### Magic: The Gathering Fan Content
 
 Majik is unofficial Fan Content permitted under the [Wizards Fan Content Policy](https://company.wizards.com/en/legal/fancontentpolicy). Not approved or endorsed by Wizards. Portions of the materials used are property of Wizards of the Coast. © Wizards of the Coast LLC.
 
-"Magic: The Gathering" and all related card names, mana symbols, set symbols, and rules text are trademarks and/or copyrighted material of Wizards of the Coast LLC. The bundled `MagicCompRules 20251114.txt` and `modern-cards.json.gz` seed (Scryfall metadata) reproduce Wizards material under the Fan Content Policy; this project does not re-license that material.
+"Magic: The Gathering" and all related card names, mana symbols, set symbols, and rules text are trademarks and/or copyrighted material of Wizards of the Coast LLC. The Comprehensive Rules text is **not redistributed in this repository** — see <https://magic.wizards.com/en/rules>. The `modern-cards.json.gz` seed contains card metadata sourced from [Scryfall](https://scryfall.com/) under their data terms; this project does not re-license Wizards' or Scryfall's material.
