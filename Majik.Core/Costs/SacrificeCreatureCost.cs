@@ -144,3 +144,47 @@ public sealed class PayLifeAdditionalCost : IAdditionalCost
         return true;
     }
 }
+
+/// <summary>
+/// "As an additional cost to cast this spell, sacrifice a Goblin." —
+/// subtype-restricted variant of <see cref="SacrificeACreatureAdditionalCost"/>.
+/// Used by Goblin Grenade (CR 601.2f). Picks the first eligible Goblin
+/// (creature with the Goblin subtype) the caster controls on the battlefield
+/// — deterministic v1, same posture as the other sacrifice picker costs
+/// in this file. Self-sacrifice (the spell sacrificing itself) is impossible
+/// here because Goblin Grenade is a Sorcery, not a Goblin creature.
+///
+/// <para><see cref="Sacrificed"/> exposes the sacrificed Goblin after
+/// payment so downstream effects could reference it if needed; Goblin
+/// Grenade itself doesn't read the sacrificed creature's stats — the
+/// 5 damage is a flat amount independent of the sacrificed Goblin.</para>
+/// </summary>
+public sealed class SacrificeAGoblinAdditionalCost : IAdditionalCost
+{
+    /// <summary>The Goblin that was sacrificed (null before <see cref="Pay"/>).</summary>
+    public Creature? Sacrificed { get; private set; }
+
+    public string Description => "sacrifice a Goblin";
+
+    public bool CanPay(Player caster)
+    {
+        if (caster == null) return false;
+        return caster.Zones.Battlefield.GetCards()
+            .OfType<Creature>()
+            .Any(c => c.HasSubtype(CardSubtype.Goblin));
+    }
+
+    public bool Pay(Player caster)
+    {
+        if (caster == null) return false;
+        var pick = caster.Zones.Battlefield.GetCards()
+            .OfType<Creature>()
+            .FirstOrDefault(c => c.HasSubtype(CardSubtype.Goblin));
+        if (pick == null) return false;
+        caster.Zones.Battlefield.RemoveCard(pick);
+        caster.Zones.Graveyard.AddCard(pick);
+        pick.SetZone(ZoneType.Graveyard);
+        Sacrificed = pick;
+        return true;
+    }
+}
