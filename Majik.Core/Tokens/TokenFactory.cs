@@ -2,6 +2,7 @@ using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
+using Majik.Core.Mana;
 using Majik.Core.Players;
 using Majik.Core.Services;
 using Majik.Core.ValueObjects;
@@ -210,6 +211,55 @@ public static class TokenFactory
         PutOnBattlefield(token, controller, zones);
         return token;
     }
+
+    /// <summary>Powerstone (CR 111.10 / The Brothers' War): colourless
+    /// artifact token with "{T}: Add {C}. This mana can't be spent to cast
+    /// a nonartifact spell." (Reckoner Bankbuster, Thran Spider, Loran's
+    /// Smile, Mishra Lost to Phyrexia). Bound as a single
+    /// <see cref="ManaAbility"/> producing one colourless mana stamped
+    /// with a <see cref="SpendRestriction"/> recording the
+    /// "artifact spells only" rider. The restriction is observational
+    /// metadata at v1 — see <see cref="SpendRestriction"/> xmldoc — and
+    /// the production payment-resolver gate is shared with Cavern of
+    /// Souls / Eldrazi Temple.</summary>
+    public static Artifact CreatePowerstone(Player controller, ZoneService? zones = null)
+    {
+        if (controller == null) throw new ArgumentNullException(nameof(controller));
+        var token = new Artifact("Powerstone", "",
+            subtypes: new[] { CardSubtype.Powerstone })
+        {
+            Owner = controller,
+            Controller = controller,
+            IsToken = true,
+        };
+        // CR 111.10 — Powerstone tokens are colourless artifacts.
+        token.SetTokenColors(Array.Empty<ManaColor>());
+
+        // "{T}: Add {C}." with the artifact-spell spend rider attached.
+        // CR 106.4 — the rider lives on the generated mana via the
+        // SpendRestriction metadata channel; payment-time enforcement is
+        // shared with the Cavern of Souls / Eldrazi Temple pipeline.
+        token.AddAbility(new ManaAbility(
+            source: token,
+            controller: controller,
+            manaGenerated: ValueObjects.ManaCost.Parse("C"),
+            canActivateCheck: null,
+            spendRestriction: PowerstoneSpendRestriction));
+
+        PutOnBattlefield(token, controller, zones);
+        return token;
+    }
+
+    /// <summary>
+    /// "Spend this mana only to cast artifact spells" — the rider stamped
+    /// on every unit of mana a Powerstone token produces. Captured as a
+    /// static so equal restrictions share a single instance (matches the
+    /// <see cref="SpendRestriction"/> equality contract — delegate
+    /// references compare by identity).
+    /// </summary>
+    public static readonly SpendRestriction PowerstoneSpendRestriction =
+        new("artifact spell",
+            spell => spell?.Card != null && spell.Card.HasType(CardType.Artifact));
 
     /// <summary>Eldrazi Spawn (CR 111.10): colorless creature token, 0/1, with
     /// "Sacrifice this token: Add {C}." mana ability.
