@@ -87,4 +87,14 @@ public sealed record CounterType(string Name)
     /// deactivates (the gate consults the live count).
     /// </summary>
     public static readonly CounterType Stasis = new("Stasis");
+
+    /// <summary>
+    /// CR 122 — Fate counters. Card-specific marker used by Oblivion Stone
+    /// (Mirrodin). Oblivion Stone's first activated ability puts a fate
+    /// counter on each nonland permanent; its second destroys each nonland
+    /// permanent without a fate counter on it, then removes all fate
+    /// counters from all permanents. The counter is purely a marker —
+    /// no built-in P/T or ability semantics.
+    /// </summary>
+    public static readonly CounterType Fate = new("Fate");
 }
