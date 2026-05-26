@@ -256,6 +256,130 @@ public class EventPayloadTests
     }
 
     [Fact]
+    public void StackObjectAddedEvent_TriggeredAbilityPayload_MatchesStateSnapshotter()
+    {
+        // Regression guard: when PriorityManager.InitializeForPhase drains
+        // a pending triggered ability onto the stack (Rule 603.3),
+        // Stack.Push publishes a StackObjectAddedEvent. GameFacade.BridgeEvent
+        // routes every GameEvent through EventPayloadBuilder, so the portal
+        // can patch state.stack from the wire delta BEFORE the next priority
+        // prompt is delivered. The discriminator and description here must
+        // mirror StateSnapshotter.SnapshotStackObject so the patched stack
+        // item matches what a fresh /state fetch would return — otherwise
+        // the portal's optimistic stack render diverges from the snapshot.
+        var alice = new Player("Alice");
+        var source = new Majik.Core.Cards.Creature("Dredger's Insight", "2U", 1, 3)
+        {
+            Owner = alice,
+            Zone = ZoneType.Battlefield,
+        };
+        var ability = new Majik.Core.Abilities.TriggeredAbility(
+            source,
+            alice,
+            Majik.Core.Abilities.Triggers.OnEnterBattlefieldSelf(source));
+        var e = new StackObjectAddedEvent(ability);
+
+        var payload = EventPayloadBuilder.Build(e);
+
+        payload.GetProperty("stackId").GetGuid().Should().Be(ability.Id);
+        payload.GetProperty("controllerId").GetGuid().Should().Be(alice.Id);
+        payload.GetProperty("kind").GetString().Should().Be("TriggeredAbility");
+        payload.GetProperty("description").GetString().Should().Be("Dredger's Insight trigger");
+    }
+
+    [Fact]
+    public void GameFacade_EnvelopeSubscriber_ReceivesStackObjectAddedEvent_WhenTriggerDrainsOntoStack()
+    {
+        // End-to-end regression: a triggered ability drained onto the
+        // stack by PriorityManager.InitializeForPhase (which TriggerManager
+        // routes through Stack.Push) must surface as a StackObjectAddedEvent
+        // on the facade's envelope subscription. The MatchFacadeBridge
+        // subscribes here, so this is the contract that guarantees the
+        // populated-stack snapshot reaches the portal BEFORE the next
+        // priority prompt fires — without this, the UI never gets a chance
+        // to animate the trigger landing before both agents auto-pass and
+        // the stack item resolves.
+        //
+        // The facade hides TriggerManager from public callers, so we
+        // reach in via reflection to register a synthetic ETB trigger
+        // on a card already on the battlefield. This is the minimum
+        // surface needed to demonstrate the drain path without
+        // depending on the full binder + spell-definition pipeline.
+        var facade = GameFacade.Create("Alice", "Bob", Array.Empty<ICard>(), Array.Empty<ICard>());
+
+        var envelopes = new List<Majik.Core.Api.Dtos.EventEnvelope>();
+        using var _ = facade.SubscribeEnvelopes(envelopes.Add);
+
+        var alice = facade.Alice;
+        var source = new Creature("Dredger's Insight", "2U", 1, 3)
+        {
+            Owner = alice,
+            Zone = ZoneType.Battlefield,
+        };
+        alice.Zones.Battlefield.AddCard(source);
+
+        var triggers = (Majik.Core.Abilities.TriggerManager)typeof(GameFacade)
+            .GetField("_triggers", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+            .GetValue(facade)!;
+        var priority = (Majik.Core.Game.PriorityManager)typeof(GameFacade)
+            .GetField("_priority", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+            .GetValue(facade)!;
+        var bus = (EventBus)typeof(GameFacade)
+            .GetField("_bus", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+            .GetValue(facade)!;
+
+        var ability = new Majik.Core.Abilities.TriggeredAbility(
+            source, alice, Majik.Core.Abilities.Triggers.OnEnterBattlefieldSelf(source));
+        triggers.RegisterTriggeredAbility(ability);
+
+        // Fire the ETB via the bus — pending list accumulates a trigger
+        // that PriorityManager.InitializeForPhase will then drain.
+        bus.Publish(new CardMovedEvent(source, ZoneType.Hand, ZoneType.Battlefield));
+
+        envelopes.Clear();
+        priority.InitializeForPhase(alice);
+
+        envelopes.Should().Contain(env => env.Public.Type == nameof(StackObjectAddedEvent),
+            "draining a pending triggered ability publishes StackObjectAddedEvent, " +
+            "which BridgeEvent must forward through SubscribeEnvelopes so the " +
+            "MatchFacadeBridge can fan it out over SignalR.");
+
+        var added = envelopes.Single(env => env.Public.Type == nameof(StackObjectAddedEvent));
+        added.Public.Payload.GetProperty("kind").GetString().Should().Be("TriggeredAbility");
+        added.Public.Payload.GetProperty("description").GetString().Should().Be("Dredger's Insight trigger");
+        added.Public.Payload.GetProperty("controllerId").GetGuid().Should().Be(alice.Id);
+        added.PerPlayer.Should().BeNull(
+            "stack additions reveal the same info to both seats — no CR 706 masking needed.");
+    }
+
+    [Fact]
+    public void StackObjectResolvedEvent_TriggeredAbilityPayload_MatchesStateSnapshotter()
+    {
+        // Symmetric guard: the resolve event must carry the same kind +
+        // description as the corresponding added event so the portal can
+        // unconditionally remove the matching stack item by id without
+        // having to re-classify the object.
+        var alice = new Player("Alice");
+        var source = new Majik.Core.Cards.Creature("Dredger's Insight", "2U", 1, 3)
+        {
+            Owner = alice,
+            Zone = ZoneType.Battlefield,
+        };
+        var ability = new Majik.Core.Abilities.TriggeredAbility(
+            source,
+            alice,
+            Majik.Core.Abilities.Triggers.OnEnterBattlefieldSelf(source));
+        var e = new StackObjectResolvedEvent(ability);
+
+        var payload = EventPayloadBuilder.Build(e);
+
+        payload.GetProperty("stackId").GetGuid().Should().Be(ability.Id);
+        payload.GetProperty("controllerId").GetGuid().Should().Be(alice.Id);
+        payload.GetProperty("kind").GetString().Should().Be("TriggeredAbility");
+        payload.GetProperty("description").GetString().Should().Be("Dredger's Insight trigger");
+    }
+
+    [Fact]
     public void CardRevealedEvent_PayloadCarriesCardPlayerSourceAndReason()
     {
         // CR 701.16 reveals — payload must let the portal flash the opponent's
