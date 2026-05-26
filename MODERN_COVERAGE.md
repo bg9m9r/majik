@@ -6,11 +6,12 @@
 > (CI hook: `--check` exits non-zero on drift).
 >
 > The card pool itself ships embedded in `Majik.Core` as
-> `CardData/Embedded/modern-cards.json.gz`. Regenerate from a fresh
-> Scryfall bulk export via
-> `dotnet run --project Majik.Console -- export-modern-cards <scryfall.json>`
-> — the exporter flags `IsImplemented` by reflecting over `[CardName]`
-> factories, so factory PRs flow into the seed on the next refresh.
+> `CardData/Embedded/modern-cards.json.gz`. **Card factory PRs do NOT
+> regenerate this file** — `IsImplemented` is derived at load time from
+> the `[CardName]` registry (`Majik.Core/CardData/Factories/ImplementedCardNames.cs`),
+> so adding a factory flips the flag automatically. Only regenerate the
+> seed on a Scryfall data refresh (new cards / errata) via
+> `dotnet run --project Majik.Console -- export-modern-cards <scryfall.json>`.
 
 Living tracker for Modern-format card + mechanic implementation in the Majik engine.
 

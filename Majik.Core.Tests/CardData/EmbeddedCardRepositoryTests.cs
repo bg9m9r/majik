@@ -140,6 +140,44 @@ public class EmbeddedCardRepositoryTests
     }
 
     [Fact]
+    public void DeriveImplemented_OverridesStoredFlagFromFactoryRegistry()
+    {
+        // A card with a [CardName] factory comes back implemented even if
+        // the seed stored false; a card with no factory comes back
+        // unimplemented even if the seed stored true. The gzipped seed's
+        // stored flag is no longer authoritative — the [CardName] registry
+        // (Majik.Core.CardData.Factories.ImplementedCardNames) is.
+        var hasFactory = new CardEntity
+        {
+            Name = "Lightning Bolt", IsImplemented = false,
+        };
+        var noFactory = new CardEntity
+        {
+            Name = "Definitely Not A Real Card", IsImplemented = true,
+        };
+
+        EmbeddedCardRepository.DeriveImplemented(hasFactory)
+            .IsImplemented.Should().BeTrue(
+                "Lightning Bolt has a [CardName] factory regardless of the stored flag");
+        EmbeddedCardRepository.DeriveImplemented(noFactory)
+            .IsImplemented.Should().BeFalse(
+                "an unimplemented card stays false even if the seed stored true");
+    }
+
+    [Fact]
+    public void Embedded_IsImplemented_DerivedFromFactoryRegistry()
+    {
+        // Drives the real bundled seed through the production load path,
+        // proving the flag is recomputed from the [CardName] registry
+        // rather than trusted from the gz.
+        var repo = new EmbeddedCardRepository();
+        repo.IsImplemented("Lightning Bolt").Should().BeTrue(
+            "LightningBoltFactory carries [CardName(\"Lightning Bolt\")]");
+        repo.IsImplemented("Forest").Should().BeTrue(
+            "basic lands have inline fallbacks in NamedCardFactory");
+    }
+
+    [Fact]
     public void SetImplemented_Throws_NotSupported()
     {
         var repo = SyntheticRepo();

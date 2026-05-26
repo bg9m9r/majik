@@ -13,9 +13,12 @@ namespace Majik.Core.CardData;
 /// (case-insensitive); subsequent lookups are O(1).
 ///
 /// Replaces the previous <c>DbCardRepository</c> / <c>HttpCardRepository</c>
-/// chain — no SQLite, no out-of-process HTTP hop. Implemented-flag
-/// mutation is intentionally unsupported: the flag is build-time, baked
-/// into the JSON when it is regenerated from the offline export script.
+/// chain — no SQLite, no out-of-process HTTP hop. The <c>IsImplemented</c>
+/// flag is <b>derived at load time</b> from the <c>[CardName]</c> factory
+/// registry (see <see cref="Factories.ImplementedCardNames"/>), overriding
+/// whatever value was baked into the gzipped seed — so adding a factory
+/// flips the flag without regenerating the binary seed, and runtime
+/// mutation stays intentionally unsupported.
 /// Thread-safe via <see cref="Lazy{T}"/> with
 /// <see cref="LazyThreadSafetyMode.ExecutionAndPublication"/>.
 /// </summary>
@@ -185,18 +188,19 @@ public sealed class EmbeddedCardRepository : ICardRepository
 
     public void SetImplemented(string name, bool value)
     {
-        // The embedded seed is read-only at runtime — the flag is baked
-        // in by the offline export script. Throwing here surfaces the
-        // mistake immediately instead of silently dropping the write
-        // (which the old DbCardRepository would have persisted).
+        // The implemented flag is derived from the [CardName] factory
+        // registry at load time, not stored mutable state. Add (or remove)
+        // a factory to change it. Throwing here surfaces the mistake
+        // immediately instead of silently dropping the write (which the
+        // old DbCardRepository would have persisted).
         _log.Warn(
             "EmbeddedCardRepository.SetImplemented({Name}, {Value}) is a no-op; " +
-            "the implemented flag is build-time. Regenerate modern-cards.json.gz " +
-            "to change it.", name, value);
+            "the implemented flag is derived from the [CardName] factory " +
+            "registry. Add or remove a factory to change it.", name, value);
         throw new NotSupportedException(
-            "EmbeddedCardRepository is read-only. " +
-            "Regenerate the embedded modern-cards.json.gz seed to change " +
-            "IsImplemented.");
+            "EmbeddedCardRepository is read-only. IsImplemented is derived " +
+            "from the [CardName] factory registry; add or remove a factory " +
+            "to change it.");
     }
 
     public BotIntent IntentFor(string cardName) => BotIntent.None;
@@ -221,8 +225,25 @@ public sealed class EmbeddedCardRepository : ICardRepository
             ?? throw new InvalidOperationException(
                 "Embedded card seed deserialized to null.");
         var entities = new List<CardEntity>(rows.Count);
-        foreach (var r in rows) entities.Add(r.ToEntity());
+        foreach (var r in rows)
+        {
+            entities.Add(DeriveImplemented(r.ToEntity()));
+        }
         return entities;
+    }
+
+    /// <summary>Overrides <paramref name="entity"/>'s <c>IsImplemented</c>
+    /// with the load-time-derived value from the <c>[CardName]</c> factory
+    /// registry, ignoring whatever flag was stored in the gzipped seed.
+    /// This is what lets a card PR add a factory without regenerating
+    /// <c>modern-cards.json.gz</c> — the binary seed was otherwise the
+    /// source of a perpetual merge-conflict treadmill. The stored flag is
+    /// kept in the file for human inspection only.</summary>
+    internal static CardEntity DeriveImplemented(CardEntity entity)
+    {
+        entity.IsImplemented =
+            Factories.ImplementedCardNames.Contains(entity.Name);
+        return entity;
     }
 
     private static readonly JsonSerializerOptions SerializerOptions = new()

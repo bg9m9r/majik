@@ -35,7 +35,9 @@ The engine reads its Modern-legal pool from a gzipped JSON resource embedded in 
 
 - **Resource:** `Majik.Core/CardData/Embedded/modern-cards.json.gz` (~22k rows, ~1.8 MB compressed).
 - **Loader:** `Majik.Core/CardData/EmbeddedCardRepository.cs` — the only `ICardRepository` implementation. Reads the gzipped JSON into an in-memory `Dictionary<string, CardEntity>` once at startup. No database, no HTTP hop.
-- **`IsImplemented` flag:** baked into the seed at export time via reflection over `Majik.Core` for `[CardName]`-attributed factories. No runtime mutation surface.
+- **`IsImplemented` flag:** **derived at load time** from the `[CardName]` factory registry (`Majik.Core/CardData/Factories/ImplementedCardNames.cs`) — `EmbeddedCardRepository` overrides whatever the gz stored. The flag stored in the seed is human-inspectable only, never authoritative. No runtime mutation surface.
+
+Because `IsImplemented` is recomputed from code, **a card PR that only adds a `[CardName]` factory does NOT need to regenerate `modern-cards.json.gz`** — the flag flips on automatically. This deliberately ends the binary-seed merge-conflict treadmill (every regen used to conflict with every other open card PR). Only regenerate the seed on a **Scryfall data refresh** (new cards / errata).
 
 To refresh from a Scryfall bulk export:
 
@@ -43,14 +45,14 @@ To refresh from a Scryfall bulk export:
 dotnet run --project Majik.Console -- export-modern-cards <path-to-scryfall-all-cards.json>
 ```
 
-`Majik.Console/Commands/ExportModernCardsCommand.cs` filters to Modern legal/restricted, dedupes by name (highest `released_at` wins), flags `IsImplemented`, writes the gzipped JSON, and round-trips through `EmbeddedCardRepository` as a sanity check. Commit the regenerated `.json.gz`.
+`Majik.Console/Commands/ExportModernCardsCommand.cs` filters to Modern legal/restricted, dedupes by name (highest `released_at` wins), stores `IsImplemented` (via the same `ImplementedCardNames` source of truth, for inspection), writes the gzipped JSON, and round-trips through `EmbeddedCardRepository` as a sanity check. Commit the regenerated `.json.gz` (only needed on a data refresh, not per card PR).
 
 ## Adding card behaviour
 
 - **Named factory:** create a class under `Majik.Core/CardData/Factories/` with `[CardName("Card Name")]`. `Majik.Core.SourceGen.NamedCardFactoryGenerator` wires it into the dispatch table at build time — no manual registration.
 - **Spell template:** for plain-vanilla spells the binders under `Majik.Core/CardData/SpellTemplates/` may already cover the oracle text via regex; check there first before writing a named factory.
 
-After adding a factory, regenerate the embedded seed (above) so `IsImplemented` flips on.
+Adding a factory flips `IsImplemented` automatically — it is derived from the `[CardName]` registry at load time (`ImplementedCardNames`). **No need to regenerate `modern-cards.json.gz`** for a card PR; that file is only regenerated on a Scryfall data refresh.
 
 ## Rules authority
 
