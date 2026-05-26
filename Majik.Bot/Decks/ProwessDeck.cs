@@ -20,7 +20,7 @@ internal static class ProwessDeck
 
         // Spells / artifacts (26)
         "Expressive Iteration", "Expressive Iteration", "Expressive Iteration",
-        "Flashback", "Flashback",
+        "Faithless Looting", "Faithless Looting",
         "Lava Dart", "Lava Dart", "Lava Dart", "Lava Dart",
         "Lightning Bolt", "Lightning Bolt", "Lightning Bolt", "Lightning Bolt",
         "Mishra's Bauble", "Mishra's Bauble", "Mishra's Bauble", "Mishra's Bauble",
