@@ -102,6 +102,9 @@ public enum CardSubtype
     /// <summary>Frog creature subtype — Psychic Frog, Sakura-Tribe Scout's
     /// sibling cycle. CR 205.3m.</summary>
     Frog,
+    /// <summary>Lizard creature subtype — Rapid Hybridization's 3/3 Frog
+    /// Lizard token (Gatecrash). CR 205.3m.</summary>
+    Lizard,
     /// <summary>Mutant creature subtype — Psychic Frog, Mutavault's
     /// changeling base type. CR 205.3m.</summary>
     Mutant,
