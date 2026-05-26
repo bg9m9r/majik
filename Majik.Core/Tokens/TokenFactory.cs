@@ -2,6 +2,7 @@ using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
+using Majik.Core.Mana;
 using Majik.Core.Players;
 using Majik.Core.Services;
 using Majik.Core.ValueObjects;
@@ -211,6 +212,91 @@ public static class TokenFactory
         return token;
     }
 
+    /// <summary>Blood (CR 111.10 / Innistrad: Crimson Vow): red artifact
+    /// token with "{1}, {T}, Discard a card, Sacrifice this artifact: Draw
+    /// a card." Voldaren Estate's red-mana-flavoured Treasure cousin —
+    /// produced by Voldaren Epicure / Bloodtithe Harvester / Voldaren
+    /// Bloodcaster and consumed by Falkenrath Pit Fighter, Voldaren Pariah's
+    /// Anointed Deacon transform clause, and the broader Crimson Vow
+    /// "sacrifice a Blood token" payoff family. Bound as a 4-cost activated
+    /// ability ({1} mana + {T} tap + DiscardACard + sacrifice-self) with a
+    /// single draw-one effect — same compositional shape as
+    /// <see cref="CreateClue"/> / <see cref="CreateFood"/>. The
+    /// <see cref="CardSubtype.Blood"/> subtype is stamped so Falkenrath Pit
+    /// Fighter's "sacrifice another creature or Blood token" cost gate +
+    /// the broader Blood-counts-as-X type predicates pick it up.</summary>
+    public static Artifact CreateBlood(Player controller, ZoneService? zones = null)
+    {
+        if (controller == null) throw new ArgumentNullException(nameof(controller));
+        var token = new Artifact("Blood", "",
+            subtypes: new[] { CardSubtype.Blood })
+        {
+            Owner = controller,
+            Controller = controller,
+            IsToken = true,
+        };
+        // CR 111.10 — Blood tokens are red artifacts (the printed token frame
+        // is red and the flavour text-box is treated as red mana for the
+        // CardColors / colour-matters surface). Single-colour list per the
+        // TokenSpec.Colors convention used by Stormchaser's Talent Mercenary.
+        token.SetTokenColors(new[] { ManaColor.Red });
+
+        // {1}, {T}, Discard a card, Sacrifice this artifact: Draw a card.
+        token.AddAbility(BuildBloodDiscardDrawAbility(token, controller));
+
+        PutOnBattlefield(token, controller, zones);
+        return token;
+    }
+
+    /// <summary>Powerstone (CR 111.10 / The Brothers' War): colourless
+    /// artifact token with "{T}: Add {C}. This mana can't be spent to cast
+    /// a nonartifact spell." (Reckoner Bankbuster, Thran Spider, Loran's
+    /// Smile, Mishra Lost to Phyrexia). Bound as a single
+    /// <see cref="ManaAbility"/> producing one colourless mana stamped
+    /// with a <see cref="SpendRestriction"/> recording the
+    /// "artifact spells only" rider. The restriction is observational
+    /// metadata at v1 — see <see cref="SpendRestriction"/> xmldoc — and
+    /// the production payment-resolver gate is shared with Cavern of
+    /// Souls / Eldrazi Temple.</summary>
+    public static Artifact CreatePowerstone(Player controller, ZoneService? zones = null)
+    {
+        if (controller == null) throw new ArgumentNullException(nameof(controller));
+        var token = new Artifact("Powerstone", "",
+            subtypes: new[] { CardSubtype.Powerstone })
+        {
+            Owner = controller,
+            Controller = controller,
+            IsToken = true,
+        };
+        // CR 111.10 — Powerstone tokens are colourless artifacts.
+        token.SetTokenColors(Array.Empty<ManaColor>());
+
+        // "{T}: Add {C}." with the artifact-spell spend rider attached.
+        // CR 106.4 — the rider lives on the generated mana via the
+        // SpendRestriction metadata channel; payment-time enforcement is
+        // shared with the Cavern of Souls / Eldrazi Temple pipeline.
+        token.AddAbility(new ManaAbility(
+            source: token,
+            controller: controller,
+            manaGenerated: ValueObjects.ManaCost.Parse("C"),
+            canActivateCheck: null,
+            spendRestriction: PowerstoneSpendRestriction));
+
+        PutOnBattlefield(token, controller, zones);
+        return token;
+    }
+
+    /// <summary>
+    /// "Spend this mana only to cast artifact spells" — the rider stamped
+    /// on every unit of mana a Powerstone token produces. Captured as a
+    /// static so equal restrictions share a single instance (matches the
+    /// <see cref="SpendRestriction"/> equality contract — delegate
+    /// references compare by identity).
+    /// </summary>
+    public static readonly SpendRestriction PowerstoneSpendRestriction =
+        new("artifact spell",
+            spell => spell?.Card != null && spell.Card.HasType(CardType.Artifact));
+
     /// <summary>Eldrazi Spawn (CR 111.10): colorless creature token, 0/1, with
     /// "Sacrifice this token: Add {C}." mana ability.
     /// v1: ManaAbility produces {C} without enforcing the sacrifice cost — the
@@ -285,6 +371,57 @@ public static class TokenFactory
         var effects = new IEffect[]
         {
             new Effect("Food: gain 3 life", () => controller.GainLife(3)),
+        };
+        return new ActivatedAbility(source, controller, costs: costs, effects: effects);
+    }
+
+    /// <summary>"{1}, {T}, Discard a card, Sacrifice this artifact: Draw a
+    /// card." — Blood ability. Four costs in cost-list declaration order
+    /// (mana, tap, discard, sacrifice); the sacrifice payment is performed
+    /// inside the effect closure because the generic
+    /// <see cref="AdditionalCost.Sacrifice"/> payment is a no-op stub
+    /// (mirrors Caustic Caterpillar / Insolent Neonate / Aether Spellbomb).
+    /// The draw is one card from the top of the controller's library — empty
+    /// library flags the SBA loss via
+    /// <see cref="Player.MarkTriedToDrawFromEmptyLibrary"/> (CR 704.5b),
+    /// matching the Clue / Food posture.</summary>
+    private static ActivatedAbility BuildBloodDiscardDrawAbility(Artifact source, Player controller)
+    {
+        var costs = new ICost[]
+        {
+            new ManaCostCost(ValueObjects.ManaCost.Parse("1")),
+            AdditionalCost.Tap(source),
+            new DiscardACardCost(),
+            AdditionalCost.Sacrifice(source),
+        };
+        var effects = new IEffect[]
+        {
+            new Effect("Blood: sacrifice self + draw a card", () =>
+            {
+                // Sacrifice payment — AdditionalCost.Sacrifice is a no-op
+                // stub (see Insolent Neonate / Caustic Caterpillar
+                // precedent), so we route the battlefield → graveyard move
+                // here. CR 701.16 — idempotent re-entry guard.
+                if (source.Zone == ZoneType.Battlefield)
+                {
+                    controller.Zones.Battlefield.RemoveCard(source);
+                    controller.Zones.Graveyard.AddCard(source);
+                    source.SetZone(ZoneType.Graveyard);
+                }
+
+                // CR 121.1 — draw one card from top of library. Empty
+                // library flags the SBA loss via the standard helper
+                // (Insolent Neonate / Faithless Looting parity).
+                var top = controller.Zones.Library.GetCards().FirstOrDefault();
+                if (top == null)
+                {
+                    controller.MarkTriedToDrawFromEmptyLibrary();
+                    return;
+                }
+                controller.Zones.Library.RemoveCard(top);
+                controller.Zones.Hand.AddCard(top);
+                top.SetZone(ZoneType.Hand);
+            }),
         };
         return new ActivatedAbility(source, controller, costs: costs, effects: effects);
     }
