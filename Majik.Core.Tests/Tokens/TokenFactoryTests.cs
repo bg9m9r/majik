@@ -135,4 +135,57 @@ public class TokenFactoryTests
 
         alice.LifeTotal.Should().Be(23);
     }
+
+    // ── Blood token (CR 111.10 — Innistrad: Crimson Vow) ─────────────────────
+
+    [Fact]
+    public void CreateBlood_PutsRedArtifactTokenOnBattlefield_WithBloodSubtype()
+    {
+        var blood = TokenFactory.CreateBlood(_alice, _zones);
+
+        blood.Should().NotBeNull();
+        blood.IsToken.Should().BeTrue();
+        blood.Subtypes.Should().Contain(CardSubtype.Blood);
+        blood.Zone.Should().Be(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.GetCards().Should().Contain(blood);
+        // CR 111.10 — Blood tokens are red artifacts.
+        Majik.Core.Cards.CardColors.GetColors(blood)
+            .Should().Contain(Majik.Core.ValueObjects.ManaColor.Red);
+    }
+
+    [Fact]
+    public void CreateBlood_HasManaTapDiscardSacForDrawAbility()
+    {
+        var alice = new Player("Alice", 20);
+        var blood = TokenFactory.CreateBlood(alice);
+
+        var abilities = blood.Abilities.OfType<ActivatedAbility>().ToList();
+        abilities.Should().HaveCount(1);
+        var ability = abilities[0];
+        // {1} mana + tap + discard a card + sacrifice this artifact = 4 costs.
+        ability.Costs.Should().HaveCount(4);
+        ability.Effects.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public void CreateBlood_DrawAbility_ResolvesDrawsACard_AndSacrificesSelf()
+    {
+        var alice = new Player("Alice", 20);
+        var blood = TokenFactory.CreateBlood(alice);
+
+        // Library top.
+        var top = new Card("Top", "");
+        alice.Zones.Library.AddCard(top);
+        top.SetZone(ZoneType.Library);
+
+        var ability = blood.Abilities.OfType<ActivatedAbility>().Single();
+        foreach (var e in ability.Effects) e.Execute();
+
+        // Draw happened.
+        alice.Zones.Hand.GetCards().Should().Contain(top);
+        // Self-sacrifice happened (battlefield → graveyard).
+        blood.Zone.Should().Be(ZoneType.Graveyard);
+        alice.Zones.Battlefield.GetCards().Should().NotContain(blood);
+        alice.Zones.Graveyard.GetCards().Should().Contain(blood);
+    }
 }
