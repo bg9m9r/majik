@@ -6,7 +6,9 @@ This document references the official Magic: The Gathering Comprehensive Rules (
 
 ## Rules Document
 
-**File**: `MagicCompRules 20251114.txt`
+**Source**: Wizards of the Coast — [Comprehensive Rules](https://magic.wizards.com/en/rules) (latest TXT download). This repository targets the **2025-11-14** release.
+
+**The Comp Rules text is NOT redistributed in this repository.** It is the copyrighted work of Wizards of the Coast LLC. Download it from the link above and (optionally) place it at `majik.core/MagicCompRules 20251114.txt` — the path is gitignored. Contributors implementing rule-driven code should cite rule numbers (e.g. `Rule 704.5j`) rather than rule text.
 
 **Effective Date**: November 14, 2025
 
