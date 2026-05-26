@@ -219,6 +219,10 @@ public enum CardSubtype
     /// Alara), Vedalken Shackles, Trinket Mage's adjacent Mirrodin /
     /// Alara blue-aligned artificer lineage. CR 205.3m.</summary>
     Vedalken,
+    /// <summary>Elder creature subtype — Atarka, World Render and the rest
+    /// of the Dragons of Tarkir Elder Dragon cycle, Etali, Primal Storm
+    /// (Elder Dinosaur), Nicol Bolas's pre-planeswalker printings. CR 205.3m.</summary>
+    Elder,
     /// <summary>Arcane spell subtype — Champions of Kamigawa block (Desperate
     /// Ritual, Goryo's Vengeance, Through the Breach, Glacial Ray, …). The
     /// only subtype that exists for instant / sorcery spells in the engine;
