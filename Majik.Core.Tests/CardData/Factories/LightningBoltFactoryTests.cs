@@ -23,6 +23,8 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Resolve body deals 3 damage to a player target.
 /// - Resolve body routes creature damage through
 ///   <see cref="Primitives.Fx.DealDamageAny"/>.
+/// - Resolve body removes loyalty from a planeswalker target
+///   (CR 306.7 — Bolt to a 3-loyalty Walker leaves it at 0).
 /// </summary>
 public class LightningBoltFactoryTests
 {
@@ -86,14 +88,14 @@ public class LightningBoltFactoryTests
     [Fact]
     public void LightningBolt_Resolve_DealsThreeDamageToCreature()
     {
-        // 0/4 so 3 damage is not lethal — verifies damage marker is
-        // applied without SBA wipe interfering.
-        var bear = new Creature("Grizzly Bears", "{1}{G}", 0, 4,
-            Array.Empty<CardSupertype>(), new[] { CardSubtype.Bear });
-        bear.SetOwner(_bob);
-        bear.SetController(_bob);
-        bear.SetZone(ZoneType.Battlefield);
-        _bob.Zones.Battlefield.AddCard(bear);
+        // Use a 0/4 creature so 3 damage is not lethal — verifies damage
+        // marker is applied without SBA wipe interfering.
+        var wall = new Creature("Wall of Wood", "{G}", 0, 4,
+            Array.Empty<CardSupertype>(), new[] { CardSubtype.Wall });
+        wall.SetOwner(_bob);
+        wall.SetController(_bob);
+        wall.SetZone(ZoneType.Battlefield);
+        _bob.Zones.Battlefield.AddCard(wall);
 
         var def = LightningBoltFactory.BuildSpellDefinition(resolver: x => x);
         var chosen = new ChosenSpellParams(
@@ -101,13 +103,42 @@ public class LightningBoltFactoryTests
             X: null,
             Targets: new[]
             {
-                (IReadOnlyList<object>)new object[] { bear },
+                (IReadOnlyList<object>)new object[] { wall },
             },
             Mana: ManaPayment.Empty);
 
         var effects = def.EffectFactory(chosen);
         foreach (var effect in effects) effect.Execute();
 
-        bear.Damage.Should().Be(3, "Lightning Bolt deals 3 damage to target creature");
+        wall.Damage.Should().Be(3, "Lightning Bolt deals 3 damage to target creature");
+    }
+
+    [Fact]
+    public void LightningBolt_Resolve_RemovesLoyaltyFromPlaneswalker()
+    {
+        // CR 306.7 — damage to a planeswalker becomes loyalty removal.
+        // Fx.DealDamageAny routes the planeswalker branch.
+        var walker = new Planeswalker("Test Walker", "{2}{B}", 3,
+            Array.Empty<CardSupertype>(), new[] { CardSubtype.Liliana });
+        walker.SetOwner(_bob);
+        walker.SetController(_bob);
+        walker.SetZone(ZoneType.Battlefield);
+        _bob.Zones.Battlefield.AddCard(walker);
+
+        var def = LightningBoltFactory.BuildSpellDefinition(resolver: x => x);
+        var chosen = new ChosenSpellParams(
+            ModeIndex: null,
+            X: null,
+            Targets: new[]
+            {
+                (IReadOnlyList<object>)new object[] { walker },
+            },
+            Mana: ManaPayment.Empty);
+
+        var effects = def.EffectFactory(chosen);
+        foreach (var effect in effects) effect.Execute();
+
+        walker.Loyalty.Should().Be(0,
+            "Lightning Bolt to a 3-loyalty planeswalker removes 3 loyalty counters (CR 306.7)");
     }
 }

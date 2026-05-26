@@ -47,3 +47,10 @@ appsettings.Local.json
 claude_results/
 .claude/
 data/modern-*.txt
+
+# Wizards of the Coast Comprehensive Rules text — copyright Wizards of the
+# Coast LLC. Not redistributed here under the Fan Content Policy. Contributors
+# who want the file locally should download the latest TXT from
+# https://magic.wizards.com/en/rules and place it at the repo root. See
+# RULES_REFERENCE.md.
+MagicCompRules*.txt

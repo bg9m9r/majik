@@ -1,4 +1,5 @@
 using Majik.Core.Abilities;
+using Majik.Core.CardData;
 using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
 using Majik.Core.Game;
@@ -15,21 +16,12 @@ namespace Majik.Core.CardData.Factories;
 /// Instant. Oracle text:
 ///   "Counter target spell."
 ///
-/// The canonical hard counter — {U}{U} for an unconditional counter of
-/// any spell on the stack (CR 701.5). Mirrors <see cref="NegateFactory"/>
-/// without the noncreature filter.
-///
-/// ## Implemented (v1)
-/// - Instant shape, mana cost {U}{U}, blue.
-/// - <b>Counter target spell</b> — at resolution, the target is removed
-///   from the stack via <see cref="OracleSpellBinder.RemoveFromStack"/>
-///   and its card moves to the graveyard (CR 701.5).
-///
-/// The <see cref="SpellTemplates.Templates.Counter"/> family of templates
-/// already binds Counterspell's oracle text generically; this named factory
-/// exists so the embedded-seed exporter flags the row
-/// <c>IsImplemented = true</c> (the seed reflects over <c>[CardName]</c>
-/// factories, not spell-template coverage).
+/// The archetypal hard counter — no filters, no riders, no escape clause.
+/// Mirrors <see cref="NegateFactory"/>'s shape with the noncreature
+/// restriction removed (any spell is a legal target). At resolution the
+/// target spell is removed from the stack via
+/// <see cref="OracleSpellBinder.RemoveFromStack"/> and its card moves to
+/// its owner's graveyard (CR 701.5, CR 608.2b).
 /// </summary>
 [CardName("Counterspell")]
 public static class CounterspellFactory
@@ -37,17 +29,17 @@ public static class CounterspellFactory
     public const string CardName = "Counterspell";
     public const string PrintedManaCost = "{U}{U}";
 
-    /// <summary>CardDef DSL — card shape only. The counter-target-spell
-    /// SpellDefinition is built via <see cref="BuildSpellDefinition"/>.</summary>
+    /// <summary>CardDef DSL — card shape only. The counter SpellDefinition
+    /// is built via <see cref="BuildSpellDefinition"/>.</summary>
     public static CardDef Define() => CardDef.Instant(CardName, PrintedManaCost);
 
     public static Instant Create(Player owner) =>
         (Instant)CardDefRuntime.Build(Define(), owner);
 
     /// <summary>
-    /// Build the "counter target spell" SpellDefinition. At resolution the
-    /// target spell is removed from the stack (CR 701.5) and its card moves
-    /// to the graveyard. No type gate — any spell is a legal target.
+    /// Build the "counter target spell" SpellDefinition. Declares a single
+    /// 1..1 "target spell" request; on resolution removes the target from
+    /// the stack and sends its card to the graveyard (CR 701.5).
     /// </summary>
     /// <param name="targetResolver">Target resolver from the caller's
     /// <see cref="GameContext"/> (chosen → live stack object).</param>

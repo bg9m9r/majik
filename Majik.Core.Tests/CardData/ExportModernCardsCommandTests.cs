@@ -147,8 +147,8 @@ public class ExportModernCardsCommandTests
         exit.Should().Be(0, log.ToString());
 
         var rows = ReadGzippedSeed(outputPath);
-        // Both Path to Exile and Lightning Bolt have [CardName] factories
-        // in Majik.Core, so both must come back implemented.
+        // Both have [CardName] factories in Majik.Core (PathToExile,
+        // LightningBolt) and so must come back implemented.
         rows.Single(r => r.Name == "Path to Exile").IsImplemented.Should().BeTrue();
         rows.Single(r => r.Name == "Lightning Bolt").IsImplemented.Should().BeTrue();
     }

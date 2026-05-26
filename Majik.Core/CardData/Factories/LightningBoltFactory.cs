@@ -10,23 +10,18 @@ using Majik.Core.Primitives;
 namespace Majik.Core.CardData.Factories;
 
 /// <summary>
-/// Named-card factory for Lightning Bolt (Alpha / many reprints, {R}).
+/// Named-card factory for Lightning Bolt (Alpha / countless reprints, {R}).
 ///
 /// Instant. Oracle text:
 ///   "Lightning Bolt deals 3 damage to any target."
 ///
-/// The canonical Bolt-shape burn spell — {R} for 3 damage to any of the
-/// four legal target classes (creature, player, planeswalker, battle —
-/// CR 115.3). Resolve routes through <see cref="Fx.DealDamageAny"/> so
-/// all classes resolve correctly (CR 306.7 — damage to a planeswalker
-/// becomes loyalty removal).
-///
-/// Mirrors the resolve shape used by <see cref="ShockFactory"/> with the
-/// damage amount bumped from 2 to 3. <see cref="DamageAnyTargetTemplate"/>
-/// already binds Bolt's oracle text generically; this named factory
-/// exists so the embedded-seed exporter flags the row
-/// <c>IsImplemented = true</c> (the seed reflects over <c>[CardName]</c>
-/// factories, not spell-template coverage).
+/// The archetypal one-mana burn spell — same resolve shape as
+/// <see cref="ShockFactory"/> but for 3 damage instead of 2. Routes through
+/// <see cref="Fx.DealDamageAny"/> so all four "any target" classes resolve
+/// correctly (CR 115.3 — creature, player, planeswalker, or battle).
+/// CR 306.7 — damage to a planeswalker becomes loyalty removal; CR 309.5 —
+/// damage to a battle becomes defense removal; both are handled inside
+/// <see cref="Fx.DealDamageAny"/>.
 /// </summary>
 [CardName("Lightning Bolt")]
 public static class LightningBoltFactory
