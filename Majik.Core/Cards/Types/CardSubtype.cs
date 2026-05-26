@@ -23,6 +23,7 @@ public enum CardSubtype
     /// CR 205.3m.</summary>
     Devil,
     Zombie,
+    Skeleton,
     Beast,
     Bird,
     Cat,
