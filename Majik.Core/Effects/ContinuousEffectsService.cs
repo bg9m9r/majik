@@ -312,6 +312,27 @@ public sealed class ContinuousEffectsService
     }
 
     /// <summary>
+    /// CR 509.1b — return true iff every active
+    /// <see cref="CantBeBlockedExceptByEffect"/> whose source is
+    /// <paramref name="attacker"/> accepts <paramref name="blocker"/>.
+    /// Multiple such effects intersect (any single rejecting effect forbids
+    /// the block). Returns true when no restriction is registered.
+    /// </summary>
+    public bool CanBlockUnderExceptByRestrictions(Creature attacker, Creature blocker)
+    {
+        if (attacker == null) throw new ArgumentNullException(nameof(attacker));
+        if (blocker == null) throw new ArgumentNullException(nameof(blocker));
+        foreach (var e in _effects)
+        {
+            if (e is not CantBeBlockedExceptByEffect r) continue;
+            if (!r.IsActive()) continue;
+            if (!ReferenceEquals(r.SourceCard, attacker)) continue;
+            if (!r.AllowedBlockerPredicate(blocker)) return false;
+        }
+        return true;
+    }
+
+    /// <summary>
     /// True iff any registered <see cref="CombatRestrictionEffect"/> matches
     /// <paramref name="restriction"/> and either targets
     /// <paramref name="creature"/> directly or has no target (a mass effect
