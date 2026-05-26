@@ -14,19 +14,23 @@ using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
 using Xunit;
 
-namespace Majik.Core.Tests.CardData;
+namespace Majik.Core.Tests.CardData.Factories;
 
 /// <summary>
-/// End-to-end tests for Spell Pierce (Zendikar, {U}).
-/// Oracle: "Counter target noncreature spell unless its controller pays {2}."
+/// End-to-end tests for Spell Pierce (Zendikar, {U}, Instant).
 ///
-/// Coverage:
-///   - Card shape + dispatch by name (Instant {U}, blue).
-///   - SpellDefinition declares one 1..1 "target noncreature spell" request.
-///   - Counter-unless-pay success branch (controller pays {2} → resolves).
-///   - Counter-unless-pay failure branch (no mana → countered).
-///   - Creature spell at resolution → illegal target, full fizzle
-///     (CR 608.2b — sole-target rule).
+/// Oracle text:
+///   "Counter target noncreature spell unless its controller pays {2}."
+///
+/// Covers:
+///   - Card shape + dispatch by <see cref="NamedCardFactory"/>.
+///   - SpellDefinition shape (single 1..1 "target noncreature spell" request).
+///   - Counter a noncreature spell whose controller has no {2} available
+///     (countered → graveyard, CR 701.5).
+///   - Auto-pay path: controller has {2} in their mana pool → spell resolves
+///     uncountered (CR 118.4 v1 auto-pay posture).
+///   - Noncreature filter: target became a creature spell at resolution
+///     (CR 608.2b) → no-op.
 /// </summary>
 public class SpellPierceFactoryTests
 {
@@ -47,19 +51,21 @@ public class SpellPierceFactoryTests
     }
 
     // -----------------------------------------------------------------------
-    // Identity + dispatch
+    // Card identity + dispatch
     // -----------------------------------------------------------------------
 
     [Fact]
-    public void Create_HasInstantShape_Blue_U()
+    public void Create_HasInstantShape_Blue_AtCostU()
     {
-        var pierce = SpellPierceFactory.Create(_alice);
+        var sp = SpellPierceFactory.Create(_alice);
 
-        pierce.Name.Should().Be("Spell Pierce");
-        pierce.HasType(CardType.Instant).Should().BeTrue();
-        CardColors.GetColors(pierce).Should().Contain(ManaColor.Blue);
-        pierce.ManaCost.Should().Be("{U}");
-        pierce.ManaCostValue.TotalValue.Should().Be(1);
+        sp.Name.Should().Be("Spell Pierce");
+        sp.ManaCost.Should().Be("{U}");
+        sp.HasType(CardType.Instant).Should().BeTrue();
+        CardColors.GetColors(sp).Should().Contain(ManaColor.Blue);
+        sp.ManaCostValue.TotalValue.Should().Be(1);
+        sp.Owner.Should().BeSameAs(_alice);
+        sp.Controller.Should().BeSameAs(_alice);
     }
 
     [Fact]
@@ -73,9 +79,9 @@ public class SpellPierceFactoryTests
     }
 
     [Fact]
-    public void SpellDefinition_DeclaresSingleNoncreatureTargetSpellRequest()
+    public void SpellDefinition_DeclaresSingleTargetNoncreatureSpellRequest()
     {
-        var def = SpellPierceFactory.BuildSpellDefinition(o => o, null);
+        var def = SpellPierceFactory.BuildDefinition(o => o, null);
 
         def.Modes.Should().BeEmpty();
         def.HasVariableX.Should().BeFalse();
@@ -86,18 +92,18 @@ public class SpellPierceFactoryTests
     }
 
     // -----------------------------------------------------------------------
-    // Counter unless pay {2}
+    // Counter when controller can't pay {2}
     // -----------------------------------------------------------------------
 
     [Fact]
-    public async Task Counters_NoncreatureSpell_WhenControllerCannotPayTwo()
+    public async Task CountersNoncreatureSpell_WhenControllerCannotPayTwo()
     {
-        var pierce = SpellPierceFactory.Create(_alice);
-        pierce.SetZone(ZoneType.Hand);
-        _alice.Zones.Hand.AddCard(pierce);
+        // Bob casts a noncreature spell (Lightning Bolt {R}) with no {2}
+        // available — Spell Pierce counters it.
+        var sp = SpellPierceFactory.Create(_alice);
+        sp.SetZone(ZoneType.Hand);
+        _alice.Zones.Hand.AddCard(sp);
 
-        // Bob casts a noncreature spell (Lightning Bolt {R}).
-        // Bob has 0 mana → cannot pay {2} → Pierce counters.
         var bobBolt = new Instant("Lightning Bolt", "{R}") { Owner = _bob, Controller = _bob };
         var bobSpell = new Majik.Core.Spells.Spell(bobBolt, _bob);
         _stack.Push(bobSpell);
@@ -108,29 +114,67 @@ public class SpellPierceFactoryTests
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
 
         await _flow.CastAsync(
-            _alice, pierce,
-            SpellPierceFactory.BuildSpellDefinition(o => o, _stack),
+            _alice, sp,
+            SpellPierceFactory.BuildDefinition(o => o, _stack),
             agent, ctx,
             alternativeCost: null);
 
         _resolver.ResolveTop(_stack);
 
         bobBolt.Zone.Should().Be(ZoneType.Graveyard,
-            because: "Bob couldn't pay {2} so Spell Pierce counters his spell");
+            because: "Bob has no {2}; the unless-pay rider fails and Spell Pierce counters (CR 701.5)");
     }
 
-    [Fact]
-    public async Task DoesNotCounter_WhenControllerPaysTwo()
-    {
-        var pierce = SpellPierceFactory.Create(_alice);
-        pierce.SetZone(ZoneType.Hand);
-        _alice.Zones.Hand.AddCard(pierce);
+    // -----------------------------------------------------------------------
+    // Auto-pay path: controller has {2} → no-op
+    // -----------------------------------------------------------------------
 
-        // Bob has {2} available in his mana pool — he auto-pays the rider.
-        _bob.AddManaToPool(ManaCost.Zero.AddGenericCost(2));
+    [Fact]
+    public async Task DoesNotCounter_WhenControllerAutoPaysTwo()
+    {
+        var sp = SpellPierceFactory.Create(_alice);
+        sp.SetZone(ZoneType.Hand);
+        _alice.Zones.Hand.AddCard(sp);
 
         var bobBolt = new Instant("Lightning Bolt", "{R}") { Owner = _bob, Controller = _bob };
         var bobSpell = new Majik.Core.Spells.Spell(bobBolt, _bob);
+        _stack.Push(bobSpell);
+
+        // Bob has {2} in his pool to pay the unless-rider.
+        _bob.AddManaToPool(ManaCost.Zero.AddGenericCost(2));
+
+        var agent = new ScriptedAgent();
+        agent.QueueTargets(new[] { (object)bobSpell });
+        agent.QueueMana(ManaPayment.Empty);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+
+        await _flow.CastAsync(
+            _alice, sp,
+            SpellPierceFactory.BuildDefinition(o => o, _stack),
+            agent, ctx,
+            alternativeCost: null);
+
+        _resolver.ResolveTop(_stack);
+
+        bobBolt.Zone.Should().NotBe(ZoneType.Graveyard,
+            because: "Bob paid {2}; the counter no-ops and Bolt remains uncountered");
+    }
+
+    // -----------------------------------------------------------------------
+    // Noncreature filter — creature spell target is illegal at resolve
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task DoesNotCounter_CreatureSpell()
+    {
+        var sp = SpellPierceFactory.Create(_alice);
+        sp.SetZone(ZoneType.Hand);
+        _alice.Zones.Hand.AddCard(sp);
+
+        // Bob casts a creature spell — Spell Pierce can't target it (the
+        // chosen-target filter runs at resolve, CR 608.2b).
+        var bobBear = new Creature("Grizzly Bears", "{1}{G}", 2, 2) { Owner = _bob, Controller = _bob };
+        var bobSpell = new Majik.Core.Spells.Spell(bobBear, _bob);
         _stack.Push(bobSpell);
 
         var agent = new ScriptedAgent();
@@ -139,50 +183,14 @@ public class SpellPierceFactoryTests
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
 
         await _flow.CastAsync(
-            _alice, pierce,
-            SpellPierceFactory.BuildSpellDefinition(o => o, _stack),
-            agent, ctx,
-            alternativeCost: null);
-
-        _resolver.ResolveTop(_stack);
-
-        bobBolt.Zone.Should().NotBe(ZoneType.Graveyard,
-            because: "Bob paid {2} so Spell Pierce is countered into a no-op");
-    }
-
-    [Fact]
-    public async Task DoesNotCounter_CreatureSpellAtResolution_FullFizzle()
-    {
-        // Spell Pierce illegally targeting a creature spell (e.g. via a
-        // type-changing effect mid-stack) → CR 608.2b sole-target rule:
-        // full fizzle. The creature spell remains on the stack and
-        // resolves normally; Pierce itself goes to its owner's
-        // graveyard via the cast pipeline's post-resolve cleanup.
-        var pierce = SpellPierceFactory.Create(_alice);
-        pierce.SetZone(ZoneType.Hand);
-        _alice.Zones.Hand.AddCard(pierce);
-
-        // Bob's creature spell. Has no payable mana → if Pierce DID
-        // counter, the creature would land in Bob's graveyard.
-        var bobBear = new Creature("Grizzly Bears", "{1}{G}", 2, 2)
-        { Owner = _bob, Controller = _bob };
-        var bobCreatureSpell = new Majik.Core.Spells.Spell(bobBear, _bob);
-        _stack.Push(bobCreatureSpell);
-
-        var agent = new ScriptedAgent();
-        agent.QueueTargets(new[] { (object)bobCreatureSpell });
-        agent.QueueMana(ManaPayment.Empty);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
-
-        await _flow.CastAsync(
-            _alice, pierce,
-            SpellPierceFactory.BuildSpellDefinition(o => o, _stack),
+            _alice, sp,
+            SpellPierceFactory.BuildDefinition(o => o, _stack),
             agent, ctx,
             alternativeCost: null);
 
         _resolver.ResolveTop(_stack);
 
         bobBear.Zone.Should().NotBe(ZoneType.Graveyard,
-            because: "Spell Pierce illegally targeted a creature spell — sole-target rule fizzles the counter");
+            because: "Spell Pierce does not counter creature spells");
     }
 }

@@ -12,7 +12,7 @@ using Majik.Core.Zones;
 namespace Majik.Core.CardData.Factories;
 
 /// <summary>
-/// Named-card factory for Spell Pierce (Zendikar / many reprints, {U}).
+/// Named-card factory for Spell Pierce (Zendikar / various reprints, {U}).
 ///
 /// Instant. Oracle text:
 ///   "Counter target noncreature spell unless its controller pays {2}."
@@ -21,30 +21,30 @@ namespace Majik.Core.CardData.Factories;
 /// - Instant shape, mana cost {U}, blue.
 /// - <b>Counter target noncreature spell unless its controller pays {2}</b>
 ///   — mirrors the "unless pay" pattern from <see cref="ManaLeakFactory"/>
-///   / <see cref="MysticalDisputeFactory"/>. At resolution the engine:
-///   1. Verifies the resolved target is still an <see cref="ISpell"/>
-///      whose card is NOT a creature. A creature-typed spell at
-///      resolution-time → CR 608.2b — illegal target, full fizzle (the
-///      sole-target rule). Spells that became creature-typed via copies
-///      / type-changing effects between cast and resolution lose
-///      legality.
-///   2. Asks the target's controller to pay {2}. v1 auto-pays when able
-///      (matches the Mana Leak / Daze / Mystical Dispute posture).
-///   3. On non-payment, counters the spell via
-///      <see cref="OracleSpellBinder.RemoveFromStack"/> and moves it to
-///      its owner's graveyard (CR 701.5).
+///   (N=3) and <see cref="DazeFactory"/> (N=1) with the added "noncreature"
+///   filter from <see cref="NegateFactory"/>. At resolution:
+///   1. CR 608.2b — if the target spell has become a creature spell (mode /
+///      type swap), the effect does nothing.
+///   2. CR 118.4 — if the target's controller has {2} available in their
+///      mana pool, the engine auto-pays (v1 auto-pay posture — same queue
+///      as Daze / Mana Leak / Cursecatcher) and the counter no-ops.
+///   3. Otherwise the spell is countered via
+///      <see cref="OracleSpellBinder.RemoveFromStack"/> and its card moves
+///      to the graveyard (CR 701.5). Uncounterable spells survive (CR 701.5b).
 ///
-/// ## Deferred (v1 gaps)
-/// - <b>"Would you like to pay {2}?" agent prompt</b> — same queue as
-///   Daze / Mana Leak / Mystical Dispute / Stubborn Denial. v1 is
-///   deterministic: pay if able.
-/// - <b>Noncreature gate at target-selection</b> — the
-///   <see cref="TargetRequest"/> description carries the "noncreature"
-///   constraint as free-text; the engine's target-validity pass uses
-///   description-keyed filters only loosely (same posture as Negate /
-///   Stubborn Denial). The resolution-time guard above catches the
-///   common races (creature-typed at resolve). A future revision can
-///   wire the noncreature filter into <c>LegalCandidates</c> directly.
+/// Coverage note: the data-driven
+/// <see cref="SpellTemplates.Templates.Counter.CounterUnlessPayTemplate"/>
+/// already binds this oracle text to the shared
+/// <see cref="SpellTemplates.Templates.Counter.CounterSpellFactory.CounterTargetSpellUnlessPay"/>
+/// shape, so casting Spell Pierce off a real seed row resolves correctly via
+/// the binder path. This named factory exists to surface the printed shape
+/// to the <see cref="NamedCardFactory"/> dispatcher (used by bot / tests /
+/// shape-only call sites) and to keep <c>IsImplemented</c> flipped at seed
+/// export.
+///
+/// ## Deferred
+/// - Real "do you want to pay {2}?" agent prompt — same queue as Daze /
+///   Mana Leak / Stubborn Denial. v1 is deterministic: "pay if able."
 /// </summary>
 [CardName("Spell Pierce")]
 public static class SpellPierceFactory
@@ -52,37 +52,34 @@ public static class SpellPierceFactory
     public const string CardName = "Spell Pierce";
     public const string PrintedManaCost = "{U}";
 
-    /// <summary>CR 118.4 — pay-or-counter rider.</summary>
-    public const int UnlessPayGeneric = 2;
+    /// <summary>The {N} the target's controller must pay to avoid the counter.</summary>
+    public const int UnlessPayN = 2;
 
     /// <summary>CardDef DSL — card shape only. Resolve behaviour
-    /// (counter unless pay {2}) is built via
-    /// <see cref="BuildSpellDefinition"/>.</summary>
+    /// (counter target noncreature spell unless pay {2}) is built via
+    /// <see cref="BuildDefinition"/>.</summary>
     public static CardDef Define() => CardDef.Instant(CardName, PrintedManaCost);
 
     public static Instant Create(Player owner) =>
         (Instant)CardDefRuntime.Build(Define(), owner);
 
     /// <summary>
-    /// Build the resolve-time <see cref="SpellDefinition"/>. Targets a
-    /// single noncreature spell; on resolution checks whether the
-    /// target's controller can pay {2} — if so they pay it
-    /// automatically and the spell resolves normally; if not, the
-    /// spell is countered (CR 701.5) and its card goes to the
-    /// graveyard.
+    /// Build the resolve-time <see cref="SpellDefinition"/>. Single
+    /// 1..1 "target noncreature spell" request; on resolution checks the
+    /// noncreature filter (CR 608.2b) and the unless-pay rider, countering
+    /// only when the target's controller cannot / does not pay {2}.
     /// </summary>
     /// <param name="targetResolver">Resolves the raw target token to a
     /// live engine object.</param>
-    /// <param name="stack">Active stack; required to remove the
-    /// countered spell. Null in pure-shape tests; the effect becomes a
-    /// no-op.</param>
-    public static SpellDefinition BuildSpellDefinition(
+    /// <param name="stack">Active stack; required to remove the countered
+    /// spell. Null in pure-shape tests — the effect becomes a no-op.</param>
+    public static SpellDefinition BuildDefinition(
         Func<object, object> targetResolver,
         Majik.Core.Stack.Stack? stack)
     {
         ArgumentNullException.ThrowIfNull(targetResolver);
 
-        var unlessCost = ManaCost.Zero.AddGenericCost(UnlessPayGeneric);
+        var unlessCost = ManaCost.Zero.AddGenericCost(UnlessPayN);
 
         return new SpellDefinition(
             Modes: Array.Empty<string>(),
@@ -98,35 +95,28 @@ public static class SpellPierceFactory
                 return new IEffect[]
                 {
                     new Effect(
-                        "Spell Pierce — counter target noncreature spell unless its controller pays {2}",
+                        $"{CardName} — counter target noncreature spell unless its controller pays {{{UnlessPayN}}}",
                         () =>
                         {
                             if (stack == null || resolved is not ISpell spell) return;
 
-                            // CR 608.2b — resolution-time legality check.
-                            // The spell must still be a noncreature spell
-                            // (printed types or any type-changing effects
-                            // currently in play). If the target became a
-                            // creature between cast and resolution (rare
-                            // — Trickery-style copies into a token
-                            // creature; copies of cast spells stay
-                            // typed-as-card), it's illegal at resolve
-                            // and Spell Pierce does nothing (sole-target
-                            // fizzle).
+                            // CR 608.2b — if the target has become a
+                            // creature spell by resolution time, the effect
+                            // does nothing for it (mirrors NegateFactory).
                             if (spell.Card.HasType(CardType.Creature)) return;
 
-                            // CR 118.4 — "unless its controller pays
-                            // {2}". v1 auto-pays when able (same posture
-                            // as Mana Leak / Daze / Mystical Dispute).
+                            // CR 118.4 — if the target's controller has
+                            // {2} in their mana pool, they auto-pay (v1
+                            // auto-pay posture). Spell Pierce no-ops.
                             if (spell.Controller is not null
                                 && spell.Controller.PayMana(unlessCost))
                             {
                                 return;
                             }
 
-                            // CR 701.5 — counter the spell: remove from
-                            // stack, move card to its owner's graveyard.
-                            OracleSpellBinder.RemoveFromStack(stack, spell);
+                            // Otherwise: counter. CR 701.5 / CR 701.5b —
+                            // uncounterable spells survive the attempt.
+                            if (!OracleSpellBinder.RemoveFromStack(stack, spell)) return;
                             spell.Card.SetZone(ZoneType.Graveyard);
                         }),
                 };
