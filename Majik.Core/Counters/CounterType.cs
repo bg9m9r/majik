@@ -66,6 +66,18 @@ public sealed record CounterType(string Name)
     public static readonly CounterType Energy = new("Energy");
 
     /// <summary>
+    /// CR 122 — Quest counters. Card-specific marker used by the
+    /// "Ascension" enchantment cycle (Zendikar; Bloodchief Ascension,
+    /// Luminarch Ascension, …). Each Ascension's gated upkeep / end-step
+    /// trigger places one quest counter when its intervening-if latch
+    /// holds; the Ascension's payoff ability unlocks once it accumulates
+    /// the printed threshold (three for Bloodchief, four for Luminarch).
+    /// Engine-level semantics are opaque — the gameplay payoff each
+    /// Ascension grants is encoded by the corresponding factory.
+    /// </summary>
+    public static readonly CounterType Quest = new("Quest");
+
+    /// <summary>
     /// CR 122 — Stasis counters. Card-specific marker used by Static Prison
     /// (Modern Horizons 3). Static Prison's ETB places one stasis counter
     /// for each energy the controller has after gaining {E}{E}; while
