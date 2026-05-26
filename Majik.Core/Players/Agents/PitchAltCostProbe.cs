@@ -67,7 +67,16 @@ public sealed class PitchAltCostProbe : IAlternativeCostProbe
     /// Built-in lookup that recognizes the ship-list of named pitch cards by
     /// name. Wired by callers that don't have a richer per-card metadata
     /// source. Force of Will = blue, +1 life; Force of Negation = blue, 0 life;
-    /// Force of Vigor = green, 0 life; Force of Despair = black, 0 life.
+    /// Force of Vigor = green, 0 life; Force of Despair = black, 0 life;
+    /// Force of Rage = red, 0 life.
+    ///
+    /// Note: only cards whose printed pitch carries the Force-cycle
+    /// not-your-turn timing gate are surfaced here. Snapback / Pyrokinesis /
+    /// Soul Spike use the no-timing-gate
+    /// <see cref="Majik.Core.Costs.ExileColoredCardAlternativeCost"/> /
+    /// <see cref="Majik.Core.Costs.ExileTwoColoredCardsAlternativeCost"/>
+    /// primitives and so don't fit this probe's
+    /// <see cref="PitchAlternativeCost"/> shape.
     /// </summary>
     public static PitchDescriptor? DefaultLookup(ICard card)
     {
@@ -77,6 +86,7 @@ public sealed class PitchAltCostProbe : IAlternativeCostProbe
             "Force of Negation" => new PitchDescriptor(ManaColor.Blue, 0),
             "Force of Vigor" => new PitchDescriptor(ManaColor.Green, 0),
             "Force of Despair" => new PitchDescriptor(ManaColor.Black, 0),
+            "Force of Rage" => new PitchDescriptor(ManaColor.Red, 0),
             _ => null,
         };
     }

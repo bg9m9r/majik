@@ -401,15 +401,30 @@ public static class OracleSpellBinder
         // Creature path goes through CombatAbilities so layer-system
         // grants (CR 613.1f) are picked up; non-creature permanents
         // (Darksteel Citadel, The One Ring under its mark, etc.) fall
-        // back to the printed KeywordAbility marker.
+        // back to the printed KeywordAbility marker plus the
+        // IndestructibleGrantRegistry (Darksteel Forge's "Other artifacts
+        // you control have indestructible" grant).
         if (permanent is Creature creature)
         {
-            return Majik.Core.Combat.CombatAbilities.HasIndestructible(creature);
+            if (Majik.Core.Combat.CombatAbilities.HasIndestructible(creature))
+                return true;
+            // CR 702.12 — creatures granted indestructible by an external
+            // anthem (Darksteel Forge's "Other artifacts you control have
+            // indestructible." on an Artifact Creature) also resist
+            // destroy. CombatAbilities reads the layer system / printed
+            // keyword set; the registry covers grants that don't flow
+            // through ContinuousEffects.
+            return Majik.Core.Rules.IndestructibleGrantRegistry.HasGrantedIndestructible(creature);
         }
 
-        return permanent.Abilities
+        if (permanent.Abilities
             .OfType<Majik.Core.Abilities.KeywordAbility>()
-            .Any(k => string.Equals(k.Keyword, "Indestructible", StringComparison.OrdinalIgnoreCase));
+            .Any(k => string.Equals(k.Keyword, "Indestructible", StringComparison.OrdinalIgnoreCase)))
+        {
+            return true;
+        }
+
+        return Majik.Core.Rules.IndestructibleGrantRegistry.HasGrantedIndestructible(permanent);
     }
 
     /// <summary>
