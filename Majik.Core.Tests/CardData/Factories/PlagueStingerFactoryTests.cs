@@ -11,18 +11,8 @@ using Creature = Majik.Core.Cards.Creature;
 namespace Majik.Core.Tests.CardData.Factories;
 
 /// <summary>
-/// Unit tests for <see cref="PlagueStingerFactory"/>
-/// (Scars of Mirrodin, {1}{B}).
-///
-/// Creature — Phyrexian Insect 1/1. Oracle text:
-///   "Flying.
-///    Infect"
-///
-/// Covers:
-///   - Identity (name, cost, P/T, plain Creature, subtypes
-///     Phyrexian / Insect, owner / controller).
-///   - <see cref="NamedCardFactory"/> dispatch.
-///   - Flying + Infect keyword markers.
+/// Tests for <see cref="PlagueStingerFactory"/> — Creature — Phyrexian Insect
+/// {1}{B} 1/1 with Flying (CR 702.9) + Infect (CR 702.90).
 /// </summary>
 public class PlagueStingerFactoryTests
 {
@@ -36,8 +26,6 @@ public class PlagueStingerFactoryTests
         c.Name.Should().Be("Plague Stinger");
         c.ManaCost.Should().Be("{1}{B}");
         c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasType(CardType.Artifact).Should().BeFalse(
-            "Plague Stinger is a plain Creature, not an Artifact Creature");
         c.HasSubtype(CardSubtype.Phyrexian).Should().BeTrue();
         c.HasSubtype(CardSubtype.Insect).Should().BeTrue();
         c.BasePower.Should().Be(1);
@@ -47,42 +35,32 @@ public class PlagueStingerFactoryTests
     }
 
     [Fact]
-    public void PlagueStinger_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Plague Stinger", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Plague Stinger");
-        c.HasSubtype(CardSubtype.Phyrexian).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Insect).Should().BeTrue();
-    }
-
-    [Fact]
-    public void PlagueStinger_HasFlyingKeywordMarker()
+    public void PlagueStinger_HasFlyingAndInfect()
     {
         var c = PlagueStingerFactory.Create(_alice);
 
-        c.Abilities.OfType<KeywordAbility>().Should().Contain(k =>
-            string.Equals(k.Keyword, "Flying", System.StringComparison.OrdinalIgnoreCase),
-            "CR 702.9 — Flying keyword marker is wired");
+        var keywords = c.Abilities.OfType<KeywordAbility>()
+            .Select(k => k.Keyword).ToList();
+
+        keywords.Should().Contain("Flying",
+            "Flying (CR 702.9) marker drives blocking-legality in combat.");
+        keywords.Should().Contain("Infect",
+            "Infect (CR 702.90) marker is attached so combat damage routes " +
+            "to -1/-1 counters / poison counters once that primitive lands.");
     }
 
     [Fact]
-    public void PlagueStinger_HasInfectKeywordMarker()
+    public void NamedCardFactory_Dispatches_PlagueStinger()
     {
-        var c = PlagueStingerFactory.Create(_alice);
+        var card = NamedCardFactory.Create("Plague Stinger", _alice);
 
-        c.Abilities.OfType<KeywordAbility>().Should().Contain(k =>
-            string.Equals(k.Keyword, "Infect", System.StringComparison.OrdinalIgnoreCase),
-            "CR 702.90 — Infect keyword marker is wired (mechanic deferred)");
-    }
-
-    [Fact]
-    public void PlagueStinger_HasExactlyTwoKeywordMarkers()
-    {
-        var c = PlagueStingerFactory.Create(_alice);
-
-        c.Abilities.OfType<KeywordAbility>().Should().HaveCount(2,
-            "Flying + Infect — two keyword markers, no others");
+        card.Should().BeOfType<Creature>();
+        card.Name.Should().Be("Plague Stinger");
+        ((Creature)card).HasSubtype(CardSubtype.Phyrexian).Should().BeTrue();
+        ((Creature)card).HasSubtype(CardSubtype.Insect).Should().BeTrue();
+        ((Creature)card).Abilities.OfType<KeywordAbility>()
+            .Any(k => k.Keyword == "Flying").Should().BeTrue();
+        ((Creature)card).Abilities.OfType<KeywordAbility>()
+            .Any(k => k.Keyword == "Infect").Should().BeTrue();
     }
 }

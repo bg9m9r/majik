@@ -12,11 +12,16 @@ public enum CardSubtype
     Dryad,
     Dwarf,
     Phyrexian,
+    Germ,
     Elf,
     Goblin,
     Dragon,
     Angel,
     Demon,
+    /// <summary>Devil creature subtype — Mayhem Devil (War of the Spark),
+    /// Hellrider, Devil Token (Bedevil / Maelstrom Pulse adjacent printings).
+    /// CR 205.3m.</summary>
+    Devil,
     Zombie,
     Skeleton,
     Beast,
@@ -40,6 +45,10 @@ public enum CardSubtype
     Archer,
     Army,
     Advisor,
+    /// <summary>Noble creature subtype — Muxus, Goblin Grandee, Goblin
+    /// Trashmaster. CR 205.3m. Added to support Muxus's "Goblin Noble"
+    /// printed line; pairs naturally with the Goblin subtype.</summary>
+    Noble,
     /// <summary>Modern Horizons 2 incarnation cycle (Solitude, Endurance,
     /// Fury, Grief, Subtlety). CR 205.3m — creature subtype.</summary>
     Incarnation,
@@ -94,6 +103,9 @@ public enum CardSubtype
     /// <summary>Frog creature subtype — Psychic Frog, Sakura-Tribe Scout's
     /// sibling cycle. CR 205.3m.</summary>
     Frog,
+    /// <summary>Lizard creature subtype — Rapid Hybridization's 3/3 Frog
+    /// Lizard token (Gatecrash). CR 205.3m.</summary>
+    Lizard,
     /// <summary>Mutant creature subtype — Psychic Frog, Mutavault's
     /// changeling base type. CR 205.3m.</summary>
     Mutant,
@@ -182,6 +194,10 @@ public enum CardSubtype
     /// <summary>Berserker creature subtype — Bloodbraid Elf (Alara Reborn /
     /// Modern Horizons 2), Goblin Berserker, Lovisa Coldeyes. CR 205.3m.</summary>
     Berserker,
+    /// <summary>Kithkin creature subtype — Burrenton Forge-Tender (Lorwyn),
+    /// Goldmeadow Stalwart, Wizened Cenn. The Lorwyn / Shadowmoor halfling-
+    /// adjacent white lineage. CR 205.3m.</summary>
+    Kithkin,
     /// <summary>Ape creature subtype — Treetop Village (Urza's Legacy) animated
     /// form, Kird Ape (Arabian Nights / many reprints). CR 205.3m.</summary>
     Ape,
@@ -212,6 +228,10 @@ public enum CardSubtype
     /// Alara), Vedalken Shackles, Trinket Mage's adjacent Mirrodin /
     /// Alara blue-aligned artificer lineage. CR 205.3m.</summary>
     Vedalken,
+    /// <summary>Elder creature subtype — Atarka, World Render and the rest
+    /// of the Dragons of Tarkir Elder Dragon cycle, Etali, Primal Storm
+    /// (Elder Dinosaur), Nicol Bolas's pre-planeswalker printings. CR 205.3m.</summary>
+    Elder,
     /// <summary>Arcane spell subtype — Champions of Kamigawa block (Desperate
     /// Ritual, Goryo's Vengeance, Through the Breach, Glacial Ray, …). The
     /// only subtype that exists for instant / sorcery spells in the engine;
@@ -240,6 +260,11 @@ public enum CardSubtype
     Aura,
     Saga,
     Shrine,
+    /// <summary>Curse enchantment subtype — CR 205.3h. Aura subtype shared
+    /// by the Innistrad/Shadows-over-Innistrad Curse cycle (Trespasser's
+    /// Curse, Curse of Misfortunes, ...). Always paired with the
+    /// Enchantment type + Aura subtype.</summary>
+    Curse,
     /// <summary>Class enchantment subtype — CR 716. Multi-level enchantment
     /// shape (Stormchaser's Talent, Modern Horizons 3 and the Adventures in
     /// the Forgotten Realms cycle). CR 205.3h.</summary>
@@ -252,6 +277,10 @@ public enum CardSubtype
     Treasure,
     Clue,
     Construct,
+    /// <summary>Golem creature/artifact subtype — Sundering Titan, Wurmcoil
+    /// Engine, Triskelion. Almost always paired with the Artifact type.
+    /// CR 205.3g + CR 205.3m.</summary>
+    Golem,
     Blood,
     Powerstone,
     /// <summary>Myr creature/artifact subtype — Myr Enforcer, Myr Retriever,
@@ -262,11 +291,19 @@ public enum CardSubtype
     /// (Animation Module, Whirlermaker, Visionary Augmenter). Always paired
     /// with the Artifact type. CR 205.3g + CR 205.3m.</summary>
     Servo,
+    /// <summary>Pest creature subtype — Mirrodin Besieged's Signal Pest,
+    /// Strixhaven's Pest tokens. CR 205.3m.</summary>
+    Pest,
 
     // Eldrazi creature subtypes (CR 205.3m)
     Eldrazi,
     Spawn,
     Scion,
+
+    /// <summary>Spike creature subtype — Urza's Saga / Exodus cycle of
+    /// counter-shifting creatures (Spike Feeder, Spike Weaver, Spike
+    /// Tiller). CR 205.3m.</summary>
+    Spike,
 
     // Planeswalker subtypes (examples)
     Ajani,
@@ -275,6 +312,7 @@ public enum CardSubtype
     Grist,
     Jace,
     Liliana,
+    Narset,
     Garruk,
     Nissa,
     Teferi,
