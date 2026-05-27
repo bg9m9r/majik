@@ -98,6 +98,53 @@ public class MatchFacadeBridgeTests
     // LayerAgreementInvariantTests.ClockHolder_FollowsEngineActivePlayer.
     // -----------------------------------------------------------------------
 
+    // -----------------------------------------------------------------------
+    // AssertAgreement — dev/test guard. Always present + unit-testable;
+    // its CALL SITES are guarded to no-op in Release builds.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void AssertAgreement_ClockHolderMismatch_Throws()
+    {
+        var active = Guid.NewGuid();
+        var otherSeat = Guid.NewGuid();
+
+        var act = () => MatchFacadeBridge.AssertAgreement(
+            activePlayerId: active,
+            clockHolderSeatId: otherSeat,
+            wirePhase: "PreCombatMain");
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*clock holder*engine active player*");
+    }
+
+    [Fact]
+    public void AssertAgreement_RawMainPhase_Throws()
+    {
+        var seat = Guid.NewGuid();
+
+        var act = () => MatchFacadeBridge.AssertAgreement(
+            activePlayerId: seat,
+            clockHolderSeatId: seat,
+            wirePhase: "Main");
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*must be disambiguated*");
+    }
+
+    [Fact]
+    public void AssertAgreement_InAgreement_DoesNotThrow()
+    {
+        var seat = Guid.NewGuid();
+
+        var act = () => MatchFacadeBridge.AssertAgreement(
+            activePlayerId: seat,
+            clockHolderSeatId: seat,
+            wirePhase: "PostCombatMain");
+
+        act.Should().NotThrow();
+    }
+
     [Fact]
     public void ForwardEvent_NoActivePlayerChange_DoesNotFireClockHandoff()
     {

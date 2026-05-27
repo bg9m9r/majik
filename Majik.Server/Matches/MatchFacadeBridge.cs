@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 using Majik.Core.Api;
 using Majik.Core.Api.Dtos;
 using Microsoft.Extensions.Logging;
@@ -280,6 +281,17 @@ public sealed class MatchFacadeBridge
         // perturbs the live event broadcast.
         MaybeFireClockHandoff(matchId);
 
+        // Dev/test tripwire (compiled out in Release). The phase-vocabulary
+        // invariant is synchronous + authoritative (EventPayloadBuilder
+        // already disambiguated the label via PhaseLabelResolver), so it can
+        // be asserted in the live event path without spurious fires. The
+        // clock↔priority invariant is NOT asserted here: the clock handoff
+        // is fire-and-forget (a Mongo round-trip), so the server clock is
+        // only EVENTUALLY consistent with the engine's active player — a
+        // call site here would trip during the brief catch-up window. Pass
+        // the active player as both seat args so only the phase check runs.
+        AssertWirePhaseIfDebug(matchId, envelope.Public);
+
         try
         {
             if (envelope.PerPlayer == null)
@@ -380,6 +392,77 @@ public sealed class MatchFacadeBridge
     /// fired the handoff (vs. the holder lagging for another reason).</summary>
     internal int ClockHandoffFireCount => _clockHandoffFireCount;
     private int _clockHandoffFireCount;
+
+    /// <summary>
+    /// Debug-only call site for the phase-vocabulary invariant. Pulls the
+    /// disambiguated label off a PhaseStarted/StepStarted EventDto and feeds
+    /// it to <see cref="AssertAgreementIfDebug"/>; non-phase events and
+    /// payloads without a string label are skipped. Compiled out in Release.
+    /// activePlayerId is passed as BOTH seat args so the clock-holder branch
+    /// of AssertAgreement is a trivial pass — only the "Main" check runs
+    /// (the clock↔priority check would fire spuriously here; see ForwardEvent).
+    /// </summary>
+    [System.Diagnostics.Conditional("DEBUG")]
+    private void AssertWirePhaseIfDebug(Guid matchId, EventDto dto)
+    {
+        if (dto.Type is not ("PhaseStartedEvent" or "StepStartedEvent")) return;
+        var member = dto.Type == "PhaseStartedEvent" ? "phase" : "step";
+        if (dto.Payload.ValueKind != JsonValueKind.Object) return;
+        if (!dto.Payload.TryGetProperty(member, out var prop)) return;
+        if (prop.ValueKind != JsonValueKind.String) return;
+        var label = prop.GetString();
+        if (string.IsNullOrEmpty(label)) return;
+
+        // Resolve the current active player so the clock-holder branch is a
+        // no-op; if the facade is gone, skip (nothing to assert against).
+        Guid active;
+        if (!_attachments.TryGetValue(matchId, out var attachment)) return;
+        try { active = attachment.Facade.ActivePlayerId; }
+        catch { return; }
+
+        AssertAgreementIfDebug(active, active, label);
+    }
+
+    /// <summary>
+    /// Dev/test invariant guard. Throws <see cref="InvalidOperationException"/>
+    /// when the three load-bearing agreements (see docs/WIRE_CONTRACT.md)
+    /// are violated:
+    /// <list type="bullet">
+    ///   <item>clock holder seat ≠ engine active player (CR 117 / 103.7), or</item>
+    ///   <item>the wire phase is the raw, ambiguous "Main" (CR 505 — must be
+    ///         split into PreCombatMain / PostCombatMain).</item>
+    /// </list>
+    /// The METHOD is always present and unit-testable; its CALL SITES are
+    /// gated behind <see cref="AssertAgreementIfDebug"/> ([Conditional("DEBUG")])
+    /// so they compile out entirely in Release — the guard is a development
+    /// tripwire, never a production hot-path cost.
+    /// </summary>
+    public static void AssertAgreement(Guid activePlayerId, Guid clockHolderSeatId, string wirePhase)
+    {
+        if (clockHolderSeatId != activePlayerId)
+        {
+            throw new InvalidOperationException(
+                $"clock holder ({clockHolderSeatId}) != engine active player " +
+                $"({activePlayerId}) — the server clock must DERIVE its holder " +
+                "from the engine (CR 117 / 103.7).");
+        }
+
+        if (wirePhase == "Main")
+        {
+            throw new InvalidOperationException(
+                "wire phase \"Main\" must be disambiguated into PreCombatMain / " +
+                "PostCombatMain before it reaches the wire (CR 505).");
+        }
+    }
+
+    /// <summary>Debug-only thin wrapper over <see cref="AssertAgreement"/>.
+    /// The <c>[Conditional("DEBUG")]</c> attribute makes every CALL to this
+    /// method (and the evaluation of its arguments) disappear in Release,
+    /// so wiring it into the event path costs nothing in production while
+    /// still tripping on a violated invariant during dev/test runs.</summary>
+    [System.Diagnostics.Conditional("DEBUG")]
+    internal static void AssertAgreementIfDebug(Guid activePlayerId, Guid clockHolderSeatId, string wirePhase)
+        => AssertAgreement(activePlayerId, clockHolderSeatId, wirePhase);
 
     private async Task FireClockHandoffAsync(Guid matchId, string newHolderSub)
     {
