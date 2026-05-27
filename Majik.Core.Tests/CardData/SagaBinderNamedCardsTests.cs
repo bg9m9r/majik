@@ -54,12 +54,14 @@ public class SagaBinderNamedCardsTests
             .Where(c => c.IsToken)
             .ToList();
         tokens.Should().HaveCount(1);
-        // CR 111 — chapter I makes a 2/2 red Goblin creature token (not a
-        // Goblin Shaman; that's the back-face Reflection's creature type).
-        tokens[0].Name.Should().Be("Goblin");
+        // Scryfall-confirmed: chapter I creates a 2/2 red Goblin Shaman token
+        // (both subtypes). "Goblin Shaman" is the token name.
+        tokens[0].Name.Should().Be("Goblin Shaman");
         tokens[0].Power.Should().Be(2);
         tokens[0].Toughness.Should().Be(2);
         tokens[0].HasSubtype(CardSubtype.Goblin).Should().BeTrue();
+        tokens[0].HasSubtype(CardSubtype.Shaman).Should()
+            .BeTrue("Scryfall: the chapter I token is a Goblin Shaman, not just Goblin");
     }
 
     [Fact]
@@ -123,7 +125,7 @@ public class SagaBinderNamedCardsTests
 
         saga.SagaState!.AdvanceAndChapter();
         owner.Zones.Battlefield.GetCards().OfType<Creature>()
-            .Any(c => c.IsToken && c.Name == "Goblin")
-            .Should().BeTrue();
+            .Any(c => c.IsToken && c.Name == "Goblin Shaman")
+            .Should().BeTrue("chapter I token is a Goblin Shaman (Scryfall-confirmed)");
     }
 }

@@ -20,15 +20,18 @@ namespace Majik.Core.CardData.Factories;
 /// Fable of the Mirror-Breaker (Kamigawa: Neon Dynasty).
 ///
 /// Enchantment Creature — Goblin Shaman 2/2 (NOT legendary). Oracle text:
-///   "{1}{R}, {T}: Create a token that's a copy of another target
+///   "{1}, {T}: Create a token that's a copy of another target
 ///    nonlegendary creature you control. That token has haste. Sacrifice
 ///    it at the beginning of the next end step."
+///
+/// Scryfall-confirmed: the activation cost is <c>{1}, {T}</c> — one generic
+/// mana plus a tap. There is NO red pip in the activation cost.
 ///
 /// This is the Reflection-of-Kiki-Jiki re-skin of Kiki-Jiki, Mirror
 /// Breaker's printed ability — the copy mechanism is identical (CR 706.2
 /// snapshot + "except it has haste" + delayed end-step removal). The only
 /// printed differences are:
-///   - cost <c>{1}{R}, {T}</c> instead of bare <c>{T}</c>;
+///   - cost <c>{1}, {T}</c> instead of bare <c>{T}</c>;
 ///   - the spawned token is <b>sacrificed</b> (battlefield → graveyard,
 ///     CR 701.16) at the next end step rather than <b>exiled</b>;
 ///   - the card is a nonlegendary Enchantment Creature rather than a
@@ -63,7 +66,7 @@ public static class ReflectionOfKikiJikiFactory
 {
     public const string FrontName = "Fable of the Mirror-Breaker";
     public const string CardName = "Reflection of Kiki-Jiki";
-    public const string PrintedManaCost = "{1}{R}";
+    public const string PrintedManaCost = "{1}";
     public const int Power = 2;
     public const int Toughness = 2;
 
@@ -112,13 +115,14 @@ public static class ReflectionOfKikiJikiFactory
     }
 
     /// <summary>
-    /// Attach the "{1}{R}, {T}: create a haste token copy of another
+    /// Attach the "{1}, {T}: create a haste token copy of another
     /// target nonlegendary creature you control; sacrifice it at the
     /// next end step" activated ability. The copy body mirrors
     /// <see cref="KikiJikiMirrorBreakerFactory"/> verbatim — the only
-    /// behavioural differences vs. Kiki-Jiki are the added {1}{R} mana
-    /// cost and the end-step removal being a <b>sacrifice</b>
-    /// (battlefield → graveyard) rather than an exile.
+    /// behavioural differences vs. Kiki-Jiki are the added {1} mana
+    /// cost (one generic, no red pip — Scryfall-confirmed) and the
+    /// end-step removal being a <b>sacrifice</b> (battlefield →
+    /// graveyard) rather than an exile.
     /// </summary>
     public static void AddCopyAbility(
         Creature card,
