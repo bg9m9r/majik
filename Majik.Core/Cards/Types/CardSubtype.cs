@@ -23,6 +23,7 @@ public enum CardSubtype
     /// CR 205.3m.</summary>
     Devil,
     Zombie,
+    Skeleton,
     Beast,
     Bird,
     Cat,
@@ -276,6 +277,11 @@ public enum CardSubtype
     Treasure,
     Clue,
     Construct,
+    /// <summary>Assembly-Worker creature subtype — Mishra's Factory and the
+    /// Antiquities Assembly-Worker cycle. CR 205.3m. Engine spelling uses
+    /// the unhyphenated identifier; observable card text still reads
+    /// "Assembly-Worker".</summary>
+    AssemblyWorker,
     /// <summary>Golem creature/artifact subtype — Sundering Titan, Wurmcoil
     /// Engine, Triskelion. Almost always paired with the Artifact type.
     /// CR 205.3g + CR 205.3m.</summary>
@@ -319,5 +325,10 @@ public enum CardSubtype
     Ugin,
     Bolas,
     Wrenn,
-    Oko
+    Oko,
+
+    /// <summary>Homarid creature subtype — Hedron Crab, Homarid. CR 205.3m.
+    /// Crustacean-flavoured creature type that originated in Fallen Empires
+    /// and was reused by Zendikar's Hedron Crab.</summary>
+    Homarid
 }

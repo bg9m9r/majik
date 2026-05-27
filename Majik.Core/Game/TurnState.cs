@@ -44,6 +44,21 @@ public sealed class TurnState
     // landfall trigger.
     private readonly Dictionary<Guid, int> _landsEnteredByController = new();
 
+    // Per-player count of cards cycled this turn (CR 702.32). Driven by
+    // CardCycledEvent subscribers (TurnDriver). Read by Hollow One's
+    // self-cost-reduction reducer ("This spell costs {2} less to cast for
+    // each card you've cycled or discarded this turn").
+    private readonly Dictionary<Guid, int> _cyclesByPlayer = new();
+
+    // Per-player count of cards discarded this turn (CR 701.16). Driven by
+    // CardMovedEvent(Hand → Graveyard) subscribers (TurnDriver) — the
+    // discarder is the moved card's owner. Read by Hollow One's
+    // self-cost-reduction reducer alongside _cyclesByPlayer. Counts every
+    // hand → graveyard move, regardless of source (player discard, opponent-
+    // forced discard, "discard a card" cost payments — all qualify per CR
+    // 701.16a).
+    private readonly Dictionary<Guid, int> _discardsByPlayer = new();
+
     // Per-permanent set of references that entered the battlefield this turn.
     // Read by "creatures that entered the battlefield this turn" effects
     // (Force of Despair — CR 109.5 / CR 700.6) at spell resolution. Reference
@@ -257,6 +272,50 @@ public sealed class TurnState
         permanent != null && _permanentsEnteredThisTurn.Contains(permanent);
 
     /// <summary>
+    /// Called when <paramref name="player"/> cycles a card (CR 702.32).
+    /// Fed by <see cref="Majik.Core.Events.CardCycledEvent"/> subscribers
+    /// in <see cref="TurnDriver"/>. Read by Hollow One's self-cost-
+    /// reduction reducer ("for each card you've cycled or discarded this
+    /// turn").
+    /// </summary>
+    public void RecordCardCycled(Player? player)
+    {
+        if (player == null) return;
+        _cyclesByPlayer[player.Id] =
+            _cyclesByPlayer.GetValueOrDefault(player.Id) + 1;
+    }
+
+    /// <summary>
+    /// How many cards <paramref name="player"/> has cycled this turn.
+    /// </summary>
+    public int CyclesByPlayer(Player player) =>
+        player == null
+            ? 0
+            : _cyclesByPlayer.TryGetValue(player.Id, out var v) ? v : 0;
+
+    /// <summary>
+    /// Called when <paramref name="player"/> discards a card (CR 701.16).
+    /// Fed by <see cref="Majik.Core.Events.CardMovedEvent"/> Hand →
+    /// Graveyard subscribers in <see cref="TurnDriver"/> — discarder is
+    /// the moved card's owner. Read by Hollow One's self-cost-reduction
+    /// reducer alongside <see cref="RecordCardCycled"/>.
+    /// </summary>
+    public void RecordCardDiscarded(Player? player)
+    {
+        if (player == null) return;
+        _discardsByPlayer[player.Id] =
+            _discardsByPlayer.GetValueOrDefault(player.Id) + 1;
+    }
+
+    /// <summary>
+    /// How many cards <paramref name="player"/> has discarded this turn.
+    /// </summary>
+    public int DiscardsByPlayer(Player player) =>
+        player == null
+            ? 0
+            : _discardsByPlayer.TryGetValue(player.Id, out var v) ? v : 0;
+
+    /// <summary>
     /// Number of spells <paramref name="player"/> has cast this turn (CR 700.6
     /// per-turn tally). Read by Damping Sphere's "+{1} per other spell cast
     /// this turn" rider — cost calculation runs before the rider increments
@@ -302,6 +361,8 @@ public sealed class TurnState
         _spellsCastByPlayer.Clear();
         _landsEnteredByController.Clear();
         _permanentsEnteredThisTurn.Clear();
+        _cyclesByPlayer.Clear();
+        _discardsByPlayer.Clear();
         _permanentsToGraveyardByController.Clear();
     }
 }
