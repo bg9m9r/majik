@@ -1,0 +1,15 @@
+{
+  "name": "Commercial District",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "R" },
+    { "kind": "mana", "produces": "G" },
+    {
+      "kind": "triggered",
+      "trigger": { "type": "etb_self" },
+      "effects": [
+        { "type": "surveil_self", "amount": 1 }
+      ]
+    }
+  ]
+}

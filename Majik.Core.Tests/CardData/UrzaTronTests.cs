@@ -12,7 +12,8 @@ namespace Majik.Core.Tests.CardData;
 
 /// <summary>
 /// Unit tests for the Urza Tron land cycle — Urza's Mine, Urza's Tower,
-/// Urza's Power-Plant (Antiquities).
+/// Urza's Power Plant (Antiquities). (Card name has a space; only the land
+/// subtype is hyphenated, "Land — Urza's Power-Plant".)
 ///
 /// Each card has the same printed mana ability:
 ///   "{T}: Add {C}. If you control an Urza's Mine, an Urza's
@@ -76,7 +77,7 @@ public class UrzaTronTests
     {
         var land = UrzasPowerPlantFactory.Create(_alice);
 
-        land.Name.Should().Be("Urza's Power-Plant");
+        land.Name.Should().Be("Urza's Power Plant");
         land.HasType(CardType.Land).Should().BeTrue();
         land.Supertypes.Should().BeEmpty();
         land.HasSubtype(CardSubtype.Urzas).Should().BeTrue();
@@ -116,10 +117,10 @@ public class UrzaTronTests
     [Fact]
     public void UrzasPowerPlant_DispatchesViaNamedCardFactory()
     {
-        var card = NamedCardFactory.Create("Urza's Power-Plant", _alice);
+        var card = NamedCardFactory.Create("Urza's Power Plant", _alice);
 
         card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Urza's Power-Plant");
+        card.Name.Should().Be("Urza's Power Plant");
         card.HasSubtype(CardSubtype.Urzas).Should().BeTrue();
         card.HasSubtype(CardSubtype.PowerPlant).Should().BeTrue();
         card.Abilities.OfType<ManaAbility>().Should().HaveCount(1);
