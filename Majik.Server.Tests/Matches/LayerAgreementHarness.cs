@@ -270,13 +270,33 @@ public sealed class LayerAgreementHarness : IDisposable
             ?? throw new InvalidOperationException(
                 $"ServerGameFactory has no facade for GameId={gameId}.");
 
-        return new LayerAgreementHarness(
+        var harness = new LayerAgreementHarness(
             factory, creatorClient, published, created.Id, gameId, facade, creatorSub, botSub);
+
+        // Clear the opening-hand mulligan gate so subsequent
+        // AdvanceByPassAsync calls actually walk the turn through phases.
+        // The bot seat keeps on its own (in-process agent); the human seat
+        // keeps via a MulliganCommand on the /commands endpoint. CR 103.4.
+        await harness.KeepOpeningHandAsync();
+
+        return harness;
     }
 
     // -----------------------------------------------------------------------
     // Drive
     // -----------------------------------------------------------------------
+
+    /// <summary>Keep the creator's opening hand (MulliganCommand keep=true)
+    /// so the engine leaves the CR 103.4 mulligan gate and starts turn 1.
+    /// The bot seat keeps on its own. Idempotent / tolerant: a non-success
+    /// just means the engine wasn't awaiting a mulligan from this seat.</summary>
+    public async Task KeepOpeningHandAsync()
+    {
+        var resp = await _creatorClient.PostAsJsonAsync(
+            $"/matches/{MatchId}/commands",
+            new Dictionary<string, object> { ["$type"] = "mulligan", ["keep"] = true });
+        _ = resp;
+    }
 
     /// <summary>POST a PassPriorityCommand for <paramref name="sub"/> via the
     /// /commands endpoint (the same path the gameplay tests use). The
