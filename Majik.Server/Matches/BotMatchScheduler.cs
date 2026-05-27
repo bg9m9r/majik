@@ -98,6 +98,14 @@ public sealed class BotMatchScheduler : IBotMatchScheduler
                     "Bot play/draw callback faulted. MatchId={MatchId} BotSub={BotSub}",
                     matchId, botSub);
             }
+            finally
+            {
+                // Evict the dedup entry so this match doesn't accumulate in
+                // _playDrawScheduled for the process lifetime. The guard window
+                // covers the in-flight scheduling; after the callback fires (or
+                // faults), a duplicate can no longer arrive.
+                _playDrawScheduled.TryRemove(matchId, out _);
+            }
         });
     }
 }
