@@ -38,11 +38,14 @@ public static class MatchRegistration
                 sp.GetRequiredService<IMatchHubPublisher>(),
                 sp.GetRequiredService<ILogger<MatchFacadeBridge>>(),
                 sp.GetService<MatchReplayBuffer>(),
-                onActivePlayerChanged: async (matchId, newHolderSub, ct) =>
+                onActivePlayerChanged: async (matchId, newHolderSub, expectedPrevHolderSub, ct) =>
                 {
                     using var scope = sp.CreateScope();
                     var svc = scope.ServiceProvider.GetRequiredService<MatchService>();
-                    await svc.OnPriorityPassedAsync(matchId, newHolderSub, ct);
+                    // expectedPrevHolderSub threads the prior holder through as a
+                    // compare-and-swap guard so out-of-order handoffs can't
+                    // double-bill the same seat (C1).
+                    await svc.OnPriorityPassedAsync(matchId, newHolderSub, ct, expectedPrevHolderSub);
                 }));
         // Bot-match scheduler: drives the bot's roll + play/draw follow-up
         // with brief delays so the SignalR-fed UI lingers on Rolling long

@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
-using System.Text.Json;
 using Majik.Core.Api;
 using Majik.Core.Api.Dtos;
 using Microsoft.Extensions.Logging;
@@ -64,7 +63,16 @@ public sealed class MatchFacadeBridge
     /// so the server clock holder always DERIVES from the engine's active
     /// player instead of staying frozen at the play/draw first player.
     /// </summary>
-    public delegate Task ClockHandoffCallback(Guid matchId, string newHolderSub, CancellationToken ct);
+    /// <param name="expectedPrevHolderSub">
+    /// The holder sub the bridge believes currently owns the clock (mapped
+    /// from the engine's PREVIOUS active player). Threaded through so the
+    /// clock update can be a compare-and-swap on the prior holder — two
+    /// out-of-order handoffs can't both bill the same prior holder (C1).
+    /// Null on the very first genuine handoff if the prior seat is
+    /// unmappable.
+    /// </param>
+    public delegate Task ClockHandoffCallback(
+        Guid matchId, string newHolderSub, string? expectedPrevHolderSub, CancellationToken ct);
 
     private readonly IMatchHubPublisher _hub;
     private readonly ILogger<MatchFacadeBridge> _logger;
@@ -138,11 +146,16 @@ public sealed class MatchFacadeBridge
         IDisposable eventSub = facade.SubscribeEnvelopes(env => ForwardEvent(matchId, env, routing));
         IDisposable promptSub = facade.SubscribePrompts(prompt => ForwardPrompt(matchId, prompt, routing));
 
-        // Seed the clock-handoff tracker with the facade's CURRENT active
-        // player so the very first TurnStartedEvent (turn 1) doesn't get
-        // mistaken for a handoff — PlayDrawAsync already set the holder to
-        // the play/draw first player, which equals the turn-1 active player.
-        var attachment = new Attachment(eventSub, promptSub, facade, routing, facade.ActivePlayerId);
+        // The clock-handoff tracker starts UNSEEDED: the active player at
+        // Attach is always Alice (the facade is created before
+        // StartFullGameAsync picks who goes first), so seeding from it here
+        // would be wrong whenever Bob goes first (draw case / bot wins the
+        // roll) — the turn-1 TurnStartedEvent would then look like a Bob→Bob
+        // change and burn a spurious slice off the correct first player. We
+        // instead seed lazily on the FIRST observed active player (no handoff
+        // on the very first turn-start) so the real first player is captured
+        // from the engine, not guessed (I2).
+        var attachment = new Attachment(eventSub, promptSub, facade, routing);
         if (!_attachments.TryAdd(matchId, attachment))
         {
             // Lost the race against another Attach for the same matchId —
@@ -281,16 +294,17 @@ public sealed class MatchFacadeBridge
         // perturbs the live event broadcast.
         MaybeFireClockHandoff(matchId);
 
-        // Dev/test tripwire (compiled out in Release). The phase-vocabulary
-        // invariant is synchronous + authoritative (EventPayloadBuilder
-        // already disambiguated the label via PhaseLabelResolver), so it can
-        // be asserted in the live event path without spurious fires. The
-        // clock↔priority invariant is NOT asserted here: the clock handoff
-        // is fire-and-forget (a Mongo round-trip), so the server clock is
-        // only EVENTUALLY consistent with the engine's active player — a
-        // call site here would trip during the brief catch-up window. Pass
-        // the active player as both seat args so only the phase check runs.
-        AssertWirePhaseIfDebug(matchId, envelope.Public);
+        // NOTE: there is intentionally NO live-path phase-vocabulary tripwire
+        // here. ForwardEvent runs as a SubscribeAll handler, which the engine
+        // dispatches through EventBus.SafeInvoke — that catches every handler
+        // exception and routes it to the (unwired) OnHandlerError sink, so a
+        // throw from this method would be silently swallowed and never trip.
+        // The phase-vocabulary invariant (raw CR 505 "Main" must never reach
+        // the wire) is instead asserted directly by the harness test
+        // LayerAgreementInvariantTests.PhaseVocabulary_NeverRawMain, which
+        // inspects the captured wire payloads. AssertAgreement remains a
+        // unit-tested guard (MatchFacadeBridgeTests); it just has no live
+        // call site that would mislead readers into thinking it self-trips.
 
         try
         {
@@ -373,55 +387,37 @@ public sealed class MatchFacadeBridge
         // events for the same match don't double-fire the handoff for one
         // active-player change. (Guid has no Interlocked.Exchange overload,
         // and the engine dispatches a game's events on one thread anyway —
-        // a short lock is both correct and cheap.)
-        if (!attachment.TryClaimActivePlayerChange(current)) return;
+        // a short lock is both correct and cheap.) The FIRST observation
+        // only seeds the tracker (no handoff) so the genuine first player —
+        // whoever the engine actually chose — is captured rather than the
+        // Alice-at-Attach guess (I2).
+        if (!attachment.TryClaimActivePlayerChange(current, out var prevActivePlayer)) return;
 
-        // Map engine active-player id → holder sub (Alice = creator,
-        // Bob = opponent). An unmappable id (shouldn't happen) is ignored.
-        string? newHolderSub =
-            current == attachment.Routing.AliceId ? attachment.Routing.CreatorSub
-            : current == attachment.Routing.BobId ? attachment.Routing.OpponentSub
-            : null;
+        // Map engine active-player ids → holder subs (Alice = creator,
+        // Bob = opponent). An unmappable NEW id (shouldn't happen) is ignored;
+        // an unmappable PREV id just means the CAS expectation is null.
+        string? newHolderSub = MapSeatToSub(attachment.Routing, current);
         if (newHolderSub == null) return;
 
-        _ = FireClockHandoffAsync(matchId, newHolderSub);
+        // The holder the engine is moving AWAY from — threaded to the
+        // callback so the clock update is a compare-and-swap on it (C1).
+        string? expectedPrevHolderSub = MapSeatToSub(attachment.Routing, prevActivePlayer);
+
+        _ = FireClockHandoffAsync(matchId, newHolderSub, expectedPrevHolderSub);
     }
+
+    /// <summary>Map an engine seat id → holder sub (Alice = creator,
+    /// Bob = opponent). Returns null for an unmappable id.</summary>
+    private static string? MapSeatToSub(PromptRouting routing, Guid seatId) =>
+        seatId == routing.AliceId ? routing.CreatorSub
+        : seatId == routing.BobId ? routing.OpponentSub
+        : null;
 
     /// <summary>Visible for tests — number of times the clock-handoff
     /// callback has been invoked. Lets a test assert the bridge actually
     /// fired the handoff (vs. the holder lagging for another reason).</summary>
     internal int ClockHandoffFireCount => _clockHandoffFireCount;
     private int _clockHandoffFireCount;
-
-    /// <summary>
-    /// Debug-only call site for the phase-vocabulary invariant. Pulls the
-    /// disambiguated label off a PhaseStarted/StepStarted EventDto and feeds
-    /// it to <see cref="AssertAgreementIfDebug"/>; non-phase events and
-    /// payloads without a string label are skipped. Compiled out in Release.
-    /// activePlayerId is passed as BOTH seat args so the clock-holder branch
-    /// of AssertAgreement is a trivial pass — only the "Main" check runs
-    /// (the clock↔priority check would fire spuriously here; see ForwardEvent).
-    /// </summary>
-    [System.Diagnostics.Conditional("DEBUG")]
-    private void AssertWirePhaseIfDebug(Guid matchId, EventDto dto)
-    {
-        if (dto.Type is not ("PhaseStartedEvent" or "StepStartedEvent")) return;
-        var member = dto.Type == "PhaseStartedEvent" ? "phase" : "step";
-        if (dto.Payload.ValueKind != JsonValueKind.Object) return;
-        if (!dto.Payload.TryGetProperty(member, out var prop)) return;
-        if (prop.ValueKind != JsonValueKind.String) return;
-        var label = prop.GetString();
-        if (string.IsNullOrEmpty(label)) return;
-
-        // Resolve the current active player so the clock-holder branch is a
-        // no-op; if the facade is gone, skip (nothing to assert against).
-        Guid active;
-        if (!_attachments.TryGetValue(matchId, out var attachment)) return;
-        try { active = attachment.Facade.ActivePlayerId; }
-        catch { return; }
-
-        AssertAgreementIfDebug(active, active, label);
-    }
 
     /// <summary>
     /// Dev/test invariant guard. Throws <see cref="InvalidOperationException"/>
@@ -464,20 +460,20 @@ public sealed class MatchFacadeBridge
     internal static void AssertAgreementIfDebug(Guid activePlayerId, Guid clockHolderSeatId, string wirePhase)
         => AssertAgreement(activePlayerId, clockHolderSeatId, wirePhase);
 
-    private async Task FireClockHandoffAsync(Guid matchId, string newHolderSub)
+    private async Task FireClockHandoffAsync(Guid matchId, string newHolderSub, string? expectedPrevHolderSub)
     {
         Interlocked.Increment(ref _clockHandoffFireCount);
         try
         {
-            await _onActivePlayerChanged!(matchId, newHolderSub, CancellationToken.None)
+            await _onActivePlayerChanged!(matchId, newHolderSub, expectedPrevHolderSub, CancellationToken.None)
                 .ConfigureAwait(false);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex,
                 "MatchFacadeBridge: clock-handoff callback faulted. " +
-                "MatchId={MatchId} NewHolderSub={NewHolderSub}",
-                matchId, newHolderSub);
+                "MatchId={MatchId} NewHolderSub={NewHolderSub} ExpectedPrev={ExpectedPrev}",
+                matchId, newHolderSub, expectedPrevHolderSub);
         }
     }
 
@@ -566,38 +562,50 @@ public sealed class MatchFacadeBridge
         /// <summary>Engine seat ids ↔ subs, captured at Attach.</summary>
         public PromptRouting Routing { get; }
 
-        // Last active-player id we fired a clock handoff for. Seeded with
-        // the facade's current active player at Attach so the turn-1
-        // TurnStartedEvent (which equals the play/draw first player) doesn't
-        // spuriously re-fire the handoff. Guarded by _activePlayerGate.
+        // Last active-player id we fired a clock handoff for. UNSEEDED (null)
+        // until the first observed active player: the facade's active player
+        // at Attach is always Alice (the facade exists before the engine
+        // chooses who goes first), so seeding from it would mis-fire whenever
+        // Bob goes first. Seeding lazily from the first observation captures
+        // the engine's real first player and suppresses a turn-1 handoff (I2).
+        // Guarded by _activePlayerGate.
         private readonly object _activePlayerGate = new();
-        private Guid _lastActivePlayerId;
+        private Guid? _lastActivePlayerId;
 
         public Attachment(
             IDisposable eventSub,
             IDisposable promptSub,
             GameFacade facade,
-            PromptRouting routing,
-            Guid initialActivePlayerId)
+            PromptRouting routing)
         {
             _eventSub = eventSub;
             _promptSub = promptSub;
             Facade = facade;
             Routing = routing;
-            _lastActivePlayerId = initialActivePlayerId;
         }
 
         /// <summary>Atomically test-and-set the last-seen active player.
-        /// Returns true (claiming the transition) only when
-        /// <paramref name="current"/> differs from the last value — so a
-        /// burst of events that all observe the same active player fires
-        /// the handoff at most once.</summary>
-        public bool TryClaimActivePlayerChange(Guid current)
+        /// Returns true (claiming a genuine transition) only when the tracker
+        /// was already seeded AND <paramref name="current"/> differs from the
+        /// last value — so a burst of events that all observe the same active
+        /// player fires the handoff at most once, AND the very first
+        /// observation only seeds (no handoff) so the engine's actual first
+        /// player is captured rather than guessed (I2). On a claimed
+        /// transition <paramref name="prevActivePlayer"/> is the seat we moved
+        /// away from (used by the caller as the clock CAS expectation).</summary>
+        public bool TryClaimActivePlayerChange(Guid current, out Guid prevActivePlayer)
         {
             lock (_activePlayerGate)
             {
-                if (_lastActivePlayerId == current) return false;
+                var prev = _lastActivePlayerId;
                 _lastActivePlayerId = current;
+                if (prev == null || prev.Value == current)
+                {
+                    // First observation (seed only) or no change → no handoff.
+                    prevActivePlayer = current;
+                    return false;
+                }
+                prevActivePlayer = prev.Value;
                 return true;
             }
         }

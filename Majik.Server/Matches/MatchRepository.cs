@@ -75,6 +75,33 @@ public sealed class MatchRepository
         return result.MatchedCount > 0;
     }
 
+    /// <summary>
+    /// Compare-and-swap variant that additionally filters on the expected
+    /// current <see cref="Match.PriorityHolderSub"/>. Used by the clock
+    /// handoff (<c>MatchService.OnPriorityPassedAsync</c>) so two rapid,
+    /// out-of-order handoffs (A→B then B→A on fast turn cycling /
+    /// bot-vs-bot) can't both read the same prior holder and double-bill or
+    /// drop a transition: only the update whose <paramref name="expectedPriorityHolderSub"/>
+    /// still matches the stored value wins; the loser matches nothing and
+    /// returns false. A null expectation matches a stored null holder.
+    /// </summary>
+    public async Task<bool> TryAtomicUpdateWithHolderAsync(
+        Guid id,
+        MatchState expectedState,
+        string? expectedPriorityHolderSub,
+        UpdateDefinition<Match> update,
+        CancellationToken ct)
+    {
+        var result = await _collection.UpdateOneAsync(
+            Builders<Match>.Filter.Where(x =>
+                x.Id == id
+                && x.State == expectedState
+                && x.PriorityHolderSub == expectedPriorityHolderSub),
+            update,
+            cancellationToken: ct);
+        return result.MatchedCount > 0;
+    }
+
     public Task<long> DeleteByIdAsync(Guid id, CancellationToken ct)
     {
         return _collection.DeleteOneAsync(x => x.Id == id, ct)

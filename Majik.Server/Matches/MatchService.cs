@@ -810,15 +810,40 @@ public sealed class MatchService
     // OnPriorityPassedAsync — decrement previous holder's clock
     // -----------------------------------------------------------------------
 
-    public async Task OnPriorityPassedAsync(Guid matchId, string newHolderSub, CancellationToken ct)
+    /// <param name="expectedPrevHolderSub">
+    /// The prior priority-holder sub the caller observed when it decided to
+    /// hand off. Threaded through as a compare-and-swap guard: if the stored
+    /// holder no longer equals this value (a concurrent / out-of-order handoff
+    /// already moved it — e.g. A→B then B→A on fast turn cycling), the update
+    /// no-ops so the same elapsed slice can't be billed twice or a transition
+    /// dropped. Pass null to opt out of the CAS (legacy callers / direct
+    /// tests); the method then falls back to the stored holder as before.
+    /// </param>
+    public async Task OnPriorityPassedAsync(
+        Guid matchId, string newHolderSub, CancellationToken ct, string? expectedPrevHolderSub = null)
     {
         var match = await _matches.GetByIdAsync(matchId, ct);
         if (match == null || match.State != MatchState.Playing) return;
         if (match.PriorityHolderSub == null || match.PriorityStartedAt == null) return;
 
+        var prevSub = match.PriorityHolderSub;
+
+        // CAS guard: if the caller named the holder it expected to displace
+        // and the engine has since moved past it, this handoff is stale —
+        // drop it rather than re-bill the already-rotated holder (C1). The
+        // authoritative re-check still happens in the atomic update below;
+        // this early-out just saves a wasted round-trip on the common miss.
+        if (expectedPrevHolderSub != null && prevSub != expectedPrevHolderSub)
+        {
+            _logger?.LogDebug(
+                "OnPriorityPassedAsync: stale handoff ignored. MatchId={MatchId} " +
+                "ExpectedPrev={ExpectedPrev} StoredHolder={StoredHolder} NewHolder={NewHolder}",
+                matchId, expectedPrevHolderSub, prevSub, newHolderSub);
+            return;
+        }
+
         var now = _clock.UtcNow;
         var elapsed = (long)(now - match.PriorityStartedAt.Value).TotalMilliseconds;
-        var prevSub = match.PriorityHolderSub;
         var stored = prevSub == match.Creator.Sub ? match.CreatorMillisRemaining
                    : prevSub == match.Opponent?.Sub ? match.OpponentMillisRemaining
                    : 0;
@@ -836,7 +861,13 @@ public sealed class MatchService
             .Set(m => m.PriorityStartedAt, now)
             .Set(m => m.UpdatedAt, now);
 
-        var moved = await _matches.TryAtomicUpdateAsync(matchId, MatchState.Playing, update, ct);
+        // Atomic compare-and-swap on the prior holder (NOT just Id+State).
+        // Two rapid handoffs that both read the same prior holder will now
+        // serialize: the first flips PriorityHolderSub, the second's filter
+        // (PriorityHolderSub == prevSub) no longer matches and it no-ops —
+        // no double-bill, no dropped transition (C1).
+        var moved = await _matches.TryAtomicUpdateWithHolderAsync(
+            matchId, MatchState.Playing, prevSub, update, ct);
         if (!moved) return;
 
         var fresh = (await _matches.GetByIdAsync(matchId, ct))!;

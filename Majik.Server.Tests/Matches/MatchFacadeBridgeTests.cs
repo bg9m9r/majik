@@ -152,7 +152,7 @@ public class MatchFacadeBridgeTests
         var fired = new List<string>();
         var bridge = new MatchFacadeBridge(
             hub, NullLogger<MatchFacadeBridge>.Instance, replay: null,
-            onActivePlayerChanged: (_, sub, _) => { fired.Add(sub); return Task.CompletedTask; });
+            onActivePlayerChanged: (_, sub, _, _) => { fired.Add(sub); return Task.CompletedTask; });
 
         var facade = BuildInertFacade(); // active player stays at Alice (seed)
         var matchId = Guid.NewGuid();
