@@ -26,6 +26,18 @@ public class GameFacadeTests
     }
 
     [Fact]
+    public void ActivePlayerId_BeforeAnyTurn_DefaultsToAlice()
+    {
+        // CR 103.7 — before the engine has emitted a TurnStartedEvent the
+        // facade has no tracked active player. The accessor must fall back
+        // to Alice (the creator seat) so the server clock + wire contract
+        // always have a non-empty active-player id to derive from.
+        var facade = GameFacade.Create("Alice", "Bob", Array.Empty<ICard>(), Array.Empty<ICard>());
+
+        facade.ActivePlayerId.Should().Be(facade.Alice.Id);
+    }
+
+    [Fact]
     public async Task PassPriorityCommand_FromBothPlayers_DrainsPriorityRound()
     {
         var facade = GameFacade.Create("Alice", "Bob", Array.Empty<ICard>(), Array.Empty<ICard>());
