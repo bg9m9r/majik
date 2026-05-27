@@ -20,15 +20,16 @@ namespace Majik.Core.Tests.CardData;
 /// (Kamigawa: Neon Dynasty, {2}{R}). Transforming Saga.
 ///
 /// Front — Enchantment — Saga:
-///   I   — Create a 2/2 red Goblin creature token with "Whenever this
-///         creature attacks, create a Treasure token."
+///   I   — Create a 2/2 red Goblin Shaman creature token with "Whenever
+///         this creature attacks, create a Treasure token."
 ///   II  — You may discard up to two cards, then draw that many cards.
 ///   III — Exile this Saga, then return it transformed (Reflection of
 ///         Kiki-Jiki).
 /// Back — Reflection of Kiki-Jiki, Enchantment Creature — Goblin Shaman 2/2:
-///   "{1}{R}, {T}: Create a token that's a copy of another target
+///   "{1}, {T}: Create a token that's a copy of another target
 ///    nonlegendary creature you control. That token has haste. Sacrifice
 ///    it at the beginning of the next end step."
+/// (Scryfall-confirmed: activation cost is {1} generic only, no red pip.)
 /// </summary>
 public class FableOfTheMirrorBreakerTests
 {
@@ -93,6 +94,8 @@ public class FableOfTheMirrorBreakerTests
         goblin.BasePower.Should().Be(2);
         goblin.BaseToughness.Should().Be(2);
         goblin.HasSubtype(CardSubtype.Goblin).Should().BeTrue();
+        goblin.HasSubtype(CardSubtype.Shaman).Should()
+            .BeTrue("Scryfall: chapter I creates a 2/2 red Goblin Shaman token");
         Majik.Core.Cards.CardColors.GetColors(goblin)
             .Should().Contain(ManaColor.Red);
     }
@@ -214,7 +217,8 @@ public class FableOfTheMirrorBreakerTests
     }
 
     // -----------------------------------------------------------------------
-    // Back face — Reflection of Kiki-Jiki {1}{R},{T} copy ability
+    // Back face — Reflection of Kiki-Jiki {1},{T} copy ability
+    // (Scryfall-confirmed: activation is {1} generic + {T}, NOT {1}{R} + {T})
     // -----------------------------------------------------------------------
 
     [Fact]
@@ -245,9 +249,22 @@ public class FableOfTheMirrorBreakerTests
         ability.TargetRequests[0].MinTargets.Should().Be(1);
         ability.TargetRequests[0].MaxTargets.Should().Be(1);
 
-        // Cost includes a mana component {1}{R} plus a tap.
-        ability.Costs.OfType<Majik.Core.Costs.ManaCostCost>().Should()
-            .ContainSingle("the printed activation costs {1}{R}");
+        // Cost includes a mana component {1} (one generic, NO red pip) plus a tap.
+        // Scryfall oracle: "{1}, {T}: Create a token..." — not {1}{R}.
+        var manaCost = ability.Costs.OfType<Majik.Core.Costs.ManaCostCost>()
+            .Should().ContainSingle("the printed activation costs {1} generic + {T}").Which;
+        manaCost.Cost.TotalValue.Should().Be(1,
+            "activation mana value is 1 (one generic), not 2 (which {1}{R} would give)");
+        manaCost.Cost.Red.Should().Be(0,
+            "Scryfall confirms no red pip in Reflection's activation cost");
+    }
+
+    [Fact]
+    public void Reflection_PrintedManaCost_IsOneGeneric_NotRedPipGated()
+    {
+        // Scryfall: Reflection of Kiki-Jiki activates for {1},{T} (no red pip).
+        ReflectionOfKikiJikiFactory.PrintedManaCost.Should().Be("{1}",
+            "Scryfall oracle text: activation cost is {1},{T}, no red pip");
     }
 
     [Fact]

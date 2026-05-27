@@ -37,7 +37,7 @@ namespace Majik.Core.CardData;
 ///     oracle, so <see cref="OracleManaBinder"/> wires it on the
 ///     production load path; the named-card factory wires it inline.
 ///   - Fable of the Mirror-Breaker (// Reflection of Kiki-Jiki): I →
-///     spawn a 2/2 red Goblin token whose attack trigger creates a
+///     spawn a 2/2 red Goblin Shaman token whose attack trigger creates a
 ///     Treasure (CR 508.1f / 111.10), wired live when a TriggerManager
 ///     is supplied; II → "you may discard up to two, then draw that many"
 ///     (count chosen via the supplied chooser; default rummages maximally);
@@ -186,8 +186,8 @@ public static class SagaBinder
 
     /// <summary>
     /// Fable of the Mirror-Breaker (NEO, {2}{R}) // Reflection of Kiki-Jiki.
-    /// I — Create a 2/2 red Goblin creature token with "Whenever this
-    ///     creature attacks, create a Treasure token." The token's attack
+    /// I — Create a 2/2 red Goblin Shaman creature token with "Whenever
+    ///     this creature attacks, create a Treasure token." The token's attack
     ///     trigger is wired live when a <paramref name="triggers"/> manager
     ///     is supplied; the Treasure is minted via
     ///     <see cref="Majik.Core.Tokens.TokenFactory.CreateTreasure"/>.
@@ -227,9 +227,10 @@ public static class SagaBinder
     };
 
     /// <summary>
-    /// Fable chapter I — CR 111 / 111.6. Create a 2/2 red Goblin creature
-    /// token with "Whenever this creature attacks, create a Treasure
-    /// token." (CR 508.1f). The attack trigger is attached to the token and
+    /// Fable chapter I — CR 111 / 111.6. Create a 2/2 red Goblin Shaman
+    /// creature token with "Whenever this creature attacks, create a Treasure
+    /// token." (CR 508.1f). Scryfall-confirmed: the token has BOTH subtypes
+    /// Goblin AND Shaman. The attack trigger is attached to the token and
     /// registered with the supplied <paramref name="triggers"/> manager so
     /// a <see cref="Majik.Core.Domain.DomainEvents.CreatureAttacksEvent"/>
     /// for the token queues the Treasure-creation ability (no-op wiring
@@ -243,10 +244,10 @@ public static class SagaBinder
     {
         var goblin = Majik.Core.Tokens.TokenFactory.CreateOnBattlefield(
             new Majik.Core.Tokens.TokenFactory.TokenSpec(
-                Name: "Goblin",
+                Name: "Goblin Shaman",
                 Power: 2,
                 Toughness: 2,
-                Subtypes: new[] { CardSubtype.Goblin },
+                Subtypes: new[] { CardSubtype.Goblin, CardSubtype.Shaman },
                 Keywords: null,
                 Colors: new[] { ManaColor.Red }),
             controller,

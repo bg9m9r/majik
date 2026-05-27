@@ -18,8 +18,8 @@ namespace Majik.Core.CardData.Factories;
 /// Enchantment — Saga. Oracle text:
 ///   "(As this Saga enters and after your draw step, add a lore counter.
 ///     Sacrifice after III.)
-///   I   — Create a 2/2 red Goblin creature token with 'Whenever this
-///         creature attacks, create a Treasure token.'
+///   I   — Create a 2/2 red Goblin Shaman creature token with 'Whenever
+///         this creature attacks, create a Treasure token.'
 ///   II  — You may discard up to two cards, then draw that many cards.
 ///   III — Exile this Saga, then return it to the battlefield transformed."
 ///
@@ -31,7 +31,7 @@ namespace Majik.Core.CardData.Factories;
 ///   target is observable (CR 712).
 /// - Chapter handlers bound through <see cref="SagaBinder.Bind"/> (the
 ///   Fable branch) — the same path the Scryfall production load takes:
-///     * <b>I</b> — create a 2/2 red Goblin token whose attack trigger
+///     * <b>I</b> — create a 2/2 red Goblin Shaman token whose attack trigger
 ///       (CR 508.1f) creates a Treasure (CR 111.10) via
 ///       <see cref="Majik.Core.Tokens.TokenFactory"/>; the trigger is
 ///       wired live when a <see cref="TriggerManager"/> is supplied.
@@ -133,7 +133,7 @@ public static class FableOfTheMirrorBreakerFactory
     /// chapter parser (final chapter III).</summary>
     private const string OracleText =
         "(As this Saga enters and after your draw step, add a lore counter. Sacrifice after III.)\n" +
-        "I — Create a 2/2 red Goblin creature token with \"Whenever this creature attacks, create a Treasure token.\"\n" +
+        "I — Create a 2/2 red Goblin Shaman creature token with \"Whenever this creature attacks, create a Treasure token.\"\n" +
         "II — You may discard up to two cards, then draw that many cards.\n" +
         "III — Exile this Saga, then return it to the battlefield transformed.";
 }
