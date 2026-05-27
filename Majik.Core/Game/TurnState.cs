@@ -53,6 +53,19 @@ public sealed class TurnState
     // re-ETB; see RecordPermanentEnteredBattlefield).
     private readonly HashSet<Permanent> _permanentsEnteredThisTurn = new();
 
+    // Per-controller set of permanent CARDS that moved Battlefield → Graveyard
+    // this turn. Read by Faith's Reward (CR 121 — "return all permanent cards
+    // in your graveyard that were put there from the battlefield this turn")
+    // at spell resolution. Reference equality keyed on the card object so a
+    // creature that died, was reanimated, and died again is tracked correctly
+    // (HashSet semantics — the second death replaces the first entry but the
+    // identity stays the same; both deaths satisfy the rule). Tokens that
+    // ceased to exist via SBA 704.5d are recorded too — but the printed
+    // "permanent CARDS" filter excludes tokens at resolution (tokens are not
+    // cards in zones after SBA), so callers should re-check zone membership
+    // when returning.
+    private readonly Dictionary<Guid, HashSet<ICard>> _permanentsToGraveyardByController = new();
+
     /// <summary>
     /// How many creatures controlled by <paramref name="player"/> died this turn.
     /// </summary>
@@ -106,6 +119,51 @@ public sealed class TurnState
                 _permanentsLeftByController.GetValueOrDefault(formerController.Id) + 1;
         }
     }
+
+    /// <summary>
+    /// Called when a permanent card moves from the battlefield to a
+    /// graveyard. Records the card reference in the per-controller
+    /// "permanents moved to graveyard from battlefield this turn" set
+    /// (CR 121 — read by Faith's Reward at resolution). The recorded
+    /// controller is the card's former controller (the player whose
+    /// battlefield it left); their graveyard is where the card now sits
+    /// (CR 404.1 — graveyard ownership follows the owner, but Faith's
+    /// Reward's printed wording is "permanent cards in your graveyard
+    /// that were put there from the battlefield this turn", and a card
+    /// only ends up in the controller's graveyard when the controller
+    /// is also the owner — opponent-controlled cards return to their
+    /// owners' graveyards on death). v1 keys on the former controller
+    /// for the common single-deck case; cross-control transfers (e.g.
+    /// stolen creatures dying) end up in the OWNER's graveyard but the
+    /// owner is who casts Faith's Reward to retrieve them.
+    /// </summary>
+    public void RecordPermanentMovedToGraveyard(Player? formerController, ICard card)
+    {
+        if (formerController == null || card == null) return;
+        // Use OWNER (not former controller) so a stolen creature that
+        // dies back into its owner's graveyard is retrieved by the owner
+        // (CR 404.1 — graveyards are owner-scoped). Falls back to the
+        // former controller when Owner is null (shape tests).
+        var ownerId = card.Owner?.Id ?? formerController.Id;
+        if (!_permanentsToGraveyardByController.TryGetValue(ownerId, out var set))
+        {
+            set = new HashSet<ICard>();
+            _permanentsToGraveyardByController[ownerId] = set;
+        }
+        set.Add(card);
+    }
+
+    /// <summary>
+    /// Snapshot of permanent cards that moved from the battlefield to
+    /// <paramref name="player"/>'s graveyard this turn. Read by Faith's
+    /// Reward (CR 121.1) at resolution to identify return candidates.
+    /// Callers must re-check current zone (CR 608.2b — illegal targets
+    /// / state-changed objects) before moving.
+    /// </summary>
+    public IReadOnlyCollection<ICard> PermanentsMovedToGraveyardThisTurn(Player player) =>
+        player != null && _permanentsToGraveyardByController.TryGetValue(player.Id, out var set)
+            ? set
+            : Array.Empty<ICard>();
 
     /// <summary>
     /// Called when a player draws a card.
@@ -244,5 +302,6 @@ public sealed class TurnState
         _spellsCastByPlayer.Clear();
         _landsEnteredByController.Clear();
         _permanentsEnteredThisTurn.Clear();
+        _permanentsToGraveyardByController.Clear();
     }
 }
