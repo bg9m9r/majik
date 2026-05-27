@@ -149,6 +149,20 @@ public class ActionValidator
                 new RuleViolation("601.3", "per-player named-card cast restriction"));
         }
 
+        // CR 601.3 — total cast block (Voice of Victory / Grand Abolisher:
+        // "Your opponents can't cast spells during your turn."). Reject ANY
+        // cast — creature and noncreature alike — when the casting player is
+        // currently restricted. The source manages the "during your turn"
+        // window (register at the controller's turn start, clear at turn end),
+        // so a registered restriction is unconditionally active here.
+        if (action.Player != null
+            && CastingRestrictions.CannotCastAnySpell(action.Player))
+        {
+            return ValidationResult.Invalid(
+                $"{action.Player.Name} can't cast spells right now",
+                new RuleViolation("601.3", "total cast restriction"));
+        }
+
         // CR 601.3 — turn-scoped noncreature-spell restriction
         // (Ranger-Captain of Eos: "Your opponents can't cast noncreature
         // spells this turn."). Reject a noncreature cast when the casting

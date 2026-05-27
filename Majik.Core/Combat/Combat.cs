@@ -93,6 +93,45 @@ public class Combat
     }
 
     /// <summary>
+    /// CR 508.3g — splice a creature into this combat as an attacker while
+    /// combat is already in progress (used by effects that "put a creature
+    /// onto the battlefield tapped and attacking" — Mobilize, Geist of Saint
+    /// Traft's Angel, etc.). Unlike <see cref="AddAttacker"/>, this is legal
+    /// in any state before combat ends because the creature was never
+    /// "declared" in the declare-attackers step — it bypasses declaration
+    /// and goes straight into the attacker set. The token still must attack
+    /// the same defending player / planeswalker as the rest of the combat
+    /// (CR 508.4 — a creature put onto the battlefield attacking is attacking
+    /// the player or planeswalker the effect that created it specifies, which
+    /// for Mobilize is the same defender its creator is attacking).
+    /// </summary>
+    public void AddAttackerInProgress(Attacker attacker)
+    {
+        if (attacker == null)
+        {
+            throw new ArgumentNullException(nameof(attacker));
+        }
+
+        if (State == CombatState.Resolved)
+        {
+            throw new InvalidOperationException(
+                "Cannot add an attacker to a combat that has ended");
+        }
+
+        if (attacker.TargetPlayer != DefendingPlayer && attacker.TargetPlaneswalker != TargetPlaneswalker)
+        {
+            throw new ArgumentException("Attacker target does not match combat target", nameof(attacker));
+        }
+
+        if (_attackers.Contains(attacker))
+        {
+            return; // Already added
+        }
+
+        _attackers.Add(attacker);
+    }
+
+    /// <summary>
     /// Transition to declaring blockers state.
     /// </summary>
     public void TransitionToDeclaringBlockers()

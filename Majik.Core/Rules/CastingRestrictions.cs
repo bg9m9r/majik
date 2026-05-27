@@ -67,6 +67,15 @@ public static class CastingRestrictions
     // gate (allow Hand only); this rail blocklists specific zones for
     // everyone.
     private static readonly List<(object Token, ZoneType Zone)> _globalCastZoneBlocks = new();
+    // CR 601.3 — "<player> can't cast spells" total cast block, keyed by
+    // source token (Voice of Victory / Grand Abolisher: "Your opponents
+    // can't cast spells during your turn."). Same (token, player) shape as
+    // the sorcery-speed list so multiple sources stack without trampling.
+    // The "during your turn" gating is the caller's responsibility — the
+    // source registers an entry per opponent when its controller's turn
+    // begins and removes them (via RemoveCannotCastAnySpell) when the turn
+    // ends, so a registered entry already means the block is active.
+    private static readonly List<(object Token, Player Player)> _cannotCastAnySpell = new();
     private static readonly object _gate = new();
 
     /// <summary>
@@ -424,6 +433,72 @@ public static class CastingRestrictions
         }
     }
 
+    /// <summary>
+    /// Register a "<paramref name="player"/> can't cast spells at all"
+    /// restriction (CR 601.3 — Voice of Victory / Grand Abolisher's "Your
+    /// opponents can't cast spells during your turn"), keyed by
+    /// <paramref name="token"/>. Idempotent for the same (token, player)
+    /// pair. The "during your turn" window is managed by the caller: the
+    /// source registers each opponent at the start of its controller's turn
+    /// and tears the entries down at end of turn via
+    /// <see cref="RemoveCannotCastAnySpell"/>, so any registered entry is an
+    /// active block. <see cref="ActionValidator.ValidateCastSpell"/> consults
+    /// <see cref="CannotCastAnySpell"/> and rejects every cast — creature and
+    /// noncreature alike (distinct from the noncreature-only Ranger-Captain
+    /// rail above).
+    /// </summary>
+    public static void AddCannotCastAnySpell(object token, Player player)
+    {
+        ArgumentNullException.ThrowIfNull(token);
+        ArgumentNullException.ThrowIfNull(player);
+        lock (_gate)
+        {
+            foreach (var entry in _cannotCastAnySpell)
+            {
+                if (ReferenceEquals(entry.Token, token)
+                    && ReferenceEquals(entry.Player, player))
+                {
+                    return;
+                }
+            }
+            _cannotCastAnySpell.Add((token, player));
+        }
+    }
+
+    /// <summary>
+    /// Remove every total cast block registered under
+    /// <paramref name="token"/> (across all players). Called when the
+    /// controller's turn ends (the "during your turn" window closes) or when
+    /// the source leaves the battlefield.
+    /// </summary>
+    public static void RemoveCannotCastAnySpell(object token)
+    {
+        ArgumentNullException.ThrowIfNull(token);
+        lock (_gate)
+        {
+            _cannotCastAnySpell.RemoveAll(e => ReferenceEquals(e.Token, token));
+        }
+    }
+
+    /// <summary>
+    /// True if at least one registered total cast block currently prevents
+    /// <paramref name="player"/> from casting any spell (CR 601.3 — Voice of
+    /// Victory / Grand Abolisher shape). Consulted by
+    /// <see cref="ActionValidator.ValidateCastSpell"/>.
+    /// </summary>
+    public static bool CannotCastAnySpell(Player player)
+    {
+        if (player == null) return false;
+        lock (_gate)
+        {
+            foreach (var entry in _cannotCastAnySpell)
+            {
+                if (ReferenceEquals(entry.Player, player)) return true;
+            }
+            return false;
+        }
+    }
+
     /// <summary>Reset the registry. Test-only.</summary>
     public static void Clear()
     {
@@ -436,6 +511,7 @@ public static class CastingRestrictions
             _namedCardBlocksByPlayer.Clear();
             _noncreatureRestrictedPlayers.Clear();
             _globalCastZoneBlocks.Clear();
+            _cannotCastAnySpell.Clear();
         }
     }
 }

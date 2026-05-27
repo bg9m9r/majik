@@ -141,6 +141,61 @@ public class CombatManager
     }
 
     /// <summary>
+    /// CR 508.3g / Mobilize — splice a creature into the current combat as an
+    /// attacker that is already <b>tapped and attacking</b>, without it being
+    /// "declared" as an attacker. This is the combat primitive behind effects
+    /// that "create a tapped and attacking token" (Mobilize, Geist of Saint
+    /// Traft's Angel, Goblin Rabblemaster-style payoffs).
+    ///
+    /// The creature is tapped (CR 508.3 — it enters combat tapped) and added
+    /// to <see cref="CurrentCombat"/>'s attacker set against the same
+    /// defending player / planeswalker as the in-progress combat (CR 508.4).
+    /// It is legal to call while combat is in any state before it ends — the
+    /// creature bypasses the declare-attackers step entirely, so it does NOT
+    /// publish a <see cref="CreatureAttacksEvent"/> (CR 508.3g — a creature
+    /// put onto the battlefield attacking was never "declared as an attacker",
+    /// so "whenever a creature attacks" abilities do not trigger).
+    ///
+    /// Returns the created <see cref="Attacker"/>, or <c>null</c> when there is
+    /// no combat in progress (nothing to attach to — the caller should fall
+    /// back to a plain battlefield token).
+    /// </summary>
+    public Attacker? AddTappedAndAttackingToken(Creature creature)
+    {
+        if (creature == null)
+        {
+            throw new ArgumentNullException(nameof(creature));
+        }
+
+        if (_currentCombat == null || _currentCombat.IsEnded)
+        {
+            return null;
+        }
+
+        // CR 508.3 — the creature enters combat tapped. Guard the Tap() call
+        // because Permanent.Tap throws if already tapped.
+        if (!creature.IsTapped)
+        {
+            creature.Tap();
+        }
+
+        // CR 508.4 — attacking the same defender as the combat it joins. The
+        // combat targets exactly one of a player / planeswalker; mirror that.
+        var attacker = new Attacker(
+            creature,
+            _currentCombat.DefendingPlayer,
+            _currentCombat.TargetPlaneswalker,
+            CombatAbilities.HasFirstStrike(creature),
+            CombatAbilities.HasDoubleStrike(creature),
+            CombatAbilities.HasTrample(creature),
+            CombatAbilities.HasDeathtouch(creature),
+            CombatAbilities.HasVigilance(creature));
+
+        _currentCombat.AddAttackerInProgress(attacker);
+        return attacker;
+    }
+
+    /// <summary>
     /// Declare blockers (Rule 509: Declare Blockers step).
     /// </summary>
     public void DeclareBlockers(Player defendingPlayer, IEnumerable<BlockerDeclaration> declarations)
