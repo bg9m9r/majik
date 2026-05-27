@@ -11,50 +11,65 @@ using Majik.Core.Zones;
 namespace Majik.Core.CardData.Factories;
 
 /// <summary>
-/// Named-card factory for Bygone Bishop (Shadows over Innistrad, {2}{W}).
+/// Named-card factory for Bygone Bishop (Shadows over Innistrad,
+/// {2}{W}).
 ///
 /// Creature — Spirit Cleric 2/3. Oracle text:
 ///   "Flying
 ///    Whenever you cast a creature spell with mana value 3 or less,
-///    investigate. (Create a Clue token. It's an artifact with
-///    \"{2}, Sacrifice this token: Draw a card.\")"
+///    investigate. (Create a Clue token. It's an artifact with '{2},
+///    Sacrifice this token: Draw a card.')"
+///
+/// Bygone Bishop is the original Investigate-on-cast value engine —
+/// each small creature cast banks a Clue for later card draw. Pairs
+/// with Tireless Tracker's land-fall Clue generator and Hard Evidence
+/// 's standalone Clue-from-instant pattern (same token primitive,
+/// different triggers).
 ///
 /// ## Implemented (v1)
-/// - 2/3 Creature — Spirit Cleric, mana cost {2}{W}.
-/// - <b>Flying (CR 702.9)</b>: <see cref="KeywordAbility"/> marker —
-///   combat helpers in <see cref="Majik.Core.Combat.CombatAbilities"/>
-///   read it directly (same shape as Supreme Phantom, Vault Skirge).
-/// - <b>Cast-creature investigate trigger (CR 603.1 / CR 701.30)</b>: a
-///   <see cref="TriggeredAbility"/> over <see cref="SpellCastEvent"/> that
-///   matches when the spell's controller is Bygone Bishop's controller AND
-///   the spell's card has type <see cref="CardType.Creature"/> AND the cast
-///   card's mana value (CR 202.3b) is ≤ 3. Mana value is read off the
-///   printed card's <see cref="Card.ManaCostValue"/>.<see cref="Majik.Core.ValueObjects.ManaCost.TotalValue"/>
-///   with a fall-through to <see cref="Majik.Core.ValueObjects.ManaCost.Parse"/>
-///   for callers that hand back a non-<see cref="Card"/> shell — same
-///   idiom as <see cref="UpTheBeanstalkFactory"/> / <see cref="SpellSnareFactory"/>.
-///   Effect: <see cref="TokenFactory.CreateClue"/> creates a Clue artifact
-///   token under Bygone Bishop's controller (CR 701.30 — "you investigate").
+/// - 2/3 Creature — Spirit Cleric at {2}{W}, owner / controller wired.
+/// - <b>Flying</b> keyword marker (CR 702.9) via
+///   <see cref="KeywordAbility"/>.
+/// - <b>Cast-trigger</b> (CR 603.1 / CR 603.6a / CR 701.39 —
+///   Investigate): fires on <see cref="SpellCastEvent"/> where (a) the
+///   spell's controller is Bygone Bishop's controller, (b) the spell's
+///   card has <see cref="CardType.Creature"/>, and (c) the spell's
+///   card has a printed mana value ≤ 3 (CR 202.3 — generic + colored +
+///   hybrid + phyrexian via <see cref="ValueObjects.ManaCost.TotalValue"/>).
+///   On resolve the trigger creates a Clue token (CR 111.10) via the
+///   shared <see cref="TokenFactory.CreateClue"/> helper — same Clue
+///   primitive used by Tireless Tracker / Hard Evidence, with the
+///   built-in "{2}, Sacrifice this token: Draw a card." activated
+///   ability attached by <see cref="TokenFactory.CreateClue"/>.
 ///
-/// ## Resolution-order notes
-/// - The trigger fires on the cast (CR 603.6c — triggers off the *cast*
-///   itself, not the resolution), so the Clue exists before the cast
-///   spell resolves. This matches printed timing for Bygone Bishop in
-///   tournament play.
-/// - Mana value uses the printed cost (CR 202.3b). When the cast spell
-///   has {X} in its cost and the chosen X &gt; 3, the printed TotalValue
-///   still reads X=0 here — Bygone Bishop ignores the chosen X for
-///   triggering (matches Scryfall ruling: Bygone Bishop triggers off
-///   X=0 spells like Walking Ballista cast for X=0).
-/// - Token cast-creature checks (e.g. casting Squee, Goblin Nabob via
-///   exile recast) — Bygone Bishop does not gate on "nontoken"; matches
-///   oracle text. (Compare Lonis, which DOES gate on "nontoken".)
+/// ## Notes
+/// - <b>Self-trigger</b>: Bygone Bishop is itself a creature spell with
+///   mana value 3 — casting Bishop does NOT trigger its own ability,
+///   because the trigger is only active while Bishop is on the
+///   battlefield (CR 603.6a — characteristic ETB-style cast trigger;
+///   <c>activeZones = {Battlefield}</c>) and Bishop is on the stack
+///   when its own cast event fires. This matches Talrand, Sky Summoner
+///   / Young Pyromancer / Monastery Mentor's "self does not trigger"
+///   posture (CR 603.6a — the source must be on the battlefield at
+///   trigger evaluation time).
+/// - <b>"Mana value 3 or less" + X spells</b>: CR 202.3b — X is 0 on
+///   the stack for cards in zones other than the stack, but on the
+///   stack X is the chosen value. v1 reads
+///   <see cref="ValueObjects.ManaCost.TotalValue"/> which sums the
+///   printed pips ignoring X. For an X creature spell cast with X = 2
+///   at total {X}{X}, the printed mana value is 0 here — the trigger
+///   fires. Same lossiness as Tireless Tracker's mv-based gates and
+///   Skyclave Apparition's mv-4 cap. The engine-wide "stack mana
+///   value with X resolved" surface is tracked as a separate gap.
 ///
 /// ## Deferred (v1 gaps)
-/// - <b>Investigate-on-Anointed-Procession doubling</b> — Procession is
-///   not yet shipped (no token-doubler primitive). When it ships, this
-///   factory needs no edit: the doubling happens at the Clue's ETB
-///   replacement layer, transparently to the trigger effect.
+/// - <b>Clue-token "Investigate (CR 701.39)" intent</b>: TokenFactory
+///   already stamps the Clue with its sac-draw activated ability;
+///   reusing it here matches Tireless Tracker's posture exactly.
+///   No deferral on the Clue side.
+/// - <b>LTB unregister</b>: when Bygone Bishop leaves the battlefield
+///   the trigger's <c>activeZones</c> guard short-circuits future
+///   cast events (CR 603.6d), so no explicit unregister is required.
 /// </summary>
 [CardName("Bygone Bishop")]
 public static class BygoneBishopFactory
@@ -63,31 +78,31 @@ public static class BygoneBishopFactory
     public const string PrintedManaCost = "{2}{W}";
     public const int Power = 2;
     public const int Toughness = 3;
-    public const int ManaValueGate = 3;
+    public const int MaxTriggeringManaValue = 3;
 
     /// <summary>
-    /// Construct Bygone Bishop with no live bus / trigger-manager wiring.
-    /// The investigate trigger is attached to the card for shape
-    /// observability but is not registered. Suitable for shape /
-    /// dispatcher tests.
+    /// Construct Bygone Bishop with no live runtime services. The
+    /// Investigate cast-trigger is attached for shape inspection; the
+    /// Clue tokens it would create bypass <see cref="ZoneService"/>
+    /// when invoked manually. Suitable for shape / dispatcher tests.
     /// </summary>
-    public static Creature Create(Player owner) =>
-        Create(owner, triggers: null, zoneService: null);
+    public static Creature Create(Player owner)
+        => Create(owner, zoneService: null, triggers: null);
 
     /// <summary>
-    /// Construct Bygone Bishop with optional <see cref="TriggerManager"/>
-    /// + <see cref="ZoneService"/>. When <paramref name="triggers"/> is
-    /// supplied the cast-creature investigate trigger is registered so
-    /// the bus surfaces it as pending on a matching
-    /// <see cref="SpellCastEvent"/>. When <paramref name="zoneService"/>
-    /// is supplied the Clue token's ETB publishes a
-    /// <see cref="CardMovedEvent"/> for downstream triggers
-    /// (Tireless Tracker, Lonis, etc.).
+    /// Construct a fully-wired Bygone Bishop. When
+    /// <paramref name="zoneService"/> is supplied the Clue tokens are
+    /// placed onto the battlefield via the ZoneService so each token's
+    /// <see cref="CardMovedEvent"/> fires (downstream ETB listeners
+    /// observe the Clue's arrival). When <paramref name="triggers"/>
+    /// is supplied the cast trigger is registered with the bus so a
+    /// matching <see cref="SpellCastEvent"/> automatically queues the
+    /// Investigate effect.
     /// </summary>
     public static Creature Create(
         Player owner,
-        TriggerManager? triggers,
-        ZoneService? zoneService = null)
+        ZoneService? zoneService,
+        TriggerManager? triggers)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -101,55 +116,50 @@ public static class BygoneBishopFactory
         card.SetOwner(owner);
         card.SetController(owner);
 
-        // CR 702.9 — Flying marker. CombatAbilities reads this; the
-        // attached KeywordAbility keeps the keyword-scan surface uniform.
+        // CR 702.9 — Flying keyword marker.
         card.AddAbility(new KeywordAbility("Flying", card, owner));
 
         // ----------------------------------------------------------------
-        // Cast-creature investigate trigger — CR 603.1 / CR 701.30.
+        // Cast trigger — CR 603.1 / CR 603.6a / CR 701.39 (Investigate).
         //   "Whenever you cast a creature spell with mana value 3 or
         //    less, investigate."
-        // Predicate gates on:
-        //   - Spell.Controller == Bygone Bishop's controller
-        //     (CR 603.1 "you cast"),
-        //   - Spell.Card.HasType(Creature) (CR 302.1 — the cast spell's
-        //     card type as cast, not its post-effect type),
-        //   - cast card's TotalValue ≤ 3 (CR 202.3b — printed mana value).
-        // Mirrors UpTheBeanstalkFactory's mana-value probe shape.
+        // Predicate: spell controller is Bishop's controller, spell
+        // card has the Creature type, mana value ≤ 3.
         // ----------------------------------------------------------------
         var investigateCondition = new EventTriggerCondition<SpellCastEvent>((e, _) =>
         {
-            if (!ReferenceEquals(e.Spell.Controller, owner)) return false;
-            if (!e.Spell.Card.HasType(CardType.Creature)) return false;
+            // CR 109.5 — "you cast" reads the cast spell's controller
+            // against Bygone Bishop's controller.
+            if (!ReferenceEquals(e.Spell.Controller, card.Controller ?? owner)) return false;
 
-            // CR 202.3b — mana value off the printed mana cost. Prefer
-            // the parsed value-object on Card when available
-            // (Card.ManaCostValue), fall through to a string parse for
-            // the rare ICard-not-Card test shim.
-            var mv = e.Spell.Card is Card concrete
-                ? concrete.ManaCostValue.TotalValue
-                : Majik.Core.ValueObjects.ManaCost.Parse(e.Spell.Card.ManaCost).TotalValue;
-            return mv <= ManaValueGate;
+            var spellCard = e.Spell.Card;
+
+            // Filter to creature spells only. CR 302.1 — Creature card
+            // type; HasType works against the spell card's type set
+            // including any additive types (Enchantment Creatures,
+            // Artifact Creatures still qualify).
+            if (!spellCard.HasType(CardType.Creature)) return false;
+
+            // CR 202.3 — printed mana value. ManaCostValue lives on
+            // Card (not ICard); the cast guards against rare future
+            // ICard-only spell shapes.
+            var mv = spellCard is Card cc ? cc.ManaCostValue.TotalValue : 0;
+            return mv <= MaxTriggeringManaValue;
         });
 
         var investigateEffect = new Effect(
-            $"{CardName}: investigate (create a Clue) — cast creature spell with mv ≤ 3",
-            () =>
-            {
-                // CR 701.30 — "you create a Clue token" under Bygone
-                // Bishop's controller. Routes through TokenFactory so
-                // the standard Clue artifact (with its activated
-                // sacrifice-for-card-draw ability) is created and
-                // optionally publishes the ETB via ZoneService.
-                var controller = card.Controller ?? owner;
-                TokenFactory.CreateClue(controller, zoneService);
-            });
+            $"{CardName}: investigate (create a Clue token, CR 701.39)",
+            () => TokenFactory.CreateClue(card.Controller ?? owner, zoneService));
 
         var investigateTrigger = new TriggeredAbility(
             source: card,
             controller: owner,
             condition: investigateCondition,
             effects: new IEffect[] { investigateEffect },
+            // CR 603.6a — cast trigger only active while Bishop is on
+            // the battlefield (this also explains why casting Bishop
+            // itself does NOT trigger: Bishop is on the stack at the
+            // moment its own SpellCastEvent fires).
             activeZones: new[] { ZoneType.Battlefield });
 
         card.AddAbility(investigateTrigger);
