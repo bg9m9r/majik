@@ -31,7 +31,7 @@ Two paths, in order of preference:
 1. **Spell template binder.** Check `Majik.Core/CardData/SpellTemplates/` first — many vanilla spells ("deal N damage to any target", etc.) are covered by oracle-text regex binders. No new code needed.
 2. **Named factory.** For unique behaviour, add a class under `Majik.Core/CardData/Factories/` with `[CardName("Card Name")]`. `Majik.Core.SourceGen.NamedCardFactoryGenerator` wires it into the dispatch table at build time.
 
-After adding a factory, regenerate the embedded seed so `IsImplemented` flips on:
+Adding a factory flips `IsImplemented` automatically — it is derived at load time from the `[CardName]` registry (`Majik.Core/CardData/Factories/ImplementedCardNames.cs`), so **you do not need to regenerate `modern-cards.json.gz` for a card PR.** That file is only regenerated on a Scryfall data refresh (new cards / errata):
 
 ```bash
 dotnet run --project Majik.Console -- export-modern-cards <path-to-scryfall-all-cards.json>

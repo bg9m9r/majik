@@ -515,49 +515,17 @@ public static class ExportModernCardsCommand
 
     // ----- implemented-name registry -----
 
-    /// <summary>Reflects over the <c>Majik.Core</c> assembly to collect every
-    /// printed name claimed by a <c>[CardName]</c>-annotated factory, plus
-    /// the inline basic-land + vanilla fallbacks hand-listed in
-    /// <c>NamedCardFactory.Create</c>. Mirrors the source generator so the
-    /// seed's <c>isImplemented</c> flag matches what
-    /// <c>NamedCardFactory.CreateGenerated</c> would dispatch.</summary>
-    internal static HashSet<string> LoadImplementedNames()
-    {
-        var names = new HashSet<string>(StringComparer.Ordinal);
-        var asm = typeof(CardNameAttribute).Assembly;
-        foreach (var type in SafeGetTypes(asm))
-        {
-            foreach (var attr in type.GetCustomAttributes<CardNameAttribute>(
-                inherit: false))
-            {
-                if (!string.IsNullOrWhiteSpace(attr.Name))
-                    names.Add(attr.Name);
-            }
-        }
-
-        // Inline fallbacks in NamedCardFactory.Create (basic lands + a few
-        // vanilla creatures). Keep in sync if that switch grows.
-        foreach (var inline in InlineFallbackNames) names.Add(inline);
-        return names;
-    }
-
-    private static readonly string[] InlineFallbackNames =
-    {
-        "Mountain", "Forest", "Plains", "Island", "Swamp", "Wastes",
-        "Grizzly Bears", "Runeclaw Bear", "Hill Giant", "Centaur Courser",
-    };
-
-    private static IEnumerable<Type> SafeGetTypes(Assembly asm)
-    {
-        try
-        {
-            return asm.GetTypes();
-        }
-        catch (ReflectionTypeLoadException ex)
-        {
-            return ex.Types.Where(t => t != null)!;
-        }
-    }
+    /// <summary>The set of printed names backed by a <c>[CardName]</c>
+    /// factory (plus the inline basic-land + vanilla fallbacks). Delegates
+    /// to <see cref="ImplementedCardNames"/> in <c>Majik.Core</c> — the
+    /// single source of truth shared with the runtime
+    /// <see cref="EmbeddedCardRepository"/>, which derives the same flag at
+    /// load time. The exported seed keeps a stored <c>isImplemented</c>
+    /// column for human inspection, but it is no longer authoritative:
+    /// adding a factory flips the runtime flag without regenerating the
+    /// gzipped seed.</summary>
+    internal static HashSet<string> LoadImplementedNames() =>
+        ImplementedCardNames.All.ToHashSet(StringComparer.Ordinal);
 
     // ----- output -----
 

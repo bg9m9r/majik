@@ -1,0 +1,88 @@
+using System.Collections.Immutable;
+using System.Reflection;
+
+namespace Majik.Core.CardData.Factories;
+
+/// <summary>
+/// Single source of truth for the set of printed card names the engine
+/// actually implements. A name counts as implemented when either:
+///
+/// <list type="number">
+/// <item>a class in <c>Majik.Core</c> carries a <see cref="CardNameAttribute"/>
+/// for it (the bulk of the dispatch table — these are wired in by
+/// <c>Majik.Core.SourceGen.NamedCardFactoryGenerator</c>), or</item>
+/// <item>it is one of the inline fallbacks hand-listed in
+/// <see cref="NamedCardFactory.Create"/> (basic lands + a few vanilla
+/// test creatures that build a runtime card directly rather than through
+/// a <c>*Factory</c>).</item>
+/// </list>
+///
+/// This set is computed once via reflection and cached. It is the
+/// authority for <c>IsImplemented</c> at runtime: <see cref="EmbeddedCardRepository"/>
+/// recomputes the flag from this set when it loads the embedded seed,
+/// rather than trusting whatever was baked into <c>modern-cards.json.gz</c>.
+/// The export tool (<c>ExportModernCardsCommand</c>) reuses the same set so
+/// the committed seed's stored flag stays human-inspectable and in sync —
+/// but the stored value is no longer load-bearing.
+///
+/// Decoupling the flag from the binary seed is deliberate: a card PR that
+/// only adds a <c>[CardName]</c> factory no longer has to regenerate the
+/// gzipped seed, which would otherwise make every such PR conflict with
+/// every other one (the binary "conflict treadmill").
+/// </summary>
+public static class ImplementedCardNames
+{
+    /// <summary>Inline fallbacks in <see cref="NamedCardFactory.Create"/>
+    /// (basic lands + a few vanilla creatures). These construct a runtime
+    /// card directly instead of dispatching to a <c>*Factory</c>, so they
+    /// are not discoverable by reflecting over <see cref="CardNameAttribute"/>.
+    /// Keep in sync if that inline switch grows.</summary>
+    public static readonly ImmutableArray<string> InlineFallbackNames =
+        ImmutableArray.Create(
+            "Mountain", "Forest", "Plains", "Island", "Swamp", "Wastes",
+            "Grizzly Bears", "Runeclaw Bear", "Hill Giant", "Centaur Courser");
+
+    private static readonly Lazy<ImmutableHashSet<string>> _all =
+        new(Compute, LazyThreadSafetyMode.ExecutionAndPublication);
+
+    /// <summary>The implemented-name set, computed once and cached.
+    /// Case-sensitive (<see cref="StringComparer.Ordinal"/>) to match how
+    /// the dispatch table and the seed's <c>Name</c> column are keyed.</summary>
+    public static ImmutableHashSet<string> All => _all.Value;
+
+    /// <summary>True when <paramref name="name"/> is backed by a
+    /// <c>[CardName]</c> factory or an inline fallback.</summary>
+    public static bool Contains(string name) =>
+        !string.IsNullOrEmpty(name) && _all.Value.Contains(name);
+
+    private static ImmutableHashSet<string> Compute()
+    {
+        var builder = ImmutableHashSet.CreateBuilder<string>(StringComparer.Ordinal);
+
+        var asm = typeof(CardNameAttribute).Assembly;
+        foreach (var type in SafeGetTypes(asm))
+        {
+            foreach (var attr in type.GetCustomAttributes<CardNameAttribute>(
+                inherit: false))
+            {
+                if (!string.IsNullOrWhiteSpace(attr.Name))
+                    builder.Add(attr.Name);
+            }
+        }
+
+        foreach (var inline in InlineFallbackNames) builder.Add(inline);
+        return builder.ToImmutable();
+    }
+
+    private static IEnumerable<Type> SafeGetTypes(Assembly asm)
+    {
+        try
+        {
+            return asm.GetTypes();
+        }
+        catch (ReflectionTypeLoadException ex)
+        {
+            return ex.Types.Where(t => t != null)!;
+        }
+    }
+}
