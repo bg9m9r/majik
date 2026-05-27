@@ -9,7 +9,8 @@ public sealed record GameStateDto(
     string? Phase,
     Guid ActivePlayerId,
     IReadOnlyList<PlayerDto> Players,
-    IReadOnlyList<StackObjectDto> Stack);
+    IReadOnlyList<StackObjectDto> Stack,
+    Guid? YouPlayerId = null);
 
 public sealed record PlayerDto(
     Guid Id,

@@ -37,7 +37,8 @@ public static class StateSnapshotter
             Phase: PhaseLabelResolver.Resolve(phase, turnState),
             ActivePlayerId: activePlayer.Id,
             Players: players.Select(p => SnapshotPlayer(p, viewer)).ToList(),
-            Stack: stack.GetAll().Select(SnapshotStackObject).ToList());
+            Stack: stack.GetAll().Select(SnapshotStackObject).ToList(),
+            YouPlayerId: viewer?.Id);
     }
 
     private static PlayerDto SnapshotPlayer(Player p, Player? viewer)
