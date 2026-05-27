@@ -195,6 +195,104 @@ public class EmbeddedCardRepositoryTests
         repo.IntentFor("Lightning Bolt").Should().Be(Majik.Core.Cards.BotIntent.None);
     }
 
+    // ----- DFC / adventure / split front-face derivation (CR 712) -----
+
+    /// <summary>
+    /// The embedded seed stores double-faced cards as "Front // Back" but
+    /// factories register the front-face name via [CardName("Front")].
+    /// DeriveImplemented must fall back to the front-face substring so that
+    /// e.g. "Bonecrusher Giant // Stomp" is counted as implemented because
+    /// "Bonecrusher Giant" is in the [CardName] registry.
+    /// </summary>
+    [Fact]
+    public void DeriveImplemented_DfcCard_ImplementedWhenFrontFaceIsInRegistry()
+    {
+        // "Bonecrusher Giant" has a real [CardName] factory; the seed form
+        // of the card is "Bonecrusher Giant // Stomp".
+        var entity = new CardEntity
+        {
+            Name = "Bonecrusher Giant // Stomp",
+            IsImplemented = false, // seed flag is false — we want it derived to true
+        };
+
+        EmbeddedCardRepository.DeriveImplemented(entity)
+            .IsImplemented.Should().BeTrue(
+                "front-face \"Bonecrusher Giant\" is in ImplementedCardNames " +
+                "so the DFC seed entry must derive IsImplemented = true");
+    }
+
+    [Fact]
+    public void DeriveImplemented_DfcCard_UnimplementedWhenFrontFaceNotInRegistry()
+    {
+        // A DFC whose front face has no factory must stay false.
+        var entity = new CardEntity
+        {
+            Name = "NoFactory Front // NoFactory Back",
+            IsImplemented = true, // seed stored true — should be overridden to false
+        };
+
+        EmbeddedCardRepository.DeriveImplemented(entity)
+            .IsImplemented.Should().BeFalse(
+                "neither the full name nor the front-face is in ImplementedCardNames");
+    }
+
+    [Fact]
+    public void DeriveImplemented_SingleFacedImplemented_StillTrue()
+    {
+        // Regression: ordinary single-faced implemented card must not be affected.
+        var entity = new CardEntity { Name = "Lightning Bolt", IsImplemented = false };
+
+        EmbeddedCardRepository.DeriveImplemented(entity)
+            .IsImplemented.Should().BeTrue(
+                "Lightning Bolt is in ImplementedCardNames regardless of stored flag");
+    }
+
+    [Fact]
+    public void DeriveImplemented_SingleFacedUnimplemented_StillFalse()
+    {
+        // Regression: ordinary single-faced unimplemented card must not be affected.
+        // Use a name that is definitely not in any factory or inline fallback list.
+        var entity = new CardEntity { Name = "Definitely Not A Real Card", IsImplemented = true };
+
+        EmbeddedCardRepository.DeriveImplemented(entity)
+            .IsImplemented.Should().BeFalse(
+                "a name absent from ImplementedCardNames stays false even if the seed stored true");
+    }
+
+    [Fact]
+    public void GetByName_DfcFrontName_ReturnsEntityWithIsImplementedTrue()
+    {
+        // Ensure that querying by front-face name not only finds the entity
+        // (GetByName already handles this via prefix scan) but also that the
+        // returned entity has IsImplemented = true after derivation.
+        var dfcEntity = new CardEntity
+        {
+            Name = "Bonecrusher Giant // Stomp",
+            TypeLine = "Creature — Giant // Instant",
+            Cmc = 3,
+            Colors = "[\"R\"]",
+            ColorIdentity = "[\"R\"]",
+            IsImplemented = false,
+        };
+        var repo = CreateWithRowsDerived(new[] { dfcEntity });
+
+        var hit = repo.GetByName("Bonecrusher Giant");
+        hit.Should().NotBeNull("GetByName resolves front-face prefix to DFC entity");
+        hit!.IsImplemented.Should().BeTrue(
+            "DeriveImplemented must have flipped the flag via front-face fallback");
+    }
+
+    // Convenience: creates a repo whose loader runs DeriveImplemented on each row,
+    // matching the production LoadFromEmbeddedResource path.
+    private static EmbeddedCardRepository CreateWithRowsDerived(
+        IEnumerable<CardEntity> rawRows)
+    {
+        var derived = rawRows
+            .Select(EmbeddedCardRepository.DeriveImplemented)
+            .ToList();
+        return CreateWithRows(derived);
+    }
+
     // ----- smoke: real embedded resource -----
 
     [Fact]
