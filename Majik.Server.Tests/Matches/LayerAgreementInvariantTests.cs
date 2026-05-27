@@ -185,6 +185,27 @@ public class LayerAgreementInvariantTests : IClassFixture<TestMongoFixture>
             .Should().Be(h.Facade.Alice.Id.ToString());
     }
 
+    // -----------------------------------------------------------------------
+    // Task 6 (Slice 2a) — YouPlayerId: GET /state as creator returns a
+    // GameStateDto whose YouPlayerId equals Alice.Id (Creator → Alice).
+    // The portal reads this field to self-identify its seat without a second
+    // round-trip — it must be non-null and correct for every seated viewer.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task YouPlayerId_CreatorGetState_EqualsAliceId()
+    {
+        using var h = await LayerAgreementHarness.StartBotMatchAsync(_fixture, rngSeed: 5);
+
+        var state = await h.GetStateAsync(h.CreatorSub);
+
+        state.Should().NotBeNull(
+            "GET /state as the creator must return a 200 GameStateDto");
+        state!.YouPlayerId.Should().Be(h.Facade.Alice.Id,
+            "Creator → Alice convention: YouPlayerId on the creator's per-viewer " +
+            "snapshot must equal Alice's engine seat id (Slice 2a invariant)");
+    }
+
     private static List<string> ExtractPhaseLabels(LayerAgreementHarness h)
     {
         var labels = new List<string>();
