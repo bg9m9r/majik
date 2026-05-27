@@ -75,6 +75,11 @@ public class OracleManaBinderTests
 
         OracleManaBinder.Bind(card, entity, _alice);
 
+        // CR 302.6 — clear summoning sickness so the {T} mana ability is
+        // legal to activate; this test asserts the bound mana output, not
+        // the sickness gate.
+        card.ClearSummoningSickness();
+
         card.Abilities.OfType<IManaAbility>().Single()
             .Activate().Should().Be(ManaCost.Parse("G"));
     }

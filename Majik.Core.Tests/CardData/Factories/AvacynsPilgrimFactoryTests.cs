@@ -67,6 +67,9 @@ public class AvacynsPilgrimFactoryTests
     {
         var c = AvacynsPilgrimFactory.Create(_alice);
         c.SetZone(ZoneType.Battlefield);
+        // CR 302.6 — clear summoning sickness so this test exercises mana
+        // production rather than the {T} sickness gate.
+        c.ClearSummoningSickness();
 
         var manaAbility = c.Abilities.OfType<ManaAbility>().Single();
 

@@ -84,7 +84,17 @@ public class AdditionalCost : ICost
 
         return _costType switch
         {
-            AdditionalCostType.Tap => _costParameter is Cards.Permanent permanent && !permanent.IsTapped,
+            // CR 302.6 / 605.3a — the {T} tap cost is the choke point every
+            // {T} activated ability's cost payment passes through. Beyond the
+            // permanent being untapped, a creature paying {T} must not be
+            // summoning sick (unless it has haste — CR 702.10). The central
+            // gate is creature-only, so land / artifact tap costs are
+            // unaffected. AdditionalCost.Tap(...) always taps the ability's
+            // own source, so gating the tapped permanent enforces CR 302.6 on
+            // the right creature.
+            AdditionalCostType.Tap => _costParameter is Cards.Permanent permanent
+                && !permanent.IsTapped
+                && Abilities.SummoningSicknessTapGate.CanTapForAbility(permanent),
             AdditionalCostType.Sacrifice => _costParameter is Cards.Permanent permanent && permanent.Controller == player,
             AdditionalCostType.Discard => _costParameter is ICard card && card.Controller == player && card.Zone == ZoneType.Hand,
             AdditionalCostType.PayLife => _costParameter is int amount && player.LifeTotal > amount,

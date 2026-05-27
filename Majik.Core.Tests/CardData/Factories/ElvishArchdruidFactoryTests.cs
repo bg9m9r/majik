@@ -161,6 +161,9 @@ public class ElvishArchdruidFactoryTests
         var archdruid = ElvishArchdruidFactory.Create(_alice);
         archdruid.SetZone(ZoneType.Battlefield);
         _alice.Zones.Battlefield.AddCard(archdruid);
+        // CR 302.6 — clear summoning sickness so this test exercises the
+        // tribal mana count rather than the {T} sickness gate.
+        archdruid.ClearSummoningSickness();
 
         var manaAbility = archdruid.Abilities.OfType<ManaAbility>().Single();
         manaAbility.CanActivate().Should().BeTrue();
@@ -177,6 +180,9 @@ public class ElvishArchdruidFactoryTests
         var archdruid = ElvishArchdruidFactory.Create(_alice);
         archdruid.SetZone(ZoneType.Battlefield);
         _alice.Zones.Battlefield.AddCard(archdruid);
+        // CR 302.6 — clear summoning sickness so Activate() is legal and the
+        // test asserts the Elf-count scaling, not the sickness gate.
+        archdruid.ClearSummoningSickness();
 
         // Two friend Elves on controller's battlefield.
         var elf1 = MakeElf(_alice, "Llanowar Elves");
@@ -199,6 +205,9 @@ public class ElvishArchdruidFactoryTests
         var archdruid = ElvishArchdruidFactory.Create(_alice);
         archdruid.SetZone(ZoneType.Battlefield);
         _alice.Zones.Battlefield.AddCard(archdruid);
+        // CR 302.6 — clear summoning sickness so Activate() is legal and the
+        // test asserts the controller-scoped Elf count, not the sickness gate.
+        archdruid.ClearSummoningSickness();
 
         // Bob has an Elf — should NOT count toward Alice's X.
         var bobElf = MakeElf(_bob, "Heritage Druid");

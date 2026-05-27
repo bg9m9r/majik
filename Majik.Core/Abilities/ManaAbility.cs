@@ -141,6 +141,19 @@ public class ManaAbility : IManaAbility
 
     public bool CanActivate()
     {
+        // CR 302.6 / 605.3a — central summoning-sickness gate. When the
+        // activation cost includes {T} (the standard mana-ability shape;
+        // _tapsAsCost == true) and the source is a summoning-sick creature
+        // without haste, the ability can't be activated. Mana abilities are
+        // NOT exempt (CR 605.3a). Checked BEFORE the per-card
+        // canActivateCheck (which only tests !IsTapped) so custom gates can't
+        // bypass the rule. No-tap mana abilities (Wall of Roots,
+        // _tapsAsCost == false) and lands are unaffected.
+        if (_tapsAsCost && !SummoningSicknessTapGate.CanTapForAbility(Source))
+        {
+            return false;
+        }
+
         if (_canActivateCheck != null)
         {
             return _canActivateCheck();
