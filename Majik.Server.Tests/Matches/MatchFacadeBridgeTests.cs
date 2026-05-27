@@ -90,6 +90,108 @@ public class MatchFacadeBridgeTests
         return GameFacade.Create("Alice", "Bob", new List<ICard>(), new List<ICard>());
     }
 
+    // -----------------------------------------------------------------------
+    // Clock-handoff wiring (Slice 1). The bridge fires the handoff callback
+    // when the engine's active player changes seats. These focused tests
+    // assert it does NOT fire spuriously while the active player is stable.
+    // The positive turn-handoff path is covered end-to-end by
+    // LayerAgreementInvariantTests.ClockHolder_FollowsEngineActivePlayer.
+    // -----------------------------------------------------------------------
+
+    // -----------------------------------------------------------------------
+    // AssertAgreement — dev/test guard. Always present + unit-testable;
+    // its CALL SITES are guarded to no-op in Release builds.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void AssertAgreement_ClockHolderMismatch_Throws()
+    {
+        var active = Guid.NewGuid();
+        var otherSeat = Guid.NewGuid();
+
+        var act = () => MatchFacadeBridge.AssertAgreement(
+            activePlayerId: active,
+            clockHolderSeatId: otherSeat,
+            wirePhase: "PreCombatMain");
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*clock holder*engine active player*");
+    }
+
+    [Fact]
+    public void AssertAgreement_RawMainPhase_Throws()
+    {
+        var seat = Guid.NewGuid();
+
+        var act = () => MatchFacadeBridge.AssertAgreement(
+            activePlayerId: seat,
+            clockHolderSeatId: seat,
+            wirePhase: "Main");
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*must be disambiguated*");
+    }
+
+    [Fact]
+    public void AssertAgreement_InAgreement_DoesNotThrow()
+    {
+        var seat = Guid.NewGuid();
+
+        var act = () => MatchFacadeBridge.AssertAgreement(
+            activePlayerId: seat,
+            clockHolderSeatId: seat,
+            wirePhase: "PostCombatMain");
+
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void ForwardEvent_NoActivePlayerChange_DoesNotFireClockHandoff()
+    {
+        var hub = new CaptureHub();
+        var fired = new List<string>();
+        var bridge = new MatchFacadeBridge(
+            hub, NullLogger<MatchFacadeBridge>.Instance, replay: null,
+            onActivePlayerChanged: (_, sub, _, _) => { fired.Add(sub); return Task.CompletedTask; });
+
+        var facade = BuildInertFacade(); // active player stays at Alice (seed)
+        var matchId = Guid.NewGuid();
+        bridge.Attach(matchId, "creator-sub", "opponent-sub", facade);
+
+        var routing = DefaultRouting(facade.Alice.Id, facade.Bob.Id);
+        // Forward several events — the inert facade never starts a turn, so
+        // ActivePlayerId stays at the seed and no handoff should fire.
+        for (var i = 0; i < 5; i++)
+        {
+            bridge.ForwardEvent(
+                matchId,
+                new EventEnvelope(FakeEvent("PriorityReceivedEvent"), PerPlayer: null),
+                routing);
+        }
+
+        fired.Should().BeEmpty("the active player never changed — no clock handoff");
+        bridge.ClockHandoffFireCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void ForwardEvent_NoCallbackWired_IsNoOp()
+    {
+        // Unit-test construction (no callback) must not throw on the
+        // handoff path — it just skips it.
+        var hub = new CaptureHub();
+        var bridge = BuildBridge(hub); // no onActivePlayerChanged
+        var facade = BuildInertFacade();
+        var matchId = Guid.NewGuid();
+        bridge.Attach(matchId, "creator-sub", "opponent-sub", facade);
+
+        var routing = DefaultRouting(facade.Alice.Id, facade.Bob.Id);
+        var act = () => bridge.ForwardEvent(
+            matchId, new EventEnvelope(FakeEvent("TurnStartedEvent"), PerPlayer: null), routing);
+
+        act.Should().NotThrow();
+        bridge.ClockHandoffFireCount.Should().Be(0);
+    }
+
     [Fact]
     public void Attach_RegistersMatch_AndDetachReleasesIt()
     {

@@ -195,6 +195,90 @@ public class MatchServiceClockTests : IClassFixture<TestMongoFixture>
     }
 
     // -----------------------------------------------------------------------
+    // C1: compare-and-swap on the prior holder. Two handoffs that both read
+    // the SAME prior holder (the race window between a fire-and-forget
+    // handoff and the next one) must not both bill that holder. The first
+    // moves the clock; the second's expectedPrevHolderSub no longer matches
+    // the stored holder, so it no-ops — no double-bill, no dropped slice.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task OnPriorityPassed_StaleExpectedPrev_NoOps_NoDoubleBill()
+    {
+        const string alice = "stub-alice";
+        const string bob = "stub-bob";
+        const long start = 1_200_000L;
+
+        var (svc, repo, clock, pub, matchId) = await SetupPlayingMatchAsync(
+            creatorSub: alice,
+            opponentSub: bob,
+            initialHolderSub: alice,
+            creatorMs: start,
+            opponentMs: start);
+
+        var t0 = clock.UtcNow;
+
+        // Handoff #1: alice held 5s, hands to bob. expectedPrev=alice matches
+        // the stored holder, so the CAS succeeds and bob becomes the holder.
+        clock.UtcNow = t0.AddMilliseconds(5_000);
+        await svc.OnPriorityPassedAsync(matchId, newHolderSub: bob, CancellationToken.None,
+            expectedPrevHolderSub: alice);
+
+        // Handoff #2 is STALE: it was computed off the SAME pre-#1 read (it
+        // also expected alice to be the holder) and arrives second — e.g. two
+        // fire-and-forget handoffs racing on fast turn cycling. Its
+        // expectedPrev=alice no longer matches the stored holder (now bob), so
+        // it must no-op: alice must NOT be billed a second time and the holder
+        // must stay bob.
+        clock.UtcNow = t0.AddMilliseconds(9_000);
+        await svc.OnPriorityPassedAsync(matchId, newHolderSub: bob, CancellationToken.None,
+            expectedPrevHolderSub: alice);
+
+        var fresh = await repo.GetByIdAsync(matchId, CancellationToken.None);
+        fresh!.PriorityHolderSub.Should().Be(bob);
+        // Alice billed exactly the 5s from handoff #1 — NOT 9s, and not twice.
+        fresh.CreatorMillisRemaining.Should().Be(start - 5_000);
+        fresh.OpponentMillisRemaining.Should().Be(start);
+    }
+
+    [Fact]
+    public async Task OnPriorityPassed_OutOfOrderHandoffs_BillEachSeatOnce()
+    {
+        // A→B then B→A in quick succession, each carrying the correct
+        // expectedPrev. Both apply (the CAS expectation matches the stored
+        // holder at the moment each runs) and each seat is billed exactly its
+        // own held interval — proving the CAS doesn't drop a genuine
+        // alternating transition.
+        const string alice = "stub-alice";
+        const string bob = "stub-bob";
+        const long start = 1_200_000L;
+
+        var (svc, repo, clock, _, matchId) = await SetupPlayingMatchAsync(
+            creatorSub: alice,
+            opponentSub: bob,
+            initialHolderSub: alice,
+            creatorMs: start,
+            opponentMs: start);
+
+        var t0 = clock.UtcNow;
+
+        // alice holds 4s → bob.
+        clock.UtcNow = t0.AddMilliseconds(4_000);
+        await svc.OnPriorityPassedAsync(matchId, newHolderSub: bob, CancellationToken.None,
+            expectedPrevHolderSub: alice);
+
+        // bob holds 6s → alice. expectedPrev=bob matches the now-stored holder.
+        clock.UtcNow = t0.AddMilliseconds(10_000);
+        await svc.OnPriorityPassedAsync(matchId, newHolderSub: alice, CancellationToken.None,
+            expectedPrevHolderSub: bob);
+
+        var fresh = await repo.GetByIdAsync(matchId, CancellationToken.None);
+        fresh!.PriorityHolderSub.Should().Be(alice);
+        fresh.CreatorMillisRemaining.Should().Be(start - 4_000);
+        fresh.OpponentMillisRemaining.Should().Be(start - 6_000);
+    }
+
+    // -----------------------------------------------------------------------
     // Test 3: Remaining <= 0 on transfer → triggers timeout inline (state=Completed)
     // -----------------------------------------------------------------------
 

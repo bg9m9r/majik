@@ -93,6 +93,16 @@ public sealed class GameFacade
     public Player Bob => _bob;
 
     /// <summary>
+    /// The id of the engine's current active player (CR 102.1 / 103.7 —
+    /// "the active player is the player whose turn it is"). Tracked from
+    /// <see cref="TurnStartedEvent"/>; falls back to the priority holder
+    /// and finally to <see cref="Alice"/> before any turn has started so
+    /// the server clock and wire contract always have a non-empty id to
+    /// DERIVE the clock holder / seat identity from rather than recompute.
+    /// </summary>
+    public Guid ActivePlayerId => (_currentActivePlayer ?? _priority.CurrentPlayer ?? _alice).Id;
+
+    /// <summary>
     /// The game's replacement-effect bus. Binders (e.g. ShockLandBinder)
     /// register handlers here during deck load; ZoneService reads from it on
     /// every card move so replacements fire correctly at the table.

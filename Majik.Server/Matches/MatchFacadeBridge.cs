@@ -54,9 +54,30 @@ namespace Majik.Server.Matches;
 /// </summary>
 public sealed class MatchFacadeBridge
 {
+    /// <summary>
+    /// Callback the bridge fires when the engine's active player changes
+    /// seats (CR 117 / 103.7 — "the active player is the player whose turn
+    /// it is", and on each new turn that player receives priority first).
+    /// Production wires this to <c>MatchService.OnPriorityPassedAsync</c>
+    /// via a fresh DI scope (mirroring <see cref="MatchTimeoutScheduler"/>),
+    /// so the server clock holder always DERIVES from the engine's active
+    /// player instead of staying frozen at the play/draw first player.
+    /// </summary>
+    /// <param name="expectedPrevHolderSub">
+    /// The holder sub the bridge believes currently owns the clock (mapped
+    /// from the engine's PREVIOUS active player). Threaded through so the
+    /// clock update can be a compare-and-swap on the prior holder — two
+    /// out-of-order handoffs can't both bill the same prior holder (C1).
+    /// Null on the very first genuine handoff if the prior seat is
+    /// unmappable.
+    /// </param>
+    public delegate Task ClockHandoffCallback(
+        Guid matchId, string newHolderSub, string? expectedPrevHolderSub, CancellationToken ct);
+
     private readonly IMatchHubPublisher _hub;
     private readonly ILogger<MatchFacadeBridge> _logger;
     private readonly MatchReplayBuffer? _replay;
+    private readonly ClockHandoffCallback? _onActivePlayerChanged;
     private readonly ConcurrentDictionary<Guid, Attachment> _attachments = new();
 
     // Per-recipient prompt buffer. Solves the race where the engine
@@ -76,11 +97,13 @@ public sealed class MatchFacadeBridge
     public MatchFacadeBridge(
         IMatchHubPublisher hub,
         ILogger<MatchFacadeBridge> logger,
-        MatchReplayBuffer? replay = null)
+        MatchReplayBuffer? replay = null,
+        ClockHandoffCallback? onActivePlayerChanged = null)
     {
         _hub = hub;
         _logger = logger;
         _replay = replay;
+        _onActivePlayerChanged = onActivePlayerChanged;
     }
 
     /// <summary>Visible for tests.</summary>
@@ -123,7 +146,16 @@ public sealed class MatchFacadeBridge
         IDisposable eventSub = facade.SubscribeEnvelopes(env => ForwardEvent(matchId, env, routing));
         IDisposable promptSub = facade.SubscribePrompts(prompt => ForwardPrompt(matchId, prompt, routing));
 
-        var attachment = new Attachment(eventSub, promptSub);
+        // The clock-handoff tracker starts UNSEEDED: the active player at
+        // Attach is always Alice (the facade is created before
+        // StartFullGameAsync picks who goes first), so seeding from it here
+        // would be wrong whenever Bob goes first (draw case / bot wins the
+        // roll) — the turn-1 TurnStartedEvent would then look like a Bob→Bob
+        // change and burn a spurious slice off the correct first player. We
+        // instead seed lazily on the FIRST observed active player (no handoff
+        // on the very first turn-start) so the real first player is captured
+        // from the engine, not guessed (I2).
+        var attachment = new Attachment(eventSub, promptSub, facade, routing);
         if (!_attachments.TryAdd(matchId, attachment))
         {
             // Lost the race against another Attach for the same matchId —
@@ -253,6 +285,27 @@ public sealed class MatchFacadeBridge
         // viewer == null path used by GET /matches/{id}/replay.
         _replay?.RecordEvent(matchId, envelope.Public);
 
+        // CR 117 / 103.7 — keep the server clock holder aligned with the
+        // engine's active player. Engine typed handlers update
+        // GameFacade._currentActivePlayer BEFORE this global (SubscribeAll)
+        // handler runs (see EventBus.Publish ordering), so reading
+        // facade.ActivePlayerId here already reflects the new turn's active
+        // player. Best-effort and isolated so a clock-side fault never
+        // perturbs the live event broadcast.
+        MaybeFireClockHandoff(matchId);
+
+        // NOTE: there is intentionally NO live-path phase-vocabulary tripwire
+        // here. ForwardEvent runs as a SubscribeAll handler, which the engine
+        // dispatches through EventBus.SafeInvoke — that catches every handler
+        // exception and routes it to the (unwired) OnHandlerError sink, so a
+        // throw from this method would be silently swallowed and never trip.
+        // The phase-vocabulary invariant (raw CR 505 "Main" must never reach
+        // the wire) is instead asserted directly by the harness test
+        // LayerAgreementInvariantTests.PhaseVocabulary_NeverRawMain, which
+        // inspects the captured wire payloads. AssertAgreement remains a
+        // unit-tested guard (MatchFacadeBridgeTests); it just has no live
+        // call site that would mislead readers into thinking it self-trips.
+
         try
         {
             if (envelope.PerPlayer == null)
@@ -297,6 +350,130 @@ public sealed class MatchFacadeBridge
             _logger.LogError(ex,
                 "MatchFacadeBridge: failed to forward EventDto. MatchId={MatchId} EventType={EventType}",
                 matchId, envelope.Public.Type);
+        }
+    }
+
+    /// <summary>
+    /// CR 117 / 103.7 — when the engine's active player has changed seats
+    /// since the last event for <paramref name="matchId"/>, map the new
+    /// active player's engine id → sub and invoke the clock-handoff
+    /// callback (production: <c>MatchService.OnPriorityPassedAsync</c>),
+    /// which decrements the previous holder's clock, moves the holder, and
+    /// republishes <c>match.clock-update</c>. The server clock thus DERIVES
+    /// its holder from the engine instead of freezing at the play/draw
+    /// first player set in <c>MatchService.PlayDrawAsync</c>.
+    ///
+    /// Fully best-effort: no callback wired (unit tests) or no live
+    /// attachment → no-op. The callback is fire-and-forget so the engine's
+    /// synchronous event dispatch isn't blocked on a Mongo round-trip;
+    /// faults are logged, never thrown back into the event broadcast.
+    /// </summary>
+    private void MaybeFireClockHandoff(Guid matchId)
+    {
+        if (_onActivePlayerChanged == null) return;
+        if (!_attachments.TryGetValue(matchId, out var attachment)) return;
+
+        Guid current;
+        try
+        {
+            current = attachment.Facade.ActivePlayerId;
+        }
+        catch
+        {
+            return; // facade torn down mid-flight — nothing to align.
+        }
+
+        // Claim the transition under the attachment's lock so concurrent
+        // events for the same match don't double-fire the handoff for one
+        // active-player change. (Guid has no Interlocked.Exchange overload,
+        // and the engine dispatches a game's events on one thread anyway —
+        // a short lock is both correct and cheap.) The FIRST observation
+        // only seeds the tracker (no handoff) so the genuine first player —
+        // whoever the engine actually chose — is captured rather than the
+        // Alice-at-Attach guess (I2).
+        if (!attachment.TryClaimActivePlayerChange(current, out var prevActivePlayer)) return;
+
+        // Map engine active-player ids → holder subs (Alice = creator,
+        // Bob = opponent). An unmappable NEW id (shouldn't happen) is ignored;
+        // an unmappable PREV id just means the CAS expectation is null.
+        string? newHolderSub = MapSeatToSub(attachment.Routing, current);
+        if (newHolderSub == null) return;
+
+        // The holder the engine is moving AWAY from — threaded to the
+        // callback so the clock update is a compare-and-swap on it (C1).
+        string? expectedPrevHolderSub = MapSeatToSub(attachment.Routing, prevActivePlayer);
+
+        _ = FireClockHandoffAsync(matchId, newHolderSub, expectedPrevHolderSub);
+    }
+
+    /// <summary>Map an engine seat id → holder sub (Alice = creator,
+    /// Bob = opponent). Returns null for an unmappable id.</summary>
+    private static string? MapSeatToSub(PromptRouting routing, Guid seatId) =>
+        seatId == routing.AliceId ? routing.CreatorSub
+        : seatId == routing.BobId ? routing.OpponentSub
+        : null;
+
+    /// <summary>Visible for tests — number of times the clock-handoff
+    /// callback has been invoked. Lets a test assert the bridge actually
+    /// fired the handoff (vs. the holder lagging for another reason).</summary>
+    internal int ClockHandoffFireCount => _clockHandoffFireCount;
+    private int _clockHandoffFireCount;
+
+    /// <summary>
+    /// Dev/test invariant guard. Throws <see cref="InvalidOperationException"/>
+    /// when the three load-bearing agreements (see docs/WIRE_CONTRACT.md)
+    /// are violated:
+    /// <list type="bullet">
+    ///   <item>clock holder seat ≠ engine active player (CR 117 / 103.7), or</item>
+    ///   <item>the wire phase is the raw, ambiguous "Main" (CR 505 — must be
+    ///         split into PreCombatMain / PostCombatMain).</item>
+    /// </list>
+    /// The METHOD is always present and unit-testable; its CALL SITES are
+    /// gated behind <see cref="AssertAgreementIfDebug"/> ([Conditional("DEBUG")])
+    /// so they compile out entirely in Release — the guard is a development
+    /// tripwire, never a production hot-path cost.
+    /// </summary>
+    public static void AssertAgreement(Guid activePlayerId, Guid clockHolderSeatId, string wirePhase)
+    {
+        if (clockHolderSeatId != activePlayerId)
+        {
+            throw new InvalidOperationException(
+                $"clock holder ({clockHolderSeatId}) != engine active player " +
+                $"({activePlayerId}) — the server clock must DERIVE its holder " +
+                "from the engine (CR 117 / 103.7).");
+        }
+
+        if (wirePhase == "Main")
+        {
+            throw new InvalidOperationException(
+                "wire phase \"Main\" must be disambiguated into PreCombatMain / " +
+                "PostCombatMain before it reaches the wire (CR 505).");
+        }
+    }
+
+    /// <summary>Debug-only thin wrapper over <see cref="AssertAgreement"/>.
+    /// The <c>[Conditional("DEBUG")]</c> attribute makes every CALL to this
+    /// method (and the evaluation of its arguments) disappear in Release,
+    /// so wiring it into the event path costs nothing in production while
+    /// still tripping on a violated invariant during dev/test runs.</summary>
+    [System.Diagnostics.Conditional("DEBUG")]
+    internal static void AssertAgreementIfDebug(Guid activePlayerId, Guid clockHolderSeatId, string wirePhase)
+        => AssertAgreement(activePlayerId, clockHolderSeatId, wirePhase);
+
+    private async Task FireClockHandoffAsync(Guid matchId, string newHolderSub, string? expectedPrevHolderSub)
+    {
+        Interlocked.Increment(ref _clockHandoffFireCount);
+        try
+        {
+            await _onActivePlayerChanged!(matchId, newHolderSub, expectedPrevHolderSub, CancellationToken.None)
+                .ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "MatchFacadeBridge: clock-handoff callback faulted. " +
+                "MatchId={MatchId} NewHolderSub={NewHolderSub} ExpectedPrev={ExpectedPrev}",
+                matchId, newHolderSub, expectedPrevHolderSub);
         }
     }
 
@@ -378,10 +555,59 @@ public sealed class MatchFacadeBridge
         private readonly IDisposable _promptSub;
         private int _disposed;
 
-        public Attachment(IDisposable eventSub, IDisposable promptSub)
+        /// <summary>The live facade for this match — read for its current
+        /// active player on each event so the clock holder can follow it.</summary>
+        public GameFacade Facade { get; }
+
+        /// <summary>Engine seat ids ↔ subs, captured at Attach.</summary>
+        public PromptRouting Routing { get; }
+
+        // Last active-player id we fired a clock handoff for. UNSEEDED (null)
+        // until the first observed active player: the facade's active player
+        // at Attach is always Alice (the facade exists before the engine
+        // chooses who goes first), so seeding from it would mis-fire whenever
+        // Bob goes first. Seeding lazily from the first observation captures
+        // the engine's real first player and suppresses a turn-1 handoff (I2).
+        // Guarded by _activePlayerGate.
+        private readonly object _activePlayerGate = new();
+        private Guid? _lastActivePlayerId;
+
+        public Attachment(
+            IDisposable eventSub,
+            IDisposable promptSub,
+            GameFacade facade,
+            PromptRouting routing)
         {
             _eventSub = eventSub;
             _promptSub = promptSub;
+            Facade = facade;
+            Routing = routing;
+        }
+
+        /// <summary>Atomically test-and-set the last-seen active player.
+        /// Returns true (claiming a genuine transition) only when the tracker
+        /// was already seeded AND <paramref name="current"/> differs from the
+        /// last value — so a burst of events that all observe the same active
+        /// player fires the handoff at most once, AND the very first
+        /// observation only seeds (no handoff) so the engine's actual first
+        /// player is captured rather than guessed (I2). On a claimed
+        /// transition <paramref name="prevActivePlayer"/> is the seat we moved
+        /// away from (used by the caller as the clock CAS expectation).</summary>
+        public bool TryClaimActivePlayerChange(Guid current, out Guid prevActivePlayer)
+        {
+            lock (_activePlayerGate)
+            {
+                var prev = _lastActivePlayerId;
+                _lastActivePlayerId = current;
+                if (prev == null || prev.Value == current)
+                {
+                    // First observation (seed only) or no change → no handoff.
+                    prevActivePlayer = current;
+                    return false;
+                }
+                prevActivePlayer = prev.Value;
+                return true;
+            }
         }
 
         public void Dispose()

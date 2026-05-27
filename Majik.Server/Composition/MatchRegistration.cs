@@ -26,7 +26,27 @@ public static class MatchRegistration
         // subscriptions across the request lifetime of MatchService
         // (scoped) — every match attaches once at facade-create and
         // detaches at terminal state.
-        services.AddSingleton<MatchFacadeBridge>();
+        //
+        // The clock-handoff callback keeps the server clock holder aligned
+        // with the engine's active player (CR 117 / 103.7). It opens a fresh
+        // DI scope to resolve the scoped MatchService and calls
+        // OnPriorityPassedAsync — same pattern as MatchTimeoutScheduler
+        // below. Without it the holder set in PlayDrawAsync freezes forever
+        // and the wrong player's clock burns.
+        services.AddSingleton<MatchFacadeBridge>(sp =>
+            new MatchFacadeBridge(
+                sp.GetRequiredService<IMatchHubPublisher>(),
+                sp.GetRequiredService<ILogger<MatchFacadeBridge>>(),
+                sp.GetService<MatchReplayBuffer>(),
+                onActivePlayerChanged: async (matchId, newHolderSub, expectedPrevHolderSub, ct) =>
+                {
+                    using var scope = sp.CreateScope();
+                    var svc = scope.ServiceProvider.GetRequiredService<MatchService>();
+                    // expectedPrevHolderSub threads the prior holder through as a
+                    // compare-and-swap guard so out-of-order handoffs can't
+                    // double-bill the same seat (C1).
+                    await svc.OnPriorityPassedAsync(matchId, newHolderSub, ct, expectedPrevHolderSub);
+                }));
         // Bot-match scheduler: drives the bot's roll + play/draw follow-up
         // with brief delays so the SignalR-fed UI lingers on Rolling long
         // enough for the user to see the dice. Singleton so the same set
