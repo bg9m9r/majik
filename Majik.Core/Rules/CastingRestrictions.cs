@@ -1,4 +1,5 @@
 using Majik.Core.Players;
+using Majik.Core.Zones;
 
 namespace Majik.Core.Rules;
 
@@ -58,6 +59,14 @@ public static class CastingRestrictions
     // <see cref="Clear"/> in tests). Same lifecycle posture as the
     // turn-scoped uncounterable rider.
     private static readonly HashSet<Guid> _noncreatureRestrictedPlayers = new();
+    // CR 601.3 — global "no player may cast spells from this zone" rail
+    // (Grafdigger's Cage: "Players can't cast spells from graveyards or
+    // libraries."). Stored as (token, zone); a zone is blocked for every
+    // player while at least one entry targeting it exists. Distinct from
+    // <see cref="_castFromHandOnly"/>, which is per-player and inverts the
+    // gate (allow Hand only); this rail blocklists specific zones for
+    // everyone.
+    private static readonly List<(object Token, ZoneType Zone)> _globalCastZoneBlocks = new();
     private static readonly object _gate = new();
 
     /// <summary>
@@ -358,6 +367,63 @@ public static class CastingRestrictions
         lock (_gate) _noncreatureRestrictedPlayers.Clear();
     }
 
+    /// <summary>
+    /// Register a global "no player may cast spells from
+    /// <paramref name="zone"/>" restriction (CR 601.3 — Grafdigger's Cage:
+    /// "Players can't cast spells from graveyards or libraries."), keyed
+    /// by <paramref name="token"/>. Idempotent for the same (token, zone)
+    /// pair — re-registering does not add a second entry. Multiple zones
+    /// per source register as separate entries under the same token.
+    /// </summary>
+    public static void AddGlobalCastZoneBlock(object token, ZoneType zone)
+    {
+        ArgumentNullException.ThrowIfNull(token);
+        lock (_gate)
+        {
+            foreach (var entry in _globalCastZoneBlocks)
+            {
+                if (ReferenceEquals(entry.Token, token) && entry.Zone == zone)
+                {
+                    return;
+                }
+            }
+            _globalCastZoneBlocks.Add((token, zone));
+        }
+    }
+
+    /// <summary>
+    /// Remove every global cast-zone block registered under
+    /// <paramref name="token"/>. Used when the source permanent leaves the
+    /// battlefield. Scoped by token, so removing one source does not tear
+    /// down blocks contributed by other sources.
+    /// </summary>
+    public static void RemoveGlobalCastZoneBlock(object token)
+    {
+        ArgumentNullException.ThrowIfNull(token);
+        lock (_gate)
+        {
+            _globalCastZoneBlocks.RemoveAll(e => ReferenceEquals(e.Token, token));
+        }
+    }
+
+    /// <summary>
+    /// True if at least one registered global block currently prevents
+    /// every player from casting spells from <paramref name="zone"/>
+    /// (CR 601.3 — Grafdigger's Cage shape). Consulted by
+    /// <see cref="ActionValidator.ValidateCastSpell"/>.
+    /// </summary>
+    public static bool IsCastFromZoneGloballyBlocked(ZoneType zone)
+    {
+        lock (_gate)
+        {
+            foreach (var entry in _globalCastZoneBlocks)
+            {
+                if (entry.Zone == zone) return true;
+            }
+            return false;
+        }
+    }
+
     /// <summary>Reset the registry. Test-only.</summary>
     public static void Clear()
     {
@@ -369,6 +435,7 @@ public static class CastingRestrictions
             _namedCardBlocks.Clear();
             _namedCardBlocksByPlayer.Clear();
             _noncreatureRestrictedPlayers.Clear();
+            _globalCastZoneBlocks.Clear();
         }
     }
 }

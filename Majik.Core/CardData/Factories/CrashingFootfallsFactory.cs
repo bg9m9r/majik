@@ -172,12 +172,13 @@ public static class CrashingFootfallsFactory
             // CR 105 / CR 111.4 — printed "4/4 green Rhino Warrior".
             Colors: new[] { Majik.Core.ValueObjects.ManaColor.Green });
 
-        var result = new List<Creature>(TokenCount);
-        for (int i = 0; i < TokenCount; i++)
-        {
-            result.Add(TokenFactory.CreateOnBattlefield(spec, controller, zoneService));
-        }
-        return result;
+        // CR 614 — route through TokenCreationIntent so token doublers
+        // (Doubling Season / Parallel Lives / Anointed Procession) can
+        // rewrite the count. When zoneService carries no ReplacementBus
+        // this falls back to a plain N-mint loop, matching the prior
+        // direct-creation path.
+        return TokenFactory.CreateOnBattlefield(
+            spec, controller, TokenCount, zoneService, zoneService?.Replacements);
     }
 
 }

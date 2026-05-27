@@ -142,6 +142,15 @@ public sealed class TurnDriver
 
         TurnState.RecordPermanentLeftBattlefield(formerController);
 
+        // Per-card "moved to graveyard from battlefield this turn" ledger
+        // (CR 121 — read by Faith's Reward at resolution). Only the
+        // Battlefield → Graveyard transition qualifies (Faith's Reward's
+        // printed wording is precise; exile / hand / library don't count).
+        if (e.ToZone == ZoneType.Graveyard)
+        {
+            TurnState.RecordPermanentMovedToGraveyard(formerController, e.Card);
+        }
+
         // A creature dying = it had the Creature type while on the battlefield
         // and the move destination is anywhere it ceases to be a permanent
         // (typically Graveyard, Exile, hand, library — all qualify as "died"
