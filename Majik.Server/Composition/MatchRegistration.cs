@@ -71,7 +71,8 @@ public static class MatchRegistration
                 using var scope = sp.CreateScope();
                 var svc = scope.ServiceProvider.GetRequiredService<MatchService>();
                 await svc.OnTimeoutAsync(matchId, holder, ct);
-            }));
+            },
+            sp.GetService<ILogger<MatchTimeoutScheduler>>()));
         services.AddSingleton<IMatchOwnership, MatchOwnership>();
         services.AddHostedService<MatchOwnershipHeartbeat>();
         // Forwarder doubles as a hosted service so its per-process reply
