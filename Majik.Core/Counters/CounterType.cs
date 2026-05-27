@@ -66,6 +66,18 @@ public sealed record CounterType(string Name)
     public static readonly CounterType Energy = new("Energy");
 
     /// <summary>
+    /// CR 122 — Quest counters. Card-specific marker used by the
+    /// "Ascension" enchantment cycle (Zendikar; Bloodchief Ascension,
+    /// Luminarch Ascension, …). Each Ascension's gated upkeep / end-step
+    /// trigger places one quest counter when its intervening-if latch
+    /// holds; the Ascension's payoff ability unlocks once it accumulates
+    /// the printed threshold (three for Bloodchief, four for Luminarch).
+    /// Engine-level semantics are opaque — the gameplay payoff each
+    /// Ascension grants is encoded by the corresponding factory.
+    /// </summary>
+    public static readonly CounterType Quest = new("Quest");
+
+    /// <summary>
     /// CR 122 — Stasis counters. Card-specific marker used by Static Prison
     /// (Modern Horizons 3). Static Prison's ETB places one stasis counter
     /// for each energy the controller has after gaining {E}{E}; while
@@ -77,13 +89,12 @@ public sealed record CounterType(string Name)
     public static readonly CounterType Stasis = new("Stasis");
 
     /// <summary>
-    /// CR 122 — Quest counters. Card-specific marker used by Pyromancer
-    /// Ascension (Zendikar). Whenever the controller casts an instant or
-    /// sorcery with the same name as a card in their graveyard, they may
-    /// put a quest counter on Pyromancer Ascension; while it has two or
-    /// more quest counters on it, instant / sorcery spells the controller
-    /// casts are copied. Counter accumulation and threshold are checked via
-    /// <see cref="CounterCollection.Count"/>.
+    /// CR 122 — Fate counters. Card-specific marker used by Oblivion Stone
+    /// (Mirrodin). Oblivion Stone's first activated ability puts a fate
+    /// counter on each nonland permanent; its second destroys each nonland
+    /// permanent without a fate counter on it, then removes all fate
+    /// counters from all permanents. The counter is purely a marker —
+    /// no built-in P/T or ability semantics.
     /// </summary>
-    public static readonly CounterType Quest = new("Quest");
+    public static readonly CounterType Fate = new("Fate");
 }
