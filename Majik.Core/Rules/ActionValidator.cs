@@ -109,6 +109,21 @@ public class ActionValidator
                 $"{action.Player.Name} can't cast spells from {action.FromZone.Value}",
                 new RuleViolation("113.6", "cast-from-hand-only restriction"));
         }
+        // CR 601.3 — global cast-from-zone block (Grafdigger's Cage:
+        // "Players can't cast spells from graveyards or libraries."). When
+        // the caller declares a source zone and that zone is currently
+        // registered as globally blocked, reject the cast for every player.
+        // Distinct from the cast-from-hand-only rail above: this rail
+        // blocklists specific zones for everyone, rather than allowlisting
+        // Hand for individual players.
+        if (action.FromZone.HasValue
+            && CastingRestrictions.IsCastFromZoneGloballyBlocked(action.FromZone.Value))
+        {
+            return ValidationResult.Invalid(
+                $"Players can't cast spells from {action.FromZone.Value}",
+                new RuleViolation("601.3", $"global cast-from-zone block on {action.FromZone.Value}"));
+        }
+
         // CR 601.3 — named-card cast block (Meddling Mage: "spells with the
         // chosen name can't be cast"). Reject a cast when the spell's card
         // name is currently registered as blocked.
