@@ -238,12 +238,30 @@ public sealed class EmbeddedCardRepository : ICardRepository
     /// This is what lets a card PR add a factory without regenerating
     /// <c>modern-cards.json.gz</c> — the binary seed was otherwise the
     /// source of a perpetual merge-conflict treadmill. The stored flag is
-    /// kept in the file for human inspection only.</summary>
+    /// kept in the file for human inspection only.
+    ///
+    /// For double-faced, adventure, and split cards (CR 712) the seed stores
+    /// the full composite name <c>"Front // Back"</c>, but factories register
+    /// only the front-face name via <c>[CardName("Front")]</c>. A secondary
+    /// front-face check (<see cref="FrontFaceImplemented"/>) ensures those
+    /// cards are not incorrectly flagged <c>IsImplemented=false</c>.</summary>
     internal static CardEntity DeriveImplemented(CardEntity entity)
     {
         entity.IsImplemented =
-            Factories.ImplementedCardNames.Contains(entity.Name);
+            Factories.ImplementedCardNames.Contains(entity.Name)
+            || FrontFaceImplemented(entity.Name);
         return entity;
+    }
+
+    // CR 712 — double-faced/split/adventure cards are seeded as "Front // Back";
+    // factories register the front-face name via [CardName], so a card counts
+    // as implemented when its front face is in the registry.
+    private static bool FrontFaceImplemented(string name)
+    {
+        var idx = name.IndexOf(" // ", StringComparison.Ordinal);
+        if (idx < 0) return false;
+        var front = name[..idx];
+        return Factories.ImplementedCardNames.Contains(front);
     }
 
     private static readonly JsonSerializerOptions SerializerOptions = new()
