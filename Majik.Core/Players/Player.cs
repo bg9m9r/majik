@@ -202,6 +202,35 @@ public class Player
         _emblems.Add(emblem);
     }
 
+    // ── The Ring (CR 701.54) ─────────────────────────────────────────────────
+
+    /// <summary>
+    /// CR 701.54 — this player's Ring state (the emblem named The Ring + tempt
+    /// counter + Ring-bearer designation), or null until the Ring first tempts
+    /// them (CR 701.54c — the emblem is created on the first tempt). Reusable
+    /// across every LOTR card that tempts.
+    /// </summary>
+    public RingState? Ring { get; private set; }
+
+    /// <summary>
+    /// CR 701.54a/c — "the Ring tempts you." Creates the emblem named The Ring
+    /// on the first tempt, increments the tempt count, and (when a creature is
+    /// offered) designates it the Ring-bearer. The optional services let the
+    /// emblem's staged triggered abilities drive themselves off the live event
+    /// bus; supply them once and they persist for the rest of the game.
+    /// Subsequent calls reuse the existing <see cref="Ring"/> and ignore later
+    /// service args (the Ring is created at most once).
+    /// </summary>
+    public void TheRingTemptsYou(
+        Majik.Core.Cards.Permanent? chosenBearer,
+        IEventBus? eventBus = null,
+        Majik.Core.Abilities.TriggerManager? triggers = null,
+        Func<IReadOnlyList<Player>>? allPlayersResolver = null)
+    {
+        Ring ??= new RingState(this, eventBus, triggers, allPlayersResolver);
+        Ring.Tempt(chosenBearer);
+    }
+
     /// <summary>
     /// CR 614 — optional <see cref="ReplacementBus"/> the player routes
     /// life-change intents through. Attached via
