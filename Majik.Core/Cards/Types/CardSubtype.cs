@@ -335,5 +335,30 @@ public enum CardSubtype
     /// <summary>Homarid creature subtype — Hedron Crab, Homarid. CR 205.3m.
     /// Crustacean-flavoured creature type that originated in Fallen Empires
     /// and was reused by Zendikar's Hedron Crab.</summary>
-    Homarid
+    Homarid,
+
+    /// <summary>Centaur creature subtype — Loxodon Smiter (Return to Ravnica),
+    /// Territorial Centaur, Centaur Courser. CR 205.3m.</summary>
+    Centaur,
+    /// <summary>Djinn creature subtype — Mahamoti Djinn (Alpha/Beta/many reprints),
+    /// Serendib Djinn, Dungeon Geists. CR 205.3m.</summary>
+    Djinn,
+    /// <summary>Elephant creature subtype — Elephant token (from Creeping
+    /// Renaissance, Trumpet Blast), Trained Armodon. CR 205.3m.</summary>
+    Elephant,
+    /// <summary>Griffin creature subtype — Griffin Sentinel (Magic 2012),
+    /// Numot, the Devastator, Pride of the Clouds. CR 205.3m.</summary>
+    Griffin,
+    /// <summary>Ogre creature subtype — Marauding Ogre (Core sets), Hellhole
+    /// Flailer (Return to Ravnica), Shattergang Brothers. CR 205.3m.</summary>
+    Ogre,
+    /// <summary>Ox creature subtype — Ox of Agonas (Theros Beyond Death),
+    /// Yoked Ox (Theros). CR 205.3m.</summary>
+    Ox,
+    /// <summary>Rat creature subtype — Pack Rat (Return to Ravnica), Rat Colony
+    /// (Dominaria), Swarm of Rats. CR 205.3m.</summary>
+    Rat,
+    /// <summary>Spider creature subtype — Giant Spider (Core sets), Sentinel
+    /// Spider (Magic 2013), Ishkanah, Grafwidow. CR 205.3m.</summary>
+    Spider,
 }
