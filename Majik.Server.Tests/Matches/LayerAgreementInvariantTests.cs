@@ -98,6 +98,14 @@ public class LayerAgreementInvariantTests : IClassFixture<TestMongoFixture>
 
         var initialActive = h.Facade.ActivePlayerId;
 
+        // Snapshot the fire count BEFORE the genuine handoff. After the I2
+        // fix the turn-1 active-player observation only seeds the tracker (no
+        // handoff), so this baseline should be 0 — but snapshotting makes the
+        // assertion robust regardless: we require the count to INCREASE across
+        // the real seat change, so it can't be satisfied by a spurious fire
+        // that happened before the turn actually flipped (I3).
+        var fireCountBeforeHandoff = h.Bridge.ClockHandoffFireCount;
+
         // Advance creator passes until the engine's active player changes
         // seats (a turn handoff), capped at 40 passes.
         var handoffSeen = false;
@@ -109,9 +117,10 @@ public class LayerAgreementInvariantTests : IClassFixture<TestMongoFixture>
 
         handoffSeen.Should().BeTrue(
             "advancing ~40 passes must hand the turn to the other seat at least once");
-        h.Bridge.ClockHandoffFireCount.Should().BeGreaterThan(0,
-            "the bridge must have fired the clock-handoff callback on the turn " +
-            "handoff — the clock following the engine can't be a coincidence");
+        h.Bridge.ClockHandoffFireCount.Should().BeGreaterThan(fireCountBeforeHandoff,
+            "the bridge must have fired the clock-handoff callback ACROSS the genuine " +
+            "turn handoff (count increased over the pre-handoff baseline) — the clock " +
+            "following the engine can't be a coincidence or a turn-1 spurious fire");
 
         // The clock-handoff callback fires asynchronously (it opens a DI
         // scope + Mongo round-trip off the engine's synchronous event
