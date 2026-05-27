@@ -515,7 +515,14 @@ public sealed class GameFacade
             landDropTracker: LandDrops);
 
         var settled = _nextPromptSignal.Task;
-        _fullGameTask = driver.RunGameAsync(maxTurns, ct);
+        // CR 103.2 / 103.4 / 103.7 — the starting player is decided UPSTREAM
+        // by the pre-game die roll + the winner's play/draw choice (see
+        // MatchService.PlayDrawAsync), which orders the intended first player
+        // into orderedPlayers[0] above. Tell the driver to honour that seat
+        // (index 0) instead of re-rolling at random; the random flip is only
+        // a fallback for callers (bot-vs-bot sims) that don't specify a
+        // starting player.
+        _fullGameTask = driver.RunGameAsync(maxTurns, startingPlayerIndex: 0, ct: ct);
         return WaitForPromptOrLoopAsync(settled, _fullGameTask, ct);
     }
 
