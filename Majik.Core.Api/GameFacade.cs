@@ -491,7 +491,8 @@ public sealed class GameFacade
     public Task StartFullGameAsync(
         int firstPlayerSlot = 0,
         int maxTurns = 30,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        Majik.Core.Random.GameRandom? rng = null)
     {
         if (_loopTask != null || _fullGameTask != null)
         {
@@ -516,6 +517,7 @@ public sealed class GameFacade
             stateBasedActions: _sba,
             priorityManager: _priority,
             combatFlow: _combatFlow,
+            rng: rng,
             eventBus: _bus,
             spellDefinitionResolver: BuildSpellDefinitionResolver(),
             continuousEffects: ContinuousEffects,
