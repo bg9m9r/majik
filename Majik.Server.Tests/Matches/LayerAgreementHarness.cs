@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using Majik.Bot.Decks;
 using Majik.Core.Api;
+using Majik.Core.Api.Dtos;
 using Majik.Core.CardData;
 using Majik.Server.Composition;
 using Majik.Server.Decks;
@@ -336,6 +337,18 @@ public sealed class LayerAgreementHarness : IDisposable
             return PayloadReflection.GetString(entry.payload, "holder");
         }
         return null;
+    }
+
+    /// <summary>GET /matches/{MatchId}/state as <paramref name="sub"/> and
+    /// deserialise the response body as <see cref="GameStateDto"/>. Mirrors
+    /// how <see cref="MatchEndpointsGameplayTests"/> GETs state with the
+    /// seated auth header, but scoped to this harness's MatchId.</summary>
+    public async Task<GameStateDto?> GetStateAsync(string sub)
+    {
+        var client = sub == CreatorSub ? _creatorClient : ClientFor(sub);
+        var resp = await client.GetAsync($"/matches/{MatchId}/state");
+        if (!resp.IsSuccessStatusCode) return null;
+        return await resp.Content.ReadFromJsonAsync<GameStateDto>();
     }
 
     public void Dispose()
