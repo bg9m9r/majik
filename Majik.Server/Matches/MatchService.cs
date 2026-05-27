@@ -779,12 +779,21 @@ public sealed class MatchService
             .Set(m => m.UpdatedAt, now);
 
         var moved = await _matches.TryAtomicUpdateAsync(matchId, MatchState.Playing, update, ct);
-        if (!moved) return Result.Fail<MatchDto>(new MatchError("cannot-concede"));
 
+        // Cleanup runs REGARDLESS of the CAS result (Slice 4a #8). Both
+        // operations are idempotent, and a CAS conflict here means a
+        // concurrent timeout already moved the match to Completed — but THIS
+        // replica still holds the timer + bridge subscriptions for the match
+        // and would leak them if we returned without tearing them down. The
+        // winning timeout path detaches its own copy; on a single replica
+        // both reference the same instances, so the double-detach is a no-op.
         _timeoutScheduler?.Cancel(matchId);
         // Tear down engine→SignalR bridge: match is over, no further
         // EventDto / PromptDto traffic should reach the hub group.
         _facadeBridge?.Detach(matchId);
+
+        if (!moved) return Result.Fail<MatchDto>(new MatchError("cannot-concede"));
+
         _hub?.Publish(matchId, "match.state-changed",
             new { matchId, state = "Completed", transitionedAt = now });
 
