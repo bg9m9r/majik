@@ -9,6 +9,17 @@ namespace Majik.Core.Events;
 /// deliberate — one bad subscriber must not abort delivery to the rest
 /// of the engine (combat code, SBA, trigger manager) which depend on
 /// observing the same event stream.
+///
+/// <para><strong>DEBUG fail-fast:</strong> <c>GameFacade</c> wires
+/// <see cref="OnHandlerError"/> to a sink that <em>rethrows</em> in
+/// DEBUG builds (via <c>GameFacadeErrorSinkInitializer</c>). This is
+/// intentional: event-handler bodies must not throw on normal execution
+/// paths — a throw in DEBUG means a real engine bug and the process
+/// crash surfaces it immediately. Release builds leave the sink null so
+/// handler exceptions are silently swallowed, preserving live-game
+/// isolation. Consequence: if you add a new event handler that can throw
+/// under ordinary conditions you will see an unhandled-exception crash in
+/// tests/DEBUG before anything reaches production.</para>
 /// </summary>
 public class EventBus : IEventBus
 {
@@ -22,6 +33,13 @@ public class EventBus : IEventBus
     /// exception and the event being published. Set to null to swallow
     /// silently (default). The bus never propagates handler exceptions
     /// to the publisher.
+    ///
+    /// <para><strong>DEBUG fail-fast:</strong> <c>GameFacade</c> sets this
+    /// to a rethrowing sink in DEBUG builds so any handler exception
+    /// crashes the process immediately — surfacing real engine bugs during
+    /// development and in the test suite. Handler bodies must therefore not
+    /// throw on normal execution paths. See <c>GameFacadeErrorSinkInitializer</c>
+    /// and the class-level summary for details.</para>
     /// </summary>
     public Action<Exception, GameEvent>? OnHandlerError { get; set; }
 
