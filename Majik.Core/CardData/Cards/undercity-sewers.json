@@ -1,0 +1,15 @@
+{
+  "name": "Undercity Sewers",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "U" },
+    { "kind": "mana", "produces": "B" },
+    {
+      "kind": "triggered",
+      "trigger": { "type": "etb_self" },
+      "effects": [
+        { "type": "surveil_self", "amount": 1 }
+      ]
+    }
+  ]
+}

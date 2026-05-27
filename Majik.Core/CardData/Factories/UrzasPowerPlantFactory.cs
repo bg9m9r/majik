@@ -6,8 +6,14 @@ using Majik.Core.Players;
 namespace Majik.Core.CardData.Factories;
 
 /// <summary>
-/// Named-card factory for Urza's Power-Plant (Antiquities — Urza Tron
+/// Named-card factory for Urza's Power Plant (Antiquities — Urza Tron
 /// cycle).
+///
+/// The printed card name has a space ("Urza's Power Plant"); only the land
+/// subtype is hyphenated ("Land — Urza's Power-Plant"). Registering the
+/// <see cref="CardNameAttribute"/> under the space form is what lets a real
+/// seed card dispatch here (the hyphen form never matched, so Tron could not
+/// assemble in live games).
 ///
 /// Land — Urza's Power-Plant. Oracle text:
 ///   "{T}: Add {C}. If you control an Urza's Mine, an Urza's
@@ -17,11 +23,11 @@ namespace Majik.Core.CardData.Factories;
 /// subtype differs (<see cref="CardSubtype.PowerPlant"/>). The shared
 /// conditional mana logic lives in <see cref="TronLandHelper"/>.
 /// </summary>
-[CardName("Urza's Power-Plant")]
+[CardName("Urza's Power Plant")]
 public static class UrzasPowerPlantFactory
 {
     /// <summary>
-    /// Construct Urza's Power-Plant owned and controlled by
+    /// Construct Urza's Power Plant owned and controlled by
     /// <paramref name="owner"/>.
     /// </summary>
     public static Land Create(Player owner)
@@ -29,7 +35,7 @@ public static class UrzasPowerPlantFactory
         ArgumentNullException.ThrowIfNull(owner);
 
         var land = new Land(
-            "Urza's Power-Plant",
+            "Urza's Power Plant",
             supertypes: null,
             subtypes: new[] { CardSubtype.Urzas, CardSubtype.PowerPlant });
         land.SetOwner(owner);
