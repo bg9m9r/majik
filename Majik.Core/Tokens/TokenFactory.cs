@@ -2,6 +2,7 @@ using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
+using Majik.Core.Effects;
 using Majik.Core.Mana;
 using Majik.Core.Players;
 using Majik.Core.Services;
@@ -95,6 +96,55 @@ public static class TokenFactory
         }
 
         return token;
+    }
+
+    /// <summary>
+    /// CR 111 / CR 614 — bus-aware "create one or more tokens" entry point.
+    /// Publishes a <see cref="TokenCreationIntent"/> through
+    /// <paramref name="replacements"/> (when supplied) so token-doubling
+    /// replacements (Doubling Season, Parallel Lives, Anointed Procession)
+    /// can rewrite the count before any token is minted, then mints the
+    /// post-replacement <c>Count</c> copies via
+    /// <see cref="CreateOnBattlefield(TokenSpec, Player, ZoneService?)"/>.
+    ///
+    /// Returns the list of minted tokens (empty when the intent was
+    /// cancelled or its count fell to zero). Callers that need a single
+    /// token can continue calling the single-token overload directly;
+    /// this overload is the recommended path whenever the number of
+    /// tokens shipped is part of the printed effect ("Create two 1/1
+    /// Soldier tokens", etc.).
+    ///
+    /// CR 616.1c — each registered doubler fires at most once per intent;
+    /// two Parallel Lives stack multiplicatively (1 → 2 → 4).
+    /// </summary>
+    public static IReadOnlyList<Creature> CreateOnBattlefield(
+        TokenSpec spec,
+        Player controller,
+        int count,
+        ZoneService? zones,
+        ReplacementBus? replacements)
+    {
+        if (spec == null) throw new ArgumentNullException(nameof(spec));
+        if (controller == null) throw new ArgumentNullException(nameof(controller));
+        if (count <= 0) return Array.Empty<Creature>();
+
+        var intent = new TokenCreationIntent(controller, spec, count);
+
+        if (replacements != null)
+        {
+            var replaced = replacements.Apply(intent);
+            if (replaced == null) return Array.Empty<Creature>();
+            intent = replaced;
+        }
+
+        if (intent.Count <= 0) return Array.Empty<Creature>();
+
+        var minted = new List<Creature>(intent.Count);
+        for (int i = 0; i < intent.Count; i++)
+        {
+            minted.Add(CreateOnBattlefield(intent.Spec, intent.Controller, zones));
+        }
+        return minted;
     }
 
     /// <summary>Amass token (CR 701.49). Creates a 0/0 black [tribe] Army
@@ -212,15 +262,19 @@ public static class TokenFactory
         return token;
     }
 
-    /// <summary>Blood (CR 111.10 / Innistrad: Crimson Vow): colourless
-    /// artifact token with "{1}, {T}, Discard a card, Sacrifice this
-    /// artifact: Draw a card." Bound as a single
-    /// <see cref="ActivatedAbility"/> with mana + tap + discard +
-    /// self-sacrifice costs and a draw-one effect. Same wiring shape as
-    /// <see cref="CreateClue"/> / <see cref="CreateFood"/>; discard
-    /// payment uses <see cref="DiscardACardCost"/> so the deferred
-    /// agent-driven discard-target prompt is shared with the wider
-    /// looting family.</summary>
+    /// <summary>Blood (CR 111.10 / Innistrad: Crimson Vow): red artifact
+    /// token with "{1}, {T}, Discard a card, Sacrifice this artifact: Draw
+    /// a card." Voldaren Estate's red-mana-flavoured Treasure cousin —
+    /// produced by Voldaren Epicure / Bloodtithe Harvester / Voldaren
+    /// Bloodcaster and consumed by Falkenrath Pit Fighter, Voldaren Pariah's
+    /// Anointed Deacon transform clause, and the broader Crimson Vow
+    /// "sacrifice a Blood token" payoff family. Bound as a 4-cost activated
+    /// ability ({1} mana + {T} tap + DiscardACard + sacrifice-self) with a
+    /// single draw-one effect — same compositional shape as
+    /// <see cref="CreateClue"/> / <see cref="CreateFood"/>. The
+    /// <see cref="CardSubtype.Blood"/> subtype is stamped so Falkenrath Pit
+    /// Fighter's "sacrifice another creature or Blood token" cost gate +
+    /// the broader Blood-counts-as-X type predicates pick it up.</summary>
     public static Artifact CreateBlood(Player controller, ZoneService? zones = null)
     {
         if (controller == null) throw new ArgumentNullException(nameof(controller));
@@ -231,11 +285,14 @@ public static class TokenFactory
             Controller = controller,
             IsToken = true,
         };
-        // CR 111.10 — Blood tokens are colourless artifacts.
-        token.SetTokenColors(Array.Empty<ManaColor>());
+        // CR 111.10 — Blood tokens are red artifacts (the printed token frame
+        // is red and the flavour text-box is treated as red mana for the
+        // CardColors / colour-matters surface). Single-colour list per the
+        // TokenSpec.Colors convention used by Stormchaser's Talent Mercenary.
+        token.SetTokenColors(new[] { ManaColor.Red });
 
         // {1}, {T}, Discard a card, Sacrifice this artifact: Draw a card.
-        token.AddAbility(BuildBloodLootAbility(token, controller));
+        token.AddAbility(BuildBloodDiscardDrawAbility(token, controller));
 
         PutOnBattlefield(token, controller, zones);
         return token;
@@ -352,28 +409,6 @@ public static class TokenFactory
         return new ActivatedAbility(source, controller, costs: costs, effects: effects);
     }
 
-    /// <summary>"{1}, {T}, Discard a card, Sacrifice this artifact: Draw a
-    /// card." — Blood ability (CR 111.10 / Innistrad: Crimson Vow). Wired
-    /// as a single <see cref="ActivatedAbility"/> with the four costs in
-    /// the printed order; resolution draws one card for the controller
-    /// (empty-library no-op, SBA-driven loss flag is owned by
-    /// <see cref="Player.DrawCard"/>).</summary>
-    private static ActivatedAbility BuildBloodLootAbility(Artifact source, Player controller)
-    {
-        var costs = new ICost[]
-        {
-            new ManaCostCost(ValueObjects.ManaCost.Parse("1")),
-            AdditionalCost.Tap(source),
-            new DiscardACardCost(),
-            AdditionalCost.Sacrifice(source),
-        };
-        var effects = new IEffect[]
-        {
-            new Effect("draw 1 from Blood", () => DrawOneCard(controller)),
-        };
-        return new ActivatedAbility(source, controller, costs: costs, effects: effects);
-    }
-
     /// <summary>"{2}, {T}, Sacrifice this artifact: You gain 3 life." — Food ability.</summary>
     private static ActivatedAbility BuildFoodGainLifeAbility(Artifact source, Player controller)
     {
@@ -386,6 +421,57 @@ public static class TokenFactory
         var effects = new IEffect[]
         {
             new Effect("Food: gain 3 life", () => controller.GainLife(3)),
+        };
+        return new ActivatedAbility(source, controller, costs: costs, effects: effects);
+    }
+
+    /// <summary>"{1}, {T}, Discard a card, Sacrifice this artifact: Draw a
+    /// card." — Blood ability. Four costs in cost-list declaration order
+    /// (mana, tap, discard, sacrifice); the sacrifice payment is performed
+    /// inside the effect closure because the generic
+    /// <see cref="AdditionalCost.Sacrifice"/> payment is a no-op stub
+    /// (mirrors Caustic Caterpillar / Insolent Neonate / Aether Spellbomb).
+    /// The draw is one card from the top of the controller's library — empty
+    /// library flags the SBA loss via
+    /// <see cref="Player.MarkTriedToDrawFromEmptyLibrary"/> (CR 704.5b),
+    /// matching the Clue / Food posture.</summary>
+    private static ActivatedAbility BuildBloodDiscardDrawAbility(Artifact source, Player controller)
+    {
+        var costs = new ICost[]
+        {
+            new ManaCostCost(ValueObjects.ManaCost.Parse("1")),
+            AdditionalCost.Tap(source),
+            new DiscardACardCost(),
+            AdditionalCost.Sacrifice(source),
+        };
+        var effects = new IEffect[]
+        {
+            new Effect("Blood: sacrifice self + draw a card", () =>
+            {
+                // Sacrifice payment — AdditionalCost.Sacrifice is a no-op
+                // stub (see Insolent Neonate / Caustic Caterpillar
+                // precedent), so we route the battlefield → graveyard move
+                // here. CR 701.16 — idempotent re-entry guard.
+                if (source.Zone == ZoneType.Battlefield)
+                {
+                    controller.Zones.Battlefield.RemoveCard(source);
+                    controller.Zones.Graveyard.AddCard(source);
+                    source.SetZone(ZoneType.Graveyard);
+                }
+
+                // CR 121.1 — draw one card from top of library. Empty
+                // library flags the SBA loss via the standard helper
+                // (Insolent Neonate / Faithless Looting parity).
+                var top = controller.Zones.Library.GetCards().FirstOrDefault();
+                if (top == null)
+                {
+                    controller.MarkTriedToDrawFromEmptyLibrary();
+                    return;
+                }
+                controller.Zones.Library.RemoveCard(top);
+                controller.Zones.Hand.AddCard(top);
+                top.SetZone(ZoneType.Hand);
+            }),
         };
         return new ActivatedAbility(source, controller, costs: costs, effects: effects);
     }

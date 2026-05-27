@@ -44,6 +44,21 @@ public sealed class TurnState
     // landfall trigger.
     private readonly Dictionary<Guid, int> _landsEnteredByController = new();
 
+    // Per-player count of cards cycled this turn (CR 702.32). Driven by
+    // CardCycledEvent subscribers (TurnDriver). Read by Hollow One's
+    // self-cost-reduction reducer ("This spell costs {2} less to cast for
+    // each card you've cycled or discarded this turn").
+    private readonly Dictionary<Guid, int> _cyclesByPlayer = new();
+
+    // Per-player count of cards discarded this turn (CR 701.16). Driven by
+    // CardMovedEvent(Hand → Graveyard) subscribers (TurnDriver) — the
+    // discarder is the moved card's owner. Read by Hollow One's
+    // self-cost-reduction reducer alongside _cyclesByPlayer. Counts every
+    // hand → graveyard move, regardless of source (player discard, opponent-
+    // forced discard, "discard a card" cost payments — all qualify per CR
+    // 701.16a).
+    private readonly Dictionary<Guid, int> _discardsByPlayer = new();
+
     // Per-permanent set of references that entered the battlefield this turn.
     // Read by "creatures that entered the battlefield this turn" effects
     // (Force of Despair — CR 109.5 / CR 700.6) at spell resolution. Reference
@@ -52,6 +67,19 @@ public sealed class TurnState
     // that left + re-entered counts only for its newest ETB (cleared via
     // re-ETB; see RecordPermanentEnteredBattlefield).
     private readonly HashSet<Permanent> _permanentsEnteredThisTurn = new();
+
+    // Per-controller set of permanent CARDS that moved Battlefield → Graveyard
+    // this turn. Read by Faith's Reward (CR 121 — "return all permanent cards
+    // in your graveyard that were put there from the battlefield this turn")
+    // at spell resolution. Reference equality keyed on the card object so a
+    // creature that died, was reanimated, and died again is tracked correctly
+    // (HashSet semantics — the second death replaces the first entry but the
+    // identity stays the same; both deaths satisfy the rule). Tokens that
+    // ceased to exist via SBA 704.5d are recorded too — but the printed
+    // "permanent CARDS" filter excludes tokens at resolution (tokens are not
+    // cards in zones after SBA), so callers should re-check zone membership
+    // when returning.
+    private readonly Dictionary<Guid, HashSet<ICard>> _permanentsToGraveyardByController = new();
 
     /// <summary>
     /// How many creatures controlled by <paramref name="player"/> died this turn.
@@ -106,6 +134,51 @@ public sealed class TurnState
                 _permanentsLeftByController.GetValueOrDefault(formerController.Id) + 1;
         }
     }
+
+    /// <summary>
+    /// Called when a permanent card moves from the battlefield to a
+    /// graveyard. Records the card reference in the per-controller
+    /// "permanents moved to graveyard from battlefield this turn" set
+    /// (CR 121 — read by Faith's Reward at resolution). The recorded
+    /// controller is the card's former controller (the player whose
+    /// battlefield it left); their graveyard is where the card now sits
+    /// (CR 404.1 — graveyard ownership follows the owner, but Faith's
+    /// Reward's printed wording is "permanent cards in your graveyard
+    /// that were put there from the battlefield this turn", and a card
+    /// only ends up in the controller's graveyard when the controller
+    /// is also the owner — opponent-controlled cards return to their
+    /// owners' graveyards on death). v1 keys on the former controller
+    /// for the common single-deck case; cross-control transfers (e.g.
+    /// stolen creatures dying) end up in the OWNER's graveyard but the
+    /// owner is who casts Faith's Reward to retrieve them.
+    /// </summary>
+    public void RecordPermanentMovedToGraveyard(Player? formerController, ICard card)
+    {
+        if (formerController == null || card == null) return;
+        // Use OWNER (not former controller) so a stolen creature that
+        // dies back into its owner's graveyard is retrieved by the owner
+        // (CR 404.1 — graveyards are owner-scoped). Falls back to the
+        // former controller when Owner is null (shape tests).
+        var ownerId = card.Owner?.Id ?? formerController.Id;
+        if (!_permanentsToGraveyardByController.TryGetValue(ownerId, out var set))
+        {
+            set = new HashSet<ICard>();
+            _permanentsToGraveyardByController[ownerId] = set;
+        }
+        set.Add(card);
+    }
+
+    /// <summary>
+    /// Snapshot of permanent cards that moved from the battlefield to
+    /// <paramref name="player"/>'s graveyard this turn. Read by Faith's
+    /// Reward (CR 121.1) at resolution to identify return candidates.
+    /// Callers must re-check current zone (CR 608.2b — illegal targets
+    /// / state-changed objects) before moving.
+    /// </summary>
+    public IReadOnlyCollection<ICard> PermanentsMovedToGraveyardThisTurn(Player player) =>
+        player != null && _permanentsToGraveyardByController.TryGetValue(player.Id, out var set)
+            ? set
+            : Array.Empty<ICard>();
 
     /// <summary>
     /// Called when a player draws a card.
@@ -199,6 +272,50 @@ public sealed class TurnState
         permanent != null && _permanentsEnteredThisTurn.Contains(permanent);
 
     /// <summary>
+    /// Called when <paramref name="player"/> cycles a card (CR 702.32).
+    /// Fed by <see cref="Majik.Core.Events.CardCycledEvent"/> subscribers
+    /// in <see cref="TurnDriver"/>. Read by Hollow One's self-cost-
+    /// reduction reducer ("for each card you've cycled or discarded this
+    /// turn").
+    /// </summary>
+    public void RecordCardCycled(Player? player)
+    {
+        if (player == null) return;
+        _cyclesByPlayer[player.Id] =
+            _cyclesByPlayer.GetValueOrDefault(player.Id) + 1;
+    }
+
+    /// <summary>
+    /// How many cards <paramref name="player"/> has cycled this turn.
+    /// </summary>
+    public int CyclesByPlayer(Player player) =>
+        player == null
+            ? 0
+            : _cyclesByPlayer.TryGetValue(player.Id, out var v) ? v : 0;
+
+    /// <summary>
+    /// Called when <paramref name="player"/> discards a card (CR 701.16).
+    /// Fed by <see cref="Majik.Core.Events.CardMovedEvent"/> Hand →
+    /// Graveyard subscribers in <see cref="TurnDriver"/> — discarder is
+    /// the moved card's owner. Read by Hollow One's self-cost-reduction
+    /// reducer alongside <see cref="RecordCardCycled"/>.
+    /// </summary>
+    public void RecordCardDiscarded(Player? player)
+    {
+        if (player == null) return;
+        _discardsByPlayer[player.Id] =
+            _discardsByPlayer.GetValueOrDefault(player.Id) + 1;
+    }
+
+    /// <summary>
+    /// How many cards <paramref name="player"/> has discarded this turn.
+    /// </summary>
+    public int DiscardsByPlayer(Player player) =>
+        player == null
+            ? 0
+            : _discardsByPlayer.TryGetValue(player.Id, out var v) ? v : 0;
+
+    /// <summary>
     /// Number of spells <paramref name="player"/> has cast this turn (CR 700.6
     /// per-turn tally). Read by Damping Sphere's "+{1} per other spell cast
     /// this turn" rider — cost calculation runs before the rider increments
@@ -244,5 +361,8 @@ public sealed class TurnState
         _spellsCastByPlayer.Clear();
         _landsEnteredByController.Clear();
         _permanentsEnteredThisTurn.Clear();
+        _cyclesByPlayer.Clear();
+        _discardsByPlayer.Clear();
+        _permanentsToGraveyardByController.Clear();
     }
 }
