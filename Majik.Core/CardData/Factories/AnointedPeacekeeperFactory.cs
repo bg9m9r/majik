@@ -1,94 +1,84 @@
+using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
+using Majik.Core.Effects;
 using Majik.Core.Players;
 
 namespace Majik.Core.CardData.Factories;
 
 /// <summary>
 /// Named-card factory for Anointed Peacekeeper (Dominaria United,
-/// {1}{W}{W}).
+/// {1}{W}{W} — Creature — Human Cleric 2/3).
 ///
-/// Creature — Human Cleric 2/4. Oracle text:
-///   "As Anointed Peacekeeper enters, look at an opponent's hand, then
-///    choose any card name.
+/// Oracle text:
+///   "Vigilance.
+///    As Anointed Peacekeeper enters the battlefield, look at an
+///    opponent's hand, then choose any card name.
 ///    Activated abilities of sources with the chosen name cost {2} more
 ///    to activate unless they're mana abilities.
 ///    Spells with the chosen name cost {2} more to cast."
 ///
-/// ## Why a named factory
-/// "As ~ enters, choose a card name" gates a static cost-increase on the
-/// chosen name across both spell-cast cost and activated-ability cost.
-/// The spell-cast half plugs into the existing
-/// <see cref="SpellCostIncreaseAbility"/> rider that
-/// <see cref="CostReduction.GetEffectiveCost"/> consults at cast time
-/// (same hook <see cref="ThaliaGuardianOfThrabenFactory"/> uses for its
-/// "noncreature spells cost {1} more" tax). The activated-ability half
-/// has no shared primitive in v1 — it's a documented gap.
-///
 /// ## Implemented (v1)
-/// - 2/4 Creature — Human Cleric at {1}{W}{W}, owner / controller wired.
-/// - <b>Spell cost increase</b> (the printed "Spells with the chosen
-///   name cost {2} more to cast" half): a closure-captured chosen name
-///   feeds a <see cref="SpellCostIncreaseAbility"/> on the card itself.
-///   Predicate matches on <see cref="ICard.Name"/> equality (case-
-///   sensitive — Magic card names are canonically cased per Oracle, so
-///   no normalisation is needed for the printed-name comparison; same
-///   posture as <see cref="PithingNeedleFactory"/>'s name registry).
-///   <see cref="SpellCostIncreaseAbility.ExtraGeneric"/> returns +{2}
-///   when the predicate matches and 0 otherwise. Symmetric across
-///   players — Peacekeeper taxes ANY caster's spells whose name matches,
-///   matching the printed text. <see cref="CostReduction.GetEffectiveCost"/>
-///   walks every player's battlefield for these riders at cast time so
-///   the increase fires irrespective of which player is casting.
-/// - <b>Name selector</b> (the printed "As Peacekeeper enters... choose
-///   any card name" half): the factory accepts a
-///   <c>Func&lt;Player, string?&gt;</c> closure that resolves the chosen
-///   name. Same selector shape as <see cref="PithingNeedleFactory"/> —
-///   bots / tests supply the name directly. A null selector or null
-///   return-value disables the cost increase (predicate returns false
-///   for every cast). The "look at an opponent's hand" preamble is a
-///   v1 no-op — the selector closure is given the controller and decides
-///   the name however the agent wants; once
-///   <see cref="Majik.Core.Players.Agents.IPlayerAgent"/> grows a
-///   <c>ChooseCardNameAsync</c> prompt the closure simply forwards to
-///   it, and the prompt UI can render the hand-peek alongside.
-/// - <b>"As ~ enters" choice timing</b>: same observational shortcut as
-///   <see cref="PithingNeedleFactory"/> — the choice is resolved at ETB
-///   time rather than as part of the ETB replacement (CR 614.12).
-///   Functionally equivalent in the engine's current pipeline.
+/// - Creature shape: Legendary-class identity is NOT printed (Anointed
+///   Peacekeeper is not Legendary) — Human Cleric 2/3 with {1}{W}{W}.
+/// - <b>Vigilance</b> (CR 702.20) — wired as a <see cref="KeywordAbility"/>
+///   marker; combat code reads
+///   <see cref="Majik.Core.Combat.CombatAbilities.HasVigilance"/>.
+/// - <b>Spell-name cost increase</b> (CR 117.7 / CR 601.2f) — Anointed
+///   Peacekeeper's "spells with the chosen name cost {2} more to cast"
+///   half is wired via <see cref="SpellCostIncreaseAbility"/> whose
+///   predicate compares the cast spell's <see cref="ICard.Name"/> against
+///   the chosen name closure. The increase is a flat <c>+{2}</c> generic
+///   when the predicate matches (symmetric — applies to either player's
+///   matching spells, same posture as <see cref="ThaliaGuardianOfThrabenFactory"/>
+///   and <see cref="DampingSphereFactory"/>).
+///   <see cref="Majik.Core.Costs.CostReduction.GetEffectiveCost"/> walks
+///   every player's battlefield for <see cref="SpellCostIncreaseAbility"/>
+///   riders, so the {2} tax applies regardless of whose turn it is.
+///
+/// ## Look-at-opponent-hand + name choice
+///
+/// The factory accepts a <c>nameSelector</c> closure
+/// (<c>Func&lt;Player, string&gt;</c>) the same way
+/// <see cref="PithingNeedleFactory"/> does. Tests and bots supply the
+/// chosen name directly. The <see cref="SpellCostIncreaseAbility"/>
+/// predicate captures the closure-returned name lazily on first evaluation
+/// — the name is resolved at most once per Anointed Peacekeeper instance,
+/// matching the "as ~ enters" timing.
+///
+/// The "look at an opponent's hand" rider is observational in v1 — the
+/// engine doesn't yet emit a peek event the agent layer can pipe to a UI.
+/// The name choice happens with the hand-look context elided; bots that
+/// want to read opponent hand contents to inform the choice can do so
+/// directly through <see cref="Player.Zones.Hand"/>.
 ///
 /// ## Deferred (v1 gaps)
-/// - <b>Activated-ability cost increase</b> (printed half "Activated
-///   abilities of sources with the chosen name cost {2} more to activate
-///   unless they're mana abilities" — CR 605 mana-ability exemption):
-///   no shared primitive in v1. The closest analogue is
-///   <see cref="PithingNeedleFactory"/>'s ActivatedAbilityRestrictions
-///   registry, which fully suppresses activations rather than taxing
-///   them — and Damping Sphere / Sphere of Resistance face the same wall
-///   for their "the third spell each turn costs more to cast" /
-///   "activated abilities cost {1} more" deltas. Tracked as a shared
-///   future-fix; once an <c>ActivatedAbilityCostIncreaseAbility</c>
-///   primitive lands, Peacekeeper wires it with the same closure-captured
-///   name. Until then the activated-ability tax is a no-op and the
-///   factory documents the gap in this xmldoc. Per the printed-text
-///   "If too complex, ship Peacekeeper with just spell cost increase"
-///   minimum, the spell-cost half alone makes the card playable in the
-///   common cases (Bant Spirits' Cavern of Souls, Affinity's Arcbound
-///   Ravager activations are NOT taxed, but Spell-named lock pieces —
-///   Boseiju, Karakas, Wasteland — are not the v1 use case).
-/// - <b>"Look at an opponent's hand" preamble</b>: agent receives no
-///   peek into opponent hands prior to the name choice. Once
-///   <see cref="Majik.Core.Players.Agents.IPlayerAgent"/> grows a
-///   <c>PeekOpponentHandThenChooseCardNameAsync</c> the closure can
-///   forward; not used by any other card in v1 so no shared primitive
-///   exists yet.
-/// - <b>LTB unregister</b>: the <see cref="SpellCostIncreaseAbility"/>
-///   lives on the card itself, so when Peacekeeper leaves the
-///   battlefield the rider stops affecting cost calculations
-///   automatically (<see cref="CostReduction.GetEffectiveCost"/> only
-///   walks battlefield permanents — same posture as Thalia, Guardian of
-///   Thraben's tax).
+/// - <b>"Activated abilities of sources with the chosen name cost {2}
+///   more to activate unless they're mana abilities."</b> There is no
+///   reusable activated-ability cost-tax primitive yet — the cost is
+///   computed inside
+///   <see cref="Majik.Core.Abilities.ActivatedAbility"/>'s own activation
+///   path, which doesn't consult a battlefield-wide scanner the way
+///   <see cref="Majik.Core.Costs.CostReduction.GetEffectiveCost"/> does
+///   for spells. Tracked alongside Damping Sphere's "second activated
+///   ability per turn taxed" gap and Sphere of Resistance's activated-
+///   ability companion clause as a single
+///   <c>ActivatedAbilityCostIncreaseAbility</c> primitive future-fix.
+///   The shipped Peacekeeper is shape-correct for the spell-tax half;
+///   the activated-tax half is the documented gap.
+/// - <b>"As ~ enters" timing</b>: same posture as
+///   <see cref="PithingNeedleFactory"/> — the choice resolves on first
+///   predicate evaluation rather than during the ETB replacement
+///   (CR 614.12). Observationally equivalent in the current pipeline.
+/// - <b>"Look at an opponent's hand"</b>: no peek-event emission (same
+///   gap as Aven Mindcensor / Drannith Magistrate companion riders).
+/// - <b>Flicker reprompt</b>: a flickered Anointed Peacekeeper re-enters
+///   as a new object and would re-choose. Today the closure caches its
+///   first answer for the lifetime of the factory instance; a fresh
+///   Create call reprompts. Acceptable until the
+///   <see cref="PithingNeedleStaticEffect"/>-style lifecycle is extended
+///   to spell-cost riders.
 /// </summary>
 [CardName("Anointed Peacekeeper")]
 public static class AnointedPeacekeeperFactory
@@ -96,34 +86,25 @@ public static class AnointedPeacekeeperFactory
     public const string CardName = "Anointed Peacekeeper";
     public const string PrintedManaCost = "{1}{W}{W}";
     public const int Power = 2;
-    public const int Toughness = 4;
-    public const int CostIncrease = 2;
+    public const int Toughness = 3;
 
     /// <summary>
-    /// Construct Anointed Peacekeeper with no name selector — the
-    /// SpellCostIncreaseAbility rider is attached but its predicate
-    /// always returns false (no name is chosen at ETB), so no spell is
-    /// taxed. Suitable for card-shape / dispatcher tests where the
-    /// chosen-name machinery doesn't need to fire.
+    /// Construct Anointed Peacekeeper with no name-selector wired. The
+    /// <see cref="SpellCostIncreaseAbility"/> is still attached for shape
+    /// but its predicate matches no spell (no name to compare against),
+    /// so the tax is dormant. Suitable for card-shape / dispatcher tests.
     /// </summary>
-    public static Creature Create(Player owner) =>
-        Create(owner, nameSelector: null);
+    public static Creature Create(Player owner) => Create(owner, nameSelector: null);
 
     /// <summary>
-    /// Construct Anointed Peacekeeper wired with a name selector. The
-    /// selector is invoked once at ETB time (lazily on first cast-cost
-    /// query via <see cref="ResolveChosenName"/>) with Peacekeeper's
-    /// controller; the returned string is captured and feeds the
-    /// SpellCostIncreaseAbility predicate. Return <see langword="null"/>
-    /// from the selector to leave the static effect disabled.
+    /// Construct a fully-wired Anointed Peacekeeper.
     /// </summary>
     /// <param name="owner">Card owner / initial controller.</param>
-    /// <param name="nameSelector">Resolves the chosen card name when the
-    /// Peacekeeper enters the battlefield. Called with the Peacekeeper's
-    /// controller. May be null — the SpellCostIncreaseAbility rider is
-    /// still attached but its predicate always returns false, so no
-    /// spell is taxed.</param>
-    public static Creature Create(Player owner, Func<Player, string?>? nameSelector)
+    /// <param name="nameSelector">Resolves the chosen card name. Called
+    /// with the Peacekeeper's controller on first predicate evaluation
+    /// and cached for the lifetime of this instance. May be null — the
+    /// spell-tax rider is dormant in that case.</param>
+    public static Creature Create(Player owner, Func<Player, string>? nameSelector)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -132,46 +113,40 @@ public static class AnointedPeacekeeperFactory
             manaCost: PrintedManaCost,
             power: Power,
             toughness: Toughness,
+            supertypes: null,
             subtypes: new[] { CardSubtype.Human, CardSubtype.Cleric });
 
         card.SetOwner(owner);
         card.SetController(owner);
 
-        // Closure-captured chosen name. Null = not yet resolved (or
-        // selector declined). Lazily filled by ResolveChosenName on the
-        // first cost-query that calls into Predicate / ExtraGeneric so
-        // that "As Peacekeeper enters" timing is observationally
-        // correct (same shortcut as PithingNeedleFactory's deferred-ETB
-        // approach).
-        string? chosenName = null;
-        bool resolved = false;
+        // CR 702.20 — Vigilance.
+        card.AddAbility(new KeywordAbility("Vigilance", card, owner));
 
-        // Local helper so both Predicate and ExtraGeneric force resolution
-        // before reading the name. Mirrors the closure-state pattern in
-        // <see cref="DampingSphereFactory"/>'s "Nth spell this turn"
-        // counters.
-        string? ResolveChosenName(Player controller)
+        // CR 117.7 / CR 601.2f — "Spells with the chosen name cost {2}
+        // more to cast." Captured-name closure with one-shot resolution:
+        // first time the predicate is consulted, the selector is invoked
+        // with the Peacekeeper's controller; the resolved name is cached
+        // for the lifetime of this instance.
+        string? chosenName = null;
+        bool selectorAttempted = false;
+
+        bool MatchesChosenName(ICard spell)
         {
-            if (resolved) return chosenName;
-            resolved = true;
-            if (nameSelector is null) return chosenName;
-            chosenName = nameSelector(controller);
-            return chosenName;
+            if (nameSelector == null) return false;
+            if (!selectorAttempted)
+            {
+                selectorAttempted = true;
+                var picked = nameSelector(owner);
+                chosenName = string.IsNullOrEmpty(picked) ? null : picked;
+            }
+            if (chosenName == null) return false;
+            return string.Equals(spell.Name, chosenName, StringComparison.Ordinal);
         }
 
-        // ----------------------------------------------------------------
-        // CR 117.7 / CR 601.2f — "Spells with the chosen name cost {2} more
-        // to cast." Symmetric across players — the rider is consulted for
-        // every cast by CostReduction.GetEffectiveCost.
-        // ----------------------------------------------------------------
         card.AddAbility(new SpellCostIncreaseAbility(
-            predicate: c =>
-            {
-                var name = ResolveChosenName(owner);
-                return name is not null && c.Name == name;
-            },
-            extraGeneric: (_, _) => CostIncrease,
-            description: $"Spells with the chosen name cost {{{CostIncrease}}} more to cast."));
+            predicate: MatchesChosenName,
+            extraGeneric: (_, _) => 2,
+            description: "Spells with the chosen name cost {2} more to cast."));
 
         return card;
     }
