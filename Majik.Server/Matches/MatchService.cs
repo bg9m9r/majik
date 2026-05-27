@@ -843,11 +843,15 @@ public sealed class MatchService
         }
 
         var now = _clock.UtcNow;
-        var elapsed = (long)(now - match.PriorityStartedAt.Value).TotalMilliseconds;
+        // Clock skew / a stale PriorityStartedAt slightly in the future would
+        // make elapsed negative and CREDIT the holder time. Clamp elapsed to
+        // ≥0, then clamp the resulting balance to ≥0 so a negative balance can
+        // never be persisted (Slice 4a #4).
+        var elapsed = Math.Max(0, (long)(now - match.PriorityStartedAt.Value).TotalMilliseconds);
         var stored = prevSub == match.Creator.Sub ? match.CreatorMillisRemaining
                    : prevSub == match.Opponent?.Sub ? match.OpponentMillisRemaining
                    : 0;
-        var newRemaining = stored - elapsed;
+        var newRemaining = Math.Max(0, stored - elapsed);
 
         if (newRemaining <= 0)
         {
@@ -855,19 +859,32 @@ public sealed class MatchService
             return;
         }
 
+        var expectedStartedAt = match.PriorityStartedAt.Value;
         var update = MongoDB.Driver.Builders<Match>.Update
             .Set(prevSub == match.Creator.Sub ? m => m.CreatorMillisRemaining : m => m.OpponentMillisRemaining, newRemaining)
             .Set(m => m.PriorityHolderSub, newHolderSub)
             .Set(m => m.PriorityStartedAt, now)
             .Set(m => m.UpdatedAt, now);
 
-        // Atomic compare-and-swap on the prior holder (NOT just Id+State).
-        // Two rapid handoffs that both read the same prior holder will now
-        // serialize: the first flips PriorityHolderSub, the second's filter
-        // (PriorityHolderSub == prevSub) no longer matches and it no-ops —
-        // no double-bill, no dropped transition (C1).
-        var moved = await _matches.TryAtomicUpdateWithHolderAsync(
-            matchId, MatchState.Playing, prevSub, update, ct);
+        // Atomic compare-and-swap on the prior holder AND the priority-start
+        // timestamp (NOT just Id+State). Two rapid handoffs that both read the
+        // same prior holder will serialize: the first flips PriorityHolderSub
+        // + advances PriorityStartedAt, the second's filter (holder==prevSub
+        // AND startedAt==expectedStartedAt) no longer matches and it no-ops —
+        // no double-bill, no dropped transition (C1 + Slice 4a #6). Adding the
+        // timestamp closes the duplicate/late-handoff window where holder is
+        // unchanged (e.g. a re-fired handoff for the SAME active player) so it
+        // can't deduct twice off one slice.
+        //
+        // Retry-with-backoff: a transient Mongo fault here would freeze the
+        // clock holder, burning the wrong player's clock. The CAS gating
+        // makes the retry safe — a lost-race retry finds the holder/startedAt
+        // already advanced and no-ops.
+        var moved = await RetryPolicy.ExecuteAsync(
+            c => _matches.TryAtomicUpdateWithHolderAsync(
+                matchId, MatchState.Playing, prevSub, update, c,
+                constrainStartedAt: true, expectedPriorityStartedAt: expectedStartedAt),
+            _logger, $"OnPriorityPassedAsync CAS (match {matchId})", ct);
         if (!moved) return;
 
         var fresh = (await _matches.GetByIdAsync(matchId, ct))!;
@@ -901,7 +918,16 @@ public sealed class MatchService
             .Set(m => m.WinnerSub, winner)
             .Set(m => m.TimeoutLoserSub, loserSub)
             .Set(m => m.UpdatedAt, now);
-        var moved = await _matches.TryAtomicUpdateAsync(matchId, MatchState.Playing, update, ct);
+
+        // Retry-with-backoff: this CAS is the ONLY thing moving the match out
+        // of Playing on a clock expiry. A single transient Mongo blip here
+        // would strand the match in Playing forever (the timer already fired
+        // and won't fire again). The CAS filter (State==Playing) makes the
+        // retry idempotent: a lost-race retry that finds the match already
+        // Completed matches nothing and returns false — never a double-apply.
+        var moved = await RetryPolicy.ExecuteAsync(
+            c => _matches.TryAtomicUpdateAsync(matchId, MatchState.Playing, update, c),
+            _logger, $"OnTimeoutAsync CAS (match {matchId})", ct);
         if (!moved) return;
 
         _timeoutScheduler?.Cancel(matchId);
