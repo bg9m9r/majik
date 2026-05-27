@@ -107,4 +107,33 @@ public class BotMatchSchedulerGuardTests : IClassFixture<TestMongoFixture>
 
         counting.ScopesCreated.Should().Be(2, "distinct matches are independent — each schedules once");
     }
+
+    /// <summary>
+    /// After the play/draw callback has run (and cleared the dedup entry in
+    /// <c>finally</c>), a second call for the same matchId must be able to
+    /// schedule again — the dict must not retain the key after the callback
+    /// completes (eviction correctness).
+    /// </summary>
+    [Fact]
+    public async Task ScheduleBotPlayDraw_AfterCallbackCompletes_AllowsReschedule()
+    {
+        using var inner = BuildContainer();
+        var counting = new CountingScopeProvider(inner);
+        var scheduler = new BotMatchScheduler(
+            counting, logger: null,
+            rollDelay: TimeSpan.Zero, playDrawDelay: TimeSpan.Zero);
+
+        var matchId = Guid.NewGuid();
+
+        // First schedule — callback fires, key is evicted in finally.
+        scheduler.ScheduleBotPlayDraw(matchId, "bot:aggro");
+        await Task.Delay(200); // wait for callback to complete
+
+        // Second schedule — the dedup key is gone so a second scope is created.
+        scheduler.ScheduleBotPlayDraw(matchId, "bot:aggro");
+        await Task.Delay(200);
+
+        counting.ScopesCreated.Should().Be(2,
+            "the dedup entry is evicted after the callback completes, so a re-schedule is allowed");
+    }
 }

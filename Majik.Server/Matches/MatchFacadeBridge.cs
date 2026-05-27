@@ -217,6 +217,13 @@ public sealed class MatchFacadeBridge
             }
         }
 
+        // Drop the desync rate-limiter entries for this match. The dict is
+        // keyed by (matchId, kind) — remove both known kinds so they don't
+        // accumulate for the process lifetime (one entry per active match
+        // per kind, bounded per-match but never freed without this sweep).
+        _lastDesyncLogAt.TryRemove((matchId, "clock-holder"), out _);
+        _lastDesyncLogAt.TryRemove((matchId, "raw-main"), out _);
+
         // Seal the replay buffer — match is over (concede / abandon /
         // timeout / completion all funnel through Detach), so no further
         // events should append to the replay log. The buffer itself is

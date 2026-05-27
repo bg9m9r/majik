@@ -76,6 +76,8 @@ Phases are pluggable (`Majik.Core/Game/Phases/`). The sequence supports MTG's ex
 
 `IEventBus` / `EventBus` in `Majik.Core/Events/`. Public `GameEvent` subclasses (`CardDrawnEvent`, `PhaseChangedEvent`, `LifeChangedEvent`, `TurnStartedEvent`, `StepStartedEvent`). Domain-internal events under `Majik.Core/Domain/DomainEvents/` (`SpellCastEvent`, `PriorityPassedEvent`, `StackObjectResolvedEvent`). Engine is UI-agnostic — clients subscribe.
 
+**DEBUG fail-fast:** `GameFacade` wires `EventBus.OnHandlerError` to a rethrowing sink in DEBUG builds (`GameFacadeErrorSinkInitializer`). Event-handler bodies must not throw on normal execution paths — a throw in DEBUG crashes the process immediately so the bug surfaces during development / tests. Release builds leave the sink null (silent swallow) to preserve live-game isolation. If you add a handler that can throw under ordinary conditions you will see an unhandled-exception crash in tests before it reaches production.
+
 ### Stack + priority + SBAs
 
 - `Majik.Core/Stack/Stack.cs` — spell/ability stack holding `IStackObject`s.
