@@ -733,6 +733,230 @@ public class MatchFacadeBridgeTests
         replay.GetReplay(matchId)!.EntryCount.Should().Be(1);
     }
 
+    // -----------------------------------------------------------------------
+    // 4. Snapshot-on-join replay (Slice 4b #1/#2)
+    //
+    // A viewer who joins AFTER the engine has emitted early events (opening
+    // draws, mulligan) must still recover authoritative state. On JoinMatch
+    // the bridge pushes the current per-viewer GameStateDto to JUST the
+    // joining connection on the "state" channel — masked per CR 706.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void ReplaySnapshotIfAny_PushesPerViewerSnapshotToConnection()
+    {
+        var hub = new CaptureHub();
+        var bridge = BuildBridge(hub);
+        var facade = BuildInertFacade();
+        var matchId = Guid.NewGuid();
+        bridge.Attach(matchId, "creator-sub", "opponent-sub", facade);
+
+        bridge.ReplaySnapshotIfAny(matchId, "creator-sub", "conn-creator");
+
+        hub.Connection.Should().ContainSingle();
+        var call = hub.Connection[0];
+        call.ConnectionId.Should().Be("conn-creator");
+        call.Event.Should().Be("state");
+        var snapshot = call.Payload.Should().BeOfType<GameStateDto>().Subject;
+        // Creator → Alice convention: the per-viewer snapshot self-identifies
+        // as Alice's seat.
+        snapshot.YouPlayerId.Should().Be(facade.Alice.Id);
+    }
+
+    [Fact]
+    public void ReplaySnapshotIfAny_OpponentGetsBobScopedSnapshot_NotSpectator()
+    {
+        // CR 706: the joining OPPONENT receives the per-viewer (Bob-scoped)
+        // snapshot, NOT the full-reveal spectator view. The differentiator
+        // is YouPlayerId — the spectator view (GetState) has it null; the
+        // per-viewer view (GetStateFor) stamps the viewer's own seat id. A
+        // Bob-scoped snapshot masks Alice's hidden zones exactly as
+        // GetGameStateAsync does (StateSnapshotter applies the masking).
+        var hub = new CaptureHub();
+        var bridge = BuildBridge(hub);
+        var facade = BuildInertFacade();
+        var matchId = Guid.NewGuid();
+        bridge.Attach(matchId, "creator-sub", "opponent-sub", facade);
+
+        bridge.ReplaySnapshotIfAny(matchId, "opponent-sub", "conn-opp");
+
+        hub.Connection.Should().ContainSingle();
+        var snapshot = (GameStateDto)hub.Connection[0].Payload;
+        snapshot.YouPlayerId.Should().Be(facade.Bob.Id,
+            "opponent maps to Bob and the snapshot must be Bob-scoped (GetStateFor), " +
+            "never the full-reveal spectator view (GetState → YouPlayerId null)");
+    }
+
+    [Fact]
+    public void ReplaySnapshotIfAny_GameNotStarted_NoFacade_IsNoOp()
+    {
+        // Still Rolling: no facade attached for this match. The snapshot
+        // push is simply skipped — no error, no send (#2).
+        var hub = new CaptureHub();
+        var bridge = BuildBridge(hub);
+
+        var act = () => bridge.ReplaySnapshotIfAny(Guid.NewGuid(), "creator-sub", "conn-1");
+
+        act.Should().NotThrow();
+        hub.Connection.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void ReplaySnapshotIfAny_BotRecipient_IsSkipped()
+    {
+        var hub = new CaptureHub();
+        var bridge = BuildBridge(hub);
+        var facade = BuildInertFacade();
+        var matchId = Guid.NewGuid();
+        bridge.Attach(matchId, "creator-sub", "bot:aggro", facade);
+
+        bridge.ReplaySnapshotIfAny(matchId, "bot:aggro", "conn-bot");
+
+        // Bot seats have no SignalR connection — nothing to push.
+        hub.Connection.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void ReplaySnapshotIfAny_UnknownRecipient_IsNoOp()
+    {
+        var hub = new CaptureHub();
+        var bridge = BuildBridge(hub);
+        var facade = BuildInertFacade();
+        var matchId = Guid.NewGuid();
+        bridge.Attach(matchId, "creator-sub", "opponent-sub", facade);
+
+        // A sub that maps to neither seat → no snapshot to scope.
+        bridge.ReplaySnapshotIfAny(matchId, "stranger-sub", "conn-x");
+
+        hub.Connection.Should().BeEmpty();
+    }
+
+    // -----------------------------------------------------------------------
+    // 5. Prod-safe desync observability (Slice 4b #3)
+    //
+    // The DEBUG-only AssertAgreement throws; the prod observer logs a
+    // WARNING + bumps a counter and NEVER throws. Driven synthetically here
+    // (clock-holder mismatch + raw "Main") per the Slice 4b test plan.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void ObserveDesync_ClockHolderMismatch_BumpsCounter_DoesNotThrow()
+    {
+        var hub = new CaptureHub();
+        var bridge = BuildBridge(hub);
+        var matchId = Guid.NewGuid();
+        var active = Guid.NewGuid();
+        var otherSeat = Guid.NewGuid();
+
+        var act = () => bridge.ObserveDesync(matchId, active, otherSeat, wirePhase: "PreCombatMain");
+
+        act.Should().NotThrow("prod observer must never throw — diagnostics, not abort");
+        bridge.DesyncWarningCount.Should().Be(1);
+    }
+
+    [Fact]
+    public void ObserveDesync_RawMain_BumpsCounter_DoesNotThrow()
+    {
+        var hub = new CaptureHub();
+        var bridge = BuildBridge(hub);
+        var matchId = Guid.NewGuid();
+        var seat = Guid.NewGuid();
+
+        var act = () => bridge.ObserveDesync(matchId, seat, seat, wirePhase: "Main");
+
+        act.Should().NotThrow();
+        bridge.DesyncWarningCount.Should().Be(1);
+    }
+
+    [Fact]
+    public void ObserveDesync_InAgreement_NoCounterBump()
+    {
+        var hub = new CaptureHub();
+        var bridge = BuildBridge(hub);
+        var seat = Guid.NewGuid();
+
+        bridge.ObserveDesync(Guid.NewGuid(), seat, seat, wirePhase: "PostCombatMain");
+
+        bridge.DesyncWarningCount.Should().Be(0,
+            "no violation → no counter bump");
+    }
+
+    [Fact]
+    public void ObserveDesync_BothViolations_CountsBoth()
+    {
+        var hub = new CaptureHub();
+        var bridge = BuildBridge(hub);
+        var matchId = Guid.NewGuid();
+        var active = Guid.NewGuid();
+        var otherSeat = Guid.NewGuid();
+
+        // Clock-holder mismatch AND raw "Main" in a single observation.
+        bridge.ObserveDesync(matchId, active, otherSeat, wirePhase: "Main");
+
+        bridge.DesyncWarningCount.Should().Be(2);
+    }
+
+    [Fact]
+    public void ObserveDesync_RepeatedViolations_CounterUnthrottled()
+    {
+        // The counter reflects the TRUE violation volume even though the
+        // WARNING log is rate-limited per (matchId, kind).
+        var hub = new CaptureHub();
+        var bridge = BuildBridge(hub);
+        var matchId = Guid.NewGuid();
+        var active = Guid.NewGuid();
+        var otherSeat = Guid.NewGuid();
+
+        for (var i = 0; i < 5; i++)
+        {
+            bridge.ObserveDesync(matchId, active, otherSeat, wirePhase: "PreCombatMain");
+        }
+
+        bridge.DesyncWarningCount.Should().Be(5);
+    }
+
+    [Fact]
+    public void ForwardEvent_RawMainOnWire_TripsDesyncObserver()
+    {
+        // Live path: a PhaseStartedEvent carrying the raw "Main" label
+        // reaching ForwardEvent must trip the prod observer (counter bump)
+        // WITHOUT throwing — even though ForwardEvent runs in a path where a
+        // throw would be swallowed.
+        var hub = new CaptureHub();
+        var bridge = BuildBridge(hub);
+        var facade = BuildInertFacade();
+        var matchId = Guid.NewGuid();
+        bridge.Attach(matchId, "creator-sub", "opponent-sub", facade);
+        var routing = DefaultRouting(facade.Alice.Id, facade.Bob.Id);
+
+        var rawMain = FakeEvent("PhaseStartedEvent", """{"phase":"Main"}""");
+        var act = () => bridge.ForwardEvent(matchId, new EventEnvelope(rawMain, PerPlayer: null), routing);
+
+        act.Should().NotThrow();
+        bridge.DesyncWarningCount.Should().BeGreaterThan(0,
+            "a raw CR 505 'Main' on the wire is an operational desync");
+        // Live broadcast still happens — the observer is a side-channel.
+        hub.Group.Should().ContainSingle();
+    }
+
+    [Fact]
+    public void ForwardEvent_DisambiguatedPhase_DoesNotTripObserver()
+    {
+        var hub = new CaptureHub();
+        var bridge = BuildBridge(hub);
+        var facade = BuildInertFacade();
+        var matchId = Guid.NewGuid();
+        bridge.Attach(matchId, "creator-sub", "opponent-sub", facade);
+        var routing = DefaultRouting(facade.Alice.Id, facade.Bob.Id);
+
+        var goodPhase = FakeEvent("PhaseStartedEvent", """{"phase":"PreCombatMain"}""");
+        bridge.ForwardEvent(matchId, new EventEnvelope(goodPhase, PerPlayer: null), routing);
+
+        bridge.DesyncWarningCount.Should().Be(0,
+            "a disambiguated phase label is not a desync; the inert facade's " +
+            "active player matches the bridge's (unseeded) clock holder");
+    }
+
     [Fact]
     public void Bridge_WithoutReplayBuffer_StillWorks()
     {

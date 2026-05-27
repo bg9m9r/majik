@@ -89,6 +89,11 @@ public sealed class LayerAgreementHarness : IDisposable
         private readonly object _gate = new();
         public List<(Guid matchId, string @event, object payload)> Published { get; } = new();
 
+        // Single-connection sends (snapshot-on-join + prompt-replay land
+        // here via MatchFacadeBridge.SendToConnection). Captured separately
+        // because they target a connectionId rather than a match group.
+        public List<(string connectionId, string @event, object payload)> ConnectionSends { get; } = new();
+
         public void Publish(Guid matchId, string @event, object payload)
         {
             lock (_gate) Published.Add((matchId, @event, payload));
@@ -107,9 +112,20 @@ public sealed class LayerAgreementHarness : IDisposable
             }
         }
 
+        public void SendToConnection(string connectionId, string @event, object payload)
+        {
+            if (string.IsNullOrEmpty(connectionId)) return;
+            lock (_gate) ConnectionSends.Add((connectionId, @event, payload));
+        }
+
         public IReadOnlyList<(Guid matchId, string @event, object payload)> Snapshot()
         {
             lock (_gate) return Published.ToList();
+        }
+
+        public IReadOnlyList<(string connectionId, string @event, object payload)> ConnectionSnapshot()
+        {
+            lock (_gate) return ConnectionSends.ToList();
         }
     }
 

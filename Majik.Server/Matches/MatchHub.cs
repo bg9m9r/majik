@@ -39,13 +39,29 @@ public sealed class MatchHub : Hub
 
         await Groups.AddToGroupAsync(Context.ConnectionId, GroupName(matchId));
 
+        // Snapshot-on-join (Slice 4b #1). Push the current per-viewer
+        // GameStateDto to JUST this connection AFTER it has joined the
+        // group. This is the robust recovery path: early engine events
+        // (mulligan, opening draws) emitted before the client joined are
+        // lost from the group fan-out (MatchService.PlayDrawAsync
+        // fire-and-forgets StartFullGameAsync, so the engine can publish
+        // to an empty group), but the snapshot gives the client
+        // authoritative state regardless of which events it missed — no
+        // dependence on awaiting the engine start. If the game hasn't
+        // started yet (still Rolling / no facade attached) this is a
+        // no-op (#2). CR 706 masking is preserved: the snapshot is the
+        // per-viewer (Creator → Alice, Opponent → Bob) masked variant.
+        _bridge?.ReplaySnapshotIfAny(matchId, sub, Context.ConnectionId);
+
         // Replay any prompt the engine published BEFORE this connection
         // joined the match group. Most acute on vs-Bot matches: the
         // engine reaches the user's opening-hand mulligan inside
         // CreateBotMatchAsync's HTTP handler, well before the client
         // navigates to /match/:id and calls JoinMatch. Without this
         // replay the prompt is published to an empty group and lost,
-        // leaving the UI stuck on "no active prompt".
+        // leaving the UI stuck on "no active prompt". Replayed AFTER the
+        // snapshot so the client first renders authoritative state, then
+        // sees which seat must act.
         _bridge?.ReplayPromptIfAny(matchId, sub, Context.ConnectionId);
     }
 
