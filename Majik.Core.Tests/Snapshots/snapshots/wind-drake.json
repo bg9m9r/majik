@@ -6,7 +6,9 @@
     "Creature"
   ],
   "supertypes": [],
-  "subtypes": [],
+  "subtypes": [
+    "Drake"
+  ],
   "power": 2,
   "toughness": 2,
   "loyalty": null,

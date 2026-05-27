@@ -16,6 +16,8 @@ public enum CardSubtype
     Elf,
     Goblin,
     Dragon,
+    /// <summary>Drake creature subtype (Wind Drake, Skywinder Drake). CR 205.3m.</summary>
+    Drake,
     Angel,
     Demon,
     /// <summary>Devil creature subtype — Mayhem Devil (War of the Spark),
@@ -151,6 +153,9 @@ public enum CardSubtype
     /// <summary>Wolf creature subtype — Young Wolf (Innistrad), Strangleroot Geist,
     /// Master of the Wild Hunt. CR 205.3m.</summary>
     Wolf,
+    /// <summary>Werewolf creature subtype (Victim of Night, Mayor of Avabruck,
+    /// Huntmaster of the Fells). Innistrad's day/night transform lineage. CR 205.3m.</summary>
+    Werewolf,
     /// <summary>Mercenary creature subtype — Slickshot Show-Off (Outlaws of
     /// Thunder Junction), Stormchaser's Talent's 1/1 U/R Mercenary token
     /// (Modern Horizons 3), and the Mercadian Masques cycle. CR 205.3m.</summary>
