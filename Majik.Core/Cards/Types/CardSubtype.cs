@@ -337,6 +337,11 @@ public enum CardSubtype
     /// and was reused by Zendikar's Hedron Crab.</summary>
     Homarid,
 
+    /// <summary>Crab creature subtype — Ancient Crab (Amonkhet), Horseshoe
+    /// Crab (Tempest), Returned Pastcaller (adjacent Theros crustacean flavour).
+    /// CR 205.3m.</summary>
+    Crab,
+
     /// <summary>Centaur creature subtype — Loxodon Smiter (Return to Ravnica),
     /// Territorial Centaur, Centaur Courser. CR 205.3m.</summary>
     Centaur,
