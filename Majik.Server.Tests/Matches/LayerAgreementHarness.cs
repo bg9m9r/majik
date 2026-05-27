@@ -45,6 +45,7 @@ public sealed class LayerAgreementHarness : IDisposable
     private readonly HttpClient _creatorClient;
 
     public CapturePublisher Published { get; }
+    public MatchFacadeBridge Bridge { get; }
     public Guid MatchId { get; }
     public Guid GameId { get; }
     public GameFacade Facade { get; }
@@ -55,6 +56,7 @@ public sealed class LayerAgreementHarness : IDisposable
         WebApplicationFactory<Program> factory,
         HttpClient creatorClient,
         CapturePublisher published,
+        MatchFacadeBridge bridge,
         Guid matchId,
         Guid gameId,
         GameFacade facade,
@@ -64,6 +66,7 @@ public sealed class LayerAgreementHarness : IDisposable
         _factory = factory;
         _creatorClient = creatorClient;
         Published = published;
+        Bridge = bridge;
         MatchId = matchId;
         GameId = gameId;
         Facade = facade;
@@ -269,9 +272,10 @@ public sealed class LayerAgreementHarness : IDisposable
         var facade = gameFactory.Get(gameId)
             ?? throw new InvalidOperationException(
                 $"ServerGameFactory has no facade for GameId={gameId}.");
+        var bridge = factory.Services.GetRequiredService<MatchFacadeBridge>();
 
         var harness = new LayerAgreementHarness(
-            factory, creatorClient, published, created.Id, gameId, facade, creatorSub, botSub);
+            factory, creatorClient, published, bridge, created.Id, gameId, facade, creatorSub, botSub);
 
         // Clear the opening-hand mulligan gate so subsequent
         // AdvanceByPassAsync calls actually walk the turn through phases.

@@ -54,9 +54,21 @@ namespace Majik.Server.Matches;
 /// </summary>
 public sealed class MatchFacadeBridge
 {
+    /// <summary>
+    /// Callback the bridge fires when the engine's active player changes
+    /// seats (CR 117 / 103.7 — "the active player is the player whose turn
+    /// it is", and on each new turn that player receives priority first).
+    /// Production wires this to <c>MatchService.OnPriorityPassedAsync</c>
+    /// via a fresh DI scope (mirroring <see cref="MatchTimeoutScheduler"/>),
+    /// so the server clock holder always DERIVES from the engine's active
+    /// player instead of staying frozen at the play/draw first player.
+    /// </summary>
+    public delegate Task ClockHandoffCallback(Guid matchId, string newHolderSub, CancellationToken ct);
+
     private readonly IMatchHubPublisher _hub;
     private readonly ILogger<MatchFacadeBridge> _logger;
     private readonly MatchReplayBuffer? _replay;
+    private readonly ClockHandoffCallback? _onActivePlayerChanged;
     private readonly ConcurrentDictionary<Guid, Attachment> _attachments = new();
 
     // Per-recipient prompt buffer. Solves the race where the engine
@@ -76,11 +88,13 @@ public sealed class MatchFacadeBridge
     public MatchFacadeBridge(
         IMatchHubPublisher hub,
         ILogger<MatchFacadeBridge> logger,
-        MatchReplayBuffer? replay = null)
+        MatchReplayBuffer? replay = null,
+        ClockHandoffCallback? onActivePlayerChanged = null)
     {
         _hub = hub;
         _logger = logger;
         _replay = replay;
+        _onActivePlayerChanged = onActivePlayerChanged;
     }
 
     /// <summary>Visible for tests.</summary>
@@ -123,7 +137,11 @@ public sealed class MatchFacadeBridge
         IDisposable eventSub = facade.SubscribeEnvelopes(env => ForwardEvent(matchId, env, routing));
         IDisposable promptSub = facade.SubscribePrompts(prompt => ForwardPrompt(matchId, prompt, routing));
 
-        var attachment = new Attachment(eventSub, promptSub);
+        // Seed the clock-handoff tracker with the facade's CURRENT active
+        // player so the very first TurnStartedEvent (turn 1) doesn't get
+        // mistaken for a handoff — PlayDrawAsync already set the holder to
+        // the play/draw first player, which equals the turn-1 active player.
+        var attachment = new Attachment(eventSub, promptSub, facade, routing, facade.ActivePlayerId);
         if (!_attachments.TryAdd(matchId, attachment))
         {
             // Lost the race against another Attach for the same matchId —
@@ -253,6 +271,15 @@ public sealed class MatchFacadeBridge
         // viewer == null path used by GET /matches/{id}/replay.
         _replay?.RecordEvent(matchId, envelope.Public);
 
+        // CR 117 / 103.7 — keep the server clock holder aligned with the
+        // engine's active player. Engine typed handlers update
+        // GameFacade._currentActivePlayer BEFORE this global (SubscribeAll)
+        // handler runs (see EventBus.Publish ordering), so reading
+        // facade.ActivePlayerId here already reflects the new turn's active
+        // player. Best-effort and isolated so a clock-side fault never
+        // perturbs the live event broadcast.
+        MaybeFireClockHandoff(matchId);
+
         try
         {
             if (envelope.PerPlayer == null)
@@ -297,6 +324,77 @@ public sealed class MatchFacadeBridge
             _logger.LogError(ex,
                 "MatchFacadeBridge: failed to forward EventDto. MatchId={MatchId} EventType={EventType}",
                 matchId, envelope.Public.Type);
+        }
+    }
+
+    /// <summary>
+    /// CR 117 / 103.7 — when the engine's active player has changed seats
+    /// since the last event for <paramref name="matchId"/>, map the new
+    /// active player's engine id → sub and invoke the clock-handoff
+    /// callback (production: <c>MatchService.OnPriorityPassedAsync</c>),
+    /// which decrements the previous holder's clock, moves the holder, and
+    /// republishes <c>match.clock-update</c>. The server clock thus DERIVES
+    /// its holder from the engine instead of freezing at the play/draw
+    /// first player set in <c>MatchService.PlayDrawAsync</c>.
+    ///
+    /// Fully best-effort: no callback wired (unit tests) or no live
+    /// attachment → no-op. The callback is fire-and-forget so the engine's
+    /// synchronous event dispatch isn't blocked on a Mongo round-trip;
+    /// faults are logged, never thrown back into the event broadcast.
+    /// </summary>
+    private void MaybeFireClockHandoff(Guid matchId)
+    {
+        if (_onActivePlayerChanged == null) return;
+        if (!_attachments.TryGetValue(matchId, out var attachment)) return;
+
+        Guid current;
+        try
+        {
+            current = attachment.Facade.ActivePlayerId;
+        }
+        catch
+        {
+            return; // facade torn down mid-flight — nothing to align.
+        }
+
+        // Claim the transition under the attachment's lock so concurrent
+        // events for the same match don't double-fire the handoff for one
+        // active-player change. (Guid has no Interlocked.Exchange overload,
+        // and the engine dispatches a game's events on one thread anyway —
+        // a short lock is both correct and cheap.)
+        if (!attachment.TryClaimActivePlayerChange(current)) return;
+
+        // Map engine active-player id → holder sub (Alice = creator,
+        // Bob = opponent). An unmappable id (shouldn't happen) is ignored.
+        string? newHolderSub =
+            current == attachment.Routing.AliceId ? attachment.Routing.CreatorSub
+            : current == attachment.Routing.BobId ? attachment.Routing.OpponentSub
+            : null;
+        if (newHolderSub == null) return;
+
+        _ = FireClockHandoffAsync(matchId, newHolderSub);
+    }
+
+    /// <summary>Visible for tests — number of times the clock-handoff
+    /// callback has been invoked. Lets a test assert the bridge actually
+    /// fired the handoff (vs. the holder lagging for another reason).</summary>
+    internal int ClockHandoffFireCount => _clockHandoffFireCount;
+    private int _clockHandoffFireCount;
+
+    private async Task FireClockHandoffAsync(Guid matchId, string newHolderSub)
+    {
+        Interlocked.Increment(ref _clockHandoffFireCount);
+        try
+        {
+            await _onActivePlayerChanged!(matchId, newHolderSub, CancellationToken.None)
+                .ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "MatchFacadeBridge: clock-handoff callback faulted. " +
+                "MatchId={MatchId} NewHolderSub={NewHolderSub}",
+                matchId, newHolderSub);
         }
     }
 
@@ -378,10 +476,47 @@ public sealed class MatchFacadeBridge
         private readonly IDisposable _promptSub;
         private int _disposed;
 
-        public Attachment(IDisposable eventSub, IDisposable promptSub)
+        /// <summary>The live facade for this match — read for its current
+        /// active player on each event so the clock holder can follow it.</summary>
+        public GameFacade Facade { get; }
+
+        /// <summary>Engine seat ids ↔ subs, captured at Attach.</summary>
+        public PromptRouting Routing { get; }
+
+        // Last active-player id we fired a clock handoff for. Seeded with
+        // the facade's current active player at Attach so the turn-1
+        // TurnStartedEvent (which equals the play/draw first player) doesn't
+        // spuriously re-fire the handoff. Guarded by _activePlayerGate.
+        private readonly object _activePlayerGate = new();
+        private Guid _lastActivePlayerId;
+
+        public Attachment(
+            IDisposable eventSub,
+            IDisposable promptSub,
+            GameFacade facade,
+            PromptRouting routing,
+            Guid initialActivePlayerId)
         {
             _eventSub = eventSub;
             _promptSub = promptSub;
+            Facade = facade;
+            Routing = routing;
+            _lastActivePlayerId = initialActivePlayerId;
+        }
+
+        /// <summary>Atomically test-and-set the last-seen active player.
+        /// Returns true (claiming the transition) only when
+        /// <paramref name="current"/> differs from the last value — so a
+        /// burst of events that all observe the same active player fires
+        /// the handoff at most once.</summary>
+        public bool TryClaimActivePlayerChange(Guid current)
+        {
+            lock (_activePlayerGate)
+            {
+                if (_lastActivePlayerId == current) return false;
+                _lastActivePlayerId = current;
+                return true;
+            }
         }
 
         public void Dispose()

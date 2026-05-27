@@ -83,6 +83,64 @@ public class LayerAgreementInvariantTests : IClassFixture<TestMongoFixture>
         }
     }
 
+    // -----------------------------------------------------------------------
+    // Task 4 — clock ↔ priority: the latest clock-update holder maps to the
+    // engine's current active player (CR 117 / 103.7). RED until the Slice 1
+    // fix wires the clock handoff: PlayDrawAsync sets the holder once and
+    // freezes it, so without the fix the holder stays the first player even
+    // after the turn passes to the other seat.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task ClockHolder_FollowsEngineActivePlayer_AcrossTurnHandoff()
+    {
+        using var h = await LayerAgreementHarness.StartBotMatchAsync(_fixture, rngSeed: 11);
+
+        var initialActive = h.Facade.ActivePlayerId;
+
+        // Advance creator passes until the engine's active player changes
+        // seats (a turn handoff), capped at 40 passes.
+        var handoffSeen = false;
+        for (var i = 0; i < 40 && !handoffSeen; i++)
+        {
+            await h.AdvanceByPassAsync(h.CreatorSub);
+            if (h.Facade.ActivePlayerId != initialActive) handoffSeen = true;
+        }
+
+        handoffSeen.Should().BeTrue(
+            "advancing ~40 passes must hand the turn to the other seat at least once");
+        h.Bridge.ClockHandoffFireCount.Should().BeGreaterThan(0,
+            "the bridge must have fired the clock-handoff callback on the turn " +
+            "handoff — the clock following the engine can't be a coincidence");
+
+        // The clock-handoff callback fires asynchronously (it opens a DI
+        // scope + Mongo round-trip off the engine's synchronous event
+        // dispatch), so the match.clock-update is eventually consistent with
+        // the engine. Poll briefly for the latest holder to converge onto
+        // the active player. Creator → Alice, Bot/Opponent → Bob.
+        var expectedActive = h.Facade.ActivePlayerId;
+        string? holder = null;
+        Guid holderSeatId = System.Guid.Empty;
+        for (var i = 0; i < 50; i++)
+        {
+            holder = h.LatestClockHolderSub();
+            if (holder != null)
+            {
+                holderSeatId = holder == h.CreatorSub ? h.Facade.Alice.Id : h.Facade.Bob.Id;
+                // Re-read the active player in case the engine advanced
+                // another turn while we were polling.
+                expectedActive = h.Facade.ActivePlayerId;
+                if (holderSeatId == expectedActive) break;
+            }
+            await Task.Delay(20);
+        }
+
+        holder.Should().NotBeNull("a clock-update must have been published");
+        holderSeatId.Should().Be(expectedActive,
+            "the clock holder must reflect the engine's active player — " +
+            "the server clock DERIVES the holder from the engine, never freezes it");
+    }
+
     private static List<string> ExtractPhaseLabels(LayerAgreementHarness h)
     {
         var labels = new List<string>();
