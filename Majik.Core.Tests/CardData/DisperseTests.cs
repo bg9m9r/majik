@@ -1,0 +1,185 @@
+using FluentAssertions;
+using Majik.Core.CardData;
+using Majik.Core.CardData.Factories;
+using Majik.Core.Cards;
+using Majik.Core.Cards.Types;
+using Majik.Core.Events;
+using Majik.Core.Game;
+using Majik.Core.Players;
+using Majik.Core.Players.Agents;
+using Majik.Core.Services;
+using Majik.Core.StateMachine;
+using Majik.Core.ValueObjects;
+using Majik.Core.Zones;
+using Xunit;
+
+namespace Majik.Core.Tests.CardData;
+
+/// <summary>
+/// End-to-end tests for Disperse ({1}{U}).
+/// Oracle: "Return target nonland permanent to its owner's hand."
+///
+/// Targets any permanent that is NOT a land — creatures, artifacts,
+/// enchantments, and planeswalkers are valid targets; lands are not.
+/// CR 608.2b: if the chosen target is no longer a permanent on the
+/// battlefield at resolution, the effect does nothing.
+/// </summary>
+public class DisperseTests
+{
+    private readonly EventBus _bus = new();
+    private readonly Majik.Core.Stack.Stack _stack;
+    private readonly SpellCastFlow _flow;
+    private readonly ZoneService _zones;
+    private readonly StackResolver _resolver;
+    private readonly Player _alice = new("Alice", 20);
+    private readonly Player _bob = new("Bob", 20);
+
+    public DisperseTests()
+    {
+        _stack = new Majik.Core.Stack.Stack(_bus);
+        _zones = new ZoneService(_bus);
+        _flow = new SpellCastFlow(_stack, _zones, _bus);
+        _resolver = new StackResolver(_bus, _zones);
+    }
+
+    // ── Identity ──────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Create_HasInstantShape_Blue_TwoMana()
+    {
+        var card = DisperseFactory.Create(_alice);
+
+        card.Name.Should().Be("Disperse");
+        card.HasType(CardType.Instant).Should().BeTrue();
+        CardColors.GetColors(card).Should().Contain(ManaColor.Blue);
+        card.ManaCost.Should().Be("{1}{U}");
+        card.ManaCostValue.TotalValue.Should().Be(2);
+    }
+
+    [Fact]
+    public void NamedCardFactory_DispatchByName_ReturnsShape()
+    {
+        var dispatched = NamedCardFactory.Create("Disperse", _alice);
+
+        dispatched.Should().BeOfType<Instant>();
+        dispatched.Name.Should().Be("Disperse");
+        dispatched.ManaCost.Should().Be("{1}{U}");
+    }
+
+    // ── Resolve: creature ─────────────────────────────────────────────────
+
+    [Fact]
+    public async Task ReturnsTargetCreatureToOwnersHand()
+    {
+        var bear = new Creature("Grizzly Bears", "{1}{G}", 2, 2) { Owner = _bob, Controller = _bob };
+        bear.SetZone(ZoneType.Battlefield);
+        _bob.Zones.Battlefield.AddCard(bear);
+
+        var card = DisperseFactory.Create(_alice);
+        card.SetZone(ZoneType.Hand);
+        _alice.Zones.Hand.AddCard(card);
+
+        var agent = new ScriptedAgent();
+        agent.QueueTargets(new[] { (object)bear });
+        agent.QueueMana(ManaPayment.Empty);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+
+        await _flow.CastAsync(
+            _alice, card, DisperseFactory.BuildDefinition(), agent, ctx, alternativeCost: null);
+
+        _resolver.ResolveTop(_stack);
+
+        bear.Zone.Should().Be(ZoneType.Hand);
+        _bob.Zones.Hand.GetCards().Should().Contain(bear);
+        _bob.Zones.Battlefield.GetCards().Should().NotContain(bear);
+    }
+
+    // ── Resolve: noncreature permanent (enchantment) ──────────────────────
+
+    [Fact]
+    public async Task ReturnsTargetEnchantmentToOwnersHand()
+    {
+        var enchantment = new Enchantment("Blood Moon", "{2}{R}") { Owner = _bob, Controller = _bob };
+        enchantment.SetZone(ZoneType.Battlefield);
+        _bob.Zones.Battlefield.AddCard(enchantment);
+
+        var card = DisperseFactory.Create(_alice);
+        card.SetZone(ZoneType.Hand);
+        _alice.Zones.Hand.AddCard(card);
+
+        var agent = new ScriptedAgent();
+        agent.QueueTargets(new[] { (object)enchantment });
+        agent.QueueMana(ManaPayment.Empty);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+
+        await _flow.CastAsync(
+            _alice, card, DisperseFactory.BuildDefinition(), agent, ctx, alternativeCost: null);
+
+        _resolver.ResolveTop(_stack);
+
+        enchantment.Zone.Should().Be(ZoneType.Hand);
+        _bob.Zones.Hand.GetCards().Should().Contain(enchantment);
+        _bob.Zones.Battlefield.GetCards().Should().NotContain(enchantment);
+    }
+
+    // ── No-op: land target — lands are not valid targets ─────────────────
+
+    [Fact]
+    public async Task NoOp_WhenTargetIsALand()
+    {
+        // Disperse restricts to "nonland permanent" — a Land passed as raw
+        // target resolves to no-op because the land check fires (CR 608.2b
+        // plus the nonland restriction in the effect gate).
+        var land = new Land("Island") { Owner = _bob, Controller = _bob };
+        land.SetZone(ZoneType.Battlefield);
+        _bob.Zones.Battlefield.AddCard(land);
+
+        var card = DisperseFactory.Create(_alice);
+        card.SetZone(ZoneType.Hand);
+        _alice.Zones.Hand.AddCard(card);
+
+        var agent = new ScriptedAgent();
+        agent.QueueTargets(new[] { (object)land });
+        agent.QueueMana(ManaPayment.Empty);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+
+        await _flow.CastAsync(
+            _alice, card, DisperseFactory.BuildDefinition(), agent, ctx, alternativeCost: null);
+
+        _resolver.ResolveTop(_stack);
+
+        // Land must stay on battlefield — Disperse cannot target lands.
+        land.Zone.Should().Be(ZoneType.Battlefield, because: "Disperse only targets nonland permanents");
+        _bob.Zones.Battlefield.GetCards().Should().Contain(land);
+        _bob.Zones.Hand.GetCards().Should().NotContain(land);
+    }
+
+    // ── No-op: target not on battlefield at resolution ────────────────────
+
+    [Fact]
+    public async Task NoOp_WhenTargetNotOnBattlefieldAtResolution()
+    {
+        // Target starts in graveyard — simulates a permanent that died before
+        // Disperse resolved (CR 608.2b: illegal / no longer on battlefield → no-op).
+        var bear = new Creature("Grizzly Bears", "{1}{G}", 2, 2) { Owner = _bob, Controller = _bob };
+        bear.SetZone(ZoneType.Graveyard);
+        _bob.Zones.Graveyard.AddCard(bear);
+
+        var card = DisperseFactory.Create(_alice);
+        card.SetZone(ZoneType.Hand);
+        _alice.Zones.Hand.AddCard(card);
+
+        var agent = new ScriptedAgent();
+        agent.QueueTargets(new[] { (object)bear });
+        agent.QueueMana(ManaPayment.Empty);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+
+        await _flow.CastAsync(
+            _alice, card, DisperseFactory.BuildDefinition(), agent, ctx, alternativeCost: null);
+
+        _resolver.ResolveTop(_stack);
+
+        bear.Zone.Should().Be(ZoneType.Graveyard, because: "target not on battlefield at resolution → no-op (CR 608.2b)");
+        _bob.Zones.Hand.GetCards().Should().NotContain(bear);
+    }
+}
