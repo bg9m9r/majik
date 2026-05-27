@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -23,6 +24,12 @@ public sealed class BotMatchScheduler : IBotMatchScheduler
     private readonly ILogger<BotMatchScheduler>? _logger;
     private readonly TimeSpan _rollDelay;
     private readonly TimeSpan _playDrawDelay;
+
+    // Per-match guard so a rapid double-submit (both rolls landing nearly
+    // simultaneously, or a duplicate trigger) can't schedule two PlayDraw
+    // callbacks for one match (Slice 4a #7). First caller to add the matchId
+    // wins; subsequent attempts no-op until the match is gone.
+    private readonly ConcurrentDictionary<Guid, byte> _playDrawScheduled = new();
 
     public BotMatchScheduler(
         IServiceProvider services,
@@ -61,6 +68,17 @@ public sealed class BotMatchScheduler : IBotMatchScheduler
 
     public void ScheduleBotPlayDraw(Guid matchId, string botSub)
     {
+        // Per-match once: a rapid double-submit must not queue two PlayDraw
+        // callbacks (Slice 4a #7). TryAdd is the gate — only the first caller
+        // proceeds.
+        if (!_playDrawScheduled.TryAdd(matchId, 0))
+        {
+            _logger?.LogDebug(
+                "Bot play/draw already scheduled for match; ignoring duplicate. MatchId={MatchId}",
+                matchId);
+            return;
+        }
+
         _ = Task.Run(async () =>
         {
             try

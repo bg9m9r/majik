@@ -676,58 +676,81 @@ public sealed class MatchService
         bool isOpponent = match.Opponent != null && callerSub == match.Opponent.Sub;
         if (!isCreator && !isOpponent) return Result.Fail<MatchDto>(new MatchError("not-a-player"));
 
-        var roll = match.Roll ?? new MatchRoll();
+        var existing = match.Roll ?? new MatchRoll();
 
-        // Idempotent: if caller's slot already set, just return current snapshot
-        var callerSlotFilled = isCreator ? roll.CreatorRoll.HasValue : roll.OpponentRoll.HasValue;
+        // Idempotent: if caller's slot already set, just return current snapshot.
+        var callerSlotFilled = isCreator ? existing.CreatorRoll.HasValue : existing.OpponentRoll.HasValue;
         if (callerSlotFilled)
         {
             return Result.Ok(ToDto(match, viewerSub: callerSub));
         }
 
-        // Generate this player's roll
+        // Generate + persist ONLY this player's roll via a field-targeted CAS
+        // guarded that the slot was empty. Two concurrent submissions (one per
+        // seat) now each write their own field, so neither can clobber the
+        // other's value — the lost-update bug where both read the same Roll,
+        // mutated in-process, and wrote the whole object is closed (Slice 4a
+        // #5). The CAS also makes a racing same-seat double-submit a no-op.
         int value = _dice.RollSingle();
-        if (isCreator) roll.CreatorRoll = value;
-        else roll.OpponentRoll = value;
-
-        // If both filled, resolve winner (with tie auto-reroll)
-        if (roll.CreatorRoll.HasValue && roll.OpponentRoll.HasValue)
+        var now = _clock.UtcNow;
+        var slotSet = await _matches.TrySetPlayerRollAsync(matchId, isCreator, value, now, ct);
+        if (!slotSet)
         {
+            // Either the match left Rolling, or the slot was filled by a
+            // concurrent/duplicate submit. Re-read and return the current
+            // snapshot (idempotent) rather than reporting a spurious conflict.
+            var snapshot = await _matches.GetByIdAsync(matchId, ct);
+            if (snapshot == null) return Result.Fail<MatchDto>(new MatchError("match-not-found"));
+            if (snapshot.State != MatchState.Rolling)
+                return Result.Fail<MatchDto>(new MatchError("not-rolling"));
+            return Result.Ok(ToDto(snapshot, viewerSub: callerSub));
+        }
+
+        // Publish per-player event for this caller's roll.
+        _hub?.Publish(matchId, "match.player-rolled", new { matchId, sub = callerSub, roll = value });
+
+        // Re-read to see whether BOTH slots are now filled. If so — and no
+        // winner has been stamped yet — this caller attempts the winner CAS.
+        // Exactly one concurrent caller wins it (WinnerSub == null guard), so
+        // the winner is computed once even under simultaneous submissions.
+        var afterSet = await _matches.GetByIdAsync(matchId, ct);
+        if (afterSet?.Roll is { CreatorRoll: not null, OpponentRoll: not null, WinnerSub: null })
+        {
+            int c = afterSet.Roll.CreatorRoll!.Value;
+            int o = afterSet.Roll.OpponentRoll!.Value;
+
+            // Tie auto-reroll (CR 104.1-style pre-game roll): reroll BOTH
+            // values until they differ. Only the caller that wins the
+            // winner CAS persists these, so a tie can't be resolved twice.
             int retries = 0;
-            while (roll.CreatorRoll!.Value == roll.OpponentRoll!.Value)
+            while (c == o)
             {
                 if (++retries > MaxTieRetries)
                     throw new InvalidOperationException("Tie reroll cap exceeded — random source likely broken.");
-                roll.CreatorRoll = _dice.RollSingle();
-                roll.OpponentRoll = _dice.RollSingle();
+                c = _dice.RollSingle();
+                o = _dice.RollSingle();
             }
-            roll.WinnerSub = roll.CreatorRoll.Value > roll.OpponentRoll.Value
-                ? match.Creator.Sub : match.Opponent!.Sub;
-        }
+            var winnerSub = c > o ? afterSet.Creator.Sub : afterSet.Opponent!.Sub;
 
-        var now = _clock.UtcNow;
-        var update = Builders<Match>.Update
-            .Set(m => m.Roll, roll)
-            .Set(m => m.UpdatedAt, now);
-        var moved = await _matches.TryAtomicUpdateAsync(matchId, MatchState.Rolling, update, ct);
-        if (!moved) return Result.Fail<MatchDto>(new MatchError("not-rolling"));
+            var wonWinnerCas = await _matches.TrySetRollWinnerAsync(
+                matchId, c, o, winnerSub, _clock.UtcNow, ct);
 
-        // Publish per-player event for this caller's roll
-        _hub?.Publish(matchId, "match.player-rolled", new { matchId, sub = callerSub, roll = value });
-
-        // If winner determined, publish consolidated match.rolled event
-        if (roll.WinnerSub != null)
-        {
-            _hub?.Publish(matchId, "match.rolled",
-                new { matchId, roll = new MatchRollDto(roll.CreatorRoll, roll.OpponentRoll, roll.WinnerSub) });
-
-            // If the winner is a bot seat, schedule the bot's play/draw
-            // follow-up so the match isn't stranded in Rolling. Detection
-            // is by sub-prefix — the only seat we ever stamp with "bot:"
-            // is the synthesized opponent in CreateBotMatchAsync.
-            if (roll.WinnerSub.StartsWith("bot:", StringComparison.Ordinal))
+            if (wonWinnerCas)
             {
-                _botScheduler.ScheduleBotPlayDraw(matchId, roll.WinnerSub);
+                _hub?.Publish(matchId, "match.rolled",
+                    new { matchId, roll = new MatchRollDto(c, o, winnerSub) });
+
+                // If the winner is a bot seat, schedule the bot's play/draw
+                // follow-up so the match isn't stranded in Rolling. Detection
+                // is by sub-prefix — the only seat we ever stamp with "bot:"
+                // is the synthesized opponent in CreateBotMatchAsync. Gating
+                // this on the winner CAS means the bot's PlayDraw is scheduled
+                // exactly once even if both rolls land concurrently (Slice 4a
+                // #7) — only the single CAS winner reaches here.
+                if (winnerSub.StartsWith("bot:", StringComparison.Ordinal))
+                {
+                    _botScheduler.ScheduleBotPlayDraw(matchId, winnerSub);
+                }
             }
         }
 

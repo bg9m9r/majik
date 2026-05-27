@@ -129,4 +129,57 @@ public class MatchRepository
         return _collection.DeleteOneAsync(x => x.Id == id, ct)
             .ContinueWith(t => t.Result.DeletedCount, ct);
     }
+
+    /// <summary>
+    /// Field-targeted CAS that sets ONLY this player's pre-game roll slot,
+    /// guarded that the match is still Rolling AND the slot was empty. Used by
+    /// <c>MatchService.SubmitRollAsync</c> so two concurrent submissions can't
+    /// lose-update: each player writes its own field, so neither clobbers the
+    /// other's value (Slice 4a #5). Returns false when the match is no longer
+    /// Rolling or the slot was already filled (idempotent re-submit / race
+    /// loser).
+    /// </summary>
+    public virtual async Task<bool> TrySetPlayerRollAsync(
+        Guid id, bool isCreator, int value, DateTime now, CancellationToken ct)
+    {
+        var filter = isCreator
+            ? Builders<Match>.Filter.Where(x =>
+                x.Id == id && x.State == MatchState.Rolling && x.Roll!.CreatorRoll == null)
+            : Builders<Match>.Filter.Where(x =>
+                x.Id == id && x.State == MatchState.Rolling && x.Roll!.OpponentRoll == null);
+
+        var update = isCreator
+            ? Builders<Match>.Update.Set(x => x.Roll!.CreatorRoll, value).Set(x => x.UpdatedAt, now)
+            : Builders<Match>.Update.Set(x => x.Roll!.OpponentRoll, value).Set(x => x.UpdatedAt, now);
+
+        var result = await _collection.UpdateOneAsync(filter, update, cancellationToken: ct);
+        return result.MatchedCount > 0;
+    }
+
+    /// <summary>
+    /// CAS that finalizes the roll: sets the (possibly tie-rerolled) values +
+    /// winner, guarded that the match is still Rolling, BOTH slots are filled,
+    /// and no winner has been stamped yet. Exactly one concurrent caller wins
+    /// this CAS, so the winner is computed once even when both players submit
+    /// simultaneously (Slice 4a #5). Returns false for the losers.
+    /// </summary>
+    public virtual async Task<bool> TrySetRollWinnerAsync(
+        Guid id, int creatorRoll, int opponentRoll, string winnerSub, DateTime now, CancellationToken ct)
+    {
+        var filter = Builders<Match>.Filter.Where(x =>
+            x.Id == id
+            && x.State == MatchState.Rolling
+            && x.Roll!.CreatorRoll != null
+            && x.Roll!.OpponentRoll != null
+            && x.Roll!.WinnerSub == null);
+
+        var update = Builders<Match>.Update
+            .Set(x => x.Roll!.CreatorRoll, creatorRoll)
+            .Set(x => x.Roll!.OpponentRoll, opponentRoll)
+            .Set(x => x.Roll!.WinnerSub, winnerSub)
+            .Set(x => x.UpdatedAt, now);
+
+        var result = await _collection.UpdateOneAsync(filter, update, cancellationToken: ct);
+        return result.MatchedCount > 0;
+    }
 }
