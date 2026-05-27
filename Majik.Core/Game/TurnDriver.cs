@@ -276,6 +276,11 @@ public sealed class TurnDriver
         // Per-turn reset so the queue doesn't bleed into the next turn.
         _additionalCombats.Reset();
 
+        // CR 511 — end of combat step. Emit the step event so "until end of
+        // combat" durations (e.g. Firebending mana) can expire before the
+        // postcombat main begins.
+        SetPhase(PhaseStateType.EndOfCombat);
+
         // Main 2 (CR 505 — postcombat main phase).
         SetTurnState(TurnStateType.PostCombatMain);
         SetPhase(PhaseStateType.PostCombatMain);
