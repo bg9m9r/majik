@@ -116,6 +116,10 @@ public class ReckonerBankbusterTests
         var card = ReckonerBankbusterFactory.Create(_alice);
         _alice.Zones.Battlefield.AddCard(card);
         card.SetZone(ZoneType.Battlefield);
+        // CR 302.6 — the {T} activated ability is only legal once the
+        // creature has shed summoning sickness; clear it so this test
+        // exercises the draw behaviour rather than the sickness gate.
+        card.ClearSummoningSickness();
         card.Counters.Add(CounterType.Charge, 3);
 
         // Seed the library so the draw has something to grab.
@@ -146,6 +150,9 @@ public class ReckonerBankbusterTests
         var card = ReckonerBankbusterFactory.Create(_alice);
         _alice.Zones.Battlefield.AddCard(card);
         card.SetZone(ZoneType.Battlefield);
+        // CR 302.6 — clear summoning sickness so the {T} activated ability's
+        // tap cost is payable; this test exercises the Powerstone tail clause.
+        card.ClearSummoningSickness();
         // Start with exactly one charge — this activation will remove the
         // last one and trigger the "create a Powerstone token" tail clause.
         card.Counters.Add(CounterType.Charge, 1);

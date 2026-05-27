@@ -93,6 +93,9 @@ public class PlagueMyrFactoryTests
     public void PlagueMyr_TapForColorless_TapsCreatureAndProducesOneGeneric()
     {
         var c = PlagueMyrFactory.Create(_alice);
+        // CR 302.6 — clear summoning sickness so this test exercises the
+        // {T}: Add {C} mana production rather than the sickness gate.
+        c.ClearSummoningSickness();
 
         var manaAbility = c.Abilities.OfType<ManaAbility>().Single();
 
@@ -116,6 +119,9 @@ public class PlagueMyrFactoryTests
     public void PlagueMyr_ManaAbility_CannotActivateWhileTapped()
     {
         var c = PlagueMyrFactory.Create(_alice);
+        // CR 302.6 — clear summoning sickness so the first activation is legal
+        // and the test asserts the !IsTapped re-activation gate specifically.
+        c.ClearSummoningSickness();
 
         var manaAbility = c.Abilities.OfType<ManaAbility>().Single();
 
