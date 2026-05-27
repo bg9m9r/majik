@@ -141,6 +141,41 @@ public class LayerAgreementInvariantTests : IClassFixture<TestMongoFixture>
             "the server clock DERIVES the holder from the engine, never freezes it");
     }
 
+    // -----------------------------------------------------------------------
+    // Task 5 — seat identity: a prompt for the creator carries
+    // playerId == Alice.Id (Creator → Alice convention). The portal reads
+    // PromptDto.PlayerId to decide which seat must act; it must DERIVE seat
+    // identity from the engine's id, never recompute it from sub strings.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task SeatIdentity_CreatorPrompt_CarriesAliceId()
+    {
+        using var h = await LayerAgreementHarness.StartBotMatchAsync(_fixture, rngSeed: 3);
+
+        // One pass surfaces a fresh PassPriorityCommand prompt for the
+        // creator's seat (the engine awaits the human after walking a step).
+        await h.AdvanceByPassAsync(h.CreatorSub);
+
+        // The bridge fans prompts per-recipient; the harness records each as
+        // a "prompt" entry carrying the PromptDto. Find any prompt addressed
+        // to the creator (Alice) and assert its PlayerId is Alice's engine id.
+        var creatorPrompts = h.Published.Snapshot()
+            .Where(e => e.@event == "prompt" && e.payload is Majik.Core.Api.Dtos.PromptDto pd
+                        && pd.PlayerId == h.Facade.Alice.Id)
+            .ToList();
+
+        creatorPrompts.Should().NotBeEmpty(
+            "the engine must prompt the creator's seat, and that prompt must " +
+            "carry Alice's engine id (Creator → Alice convention)");
+
+        // And the reflection helper reads the same id off the payload — the
+        // seam the portal relies on when it can only see the wire shape.
+        var first = (Majik.Core.Api.Dtos.PromptDto)creatorPrompts[0].payload;
+        PayloadReflection.GetString(first, "PlayerId")
+            .Should().Be(h.Facade.Alice.Id.ToString());
+    }
+
     private static List<string> ExtractPhaseLabels(LayerAgreementHarness h)
     {
         var labels = new List<string>();
