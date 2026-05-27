@@ -19,9 +19,9 @@ public class BotVsRandomAgentTests
     /// (always pass, always keep, always take the first legal target), so no
     /// additional entropy enters from the opponent side.
     ///
-    /// Seed selection: 20 seeds tested to yield a stable burn-bot win-rate
-    /// well above the 70% floor (14/20). Verified by running the test 5+
-    /// times consecutively and confirming the same win count each time.
+    /// Seed selection: 20 seeds tested to yield a stable bot win-rate well
+    /// above the 70% floor (14/20). Verified by running the test 5+ times
+    /// consecutively and confirming the same win count each time.
     /// </summary>
     private static readonly int[] Seeds = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 };
 
@@ -59,7 +59,7 @@ public class BotVsRandomAgentTests
     }
 
     [Fact]
-    public async Task Burn_BeatsRandom_AtLeast70Pct()
+    public async Task SeededBot_BeatsRandomAgent_AtLeast70Pct()
     {
         int wins = 0;
         for (int i = 0; i < Seeds.Length; i++)
@@ -84,6 +84,6 @@ public class BotVsRandomAgentTests
             if (ReferenceEquals(result.Winner, facade.Alice)) wins++;
         }
         wins.Should().BeGreaterThanOrEqualTo(14,
-            $"burn bot should win ≥70 %% of 20 fixed-seed matches; won {wins}/20");
+            $"bot should win ≥70 %% of 20 fixed-seed matches; won {wins}/20");
     }
 }
