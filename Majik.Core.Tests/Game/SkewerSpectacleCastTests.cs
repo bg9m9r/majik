@@ -102,7 +102,7 @@ public class SkewerSpectacleCastTests
         var stack = new Majik.Core.Stack.Stack(bus);
         var flow = new SpellCastFlow(stack, new ZoneService(bus), bus);
         var agent = new CostCapturingAgent();
-        var ctx = new GameContext(alice, new[] { alice, bob }, alice, 1, PhaseStateType.Main, stack);
+        var ctx = new GameContext(alice, new[] { alice, bob }, alice, 1, PhaseStateType.PreCombatMain, stack);
 
         // Vanilla effects — the damage body is exercised by the Damage
         // spell-template test suite; here we care only about the COST gate.
@@ -144,7 +144,7 @@ public class SkewerSpectacleCastTests
         var stack = new Majik.Core.Stack.Stack(bus);
         var flow = new SpellCastFlow(stack, new ZoneService(bus), bus);
         var agent = new CostCapturingAgent();
-        var ctx = new GameContext(alice, new[] { alice, bob }, alice, 1, PhaseStateType.Main, stack);
+        var ctx = new GameContext(alice, new[] { alice, bob }, alice, 1, PhaseStateType.PreCombatMain, stack);
 
         var def = new SpellDefinition(
             Modes: Array.Empty<string>(),

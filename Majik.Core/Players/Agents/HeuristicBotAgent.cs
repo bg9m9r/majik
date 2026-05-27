@@ -4,6 +4,7 @@ using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
 using Majik.Core.Game;
 using Majik.Core.Keywords;
+using Majik.Core.StateMachine;
 using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
 using Creature = Majik.Core.Cards.Creature;
@@ -108,7 +109,7 @@ public sealed class HeuristicBotAgent : IPlayerAgent
         // when there's something worth reacting to (opponent's combat phase,
         // a spell on the stack, opponent's end step). Outside both → pass.
         var phase = ctx.CurrentPhase;
-        var sorceryWindow = phase == Majik.Core.StateMachine.PhaseStateType.Main
+        var sorceryWindow = phase is { } p && p.IsMain()
             && ReferenceEquals(ctx.Self, ctx.ActivePlayer)
             && ctx.Stack.IsEmpty;
         var instantWindow = !sorceryWindow && IsReactiveWindow(ctx);

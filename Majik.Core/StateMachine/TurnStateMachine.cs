@@ -29,12 +29,10 @@ public class TurnStateMachine : StateMachine<TurnState>
     {
         _eventBus?.Publish(new PhaseChangedEvent(previous?.Name, current.Name));
         // Typed companion event. PhaseStateMachine fires its own
-        // PhaseChangedEvent with a different vocabulary ("Main", "Untap",
-        // …), so the string-only event isn't enough to recover which
-        // turn-state we're inside. Downstream wire code (GameFacade +
-        // EventPayloadBuilder) tracks this typed event to disambiguate
-        // PhaseStateType.Main into PreCombatMain / PostCombatMain at the
-        // serialization boundary.
+        // PhaseChangedEvent with the phase-step vocabulary ("PreCombatMain",
+        // "Untap", …); this typed turn-state event is tracked downstream
+        // (GameFacade) for TurnStateChangedEvent payloads and other
+        // turn-state consumers.
         _eventBus?.Publish(new TurnStateChangedEvent(previous?.Type, current.Type));
     }
 }

@@ -38,7 +38,7 @@ public class AbilityActivationFlowTargetingTests
         agent.QueueTargets(new object[] { _bob });
 
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice,
-            1, PhaseStateType.Main, stack);
+            1, PhaseStateType.PreCombatMain, stack);
 
         await flow.ActivateAsync(_alice, ability,
             targetRequests: new[] { req },
@@ -66,7 +66,7 @@ public class AbilityActivationFlowTargetingTests
         agent.QueueTargets(new object[] { _alice });
 
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice,
-            1, PhaseStateType.Main, stack);
+            1, PhaseStateType.PreCombatMain, stack);
 
         await flow.ActivateAsync(_alice, ability,
             targetRequests: new[] { req1, req2 },
@@ -90,7 +90,7 @@ public class AbilityActivationFlowTargetingTests
 
         var agent = new ScriptedAgent();
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice,
-            1, PhaseStateType.Main, stack);
+            1, PhaseStateType.PreCombatMain, stack);
 
         await flow.ActivateAsync(_alice, ability,
             targetRequests: System.Array.Empty<TargetRequest>(),

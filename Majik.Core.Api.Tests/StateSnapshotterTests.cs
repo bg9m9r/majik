@@ -25,12 +25,12 @@ public class StateSnapshotterTests
         var stack = new Majik.Core.Stack.Stack(_bus);
 
         var dto = StateSnapshotter.Snapshot(
-            Guid.NewGuid(), 1, PhaseStateType.Main, alice,
+            Guid.NewGuid(), 1, PhaseStateType.PreCombatMain, alice,
             new[] { alice, bob }, stack);
 
         dto.Players.Should().HaveCount(2);
         dto.ActivePlayerId.Should().Be(alice.Id);
-        dto.Phase.Should().Be("Main");
+        dto.Phase.Should().Be("PreCombatMain");
         dto.Stack.Should().BeEmpty();
 
         // Must round-trip — no cycles.
@@ -49,7 +49,7 @@ public class StateSnapshotterTests
         zones.MoveCardTo(bear, ZoneType.Battlefield, controller: alice);
 
         var dto = StateSnapshotter.Snapshot(
-            Guid.NewGuid(), 1, PhaseStateType.Main, alice,
+            Guid.NewGuid(), 1, PhaseStateType.PreCombatMain, alice,
             new[] { alice }, new Majik.Core.Stack.Stack(_bus));
 
         var aliceDto = dto.Players.Single(p => p.Id == alice.Id);
@@ -69,7 +69,7 @@ public class StateSnapshotterTests
         stack.Push(spell);
 
         var dto = StateSnapshotter.Snapshot(
-            Guid.NewGuid(), 1, PhaseStateType.Main, alice, new[] { alice }, stack);
+            Guid.NewGuid(), 1, PhaseStateType.PreCombatMain, alice, new[] { alice }, stack);
 
         dto.Stack.Should().ContainSingle();
         dto.Stack[0].Kind.Should().Be("Spell");

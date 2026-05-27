@@ -47,8 +47,11 @@ public sealed class PhaseSequenceMutator
     }
 
     /// <summary>Queue an extra main phase (e.g. Seedborn Muse, Relentless
-    /// Assault).</summary>
-    public void AddExtraMainPhase() => AddExtraPhase(PhaseStateType.Main);
+    /// Assault). Cards that grant an additional main phase grant a
+    /// postcombat main (CR 505.1b — the extra main follows the combat it
+    /// was created after), so the contextually-correct type is
+    /// <see cref="PhaseStateType.PostCombatMain"/>.</summary>
+    public void AddExtraMainPhase() => AddExtraPhase(PhaseStateType.PostCombatMain);
 
     /// <summary>Peek the next pending insertion without consuming it.
     /// Returns null when the queue is empty.</summary>

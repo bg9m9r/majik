@@ -54,7 +54,7 @@ public class SideboardCompanionTests
 
     private GameContext MainPhaseCtx(Player active) =>
         new(active, new[] { _alice, _bob }, active, 1,
-            PhaseStateType.Main, _stack);
+            PhaseStateType.PreCombatMain, _stack);
 
     // ── Zone shape ─────────────────────────────────────────────────────
 
@@ -182,7 +182,7 @@ public class SideboardCompanionTests
 
         // Bob is the active player; Alice trying to invoke companion.
         var bobsCtx = new GameContext(_alice, new[] { _alice, _bob },
-            _bob, 1, PhaseStateType.Main, _stack);
+            _bob, 1, PhaseStateType.PreCombatMain, _stack);
 
         Func<Task> act = () => _flow.CastCompanionAsync(_alice, lurrus, bobsCtx);
         await act.Should().ThrowAsync<InvalidOperationException>()
@@ -247,7 +247,7 @@ public class SideboardCompanionTests
         alice.AddManaToPool(ManaCost.Parse("{3}{W}{B}"));
 
         var ctx = new GameContext(alice, new[] { alice, game.GetPlayer("Bob")! },
-            alice, 1, PhaseStateType.Main, _stack);
+            alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         // Step 1 — Companion tax + sideboard → hand.
         await _flow.CastCompanionAsync(alice, lurrus, ctx);

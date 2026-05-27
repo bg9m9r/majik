@@ -39,7 +39,7 @@ public class PriorityPolicyTests
         s.AddCardToHand(s.Self, land);
         var oppCtx = new Majik.Core.Game.GameContext(
             s.Self, new[] { s.Self, s.Opponent }, activePlayer: s.Opponent,
-            turnNumber: 1, currentPhase: Majik.Core.StateMachine.PhaseStateType.Main, stack: s.Stack);
+            turnNumber: 1, currentPhase: Majik.Core.StateMachine.PhaseStateType.PreCombatMain, stack: s.Stack);
         var pol = new PriorityPolicy(ArchetypeWeights.Burn);
         pol.Pick(oppCtx, s.Self).Should().BeOfType<PriorityAction.PassAction>();
     }
@@ -105,7 +105,7 @@ public class PriorityPolicyTests
         // Opponent's turn, in their main, stack empty — instant cast still legal.
         var oppCtx = new Majik.Core.Game.GameContext(
             s.Self, new[] { s.Self, s.Opponent }, activePlayer: s.Opponent,
-            turnNumber: 1, currentPhase: Majik.Core.StateMachine.PhaseStateType.Main, stack: s.Stack);
+            turnNumber: 1, currentPhase: Majik.Core.StateMachine.PhaseStateType.PreCombatMain, stack: s.Stack);
         var pol = new PriorityPolicy(ArchetypeWeights.Burn);
 
         // Opponent's turn → policy should *not* cast our instant proactively.
@@ -126,7 +126,7 @@ public class PriorityPolicyTests
 
         var oppCtx = new Majik.Core.Game.GameContext(
             s.Self, new[] { s.Self, s.Opponent }, activePlayer: s.Opponent,
-            turnNumber: 1, currentPhase: Majik.Core.StateMachine.PhaseStateType.Main, stack: s.Stack);
+            turnNumber: 1, currentPhase: Majik.Core.StateMachine.PhaseStateType.PreCombatMain, stack: s.Stack);
         var pol = new PriorityPolicy(ArchetypeWeights.Burn);
 
         pol.Pick(oppCtx, s.Self).Should().BeOfType<PriorityAction.PassAction>();

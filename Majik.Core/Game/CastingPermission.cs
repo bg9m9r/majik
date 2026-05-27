@@ -40,7 +40,7 @@ public static class CastingPermission
                 reason = "sorceries can only be cast on your turn";
                 return false;
             }
-            if (currentPhase != PhaseStateType.Main)
+            if (!currentPhase.IsMain())
             {
                 reason = "sorceries can only be cast during a main phase";
                 return false;

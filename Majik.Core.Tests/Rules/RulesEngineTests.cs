@@ -179,7 +179,7 @@ public class RulesEngineTests
         var sorcery = new Sorcery("Fireball", "2RR");
 
         // Act
-        var result = _rulesEngine.CanCastInPhase(sorcery, PhaseStateType.Main, isStackEmpty: true);
+        var result = _rulesEngine.CanCastInPhase(sorcery, PhaseStateType.PreCombatMain, isStackEmpty: true);
 
         // Assert
         result.Should().BeTrue();

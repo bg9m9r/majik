@@ -143,7 +143,7 @@ public class UrzasBaubleTests
         foreach (var e in ability.Effects) e.Execute();
 
         bus.Publish(new StepStartedEvent(PhaseStateType.Draw, _alice));
-        bus.Publish(new StepStartedEvent(PhaseStateType.Main, _alice));
+        bus.Publish(new StepStartedEvent(PhaseStateType.PreCombatMain, _alice));
         bus.Publish(new StepStartedEvent(PhaseStateType.End, _alice));
 
         triggers.PendingCount.Should().Be(0);

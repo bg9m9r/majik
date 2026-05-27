@@ -302,7 +302,7 @@ public class NecropotenceTests : IDisposable
 
         bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _alice));
         bus.Publish(new StepStartedEvent(PhaseStateType.Draw, _alice));
-        bus.Publish(new StepStartedEvent(PhaseStateType.Main, _alice));
+        bus.Publish(new StepStartedEvent(PhaseStateType.PreCombatMain, _alice));
 
         triggers.PendingCount.Should().Be(0,
             "only End-step StepStartedEvent triggers the delayed return-to-hand");

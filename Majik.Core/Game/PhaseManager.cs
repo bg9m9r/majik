@@ -204,7 +204,8 @@ public class PhaseManager
                 }
                 break;
                 
-            case PhaseStateType.Main:
+            case PhaseStateType.PreCombatMain:
+            case PhaseStateType.PostCombatMain:
                 // Main phase: players can cast spells (handled by stack/priority in future)
                 // For now, just auto-complete
                 break;
@@ -289,7 +290,8 @@ public class PhaseManager
         // Main phases and combat will require player input in future
         switch (_currentPhase.Value)
         {
-            case PhaseStateType.Main:
+            case PhaseStateType.PreCombatMain:
+            case PhaseStateType.PostCombatMain:
                 // Main phase requires stack empty and all players passed
                 return stack?.IsEmpty == true && priorityManager?.AllPlayersPassed == true;
                 

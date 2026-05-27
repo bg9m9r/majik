@@ -30,7 +30,7 @@ public sealed class BotTestScenario
             allPlayers: new[] { Self, Opponent },
             activePlayer: Self,
             turnNumber: 1,
-            currentPhase: PhaseStateType.Main,
+            currentPhase: PhaseStateType.PreCombatMain,
             stack: Stack);
     }
 

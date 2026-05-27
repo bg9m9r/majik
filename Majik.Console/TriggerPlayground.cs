@@ -311,7 +311,7 @@ internal static class TriggerPlayground
         var agent = new ScriptedAgent();
         agent.QueueTargets(new[] { (object)bob });
         agent.QueueMana(ManaPayment.Empty);
-        var ctx = new GameContext(alice, new[] { alice, bob }, alice, 1, PhaseStateType.Main, stack);
+        var ctx = new GameContext(alice, new[] { alice, bob }, alice, 1, PhaseStateType.PreCombatMain, stack);
         var def = factory.LookupSpellDefinition("Lightning Bolt", alice, raw => raw, stack)!;
         castFlow.CastAsync(alice, bolt, def, agent, ctx).GetAwaiter().GetResult();
 
@@ -346,7 +346,7 @@ internal static class TriggerPlayground
                 [bob] = new DeterministicBotAgent(),
             },
             turnNumberAccessor: () => 1,
-            phaseAccessor: () => PhaseStateType.Main,
+            phaseAccessor: () => PhaseStateType.PreCombatMain,
             landDropTracker: new LandDropTracker());
 
         Log("RunUntilRoundEndsAsync — both bots pass, stack drains");

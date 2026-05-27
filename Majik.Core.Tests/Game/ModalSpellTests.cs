@@ -53,7 +53,7 @@ public class ModalSpellTests
                 }
             }) });
 
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         var spell = await _flow.CastAsync(_alice, charm, def, agent, ctx);
         spell.Resolve();
@@ -85,7 +85,7 @@ public class ModalSpellTests
                 }
             }) });
 
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         var spell = await _flow.CastAsync(_alice, charm, def, agent, ctx);
         spell.Resolve();

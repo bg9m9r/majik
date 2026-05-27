@@ -166,7 +166,7 @@ public class PriorityPolicy
         EnumerateCandidates(GameContext ctx, Player self, double current)
     {
         var sorceryWindow = ctx.ActivePlayer == self
-            && ctx.CurrentPhase == PhaseStateType.Main
+            && ctx.CurrentPhase is { } phase && phase.IsMain()
             && ctx.Stack.Count == 0;
 
         if (sorceryWindow)

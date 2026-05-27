@@ -119,7 +119,7 @@ public class MindRotFactoryTests
         agent.QueueTargets(new object[] { _bob });
         agent.QueueMana(ManaPayment.Empty);
 
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
         await _flow.CastAsync(_alice, card, def, agent, ctx);
         _resolver.ResolveTop(_stack);
 
@@ -148,7 +148,7 @@ public class MindRotFactoryTests
         agent.QueueTargets(new object[] { _bob });
         agent.QueueMana(ManaPayment.Empty);
 
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
         await _flow.CastAsync(_alice, card, def, agent, ctx);
         _resolver.ResolveTop(_stack);
 
@@ -176,7 +176,7 @@ public class MindRotFactoryTests
         agent.QueueTargets(new object[] { _bob });
         agent.QueueMana(ManaPayment.Empty);
 
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
         await _flow.CastAsync(_alice, card, def, agent, ctx);
 
         // Should not throw.
@@ -214,7 +214,7 @@ public class MindRotFactoryTests
         casterAgent.QueueTargets(new object[] { _bob });
         casterAgent.QueueMana(ManaPayment.Empty);
 
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
         await _flow.CastAsync(_alice, card, def, casterAgent, ctx);
         _resolver.ResolveTop(_stack);
 

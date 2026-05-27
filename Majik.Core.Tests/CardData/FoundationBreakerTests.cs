@@ -222,7 +222,7 @@ public class FoundationBreakerTests
 
         var agent = new ScriptedAgent();
         agent.QueueMana(ManaPayment.Empty);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(
             _alice, fb,
@@ -272,7 +272,7 @@ public class FoundationBreakerTests
     {
         var agent = new ScriptedAgent();
         agent.QueueMana(ManaPayment.Empty);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(
             _alice, fb,
@@ -302,7 +302,7 @@ public class FoundationBreakerTests
     {
         var agent = new ScriptedAgent();
         agent.QueueMana(ManaPayment.Empty);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(
             _alice, fb,

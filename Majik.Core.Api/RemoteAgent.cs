@@ -405,7 +405,7 @@ public sealed class RemoteAgent : IPlayerAgent
         var kinds = new List<Type>(3) { typeof(PassPriorityCommand) };
 
         var hand = ctx.Self.Zones.Hand.GetCards();
-        var sorceryWindow = ctx.CurrentPhase == PhaseStateType.Main
+        var sorceryWindow = ctx.CurrentPhase is { } sorceryPhase && sorceryPhase.IsMain()
             && ReferenceEquals(ctx.Self, ctx.ActivePlayer)
             && ctx.Stack.IsEmpty;
 

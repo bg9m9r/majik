@@ -107,5 +107,5 @@ public class PitchAltCostProbeTests
     }
 
     private GameContext NewContext(Player activePlayer) =>
-        new(_alice, new[] { _alice, _bob }, activePlayer, 1, PhaseStateType.Main, _stack);
+        new(_alice, new[] { _alice, _bob }, activePlayer, 1, PhaseStateType.PreCombatMain, _stack);
 }

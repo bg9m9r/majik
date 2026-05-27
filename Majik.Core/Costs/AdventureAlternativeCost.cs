@@ -1,5 +1,6 @@
 using Majik.Core.Cards;
 using Majik.Core.Players;
+using Majik.Core.StateMachine;
 using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
 
@@ -87,7 +88,7 @@ public sealed class AdventureAlternativeCost : IAlternativeCost
     {
         if (!IsSorcerySpeed) return true;
         if (!ReferenceEquals(caster, activePlayer)) return false;
-        if (currentPhase.HasValue && currentPhase.Value != Majik.Core.StateMachine.PhaseStateType.Main) return false;
+        if (currentPhase is { } phase && !phase.IsMain()) return false;
         if (!stackIsEmpty) return false;
         return true;
     }

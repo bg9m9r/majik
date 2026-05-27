@@ -188,7 +188,7 @@ public class LavaDartFactoryTests
         agent.QueueMana(ManaPayment.Empty);
 
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1,
-            PhaseStateType.Main, stack);
+            PhaseStateType.PreCombatMain, stack);
 
         var spell = await flow.CastAsync(
             _alice, dart, def, agent, ctx,

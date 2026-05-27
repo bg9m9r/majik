@@ -127,7 +127,7 @@ public class LavaDartFlashbackTests
         agent.QueueMana(ManaPayment.Empty);
 
         var ctx = new GameContext(alice, new[] { alice, bob }, alice, 1,
-            PhaseStateType.Main, stack);
+            PhaseStateType.PreCombatMain, stack);
 
         // The DamageAnyTargetTemplate normally requests a target — supply
         // one TargetRequest so the flow prompts the agent.

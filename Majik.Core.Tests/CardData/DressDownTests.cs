@@ -281,7 +281,7 @@ public class DressDownTests
         // should fire the trigger.
         _bus.Publish(new StepStartedEvent(PhaseStateType.End, _bob));
         _bus.Publish(new StepStartedEvent(PhaseStateType.Upkeep, _alice));
-        _bus.Publish(new StepStartedEvent(PhaseStateType.Main, _alice));
+        _bus.Publish(new StepStartedEvent(PhaseStateType.PreCombatMain, _alice));
         _bus.Publish(new StepStartedEvent(PhaseStateType.Cleanup, _alice));
 
         triggers.PendingCount.Should().Be(0,

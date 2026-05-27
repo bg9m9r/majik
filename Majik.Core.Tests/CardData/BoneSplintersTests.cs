@@ -153,7 +153,7 @@ public class BoneSplintersTests
         agent.QueueMana(ManaPayment.Empty);
 
         var ctx = new GameContext(
-            alice, new[] { alice, bob }, alice, 1, PhaseStateType.Main, stack);
+            alice, new[] { alice, bob }, alice, 1, PhaseStateType.PreCombatMain, stack);
 
         var def = BoneSplintersFactory.BuildSpellDefinition(resolver: t => t);
 

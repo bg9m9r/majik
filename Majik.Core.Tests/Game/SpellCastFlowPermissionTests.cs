@@ -32,7 +32,7 @@ public class SpellCastFlowPermissionTests
         var sorc = new Sorcery("Divination", "2U") { Owner = _alice, Zone = ZoneType.Hand };
         _alice.Zones.Hand.AddCard(sorc);
         var ctx = new GameContext(_alice, new[] { _alice, _bob },
-            activePlayer: _bob, 1, PhaseStateType.Main, _stack);
+            activePlayer: _bob, 1, PhaseStateType.PreCombatMain, _stack);
         var agent = new ScriptedAgent();
 
         var act = async () => await _flow.CastAsync(_alice, sorc,
@@ -71,7 +71,7 @@ public class SpellCastFlowPermissionTests
         agent.X = 3;
         agent.ManaCallback = c => promptedCost = c;
 
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(_alice, fireball,
             new SpellDefinition(

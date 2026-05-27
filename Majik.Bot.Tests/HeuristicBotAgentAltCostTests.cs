@@ -52,7 +52,7 @@ public class HeuristicBotAgentAltCostTests
 
         var bot = new HeuristicBotAgent(probe);
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice,
-            1, PhaseStateType.Main, new Majik.Core.Stack.Stack());
+            1, PhaseStateType.PreCombatMain, new Majik.Core.Stack.Stack());
 
         var action = await bot.ChoosePriorityActionAsync(ctx);
 
@@ -90,7 +90,7 @@ public class HeuristicBotAgentAltCostTests
 
         var bot = new HeuristicBotAgent(probe);
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice,
-            1, PhaseStateType.Main, new Majik.Core.Stack.Stack());
+            1, PhaseStateType.PreCombatMain, new Majik.Core.Stack.Stack());
 
         var action = await bot.ChoosePriorityActionAsync(ctx);
 
@@ -137,7 +137,7 @@ public class HeuristicBotAgentAltCostTests
 
         var bot = new HeuristicBotAgent(new RuntimeFlashbackAltCostProbe());
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice,
-            1, PhaseStateType.Main, new Majik.Core.Stack.Stack());
+            1, PhaseStateType.PreCombatMain, new Majik.Core.Stack.Stack());
 
         var action = await bot.ChoosePriorityActionAsync(ctx);
 
@@ -167,7 +167,7 @@ public class HeuristicBotAgentAltCostTests
 
         var bot = new HeuristicBotAgent(new RuntimeFlashbackAltCostProbe());
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice,
-            1, PhaseStateType.Main, new Majik.Core.Stack.Stack());
+            1, PhaseStateType.PreCombatMain, new Majik.Core.Stack.Stack());
 
         var action = await bot.ChoosePriorityActionAsync(ctx);
 
@@ -193,7 +193,7 @@ public class HeuristicBotAgentAltCostTests
 
         var probe = new RuntimeFlashbackAltCostProbe();
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice,
-            1, PhaseStateType.Main, new Majik.Core.Stack.Stack());
+            1, PhaseStateType.PreCombatMain, new Majik.Core.Stack.Stack());
 
         var grantedCandidates = probe.CandidatesFor(boltInYard, _alice, ctx).ToList();
         grantedCandidates.Should().ContainSingle().Which

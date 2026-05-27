@@ -28,7 +28,7 @@ public class SuspendAltCostProbeTests
     }
 
     private GameContext NewContext()
-        => new(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        => new(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
     private static T InHand<T>(Player owner, T card) where T : Card
     {

@@ -40,12 +40,12 @@ public class PhaseSequenceMutatorTests
     public void PeekAndDequeue_FollowFifoOrder()
     {
         var mutator = new PhaseSequenceMutator();
-        mutator.AddExtraPhase(PhaseStateType.Main);
+        mutator.AddExtraPhase(PhaseStateType.PreCombatMain);
         mutator.AddExtraPhase(PhaseStateType.End);
 
-        mutator.PeekNext().Should().Be(PhaseStateType.Main);
+        mutator.PeekNext().Should().Be(PhaseStateType.PreCombatMain);
         mutator.TryDequeue(out var first).Should().BeTrue();
-        first.Should().Be(PhaseStateType.Main);
+        first.Should().Be(PhaseStateType.PreCombatMain);
         mutator.TryDequeue(out var second).Should().BeTrue();
         second.Should().Be(PhaseStateType.End);
         mutator.PendingCount.Should().Be(0);

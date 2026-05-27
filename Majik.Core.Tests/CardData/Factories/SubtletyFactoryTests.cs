@@ -100,7 +100,7 @@ public class SubtletyFactoryTests
 
         var agent = new ScriptedAgent();
         agent.QueueMana(ManaPayment.Empty);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(
             _alice, subtlety,
@@ -157,7 +157,7 @@ public class SubtletyFactoryTests
         // Cast Subtlety normally (no alternative cost).
         var agent = new ScriptedAgent();
         agent.QueueMana(ManaPayment.Empty);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(
             _alice, subtlety,
@@ -227,7 +227,7 @@ public class SubtletyFactoryTests
 
         var aliceAgent = new ScriptedAgent();
         aliceAgent.QueueMana(ManaPayment.Empty);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(
             _alice, subtlety,
@@ -286,7 +286,7 @@ public class SubtletyFactoryTests
 
         var aliceAgent = new ScriptedAgent();
         aliceAgent.QueueMana(ManaPayment.Empty);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(
             _alice, subtlety,

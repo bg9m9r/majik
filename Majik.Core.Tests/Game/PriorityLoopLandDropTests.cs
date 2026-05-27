@@ -50,7 +50,7 @@ public class PriorityLoopLandDropTests
             new[] { _alice, _bob }, _priority, _stack, _resolver, _zones,
             new Dictionary<Player, IPlayerAgent>
             { [_alice] = aliceAgent, [_bob] = bobAgent },
-            () => 1, () => PhaseStateType.Main, tracker);
+            () => 1, () => PhaseStateType.PreCombatMain, tracker);
 
         await loop.RunUntilRoundEndsAsync(_alice);
 
@@ -84,7 +84,7 @@ public class PriorityLoopLandDropTests
             new[] { _alice, _bob }, _priority, _stack, _resolver, _zones,
             new Dictionary<Player, IPlayerAgent>
             { [_alice] = aliceAgent, [_bob] = bobAgent },
-            () => 1, () => PhaseStateType.Main, tracker);
+            () => 1, () => PhaseStateType.PreCombatMain, tracker);
 
         await loop.RunUntilRoundEndsAsync(_alice);
 
@@ -102,7 +102,7 @@ public class PriorityLoopLandDropTests
             new[] { _alice, _bob }, _priority, _stack, _resolver, _zones,
             new Dictionary<Player, IPlayerAgent>
             { [_alice] = new ScriptedAgent(), [_bob] = new ScriptedAgent() },
-            () => 1, () => PhaseStateType.Main, landDropTracker: null!);
+            () => 1, () => PhaseStateType.PreCombatMain, landDropTracker: null!);
 
         act.Should().Throw<ArgumentNullException>()
             .And.ParamName.Should().Be("landDropTracker");

@@ -51,14 +51,11 @@ public static class EventPayloadBuilder
     /// the rest of the payload set is public and ignores the viewer.</summary>
     public static JsonElement Build(GameEvent e, Player? viewer) => Build(e, viewer, turnState: null);
 
-    /// <summary>Viewer-scoped payload with turn-state context. The
-    /// <paramref name="turnState"/> argument lets the builder disambiguate
-    /// <see cref="PhaseStateType.Main"/> into the wire labels
-    /// "PreCombatMain" / "PostCombatMain" on phase / step events — the
-    /// engine's PhaseStateMachine collapses both into <c>Main</c>, so the
-    /// caller (typically <see cref="GameFacade"/>) supplies the outer
-    /// TurnStateMachine state it tracks via <see cref="TurnStateChangedEvent"/>.
-    /// Pass <c>null</c> to keep the legacy "Main" label.</summary>
+    /// <summary>Viewer-scoped payload with turn-state context. Since Slice 3
+    /// the engine carries the precombat / postcombat distinction as
+    /// first-class phase values, so phase / step labels are already
+    /// disambiguated and the <paramref name="turnState"/> argument is retained
+    /// only for call-site compatibility (it no longer affects the labels).</summary>
     public static JsonElement Build(GameEvent e, Player? viewer, TurnStateType? turnState) => e switch
     {
         CardMovedEvent x => BuildCardMoved(x, viewer),
@@ -92,8 +89,8 @@ public static class EventPayloadBuilder
         }),
         PhaseChangedEvent x => Serialize(new
         {
-            from = RemapMainLabel(x.PreviousPhase, turnState),
-            to = RemapMainLabel(x.CurrentPhase, turnState),
+            from = x.PreviousPhase,
+            to = x.CurrentPhase,
         }),
         TurnStateChangedEvent x => Serialize(new
         {
@@ -265,17 +262,6 @@ public static class EventPayloadBuilder
         => JsonSerializer.SerializeToElement(value, Opts);
 
     private static JsonElement Empty() => JsonDocument.Parse("{}").RootElement;
-
-    // PhaseChangedEvent carries the raw IState.Name string from either the
-    // TurnStateMachine ("PreCombatMain", "Combat", …) or the
-    // PhaseStateMachine ("Main", "Untap", …). When we see the ambiguous
-    // "Main" label and the caller has supplied a TurnStateType, lift the
-    // wire string into the disambiguated form the frontend expects.
-    private static string? RemapMainLabel(string? raw, TurnStateType? turnState)
-    {
-        if (raw != PhaseStateType.Main.ToString()) return raw;
-        return PhaseLabelResolver.Resolve(PhaseStateType.Main, turnState);
-    }
 
     // The next two helpers must stay aligned with
     // StateSnapshotter.SnapshotStackObject — the wire-format `kind` +

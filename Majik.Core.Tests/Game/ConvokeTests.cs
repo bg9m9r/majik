@@ -122,7 +122,7 @@ public class ConvokeTests
         var stack = new Majik.Core.Stack.Stack(bus);
         var flow = new SpellCastFlow(stack, new ZoneService(bus), bus);
         var agent = new CostCapturingAgent();
-        var ctxGame = new GameContext(alice, new[] { alice, bob }, alice, 1, PhaseStateType.Main, stack);
+        var ctxGame = new GameContext(alice, new[] { alice, bob }, alice, 1, PhaseStateType.PreCombatMain, stack);
 
         var convoke = new ConvokeAlternativeCost(ManaCost.Parse("G"));
         var def = new SpellDefinition(

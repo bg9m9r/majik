@@ -67,7 +67,7 @@ public class ImproviseAdditionalCostTests
 
     private GameContext Ctx() =>
         new(_alice, new[] { _alice, _bob }, _alice, turnNumber: 1,
-            PhaseStateType.Main, _stack);
+            PhaseStateType.PreCombatMain, _stack);
 
     private static SpellDefinition NoOpDef() =>
         new(Modes: Array.Empty<string>(),

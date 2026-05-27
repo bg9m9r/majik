@@ -155,7 +155,7 @@ public class SoulSpikeTests
         agent.QueueTargets(new object[] { _bob });
         agent.QueueMana(ManaPayment.Empty);
 
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         var spell = await _flow.CastAsync(
             _alice, ss,
@@ -267,7 +267,7 @@ public class SoulSpikeTests
         agent.QueueTargets(new object[] { target });
         agent.QueueMana(ManaPayment.Empty);
 
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         var spell = await _flow.CastAsync(
             _alice, ss,

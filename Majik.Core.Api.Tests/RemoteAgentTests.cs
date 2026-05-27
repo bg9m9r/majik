@@ -466,7 +466,7 @@ public class RemoteAgentTests
             allPlayers: new[] { _alice, bob },
             activePlayer: bob,
             turnNumber: 1,
-            currentPhase: PhaseStateType.Main,
+            currentPhase: PhaseStateType.PreCombatMain,
             stack: new Majik.Core.Stack.Stack());
 
         _ = agent.ChoosePriorityActionAsync(ctx);
@@ -574,7 +574,7 @@ public class RemoteAgentTests
         stack.Push(new TestStackObject());
         var ctx = new GameContext(
             _alice, new[] { _alice }, _alice, 1,
-            PhaseStateType.Main, stack);
+            PhaseStateType.PreCombatMain, stack);
 
         _ = agent.ChoosePriorityActionAsync(ctx);
 
@@ -1089,5 +1089,5 @@ public class RemoteAgentTests
     }
 
     private GameContext NewContext() =>
-        new(_alice, new[] { _alice }, _alice, 1, PhaseStateType.Main, new Majik.Core.Stack.Stack());
+        new(_alice, new[] { _alice }, _alice, 1, PhaseStateType.PreCombatMain, new Majik.Core.Stack.Stack());
 }

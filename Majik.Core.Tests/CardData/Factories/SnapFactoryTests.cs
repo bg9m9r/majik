@@ -94,7 +94,7 @@ public class SnapFactoryTests
         // Slot 1 — up to two land targets.
         agent.QueueTargets(new[] { (object)island1, (object)island2 });
         agent.QueueMana(ManaPayment.Empty);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(
             _alice, snap,
@@ -128,7 +128,7 @@ public class SnapFactoryTests
         // Slot 1 — pick zero lands (open-cardinality lower bound = 0).
         agent.QueueTargets(Array.Empty<object>());
         agent.QueueMana(ManaPayment.Empty);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(
             _alice, snap,

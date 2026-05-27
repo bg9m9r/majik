@@ -265,12 +265,11 @@ public static class ActivatedAbilityPolicy
         // approximate as "our turn AND we have untapped creatures AND
         // current phase precedes combat".
         if (ReferenceEquals(ctx.ActivePlayer, self)
-            && phase == PhaseStateType.Main)
+            && phase is { } mainPhase && mainPhase.IsMain())
         {
-            // Only the FIRST main (pre-combat) gates pump usefully. Without
-            // a step-distinction we can't tell pre- vs post-combat from
-            // PhaseStateType alone; assume pre-combat (the more common
-            // pump window) — over-grants pumping in post-combat main, but
+            // Either main phase gates pump here. Pre-combat is the more
+            // useful pump window (combat is still ahead); over-grants pumping
+            // in post-combat main, but
             // that's the same eager behaviour as today, just bounded by
             // the rest of the cost gate.
             var untappedCreatures = self.Zones.Battlefield.GetCards()

@@ -242,7 +242,7 @@ public class SpliceOntoArcaneTests
         agent.QueueMana(ManaPayment.Empty);
 
         var ctx = new GameContext(_alice, new[] { _alice, _bob },
-            _alice, 1, PhaseStateType.Main, _stack);
+            _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         // Goryo's resolve body needs the caster + zone service; in this
         // shape-only test there's nothing in the graveyard so the
@@ -294,7 +294,7 @@ public class SpliceOntoArcaneTests
         agent.QueueMana(ManaPayment.Empty);
 
         var ctx = new GameContext(_alice, new[] { _alice, _bob },
-            _alice, 1, PhaseStateType.Main, _stack);
+            _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         var goryosDef = new SpellDefinition(
             Modes: Array.Empty<string>(),
@@ -339,7 +339,7 @@ public class SpliceOntoArcaneTests
         agent.QueueMana(ManaPayment.Empty);
 
         var ctx = new GameContext(_alice, new[] { _alice, _bob },
-            _alice, 1, PhaseStateType.Main, _stack);
+            _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         var splice = DesperateRitualFactory.BuildSpliceCost(bl, dr);
 

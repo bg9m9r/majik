@@ -26,7 +26,7 @@ public class HeuristicBotAgentIntentTests
 
     private GameContext NewCtx() =>
         new(_self, new[] { _self, _opp }, _self,
-            1, PhaseStateType.Main, new Majik.Core.Stack.Stack());
+            1, PhaseStateType.PreCombatMain, new Majik.Core.Stack.Stack());
 
     private Creature AddCreature(Player owner, string name, int p, int t)
     {
@@ -53,7 +53,7 @@ public class HeuristicBotAgentIntentTests
     {
         var lowSelf = new Player("Self", 4);
         var ctx = new GameContext(lowSelf, new[] { lowSelf, _opp }, lowSelf,
-            1, PhaseStateType.Main, new Majik.Core.Stack.Stack());
+            1, PhaseStateType.PreCombatMain, new Majik.Core.Stack.Stack());
 
         var bot = new HeuristicBotAgent();
         var idx = await bot.ChooseModeAsync(ctx,
@@ -303,7 +303,7 @@ public class HeuristicBotAgentIntentTests
     {
         var lowSelf = new Player("Self", 4);
         var ctx = new GameContext(lowSelf, new[] { lowSelf, _opp }, lowSelf,
-            1, PhaseStateType.Main, new Majik.Core.Stack.Stack());
+            1, PhaseStateType.PreCombatMain, new Majik.Core.Stack.Stack());
 
         var sorcery = new Majik.Core.Cards.Sorcery("Healing Salve", "{W}")
         { Owner = lowSelf, Controller = lowSelf };

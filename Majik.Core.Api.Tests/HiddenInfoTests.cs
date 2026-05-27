@@ -23,7 +23,7 @@ public class HiddenInfoTests
         SeedHand(bob, "BobSecret");
 
         var dto = StateSnapshotter.Snapshot(
-            Guid.NewGuid(), 1, PhaseStateType.Main, alice,
+            Guid.NewGuid(), 1, PhaseStateType.PreCombatMain, alice,
             new[] { alice, bob }, new Majik.Core.Stack.Stack(_bus),
             viewer: null);
 
@@ -40,7 +40,7 @@ public class HiddenInfoTests
         SeedHand(bob, "BobSecret");
 
         var dto = StateSnapshotter.Snapshot(
-            Guid.NewGuid(), 1, PhaseStateType.Main, alice,
+            Guid.NewGuid(), 1, PhaseStateType.PreCombatMain, alice,
             new[] { alice, bob }, new Majik.Core.Stack.Stack(_bus),
             viewer: alice);
 
@@ -57,7 +57,7 @@ public class HiddenInfoTests
         alice.Zones.Library.AddCard(c);
 
         var dto = StateSnapshotter.Snapshot(
-            Guid.NewGuid(), 1, PhaseStateType.Main, alice,
+            Guid.NewGuid(), 1, PhaseStateType.PreCombatMain, alice,
             new[] { alice }, new Majik.Core.Stack.Stack(_bus),
             viewer: alice);
 
@@ -75,7 +75,7 @@ public class HiddenInfoTests
         bob.Zones.Battlefield.AddCard(bear);
 
         var dto = StateSnapshotter.Snapshot(
-            Guid.NewGuid(), 1, PhaseStateType.Main, alice,
+            Guid.NewGuid(), 1, PhaseStateType.PreCombatMain, alice,
             new[] { alice, bob }, new Majik.Core.Stack.Stack(_bus),
             viewer: alice);
 

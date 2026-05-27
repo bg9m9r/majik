@@ -42,7 +42,7 @@ public class SpellCastFlowCostsTests
         var agent = new ScriptedAgent();
         agent.QueueMana(ManaPayment.Empty);
 
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(
             _alice, spell,
@@ -63,7 +63,7 @@ public class SpellCastFlowCostsTests
         var agent = new ScriptedAgent();
         agent.QueueMana(ManaPayment.Empty);
 
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         var ran = false;
         var spell = await _flow.CastAsync(
@@ -103,7 +103,7 @@ public class SpellCastFlowCostsTests
         var agent = new ScriptedAgent();
         agent.QueueMana(ManaPayment.Empty);
 
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         var def = new SpellDefinition(
             Modes: System.Array.Empty<string>(), HasVariableX: false,
@@ -130,7 +130,7 @@ public class SpellCastFlowCostsTests
         var agent = new ScriptedAgent();
         agent.QueueMana(ManaPayment.Empty);
 
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         var def = new SpellDefinition(
             Modes: System.Array.Empty<string>(), HasVariableX: false,
@@ -163,7 +163,7 @@ public class SpellCastFlowCostsTests
         agent.QueueTargets(new object[] { _bob });
         agent.QueueMana(ManaPayment.Empty);
 
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         var def = new SpellDefinition(
             Modes: System.Array.Empty<string>(), HasVariableX: false,
@@ -229,7 +229,7 @@ public class SpellCastFlowCostsTests
         agent.QueueTargets(new object[] { _bob });
         agent.QueueMana(ManaPayment.Empty);
 
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         var spell = await _flow.CastAsync(_alice, fling, def, agent, ctx);
         spell.Resolve();
@@ -272,7 +272,7 @@ public class SpellCastFlowCostsTests
         var agent = new ScriptedAgent();
         agent.QueueMana(ManaPayment.Empty);
 
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         var spell = await _flow.CastAsync(
             _alice, phlage,
@@ -311,7 +311,7 @@ public class SpellCastFlowCostsTests
 
         var agent = new ScriptedAgent();
         agent.QueueMana(ManaPayment.Empty);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         Func<System.Threading.Tasks.Task> act = async () => await _flow.CastAsync(
             _alice, phlage,
@@ -346,7 +346,7 @@ public class SpellCastFlowCostsTests
 
         var agent = new ScriptedAgent();
         agent.QueueMana(ManaPayment.Empty);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         Func<System.Threading.Tasks.Task> act = async () => await _flow.CastAsync(
             _alice, phlage,
