@@ -421,17 +421,16 @@ public sealed class MatchFacadeBridge
 
     /// <summary>
     /// Dev/test invariant guard. Throws <see cref="InvalidOperationException"/>
-    /// when the three load-bearing agreements (see docs/WIRE_CONTRACT.md)
-    /// are violated:
+    /// when the load-bearing agreements (see docs/WIRE_CONTRACT.md) are violated:
     /// <list type="bullet">
     ///   <item>clock holder seat ≠ engine active player (CR 117 / 103.7), or</item>
     ///   <item>the wire phase is the raw, ambiguous "Main" (CR 505 — must be
     ///         split into PreCombatMain / PostCombatMain).</item>
     /// </list>
-    /// The METHOD is always present and unit-testable; its CALL SITES are
-    /// gated behind <see cref="AssertAgreementIfDebug"/> ([Conditional("DEBUG")])
-    /// so they compile out entirely in Release — the guard is a development
-    /// tripwire, never a production hot-path cost.
+    /// The method is always present and unit-tested
+    /// (<c>MatchFacadeBridgeTests.AssertAgreement_*</c>); it has no live call
+    /// site — the phase-vocabulary invariant is enforced by the harness test
+    /// <c>LayerAgreementInvariantTests.PhaseVocabulary_NeverRawMain</c> instead.
     /// </summary>
     public static void AssertAgreement(Guid activePlayerId, Guid clockHolderSeatId, string wirePhase)
     {
@@ -450,15 +449,6 @@ public sealed class MatchFacadeBridge
                 "PostCombatMain before it reaches the wire (CR 505).");
         }
     }
-
-    /// <summary>Debug-only thin wrapper over <see cref="AssertAgreement"/>.
-    /// The <c>[Conditional("DEBUG")]</c> attribute makes every CALL to this
-    /// method (and the evaluation of its arguments) disappear in Release,
-    /// so wiring it into the event path costs nothing in production while
-    /// still tripping on a violated invariant during dev/test runs.</summary>
-    [System.Diagnostics.Conditional("DEBUG")]
-    internal static void AssertAgreementIfDebug(Guid activePlayerId, Guid clockHolderSeatId, string wirePhase)
-        => AssertAgreement(activePlayerId, clockHolderSeatId, wirePhase);
 
     private async Task FireClockHandoffAsync(Guid matchId, string newHolderSub, string? expectedPrevHolderSub)
     {

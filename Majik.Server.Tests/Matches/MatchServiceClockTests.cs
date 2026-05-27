@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Majik.Server.Matches;
 using Majik.Server.Tests.Profiles;
+using MongoDB.Driver;
 using Xunit;
 
 namespace Majik.Server.Tests.Matches;
@@ -366,5 +367,89 @@ public class MatchServiceClockTests : IClassFixture<TestMongoFixture>
         pub.Published.Should().BeEmpty();
         var fresh = await repo.GetByIdAsync(matchId, CancellationToken.None);
         fresh!.WinnerSub.Should().Be(bob); // unchanged from first call
+    }
+
+    // -----------------------------------------------------------------------
+    // C1 atomic-filter MISS — DB-layer CAS rejects a stale update.
+    //
+    // The early-out in OnPriorityPassedAsync saves a round-trip when the
+    // in-memory read already shows a holder mismatch.  The DB-layer
+    // TryAtomicUpdateWithHolderAsync is the AUTHORITATIVE guard: even if two
+    // concurrent callers both pass the early-out (both read holder=alice
+    // before either writes), only one can win the CAS — the second's filter
+    // (PriorityHolderSub == "alice") matches nothing once the first has
+    // flipped the holder to "bob", so it returns false and the update is
+    // discarded.
+    //
+    // This test exercises that DB-layer miss path directly:
+    //   1. Insert a match in Playing with holder=alice.
+    //   2. Mutate the stored holder to "bob" out-of-band (simulating the
+    //      winning concurrent writer).
+    //   3. Call TryAtomicUpdateWithHolderAsync with expectedHolder="alice"
+    //      (now stale).
+    //   4. Assert: returns false, holder still "bob", balances unchanged.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task TryAtomicUpdateWithHolder_StaleExpectedHolder_ReturnsFalse_NoDoubleBill()
+    {
+        const string alice = "stub-alice";
+        const string bob = "stub-bob";
+        const long startMs = 1_200_000L;
+
+        var db = _fixture.NewDatabase();
+        var repo = new MatchRepository(db);
+        await repo.EnsureIndexesAsync(CancellationToken.None);
+
+        // Insert a Playing match with holder = alice.
+        var match = new Match
+        {
+            Id = Guid.NewGuid(),
+            State = MatchState.Playing,
+            Visibility = MatchVisibility.Public,
+            Format = "constructed",
+            ClockMinutes = 20,
+            Creator = new MatchPlayer { Sub = alice, Handle = "Alice", DeckId = "burn", DeckSnapshot = new List<string>() },
+            Opponent = new MatchPlayer { Sub = bob, Handle = "Bob", DeckId = "stompy", DeckSnapshot = new List<string>() },
+            CreatorMillisRemaining = startMs,
+            OpponentMillisRemaining = startMs,
+            PriorityHolderSub = alice,
+            PriorityStartedAt = new DateTime(2026, 5, 19, 12, 0, 0, DateTimeKind.Utc),
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+        };
+        await repo.InsertAsync(match, CancellationToken.None);
+
+        // Simulate the winning concurrent writer: mutate PriorityHolderSub to
+        // "bob" out-of-band, exactly as if the first handoff already succeeded.
+        var winnerUpdate = MongoDB.Driver.Builders<Match>.Update
+            .Set(m => m.PriorityHolderSub, bob)
+            .Set(m => m.CreatorMillisRemaining, startMs - 5_000)   // alice billed 5s
+            .Set(m => m.PriorityStartedAt, new DateTime(2026, 5, 19, 12, 0, 5, DateTimeKind.Utc));
+        var winnerMoved = await repo.TryAtomicUpdateWithHolderAsync(
+            match.Id, MatchState.Playing, alice, winnerUpdate, CancellationToken.None);
+        winnerMoved.Should().BeTrue("setup: the winner CAS must succeed");
+
+        // Now simulate the LOSING concurrent caller: it also read holder=alice,
+        // passed the early-out, and now attempts TryAtomicUpdateWithHolderAsync
+        // with the same stale expectedHolder="alice". The DB holder is now "bob",
+        // so the filter matches nothing.
+        var loserUpdate = MongoDB.Driver.Builders<Match>.Update
+            .Set(m => m.CreatorMillisRemaining, startMs - 9_000)   // would double-bill alice
+            .Set(m => m.PriorityHolderSub, bob)
+            .Set(m => m.PriorityStartedAt, new DateTime(2026, 5, 19, 12, 0, 9, DateTimeKind.Utc));
+        var loserMoved = await repo.TryAtomicUpdateWithHolderAsync(
+            match.Id, MatchState.Playing, alice /* stale */, loserUpdate, CancellationToken.None);
+
+        // Assert: the CAS must REJECT the stale update.
+        loserMoved.Should().BeFalse("stale expectedHolder must cause the atomic filter to miss");
+
+        // Re-read from Mongo and assert invariants are preserved.
+        var stored = await repo.GetByIdAsync(match.Id, CancellationToken.None);
+        stored.Should().NotBeNull();
+        stored!.PriorityHolderSub.Should().Be(bob,         "holder must remain as set by the winner");
+        stored.CreatorMillisRemaining.Should().Be(startMs - 5_000,
+            "alice must only be billed for the winner's 5 s slice — no double-bill");
+        stored.OpponentMillisRemaining.Should().Be(startMs, "bob's balance must be untouched");
     }
 }
