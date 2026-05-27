@@ -31,6 +31,26 @@ namespace Majik.Core.Api;
 /// </summary>
 public sealed class GameFacade
 {
+    /// <summary>
+    /// Process-wide sink invoked when a per-match <see cref="EventBus"/>
+    /// handler throws. Without this wired, <see cref="EventBus.OnHandlerError"/>
+    /// stays null and every handler exception vanishes silently — a thrown
+    /// trigger / SBA / wire-bridge handler would never surface, freezing a
+    /// match with no diagnostic. The server composition root assigns this
+    /// to a structured logger at startup (see
+    /// <c>MatchRegistration.AddMajikMatches</c>); tests can swap it to
+    /// capture failures. Majik.Core intentionally takes no dependency on
+    /// Microsoft.Extensions.Logging, so this is a plain delegate seam.
+    ///
+    /// <para>In DEBUG builds the default (when left null) FAILS FAST: a
+    /// handler exception is rethrown on a background thread so it surfaces
+    /// loudly in tests / dev runs instead of being swallowed. In RELEASE
+    /// the default is a no-op (the bus still continues delivery to other
+    /// handlers) — the server overrides it with a logger so production
+    /// failures are observed, never silent.</para>
+    /// </summary>
+    public static Action<Exception, GameEvent>? OnEventHandlerError { get; set; }
+
     private readonly EventBus _bus = new();
     private readonly Majik.Core.Stack.Stack _stack;
     private readonly TriggerManager _triggers;
@@ -133,6 +153,12 @@ public sealed class GameFacade
     {
         _alice = alice;
         _bob = bob;
+
+        // Route per-match EventBus handler exceptions to the process-wide
+        // sink so a throwing trigger / SBA / wire-bridge handler can't vanish
+        // and freeze the match with no diagnostic. Fail loud: log (server) or
+        // fail-fast (DEBUG default) instead of swallowing silently.
+        _bus.OnHandlerError = HandleBusHandlerError;
 
         _stack = new Majik.Core.Stack.Stack(_bus);
         _triggers = new TriggerManager(_stack, _bus);
@@ -787,6 +813,32 @@ public sealed class GameFacade
         }
 
         return null;
+    }
+
+    // Per-match EventBus error routing. The bus already isolates handlers
+    // (a throwing handler doesn't abort delivery to the rest); this just
+    // makes the failure VISIBLE instead of dropping it on the floor.
+    private static void HandleBusHandlerError(Exception ex, GameEvent @event)
+    {
+        var sink = OnEventHandlerError;
+        if (sink != null)
+        {
+            sink(ex, @event);
+            return;
+        }
+
+#if DEBUG
+        // No sink wired (typically a unit test that didn't opt into one):
+        // fail loud. Rethrow on a background thread so the exception isn't
+        // swallowed by the bus's catch — surfaces as an unhandled-exception
+        // / test-crash rather than a silent freeze. This deliberately
+        // encodes "handler exceptions must not be invisible".
+        var captured = System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(ex);
+        ThreadPool.QueueUserWorkItem(_ => captured.Throw());
+#endif
+        // RELEASE with no sink: bus continues delivery (handlers stay
+        // isolated) but we have nowhere to log. Production always wires
+        // OnEventHandlerError, so this no-op path is dev/test-only.
     }
 
     private sealed class Subscription : IDisposable

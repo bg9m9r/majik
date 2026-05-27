@@ -1,3 +1,4 @@
+using Majik.Core.Api;
 using Majik.Server.Matches;
 using Microsoft.Extensions.Logging;
 
@@ -9,6 +10,15 @@ public static class MatchRegistration
     {
         if (!MongoRegistration.IsConfigured(config))
             return services;
+
+        // Wire the per-match EventBus error sink to a structured logger.
+        // Without this, GameFacade leaves EventBus.OnHandlerError null and
+        // every engine handler exception (trigger / SBA / wire-bridge) is
+        // swallowed silently — a thrown handler would freeze a match with
+        // no diagnostic. Set once at composition; the static hook is
+        // process-wide (matches GameFacade's per-game bus construction).
+        services.AddSingleton<GameFacadeErrorSinkInitializer>();
+        services.AddHostedService(sp => sp.GetRequiredService<GameFacadeErrorSinkInitializer>());
 
         services.AddSingleton<MatchRepository>(sp =>
             new MatchRepository(sp.GetRequiredService<MongoDB.Driver.IMongoDatabase>()));
