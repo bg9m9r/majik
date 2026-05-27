@@ -6,7 +6,7 @@ Thanks for your interest. This repo holds the C# / .NET 10 rules engine, server,
 
 - Read [`README.md`](./README.md) for the project layout and common commands.
 - Read [`CLAUDE.md`](./CLAUDE.md) for architecture (state machines, event bus, stack/priority/SBAs, abilities/effects, keyword pipeline).
-- Game-logic decisions cite [`MagicCompRules 20251114.txt`](./MagicCompRules%2020251114.txt) (the 2025-11-14 Comp Rules) and reference rule numbers (e.g. `Rule 704.5j`). [`RULES_REFERENCE.md`](./RULES_REFERENCE.md) indexes the most-touched rules.
+- Game-logic decisions cite the official Magic: The Gathering Comprehensive Rules (2025-11-14) and reference rule numbers (e.g. `Rule 704.5j`). The Comp Rules text itself is **not redistributed in this repository** — download the latest TXT from <https://magic.wizards.com/en/rules> and (optionally) place it at `MagicCompRules 20251114.txt` (gitignored). [`RULES_REFERENCE.md`](./RULES_REFERENCE.md) indexes the most-touched rules.
 
 ## Development setup
 

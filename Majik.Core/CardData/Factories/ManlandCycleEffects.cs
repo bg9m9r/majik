@@ -52,11 +52,40 @@ public sealed class ManlandCycleAnimateEffect : ContinuousEffect
 {
     private readonly Permanent _target;
     private readonly string[] _keywords;
+    private readonly CardSubtype[] _subtypes;
+    private readonly CardType[] _extraTypes;
 
     public ManlandCycleAnimateEffect(Permanent target, IEnumerable<string> keywords)
+        : this(target, keywords, subtypes: null, extraTypes: null)
+    {
+    }
+
+    /// <summary>
+    /// Construct an animate effect with non-default subtype / extra type
+    /// grants. Used by manlands that animate to a non-Elemental body (e.g.
+    /// Crawling Barrens — Construct, Mishra's Factory — Assembly-Worker)
+    /// or that also gain an extra type (e.g. Mishra's Factory's "artifact
+    /// creature" requires Artifact in addition to Creature). When
+    /// <paramref name="subtypes"/> is null the default
+    /// <see cref="CardSubtype.Elemental"/> is granted (cycle default).
+    /// When <paramref name="extraTypes"/> is null only Creature is added;
+    /// both are additive on top of the printed Land (CR 613.1c — "It's
+    /// still a land").
+    /// </summary>
+    public ManlandCycleAnimateEffect(
+        Permanent target,
+        IEnumerable<string> keywords,
+        IEnumerable<CardSubtype>? subtypes,
+        IEnumerable<CardType>? extraTypes)
     {
         _target = target ?? throw new ArgumentNullException(nameof(target));
         _keywords = (keywords ?? throw new ArgumentNullException(nameof(keywords))).ToArray();
+        _subtypes = subtypes != null
+            ? subtypes.ToArray()
+            : new[] { CardSubtype.Elemental };
+        _extraTypes = extraTypes != null
+            ? extraTypes.ToArray()
+            : Array.Empty<CardType>();
     }
 
     /// <summary>The permanent being animated.</summary>
@@ -64,6 +93,12 @@ public sealed class ManlandCycleAnimateEffect : ContinuousEffect
 
     /// <summary>Keyword strings granted by the animation (e.g. "Flying").</summary>
     public IReadOnlyList<string> Keywords => _keywords;
+
+    /// <summary>Subtypes granted by the animation (default: Elemental).</summary>
+    public IReadOnlyList<CardSubtype> Subtypes => _subtypes;
+
+    /// <summary>Extra card types granted on top of Creature (e.g. Artifact).</summary>
+    public IReadOnlyList<CardType> ExtraTypes => _extraTypes;
 
     public override Layer Layer => Layer.Type;
 
@@ -85,7 +120,14 @@ public sealed class ManlandCycleAnimateEffect : ContinuousEffect
     public override void Apply(PermanentCharacteristics chars)
     {
         chars.Types.Add(CardType.Creature);
-        chars.Subtypes.Add(CardSubtype.Elemental);
+        foreach (var t in _extraTypes)
+        {
+            chars.Types.Add(t);
+        }
+        foreach (var st in _subtypes)
+        {
+            chars.Subtypes.Add(st);
+        }
         foreach (var k in _keywords)
         {
             chars.Keywords.Add(k);

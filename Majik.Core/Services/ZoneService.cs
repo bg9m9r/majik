@@ -28,6 +28,16 @@ public class ZoneService
     }
 
     /// <summary>
+    /// The attached <see cref="ReplacementBus"/>, or <c>null</c> when the
+    /// service was constructed without one. Exposed so token-creation
+    /// helpers (<see cref="Majik.Core.Tokens.TokenFactory"/>) can reach
+    /// the same bus the zone service routes ETB intents through without
+    /// requiring every caller to thread the bus alongside the
+    /// <see cref="ZoneService"/> they already pass.
+    /// </summary>
+    public ReplacementBus? Replacements => _replacements;
+
+    /// <summary>
     /// Move a card from one zone to another.
     /// </summary>
     public void MoveCard(ICard card, ZoneType fromZone, ZoneType toZone, Player? controller = null)

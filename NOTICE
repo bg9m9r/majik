@@ -23,13 +23,14 @@ or endorsement is claimed or implied.
 
 Third-Party Components
 
-Comprehensive Rules
-  File:    MagicCompRules 20251114.txt
+Comprehensive Rules (NOT redistributed)
   Source:  https://magic.wizards.com/en/rules
+  Target:  2025-11-14 release.
   Notice:  (c) Wizards of the Coast LLC. The Comprehensive Rules text is
-           the property of Wizards of the Coast and is included verbatim
-           as a reference document under Fan Content Policy. It is not
-           re-licensed by this project.
+           the property of Wizards of the Coast and is NOT redistributed
+           in this repository. Contributors who want a local copy should
+           download the TXT from the link above; the file path
+           `MagicCompRules*.txt` is gitignored.
 
 Modern card pool (embedded seed)
   File:    Majik.Core/CardData/Embedded/modern-cards.json.gz
