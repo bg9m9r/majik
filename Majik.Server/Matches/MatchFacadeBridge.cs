@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 using Majik.Core.Api;
 using Majik.Core.Api.Dtos;
 using Microsoft.Extensions.Logging;
@@ -79,6 +80,27 @@ public sealed class MatchFacadeBridge
     private readonly MatchReplayBuffer? _replay;
     private readonly ClockHandoffCallback? _onActivePlayerChanged;
     private readonly ConcurrentDictionary<Guid, Attachment> _attachments = new();
+
+    // Prod-safe desync observability (Slice 4b #3). The DEBUG-only
+    // AssertAgreement guard is compiled out of Release, so operational
+    // desync (clock holder ≠ engine active player, or a raw CR 505 "Main"
+    // on the wire) would be invisible in prod. We mirror its two invariants
+    // here as a structured WARNING + counter that NEVER throws — a desync
+    // is a diagnostic signal, not a reason to abort live delivery.
+    //
+    // Rate-limited: a single desync would otherwise log on every event for
+    // the affected match (the bridge sees every engine event). We log at
+    // most once per (matchId, kind) window-cooldown so a stuck match emits
+    // a handful of WARNINGs, not a flood. The counter is unthrottled so
+    // metrics still reflect the true violation volume.
+    private static readonly TimeSpan DesyncLogCooldown = TimeSpan.FromSeconds(30);
+    private readonly ConcurrentDictionary<(Guid MatchId, string Kind), DateTime> _lastDesyncLogAt = new();
+    private long _desyncWarningCount;
+
+    /// <summary>Visible for tests / metrics — total number of desync
+    /// violations DETECTED (clock-holder mismatch + raw-"Main"), counting
+    /// every detection regardless of log rate-limiting.</summary>
+    internal long DesyncWarningCount => Interlocked.Read(ref _desyncWarningCount);
 
     // Per-recipient prompt buffer. Solves the race where the engine
     // publishes a prompt to the match group BEFORE the targeted player's
@@ -259,6 +281,81 @@ public sealed class MatchFacadeBridge
         }
     }
 
+    /// <summary>
+    /// Push the current per-viewer <see cref="GameStateDto"/> snapshot for
+    /// <paramref name="recipientSub"/> to the single SignalR connection
+    /// <paramref name="connectionId"/> on the <c>"state"</c> channel. Called
+    /// from <c>MatchHub.JoinMatch</c> AFTER the connection is added to the
+    /// match group, so a client that joins (or reconnects) AFTER the engine
+    /// has already emitted early events (opening draws, mulligan) recovers
+    /// authoritative state regardless of which events it missed (Slice 4b
+    /// #1). This is the robust fix for the startup race: the client no
+    /// longer depends on catching the engine's early fire-and-forget events.
+    ///
+    /// CR 706 masking is preserved — the snapshot is produced via
+    /// <see cref="GameFacade.GetStateFor"/> with the recipient's seat
+    /// (Creator → Alice, Opponent → Bob), so the opponent's hand is
+    /// masked exactly as <c>MatchService.GetGameStateAsync</c> does.
+    ///
+    /// No-op (no error) when:
+    /// <list type="bullet">
+    ///   <item>the game hasn't started yet — no facade attached for the
+    ///         match (still Rolling), so there is no snapshot to push (#2);</item>
+    ///   <item>the recipient is a bot seat (no SignalR connection); or</item>
+    ///   <item>the recipient sub can't be mapped to a seat in the facade.</item>
+    /// </list>
+    /// Group-fanout is intentionally avoided: the snapshot is per-viewer
+    /// (masked) and must reach ONLY the joining connection.
+    /// </summary>
+    public void ReplaySnapshotIfAny(Guid matchId, string recipientSub, string connectionId)
+    {
+        if (string.IsNullOrEmpty(recipientSub)) return;
+        if (string.IsNullOrEmpty(connectionId)) return;
+        if (recipientSub.StartsWith("bot:", StringComparison.Ordinal)) return;
+
+        // Still Rolling / no facade attached → nothing to snapshot. Skipping
+        // is correct (the client will get the snapshot when it re-joins
+        // after PlayDrawAsync starts the engine and re-renders) — never an
+        // error.
+        if (!_attachments.TryGetValue(matchId, out var attachment)) return;
+
+        // Map the joining recipient → its engine seat id, then take the
+        // per-viewer masked snapshot. Same Creator → Alice / Opponent → Bob
+        // convention GetGameStateAsync uses.
+        var viewerPlayerId = attachment.Routing.ResolvePlayerIdForSub(recipientSub);
+        if (viewerPlayerId == null) return;
+
+        GameStateDto? snapshot;
+        try
+        {
+            snapshot = attachment.Facade.GetStateFor(viewerPlayerId.Value);
+        }
+        catch (Exception ex)
+        {
+            // Facade torn down mid-flight (terminal-state Detach raced the
+            // join) — nothing to push. Best-effort: log and bail.
+            _logger.LogWarning(ex,
+                "MatchFacadeBridge: snapshot-on-join faulted reading facade state. " +
+                "MatchId={MatchId} RecipientSub={RecipientSub} ConnectionId={ConnectionId}",
+                matchId, recipientSub, connectionId);
+            return;
+        }
+
+        if (snapshot == null) return;
+
+        try
+        {
+            _hub.SendToConnection(connectionId, "state", snapshot);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "MatchFacadeBridge: failed to push snapshot-on-join. " +
+                "MatchId={MatchId} RecipientSub={RecipientSub} ConnectionId={ConnectionId}",
+                matchId, recipientSub, connectionId);
+        }
+    }
+
     // Event-handler core — internal so unit tests can drive forwarding
     // without standing up a full engine. Producing real envelopes from
     // the engine requires a game loop; isolating the routing here lets
@@ -294,17 +391,15 @@ public sealed class MatchFacadeBridge
         // perturbs the live event broadcast.
         MaybeFireClockHandoff(matchId);
 
-        // NOTE: there is intentionally NO live-path phase-vocabulary tripwire
-        // here. ForwardEvent runs as a SubscribeAll handler, which the engine
-        // dispatches through EventBus.SafeInvoke — that catches every handler
-        // exception and routes it to the (unwired) OnHandlerError sink, so a
-        // throw from this method would be silently swallowed and never trip.
-        // The phase-vocabulary invariant (raw CR 505 "Main" must never reach
-        // the wire) is instead asserted directly by the harness test
-        // LayerAgreementInvariantTests.PhaseVocabulary_NeverRawMain, which
-        // inspects the captured wire payloads. AssertAgreement remains a
-        // unit-tested guard (MatchFacadeBridgeTests); it just has no live
-        // call site that would mislead readers into thinking it self-trips.
+        // Prod-safe desync observability (Slice 4b #3). Unlike the DEBUG-only
+        // AssertAgreement guard (which throws and is compiled out of Release),
+        // this NEVER throws — a throw here would be swallowed by EventBus
+        // SafeInvoke anyway. It emits a rate-limited structured WARNING + a
+        // counter so operational desync becomes visible in prod:
+        //   * clock holder (the seat the bridge last handed the clock to) ≠
+        //     engine active player (CR 117 / 103.7), or
+        //   * a raw CR 505 "Main" phase/step label reaching the wire.
+        MaybeWarnDesync(matchId, envelope);
 
         try
         {
@@ -412,6 +507,117 @@ public sealed class MatchFacadeBridge
         seatId == routing.AliceId ? routing.CreatorSub
         : seatId == routing.BobId ? routing.OpponentSub
         : null;
+
+    // -----------------------------------------------------------------------
+    // Prod-safe desync observability (Slice 4b #3)
+    // -----------------------------------------------------------------------
+
+    /// <summary>
+    /// Live-path desync observer driven off <see cref="ForwardEvent"/>.
+    /// Extracts the wire phase/step label from the envelope's public payload
+    /// and the seat the bridge believes holds the clock, then delegates to
+    /// <see cref="ObserveDesync"/>. Best-effort: any fault is swallowed so a
+    /// diagnostic side-channel can never perturb the live broadcast.
+    /// </summary>
+    private void MaybeWarnDesync(Guid matchId, EventEnvelope envelope)
+    {
+        try
+        {
+            if (!_attachments.TryGetValue(matchId, out var attachment)) return;
+
+            // The engine's current active player (read post-handoff so it
+            // reflects the new turn) and the seat the bridge last handed the
+            // clock to. In steady state these are equal — a divergence means
+            // a handoff was dropped/stale (CAS no-op), which is exactly the
+            // operational desync we want visible.
+            Guid activePlayer;
+            try { activePlayer = attachment.Facade.ActivePlayerId; }
+            catch { return; } // facade torn down mid-flight — nothing to check.
+
+            var clockHolderSeat = attachment.LastHandedOffSeat ?? activePlayer;
+            var wirePhase = WirePhaseLabel(envelope.Public);
+
+            ObserveDesync(matchId, activePlayer, clockHolderSeat, wirePhase);
+        }
+        catch
+        {
+            // Never let the observer perturb the live broadcast.
+        }
+    }
+
+    /// <summary>
+    /// Prod-safe mirror of <see cref="AssertAgreement"/>: detects the same
+    /// two load-bearing violations but LOGS a structured WARNING + bumps a
+    /// counter instead of throwing, so operational desync is visible in prod
+    /// without aborting live delivery (Slice 4b #3).
+    /// <list type="bullet">
+    ///   <item>clock holder seat ≠ engine active player (CR 117 / 103.7), or</item>
+    ///   <item>a raw, ambiguous CR 505 "Main" label reaching the wire.</item>
+    /// </list>
+    /// The counter (<see cref="DesyncWarningCount"/>) counts every detection;
+    /// the WARNING log is rate-limited per (matchId, kind) so a stuck match
+    /// emits a handful of lines, not a flood. Internal so tests can drive a
+    /// synthetic mismatch / synthetic raw-"Main" directly.
+    /// </summary>
+    internal void ObserveDesync(Guid matchId, Guid activePlayerId, Guid clockHolderSeatId, string? wirePhase)
+    {
+        if (clockHolderSeatId != activePlayerId)
+        {
+            Interlocked.Increment(ref _desyncWarningCount);
+            if (ShouldLogDesync(matchId, "clock-holder"))
+            {
+                _logger.LogWarning(
+                    "DESYNC: clock holder seat ({ClockHolderSeat}) != engine active player " +
+                    "({ActivePlayer}) — the server clock must DERIVE its holder from the " +
+                    "engine (CR 117 / 103.7). MatchId={MatchId}",
+                    clockHolderSeatId, activePlayerId, matchId);
+            }
+        }
+
+        if (wirePhase == "Main")
+        {
+            Interlocked.Increment(ref _desyncWarningCount);
+            if (ShouldLogDesync(matchId, "raw-main"))
+            {
+                _logger.LogWarning(
+                    "DESYNC: raw phase label \"Main\" reached the wire — it must be " +
+                    "disambiguated into PreCombatMain / PostCombatMain before broadcast " +
+                    "(CR 505). MatchId={MatchId}",
+                    matchId);
+            }
+        }
+    }
+
+    /// <summary>Rate-limit guard for the desync WARNING log. Returns true at
+    /// most once per <see cref="DesyncLogCooldown"/> window per (matchId,
+    /// kind) so a persistent violation doesn't flood the log. The counter is
+    /// bumped unconditionally by the caller — only the log line is throttled.</summary>
+    private bool ShouldLogDesync(Guid matchId, string kind)
+    {
+        var now = DateTime.UtcNow;
+        var key = (matchId, kind);
+        if (_lastDesyncLogAt.TryGetValue(key, out var last) && now - last < DesyncLogCooldown)
+        {
+            return false;
+        }
+        _lastDesyncLogAt[key] = now;
+        return true;
+    }
+
+    /// <summary>Extract the disambiguated phase/step label from a
+    /// PhaseStartedEvent / StepStartedEvent payload, or null when the event
+    /// carries no phase/step field. Used by the live desync observer to spot
+    /// a raw CR 505 "Main" reaching the wire.</summary>
+    private static string? WirePhaseLabel(EventDto evt)
+    {
+        if (evt.Payload.ValueKind != JsonValueKind.Object) return null;
+        // PhaseStarted/Ended carry "phase"; StepStarted/Ended carry "step".
+        if (evt.Payload.TryGetProperty("phase", out var phase) && phase.ValueKind == JsonValueKind.String)
+            return phase.GetString();
+        if (evt.Payload.TryGetProperty("step", out var step) && step.ValueKind == JsonValueKind.String)
+            return step.GetString();
+        return null;
+    }
 
     /// <summary>Visible for tests — number of times the clock-handoff
     /// callback has been invoked. Lets a test assert the bridge actually
@@ -562,6 +768,16 @@ public sealed class MatchFacadeBridge
         private readonly object _activePlayerGate = new();
         private Guid? _lastActivePlayerId;
 
+        // The seat the bridge most recently handed the clock to (the new
+        // active player of the last CLAIMED transition). Used by the prod
+        // desync observer as the "clock holder the bridge believes it set"
+        // — a divergence from the engine's live active player surfaces a
+        // dropped/stale handoff (Slice 4b #3). Null until the first claimed
+        // handoff. Read under no lock (single Guid, eventually-consistent
+        // diagnostic) — a torn read just skips one observation.
+        private Guid? _lastHandedOffSeat;
+        public Guid? LastHandedOffSeat => _lastHandedOffSeat;
+
         public Attachment(
             IDisposable eventSub,
             IDisposable promptSub,
@@ -596,6 +812,10 @@ public sealed class MatchFacadeBridge
                     return false;
                 }
                 prevActivePlayer = prev.Value;
+                // Record the seat we're handing the clock TO so the desync
+                // observer can compare the bridge's believed holder against
+                // the engine's live active player.
+                _lastHandedOffSeat = current;
                 return true;
             }
         }

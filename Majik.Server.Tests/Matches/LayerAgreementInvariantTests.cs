@@ -206,6 +206,56 @@ public class LayerAgreementInvariantTests : IClassFixture<TestMongoFixture>
             "snapshot must equal Alice's engine seat id (Slice 2a invariant)");
     }
 
+    // -----------------------------------------------------------------------
+    // Slice 4b #1 — snapshot-on-join: a viewer who joins AFTER the engine has
+    // already emitted events (opening draws, mulligan) recovers authoritative
+    // state. The bridge pushes the per-viewer GameStateDto to the joining
+    // connection on the "state" channel, masked per CR 706.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task SnapshotOnJoin_AfterEngineEmittedEvents_PushesMaskedPerViewerSnapshot()
+    {
+        using var h = await LayerAgreementHarness.StartBotMatchAsync(_fixture, rngSeed: 13);
+
+        // The engine has already started, dealt opening hands, and walked the
+        // opening mulligan (KeepOpeningHandAsync in the harness setup). Advance
+        // a few more passes so additional events fire — the "late join" client
+        // missed all of these.
+        for (var i = 0; i < 4; i++)
+        {
+            await h.AdvanceByPassAsync(h.CreatorSub);
+        }
+
+        // Simulate the creator's SignalR connection joining the match group
+        // AFTER all those events. JoinMatch wires this exact call.
+        h.Bridge.ReplaySnapshotIfAny(h.MatchId, h.CreatorSub, "late-join-conn");
+
+        var sends = h.Published.ConnectionSnapshot();
+        var stateSend = sends.LastOrDefault(s => s.connectionId == "late-join-conn" && s.@event == "state");
+        stateSend.payload.Should().NotBeNull(
+            "a late-joining connection must receive a full per-viewer snapshot on the " +
+            "'state' channel regardless of which early events it missed");
+
+        var snapshot = stateSend.payload.Should().BeOfType<GameStateDto>().Subject;
+
+        // Per-viewer (Creator → Alice): the snapshot self-identifies as Alice.
+        snapshot.YouPlayerId.Should().Be(h.Facade.Alice.Id,
+            "the snapshot must be the per-viewer (GetStateFor) variant, never the " +
+            "full-reveal spectator view (YouPlayerId null)");
+
+        // CR 706: the BOT opponent's (Bob's) hand must be masked in the
+        // creator's view. Libraries are always masked even for the owner.
+        var bobView = snapshot.Players.Single(p => p.Id == h.Facade.Bob.Id);
+        bobView.Hand.Cards.Should().OnlyContain(c => c.Name == "(hidden)",
+            "CR 706 — the joining viewer must never see the opponent's hand card names");
+        foreach (var player in snapshot.Players)
+        {
+            player.Library.Cards.Should().OnlyContain(c => c.Name == "(hidden)",
+                "CR 706 — libraries are always hidden, even the viewer's own");
+        }
+    }
+
     private static List<string> ExtractPhaseLabels(LayerAgreementHarness h)
     {
         var labels = new List<string>();

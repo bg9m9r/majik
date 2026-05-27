@@ -1114,31 +1114,60 @@ public sealed class MatchService
             ? facade.Alice.Id
             : facade.Bob.Id;
         var state = facade.GetStateFor(viewerPlayerId);
+        return ResolveViewerStateResult(
+            state, matchId, gid, callerSub, viewerPlayerId,
+            facade.Alice.Id, facade.Bob.Id, isCreator: callerSub == match.Creator.Sub);
+    }
+
+    /// <summary>
+    /// Decide what <see cref="GetGameStateAsync"/> returns given the
+    /// per-viewer snapshot <paramref name="state"/> produced by
+    /// <see cref="GameFacade.GetStateFor"/>. Extracted as a pure helper so
+    /// the CR-706 hand-leak guard (Slice 4b #4) is unit-testable without a
+    /// fakeable sealed <see cref="GameFacade"/>:
+    /// <list type="bullet">
+    ///   <item>non-null snapshot → <c>Ok(state)</c> (the masked per-viewer
+    ///         view);</item>
+    ///   <item>null snapshot → REFUSE. The prior behaviour fell back to
+    ///         <c>facade.GetState()</c> (full-reveal spectator view), which
+    ///         LEAKS the opponent's hand + library card names. We instead
+    ///         emit CRITICAL + bump a counter and return a structured
+    ///         <c>game-state-unavailable</c> error. The hidden zones are
+    ///         NEVER serialized on this path — <c>GetState()</c> is never
+    ///         called here.</item>
+    /// </list>
+    /// </summary>
+    internal Result<GameStateDto> ResolveViewerStateResult(
+        GameStateDto? state, Guid matchId, Guid gameId, string callerSub,
+        Guid viewerPlayerId, Guid aliceId, Guid bobId, bool isCreator)
+    {
+        // CR 706 — the per-viewer snapshot masks the opponent's hand (each
+        // card surfaces as a "(hidden)" placeholder, count preserved).
         if (state != null) return Result.Ok(state);
 
-        // GetStateFor returned null — the viewerPlayerId didn't resolve to
-        // either seat in the facade. Theoretically unreachable (Player.Id
-        // is a stable Guid set at construction and we just derived viewer
-        // from facade.Alice.Id / facade.Bob.Id), but the bot-match flow
-        // showed this branch firing in prod, which collapsed the portal
-        // to "No game state." and bricked the game. Fall back to the
-        // spectator view so the match stays playable. This regresses CR
-        // 706 masking for this specific failure mode (opponent hand
-        // visible), but the alternative is a dead game — and the masking
-        // story is still enforced on the wire-event channel via
-        // MatchFacadeBridge per-recipient publishes (PR #169). Loud
-        // warning lets us investigate the root cause without users
-        // bouncing off a broken match.
-        _logger?.LogWarning(
-            "GetGameStateAsync: GetStateFor returned null; falling back to spectator view. " +
-            "MatchId={MatchId} GameId={GameId} CallerSub={CallerSub} " +
+        // GetStateFor returned null — theoretically unreachable (the viewer
+        // id was derived from facade.Alice.Id / facade.Bob.Id, both stable),
+        // but the bot-match flow showed this branch firing in prod. We
+        // REFUSE the leaky full-reveal fallback and return an error instead.
+        Interlocked.Increment(ref _stateFallbackRefusedCount);
+        _logger?.LogCritical(
+            "GetGameStateAsync: GetStateFor returned null; REFUSING the full-reveal " +
+            "fallback (would leak opponent hidden zones, CR 706). Returning " +
+            "game-state-unavailable. MatchId={MatchId} GameId={GameId} CallerSub={CallerSub} " +
             "ViewerPlayerId={ViewerPlayerId} AliceId={AliceId} BobId={BobId} " +
             "IsCreator={IsCreator}",
-            matchId, gid, callerSub,
-            viewerPlayerId, facade.Alice.Id, facade.Bob.Id,
-            callerSub == match.Creator.Sub);
-        return Result.Ok(facade.GetState());
+            matchId, gameId, callerSub,
+            viewerPlayerId, aliceId, bobId, isCreator);
+        return Result.Fail<GameStateDto>(new MatchError("game-state-unavailable",
+            "Per-viewer game state could not be produced; refusing to serve a full-reveal view."));
     }
+
+    /// <summary>Visible for tests / metrics — number of times
+    /// <see cref="GetGameStateAsync"/> refused the leaky full-reveal
+    /// fallback (CR 706 hand-leak guard, Slice 4b #4). Should be 0 in a
+    /// healthy system; a non-zero value flags the null-snapshot regression.</summary>
+    internal long StateFallbackRefusedCount => Interlocked.Read(ref _stateFallbackRefusedCount);
+    private long _stateFallbackRefusedCount;
 
     // -----------------------------------------------------------------------
     // GetReplayAsync
