@@ -90,6 +90,9 @@ public class NobleHierarchTests
     {
         var c = NobleHierarchFactory.Create(_alice);
         c.SetZone(ZoneType.Battlefield);
+        // CR 302.6 — clear summoning sickness so this test exercises mana
+        // production rather than the {T} sickness gate.
+        c.ClearSummoningSickness();
 
         // ManaCost.ToString() returns "G" (no braces) — see ManaCost.cs line 242.
         var greenAbility = c.Abilities.OfType<ManaAbility>()

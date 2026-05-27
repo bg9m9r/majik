@@ -72,6 +72,10 @@ public class ElvishMysticFactoryTests
     {
         var c = ElvishMysticFactory.Create(_alice);
         c.SetZone(ZoneType.Battlefield);
+        // CR 302.6 — the {T} mana ability is only legal once the creature
+        // has shed summoning sickness; clear it so this test exercises the
+        // mana-production behaviour rather than the sickness gate.
+        c.ClearSummoningSickness();
 
         var ability = c.Abilities.OfType<ManaAbility>().Single();
         ability.CanActivate().Should().BeTrue("Elvish Mystic is untapped.");
@@ -87,6 +91,9 @@ public class ElvishMysticFactoryTests
     {
         var c = ElvishMysticFactory.Create(_alice);
         c.SetZone(ZoneType.Battlefield);
+        // CR 302.6 — clear summoning sickness so we can activate at all and
+        // then assert the !IsTapped re-activation gate specifically.
+        c.ClearSummoningSickness();
 
         var ability = c.Abilities.OfType<ManaAbility>().Single();
 

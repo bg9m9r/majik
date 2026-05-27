@@ -43,6 +43,16 @@ public sealed class TurnDriver
     private PhaseStateType _currentPhase;
     private int _currentTurnNumber;
 
+    // CR 505 — the PhaseStateMachine collapses both main phases under the
+    // single PhaseStateType.Main value, so a StepStartedEvent alone can't
+    // tell pre-combat main from post-combat main. We track the outer
+    // turn-level state (CR 500.1 turn structure) here and publish a
+    // TurnStateChangedEvent at each turn-state boundary so the API layer
+    // (GameFacade._currentTurnState) can disambiguate "Main" into the
+    // CR 505 wire labels "PreCombatMain" / "PostCombatMain" that clients
+    // key on. Starts null; the first SetTurnState at turn start populates it.
+    private TurnStateType? _currentTurnState;
+
     /// <summary>
     /// Per-turn event tally — creatures died, permanents left, cards drawn.
     /// Reset at the start of each turn; consulted by revolt / connive / draw-watchers.
@@ -217,7 +227,13 @@ public sealed class TurnDriver
         // Reset per-turn event tally (revolt, connive X, draw watchers).
         TurnState.Reset();
 
-        // Beginning phase
+        // CR 500.1 — fresh turn restarts the turn-state sequence. Clear the
+        // tracked state so the TurnBeginning transition below always fires,
+        // even though the previous turn ended in TurnEnding.
+        _currentTurnState = null;
+
+        // Beginning phase (CR 501-504: Untap, Upkeep, Draw).
+        SetTurnState(TurnStateType.TurnBeginning);
         SetPhase(PhaseStateType.Untap);
         UntapStep(activePlayer);
 
@@ -235,13 +251,15 @@ public sealed class TurnDriver
         }
         await PriorityRound(activePlayer, ct);
 
-        // Main 1
+        // Main 1 (CR 505 — precombat main phase).
+        SetTurnState(TurnStateType.PreCombatMain);
         SetPhase(PhaseStateType.Main);
         // CR 714.2 — Saga lore-counter tick fires at the precombat main.
         AdvanceSagas(activePlayer);
         await PriorityRound(activePlayer, ct);
 
-        // Combat
+        // Combat (CR 506-511).
+        SetTurnState(TurnStateType.Combat);
         SetPhase(PhaseStateType.BeginningOfCombat);
         await PriorityRound(activePlayer, ct);
 
@@ -260,11 +278,13 @@ public sealed class TurnDriver
         // Per-turn reset so the queue doesn't bleed into the next turn.
         _additionalCombats.Reset();
 
-        // Main 2
+        // Main 2 (CR 505 — postcombat main phase).
+        SetTurnState(TurnStateType.PostCombatMain);
         SetPhase(PhaseStateType.Main);
         await PriorityRound(activePlayer, ct);
 
-        // End phase
+        // End phase (CR 512-514: End step, Cleanup).
+        SetTurnState(TurnStateType.TurnEnding);
         SetPhase(PhaseStateType.End);
         await PriorityRound(activePlayer, ct);
 
@@ -283,6 +303,24 @@ public sealed class TurnDriver
         {
             _eventBus?.Publish(new Majik.Core.Events.StepStartedEvent(phase, _activePlayerForStepEvents));
         }
+    }
+
+    /// <summary>
+    /// CR 500.1 — advance the outer turn-level state and publish a
+    /// <see cref="Majik.Core.Events.TurnStateChangedEvent"/> so downstream
+    /// wire code can recover which main phase we're in (CR 505). This is
+    /// the only place the live turn flow surfaces the turn-state; the
+    /// dedicated <see cref="StateMachine.TurnStateMachine"/> is not driven
+    /// in the production match path. No-op when the state hasn't actually
+    /// changed, so repeated entries (e.g. extra combat phases re-entering
+    /// Combat) don't emit redundant events.
+    /// </summary>
+    private void SetTurnState(TurnStateType turnState)
+    {
+        if (_currentTurnState == turnState) return;
+        var previous = _currentTurnState;
+        _currentTurnState = turnState;
+        _eventBus?.Publish(new Majik.Core.Events.TurnStateChangedEvent(previous, turnState));
     }
 
     private void UntapStep(Player active)

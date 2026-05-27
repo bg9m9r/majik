@@ -43,6 +43,10 @@ public class AdditionalCostTests
         var player = new Player("Alice", 20);
         var permanent = new Creature("Grizzly Bears", "1G", 2, 2) { Controller = player };
         permanent.SetZone(ZoneType.Battlefield);
+        // CR 302.6 — a creature's {T} cost is only payable once it sheds
+        // summoning sickness; clear it so this test isolates the untapped /
+        // tapped distinction.
+        permanent.ClearSummoningSickness();
         var cost = AdditionalCost.Tap(permanent);
 
         // Act
@@ -76,6 +80,9 @@ public class AdditionalCostTests
         var player = new Player("Alice", 20);
         var permanent = new Creature("Grizzly Bears", "1G", 2, 2) { Controller = player };
         permanent.SetZone(ZoneType.Battlefield);
+        // CR 302.6 — clear summoning sickness so the {T} cost is payable;
+        // this test asserts that paying it taps the permanent.
+        permanent.ClearSummoningSickness();
         var cost = AdditionalCost.Tap(permanent);
 
         // Act

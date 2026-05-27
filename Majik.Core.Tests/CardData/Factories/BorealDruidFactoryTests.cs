@@ -79,6 +79,9 @@ public class BorealDruidFactoryTests
     {
         var c = BorealDruidFactory.Create(_alice);
         c.SetZone(ZoneType.Battlefield);
+        // CR 302.6 — clear summoning sickness so this test exercises mana
+        // production rather than the {T} sickness gate.
+        c.ClearSummoningSickness();
 
         var ability = c.Abilities.OfType<ManaAbility>().Single();
         ability.CanActivate().Should().BeTrue("Boreal Druid is untapped.");
@@ -97,6 +100,9 @@ public class BorealDruidFactoryTests
     {
         var c = BorealDruidFactory.Create(_alice);
         c.SetZone(ZoneType.Battlefield);
+        // CR 302.6 — clear summoning sickness so we can activate and then
+        // assert the !IsTapped re-activation gate specifically.
+        c.ClearSummoningSickness();
 
         var ability = c.Abilities.OfType<ManaAbility>().Single();
 

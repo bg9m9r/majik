@@ -40,6 +40,10 @@ public class CostPaymentTests
         player.AddManaToPool(ManaCost.Parse("R"));
         var permanent = new Creature("Grizzly Bears", "1G", 2, 2) { Owner = player, Controller = player };
         permanent.SetZone(ZoneType.Battlefield);
+        // CR 302.6 — a creature must shed summoning sickness before its {T}
+        // cost can be paid; clear it so this test exercises multi-cost
+        // ordering rather than the sickness gate.
+        permanent.ClearSummoningSickness();
         var costs = new List<ICost>
         {
             new ManaCostCost("R"),
