@@ -17,7 +17,8 @@ namespace Majik.Core.Game;
 ///
 /// Phase 25 wiring:
 ///   1. Shuffle each player's library via <see cref="Majik.Core.Random.GameRandom"/>
-///   2. Choose starting player (coin flip)
+///   2. Choose starting player — caller-supplied (CR 103.2/103.4/103.7
+///      decision made upstream) or, when unspecified, a random coin flip
 ///   3. Each player runs the <see cref="MulliganController"/> (London)
 ///   4. Normal turn loop, first player skips draw step (already handled by TurnDriver)
 /// </summary>
@@ -111,7 +112,10 @@ public sealed class GameDriver
             landDropTracker: tracker);
     }
 
-    public async Task<GameResult> RunGameAsync(int maxTurns = 30, CancellationToken ct = default)
+    public async Task<GameResult> RunGameAsync(
+        int maxTurns = 30,
+        int? startingPlayerIndex = null,
+        CancellationToken ct = default)
     {
         // CR 103.1 — shuffle libraries.
         foreach (var p in _players)
@@ -119,9 +123,21 @@ public sealed class GameDriver
             ShuffleLibrary(p);
         }
 
-        // CR 103.2 — determine starting player. Coin flip works for 2,
-        // generalised to N-player by random pick.
-        var startingIndex = _rng.Next(_players.Count);
+        // CR 103.2 / 103.4 / 103.7 — determine the starting player. In a
+        // real match this is settled UPSTREAM: the pre-game die roll picks a
+        // winner (CR 103.2) who then chooses to play or draw (CR 103.4/103.7).
+        // The caller (GameFacade) encodes that decision by passing the
+        // intended seat in startingPlayerIndex (it orders the chosen player
+        // into players[0]). When no index is supplied — bot-vs-bot sims and
+        // unit tests that genuinely want CR 103.2 randomness — fall back to a
+        // random pick (a coin flip for 2 players, generalised to N).
+        var startingIndex = startingPlayerIndex is { } idx
+            ? (idx >= 0 && idx < _players.Count
+                ? idx
+                : throw new ArgumentOutOfRangeException(
+                    nameof(startingPlayerIndex),
+                    $"startingPlayerIndex {idx} is outside [0,{_players.Count})."))
+            : _rng.Next(_players.Count);
         var startingPlayer = _players[startingIndex];
 
         // CR 103.4 — mulligan loop per player.
