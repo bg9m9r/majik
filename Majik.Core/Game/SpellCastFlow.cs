@@ -2,6 +2,7 @@ using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Costs;
 using Majik.Core.Domain.DomainEvents;
+using Majik.Core.Effects;
 using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
@@ -675,6 +676,23 @@ public sealed class SpellCastFlow
             {
                 concreteForHandCast.SetWasCastFromHand(true);
             }
+        }
+
+        // CR 702.10 / CR 106.4 — mana-provenance haste rider (Arena of
+        // Glory's exert ability: "If that mana is spent on a creature spell,
+        // it gains haste until end of turn"). The exert ability stamped the
+        // caster's haste-granting-mana counter when it added {R}{R}; here we
+        // consume it on the first spell cast after the exert. When that spell
+        // is a creature spell, register a Layer-6 "Haste" grant on the
+        // resulting creature that expires in the cleanup step. Casting a
+        // noncreature spell consumes the provenance too (the mana was spent
+        // on a noncreature) but grants nothing. See
+        // Player.PendingHasteGrantingRedMana xmldoc for the v1 scope.
+        if (caster.ConsumeHasteGrantingMana() && card is Cards.Creature hasteCreature)
+        {
+            hasteCreature.ActiveEffects ??= new ContinuousEffectsService();
+            hasteCreature.ActiveEffects.Register(
+                new GrantKeywordUntilEndOfTurnEffect(hasteCreature, "Haste"));
         }
 
         _stack.Push(spell);
