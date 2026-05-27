@@ -43,14 +43,12 @@ public sealed class TurnDriver
     private PhaseStateType _currentPhase;
     private int _currentTurnNumber;
 
-    // CR 505 — the PhaseStateMachine collapses both main phases under the
-    // single PhaseStateType.Main value, so a StepStartedEvent alone can't
-    // tell pre-combat main from post-combat main. We track the outer
-    // turn-level state (CR 500.1 turn structure) here and publish a
-    // TurnStateChangedEvent at each turn-state boundary so the API layer
-    // (GameFacade._currentTurnState) can disambiguate "Main" into the
-    // CR 505 wire labels "PreCombatMain" / "PostCombatMain" that clients
-    // key on. Starts null; the first SetTurnState at turn start populates it.
+    // CR 505 — the phase value itself distinguishes PreCombatMain from
+    // PostCombatMain (Slice 3), so phase/step labels are unambiguous. We
+    // still track the outer turn-level state (CR 500.1 turn structure) here
+    // and publish a TurnStateChangedEvent at each turn-state boundary for
+    // TurnStateChangedEvent consumers (GameFacade._currentTurnState).
+    // Starts null; the first SetTurnState at turn start populates it.
     private TurnStateType? _currentTurnState;
 
     /// <summary>
@@ -253,7 +251,7 @@ public sealed class TurnDriver
 
         // Main 1 (CR 505 — precombat main phase).
         SetTurnState(TurnStateType.PreCombatMain);
-        SetPhase(PhaseStateType.Main);
+        SetPhase(PhaseStateType.PreCombatMain);
         // CR 714.2 — Saga lore-counter tick fires at the precombat main.
         AdvanceSagas(activePlayer);
         await PriorityRound(activePlayer, ct);
@@ -280,7 +278,7 @@ public sealed class TurnDriver
 
         // Main 2 (CR 505 — postcombat main phase).
         SetTurnState(TurnStateType.PostCombatMain);
-        SetPhase(PhaseStateType.Main);
+        SetPhase(PhaseStateType.PostCombatMain);
         await PriorityRound(activePlayer, ct);
 
         // End phase (CR 512-514: End step, Cleanup).

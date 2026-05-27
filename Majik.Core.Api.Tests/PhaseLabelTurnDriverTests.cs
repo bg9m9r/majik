@@ -17,17 +17,16 @@ using Xunit;
 namespace Majik.Core.Api.Tests;
 
 /// <summary>
-/// End-to-end (engine → wire) regression for the bug where BOTH main
-/// phases serialized to the same "Main" label, leaving the portal's phase
-/// indicator unable to tell pre-combat from post-combat main.
+/// End-to-end (engine → wire) regression guarding that the two main phases
+/// serialize to distinct labels, so the portal's phase indicator can tell
+/// pre-combat from post-combat main.
 ///
 /// Drives a real turn through the production <see cref="TurnDriver"/> (the
 /// same driver <see cref="Majik.Core.Game.GameDriver"/> runs in the live
-/// match) and replays the captured events through the exact tracking logic
-/// <see cref="GameFacade"/> uses: a running <see cref="TurnStateType"/>
-/// updated from <see cref="TurnStateChangedEvent"/>, fed into
-/// <see cref="EventPayloadBuilder"/> when resolving each
-/// <see cref="StepStartedEvent"/> phase label.
+/// match) and replays the captured <see cref="StepStartedEvent"/> phase
+/// labels. Since Slice 3 each main phase carries its own first-class
+/// <see cref="PhaseStateType"/> value (PreCombatMain / PostCombatMain), so
+/// the label is authoritative without consulting the turn state.
 ///
 /// CR 505 — the two main phases are distinct steps; clients key on the
 /// "PreCombatMain" / "PostCombatMain" wire labels.
@@ -67,16 +66,17 @@ public class PhaseLabelTurnDriverTests
             combatFlow: new CombatFlow(bus, sba),
             eventBus: bus);
 
-        // Mirror GameFacade's wire-serialization path exactly: track the
-        // outer turn-state from TurnStateChangedEvent and resolve each
-        // StepStartedEvent's phase label against it, recording the order in
-        // which the two PhaseStateType.Main steps serialize.
+        // Mirror GameFacade's wire-serialization path: since Slice 3 the
+        // phase value itself carries the pre/post distinction, so each main
+        // StepStartedEvent's label comes straight from its phase. We still
+        // track the turn-state (as GameFacade does) but it no longer affects
+        // the label. Record the order the two main steps serialize.
         TurnStateType? currentTurnState = null;
         var mainLabels = new List<string>();
         bus.Subscribe<TurnStateChangedEvent>(e => currentTurnState = e.CurrentState);
         bus.Subscribe<StepStartedEvent>(e =>
         {
-            if (e.StepType != PhaseStateType.Main) return;
+            if (!e.StepType.IsMain()) return;
             mainLabels.Add(PhaseLabelResolver.Resolve(e.StepType, currentTurnState));
         });
 

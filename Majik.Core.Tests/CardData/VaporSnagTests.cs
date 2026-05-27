@@ -95,7 +95,7 @@ public class VaporSnagTests
         var agent = new ScriptedAgent();
         agent.QueueTargets(new[] { (object)bear });
         agent.QueueMana(ManaPayment.Empty);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         var bobLifeBefore = _bob.LifeTotal;
 
@@ -138,7 +138,7 @@ public class VaporSnagTests
         var agent = new ScriptedAgent();
         agent.QueueTargets(new[] { (object)bear });
         agent.QueueMana(ManaPayment.Empty);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         var bobLifeBefore = _bob.LifeTotal;
 
@@ -211,7 +211,7 @@ public class VaporSnagTests
         var agent = new ScriptedAgent();
         agent.QueueTargets(new[] { (object)bear });
         agent.QueueMana(ManaPayment.Empty);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         var damageReceivedBefore = bear.Damage;
 
@@ -285,7 +285,7 @@ public class VaporSnagTests
         var agent = new ScriptedAgent();
         agent.QueueTargets(new[] { (object)bigCreature });
         agent.QueueMana(ManaPayment.Empty);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(
             _alice, d,
@@ -320,7 +320,7 @@ public class VaporSnagTests
         var agent = new ScriptedAgent();
         agent.QueueTargets(new[] { (object)bigCreature });
         agent.QueueMana(ManaPayment.Empty);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(
             _alice, d,
@@ -361,7 +361,7 @@ public class VaporSnagTests
         var agent = new ScriptedAgent();
         agent.QueueTargets(new[] { (object)bear });
         agent.QueueMana(ManaPayment.Empty);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(
             _alice, d,

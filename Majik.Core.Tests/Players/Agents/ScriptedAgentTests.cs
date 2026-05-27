@@ -109,6 +109,6 @@ public class ScriptedAgentTests
     private GameContext NewContext()
     {
         var stack = new Majik.Core.Stack.Stack();
-        return new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, stack);
+        return new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, stack);
     }
 }

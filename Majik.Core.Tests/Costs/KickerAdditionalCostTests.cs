@@ -132,7 +132,7 @@ public class KickerAdditionalCostTests
         agent.QueueMana(ManaPayment.Empty);
 
         var ctx = new GameContext(_alice, new[] { _alice, _bob },
-            _alice, 1, PhaseStateType.Main, _stack);
+            _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         var spell = await _flow.CastAsync(
             _alice, bl,
@@ -162,7 +162,7 @@ public class KickerAdditionalCostTests
         agent.QueueMana(ManaPayment.Empty);
 
         var ctx = new GameContext(_alice, new[] { _alice, _bob },
-            _alice, 1, PhaseStateType.Main, _stack);
+            _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         var additional = new[] { BurstLightningFactory.BuildAdditionalCost(bl) };
 
@@ -200,7 +200,7 @@ public class KickerAdditionalCostTests
         agent.QueueMana(ManaPayment.Empty);
 
         var ctx = new GameContext(_alice, new[] { _alice, _bob },
-            _alice, 1, PhaseStateType.Main, _stack);
+            _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         var spell = await _flow.CastAsync(
             _alice, bl,
@@ -287,7 +287,7 @@ public class KickerAdditionalCostTests
         _alice.Zones.Hand.AddCard(bl);
 
         var ctx = new GameContext(_alice, new[] { _alice, _bob },
-            _alice, 1, PhaseStateType.Main, _stack);
+            _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         var probe = new KickerAltCostProbe();
         probe.CandidatesFor(bl, _alice, ctx).Should().BeEmpty();

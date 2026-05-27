@@ -64,7 +64,7 @@ public class CascadeAltCostProbeTests
         _alice.Zones.Hand.AddCard(card);
 
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice,
-            1, PhaseStateType.Main, _stack);
+            1, PhaseStateType.PreCombatMain, _stack);
 
         probe.CandidatesFor(card, _alice, ctx).Should().BeEmpty();
     }

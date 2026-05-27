@@ -94,7 +94,7 @@ public class AetherGustTests
         var agent = new ScriptedAgent();
         agent.QueueTargets(new[] { (object)bobSpell });
         agent.QueueMana(ManaPayment.Empty);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(
             _alice, gust,
@@ -138,7 +138,7 @@ public class AetherGustTests
         var agent = new ScriptedAgent();
         agent.QueueTargets(new[] { (object)goyf });
         agent.QueueMana(ManaPayment.Empty);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(
             _alice, gust,
@@ -175,7 +175,7 @@ public class AetherGustTests
         var agent = new ScriptedAgent();
         agent.QueueTargets(new[] { (object)bobSpell });
         agent.QueueMana(ManaPayment.Empty);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(
             _alice, gust,
@@ -211,7 +211,7 @@ public class AetherGustTests
         var agent = new ScriptedAgent();
         agent.QueueTargets(new[] { (object)sigil });
         agent.QueueMana(ManaPayment.Empty);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(
             _alice, gust,

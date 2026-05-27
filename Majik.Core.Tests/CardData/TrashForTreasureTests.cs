@@ -183,7 +183,7 @@ public class TrashForTreasureTests
         agent.QueueMana(ManaPayment.Empty);
 
         var ctx = new GameContext(
-            alice, new[] { alice, bob }, alice, 1, PhaseStateType.Main, stack);
+            alice, new[] { alice, bob }, alice, 1, PhaseStateType.PreCombatMain, stack);
 
         var def = TrashForTreasureFactory.BuildSpellDefinition(alice);
 

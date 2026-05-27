@@ -72,12 +72,12 @@ public sealed class GameFacade
         prev.TrySetResult(true);
     }
     private int _currentTurn = 1;
-    private PhaseStateType _currentPhase = PhaseStateType.Main;
+    private PhaseStateType _currentPhase = PhaseStateType.PreCombatMain;
     private Player? _currentActivePlayer;
-    // PhaseStateType.Main covers both pre- and post-combat main phases.
-    // Track the outer TurnStateMachine state via TurnStateChangedEvent so
-    // GetState + BridgeEvent can disambiguate "Main" into the CR 505 step
-    // names the wire/UI expect.
+    // Since Slice 3 the phase value already carries the precombat /
+    // postcombat distinction (CR 505), so the wire/UI labels need no
+    // disambiguation. The outer TurnStateMachine state is still tracked for
+    // TurnStateChangedEvent payloads and other turn-state consumers.
     private TurnStateType? _currentTurnState;
 
     public Guid GameId { get; } = Guid.NewGuid();
@@ -307,7 +307,7 @@ public sealed class GameFacade
             zoneService: _zones,
             agents: agents,
             turnNumberAccessor: () => 1,
-            phaseAccessor: () => PhaseStateType.Main,
+            phaseAccessor: () => PhaseStateType.PreCombatMain,
             // CR 305.2 — share the facade's per-turn land-drop counter so
             // PlayLandCommand submissions are gated on the same instance
             // a subsequent StartFullGameAsync run also uses.
@@ -714,9 +714,10 @@ public sealed class GameFacade
     private void BridgeEvent(GameEvent e)
     {
         var type = e.GetType().Name;
-        // Snapshot the currently-tracked turn state so the payload builder
-        // can disambiguate PhaseStateType.Main into the CR 505 wire names
-        // (PreCombatMain / PostCombatMain) on phase / step events.
+        // Snapshot the currently-tracked turn state for the payload builder.
+        // Phase labels are already first-class (PreCombatMain / PostCombatMain)
+        // since Slice 3; turn state is carried for TurnStateChangedEvent and
+        // other turn-state consumers.
         var turnState = _currentTurnState;
         var publicDto = new EventDto(
             EventId: e.EventId,

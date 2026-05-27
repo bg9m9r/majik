@@ -83,7 +83,7 @@ public class PyrokinesisFactoryTests
         // On Alice's own turn — Pyrokinesis is a sorcery, but the pitch
         // primitive has no timing restriction (no "if it's not your turn"
         // clause). Cast at sorcery speed during main phase.
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(
             _alice, pyro,

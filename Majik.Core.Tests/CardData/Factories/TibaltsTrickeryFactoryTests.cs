@@ -290,7 +290,7 @@ public class TibaltsTrickeryFactoryTests
         agent.QueueMana(ManaPayment.Empty);
 
         var ctx = new GameContext(_alice, new[] { _alice, _bob },
-            _alice, 1, PhaseStateType.Main, _stack);
+            _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         var random = new GameRandom(seed: 42);
 

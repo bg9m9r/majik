@@ -140,7 +140,7 @@ public class SpellCastFlowCostIncreaseRiderTests
         var agent = new CapturingAgent();
         agent.QueueMana(ManaPayment.Empty);
 
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(
             _alice, bolt,
@@ -170,7 +170,7 @@ public class SpellCastFlowCostIncreaseRiderTests
         var agent = new CapturingAgent();
         agent.QueueMana(ManaPayment.Empty);
 
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(
             _alice, ponder,
@@ -203,7 +203,7 @@ public class SpellCastFlowCostIncreaseRiderTests
         var agent = new CapturingAgent();
         agent.QueueMana(ManaPayment.Empty);
 
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(
             _alice, goblin,
@@ -230,7 +230,7 @@ public class SpellCastFlowCostIncreaseRiderTests
         var agent = new CapturingAgent();
         agent.QueueMana(ManaPayment.Empty);
 
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(
             _alice, bolt,
@@ -259,7 +259,7 @@ public class SpellCastFlowCostIncreaseRiderTests
         var agent = new CapturingAgent();
         agent.QueueMana(ManaPayment.Empty);
 
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(
             _alice, bolt,

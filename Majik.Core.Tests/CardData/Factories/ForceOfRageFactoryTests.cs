@@ -76,7 +76,7 @@ public class ForceOfRageFactoryTests
         _alice.Zones.Hand.AddCard(redFuel);
 
         var probe = new PitchAltCostProbe(PitchAltCostProbe.DefaultLookup);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _bob, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _bob, 1, PhaseStateType.PreCombatMain, _stack);
 
         var candidates = probe.CandidatesFor(four, _alice, ctx).ToList();
         candidates.Should().HaveCount(1);
@@ -168,7 +168,7 @@ public class ForceOfRageFactoryTests
         // gates it — pitching on opponent's turn (CR 118.9 + Force-cycle
         // not-your-turn restriction) cuts through the sorcery-speed gate
         // (CR 117.1) the same way Force of Despair does.
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _bob, 2, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _bob, 2, PhaseStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(
             _alice, four,

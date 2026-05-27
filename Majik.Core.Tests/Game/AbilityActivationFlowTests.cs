@@ -31,7 +31,7 @@ public class AbilityActivationFlowTests
         agent.QueueMana(ManaPayment.Empty);
 
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice,
-            1, PhaseStateType.Main, stack);
+            1, PhaseStateType.PreCombatMain, stack);
 
         await flow.ActivateAsync(_alice, ability,
             targetRequests: System.Array.Empty<TargetRequest>(),
@@ -53,7 +53,7 @@ public class AbilityActivationFlowTests
 
         var agent = new ScriptedAgent(); // no mana queued
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice,
-            1, PhaseStateType.Main, stack);
+            1, PhaseStateType.PreCombatMain, stack);
 
         await flow.ActivateAsync(_alice, ability,
             targetRequests: System.Array.Empty<TargetRequest>(),

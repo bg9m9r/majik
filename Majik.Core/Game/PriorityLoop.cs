@@ -140,7 +140,7 @@ public sealed class PriorityLoop
                     throw new InvalidOperationException(
                         "PriorityLoop received PlayLand before RunUntilRoundEndsAsync set an active player.");
                 {
-                    var phase = _phaseAccessor() ?? PhaseStateType.Main;
+                    var phase = _phaseAccessor() ?? PhaseStateType.PreCombatMain;
                     if (!_landDropTracker.CanPlayLand(
                         actor, _activePlayer, phase, _stack.IsEmpty, out var reason))
                     {

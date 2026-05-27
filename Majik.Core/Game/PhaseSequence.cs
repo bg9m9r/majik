@@ -15,13 +15,13 @@ public static class PhaseSequence
         PhaseStateType.Untap,
         PhaseStateType.Upkeep,
         PhaseStateType.Draw,
-        PhaseStateType.Main,              // Pre-combat main phase
+        PhaseStateType.PreCombatMain,     // Pre-combat main phase
         PhaseStateType.BeginningOfCombat,
         PhaseStateType.DeclareAttackers,
         PhaseStateType.DeclareBlockers,
         PhaseStateType.CombatDamage,
         PhaseStateType.EndOfCombat,
-        PhaseStateType.Main,              // Post-combat main phase
+        PhaseStateType.PostCombatMain,    // Post-combat main phase
         PhaseStateType.End,
         PhaseStateType.Cleanup
     };
@@ -34,13 +34,13 @@ public static class PhaseSequence
         PhaseStateType.Untap,
         PhaseStateType.Upkeep,
         // Draw step skipped on first turn
-        PhaseStateType.Main,              // Pre-combat main phase
+        PhaseStateType.PreCombatMain,     // Pre-combat main phase
         PhaseStateType.BeginningOfCombat,
         PhaseStateType.DeclareAttackers,
         PhaseStateType.DeclareBlockers,
         PhaseStateType.CombatDamage,
         PhaseStateType.EndOfCombat,
-        PhaseStateType.Main,              // Post-combat main phase
+        PhaseStateType.PostCombatMain,    // Post-combat main phase
         PhaseStateType.End,
         PhaseStateType.Cleanup
     };

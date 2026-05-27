@@ -212,7 +212,7 @@ public class SpreadingSeasTests
         var def = SpreadingSeasFactory.BuildSpellDefinition(
             ss, _alice.Zones.Battlefield.GetCards().OfType<Permanent>());
         var ctx = new GameContext(_alice, new[] { _alice }, _alice, 1,
-            PhaseStateType.Main, stack);
+            PhaseStateType.PreCombatMain, stack);
 
         // Act: cast (push to stack) + resolve (auto-attach + ETB move).
         var spell = await castFlow.CastAsync(_alice, ss, def, agent, ctx);
@@ -257,7 +257,7 @@ public class SpreadingSeasTests
         var def = SpreadingSeasFactory.BuildSpellDefinition(
             ss, _alice.Zones.Battlefield.GetCards().OfType<Permanent>());
         var ctx = new GameContext(_alice, new[] { _alice }, _alice, 1,
-            PhaseStateType.Main, stack);
+            PhaseStateType.PreCombatMain, stack);
 
         // Act & Assert: cast is rejected; nothing reaches the stack.
         Func<Task> cast = async () =>
@@ -319,7 +319,7 @@ public class SpreadingSeasTests
         var def = SpreadingSeasFactory.BuildSpellDefinition(
             ss, _alice.Zones.Battlefield.GetCards().OfType<Permanent>());
         var ctx = new GameContext(_alice, new[] { _alice }, _alice, 1,
-            PhaseStateType.Main, stack);
+            PhaseStateType.PreCombatMain, stack);
 
         var handCountBeforeResolve = _alice.Zones.Hand.GetCards().Count();
 

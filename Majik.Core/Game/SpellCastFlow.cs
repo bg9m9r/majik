@@ -6,6 +6,7 @@ using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
 using Majik.Core.Services;
+using Majik.Core.StateMachine;
 using Majik.Core.Spells;
 using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
@@ -102,7 +103,8 @@ public sealed class SpellCastFlow
         // controller's own main phase with an empty stack.
         if (!ReferenceEquals(ctx.ActivePlayer, caster)
             || !_stack.IsEmpty
-            || ctx.CurrentPhase != StateMachine.PhaseStateType.Main)
+            || ctx.CurrentPhase is not { } companionPhase
+            || !companionPhase.IsMain())
         {
             throw new InvalidOperationException(
                 $"Cannot move companion {card.Name} from sideboard: "

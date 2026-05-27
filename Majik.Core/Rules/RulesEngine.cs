@@ -171,7 +171,7 @@ public class RulesEngine
         if (card is Sorcery)
         {
             // Sorceries can only be cast during main phase when stack is empty
-            return currentPhase == PhaseStateType.Main && isStackEmpty;
+            return currentPhase is { } p && p.IsMain() && isStackEmpty;
         }
 
         return false;

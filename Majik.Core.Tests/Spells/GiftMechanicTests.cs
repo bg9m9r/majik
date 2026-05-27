@@ -67,7 +67,7 @@ public class GiftMechanicTests
         // No QueueGiftRecipient call — ScriptedAgent defaults to "decline".
         agent.QueueTargets(new[] { (object)bear });
         agent.QueueMana(ManaPayment.Empty);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         var spell = await _flow.CastAsync(
             _alice, card,
@@ -107,7 +107,7 @@ public class GiftMechanicTests
         agent.QueueGiftRecipient(_bob);
         agent.QueueTargets(new[] { (object)stax });
         agent.QueueMana(ManaPayment.Empty);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         var spell = await _flow.CastAsync(
             _alice, card,
@@ -163,7 +163,7 @@ public class GiftMechanicTests
         agent.QueueGiftRecipient(_bob);
         agent.QueueTargets(new[] { (object)bear });
         agent.QueueMana(ManaPayment.Empty);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         var spell = await _flow.CastAsync(
             _alice, card,
@@ -227,7 +227,7 @@ public class GiftMechanicTests
         // through a scripted agent shell so this test isn't a full bot
         // E2E. We poke ChooseGiftRecipientAsync directly.
         var bot = new HeuristicBotAgent();
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
         var pick = await bot.ChooseGiftRecipientAsync(
             ctx, card,
             IntoTheFloodMawFactory.GiftDescription,

@@ -464,15 +464,15 @@ public class EventPayloadTests
         payload.EnumerateObject().Should().BeEmpty();
     }
 
-    // CR 505 — PhaseStateType.Main covers both pre- and post-combat main
-    // phases. EventPayloadBuilder uses the supplied TurnStateType context
-    // to lift the ambiguous "Main" wire label into the disambiguated form
-    // the frontend phase bar expects.
+    // CR 505 — since Slice 3 the phase value itself distinguishes
+    // PreCombatMain from PostCombatMain, so EventPayloadBuilder emits the
+    // disambiguated label straight from the phase. The TurnStateType context
+    // is accepted for call-site compatibility but no longer affects the label.
     [Fact]
-    public void StepStartedEvent_Main_WithPreCombatTurnState_EmitsPreCombatMain()
+    public void StepStartedEvent_PreCombatMain_EmitsPreCombatMain()
     {
         var alice = new Player("Alice");
-        var e = new StepStartedEvent(Majik.Core.StateMachine.PhaseStateType.Main, alice);
+        var e = new StepStartedEvent(Majik.Core.StateMachine.PhaseStateType.PreCombatMain, alice);
 
         var payload = EventPayloadBuilder.Build(e, viewer: null,
             turnState: Majik.Core.StateMachine.TurnStateType.PreCombatMain);
@@ -481,13 +481,15 @@ public class EventPayloadTests
     }
 
     [Fact]
-    public void StepStartedEvent_Main_WithPostCombatTurnState_EmitsPostCombatMain()
+    public void StepStartedEvent_PostCombatMain_EmitsPostCombatMain_IndependentOfTurnState()
     {
         var alice = new Player("Alice");
-        var e = new StepStartedEvent(Majik.Core.StateMachine.PhaseStateType.Main, alice);
+        var e = new StepStartedEvent(Majik.Core.StateMachine.PhaseStateType.PostCombatMain, alice);
 
+        // Turn-state deliberately left at PreCombatMain to prove the label is
+        // driven by the phase value alone, not the turn state.
         var payload = EventPayloadBuilder.Build(e, viewer: null,
-            turnState: Majik.Core.StateMachine.TurnStateType.PostCombatMain);
+            turnState: Majik.Core.StateMachine.TurnStateType.PreCombatMain);
 
         payload.GetProperty("step").GetString().Should().Be(PhaseLabelResolver.PostCombatMain);
     }
@@ -505,23 +507,24 @@ public class EventPayloadTests
     }
 
     [Fact]
-    public void StepStartedEvent_Main_WithoutTurnState_RetainsLegacyMainLabel()
+    public void StepStartedEvent_PreCombatMain_WithoutTurnState_StillDisambiguated()
     {
-        // Old callers that don't supply a TurnStateType (and test fixtures
-        // that don't drive the turn state machine) keep the previous
-        // PhaseStateType.ToString() behavior.
+        // Callers that don't supply a TurnStateType now still get the
+        // first-class label, since the phase value is authoritative.
         var alice = new Player("Alice");
-        var e = new StepStartedEvent(Majik.Core.StateMachine.PhaseStateType.Main, alice);
+        var e = new StepStartedEvent(Majik.Core.StateMachine.PhaseStateType.PreCombatMain, alice);
 
         var payload = EventPayloadBuilder.Build(e);
 
-        payload.GetProperty("step").GetString().Should().Be("Main");
+        payload.GetProperty("step").GetString().Should().Be(PhaseLabelResolver.PreCombatMain);
     }
 
     [Fact]
-    public void PhaseChangedEvent_MainLabel_RemappedAgainstTurnState()
+    public void PhaseChangedEvent_EmitsRawPhaseLabelsVerbatim()
     {
-        var e = new PhaseChangedEvent(previousPhase: "Draw", currentPhase: "Main");
+        // PhaseChangedEvent carries the PhaseState.Name strings, which are now
+        // already the first-class CR 505 labels — emitted verbatim.
+        var e = new PhaseChangedEvent(previousPhase: "Draw", currentPhase: PhaseLabelResolver.PreCombatMain);
 
         var payload = EventPayloadBuilder.Build(e, viewer: null,
             turnState: Majik.Core.StateMachine.TurnStateType.PreCombatMain);

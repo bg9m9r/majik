@@ -41,7 +41,7 @@ public sealed class LandDropTracker
             reason = "lands can only be played on your turn";
             return false;
         }
-        if (phase != PhaseStateType.Main)
+        if (!phase.IsMain())
         {
             reason = "lands can only be played during a main phase";
             return false;

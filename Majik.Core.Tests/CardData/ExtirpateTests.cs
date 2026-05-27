@@ -113,7 +113,7 @@ public class ExtirpateTests
         var agent = new ScriptedAgent();
         agent.QueueTargets(new[] { (object)graveBolt });
         agent.QueueMana(ManaPayment.Empty);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         var graveyardCards = new ICard[] { graveBolt };
         await _flow.CastAsync(
@@ -154,7 +154,7 @@ public class ExtirpateTests
         var agent = new ScriptedAgent();
         agent.QueueTargets(new[] { (object)swamp });
         agent.QueueMana(ManaPayment.Empty);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         var def = ExtirpateFactory.BuildDefinition(new ICard[] { swamp });
 
@@ -187,7 +187,7 @@ public class ExtirpateTests
         var agent = new ScriptedAgent();
         agent.QueueTargets(new[] { (object)graveBolt });
         agent.QueueMana(ManaPayment.Empty);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(
             _alice, x,

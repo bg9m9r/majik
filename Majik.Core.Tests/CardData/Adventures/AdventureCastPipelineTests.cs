@@ -186,7 +186,7 @@ public class AdventureCastPipelineTests
         var def = SpellDefinition.Vanilla(_ => Array.Empty<Majik.Core.Abilities.IEffect>());
         var agent = new ScriptedAgent();
         agent.QueueMana(ManaPayment.Empty);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(_alice, bcg, def, agent, ctx, alternativeCost: exileCast);
 
@@ -227,7 +227,7 @@ public class AdventureCastPipelineTests
         var def = SpellDefinition.Vanilla(_ => Array.Empty<Majik.Core.Abilities.IEffect>());
         var agent = new ScriptedAgent();
         agent.QueueMana(ManaPayment.Empty);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(_alice, mr, def, agent, ctx, alternativeCost: exileCast);
         _resolver.ResolveTop(_stack);
@@ -256,7 +256,7 @@ public class AdventureCastPipelineTests
         var def = SpellDefinition.Vanilla(_ => Array.Empty<Majik.Core.Abilities.IEffect>());
         var agent = new ScriptedAgent();
         agent.QueueMana(ManaPayment.Empty);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(_alice, bcg, def, agent, ctx, alternativeCost: exileCast);
         _resolver.ResolveTop(_stack);
@@ -287,7 +287,7 @@ public class AdventureCastPipelineTests
         var def = SpellDefinition.Vanilla(_ => Array.Empty<Majik.Core.Abilities.IEffect>());
         var agent = new ScriptedAgent();
         agent.QueueMana(ManaPayment.Empty);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(_alice, bcg, def, agent, ctx, alternativeCost: null);
 
@@ -378,7 +378,7 @@ public class AdventureCastPipelineTests
         agent.QueueMana(ManaPayment.Empty);
 
         var ctx = new GameContext(
-            _alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+            _alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(_alice, adventurerCard, def, agent, ctx, alternativeCost: altCost);
 

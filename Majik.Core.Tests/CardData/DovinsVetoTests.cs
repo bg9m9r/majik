@@ -110,7 +110,7 @@ public class DovinsVetoTests
 
         var agent = new ScriptedAgent();
         agent.QueueMana(ManaPayment.Empty);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         var spell = await _flow.CastAsync(_alice, veto, def, agent, ctx, alternativeCost: null);
 
@@ -136,7 +136,7 @@ public class DovinsVetoTests
 
         var vetoAgent = new ScriptedAgent();
         vetoAgent.QueueMana(ManaPayment.Empty);
-        var vetoCtx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var vetoCtx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
         var vetoSpell = await _flow.CastAsync(_alice, veto, vetoDef, vetoAgent, vetoCtx, alternativeCost: null);
 
         // Verify CannotBeCountered was stamped.
@@ -189,7 +189,7 @@ public class DovinsVetoTests
         var agent = new ScriptedAgent();
         agent.QueueTargets(new[] { (object)bobSpell });
         agent.QueueMana(ManaPayment.Empty);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(
             _alice, veto,
@@ -222,7 +222,7 @@ public class DovinsVetoTests
         var agent = new ScriptedAgent();
         agent.QueueTargets(new[] { (object)bobSpell });
         agent.QueueMana(ManaPayment.Empty);
-        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main, _stack);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(
             _alice, veto,

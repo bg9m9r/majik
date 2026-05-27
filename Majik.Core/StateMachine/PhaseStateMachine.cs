@@ -18,12 +18,13 @@ public class PhaseStateMachine : StateMachine<PhaseState>
         RegisterState(new PhaseState(PhaseStateType.Untap, _eventBus));
         RegisterState(new PhaseState(PhaseStateType.Upkeep, _eventBus));
         RegisterState(new PhaseState(PhaseStateType.Draw, _eventBus));
-        RegisterState(new PhaseState(PhaseStateType.Main, _eventBus));
+        RegisterState(new PhaseState(PhaseStateType.PreCombatMain, _eventBus));
         RegisterState(new PhaseState(PhaseStateType.BeginningOfCombat, _eventBus));
         RegisterState(new PhaseState(PhaseStateType.DeclareAttackers, _eventBus));
         RegisterState(new PhaseState(PhaseStateType.DeclareBlockers, _eventBus));
         RegisterState(new PhaseState(PhaseStateType.CombatDamage, _eventBus));
         RegisterState(new PhaseState(PhaseStateType.EndOfCombat, _eventBus));
+        RegisterState(new PhaseState(PhaseStateType.PostCombatMain, _eventBus));
         RegisterState(new PhaseState(PhaseStateType.End, _eventBus));
         RegisterState(new PhaseState(PhaseStateType.Cleanup, _eventBus));
         

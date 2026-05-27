@@ -223,6 +223,6 @@ public class TakeVengeanceFactoryTests
     }
 
     private GameContext MakeContext() =>
-        new(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.Main,
+        new(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain,
             new Majik.Core.Stack.Stack(new Majik.Core.Events.EventBus()));
 }
