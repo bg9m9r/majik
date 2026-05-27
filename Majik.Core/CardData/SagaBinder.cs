@@ -1,10 +1,12 @@
 using System.Text.RegularExpressions;
+using Majik.Core.Abilities;
 using Majik.Core.CardData;
 using Majik.Core.CardData.Factories;
 using Majik.Core.CardData.Sagas;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Effects;
+using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Services;
 using Majik.Core.ValueObjects;
@@ -35,10 +37,13 @@ namespace Majik.Core.CardData;
 ///     oracle, so <see cref="OracleManaBinder"/> wires it on the
 ///     production load path; the named-card factory wires it inline.
 ///   - Fable of the Mirror-Breaker (// Reflection of Kiki-Jiki): I →
-///     spawn a 2/2 red Goblin Shaman token (embedded "attacks → Treasure"
-///     trigger deferred); II → discard up to 2, draw that many (v1
-///     pumps the first two cards in hand and draws 2; "you may" opt-out
-///     deferred); III → transform, deferred.
+///     spawn a 2/2 red Goblin token whose attack trigger creates a
+///     Treasure (CR 508.1f / 111.10), wired live when a TriggerManager
+///     is supplied; II → "you may discard up to two, then draw that many"
+///     (count chosen via the supplied chooser; default rummages maximally);
+///     III → exile this Saga and return it transformed into Reflection of
+///     Kiki-Jiki (CR 714.4 / 712.4) via ReflectionOfKikiJikiFactory, then
+///     clear SagaState so the sacrifice SBA does not fire.
 ///   - The Legend of Roku (// Avatar Roku): I → exile top 3 of library
 ///     (the "may play those cards until end of next turn" rider is
 ///     deferred — needs an alt-play / temporal-permission framework);
@@ -66,7 +71,10 @@ public static class SagaBinder
         ICard card,
         CardEntity entity,
         ContinuousEffectsService? effects = null,
-        ZoneService? zones = null)
+        ZoneService? zones = null,
+        Majik.Core.Abilities.TriggerManager? triggers = null,
+        IEventBus? eventBus = null,
+        Func<int>? fableRummageChoice = null)
     {
         if (card == null) throw new ArgumentNullException(nameof(card));
         if (entity == null) throw new ArgumentNullException(nameof(entity));
@@ -82,7 +90,7 @@ public static class SagaBinder
             "Urza's Saga" => MakeUrzasSagaChapterHandler(perm, effects, zones),
             "Fable of the Mirror-Breaker"
                 or "Fable of the Mirror-Breaker // Reflection of Kiki-Jiki"
-                => MakeFableChapterHandler(perm),
+                => MakeFableChapterHandler(perm, zones, triggers, eventBus, fableRummageChoice),
             "The Legend of Roku"
                 or "The Legend of Roku // Avatar Roku"
                 => MakeRokuChapterHandler(perm),
@@ -172,36 +180,163 @@ public static class SagaBinder
     }
 
     /// <summary>
-    /// Fable of the Mirror-Breaker (NEO, {2}{R}).
-    /// I — Create a 2/2 red Goblin Shaman creature token with "Whenever this
-    ///     creature attacks, create a Treasure token."  v1 creates the token
-    ///     body; the embedded attack trigger is deferred (no attack-trigger
-    ///     wiring for token-resident abilities yet).
-    /// II — You may discard up to two cards. If you do, draw that many cards.
-    ///     v1: discard up to the first two cards in hand and draw exactly
-    ///     that many. "You may" opt-out + per-card choice deferred.
+    /// Fable of the Mirror-Breaker (NEO, {2}{R}) // Reflection of Kiki-Jiki.
+    /// I — Create a 2/2 red Goblin creature token with "Whenever this
+    ///     creature attacks, create a Treasure token." The token's attack
+    ///     trigger is wired live when a <paramref name="triggers"/> manager
+    ///     is supplied; the Treasure is minted via
+    ///     <see cref="Majik.Core.Tokens.TokenFactory.CreateTreasure"/>.
+    /// II — You may discard up to two cards, then draw that many cards. The
+    ///     "you may"/"up to two" choice is supplied by
+    ///     <paramref name="rummageChoice"/> (clamped to [0, 2] and to the
+    ///     hand size); the default deterministic policy discards as many as
+    ///     possible (up to two) — i.e. always rummages.
     /// III — Exile this Saga, then return it transformed (Reflection of
-    ///     Kiki-Jiki). Deferred — transform infrastructure for sagas is not
-    ///     wired (CR 714.4 / 712.4); per task scope, no transform built.
+    ///     Kiki-Jiki, CR 714.4 / 712.4). Modelled by exiling the Fable
+    ///     Enchantment and minting the Reflection-of-Kiki-Jiki Enchantment
+    ///     Creature (back face) on the battlefield under the same
+    ///     controller via <see cref="ReflectionOfKikiJikiFactory"/>. The
+    ///     <see cref="SagaState"/> is cleared so the generic Saga-sacrifice
+    ///     SBA (CR 704.5r) does not fire on the transformed permanent.
     /// </summary>
-    private static Action<int> MakeFableChapterHandler(Permanent perm) => chapter =>
+    private static Action<int> MakeFableChapterHandler(
+        Permanent perm,
+        ZoneService? zones,
+        Majik.Core.Abilities.TriggerManager? triggers,
+        IEventBus? eventBus,
+        Func<int>? rummageChoice) => chapter =>
     {
         var controller = perm.Controller ?? perm.Owner!;
         switch (chapter)
         {
             case 1:
-                Majik.Core.Tokens.TokenFactory.CreateOnBattlefield(
-                    new Majik.Core.Tokens.TokenFactory.TokenSpec(
-                        "Goblin Shaman", 2, 2,
-                        Subtypes: new[] { CardSubtype.Goblin, CardSubtype.Shaman }),
-                    controller);
+                FableCreateGoblinToken(controller, zones, triggers);
                 break;
             case 2:
-                DiscardUpToAndDraw(controller, max: 2);
+                FableRummage(controller, rummageChoice);
                 break;
-            // case 3: transform — deferred.
+            case 3:
+                FableTransform(perm, controller, zones, triggers);
+                break;
         }
     };
+
+    /// <summary>
+    /// Fable chapter I — CR 111 / 111.6. Create a 2/2 red Goblin creature
+    /// token with "Whenever this creature attacks, create a Treasure
+    /// token." (CR 508.1f). The attack trigger is attached to the token and
+    /// registered with the supplied <paramref name="triggers"/> manager so
+    /// a <see cref="Majik.Core.Domain.DomainEvents.CreatureAttacksEvent"/>
+    /// for the token queues the Treasure-creation ability (no-op wiring
+    /// when no trigger manager is supplied — the token still exists with
+    /// the ability attached for shape).
+    /// </summary>
+    private static void FableCreateGoblinToken(
+        Player controller,
+        ZoneService? zones,
+        Majik.Core.Abilities.TriggerManager? triggers)
+    {
+        var goblin = Majik.Core.Tokens.TokenFactory.CreateOnBattlefield(
+            new Majik.Core.Tokens.TokenFactory.TokenSpec(
+                Name: "Goblin",
+                Power: 2,
+                Toughness: 2,
+                Subtypes: new[] { CardSubtype.Goblin },
+                Keywords: null,
+                Colors: new[] { ManaColor.Red }),
+            controller,
+            zones);
+
+        // CR 508.1f — "Whenever this creature attacks, create a Treasure
+        // token." Attached to the token itself (same shape as Goblin
+        // Rabblemaster's attack trigger), so when this specific Goblin
+        // attacks the Treasure is minted.
+        var treasureEffect = new Effect(
+            "Fable Goblin: create a Treasure token on attack",
+            () => Majik.Core.Tokens.TokenFactory.CreateTreasure(
+                goblin.Controller ?? controller, zones));
+
+        var attackTrigger = new Majik.Core.Abilities.TriggeredAbility(
+            source: goblin,
+            controller: controller,
+            condition: Majik.Core.Abilities.Triggers.OnAttackSelf(goblin),
+            effects: new IEffect[] { treasureEffect },
+            activeZones: new[] { ZoneType.Battlefield });
+
+        goblin.AddAbility(attackTrigger);
+        triggers?.RegisterTriggeredAbility(attackTrigger);
+    }
+
+    /// <summary>
+    /// Fable chapter II — CR 701.7. "You may discard up to two cards, then
+    /// draw that many cards." <paramref name="rummageChoice"/> picks how
+    /// many cards to discard (the "you may"/"up to two" decision); the
+    /// result is clamped to [0, 2] and to the current hand size. The
+    /// default policy (null choice) discards as many as possible, up to
+    /// two — matching the deterministic looter posture used elsewhere
+    /// (Cathartic Reunion / Faithless Looting).
+    /// </summary>
+    private static void FableRummage(Player player, Func<int>? rummageChoice)
+    {
+        var handCount = player.Zones.Hand.GetCards().Count();
+        var want = rummageChoice?.Invoke() ?? 2;
+        var n = Math.Clamp(want, 0, Math.Min(2, handCount));
+        if (n <= 0) return; // "you may" opt-out — discard 0, draw 0.
+
+        DiscardUpToAndDraw(player, max: n);
+    }
+
+    /// <summary>
+    /// Fable chapter III — CR 714.4 / 712.4. "Exile this Saga, then return
+    /// it to the battlefield transformed." Modelled as: exile the Fable
+    /// Enchantment, then mint the Reflection-of-Kiki-Jiki Enchantment
+    /// Creature (back face) on the battlefield under the same controller.
+    /// The Fable's <see cref="SagaState"/> is cleared so
+    /// <c>SagaSacrificedCheck</c> (CR 704.5r) does not subsequently try to
+    /// sacrifice it.
+    /// </summary>
+    private static void FableTransform(
+        Permanent perm,
+        Player controller,
+        ZoneService? zones,
+        Majik.Core.Abilities.TriggerManager? triggers)
+    {
+        // CR 714.4 — clear the Saga state first so the SBA can't sacrifice
+        // the permanent we're about to exile + transform.
+        perm.SagaState = null;
+        if (perm.MdfcState != null && !perm.MdfcState.IsBackFace)
+            perm.MdfcState.Transform();
+
+        // Exile the Fable face.
+        if (zones != null)
+        {
+            zones.MoveCardTo(perm, ZoneType.Exile, controller);
+        }
+        else
+        {
+            controller.Zones.Battlefield.RemoveCard(perm);
+            controller.Zones.Exile.AddCard(perm);
+            perm.SetZone(ZoneType.Exile);
+        }
+
+        // Return it transformed — Reflection of Kiki-Jiki (back face) onto
+        // the battlefield under the same controller.
+        var reflection = ReflectionOfKikiJikiFactory.Create(
+            controller, zones, triggers);
+
+        reflection.SetZone(ZoneType.Library); // sentinel for ZoneService.MoveCardTo's from-check
+        controller.Zones.Library.AddCard(reflection);
+        if (zones != null)
+        {
+            zones.MoveCardTo(reflection, ZoneType.Battlefield, controller);
+        }
+        else
+        {
+            controller.Zones.Library.RemoveCard(reflection);
+            reflection.SetZone(ZoneType.Battlefield);
+            controller.Zones.Battlefield.AddCard(reflection);
+        }
+    }
 
     /// <summary>
     /// The Legend of Roku (TLA, {2}{R}{R}).

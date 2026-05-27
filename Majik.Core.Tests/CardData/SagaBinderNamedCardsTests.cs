@@ -41,7 +41,7 @@ public class SagaBinderNamedCardsTests
         };
 
     [Fact]
-    public void Fable_ChapterI_CreatesGoblinShamanToken()
+    public void Fable_ChapterI_CreatesTwoTwoRedGoblinToken()
     {
         var (owner, saga) = MakeSaga(
             "Fable of the Mirror-Breaker // Reflection of Kiki-Jiki");
@@ -54,11 +54,12 @@ public class SagaBinderNamedCardsTests
             .Where(c => c.IsToken)
             .ToList();
         tokens.Should().HaveCount(1);
-        tokens[0].Name.Should().Be("Goblin Shaman");
+        // CR 111 — chapter I makes a 2/2 red Goblin creature token (not a
+        // Goblin Shaman; that's the back-face Reflection's creature type).
+        tokens[0].Name.Should().Be("Goblin");
         tokens[0].Power.Should().Be(2);
         tokens[0].Toughness.Should().Be(2);
         tokens[0].HasSubtype(CardSubtype.Goblin).Should().BeTrue();
-        tokens[0].HasSubtype(CardSubtype.Shaman).Should().BeTrue();
     }
 
     [Fact]
@@ -122,7 +123,7 @@ public class SagaBinderNamedCardsTests
 
         saga.SagaState!.AdvanceAndChapter();
         owner.Zones.Battlefield.GetCards().OfType<Creature>()
-            .Any(c => c.IsToken && c.Name == "Goblin Shaman")
+            .Any(c => c.IsToken && c.Name == "Goblin")
             .Should().BeTrue();
     }
 }
