@@ -64,6 +64,7 @@ public static class MatchEndpoints
                                    => Results.BadRequest(err),
         "match-not-open" or "not-rolling" or "cannot-concede"
             or "match-in-progress" or "game-not-started" or "self-join-forbidden"
+            or "game-state-unavailable"
                                    => Results.Conflict(err),
         "not-roll-winner" or "not-a-player" or "forbidden" or "no-profile" or "private-match"
                                    => Results.Json(err, statusCode: StatusCodes.Status403Forbidden),
