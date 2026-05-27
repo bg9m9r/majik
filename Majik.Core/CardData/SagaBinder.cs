@@ -44,11 +44,15 @@ namespace Majik.Core.CardData;
 ///     III → exile this Saga and return it transformed into Reflection of
 ///     Kiki-Jiki (CR 714.4 / 712.4) via ReflectionOfKikiJikiFactory, then
 ///     clear SagaState so the sacrifice SBA does not fire.
-///   - The Legend of Roku (// Avatar Roku): I → exile top 3 of library
-///     (the "may play those cards until end of next turn" rider is
-///     deferred — needs an alt-play / temporal-permission framework);
-///     II → add one mana of any color (v1 picks {R} deterministically —
-///     no mana-color prompt yet); III → transform, deferred.
+///   - The Legend of Roku (// Avatar Roku): I → exile top 3 of library and
+///     grant a runtime exile-cast on each (Card.GrantRuntimeExileCast) so the
+///     controller may play them; the grant clears at the end of the
+///     controller's NEXT turn (CR 514.2) when an event bus is supplied (same
+///     Cleanup-counting shape as Light Up the Stage). II → add one mana of any
+///     color (chosen via the supplied color chooser; default {R}). III →
+///     exile this Saga and return it transformed into Avatar Roku
+///     (CR 714.4 / 712.4) via AvatarRokuFactory, then clear SagaState so the
+///     sacrifice SBA does not fire.
 ///   - All other Sagas: chapter callback is a no-op (per-card effect
 ///     parsing is a future cut). The state still ticks so SBA
 ///     sacrifices the Saga after the final chapter.
@@ -74,7 +78,8 @@ public static class SagaBinder
         ZoneService? zones = null,
         Majik.Core.Abilities.TriggerManager? triggers = null,
         IEventBus? eventBus = null,
-        Func<int>? fableRummageChoice = null)
+        Func<int>? fableRummageChoice = null,
+        Func<ManaColor>? rokuColorChoice = null)
     {
         if (card == null) throw new ArgumentNullException(nameof(card));
         if (entity == null) throw new ArgumentNullException(nameof(entity));
@@ -93,7 +98,7 @@ public static class SagaBinder
                 => MakeFableChapterHandler(perm, zones, triggers, eventBus, fableRummageChoice),
             "The Legend of Roku"
                 or "The Legend of Roku // Avatar Roku"
-                => MakeRokuChapterHandler(perm),
+                => MakeRokuChapterHandler(perm, zones, triggers, eventBus, rokuColorChoice),
             _ => _ => { /* generic saga — no-op effect, state still ticks */ },
         };
 
@@ -339,29 +344,151 @@ public static class SagaBinder
     }
 
     /// <summary>
-    /// The Legend of Roku (TLA, {2}{R}{R}).
+    /// The Legend of Roku (TLA, {2}{R}{R}) // Avatar Roku.
     /// I — Exile the top three cards of your library. Until the end of your
-    ///     next turn, you may play those cards. v1: cards move to exile;
-    ///     the "you may play them" rider is deferred (no alt-play /
-    ///     turn-scoped permission system yet).
-    /// II — Add one mana of any color. v1: adds {R} deterministically —
-    ///     no mana-color prompt; matches the deck's red theme.
-    /// III — Exile this Saga, then return it transformed (Avatar Roku).
-    ///     Deferred — transform infrastructure for sagas not wired.
+    ///     next turn, you may play those cards. Cards move to exile (CR
+    ///     701.20) and each gets a runtime exile-cast grant
+    ///     (<see cref="Card.GrantRuntimeExileCast"/>) so the controller may
+    ///     play them; the grant clears at the end of the controller's NEXT
+    ///     turn (CR 514.2) when an <paramref name="eventBus"/> is supplied —
+    ///     same Cleanup-counting shape as <see cref="LightUpTheStageFactory"/>.
+    /// II — Add one mana of any color (CR 106.1). Color chosen via
+    ///     <paramref name="colorChoice"/>; default {R}.
+    /// III — Exile this Saga, then return it transformed (Avatar Roku,
+    ///     CR 714.4 / 712.4) via <see cref="AvatarRokuFactory"/>; the
+    ///     <see cref="SagaState"/> is cleared so the generic Saga-sacrifice SBA
+    ///     (CR 704.5r) does not fire on the transformed creature.
     /// </summary>
-    private static Action<int> MakeRokuChapterHandler(Permanent perm) => chapter =>
+    private static Action<int> MakeRokuChapterHandler(
+        Permanent perm,
+        ZoneService? zones,
+        Majik.Core.Abilities.TriggerManager? triggers,
+        IEventBus? eventBus,
+        Func<ManaColor>? colorChoice) => chapter =>
     {
         var controller = perm.Controller ?? perm.Owner!;
         switch (chapter)
         {
             case 1:
-                ExileTopOfLibrary(controller, n: 3);
+                RokuImpulseExile(controller, n: 3, eventBus);
                 break;
             case 2:
-                controller.AddManaToPool(Majik.Core.ValueObjects.ManaCost.Parse("R"));
+                var color = colorChoice?.Invoke() ?? ManaColor.Red;
+                controller.AddManaToPool(ManaCost.Parse(ManaLetterFor(color)));
                 break;
-            // case 3: transform — deferred.
+            case 3:
+                RokuTransform(perm, controller, zones, eventBus, triggers);
+                break;
         }
+    };
+
+    /// <summary>Roku chapter I — CR 701.20 / CR 118.9. Exile the top
+    /// <paramref name="n"/> cards of <paramref name="controller"/>'s library
+    /// and stamp a runtime exile-cast grant on each (cost = printed mana cost)
+    /// so the controller may play them. When <paramref name="eventBus"/> is
+    /// supplied, schedule the "until end of your next turn" cleanup on the
+    /// controller's NEXT turn's Cleanup step (CR 514.2 — second Cleanup
+    /// belonging to the controller after the Saga resolved on their turn).
+    /// Mirrors <see cref="LightUpTheStageFactory.BuildResolveEffect"/>.</summary>
+    private static void RokuImpulseExile(Player controller, int n, IEventBus? eventBus)
+    {
+        var stamped = new List<Card>(n);
+        for (var i = 0; i < n; i++)
+        {
+            var top = controller.Zones.Library.GetCards().FirstOrDefault();
+            if (top == null) break; // library underflow — fewer grants
+
+            controller.Zones.Library.RemoveCard(top);
+            controller.Zones.Exile.AddCard(top);
+            top.SetZone(ZoneType.Exile);
+
+            if (top is Card concrete)
+            {
+                concrete.GrantRuntimeExileCast(controller, concrete.ManaCostValue);
+                stamped.Add(concrete);
+            }
+        }
+
+        if (stamped.Count == 0 || eventBus == null) return;
+
+        // CR 514.2 — first Cleanup owned by the controller is THIS turn's
+        // (Saga ticks on the controller's main phase), the second is the
+        // controller's NEXT turn's cleanup → clear the grant then.
+        var cleanupsSeen = 0;
+        Action<StepStartedEvent>? handler = null;
+        handler = e =>
+        {
+            if (e.StepType != Majik.Core.StateMachine.PhaseStateType.Cleanup) return;
+            if (!ReferenceEquals(e.Player, controller)) return;
+            cleanupsSeen++;
+            if (cleanupsSeen < 2) return;
+
+            foreach (var s in stamped) s.ClearRuntimeExileCast();
+            if (handler != null) eventBus.Unsubscribe(handler);
+        };
+        eventBus.Subscribe(handler);
+    }
+
+    /// <summary>Roku chapter III — CR 714.4 / 712.4. "Exile this Saga, then
+    /// return it transformed." Exile the Roku Saga front face, flip the
+    /// <see cref="MdfcState"/>, and mint Avatar Roku (back face) on the
+    /// battlefield under the same controller via
+    /// <see cref="AvatarRokuFactory"/>. Mirrors
+    /// <see cref="FableTransform"/>.</summary>
+    private static void RokuTransform(
+        Permanent perm,
+        Player controller,
+        ZoneService? zones,
+        IEventBus? eventBus,
+        Majik.Core.Abilities.TriggerManager? triggers)
+    {
+        // CR 714.4 — clear the Saga state first so the SBA can't sacrifice the
+        // permanent we're about to exile + transform.
+        perm.SagaState = null;
+        if (perm.MdfcState != null && !perm.MdfcState.IsBackFace)
+            perm.MdfcState.Transform();
+
+        // Exile the Roku front face.
+        if (zones != null)
+        {
+            zones.MoveCardTo(perm, ZoneType.Exile, controller);
+        }
+        else
+        {
+            controller.Zones.Battlefield.RemoveCard(perm);
+            controller.Zones.Exile.AddCard(perm);
+            perm.SetZone(ZoneType.Exile);
+        }
+
+        // Return it transformed — Avatar Roku (back face) onto the battlefield
+        // under the same controller.
+        var avatar = AvatarRokuFactory.Create(controller, zones, eventBus, triggers);
+
+        avatar.SetZone(ZoneType.Library); // sentinel for ZoneService.MoveCardTo's from-check
+        controller.Zones.Library.AddCard(avatar);
+        if (zones != null)
+        {
+            zones.MoveCardTo(avatar, ZoneType.Battlefield, controller);
+        }
+        else
+        {
+            controller.Zones.Library.RemoveCard(avatar);
+            avatar.SetZone(ZoneType.Battlefield);
+            controller.Zones.Battlefield.AddCard(avatar);
+        }
+    }
+
+    /// <summary>Single-pip mana letter for <paramref name="color"/>
+    /// (CR 106.1b) — used by Roku chapter II's "add one mana of any
+    /// color".</summary>
+    private static string ManaLetterFor(ManaColor color) => color switch
+    {
+        ManaColor.White => "W",
+        ManaColor.Blue => "U",
+        ManaColor.Black => "B",
+        ManaColor.Red => "R",
+        ManaColor.Green => "G",
+        _ => "R",
     };
 
     /// <summary>CR 701.7 — discard up to <paramref name="max"/> cards from
@@ -390,21 +517,6 @@ public static class SagaBinder
             player.Zones.Library.RemoveCard(top);
             player.Zones.Hand.AddCard(top);
             top.SetZone(ZoneType.Hand);
-        }
-    }
-
-    /// <summary>Move the top <paramref name="n"/> cards of
-    /// <paramref name="player"/>'s library to their exile zone. Stops
-    /// short silently if the library runs out.</summary>
-    private static void ExileTopOfLibrary(Player player, int n)
-    {
-        for (var i = 0; i < n; i++)
-        {
-            var top = player.Zones.Library.GetCards().FirstOrDefault();
-            if (top == null) return;
-            player.Zones.Library.RemoveCard(top);
-            player.Zones.Exile.AddCard(top);
-            top.SetZone(ZoneType.Exile);
         }
     }
 
