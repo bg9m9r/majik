@@ -5,8 +5,13 @@ namespace Majik.Server.Matches;
 /// <summary>Mongo-backed access to <see cref="Match"/> documents. Concrete
 /// class — no interface yet (matches the <c>UserProfileRepository</c>
 /// pattern). All state transitions go through <see cref="TryAtomicUpdateAsync"/>
-/// to make races safe.</summary>
-public sealed class MatchRepository
+/// to make races safe.
+///
+/// <para>Not sealed and its data methods are <c>virtual</c> so reliability
+/// tests can subclass it to inject transient faults (the retry-policy
+/// coverage in <c>MatchServiceRetryTests</c>); the default production graph
+/// uses the un-overridden Mongo implementation.</para></summary>
+public class MatchRepository
 {
     private const string CollectionName = "matches";
     private readonly IMongoCollection<Match> _collection;
@@ -32,13 +37,13 @@ public sealed class MatchRepository
             ct);
     }
 
-    public Task InsertAsync(Match m, CancellationToken ct) =>
+    public virtual Task InsertAsync(Match m, CancellationToken ct) =>
         _collection.InsertOneAsync(m, cancellationToken: ct);
 
-    public Task<Match?> GetByIdAsync(Guid id, CancellationToken ct) =>
+    public virtual Task<Match?> GetByIdAsync(Guid id, CancellationToken ct) =>
         _collection.Find(x => x.Id == id).FirstOrDefaultAsync(ct)!;
 
-    public async Task<IReadOnlyList<Match>> ListOpenPublicAsync(int limit, CancellationToken ct)
+    public virtual async Task<IReadOnlyList<Match>> ListOpenPublicAsync(int limit, CancellationToken ct)
     {
         // Bot matches synthesize an Opponent at create time and are stamped
         // Invite, but defense-in-depth: also exclude any doc whose opponent
@@ -54,7 +59,7 @@ public sealed class MatchRepository
         return found;
     }
 
-    public async Task<IReadOnlyList<Match>> ListInStateAsync(MatchState state, CancellationToken ct)
+    public virtual async Task<IReadOnlyList<Match>> ListInStateAsync(MatchState state, CancellationToken ct)
     {
         var found = await _collection
             .Find(x => x.State == state)
@@ -62,7 +67,7 @@ public sealed class MatchRepository
         return found;
     }
 
-    public async Task<bool> TryAtomicUpdateAsync(
+    public virtual async Task<bool> TryAtomicUpdateAsync(
         Guid id,
         MatchState expectedState,
         UpdateDefinition<Match> update,
@@ -77,34 +82,104 @@ public sealed class MatchRepository
 
     /// <summary>
     /// Compare-and-swap variant that additionally filters on the expected
-    /// current <see cref="Match.PriorityHolderSub"/>. Used by the clock
+    /// current <see cref="Match.PriorityHolderSub"/> AND, when supplied, the
+    /// expected <see cref="Match.PriorityStartedAt"/>. Used by the clock
     /// handoff (<c>MatchService.OnPriorityPassedAsync</c>) so two rapid,
     /// out-of-order handoffs (A→B then B→A on fast turn cycling /
     /// bot-vs-bot) can't both read the same prior holder and double-bill or
     /// drop a transition: only the update whose <paramref name="expectedPriorityHolderSub"/>
     /// still matches the stored value wins; the loser matches nothing and
-    /// returns false. A null expectation matches a stored null holder.
+    /// returns false. A null holder expectation matches a stored null holder.
+    ///
+    /// <para>When <paramref name="constrainStartedAt"/> is true the CAS is
+    /// tightened to also require <paramref name="expectedPriorityStartedAt"/>,
+    /// so a duplicate / late handoff that observed the SAME (holder, startedAt)
+    /// pair as the winner can't apply a second deduction off the same slice —
+    /// the winner advances PriorityStartedAt, so the duplicate's filter misses
+    /// and it no-ops (Slice 4a #6). When false (the default, for direct callers
+    /// / legacy tests) the timestamp is not part of the filter.</para>
     /// </summary>
-    public async Task<bool> TryAtomicUpdateWithHolderAsync(
+    public virtual async Task<bool> TryAtomicUpdateWithHolderAsync(
         Guid id,
         MatchState expectedState,
         string? expectedPriorityHolderSub,
         UpdateDefinition<Match> update,
-        CancellationToken ct)
+        CancellationToken ct,
+        bool constrainStartedAt = false,
+        DateTime? expectedPriorityStartedAt = null)
     {
-        var result = await _collection.UpdateOneAsync(
-            Builders<Match>.Filter.Where(x =>
-                x.Id == id
-                && x.State == expectedState
-                && x.PriorityHolderSub == expectedPriorityHolderSub),
-            update,
-            cancellationToken: ct);
+        var filter = Builders<Match>.Filter.Where(x =>
+            x.Id == id
+            && x.State == expectedState
+            && x.PriorityHolderSub == expectedPriorityHolderSub);
+
+        if (constrainStartedAt)
+        {
+            filter = Builders<Match>.Filter.And(
+                filter,
+                Builders<Match>.Filter.Eq(x => x.PriorityStartedAt, expectedPriorityStartedAt));
+        }
+
+        var result = await _collection.UpdateOneAsync(filter, update, cancellationToken: ct);
         return result.MatchedCount > 0;
     }
 
-    public Task<long> DeleteByIdAsync(Guid id, CancellationToken ct)
+    public virtual Task<long> DeleteByIdAsync(Guid id, CancellationToken ct)
     {
         return _collection.DeleteOneAsync(x => x.Id == id, ct)
             .ContinueWith(t => t.Result.DeletedCount, ct);
+    }
+
+    /// <summary>
+    /// Field-targeted CAS that sets ONLY this player's pre-game roll slot,
+    /// guarded that the match is still Rolling AND the slot was empty. Used by
+    /// <c>MatchService.SubmitRollAsync</c> so two concurrent submissions can't
+    /// lose-update: each player writes its own field, so neither clobbers the
+    /// other's value (Slice 4a #5). Returns false when the match is no longer
+    /// Rolling or the slot was already filled (idempotent re-submit / race
+    /// loser).
+    /// </summary>
+    public virtual async Task<bool> TrySetPlayerRollAsync(
+        Guid id, bool isCreator, int value, DateTime now, CancellationToken ct)
+    {
+        var filter = isCreator
+            ? Builders<Match>.Filter.Where(x =>
+                x.Id == id && x.State == MatchState.Rolling && x.Roll!.CreatorRoll == null)
+            : Builders<Match>.Filter.Where(x =>
+                x.Id == id && x.State == MatchState.Rolling && x.Roll!.OpponentRoll == null);
+
+        var update = isCreator
+            ? Builders<Match>.Update.Set(x => x.Roll!.CreatorRoll, value).Set(x => x.UpdatedAt, now)
+            : Builders<Match>.Update.Set(x => x.Roll!.OpponentRoll, value).Set(x => x.UpdatedAt, now);
+
+        var result = await _collection.UpdateOneAsync(filter, update, cancellationToken: ct);
+        return result.MatchedCount > 0;
+    }
+
+    /// <summary>
+    /// CAS that finalizes the roll: sets the (possibly tie-rerolled) values +
+    /// winner, guarded that the match is still Rolling, BOTH slots are filled,
+    /// and no winner has been stamped yet. Exactly one concurrent caller wins
+    /// this CAS, so the winner is computed once even when both players submit
+    /// simultaneously (Slice 4a #5). Returns false for the losers.
+    /// </summary>
+    public virtual async Task<bool> TrySetRollWinnerAsync(
+        Guid id, int creatorRoll, int opponentRoll, string winnerSub, DateTime now, CancellationToken ct)
+    {
+        var filter = Builders<Match>.Filter.Where(x =>
+            x.Id == id
+            && x.State == MatchState.Rolling
+            && x.Roll!.CreatorRoll != null
+            && x.Roll!.OpponentRoll != null
+            && x.Roll!.WinnerSub == null);
+
+        var update = Builders<Match>.Update
+            .Set(x => x.Roll!.CreatorRoll, creatorRoll)
+            .Set(x => x.Roll!.OpponentRoll, opponentRoll)
+            .Set(x => x.Roll!.WinnerSub, winnerSub)
+            .Set(x => x.UpdatedAt, now);
+
+        var result = await _collection.UpdateOneAsync(filter, update, cancellationToken: ct);
+        return result.MatchedCount > 0;
     }
 }

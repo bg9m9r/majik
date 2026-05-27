@@ -27,8 +27,32 @@ public class MatchServiceSubmitRollTests : IClassFixture<TestMongoFixture>
         public int NextInt(int min, int max) => _values.Dequeue();
     }
 
-    private async Task<(MatchService svc, CapturePublisher pub, Guid matchId)>
+    /// <summary>Thread-safe sequence source for the concurrent-submission
+    /// test. Hands out values from a queue under a lock so two parallel
+    /// SubmitRollAsync calls can dequeue safely; falls back to a fixed value
+    /// once exhausted so tie-rerolls (if any) never throw.</summary>
+    private sealed class ConcurrentStubRandomSource : IRandomSource
+    {
+        private readonly Queue<int> _values;
+        private readonly int _fallback;
+        private readonly object _gate = new();
+        public ConcurrentStubRandomSource(int fallback, params int[] values)
+        {
+            _values = new Queue<int>(values);
+            _fallback = fallback;
+        }
+        public int NextInt(int min, int max)
+        {
+            lock (_gate) return _values.Count > 0 ? _values.Dequeue() : _fallback;
+        }
+    }
+
+    private Task<(MatchService svc, CapturePublisher pub, Guid matchId)>
         NewServiceAndRollingMatchAsync(StubRandomSource rng, string creatorSub = "u-alice", string opponentSub = "u-bob")
+        => NewServiceAndRollingMatchAsync((IRandomSource)rng, creatorSub, opponentSub);
+
+    private async Task<(MatchService svc, CapturePublisher pub, Guid matchId)>
+        NewServiceAndRollingMatchAsync(IRandomSource rng, string creatorSub = "u-alice", string opponentSub = "u-bob")
     {
         var db = _fixture.NewDatabase();
         var matchRepo = new MatchRepository(db);
@@ -177,5 +201,49 @@ public class MatchServiceSubmitRollTests : IClassFixture<TestMongoFixture>
 
         r.IsSuccess.Should().BeFalse();
         r.Error!.Error.Should().Be("match-not-found");
+    }
+
+    // -----------------------------------------------------------------------
+    // #5 — two CONCURRENT submissions (one per seat) must not lose-update.
+    // The old code read the same match.Roll, mutated in-process, and wrote the
+    // whole object back gated only on State==Rolling, so a roll value or the
+    // winner could be lost. The field-targeted CAS keeps both rolls + computes
+    // exactly one winner. Repeated to shake out the race window.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task SubmitRoll_ConcurrentSubmissions_BothRollsSurvive_SingleWinner()
+    {
+        for (var iteration = 0; iteration < 20; iteration++)
+        {
+            // 6 and 2 are distinct (no tie); fallback 4 keeps any stray
+            // tie-reroll deterministic-ish without throwing. The order in
+            // which the two concurrent calls dequeue is nondeterministic —
+            // the invariant under test is that BOTH rolls land and a single
+            // correct winner is chosen, regardless of who got which value.
+            var rng = new ConcurrentStubRandomSource(fallback: 4, 6, 2);
+            var (svc, _, matchId) = await NewServiceAndRollingMatchAsync(rng);
+
+            var t1 = Task.Run(() => svc.SubmitRollAsync("u-alice", matchId, CancellationToken.None));
+            var t2 = Task.Run(() => svc.SubmitRollAsync("u-bob", matchId, CancellationToken.None));
+            await Task.WhenAll(t1, t2);
+
+            // Re-read authoritative state.
+            var fresh = await svc.GetAsync("u-alice", matchId, CancellationToken.None);
+            fresh.IsSuccess.Should().BeTrue();
+            var roll = fresh.Value!.Roll;
+            roll.Should().NotBeNull($"iteration {iteration}: roll record must exist");
+            roll!.CreatorRoll.Should().NotBeNull($"iteration {iteration}: alice's roll must not be lost");
+            roll.OpponentRoll.Should().NotBeNull($"iteration {iteration}: bob's roll must not be lost");
+            roll.WinnerSub.Should().NotBeNull($"iteration {iteration}: a winner must be computed once both rolled");
+
+            // Winner is the seat with the strictly-higher value (no tie since
+            // values differ); the stored values must be internally consistent
+            // with the winner.
+            roll.CreatorRoll!.Value.Should().NotBe(roll.OpponentRoll!.Value,
+                $"iteration {iteration}: tie must have been rerolled away");
+            var expectedWinner = roll.CreatorRoll.Value > roll.OpponentRoll.Value ? "u-alice" : "u-bob";
+            roll.WinnerSub.Should().Be(expectedWinner, $"iteration {iteration}: winner must match the higher roll");
+        }
     }
 }

@@ -1,8 +1,12 @@
 using FluentAssertions;
+using Majik.Core.Api;
+using Majik.Core.Cards;
 using Majik.Server.Matches;
 using Majik.Server.Profiles;
 using Majik.Server.Tests.Helpers;
 using Majik.Server.Tests.Profiles;
+using Microsoft.Extensions.Logging.Abstractions;
+using MongoDB.Driver;
 using Xunit;
 
 namespace Majik.Server.Tests.Matches;
@@ -277,5 +281,101 @@ public class MatchServiceConcedeAbandonTests : IClassFixture<TestMongoFixture>
         result.IsSuccess.Should().BeTrue();
         var updated = await matchRepo.GetByIdAsync(match.Id, CancellationToken.None);
         updated!.State.Should().Be(MatchState.Abandoned);
+    }
+
+    // =======================================================================
+    // #8 — Concede cleanup runs OUTSIDE the CAS. A concurrent timeout that
+    // already moved the match to Completed makes the concede CAS conflict;
+    // the bridge + timer must still be torn down on this replica rather than
+    // leaked.
+    // =======================================================================
+
+    /// <summary>Repo that simulates a concurrent timeout winning the race: the
+    /// concede read still observes Playing, but the FIRST concede CAS is
+    /// preceded by an out-of-band Completed write, so the CAS misses. Models
+    /// the genuine read-then-CAS-conflict window the fix targets.</summary>
+    private sealed class TimeoutRacingRepo : MatchRepository
+    {
+        private bool _raced;
+        public TimeoutRacingRepo(IMongoDatabase db) : base(db) { }
+
+        public override async Task<bool> TryAtomicUpdateAsync(
+            Guid id, MatchState expectedState, UpdateDefinition<Match> update, CancellationToken ct)
+        {
+            if (!_raced && expectedState == MatchState.Playing)
+            {
+                _raced = true;
+                // The concurrent timeout completes the match just before this
+                // concede CAS runs — so the concede's State==Playing filter
+                // now misses.
+                await base.TryAtomicUpdateAsync(id, MatchState.Playing,
+                    Builders<Match>.Update.Set(m => m.State, MatchState.Completed),
+                    ct);
+            }
+            return await base.TryAtomicUpdateAsync(id, expectedState, update, ct);
+        }
+    }
+
+    [Fact]
+    public async Task ConcedeAsync_CasConflict_StillDetachesBridge_NoLeak()
+    {
+        const string alice = "stub-alice";
+        const string bob = "stub-bob";
+
+        var db = _fixture.NewDatabase();
+        var matchRepo = new TimeoutRacingRepo(db);
+        await matchRepo.EnsureIndexesAsync(CancellationToken.None);
+        var profileRepo = new UserProfileRepository(db);
+        await profileRepo.EnsureIndexesAsync(CancellationToken.None);
+
+        var now = DateTime.UtcNow;
+        await profileRepo.UpsertAsync(new UserProfile { Sub = alice, Handle = "alice", HandleDisplay = "Alice", CreatedAt = now, UpdatedAt = now }, CancellationToken.None);
+        await profileRepo.UpsertAsync(new UserProfile { Sub = bob, Handle = "bob", HandleDisplay = "Bob", CreatedAt = now, UpdatedAt = now }, CancellationToken.None);
+
+        var bridge = new MatchFacadeBridge(new CapturePublisher(), NullLogger<MatchFacadeBridge>.Instance);
+
+        var svc = new MatchService(matchRepo, profileRepo,
+            new DiceRoller(new StubRandomSource()), new StubDeckLoader(), new SystemClock(),
+            new CapturePublisher(),
+            timeoutScheduler: new MatchTimeoutScheduler((_, _, _) => Task.CompletedTask),
+            gameFactory: null,
+            deckOwnershipPolicy: new AllowStubDeckOwnershipPolicy(),
+            facadeBridge: bridge);
+
+        // Insert a Playing match directly and attach the bridge for it, as the
+        // live flow would after StartFullGameAsync.
+        var matchId = Guid.NewGuid();
+        var match = new Match
+        {
+            Id = matchId,
+            State = MatchState.Playing,
+            Visibility = MatchVisibility.Public,
+            Format = "constructed",
+            ClockMinutes = 20,
+            Creator = new MatchPlayer { Sub = alice, Handle = "Alice", DeckId = "burn", DeckSnapshot = new List<string>() },
+            Opponent = new MatchPlayer { Sub = bob, Handle = "Bob", DeckId = "stompy", DeckSnapshot = new List<string>() },
+            CreatorMillisRemaining = 1_200_000L,
+            OpponentMillisRemaining = 1_200_000L,
+            PriorityHolderSub = alice,
+            PriorityStartedAt = now,
+            CreatedAt = now,
+            UpdatedAt = now,
+        };
+        await matchRepo.InsertAsync(match, CancellationToken.None);
+
+        var facade = GameFacade.Create("Alice", "Bob", new List<ICard>(), new List<ICard>());
+        bridge.Attach(matchId, alice, bob, facade);
+        bridge.IsAttached(matchId).Should().BeTrue("setup: the bridge must be attached before concede");
+
+        // Concede reads Playing, passes the pre-check, then the racing repo
+        // completes the match out-of-band so the concede CAS misses.
+        var result = await svc.ConcedeAsync(alice, matchId, CancellationToken.None);
+
+        // CAS conflict surfaces as cannot-concede ...
+        result.IsSuccess.Should().BeFalse();
+        result.Error!.Error.Should().Be("cannot-concede");
+        // ... but the bridge MUST have been detached anyway (no leak).
+        bridge.IsAttached(matchId).Should().BeFalse(
+            "the bridge must be torn down even when the concede CAS loses to a concurrent timeout");
     }
 }

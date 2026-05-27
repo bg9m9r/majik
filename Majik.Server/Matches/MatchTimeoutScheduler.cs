@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using Microsoft.Extensions.Logging;
 
 namespace Majik.Server.Matches;
 
@@ -9,11 +10,15 @@ namespace Majik.Server.Matches;
 public sealed class MatchTimeoutScheduler
 {
     private readonly Func<Guid, string, CancellationToken, Task> _onTimeout;
+    private readonly ILogger<MatchTimeoutScheduler>? _logger;
     private readonly ConcurrentDictionary<Guid, Entry> _entries = new();
 
-    public MatchTimeoutScheduler(Func<Guid, string, CancellationToken, Task> onTimeout)
+    public MatchTimeoutScheduler(
+        Func<Guid, string, CancellationToken, Task> onTimeout,
+        ILogger<MatchTimeoutScheduler>? logger = null)
     {
         _onTimeout = onTimeout;
+        _logger = logger;
     }
 
     public void Schedule(Guid matchId, string holderSub, long remainingMillis)
@@ -31,7 +36,19 @@ public sealed class MatchTimeoutScheduler
                 _entries.TryRemove(matchId, out _);
                 await _onTimeout(matchId, holderSub, CancellationToken.None);
             }
-            catch (TaskCanceledException) { }
+            catch (TaskCanceledException) { /* expected on Cancel/replace */ }
+            catch (OperationCanceledException) { /* expected on Cancel/replace */ }
+            catch (Exception ex)
+            {
+                // The timeout callback (OnTimeoutAsync) threw — e.g. the
+                // retry policy exhausted its budget on a transient Mongo
+                // fault. Observe + structured-log so it doesn't surface as
+                // an UnobservedTaskException and vanish; the match is left
+                // in Playing and will need manual / cleanup-sweep recovery.
+                _logger?.LogError(ex,
+                    "Match timeout callback faulted. MatchId={MatchId} HolderSub={HolderSub}",
+                    matchId, holderSub);
+            }
         });
     }
 

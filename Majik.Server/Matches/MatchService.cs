@@ -676,58 +676,81 @@ public sealed class MatchService
         bool isOpponent = match.Opponent != null && callerSub == match.Opponent.Sub;
         if (!isCreator && !isOpponent) return Result.Fail<MatchDto>(new MatchError("not-a-player"));
 
-        var roll = match.Roll ?? new MatchRoll();
+        var existing = match.Roll ?? new MatchRoll();
 
-        // Idempotent: if caller's slot already set, just return current snapshot
-        var callerSlotFilled = isCreator ? roll.CreatorRoll.HasValue : roll.OpponentRoll.HasValue;
+        // Idempotent: if caller's slot already set, just return current snapshot.
+        var callerSlotFilled = isCreator ? existing.CreatorRoll.HasValue : existing.OpponentRoll.HasValue;
         if (callerSlotFilled)
         {
             return Result.Ok(ToDto(match, viewerSub: callerSub));
         }
 
-        // Generate this player's roll
+        // Generate + persist ONLY this player's roll via a field-targeted CAS
+        // guarded that the slot was empty. Two concurrent submissions (one per
+        // seat) now each write their own field, so neither can clobber the
+        // other's value — the lost-update bug where both read the same Roll,
+        // mutated in-process, and wrote the whole object is closed (Slice 4a
+        // #5). The CAS also makes a racing same-seat double-submit a no-op.
         int value = _dice.RollSingle();
-        if (isCreator) roll.CreatorRoll = value;
-        else roll.OpponentRoll = value;
-
-        // If both filled, resolve winner (with tie auto-reroll)
-        if (roll.CreatorRoll.HasValue && roll.OpponentRoll.HasValue)
+        var now = _clock.UtcNow;
+        var slotSet = await _matches.TrySetPlayerRollAsync(matchId, isCreator, value, now, ct);
+        if (!slotSet)
         {
+            // Either the match left Rolling, or the slot was filled by a
+            // concurrent/duplicate submit. Re-read and return the current
+            // snapshot (idempotent) rather than reporting a spurious conflict.
+            var snapshot = await _matches.GetByIdAsync(matchId, ct);
+            if (snapshot == null) return Result.Fail<MatchDto>(new MatchError("match-not-found"));
+            if (snapshot.State != MatchState.Rolling)
+                return Result.Fail<MatchDto>(new MatchError("not-rolling"));
+            return Result.Ok(ToDto(snapshot, viewerSub: callerSub));
+        }
+
+        // Publish per-player event for this caller's roll.
+        _hub?.Publish(matchId, "match.player-rolled", new { matchId, sub = callerSub, roll = value });
+
+        // Re-read to see whether BOTH slots are now filled. If so — and no
+        // winner has been stamped yet — this caller attempts the winner CAS.
+        // Exactly one concurrent caller wins it (WinnerSub == null guard), so
+        // the winner is computed once even under simultaneous submissions.
+        var afterSet = await _matches.GetByIdAsync(matchId, ct);
+        if (afterSet?.Roll is { CreatorRoll: not null, OpponentRoll: not null, WinnerSub: null })
+        {
+            int c = afterSet.Roll.CreatorRoll!.Value;
+            int o = afterSet.Roll.OpponentRoll!.Value;
+
+            // Tie auto-reroll (CR 104.1-style pre-game roll): reroll BOTH
+            // values until they differ. Only the caller that wins the
+            // winner CAS persists these, so a tie can't be resolved twice.
             int retries = 0;
-            while (roll.CreatorRoll!.Value == roll.OpponentRoll!.Value)
+            while (c == o)
             {
                 if (++retries > MaxTieRetries)
                     throw new InvalidOperationException("Tie reroll cap exceeded — random source likely broken.");
-                roll.CreatorRoll = _dice.RollSingle();
-                roll.OpponentRoll = _dice.RollSingle();
+                c = _dice.RollSingle();
+                o = _dice.RollSingle();
             }
-            roll.WinnerSub = roll.CreatorRoll.Value > roll.OpponentRoll.Value
-                ? match.Creator.Sub : match.Opponent!.Sub;
-        }
+            var winnerSub = c > o ? afterSet.Creator.Sub : afterSet.Opponent!.Sub;
 
-        var now = _clock.UtcNow;
-        var update = Builders<Match>.Update
-            .Set(m => m.Roll, roll)
-            .Set(m => m.UpdatedAt, now);
-        var moved = await _matches.TryAtomicUpdateAsync(matchId, MatchState.Rolling, update, ct);
-        if (!moved) return Result.Fail<MatchDto>(new MatchError("not-rolling"));
+            var wonWinnerCas = await _matches.TrySetRollWinnerAsync(
+                matchId, c, o, winnerSub, _clock.UtcNow, ct);
 
-        // Publish per-player event for this caller's roll
-        _hub?.Publish(matchId, "match.player-rolled", new { matchId, sub = callerSub, roll = value });
-
-        // If winner determined, publish consolidated match.rolled event
-        if (roll.WinnerSub != null)
-        {
-            _hub?.Publish(matchId, "match.rolled",
-                new { matchId, roll = new MatchRollDto(roll.CreatorRoll, roll.OpponentRoll, roll.WinnerSub) });
-
-            // If the winner is a bot seat, schedule the bot's play/draw
-            // follow-up so the match isn't stranded in Rolling. Detection
-            // is by sub-prefix — the only seat we ever stamp with "bot:"
-            // is the synthesized opponent in CreateBotMatchAsync.
-            if (roll.WinnerSub.StartsWith("bot:", StringComparison.Ordinal))
+            if (wonWinnerCas)
             {
-                _botScheduler.ScheduleBotPlayDraw(matchId, roll.WinnerSub);
+                _hub?.Publish(matchId, "match.rolled",
+                    new { matchId, roll = new MatchRollDto(c, o, winnerSub) });
+
+                // If the winner is a bot seat, schedule the bot's play/draw
+                // follow-up so the match isn't stranded in Rolling. Detection
+                // is by sub-prefix — the only seat we ever stamp with "bot:"
+                // is the synthesized opponent in CreateBotMatchAsync. Gating
+                // this on the winner CAS means the bot's PlayDraw is scheduled
+                // exactly once even if both rolls land concurrently (Slice 4a
+                // #7) — only the single CAS winner reaches here.
+                if (winnerSub.StartsWith("bot:", StringComparison.Ordinal))
+                {
+                    _botScheduler.ScheduleBotPlayDraw(matchId, winnerSub);
+                }
             }
         }
 
@@ -756,12 +779,21 @@ public sealed class MatchService
             .Set(m => m.UpdatedAt, now);
 
         var moved = await _matches.TryAtomicUpdateAsync(matchId, MatchState.Playing, update, ct);
-        if (!moved) return Result.Fail<MatchDto>(new MatchError("cannot-concede"));
 
+        // Cleanup runs REGARDLESS of the CAS result (Slice 4a #8). Both
+        // operations are idempotent, and a CAS conflict here means a
+        // concurrent timeout already moved the match to Completed — but THIS
+        // replica still holds the timer + bridge subscriptions for the match
+        // and would leak them if we returned without tearing them down. The
+        // winning timeout path detaches its own copy; on a single replica
+        // both reference the same instances, so the double-detach is a no-op.
         _timeoutScheduler?.Cancel(matchId);
         // Tear down engine→SignalR bridge: match is over, no further
         // EventDto / PromptDto traffic should reach the hub group.
         _facadeBridge?.Detach(matchId);
+
+        if (!moved) return Result.Fail<MatchDto>(new MatchError("cannot-concede"));
+
         _hub?.Publish(matchId, "match.state-changed",
             new { matchId, state = "Completed", transitionedAt = now });
 
@@ -843,11 +875,15 @@ public sealed class MatchService
         }
 
         var now = _clock.UtcNow;
-        var elapsed = (long)(now - match.PriorityStartedAt.Value).TotalMilliseconds;
+        // Clock skew / a stale PriorityStartedAt slightly in the future would
+        // make elapsed negative and CREDIT the holder time. Clamp elapsed to
+        // ≥0, then clamp the resulting balance to ≥0 so a negative balance can
+        // never be persisted (Slice 4a #4).
+        var elapsed = Math.Max(0, (long)(now - match.PriorityStartedAt.Value).TotalMilliseconds);
         var stored = prevSub == match.Creator.Sub ? match.CreatorMillisRemaining
                    : prevSub == match.Opponent?.Sub ? match.OpponentMillisRemaining
                    : 0;
-        var newRemaining = stored - elapsed;
+        var newRemaining = Math.Max(0, stored - elapsed);
 
         if (newRemaining <= 0)
         {
@@ -855,19 +891,32 @@ public sealed class MatchService
             return;
         }
 
+        var expectedStartedAt = match.PriorityStartedAt.Value;
         var update = MongoDB.Driver.Builders<Match>.Update
             .Set(prevSub == match.Creator.Sub ? m => m.CreatorMillisRemaining : m => m.OpponentMillisRemaining, newRemaining)
             .Set(m => m.PriorityHolderSub, newHolderSub)
             .Set(m => m.PriorityStartedAt, now)
             .Set(m => m.UpdatedAt, now);
 
-        // Atomic compare-and-swap on the prior holder (NOT just Id+State).
-        // Two rapid handoffs that both read the same prior holder will now
-        // serialize: the first flips PriorityHolderSub, the second's filter
-        // (PriorityHolderSub == prevSub) no longer matches and it no-ops —
-        // no double-bill, no dropped transition (C1).
-        var moved = await _matches.TryAtomicUpdateWithHolderAsync(
-            matchId, MatchState.Playing, prevSub, update, ct);
+        // Atomic compare-and-swap on the prior holder AND the priority-start
+        // timestamp (NOT just Id+State). Two rapid handoffs that both read the
+        // same prior holder will serialize: the first flips PriorityHolderSub
+        // + advances PriorityStartedAt, the second's filter (holder==prevSub
+        // AND startedAt==expectedStartedAt) no longer matches and it no-ops —
+        // no double-bill, no dropped transition (C1 + Slice 4a #6). Adding the
+        // timestamp closes the duplicate/late-handoff window where holder is
+        // unchanged (e.g. a re-fired handoff for the SAME active player) so it
+        // can't deduct twice off one slice.
+        //
+        // Retry-with-backoff: a transient Mongo fault here would freeze the
+        // clock holder, burning the wrong player's clock. The CAS gating
+        // makes the retry safe — a lost-race retry finds the holder/startedAt
+        // already advanced and no-ops.
+        var moved = await RetryPolicy.ExecuteAsync(
+            c => _matches.TryAtomicUpdateWithHolderAsync(
+                matchId, MatchState.Playing, prevSub, update, c,
+                constrainStartedAt: true, expectedPriorityStartedAt: expectedStartedAt),
+            _logger, $"OnPriorityPassedAsync CAS (match {matchId})", ct);
         if (!moved) return;
 
         var fresh = (await _matches.GetByIdAsync(matchId, ct))!;
@@ -901,7 +950,16 @@ public sealed class MatchService
             .Set(m => m.WinnerSub, winner)
             .Set(m => m.TimeoutLoserSub, loserSub)
             .Set(m => m.UpdatedAt, now);
-        var moved = await _matches.TryAtomicUpdateAsync(matchId, MatchState.Playing, update, ct);
+
+        // Retry-with-backoff: this CAS is the ONLY thing moving the match out
+        // of Playing on a clock expiry. A single transient Mongo blip here
+        // would strand the match in Playing forever (the timer already fired
+        // and won't fire again). The CAS filter (State==Playing) makes the
+        // retry idempotent: a lost-race retry that finds the match already
+        // Completed matches nothing and returns false — never a double-apply.
+        var moved = await RetryPolicy.ExecuteAsync(
+            c => _matches.TryAtomicUpdateAsync(matchId, MatchState.Playing, update, c),
+            _logger, $"OnTimeoutAsync CAS (match {matchId})", ct);
         if (!moved) return;
 
         _timeoutScheduler?.Cancel(matchId);
