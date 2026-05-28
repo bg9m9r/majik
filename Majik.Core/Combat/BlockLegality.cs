@@ -94,4 +94,20 @@ public static class BlockLegality
         if (blockerCount == 0) return true; // unblocked is fine; menace only restricts who CAN block
         return blockerCount >= 2;
     }
+
+    /// <summary>
+    /// CR 509.1b — parameterised "can't be blocked except by N or more
+    /// creatures" restriction (e.g. Troll of Khazad-dûm requires N≥3).
+    /// Returns true iff no such restriction exists on the attacker, or the
+    /// <paramref name="blockerCount"/> is zero (going unblocked is always
+    /// legal — the restriction only governs who may participate in a block),
+    /// or <paramref name="blockerCount"/> ≥ N.
+    /// </summary>
+    public static bool MinBlockersSatisfied(Creature attacker, int blockerCount)
+    {
+        var n = CombatAbilities.GetMinBlockerRestriction(attacker);
+        if (n == null) return true;
+        if (blockerCount == 0) return true; // unblocked is always legal
+        return blockerCount >= n.Value;
+    }
 }

@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Majik.Core.Abilities;
+using Majik.Core.CardData.Factories;
 using Majik.Core.Combat;
 using Majik.Core.Players;
 using Xunit;
@@ -81,6 +82,27 @@ public class BlockLegalityTests
         BlockLegality.MenaceSatisfied(menaceAttacker, blockerCount: 2).Should().BeTrue();
         // Non-menace attackers always satisfied
         BlockLegality.MenaceSatisfied(blocker, blockerCount: 1).Should().BeTrue();
+    }
+
+    [Fact]
+    public void MinBlockers_ThreeOrMore_RequiresAtLeastThreeBlockers()
+    {
+        // Troll of Khazad-dûm: can't be blocked except by three or more
+        var troll = TrollOfKhazadDumFactory.Create(_alice);
+
+        BlockLegality.MinBlockersSatisfied(troll, blockerCount: 0).Should().BeTrue(
+            "unblocked is always legal (CR 509.1b)");
+        BlockLegality.MinBlockersSatisfied(troll, blockerCount: 1).Should().BeFalse();
+        BlockLegality.MinBlockersSatisfied(troll, blockerCount: 2).Should().BeFalse();
+        BlockLegality.MinBlockersSatisfied(troll, blockerCount: 3).Should().BeTrue();
+        BlockLegality.MinBlockersSatisfied(troll, blockerCount: 4).Should().BeTrue();
+    }
+
+    [Fact]
+    public void MinBlockers_PlainCreature_AlwaysSatisfied()
+    {
+        var bear = Make("Bear", null, _alice);
+        BlockLegality.MinBlockersSatisfied(bear, blockerCount: 1).Should().BeTrue();
     }
 
     private static Creature Make(string name, string? keyword, Player owner)
