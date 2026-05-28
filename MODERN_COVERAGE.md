@@ -1,8 +1,7 @@
 # Modern Coverage
 
-> **Headline (manual, 2026-05-26):** Raw 27.5% (6022 / 21917) ·
-> Live mtgtop8 Modern top-20 most-played: 18 / 20 (missing **Arena of Glory**
-> + **Sink into Stupor** — both recent lands). Sampled played-pool staple
+> **Headline (manual, 2026-05-28):** Raw 27.5% (6022 / 21917) ·
+> Live mtgtop8 Modern top-20 most-played: 20 / 20. Sampled played-pool staple
 > coverage ~51% (see Headline numbers note). Refresh the on-disk factory / template
 > counts in the table below with `./scripts/update-coverage-headline.sh`
 > (CI hook: `--check` exits non-zero on drift).
@@ -131,7 +130,7 @@ Living tracker for Modern-format card + mechanic implementation in the Majik eng
 
 | Metric | Count |
 |---|---|
-| Named factories | 752 |
+| Named factories | 963 |
 | Bespoke templates | 28 |
 | Generic templates | 97 |
 | JSON-defined cards | 25 |
