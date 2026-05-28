@@ -366,4 +366,8 @@ public enum CardSubtype
     /// <summary>Spider creature subtype — Giant Spider (Core sets), Sentinel
     /// Spider (Magic 2013), Ishkanah, Grafwidow. CR 205.3m.</summary>
     Spider,
+
+    /// <summary>Archon creature subtype — Archon of Cruelty (Modern Horizons 2),
+    /// Archon of Justice, Archon of the Triumvirate. CR 205.3m.</summary>
+    Archon,
 }
