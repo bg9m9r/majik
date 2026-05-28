@@ -184,29 +184,7 @@ public static class SteelHellkiteFactory
 
         if (eventBus != null)
         {
-            eventBus.Subscribe<CombatDamageDealtEvent>(e =>
-            {
-                if (!ReferenceEquals(e.Source, card)) return;
-                if (e.Amount <= 0) return;
-
-                // Damage to a creature / planeswalker → its controller.
-                // CombatDamageDealtEvent.Target is ICard? (null when the
-                // target is a player — see the dual-ctor on the event).
-                if (e.Target is ICard targetCard)
-                {
-                    var c = targetCard.Controller;
-                    if (c != null) combatVictims.Add(c);
-                    return;
-                }
-
-                // Damage to a player → read TargetPlayer off the base
-                // DamageDealtEvent (set by the Player-target ctor).
-                if (e.TargetPlayer is { } victimPlayer)
-                {
-                    combatVictims.Add(victimPlayer);
-                }
-            });
-
+            eventBus.Subscribe<CombatDamageDealtEvent>(e => TrackCombatVictim(e, card, combatVictims));
             eventBus.Subscribe<TurnStartedEvent>(_ => combatVictims.Clear());
         }
 
@@ -219,41 +197,7 @@ public static class SteelHellkiteFactory
         // ----------------------------------------------------------------
         var sweepEffect = new Effect(
             $"{CardName}: destroy each nontoken permanent with mv = X whose controller took combat damage from this card this turn",
-            () =>
-            {
-                var x = xValueProvider?.Invoke() ?? 0;
-                if (combatVictims.Count == 0) return;
-
-                var players = allPlayersResolver?.Invoke()
-                    ?? (IReadOnlyList<Player>)new[] { owner };
-
-                foreach (var p in players)
-                {
-                    if (p == null) continue;
-
-                    // Snapshot — we mutate the battlefield list inside
-                    // the loop. Mirror Engineered Explosives / Blast Zone
-                    // pattern.
-                    var victims = p.Zones.Battlefield.GetCards()
-                        .OfType<Permanent>()
-                        .Where(c => !c.IsToken)
-                        .Where(c => c.Controller != null && combatVictims.Contains(c.Controller))
-                        .Where(c => c.ManaCostValue.TotalValue == x)
-                        .ToList();
-
-                    foreach (var v in victims)
-                    {
-                        // CR 701.7b — destroyed permanents go to their
-                        // owner's graveyard. Fall back to the iterated
-                        // player when Owner is null so shape-only tests
-                        // still surface the destruction.
-                        var victimOwner = v.Owner ?? p;
-                        p.Zones.Battlefield.RemoveCard(v);
-                        victimOwner.Zones.Graveyard.AddCard(v);
-                        v.SetZone(ZoneType.Graveyard);
-                    }
-                }
-            });
+            () => ResolveDestroySweep(owner, xValueProvider, allPlayersResolver, combatVictims));
 
         card.AddAbility(new ActivatedAbility(
             source: card,
@@ -263,5 +207,74 @@ public static class SteelHellkiteFactory
             sorcerySpeed: true));
 
         return card;
+    }
+
+    // --- Combat-damage-victim tracker (CR 510.1c / 700.5) -----------------
+    private static void TrackCombatVictim(
+        CombatDamageDealtEvent e,
+        Creature card,
+        HashSet<Player> combatVictims)
+    {
+        if (!ReferenceEquals(e.Source, card)) return;
+        if (e.Amount <= 0) return;
+
+        // Damage to a creature / planeswalker → its controller.
+        // CombatDamageDealtEvent.Target is ICard? (null when the target is
+        // a player — see the dual-ctor on the event).
+        if (e.Target is ICard targetCard)
+        {
+            var c = targetCard.Controller;
+            if (c != null) combatVictims.Add(c);
+            return;
+        }
+
+        // Damage to a player → read TargetPlayer off the base
+        // DamageDealtEvent (set by the Player-target ctor).
+        if (e.TargetPlayer is { } victimPlayer)
+        {
+            combatVictims.Add(victimPlayer);
+        }
+    }
+
+    // --- {X}: destroy sweep (CR 701.7b) -----------------------------------
+    private static void ResolveDestroySweep(
+        Player owner,
+        Func<int>? xValueProvider,
+        Func<IReadOnlyList<Player>>? allPlayersResolver,
+        HashSet<Player> combatVictims)
+    {
+        var x = xValueProvider?.Invoke() ?? 0;
+        if (combatVictims.Count == 0) return;
+
+        var players = allPlayersResolver?.Invoke() ?? (IReadOnlyList<Player>)new[] { owner };
+
+        foreach (var p in players)
+        {
+            if (p == null) continue;
+            DestroyMatchingPermanents(p, x, combatVictims);
+        }
+    }
+
+    private static void DestroyMatchingPermanents(Player p, int x, HashSet<Player> combatVictims)
+    {
+        // Snapshot — we mutate the battlefield list inside the loop.
+        // Mirror Engineered Explosives / Blast Zone pattern.
+        var victims = p.Zones.Battlefield.GetCards()
+            .OfType<Permanent>()
+            .Where(c => !c.IsToken)
+            .Where(c => c.Controller != null && combatVictims.Contains(c.Controller))
+            .Where(c => c.ManaCostValue.TotalValue == x)
+            .ToList();
+
+        foreach (var v in victims)
+        {
+            // CR 701.7b — destroyed permanents go to their owner's
+            // graveyard. Fall back to the iterated player when Owner is
+            // null so shape-only tests still surface the destruction.
+            var victimOwner = v.Owner ?? p;
+            p.Zones.Battlefield.RemoveCard(v);
+            victimOwner.Zones.Graveyard.AddCard(v);
+            v.SetZone(ZoneType.Graveyard);
+        }
     }
 }

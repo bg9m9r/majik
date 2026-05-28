@@ -136,79 +136,7 @@ public static class ReflectionOfKikiJikiFactory
         ActivatedAbility? tapAbility = null;
         var tapEffect = new Effect(
             $"{CardName}: create a haste token copy of another target nonlegendary creature you control, sacrifice EOT",
-            () =>
-            {
-                if (tapAbility == null) return;
-                var chosen = tapAbility.ChosenTargets;
-                if (chosen.Count == 0 || chosen[0].Count == 0) return;
-
-                if (chosen[0][0] is not Creature original) return;
-
-                // CR 608.2b — resolve-time legality recheck (another /
-                // nonlegendary / you-control / still on the battlefield).
-                if (original.Zone != ZoneType.Battlefield) return;
-                if (ReferenceEquals(original, card)) return;                  // "another"
-                if (original.HasSupertype(CardSupertype.Legendary)) return;   // "nonlegendary"
-                var controller = card.Controller ?? owner;
-                if (!ReferenceEquals(original.Controller, controller)) return; // "you control"
-
-                // CR 706.2 — snapshot copiable values (name, P/T, subtypes,
-                // keyword names, colour). v1 lossy (see Kiki-Jiki factory).
-                var keywords = new List<string>(
-                    original.Abilities.OfType<KeywordAbility>()
-                        .Select(k => k.Keyword));
-                if (!keywords.Contains("Haste")) keywords.Add("Haste");
-
-                var colours = CardColors.GetColors(original).ToList();
-
-                var spec = new TokenFactory.TokenSpec(
-                    Name: original.Name,
-                    Power: original.BasePower,
-                    Toughness: original.BaseToughness,
-                    Subtypes: original.Subtypes.ToList(),
-                    Keywords: keywords,
-                    Colors: colours);
-
-                var token = TokenFactory.CreateOnBattlefield(spec, controller, zoneService);
-
-                // CR 702.10b — Haste lets the token attack immediately.
-                token.HasSummoningSickness = false;
-
-                // CR 603.7 — delayed end-step trigger to SACRIFICE the
-                // spawned token (battlefield → graveyard, CR 701.16).
-                if (triggers != null)
-                {
-                    var resolvedAt = DateTime.UtcNow;
-                    var sacEffect = new Effect(
-                        $"{CardName}: sacrifice token at next end step",
-                        () =>
-                        {
-                            if (token.Zone != ZoneType.Battlefield) return;
-                            if (!controller.Zones.Battlefield.GetCards().Contains(token)) return;
-
-                            if (zoneService != null)
-                            {
-                                zoneService.MoveCard(token, ZoneType.Battlefield, ZoneType.Graveyard, controller);
-                            }
-                            else
-                            {
-                                controller.Zones.Battlefield.RemoveCard(token);
-                                controller.Zones.Graveyard.AddCard(token);
-                                token.SetZone(ZoneType.Graveyard);
-                            }
-                        });
-
-                    var delayed = new DelayedTriggeredAbility(
-                        source: card,
-                        controller: controller,
-                        condition: new EventTriggerCondition<StepStartedEvent>(
-                            (e, _) => e.StepType == PhaseStateType.End
-                                      && e.Timestamp > resolvedAt),
-                        effects: new IEffect[] { sacEffect });
-
-                    triggers.RegisterDelayed(delayed);
-                }
-            });
+            () => ResolveCopyTokenActivation(tapAbility, card, owner, zoneService, triggers));
 
         tapAbility = new ActivatedAbility(
             source: card,
@@ -230,5 +158,114 @@ public static class ReflectionOfKikiJikiFactory
             });
 
         card.AddAbility(tapAbility);
+    }
+
+    // --- Copy-token activation body (CR 706.2 / 603.7) ---------------------
+
+    private static void ResolveCopyTokenActivation(
+        ActivatedAbility? tapAbility,
+        Creature card,
+        Player owner,
+        ZoneService? zoneService,
+        TriggerManager? triggers)
+    {
+        var original = ResolveLegalTarget(tapAbility, card, owner);
+        if (original == null) return;
+
+        var controller = card.Controller ?? owner;
+        var token = SpawnHasteCopyToken(original, controller, zoneService);
+
+        // CR 603.7 — delayed end-step trigger sacrifices the spawned token.
+        if (triggers != null)
+        {
+            RegisterEndStepSacrifice(card, controller, token, zoneService, triggers);
+        }
+    }
+
+    private static Creature? ResolveLegalTarget(
+        ActivatedAbility? tapAbility,
+        Creature card,
+        Player owner)
+    {
+        if (tapAbility == null) return null;
+        var chosen = tapAbility.ChosenTargets;
+        if (chosen.Count == 0 || chosen[0].Count == 0) return null;
+        if (chosen[0][0] is not Creature original) return null;
+
+        // CR 608.2b — resolve-time legality recheck (another / nonlegendary
+        // / you-control / still on the battlefield).
+        if (original.Zone != ZoneType.Battlefield) return null;
+        if (ReferenceEquals(original, card)) return null;                   // "another"
+        if (original.HasSupertype(CardSupertype.Legendary)) return null;    // "nonlegendary"
+        var controller = card.Controller ?? owner;
+        if (!ReferenceEquals(original.Controller, controller)) return null; // "you control"
+        return original;
+    }
+
+    private static Creature SpawnHasteCopyToken(
+        Creature original,
+        Player controller,
+        ZoneService? zoneService)
+    {
+        // CR 706.2 — snapshot copiable values (name, P/T, subtypes, keyword
+        // names, colour). v1 lossy (see Kiki-Jiki factory).
+        var keywords = new List<string>(
+            original.Abilities.OfType<KeywordAbility>().Select(k => k.Keyword));
+        if (!keywords.Contains("Haste")) keywords.Add("Haste");
+
+        var colours = CardColors.GetColors(original).ToList();
+
+        var spec = new TokenFactory.TokenSpec(
+            Name: original.Name,
+            Power: original.BasePower,
+            Toughness: original.BaseToughness,
+            Subtypes: original.Subtypes.ToList(),
+            Keywords: keywords,
+            Colors: colours);
+
+        var token = TokenFactory.CreateOnBattlefield(spec, controller, zoneService);
+
+        // CR 702.10b — Haste lets the token attack immediately.
+        token.HasSummoningSickness = false;
+        return token;
+    }
+
+    private static void RegisterEndStepSacrifice(
+        Creature card,
+        Player controller,
+        Creature token,
+        ZoneService? zoneService,
+        TriggerManager triggers)
+    {
+        var resolvedAt = DateTime.UtcNow;
+        var sacEffect = new Effect(
+            $"{CardName}: sacrifice token at next end step",
+            () => SacrificeToken(token, controller, zoneService));
+
+        var delayed = new DelayedTriggeredAbility(
+            source: card,
+            controller: controller,
+            condition: new EventTriggerCondition<StepStartedEvent>(
+                (e, _) => e.StepType == PhaseStateType.End && e.Timestamp > resolvedAt),
+            effects: new IEffect[] { sacEffect });
+
+        triggers.RegisterDelayed(delayed);
+    }
+
+    private static void SacrificeToken(Creature token, Player controller, ZoneService? zoneService)
+    {
+        if (token.Zone != ZoneType.Battlefield) return;
+        if (!controller.Zones.Battlefield.GetCards().Contains(token)) return;
+
+        if (zoneService != null)
+        {
+            zoneService.MoveCard(token, ZoneType.Battlefield, ZoneType.Graveyard, controller);
+        }
+        else
+        {
+            controller.Zones.Battlefield.RemoveCard(token);
+            controller.Zones.Graveyard.AddCard(token);
+            token.SetZone(ZoneType.Graveyard);
+        }
     }
 }

@@ -154,56 +154,7 @@ public static class RestorationAngelFactory
 
         var etbEffect = new Effect(
             $"{CardName} — exile another target non-Angel creature you control, then return it",
-            () =>
-            {
-                if (etbTrigger == null) return;
-                var chosen = etbTrigger.ChosenTargets;
-                if (chosen.Count == 0 || chosen[0].Count == 0) return; // "may" → declined
-
-                if (chosen[0][0] is not Creature target) return;
-                // "another" — cannot target Restoration Angel itself.
-                if (ReferenceEquals(target, card)) return;
-                // CR 608.2b — resolution-time legality re-check.
-                if (target.Zone != ZoneType.Battlefield) return;
-                if (!ReferenceEquals(target.Controller, owner)) return;
-                if (target.HasSubtype(CardSubtype.Angel)) return;
-
-                // CR 701.21 — Exile. Prefer ZoneService when supplied so
-                // CardMovedEvent fires (matches TouchTheSpiritRealm /
-                // Yorion two-mode posture).
-                if (zones != null)
-                {
-                    zones.MoveCard(target, ZoneType.Battlefield, ZoneType.Exile);
-                }
-                else
-                {
-                    var fromOwner = target.Owner ?? owner;
-                    fromOwner.Zones.Battlefield.RemoveCard(target);
-                    fromOwner.Zones.Exile.AddCard(target);
-                    target.SetZone(ZoneType.Exile);
-                }
-
-                // CR 614 — "return that card to the battlefield under
-                // your control" — resolves in the same triggered-ability
-                // resolution (no delayed trigger). Defensive token guard:
-                // CR 111.8 — a token in exile has already been removed
-                // by SBAs in production; the Zone == Exile check skips
-                // it cleanly.
-                if (target.Zone != ZoneType.Exile) return;
-
-                if (zones != null)
-                {
-                    zones.MoveCard(target, ZoneType.Exile, ZoneType.Battlefield, owner);
-                }
-                else
-                {
-                    var returnOwner = target.Owner ?? owner;
-                    returnOwner.Zones.Exile.RemoveCard(target);
-                    owner.Zones.Battlefield.AddCard(target);
-                    target.SetZone(ZoneType.Battlefield);
-                    target.SetController(owner);
-                }
-            });
+            () => ResolveFlickerTrigger(etbTrigger, card, owner, zones));
 
         etbTrigger = new TriggeredAbility(
             source: card,
@@ -217,5 +168,74 @@ public static class RestorationAngelFactory
         triggers?.RegisterTriggeredAbility(etbTrigger);
 
         return card;
+    }
+
+    // --- Flicker resolve (CR 608.2b / 701.21 / 614 / 111.8) ---------------
+
+    private static void ResolveFlickerTrigger(
+        TriggeredAbility? etbTrigger,
+        Creature card,
+        Player owner,
+        ZoneService? zones)
+    {
+        var target = ResolveLegalFlickerTarget(etbTrigger, card, owner);
+        if (target == null) return;
+
+        // CR 701.21 — Exile. Prefer ZoneService when supplied so
+        // CardMovedEvent fires (TouchTheSpiritRealm / Yorion posture).
+        ExileTarget(target, owner, zones);
+
+        // CR 614 — "return that card to the battlefield under your
+        // control". CR 111.8 token guard: a token in exile has already
+        // been removed by SBAs in production; Zone == Exile check skips
+        // it cleanly.
+        if (target.Zone != ZoneType.Exile) return;
+        ReturnTarget(target, owner, zones);
+    }
+
+    private static Creature? ResolveLegalFlickerTarget(
+        TriggeredAbility? etbTrigger,
+        Creature card,
+        Player owner)
+    {
+        if (etbTrigger == null) return null;
+        var chosen = etbTrigger.ChosenTargets;
+        if (chosen.Count == 0 || chosen[0].Count == 0) return null; // "may" → declined
+        if (chosen[0][0] is not Creature target) return null;
+
+        // "another" — cannot target Restoration Angel itself.
+        if (ReferenceEquals(target, card)) return null;
+        // CR 608.2b — resolution-time legality re-check.
+        if (target.Zone != ZoneType.Battlefield) return null;
+        if (!ReferenceEquals(target.Controller, owner)) return null;
+        if (target.HasSubtype(CardSubtype.Angel)) return null;
+        return target;
+    }
+
+    private static void ExileTarget(Creature target, Player owner, ZoneService? zones)
+    {
+        if (zones != null)
+        {
+            zones.MoveCard(target, ZoneType.Battlefield, ZoneType.Exile);
+            return;
+        }
+        var fromOwner = target.Owner ?? owner;
+        fromOwner.Zones.Battlefield.RemoveCard(target);
+        fromOwner.Zones.Exile.AddCard(target);
+        target.SetZone(ZoneType.Exile);
+    }
+
+    private static void ReturnTarget(Creature target, Player owner, ZoneService? zones)
+    {
+        if (zones != null)
+        {
+            zones.MoveCard(target, ZoneType.Exile, ZoneType.Battlefield, owner);
+            return;
+        }
+        var returnOwner = target.Owner ?? owner;
+        returnOwner.Zones.Exile.RemoveCard(target);
+        owner.Zones.Battlefield.AddCard(target);
+        target.SetZone(ZoneType.Battlefield);
+        target.SetController(owner);
     }
 }

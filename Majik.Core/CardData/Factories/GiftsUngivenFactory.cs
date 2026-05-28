@@ -154,13 +154,25 @@ public static class GiftsUngivenFactory
             return;
         }
 
-        // ----------------------------------------------------------------
-        // CR 701.19a + printed "different names" — caster's agent picks
-        // up to 4 cards from their library with distinct names. The
-        // per-slot loop re-filters the candidate set each pass so the
-        // distinct-name rider is enforced agent-side (same shape as
-        // Scapeshift's per-slot loop).
-        // ----------------------------------------------------------------
+        var revealed = TutorDistinctNameCards(controller);
+
+        // No legal picks → still shuffle (CR 701.20a, "search happened").
+        if (revealed.Count == 0)
+        {
+            LibraryShuffle.ShuffleLibrary(controller, "gifts-ungiven");
+            return;
+        }
+
+        var toGraveyard = ChooseOpponentGraveyardPicks(targetOpponent, revealed);
+        SplitRevealedPile(controller, revealed, toGraveyard);
+
+        // CR 701.20a — shuffle after search.
+        LibraryShuffle.ShuffleLibrary(controller, "gifts-ungiven");
+    }
+
+    // --- Tutor: caster picks up to 4 distinct-name cards (CR 701.19a) ----
+    private static List<ICard> TutorDistinctNameCards(Player controller)
+    {
         var casterAgent = AgentRegistry.Get(controller);
         var revealed = new List<ICard>(MaxTutorPicks);
         var revealedNames = new HashSet<string>(StringComparer.Ordinal);
@@ -170,88 +182,88 @@ public static class GiftsUngivenFactory
             var libSnapshot = controller.Zones.Library.GetCards()
                 .Where(c => !revealedNames.Contains(c.Name))
                 .ToList();
-
             if (libSnapshot.Count == 0) break;
 
-            ICard? pick = casterAgent != null
-                ? casterAgent.ChooseLibraryPickAsync(
-                    ctx: null,
-                    libSnapshot,
-                    $"card #{i + 1} of up to {MaxTutorPicks} with a different name")
-                    .GetAwaiter().GetResult()
-                : libSnapshot[0];
+            var pick = PickOneFromLibrary(casterAgent, libSnapshot, i);
+            if (pick == null) break; // CR 701.19a — caster may decline.
 
-            // CR 701.19a — caster may decline; clean stop, smaller pile.
-            if (pick == null) break;
-
-            // Defensive: agent picked a card not in the filtered list
-            // (e.g. duplicate name) — skip it but continue the loop so
-            // the caster gets fresh prompts.
+            // Defensive: skip dupes / not-in-library agent returns.
             if (revealedNames.Contains(pick.Name)) continue;
             if (!controller.Zones.Library.GetCards().Contains(pick)) continue;
 
             revealed.Add(pick);
             revealedNames.Add(pick.Name);
         }
+        return revealed;
+    }
 
-        // No legal picks → still shuffle (CR 701.20a, "search happened").
-        if (revealed.Count == 0)
-        {
-            LibraryShuffle.ShuffleLibrary(controller, "gifts-ungiven");
-            return;
-        }
+    private static ICard? PickOneFromLibrary(
+        IPlayerAgent? casterAgent,
+        List<ICard> libSnapshot,
+        int slotIndex)
+    {
+        if (casterAgent == null) return libSnapshot[0];
+        return casterAgent.ChooseLibraryPickAsync(
+            ctx: null,
+            libSnapshot,
+            $"card #{slotIndex + 1} of up to {MaxTutorPicks} with a different name")
+            .GetAwaiter().GetResult();
+    }
 
-        // ----------------------------------------------------------------
-        // CR 700.1 — target opponent's agent picks two cards to go to
-        // graveyard. When fewer than two cards were revealed, every
-        // revealed card goes to graveyard (do as much as possible — CR
-        // 119.x / 121.4).
-        // ----------------------------------------------------------------
-        var opponentAgent = AgentRegistry.Get(targetOpponent);
+    // --- Opponent picks 2 to graveyard (CR 700.1) -------------------------
+    private static List<ICard> ChooseOpponentGraveyardPicks(
+        Player targetOpponent,
+        List<ICard> revealed)
+    {
         var toGraveyard = new List<ICard>(OpponentGraveyardPicks);
 
         if (revealed.Count <= OpponentGraveyardPicks)
         {
-            // All revealed cards go to graveyard, hand pile is empty.
+            // Do-as-much-as-possible (CR 119.x / 121.4): all revealed →
+            // graveyard, hand pile empty.
             toGraveyard.AddRange(revealed);
+            return toGraveyard;
         }
-        else
+
+        var opponentAgent = AgentRegistry.Get(targetOpponent);
+        var remaining = new List<ICard>(revealed);
+        for (var i = 0; i < OpponentGraveyardPicks; i++)
         {
-            var remaining = new List<ICard>(revealed);
-            for (var i = 0; i < OpponentGraveyardPicks; i++)
-            {
-                ICard? pick = opponentAgent != null
-                    ? opponentAgent.ChooseFromPileAsync(
-                        targetOpponent,
-                        remaining,
-                        $"card #{i + 1} of {OpponentGraveyardPicks} to put into the caster's graveyard",
-                        Majik.Core.Cards.BotIntent.Removal)
-                        .GetAwaiter().GetResult()
-                    : remaining[0];
-
-                // Mandatory pick — printed text doesn't let the opponent
-                // skip choosing. Fall back to the first remaining
-                // candidate if the agent declines / picks something
-                // outside the candidate list.
-                if (pick == null || !remaining.Contains(pick))
-                {
-                    pick = remaining[0];
-                }
-
-                toGraveyard.Add(pick);
-                remaining.Remove(pick);
-            }
+            var pick = PickOneForGraveyard(opponentAgent, targetOpponent, remaining, i);
+            toGraveyard.Add(pick);
+            remaining.Remove(pick);
         }
+        return toGraveyard;
+    }
 
-        // ----------------------------------------------------------------
-        // Split the revealed pile — chosen cards → caster's graveyard,
-        // rest → caster's hand. CR 401.4 / 608.2c.
-        // ----------------------------------------------------------------
+    private static ICard PickOneForGraveyard(
+        IPlayerAgent? opponentAgent,
+        Player targetOpponent,
+        List<ICard> remaining,
+        int slotIndex)
+    {
+        ICard? pick = opponentAgent != null
+            ? opponentAgent.ChooseFromPileAsync(
+                targetOpponent,
+                remaining,
+                $"card #{slotIndex + 1} of {OpponentGraveyardPicks} to put into the caster's graveyard",
+                Majik.Core.Cards.BotIntent.Removal)
+                .GetAwaiter().GetResult()
+            : remaining[0];
+        // Mandatory pick — opponent doesn't get to skip. Fall back to the
+        // first remaining candidate on decline / out-of-list.
+        if (pick == null || !remaining.Contains(pick)) pick = remaining[0];
+        return pick;
+    }
+
+    // --- Split pile → graveyard + hand (CR 401.4 / 608.2c) ----------------
+    private static void SplitRevealedPile(
+        Player controller,
+        List<ICard> revealed,
+        List<ICard> toGraveyard)
+    {
         foreach (var card in revealed)
         {
-            // Defensive: the card must still be in the controller's
-            // library to move (no concurrent mutation in v1, but the
-            // zone-membership check matches every other tutor factory).
             if (!controller.Zones.Library.GetCards().Contains(card)) continue;
             controller.Zones.Library.RemoveCard(card);
 
@@ -266,8 +278,5 @@ public static class GiftsUngivenFactory
                 card.SetZone(ZoneType.Hand);
             }
         }
-
-        // CR 701.20a — shuffle after search.
-        LibraryShuffle.ShuffleLibrary(controller, "gifts-ungiven");
     }
 }

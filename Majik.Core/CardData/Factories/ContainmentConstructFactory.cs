@@ -171,64 +171,7 @@ public static class ContainmentConstructFactory
             {
                 var discarded = capturedDiscard;
                 capturedDiscard = null;
-                if (discarded == null) return;
-
-                var controller = card.Controller ?? owner;
-                var agent = AgentRegistry.Get(controller);
-
-                // "You may exile it" — CR 603.1 may-clause. Default
-                // auto-accept (BotIntent.CardAdvantage) so tests with no
-                // agent registered take the upside branch.
-                bool exile = agent == null
-                    ? true
-                    : agent.ChooseYesNoAsync(
-                        $"Exile {discarded.Name} discarded by {controller.Name}?",
-                        BotIntent.CardAdvantage).GetAwaiter().GetResult();
-                if (!exile) return;
-
-                // Move Graveyard → Exile. Guard the zone in case a
-                // sibling effect already moved the card (Rest in Peace,
-                // Leyline of the Void replacement that beats this
-                // trigger to the punch).
-                if (discarded.Zone != ZoneType.Graveyard) return;
-                var graveyardOwner = discarded.Owner;
-                if (graveyardOwner == null) return;
-                if (!graveyardOwner.Zones.Graveyard.GetCards().Contains(discarded))
-                    return;
-
-                graveyardOwner.Zones.Graveyard.RemoveCard(discarded);
-                graveyardOwner.Zones.Exile.AddCard(discarded);
-                discarded.SetZone(ZoneType.Exile);
-
-                // "If you do, you may play that card this turn."
-                // CR 118.9 — runtime grant surface used by Ragavan /
-                // Light Up the Stage / Igneous Inspiration. Cost is the
-                // exiled card's printed mana cost ("you may play that
-                // card" with no alternate-cost rider).
-                if (discarded is not Card stampable) return;
-                stampable.GrantRuntimeExileCast(controller, stampable.ManaCostValue);
-
-                if (eventBus == null) return;
-
-                // "This turn" — CR 514.2. Clear on the first Cleanup
-                // step seen after the discard (mirrors Ragavan's EOT
-                // cleanup pattern). The discard can happen on any
-                // player's turn, so the cleanup we wait for is the next
-                // one regardless of who is active. Only revoke if the
-                // stamp we set is still the live grant — a re-stamp by
-                // a later effect overwrites and we must not clobber it.
-                Action<StepStartedEvent>? handler = null;
-                handler = (e) =>
-                {
-                    if (e.StepType != PhaseStateType.Cleanup) return;
-                    // Only clear if still our grant (allowedCaster matches).
-                    if (ReferenceEquals(stampable.RuntimeExileCastAllowedCaster, controller))
-                    {
-                        stampable.ClearRuntimeExileCast();
-                    }
-                    if (handler != null) eventBus.Unsubscribe(handler);
-                };
-                eventBus.Subscribe(handler);
+                ResolveDiscardTrigger(discarded, card, owner, eventBus);
             });
 
         var discardTrigger = new TriggeredAbility(
@@ -245,5 +188,78 @@ public static class ContainmentConstructFactory
         triggers?.RegisterTriggeredAbility(discardTrigger);
 
         return card;
+    }
+
+    // --- Trigger resolution (CR 603.1 + CR 514.2 cleanup) ------------------
+
+    private static void ResolveDiscardTrigger(
+        ICard? discarded,
+        Creature card,
+        Player owner,
+        IEventBus? eventBus)
+    {
+        if (discarded == null) return;
+
+        var controller = card.Controller ?? owner;
+        if (!ShouldExileDiscard(discarded, controller)) return;
+
+        if (!MoveDiscardToExile(discarded)) return;
+
+        // "If you do, you may play that card this turn." CR 118.9 runtime grant.
+        if (discarded is not Card stampable) return;
+        stampable.GrantRuntimeExileCast(controller, stampable.ManaCostValue);
+
+        // "This turn" — CR 514.2. Clear on next Cleanup step.
+        ScheduleEndOfTurnGrantClear(stampable, controller, eventBus);
+    }
+
+    private static bool ShouldExileDiscard(ICard discarded, Player controller)
+    {
+        var agent = AgentRegistry.Get(controller);
+        // CR 603.1 may-clause. Default auto-accept (BotIntent.CardAdvantage)
+        // so tests with no agent registered take the upside branch.
+        if (agent == null) return true;
+        return agent.ChooseYesNoAsync(
+            $"Exile {discarded.Name} discarded by {controller.Name}?",
+            BotIntent.CardAdvantage).GetAwaiter().GetResult();
+    }
+
+    private static bool MoveDiscardToExile(ICard discarded)
+    {
+        // Guard the zone in case a sibling effect already moved the card
+        // (Rest in Peace, Leyline of the Void).
+        if (discarded.Zone != ZoneType.Graveyard) return false;
+        var graveyardOwner = discarded.Owner;
+        if (graveyardOwner == null) return false;
+        if (!graveyardOwner.Zones.Graveyard.GetCards().Contains(discarded)) return false;
+
+        graveyardOwner.Zones.Graveyard.RemoveCard(discarded);
+        graveyardOwner.Zones.Exile.AddCard(discarded);
+        discarded.SetZone(ZoneType.Exile);
+        return true;
+    }
+
+    private static void ScheduleEndOfTurnGrantClear(
+        Card stampable,
+        Player controller,
+        IEventBus? eventBus)
+    {
+        if (eventBus == null) return;
+
+        // The discard can happen on any player's turn, so the cleanup we
+        // wait for is the next one regardless of who is active. Only
+        // revoke if the stamp is still the live grant — a re-stamp by a
+        // later effect overwrites and we must not clobber it.
+        Action<StepStartedEvent>? handler = null;
+        handler = (e) =>
+        {
+            if (e.StepType != PhaseStateType.Cleanup) return;
+            if (ReferenceEquals(stampable.RuntimeExileCastAllowedCaster, controller))
+            {
+                stampable.ClearRuntimeExileCast();
+            }
+            if (handler != null) eventBus.Unsubscribe(handler);
+        };
+        eventBus.Subscribe(handler);
     }
 }

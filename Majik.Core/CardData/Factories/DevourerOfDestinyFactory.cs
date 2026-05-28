@@ -140,36 +140,7 @@ public static class DevourerOfDestinyFactory
 
         var castEffect = new Effect(
             $"{CardName}: exile target colored permanent (cast trigger)",
-            () =>
-            {
-                if (castTrigger == null) return;
-                var chosen = castTrigger.ChosenTargets;
-                if (chosen.Count == 0 || chosen[0].Count == 0) return;
-
-                if (chosen[0][0] is not Card permCard) return;
-                // CR 608.2b — illegal-on-resolution check: target must
-                // still be on the battlefield AND still colored. A
-                // permanent that lost all its colors between cast and
-                // resolution is no longer a legal target.
-                if (permCard.Zone != ZoneType.Battlefield) return;
-                if (CardColors.GetColors(permCard).Count == 0) return;
-
-                // CR 701.21 — exile is NOT a destroy effect; indestructible
-                // permanents are exiled normally. Route through ZoneService
-                // when supplied so CardMovedEvent fires.
-                if (zones != null)
-                {
-                    zones.MoveCard(permCard, ZoneType.Battlefield, ZoneType.Exile);
-                }
-                else
-                {
-                    var permController = permCard.Controller ?? permCard.Owner;
-                    permController?.Zones.Battlefield.RemoveCard(permCard);
-                    var exileOwner = permCard.Owner ?? owner;
-                    exileOwner.Zones.Exile.AddCard(permCard);
-                    permCard.SetZone(ZoneType.Exile);
-                }
-            });
+            () => ResolveCastExile(castTrigger, owner, zones));
 
         castTrigger = new TriggeredAbility(
             source: card,
@@ -194,26 +165,59 @@ public static class DevourerOfDestinyFactory
                     // permanent across all players and include only those
                     // with a non-empty color set; colorless permanents
                     // (Eldrazi, most artifacts) are deliberately excluded.
-                    CandidateGatherer: ctx =>
-                    {
-                        var pool = new List<object>();
-                        foreach (var p in ctx.AllPlayers)
-                        {
-                            foreach (var c in p.Zones.Battlefield.GetCards())
-                            {
-                                if (CardColors.GetColors(c).Count > 0)
-                                {
-                                    pool.Add(c);
-                                }
-                            }
-                        }
-                        return pool;
-                    }),
+                    CandidateGatherer: GatherColoredPermanents),
             });
 
         card.AddAbility(castTrigger);
         triggers?.RegisterTriggeredAbility(castTrigger);
 
         return card;
+    }
+
+    // --- Cast-trigger helpers (CR 608.2b / 701.21 / 700.2a) ---------------
+
+    private static List<object> GatherColoredPermanents(GameContext ctx)
+    {
+        // CR 700.2a — "colored" means at least one of W/U/B/R/G.
+        var pool = new List<object>();
+        foreach (var p in ctx.AllPlayers)
+        {
+            foreach (var c in p.Zones.Battlefield.GetCards())
+            {
+                if (CardColors.GetColors(c).Count > 0) pool.Add(c);
+            }
+        }
+        return pool;
+    }
+
+    private static void ResolveCastExile(TriggeredAbility? castTrigger, Player owner, ZoneService? zones)
+    {
+        if (castTrigger == null) return;
+        var chosen = castTrigger.ChosenTargets;
+        if (chosen.Count == 0 || chosen[0].Count == 0) return;
+
+        if (chosen[0][0] is not Card permCard) return;
+        // CR 608.2b — illegal-on-resolution check.
+        if (permCard.Zone != ZoneType.Battlefield) return;
+        if (CardColors.GetColors(permCard).Count == 0) return;
+
+        ExilePermanent(permCard, owner, zones);
+    }
+
+    private static void ExilePermanent(Card permCard, Player owner, ZoneService? zones)
+    {
+        // CR 701.21 — exile is NOT a destroy effect; indestructible
+        // permanents are exiled normally. Route through ZoneService when
+        // supplied so CardMovedEvent fires.
+        if (zones != null)
+        {
+            zones.MoveCard(permCard, ZoneType.Battlefield, ZoneType.Exile);
+            return;
+        }
+        var permController = permCard.Controller ?? permCard.Owner;
+        permController?.Zones.Battlefield.RemoveCard(permCard);
+        var exileOwner = permCard.Owner ?? owner;
+        exileOwner.Zones.Exile.AddCard(permCard);
+        permCard.SetZone(ZoneType.Exile);
     }
 }

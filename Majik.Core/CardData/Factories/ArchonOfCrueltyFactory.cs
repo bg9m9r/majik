@@ -128,96 +128,7 @@ public static class ArchonOfCrueltyFactory
         IEffect BuildEffect(Func<TriggeredAbility?> getTrigger, string label) =>
             new Effect(
                 $"{CardName}: {label} — target opponent sacs creature/planeswalker, discards, loses {LifeSwing}; you draw, gain {LifeSwing}",
-                () =>
-                {
-                    var trigger = getTrigger();
-                    var controller = card.Controller ?? owner;
-
-                    // Resolve target opponent from ChosenTargets.
-                    Player? opponent = null;
-                    if (trigger is not null
-                        && trigger.ChosenTargets.Count > 0
-                        && trigger.ChosenTargets[0].Count > 0)
-                    {
-                        opponent = trigger.ChosenTargets[0][0] as Player;
-                    }
-
-                    if (opponent is null) return; // no target chosen → no-op
-
-                    // --- Step 1: opponent sacrifices a creature or planeswalker ---
-                    // CR 701.16 — sacrifice: choice belongs to opponent.
-                    // CR 101.1 / 305.1 — "creature or planeswalker" = battlefield
-                    // permanents with CardType.Creature OR CardType.Planeswalker
-                    // controlled by the opponent.
-                    var sacCandidates = opponent.Zones.Battlefield.GetCards()
-                        .Where(c => c.HasType(CardType.Creature) || c.HasType(CardType.Planeswalker))
-                        .Cast<ICard>()
-                        .ToList();
-
-                    if (sacCandidates.Count > 0)
-                    {
-                        ICard? sacPick = null;
-                        if (targetAgent != null)
-                        {
-                            sacPick = targetAgent
-                                .ChooseFromBattlefieldAsync(opponent, sacCandidates, BotIntent.Removal)
-                                .GetAwaiter().GetResult();
-
-                            // Validate: must still be a creature/planeswalker on
-                            // the battlefield controlled by the opponent.
-                            if (sacPick == null
-                                || sacPick.Zone != ZoneType.Battlefield
-                                || (!sacPick.HasType(CardType.Creature) && !sacPick.HasType(CardType.Planeswalker))
-                                || !ReferenceEquals(sacPick.Controller, opponent))
-                            {
-                                sacPick = sacCandidates[0];
-                            }
-                        }
-                        else
-                        {
-                            sacPick = sacCandidates[0];
-                        }
-
-                        // CR 701.16 — sacrifice bypasses Indestructible (CR 702.12)
-                        // and regeneration (CR 701.15).
-                        Fx.Sacrifice(sacPick);
-                    }
-                    // No creatures/planeswalkers → no-op for this step only.
-
-                    // --- Step 2: opponent discards a card ---
-                    // CR 701.8 — opponent chooses what to discard.
-                    var hand = opponent.Zones.Hand.GetCards().ToList();
-                    if (hand.Count > 0)
-                    {
-                        ICard? discardPick = null;
-                        if (targetAgent != null)
-                        {
-                            discardPick = targetAgent
-                                .ChooseFromHandAsync(opponent, hand.Cast<ICard>().ToList(), BotIntent.Discard)
-                                .GetAwaiter().GetResult();
-
-                            if (discardPick == null || discardPick.Zone != ZoneType.Hand)
-                                discardPick = hand[0];
-                        }
-                        else
-                        {
-                            discardPick = hand[0];
-                        }
-
-                        opponent.Zones.Hand.RemoveCard(discardPick);
-                        opponent.Zones.Graveyard.AddCard(discardPick);
-                        discardPick.SetZone(ZoneType.Graveyard);
-                    }
-
-                    // --- Step 3: opponent loses 3 life (CR 119.3) ---
-                    Fx.LoseLife(opponent, LifeSwing);
-
-                    // --- Step 4: controller draws 1 card (CR 120.1) ---
-                    Fx.DrawCards(controller, 1);
-
-                    // --- Step 5: controller gains 3 life (CR 119.3) ---
-                    Fx.GainLife(controller, LifeSwing);
-                });
+                () => ResolveTriggerBody(getTrigger(), card, owner, targetAgent));
 
         // ----------------------------------------------------------------
         // ETB trigger — "Whenever this creature enters, …"
@@ -259,5 +170,104 @@ public static class ArchonOfCrueltyFactory
         triggers?.RegisterTriggeredAbility(attackTrigger);
 
         return card;
+    }
+
+    // --- Trigger body (CR 701.16 / 701.8 / 119.3 / 120.1) -----------------
+    private static void ResolveTriggerBody(
+        TriggeredAbility? trigger,
+        Creature card,
+        Player owner,
+        IPlayerAgent? targetAgent)
+    {
+        var controller = card.Controller ?? owner;
+        var opponent = ResolveTargetOpponent(trigger);
+        if (opponent is null) return; // no target chosen → no-op
+
+        // Step 1: opponent sacrifices a creature or planeswalker (CR 701.16).
+        SacrificeCreatureOrPlaneswalker(opponent, targetAgent);
+
+        // Step 2: opponent discards a card (CR 701.8).
+        OpponentDiscards(opponent, targetAgent);
+
+        // Step 3: opponent loses 3 life (CR 119.3).
+        Fx.LoseLife(opponent, LifeSwing);
+
+        // Step 4: controller draws 1 card (CR 120.1).
+        Fx.DrawCards(controller, 1);
+
+        // Step 5: controller gains 3 life (CR 119.3).
+        Fx.GainLife(controller, LifeSwing);
+    }
+
+    private static Player? ResolveTargetOpponent(TriggeredAbility? trigger)
+    {
+        if (trigger is null
+            || trigger.ChosenTargets.Count == 0
+            || trigger.ChosenTargets[0].Count == 0)
+        {
+            return null;
+        }
+        return trigger.ChosenTargets[0][0] as Player;
+    }
+
+    private static void SacrificeCreatureOrPlaneswalker(Player opponent, IPlayerAgent? targetAgent)
+    {
+        // CR 101.1 / 305.1 — "creature or planeswalker" = battlefield permanents
+        // with CardType.Creature OR CardType.Planeswalker controlled by opponent.
+        var sacCandidates = opponent.Zones.Battlefield.GetCards()
+            .Where(c => c.HasType(CardType.Creature) || c.HasType(CardType.Planeswalker))
+            .Cast<ICard>()
+            .ToList();
+        if (sacCandidates.Count == 0) return; // no-op for this step only.
+
+        var sacPick = PickSacrificeTarget(opponent, sacCandidates, targetAgent);
+        // CR 701.16 — sacrifice bypasses Indestructible (CR 702.12) and
+        // regeneration (CR 701.15).
+        Fx.Sacrifice(sacPick);
+    }
+
+    private static ICard PickSacrificeTarget(
+        Player opponent,
+        List<ICard> sacCandidates,
+        IPlayerAgent? targetAgent)
+    {
+        if (targetAgent == null) return sacCandidates[0];
+
+        var pick = targetAgent
+            .ChooseFromBattlefieldAsync(opponent, sacCandidates, BotIntent.Removal)
+            .GetAwaiter().GetResult();
+
+        if (pick == null
+            || pick.Zone != ZoneType.Battlefield
+            || (!pick.HasType(CardType.Creature) && !pick.HasType(CardType.Planeswalker))
+            || !ReferenceEquals(pick.Controller, opponent))
+        {
+            return sacCandidates[0];
+        }
+        return pick;
+    }
+
+    private static void OpponentDiscards(Player opponent, IPlayerAgent? targetAgent)
+    {
+        // CR 701.8 — opponent chooses what to discard.
+        var hand = opponent.Zones.Hand.GetCards().ToList();
+        if (hand.Count == 0) return;
+
+        ICard discardPick;
+        if (targetAgent != null)
+        {
+            var pick = targetAgent
+                .ChooseFromHandAsync(opponent, hand.Cast<ICard>().ToList(), BotIntent.Discard)
+                .GetAwaiter().GetResult();
+            discardPick = (pick != null && pick.Zone == ZoneType.Hand) ? pick : hand[0];
+        }
+        else
+        {
+            discardPick = hand[0];
+        }
+
+        opponent.Zones.Hand.RemoveCard(discardPick);
+        opponent.Zones.Graveyard.AddCard(discardPick);
+        discardPick.SetZone(ZoneType.Graveyard);
     }
 }

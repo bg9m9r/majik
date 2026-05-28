@@ -126,63 +126,75 @@ public static class NahirisWrathFactory
                     MaxTargets: int.MaxValue,
                     LegalCandidates: Array.Empty<object>(),
                     Intent: BotIntent.Burn,
-                    CandidateGatherer: ctx =>
-                    {
-                        var candidates = new List<object>();
-                        foreach (var p in ctx.AllPlayers)
-                        {
-                            candidates.Add(p);
-                            foreach (var c in p.Zones.Battlefield.GetCards())
-                            {
-                                if (c.HasType(CardType.Creature)
-                                    || c.HasType(CardType.Planeswalker))
-                                {
-                                    candidates.Add(c);
-                                }
-                            }
-                        }
-                        return candidates;
-                    }),
+                    CandidateGatherer: GatherCandidates),
             },
             EffectFactory: chosen => new IEffect[]
             {
                 new Effect(
                     $"{CardName}: deal total-mv damage to each chosen target",
-                    () =>
-                    {
-                        // CR 202.3 — mana value is computed from the printed
-                        // mana cost. Sum across the discarded set; X in any
-                        // zone other than the stack is 0 (CR 202.3b), which
-                        // ManaCost.Parse already honours.
-                        var total = 0;
-                        foreach (var disc in discardCost.Discarded)
-                        {
-                            total += Majik.Core.ValueObjects.ManaCost
-                                .Parse(disc.ManaCost).TotalValue;
-                        }
-
-                        if (total <= 0) return; // nothing to deal — clean stop.
-                        if (chosen.Targets.Count == 0) return;
-
-                        foreach (var raw in chosen.Targets[0])
-                        {
-                            var live = resolver(raw);
-                            // CR 608.2b — resolution-time legality check
-                            // for each target. DealDamageAny no-ops on
-                            // shapes it doesn't recognise.
-                            switch (live)
-                            {
-                                case Permanent perm when perm.Zone != ZoneType.Battlefield:
-                                    continue;
-                                case Player:
-                                case Creature:
-                                case Planeswalker:
-                                    Fx.DealDamageAny(live, total);
-                                    break;
-                            }
-                        }
-                    }),
+                    () => ResolveDamage(chosen, discardCost, resolver)),
             },
             AdditionalCosts: new IAdditionalCost[] { discardCost });
+    }
+
+    // --- Helpers -----------------------------------------------------------
+
+    private static List<object> GatherCandidates(Majik.Core.Game.GameContext ctx)
+    {
+        var candidates = new List<object>();
+        foreach (var p in ctx.AllPlayers)
+        {
+            candidates.Add(p);
+            foreach (var c in p.Zones.Battlefield.GetCards())
+            {
+                if (c.HasType(CardType.Creature) || c.HasType(CardType.Planeswalker))
+                {
+                    candidates.Add(c);
+                }
+            }
+        }
+        return candidates;
+    }
+
+    private static void ResolveDamage(
+        ChosenSpellParams chosen,
+        DiscardXCardsAdditionalCost discardCost,
+        Func<object, object> resolver)
+    {
+        var total = SumDiscardedManaValue(discardCost);
+        if (total <= 0) return; // nothing to deal — clean stop.
+        if (chosen.Targets.Count == 0) return;
+
+        foreach (var raw in chosen.Targets[0])
+        {
+            DealToLegalTarget(resolver(raw), total);
+        }
+    }
+
+    private static int SumDiscardedManaValue(DiscardXCardsAdditionalCost discardCost)
+    {
+        // CR 202.3 — mana value is computed from the printed mana cost.
+        // X in any zone other than the stack is 0 (CR 202.3b).
+        var total = 0;
+        foreach (var disc in discardCost.Discarded)
+        {
+            total += Majik.Core.ValueObjects.ManaCost.Parse(disc.ManaCost).TotalValue;
+        }
+        return total;
+    }
+
+    private static void DealToLegalTarget(object live, int total)
+    {
+        // CR 608.2b — resolution-time legality check.
+        switch (live)
+        {
+            case Permanent perm when perm.Zone != ZoneType.Battlefield:
+                return;
+            case Player:
+            case Creature:
+            case Planeswalker:
+                Fx.DealDamageAny(live, total);
+                break;
+        }
     }
 }

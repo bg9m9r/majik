@@ -111,49 +111,7 @@ public static class BragoKingEternalFactory
 
         var effect = new Effect(
             $"{CardName}: blink target nonland permanent you control (single-target collapse)",
-            () =>
-            {
-                if (trigger == null) return;
-                if (trigger.ChosenTargets.Count == 0 || trigger.ChosenTargets[0].Count == 0) return;
-
-                if (trigger.ChosenTargets[0][0] is not Permanent target) return;
-
-                // CR 608.2b — resolution-time legality.
-                if (target.Zone != ZoneType.Battlefield) return;
-                if (target.HasType(CardType.Land)) return;
-
-                var myController = card.Controller ?? owner;
-                if (!ReferenceEquals(target.Controller, myController)) return;
-
-                var targetOwner = target.Owner ?? myController;
-
-                // CR 701.21 — exile then CR 614 — return to battlefield
-                // under owner's control in the same resolution. Mirrors
-                // CloudshiftFactory's exile-then-immediate-return shape.
-                if (zones != null)
-                {
-                    zones.MoveCard(target, ZoneType.Battlefield, ZoneType.Exile);
-
-                    if (target.Zone != ZoneType.Exile) return;
-
-                    zones.MoveCard(target, ZoneType.Exile, ZoneType.Battlefield, targetOwner);
-                }
-                else
-                {
-                    // Raw zone manipulation — shape-only path. Mirrors
-                    // CloudshiftFactory's no-service fallthrough.
-                    targetOwner.Zones.Battlefield.RemoveCard(target);
-                    targetOwner.Zones.Exile.AddCard(target);
-                    target.SetZone(ZoneType.Exile);
-
-                    if (target.Zone != ZoneType.Exile) return;
-
-                    targetOwner.Zones.Exile.RemoveCard(target);
-                    targetOwner.Zones.Battlefield.AddCard(target);
-                    target.SetZone(ZoneType.Battlefield);
-                    target.SetController(targetOwner);
-                }
-            });
+            () => ResolveBlinkTrigger(trigger, card, owner, zones));
 
         trigger = new TriggeredAbility(
             source: card,
@@ -187,5 +145,68 @@ public static class BragoKingEternalFactory
         triggers?.RegisterTriggeredAbility(trigger);
 
         return card;
+    }
+
+    // --- Blink resolve (CR 701.21 + CR 614) -------------------------------
+
+    private static void ResolveBlinkTrigger(
+        TriggeredAbility? trigger,
+        Creature card,
+        Player owner,
+        ZoneService? zones)
+    {
+        var target = ResolveLegalBlinkTarget(trigger, card, owner);
+        if (target == null) return;
+
+        var targetOwner = target.Owner ?? card.Controller ?? owner;
+
+        // CR 701.21 — exile then CR 614 — return to battlefield under
+        // owner's control in the same resolution. Mirrors Cloudshift.
+        ExileTarget(target, targetOwner, zones);
+        if (target.Zone != ZoneType.Exile) return;
+        ReturnTargetFromExile(target, targetOwner, zones);
+    }
+
+    private static Permanent? ResolveLegalBlinkTarget(
+        TriggeredAbility? trigger,
+        Creature card,
+        Player owner)
+    {
+        if (trigger == null) return null;
+        if (trigger.ChosenTargets.Count == 0 || trigger.ChosenTargets[0].Count == 0) return null;
+        if (trigger.ChosenTargets[0][0] is not Permanent target) return null;
+
+        // CR 608.2b — resolution-time legality.
+        if (target.Zone != ZoneType.Battlefield) return null;
+        if (target.HasType(CardType.Land)) return null;
+
+        var myController = card.Controller ?? owner;
+        if (!ReferenceEquals(target.Controller, myController)) return null;
+        return target;
+    }
+
+    private static void ExileTarget(Permanent target, Player targetOwner, ZoneService? zones)
+    {
+        if (zones != null)
+        {
+            zones.MoveCard(target, ZoneType.Battlefield, ZoneType.Exile);
+            return;
+        }
+        targetOwner.Zones.Battlefield.RemoveCard(target);
+        targetOwner.Zones.Exile.AddCard(target);
+        target.SetZone(ZoneType.Exile);
+    }
+
+    private static void ReturnTargetFromExile(Permanent target, Player targetOwner, ZoneService? zones)
+    {
+        if (zones != null)
+        {
+            zones.MoveCard(target, ZoneType.Exile, ZoneType.Battlefield, targetOwner);
+            return;
+        }
+        targetOwner.Zones.Exile.RemoveCard(target);
+        targetOwner.Zones.Battlefield.AddCard(target);
+        target.SetZone(ZoneType.Battlefield);
+        target.SetController(targetOwner);
     }
 }
