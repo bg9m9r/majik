@@ -1,7 +1,8 @@
 # Majik — engine + server
 
-[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=bg9m9r_majik&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=bg9m9r_majik)
 [![SonarQube Cloud](https://sonarcloud.io/images/project_badges/sonarcloud-light.svg)](https://sonarcloud.io/summary/new_code?id=bg9m9r_majik)
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=bg9m9r_majik&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=bg9m9r_majik)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=bg9m9r_majik&metric=coverage)](https://sonarcloud.io/summary/new_code?id=bg9m9r_majik)
 
 Open-source Magic: The Gathering rules engine in C# / .NET 10. UI-agnostic, event-driven, state-machine based. Pairs with [`majik.portal`](https://github.com/bg9m9r/majik.portal) (Angular web client) — together they back [majik.tech](https://majik.tech), a free 1v1 client.
 
