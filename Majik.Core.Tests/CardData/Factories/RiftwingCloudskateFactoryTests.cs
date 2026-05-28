@@ -147,7 +147,8 @@ public class RiftwingCloudskateFactoryTests
         var etb = cloudskate.Abilities.OfType<TriggeredAbility>().Single();
         etb.SetChosenTargets(System.Array.Empty<IReadOnlyList<object>>());
 
-        // Should not throw.
-        foreach (var e in etb.Effects) e.Execute();
+        // No targets chosen → resolve-time no-op. Contract: must not throw.
+        var act = () => { foreach (var e in etb.Effects) e.Execute(); };
+        act.Should().NotThrow();
     }
 }

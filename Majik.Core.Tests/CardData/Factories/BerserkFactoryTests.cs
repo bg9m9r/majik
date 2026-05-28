@@ -160,8 +160,11 @@ public class BerserkFactoryTests
             X: null,
             Targets: new IReadOnlyList<object>[] { new object[] { nonCreature } },
             Mana: ManaPayment.Empty);
-        foreach (var e in def.EffectFactory(chosen)) e.Execute();
-        // Clean no-op: must not throw.
+
+        // CR 608.2b — non-Creature resolver result → effect resolves as no-op.
+        // Contract: must not throw.
+        var act = () => { foreach (var e in def.EffectFactory(chosen)) e.Execute(); };
+        act.Should().NotThrow();
     }
 
     // ── Delayed end-step destroy ──────────────────────────────────────────────

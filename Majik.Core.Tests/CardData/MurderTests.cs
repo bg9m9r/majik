@@ -143,9 +143,10 @@ public class MurderTests
         // Targeting a non-creature object (e.g. a raw object token) — no-op.
         var notACreature = new object();
 
-        ResolveRaw(notACreature);
-
-        // No exception thrown; the effect resolves cleanly with no game change.
+        // CR 608.2b — non-Creature target → effect resolves cleanly with no
+        // game change. The contract here is simply "does not throw".
+        var act = () => ResolveRaw(notACreature);
+        act.Should().NotThrow();
     }
 
     // -----------------------------------------------------------------------

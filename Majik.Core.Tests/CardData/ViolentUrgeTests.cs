@@ -223,11 +223,16 @@ public class ViolentUrgeTests
             X: null,
             Targets: new IReadOnlyList<object>[] { new object[] { nonCreature } },
             Mana: ManaPayment.Empty);
-        foreach (var e in def.EffectFactory(chosen)) e.Execute();
 
-        // Clean no-op: nothing to assert beyond "must not throw".
-        var continuous = new ContinuousEffectsService();
-        continuous.ExpireEndOfTurn(); // must not throw
+        // Clean no-op: contract is "must not throw" for an illegal non-creature
+        // target (CR 608.2b).
+        var act = () =>
+        {
+            foreach (var e in def.EffectFactory(chosen)) e.Execute();
+            var continuous = new ContinuousEffectsService();
+            continuous.ExpireEndOfTurn();
+        };
+        act.Should().NotThrow();
     }
 
     // -----------------------------------------------------------------------
