@@ -35,27 +35,31 @@ internal static class SearchSpellFactory
                 _ => false,
             };
             var candidates = caster.Zones.Library.GetCards().Where(Pred).ToList();
-            if (candidates.Count == 0) return;
 
+            // CR 701.19a — LibrarySearch.PromptOnly always prompts the
+            // agent (so a human searcher sees the full library with no
+            // eligible cards highlighted and a single Acknowledge button
+            // even when candidates is empty — the silent-no-op behaviour
+            // that surprised the user on a Green Sun's Zenith into a deck
+            // with zero green creatures is exactly what this helper is
+            // designed to prevent).
             // TODO: remove sync-over-async once IEffect.Execute becomes async.
-            var agent = AgentRegistry.Get(caster);
-            // Thread a GameContext built from ChosenSpellParams.AllPlayers so
-            // LibraryPickPolicy can score against opp board state (4/4 in
-            // play -> prefer removal, board-behind -> prefer creatures).
             var pickCtx = BuildPickContext(caster, p);
-            ICard? pick = agent != null
-                ? agent.ChooseLibraryPickAsync(pickCtx, candidates,
-                    string.IsNullOrEmpty(kindRaw) ? "card" : kindRaw + " card")
-                    .GetAwaiter().GetResult()
-                : candidates[0];
-            if (pick == null) return;
-            caster.Zones.Library.RemoveCard(pick);
-            caster.Zones.Hand.AddCard(pick);
-            pick.SetZone(ZoneType.Hand);
+            var pick = LibrarySearch.PromptOnly(
+                caster, candidates,
+                string.IsNullOrEmpty(kindRaw) ? "card" : kindRaw + " card",
+                pickCtx);
+            if (pick != null)
+            {
+                caster.Zones.Library.RemoveCard(pick);
+                caster.Zones.Hand.AddCard(pick);
+                pick.SetZone(ZoneType.Hand);
+            }
             // CR 701.20a — "If a player searches a library, that library
             // is shuffled afterward." LibraryShuffle pulls the active
             // GameRandom from GameRandomRegistry (deterministic when
             // tests seed it) and publishes a LibraryShuffledEvent.
+            // Shuffles whether or not a card was actually found.
             LibraryShuffle.ShuffleLibrary(caster, $"search/{kindRaw}");
         }) });
 
@@ -78,46 +82,49 @@ internal static class SearchSpellFactory
             }
 
             var candidates = caster.Zones.Library.GetCards().Where(Pred).ToList();
-            if (candidates.Count == 0) return;
 
-            var agent = AgentRegistry.Get(caster);
+            // CR 701.19a — prompt agent even on zero candidates so the
+            // human searcher sees the failed search rather than a silent
+            // no-op (see LibrarySearch xmldoc).
             var pickCtx = BuildPickContext(caster, p);
-            ICard? pick = agent != null
-                ? agent.ChooseLibraryPickAsync(pickCtx, candidates,
-                    kindRaw.Contains("basic", StringComparison.OrdinalIgnoreCase)
-                        ? "basic land card" : "land card")
-                    .GetAwaiter().GetResult()
-                : candidates[0];
-            if (pick == null) return;
-            // CR 603.6a / CR 614 — route through ZoneService so ETB
-            // triggers (bounce-land bounce, Amulet of Vigor untap) and
-            // enters-tapped replacements fire on the tutored land. The
-            // registry lookup falls back to raw mutation when no live
-            // service is wired (shape / dispatcher-test path).
-            var zones = ZoneServiceRegistry.Get(caster);
-            if (zones != null)
+            var pick = LibrarySearch.PromptOnly(
+                caster, candidates,
+                kindRaw.Contains("basic", StringComparison.OrdinalIgnoreCase)
+                    ? "basic land card" : "land card",
+                pickCtx);
+            if (pick != null)
             {
-                zones.MoveCard(pick, ZoneType.Library, ZoneType.Battlefield, caster);
-                if (tapped && pick is Permanent permTapped && !permTapped.IsTapped)
+                // CR 603.6a / CR 614 — route through ZoneService so ETB
+                // triggers (bounce-land bounce, Amulet of Vigor untap) and
+                // enters-tapped replacements fire on the tutored land. The
+                // registry lookup falls back to raw mutation when no live
+                // service is wired (shape / dispatcher-test path).
+                var zones = ZoneServiceRegistry.Get(caster);
+                if (zones != null)
                 {
-                    // Printed "tapped" rider — tap AFTER ZoneService.MoveCard
-                    // so any ETB-tapped replacement (shock lands, bounce
-                    // lands) has already applied. Double-tapping a tapped
-                    // permanent is a no-op; an Amulet-of-Vigor untap trigger
-                    // is already pending from the move, so the post-move
-                    // tap doesn't suppress it.
-                    permTapped.Tap();
+                    zones.MoveCard(pick, ZoneType.Library, ZoneType.Battlefield, caster);
+                    if (tapped && pick is Permanent permTapped && !permTapped.IsTapped)
+                    {
+                        // Printed "tapped" rider — tap AFTER ZoneService.MoveCard
+                        // so any ETB-tapped replacement (shock lands, bounce
+                        // lands) has already applied. Double-tapping a tapped
+                        // permanent is a no-op; an Amulet-of-Vigor untap trigger
+                        // is already pending from the move, so the post-move
+                        // tap doesn't suppress it.
+                        permTapped.Tap();
+                    }
+                }
+                else
+                {
+                    caster.Zones.Library.RemoveCard(pick);
+                    caster.Zones.Battlefield.AddCard(pick);
+                    pick.SetZone(ZoneType.Battlefield);
+                    if (tapped && pick is Permanent perm)
+                        perm.Tap();
                 }
             }
-            else
-            {
-                caster.Zones.Library.RemoveCard(pick);
-                caster.Zones.Battlefield.AddCard(pick);
-                pick.SetZone(ZoneType.Battlefield);
-                if (tapped && pick is Permanent perm)
-                    perm.Tap();
-            }
             // CR 701.20a — shuffle after a search effect (see SearchLibrarySpell).
+            // Shuffles whether or not a card was actually found.
             LibraryShuffle.ShuffleLibrary(caster, $"search-land/{kindRaw}");
         }) });
 
@@ -258,30 +265,34 @@ internal static class SearchSpellFactory
                         CardColors.GetColors(c).Contains(targetColor) &&
                         ManaCost.Parse(c.ManaCost).TotalValue <= x)
                     .ToList();
-                if (candidates.Count == 0) return;
 
-                var agent = AgentRegistry.Get(caster);
+                // CR 701.19a — prompt agent even on zero candidates (see
+                // LibrarySearch xmldoc). This is the exact path that
+                // silently no-op'd when a user cast GSZ into a deck with
+                // no green creatures matching the chosen X.
                 var pickCtx = BuildPickContext(caster, p);
-                ICard? pick = agent != null
-                    ? agent.ChooseLibraryPickAsync(pickCtx, candidates,
-                        $"{colorRaw} creature card with mana value {x} or less")
-                        .GetAwaiter().GetResult()
-                    : candidates[0];
-                if (pick == null) return;
-                // CR 603.6a — route through ZoneService so ETB triggers
-                // on the tutored creature fire.
-                var zones = ZoneServiceRegistry.Get(caster);
-                if (zones != null)
+                var pick = LibrarySearch.PromptOnly(
+                    caster, candidates,
+                    $"{colorRaw} creature card with mana value {x} or less",
+                    pickCtx);
+                if (pick != null)
                 {
-                    zones.MoveCard(pick, ZoneType.Library, ZoneType.Battlefield, caster);
+                    // CR 603.6a — route through ZoneService so ETB triggers
+                    // on the tutored creature fire.
+                    var zones = ZoneServiceRegistry.Get(caster);
+                    if (zones != null)
+                    {
+                        zones.MoveCard(pick, ZoneType.Library, ZoneType.Battlefield, caster);
+                    }
+                    else
+                    {
+                        caster.Zones.Library.RemoveCard(pick);
+                        caster.Zones.Battlefield.AddCard(pick);
+                        pick.SetZone(ZoneType.Battlefield);
+                    }
                 }
-                else
-                {
-                    caster.Zones.Library.RemoveCard(pick);
-                    caster.Zones.Battlefield.AddCard(pick);
-                    pick.SetZone(ZoneType.Battlefield);
-                }
-                // CR 701.20a — shuffle after a search effect.
+                // CR 701.20a — shuffle after a search effect, regardless
+                // of whether a card was found.
                 LibraryShuffle.ShuffleLibrary(caster, "green-suns-zenith");
             }) };
         });

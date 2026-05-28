@@ -164,6 +164,93 @@ public class PathToExileTests : IDisposable
     }
 
     [Fact]
+    public async Task PathToExile_NoBasicsInLibrary_AgentStillPrompted_LibraryStillShuffled()
+    {
+        // Regression: empty candidate list used to silently no-op on the
+        // agent prompt — a remote (human) Bob would see Path to Exile
+        // exile his creature and... nothing else, no modal, no feedback.
+        // The fix routes through LibrarySearch.PromptOnly which always
+        // calls the agent so the portal can render the full library with
+        // no eligible cards and a single Acknowledge button. CR 701.20a
+        // — the search happened, so the library still shuffles.
+        var bears = new Creature("Grizzly Bears", "{1}{G}", 2, 2);
+        bears.SetOwner(_bob);
+        bears.SetController(_bob);
+        bears.SetZone(ZoneType.Battlefield);
+        _bob.Zones.Battlefield.AddCard(bears);
+
+        // Library has cards but NO basics.
+        var bolt = new Card("Lightning Bolt", "{R}");
+        bolt.AddCardType(CardType.Instant);
+        bolt.SetOwner(_bob);
+        _bob.Zones.Library.AddCard(bolt);
+        bolt.SetZone(ZoneType.Library);
+
+        var recording = new RecordingPickAgent();
+        AgentRegistry.Set(_bob, recording);
+
+        var shuffles = new List<LibraryShuffledEvent>();
+        var shuffleBus = new EventBus();
+        shuffleBus.Subscribe<LibraryShuffledEvent>(shuffles.Add);
+        EventBusRegistry.Set(_bob, shuffleBus);
+
+        try
+        {
+            await CastAndResolveTargeting(bears);
+        }
+        finally
+        {
+            EventBusRegistry.Clear();
+        }
+
+        bears.Zone.Should().Be(ZoneType.Exile);
+
+        // Agent was prompted with empty candidates so the portal modal
+        // would render the full library with no eligible cards.
+        recording.Calls.Should().Be(1);
+        recording.LastCandidates.Should().BeEmpty();
+        recording.LastLabel.Should().Be("basic land card");
+
+        // CR 701.20a — library still shuffled despite zero pick.
+        shuffles.Should().Contain(e => e.Reason == "path-to-exile");
+    }
+
+    /// <summary>
+    /// Records every ChooseLibraryPickAsync invocation, returns null. Used
+    /// to assert that the engine prompts the agent even on empty
+    /// candidates (the silent-no-op regression).
+    /// </summary>
+    private sealed class RecordingPickAgent : IPlayerAgent
+    {
+        public int Calls { get; private set; }
+        public IReadOnlyList<ICard>? LastCandidates { get; private set; }
+        public string? LastLabel { get; private set; }
+
+        public Task<ICard?> ChooseLibraryPickAsync(
+            GameContext? ctx, IReadOnlyList<ICard> candidates, string kindLabel,
+            CancellationToken ct = default)
+        {
+            Calls++;
+            LastCandidates = candidates;
+            LastLabel = kindLabel;
+            return Task.FromResult<ICard?>(null);
+        }
+
+        public Task<PriorityAction> ChoosePriorityActionAsync(GameContext ctx, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<MulliganDecision> ChooseMulliganAsync(GameContext ctx, IReadOnlyList<ICard> hand, int mulligansTaken, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<IReadOnlyList<ICard>> ChooseCardsToBottomAsync(GameContext ctx, IReadOnlyList<ICard> hand, int countToBottom, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<IReadOnlyList<object>> ChooseTargetsAsync(GameContext ctx, TargetRequest request, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<int> ChooseXAsync(GameContext ctx, ICard source, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<int> ChooseModeAsync(GameContext ctx, IReadOnlyList<string> modes, IReadOnlyList<BotIntent>? modeIntents = null, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<IReadOnlyList<Majik.Core.Abilities.ITriggeredAbility>> OrderTriggersAsync(GameContext ctx, IReadOnlyList<Majik.Core.Abilities.ITriggeredAbility> mine, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<ManaPayment> ChooseManaSourcesAsync(GameContext ctx, ManaCost cost, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<CombatPlan> DeclareAttackersAsync(GameContext ctx, IReadOnlyList<Creature> eligibleAttackers, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<BlockPlan> DeclareBlockersAsync(GameContext ctx, IReadOnlyList<Creature> attackers, IReadOnlyList<Creature> eligibleBlockers, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<ScryAction.ScryDecision> ChooseScryDecisionAsync(GameContext? ctx, IReadOnlyList<ICard> peeked, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<SurveilAction.SurveilDecision> ChooseSurveilDecisionAsync(GameContext? ctx, IReadOnlyList<ICard> peeked, CancellationToken ct = default) => throw new NotSupportedException();
+    }
+
+    [Fact]
     public async Task PathToExile_EmptyLibrary_ExilesCreature_NoTutor()
     {
         // Bob controls a Bear and has nothing in his library — exile

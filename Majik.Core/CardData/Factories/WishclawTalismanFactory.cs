@@ -120,23 +120,20 @@ public static class WishclawTalismanFactory
                 // CR 701.19a — search consults the agent. Mirrors
                 // SearchSpellFactory.SearchLibrarySpell ("card") semantics:
                 // an agent-picked candidate goes to hand; null = decline.
+                // LibrarySearch.PromptOnly always prompts the agent even
+                // when candidates is empty so a human searcher sees the
+                // failed search rather than a silent no-op.
                 var candidates = owner.Zones.Library.GetCards().ToList();
-                if (candidates.Count == 0) return;
+                var pick = Majik.Core.Zones.LibrarySearch.PromptOnly(
+                    owner, candidates, "card");
 
-                var agent = AgentRegistry.Get(owner);
-                ICard? pick = agent != null
-                    ? agent.ChooseLibraryPickAsync(
-                        ctx: null,
-                        candidates: candidates,
-                        kindLabel: "card")
-                        .GetAwaiter().GetResult()
-                    : candidates[0];
-                if (pick == null) return;
-
-                owner.Zones.Library.RemoveCard(pick);
-                owner.Zones.Hand.AddCard(pick);
-                pick.SetZone(ZoneType.Hand);
-                // CR 701.20a — shuffle after the search resolves.
+                if (pick != null)
+                {
+                    owner.Zones.Library.RemoveCard(pick);
+                    owner.Zones.Hand.AddCard(pick);
+                    pick.SetZone(ZoneType.Hand);
+                }
+                // CR 701.20a — shuffle whether or not a card was found.
                 Majik.Core.Zones.LibraryShuffle.ShuffleLibrary(owner, "wishclaw-talisman");
             });
 

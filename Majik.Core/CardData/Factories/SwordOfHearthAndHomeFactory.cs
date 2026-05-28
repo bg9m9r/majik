@@ -288,32 +288,24 @@ public static class SwordOfHearthAndHomeFactory
         var candidates = player.Zones.Library.GetCards()
             .Where(c => c.HasType(CardType.Land) && BasicLandNames.Contains(c.Name))
             .ToList();
-        if (candidates.Count == 0)
-        {
-            // CR 701.20a — still shuffle even when search finds nothing.
-            Majik.Core.Zones.LibraryShuffle.ShuffleLibrary(player, "sword-of-hearth-and-home");
-            return;
-        }
 
-        var agent = AgentRegistry.Get(player);
-        ICard? pick = agent != null
-            ? agent.ChooseLibraryPickAsync(ctx: null, candidates, "basic land card")
-                .GetAwaiter().GetResult()
-            : candidates[0];
-        if (pick == null)
-        {
-            Majik.Core.Zones.LibraryShuffle.ShuffleLibrary(player, "sword-of-hearth-and-home");
-            return;
-        }
+        // CR 701.19a — prompt agent even on zero candidates so the human
+        // searcher sees the failed search (see LibrarySearch xmldoc).
+        var pick = Majik.Core.Zones.LibrarySearch.PromptOnly(
+            player, candidates, "basic land card");
 
-        player.Zones.Library.RemoveCard(pick);
-        player.Zones.Battlefield.AddCard(pick);
-        pick.SetZone(ZoneType.Battlefield);
-        pick.SetController(player);
-        if (pick is Permanent perm)
+        if (pick != null)
         {
-            perm.Tap();
+            player.Zones.Library.RemoveCard(pick);
+            player.Zones.Battlefield.AddCard(pick);
+            pick.SetZone(ZoneType.Battlefield);
+            pick.SetController(player);
+            if (pick is Permanent perm)
+            {
+                perm.Tap();
+            }
         }
+        // CR 701.20a — shuffle whether or not a card was found.
         Majik.Core.Zones.LibraryShuffle.ShuffleLibrary(player, "sword-of-hearth-and-home");
     }
 }

@@ -138,17 +138,15 @@ public static class GreenSunsZenithFactory
                                 CardColors.GetColors(c).Contains(ManaColor.Green) &&
                                 ManaCost.Parse(c.ManaCost).TotalValue <= x)
                             .ToList();
-                        if (candidates.Count == 0) return;
 
-                        var agent = AgentRegistry.Get(caster);
-                        ICard? pick = agent != null
-                            ? agent.ChooseLibraryPickAsync(
-                                ctx: null,
-                                candidates: candidates,
-                                kindLabel: $"green creature card with mana value {x} or less")
-                                .GetAwaiter().GetResult()
-                            : candidates[0];
-                        if (pick == null) return;
+                        // CR 701.19a — LibrarySearch.PromptOnly always
+                        // prompts the agent (even when candidates is empty,
+                        // so a human searcher sees the full library with
+                        // no eligible cards and a single Acknowledge
+                        // button rather than the spell silently no-opping).
+                        var pick = Majik.Core.Zones.LibrarySearch.PromptOnly(
+                            caster, candidates,
+                            $"green creature card with mana value {x} or less");
 
                         // CR 603.6a — prefer caller-supplied zoneService;
                         // fall back to ZoneServiceRegistry so the
@@ -157,22 +155,26 @@ public static class GreenSunsZenithFactory
                         // is invoked without an explicit service ref.
                         var effectiveZones = zoneService
                             ?? Majik.Core.Services.ZoneServiceRegistry.Get(caster);
-                        if (effectiveZones != null)
+                        if (pick != null)
                         {
-                            effectiveZones.MoveCard(
-                                pick, ZoneType.Library, ZoneType.Battlefield, caster);
+                            if (effectiveZones != null)
+                            {
+                                effectiveZones.MoveCard(
+                                    pick, ZoneType.Library, ZoneType.Battlefield, caster);
+                            }
+                            else
+                            {
+                                // Direct mutation fallback — same shape used by
+                                // SearchSpellFactory.GreenSunsZenithSpell. ETB
+                                // triggers won't fire because no event publishes.
+                                caster.Zones.Library.RemoveCard(pick);
+                                caster.Zones.Battlefield.AddCard(pick);
+                                pick.SetZone(ZoneType.Battlefield);
+                                pick.SetController(caster);
+                            }
                         }
-                        else
-                        {
-                            // Direct mutation fallback — same shape used by
-                            // SearchSpellFactory.GreenSunsZenithSpell. ETB
-                            // triggers won't fire because no event publishes.
-                            caster.Zones.Library.RemoveCard(pick);
-                            caster.Zones.Battlefield.AddCard(pick);
-                            pick.SetZone(ZoneType.Battlefield);
-                            pick.SetController(caster);
-                        }
-                        // CR 701.20a — shuffle after a search effect.
+                        // CR 701.20a — shuffle after the search effect,
+                        // whether or not a card was actually found.
                         Majik.Core.Zones.LibraryShuffle.ShuffleLibrary(caster, "green-suns-zenith");
                     }),
                     new Effect("Green Sun's Zenith: shuffle self into owner's library", () =>

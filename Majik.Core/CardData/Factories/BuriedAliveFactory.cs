@@ -102,7 +102,6 @@ public static class BuriedAliveFactory
 
     private static void Resolve(Player caster, ZoneService? zones)
     {
-        var agent = AgentRegistry.Get(caster);
         var effectiveZones = zones ?? ZoneServiceRegistry.Get(caster);
 
         // Track already-picked cards so the second / third prompt cannot
@@ -117,15 +116,16 @@ public static class BuriedAliveFactory
                 .Where(c => c.HasType(CardType.Creature))
                 .Where(c => !alreadyPicked.Contains(c))
                 .ToList();
-            if (candidates.Count == 0) break;
+            // CR 701.19a — on the FIRST slot always prompt the agent
+            // (even with empty candidates so a human searcher SEES the
+            // failed search). Subsequent slots short-circuit on empty
+            // candidates since the player has already acknowledged the
+            // search and there's nothing more to surface.
+            if (candidates.Count == 0 && i > 0) break;
 
-            ICard? pick = agent != null
-                ? agent.ChooseLibraryPickAsync(
-                        ctx: null,
-                        candidates: candidates,
-                        kindLabel: $"creature card #{i + 1} of up to {MaxCreatureCount}")
-                    .GetAwaiter().GetResult()
-                : candidates[0];
+            var pick = Majik.Core.Zones.LibrarySearch.PromptOnly(
+                caster, candidates,
+                $"creature card #{i + 1} of up to {MaxCreatureCount}");
 
             // CR 701.19a — "find nothing" / decline short-circuits the
             // remaining picks (the printed "up to three" caps but doesn't
