@@ -9,7 +9,13 @@ public class BotDeckCatalogTests
     [Fact]
     public void Catalog_ContainsAllArchetypes()
     {
-        BotDeckCatalog.Archetypes.Should().BeEquivalentTo(new[] { "Burn", "Prowess", "BorosEnergy", "Yawg" });
+        BotDeckCatalog.Archetypes.Should().BeEquivalentTo(new[]
+        {
+            "Burn", "Prowess", "BorosEnergy", "Yawg",
+            "Affinity", "RubyStorm", "Belcher", "GoryoVengeance", "LivingEnd",
+            "EldraziTron", "GrixisReanimator", "DimirMidrange", "EldraziRamp",
+            "Neobrand", "EsperBlink", "SultaiMidrange", "MonoBlackMidrange",
+        });
     }
 
     [Fact]
