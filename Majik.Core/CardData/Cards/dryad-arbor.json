@@ -3,6 +3,7 @@
   "types": ["Creature", "Land"],
   "subtypes": ["Forest", "Dryad"],
   "manaCost": "",
+  "colors": ["G"],
   "power": 1,
   "toughness": 1,
   "abilities": [

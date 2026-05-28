@@ -104,6 +104,33 @@ public class SummonersPactTests
     }
 
     [Fact]
+    public void Resolve_DryadArborInLibrary_IsTutoredToHand()
+    {
+        // Regression: Dryad Arbor's color is set by a color indicator
+        // (CR 202.2c), not by mana-cost pips. Before honoring the
+        // indicator, Summoner's Pact silently filtered Dryad Arbor out of
+        // its "green creature card" candidate list and either picked
+        // nothing or skipped to the next match. Pinning the indicator path
+        // here gives Summoner's Pact its own regression coverage parallel
+        // to GreenSunsZenithTests.Resolve_XEquals0_TutorsDryadArborOntoBattlefield.
+        var arbor = DryadArborFactory.Create(_alice);
+        _alice.Zones.Library.AddCard(arbor);
+        arbor.SetZone(ZoneType.Library);
+
+        var def = SummonersPactFactory.BuildDefinition(_alice, triggers: null);
+        var chosen = new ChosenSpellParams(
+            ModeIndex: null, X: null,
+            Targets: Array.Empty<IReadOnlyList<object>>(),
+            Mana: ManaPayment.Empty);
+
+        foreach (var effect in def.EffectFactory(chosen)) effect.Execute();
+
+        arbor.Zone.Should().Be(ZoneType.Hand);
+        _alice.Zones.Hand.GetCards().Should().Contain(arbor);
+        _alice.Zones.Library.GetCards().Should().NotContain(arbor);
+    }
+
+    [Fact]
     public void Resolve_NoGreenCreatureInLibrary_IsNoOp()
     {
         var goblin = MakeCreatureInLibrary("Goblin Guide", "{R}", _alice);

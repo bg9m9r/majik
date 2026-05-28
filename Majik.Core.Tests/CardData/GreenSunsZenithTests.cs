@@ -209,6 +209,36 @@ public class GreenSunsZenithTests
     // ── ETB trigger fires on the tutored creature ─────────────────────────────
 
     [Fact]
+    public void Resolve_XEquals0_TutorsDryadArborOntoBattlefield()
+    {
+        // Regression: Green Sun's Zenith for X=0 with Dryad Arbor in the
+        // library used to silently no-op because Dryad Arbor has no mana
+        // cost and CardColors.GetColors only looked at mana-cost pips —
+        // so it was filtered out by the colour predicate. Now that
+        // CardColors honours the color indicator (CR 202.2c), Dryad Arbor
+        // is a legal green-creature target for GSZ X=0 (mana value 0 ≤ 0).
+        var bus = new EventBus();
+        var zones = new ZoneService(bus);
+        var caster = new Player("Alice", 20);
+        var gsz = GreenSunsZenithFactory.Create(caster);
+        caster.Zones.Hand.AddCard(gsz);
+        gsz.SetZone(ZoneType.Hand);
+
+        var arbor = DryadArborFactory.Create(caster);
+        caster.Zones.Library.AddCard(arbor);
+        arbor.SetZone(ZoneType.Library);
+
+        AgentRegistry.Set(caster, new DeterministicBotAgent());
+
+        Resolve(GreenSunsZenithFactory.BuildSpellDefinition(caster, gsz, zones), x: 0);
+
+        // Dryad Arbor moved from library to battlefield.
+        arbor.Zone.Should().Be(ZoneType.Battlefield);
+        caster.Zones.Battlefield.GetCards().Should().Contain(arbor);
+        caster.Zones.Library.GetCards().Should().NotContain(arbor);
+    }
+
+    [Fact]
     public void Resolve_WithLiveZoneService_PublishesCardMovedEventForTutoredCreature()
     {
         // When a ZoneService is threaded into BuildSpellDefinition, the
