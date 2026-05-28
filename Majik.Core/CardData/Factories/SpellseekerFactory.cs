@@ -98,22 +98,21 @@ public static class SpellseekerFactory
                         && c.ManaCostValue.TotalValue <= 2)
                     .Cast<ICard>()
                     .ToList();
-                if (candidates.Count == 0) return; // CR 701.19a — empty = no-op.
 
-                var agent = AgentRegistry.Get(controller);
-                ICard? pick = agent != null
-                    ? agent.ChooseLibraryPickAsync(
-                        ctx: null,
-                        candidates,
-                        "instant or sorcery card with mana value 2 or less")
-                        .GetAwaiter().GetResult()
-                    : candidates[0];
-                if (pick == null) return; // CR 701.19a — caster declined.
+                // CR 701.19a — prompt agent even on zero candidates so
+                // the human searcher sees the failed search (see
+                // LibrarySearch xmldoc).
+                var pick = Majik.Core.Zones.LibrarySearch.PromptOnly(
+                    controller, candidates,
+                    "instant or sorcery card with mana value 2 or less");
 
-                controller.Zones.Library.RemoveCard(pick);
-                controller.Zones.Hand.AddCard(pick);
-                pick.SetZone(ZoneType.Hand);
-                // CR 701.20a — shuffle after the search resolves.
+                if (pick != null)
+                {
+                    controller.Zones.Library.RemoveCard(pick);
+                    controller.Zones.Hand.AddCard(pick);
+                    pick.SetZone(ZoneType.Hand);
+                }
+                // CR 701.20a — shuffle whether or not a card was found.
                 LibraryShuffle.ShuffleLibrary(controller, "spellseeker");
             });
 

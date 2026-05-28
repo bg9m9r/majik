@@ -144,49 +144,40 @@ public static class SakuraTribeElderFactory
         var candidates = player.Zones.Library.GetCards()
             .Where(c => c.HasType(CardType.Land) && c.HasSupertype(CardSupertype.Basic))
             .ToList();
-        if (candidates.Count == 0)
-        {
-            // CR 701.20a — still shuffle even when search finds nothing.
-            LibraryShuffle.ShuffleLibrary(player, "sakura-tribe-elder");
-            return;
-        }
 
-        var agent = AgentRegistry.Get(player);
-        ICard? pick = agent != null
-            ? agent.ChooseLibraryPickAsync(ctx: null, candidates, "basic land card")
-                .GetAwaiter().GetResult()
-            : candidates[0];
-        if (pick == null)
-        {
-            LibraryShuffle.ShuffleLibrary(player, "sakura-tribe-elder");
-            return;
-        }
+        // CR 701.19a — prompt agent even on zero candidates so the human
+        // searcher sees the failed search (see LibrarySearch xmldoc).
+        var pick = LibrarySearch.PromptOnly(player, candidates, "basic land card");
 
-        // CR 603.6a / CR 614 — route through ZoneService so ETB triggers
-        // (Amulet of Vigor untap, bounce-land bounce, Lotus Cobra) and
-        // enters-tapped replacements (snow basics) fire on the tutored
-        // basic. The printed "tapped" rider is applied AFTER the move so
-        // any ETB-tapped replacement has already applied; double-tapping
-        // a tapped permanent is a no-op (CR 701.20).
-        var zones = ZoneServiceRegistry.Get(player);
-        if (zones != null)
+        if (pick != null)
         {
-            zones.MoveCard(pick, ZoneType.Library, ZoneType.Battlefield, player);
-            if (pick is Permanent permTapped && !permTapped.IsTapped)
+            // CR 603.6a / CR 614 — route through ZoneService so ETB triggers
+            // (Amulet of Vigor untap, bounce-land bounce, Lotus Cobra) and
+            // enters-tapped replacements (snow basics) fire on the tutored
+            // basic. The printed "tapped" rider is applied AFTER the move so
+            // any ETB-tapped replacement has already applied; double-tapping
+            // a tapped permanent is a no-op (CR 701.20).
+            var zones = ZoneServiceRegistry.Get(player);
+            if (zones != null)
             {
-                permTapped.Tap();
+                zones.MoveCard(pick, ZoneType.Library, ZoneType.Battlefield, player);
+                if (pick is Permanent permTapped && !permTapped.IsTapped)
+                {
+                    permTapped.Tap();
+                }
+            }
+            else
+            {
+                player.Zones.Library.RemoveCard(pick);
+                player.Zones.Battlefield.AddCard(pick);
+                pick.SetZone(ZoneType.Battlefield);
+                pick.SetController(player);
+                if (pick is Permanent perm)
+                    perm.Tap();
             }
         }
-        else
-        {
-            player.Zones.Library.RemoveCard(pick);
-            player.Zones.Battlefield.AddCard(pick);
-            pick.SetZone(ZoneType.Battlefield);
-            pick.SetController(player);
-            if (pick is Permanent perm)
-                perm.Tap();
-        }
 
+        // CR 701.20a — shuffle whether or not a card was found.
         LibraryShuffle.ShuffleLibrary(player, "sakura-tribe-elder");
     }
 }

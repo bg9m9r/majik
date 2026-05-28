@@ -148,34 +148,20 @@ public static class DriftOfPhantasmsFactory
                 }
 
                 var candidates = owner.Zones.Library.GetCards().Where(Pred).ToList();
-                if (candidates.Count == 0)
+
+                // CR 701.19a — prompt agent even on zero candidates so
+                // the human searcher sees the failed search (see
+                // LibrarySearch xmldoc).
+                var pick = Majik.Core.Zones.LibrarySearch.PromptOnly(
+                    owner, candidates, $"card with mana value {targetMv}");
+
+                if (pick != null)
                 {
-                    // CR 701.19a — declining / empty candidate set is a
-                    // clean no-op; still shuffle the library since "search"
-                    // happened (CR 701.20a).
-                    LibraryShuffle.ShuffleLibrary(owner, "drift-of-phantasms");
-                    return;
+                    owner.Zones.Library.RemoveCard(pick);
+                    owner.Zones.Hand.AddCard(pick);
+                    pick.SetZone(ZoneType.Hand);
                 }
-
-                var agent = AgentRegistry.Get(owner);
-                ICard? pick = agent != null
-                    ? agent.ChooseLibraryPickAsync(
-                        ctx: null,
-                        candidates,
-                        $"card with mana value {targetMv}")
-                        .GetAwaiter().GetResult()
-                    : candidates[0];
-
-                if (pick == null)
-                {
-                    // CR 701.19a — caster declined; still shuffle.
-                    LibraryShuffle.ShuffleLibrary(owner, "drift-of-phantasms");
-                    return;
-                }
-
-                owner.Zones.Library.RemoveCard(pick);
-                owner.Zones.Hand.AddCard(pick);
-                pick.SetZone(ZoneType.Hand);
+                // CR 701.20a — shuffle whether or not a card was found.
                 LibraryShuffle.ShuffleLibrary(owner, "drift-of-phantasms");
             });
 

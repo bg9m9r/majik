@@ -279,4 +279,97 @@ public class GreenSunsZenithTests
             ReferenceEquals(e.Card, gsz)
             && e.ToZone == ZoneType.Library);
     }
+
+    // ── Empty-candidates UX: prompt agent + still shuffle ────────────────────
+
+    // Test-only agent that records every ChooseLibraryPickAsync call.
+    // The pre-fix bug: when no green creature matched, the engine never
+    // called this method — the player just saw the spell resolve into the
+    // void. The fix: even with zero candidates, the agent gets the prompt
+    // (so a portal-rendered library modal can show the empty result with a
+    // single Acknowledge button) and the library still shuffles per
+    // CR 701.20a.
+    private sealed class RecordingAgent : IPlayerAgent
+    {
+        public int LibraryPickCalls { get; private set; }
+        public IReadOnlyList<ICard>? LastCandidates { get; private set; }
+        public string? LastLabel { get; private set; }
+
+        public Task<ICard?> ChooseLibraryPickAsync(
+            GameContext? ctx,
+            IReadOnlyList<ICard> candidates,
+            string kindLabel,
+            CancellationToken ct = default)
+        {
+            LibraryPickCalls++;
+            LastCandidates = candidates;
+            LastLabel = kindLabel;
+            return Task.FromResult<ICard?>(candidates.FirstOrDefault());
+        }
+
+        // Unused — throw so any unintended invocation fails loudly.
+        public Task<PriorityAction> ChoosePriorityActionAsync(GameContext ctx, CancellationToken ct = default) => throw new NotImplementedException();
+        public Task<MulliganDecision> ChooseMulliganAsync(GameContext ctx, IReadOnlyList<ICard> hand, int mulligansTaken, CancellationToken ct = default) => throw new NotImplementedException();
+        public Task<IReadOnlyList<ICard>> ChooseCardsToBottomAsync(GameContext ctx, IReadOnlyList<ICard> hand, int countToBottom, CancellationToken ct = default) => throw new NotImplementedException();
+        public Task<IReadOnlyList<object>> ChooseTargetsAsync(GameContext ctx, TargetRequest request, CancellationToken ct = default) => throw new NotImplementedException();
+        public Task<int> ChooseXAsync(GameContext ctx, ICard source, CancellationToken ct = default) => throw new NotImplementedException();
+        public Task<int> ChooseModeAsync(GameContext ctx, IReadOnlyList<string> modes, IReadOnlyList<Majik.Core.Cards.BotIntent>? modeIntents = null, CancellationToken ct = default) => throw new NotImplementedException();
+        public Task<IReadOnlyList<Majik.Core.Abilities.ITriggeredAbility>> OrderTriggersAsync(GameContext ctx, IReadOnlyList<Majik.Core.Abilities.ITriggeredAbility> mine, CancellationToken ct = default) => throw new NotImplementedException();
+        public Task<ManaPayment> ChooseManaSourcesAsync(GameContext ctx, ManaCost cost, CancellationToken ct = default) => throw new NotImplementedException();
+        public Task<Majik.Core.Players.Agents.CombatPlan> DeclareAttackersAsync(GameContext ctx, IReadOnlyList<Creature> eligibleAttackers, CancellationToken ct = default) => throw new NotImplementedException();
+        public Task<Majik.Core.Players.Agents.BlockPlan> DeclareBlockersAsync(GameContext ctx, IReadOnlyList<Creature> attackers, IReadOnlyList<Creature> eligibleBlockers, CancellationToken ct = default) => throw new NotImplementedException();
+        public Task<Majik.Core.Keywords.ScryAction.ScryDecision> ChooseScryDecisionAsync(GameContext? ctx, IReadOnlyList<ICard> peeked, CancellationToken ct = default) => throw new NotImplementedException();
+        public Task<Majik.Core.Keywords.SurveilAction.SurveilDecision> ChooseSurveilDecisionAsync(GameContext? ctx, IReadOnlyList<ICard> peeked, CancellationToken ct = default) => throw new NotImplementedException();
+    }
+
+    [Fact]
+    public void Resolve_NoGreenCreatureCandidates_AgentStillPrompted_LibraryStillShuffled()
+    {
+        // Regression: the user's report — cast GSZ into a deck with zero
+        // green creatures, engine silently no-op'd, no UI surfaced. Now
+        // the agent gets the prompt (even with empty candidates) so the
+        // remote-agent UI can render the full library with no eligible
+        // cards and a single Acknowledge button. CR 701.20a still
+        // applies — the search happened, so the library shuffles.
+        var caster = new Player("Alice", 20);
+        var gsz = GreenSunsZenithFactory.Create(caster);
+        caster.Zones.Hand.AddCard(gsz);
+        gsz.SetZone(ZoneType.Hand);
+
+        // Only non-green creatures in the library.
+        MakeCreatureInLibrary("Goblin", "R", caster);
+        MakeCreatureInLibrary("Merfolk", "U", caster);
+
+        var agent = new RecordingAgent();
+        AgentRegistry.Set(caster, agent);
+
+        var shuffles = new List<LibraryShuffledEvent>();
+        var bus = new EventBus();
+        bus.Subscribe<LibraryShuffledEvent>(shuffles.Add);
+        EventBusRegistry.Set(caster, bus);
+        try
+        {
+            Resolve(GreenSunsZenithFactory.BuildSpellDefinition(caster, gsz), x: 99);
+        }
+        finally
+        {
+            EventBusRegistry.Clear();
+        }
+
+        // Agent was prompted (with an empty candidate list) so the human
+        // searcher would see the failed search in the portal modal.
+        agent.LibraryPickCalls.Should().Be(1);
+        agent.LastCandidates.Should().BeEmpty();
+        agent.LastLabel.Should().Contain("green creature").And.Contain("99");
+
+        // Nothing tutored to battlefield (no green creature existed).
+        caster.Zones.Battlefield.GetCards().Should().BeEmpty();
+
+        // CR 701.20a — library still shuffled despite zero pick.
+        shuffles.Should().Contain(e => e.Reason == "green-suns-zenith");
+
+        // GSZ itself still went into its owner's library (printed self-
+        // shuffle override fires regardless of the tutor branch).
+        gsz.Zone.Should().Be(ZoneType.Library);
+    }
 }

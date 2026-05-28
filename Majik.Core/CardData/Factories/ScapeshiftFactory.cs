@@ -156,19 +156,22 @@ public static class ScapeshiftFactory
                 // Agent-driven path: sequential single-land tutors, refiltering
                 // the library each pass so the agent never sees a previously
                 // picked land. Mirrors PrimevalTitanFactory.TutorUpToTwoLandsTapped.
-                var agent = AgentRegistry.Get(caster);
+                // CR 701.19a — on the FIRST slot, always prompt the agent
+                // (even with empty candidates) so a human searcher sees
+                // the failed search. Subsequent slots short-circuit on
+                // empty candidates (the player already acknowledged the
+                // search; nothing more to surface). CR 701.20a — shuffle
+                // once at the end regardless of how many cards were found.
                 for (int slot = 0; slot < sacrificed; slot++)
                 {
                     var candidates = caster.Zones.Library.GetCards()
                         .Where(c => c.HasType(CardType.Land))
                         .ToList();
-                    if (candidates.Count == 0) return;
+                    if (candidates.Count == 0 && slot > 0) break;
 
-                    ICard? pick = agent != null
-                        ? agent.ChooseLibraryPickAsync(ctx: null, candidates, "land card")
-                            .GetAwaiter().GetResult()
-                        : candidates[0];
-                    if (pick == null) return; // CR 701.19a — decline is legal.
+                    var pick = Majik.Core.Zones.LibrarySearch.PromptOnly(
+                        caster, candidates, "land card");
+                    if (pick == null) break; // CR 701.19a — decline is legal.
 
                     MoveLibraryToBattlefield(caster, pick);
                 }

@@ -219,37 +219,29 @@ public static class GhostQuarterFactory
         var candidates = player.Zones.Library.GetCards()
             .Where(c => c.HasType(CardType.Land) && c.HasSupertype(CardSupertype.Basic))
             .ToList();
-        if (candidates.Count == 0)
+
+        // CR 701.19a — prompt agent even on zero candidates so the human
+        // searcher sees the failed search (see LibrarySearch xmldoc).
+        var pick = Majik.Core.Zones.LibrarySearch.PromptOnly(
+            player, candidates, "basic land card");
+
+        if (pick != null)
         {
-            // CR 701.20a — still shuffle when search finds nothing.
-            LibraryShuffle.ShuffleLibrary(player, "ghost-quarter");
-            return;
+            var zones = ZoneServiceRegistry.Get(player);
+            if (zones != null)
+            {
+                zones.MoveCard(pick, ZoneType.Library, ZoneType.Battlefield, player);
+            }
+            else
+            {
+                player.Zones.Library.RemoveCard(pick);
+                player.Zones.Battlefield.AddCard(pick);
+                pick.SetZone(ZoneType.Battlefield);
+                pick.SetController(player);
+            }
         }
 
-        var agent = AgentRegistry.Get(player);
-        ICard? pick = agent != null
-            ? agent.ChooseLibraryPickAsync(ctx: null, candidates, "basic land card")
-                .GetAwaiter().GetResult()
-            : candidates[0];
-        if (pick == null)
-        {
-            LibraryShuffle.ShuffleLibrary(player, "ghost-quarter");
-            return;
-        }
-
-        var zones = ZoneServiceRegistry.Get(player);
-        if (zones != null)
-        {
-            zones.MoveCard(pick, ZoneType.Library, ZoneType.Battlefield, player);
-        }
-        else
-        {
-            player.Zones.Library.RemoveCard(pick);
-            player.Zones.Battlefield.AddCard(pick);
-            pick.SetZone(ZoneType.Battlefield);
-            pick.SetController(player);
-        }
-
+        // CR 701.20a — shuffle whether or not a card was found.
         LibraryShuffle.ShuffleLibrary(player, "ghost-quarter");
     }
 }

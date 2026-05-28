@@ -81,22 +81,12 @@ public static class ExpeditionMapFactory
                 var candidates = owner.Zones.Library.GetCards()
                     .Where(c => c.HasType(CardType.Land))
                     .ToList();
-                if (candidates.Count == 0)
-                {
-                    // CR 701.19a — no candidate is a legal outcome; still
-                    // shuffle per CR 701.20a since the search occurred.
-                    LibraryShuffle.ShuffleLibrary(owner, "expedition-map");
-                    return;
-                }
 
-                var agent = AgentRegistry.Get(owner);
-                ICard? pick = agent != null
-                    ? agent.ChooseLibraryPickAsync(
-                            ctx: null,
-                            candidates: candidates,
-                            kindLabel: "land card")
-                        .GetAwaiter().GetResult()
-                    : candidates[0];
+                // CR 701.19a — prompt agent even on zero candidates so the
+                // human searcher sees the failed search (see LibrarySearch
+                // xmldoc).
+                var pick = LibrarySearch.PromptOnly(
+                    owner, candidates, "land card");
 
                 if (pick != null)
                 {
@@ -105,7 +95,7 @@ public static class ExpeditionMapFactory
                     pick.SetZone(ZoneType.Hand);
                 }
 
-                // CR 701.20a — shuffle after the search resolves.
+                // CR 701.20a — shuffle whether or not a card was found.
                 LibraryShuffle.ShuffleLibrary(owner, "expedition-map");
             });
 

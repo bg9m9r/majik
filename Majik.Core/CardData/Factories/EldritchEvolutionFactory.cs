@@ -149,40 +149,38 @@ public static class EldritchEvolutionFactory
                             .Where(c => c.HasType(CardType.Creature)
                                         && Majik.Core.ValueObjects.ManaCost.Parse(c.ManaCost).TotalValue <= cap)
                             .ToList();
-                        if (candidates.Count == 0) return;
 
-                        var agent = AgentRegistry.Get(caster);
-                        ICard? pick = agent != null
-                            ? agent.ChooseLibraryPickAsync(
-                                ctx: null,
-                                candidates: candidates,
-                                kindLabel: $"creature card with mana value {cap} or less")
-                                .GetAwaiter().GetResult()
-                            : candidates[0];
+                        // CR 701.19a — prompt agent even on zero candidates
+                        // so the human searcher sees the failed search
+                        // (see LibrarySearch xmldoc).
+                        var pick = Majik.Core.Zones.LibrarySearch.PromptOnly(
+                            caster, candidates,
+                            $"creature card with mana value {cap} or less");
 
-                        // CR 701.19a — agent may decline to find.
-                        if (pick == null) return;
-
-                        // CR 603.6a — prefer caller-supplied zoneService;
-                        // fall back to ZoneServiceRegistry so the
-                        // dispatcher-driven cast flow routes through the
-                        // live ZoneService even when BuildSpellDefinition
-                        // is invoked without an explicit service ref.
-                        var effectiveZones = zoneService
-                            ?? Majik.Core.Services.ZoneServiceRegistry.Get(caster);
-                        if (effectiveZones != null)
+                        if (pick != null)
                         {
-                            effectiveZones.MoveCard(
-                                pick, ZoneType.Library, ZoneType.Battlefield, caster);
+                            // CR 603.6a — prefer caller-supplied zoneService;
+                            // fall back to ZoneServiceRegistry so the
+                            // dispatcher-driven cast flow routes through the
+                            // live ZoneService even when BuildSpellDefinition
+                            // is invoked without an explicit service ref.
+                            var effectiveZones = zoneService
+                                ?? Majik.Core.Services.ZoneServiceRegistry.Get(caster);
+                            if (effectiveZones != null)
+                            {
+                                effectiveZones.MoveCard(
+                                    pick, ZoneType.Library, ZoneType.Battlefield, caster);
+                            }
+                            else
+                            {
+                                caster.Zones.Library.RemoveCard(pick);
+                                caster.Zones.Battlefield.AddCard(pick);
+                                pick.SetZone(ZoneType.Battlefield);
+                                pick.SetController(caster);
+                            }
                         }
-                        else
-                        {
-                            caster.Zones.Library.RemoveCard(pick);
-                            caster.Zones.Battlefield.AddCard(pick);
-                            pick.SetZone(ZoneType.Battlefield);
-                            pick.SetController(caster);
-                        }
-                        // CR 701.20a — shuffle after a search effect.
+                        // CR 701.20a — shuffle after a search effect,
+                        // whether or not a card was found.
                         Majik.Core.Zones.LibraryShuffle.ShuffleLibrary(caster, "eldritch-evolution");
                     }),
                     new Effect("Eldritch Evolution: exile self", () =>

@@ -181,7 +181,28 @@ public static class ToothAndNailFactory
     private static IEffect BuildTutorEffect(Player caster) =>
         new Effect("Tooth and Nail — search library for up to two creatures", () =>
         {
-            var picks = PickUpToTwoCreatures(caster.Zones.Library, caster, "creature card");
+            // CR 701.19a — library search. Use LibrarySearch.PromptOnly so
+            // the first prompt fires even with zero candidates (a human
+            // searcher must SEE the failed search rather than the spell
+            // silently no-opping).
+            var picks = new List<ICard>(capacity: MaxCreaturesPerMode);
+            for (var slot = 0; slot < MaxCreaturesPerMode; slot++)
+            {
+                var candidates = caster.Zones.Library.GetCards()
+                    .Where(IsCreature)
+                    .Where(c => !picks.Contains(c))
+                    .ToList();
+                // First slot always prompts (even when empty); subsequent
+                // slots short-circuit on empty candidates since the player
+                // has already acknowledged the search.
+                if (candidates.Count == 0 && slot > 0) break;
+
+                var pick = Majik.Core.Zones.LibrarySearch.PromptOnly(
+                    caster, candidates, "creature card");
+                if (pick == null) break; // CR 701.19a — decline / nothing found.
+                picks.Add(pick);
+            }
+
             foreach (var pick in picks)
             {
                 caster.Zones.Library.RemoveCard(pick);

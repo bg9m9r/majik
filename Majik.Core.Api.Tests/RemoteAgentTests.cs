@@ -1060,6 +1060,53 @@ public class RemoteAgentTests
     }
 
     [Fact]
+    public async Task ChooseLibraryPick_EmptyCandidates_PublishesPromptAndResolvesToNull()
+    {
+        // Companion to the engine-side LibrarySearch refactor: when a tutor
+        // pre-filters down to ZERO candidates, the engine now still prompts
+        // the agent so a human searcher SEES the failed search rather than
+        // a silent no-op. RemoteAgent must:
+        //   1. Publish the prompt (with an empty candidate snapshot list).
+        //   2. Still ship the libraryView (the FULL library) so the portal
+        //      modal can render every card muted with a single Acknowledge
+        //      button.
+        //   3. Resolve cleanly to null when the wire command comes back
+        //      with no SelectedInstanceId.
+        // The library is empty here for simplicity (no cards in the
+        // library to even put in libraryView); the key invariant is
+        // "prompt publishes; submit-null resolves to null".
+        var agent = new RemoteAgent(_alice);
+
+        var task = agent.ChooseLibraryPickAsync(
+            ctx: null,
+            candidates: Array.Empty<ICard>(),
+            kindLabel: "green creature card with mana value 5 or less");
+
+        // Prompt published.
+        agent.HasPending.Should().BeTrue();
+        agent.ExpectedCommandKinds.Should().ContainSingle()
+            .Which.Should().Be(typeof(ChooseLibraryPickCommand));
+
+        // Payload carries an empty Candidates list (the portal renders 0
+        // eligible cards) but still has the kindLabel + libraryView (the
+        // latter mirrors the searcher's library, which is empty in this
+        // setup).
+        agent.PendingPayload.Should().NotBeNull();
+        agent.PendingPayload!.Candidates.Should().NotBeNull();
+        agent.PendingPayload!.Candidates!.Should().BeEmpty();
+        agent.PendingPayload!.Label.Should()
+            .Be("green creature card with mana value 5 or less");
+        agent.PendingPayload!.LibraryView.Should().NotBeNull();
+
+        // Acknowledge / decline: portal sends ChooseLibraryPickCommand
+        // with SelectedInstanceId = null.
+        agent.Submit(new ChooseLibraryPickCommand(SelectedInstanceId: null)
+            { PlayerId = _alice.Id });
+
+        (await task).Should().BeNull();
+    }
+
+    [Fact]
     public async Task ChooseLibraryPick_PromptPayload_ClearedAfterSubmit()
     {
         // Per-prompt payload must not leak past the prompt that owns it —

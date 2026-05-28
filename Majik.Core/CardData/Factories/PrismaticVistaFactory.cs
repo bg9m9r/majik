@@ -102,37 +102,30 @@ public static class PrismaticVistaFactory
         var candidates = player.Zones.Library.GetCards()
             .Where(c => c.HasType(CardType.Land) && c.HasSupertype(CardSupertype.Basic))
             .ToList();
-        if (candidates.Count == 0)
+
+        // CR 701.19a — prompt agent even on zero candidates so the human
+        // searcher sees the failed search rather than a silent no-op
+        // (see LibrarySearch xmldoc).
+        var pick = Majik.Core.Zones.LibrarySearch.PromptOnly(
+            player, candidates, "basic land card");
+
+        if (pick != null)
         {
-            // CR 701.20a — still shuffle even when search finds nothing.
-            Majik.Core.Zones.LibraryShuffle.ShuffleLibrary(player, "prismatic-vista");
-            return;
+            var zones = ZoneServiceRegistry.Get(player);
+            if (zones != null)
+            {
+                zones.MoveCard(pick, ZoneType.Library, ZoneType.Battlefield, player);
+            }
+            else
+            {
+                player.Zones.Library.RemoveCard(pick);
+                player.Zones.Battlefield.AddCard(pick);
+                pick.SetZone(ZoneType.Battlefield);
+                pick.SetController(player);
+            }
         }
 
-        var agent = AgentRegistry.Get(player);
-        ICard? pick = agent != null
-            ? agent.ChooseLibraryPickAsync(ctx: null, candidates, "basic land card")
-                .GetAwaiter().GetResult()
-            : candidates[0];
-        if (pick == null)
-        {
-            Majik.Core.Zones.LibraryShuffle.ShuffleLibrary(player, "prismatic-vista");
-            return;
-        }
-
-        var zones = ZoneServiceRegistry.Get(player);
-        if (zones != null)
-        {
-            zones.MoveCard(pick, ZoneType.Library, ZoneType.Battlefield, player);
-        }
-        else
-        {
-            player.Zones.Library.RemoveCard(pick);
-            player.Zones.Battlefield.AddCard(pick);
-            pick.SetZone(ZoneType.Battlefield);
-            pick.SetController(player);
-        }
-
+        // CR 701.20a — shuffle whether or not a card was found.
         Majik.Core.Zones.LibraryShuffle.ShuffleLibrary(player, "prismatic-vista");
     }
 }

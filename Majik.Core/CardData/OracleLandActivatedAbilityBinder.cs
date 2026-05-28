@@ -133,36 +133,38 @@ public static class OracleLandActivatedAbilityBinder
             .Where(c => c.HasType(CardType.Land)
                      && (c.HasSubtype(subtypeA) || c.HasSubtype(subtypeB)))
             .ToList();
-        if (candidates.Count == 0) return;
 
-        var agent = AgentRegistry.Get(controller);
-        ICard? pick = agent != null
-            ? agent.ChooseLibraryPickAsync(ctx: null, candidates, "land card")
-                .GetAwaiter().GetResult()
-            : candidates[0];
-        if (pick == null) return; // CR 701.19a — declining a successful search is legal.
+        // CR 701.19a — LibrarySearch.PromptOnly always prompts the agent
+        // even when candidates is empty so a human searcher sees the
+        // failed search rather than a silent no-op.
+        var pick = Majik.Core.Zones.LibrarySearch.PromptOnly(
+            controller, candidates, "land card");
 
-        // CR 603.6a / CR 614 — route the Library → Battlefield move through
-        // ZoneService when a live service is registered so the tutored land's
-        // CardMovedEvent fires (drives bounce-land bounce + Amulet of Vigor
-        // untap) and ETB-tapped replacements (shock lands paying 2 life,
-        // bounce/surveil lands always tapped) run. Falls back to raw zone
-        // mutation for the no-service test paths.
-        var zones = ZoneServiceRegistry.Get(controller);
-        if (zones != null)
+        if (pick != null)
         {
-            zones.MoveCard(pick, ZoneType.Library, ZoneType.Battlefield, controller);
-        }
-        else
-        {
-            controller.Zones.Library.RemoveCard(pick);
-            controller.Zones.Battlefield.AddCard(pick);
-            pick.SetZone(ZoneType.Battlefield);
-            pick.SetController(controller);
+            // CR 603.6a / CR 614 — route the Library → Battlefield move through
+            // ZoneService when a live service is registered so the tutored land's
+            // CardMovedEvent fires (drives bounce-land bounce + Amulet of Vigor
+            // untap) and ETB-tapped replacements (shock lands paying 2 life,
+            // bounce/surveil lands always tapped) run. Falls back to raw zone
+            // mutation for the no-service test paths.
+            var zones = ZoneServiceRegistry.Get(controller);
+            if (zones != null)
+            {
+                zones.MoveCard(pick, ZoneType.Library, ZoneType.Battlefield, controller);
+            }
+            else
+            {
+                controller.Zones.Library.RemoveCard(pick);
+                controller.Zones.Battlefield.AddCard(pick);
+                pick.SetZone(ZoneType.Battlefield);
+                pick.SetController(controller);
+            }
         }
 
         // CR 701.19c — "then shuffle." Route through the shared library-shuffle
-        // helper for parity with FetchLandCycleFactory.
+        // helper for parity with FetchLandCycleFactory. Shuffles whether or
+        // not a card was actually found.
         Majik.Core.Zones.LibraryShuffle.ShuffleLibrary(controller, "fetch-land");
     }
 }
