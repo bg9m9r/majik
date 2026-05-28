@@ -1228,6 +1228,118 @@ public class RemoteAgentTests
         agent.HasPending.Should().BeFalse();
     }
 
+    // -----------------------------------------------------------------------
+    // CR 117.x / 605.1 — Yes/No prompt (shock-land "pay 2 life?" choice)
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task ChooseYesNo_Submit_ResolvesToAnswer_True()
+    {
+        // CR 117.x — optional "may" prompt. RemoteAgent must stash a
+        // YesNoView on the prompt payload and resolve the bool when the
+        // client submits a ChooseYesNoCommand.
+        var agent = new RemoteAgent(_alice);
+
+        var task = agent.ChooseYesNoAsync(
+            ctx: null,
+            question: "Pay 2 life for Overgrown Tomb to enter untapped?",
+            sourceCardName: "Overgrown Tomb");
+        agent.HasPending.Should().BeTrue();
+        agent.ExpectedCommandKinds.Should().ContainSingle()
+            .Which.Should().Be(typeof(ChooseYesNoCommand));
+
+        agent.Submit(new ChooseYesNoCommand(Answer: true) { PlayerId = _alice.Id });
+        var answer = await task;
+
+        answer.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ChooseYesNo_Submit_ResolvesToAnswer_False()
+    {
+        var agent = new RemoteAgent(_alice);
+
+        var task = agent.ChooseYesNoAsync(
+            ctx: null,
+            question: "Pay 2 life for Steam Vents to enter untapped?",
+            sourceCardName: "Steam Vents");
+        agent.Submit(new ChooseYesNoCommand(Answer: false) { PlayerId = _alice.Id });
+
+        (await task).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ChooseYesNo_PromptPayload_CarriesYesNoView()
+    {
+        // The portal needs the question + source card label to render the
+        // modal title and copy — the engine attaches both onto the
+        // PendingPayload so GameFacade.BuildPrompt can forward them.
+        var agent = new RemoteAgent(_alice);
+
+        _ = agent.ChooseYesNoAsync(
+            ctx: null,
+            question: "Pay 2 life for Overgrown Tomb to enter untapped?",
+            sourceCardName: "Overgrown Tomb");
+
+        agent.PendingPayload.Should().NotBeNull();
+        var view = agent.PendingPayload!.YesNoView;
+        view.Should().NotBeNull();
+        view!.Question.Should().Be("Pay 2 life for Overgrown Tomb to enter untapped?");
+        view.SourceCardName.Should().Be("Overgrown Tomb");
+        view.YesLabel.Should().Be("Yes", "default label when caller doesn't override");
+        view.NoLabel.Should().Be("No", "default label when caller doesn't override");
+        await Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task ChooseYesNo_NullSourceCardName_Allowed()
+    {
+        // Not every Yes/No prompt has a source card (future may-clauses
+        // attached to spells / abilities without a permanent context).
+        // The payload must accept null SourceCardName without throwing.
+        var agent = new RemoteAgent(_alice);
+
+        var task = agent.ChooseYesNoAsync(
+            ctx: null,
+            question: "Cast it for its alternative cost?",
+            sourceCardName: null);
+
+        agent.PendingPayload!.YesNoView!.SourceCardName.Should().BeNull();
+        agent.PendingPayload!.YesNoView!.Question.Should().Be(
+            "Cast it for its alternative cost?");
+
+        agent.Submit(new ChooseYesNoCommand(Answer: true) { PlayerId = _alice.Id });
+        (await task).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ChooseYesNo_PendingPayload_ClearedAfterSubmit()
+    {
+        var agent = new RemoteAgent(_alice);
+
+        var task = agent.ChooseYesNoAsync(ctx: null, question: "ok?", sourceCardName: "X");
+        agent.PendingPayload.Should().NotBeNull();
+
+        agent.Submit(new ChooseYesNoCommand(Answer: true) { PlayerId = _alice.Id });
+        await task;
+
+        agent.PendingPayload.Should().BeNull();
+        agent.HasPending.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ChooseYesNo_EmptyQuestion_Throws()
+    {
+        var agent = new RemoteAgent(_alice);
+
+        // Argument validation happens synchronously before any Task is
+        // returned — Action wrapper observes it without ThrowAsync.
+        Action act = () => agent.ChooseYesNoAsync(ctx: null, question: "", sourceCardName: "X");
+
+        act.Should().Throw<ArgumentException>();
+        await Task.CompletedTask;
+    }
+
     private sealed class TestStackObject : Majik.Core.Stack.IStackObject
     {
         public Guid Id { get; } = Guid.NewGuid();

@@ -26,6 +26,7 @@ namespace Majik.Core.Api.Commands;
 [JsonDerivedType(typeof(ChooseCardsToBottomCommand), "bottom")]
 [JsonDerivedType(typeof(ChooseLibraryPickCommand), "chooseLibraryPick")]
 [JsonDerivedType(typeof(ChooseSurveilCommand), "chooseSurveil")]
+[JsonDerivedType(typeof(ChooseYesNoCommand), "chooseYesNo")]
 public abstract record GameCommand
 {
     /// <summary>The player who submitted the command.</summary>
@@ -133,3 +134,15 @@ public sealed record ChooseLibraryPickCommand(Guid? SelectedInstanceId) : GameCo
 public sealed record ChooseSurveilCommand(
     IReadOnlyList<Guid> ToGraveyardInstanceIds,
     IReadOnlyList<Guid> TopOrderInstanceIds) : GameCommand;
+
+/// <summary>
+/// CR 117.x / 605.1 — response to a Yes/No prompt
+/// (<see cref="Majik.Core.Players.Agents.IPlayerAgent.ChooseYesNoAsync(Majik.Core.Game.GameContext?,string,string?,System.Threading.CancellationToken)"/>).
+/// <see cref="Answer"/> is the bool the agent answered with — <c>true</c> to
+/// take the optional action ("pay 2 life"), <c>false</c> to decline.
+/// Currently produced by the production shock-land binder-chain
+/// (<c>ShockLandReplacement</c>); reusable by the same pattern for
+/// painlands / slowlands / verge lands / filter lands (deferred — see
+/// PR body).
+/// </summary>
+public sealed record ChooseYesNoCommand(bool Answer) : GameCommand;

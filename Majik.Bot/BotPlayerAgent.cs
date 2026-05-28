@@ -94,4 +94,22 @@ public sealed class BotPlayerAgent : IPlayerAgent
 
     public Task<ICard?> ChooseLibraryPickAsync(GameContext? ctx, IReadOnlyList<ICard> candidates, string kindLabel, CancellationToken ct = default)
         => WrapAsync(() => _strategy.PickLibraryCard(ctx, _self, candidates, kindLabel), ct);
+
+    /// <summary>
+    /// CR 117.x / 605.1 — wire-shaped Yes/No prompt. Heuristic posture:
+    /// always accept. Shock-land "pay 2 life to enter untapped?" is the
+    /// only current caller and bots want to curve out, so paying is the
+    /// strictly better choice in nearly every game state (the alternative
+    /// is a tapped land, which delays the next-turn curve). Smarter
+    /// per-context overrides can land later (e.g. decline at low life
+    /// or under specific aggro pressure); the simple "yes" baseline keeps
+    /// the bot's mana on schedule and matches the way real ladder players
+    /// play untapped shocks by default.
+    /// </summary>
+    public Task<bool> ChooseYesNoAsync(
+        GameContext? ctx,
+        string question,
+        string? sourceCardName,
+        CancellationToken ct = default)
+        => WrapAsync(() => true, ct);
 }

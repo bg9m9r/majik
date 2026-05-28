@@ -120,7 +120,35 @@ public sealed record PromptDto(
     /// Privacy: shipped per-recipient like <see cref="LibraryView"/>, never
     /// broadcast to opponents or spectators.
     /// </summary>
-    IReadOnlyList<CardSnapshotDto>? SurveilView = null);
+    IReadOnlyList<CardSnapshotDto>? SurveilView = null,
+    /// <summary>
+    /// CR 117.x / 605.1 — Yes/No prompt envelope (e.g. shock-land
+    /// "pay 2 life?" choice). Non-null only on Yes/No prompts; null on
+    /// every other prompt kind. The portal renders a modal showing
+    /// <see cref="YesNoViewDto.Question"/> (and, when present,
+    /// <see cref="YesNoViewDto.SourceCardName"/> as the modal header so
+    /// the player knows which permanent triggered the prompt), and
+    /// dispatches a <c>ChooseYesNoCommand</c> with the bool answer on
+    /// click.
+    /// </summary>
+    YesNoViewDto? YesNoView = null);
+
+/// <summary>
+/// Per-prompt body for CR 117.x / 605.1 Yes/No prompts surfaced on
+/// <see cref="PromptDto.YesNoView"/>. <see cref="YesLabel"/> /
+/// <see cref="NoLabel"/> default to "Yes" / "No" for plain may-clause
+/// prompts; callers (engine-side) may override when the wire UI benefits
+/// from a card-specific phrasing ("Pay 2 life" / "Enter tapped").
+/// <see cref="SourceCardName"/> is optional — set by binder-chain callers
+/// that know the triggering permanent (e.g. shock-land replacement passes
+/// the land's name), so the portal modal can be titled "Overgrown Tomb"
+/// instead of just "Choose".
+/// </summary>
+public sealed record YesNoViewDto(
+    string Question,
+    string YesLabel = "Yes",
+    string NoLabel = "No",
+    string? SourceCardName = null);
 
 /// <summary>
 /// Per-viewer auto-pass policy. Mirrors the portal-side

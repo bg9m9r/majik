@@ -195,6 +195,33 @@ public interface IPlayerAgent
     /// factory written before this prompt shipped.
     /// </para>
     /// </summary>
+    /// <summary>
+    /// Wire-shaped Yes/No prompt for optional "may" clauses (CR 117.x /
+    /// 605.1) that need a source-card label on the prompt envelope (so
+    /// remote UIs can render "Overgrown Tomb: pay 2 life?"). Default
+    /// implementation routes to the legacy
+    /// <see cref="ChooseYesNoAsync(string,BotIntent,CancellationToken)"/>
+    /// with a conservative <see cref="BotIntent.LoseLife"/> | <see cref="BotIntent.CostToDecline"/>
+    /// classifier (matches the shock-land prompt — every current caller is
+    /// the production binder-chain shock-land replacement).
+    /// <para>
+    /// <paramref name="ctx"/> may be <see langword="null"/> in v1 effect
+    /// closures (same sync-over-async wart as
+    /// <see cref="ChooseScryDecisionAsync"/>). <paramref name="sourceCardName"/>
+    /// is optional but, when present, lets remote-agent UIs name the prompt
+    /// after the triggering permanent / spell.
+    /// </para>
+    /// </summary>
+    Task<bool> ChooseYesNoAsync(
+        GameContext? ctx,
+        string question,
+        string? sourceCardName,
+        CancellationToken ct = default)
+        => ChooseYesNoAsync(
+            question,
+            BotIntent.LoseLife | BotIntent.CostToDecline,
+            ct);
+
     Task<bool> ChooseYesNoAsync(
         string question,
         BotIntent intent,

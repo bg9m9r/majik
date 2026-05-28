@@ -338,6 +338,13 @@ public sealed class RemoteAgent : IPlayerAgent
                     new SurveilAction.SurveilDecision(toGy, top));
                 break;
             }
+            case ChooseYesNoCommand yn:
+                // CR 117.x / 605.1 — translate the wire bool answer back
+                // to the engine's TaskCompletionSource<bool>. Submit()
+                // already enforced _pendingKinds so we know the caller
+                // intended this prompt; nothing further to validate.
+                ((TaskCompletionSource<bool>)tcs).SetResult(yn.Answer);
+                break;
             case ChooseLibraryPickCommand lp:
             {
                 // CR 701.19a — translate the wire command into the
@@ -679,6 +686,48 @@ public sealed class RemoteAgent : IPlayerAgent
         }
     }
 
+    /// <summary>
+    /// CR 117.x / 605.1 — wire-shaped Yes/No prompt. Default in
+    /// <see cref="IPlayerAgent"/> delegates to the legacy intent-driven
+    /// overload which is fine for bot agents but auto-decides for remote
+    /// (human) players, so this override stashes a
+    /// <see cref="YesNoViewDto"/> on the prompt payload and awaits a
+    /// <see cref="ChooseYesNoCommand"/> back from the client.
+    /// </summary>
+    public Task<bool> ChooseYesNoAsync(
+        GameContext? ctx,
+        string question,
+        string? sourceCardName,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(question))
+            throw new ArgumentException("Question must be non-empty.", nameof(question));
+        // Mirror ChooseLibraryPickAsync / ChooseSurveilDecisionAsync: stash
+        // before Prompt fires PromptRequested observers, guard by checking
+        // _pending so we don't smear stash on top of a still-pending prompt.
+        if (_pending != null)
+        {
+            throw new InvalidOperationException("A prompt is already pending.");
+        }
+        _pendingPayload = new PromptPayload(
+            Candidates: null,
+            Label: null,
+            LibraryView: null,
+            SurveilView: null,
+            YesNoView: new YesNoViewDto(
+                Question: question,
+                SourceCardName: sourceCardName));
+        try
+        {
+            return Prompt<bool>(ct, typeof(ChooseYesNoCommand));
+        }
+        catch
+        {
+            _pendingPayload = null;
+            throw;
+        }
+    }
+
     private Task<T> Prompt<T>(CancellationToken ct, params Type[] acceptedKinds)
     {
         if (_pending != null)
@@ -731,4 +780,12 @@ public sealed record PromptPayload(
     /// other prompt kind. Privacy posture matches <see cref="LibraryView"/>:
     /// shipped per-recipient, never broadcast.
     /// </summary>
-    IReadOnlyList<CardSnapshotDto>? SurveilView = null);
+    IReadOnlyList<CardSnapshotDto>? SurveilView = null,
+    /// <summary>
+    /// CR 117.x / 605.1 — Yes/No prompt body (question + optional source
+    /// card label + optional Yes/No button overrides). Non-null only on
+    /// Yes/No prompts; null on every other prompt kind.
+    /// <see cref="GameFacade.BuildPrompt"/> forwards this onto
+    /// <see cref="PromptDto.YesNoView"/>.
+    /// </summary>
+    YesNoViewDto? YesNoView = null);
