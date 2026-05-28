@@ -45,11 +45,12 @@ namespace Majik.Core.CardData.Factories;
 ///   the chosen land when an agent is registered; otherwise falls back to
 ///   the first deterministic match. Mirrors the pre-consolidation shape of
 ///   the per-card Misty Rainforest / Scalding Tarn factories.
-/// - Self-sacrifice + 1-life payment are inline in the resolve closure
-///   (same trick as <see cref="WastelandFactory"/>) because
-///   <see cref="AdditionalCost.Sacrifice"/>.Pay() is a no-op stub.
-/// - <see cref="AdditionalCost.Tap"/> is the declared cost so the ability's
-///   <c>CanPay</c> gate still reads correctly.
+/// - <see cref="AdditionalCost.Tap"/>, <see cref="AdditionalCost.PayLife"/>,
+///   and <see cref="AdditionalCost.Sacrifice"/> are all declared as proper
+///   ICosts on the ability (CR 117.5 — the real-card cost is
+///   <c>{T}, Pay 1 life, Sacrifice this land:</c>). CostPayment runs them
+///   atomically before the ability hits the stack so the activator can't
+///   ship a half-paid stub. The resolve closure does only the tutor.
 ///
 /// ## Deferred (v1 gaps)
 /// - <b>Sorcery-speed gate</b>: fetchlands have no printed timing restriction;
@@ -105,22 +106,18 @@ public static class FetchLandCycleFactory
         land.SetOwner(owner);
         land.SetController(owner);
 
-        ActivatedAbility? fetchAbility = null;
+        // CR 117.5 — fetchland cost: {T}, Pay 1 life, Sacrifice this land.
+        // CostPayment runs all three before the ability hits the stack, so
+        // by the time the resolve closure fires the fetchland is already in
+        // the graveyard and 1 life has been spent. The closure only needs
+        // to perform the tutor (CR 701.19a) — no longer responsible for the
+        // sacrifice or the life payment.
         var fetchEffect = new Effect(
             $"{cardName}: search library for {subtypeA} or {subtypeB}, put onto battlefield",
             () =>
             {
-                if (fetchAbility == null) return;
-
-                // Pay 1 life (CR 119.4).
                 var controller = land.Controller ?? land.Owner;
                 if (controller == null) return;
-                controller.LoseLife(1);
-
-                // Self-sacrifice — move this land from battlefield to
-                // owner's graveyard (CR 701.16). Must happen before the
-                // library search so the land is no longer in the library.
-                SacrificeToOwnersGraveyard(land);
 
                 TutorLandToBattlefield(
                     controller,
@@ -128,10 +125,15 @@ public static class FetchLandCycleFactory
                          && (c.HasSubtype(subtypeA) || c.HasSubtype(subtypeB)));
             });
 
-        fetchAbility = new ActivatedAbility(
+        var fetchAbility = new ActivatedAbility(
             source: land,
             controller: owner,
-            costs: new ICost[] { AdditionalCost.Tap(land) },
+            costs: new ICost[]
+            {
+                AdditionalCost.Tap(land),
+                AdditionalCost.PayLife(1),
+                AdditionalCost.Sacrifice(land),
+            },
             effects: new IEffect[] { fetchEffect });
 
         land.AddAbility(fetchAbility);
@@ -147,18 +149,6 @@ public static class FetchLandCycleFactory
         throw new ArgumentException(
             $"FetchLandCycleFactory: '{raw}' is not a valid CardSubtype.",
             nameof(raw));
-    }
-
-    private static void SacrificeToOwnersGraveyard(Land self)
-    {
-        var ownerOfSelf = self.Owner;
-        if (ownerOfSelf == null) return;
-        if (self.Zone != ZoneType.Battlefield) return;
-
-        var holder = self.Controller ?? ownerOfSelf;
-        holder.Zones.Battlefield.RemoveCard(self);
-        ownerOfSelf.Zones.Graveyard.AddCard(self);
-        self.SetZone(ZoneType.Graveyard);
     }
 
     /// <summary>

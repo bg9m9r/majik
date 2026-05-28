@@ -4,7 +4,9 @@ using Majik.Core.CardData;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
+using Majik.Core.Events;
 using Majik.Core.Players;
+using Majik.Core.Services;
 using Majik.Core.Zones;
 using Xunit;
 
@@ -64,8 +66,16 @@ public class CycleFactoryTests
         var land = NamedCardFactory.Create(cardName, _alice);
 
         var ability = land.Abilities.OfType<ActivatedAbility>().Should().ContainSingle().Subject;
-        ability.Costs.OfType<AdditionalCost>()
-            .Should().Contain(ac => ac.CostType == AdditionalCostType.Tap);
+
+        // CR 117.5 — fetchlands have a three-part real-card cost:
+        // {T}, Pay 1 life, Sacrifice this land. The factory must declare all
+        // three as proper ICosts (not bury them in the effect closure) so
+        // CostPayment runs them once and the stack-resolution effect does
+        // only the tutor.
+        var costTypes = ability.Costs.OfType<AdditionalCost>().Select(c => c.CostType).ToList();
+        costTypes.Should().Contain(AdditionalCostType.Tap);
+        costTypes.Should().Contain(AdditionalCostType.PayLife);
+        costTypes.Should().Contain(AdditionalCostType.Sacrifice);
     }
 
     [Theory]
@@ -74,10 +84,13 @@ public class CycleFactoryTests
         string cardName, CardSubtype subtypeA, CardSubtype subtypeB)
     {
         // Stage one basic of each subtype in the library; activating the
-        // fetch should move one of them to the battlefield.
+        // fetch via CostPayment (sacrifice + life) then resolving its
+        // effects (tutor) should move one of them to the battlefield.
         var alice = new Player("Alice", 20);
         var landA = new Land($"Basic-{subtypeA}", new[] { CardSupertype.Basic }, new[] { subtypeA });
         var landB = new Land($"Basic-{subtypeB}", new[] { CardSupertype.Basic }, new[] { subtypeB });
+        landA.SetOwner(alice);
+        landB.SetOwner(alice);
         alice.Zones.Library.AddCard(landA);
         alice.Zones.Library.AddCard(landB);
         landA.SetZone(ZoneType.Library);
@@ -89,6 +102,13 @@ public class CycleFactoryTests
         fetch!.SetZone(ZoneType.Battlefield);
 
         var ability = fetch!.Abilities.OfType<ActivatedAbility>().Single();
+
+        // Drive costs through the real CostPayment pipeline — taps the
+        // fetchland, pays 1 life, sacrifices the fetchland to graveyard.
+        var payer = new CostPayment();
+        payer.PayCosts(alice, ability.Costs);
+
+        // Then the resolve closure tutors a matching land onto the battlefield.
         foreach (var eff in ability.Effects)
         {
             eff.Execute();
@@ -100,10 +120,63 @@ public class CycleFactoryTests
             .Should().HaveCount(1,
                 because: $"{cardName} fetched a {subtypeA} or {subtypeB} land");
 
-        // Fetch land itself sacrificed.
+        // Fetch land itself sacrificed (CR 701.16).
         alice.Zones.Graveyard.GetCards().Should().Contain(fetch);
 
         // Life paid (CR 119.4).
+        alice.LifeTotal.Should().Be(19);
+    }
+
+    [Fact]
+    public void Fetchland_ActivatedThroughGameFlow_SacrificesSelfAndFetches()
+    {
+        // End-to-end: stage a fetchland on the battlefield, two basics in
+        // the library, activate the fetch ability via AbilityActivator (the
+        // production path), then resolve the top of the stack via
+        // StackResolver. This exercises the full bug surface — the activator
+        // must preserve the effect closure when pushing the wrapper onto the
+        // stack, and the resolver must invoke that closure.
+        var alice = new Player("Alice", 20);
+        var forest = new Land("Forest", new[] { CardSupertype.Basic }, new[] { CardSubtype.Forest });
+        var island = new Land("Island", new[] { CardSupertype.Basic }, new[] { CardSubtype.Island });
+        forest.SetOwner(alice);
+        island.SetOwner(alice);
+        alice.Zones.Library.AddCard(forest);
+        alice.Zones.Library.AddCard(island);
+        forest.SetZone(ZoneType.Library);
+        island.SetZone(ZoneType.Library);
+
+        var fetch = NamedCardFactory.Create("Misty Rainforest", alice) as Land;
+        fetch.Should().NotBeNull();
+        alice.Zones.Battlefield.AddCard(fetch!);
+        fetch!.SetZone(ZoneType.Battlefield);
+
+        var ability = fetch!.Abilities.OfType<ActivatedAbility>().Single();
+
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var activator = new AbilityActivator(stack, bus);
+
+        // Live activation: pay costs + push onto the stack.
+        activator.ActivateAbility(ability, alice, targets: null, costs: ability.Costs);
+
+        stack.Count.Should().Be(1, because: "the fetchland ability is on the stack until resolution");
+
+        // Resolve the top — must invoke the tutor effect closure.
+        var resolver = new StackResolver(bus);
+        resolver.ResolveTop(stack);
+
+        // Fetchland sacrificed.
+        alice.Zones.Graveyard.GetCards().Should().Contain(fetch,
+            because: "the Sacrifice additional cost moved Misty Rainforest to the graveyard");
+
+        // One basic should now be on the battlefield.
+        alice.Zones.Battlefield.GetCards()
+            .Where(c => c == forest || c == island)
+            .Should().HaveCount(1,
+                because: "Misty Rainforest tutored a Forest or Island onto the battlefield");
+
+        // Life paid.
         alice.LifeTotal.Should().Be(19);
     }
 

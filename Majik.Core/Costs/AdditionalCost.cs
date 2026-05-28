@@ -1,6 +1,7 @@
 using Majik.Core.Cards;
 using Majik.Core.Domain.Exceptions;
 using Majik.Core.Players;
+using Majik.Core.Services;
 using Majik.Core.Zones;
 
 namespace Majik.Core.Costs;
@@ -124,7 +125,33 @@ public class AdditionalCost : ICost
                 break;
 
             case AdditionalCostType.Sacrifice:
-                // TODO: Move permanent to graveyard (zone service)
+                // CR 701.16 — move the permanent from its controller's
+                // battlefield to its owner's graveyard. Route through
+                // ZoneService when a per-player service is registered so
+                // CardMovedEvent fires (sac triggers — Sakura-Tribe Elder,
+                // Bloodghast, Bridge from Below, Korlash, dredge, etc. all
+                // depend on it) and replacement effects (LTBs) run. Falls
+                // back to raw zone manipulation when no service is
+                // registered (unit-test shape with no live game).
+                if (_costParameter is Cards.Permanent sac)
+                {
+                    var ownerOfSac = sac.Owner;
+                    if (ownerOfSac == null) break;
+                    var holder = sac.Controller ?? ownerOfSac;
+                    if (sac.Zone != ZoneType.Battlefield) break;
+
+                    var zones = ZoneServiceRegistry.Get(holder);
+                    if (zones != null)
+                    {
+                        zones.MoveCard(sac, ZoneType.Battlefield, ZoneType.Graveyard, ownerOfSac);
+                    }
+                    else
+                    {
+                        holder.Zones.Battlefield.RemoveCard(sac);
+                        ownerOfSac.Zones.Graveyard.AddCard(sac);
+                        sac.SetZone(ZoneType.Graveyard);
+                    }
+                }
                 break;
 
             case AdditionalCostType.Discard:

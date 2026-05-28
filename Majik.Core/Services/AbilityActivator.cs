@@ -73,8 +73,28 @@ public class AbilityActivator
         var costList = costs?.ToList() ?? new List<ICost>();
         _costPayment.PayCosts(player, costList);
 
-        // Create activated ability with targets and costs
-        var activatedAbility = new ActivatedAbility(ability.Source, player, targetList, costList);
+        // Create activated ability with targets and costs. CR 602.4 — the
+        // ability that goes on the stack must carry the SAME effects /
+        // target requests / sorcery-speed rider as the original. Previously
+        // the wrapper only got source/controller/targets/costs, so every
+        // non-mana activation resolved to a no-op (fetchlands didn't
+        // sacrifice or fetch, planeswalker abilities didn't fire, etc.).
+        //
+        // When ANY new field is added to ActivatedAbility, mirror it here
+        // or the stack object will be a stub.
+        var sourceAbility = ability as ActivatedAbility;
+        var activatedAbility = new ActivatedAbility(
+            source: ability.Source,
+            controller: player,
+            targets: targetList,
+            costs: costList,
+            effects: sourceAbility?.Effects,
+            targetRequests: sourceAbility?.TargetRequests,
+            sorcerySpeed: ability.IsSorcerySpeed);
+        if (sourceAbility != null && sourceAbility.ChosenTargets.Count > 0)
+        {
+            activatedAbility.SetChosenTargets(sourceAbility.ChosenTargets);
+        }
 
         // Add ability to stack
         _stack.Push(activatedAbility);

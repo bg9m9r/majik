@@ -31,6 +31,18 @@ public static class AgentRegistry
         lock (_lock) { return _agents.TryGetValue(player.Id, out var a) ? a : null; }
     }
 
+    /// <summary>Remove the registration for <paramref name="player"/>. No-op
+    /// when nothing was registered. Per-player removal is safer than
+    /// <see cref="Clear"/> when multiple games run in the same process
+    /// (each <see cref="Player"/> has a unique Guid Id, so the registry
+    /// can hold entries for several live matches at once — clearing would
+    /// rip out everyone else's seats).</summary>
+    public static void Remove(Player player)
+    {
+        if (player is null) return;
+        lock (_lock) { _agents.Remove(player.Id); }
+    }
+
     /// <summary>Remove all registrations (call at game teardown / test cleanup).</summary>
     public static void Clear()
     {
