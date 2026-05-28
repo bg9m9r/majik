@@ -124,25 +124,7 @@ public static class PyromancerAscensionFactory
         // verbatim against the controller's graveyard.
         // ----------------------------------------------------------------
         var questCondition = new EventTriggerCondition<SpellCastEvent>((e, _) =>
-        {
-            if (e.Spell is not Majik.Core.Spells.Spell spell) return false;
-            // Only the Ascension's controller's casts qualify.
-            if (!ReferenceEquals(spell.Controller, card.Controller ?? owner)) return false;
-            var spellCard = spell.Card;
-            if (spellCard is null) return false;
-            if (!spellCard.HasType(CardType.Instant) && !spellCard.HasType(CardType.Sorcery))
-            {
-                return false;
-            }
-            // Same-name match against the controller's graveyard.
-            var controller = card.Controller ?? owner;
-            var name = spellCard.Name;
-            foreach (var raw in controller.Zones.Graveyard.GetCards())
-            {
-                if (raw is Card g && g.Name == name) return true;
-            }
-            return false;
-        });
+            IsQuestTriggerMatch(e, card, owner));
 
         var questEffect = new Effect(
             $"{CardName}: put a quest counter on this enchantment",
@@ -180,24 +162,9 @@ public static class PyromancerAscensionFactory
 
         var copyCondition = new EventTriggerCondition<SpellCastEvent>((e, _) =>
         {
-            if (card.Zone != ZoneType.Battlefield) return false;
-            if (e.Spell is not Majik.Core.Spells.Spell spell) return false;
-            if (!ReferenceEquals(spell.Controller, card.Controller ?? owner)) return false;
-            var spellCard = spell.Card;
-            if (spellCard is null) return false;
-            if (!spellCard.HasType(CardType.Instant) && !spellCard.HasType(CardType.Sorcery))
-            {
-                return false;
-            }
-            // CR 122 — live threshold read on the source. Quest counters
-            // accumulated earlier this turn (via the quest trigger) count
-            // immediately; the queued quest trigger for THIS cast has not
-            // yet resolved (triggers go on the stack), so the threshold
-            // does NOT include a not-yet-placed counter for the current
-            // spell.
-            if (card.Counters.Count(CounterType.Quest) < CopyThreshold) return false;
-            capturedSpell = spell;
-            return true;
+            var matched = IsCopyTriggerMatch(e, card, owner);
+            if (matched) capturedSpell = (Majik.Core.Spells.Spell)e.Spell!;
+            return matched;
         });
 
         var copyEffect = new Effect(
@@ -220,5 +187,48 @@ public static class PyromancerAscensionFactory
         triggers?.RegisterTriggeredAbility(copyTrigger);
 
         return card;
+    }
+
+    // --- Trigger gating helpers (CR 603.1 / 614) --------------------------
+
+    private static bool IsControllerInstantOrSorceryCast(
+        SpellCastEvent e,
+        Enchantment card,
+        Player owner,
+        out Majik.Core.Cards.ICard? spellCard)
+    {
+        spellCard = null;
+        if (e.Spell is not Majik.Core.Spells.Spell s) return false;
+        if (!ReferenceEquals(s.Controller, card.Controller ?? owner)) return false;
+        var sc = s.Card;
+        if (sc is null) return false;
+        if (!sc.HasType(CardType.Instant) && !sc.HasType(CardType.Sorcery)) return false;
+        spellCard = sc;
+        return true;
+    }
+
+    private static bool IsQuestTriggerMatch(SpellCastEvent e, Enchantment card, Player owner)
+    {
+        if (!IsControllerInstantOrSorceryCast(e, card, owner, out var spellCard)) return false;
+        // Same-name match against the controller's graveyard.
+        var controller = card.Controller ?? owner;
+        var name = spellCard!.Name;
+        foreach (var raw in controller.Zones.Graveyard.GetCards())
+        {
+            if (raw is Card g && g.Name == name) return true;
+        }
+        return false;
+    }
+
+    private static bool IsCopyTriggerMatch(SpellCastEvent e, Enchantment card, Player owner)
+    {
+        if (card.Zone != ZoneType.Battlefield) return false;
+        if (!IsControllerInstantOrSorceryCast(e, card, owner, out _)) return false;
+        // CR 122 — live threshold read on the source. Quest counters
+        // accumulated earlier this turn (via the quest trigger) count
+        // immediately; the queued quest trigger for THIS cast has not yet
+        // resolved (triggers go on the stack), so the threshold does NOT
+        // include a not-yet-placed counter for the current spell.
+        return card.Counters.Count(CounterType.Quest) >= CopyThreshold;
     }
 }

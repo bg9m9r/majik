@@ -148,78 +148,95 @@ public static class OtherworldlyJourneyFactory
                 {
                     new Effect(
                         $"{CardName}: exile target creature; return at next end step with +1/+1 counter",
-                        () =>
-                        {
-                            // CR 608.2b — resolution-time legality re-check.
-                            if (target.Zone != ZoneType.Battlefield) return;
-
-                            // CR 701.21 — Exile. Prefer ZoneService so
-                            // CardMovedEvent fires (Touch the Spirit
-                            // Realm / Yorion posture).
-                            if (zones != null)
-                            {
-                                zones.MoveCard(target, ZoneType.Battlefield, ZoneType.Exile);
-                            }
-                            else
-                            {
-                                var fromOwner = target.Owner ?? caster;
-                                fromOwner.Zones.Battlefield.RemoveCard(target);
-                                fromOwner.Zones.Exile.AddCard(target);
-                                target.SetZone(ZoneType.Exile);
-                            }
-
-                            // CR 603.7 — delayed end-step return. Only
-                            // register when a TriggerManager is supplied
-                            // (shape-only fallback per Touch the Spirit
-                            // Realm / Yorion / Wrenn's Resolve).
-                            if (triggers == null) return;
-
-                            var resolvedAt = DateTime.UtcNow;
-                            var returnEffect = new Effect(
-                                $"{CardName} — return exiled creature at next end step with +1/+1 counter (CR 603.7 / CR 614 / CR 122.1c)",
-                                () =>
-                                {
-                                    // CR 111.8 — token guard. CR 614 —
-                                    // "under its owner's control".
-                                    if (target.Zone != ZoneType.Exile) return;
-
-                                    var returnOwner = target.Owner ?? caster;
-
-                                    if (zones != null)
-                                    {
-                                        zones.MoveCard(target, ZoneType.Exile, ZoneType.Battlefield, returnOwner);
-                                    }
-                                    else
-                                    {
-                                        returnOwner.Zones.Exile.RemoveCard(target);
-                                        returnOwner.Zones.Battlefield.AddCard(target);
-                                        target.SetZone(ZoneType.Battlefield);
-                                        target.SetController(returnOwner);
-                                    }
-
-                                    // CR 122.1c — +1/+1 counter on the
-                                    // returned card. Routed through
-                                    // CountersService so Hardened Scales
-                                    // / Doubling Season replacements
-                                    // can rewrite the count via the
-                                    // ReplacementBus.
-                                    if (target.Zone == ZoneType.Battlefield)
-                                    {
-                                        CountersService.Add(target, CounterType.PlusOnePlusOne, 1, replacements);
-                                    }
-                                });
-
-                            var delayed = new DelayedTriggeredAbility(
-                                source: target,
-                                controller: caster,
-                                condition: new EventTriggerCondition<StepStartedEvent>(
-                                    (e, _) => e.StepType == PhaseStateType.End
-                                              && e.Timestamp > resolvedAt),
-                                effects: new IEffect[] { returnEffect });
-
-                            triggers.RegisterDelayed(delayed);
-                        }),
+                        () => ResolveCast(target, caster, triggers, zones, replacements)),
                 };
             });
+    }
+
+    // --- Resolve: exile + register delayed return (CR 701.21 / 603.7) ----
+    private static void ResolveCast(
+        Creature target,
+        Player caster,
+        TriggerManager? triggers,
+        ZoneService? zones,
+        ReplacementBus? replacements)
+    {
+        // CR 608.2b — resolution-time legality re-check.
+        if (target.Zone != ZoneType.Battlefield) return;
+
+        ExileTarget(target, caster, zones);
+
+        // CR 603.7 — delayed end-step return. Only register when a
+        // TriggerManager is supplied (shape-only fallback per Touch the
+        // Spirit Realm / Yorion / Wrenn's Resolve).
+        if (triggers == null) return;
+
+        RegisterDelayedReturn(target, caster, triggers, zones, replacements);
+    }
+
+    private static void ExileTarget(Creature target, Player caster, ZoneService? zones)
+    {
+        // CR 701.21 — prefer ZoneService so CardMovedEvent fires.
+        if (zones != null)
+        {
+            zones.MoveCard(target, ZoneType.Battlefield, ZoneType.Exile);
+            return;
+        }
+        var fromOwner = target.Owner ?? caster;
+        fromOwner.Zones.Battlefield.RemoveCard(target);
+        fromOwner.Zones.Exile.AddCard(target);
+        target.SetZone(ZoneType.Exile);
+    }
+
+    private static void RegisterDelayedReturn(
+        Creature target,
+        Player caster,
+        TriggerManager triggers,
+        ZoneService? zones,
+        ReplacementBus? replacements)
+    {
+        var resolvedAt = DateTime.UtcNow;
+        var returnEffect = new Effect(
+            $"{CardName} — return exiled creature at next end step with +1/+1 counter (CR 603.7 / CR 614 / CR 122.1c)",
+            () => ResolveDelayedReturn(target, caster, zones, replacements));
+
+        var delayed = new DelayedTriggeredAbility(
+            source: target,
+            controller: caster,
+            condition: new EventTriggerCondition<StepStartedEvent>(
+                (e, _) => e.StepType == PhaseStateType.End && e.Timestamp > resolvedAt),
+            effects: new IEffect[] { returnEffect });
+
+        triggers.RegisterDelayed(delayed);
+    }
+
+    private static void ResolveDelayedReturn(
+        Creature target,
+        Player caster,
+        ZoneService? zones,
+        ReplacementBus? replacements)
+    {
+        // CR 111.8 — token guard. CR 614 — "under its owner's control".
+        if (target.Zone != ZoneType.Exile) return;
+
+        var returnOwner = target.Owner ?? caster;
+
+        if (zones != null)
+        {
+            zones.MoveCard(target, ZoneType.Exile, ZoneType.Battlefield, returnOwner);
+        }
+        else
+        {
+            returnOwner.Zones.Exile.RemoveCard(target);
+            returnOwner.Zones.Battlefield.AddCard(target);
+            target.SetZone(ZoneType.Battlefield);
+            target.SetController(returnOwner);
+        }
+
+        // CR 122.1c — +1/+1 counter on returned card.
+        if (target.Zone == ZoneType.Battlefield)
+        {
+            CountersService.Add(target, CounterType.PlusOnePlusOne, 1, replacements);
+        }
     }
 }

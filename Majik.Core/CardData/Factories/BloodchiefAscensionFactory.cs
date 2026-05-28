@@ -137,11 +137,7 @@ public static class BloodchiefAscensionFactory
             controller: owner,
             condition: new EventTriggerCondition<StepStartedEvent>((e, _) =>
             {
-                if (e.StepType != PhaseStateType.End) return false;
-                var ctrl = card.Controller ?? owner;
-                if (ReferenceEquals(e.Player, ctrl)) return false; // "each opponent's end step"
-                if (e.Player.LifeLostThisTurn < LifeLostThreshold) return false;
-
+                if (!IsOpponentEndStepWithLifeLoss(e, card, owner)) return false;
                 lastEndStepOpponent = e.Player;
                 return true;
             }),
@@ -185,19 +181,8 @@ public static class BloodchiefAscensionFactory
             controller: owner,
             condition: new EventTriggerCondition<CardMovedEvent>((e, _) =>
             {
-                if (e.ToZone != ZoneType.Graveyard) return false;
-                if (card.Counters.Count(CounterType.Quest) < QuestThreshold) return false;
-
-                // CR 404.2 — a graveyard is owned by its player; "into
-                // an opponent's graveyard" reads the moved card's
-                // OWNER (graveyards never change owner). Filtering on
-                // owner instead of controller correctly catches mills
-                // (library → graveyard, owner-side move) and the
-                // assorted exile / hand → graveyard paths too.
-                var ctrl = card.Controller ?? owner;
-                var graveOwner = e.Card.Owner;
-                if (graveOwner == null || ReferenceEquals(graveOwner, ctrl)) return false;
-
+                var graveOwner = TryGetOpponentGraveyardMove(e, card, owner);
+                if (graveOwner == null) return false;
                 lastDrainOpponent = graveOwner;
                 return true;
             }),
@@ -208,5 +193,36 @@ public static class BloodchiefAscensionFactory
         triggers?.RegisterTriggeredAbility(drainTrigger);
 
         return card;
+    }
+
+    // --- Trigger predicates (CR 603.4 / 603.6e) ----------------------------
+
+    private static bool IsOpponentEndStepWithLifeLoss(
+        StepStartedEvent e,
+        Enchantment card,
+        Player owner)
+    {
+        if (e.StepType != PhaseStateType.End) return false;
+        var ctrl = card.Controller ?? owner;
+        if (ReferenceEquals(e.Player, ctrl)) return false; // "each opponent's end step"
+        return e.Player.LifeLostThisTurn >= LifeLostThreshold;
+    }
+
+    private static Player? TryGetOpponentGraveyardMove(
+        CardMovedEvent e,
+        Enchantment card,
+        Player owner)
+    {
+        if (e.ToZone != ZoneType.Graveyard) return null;
+        if (card.Counters.Count(CounterType.Quest) < QuestThreshold) return null;
+
+        // CR 404.2 — a graveyard is owned by its player; "into an
+        // opponent's graveyard" reads the moved card's OWNER. Filtering
+        // on owner catches mills (library → graveyard) and exile /
+        // hand → graveyard paths too.
+        var ctrl = card.Controller ?? owner;
+        var graveOwner = e.Card.Owner;
+        if (graveOwner == null || ReferenceEquals(graveOwner, ctrl)) return null;
+        return graveOwner;
     }
 }

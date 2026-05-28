@@ -190,56 +190,7 @@ public static class MausoleumWandererFactory
 
         var counterEffect = new Effect(
             "Mausoleum Wanderer — sac self, then counter target instant or sorcery unless its controller pays {X}",
-            () =>
-            {
-                // Capture X = Wanderer's power BEFORE the sac fires. At
-                // this point any prior Spirit-ETB pumps are still on the
-                // layers stack so the read picks them up.
-                int x = card.GetPower();
-
-                // Sacrifice (zone-move stub — see class xmldoc).
-                if (card.Zone == ZoneType.Battlefield)
-                {
-                    owner.Zones.Battlefield.RemoveCard(card);
-                    var sacOwner = card.Owner ?? owner;
-                    sacOwner.Zones.Graveyard.AddCard(card);
-                    card.SetZone(ZoneType.Graveyard);
-                }
-
-                // Counter unless pay {X}.
-                if (ability == null) return;
-                var chosen = ability.ChosenTargets;
-                if (chosen.Count == 0 || chosen[0].Count == 0) return;
-
-                var raw = chosen[0][0];
-                if (raw is not ISpell spell) return;
-                if (stack == null) return;
-
-                // Re-check legality at resolution (CR 608.2b): target
-                // must still be on the stack and remain an instant or
-                // sorcery (the only spell types the printed restriction
-                // permits).
-                var targetCard = spell.Card as Card;
-                if (targetCard == null) return;
-                if (targetCard.Zone != ZoneType.Stack) return;
-                if (!targetCard.HasType(CardType.Instant)
-                    && !targetCard.HasType(CardType.Sorcery)) return;
-
-                // CR 118.4 — controller may pay {X}. v1 auto-pays when
-                // mana is available (same posture as Cursecatcher /
-                // Daze / Mana Leak).
-                if (x > 0
-                    && spell.Controller is not null
-                    && spell.Controller.PayMana(ManaCost.Zero.AddGenericCost(x)))
-                {
-                    // Controller paid — spell is NOT countered.
-                    return;
-                }
-
-                // CR 701.5 — counter: remove from stack + send to graveyard.
-                OracleSpellBinder.RemoveFromStack(stack, spell);
-                spell.Card.SetZone(ZoneType.Graveyard);
-            });
+            () => ResolveCounterActivation(ability, card, owner, stack));
 
         ability = new ActivatedAbility(
             source: card,
@@ -273,5 +224,68 @@ public static class MausoleumWandererFactory
         card.AddAbility(ability);
 
         return card;
+    }
+
+    // --- Sac + counter-unless-pay-X (CR 113.3b / 701.5 / 202.3b) ---------
+
+    private static void ResolveCounterActivation(
+        ActivatedAbility? ability,
+        Creature card,
+        Player owner,
+        Majik.Core.Stack.Stack? stack)
+    {
+        // CR 202.3b — capture X = Wanderer's power BEFORE the sac fires so
+        // any prior Spirit-ETB pumps still apply.
+        int x = card.GetPower();
+
+        SacrificeSelf(card, owner);
+
+        if (ability == null || stack == null) return;
+        var spell = ResolveTargetSpell(ability);
+        if (spell == null) return;
+
+        if (ControllerPaidX(spell, x))
+        {
+            // Controller paid — spell is NOT countered.
+            return;
+        }
+
+        // CR 701.5 — counter: remove from stack + send to graveyard.
+        OracleSpellBinder.RemoveFromStack(stack, spell);
+        spell.Card.SetZone(ZoneType.Graveyard);
+    }
+
+    private static void SacrificeSelf(Creature card, Player owner)
+    {
+        // Sacrifice (zone-move stub — see class xmldoc).
+        if (card.Zone != ZoneType.Battlefield) return;
+        owner.Zones.Battlefield.RemoveCard(card);
+        var sacOwner = card.Owner ?? owner;
+        sacOwner.Zones.Graveyard.AddCard(card);
+        card.SetZone(ZoneType.Graveyard);
+    }
+
+    private static ISpell? ResolveTargetSpell(ActivatedAbility ability)
+    {
+        var chosen = ability.ChosenTargets;
+        if (chosen.Count == 0 || chosen[0].Count == 0) return null;
+        if (chosen[0][0] is not ISpell spell) return null;
+
+        // Re-check legality at resolution (CR 608.2b).
+        var targetCard = spell.Card as Card;
+        if (targetCard == null) return null;
+        if (targetCard.Zone != ZoneType.Stack) return null;
+        if (!targetCard.HasType(CardType.Instant) && !targetCard.HasType(CardType.Sorcery)) return null;
+
+        return spell;
+    }
+
+    private static bool ControllerPaidX(ISpell spell, int x)
+    {
+        // CR 118.4 — controller may pay {X}. v1 auto-pays when mana is
+        // available (same posture as Cursecatcher / Daze / Mana Leak).
+        if (x <= 0) return false;
+        if (spell.Controller is null) return false;
+        return spell.Controller.PayMana(ManaCost.Zero.AddGenericCost(x));
     }
 }

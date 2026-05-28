@@ -101,25 +101,7 @@ public static class SoulGuideLanternFactory
         TriggeredAbility? etbTrigger = null;
         var etbEffect = new Effect(
             $"{CardName}: exile target card from a graveyard",
-            () =>
-            {
-                if (etbTrigger == null) return;
-                if (etbTrigger.ChosenTargets.Count == 0) return;
-                if (etbTrigger.ChosenTargets[0].Count == 0) return;
-
-                var raw = etbTrigger.ChosenTargets[0][0];
-                if (raw is not ICard targetCard) return;
-
-                // CR 608.2b — the target card must still be in a graveyard.
-                if (targetCard.Zone != ZoneType.Graveyard) return;
-
-                var targetOwner = targetCard.Owner;
-                if (targetOwner == null) return;
-
-                targetOwner.Zones.Graveyard.RemoveCard(targetCard);
-                targetOwner.Zones.Exile.AddCard(targetCard);
-                targetCard.SetZone(ZoneType.Exile);
-            });
+            () => ResolveEtbExileTarget(etbTrigger));
 
         etbTrigger = new TriggeredAbility(
             source: lantern,
@@ -149,29 +131,8 @@ public static class SoulGuideLanternFactory
             $"{CardName}: exile each opponent's graveyard",
             () =>
             {
-                // Self-sacrifice: Battlefield → Graveyard. Idempotent
-                // (mirrors Tormod's Crypt).
-                if (lantern.Zone == ZoneType.Battlefield)
-                {
-                    owner.Zones.Battlefield.RemoveCard(lantern);
-                    owner.Zones.Graveyard.AddCard(lantern);
-                    lantern.SetZone(ZoneType.Graveyard);
-                }
-
-                var opponents = opponentsResolver?.Invoke()
-                    ?? (IReadOnlyList<Player>)Array.Empty<Player>();
-
-                foreach (var opp in opponents)
-                {
-                    if (ReferenceEquals(opp, owner)) continue;
-                    var graveyardCards = opp.Zones.Graveyard.GetCards().ToList();
-                    foreach (var card in graveyardCards)
-                    {
-                        opp.Zones.Graveyard.RemoveCard(card);
-                        opp.Zones.Exile.AddCard(card);
-                        card.SetZone(ZoneType.Exile);
-                    }
-                }
+                SacrificeSelf(lantern, owner);
+                ExileEachOpponentGraveyard(owner, opponentsResolver);
             });
 
         var sweepAbility = new ActivatedAbility(
@@ -193,21 +154,8 @@ public static class SoulGuideLanternFactory
             $"{CardName}: draw a card",
             () =>
             {
-                if (lantern.Zone == ZoneType.Battlefield)
-                {
-                    owner.Zones.Battlefield.RemoveCard(lantern);
-                    owner.Zones.Graveyard.AddCard(lantern);
-                    lantern.SetZone(ZoneType.Graveyard);
-                }
-
-                // Draw 1 — top of controller's library to hand. Empty
-                // library is a silent no-op (SBAs handle the loss
-                // condition — mirrors Pyrite Spellbomb's cantrip mode).
-                var top = owner.Zones.Library.GetCards().FirstOrDefault();
-                if (top == null) return;
-                owner.Zones.Library.RemoveCard(top);
-                owner.Zones.Hand.AddCard(top);
-                top.SetZone(ZoneType.Hand);
+                SacrificeSelf(lantern, owner);
+                DrawOne(owner);
             });
 
         var drawAbility = new ActivatedAbility(
@@ -224,5 +172,66 @@ public static class SoulGuideLanternFactory
         lantern.AddAbility(drawAbility);
 
         return lantern;
+    }
+
+    // --- ETB / sweep / draw helpers ---------------------------------------
+
+    private static void ResolveEtbExileTarget(TriggeredAbility? etbTrigger)
+    {
+        if (etbTrigger == null) return;
+        if (etbTrigger.ChosenTargets.Count == 0) return;
+        if (etbTrigger.ChosenTargets[0].Count == 0) return;
+
+        var raw = etbTrigger.ChosenTargets[0][0];
+        if (raw is not ICard targetCard) return;
+
+        // CR 608.2b — the target card must still be in a graveyard.
+        if (targetCard.Zone != ZoneType.Graveyard) return;
+
+        var targetOwner = targetCard.Owner;
+        if (targetOwner == null) return;
+
+        targetOwner.Zones.Graveyard.RemoveCard(targetCard);
+        targetOwner.Zones.Exile.AddCard(targetCard);
+        targetCard.SetZone(ZoneType.Exile);
+    }
+
+    private static void SacrificeSelf(Artifact lantern, Player owner)
+    {
+        // Self-sacrifice: Battlefield → Graveyard. Idempotent (mirrors
+        // Tormod's Crypt).
+        if (lantern.Zone != ZoneType.Battlefield) return;
+        owner.Zones.Battlefield.RemoveCard(lantern);
+        owner.Zones.Graveyard.AddCard(lantern);
+        lantern.SetZone(ZoneType.Graveyard);
+    }
+
+    private static void ExileEachOpponentGraveyard(
+        Player owner,
+        Func<IReadOnlyList<Player>>? opponentsResolver)
+    {
+        var opponents = opponentsResolver?.Invoke() ?? (IReadOnlyList<Player>)Array.Empty<Player>();
+        foreach (var opp in opponents)
+        {
+            if (ReferenceEquals(opp, owner)) continue;
+            var graveyardCards = opp.Zones.Graveyard.GetCards().ToList();
+            foreach (var card in graveyardCards)
+            {
+                opp.Zones.Graveyard.RemoveCard(card);
+                opp.Zones.Exile.AddCard(card);
+                card.SetZone(ZoneType.Exile);
+            }
+        }
+    }
+
+    private static void DrawOne(Player owner)
+    {
+        // Empty library = silent no-op (SBAs handle the loss condition;
+        // mirrors Pyrite Spellbomb's cantrip mode).
+        var top = owner.Zones.Library.GetCards().FirstOrDefault();
+        if (top == null) return;
+        owner.Zones.Library.RemoveCard(top);
+        owner.Zones.Hand.AddCard(top);
+        top.SetZone(ZoneType.Hand);
     }
 }

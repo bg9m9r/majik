@@ -159,40 +159,7 @@ public static class WallOfFrostFactory
                     {
                         var combat = capturedCombat[0];
                         capturedCombat[0] = null; // consume
-
-                        if (combat == null) return;
-
-                        // For each attacker that Wall of Frost was blocking,
-                        // register a skip-untap restriction (CR 502.1).
-                        foreach (var blocker in combat.GetAllBlockers()
-                                     .Where(b => ReferenceEquals(b.Creature, card)))
-                        {
-                            var attacked = blocker.BlockedAttacker.Creature;
-                            if (attacked.Zone != ZoneType.Battlefield) continue;
-
-                            var skipToken = new object();
-                            UntapStepRestrictions.MarkPermanentDoesNotUntap(skipToken, attacked);
-
-                            if (eventBus != null)
-                            {
-                                // CR 611.2b — one-shot: remove the skip on the
-                                // first Untap step that belongs to the attacked
-                                // creature's current controller.
-                                var targetController = attacked.Controller;
-                                Action<GameEvent>? cleanupHandler = null;
-                                cleanupHandler = ev =>
-                                {
-                                    if (ev is not StepStartedEvent sse) return;
-                                    if (sse.StepType != PhaseStateType.Untap) return;
-                                    if (!ReferenceEquals(sse.Player, targetController)) return;
-
-                                    UntapStepRestrictions.RemoveAll(skipToken);
-                                    if (cleanupHandler != null)
-                                        eventBus.UnsubscribeAll(cleanupHandler);
-                                };
-                                eventBus.SubscribeAll(cleanupHandler);
-                            }
-                        }
+                        ResolveBlocksTrigger(combat, card, eventBus);
                     }),
             },
             activeZones: new[] { ZoneType.Battlefield });
@@ -201,5 +168,52 @@ public static class WallOfFrostFactory
         triggers?.RegisterTriggeredAbility(blocksTrigger);
 
         return card;
+    }
+
+    // --- Block-trigger body (CR 502.1 / 611.2b) ----------------------------
+
+    private static void ResolveBlocksTrigger(
+        Majik.Core.Combat.Combat? combat,
+        Creature card,
+        IEventBus? eventBus)
+    {
+        if (combat == null) return;
+
+        // For each attacker that Wall of Frost was blocking, register a
+        // skip-untap restriction (CR 502.1).
+        foreach (var blocker in combat.GetAllBlockers()
+                     .Where(b => ReferenceEquals(b.Creature, card)))
+        {
+            var attacked = blocker.BlockedAttacker.Creature;
+            if (attacked.Zone != ZoneType.Battlefield) continue;
+
+            var skipToken = new object();
+            UntapStepRestrictions.MarkPermanentDoesNotUntap(skipToken, attacked);
+            ScheduleSkipUntapCleanup(attacked, skipToken, eventBus);
+        }
+    }
+
+    private static void ScheduleSkipUntapCleanup(
+        Creature attacked,
+        object skipToken,
+        IEventBus? eventBus)
+    {
+        if (eventBus == null) return;
+
+        // CR 611.2b — one-shot: remove the skip on the first Untap step
+        // that belongs to the attacked creature's current controller.
+        var targetController = attacked.Controller;
+        Action<GameEvent>? cleanupHandler = null;
+        cleanupHandler = ev =>
+        {
+            if (ev is not StepStartedEvent sse) return;
+            if (sse.StepType != PhaseStateType.Untap) return;
+            if (!ReferenceEquals(sse.Player, targetController)) return;
+
+            UntapStepRestrictions.RemoveAll(skipToken);
+            if (cleanupHandler != null)
+                eventBus.UnsubscribeAll(cleanupHandler);
+        };
+        eventBus.SubscribeAll(cleanupHandler);
     }
 }

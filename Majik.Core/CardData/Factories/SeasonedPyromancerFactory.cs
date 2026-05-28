@@ -135,73 +135,7 @@ public static class SeasonedPyromancerFactory
 
         var etbEffect = new Effect(
             $"{CardName}: discard two, draw two, create Elemental token per nonland discarded",
-            () =>
-            {
-                var controller = card.Controller ?? owner;
-                var agent      = AgentRegistry.Get(controller);
-
-                // ----------------------------------------------------------
-                // Discard step (CR 701.16). Track each discarded card so
-                // we can test its type after the discard (a land discarded
-                // doesn't make a token). Same agent-or-fallback policy as
-                // CatharticReunion / TormentingVoice.
-                // ----------------------------------------------------------
-                var discarded = new List<ICard>(EtbDiscardCount);
-                for (var i = 0; i < EtbDiscardCount; i++)
-                {
-                    var hand = controller.Zones.Hand.GetCards().ToList();
-                    if (hand.Count == 0) break;
-
-                    ICard? pick;
-                    if (agent != null)
-                    {
-                        pick = agent.ChooseFromHandAsync(controller, hand, BotIntent.Discard)
-                            .GetAwaiter().GetResult();
-                        if (pick == null || pick.Zone != ZoneType.Hand)
-                            pick = hand[^1];
-                    }
-                    else
-                    {
-                        pick = hand[^1];
-                    }
-
-                    controller.Zones.Hand.RemoveCard(pick);
-                    controller.Zones.Graveyard.AddCard(pick);
-                    pick.SetZone(ZoneType.Graveyard);
-                    discarded.Add(pick);
-                }
-
-                // ----------------------------------------------------------
-                // Draw step (CR 121.1). Empty library: stamp the SBA loss
-                // flag (CR 704.5b) and short-circuit remaining draws.
-                // ----------------------------------------------------------
-                for (var i = 0; i < EtbDrawCount; i++)
-                {
-                    var top = controller.Zones.Library.GetCards().FirstOrDefault();
-                    if (top == null)
-                    {
-                        controller.MarkTriedToDrawFromEmptyLibrary();
-                        break;
-                    }
-                    controller.Zones.Library.RemoveCard(top);
-                    controller.Zones.Hand.AddCard(top);
-                    top.SetZone(ZoneType.Hand);
-                }
-
-                // ----------------------------------------------------------
-                // Token step: for each nonland discarded, create one 1/1
-                // red Elemental token (CR 111 / CR 111.6).
-                // CR 305.1 / CR 205.2a — a card is a land if it has the
-                // Land card type. Check HasType(CardType.Land).
-                // ----------------------------------------------------------
-                foreach (var discardedCard in discarded)
-                {
-                    if (!discardedCard.HasType(CardType.Land))
-                    {
-                        CreateElementalToken(controller, zoneService);
-                    }
-                }
-            });
+            () => ResolveEtbTrigger(card, owner, zoneService));
 
         var etbTrigger = new TriggeredAbility(
             source: card,
@@ -230,26 +164,7 @@ public static class SeasonedPyromancerFactory
         // --------------------------------------------------------------------
         var activatedEffect = new Effect(
             $"{CardName}: exile self from graveyard, create two 1/1 red Elemental tokens",
-            () =>
-            {
-                // Zone guard — only payable from graveyard.
-                if (card.Zone != ZoneType.Graveyard) return;
-                if (card.Owner == null) return;
-
-                var cardOwner = card.Owner;
-
-                // Exile this card from the graveyard as part of the cost.
-                cardOwner.Zones.Graveyard.RemoveCard(card);
-                cardOwner.Zones.Exile.AddCard(card);
-                card.SetZone(ZoneType.Exile);
-
-                // Create two 1/1 red Elemental creature tokens.
-                var controller = card.Controller ?? owner;
-                for (var i = 0; i < GraveyardTokenCount; i++)
-                {
-                    CreateElementalToken(controller, zoneService);
-                }
-            });
+            () => ResolveGraveyardActivation(card, owner, zoneService));
 
         var activatedAbility = new ActivatedAbility(
             source: card,
@@ -284,5 +199,92 @@ public static class SeasonedPyromancerFactory
             Colors: new[] { Majik.Core.ValueObjects.ManaColor.Red });
 
         return TokenFactory.CreateOnBattlefield(spec, controller, zoneService);
+    }
+
+    // --- ETB body (discard two, draw two, token per nonland discarded) ----
+    private static void ResolveEtbTrigger(Creature card, Player owner, ZoneService? zoneService)
+    {
+        var controller = card.Controller ?? owner;
+        var agent = AgentRegistry.Get(controller);
+
+        var discarded = DiscardN(controller, agent, EtbDiscardCount);
+        DrawN(controller, EtbDrawCount);
+
+        // CR 305.1 / CR 205.2a — only nonland discards create a token.
+        foreach (var discardedCard in discarded)
+        {
+            if (!discardedCard.HasType(CardType.Land))
+            {
+                CreateElementalToken(controller, zoneService);
+            }
+        }
+    }
+
+    private static List<ICard> DiscardN(Player controller, IPlayerAgent? agent, int count)
+    {
+        // CR 701.16. Same agent-or-fallback policy as CatharticReunion.
+        var discarded = new List<ICard>(count);
+        for (var i = 0; i < count; i++)
+        {
+            var hand = controller.Zones.Hand.GetCards().ToList();
+            if (hand.Count == 0) break;
+
+            var pick = PickDiscard(agent, controller, hand);
+
+            controller.Zones.Hand.RemoveCard(pick);
+            controller.Zones.Graveyard.AddCard(pick);
+            pick.SetZone(ZoneType.Graveyard);
+            discarded.Add(pick);
+        }
+        return discarded;
+    }
+
+    private static ICard PickDiscard(IPlayerAgent? agent, Player controller, List<ICard> hand)
+    {
+        if (agent == null) return hand[^1];
+        var pick = agent.ChooseFromHandAsync(controller, hand, BotIntent.Discard)
+            .GetAwaiter().GetResult();
+        if (pick == null || pick.Zone != ZoneType.Hand) return hand[^1];
+        return pick;
+    }
+
+    private static void DrawN(Player controller, int count)
+    {
+        // CR 121.1. Empty library: stamp the SBA loss flag (CR 704.5b)
+        // and short-circuit remaining draws.
+        for (var i = 0; i < count; i++)
+        {
+            var top = controller.Zones.Library.GetCards().FirstOrDefault();
+            if (top == null)
+            {
+                controller.MarkTriedToDrawFromEmptyLibrary();
+                break;
+            }
+            controller.Zones.Library.RemoveCard(top);
+            controller.Zones.Hand.AddCard(top);
+            top.SetZone(ZoneType.Hand);
+        }
+    }
+
+    // --- Graveyard-activated body (CR 113.6 / 307.5) ----------------------
+    private static void ResolveGraveyardActivation(Creature card, Player owner, ZoneService? zoneService)
+    {
+        // Zone guard — only payable from graveyard.
+        if (card.Zone != ZoneType.Graveyard) return;
+        if (card.Owner == null) return;
+
+        var cardOwner = card.Owner;
+
+        // Exile this card from the graveyard as part of the cost.
+        cardOwner.Zones.Graveyard.RemoveCard(card);
+        cardOwner.Zones.Exile.AddCard(card);
+        card.SetZone(ZoneType.Exile);
+
+        // Create two 1/1 red Elemental creature tokens.
+        var controller = card.Controller ?? owner;
+        for (var i = 0; i < GraveyardTokenCount; i++)
+        {
+            CreateElementalToken(controller, zoneService);
+        }
     }
 }

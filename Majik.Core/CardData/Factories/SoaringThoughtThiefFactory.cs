@@ -151,63 +151,13 @@ public static class SoaringThoughtThiefFactory
         TriggeredAbility? attackTrigger = null;
         var attackEffect = new Effect(
             $"{CardName}: target opponent mills 2",
-            () =>
-            {
-                if (allPlayersResolver == null) return;
-                var players = allPlayersResolver();
-                if (players == null) return;
-
-                var controller = card.Controller ?? owner;
-                Player? chosen = null;
-
-                // CR 115 — honour an explicit target if the trigger was
-                // dispatched with one. ChosenTargets[0][0] is the agent /
-                // resolver-picked opponent.
-                if (attackTrigger != null
-                    && attackTrigger.ChosenTargets.Count > 0
-                    && attackTrigger.ChosenTargets[0].Count > 0
-                    && attackTrigger.ChosenTargets[0][0] is Player chosenPlayer
-                    && !ReferenceEquals(chosenPlayer, controller))
-                {
-                    chosen = chosenPlayer;
-                }
-
-                // v1 fallback — first opponent in the player list (same
-                // posture as Ashiok, Dream Render's -1 mill rider).
-                if (chosen == null)
-                {
-                    foreach (var p in players)
-                    {
-                        if (ReferenceEquals(p, controller)) continue;
-                        chosen = p;
-                        break;
-                    }
-                }
-
-                if (chosen == null) return;
-
-                // CR 701.13b — mill N. MillAction.Apply gracefully handles
-                // libraries with fewer than N cards (mills the remainder).
-                MillAction.Apply(chosen, MillCount);
-            });
+            () => ResolveAttackMill(attackTrigger, card, owner, allPlayersResolver));
 
         attackTrigger = new TriggeredAbility(
             source: card,
             controller: owner,
-            condition: new EventTriggerCondition<AttackersDeclaredEvent>((e, _) =>
-            {
-                var controller = card.Controller ?? owner;
-                if (!ReferenceEquals(e.Combat.AttackingPlayer, controller)) return false;
-                // CR 700.2 — "one or more Rogues" satisfies on count ≥ 1.
-                // The attacker creature already has the controller filter
-                // baked in (declared attackers belong to AttackingPlayer).
-                foreach (var atk in e.Combat.Attackers)
-                {
-                    if (atk?.Creature == null) continue;
-                    if (atk.Creature.HasSubtype(CardSubtype.Rogue)) return true;
-                }
-                return false;
-            }),
+            condition: new EventTriggerCondition<AttackersDeclaredEvent>(
+                (e, _) => IsAttackWithRoguesMatch(e, card, owner)),
             effects: new IEffect[] { attackEffect },
             activeZones: new[] { ZoneType.Battlefield },
             targetRequests: new[]
@@ -223,5 +173,66 @@ public static class SoaringThoughtThiefFactory
         triggers?.RegisterTriggeredAbility(attackTrigger);
 
         return card;
+    }
+
+    // --- Trigger condition / body helpers (CR 508.1f / 701.13b) -----------
+
+    private static bool IsAttackWithRoguesMatch(AttackersDeclaredEvent e, Creature card, Player owner)
+    {
+        var controller = card.Controller ?? owner;
+        if (!ReferenceEquals(e.Combat.AttackingPlayer, controller)) return false;
+        // CR 700.2 — "one or more Rogues" satisfies on count ≥ 1.
+        foreach (var atk in e.Combat.Attackers)
+        {
+            if (atk?.Creature == null) continue;
+            if (atk.Creature.HasSubtype(CardSubtype.Rogue)) return true;
+        }
+        return false;
+    }
+
+    private static void ResolveAttackMill(
+        TriggeredAbility? attackTrigger,
+        Creature card,
+        Player owner,
+        Func<IReadOnlyList<Player>>? allPlayersResolver)
+    {
+        if (allPlayersResolver == null) return;
+        var players = allPlayersResolver();
+        if (players == null) return;
+
+        var controller = card.Controller ?? owner;
+        var chosen = ResolveMillTarget(attackTrigger, players, controller);
+        if (chosen == null) return;
+
+        // CR 701.13b — mill N. MillAction.Apply gracefully handles libraries
+        // with fewer than N cards (mills the remainder).
+        MillAction.Apply(chosen, MillCount);
+    }
+
+    private static Player? ResolveMillTarget(
+        TriggeredAbility? attackTrigger,
+        IReadOnlyList<Player> players,
+        Player controller)
+    {
+        // CR 115 — honour an explicit target if the trigger was dispatched
+        // with one. ChosenTargets[0][0] is the agent / resolver-picked
+        // opponent.
+        if (attackTrigger != null
+            && attackTrigger.ChosenTargets.Count > 0
+            && attackTrigger.ChosenTargets[0].Count > 0
+            && attackTrigger.ChosenTargets[0][0] is Player chosenPlayer
+            && !ReferenceEquals(chosenPlayer, controller))
+        {
+            return chosenPlayer;
+        }
+
+        // v1 fallback — first opponent in the player list (same posture as
+        // Ashiok, Dream Render's -1 mill rider).
+        foreach (var p in players)
+        {
+            if (ReferenceEquals(p, controller)) continue;
+            return p;
+        }
+        return null;
     }
 }

@@ -111,50 +111,7 @@ public static class FrostLynxFactory
 
         var etbEffect = new Effect(
             "Frost Lynx — tap target opponent creature; it skips its controller's next untap step",
-            () =>
-            {
-                if (etbTrigger == null) return;
-
-                var chosen = etbTrigger.ChosenTargets;
-                if (chosen.Count == 0 || chosen[0].Count == 0) return;
-
-                if (chosen[0][0] is not Permanent target) return;
-
-                // CR 608.2b — if the target is no longer on the battlefield
-                // at resolution, the ability does nothing.
-                if (target.Zone != ZoneType.Battlefield) return;
-
-                // CR 701.20 — tap the target creature.
-                target.Tap();
-
-                // CR 502.1 — "doesn't untap during its controller's next
-                // untap step". Register the per-permanent skip with a token
-                // keyed by the etbTrigger instance. The skip must be a
-                // one-shot: schedule removal on the target controller's next
-                // Untap step when a bus is available.
-                var skipToken = new object();
-                UntapStepRestrictions.MarkPermanentDoesNotUntap(skipToken, target);
-
-                if (eventBus != null)
-                {
-                    // One-shot subscription: remove the skip on the FIRST
-                    // Untap step that belongs to the target's current
-                    // controller (CR 502.1 / "next untap step").
-                    var targetController = target.Controller;
-                    Action<GameEvent>? cleanupHandler = null;
-                    cleanupHandler = ev =>
-                    {
-                        if (ev is not StepStartedEvent sse) return;
-                        if (sse.StepType != PhaseStateType.Untap) return;
-                        if (!ReferenceEquals(sse.Player, targetController)) return;
-
-                        UntapStepRestrictions.RemoveAll(skipToken);
-                        if (cleanupHandler != null)
-                            eventBus.UnsubscribeAll(cleanupHandler);
-                    };
-                    eventBus.SubscribeAll(cleanupHandler);
-                }
-            });
+            () => ResolveEtbTrigger(etbTrigger, eventBus));
 
         etbTrigger = new TriggeredAbility(
             source: card,
@@ -184,5 +141,49 @@ public static class FrostLynxFactory
         triggers?.RegisterTriggeredAbility(etbTrigger);
 
         return card;
+    }
+
+    // --- ETB body (CR 608.2b / 701.20 / 502.1 / 611.2b) -------------------
+
+    private static void ResolveEtbTrigger(TriggeredAbility? etbTrigger, IEventBus? eventBus)
+    {
+        if (etbTrigger == null) return;
+
+        var chosen = etbTrigger.ChosenTargets;
+        if (chosen.Count == 0 || chosen[0].Count == 0) return;
+        if (chosen[0][0] is not Permanent target) return;
+
+        // CR 608.2b — illegal target at resolution = no effect.
+        if (target.Zone != ZoneType.Battlefield) return;
+
+        // CR 701.20 — tap the target creature.
+        target.Tap();
+
+        // CR 502.1 — "doesn't untap during its controller's next untap step".
+        var skipToken = new object();
+        UntapStepRestrictions.MarkPermanentDoesNotUntap(skipToken, target);
+
+        ScheduleSkipUntapCleanup(target, skipToken, eventBus);
+    }
+
+    private static void ScheduleSkipUntapCleanup(Permanent target, object skipToken, IEventBus? eventBus)
+    {
+        if (eventBus == null) return;
+
+        // One-shot: remove the skip on the FIRST Untap step that belongs
+        // to the target's current controller (CR 502.1 / "next untap step").
+        var targetController = target.Controller;
+        Action<GameEvent>? cleanupHandler = null;
+        cleanupHandler = ev =>
+        {
+            if (ev is not StepStartedEvent sse) return;
+            if (sse.StepType != PhaseStateType.Untap) return;
+            if (!ReferenceEquals(sse.Player, targetController)) return;
+
+            UntapStepRestrictions.RemoveAll(skipToken);
+            if (cleanupHandler != null)
+                eventBus.UnsubscribeAll(cleanupHandler);
+        };
+        eventBus.SubscribeAll(cleanupHandler);
     }
 }

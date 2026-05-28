@@ -111,82 +111,71 @@ public static class SummonersPactFactory
             {
                 new Effect("Summoner's Pact: tutor green creature → hand + queue delayed upkeep pact", () =>
                 {
-                    // ----------------------------------------------------
-                    // CR 701.19a — search the controller's library for a
-                    // green creature card. CR 105.2a — colour derived
-                    // from cost pips via CardColors.GetColors (mirrors
-                    // GreenSunsZenithFactory's filter).
-                    // ----------------------------------------------------
-                    var candidates = caster.Zones.Library.GetCards()
-                        .Where(c =>
-                            c.HasType(CardType.Creature) &&
-                            CardColors.GetColors(c).Contains(ManaColor.Green))
-                        .ToList();
-
-                    if (candidates.Count > 0)
-                    {
-                        var agent = AgentRegistry.Get(caster);
-                        ICard? pick = agent != null
-                            ? agent.ChooseLibraryPickAsync(
-                                ctx: null,
-                                candidates: candidates,
-                                kindLabel: "green creature card")
-                                .GetAwaiter().GetResult()
-                            : candidates[0];
-
-                        if (pick != null)
-                        {
-                            // Reveal + move to hand. "Reveal" is implicit
-                            // (the search is public). Direct zone mutation
-                            // since no public ETB / hand-arrival trigger
-                            // surface exists — same posture as other
-                            // hand-tutors (Eladamri's Call etc.).
-                            caster.Zones.Library.RemoveCard(pick);
-                            caster.Zones.Hand.AddCard(pick);
-                            pick.SetZone(ZoneType.Hand);
-                            pick.SetController(caster);
-                        }
-                    }
-
-                    // CR 701.20a — shuffle after the search effect
-                    // (regardless of find/no-find).
+                    TutorGreenCreatureToHand(caster);
+                    // CR 701.20a — shuffle after the search effect.
                     LibraryShuffle.ShuffleLibrary(caster, "summoners-pact");
-
-                    // ----------------------------------------------------
-                    // CR 603.7 — register the "at the beginning of your
-                    // next upkeep" delayed trigger. Mirrors Pact of
-                    // Negation / Slaughter Pact: fires on the first
-                    // Upkeep StepStartedEvent strictly after this resolve,
-                    // attempts to pay {2}{G}{G} from the controller's pool,
-                    // falls back to MarkLost on failure (CR 104.3 / CR 118.3).
-                    // ----------------------------------------------------
-                    if (triggers == null) return;
-
-                    var resolvedAt = DateTime.UtcNow;
-                    var pactCost = ManaCost.Parse(DelayedUpkeepCost);
-
-                    var payOrLoseEffect = new Effect(
-                        $"Summoner's Pact: pay {DelayedUpkeepCost} at upkeep or lose the game",
-                        () =>
-                        {
-                            if (caster.HasLost) return;
-                            if (!caster.PayMana(pactCost))
-                            {
-                                caster.MarkLost();
-                            }
-                        });
-
-                    var delayed = new DelayedTriggeredAbility(
-                        source: caster,
-                        controller: caster,
-                        condition: new EventTriggerCondition<StepStartedEvent>(
-                            (e, _) => e.StepType == PhaseStateType.Upkeep
-                                      && ReferenceEquals(e.Player, caster)
-                                      && e.Timestamp > resolvedAt),
-                        effects: new IEffect[] { payOrLoseEffect });
-
-                    triggers.RegisterDelayed(delayed);
+                    RegisterDelayedUpkeepPact(caster, triggers);
                 }),
             });
+    }
+
+    // --- Tutor: pick a green creature to hand (CR 701.19a) ---------------
+    private static void TutorGreenCreatureToHand(Player caster)
+    {
+        // CR 105.2a — colour derived from cost pips via CardColors.GetColors.
+        var candidates = caster.Zones.Library.GetCards()
+            .Where(c => c.HasType(CardType.Creature) &&
+                        CardColors.GetColors(c).Contains(ManaColor.Green))
+            .ToList();
+        if (candidates.Count == 0) return;
+
+        var pick = PickGreenCreature(caster, candidates);
+        if (pick == null) return;
+
+        // Reveal + move to hand. Direct zone mutation (no public
+        // hand-arrival surface yet) — same posture as other hand-tutors.
+        caster.Zones.Library.RemoveCard(pick);
+        caster.Zones.Hand.AddCard(pick);
+        pick.SetZone(ZoneType.Hand);
+        pick.SetController(caster);
+    }
+
+    private static ICard? PickGreenCreature(Player caster, List<ICard> candidates)
+    {
+        var agent = AgentRegistry.Get(caster);
+        if (agent == null) return candidates[0];
+        return agent.ChooseLibraryPickAsync(
+            ctx: null,
+            candidates: candidates,
+            kindLabel: "green creature card")
+            .GetAwaiter().GetResult();
+    }
+
+    // --- Delayed upkeep pact (CR 603.7 / 104.3 / 118.3) ------------------
+    private static void RegisterDelayedUpkeepPact(Player caster, TriggerManager? triggers)
+    {
+        if (triggers == null) return;
+
+        var resolvedAt = DateTime.UtcNow;
+        var pactCost = ManaCost.Parse(DelayedUpkeepCost);
+
+        var payOrLoseEffect = new Effect(
+            $"Summoner's Pact: pay {DelayedUpkeepCost} at upkeep or lose the game",
+            () =>
+            {
+                if (caster.HasLost) return;
+                if (!caster.PayMana(pactCost)) caster.MarkLost();
+            });
+
+        var delayed = new DelayedTriggeredAbility(
+            source: caster,
+            controller: caster,
+            condition: new EventTriggerCondition<StepStartedEvent>(
+                (e, _) => e.StepType == PhaseStateType.Upkeep
+                          && ReferenceEquals(e.Player, caster)
+                          && e.Timestamp > resolvedAt),
+            effects: new IEffect[] { payOrLoseEffect });
+
+        triggers.RegisterDelayed(delayed);
     }
 }

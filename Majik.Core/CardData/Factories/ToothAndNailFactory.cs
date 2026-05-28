@@ -141,38 +141,37 @@ public static class ToothAndNailFactory
                 BotIntent.Tutor,         // library tutor — strict card advantage
                 BotIntent.CheatIntoPlay, // hand → battlefield, classic finisher mode
             },
-            EffectFactory: p =>
-            {
-                // Honor either the multi-pick list (entwine path supplies
-                // both indices) or the legacy scalar ModeIndex.
-                var indices = p.ModeIndexes is { Count: > 0 } list
-                    ? list
-                    : (p.ModeIndex.HasValue ? new[] { p.ModeIndex.Value } : Array.Empty<int>());
-
-                var effectsOut = new List<IEffect>();
-                var seen = new HashSet<int>();
-                foreach (var raw in indices)
-                {
-                    if (raw < 0 || raw >= TotalModes) continue;
-                    if (!seen.Add(raw)) continue;       // CR 700.2d — each mode at most once
-                    // Note: no PickCount cap here. Entwine (CR 702.41 /
-                    // 700.2e) lets both modes resolve when the additional
-                    // cost is paid; the cap is the caller's responsibility
-                    // until EntwineAdditionalCost ships.
-
-                    switch (raw)
-                    {
-                        case ModeTutor:
-                            effectsOut.Add(BuildTutorEffect(caster));
-                            break;
-                        case ModeReanimateFromHand:
-                            effectsOut.Add(BuildReanimateFromHandEffect(caster));
-                            break;
-                    }
-                }
-                return effectsOut;
-            });
+            EffectFactory: p => BuildEffectsForModes(p, caster));
     }
+
+    private static IReadOnlyList<IEffect> BuildEffectsForModes(ChosenSpellParams p, Player caster)
+    {
+        // Honor either the multi-pick list (entwine path supplies both
+        // indices) or the legacy scalar ModeIndex.
+        var indices = p.ModeIndexes is { Count: > 0 } list
+            ? list
+            : (p.ModeIndex.HasValue ? new[] { p.ModeIndex.Value } : Array.Empty<int>());
+
+        var effectsOut = new List<IEffect>();
+        var seen = new HashSet<int>();
+        foreach (var raw in indices)
+        {
+            if (raw < 0 || raw >= TotalModes) continue;
+            if (!seen.Add(raw)) continue; // CR 700.2d — each mode at most once
+            // Note: no PickCount cap here. Entwine (CR 702.41 / 700.2e)
+            // lets both modes resolve when the additional cost is paid.
+            var effect = BuildEffectForMode(raw, caster);
+            if (effect != null) effectsOut.Add(effect);
+        }
+        return effectsOut;
+    }
+
+    private static IEffect? BuildEffectForMode(int modeIndex, Player caster) => modeIndex switch
+    {
+        ModeTutor => BuildTutorEffect(caster),
+        ModeReanimateFromHand => BuildReanimateFromHandEffect(caster),
+        _ => null,
+    };
 
     /// <summary>
     /// Mode 0 effect: prompt the caster's agent for up to two creature
@@ -182,38 +181,7 @@ public static class ToothAndNailFactory
     private static IEffect BuildTutorEffect(Player caster) =>
         new Effect("Tooth and Nail — search library for up to two creatures", () =>
         {
-            bool IsCreature(ICard c) => c.HasType(CardType.Creature);
-
-            var picks = new List<ICard>(capacity: MaxCreaturesPerMode);
-            var agent = AgentRegistry.Get(caster);
-
-            // First pick — agent may decline (return null) for "up to two".
-            var firstCandidates = caster.Zones.Library.GetCards().Where(IsCreature).ToList();
-            if (firstCandidates.Count > 0)
-            {
-                ICard? first = agent != null
-                    ? agent.ChooseLibraryPickAsync(ctx: null, firstCandidates, "creature card")
-                        .GetAwaiter().GetResult()
-                    : firstCandidates[0];
-                if (first != null) picks.Add(first);
-            }
-
-            // Second pick — exclude the first pick. Agent may decline.
-            if (picks.Count > 0)
-            {
-                var secondCandidates = caster.Zones.Library.GetCards()
-                    .Where(c => IsCreature(c) && !ReferenceEquals(c, picks[0]))
-                    .ToList();
-                if (secondCandidates.Count > 0)
-                {
-                    ICard? second = agent != null
-                        ? agent.ChooseLibraryPickAsync(ctx: null, secondCandidates, "creature card")
-                            .GetAwaiter().GetResult()
-                        : secondCandidates[0];
-                    if (second != null) picks.Add(second);
-                }
-            }
-
+            var picks = PickUpToTwoCreatures(caster.Zones.Library, caster, "creature card");
             foreach (var pick in picks)
             {
                 caster.Zones.Library.RemoveCard(pick);
@@ -222,8 +190,7 @@ public static class ToothAndNailFactory
             }
 
             // CR 701.20a — shuffle once after the search effect resolves,
-            // even when zero / one card was found (the search still
-            // happened).
+            // even when zero / one card was found.
             LibraryShuffle.ShuffleLibrary(caster, "tooth-and-nail/tutor");
         });
 
@@ -236,53 +203,60 @@ public static class ToothAndNailFactory
     private static IEffect BuildReanimateFromHandEffect(Player caster) =>
         new Effect("Tooth and Nail — put up to two creatures from hand onto the battlefield", () =>
         {
-            bool IsCreature(ICard c) => c.HasType(CardType.Creature);
-
-            var picks = new List<ICard>(capacity: MaxCreaturesPerMode);
-            var agent = AgentRegistry.Get(caster);
-
-            // First pick from hand.
-            var firstCandidates = caster.Zones.Hand.GetCards().Where(IsCreature).ToList();
-            if (firstCandidates.Count > 0)
-            {
-                ICard? first = agent != null
-                    ? agent.ChooseLibraryPickAsync(ctx: null, firstCandidates,
-                        "creature card from hand to put onto the battlefield")
-                        .GetAwaiter().GetResult()
-                    : firstCandidates[0];
-                if (first != null) picks.Add(first);
-            }
-
-            // Second pick — exclude the first.
-            if (picks.Count > 0)
-            {
-                var secondCandidates = caster.Zones.Hand.GetCards()
-                    .Where(c => IsCreature(c) && !ReferenceEquals(c, picks[0]))
-                    .ToList();
-                if (secondCandidates.Count > 0)
-                {
-                    ICard? second = agent != null
-                        ? agent.ChooseLibraryPickAsync(ctx: null, secondCandidates,
-                            "creature card from hand to put onto the battlefield")
-                            .GetAwaiter().GetResult()
-                        : secondCandidates[0];
-                    if (second != null) picks.Add(second);
-                }
-            }
-
-            var zones = ZoneServiceRegistry.Get(caster);
-            foreach (var pick in picks)
-            {
-                if (zones != null)
-                {
-                    zones.MoveCard(pick, ZoneType.Hand, ZoneType.Battlefield, caster);
-                }
-                else
-                {
-                    caster.Zones.Hand.RemoveCard(pick);
-                    caster.Zones.Battlefield.AddCard(pick);
-                    pick.SetZone(ZoneType.Battlefield);
-                }
-            }
+            var picks = PickUpToTwoCreatures(caster.Zones.Hand, caster,
+                "creature card from hand to put onto the battlefield");
+            PutCreaturesOntoBattlefield(picks, caster);
         });
+
+    // --- Picker / mover helpers -------------------------------------------
+
+    private static bool IsCreature(ICard c) => c.HasType(CardType.Creature);
+
+    private static List<ICard> PickUpToTwoCreatures(IZone zone, Player caster, string kindLabel)
+    {
+        var picks = new List<ICard>(capacity: MaxCreaturesPerMode);
+        var agent = AgentRegistry.Get(caster);
+
+        // First pick — agent may decline (return null) for "up to two".
+        var first = PickOne(zone, agent, kindLabel, excluded: null);
+        if (first != null) picks.Add(first);
+
+        // Second pick — exclude the first.
+        if (picks.Count > 0)
+        {
+            var second = PickOne(zone, agent, kindLabel, excluded: picks[0]);
+            if (second != null) picks.Add(second);
+        }
+        return picks;
+    }
+
+    private static ICard? PickOne(IZone zone, IPlayerAgent? agent, string kindLabel, ICard? excluded)
+    {
+        var candidates = zone.GetCards()
+            .Where(c => IsCreature(c) && (excluded == null || !ReferenceEquals(c, excluded)))
+            .ToList();
+        if (candidates.Count == 0) return null;
+
+        if (agent == null) return candidates[0];
+        return agent.ChooseLibraryPickAsync(ctx: null, candidates, kindLabel)
+            .GetAwaiter().GetResult();
+    }
+
+    private static void PutCreaturesOntoBattlefield(List<ICard> picks, Player caster)
+    {
+        var zones = ZoneServiceRegistry.Get(caster);
+        foreach (var pick in picks)
+        {
+            if (zones != null)
+            {
+                zones.MoveCard(pick, ZoneType.Hand, ZoneType.Battlefield, caster);
+            }
+            else
+            {
+                caster.Zones.Hand.RemoveCard(pick);
+                caster.Zones.Battlefield.AddCard(pick);
+                pick.SetZone(ZoneType.Battlefield);
+            }
+        }
+    }
 }
