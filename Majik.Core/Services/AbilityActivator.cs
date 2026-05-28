@@ -91,11 +91,4 @@ public class AbilityActivator
         }
     }
 
-    /// <summary>
-    /// Activate an ability (simplified version for backward compatibility).
-    /// </summary>
-    public void ActivateAbility(IActivatedAbility ability, Player player)
-    {
-        ActivateAbility(ability, player, null, null);
-    }
 }
