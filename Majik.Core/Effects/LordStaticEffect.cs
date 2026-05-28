@@ -25,11 +25,18 @@ namespace Majik.Core.Effects;
 /// ANY player — used by Engineered Plague ("All creatures of the chosen
 /// type get -1/-1."). When allPlayers is true, opponentsOnly is
 /// ignored.</para>
+///
+/// <para>Pass <c>matchingSubtype: null</c> to skip the subtype filter
+/// entirely — the effect applies to ALL creature permanents in the
+/// relevant controller scope. Used by Waker of Waves ("Creatures your
+/// opponents control get -1/-0.") where no creature type restriction
+/// exists. CR 613.7c — scope is still governed by opponentsOnly /
+/// allPlayers / includeSelf flags.</para>
 /// </summary>
 public sealed class LordStaticEffect : ContinuousEffect
 {
     private readonly Permanent _source;
-    private readonly CardSubtype _subtype;
+    private readonly CardSubtype? _subtype;
     private readonly int _power;
     private readonly int _toughness;
     private readonly IReadOnlyList<string> _grantedKeywords;
@@ -37,9 +44,31 @@ public sealed class LordStaticEffect : ContinuousEffect
     private readonly bool _opponentsOnly;
     private readonly bool _allPlayers;
 
+    /// <summary>
+    /// Construct with a specific creature-type filter.
+    /// </summary>
     public LordStaticEffect(
         Permanent source,
         CardSubtype matchingSubtype,
+        int power = 1,
+        int toughness = 1,
+        IReadOnlyList<string>? grantedKeywords = null,
+        bool includeSelf = false,
+        bool opponentsOnly = false,
+        bool allPlayers = false)
+        : this(source, (CardSubtype?)matchingSubtype, power, toughness,
+               grantedKeywords, includeSelf, opponentsOnly, allPlayers)
+    {
+    }
+
+    /// <summary>
+    /// Construct with an optional creature-type filter. Pass
+    /// <paramref name="matchingSubtype"/> as <c>null</c> to apply the
+    /// effect to ALL creatures in the relevant scope (no subtype gate).
+    /// </summary>
+    public LordStaticEffect(
+        Permanent source,
+        CardSubtype? matchingSubtype,
         int power = 1,
         int toughness = 1,
         IReadOnlyList<string>? grantedKeywords = null,
@@ -77,7 +106,7 @@ public sealed class LordStaticEffect : ContinuousEffect
             // Merfolk" (allPlayers: true, includeSelf: false) so it must
             // exclude itself from its own buff.
             if (!_includeSelf && ReferenceEquals(creature, _source)) return false;
-            return creature.HasSubtype(_subtype);
+            return _subtype == null || creature.HasSubtype(_subtype.Value);
         }
         var sameController = ReferenceEquals(creature.Controller, _source.Controller);
         if (_opponentsOnly)
@@ -91,7 +120,8 @@ public sealed class LordStaticEffect : ContinuousEffect
             if (!sameController) return false;
             if (!_includeSelf && ReferenceEquals(creature, _source)) return false;
         }
-        return creature.HasSubtype(_subtype);
+        // _subtype == null → no type restriction; all creatures in scope match.
+        return _subtype == null || creature.HasSubtype(_subtype.Value);
     }
 
     public override void Apply(CreatureCharacteristics chars)
