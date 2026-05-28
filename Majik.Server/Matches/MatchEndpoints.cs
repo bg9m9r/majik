@@ -48,6 +48,13 @@ public static class MatchEndpoints
             .WithName("SubmitMatchCommand")
             .RequireRateLimiting(RateLimitPolicies.InMatch);
 
+        // Slice 5a — per-viewer auto-pass preferences. Caller PUTs a
+        // full AutoPassPrefs snapshot; the next priority window picks
+        // it up. Party-only authz. 204 NoContent on success.
+        group.MapPut("/{id:guid}/me/prefs", SetAutoPassPrefs)
+            .WithName("SetAutoPassPrefs")
+            .RequireRateLimiting(RateLimitPolicies.InMatch);
+
         // Annotate the response shape so ng-openapi-gen emits a typed
         // GameStateDto return on the frontend client. Minimal-API infers
         // void otherwise (the handler returns IResult, which the spec
@@ -176,6 +183,16 @@ public static class MatchEndpoints
         if (svc == null) return MongoUnavailable();
         var sub = SubOf(user); if (sub == null) return Results.Unauthorized();
         var r = await svc.AbandonAsync(sub, id, ct);
+        return r.IsSuccess ? Results.NoContent() : ErrorToResult(r.Error!);
+    }
+
+    private static async Task<IResult> SetAutoPassPrefs(
+        Guid id, AutoPassPrefs body, ClaimsPrincipal user,
+        [FromServices] MatchService? svc, CancellationToken ct)
+    {
+        if (svc == null) return MongoUnavailable();
+        var sub = SubOf(user); if (sub == null) return Results.Unauthorized();
+        var r = await svc.SetAutoPassPrefsAsync(sub, id, body, ct);
         return r.IsSuccess ? Results.NoContent() : ErrorToResult(r.Error!);
     }
 

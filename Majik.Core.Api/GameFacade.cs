@@ -518,7 +518,9 @@ public sealed class GameFacade
         int firstPlayerSlot = 0,
         int maxTurns = 30,
         CancellationToken ct = default,
-        Majik.Core.Random.GameRandom? rng = null)
+        Majik.Core.Random.GameRandom? rng = null,
+        Func<Player, Majik.Core.Game.IAutoPassPrefsView?>? autoPassPrefsProvider = null,
+        Func<DateTime>? clock = null)
     {
         if (_loopTask != null || _fullGameTask != null)
         {
@@ -528,6 +530,30 @@ public sealed class GameFacade
         var orderedPlayers = firstPlayerSlot == 1
             ? new[] { _bob, _alice }
             : new[] { _alice, _bob };
+
+        // Slice 5a — server-side auto-pass. Build a per-seat prefs
+        // resolver that maps the engine's Player back through the
+        // caller-supplied provider. Bot seats: BotPlayerAgent drives
+        // itself, so the wired provider should return null for the bot
+        // seat (the server's MatchService only writes prefs for the
+        // human seat sub). If no provider was passed (legacy tests),
+        // every seat returns null → auto-pass disabled (pre-Slice-5a
+        // behaviour preserved).
+        Func<Player, Majik.Core.Game.IAutoPassPrefsView?>? prefsForLoop = null;
+        if (autoPassPrefsProvider != null)
+        {
+            prefsForLoop = player =>
+            {
+                // Never auto-pass for a seat whose effective agent isn't
+                // a RemoteAgent — that seat is bot-driven and must reach
+                // its own ChoosePriorityActionAsync to decide. Defence-
+                // in-depth: even if the caller's provider returns prefs
+                // for the bot sub, we suppress here.
+                var effective = ReferenceEquals(player, _alice) ? _aliceAgentEffective : _bobAgentEffective;
+                if (effective is not RemoteAgent) return null;
+                return autoPassPrefsProvider(player);
+            };
+        }
 
         var driver = new GameDriver(
             players: orderedPlayers,
@@ -550,7 +576,13 @@ public sealed class GameFacade
             // CR 305.2 — TurnDriver resets the tracker per turn and the
             // PriorityLoop it builds each round consults the same instance
             // to gate PlayLand actions.
-            landDropTracker: LandDrops);
+            landDropTracker: LandDrops,
+            // Slice 5a — auto-pass plumbing forwarded into every per-round
+            // PriorityLoop the TurnDriver builds. PriorityKinds.Build is
+            // the single source of truth for "is this a dead window?".
+            autoPassPrefsProvider: prefsForLoop,
+            isPassOnlyDeadWindow: ctx => PriorityKinds.IsPassOnly(PriorityKinds.Build(ctx)),
+            clock: clock);
 
         var settled = _nextPromptSignal.Task;
         // CR 103.2 / 103.4 / 103.7 — the starting player is decided UPSTREAM

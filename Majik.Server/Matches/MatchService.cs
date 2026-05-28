@@ -50,6 +50,12 @@ public sealed class MatchService
     private readonly MatchFacadeBridge? _facadeBridge;
     private readonly MatchReplayBuffer? _replayBuffer;
     private readonly IBotMatchScheduler _botScheduler;
+    // Slice 5a — per-(match, sub) auto-pass prefs. The engine consults
+    // this on every priority window to decide whether to short-circuit
+    // the human's prompt. Null = no prefs surface registered (legacy
+    // callers / tests), and the loop falls back to its always-prompt
+    // pre-Slice-5a behaviour.
+    private readonly AutoPassPrefsStore? _autoPassPrefs;
     private readonly ILogger<MatchService>? _logger;
 
     public MatchService(
@@ -70,8 +76,10 @@ public sealed class MatchService
         IDeckOwnershipPolicy? deckOwnershipPolicy = null,
         MatchFacadeBridge? facadeBridge = null,
         MatchReplayBuffer? replayBuffer = null,
-        IBotMatchScheduler? botScheduler = null)
+        IBotMatchScheduler? botScheduler = null,
+        AutoPassPrefsStore? autoPassPrefs = null)
     {
+        _autoPassPrefs = autoPassPrefs;
         _matches = matches;
         _profiles = profiles;
         _dice = dice;
@@ -663,7 +671,48 @@ public sealed class MatchService
         if (_gameFactory != null && match.GameId is Guid gid)
         {
             var facade = _gameFactory.Get(gid);
-            facade?.StartFullGameAsync(firstPlayerSlot);
+            // Slice 5a — wire a per-seat AutoPassPrefs provider into the
+            // engine. The provider maps the engine's Player (Alice/Bob)
+            // back to the corresponding match sub, then to the store.
+            // Bot seats (sub starts with "bot:") return null so the bot
+            // agent's own ChoosePriorityActionAsync is never short-
+            // circuited; the store also fully guards via Has() — a sub
+            // for which no entry has ever been written returns null.
+            // We capture matchId so the lambda is self-contained; the
+            // facade outlives this call by the duration of the game.
+            Func<Majik.Core.Players.Player, Majik.Core.Game.IAutoPassPrefsView?>? prefsProvider = null;
+            if (_autoPassPrefs != null && facade != null)
+            {
+                var prefsMatchId = match.Id;
+                var creatorSub = match.Creator.Sub;
+                var opponentSub = match.Opponent?.Sub;
+                var aliceId = facade.Alice.Id;
+                var prefsStore = _autoPassPrefs;
+                prefsProvider = player =>
+                {
+                    // Map engine seat → wire sub. Creator → Alice; Opponent → Bob.
+                    var sub = player.Id == aliceId ? creatorSub : opponentSub;
+                    // Bot seats: stamped "bot:<archetype>" by CreateBotMatchAsync.
+                    // Never auto-pass on a bot seat — the BotPlayerAgent
+                    // must reach its own decision path.
+                    if (sub == null || sub.StartsWith("bot:", StringComparison.Ordinal))
+                    {
+                        return null;
+                    }
+                    // Opt-in semantics: auto-pass is DISABLED until the
+                    // portal has explicitly PUT a prefs snapshot for this
+                    // (matchId, sub) — at which point the recorded prefs
+                    // (defaults or otherwise) drive the gate. Pre-Slice-5a
+                    // clients that never call PUT keep their always-prompt
+                    // behaviour and the LayerAgreement / older harness
+                    // tests aren't disturbed by the engine racing ahead.
+                    // Snapshot read — concurrent prefs updates land in
+                    // the next priority window's read (per spec).
+                    if (!prefsStore.Has(prefsMatchId, sub)) return null;
+                    return prefsStore.Get(prefsMatchId, sub);
+                };
+            }
+            facade?.StartFullGameAsync(firstPlayerSlot, autoPassPrefsProvider: prefsProvider);
         }
         _timeoutScheduler?.Schedule(matchId, firstPlayerSub, match.ClockMinutes * 60_000L);
         _hub?.Publish(matchId, "match.play-draw-chosen",
@@ -808,6 +857,10 @@ public sealed class MatchService
         // Tear down engine→SignalR bridge: match is over, no further
         // EventDto / PromptDto traffic should reach the hub group.
         _facadeBridge?.Detach(matchId);
+        // Slice 5a — terminal state, evict per-(matchId, *) auto-pass
+        // prefs so the store doesn't grow unbounded across the server's
+        // lifetime. Idempotent on a no-match-found.
+        _autoPassPrefs?.EvictMatch(matchId);
 
         if (!moved) return Result.Fail<MatchDto>(new MatchError("cannot-concede"));
 
@@ -850,6 +903,10 @@ public sealed class MatchService
         }
         if (_ownership != null) await _ownership.ReleaseAsync(matchId, ct);
         if (_forwarder != null) await _forwarder.OnReleasedAsync(matchId, ct);
+        // Slice 5a — abandon is terminal; evict prefs (matches the
+        // Concede / Timeout posture so the store sheds the same set of
+        // entries regardless of which terminal path was taken).
+        _autoPassPrefs?.EvictMatch(matchId);
         _hub?.Publish(matchId, "match.state-changed",
             new { matchId, state = "Abandoned", transitionedAt = now });
         return Result.Ok(true);
@@ -984,6 +1041,8 @@ public sealed class MatchService
         // surface on the hub. (Facade itself is left to MatchCleanup /
         // a future explicit teardown; the bridge just unhooks.)
         _facadeBridge?.Detach(matchId);
+        // Slice 5a — timeout is terminal; evict per-match prefs.
+        _autoPassPrefs?.EvictMatch(matchId);
         _hub?.Publish(matchId, "match.timed-out", new { matchId, loserSub, winnerSub = winner });
         _hub?.Publish(matchId, "match.state-changed",
             new { matchId, state = "Completed", transitionedAt = now });
@@ -1019,6 +1078,52 @@ public sealed class MatchService
         // decklist is the creator's own data and was never meant to be
         // visible to lobby browsers (which are arbitrary authed users).
         return matches.Select(m => ToDto(m, viewerSub: null)).ToList();
+    }
+
+    // -----------------------------------------------------------------------
+    // SetAutoPassPrefsAsync — Slice 5a
+    // -----------------------------------------------------------------------
+
+    /// <summary>
+    /// Slice 5a — record the caller's auto-pass preferences for this
+    /// match. The next priority-window evaluation reads the updated
+    /// value (no in-flight prompt is mutated — a prompt already
+    /// outstanding completes on the caller's own submit).
+    ///
+    /// <para>Authz: caller must be party to the match (Creator or
+    /// Opponent sub matches the authed sub). Mirrors
+    /// <see cref="GetGameStateAsync"/>'s party check.</para>
+    ///
+    /// <para>404 when match doesn't exist; 403 (<c>forbidden</c>) when
+    /// caller isn't party. 400 (<c>invalid-request</c>) when the body
+    /// is null or PhaseStops is null (only FullControl + a non-null
+    /// dict are accepted shapes — empty dict = no stops).</para>
+    /// </summary>
+    public async Task<Result<bool>> SetAutoPassPrefsAsync(
+        string callerSub, Guid matchId, AutoPassPrefs prefs, CancellationToken ct)
+    {
+        if (prefs == null)
+            return Result.Fail<bool>(new MatchError("invalid-request", "prefs body is required"));
+        if (prefs.PhaseStops == null)
+            return Result.Fail<bool>(new MatchError("invalid-request", "PhaseStops is required (empty dict allowed)"));
+
+        var match = await _matches.GetByIdAsync(matchId, ct);
+        if (match == null) return Result.Fail<bool>(new MatchError("match-not-found"));
+
+        var isParty = callerSub == match.Creator.Sub || callerSub == match.Opponent?.Sub;
+        if (!isParty) return Result.Fail<bool>(new MatchError("forbidden"));
+
+        // Bot seats can't have prefs — defensive guard. (The endpoint
+        // only authzs human subs via JWT, so this should never trigger,
+        // but the explicit reject documents the intent.)
+        if (callerSub.StartsWith("bot:", StringComparison.Ordinal))
+            return Result.Fail<bool>(new MatchError("forbidden"));
+
+        // Null prefs store = legacy boot, swallow the write silently
+        // (the endpoint still 204s, since this is a "best-effort" UX
+        // hint — the engine just falls back to its always-prompt path).
+        _autoPassPrefs?.Set(matchId, callerSub, prefs);
+        return Result.Ok(true);
     }
 
     // -----------------------------------------------------------------------
