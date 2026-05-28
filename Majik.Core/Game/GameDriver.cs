@@ -31,6 +31,7 @@ public sealed class GameDriver
     private readonly Majik.Core.Random.GameRandom _rng;
     private readonly Majik.Core.Events.IEventBus? _eventBus;
     private readonly ZoneService _zoneService;
+    private readonly TriggerManager _triggerManager;
     private readonly ExtraTurnQueue _extraTurns = new();
 
     /// <summary>Effects that grant an extra turn enqueue here; the loop
@@ -61,6 +62,7 @@ public sealed class GameDriver
         _rng = rng ?? new Majik.Core.Random.GameRandom();
         _eventBus = eventBus;
         _zoneService = zoneService ?? throw new ArgumentNullException(nameof(zoneService));
+        _triggerManager = triggerManager ?? throw new ArgumentNullException(nameof(triggerManager));
 
         // CR 701.20 — register the game RNG + bus so factory closures
         // (e.g. SearchSpellFactory's tutor effects) can resolve the
@@ -161,6 +163,16 @@ public sealed class GameDriver
             var leylineAltCost = new OpeningHandLeylineAlternativeCost(
                 _zoneService, _agents);
             leylineAltCost.Attach(_eventBus);
+
+            // CR 103.5 / CR 603.7 — reveal-from-opening-hand → schedule
+            // first-upkeep look-at-top-4-keep-1-on-top-exile-rest
+            // (Devourer of Destiny). Sibling to the Leyline subscriber;
+            // both Attach against the same event so order is the
+            // subscription order on the bus (Leyline first → reveals run
+            // after Leylines settle).
+            var revealLook4 = new OpeningHandRevealLook4Trigger(
+                _agents, _triggerManager);
+            revealLook4.Attach(_eventBus);
 
             // Publish in turn order: starting player first, then the
             // remaining seats cycling forward. Matches CR 103.5
