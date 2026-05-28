@@ -28,6 +28,26 @@ public sealed class ReplacementBus
     }
 
     /// <summary>
+    /// Find an already-registered <see cref="IReplacementEffect{TIntent}"/>
+    /// whose <see cref="IReplacementEffect{TIntent}.Tag"/> matches
+    /// <paramref name="tag"/> by reference equality, or null when no such
+    /// effect is registered. Used by global-replacement factories
+    /// (<see cref="FinalityCounterReplacement"/>) to make
+    /// <c>Register</c> idempotent across factory calls without forcing
+    /// callers to coordinate.
+    /// </summary>
+    public IReplacementEffect<TIntent>? FindByTag<TIntent>(object tag) where TIntent : class
+    {
+        if (tag == null) return null;
+        foreach (var raw in _effects)
+        {
+            if (raw is not IReplacementEffect<TIntent> eff) continue;
+            if (ReferenceEquals(eff.Tag, tag)) return eff;
+        }
+        return null;
+    }
+
+    /// <summary>
     /// Drop all replacement effects flagged as expiring at end of turn —
     /// per-turn shields like Fog ("prevent all combat damage this turn")
     /// and one-shot "prevent the next N damage this turn" effects.
