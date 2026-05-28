@@ -29,7 +29,7 @@ namespace Majik.Core.Api;
 ///   <see cref="GameDriver"/> loop: shuffle, mulligan, multi-turn,
 ///   state-based actions, combat, win-condition checks (Phase 10).
 /// </summary>
-public sealed class GameFacade
+public sealed class GameFacade : IDisposable
 {
     /// <summary>
     /// Process-wide sink invoked when a per-match <see cref="EventBus"/>
@@ -175,6 +175,16 @@ public sealed class GameFacade
 
         _aliceAgentEffective = _aliceAgent;
         _bobAgentEffective = _bobAgent;
+
+        // Register both seats' agents so effect closures that can't receive
+        // an agent parameter (the v1 sync effect model — fetchland tutors,
+        // Sakura-Tribe Elder sacrifice, Path to Exile, Wish, Mox Diamond,
+        // etc.) can prompt the right player at resolution. Pre-fix this was
+        // never called and AgentRegistry.Get(player) always returned null,
+        // so every closure silently fell back to candidates[0] — the user
+        // never saw a prompt at the live table.
+        AgentRegistry.Set(_alice, _aliceAgentEffective);
+        AgentRegistry.Set(_bob, _bobAgentEffective);
 
         _loop = BuildPriorityLoop();
 
@@ -390,6 +400,12 @@ public sealed class GameFacade
 
         if (ReferenceEquals(seat, _alice)) _aliceAgentEffective = agent;
         else _bobAgentEffective = agent;
+
+        // Mirror the swap into AgentRegistry so effect closures (fetchland
+        // tutor, Sakura-Tribe Elder, Path to Exile, Wish, Mox Diamond, etc.)
+        // prompt the seat's NEW agent — otherwise a bot swap would still
+        // hit the RemoteAgent originally registered at construction time.
+        AgentRegistry.Set(seat, agent);
 
         _loop = BuildPriorityLoop();
     }
@@ -883,5 +899,17 @@ public sealed class GameFacade
         private readonly Action _dispose;
         public Subscription(Action dispose) { _dispose = dispose; }
         public void Dispose() => _dispose();
+    }
+
+    /// <summary>
+    /// Unregister this facade's player→agent bindings from the static
+    /// <see cref="AgentRegistry"/>. Per-player <c>Remove</c> instead of
+    /// <see cref="AgentRegistry.Clear"/> so concurrent matches keep their
+    /// own seats. Idempotent.
+    /// </summary>
+    public void Dispose()
+    {
+        AgentRegistry.Remove(_alice);
+        AgentRegistry.Remove(_bob);
     }
 }
