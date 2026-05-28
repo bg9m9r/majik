@@ -44,12 +44,12 @@ public sealed class SacrificeSelfCost : ICost
     /// (CR 701.16a). Ownership is irrelevant for sacrifice — control is
     /// what matters.
     /// </remarks>
-    public bool CanPay(Player caster)
+    public bool CanPay(Player player)
     {
-        if (caster == null) return false;
-        return ReferenceEquals(_self.Controller, caster)
+        if (player == null) return false;
+        return ReferenceEquals(_self.Controller, player)
                && _self.Zone == ZoneType.Battlefield
-               && caster.Zones.Battlefield.ContainsCard(_self);
+               && player.Zones.Battlefield.ContainsCard(_self);
     }
 
     /// <inheritdoc/>
@@ -60,22 +60,22 @@ public sealed class SacrificeSelfCost : ICost
     /// ownership differ (stolen permanents go to their OWNER's
     /// graveyard, CR 701.16a / CR 614 zone-change ordering).
     /// </remarks>
-    public void Pay(Player caster)
+    public void Pay(Player player)
     {
-        if (caster == null) throw new ArgumentNullException(nameof(caster));
+        if (player == null) throw new ArgumentNullException(nameof(player));
 
-        if (!CanPay(caster))
+        if (!CanPay(player))
             throw new InvalidPlayerActionException(
                 $"Cannot pay {Description}: {_self.Name} is not on " +
-                $"{caster.Name}'s battlefield.");
+                $"{player.Name}'s battlefield.");
 
         // CR 701.16a — sacrificed permanents go to their OWNER's graveyard,
         // not the activating player's. Route through the owner so this
         // behaves correctly when the activating player has stolen the
         // permanent (its Controller is the caster, but Owner stays put).
-        var owner = _self.Owner ?? caster;
+        var owner = _self.Owner ?? player;
 
-        caster.Zones.Battlefield.RemoveCard(_self);
+        player.Zones.Battlefield.RemoveCard(_self);
         owner.Zones.Graveyard.AddCard(_self);
         // Zone.AddCard internally calls card.SetZone — no manual SetZone
         // needed.
