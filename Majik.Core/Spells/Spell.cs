@@ -115,6 +115,22 @@ public class Spell : ISpell
     public bool WasCastFromHand { get; set; }
 
     /// <summary>
+    /// CR 601.2 / CR 113.5 — "cast from library" runtime sentinel on the
+    /// resolving spell. Stamped <c>true</c> by
+    /// <see cref="Majik.Core.Game.SpellCastFlow"/> when the resolving
+    /// spell's source zone was <see cref="Majik.Core.Zones.ZoneType.Library"/>.
+    /// Read by ETB intervening-if clauses that gate on the "if it was cast
+    /// from your library" branch — Fblthp, the Lost's ETB is the canonical
+    /// consumer; the matching <see cref="Majik.Core.Cards.Card.WasCastFromLibrary"/>
+    /// mirror stamps the underlying card for resolve-body reads after
+    /// Stack → Battlefield.
+    ///
+    /// Defaults to <c>false</c> so hand-built test spells without an
+    /// explicit stamp are treated as non-library casts.
+    /// </summary>
+    public bool WasCastFromLibrary { get; set; }
+
+    /// <summary>
     /// CR 702.33b — "kicked" runtime sentinel on the resolving spell.
     /// Stamped <c>true</c> by <see cref="Majik.Core.Game.SpellCastFlow"/>
     /// when the cast layered a paid

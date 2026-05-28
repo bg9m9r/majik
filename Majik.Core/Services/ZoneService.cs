@@ -92,6 +92,17 @@ public class ZoneService
             {
                 permanent.Tap();
             }
+            // CR 400.7 / CR 603.6a — stamp "entered directly from library"
+            // sentinel so ETB abilities (Fblthp, the Lost's draw-2 clause)
+            // can check whether the card came from the library without a
+            // cast (Library → Battlefield, WasCast == false). Only stamped
+            // on this specific transition; cast-from-library entries use
+            // WasCastFromLibrary instead.
+            if (fromZone == ZoneType.Library && card is Card concreteForLibraryPlaced
+                && !concreteForLibraryPlaced.WasCast)
+            {
+                concreteForLibraryPlaced.SetWasPlacedFromLibrary(true);
+            }
             // CR 614.1d — ETB-counter replacement effects accumulated their
             // amount onto the intent; apply now after the permanent has
             // landed so SBAs (Rule 704.5f) see the correct power/toughness.
@@ -133,6 +144,13 @@ public class ZoneService
             // object; a later re-cast / blink / token copy must start
             // from a clean slate. Mirrors WasCast's lifecycle above.
             concreteForCastClear.ClearWasCastFromHand();
+            // CR 400.7 — mirror cast-from-library sentinel lifecycle. Same
+            // shape as WasCastFromHand: survives Stack → Battlefield but a
+            // subsequent battlefield exit resets the object.
+            concreteForCastClear.ClearWasCastFromLibrary();
+            // CR 400.7 — clear the placed-from-library sentinel on
+            // battlefield exit (matching the WasCastFromLibrary lifecycle).
+            concreteForCastClear.ClearWasPlacedFromLibrary();
         }
     }
 
