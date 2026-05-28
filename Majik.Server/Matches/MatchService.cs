@@ -320,7 +320,16 @@ public sealed class MatchService
             }
             catch (DeckLoadException ex)
             {
-                return Result.Fail<MatchDto>(new MatchError("deck-invalid", ex.Message));
+                // Don't surface ex.Message — it names specific cards / deck ids
+                // (e.g. "unknown card at load time: <name>"), which leaks
+                // internal load detail. Mirror the CardsEndpoints posture: log
+                // the full message server-side, return a generic client message
+                // (same code/status). (Info leak hardening.)
+                _logger?.LogWarning(ex,
+                    "Bot match create: deck load failed. MatchId={MatchId} CreatorSub={CreatorSub} Detail={Detail}",
+                    matchId, creator.Sub, ex.Message);
+                return Result.Fail<MatchDto>(new MatchError(
+                    "deck-invalid", "One or more cards in the deck are invalid"));
             }
             catch (Exception ex)
             {
@@ -565,7 +574,15 @@ public sealed class MatchService
             }
             catch (DeckLoadException ex)
             {
-                return Result.Fail<MatchDto>(new MatchError("deck-invalid", ex.Message));
+                // Don't surface ex.Message — it names specific cards / deck ids,
+                // leaking internal load detail. Log full detail server-side,
+                // return a generic client message (same code/status). Mirrors
+                // the CardsEndpoints "don't surface ex.Message" posture.
+                _logger?.LogWarning(ex,
+                    "Join match: deck load failed. MatchId={MatchId} CallerSub={CallerSub} Detail={Detail}",
+                    matchId, callerSub, ex.Message);
+                return Result.Fail<MatchDto>(new MatchError(
+                    "deck-invalid", "One or more cards in the deck are invalid"));
             }
             catch (Exception ex)
             {
@@ -1020,6 +1037,15 @@ public sealed class MatchService
         if (match.GameId is not Guid gid) return Result.Fail<bool>(new MatchError("game-not-started"));
         if (_gameFactory == null) return Result.Fail<bool>(new MatchError("game-not-started"));
 
+        // Input-bounds guard (DoS). Reject pathologically large X / list
+        // payloads BEFORE the command reaches the engine — a huge ChooseX or
+        // a multi-million-element target/attacker/blocker list would force
+        // large allocations and CPU spins inside the engine before it ever
+        // rejects the illegal action. See CommandValidator for the caps and
+        // rationale. Well-behaved clients/bots never trip this.
+        if (CommandValidator.Validate(command) is { } boundsError)
+            return Result.Fail<bool>(boundsError);
+
         // Fast path: this replica owns the facade in-process.
         var facade = _gameFactory.Get(gid);
         if (facade != null)
@@ -1037,7 +1063,33 @@ public sealed class MatchService
             var seatId = callerSub == match.Creator.Sub ? facade.Alice.Id : facade.Bob.Id;
             command = command with { PlayerId = seatId };
 
-            await facade.SubmitAsync(command, ct);
+            try
+            {
+                await facade.SubmitAsync(command, ct);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                // Caller disconnect / shutdown — propagate, not a client error.
+                throw;
+            }
+            catch (Exception ex)
+            {
+                // The engine throws (e.g. InvalidOperationException) when a
+                // command is illegal for the current prompt — wrong command
+                // type, no pending prompt, an instance id not in the engine's
+                // candidate set, etc. Left uncaught these bubble to the global
+                // UseExceptionHandler, which returns the exception TYPE NAME to
+                // the client (info leak) as a 500. Mirror the deck-load catch
+                // posture: log the full detail server-side, hand the client a
+                // clean 4xx "invalid-command" with NO type/message detail.
+                _logger?.LogWarning(ex,
+                    "Engine rejected submitted command. " +
+                    "MatchId={MatchId} GameId={GameId} CallerSub={CallerSub} CommandType={CommandType}",
+                    matchId, gid, callerSub, command.GetType().Name);
+                return Result.Fail<bool>(new MatchError(
+                    "invalid-command",
+                    "The command was not valid for the current game state."));
+            }
             // The submitted command resolved the engine's pending TCS for
             // this seat, so any prompt previously buffered for the caller
             // is no longer authoritative. If the engine emits a fresh
