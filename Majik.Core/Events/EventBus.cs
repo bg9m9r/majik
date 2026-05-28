@@ -75,9 +75,9 @@ public class EventBus : IEventBus
             }
         }
 
-        if (_asyncHandlers.TryGetValue(type, out var async))
+        if (_asyncHandlers.TryGetValue(type, out var asyncHandlers))
         {
-            foreach (var handler in async.ToArray())
+            foreach (var handler in asyncHandlers.ToArray())
             {
                 if (handler is Func<T, Task> typed)
                     SafeFireAndForget(() => typed(@event), @event);
@@ -109,9 +109,9 @@ public class EventBus : IEventBus
             }
         }
 
-        if (_asyncHandlers.TryGetValue(type, out var async))
+        if (_asyncHandlers.TryGetValue(type, out var asyncHandlers))
         {
-            foreach (var handler in async.ToArray())
+            foreach (var handler in asyncHandlers.ToArray())
             {
                 if (handler is Func<T, Task> typed)
                     await SafeAwait(() => typed(@event), @event).ConfigureAwait(false);
