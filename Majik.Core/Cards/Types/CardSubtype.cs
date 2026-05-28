@@ -370,4 +370,9 @@ public enum CardSubtype
     /// <summary>Archon creature subtype — Archon of Cruelty (Modern Horizons 2),
     /// Archon of Justice, Archon of the Triumvirate. CR 205.3m.</summary>
     Archon,
+
+    /// <summary>Utrom creature subtype — Krang, Master Mind (Universes Beyond:
+    /// Teenage Mutant Ninja Turtles). The Utroms are an alien brain-shaped
+    /// species from the TMNT universe; Krang is the most prominent. CR 205.3m.</summary>
+    Utrom,
 }
