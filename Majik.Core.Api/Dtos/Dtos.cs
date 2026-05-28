@@ -38,7 +38,7 @@ public sealed record CardSnapshotDto(
     IReadOnlyList<AbilityDto> Abilities,
     string ProducedManaColors = "");
 
-public sealed record AbilityDto(string Kind, string Description);
+public sealed record AbilityDto(string Kind, string Description, Guid? Id = null);
 
 public sealed record StackObjectDto(
     Guid Id,

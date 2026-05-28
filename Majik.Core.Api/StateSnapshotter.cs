@@ -166,7 +166,7 @@ public static class StateSnapshotter
 
     private static AbilityDto SnapshotAbility(IAbility ability) => ability switch
     {
-        IActivatedAbility a => new AbilityDto("Activated", a.GetType().Name),
+        IActivatedAbility a => new AbilityDto("Activated", a.GetType().Name, a.Id),
         ITriggeredAbility => new AbilityDto("Triggered", "triggered ability"),
         IStaticAbility => new AbilityDto("Static", "static ability"),
         _ => new AbilityDto(ability.GetType().Name, ability.ToString() ?? ""),

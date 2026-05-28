@@ -76,4 +76,57 @@ public class StateSnapshotterTests
         dto.Stack[0].ControllerId.Should().Be(alice.Id);
         dto.Stack[0].Description.Should().Be("Bolt");
     }
+
+    [Fact]
+    public void Snapshot_ActivatedAbilityOnCard_AbilityDtoExposesId()
+    {
+        // A permanent with one IActivatedAbility — the DTO must carry the
+        // ability's stable Guid so clients can reference it in
+        // ActivateAbilityCommand(permanentInstanceId, abilityId).
+        var alice = new Player("Alice", 20);
+        var bear = new Creature("Pinger", "2U", 1, 1) { Owner = alice };
+        alice.Zones.Library.AddCard(bear);
+        var zones = new ZoneService(_bus);
+        zones.MoveCardTo(bear, ZoneType.Battlefield, controller: alice);
+
+        var ability = new ActivatedAbility(bear, alice);
+        bear.AddAbility(ability);
+
+        var dto = StateSnapshotter.Snapshot(
+            Guid.NewGuid(), 1, PhaseStateType.PreCombatMain, alice,
+            new[] { alice }, new Majik.Core.Stack.Stack(_bus));
+
+        var cardDto = dto.Players.Single(p => p.Id == alice.Id)
+                         .Battlefield.Cards
+                         .Single(c => c.InstanceId == bear.InstanceId);
+
+        var abilityDto = cardDto.Abilities.Should().ContainSingle(a => a.Kind == "Activated")
+                                .Subject;
+        abilityDto.Id.Should().Be(ability.Id);
+    }
+
+    [Fact]
+    public void Snapshot_StaticAbilityOnCard_AbilityDtoIdIsNull()
+    {
+        // Clients don't activate static abilities, so Id should remain null.
+        var alice = new Player("Alice", 20);
+        var bear = new Creature("Bear", "1G", 2, 2) { Owner = alice };
+        alice.Zones.Library.AddCard(bear);
+        var zones = new ZoneService(_bus);
+        zones.MoveCardTo(bear, ZoneType.Battlefield, controller: alice);
+
+        bear.AddAbility(new KeywordAbility("Flying", bear, alice));
+
+        var dto = StateSnapshotter.Snapshot(
+            Guid.NewGuid(), 1, PhaseStateType.PreCombatMain, alice,
+            new[] { alice }, new Majik.Core.Stack.Stack(_bus));
+
+        var cardDto = dto.Players.Single(p => p.Id == alice.Id)
+                         .Battlefield.Cards
+                         .Single(c => c.InstanceId == bear.InstanceId);
+
+        var abilityDto = cardDto.Abilities.Should().ContainSingle(a => a.Kind == "Static")
+                                .Subject;
+        abilityDto.Id.Should().BeNull();
+    }
 }
