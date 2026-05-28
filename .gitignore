@@ -54,3 +54,9 @@ data/modern-*.txt
 # https://magic.wizards.com/en/rules and place it at the repo root. See
 # RULES_REFERENCE.md.
 MagicCompRules*.txt
+
+# Modern banned-and-restricted list (Scryfall authoritative dump) — fetched
+# locally for dev reference. Card text/legality data is freely reusable, but
+# the file is checkout-only by convention — refresh with a Scryfall
+# `banned:modern` search.
+ModernBanlist.txt
