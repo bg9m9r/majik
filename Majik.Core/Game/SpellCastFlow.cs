@@ -674,6 +674,17 @@ public sealed class SpellCastFlow
                 concreteForHandCast.SetWasCastFromHand(true);
             }
         }
+
+        // CR 601.2 / CR 113.5 — strict "cast from library" sentinel for
+        // ETB intervening-if clauses (Fblthp, the Lost's draw-2 rider).
+        if (sourceZoneAtCast == ZoneType.Library)
+        {
+            spell.WasCastFromLibrary = true;
+            if (card is Card concreteForLibraryCast)
+            {
+                concreteForLibraryCast.SetWasCastFromLibrary(true);
+            }
+        }
     }
 
     /// <summary>CR 702.10 / CR 106.4 — mana-provenance haste rider (Arena of

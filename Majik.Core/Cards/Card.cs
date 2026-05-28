@@ -545,6 +545,80 @@ public class Card : ICard
     }
 
     /// <summary>
+    /// CR 601.2 / CR 113.5 — "cast from library" sentinel. Stamped
+    /// <c>true</c> by <see cref="Majik.Core.Game.SpellCastFlow"/> when the
+    /// card's source zone at cast time was
+    /// <see cref="Majik.Core.Zones.ZoneType.Library"/> (Future Sight, Narset,
+    /// Possibility Storm, etc.). Read by ETB intervening-if clauses that
+    /// gate on the "if you cast it from your library" branch — Fblthp, the
+    /// Lost's ETB draw-2 rider is the canonical consumer.
+    ///
+    /// <para>Survives Stack → Battlefield so ETB triggers can observe the
+    /// stamp immediately after the zone move. Cleared on battlefield exit
+    /// (any destination) by <see cref="Majik.Core.Services.ZoneService"/>,
+    /// matching CR 400.7 — the card is a "new object" after each subsequent
+    /// zone change.</para>
+    ///
+    /// <para>Mirrors <see cref="Majik.Core.Spells.Spell.WasCastFromLibrary"/>
+    /// on the resolving stack object.</para>
+    ///
+    /// <para>Defaults to <c>false</c> so hand-built test cards without an
+    /// explicit stamp are treated as non-library casts.</para>
+    /// </summary>
+    public bool WasCastFromLibrary { get; private set; }
+
+    /// <summary>Stamp the cast-from-library sentinel. Called by
+    /// <see cref="Majik.Core.Game.SpellCastFlow"/> immediately before the
+    /// card moves Library → Stack (CR 601.2i).</summary>
+    public void SetWasCastFromLibrary(bool value)
+    {
+        WasCastFromLibrary = value;
+    }
+
+    /// <summary>Clear the cast-from-library sentinel. Called by
+    /// <see cref="Majik.Core.Services.ZoneService"/> when a permanent leaves
+    /// the battlefield to any other zone (CR 400.7 — new object on each
+    /// zone change). Idempotent.</summary>
+    public void ClearWasCastFromLibrary()
+    {
+        WasCastFromLibrary = false;
+    }
+
+    /// <summary>
+    /// CR 400.7 / CR 603.6a — "entered directly from library" sentinel.
+    /// Stamped <c>true</c> by <see cref="Majik.Core.Services.ZoneService"/>
+    /// when it observes a Library → Battlefield move where
+    /// <see cref="WasCast"/> is <c>false</c> (i.e. the card was placed onto
+    /// the battlefield without being cast — Glimpse of Nature style, Sneak
+    /// Attack on a library-top card, etc.). Cleared on battlefield exit to
+    /// any other zone (CR 400.7 — new object per zone change).
+    ///
+    /// <para>Pairs with <see cref="WasCastFromLibrary"/> to cover the full
+    /// Fblthp, the Lost draw-2 condition: "If it entered from your library
+    /// OR was cast from your library." A factory checks
+    /// <c>WasCastFromLibrary || WasPlacedFromLibrary</c>.</para>
+    ///
+    /// <para>Defaults to <c>false</c>.</para>
+    /// </summary>
+    public bool WasPlacedFromLibrary { get; private set; }
+
+    /// <summary>Stamp the placed-from-library sentinel. Called by
+    /// <see cref="Majik.Core.Services.ZoneService"/> when it observes a
+    /// Library → Battlefield move without a cast marker.</summary>
+    public void SetWasPlacedFromLibrary(bool value)
+    {
+        WasPlacedFromLibrary = value;
+    }
+
+    /// <summary>Clear the placed-from-library sentinel. Called by
+    /// <see cref="Majik.Core.Services.ZoneService"/> on battlefield exit.
+    /// Idempotent.</summary>
+    public void ClearWasPlacedFromLibrary()
+    {
+        WasPlacedFromLibrary = false;
+    }
+
+    /// <summary>
     /// CR 702.33b — "kicked" runtime sentinel. Stamped <c>true</c> by
     /// <see cref="Majik.Core.Costs.KickerAdditionalCost.Pay"/> at cast
     /// announcement when the caster pays the optional kicker mana
