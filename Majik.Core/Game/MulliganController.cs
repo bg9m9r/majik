@@ -6,14 +6,18 @@ using Majik.Core.Zones;
 namespace Majik.Core.Game;
 
 /// <summary>
-/// Runs the London mulligan loop (Rule 103.4) for a single player:
-/// draw 7 → ask agent keep-or-mull → on mull, shuffle hand back and repeat
-/// (cap at 7 mulligans). When the agent finally keeps, the player puts N
-/// cards on the bottom of their library where N = mulligans taken.
+/// Runs the London mulligan loop (CR 103.4) for a single player:
+/// draw 7 → ask agent keep-or-mull → on mull, put the hand back into
+/// the library, SHUFFLE THE LIBRARY (CR 103.4 — "shuffles their hand
+/// into their library"), then re-prompt (cap at 7 mulligans). When
+/// the agent finally keeps, the player puts N cards on the bottom of
+/// their library where N = mulligans taken.
 ///
-/// First-pass simplification: "bottom" picks the first N cards in hand
-/// (Phase 10.5 can add a `ChooseCardsToBottomAsync` prompt). Library is
-/// not actually shuffled either — that's a deck-builder concern.
+/// The shuffle goes through <see cref="LibraryShuffle.ShuffleLibrary"/>
+/// so it uses the per-player <see cref="GameRandom"/> registered in
+/// <see cref="GameRandomRegistry"/> (deterministic replay) and
+/// publishes a <see cref="LibraryShuffledEvent"/> to any subscribed
+/// event bus — same shape as game-start + tutor shuffles.
 /// </summary>
 public sealed class MulliganController
 {
@@ -52,13 +56,21 @@ public sealed class MulliganController
                 return mulligansTaken;
             }
 
-            // Put hand back in library (no real shuffle yet — Phase 10.5).
+            // CR 103.4 — "the player shuffles their hand into their
+            // library". Move the 7 in hand back to the library, then
+            // shuffle the WHOLE library (not just the returned cards).
+            // Pre-fix this step skipped the shuffle, so the next iteration
+            // just bubbled the cards previously at positions 7..13 to
+            // the top of the library and drew an entirely predictable
+            // (i.e. non-mulligan) hand. CR 103.4 explicitly requires a
+            // shuffle.
             foreach (var card in hand)
             {
                 player.Zones.Hand.RemoveCard(card);
                 player.Zones.Library.AddCard(card);
                 card.SetZone(ZoneType.Library);
             }
+            LibraryShuffle.ShuffleLibrary(player, "mulligan");
             mulligansTaken++;
         }
     }
