@@ -650,12 +650,37 @@ public sealed class TurnDriver
     {
         var eligibleAttackers = attacker.Zones.Battlefield.GetCards()
             .OfType<Creature>()
-            .Where(c => !c.HasSummoningSickness && !c.IsTapped)
+            // CR 508.1c / 302.6 — eligible iff untapped AND (no summoning
+            // sickness OR has haste). Without the haste check, freshly
+            // hasted creatures (Lightning Greaves, Hexdrinker, etc.) would
+            // never be offered as attackers.
+            .Where(c => !c.IsTapped
+                && (!c.HasSummoningSickness || Majik.Core.Combat.CombatAbilities.HasHaste(c)))
             .ToList();
         var eligibleBlockers = defender.Zones.Battlefield.GetCards()
             .OfType<Creature>()
             .Where(c => !c.IsTapped)
             .ToList();
+
+        // UX fast-path: if the active player has zero eligible attackers,
+        // skip the DeclareAttackers prompt and the per-attacker plumbing
+        // entirely. Full Control opts back into prompting (the human asked
+        // for every window). Mirrors the "skip combat" affordance shipped
+        // by MTG Arena / MTGO. Rules: no attackers declared → no combat
+        // damage step would fire anyway (CR 508.2 — empty Attackers list
+        // is legal). We do still publish StepStartedEvent for the phase
+        // (SetPhase already fired at the caller) so "until end of combat"
+        // and step-aware triggers continue to land.
+        var fullControl = _autoPassPrefsProvider?.Invoke(attacker)?.FullControl ?? false;
+        if (eligibleAttackers.Count == 0 && !fullControl)
+        {
+            // Still run a priority round on the empty combat step so the
+            // defender can react to triggers / play instants (rare but
+            // legal — e.g. opponent's Stoneforge Mystic triggers on combat).
+            // The auto-pass gate will burn through this on default prefs.
+            await PriorityRound(attacker, ct);
+            return;
+        }
 
         var ctx = new GameContext(
             attacker, _players, attacker, _currentTurnNumber, _currentPhase, _stack);
