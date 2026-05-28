@@ -32,6 +32,12 @@ public static class MatchRegistration
         // wipes history. Promote to Mongo if real games push past the
         // per-match entry cap on a regular basis.
         services.AddSingleton<MatchReplayBuffer>();
+        // Slice 5a — per-(matchId, sub) auto-pass prefs. Process-local;
+        // a restart resets every entry to AutoPassPrefs.Default (which is
+        // safe — the engine's auto-pass gate is narrow + opt-out). The
+        // store is read on every priority window inside the engine's
+        // PriorityLoop, so singleton lifetime is required.
+        services.AddSingleton<AutoPassPrefsStore>();
         // Engine → SignalR bridge. Singleton so the same instance holds
         // subscriptions across the request lifetime of MatchService
         // (scoped) — every match attaches once at facade-create and
