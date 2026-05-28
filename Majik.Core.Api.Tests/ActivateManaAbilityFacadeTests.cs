@@ -61,7 +61,7 @@ public class ActivateManaAbilityFacadeTests
     }
 
     [Fact]
-    public async Task ActivateAlreadyTappedMountain_NoCrashNoPoolChange_StillHoldsPriority()
+    public async Task ActivateAlreadyTappedMountain_RejectedByWirePreCheck_NoPoolChange()
     {
         var facade = GameFacade.Create("Alice", "Bob",
             Array.Empty<ICard>(), Array.Empty<ICard>());
@@ -72,12 +72,20 @@ public class ActivateManaAbilityFacadeTests
 
         await facade.StartAsync();
 
-        // Engine swallows the InvalidPlayerActionException from
-        // ManaAbilityActivator.CanActivate. The round must continue.
-        await facade.SubmitAsync(new ActivateManaAbilityCommand(mountain.InstanceId, "R")
-        {
-            PlayerId = facade.Alice.Id,
-        });
+        // PriorityKinds gates ActivateManaAbilityCommand on
+        // IManaAbility.CanActivate(); a tapped source returns false, so
+        // the kind is not advertised and the wire pre-check in
+        // RemoteAgent.Submit rejects the command up front. Engine state
+        // remains pristine: the mana pool never gets touched, and the
+        // priority loop keeps waiting for the expected PassPriority.
+        var act = async () => await facade.SubmitAsync(
+            new ActivateManaAbilityCommand(mountain.InstanceId, "R")
+            {
+                PlayerId = facade.Alice.Id,
+            });
+        await act.Should().ThrowAsync<InvalidOperationException>()
+            .Where(e => e.Message.Contains("PassPriorityCommand"));
+
         facade.Alice.ManaPool.Red.Should().Be(0, "tapped source must not produce mana.");
 
         // Priority loop is still healthy — both players can pass to close

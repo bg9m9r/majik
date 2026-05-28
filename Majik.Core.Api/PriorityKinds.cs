@@ -71,24 +71,47 @@ public static class PriorityKinds
         }
 
         // CR 605.1a / 605.3a — mana abilities are activated whenever the
-        // controller has priority. Advertise the command kind whenever the
-        // player controls at least one permanent with a mana ability; the
-        // engine validates legality (untapped, CanActivate, etc.) on submit.
+        // controller has priority. We gate on IManaAbility.CanActivate()
+        // (which already incorporates the summoning-sickness + IsTapped
+        // checks for {T}-cost mana abilities — CR 302.6) so a Delighted
+        // Halfling that just came down doesn't keep prompting a dead
+        // window. False NEGATIVES would lock the user out, so we err on
+        // the permissive side: if any mana source plausibly CanActivate,
+        // surface the kind and let the engine validate on submit.
         var battlefield = ctx.Self.Zones.Battlefield.GetCards();
         var hasManaSource = battlefield.Any(c =>
-            c.Abilities.OfType<IManaAbility>().Any());
+            c.Abilities.OfType<IManaAbility>().Any(a => a.CanActivate()));
         if (hasManaSource)
         {
             kinds.Add(typeof(ActivateManaAbilityCommand));
         }
 
         // CR 602.1a — non-mana activated abilities (fetchland sacrifice,
-        // equip, planeswalker loyalty, "tap: do X", etc.) — same
-        // permissive posture as the mana branch above. False negatives
-        // here would lock the user out of fetchlands / equip / loyalty.
+        // equip, planeswalker loyalty, "tap: do X", etc.). IActivatedAbility
+        // doesn't expose a CanActivate predicate today, so apply a
+        // conservative source-level narrowing: a tapped permanent or a
+        // summoning-sick non-haste creature can't pay a {T} cost (the
+        // overwhelmingly common shape) — skip those sources. Permanents
+        // with non-tap activated abilities (e.g. {2}: do X) that happen
+        // to be sick are a rare false-negative; the trade-off heavily
+        // favours killing the per-step prompt spam on a board of just
+        // summoning-sick creatures.
         var hasActivatedAbility = battlefield.Any(c =>
-            c.Abilities.OfType<IActivatedAbility>()
-                .Any(a => a is not IManaAbility));
+        {
+            if (!c.Abilities.OfType<IActivatedAbility>().Any(a => a is not IManaAbility))
+            {
+                return false;
+            }
+            if (c is Majik.Core.Cards.Permanent p && p.IsTapped) return false;
+            if (c is Majik.Core.Cards.Creature cr
+                && cr.HasSummoningSickness
+                && !cr.Abilities.OfType<KeywordAbility>().Any(k =>
+                    string.Equals(k.Keyword, "Haste", StringComparison.OrdinalIgnoreCase)))
+            {
+                return false;
+            }
+            return true;
+        });
         if (hasActivatedAbility)
         {
             kinds.Add(typeof(ActivateAbilityCommand));

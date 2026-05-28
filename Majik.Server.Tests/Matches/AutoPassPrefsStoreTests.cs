@@ -20,7 +20,12 @@ public class AutoPassPrefsStoreTests
 
         prefs.Should().BeSameAs(AutoPassPrefs.Default);
         prefs.FullControl.Should().BeFalse();
-        prefs.PhaseStops.Should().BeEmpty();
+        // Standard MTG-client opponent-turn pattern — wake up at
+        // beginning-of-combat + end step, auto-pass everywhere else on
+        // the opponent's turn.
+        prefs.PhaseStops.Should().HaveCount(2);
+        prefs.PhaseStops["BeginningOfCombat"].Should().Be("theirs");
+        prefs.PhaseStops["End"].Should().Be("theirs");
     }
 
     [Fact]

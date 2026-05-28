@@ -140,17 +140,34 @@ public sealed record PromptDto(
 /// </list>
 ///
 /// <para>Defaults: <see cref="FullControl"/> = false,
-/// <see cref="PhaseStops"/> empty — auto-pass enabled, no per-phase
-/// stops, which is the closest match to the v1 "always prompt" behaviour
-/// short-circuited only by the engine-narrowed dead-window detection.</para>
+/// <see cref="PhaseStops"/> = standard MTG-client opponent-turn stops
+/// (<c>BeginningOfCombat</c> + <c>End</c>, both <c>"theirs"</c>). The
+/// engine auto-passes every other window on the opponent's turn — the
+/// user is woken up at the two windows where they realistically want to
+/// respond (pre-attacker-declaration + end step). Own-turn windows have
+/// no stops by default; the empty-action gate (PriorityKinds.IsPassOnly)
+/// auto-passes any dead window and the user still drives every action
+/// they actually have available.</para>
 /// </summary>
 public sealed record AutoPassPrefs(
     bool FullControl,
     IReadOnlyDictionary<string, string> PhaseStops)
     : Majik.Core.Game.IAutoPassPrefsView
 {
-    /// <summary>Default prefs: FullControl off, no phase stops.</summary>
+    /// <summary>
+    /// Default prefs: FullControl off, opponent-turn stops at
+    /// <c>BeginningOfCombat</c> and <c>End</c>. Mirrors the default
+    /// hold-priority pattern shipped by MTG Arena / MTGO when Full
+    /// Control is off — the human is auto-passed everywhere except the
+    /// two windows where they typically want to interact on the
+    /// opponent's turn (cast an instant before attackers are declared,
+    /// or before the turn ends).
+    /// </summary>
     public static readonly AutoPassPrefs Default = new(
         FullControl: false,
-        PhaseStops: new Dictionary<string, string>());
+        PhaseStops: new Dictionary<string, string>
+        {
+            [nameof(Majik.Core.StateMachine.PhaseStateType.BeginningOfCombat)] = "theirs",
+            [nameof(Majik.Core.StateMachine.PhaseStateType.End)] = "theirs",
+        });
 }
