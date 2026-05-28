@@ -1,14 +1,14 @@
 namespace Majik.Bot.Decks;
 
 /// <summary>
-/// Ruby Storm archetype — Modern combo built around Birgi, God of
-/// Storytelling and Ruby Medallion. Cast a chain of cheap red spells,
-/// generate floating mana off Birgi / Medallion / rituals, dig with
-/// Reckless Impulse + Burning Inquiry, then close with Past in Flames
-/// + Grapeshot (or assemble lethal Lightning Bolt copies via Galvanic
-/// Iteration). Sideboard NOT wired in v1.
+/// Ruby Storm archetype — Modern Ral, Monsoon Mage combo. Ral + Ruby
+/// Medallion + rituals chain cheap red spells for floating mana; Wrenn's
+/// Resolve, Reckless Impulse, Artist's Talent, Glimpse the Impossible dig;
+/// Past in Flames + Grapeshot or Wish-board finish the turn. Sideboard NOT
+/// wired in v1.
 ///
-/// Source: MTGGoldfish Modern metagame (Ruby Storm, current snapshot).
+/// Source: MTGGoldfish Modern metagame (verified 2026-05 against current
+/// archetype top-3 mainboards; representative list snapshotted).
 ///
 /// Many cards in this list are not yet IsImplemented=true; BotDeckValidator
 /// logs warnings at startup. Engine treats unknown cards as vanilla until
@@ -18,28 +18,29 @@ internal static class RubyStormDeck
 {
     public static IReadOnlyList<string> Cards { get; } = new[]
     {
-        // Creatures (8)
-        "Birgi, God of Storytelling", "Birgi, God of Storytelling", "Birgi, God of Storytelling", "Birgi, God of Storytelling",
-        "Goblin Electromancer", "Goblin Electromancer", "Goblin Electromancer", "Goblin Electromancer",
-
-        // Spells / artifacts (38)
-        "Ruby Medallion", "Ruby Medallion", "Ruby Medallion", "Ruby Medallion",
-        "Manamorphose", "Manamorphose", "Manamorphose", "Manamorphose",
-        "Desperate Ritual", "Desperate Ritual", "Desperate Ritual", "Desperate Ritual",
-        "Pyretic Ritual", "Pyretic Ritual", "Pyretic Ritual", "Pyretic Ritual",
-        "Burning Inquiry", "Burning Inquiry", "Burning Inquiry", "Burning Inquiry",
-        "Reckless Impulse", "Reckless Impulse", "Reckless Impulse", "Reckless Impulse",
-        "Past in Flames", "Past in Flames",
-        "Grapeshot", "Grapeshot",
-        "Wishclaw Talisman", "Wishclaw Talisman",
-        "Galvanic Iteration", "Galvanic Iteration",
-        "Reforge the Soul", "Reforge the Soul",
-        "Lightning Bolt", "Lightning Bolt", "Lightning Bolt", "Lightning Bolt",
-
-        // Lands (14)
-        "Mountain", "Mountain", "Mountain", "Mountain", "Mountain", "Mountain",
-        "Spirebluff Canal", "Spirebluff Canal", "Spirebluff Canal", "Spirebluff Canal",
-        "Scalding Tarn", "Scalding Tarn",
+        "Arid Mesa", "Arid Mesa", "Arid Mesa",
+        "Artist's Talent", "Artist's Talent",
         "Bloodstained Mire", "Bloodstained Mire",
+        "Commercial District",
+        "Desperate Ritual", "Desperate Ritual", "Desperate Ritual", "Desperate Ritual",
+        "Elegant Parlor",
+        "Flashback", "Flashback",
+        "Gemstone Caverns",
+        "Glimpse the Impossible", "Glimpse the Impossible",
+        "Grapeshot",
+        "Manamorphose", "Manamorphose", "Manamorphose", "Manamorphose",
+        "Mountain", "Mountain", "Mountain", "Mountain",
+        "Past in Flames", "Past in Flames", "Past in Flames",
+        "Pyretic Ritual", "Pyretic Ritual", "Pyretic Ritual", "Pyretic Ritual",
+        "Ral, Monsoon Mage", "Ral, Monsoon Mage", "Ral, Monsoon Mage", "Ral, Monsoon Mage",
+        "Reckless Impulse", "Reckless Impulse", "Reckless Impulse", "Reckless Impulse",
+        "Ruby Medallion", "Ruby Medallion", "Ruby Medallion", "Ruby Medallion",
+        "Sacred Foundry",
+        "Scalding Tarn", "Scalding Tarn",
+        "Sunbaked Canyon",
+        "Valakut Awakening", "Valakut Awakening",
+        "Wish", "Wish",
+        "Wooded Foothills", "Wooded Foothills",
+        "Wrenn's Resolve", "Wrenn's Resolve", "Wrenn's Resolve", "Wrenn's Resolve",
     };
 }

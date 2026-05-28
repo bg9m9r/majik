@@ -1,13 +1,14 @@
 namespace Majik.Bot.Decks;
 
 /// <summary>
-/// Eldrazi Ramp archetype — Modern colorless Eldrazi ramp. Sanctum
-/// Weaver + Eldrazi Temple + Sowing Mycospawn accelerate into Kozilek's
-/// Command, Thought-Knot Seer, then big finishers (Ulamog, the Ceaseless
-/// Hunger / Emrakul, the Promised End). Chalice of the Void shores up
-/// the slow-start angle. Sideboard NOT wired in v1.
+/// Eldrazi Ramp archetype — Modern colorless Eldrazi with green ramp
+/// splash. Utopia Sprawl + Talisman of Impulse + Ugin's Labyrinth power out
+/// Sowing Mycospawn / Writhing Chrysalis early, then Emrakul, the Promised
+/// End / Sire of Seven Deaths / Ugin, Eye of the Storms close. Kozilek's
+/// Command / Malevolent Rumble dig and disrupt. Sideboard NOT wired in v1.
 ///
-/// Source: MTGGoldfish Modern metagame (Eldrazi Ramp, current snapshot).
+/// Source: MTGGoldfish Modern metagame (verified 2026-05 against current
+/// archetype top-3 mainboards; representative list snapshotted).
 ///
 /// Many cards in this list are not yet IsImplemented=true; BotDeckValidator
 /// logs warnings at startup. Engine treats unknown cards as vanilla until
@@ -17,31 +18,29 @@ internal static class EldraziRampDeck
 {
     public static IReadOnlyList<string> Cards { get; } = new[]
     {
-        // Creatures (22)
-        "Eldrazi Mimic", "Eldrazi Mimic", "Eldrazi Mimic", "Eldrazi Mimic",
-        "Matter Reshaper", "Matter Reshaper",
-        "Thought-Knot Seer", "Thought-Knot Seer", "Thought-Knot Seer", "Thought-Knot Seer",
-        "Reality Smasher", "Reality Smasher",
-        "Devourer of Destiny", "Devourer of Destiny", "Devourer of Destiny", "Devourer of Destiny",
-        "Sanctum Weaver", "Sanctum Weaver", "Sanctum Weaver", "Sanctum Weaver",
-        "Ulamog, the Ceaseless Hunger", "Ulamog, the Ceaseless Hunger",
-
-        // Spells (10)
-        "Kozilek's Command", "Kozilek's Command", "Kozilek's Command", "Kozilek's Command",
-        "Chalice of the Void", "Chalice of the Void", "Chalice of the Void", "Chalice of the Void",
-        "Sowing Mycospawn", "Sowing Mycospawn", "Sowing Mycospawn", "Sowing Mycospawn",
-
-        // Top end (2) — kept separately; counts above already include creature totals
-        "Emrakul, the Promised End", "Emrakul, the Promised End",
-
-        // Lands (22)
+        "Bojuka Bog",
+        "Cavern of Souls",
+        "Commercial District",
+        "Devourer of Destiny", "Devourer of Destiny",
         "Eldrazi Temple", "Eldrazi Temple", "Eldrazi Temple", "Eldrazi Temple",
-        "Cavern of Souls", "Cavern of Souls", "Cavern of Souls",
-        "Boseiju, Who Endures", "Boseiju, Who Endures",
-        "Wastes", "Wastes", "Wastes", "Wastes", "Wastes", "Wastes",
-        "The Mycosynth Gardens", "The Mycosynth Gardens",
-        "Sanctum of Ugin", "Sanctum of Ugin",
+        "Emrakul, the Promised End", "Emrakul, the Promised End", "Emrakul, the Promised End",
         "Forest", "Forest", "Forest",
-        "Karplusan Forest", "Karplusan Forest",
+        "Ghost Quarter",
+        "Kozilek's Command", "Kozilek's Command", "Kozilek's Command", "Kozilek's Command",
+        "Kozilek's Return", "Kozilek's Return",
+        "Malevolent Rumble", "Malevolent Rumble", "Malevolent Rumble", "Malevolent Rumble",
+        "Mutable Explorer",
+        "Shifting Woodland",
+        "Sire of Seven Deaths", "Sire of Seven Deaths", "Sire of Seven Deaths",
+        "Sowing Mycospawn", "Sowing Mycospawn", "Sowing Mycospawn", "Sowing Mycospawn",
+        "Stomping Ground",
+        "Talisman of Impulse", "Talisman of Impulse", "Talisman of Impulse", "Talisman of Impulse",
+        "Ugin's Labyrinth", "Ugin's Labyrinth", "Ugin's Labyrinth", "Ugin's Labyrinth",
+        "Ugin, Eye of the Storms",
+        "Utopia Sprawl", "Utopia Sprawl", "Utopia Sprawl", "Utopia Sprawl",
+        "Verdant Catacombs", "Verdant Catacombs",
+        "Wooded Foothills", "Wooded Foothills", "Wooded Foothills",
+        "World Breaker", "World Breaker",
+        "Writhing Chrysalis", "Writhing Chrysalis", "Writhing Chrysalis", "Writhing Chrysalis",
     };
 }
