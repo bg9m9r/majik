@@ -50,9 +50,10 @@ public class EntersWithCountersTests
         // "For each ..." shape might still match the simple binder if the
         // regex catches the trailing "enters with a +1/+1 counter on it".
         // That's lossy but acceptable — at most over-fires by one counter
-        // instead of producing zero behavior.
-        EntersWithCountersBinder.Bind(card, entity, bus);
-        // No assertion on bool — just guard against crashes here.
+        // instead of producing zero behavior. Contract here is "must not
+        // throw" — the bool return value is intentionally not pinned.
+        var act = () => EntersWithCountersBinder.Bind(card, entity, bus);
+        act.Should().NotThrow();
     }
 
     [Fact]

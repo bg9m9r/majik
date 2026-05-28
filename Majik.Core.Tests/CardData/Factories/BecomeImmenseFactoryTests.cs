@@ -175,9 +175,11 @@ public class BecomeImmenseFactoryTests
             X: null,
             Targets: new IReadOnlyList<object>[] { new object[] { nonCreature } },
             Mana: ManaPayment.Empty);
-        foreach (var e in def.EffectFactory(chosen)) e.Execute();
 
-        // Clean no-op: just must not throw.
+        // CR 608.2b — non-Creature resolver result → effect resolves as no-op.
+        // Contract: must not throw.
+        var act = () => { foreach (var e in def.EffectFactory(chosen)) e.Execute(); };
+        act.Should().NotThrow();
     }
 
     // ── Delve cast wiring ─────────────────────────────────────────────────────

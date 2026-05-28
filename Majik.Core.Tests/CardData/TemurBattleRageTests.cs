@@ -198,11 +198,16 @@ public class TemurBattleRageTests
             X: null,
             Targets: new IReadOnlyList<object>[] { new object[] { nonCreature } },
             Mana: ManaPayment.Empty);
-        foreach (var e in def.EffectFactory(chosen)) e.Execute();
 
-        // Clean no-op: nothing to assert — just must not throw.
-        var continuous = new ContinuousEffectsService();
-        continuous.ExpireEndOfTurn(); // must not throw
+        // CR 608.2b — non-Creature target → effect resolves as no-op. Contract:
+        // must not throw, and cleanup must not throw either.
+        var act = () =>
+        {
+            foreach (var e in def.EffectFactory(chosen)) e.Execute();
+            var continuous = new ContinuousEffectsService();
+            continuous.ExpireEndOfTurn();
+        };
+        act.Should().NotThrow();
     }
 
     // -----------------------------------------------------------------------

@@ -332,8 +332,10 @@ public class MatchSecurityTests : IClassFixture<TestMongoFixture>
         await hub.StartAsync();
         try
         {
-            // No exception → group join succeeded.
-            await hub.InvokeAsync("JoinMatch", matchDto!.Id);
+            // No exception → group join succeeded. Seated creator must be
+            // accepted into the hub group for their own match.
+            var act = async () => await hub.InvokeAsync("JoinMatch", matchDto!.Id);
+            await act.Should().NotThrowAsync();
         }
         finally
         {

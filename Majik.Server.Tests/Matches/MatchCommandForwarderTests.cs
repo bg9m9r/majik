@@ -32,8 +32,10 @@ public class MatchCommandForwarderTests
     public async Task OnClaimed_NoRedis_IsNoOp()
     {
         var forwarder = Build();
-        await forwarder.OnClaimedAsync(Guid.NewGuid(), CancellationToken.None);
-        // Just asserting no throw — without Redis the call is inert.
+
+        // Without Redis the claim notify is inert. Contract: must not throw.
+        var act = async () => await forwarder.OnClaimedAsync(Guid.NewGuid(), CancellationToken.None);
+        await act.Should().NotThrowAsync();
     }
 
     [Fact]
@@ -41,16 +43,30 @@ public class MatchCommandForwarderTests
     {
         var forwarder = Build();
         var matchId = Guid.NewGuid();
-        await forwarder.OnReleasedAsync(matchId, CancellationToken.None);
-        await forwarder.OnReleasedAsync(matchId, CancellationToken.None);
+
+        // Double-release for the same match id must be a clean no-op without
+        // Redis — contract: idempotent and non-throwing.
+        var act = async () =>
+        {
+            await forwarder.OnReleasedAsync(matchId, CancellationToken.None);
+            await forwarder.OnReleasedAsync(matchId, CancellationToken.None);
+        };
+        await act.Should().NotThrowAsync();
     }
 
     [Fact]
     public async Task StartAsync_NoRedis_DoesNotThrow()
     {
         var forwarder = Build();
-        await forwarder.StartAsync(CancellationToken.None);
-        await forwarder.StopAsync(CancellationToken.None);
+
+        // Lifecycle (start + stop) must be inert without Redis. Contract:
+        // must not throw — the forwarder simply has nothing to subscribe to.
+        var act = async () =>
+        {
+            await forwarder.StartAsync(CancellationToken.None);
+            await forwarder.StopAsync(CancellationToken.None);
+        };
+        await act.Should().NotThrowAsync();
     }
 
     [Fact]

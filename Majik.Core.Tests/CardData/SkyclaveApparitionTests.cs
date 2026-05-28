@@ -183,10 +183,14 @@ public class SkyclaveApparitionTests
         {
             Array.Empty<object>(),
         });
-        foreach (var e in etb.Effects) e.Execute();
 
-        // Nothing to assert beyond "no exception thrown". LTB test below
-        // verifies 0-target ETB leads to no token on LTB.
+        // "Up to one" with 0 targets — must not throw. (LTB test below
+        // verifies 0-target ETB leads to no token on LTB.)
+        var act = () => { foreach (var e in etb.Effects) e.Execute(); };
+        act.Should().NotThrow();
+
+        // And nothing on Bob's side ended up exiled.
+        _bob.Zones.Exile.GetCards().Should().BeEmpty();
     }
 
     // -----------------------------------------------------------------------

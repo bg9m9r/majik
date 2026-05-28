@@ -65,6 +65,10 @@ public class GameRandomTests
     public void FlipCoin_AbsentSeed_StillRunsWithoutError()
     {
         var rng = new GameRandom();
-        for (var i = 0; i < 10; i++) _ = rng.FlipCoin();
+
+        // Contract: seedless construction still produces flips without
+        // throwing. Repeated calls (10x) keep the surface area honest.
+        var act = () => { for (var i = 0; i < 10; i++) _ = rng.FlipCoin(); };
+        act.Should().NotThrow();
     }
 }

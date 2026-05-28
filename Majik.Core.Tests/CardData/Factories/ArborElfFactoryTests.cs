@@ -136,8 +136,10 @@ public class ArborElfFactoryTests
         var ability = GetUntapAbility(elf);
         // Do NOT set chosen targets — empty list path.
 
-        // Should not throw.
-        foreach (var e in ability.Effects) e.Execute();
+        // CR 608.2b — no chosen target → resolve-time no-op. The contract is
+        // "must not throw".
+        var act = () => { foreach (var e in ability.Effects) e.Execute(); };
+        act.Should().NotThrow();
     }
 
     [Fact]
