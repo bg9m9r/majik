@@ -89,6 +89,21 @@ public sealed record CounterType(string Name)
     public static readonly CounterType Stasis = new("Stasis");
 
     /// <summary>
+    /// CR 122.1m — Finality counters. "If a creature with one or more
+    /// finality counters on it would die, exile it instead." Introduced
+    /// in Ravnica Allegiance (Judith, the Scourge Diva's death-rider
+    /// variants) and reused widely on modern reanimator-with-rider
+    /// effects (Emperor of Bones, General Ferrous Rokiric, Wand of the
+    /// Worldsoul) so a cheated-in creature can't be looped through the
+    /// graveyard. Counter placement is delivered by the printed effect
+    /// that creates / returns the permanent ("with a finality counter
+    /// on it"); the global "if it would die, exile it instead"
+    /// replacement is wired by
+    /// <see cref="Majik.Core.Effects.FinalityCounterReplacement"/>.
+    /// </summary>
+    public static readonly CounterType Finality = new("Finality");
+
+    /// <summary>
     /// CR 122 — Fate counters. Card-specific marker used by Oblivion Stone
     /// (Mirrodin). Oblivion Stone's first activated ability puts a fate
     /// counter on each nonland permanent; its second destroys each nonland
