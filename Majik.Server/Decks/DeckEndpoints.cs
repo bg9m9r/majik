@@ -7,13 +7,14 @@ namespace Majik.Server.Decks;
 
 public static class DeckEndpoints
 {
-    public const string RateLimitPolicy = "authed-60-per-min";
+    // Deck CRUD is "expensive" — write-heavy, abuse-prone. 60 req/min.
+    public const string RateLimitPolicy = RateLimitPolicies.Expensive;
 
     public static IEndpointRouteBuilder MapDeckEndpoints(this IEndpointRouteBuilder routes)
     {
         var group = routes.MapGroup("/decks")
             .RequireAuthorization(AuthRegistration.AsPlayerPolicy)
-            .RequireRateLimiting(RateLimitPolicy)
+            .RequireRateLimiting(RateLimitPolicies.Expensive)
             .WithTags("Decks");
 
         group.MapGet("/", List).WithName("ListDecks")

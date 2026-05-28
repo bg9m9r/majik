@@ -9,7 +9,8 @@ namespace Majik.Server.Cards;
 /// Auth: <see cref="AuthRegistration.AsPlayerPolicy"/>.</summary>
 public static class CardsEndpoints
 {
-    public const string RateLimitPolicy = "authed-60-per-min";
+    // Card search is "expensive" — fan-out query over embedded card data. 60 req/min.
+    public const string RateLimitPolicy = RateLimitPolicies.Expensive;
 
     private const int DefaultLimit = 50;
     private const int MaxLimit = 200;
@@ -18,7 +19,7 @@ public static class CardsEndpoints
     {
         var group = routes.MapGroup("/cards")
             .RequireAuthorization(AuthRegistration.AsPlayerPolicy)
-            .RequireRateLimiting(RateLimitPolicy)
+            .RequireRateLimiting(RateLimitPolicies.Expensive)
             .WithTags("Cards");
 
         group.MapGet("/", Search)

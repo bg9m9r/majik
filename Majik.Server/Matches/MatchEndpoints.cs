@@ -10,44 +10,67 @@ namespace Majik.Server.Matches;
 
 public static class MatchEndpoints
 {
-    public const string RateLimitPolicy = "authed-60-per-min";
+    // Keep for backwards-compat references in tests; canonical names live in
+    // RateLimitPolicies.
+    public const string RateLimitPolicy = RateLimitPolicies.Expensive;
 
     public static IEndpointRouteBuilder MapMatchEndpoints(this IEndpointRouteBuilder routes)
     {
+        // Group default: "expensive" bucket (60 req/min).
+        // Per-priority-window routes override to "in-match" (600 req/min) so
+        // gameplay traffic doesn't hit the tight cap mid-game.
         var group = routes.MapGroup("/matches")
             .RequireAuthorization(AuthRegistration.AsPlayerPolicy)
-            .RequireRateLimiting(RateLimitPolicy)
+            .RequireRateLimiting(RateLimitPolicies.Expensive)
             .WithTags("Matches");
 
+        // --- "expensive" routes (inherit group policy) ---
         group.MapPost("/", Create).WithName("CreateMatch");
         group.MapGet("/", List).WithName("ListMatches");
         group.MapGet("/{id:guid}", Get).WithName("GetMatch");
         group.MapPost("/{id:guid}/join", Join).WithName("JoinMatch");
-        group.MapPost("/{id:guid}/roll", Roll).WithName("SubmitRoll");
-        group.MapPost("/{id:guid}/play-draw", PlayDraw).WithName("ChoosePlayOrDraw");
-        group.MapPost("/{id:guid}/concede", Concede).WithName("ConcedeMatch");
         group.MapDelete("/{id:guid}", Abandon).WithName("AbandonMatch");
 
-        group.MapPost("/{id:guid}/commands", SubmitCommand).WithName("SubmitMatchCommand");
+        // --- "in-match" routes (per-priority-window, 600 req/min) ---
+        group.MapPost("/{id:guid}/roll", Roll)
+            .WithName("SubmitRoll")
+            .RequireRateLimiting(RateLimitPolicies.InMatch);
+
+        group.MapPost("/{id:guid}/play-draw", PlayDraw)
+            .WithName("ChoosePlayOrDraw")
+            .RequireRateLimiting(RateLimitPolicies.InMatch);
+
+        group.MapPost("/{id:guid}/concede", Concede)
+            .WithName("ConcedeMatch")
+            .RequireRateLimiting(RateLimitPolicies.InMatch);
+
+        group.MapPost("/{id:guid}/commands", SubmitCommand)
+            .WithName("SubmitMatchCommand")
+            .RequireRateLimiting(RateLimitPolicies.InMatch);
+
         // Annotate the response shape so ng-openapi-gen emits a typed
         // GameStateDto return on the frontend client. Minimal-API infers
         // void otherwise (the handler returns IResult, which the spec
         // can't introspect into GameStateDto).
         group.MapGet("/{id:guid}/state", GetState)
             .WithName("GetMatchState")
+            .RequireRateLimiting(RateLimitPolicies.InMatch)
             .Produces<GameStateDto>(StatusCodes.Status200OK)
             .Produces<MatchError>(StatusCodes.Status404NotFound)
             .Produces<MatchError>(StatusCodes.Status403Forbidden)
             .Produces<MatchError>(StatusCodes.Status409Conflict);
+
         // Replay log download — MVP "share a finished game" capability.
         // Returns the in-memory capture of EventDto + BotDecision records
         // in arrival order. Access is gated to seated players via
         // MatchService.GetReplayAsync.
         group.MapGet("/{id:guid}/replay", GetReplay)
             .WithName("GetMatchReplay")
+            .RequireRateLimiting(RateLimitPolicies.InMatch)
             .Produces<MatchReplayDto>(StatusCodes.Status200OK)
             .Produces<MatchError>(StatusCodes.Status404NotFound)
             .Produces<MatchError>(StatusCodes.Status403Forbidden);
+
         return routes;
     }
 
