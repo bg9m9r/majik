@@ -631,8 +631,19 @@ public sealed class SpellCastFlow
             concreteForSurge.SetWasCastForSurge(true);
         }
 
-        // CR 701.5b — Uncounterable keyword marker.
+        // CR 701.5b — Uncounterable keyword marker (card carries the ability).
         if (HasUncounterableMarker(card))
+        {
+            spell.CannotBeCountered = true;
+        }
+
+        // CR 701.5b — one-shot "next spell can't be countered" rider from an
+        // activated ability (e.g. Mistrise Village's {U}{T} activation). The
+        // flag is consumed on the first cast so only that spell benefits.
+        // ConsumeNextSpellUncounterableForTurn returns true exactly once per
+        // activation and clears the entry; the OR preserves an existing stamp.
+        if (!spell.CannotBeCountered
+            && Majik.Core.Rules.CastingRestrictions.ConsumeNextSpellUncounterableForTurn(caster))
         {
             spell.CannotBeCountered = true;
         }
