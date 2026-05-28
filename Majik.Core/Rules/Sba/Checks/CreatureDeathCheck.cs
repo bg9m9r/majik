@@ -18,32 +18,40 @@ public sealed class CreatureDeathCheck : IStateBasedActionCheck
         var anyExecuted = false;
         foreach (var creature in ctx.Cards.OfType<Creature>().ToList())
         {
-            if (creature.Zone != ZoneType.Battlefield) continue;
-            if (CombatAbilities.HasIndestructible(creature)) continue;
-            // CR 702.12 / 613.1f — creatures granted indestructible by an
-            // external anthem (Darksteel Forge on an Artifact Creature)
-            // also resist the lethal-damage / zero-toughness destroy SBA.
-            if (Majik.Core.Rules.IndestructibleGrantRegistry.HasGrantedIndestructible(creature)) continue;
-
-            var dies = creature.IsDead() || creature.MarkedForDestructionByDeathtouch;
-            if (!dies) continue;
-
-            if (ctx.Replacements != null)
-            {
-                var result = ctx.Replacements.Apply(new DestroyIntent(creature));
-                if (result == null)
-                {
-                    creature.MarkedForDestructionByDeathtouch = false;
-                    continue;
-                }
-            }
-
-            if (ctx.ZoneService != null) ctx.ZoneService.MoveCardTo(creature, ZoneType.Graveyard);
-            else creature.SetZone(ZoneType.Graveyard);
-
-            ctx.EventBus?.Publish(new StateBasedActionExecutedEvent($"Creature {creature.Name} died"));
-            anyExecuted = true;
+            if (TryDestroyCreature(creature, ctx)) anyExecuted = true;
         }
         return anyExecuted;
+    }
+
+    /// <summary>CR 704.5f / 702.12 / 613.1f — destroy <paramref name="creature"/>
+    /// if it has lethal damage / 0 toughness, no indestructible (intrinsic or
+    /// externally granted), and no replacement intervenes. Returns true when
+    /// the SBA actually fired.</summary>
+    private static bool TryDestroyCreature(Creature creature, SbaContext ctx)
+    {
+        if (creature.Zone != ZoneType.Battlefield) return false;
+        if (CombatAbilities.HasIndestructible(creature)) return false;
+        // CR 702.12 / 613.1f — externally-granted indestructible (Darksteel
+        // Forge on an Artifact Creature) also resists the destroy SBA.
+        if (Majik.Core.Rules.IndestructibleGrantRegistry.HasGrantedIndestructible(creature)) return false;
+
+        var dies = creature.IsDead() || creature.MarkedForDestructionByDeathtouch;
+        if (!dies) return false;
+
+        if (ctx.Replacements != null)
+        {
+            var result = ctx.Replacements.Apply(new DestroyIntent(creature));
+            if (result == null)
+            {
+                creature.MarkedForDestructionByDeathtouch = false;
+                return false;
+            }
+        }
+
+        if (ctx.ZoneService != null) ctx.ZoneService.MoveCardTo(creature, ZoneType.Graveyard);
+        else creature.SetZone(ZoneType.Graveyard);
+
+        ctx.EventBus?.Publish(new StateBasedActionExecutedEvent($"Creature {creature.Name} died"));
+        return true;
     }
 }

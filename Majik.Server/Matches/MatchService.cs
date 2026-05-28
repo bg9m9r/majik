@@ -644,18 +644,15 @@ public sealed class MatchService
         string callerSub, Guid matchId, PlayDrawRequest request, CancellationToken ct)
     {
         var match = await _matches.GetByIdAsync(matchId, ct);
-        if (match == null) return Result.Fail<MatchDto>(new MatchError("match-not-found"));
-        if (match.State != MatchState.Rolling) return Result.Fail<MatchDto>(new MatchError("not-rolling"));
-        if (match.Roll == null || match.Roll.WinnerSub != callerSub)
-            return Result.Fail<MatchDto>(new MatchError("not-roll-winner"));
+        if (PlayDrawPreconditionError(match, callerSub) is { } preErr)
+            return Result.Fail<MatchDto>(preErr);
 
         var choice = request.Choice?.ToLowerInvariant();
         if (choice != "play" && choice != "draw")
             return Result.Fail<MatchDto>(new MatchError("invalid-choice"));
 
-        string firstPlayerSub = choice == "play" ? callerSub
-            : callerSub == match.Creator.Sub ? match.Opponent!.Sub : match.Creator.Sub;
-        int firstPlayerSlot = firstPlayerSub == match.Creator.Sub ? 0 : 1;
+        var firstPlayerSub = ResolveFirstPlayerSub(match!, callerSub, choice);
+        var firstPlayerSlot = firstPlayerSub == match!.Creator.Sub ? 0 : 1;
 
         var now = _clock.UtcNow;
         var update = Builders<Match>.Update
@@ -668,62 +665,94 @@ public sealed class MatchService
         var moved = await _matches.TryAtomicUpdateAsync(matchId, MatchState.Rolling, update, ct);
         if (!moved) return Result.Fail<MatchDto>(new MatchError("not-rolling"));
 
-        if (_gameFactory != null && match.GameId is Guid gid)
-        {
-            var facade = _gameFactory.Get(gid);
-            // Slice 5a — wire a per-seat AutoPassPrefs provider into the
-            // engine. The provider maps the engine's Player (Alice/Bob)
-            // back to the corresponding match sub, then to the store.
-            // Bot seats (sub starts with "bot:") return null so the bot
-            // agent's own ChoosePriorityActionAsync is never short-
-            // circuited; the store also fully guards via Has() — a sub
-            // for which no entry has ever been written returns null.
-            // We capture matchId so the lambda is self-contained; the
-            // facade outlives this call by the duration of the game.
-            Func<Majik.Core.Players.Player, Majik.Core.Game.IAutoPassPrefsView?>? prefsProvider = null;
-            if (_autoPassPrefs != null && facade != null)
-            {
-                var prefsMatchId = match.Id;
-                var creatorSub = match.Creator.Sub;
-                var opponentSub = match.Opponent?.Sub;
-                var aliceId = facade.Alice.Id;
-                var prefsStore = _autoPassPrefs;
-                prefsProvider = player =>
-                {
-                    // Map engine seat → wire sub. Creator → Alice; Opponent → Bob.
-                    var sub = player.Id == aliceId ? creatorSub : opponentSub;
-                    // Bot seats: stamped "bot:<archetype>" by CreateBotMatchAsync.
-                    // Never auto-pass on a bot seat — the BotPlayerAgent
-                    // must reach its own decision path.
-                    if (sub == null || sub.StartsWith("bot:", StringComparison.Ordinal))
-                    {
-                        return null;
-                    }
-                    // Opt-in semantics: auto-pass is DISABLED until the
-                    // portal has explicitly PUT a prefs snapshot for this
-                    // (matchId, sub) — at which point the recorded prefs
-                    // (defaults or otherwise) drive the gate. Pre-Slice-5a
-                    // clients that never call PUT keep their always-prompt
-                    // behaviour and the LayerAgreement / older harness
-                    // tests aren't disturbed by the engine racing ahead.
-                    // Snapshot read — concurrent prefs updates land in
-                    // the next priority window's read (per spec).
-                    if (!prefsStore.Has(prefsMatchId, sub)) return null;
-                    return prefsStore.Get(prefsMatchId, sub);
-                };
-            }
-            facade?.StartFullGameAsync(firstPlayerSlot, autoPassPrefsProvider: prefsProvider);
-        }
-        _timeoutScheduler?.Schedule(matchId, firstPlayerSub, match.ClockMinutes * 60_000L);
-        _hub?.Publish(matchId, "match.play-draw-chosen",
-            new { matchId, choice, firstPlayerSub });
-        _hub?.Publish(matchId, "match.state-changed",
-            new { matchId, state = "Playing", transitionedAt = now });
-        _hub?.Publish(matchId, "match.clock-update",
-            new { matchId, creatorMs = match.CreatorMillisRemaining, opponentMs = match.OpponentMillisRemaining, holder = firstPlayerSub, startedAt = now });
+        StartGameForFirstPlayer(match, firstPlayerSlot);
+        PublishPlayDrawTransitionEvents(match, choice!, firstPlayerSub, now);
 
         var fresh = (await _matches.GetByIdAsync(matchId, ct))!;
         return Result.Ok(ToDto(fresh, viewerSub: callerSub));
+    }
+
+    /// <summary>PlayDraw entry-gate checks: match exists, state is Rolling,
+    /// and the caller actually won the roll. Returns a structured error or
+    /// null when all preconditions hold.</summary>
+    private static MatchError? PlayDrawPreconditionError(Match? match, string callerSub)
+    {
+        if (match == null) return new MatchError("match-not-found");
+        if (match.State != MatchState.Rolling) return new MatchError("not-rolling");
+        if (match.Roll == null || match.Roll.WinnerSub != callerSub)
+            return new MatchError("not-roll-winner");
+        return null;
+    }
+
+    /// <summary>Compute the sub of whoever takes the first turn. "play" puts
+    /// the caller first; "draw" hands first turn to the opponent.</summary>
+    private static string ResolveFirstPlayerSub(Match match, string callerSub, string choice)
+        => choice == "play"
+            ? callerSub
+            : callerSub == match.Creator.Sub ? match.Opponent!.Sub : match.Creator.Sub;
+
+    /// <summary>Boot the engine for the just-decided first-player slot and
+    /// wire the Slice 5a auto-pass prefs provider so the engine can short-
+    /// circuit the human's priority prompt when prefs match.</summary>
+    private void StartGameForFirstPlayer(Match match, int firstPlayerSlot)
+    {
+        if (_gameFactory == null || match.GameId is not Guid gid) return;
+        var facade = _gameFactory.Get(gid);
+        var prefsProvider = BuildAutoPassPrefsProvider(match, facade);
+        facade?.StartFullGameAsync(firstPlayerSlot, autoPassPrefsProvider: prefsProvider);
+    }
+
+    /// <summary>Slice 5a — build the per-seat AutoPassPrefs provider. The
+    /// provider maps the engine's Player (Alice/Bob) back to the
+    /// corresponding match sub, then to the store. Bot seats (sub starts
+    /// with "bot:") return null so the BotPlayerAgent's own
+    /// <c>ChoosePriorityActionAsync</c> is never short-circuited; the store
+    /// also fully guards via <c>Has()</c> — a sub for which no entry has
+    /// ever been written returns null. Captures <paramref name="match"/>.Id
+    /// so the lambda is self-contained; the facade outlives this call by
+    /// the duration of the game.</summary>
+    private Func<Majik.Core.Players.Player, Majik.Core.Game.IAutoPassPrefsView?>?
+        BuildAutoPassPrefsProvider(Match match, Majik.Core.Api.GameFacade? facade)
+    {
+        if (_autoPassPrefs == null || facade == null) return null;
+        var prefsMatchId = match.Id;
+        var creatorSub = match.Creator.Sub;
+        var opponentSub = match.Opponent?.Sub;
+        var aliceId = facade.Alice.Id;
+        var prefsStore = _autoPassPrefs;
+        return player =>
+        {
+            var sub = player.Id == aliceId ? creatorSub : opponentSub;
+            if (sub == null || sub.StartsWith("bot:", StringComparison.Ordinal))
+            {
+                return null;
+            }
+            // Opt-in semantics: auto-pass is DISABLED until the portal has
+            // explicitly PUT a prefs snapshot for this (matchId, sub).
+            if (!prefsStore.Has(prefsMatchId, sub)) return null;
+            return prefsStore.Get(prefsMatchId, sub);
+        };
+    }
+
+    /// <summary>Fan out the post-PlayDraw events (timeout schedule + SignalR
+    /// hub publishes for play-draw-chosen / state-changed / clock-update).</summary>
+    private void PublishPlayDrawTransitionEvents(
+        Match match, string choice, string firstPlayerSub, DateTime now)
+    {
+        _timeoutScheduler?.Schedule(match.Id, firstPlayerSub, match.ClockMinutes * 60_000L);
+        _hub?.Publish(match.Id, "match.play-draw-chosen",
+            new { matchId = match.Id, choice, firstPlayerSub });
+        _hub?.Publish(match.Id, "match.state-changed",
+            new { matchId = match.Id, state = "Playing", transitionedAt = now });
+        _hub?.Publish(match.Id, "match.clock-update",
+            new
+            {
+                matchId = match.Id,
+                creatorMs = match.CreatorMillisRemaining,
+                opponentMs = match.OpponentMillisRemaining,
+                holder = firstPlayerSub,
+                startedAt = now,
+            });
     }
 
     // -----------------------------------------------------------------------
@@ -732,16 +761,11 @@ public sealed class MatchService
 
     public async Task<Result<MatchDto>> SubmitRollAsync(string callerSub, Guid matchId, CancellationToken ct)
     {
-        const int MaxTieRetries = 100;
-
         var match = await _matches.GetByIdAsync(matchId, ct);
-        if (match == null) return Result.Fail<MatchDto>(new MatchError("match-not-found"));
-        if (match.State != MatchState.Rolling) return Result.Fail<MatchDto>(new MatchError("not-rolling"));
+        if (SubmitRollPreconditionError(match, callerSub) is { } preErr)
+            return Result.Fail<MatchDto>(preErr);
 
-        bool isCreator = callerSub == match.Creator.Sub;
-        bool isOpponent = match.Opponent != null && callerSub == match.Opponent.Sub;
-        if (!isCreator && !isOpponent) return Result.Fail<MatchDto>(new MatchError("not-a-player"));
-
+        var isCreator = callerSub == match!.Creator.Sub;
         var existing = match.Roll ?? new MatchRoll();
 
         // Idempotent: if caller's slot already set, just return current snapshot.
@@ -751,77 +775,94 @@ public sealed class MatchService
             return Result.Ok(ToDto(match, viewerSub: callerSub));
         }
 
-        // Generate + persist ONLY this player's roll via a field-targeted CAS
-        // guarded that the slot was empty. Two concurrent submissions (one per
-        // seat) now each write their own field, so neither can clobber the
-        // other's value — the lost-update bug where both read the same Roll,
-        // mutated in-process, and wrote the whole object is closed (Slice 4a
-        // #5). The CAS also makes a racing same-seat double-submit a no-op.
-        int value = _dice.RollSingle();
+        var seatOutcome = await TryWriteCallerSeatRollAsync(matchId, callerSub, isCreator, ct);
+        if (seatOutcome.EarlyReturn is { } early) return early;
+
+        // Re-read to see whether BOTH slots are now filled.
+        var afterSet = await _matches.GetByIdAsync(matchId, ct);
+        await TryResolveRollWinnerAsync(matchId, afterSet, ct);
+
+        var fresh = (await _matches.GetByIdAsync(matchId, ct))!;
+        return Result.Ok(ToDto(fresh, viewerSub: callerSub));
+    }
+
+    private readonly record struct SeatRollOutcome(Result<MatchDto>? EarlyReturn);
+
+    /// <summary>SubmitRoll entry-gate checks: match exists, state is Rolling,
+    /// and caller is one of the two seats.</summary>
+    private static MatchError? SubmitRollPreconditionError(Match? match, string callerSub)
+    {
+        if (match == null) return new MatchError("match-not-found");
+        if (match.State != MatchState.Rolling) return new MatchError("not-rolling");
+        var isCreator = callerSub == match.Creator.Sub;
+        var isOpponent = match.Opponent != null && callerSub == match.Opponent.Sub;
+        if (!isCreator && !isOpponent) return new MatchError("not-a-player");
+        return null;
+    }
+
+    /// <summary>Generate the caller's per-seat roll and persist it via a
+    /// field-targeted CAS guarded on "slot was empty". The CAS closes the
+    /// lost-update window (two concurrent submissions used to read the same
+    /// Roll, mutate in-process, and clobber the other seat — Slice 4a #5)
+    /// and makes racing same-seat double-submits idempotent. On CAS miss the
+    /// current snapshot is returned (also idempotent).</summary>
+    private async Task<SeatRollOutcome> TryWriteCallerSeatRollAsync(
+        Guid matchId, string callerSub, bool isCreator, CancellationToken ct)
+    {
+        var value = _dice.RollSingle();
         var now = _clock.UtcNow;
         var slotSet = await _matches.TrySetPlayerRollAsync(matchId, isCreator, value, now, ct);
         if (!slotSet)
         {
-            // Either the match left Rolling, or the slot was filled by a
-            // concurrent/duplicate submit. Re-read and return the current
-            // snapshot (idempotent) rather than reporting a spurious conflict.
             var snapshot = await _matches.GetByIdAsync(matchId, ct);
-            if (snapshot == null) return Result.Fail<MatchDto>(new MatchError("match-not-found"));
+            if (snapshot == null)
+                return new SeatRollOutcome(Result.Fail<MatchDto>(new MatchError("match-not-found")));
             if (snapshot.State != MatchState.Rolling)
-                return Result.Fail<MatchDto>(new MatchError("not-rolling"));
-            return Result.Ok(ToDto(snapshot, viewerSub: callerSub));
+                return new SeatRollOutcome(Result.Fail<MatchDto>(new MatchError("not-rolling")));
+            return new SeatRollOutcome(Result.Ok(ToDto(snapshot, viewerSub: callerSub)));
         }
 
-        // Publish per-player event for this caller's roll.
         _hub?.Publish(matchId, "match.player-rolled", new { matchId, sub = callerSub, roll = value });
+        return new SeatRollOutcome(null);
+    }
 
-        // Re-read to see whether BOTH slots are now filled. If so — and no
-        // winner has been stamped yet — this caller attempts the winner CAS.
-        // Exactly one concurrent caller wins it (WinnerSub == null guard), so
-        // the winner is computed once even under simultaneous submissions.
-        var afterSet = await _matches.GetByIdAsync(matchId, ct);
-        if (afterSet?.Roll is { CreatorRoll: not null, OpponentRoll: not null, WinnerSub: null })
+    /// <summary>When both slots are now filled and no winner has been
+    /// stamped, attempt the winner CAS. Exactly one concurrent caller wins
+    /// it (WinnerSub == null guard), so the winner is computed once even
+    /// under simultaneous submissions. Auto-rerolls ties (CR 104.1).</summary>
+    private async Task TryResolveRollWinnerAsync(Guid matchId, Match? afterSet, CancellationToken ct)
+    {
+        const int MaxTieRetries = 100;
+        if (afterSet?.Roll is not { CreatorRoll: not null, OpponentRoll: not null, WinnerSub: null })
+            return;
+
+        int c = afterSet.Roll.CreatorRoll!.Value;
+        int o = afterSet.Roll.OpponentRoll!.Value;
+
+        int retries = 0;
+        while (c == o)
         {
-            int c = afterSet.Roll.CreatorRoll!.Value;
-            int o = afterSet.Roll.OpponentRoll!.Value;
-
-            // Tie auto-reroll (CR 104.1-style pre-game roll): reroll BOTH
-            // values until they differ. Only the caller that wins the
-            // winner CAS persists these, so a tie can't be resolved twice.
-            int retries = 0;
-            while (c == o)
-            {
-                if (++retries > MaxTieRetries)
-                    throw new InvalidOperationException("Tie reroll cap exceeded — random source likely broken.");
-                c = _dice.RollSingle();
-                o = _dice.RollSingle();
-            }
-            var winnerSub = c > o ? afterSet.Creator.Sub : afterSet.Opponent!.Sub;
-
-            var wonWinnerCas = await _matches.TrySetRollWinnerAsync(
-                matchId, c, o, winnerSub, _clock.UtcNow, ct);
-
-            if (wonWinnerCas)
-            {
-                _hub?.Publish(matchId, "match.rolled",
-                    new { matchId, roll = new MatchRollDto(c, o, winnerSub) });
-
-                // If the winner is a bot seat, schedule the bot's play/draw
-                // follow-up so the match isn't stranded in Rolling. Detection
-                // is by sub-prefix — the only seat we ever stamp with "bot:"
-                // is the synthesized opponent in CreateBotMatchAsync. Gating
-                // this on the winner CAS means the bot's PlayDraw is scheduled
-                // exactly once even if both rolls land concurrently (Slice 4a
-                // #7) — only the single CAS winner reaches here.
-                if (winnerSub.StartsWith("bot:", StringComparison.Ordinal))
-                {
-                    _botScheduler.ScheduleBotPlayDraw(matchId, winnerSub);
-                }
-            }
+            if (++retries > MaxTieRetries)
+                throw new InvalidOperationException("Tie reroll cap exceeded — random source likely broken.");
+            c = _dice.RollSingle();
+            o = _dice.RollSingle();
         }
+        var winnerSub = c > o ? afterSet.Creator.Sub : afterSet.Opponent!.Sub;
 
-        var fresh = (await _matches.GetByIdAsync(matchId, ct))!;
-        return Result.Ok(ToDto(fresh, viewerSub: callerSub));
+        var wonWinnerCas = await _matches.TrySetRollWinnerAsync(
+            matchId, c, o, winnerSub, _clock.UtcNow, ct);
+        if (!wonWinnerCas) return;
+
+        _hub?.Publish(matchId, "match.rolled",
+            new { matchId, roll = new MatchRollDto(c, o, winnerSub) });
+
+        // Bot seats stamp "bot:<archetype>" in CreateBotMatchAsync. Gating
+        // this on the winner CAS means PlayDraw is scheduled exactly once
+        // even under racing submissions (Slice 4a #7).
+        if (winnerSub.StartsWith("bot:", StringComparison.Ordinal))
+        {
+            _botScheduler.ScheduleBotPlayDraw(matchId, winnerSub);
+        }
     }
 
     // -----------------------------------------------------------------------
@@ -1134,97 +1175,106 @@ public sealed class MatchService
         string callerSub, Guid matchId, GameCommand command, CancellationToken ct)
     {
         var match = await _matches.GetByIdAsync(matchId, ct);
-        if (match == null) return Result.Fail<bool>(new MatchError("match-not-found"));
-
-        var isParty = callerSub == match.Creator.Sub || callerSub == match.Opponent?.Sub;
-        if (!isParty) return Result.Fail<bool>(new MatchError("forbidden"));
-        if (match.State != MatchState.Playing) return Result.Fail<bool>(new MatchError("match-not-open"));
-        if (match.GameId is not Guid gid) return Result.Fail<bool>(new MatchError("game-not-started"));
-        if (_gameFactory == null) return Result.Fail<bool>(new MatchError("game-not-started"));
+        if (SubmitCommandPreconditionError(match, callerSub, out var gid) is { } preErr)
+            return Result.Fail<bool>(preErr);
 
         // Input-bounds guard (DoS). Reject pathologically large X / list
-        // payloads BEFORE the command reaches the engine — a huge ChooseX or
-        // a multi-million-element target/attacker/blocker list would force
-        // large allocations and CPU spins inside the engine before it ever
-        // rejects the illegal action. See CommandValidator for the caps and
-        // rationale. Well-behaved clients/bots never trip this.
+        // payloads BEFORE the command reaches the engine — see
+        // CommandValidator for the caps and rationale.
         if (CommandValidator.Validate(command) is { } boundsError)
             return Result.Fail<bool>(boundsError);
 
         // Fast path: this replica owns the facade in-process.
-        var facade = _gameFactory.Get(gid);
+        var facade = _gameFactory!.Get(gid);
         if (facade != null)
         {
-            // Stamp PlayerId from the caller's seat mapping. The portal's
-            // generated OpenAPI client treats GameCommand.PlayerId as
-            // optional and its command builders omit it, so commands arrive
-            // here with Guid.Empty. GameFacade.SubmitAsync routes by
-            // PlayerId and throws "Unknown player {Guid.Empty}" otherwise.
-            // Stamping here also prevents seat-impersonation: even if a
-            // malicious client sets PlayerId to the opponent's Guid, we
-            // overwrite it with the seat derived from the authed sub.
-            // Mapping convention matches GetGameStateAsync: Creator → Alice,
-            // Opponent → Bob.
-            var seatId = callerSub == match.Creator.Sub ? facade.Alice.Id : facade.Bob.Id;
-            command = command with { PlayerId = seatId };
+            return await ExecuteCommandOnLocalFacadeAsync(match!, facade, command, callerSub, matchId, gid, ct);
+        }
 
-            try
-            {
-                await facade.SubmitAsync(command, ct);
-            }
-            catch (OperationCanceledException) when (ct.IsCancellationRequested)
-            {
-                // Caller disconnect / shutdown — propagate, not a client error.
-                throw;
-            }
-            catch (Exception ex)
-            {
-                // The engine throws (e.g. InvalidOperationException) when a
-                // command is illegal for the current prompt — wrong command
-                // type, no pending prompt, an instance id not in the engine's
-                // candidate set, etc. Left uncaught these bubble to the global
-                // UseExceptionHandler, which returns the exception TYPE NAME to
-                // the client (info leak) as a 500. Mirror the deck-load catch
-                // posture: log the full detail server-side, hand the client a
-                // clean 4xx "invalid-command" with NO type/message detail.
-                _logger?.LogWarning(ex,
-                    "Engine rejected submitted command. " +
-                    "MatchId={MatchId} GameId={GameId} CallerSub={CallerSub} CommandType={CommandType}",
-                    matchId, gid, callerSub, command.GetType().Name);
-                return Result.Fail<bool>(new MatchError(
-                    "invalid-command",
-                    "The command was not valid for the current game state."));
-            }
-            // The submitted command resolved the engine's pending TCS for
-            // this seat, so any prompt previously buffered for the caller
-            // is no longer authoritative. If the engine emits a fresh
-            // prompt for the same seat next, MatchFacadeBridge.ForwardPrompt
-            // will rebuffer it; if the next prompt is for the OTHER seat
-            // (or the game ends), the buffered entry must be cleared so a
-            // late JoinMatch from the caller doesn't replay a stale prompt.
-            _facadeBridge?.AckPrompt(matchId, callerSub);
+        // Cross-replica fallback: another replica owns the facade.
+        if (await TryForwardCommandToRemoteOwnerAsync(matchId, callerSub, command, ct))
             return Result.Ok(true);
-        }
-
-        // Cross-replica fallback: another replica owns the facade. Look up
-        // ownership in Redis and forward the command via pub/sub. The
-        // ownership check is best-effort — if it returns our own instance
-        // id (stale claim) the forward will still time out and we'll fall
-        // back to game-not-started, which the client retries.
-        if (_ownership != null && _forwarder != null && _instanceIds != null)
-        {
-            var owner = await _ownership.GetOwnerAsync(matchId, ct);
-            if (owner != null && owner != _instanceIds.Value)
-            {
-                var delivered = await _forwarder.SendAsync(matchId, callerSub, command, ct);
-                if (delivered) return Result.Ok(true);
-                _logger?.LogWarning(
-                    "Forwarded command to remote owner failed/timed-out. MatchId={MatchId} Owner={Owner}",
-                    matchId, owner);
-            }
-        }
 
         return Result.Fail<bool>(new MatchError("game-not-started"));
+    }
+
+    /// <summary>Entry-gate checks for SubmitCommand: match exists, caller is
+    /// a party, state is Playing, the engine game id is set, and the
+    /// gameFactory is wired. Emits the GameId via the out param when valid.</summary>
+    private MatchError? SubmitCommandPreconditionError(Match? match, string callerSub, out Guid gid)
+    {
+        gid = default;
+        if (match == null) return new MatchError("match-not-found");
+        var isParty = callerSub == match.Creator.Sub || callerSub == match.Opponent?.Sub;
+        if (!isParty) return new MatchError("forbidden");
+        if (match.State != MatchState.Playing) return new MatchError("match-not-open");
+        if (match.GameId is not Guid g) return new MatchError("game-not-started");
+        if (_gameFactory == null) return new MatchError("game-not-started");
+        gid = g;
+        return null;
+    }
+
+    /// <summary>Local-replica command execution. Stamps PlayerId from the
+    /// caller's seat mapping (Creator→Alice, Opponent→Bob), submits to the
+    /// facade, translates engine throws into "invalid-command", and ACKs
+    /// any buffered prompt so a late rejoin doesn't replay a stale one.</summary>
+    private async Task<Result<bool>> ExecuteCommandOnLocalFacadeAsync(
+        Match match,
+        Majik.Core.Api.GameFacade facade,
+        GameCommand command,
+        string callerSub,
+        Guid matchId,
+        Guid gid,
+        CancellationToken ct)
+    {
+        // Stamping prevents seat-impersonation: even if a malicious client
+        // sets PlayerId to the opponent's Guid, we overwrite it with the
+        // seat derived from the authed sub.
+        var seatId = callerSub == match.Creator.Sub ? facade.Alice.Id : facade.Bob.Id;
+        command = command with { PlayerId = seatId };
+
+        try
+        {
+            await facade.SubmitAsync(command, ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            // Caller disconnect / shutdown — propagate, not a client error.
+            throw;
+        }
+        catch (Exception ex)
+        {
+            // Engine throws on illegal command — log server-side and surface
+            // a clean 4xx with no type / message detail (info-leak hardening).
+            _logger?.LogWarning(ex,
+                "Engine rejected submitted command. " +
+                "MatchId={MatchId} GameId={GameId} CallerSub={CallerSub} CommandType={CommandType}",
+                matchId, gid, callerSub, command.GetType().Name);
+            return Result.Fail<bool>(new MatchError(
+                "invalid-command",
+                "The command was not valid for the current game state."));
+        }
+        // ACK the buffered prompt so a late JoinMatch doesn't replay it.
+        _facadeBridge?.AckPrompt(matchId, callerSub);
+        return Result.Ok(true);
+    }
+
+    /// <summary>Cross-replica fallback: look up ownership in Redis and
+    /// forward via pub/sub. Best-effort: a stale own-instance claim will
+    /// just time out and fall back to the caller-retry path.</summary>
+    private async Task<bool> TryForwardCommandToRemoteOwnerAsync(
+        Guid matchId, string callerSub, GameCommand command, CancellationToken ct)
+    {
+        if (_ownership == null || _forwarder == null || _instanceIds == null) return false;
+        var owner = await _ownership.GetOwnerAsync(matchId, ct);
+        if (owner == null || owner == _instanceIds.Value) return false;
+
+        var delivered = await _forwarder.SendAsync(matchId, callerSub, command, ct);
+        if (delivered) return true;
+        _logger?.LogWarning(
+            "Forwarded command to remote owner failed/timed-out. MatchId={MatchId} Owner={Owner}",
+            matchId, owner);
+        return false;
     }
 
     // -----------------------------------------------------------------------

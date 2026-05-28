@@ -146,6 +146,102 @@ public sealed class SpellCastFlow
         if (definition == null) throw new ArgumentNullException(nameof(definition));
         if (agent == null) throw new ArgumentNullException(nameof(agent));
 
+        // CR 601.2a — verify casting permission + alt-cost legality BEFORE any
+        // mutation (sorcery-speed gate, alt-cost CanCastFor, Pitch/Surge/
+        // Adventure context predicates).
+        ValidateCastingPermissionAndAltCost(card, caster, ctx, alternativeCost);
+
+        // CR 702.138a — Escape's bundled "exile N other graveyard cards" rider
+        // is paid as part of the alt-cost itself, before other zone mutations.
+        PayEscapeRiderIfAny(card, caster, alternativeCost);
+
+        // CR 601.2f — merge caller-supplied additional costs with the ones the
+        // SpellDefinition itself declares, pre-check legality, then pay them.
+        var mergedAdditional = BuildAndPayAdditionalCosts(definition, additionalCosts, caster);
+
+        // CR 701.59 — Gift cast-time prompt (must run BEFORE target collection
+        // because Gift spells upgrade their target predicate when promised).
+        var giftRecipient = await PromptForGiftRecipientAsync(card, caster, ctx, agent, ct);
+
+        // CR 700.2 — choose modes (modal spells).
+        int? mode = await PromptForModeAsync(definition, ctx, agent, ct);
+
+        // CR 601.2e + CR 202.3b — choose X and stamp the value on the card so
+        // permanents whose ETB references X can read it.
+        int? xValue = await PromptForXAsync(definition, card, ctx, agent, ct);
+
+        // CR 601.2c — collect targets in declaration order.
+        var collectedTargets = await CollectTargetsAsync(definition, card, ctx, agent, ct);
+
+        // CR 601.2f — compute the post-reduction total cost (printed cost OR
+        // alt cost; + X; − cost reductions; − Delve, Improvise, Convoke
+        // reductions). Delve pays its exile portion here per CR 702.66b.
+        var totalCost = ComputeAndApplyTotalCost(
+            card, caster, ctx, alternativeCost, xValue, delveCost, mergedAdditional);
+
+        // CR 601.2g / CR 605.1 — mana sourcing. Reuse pre-chosen mana when the
+        // caller (TurnDriver) already prompted, otherwise prompt the agent.
+        var mana = preChosenMana ?? await agent.ChooseManaSourcesAsync(ctx, totalCost, ct);
+
+        var chosen = new ChosenSpellParams(
+            mode, xValue, collectedTargets, mana, ctx.AllPlayers,
+            ModeIndexes: null,
+            AdditionalCostPayments: mergedAdditional.Count > 0 ? mergedAdditional : null);
+        var effects = definition.EffectFactory(chosen);
+
+        // CR 702.46 — Splice onto Arcane: fold each spliced rider's effects
+        // into the spell's effect chain in announcement order.
+        effects = ApplySpliceRiders(effects, mergedAdditional, caster);
+
+        // CR 601.2 / CR 113.5 — capture source zone BEFORE the Hand → Stack
+        // move so the "cast from hand" sentinel can branch on it.
+        var sourceZoneAtCast = card.Zone;
+        _zoneService.MoveCard(card, card.Zone, ZoneType.Stack, controller: caster);
+
+        // CR 702.34b / 702.33b / 702.115 / 701.59 — append per-feature cleanup
+        // effects (alt-cost OnResolved, Kicker/Surge/Gift sentinel-clear).
+        bool hasKickerPayment = mergedAdditional.OfType<KickerAdditionalCost>().Any();
+        var finalEffects = AppendCleanupEffects(
+            effects, card, caster, alternativeCost, hasKickerPayment, giftRecipient);
+
+        var spell = new Spells.Spell(card, caster, effects: finalEffects);
+
+        // CR 608.2 / 715.3d / 118 / 702.138b / 702.62d / 702.33b / 702.115 /
+        // 701.5b / 701.59 / 113.5 / 601.2 — stamp every per-cast sentinel on
+        // the spell + underlying card so downstream gates can branch on them.
+        StampSpellAndCardSentinels(
+            spell, card, caster, alternativeCost, totalCost,
+            hasKickerPayment, giftRecipient, sourceZoneAtCast);
+
+        // CR 702.10 / 106.4 — mana-provenance haste rider (Arena of Glory).
+        ApplyHasteGrantingManaProvenance(card, caster);
+
+        _stack.Push(spell);
+        _eventBus.Publish(new SpellCastEvent(spell));
+
+        // Clear the pending-targets stamp — once the spell is on the stack,
+        // ChosenSpellParams.Targets is authoritative.
+        if (card is Card concreteToClear)
+        {
+            concreteToClear.ClearPendingCastTargets();
+        }
+
+        return spell;
+    }
+
+    // ---------------------------------------------------------------------
+    // Per-step helpers — one extraction per CR 601.2 sub-rule (plus the
+    // associated alt-cost predicates). Documented with the rule cite the
+    // original inline comment carried; behaviour is identical.
+    // ---------------------------------------------------------------------
+
+    /// <summary>CR 117.1 / 118.9 / 702.115a / 117.1+715.3b — sorcery-speed
+    /// gate + alternative-cost legality + per-alt context predicates
+    /// (Pitch / Surge / Adventure). Throws when any precondition fails.
+    /// </summary>
+    private void ValidateCastingPermissionAndAltCost(
+        ICard card, Player caster, GameContext ctx, IAlternativeCost? alternativeCost)
+    {
         // CR 117.1 — sorcery-speed gating (skipped when the alternative cost
         // specifies its own casting permission, e.g. Flashback from graveyard).
         if (alternativeCost == null
@@ -165,11 +261,7 @@ public sealed class SpellCastFlow
 
         // CR 118.9 — Pitch alt-cost imposes an additional context check:
         // "If it's not your turn …". Force-of-Will-cycle spells embed this
-        // timing predicate in the alt cost itself. Other alt-costs (Flashback,
-        // Spectacle, Evoke, …) carry their own zone / state predicates inside
-        // CanCastFor and don't need this hook. Keep the surface minimal —
-        // SpellCastFlow stays generic, only this one concrete type gets the
-        // activePlayer gate.
+        // timing predicate in the alt cost itself.
         if (alternativeCost is PitchAlternativeCost pitch
             && !pitch.IsLegalInContext(ctx.ActivePlayer))
         {
@@ -178,9 +270,7 @@ public sealed class SpellCastFlow
         }
 
         // CR 702.115a — Surge alt-cost. Gated on "you or a teammate has
-        // cast another spell this turn". v1 has no team modelling, so the
-        // SurgeAlternativeCost reads the controller's per-turn spell tally
-        // off the live TurnState reference it was constructed with.
+        // cast another spell this turn".
         if (alternativeCost is SurgeAlternativeCost surge
             && !surge.IsLegalInContext(caster))
         {
@@ -189,43 +279,39 @@ public sealed class SpellCastFlow
         }
 
         // CR 117.1 + CR 715.3b — Adventure alt-cost. A sorcery-typed
-        // Adventure ("while on the stack as an Adventure, the spell has
-        // only its alternative characteristics") must be cast at sorcery
-        // speed even though the printed card is a Creature. SpellCastFlow
-        // already skips the generic CastingPermission gate when an alt-cost
-        // is supplied (per the alternativeCost == null check above), so the
-        // Adventure-shaped sorcery-speed re-check lives here — same shape
-        // PitchAlternativeCost uses for its activePlayer gate. Instant
-        // Adventures return true unconditionally.
+        // Adventure must be cast at sorcery speed.
         if (alternativeCost is AdventureAlternativeCost adv
             && !adv.IsLegalInContext(ctx.ActivePlayer, ctx.CurrentPhase, _stack.IsEmpty, caster))
         {
             throw new InvalidOperationException(
                 $"Cannot cast {card.Name} as Adventure: sorcery-speed restriction (CR 117.1 / 715.3b).");
         }
+    }
 
-        // CR 702.138a — Escape alt-cost has a bundled "exile N other
-        // graveyard cards" rider that must be paid as part of the
-        // alt-cost (not as a generic IAdditionalCost — see
-        // EscapeAlternativeCost xmldoc). Pre-check + pay it BEFORE any
-        // other zone mutations so a graveyard with too few "other"
-        // cards short-circuits the cast cleanly (CR 601.2g — illegal to
-        // announce a cost you can't pay, no partial payment). The
-        // Pay call atomically moves the picked cards Graveyard → Exile.
-        if (alternativeCost is EscapeAlternativeCost escape)
+    /// <summary>CR 702.138a — Escape alt-cost's bundled "exile N other
+    /// graveyard cards" rider. Atomically moves the picked cards Graveyard →
+    /// Exile. Throws on insufficient yard.</summary>
+    private static void PayEscapeRiderIfAny(
+        ICard card, Player caster, IAlternativeCost? alternativeCost)
+    {
+        if (alternativeCost is not EscapeAlternativeCost escape) return;
+        if (!escape.Pay(caster, card))
         {
-            if (!escape.Pay(caster, card))
-            {
-                throw new InvalidOperationException(
-                    $"Cannot pay Escape exile rider for {card.Name}: " +
-                    $"need {escape.ExileFromGraveyardCount} OTHER graveyard cards.");
-            }
+            throw new InvalidOperationException(
+                $"Cannot pay Escape exile rider for {card.Name}: " +
+                $"need {escape.ExileFromGraveyardCount} OTHER graveyard cards.");
         }
+    }
 
-        // CR 601.2f — additional costs first, before mana payment.
-        // Merge the caller-supplied list with any costs the card itself
-        // declares via SpellDefinition.AdditionalCosts (template-bound
-        // "As an additional cost to cast this spell, sacrifice …" cards).
+    /// <summary>CR 601.2f — additional costs first, before mana payment.
+    /// Merges caller-supplied costs with definition-supplied costs,
+    /// pre-checks legality (CR 601.2g — no partial payment), then pays
+    /// each.</summary>
+    private static List<IAdditionalCost> BuildAndPayAdditionalCosts(
+        SpellDefinition definition,
+        IReadOnlyList<IAdditionalCost>? additionalCosts,
+        Player caster)
+    {
         var mergedAdditional = new List<IAdditionalCost>();
         if (definition.AdditionalCosts is { Count: > 0 } defCosts)
         {
@@ -236,10 +322,6 @@ public sealed class SpellCastFlow
             mergedAdditional.AddRange(additionalCosts);
         }
 
-        // Pre-check legality so we fail BEFORE mutating any zone — CR
-        // 601.2g requires that if any cost can't be paid the cast is
-        // illegal and the game is rewound. v1 short-circuit: if any cost
-        // refuses, throw, no partial payment.
         foreach (var pre in mergedAdditional)
         {
             if (!pre.CanPay(caster))
@@ -258,74 +340,68 @@ public sealed class SpellCastFlow
             }
         }
 
-        // CR 701.59 — Bloomburrow Gift cast-time prompt. If the card
-        // carries an IGiftClause (Into the Flood Maw etc.) the caster
-        // may promise an opponent the named gift. The promise must be
-        // recorded BEFORE target collection because Gift spells upgrade
-        // their target predicate when promised (Flood Maw flips
-        // "target creature an opponent controls" → "target nonland
-        // permanent an opponent controls"); the resolve body branches
-        // on Card.HasGiftPromised which is stamped here. Gift delivery
-        // is a cast-time side-effect in v1 — see IGiftClause xmldoc for
-        // the deviation from CR 701.59's resolve-time delivery (kept so
-        // the gift survives a countered Gift spell, matching the engine
-        // simplification documented in the test spec).
-        Player? giftRecipient = null;
-        if (card is IGiftClause giftClause && card is Card giftCardForPrompt)
+        return mergedAdditional;
+    }
+
+    /// <summary>CR 701.59 — Bloomburrow Gift cast-time prompt. Promised gifts
+    /// upgrade target predicates and are read at resolve time via
+    /// Card.HasGiftPromised.</summary>
+    private static async Task<Player?> PromptForGiftRecipientAsync(
+        ICard card, Player caster, GameContext ctx, IPlayerAgent agent, CancellationToken ct)
+    {
+        if (card is not IGiftClause giftClause || card is not Card giftCardForPrompt)
         {
-            var opponents = ctx.AllPlayers
-                .Where(p => !ReferenceEquals(p, caster))
-                .ToList();
-            if (opponents.Count > 0)
-            {
-                giftRecipient = await agent.ChooseGiftRecipientAsync(
-                    ctx, card, giftClause.Description, opponents, ct);
-                if (giftRecipient != null)
-                {
-                    giftCardForPrompt.SetHasGiftPromised(true);
-                }
-            }
+            return null;
         }
+        var opponents = ctx.AllPlayers.Where(p => !ReferenceEquals(p, caster)).ToList();
+        if (opponents.Count == 0) return null;
 
-        int? mode = null;
-        if (definition.Modes.Count > 0)
+        var giftRecipient = await agent.ChooseGiftRecipientAsync(
+            ctx, card, giftClause.Description, opponents, ct);
+        if (giftRecipient != null)
         {
-            mode = await agent.ChooseModeAsync(ctx, definition.Modes, definition.ModeIntents, ct);
+            giftCardForPrompt.SetHasGiftPromised(true);
         }
+        return giftRecipient;
+    }
 
-        int? xValue = null;
-        if (definition.HasVariableX)
+    /// <summary>CR 700.2 — modal-spell mode prompt.</summary>
+    private static async Task<int?> PromptForModeAsync(
+        SpellDefinition definition, GameContext ctx, IPlayerAgent agent, CancellationToken ct)
+    {
+        if (definition.Modes.Count == 0) return null;
+        return await agent.ChooseModeAsync(ctx, definition.Modes, definition.ModeIntents, ct);
+    }
+
+    /// <summary>CR 601.2e + CR 202.3b — choose X and stamp it on the card so
+    /// ETB-with-X-counters effects (Chalice of the Void, Walking Ballista)
+    /// can read it without threading ChosenSpellParams.</summary>
+    private static async Task<int?> PromptForXAsync(
+        SpellDefinition definition, ICard card, GameContext ctx, IPlayerAgent agent, CancellationToken ct)
+    {
+        if (!definition.HasVariableX) return null;
+        var xValue = await agent.ChooseXAsync(ctx, card, ct);
+        if (card is Card concreteForX)
         {
-            xValue = await agent.ChooseXAsync(ctx, card, ct);
-
-            // CR 202.3b — stamp the chosen X on the card itself so
-            // permanents whose ETB references X (Chalice of the Void's
-            // "enters with X charge counters", Walking Ballista, …) can
-            // read the value without us threading ChosenSpellParams.X
-            // through the spell → permanent boundary. Consumed + cleared
-            // by the ETB effect (same pattern Murktide Regent uses for
-            // PendingDelveExiledCount).
-            if (card is Card concreteForX && xValue.HasValue)
-            {
-                concreteForX.SetPendingCastX(xValue.Value);
-            }
+            concreteForX.SetPendingCastX(xValue);
         }
+        return xValue;
+    }
 
+    /// <summary>CR 601.2c — collect targets in declaration order, lazy-
+    /// gathering candidate pools against the live ctx. Throws when the agent
+    /// can't pick enough legal targets (cast is illegal).</summary>
+    private static async Task<List<IReadOnlyList<object>>> CollectTargetsAsync(
+        SpellDefinition definition, ICard card, GameContext ctx, IPlayerAgent agent, CancellationToken ct)
+    {
         var collectedTargets = new List<IReadOnlyList<object>>(definition.TargetRequests.Count);
         foreach (var req in definition.TargetRequests)
         {
-            // Lazy-gather candidate pool against the live ctx (TargetRequest's
-            // optional CandidateGatherer fires here). Falls through to the
-            // request's static LegalCandidates when no gatherer is set.
             var live = req.ResolveCandidates(ctx);
             var promptReq = ReferenceEquals(live, req.LegalCandidates)
                 ? req
                 : req.WithCandidates(live);
             var picked = await agent.ChooseTargetsAsync(ctx, promptReq, ct);
-            // CR 601.2c — cast is illegal if the agent can't pick enough
-            // legal targets. Throw a typed exception so the caller (cast
-            // dispatcher) can catch and abort cleanly instead of letting
-            // EffectFactory crash on Targets[0][0].
             if (picked.Count < req.MinTargets)
             {
                 throw new InvalidOperationException(
@@ -335,36 +411,37 @@ public sealed class SpellCastFlow
             collectedTargets.Add(picked);
         }
 
-        // CR 601.2f — stamp the freshly-picked targets onto the card so
-        // any cost-reduction ability on the card itself can read them
-        // during cost calculation below (Mystical Dispute's "costs {2}
-        // less if it targets a blue spell"). Same Pending* idiom used
-        // for X / Delve count above. Cleared after the spell hits the
-        // stack so a later re-cast starts from a clean slate.
+        // CR 601.2f — stamp the freshly-picked targets onto the card so any
+        // cost-reduction ability on the card itself can read them during cost
+        // calculation (Mystical Dispute's "costs {2} less if it targets a blue
+        // spell").
         if (card is Card concreteForTargets && collectedTargets.Count > 0)
         {
             concreteForTargets.SetPendingCastTargets(collectedTargets);
         }
+        return collectedTargets;
+    }
 
-        // Cost — printed + X, OR alternative cost when supplied. CR 117.7:
-        // also subtract any CostReductionAbility on the card (Affinity etc.).
-        // CR 117.7 / 601.2f — pass the live player roster so the three-arg
-        // overload also folds in SpellCostIncreaseAbility riders from every
-        // player's battlefield (Sphere of Resistance, Trinisphere, Thalia,
-        // Damping Sphere). The two-arg overload silently skips those riders
-        // and is reserved for unit tests / cost previews.
+    /// <summary>CR 117.7 / 601.2f / 702.66 / 702.127 / 702.51 — compute the
+    /// effective mana cost: alt-cost OR printed-with-reductions, plus X,
+    /// minus Delve (and pay its exile rider per CR 702.66b), minus Improvise
+    /// + Convoke reductions.</summary>
+    private static ManaCost ComputeAndApplyTotalCost(
+        ICard card,
+        Player caster,
+        GameContext ctx,
+        IAlternativeCost? alternativeCost,
+        int? xValue,
+        DelveCost? delveCost,
+        IReadOnlyList<IAdditionalCost> mergedAdditional)
+    {
         var totalCost = alternativeCost?.AlternativeManaCost
             ?? Majik.Core.Costs.CostReduction.GetEffectiveCost(card, caster, ctx.AllPlayers);
-        if (xValue.HasValue && xValue.Value > 0)
+        if (xValue is { } xv && xv > 0)
         {
-            totalCost = totalCost.AddGenericCost(xValue.Value);
+            totalCost = totalCost.AddGenericCost(xv);
         }
 
-        // CR 702.66 — Delve. Each exiled graveyard card reduces the
-        // spell's total generic mana by 1. Apply after X (X is generic
-        // and is delve-payable per CR 702.66 + CR 601.2g order) and
-        // after cost reduction. Pay the exile portion of the cost now —
-        // CR 702.66b says delve is paid when the spell is cast.
         if (delveCost != null)
         {
             if (!delveCost.CanPay(caster, totalCost))
@@ -377,26 +454,16 @@ public sealed class SpellCastFlow
             totalCost = delveCost.ApplyTo(totalCost);
             delveCost.Pay(caster);
 
-            // CR 702.66 — stamp the count of delve-exiled cards on the card
-            // itself so downstream ETB-with-counters effects (Murktide Regent
-            // — CR 122.1g X-counter ETB) can read "cards exiled with me"
-            // without us re-plumbing DelveCost across the spell-cast →
-            // permanent boundary. Consumed + cleared by the ETB effect.
+            // CR 702.66 — stamp the delve-exile count for ETB-with-counters
+            // (Murktide Regent — CR 122.1g X-counter ETB).
             if (card is Card concreteCard)
             {
                 concreteCard.SetPendingDelveExiledCount(delveCost.ReductionAmount);
             }
         }
 
-        // CR 702.127 — Improvise. "Each artifact you tap after you're done
-        // activating mana abilities pays for {1}." The Improvise cost
-        // already tapped the chosen artifacts in the CR 601.2f additional-
-        // cost loop above; here we fold the generic-mana reduction into
-        // the cost before the agent is prompted for the remaining mana
-        // payment (CR 605.1 — mana abilities are settled by the time
-        // ChooseManaSourcesAsync fires, satisfying the
-        // "after you're done activating mana abilities" timing rule).
-        // Coloured pips are preserved per CR 702.127.
+        // CR 702.127 — Improvise generic reduction (artifacts tapped in the
+        // additional-cost loop above).
         foreach (var addCost in mergedAdditional)
         {
             if (addCost is ImproviseAdditionalCost improvise && improvise.ReductionAmount > 0)
@@ -405,13 +472,8 @@ public sealed class SpellCastFlow
             }
         }
 
-        // CR 702.51 — Convoke. "Each creature you tap while casting this
-        // spell pays for {1} or one mana of that creature's color." Same
-        // timing shape as Improvise: the chosen creatures were already
-        // tapped in the CR 601.2f additional-cost loop above, and here we
-        // fold the per-tap reduction (generic OR creature-coloured pip,
-        // per CR 702.51b) into the mana cost before the agent's mana-
-        // source prompt fires (CR 605.1 — mana abilities settled by then).
+        // CR 702.51 — Convoke generic-or-coloured reduction (creatures tapped
+        // in the additional-cost loop above).
         foreach (var addCost in mergedAdditional)
         {
             if (addCost is ConvokeAdditionalCost convoke && convoke.ReductionAmount > 0)
@@ -420,83 +482,48 @@ public sealed class SpellCastFlow
             }
         }
 
-        // CR 601.2g — mana sourcing. When the caller has already prompted +
-        // paid mana (TurnDriver does this so a failed pay can rotate the
-        // hand instead of mutating the stack), reuse that ManaPayment as
-        // metadata so the agent isn't asked twice (visible UX bug: double
-        // mana prompt). Otherwise prompt here as the canonical caster.
-        var mana = preChosenMana
-            ?? await agent.ChooseManaSourcesAsync(ctx, totalCost, ct);
+        return totalCost;
+    }
 
-        var chosen = new ChosenSpellParams(
-            mode, xValue, collectedTargets, mana, ctx.AllPlayers,
-            ModeIndexes: null,
-            AdditionalCostPayments: mergedAdditional.Count > 0 ? mergedAdditional : null);
-        var effects = definition.EffectFactory(chosen);
-
-        // CR 702.46 — Splice onto Arcane. After the Arcane spell's printed
-        // body resolves we run each spliced rider's effects in announcement
-        // order (CR 702.46b — multiple splice riders concatenate in the
-        // order the caster announced them). The splice cost was already
-        // paid in the CR 601.2f additional-cost loop above (mana drained,
-        // Arcane + hand-residence gate enforced); here we only fold the
-        // pre-built effect chain in. The spliced card itself stays in the
-        // caster's hand (CR 702.46a — "the card stays in your hand"); no
-        // zone move is performed for it.
+    /// <summary>CR 702.46 — Splice onto Arcane: spliced riders' effects
+    /// concatenate after the printed body in announcement order
+    /// (CR 702.46b).</summary>
+    private static IReadOnlyList<IEffect> ApplySpliceRiders(
+        IReadOnlyList<IEffect> effects, IReadOnlyList<IAdditionalCost> mergedAdditional, Player caster)
+    {
         var spliceRiders = mergedAdditional.OfType<SpliceOntoArcaneCost>().ToList();
-        if (spliceRiders.Count > 0)
+        if (spliceRiders.Count == 0) return effects;
+        var combined = effects.ToList();
+        foreach (var rider in spliceRiders)
         {
-            var combined = effects.ToList();
-            foreach (var rider in spliceRiders)
-            {
-                combined.AddRange(rider.BuildSplicedEffects(caster));
-            }
-            effects = combined;
+            combined.AddRange(rider.BuildSplicedEffects(caster));
         }
+        return combined;
+    }
 
-        // CR 601.2 / CR 113.5 — capture the source zone BEFORE the Hand →
-        // Stack move so the "cast from hand" sentinel can branch on it.
-        // Bedlam Reveler's ETB intervening-if reads this off the resolving
-        // spell / card via Card.WasCastFromHand. Distinct from Card.WasCast
-        // (any cast — flashback / suspend / from-graveyard included): this
-        // flag is the strict "source zone was Hand" gate.
-        var sourceZoneAtCast = card.Zone;
-
-        // If casting via alternative cost (e.g. Flashback), card may not be in
-        // hand — move it from whatever zone it's in.
-        _zoneService.MoveCard(card, card.Zone, ZoneType.Stack, controller: caster);
-
-        // Wrap effects so the alternative cost's OnResolved fires after the
-        // spell's printed effects (CR 702.34b style).
+    /// <summary>CR 702.34b / 702.33b / 702.115 / 701.59 — append per-feature
+    /// cleanup effects (alt-cost OnResolved, Kicker / Surge / Gift sentinel
+    /// clears). Each cleanup matches the CR 400.7 "new object per zone
+    /// change" lifecycle so a later re-cast / blink / token copy starts
+    /// clean.</summary>
+    private static IReadOnlyList<IEffect> AppendCleanupEffects(
+        IReadOnlyList<IEffect> effects,
+        ICard card,
+        Player caster,
+        IAlternativeCost? alternativeCost,
+        bool hasKickerPayment,
+        Player? giftRecipient)
+    {
         IReadOnlyList<IEffect> finalEffects = effects;
         if (alternativeCost != null)
         {
-            var wrapped = effects.Append(new Effect(
+            finalEffects = finalEffects.Append(new Effect(
                 $"{alternativeCost.Description} cleanup",
                 () => alternativeCost.OnResolved(card, caster))).ToList();
-            finalEffects = wrapped;
-        }
-
-        // CR 702.33b / CR 400.7 — if a kicker additional cost was paid
-        // this cast, append a cleanup effect that clears
-        // <see cref="Card.WasKicked"/> after the spell's printed body
-        // resolves so the sentinel doesn't leak to a copy / blink /
-        // re-cast. KickerAdditionalCost.Pay stamps the flag during the
-        // additional-cost loop above; the spell-level mirror stamp
-        // (see below) is read by stack-side gates that don't have
-        // the card handy.
-        bool hasKickerPayment = false;
-        foreach (var addCost in mergedAdditional)
-        {
-            if (addCost is KickerAdditionalCost)
-            {
-                hasKickerPayment = true;
-                break;
-            }
         }
         if (hasKickerPayment)
         {
-            var withKickerCleanup = finalEffects.Append(new Effect(
+            finalEffects = finalEffects.Append(new Effect(
                 "Kicker cleanup — clear Card.WasKicked",
                 () =>
                 {
@@ -505,18 +532,10 @@ public sealed class SpellCastFlow
                         concreteForKicked.ClearWasKicked();
                     }
                 })).ToList();
-            finalEffects = withKickerCleanup;
         }
-
-        // CR 702.115 / CR 400.7 — Surge cleanup. After the printed body
-        // runs (and its resolve-time branch has read Card.WasCastForSurge),
-        // clear the sentinel so a later re-cast / blink / token copy
-        // doesn't inherit the prior surge posture (CR 400.7 — new object
-        // per zone change). Mirrors the Kicker cleanup append directly
-        // above.
         if (alternativeCost is SurgeAlternativeCost)
         {
-            var withSurgeCleanup = finalEffects.Append(new Effect(
+            finalEffects = finalEffects.Append(new Effect(
                 "Surge cleanup — clear Card.WasCastForSurge",
                 () =>
                 {
@@ -525,17 +544,10 @@ public sealed class SpellCastFlow
                         concreteForSurgeCleanup.ClearWasCastForSurge();
                     }
                 })).ToList();
-            finalEffects = withSurgeCleanup;
         }
-
-        // CR 701.59 — Gift cleanup. After the printed body runs (and
-        // its resolve-time branch has read Card.HasGiftPromised), clear
-        // the sentinel so a later re-cast / blink / token copy doesn't
-        // inherit the prior promise (CR 400.7 — new object per zone
-        // change). Mirrors the Kicker cleanup append directly above.
         if (giftRecipient != null)
         {
-            var withGiftCleanup = finalEffects.Append(new Effect(
+            finalEffects = finalEffects.Append(new Effect(
                 "Gift cleanup — clear Card.HasGiftPromised",
                 () =>
                 {
@@ -544,38 +556,35 @@ public sealed class SpellCastFlow
                         concreteForGift.ClearHasGiftPromised();
                     }
                 })).ToList();
-            finalEffects = withGiftCleanup;
         }
+        return finalEffects;
+    }
 
-        var spell = new Spells.Spell(card, caster, effects: finalEffects);
-
-        // CR 608.2 / CR 715.3d — let the alt-cost re-route the post-
-        // resolution destination away from the printed-type default
-        // (Adventure exiles a Creature card; future "exile if it would
-        // be put in graveyard" riders can reuse the same hook). The
-        // StackResolver reads this in preference to the printed-type
-        // check when deciding where the card lands after Spell.Resolve().
+    /// <summary>CR 608.2 / 715.3d / 118 / 702.138b / 702.62d / 702.33b /
+    /// 702.115 / 701.5b / 701.59 / 113.5 / 601.2 — stamp every per-cast
+    /// sentinel on the resolving spell + (mirrored) on the underlying Card so
+    /// stack-side and battlefield-side gates can read the same truth without
+    /// the spell handle.</summary>
+    private static void StampSpellAndCardSentinels(
+        Spells.Spell spell,
+        ICard card,
+        Player caster,
+        IAlternativeCost? alternativeCost,
+        ManaCost totalCost,
+        bool hasKickerPayment,
+        Player? giftRecipient,
+        ZoneType sourceZoneAtCast)
+    {
+        // CR 608.2 / CR 715.3d — alt-cost post-resolution zone override.
         if (alternativeCost?.PostResolutionZone is { } overrideZone)
         {
             spell.PostResolutionZoneOverride = overrideZone;
         }
 
-        // CR 118 — Roiling Vortex / Eidolon of the Great Revel-style
-        // "no mana was spent to cast it" sentinel. After all cost
-        // collapses (printed → alternative → cost reductions → +X →
-        // Delve), if the resulting totalCost is zero across every bucket
-        // then no mana payment was actually made for this cast. Stamping
-        // the spell rather than diffing buckets at trigger time lets
-        // downstream consumers ignore the cost machinery entirely.
+        // CR 118 — "no mana was spent" sentinel (Roiling Vortex, Eidolon).
         spell.WasFreeCast = totalCost.IsZero;
 
-        // CR 702.138b — stamp the "escaped" sentinel so downstream gates
-        // (Uro's "sacrifice it unless it escaped" trigger; future
-        // "escapes with [counters]" replacements per CR 702.138c) can
-        // read it off the resolving spell + resulting permanent. We
-        // stamp the Card too — Uro's sac trigger fires on the
-        // battlefield, sourced off the resolved permanent, and that
-        // is the easiest read site for the gate body.
+        // CR 702.138b — Escape sentinel (Uro's "sacrifice unless escaped").
         if (alternativeCost is EscapeAlternativeCost)
         {
             spell.WasCastForEscape = true;
@@ -585,11 +594,7 @@ public sealed class SpellCastFlow
             }
         }
 
-        // CR 702.62d / 702.62g — stamp the "cast via suspend" sentinel on
-        // the resolving spell + underlying card whenever the alt-cost is
-        // the suspend "cast for free" payoff. The Card-side mirror lets
-        // resolve-body reads (creature haste gate; future "if cast via
-        // suspend" triggers) consult the flag without the spell handle.
+        // CR 702.62d / 702.62g — suspend cast sentinel.
         if (alternativeCost is CastFromExileAlternativeCost { IsSuspendCast: true })
         {
             spell.WasCastFromSuspend = true;
@@ -599,76 +604,45 @@ public sealed class SpellCastFlow
             }
         }
 
-        // CR 702.33b — mirror the kicked posture onto the resolving
-        // stack object so stack-side gates that don't have the card
-        // reference handy (downstream triggers, future "casts a
-        // kicked spell" replacements) can read it off the spell.
+        // CR 702.33b — kicked posture mirror.
         if (hasKickerPayment)
         {
             spell.WasKicked = true;
         }
 
-        // CR 702.115 — Surge sentinel. Mirror the surge posture onto the
-        // underlying card at announce time so resolve-body branches
-        // ("if its surge cost was paid" — Reckless Bushwhacker) can read
-        // the flag even before SurgeAlternativeCost.OnResolved fires.
-        // The OnResolved cleanup pass appended above still stamps the
-        // flag (idempotent set), and the clear-on-resolve cleanup
-        // appended below wipes the sentinel after the printed body runs
-        // so a later re-cast / blink / token copy doesn't inherit the
-        // prior surge posture (CR 400.7 — new object on each zone change).
+        // CR 702.115 — Surge posture mirror onto the underlying card so
+        // resolve-body branches (Reckless Bushwhacker) can read it even before
+        // SurgeAlternativeCost.OnResolved fires.
         if (alternativeCost is SurgeAlternativeCost
             && card is Card concreteForSurge)
         {
             concreteForSurge.SetWasCastForSurge(true);
         }
 
-        // CR 701.5b — "An uncounterable spell can't be countered." Cards
-        // that print "this spell can't be countered" (Emrakul, the Aeons
-        // Torn; Apocalypse Hydra; …) carry a
-        // <see cref="KeywordAbility"/>("Uncounterable") marker; the
-        // resolving spell mirrors the flag so
-        // <see cref="Majik.Core.CardData.OracleSpellBinder.RemoveFromStack"/>
-        // can veto the counter-attempt without re-reading the card's
-        // abilities at counter resolution time.
+        // CR 701.5b — Uncounterable keyword marker.
         if (HasUncounterableMarker(card))
         {
             spell.CannotBeCountered = true;
         }
 
-        // CR 701.59 — stamp the Gift recipient onto the resolving spell
-        // and deliver the promised gift NOW (cast-time delivery — see
-        // IGiftClause xmldoc for the v1 deviation from strict CR 701.59
-        // resolve-time delivery; the engine simplification keeps the
-        // gift in the recipient's hand even when the gift-bearing spell
-        // is later countered, matching the test spec).
+        // CR 701.59 — stamp Gift recipient + deliver the promised gift NOW
+        // (v1 cast-time delivery — see IGiftClause xmldoc).
         if (giftRecipient != null && card is IGiftClause giftClauseForDelivery)
         {
             spell.GiftRecipient = giftRecipient;
             giftClauseForDelivery.DeliverTo(giftRecipient, spell);
         }
 
-        // CR 113.5 / CR 400.7 — stamp the persistent cast marker on the
-        // underlying card just before the spell hits the stack. The flag
-        // survives Stack → Battlefield so ETB triggers ("when ~ enters,
-        // if you cast it, …" — The One Ring) and battlefield-entry
-        // replacements ("if it wasn't cast" — Containment Priest, via
-        // ZoneMoveIntent.WasCast which ZoneService populates from this
-        // field) read the same truth. ZoneService clears the flag when
-        // the permanent later leaves the battlefield.
+        // CR 113.5 / CR 400.7 — persistent "was cast" marker (survives Stack →
+        // Battlefield for ETB triggers like The One Ring; cleared by
+        // ZoneService on battlefield exit).
         if (card is Card concreteForCast)
         {
             concreteForCast.SetWasCast(true);
         }
 
-        // CR 601.2 / CR 113.5 — stamp the strict "cast from hand" sentinel
-        // when the source zone captured before the stack-push was Hand.
-        // Read by ETB intervening-if clauses keyed on "if you cast it from
-        // your hand" (Bedlam Reveler). Distinct from Card.WasCast which
-        // fires on any cast — flashback / suspend / from-graveyard / from-
-        // exile all set WasCast but leave WasCastFromHand false. The flag
-        // is cleared by ZoneService on battlefield exit (any destination),
-        // mirroring WasCast's CR 400.7 lifecycle.
+        // CR 601.2 / CR 113.5 — strict "cast from hand" sentinel for ETB
+        // intervening-if clauses (Bedlam Reveler).
         if (sourceZoneAtCast == ZoneType.Hand)
         {
             spell.WasCastFromHand = true;
@@ -677,37 +651,19 @@ public sealed class SpellCastFlow
                 concreteForHandCast.SetWasCastFromHand(true);
             }
         }
+    }
 
-        // CR 702.10 / CR 106.4 — mana-provenance haste rider (Arena of
-        // Glory's exert ability: "If that mana is spent on a creature spell,
-        // it gains haste until end of turn"). The exert ability stamped the
-        // caster's haste-granting-mana counter when it added {R}{R}; here we
-        // consume it on the first spell cast after the exert. When that spell
-        // is a creature spell, register a Layer-6 "Haste" grant on the
-        // resulting creature that expires in the cleanup step. Casting a
-        // noncreature spell consumes the provenance too (the mana was spent
-        // on a noncreature) but grants nothing. See
-        // Player.PendingHasteGrantingRedMana xmldoc for the v1 scope.
-        if (caster.ConsumeHasteGrantingMana() && card is Cards.Creature hasteCreature)
-        {
-            hasteCreature.ActiveEffects ??= new ContinuousEffectsService();
-            hasteCreature.ActiveEffects.Register(
-                new GrantKeywordUntilEndOfTurnEffect(hasteCreature, "Haste"));
-        }
-
-        _stack.Push(spell);
-        _eventBus.Publish(new SpellCastEvent(spell));
-
-        // Clear the pending-targets stamp — the spell is on the stack and
-        // its ChosenSpellParams.Targets is the authoritative source from
-        // here on. Cost-calc only needed the stamp for the brief window
-        // between target collection and the GetEffectiveCost call.
-        if (card is Card concreteToClear)
-        {
-            concreteToClear.ClearPendingCastTargets();
-        }
-
-        return spell;
+    /// <summary>CR 702.10 / CR 106.4 — mana-provenance haste rider (Arena of
+    /// Glory's exert: "If that mana is spent on a creature spell, it gains
+    /// haste until end of turn"). Casting a noncreature consumes the
+    /// provenance but grants nothing.</summary>
+    private static void ApplyHasteGrantingManaProvenance(ICard card, Player caster)
+    {
+        if (!caster.ConsumeHasteGrantingMana()) return;
+        if (card is not Cards.Creature hasteCreature) return;
+        hasteCreature.ActiveEffects ??= new ContinuousEffectsService();
+        hasteCreature.ActiveEffects.Register(
+            new GrantKeywordUntilEndOfTurnEffect(hasteCreature, "Haste"));
     }
 
     /// <summary>
