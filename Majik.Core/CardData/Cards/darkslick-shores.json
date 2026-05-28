@@ -1,0 +1,8 @@
+{
+  "name": "Darkslick Shores",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "U" },
+    { "kind": "mana", "produces": "B" }
+  ]
+}
