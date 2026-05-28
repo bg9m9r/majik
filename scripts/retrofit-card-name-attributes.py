@@ -71,12 +71,9 @@ def insert_attribute(source: str, factory_name: str, card_name: str) -> str:
     return "\n".join(lines)
 
 
-def ensure_using(source: str) -> str:
-    if "using Majik.Core.CardData.Factories;" in source:
-        return source
-    # Factory files already live in this namespace, so the attribute is
-    # in-scope without any using directive. Nothing to do.
-    return source
+# NOTE: factory files already live in the
+# `Majik.Core.CardData.Factories` namespace, so the [CardName] attribute
+# is in-scope without any using directive. No using-injection needed.
 
 
 def main(argv: list[str]) -> int:
@@ -114,7 +111,7 @@ def main(argv: list[str]) -> int:
             return 2
 
         src = path.read_text()
-        out = ensure_using(insert_attribute(src, factory, name))
+        out = insert_attribute(src, factory, name)
         if out != src:
             path.write_text(out)
             edited += 1

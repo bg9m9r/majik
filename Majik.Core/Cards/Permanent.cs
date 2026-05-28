@@ -313,12 +313,22 @@ public class Permanent : Card
         if (_regenerationShields <= 0) return false;
         _regenerationShields--;
         if (!IsTapped) Tap();
-        if (this is Creature c) c.ClearDamage();
+        OnRegenerationShieldConsumed();
         // CR 701.15c also removes the permanent from combat; the combat
         // manager owns per-turn attacker/blocker plans and doesn't expose
         // a per-creature removal hook yet (same gap as
         // RegenerationShieldEffect). Followup when CombatFlow surfaces it.
         return true;
+    }
+
+    /// <summary>
+    /// CR 701.15c hook — called from <see cref="ConsumeRegenerationShield"/>
+    /// after the permanent is tapped and the shield count is decremented.
+    /// Defaults to a no-op; subclasses that hold per-turn combat damage
+    /// (e.g. <see cref="Creature"/>) override to clear it.
+    /// </summary>
+    protected virtual void OnRegenerationShieldConsumed()
+    {
     }
 
     /// <summary>

@@ -141,6 +141,16 @@ public class Creature : Permanent
     }
 
     /// <summary>
+    /// CR 701.15c — clear marked combat damage when a regeneration shield
+    /// is consumed. Overrides the no-op default on <see cref="Permanent"/>
+    /// so the shield-consume hook no longer needs a runtime type test.
+    /// </summary>
+    protected override void OnRegenerationShieldConsumed()
+    {
+        ClearDamage();
+    }
+
+    /// <summary>
     /// Check if the creature is dead (damage >= toughness).
     /// </summary>
     public bool IsDead()
