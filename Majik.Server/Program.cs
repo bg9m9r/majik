@@ -10,6 +10,20 @@ using Microsoft.AspNetCore.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Request body size cap (DoS hardening). Every endpoint on this server takes
+// a tiny body: game commands are well under 1 KB and the largest legitimate
+// POST is a deck create carrying a full decklist (a few hundred short card
+// names) — comfortably under 256 KB. The OpenAPI/whoami/health paths are GETs
+// with no body. Capping globally turns an oversized body into a clean 413
+// (BadHttpRequestException → Kestrel's 413) instead of letting a multi-MB
+// payload stream into memory and surface as a 500. Kestrel's default is
+// 30 MB; 256 KB is ~120x headroom over our largest real payload.
+const long MaxRequestBodyBytes = 256 * 1024;
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.Limits.MaxRequestBodySize = MaxRequestBodyBytes;
+});
+
 builder.Services.AddMajikEngine(builder.Configuration);
 builder.Services.AddMajikAuth(builder.Configuration);
 builder.Services.AddMajikCors(builder.Configuration);

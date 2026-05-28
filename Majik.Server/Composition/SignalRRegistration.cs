@@ -20,10 +20,20 @@ public static class SignalRRegistration
     /// Keeps the namespace clear if/when other systems share the same Redis.</summary>
     public const string ChannelPrefix = "majik:signalr";
 
+    /// <summary>Cap on inbound hub message size (DoS hardening). The hub is
+    /// server→client fan-out only today (commands go over REST), so any
+    /// client→server message is tiny. 64 KB is far above any legitimate
+    /// inbound frame; SignalR's default is 32 KB but we set it explicitly so
+    /// the bound is intentional and survives any future default change.</summary>
+    public const long MaximumReceiveMessageSize = 64 * 1024;
+
     public static IServiceCollection AddMajikSignalR(this IServiceCollection services, IConfiguration configuration)
     {
         var connStr = configuration[ConnectionStringKey];
-        var signalR = services.AddSignalR();
+        var signalR = services.AddSignalR(options =>
+        {
+            options.MaximumReceiveMessageSize = MaximumReceiveMessageSize;
+        });
 
         if (!string.IsNullOrWhiteSpace(connStr))
         {
