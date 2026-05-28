@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Majik.Server.Composition;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using MongoDB.Driver;
 
 namespace Majik.Server.Profiles;
@@ -19,6 +20,7 @@ public static class ProfileEndpoints
             .RequireAuthorization(AuthRegistration.AsPlayerPolicy)
             .WithTags("Profile");
 
+        // GET /me — read-only lookup; not rate-limited (lightweight, no abuse vector).
         group.MapGet("/", GetMe)
              .WithName("GetMyProfile")
              .Produces<ProfileDto>(StatusCodes.Status200OK)
@@ -26,8 +28,10 @@ public static class ProfileEndpoints
              .Produces(StatusCodes.Status401Unauthorized)
              .Produces<ProfileError>(StatusCodes.Status503ServiceUnavailable);
 
+        // PUT /me — handle mutation; "expensive" policy (60 req/min).
         group.MapPut("/", PutMe)
              .WithName("UpdateMyHandle")
+             .RequireRateLimiting(RateLimitPolicies.Expensive)
              .Produces<ProfileDto>(StatusCodes.Status200OK)
              .Produces<ProfileError>(StatusCodes.Status400BadRequest)
              .Produces<ProfileError>(StatusCodes.Status409Conflict)

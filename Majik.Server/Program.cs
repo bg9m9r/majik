@@ -39,28 +39,50 @@ builder.Services.AddSingleton<Microsoft.AspNetCore.SignalR.IUserIdProvider, Maji
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddOpenApi();
 
-// Per-user (fall back to per-IP) rate limit. 60 req/min on the expensive
-// or write-heavy endpoints: deck CRUD, match creation/join, card search.
-// Health, whoami, OpenAPI, and the SignalR negotiate are unpartitioned
-// (no policy attached on their endpoints).
-const string AuthedRateLimitPolicy = "authed-60-per-min";
+// Per-user (fall back to per-IP) rate-limit — two named policies so the
+// tight bucket protects abuse-prone routes while per-priority-window
+// in-match traffic gets 10× headroom.
+//
+//  "expensive"  — 60 req/min — deck CRUD, match create/join, card search,
+//                 profile mutations. Protects against trivial DoS and
+//                 credential-stuffing on write-heavy endpoints.
+//  "in-match"   — 600 req/min — commands, state polls, roll, play-draw,
+//                 concede, replay.  Called every priority window during a
+//                 game; the tight cap would 429 legit gameplay at ~3 turns.
+//
+// Health, whoami, OpenAPI, and the SignalR negotiate are NOT rate-limited.
+// Both policies partition per-sub (JWT "sub" claim, IP fallback).
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-    options.AddPolicy(AuthedRateLimitPolicy, httpContext =>
-    {
-        var key = httpContext.User?.FindFirst("sub")?.Value
-            ?? httpContext.Connection.RemoteIpAddress?.ToString()
-            ?? "anonymous";
-        return RateLimitPartition.GetFixedWindowLimiter(key, _ => new FixedWindowRateLimiterOptions
+
+    static string PartitionKey(Microsoft.AspNetCore.Http.HttpContext ctx) =>
+        ctx.User?.FindFirst("sub")?.Value
+        ?? ctx.Connection.RemoteIpAddress?.ToString()
+        ?? "anonymous";
+
+    // "expensive" — 60 req/min per sub
+    options.AddPolicy(RateLimitPolicies.Expensive, ctx =>
+        RateLimitPartition.GetFixedWindowLimiter(PartitionKey(ctx), _ => new FixedWindowRateLimiterOptions
         {
             PermitLimit = 60,
             Window = TimeSpan.FromMinutes(1),
             QueueLimit = 0,
             QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
             AutoReplenishment = true,
-        });
-    });
+        }));
+
+    // "in-match" — 600 req/min per sub (10× headroom for gameplay traffic)
+    options.AddPolicy(RateLimitPolicies.InMatch, ctx =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            "in-match:" + PartitionKey(ctx), _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 600,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                AutoReplenishment = true,
+            }));
 });
 
 var app = builder.Build();
