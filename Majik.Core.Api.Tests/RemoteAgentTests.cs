@@ -1078,6 +1078,156 @@ public class RemoteAgentTests
         agent.HasPending.Should().BeFalse();
     }
 
+    // -----------------------------------------------------------------------
+    // CR 701.42 — surveil prompt (PR follow-up: wires what PR #1003 deferred)
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task ChooseSurveil_Submit_PartitionsPeekedCardsIntoGraveyardAndTopOrder()
+    {
+        // Engine peeks two cards on surveil 2; client partitions them into
+        // "send the first to graveyard, keep the second on top" via the
+        // wire ChooseSurveilCommand.
+        var top = new Creature("Forest", "", 0, 0) { Owner = _alice };
+        var next = new Creature("Mountain", "", 0, 0) { Owner = _alice };
+        var peeked = new ICard[] { top, next };
+        var agent = new RemoteAgent(_alice);
+
+        var task = agent.ChooseSurveilDecisionAsync(ctx: null, peeked);
+        agent.HasPending.Should().BeTrue();
+        agent.ExpectedCommandKinds.Should().ContainSingle()
+            .Which.Should().Be(typeof(ChooseSurveilCommand));
+
+        agent.Submit(new ChooseSurveilCommand(
+                ToGraveyardInstanceIds: new[] { top.InstanceId },
+                TopOrderInstanceIds: new[] { next.InstanceId })
+            { PlayerId = _alice.Id });
+        var decision = await task;
+
+        decision.ToGraveyard.Should().ContainSingle().Which.Should().BeSameAs(top);
+        decision.TopOrder.Should().ContainSingle().Which.Should().BeSameAs(next);
+    }
+
+    [Fact]
+    public async Task ChooseSurveil_PromptPayload_ExposesPeekedSnapshotsOnSurveilView()
+    {
+        // Portal needs the peeked card data to render the surveil modal — the
+        // library is hidden in GameStateDto (CR 706). RemoteAgent stashes a
+        // CardSnapshotDto list in PendingPayload.SurveilView so
+        // GameFacade.BuildPrompt can copy it onto the wire PromptDto.
+        var top = new Creature("Forest", "", 0, 0) { Owner = _alice };
+        var agent = new RemoteAgent(_alice);
+
+        _ = agent.ChooseSurveilDecisionAsync(ctx: null, new ICard[] { top });
+
+        agent.PendingPayload.Should().NotBeNull();
+        agent.PendingPayload!.SurveilView.Should().NotBeNull();
+        agent.PendingPayload.SurveilView!.Should().ContainSingle()
+            .Which.InstanceId.Should().Be(top.InstanceId);
+        agent.PendingPayload.Label.Should().Be("surveil 1");
+        await Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task ChooseSurveil_AllToGraveyard_DefaultDecision()
+    {
+        // The bot's pre-agent default (and ScriptedAgent's fallback) sends
+        // every peeked card to the graveyard. Same partition shape should
+        // survive the wire — empty TopOrder + every peeked id in
+        // ToGraveyard resolves cleanly.
+        var c1 = new Creature("Forest", "", 0, 0) { Owner = _alice };
+        var c2 = new Creature("Mountain", "", 0, 0) { Owner = _alice };
+        var peeked = new ICard[] { c1, c2 };
+        var agent = new RemoteAgent(_alice);
+
+        var task = agent.ChooseSurveilDecisionAsync(ctx: null, peeked);
+        agent.Submit(new ChooseSurveilCommand(
+                ToGraveyardInstanceIds: new[] { c1.InstanceId, c2.InstanceId },
+                TopOrderInstanceIds: Array.Empty<Guid>())
+            { PlayerId = _alice.Id });
+        var decision = await task;
+
+        decision.ToGraveyard.Should().BeEquivalentTo(new[] { c1, c2 });
+        decision.TopOrder.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task ChooseSurveil_UnknownInstanceId_Throws()
+    {
+        // Defence: clients can't smuggle an InstanceId the engine didn't peek
+        // (would let them rearrange / discard cards beyond the surveil
+        // window).
+        var top = new Creature("Forest", "", 0, 0) { Owner = _alice };
+        var agent = new RemoteAgent(_alice);
+
+        _ = agent.ChooseSurveilDecisionAsync(ctx: null, new ICard[] { top });
+        var act = () => agent.Submit(new ChooseSurveilCommand(
+                ToGraveyardInstanceIds: new[] { Guid.NewGuid() },
+                TopOrderInstanceIds: Array.Empty<Guid>())
+            { PlayerId = _alice.Id });
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*unknown instance*");
+        await Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task ChooseSurveil_PartitionDoesNotCoverPeeked_Throws()
+    {
+        // Defence: client must partition every peeked card exactly once.
+        // Dropping one (or assigning one to both buckets) is a wire-error.
+        var c1 = new Creature("Forest", "", 0, 0) { Owner = _alice };
+        var c2 = new Creature("Mountain", "", 0, 0) { Owner = _alice };
+        var agent = new RemoteAgent(_alice);
+
+        _ = agent.ChooseSurveilDecisionAsync(ctx: null, new ICard[] { c1, c2 });
+        // Only c1 referenced; c2 is dropped on the floor.
+        var act = () => agent.Submit(new ChooseSurveilCommand(
+                ToGraveyardInstanceIds: new[] { c1.InstanceId },
+                TopOrderInstanceIds: Array.Empty<Guid>())
+            { PlayerId = _alice.Id });
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*partitioned 1 cards but engine peeked 2*");
+        await Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task ChooseSurveil_DuplicateInstanceId_Throws()
+    {
+        // Defence: same id in both buckets (or twice in one) — refuse.
+        var c1 = new Creature("Forest", "", 0, 0) { Owner = _alice };
+        var agent = new RemoteAgent(_alice);
+
+        _ = agent.ChooseSurveilDecisionAsync(ctx: null, new ICard[] { c1 });
+        var act = () => agent.Submit(new ChooseSurveilCommand(
+                ToGraveyardInstanceIds: new[] { c1.InstanceId },
+                TopOrderInstanceIds: new[] { c1.InstanceId })
+            { PlayerId = _alice.Id });
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*more than once*");
+        await Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task ChooseSurveil_PendingPayload_ClearedAfterSubmit()
+    {
+        var c1 = new Creature("Forest", "", 0, 0) { Owner = _alice };
+        var agent = new RemoteAgent(_alice);
+
+        var task = agent.ChooseSurveilDecisionAsync(ctx: null, new ICard[] { c1 });
+        agent.PendingPayload.Should().NotBeNull();
+        agent.Submit(new ChooseSurveilCommand(
+                ToGraveyardInstanceIds: new[] { c1.InstanceId },
+                TopOrderInstanceIds: Array.Empty<Guid>())
+            { PlayerId = _alice.Id });
+        await task;
+
+        agent.PendingPayload.Should().BeNull();
+        agent.HasPending.Should().BeFalse();
+    }
+
     private sealed class TestStackObject : Majik.Core.Stack.IStackObject
     {
         public Guid Id { get; } = Guid.NewGuid();

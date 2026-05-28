@@ -26,8 +26,10 @@
       "list": []
     },
     "triggered": {
-      "count": 0,
-      "list": []
+      "count": 1,
+      "list": [
+        "trig:CardMovedEvent=\u003EEffect"
+      ]
     },
     "static": {
       "count": 0,

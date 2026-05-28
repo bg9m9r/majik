@@ -25,6 +25,7 @@ namespace Majik.Core.Api.Commands;
 [JsonDerivedType(typeof(DeclareBlockersCommand), "blockers")]
 [JsonDerivedType(typeof(ChooseCardsToBottomCommand), "bottom")]
 [JsonDerivedType(typeof(ChooseLibraryPickCommand), "chooseLibraryPick")]
+[JsonDerivedType(typeof(ChooseSurveilCommand), "chooseSurveil")]
 public abstract record GameCommand
 {
     /// <summary>The player who submitted the command.</summary>
@@ -110,3 +111,25 @@ public sealed record ChooseCardsToBottomCommand(IReadOnlyList<Guid> CardInstance
 /// client can never silently smuggle a non-matching pick through.
 /// </summary>
 public sealed record ChooseLibraryPickCommand(Guid? SelectedInstanceId) : GameCommand;
+
+/// <summary>
+/// CR 701.42 — response to a surveil prompt
+/// (<see cref="Majik.Core.Players.Agents.IPlayerAgent.ChooseSurveilDecisionAsync"/>).
+/// The engine peeked N cards from the top of the searching player's library
+/// and shipped them in the prompt envelope's <c>SurveilView</c> (in
+/// top-to-bottom order). The client partitions those N cards into two
+/// disjoint lists:
+/// <list type="bullet">
+/// <item><see cref="ToGraveyardInstanceIds"/> — the InstanceIds the player
+/// chose to send to their graveyard (CR 701.42a).</item>
+/// <item><see cref="TopOrderInstanceIds"/> — the remaining peeked cards in
+/// the order the player wants them on top of the library, where index 0
+/// becomes the new top (CR 701.42b).</item>
+/// </list>
+/// The engine rejects payloads that don't partition the peeked set exactly
+/// once with a clear error so the client can't smuggle a graveyard-bound
+/// card back to the top or drop a peeked card on the floor.
+/// </summary>
+public sealed record ChooseSurveilCommand(
+    IReadOnlyList<Guid> ToGraveyardInstanceIds,
+    IReadOnlyList<Guid> TopOrderInstanceIds) : GameCommand;

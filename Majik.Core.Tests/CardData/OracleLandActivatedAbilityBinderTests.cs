@@ -5,7 +5,9 @@ using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
 using Majik.Core.Zones;
+using Moq;
 using Xunit;
 
 namespace Majik.Core.Tests.CardData;
@@ -150,6 +152,105 @@ public class OracleLandActivatedAbilityBinderTests
     }
 
     // -------------------------------------------------------------------
+    // Agent prompt — CR 701.19a "the player chooses which card to fetch"
+    // -------------------------------------------------------------------
+
+    [Fact]
+    public void Effect_ConsultsRegisteredAgent_WhenChoosingAmongCandidates()
+    {
+        // Production bug surfaced in the live fetchland test (PR #1003 wired
+        // AgentRegistry but the binder's FetchEffect never consulted it):
+        // the human user saw their fetchland resolve without ever being asked
+        // which land to fetch. The binder must mirror FetchLandCycleFactory
+        // and call agent.ChooseLibraryPickAsync when an agent is registered
+        // for the fetchland's controller.
+        var alice = new Player("Alice", 20);
+        AgentRegistry.Clear();
+        try
+        {
+            var fetch = new Land("Misty Rainforest") { Owner = alice, Controller = alice };
+            alice.Zones.Battlefield.AddCard(fetch);
+
+            var forest = new Land("Forest", subtypes: new[] { CardSubtype.Forest })
+            {
+                Owner = alice, Controller = alice,
+            };
+            var island = new Land("Island", subtypes: new[] { CardSubtype.Island })
+            {
+                Owner = alice, Controller = alice,
+            };
+            alice.Zones.Library.AddCard(forest);
+            alice.Zones.Library.AddCard(island);
+
+            // Mock agent always picks the Island — proves the binder
+            // honoured the agent's choice rather than falling through to
+            // FirstOrDefault (which would have picked the Forest, registered
+            // first in the library).
+            var agent = new Mock<IPlayerAgent>();
+            agent.Setup(a => a.ChooseLibraryPickAsync(
+                    It.IsAny<Majik.Core.Game.GameContext?>(),
+                    It.IsAny<IReadOnlyList<ICard>>(),
+                    It.IsAny<string>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync((ICard?)island);
+            AgentRegistry.Set(alice, agent.Object);
+
+            OracleLandActivatedAbilityBinder.Bind(fetch, MistyRainforestEntity(), alice);
+            fetch.Abilities.OfType<ActivatedAbility>().Single().Resolve();
+
+            alice.Zones.Battlefield.GetCards().Should().Contain(island,
+                because: "the agent picked the Island, not FirstOrDefault");
+            alice.Zones.Battlefield.GetCards().Should().NotContain(forest);
+            alice.Zones.Library.GetCards().Should().Contain(forest);
+        }
+        finally
+        {
+            AgentRegistry.Clear();
+        }
+    }
+
+    [Fact]
+    public void Effect_AgentPicksNull_ModelsFindNothing()
+    {
+        // CR 701.19a — a player may decline to choose a card from a
+        // successful search. The binder must surface that as "nothing
+        // moved to the battlefield", not as a thrown / silent
+        // FirstOrDefault.
+        var alice = new Player("Alice", 20);
+        AgentRegistry.Clear();
+        try
+        {
+            var fetch = new Land("Misty Rainforest") { Owner = alice, Controller = alice };
+            alice.Zones.Battlefield.AddCard(fetch);
+            var forest = new Land("Forest", subtypes: new[] { CardSubtype.Forest })
+            {
+                Owner = alice, Controller = alice,
+            };
+            alice.Zones.Library.AddCard(forest);
+
+            var agent = new Mock<IPlayerAgent>();
+            agent.Setup(a => a.ChooseLibraryPickAsync(
+                    It.IsAny<Majik.Core.Game.GameContext?>(),
+                    It.IsAny<IReadOnlyList<ICard>>(),
+                    It.IsAny<string>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync((ICard?)null);
+            AgentRegistry.Set(alice, agent.Object);
+
+            OracleLandActivatedAbilityBinder.Bind(fetch, MistyRainforestEntity(), alice);
+            fetch.Abilities.OfType<ActivatedAbility>().Single().Resolve();
+
+            alice.Zones.Library.GetCards().Should().Contain(forest,
+                because: "the agent declined the search; Forest stays in library");
+            alice.Zones.Battlefield.GetCards().Should().NotContain(forest);
+        }
+        finally
+        {
+            AgentRegistry.Clear();
+        }
+    }
+
+    // -------------------------------------------------------------------
     // Non-fetch / non-land cards — nothing attached
     // -------------------------------------------------------------------
 
@@ -205,4 +306,5 @@ public class OracleLandActivatedAbilityBinderTests
         OracleText = "{T}, Pay 1 life, Sacrifice Misty Rainforest: Search your library for a Forest or Island card, " +
                      "put it onto the battlefield, then shuffle.",
     };
+
 }

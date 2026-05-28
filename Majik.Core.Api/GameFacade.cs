@@ -789,7 +789,8 @@ public sealed class GameFacade : IDisposable
             ExpectedKinds: kinds.Select(t => t.Name).ToList(),
             Candidates: payload?.Candidates,
             Label: payload?.Label,
-            LibraryView: payload?.LibraryView);
+            LibraryView: payload?.LibraryView,
+            SurveilView: payload?.SurveilView);
     }
 
     private void BridgeEvent(GameEvent e)
