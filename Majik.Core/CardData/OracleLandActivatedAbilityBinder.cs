@@ -5,6 +5,8 @@ using Majik.Core.Cards.Types;
 using Majik.Core.CardData;
 using Majik.Core.Costs;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
+using Majik.Core.Services;
 using Majik.Core.Zones;
 
 namespace Majik.Core.CardData;
@@ -105,17 +107,62 @@ public static class OracleLandActivatedAbilityBinder
 
     private static void FetchEffect(Player controller, CardSubtype subtypeA, CardSubtype subtypeB)
     {
-        // Search the library for the first card with either target land subtype.
-        var target = controller.Zones.Library
+        // CR 701.19a / CR 701.19c — gather the legal candidates (lands whose
+        // subtypes include either of the two basics the fetchland names), let
+        // the controller's agent pick one, then route the chosen card to the
+        // battlefield via ZoneService so ETB triggers + ETB-tapped
+        // replacements fire on the tutored land (Underground Mortuary surveil,
+        // shock-land "may pay 2 life or enters tapped", bounce-land bounce,
+        // Amulet of Vigor untap).
+        //
+        // Pre-fix this method called FirstOrDefault + raw zone mutation:
+        //   * AgentRegistry was never consulted, so the engine silently
+        //     auto-picked the first match. The human user saw their fetchland
+        //     resolve without ever being asked which land to fetch — even
+        //     after PR #1003 wired AgentRegistry on the GameFacade. The
+        //     fetchland production path went through THIS binder, not through
+        //     FetchLandCycleFactory (which DOES consult the agent), so the
+        //     prompt never fired at the live table.
+        //   * Raw Library.RemoveCard / Battlefield.AddCard bypassed
+        //     ZoneService.MoveCard, so CardMovedEvent never published and no
+        //     ETB replacement / trigger ran on the tutored land.
+        //
+        // Both paths now match FetchLandCycleFactory.TutorLandToBattlefield.
+        var candidates = controller.Zones.Library
             .GetCards()
-            .FirstOrDefault(c => c.HasSubtype(subtypeA) || c.HasSubtype(subtypeB));
+            .Where(c => c.HasType(CardType.Land)
+                     && (c.HasSubtype(subtypeA) || c.HasSubtype(subtypeB)))
+            .ToList();
+        if (candidates.Count == 0) return;
 
-        if (target == null) return; // Nothing found — ability fizzles (library empty or no match).
+        var agent = AgentRegistry.Get(controller);
+        ICard? pick = agent != null
+            ? agent.ChooseLibraryPickAsync(ctx: null, candidates, "land card")
+                .GetAwaiter().GetResult()
+            : candidates[0];
+        if (pick == null) return; // CR 701.19a — declining a successful search is legal.
 
-        controller.Zones.Library.RemoveCard(target);
-        controller.Zones.Battlefield.AddCard(target);
-        // AddCard already calls target.SetZone(ZoneType.Battlefield) internally (Zone.AddCard).
+        // CR 603.6a / CR 614 — route the Library → Battlefield move through
+        // ZoneService when a live service is registered so the tutored land's
+        // CardMovedEvent fires (drives bounce-land bounce + Amulet of Vigor
+        // untap) and ETB-tapped replacements (shock lands paying 2 life,
+        // bounce/surveil lands always tapped) run. Falls back to raw zone
+        // mutation for the no-service test paths.
+        var zones = ZoneServiceRegistry.Get(controller);
+        if (zones != null)
+        {
+            zones.MoveCard(pick, ZoneType.Library, ZoneType.Battlefield, controller);
+        }
+        else
+        {
+            controller.Zones.Library.RemoveCard(pick);
+            controller.Zones.Battlefield.AddCard(pick);
+            pick.SetZone(ZoneType.Battlefield);
+            pick.SetController(controller);
+        }
 
-        // CR 701.19c — "then shuffle." Shuffle hook not yet implemented; no-op stub.
+        // CR 701.19c — "then shuffle." Route through the shared library-shuffle
+        // helper for parity with FetchLandCycleFactory.
+        Majik.Core.Zones.LibraryShuffle.ShuffleLibrary(controller, "fetch-land");
     }
 }

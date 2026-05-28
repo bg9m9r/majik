@@ -188,7 +188,37 @@ public static class StateSnapshotter
             Id: a.Id,
             Kind: "ActivatedAbility",
             ControllerId: a.Controller.Id,
-            Description: "ability"),
+            // Surface a human-readable description matching the triggered-
+            // ability case above: "<source card name>: <first effect text>".
+            // Falls back to the source name alone (then to "ability") when
+            // the wrapper carries no effects, so a half-built stub still
+            // produces something more useful than the generic "ability"
+            // label clients saw before.
+            Description: BuildActivatedAbilityDescription(a)),
         _ => new StackObjectDto(obj.Id, obj.GetType().Name, null, obj.GetType().Name),
     };
+
+    private static string BuildActivatedAbilityDescription(IActivatedAbility a)
+    {
+        var sourceName = (a.Source as ICard)?.Name;
+        // IActivatedAbility does not expose Effects on the interface; the
+        // concrete ActivatedAbility does. Cast and read the first effect's
+        // description when present.
+        var firstEffect = (a as ActivatedAbility)?.Effects?.FirstOrDefault()?.Description;
+        if (!string.IsNullOrWhiteSpace(firstEffect))
+        {
+            // Effect descriptions like FetchLandCycleFactory's "Windswept
+            // Heath: search library for Forest or Plains, put onto
+            // battlefield" already lead with the card name; avoid stuttering
+            // by using the effect text directly when it starts with the
+            // source's name, otherwise prepend "Name: ".
+            if (!string.IsNullOrWhiteSpace(sourceName) &&
+                !firstEffect.StartsWith(sourceName!, StringComparison.OrdinalIgnoreCase))
+            {
+                return $"{sourceName}: {firstEffect}";
+            }
+            return firstEffect!;
+        }
+        return sourceName ?? "ability";
+    }
 }

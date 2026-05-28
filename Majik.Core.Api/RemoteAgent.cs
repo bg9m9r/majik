@@ -40,10 +40,16 @@ public sealed class RemoteAgent : IPlayerAgent
     // InstanceId came from the offered set and resolve it back to an
     // ICard. Cleared on prompt resolution; replaced on each new prompt.
     private IReadOnlyList<ICard>? _pendingLibraryCandidates;
+    // Engine-supplied peeked-card list for the most recent surveil prompt
+    // (CR 701.42). Stashed so Submit can validate that the wire command's
+    // partition (ToGraveyard ∪ TopOrder) matches the offered set exactly
+    // and resolve each InstanceId back to an ICard. Cleared on prompt
+    // resolution; replaced on each new surveil prompt.
+    private IReadOnlyList<ICard>? _pendingSurveilPeeked;
     // Per-prompt extra payload (currently: library-search candidates +
-    // label) surfaced via PendingPayload for GameFacade.BuildPrompt to
-    // copy into the wire PromptDto. Null on prompt kinds that need no
-    // additional context.
+    // label, surveil peeked view) surfaced via PendingPayload for
+    // GameFacade.BuildPrompt to copy into the wire PromptDto. Null on
+    // prompt kinds that need no additional context.
     private PromptPayload? _pendingPayload;
 
     public RemoteAgent(
@@ -107,19 +113,22 @@ public sealed class RemoteAgent : IPlayerAgent
         var pending = _pending;
         var triggerOrder = _pendingTriggerOrder;
         var libraryCandidates = _pendingLibraryCandidates;
+        var surveilPeeked = _pendingSurveilPeeked;
         _pending = null;
         _pendingKinds = null;
         _pendingTriggerOrder = null;
         _pendingLibraryCandidates = null;
+        _pendingSurveilPeeked = null;
         _pendingPayload = null;
-        Resolve(pending, command, triggerOrder, libraryCandidates);
+        Resolve(pending, command, triggerOrder, libraryCandidates, surveilPeeked);
     }
 
     private void Resolve(
         object tcs,
         GameCommand command,
         IReadOnlyList<ITriggeredAbility>? triggerOrder,
-        IReadOnlyList<ICard>? libraryCandidates)
+        IReadOnlyList<ICard>? libraryCandidates,
+        IReadOnlyList<ICard>? surveilPeeked)
     {
         switch (command)
         {
@@ -283,6 +292,52 @@ public sealed class RemoteAgent : IPlayerAgent
             case DeclareBlockersCommand blk:
                 ((TaskCompletionSource<BlockPlan>)tcs).SetResult(BuildBlockPlan(blk));
                 break;
+            case ChooseSurveilCommand sc:
+            {
+                // CR 701.42 — partition the peeked top-N into graveyard /
+                // top-order buckets and ship a SurveilDecision back to the
+                // engine. Validate that the wire payload covers the peeked
+                // set exactly once (no duplicates, no extras, no missing
+                // peeked card) so the client can't smuggle library order
+                // beyond what the engine offered.
+                if (surveilPeeked == null)
+                {
+                    throw new InvalidOperationException(
+                        "ChooseSurveilCommand resolved without a pending peeked-card list.");
+                }
+                var surveilById = surveilPeeked.ToDictionary(c => c.InstanceId);
+                var seen = new HashSet<Guid>();
+                var toGy = new List<ICard>(sc.ToGraveyardInstanceIds.Count);
+                foreach (var id in sc.ToGraveyardInstanceIds)
+                {
+                    if (!surveilById.TryGetValue(id, out var gyCard))
+                        throw new InvalidOperationException(
+                            $"ChooseSurveilCommand ToGraveyard references unknown instance {id}.");
+                    if (!seen.Add(id))
+                        throw new InvalidOperationException(
+                            $"ChooseSurveilCommand listed instance {id} more than once.");
+                    toGy.Add(gyCard);
+                }
+                var top = new List<ICard>(sc.TopOrderInstanceIds.Count);
+                foreach (var id in sc.TopOrderInstanceIds)
+                {
+                    if (!surveilById.TryGetValue(id, out var topCard))
+                        throw new InvalidOperationException(
+                            $"ChooseSurveilCommand TopOrder references unknown instance {id}.");
+                    if (!seen.Add(id))
+                        throw new InvalidOperationException(
+                            $"ChooseSurveilCommand listed instance {id} more than once.");
+                    top.Add(topCard);
+                }
+                if (seen.Count != surveilPeeked.Count)
+                {
+                    throw new InvalidOperationException(
+                        $"ChooseSurveilCommand partitioned {seen.Count} cards but engine peeked {surveilPeeked.Count}.");
+                }
+                ((TaskCompletionSource<SurveilAction.SurveilDecision>)tcs).SetResult(
+                    new SurveilAction.SurveilDecision(toGy, top));
+                break;
+            }
             case ChooseLibraryPickCommand lp:
             {
                 // CR 701.19a — translate the wire command into the
@@ -515,14 +570,57 @@ public sealed class RemoteAgent : IPlayerAgent
             $"Defender {defenderId} is neither a known player nor a Planeswalker.");
     }
 
-    // TODO (v2): wire Scry/Surveil prompts through the command channel
-    // (ChooseScryCommand / ChooseSurveilCommand) once the prompt system
-    // is updated to handle sync-over-async in effect closures.
+    // TODO (v2): wire the Scry prompt through the command channel
+    // (ChooseScryCommand) once the prompt system is updated to handle
+    // sync-over-async in effect closures.
     public Task<ScryAction.ScryDecision> ChooseScryDecisionAsync(GameContext? ctx, IReadOnlyList<ICard> peeked, CancellationToken ct = default)
         => throw new NotImplementedException("Scry prompt wired in v2 (effect async refactor).");
 
-    public Task<SurveilAction.SurveilDecision> ChooseSurveilDecisionAsync(GameContext? ctx, IReadOnlyList<ICard> peeked, CancellationToken ct = default)
-        => throw new NotImplementedException("Surveil prompt wired in v2 (effect async refactor).");
+    /// <summary>
+    /// CR 701.42 — surveil prompt. Default in <see cref="IPlayerAgent"/>
+    /// auto-keeps all peeked cards on top, which caused remote (human)
+    /// players to see DSK surveil lands ETB and silently send nothing to
+    /// the graveyard (pre-fix RemoteAgent threw NotImplementedException —
+    /// the engine then crashed the resolve closure under the
+    /// GetAwaiter().GetResult() bridge). Override snapshots the engine-
+    /// peeked top-N onto the prompt payload so the portal can render the
+    /// surveil modal, then awaits a <see cref="ChooseSurveilCommand"/> back
+    /// from the client. The command's <c>ToGraveyardInstanceIds</c> /
+    /// <c>TopOrderInstanceIds</c> are validated against the peeked set in
+    /// <see cref="Resolve"/> before constructing the
+    /// <see cref="SurveilAction.SurveilDecision"/>.
+    /// </summary>
+    public Task<SurveilAction.SurveilDecision> ChooseSurveilDecisionAsync(
+        GameContext? ctx,
+        IReadOnlyList<ICard> peeked,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(peeked);
+        // Mirror ChooseLibraryPickAsync: stash before Prompt fires
+        // PromptRequested observers, guard by checking _pending so we don't
+        // smear stash on top of a still-pending prompt.
+        if (_pending != null)
+        {
+            throw new InvalidOperationException("A prompt is already pending.");
+        }
+        var snapshots = peeked.Select(StateSnapshotter.SnapshotCard).ToList();
+        _pendingSurveilPeeked = peeked;
+        _pendingPayload = new PromptPayload(
+            Candidates: null,
+            Label: peeked.Count == 1 ? "surveil 1" : $"surveil {peeked.Count}",
+            LibraryView: null,
+            SurveilView: snapshots);
+        try
+        {
+            return Prompt<SurveilAction.SurveilDecision>(ct, typeof(ChooseSurveilCommand));
+        }
+        catch
+        {
+            _pendingSurveilPeeked = null;
+            _pendingPayload = null;
+            throw;
+        }
+    }
 
     /// <summary>
     /// CR 701.19a — library search. Default in <see cref="IPlayerAgent"/>
@@ -626,4 +724,11 @@ public sealed record PromptPayload(
     /// broadcast to the opponent or spectators via this path.
     /// </para>
     /// </summary>
-    IReadOnlyList<CardSnapshotDto>? LibraryView = null);
+    IReadOnlyList<CardSnapshotDto>? LibraryView = null,
+    /// <summary>
+    /// CR 701.42 — peeked top-N of the surveilling player's library, in
+    /// top-to-bottom order. Non-null only on surveil prompts; null on every
+    /// other prompt kind. Privacy posture matches <see cref="LibraryView"/>:
+    /// shipped per-recipient, never broadcast.
+    /// </summary>
+    IReadOnlyList<CardSnapshotDto>? SurveilView = null);

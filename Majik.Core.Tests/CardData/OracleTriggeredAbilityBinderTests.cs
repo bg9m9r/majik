@@ -423,4 +423,57 @@ public class OracleTriggeredAbilityBinderTests
         var act = () => trigger!.Resolve();
         act.Should().NotThrow();
     }
+
+    // ---- ETB surveil on the DSK surveil-land cycle (Underground Mortuary etc.)
+
+    [Fact]
+    public void ETB_SurveilLand_ThisLandEnters_BindsAndFiresWithoutAgent()
+    {
+        // CR 701.42 — production load path for the DSK surveil-land cycle
+        // (Underground Mortuary, Lush Portico, Meticulous Archive, Shadowy
+        // Backstreet, Thundering Falls). Oracle text uses "When this land
+        // enters, surveil 1." Pre-fix the EtbLine regex didn't accept
+        // "this land", so the trigger never bound — production lands ETBed
+        // without any surveil at all.
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+        var zones = new ZoneService(_bus);
+
+        // Stack 2 cards on top so surveil 1 has something to peek.
+        var top = new Majik.Core.Cards.Land("Forest") { Owner = _alice, Controller = _alice };
+        var next = new Majik.Core.Cards.Land("Forest") { Owner = _alice, Controller = _alice };
+        _alice.Zones.Library.AddCard(top);
+        _alice.Zones.Library.AddCard(next);
+        top.SetZone(ZoneType.Library);
+        next.SetZone(ZoneType.Library);
+
+        var land = new Majik.Core.Cards.Land("Underground Mortuary")
+        {
+            Owner = _alice, Controller = _alice,
+        };
+        land.SetZone(ZoneType.Hand);
+        _alice.Zones.Hand.AddCard(land);
+
+        var entity = new CardEntity
+        {
+            Name = "Underground Mortuary",
+            TypeLine = "Land — Swamp Forest",
+            OracleText = "({T}: Add {B} or {G}.)\nThis land enters tapped.\n" +
+                         "When this land enters, surveil 1.",
+        };
+        foreach (var ab in OracleTriggeredAbilityBinder.Bind(land, entity, _alice))
+        {
+            land.AddAbility(ab);
+        }
+        triggers.BindCard(land);
+
+        zones.MoveCardTo(land, ZoneType.Battlefield, controller: _alice);
+        triggers.PutPendingTriggersOnStack(_alice);
+        stack.Pop()!.Resolve();
+
+        // Default decision (no agent registered) sends all peeked cards to
+        // graveyard. Underground Mortuary surveils 1 → top card goes to GY.
+        _alice.Zones.Graveyard.GetCards().Should().Contain(top,
+            because: "no agent was registered; surveil falls back to all-to-graveyard");
+    }
 }

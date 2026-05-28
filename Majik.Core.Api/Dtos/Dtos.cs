@@ -110,7 +110,17 @@ public sealed record PromptDto(
     IReadOnlyList<string> ExpectedKinds,
     IReadOnlyList<CardSnapshotDto>? Candidates = null,
     string? Label = null,
-    IReadOnlyList<CardSnapshotDto>? LibraryView = null);
+    IReadOnlyList<CardSnapshotDto>? LibraryView = null,
+    /// <summary>
+    /// CR 701.42 — peeked top N of the searching player's library on a
+    /// surveil prompt, in top-to-bottom order. The client surfaces each
+    /// card with two choices ("to graveyard" vs "keep on top") and assembles
+    /// a <c>ChooseSurveilCommand</c> partitioning the peeked set.
+    /// Non-null only on surveil prompts; null on every other prompt kind.
+    /// Privacy: shipped per-recipient like <see cref="LibraryView"/>, never
+    /// broadcast to opponents or spectators.
+    /// </summary>
+    IReadOnlyList<CardSnapshotDto>? SurveilView = null);
 
 /// <summary>
 /// Per-viewer auto-pass policy. Mirrors the portal-side

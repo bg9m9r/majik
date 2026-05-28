@@ -205,7 +205,7 @@ public class AgentRegistryTests : IDisposable
             TopOrder: new ICard[] { cardA }));
         AgentRegistry.Set(_alice, agent);
 
-        var mortuary = UndergroundMortuaryFactory.Create(_alice);
+        var mortuary = NamedCardFactory.Create("Underground Mortuary", _alice);
 
         // Fire the ETB trigger effect directly.
         var etbTrigger = mortuary.Abilities
@@ -224,7 +224,7 @@ public class AgentRegistryTests : IDisposable
         var cardA = new Land("A") { Owner = _alice, Zone = ZoneType.Library };
         _alice.Zones.Library.AddCard(cardA);
 
-        var mortuary = UndergroundMortuaryFactory.Create(_alice);
+        var mortuary = NamedCardFactory.Create("Underground Mortuary", _alice);
 
         var etbTrigger = mortuary.Abilities
             .OfType<TriggeredAbility>()

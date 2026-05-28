@@ -27,7 +27,7 @@ namespace Majik.Core.CardData;
 public static class OracleTriggeredAbilityBinder
 {
     private static readonly Regex EtbLine = new(
-        @"When(ever)?\s+(?<ref>~|this creature|this artifact|this enchantment|this permanent)\s+enters(\s+the\s+battlefield)?\s*,\s*(?<effect>[^.]+)\.",
+        @"When(ever)?\s+(?<ref>~|this creature|this artifact|this enchantment|this permanent|this land)\s+enters(\s+the\s+battlefield)?\s*,\s*(?<effect>[^.]+)\.",
         RegexOptions.IgnoreCase);
     private static readonly Regex DiesLine = new(
         @"When\s+(?<ref>~|this creature)\s+dies\s*,\s*(?<effect>[^.]+)\.",
@@ -44,6 +44,14 @@ public static class OracleTriggeredAbilityBinder
         RegexOptions.IgnoreCase);
     private static readonly Regex DrawCards = new(
         @"draw\s+(?<n>\d+|a|one|two|three|four|five|six|seven)\s+cards?",
+        RegexOptions.IgnoreCase);
+    // "surveil N" — CR 701.42. Common ETB rider on DSK surveil lands
+    // (Underground Mortuary, Lush Portico, Meticulous Archive, Shadowy
+    // Backstreet, Thundering Falls) and various spells. We bind the inner
+    // surveil effect; the binder above wires the ETB trigger when paired
+    // with "When this land enters, surveil N".
+    private static readonly Regex SurveilN = new(
+        @"surveil\s+(?<n>\d+|a|one|two|three|four|five|six|seven|eight|nine|ten)\b",
         RegexOptions.IgnoreCase);
     private static readonly Regex DealDamageOpponent = new(
         @"deals?\s+(?<n>\d+|one|two|three|four|five|six|seven)\s+damage\s+to\s+(that\s+player|any\s+opponent)",
@@ -478,6 +486,41 @@ public static class OracleTriggeredAbilityBinder
         // "Create a Treasure token" shorthand without explicit pluralisation
         // is already handled by CreateTreasure regex; the equivalent
         // keyword shorthand "create a Treasure" trades to the same path.
+
+        // "Surveil N" — peek top N of own library, consult the registered
+        // agent on which to send to the graveyard and which to keep on top
+        // (CR 701.42). Mirrors the named-card surveil path in
+        // CardDefinitionFactory.BuildSurveilSelfEffect so the binder-driven
+        // production load gets the same prompt + apply behaviour without
+        // needing a per-card factory.
+        m = SurveilN.Match(effectText);
+        if (m.Success)
+        {
+            var n = WordToInt(m.Groups["n"].Value);
+            if (n > 0)
+            {
+                yield return new Effect($"surveil {n}", () =>
+                {
+                    var peeked = Majik.Core.Keywords.SurveilAction.Peek(controller, n);
+                    if (peeked.Count == 0) return;
+
+                    var agent = Majik.Core.Players.Agents.AgentRegistry.Get(controller);
+                    Majik.Core.Keywords.SurveilAction.SurveilDecision decision;
+                    if (agent != null)
+                    {
+                        decision = agent.ChooseSurveilDecisionAsync(null, peeked)
+                            .GetAwaiter().GetResult();
+                    }
+                    else
+                    {
+                        decision = new Majik.Core.Keywords.SurveilAction.SurveilDecision(
+                            ToGraveyard: peeked.ToList(),
+                            TopOrder: Array.Empty<ICard>());
+                    }
+                    Majik.Core.Keywords.SurveilAction.Apply(controller, n, decision);
+                });
+            }
+        }
     }
 
     private static void DrawN(Player player, int n)

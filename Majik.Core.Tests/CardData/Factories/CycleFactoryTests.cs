@@ -181,6 +181,119 @@ public class CycleFactoryTests
     }
 
     // -----------------------------------------------------------------------
+    // Surveil land cycle — 5 members (DSK / Foundations / MKM)
+    // -----------------------------------------------------------------------
+
+    public static IEnumerable<object[]> AllSurveilLands => new[]
+    {
+        // name, subtypeA, subtypeB, colourA, colourB
+        new object[] { "Underground Mortuary", CardSubtype.Swamp,    CardSubtype.Forest,   "B", "G" },
+        new object[] { "Lush Portico",         CardSubtype.Forest,   CardSubtype.Plains,   "G", "W" },
+        new object[] { "Meticulous Archive",   CardSubtype.Plains,   CardSubtype.Island,   "W", "U" },
+        new object[] { "Shadowy Backstreet",   CardSubtype.Plains,   CardSubtype.Swamp,    "W", "B" },
+        new object[] { "Thundering Falls",     CardSubtype.Island,   CardSubtype.Mountain, "U", "R" },
+        new object[] { "Elegant Parlor",       CardSubtype.Mountain, CardSubtype.Plains,   "R", "W" },
+    };
+
+    [Theory]
+    [MemberData(nameof(AllSurveilLands))]
+    public void SurveilLand_Dispatch_ReturnsLandWithPrintedNameAndDualSubtypes(
+        string cardName, CardSubtype subtypeA, CardSubtype subtypeB, string colorA, string colorB)
+    {
+        _ = colorA; _ = colorB;
+
+        var card = NamedCardFactory.Create(cardName, _alice);
+
+        card.Should().BeAssignableTo<Land>();
+        card.Name.Should().Be(cardName);
+        var land = (Land)card;
+        // CR 305.6 — surveil lands print as Land — TypeA TypeB; both subtypes
+        // must be on the card so fetchland subtype searches (and effects like
+        // Yavimaya / Urborg) treat them as real duals.
+        land.HasSubtype(subtypeA).Should().BeTrue(because: $"{cardName} is a {subtypeA}");
+        land.HasSubtype(subtypeB).Should().BeTrue(because: $"{cardName} is a {subtypeB}");
+    }
+
+    [Theory]
+    [MemberData(nameof(AllSurveilLands))]
+    public void SurveilLand_HasTwoManaAbilities_OnePerProducedColour(
+        string cardName, CardSubtype subtypeA, CardSubtype subtypeB, string colorA, string colorB)
+    {
+        _ = subtypeA; _ = subtypeB;
+
+        var land = NamedCardFactory.Create(cardName, _alice);
+
+        var manaAbilities = land.Abilities.OfType<Majik.Core.Abilities.ManaAbility>().ToList();
+        manaAbilities.Should().HaveCount(2,
+            because: $"{cardName} has \"{{T}}: Add {{{colorA}}} or {{{colorB}}}\" — one mana ability per colour");
+
+        // Each mana ability produces exactly one of the named colours.
+        var producedSymbols = manaAbilities
+            .Select(a => SingleColorOf(a.ManaGenerated))
+            .OrderBy(s => s)
+            .ToList();
+        var expected = new[] { colorA, colorB }.OrderBy(s => s).ToList();
+        producedSymbols.Should().Equal(expected,
+            because: $"{cardName} produces {{{colorA}}} and {{{colorB}}}");
+    }
+
+    [Theory]
+    [MemberData(nameof(AllSurveilLands))]
+    public void SurveilLand_HasOneEtbTriggeredAbility_ForSurveil1(
+        string cardName, CardSubtype subtypeA, CardSubtype subtypeB, string colorA, string colorB)
+    {
+        _ = subtypeA; _ = subtypeB; _ = colorA; _ = colorB;
+
+        var land = NamedCardFactory.Create(cardName, _alice);
+
+        var triggers = land.Abilities.OfType<Majik.Core.Abilities.TriggeredAbility>().ToList();
+        triggers.Should().ContainSingle(
+            because: $"{cardName}'s only triggered ability is \"When this land enters, surveil 1.\"");
+    }
+
+    [Theory]
+    [MemberData(nameof(AllSurveilLands))]
+    public void SurveilLand_EtbTriggerEffect_PeeksOneCardFromLibrary_DefaultsAllToGraveyard(
+        string cardName, CardSubtype subtypeA, CardSubtype subtypeB, string colorA, string colorB)
+    {
+        _ = subtypeA; _ = subtypeB; _ = colorA; _ = colorB;
+
+        var alice = new Player("Alice", 20);
+        var top = new Land("Forest", subtypes: new[] { CardSubtype.Forest })
+        {
+            Owner = alice, Controller = alice,
+        };
+        alice.Zones.Library.AddCard(top);
+
+        var land = NamedCardFactory.Create(cardName, alice);
+        var trigger = land.Abilities.OfType<Majik.Core.Abilities.TriggeredAbility>().Single();
+        foreach (var e in trigger.Effects) e.Execute();
+
+        // Default decision (no agent registered) sends every peeked card to
+        // the graveyard. Surveil 1 → top library card moves to GY.
+        alice.Zones.Library.GetCards().Should().NotContain(top);
+        alice.Zones.Graveyard.GetCards().Should().Contain(top,
+            because: "no agent registered → default surveil decision is all-to-graveyard");
+    }
+
+    /// <summary>
+    /// Pluck the single-symbol colour from a <see cref="ManaCost"/> the
+    /// surveil-land mana ability produces. Throws when the cost has more
+    /// than one symbol — surveil lands never produce hybrid / multi-symbol
+    /// mana abilities in v1.
+    /// </summary>
+    private static string SingleColorOf(Majik.Core.ValueObjects.ManaCost? cost)
+    {
+        if (cost == null) throw new InvalidOperationException("ManaCost is null");
+        if (cost.White > 0) return "W";
+        if (cost.Blue  > 0) return "U";
+        if (cost.Black > 0) return "B";
+        if (cost.Red   > 0) return "R";
+        if (cost.Green > 0) return "G";
+        return "C";
+    }
+
+    // -----------------------------------------------------------------------
     // Horizon-land cycle — 2 members shipped (Fiery Islet, Sunbaked Canyon)
     // -----------------------------------------------------------------------
 
