@@ -84,6 +84,21 @@ public static class CardDefinitionFactory
         card.SetOwner(owner);
         card.SetController(owner);
 
+        // CR 202.2c — printed color indicator. Stamped on the concrete
+        // Card so CardColors.GetColors honours it (Dryad Arbor: no mana
+        // cost, indicator says green). Skipped when the definition lists
+        // no indicator codes (the default for the overwhelming majority
+        // of cards).
+        if (card is Card concreteForIndicator && definition.Colors.Count > 0)
+        {
+            var indicator = new List<ManaColor>(definition.Colors.Count);
+            foreach (var letter in definition.Colors)
+            {
+                indicator.Add(ParseColorLetter(letter));
+            }
+            concreteForIndicator.SetColorIndicator(indicator);
+        }
+
         foreach (var ability in definition.Abilities)
         {
             card.AddAbility(BuildAbility(ability, card, owner, replacements));
@@ -91,6 +106,19 @@ public static class CardDefinitionFactory
 
         return card;
     }
+
+    private static ManaColor ParseColorLetter(string raw) =>
+        raw?.Trim().ToUpperInvariant() switch
+        {
+            "W" => ManaColor.White,
+            "U" => ManaColor.Blue,
+            "B" => ManaColor.Black,
+            "R" => ManaColor.Red,
+            "G" => ManaColor.Green,
+            _ => throw new ArgumentException(
+                $"Unknown color indicator code '{raw}'. Expected single-letter Scryfall codes (W/U/B/R/G).",
+                nameof(raw)),
+        };
 
     private static IAbility BuildAbility(AbilityDefinition definition, ICard card, Player controller, ReplacementBus? replacements) =>
         definition switch

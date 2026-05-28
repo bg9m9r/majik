@@ -78,6 +78,15 @@ public sealed class ScryfallCardFactory
 
         card.SetOwner(owner);
 
+        // CR 202.2c — when the Scryfall `colors` array carries colors that
+        // the mana cost cannot account for (no mana cost at all → Dryad
+        // Arbor; or a printed color indicator on a card that also has a
+        // mana cost), stamp the indicator so CardColors.GetColors picks
+        // them up. Without this, color-matters tutors (Green Sun's Zenith,
+        // Summoner's Pact, etc.) silently filter out cards like Dryad
+        // Arbor whose color comes from the indicator, not from cost pips.
+        ApplyColorIndicator(card, entity);
+
         // Permanent-resident abilities (keyword markers, mana abilities,
         // triggered abilities). Instant/sorcery effects are bound at cast
         // time, not here.
@@ -231,4 +240,23 @@ public sealed class ScryfallCardFactory
 
     private static string StripBraces(string s) =>
         s.Replace("{", "").Replace("}", "");
+
+    /// <summary>
+    /// Parse the Scryfall <c>colors</c> JSON array on the seed row via the
+    /// shared <see cref="CardColors.ParseScryfallColors"/> helper and stamp
+    /// any colors as the runtime color indicator on the built
+    /// <see cref="Card"/>. We always stamp when the array is non-empty
+    /// (rather than only when the mana cost can't explain the colors) so
+    /// the runtime mirror is uniform — <see cref="CardColors.GetColors"/>
+    /// unions indicator + cost pips and the duplicate is a no-op. The
+    /// helper degrades silently to "no indicator" for malformed seed rows
+    /// so the binder pipeline can't crash on a bad row.
+    /// </summary>
+    private static void ApplyColorIndicator(ICard card, CardEntity entity)
+    {
+        if (card is not Card concrete) return;
+        var colors = CardColors.ParseScryfallColors(entity.Colors);
+        if (colors.Count == 0) return;
+        concrete.SetColorIndicator(colors);
+    }
 }

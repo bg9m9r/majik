@@ -49,6 +49,18 @@ public sealed class CardDefinition
     /// <summary>Starting loyalty. Null for non-planeswalkers.</summary>
     public int? Loyalty { get; set; }
 
+    /// <summary>
+    /// CR 202.2c — printed color indicator on this card (the round dot to
+    /// the left of the type line). Single-letter Scryfall codes (W/U/B/R/G).
+    /// Optional; null/empty means "no color indicator printed — color is
+    /// derived from the mana cost alone". Set to <c>["G"]</c> for cards
+    /// like Dryad Arbor (no mana cost, green color indicator) so the
+    /// runtime <see cref="Majik.Core.Cards.CardColors.GetColors"/> reports
+    /// them as green and color-matters tutors (Green Sun's Zenith,
+    /// Summoner's Pact, Chord of Calling) find them.
+    /// </summary>
+    public List<string> Colors { get; set; } = new();
+
     /// <summary>Ability list. Each entry is a discriminated union via
     /// the <c>kind</c> JSON property.</summary>
     public List<AbilityDefinition> Abilities { get; set; } = new();

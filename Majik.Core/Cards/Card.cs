@@ -750,6 +750,42 @@ public class Card : ICard
         TokenColorsOverride = colors;
     }
 
+    /// <summary>
+    /// CR 202.2 — printed color indicator (the round dot to the left of the
+    /// type line). Some cards' color is determined by a color indicator
+    /// instead of (or in addition to) their mana cost: Dryad Arbor (Land
+    /// Creature with empty mana cost and a green indicator), Devoid cards
+    /// (e.g. Eldrazi Skyspawner — printed with a colored mana symbol but
+    /// the colorless indicator overrides), the back faces of double-faced
+    /// cards (Garruk Relentless // Garruk, the Veil-Cursed back-face),
+    /// etc. When this list is non-null, <see cref="CardColors.GetColors"/>
+    /// unions its entries with the mana-cost-pip-derived colors so the
+    /// color predicate is correct for tutors and color-matters effects
+    /// (Green Sun's Zenith, Summoner's Pact, Hibernation, etc.).
+    /// <para>Null means "no color indicator was printed" — the default; the
+    /// card's color is whatever the mana cost says (the existing behavior
+    /// for every non-indicator card). An empty list is explicit "color
+    /// indicator overrides to colorless" (the Devoid path — the indicator
+    /// rule strips all colors regardless of mana symbols).</para>
+    /// </summary>
+    public IReadOnlyList<ValueObjects.ManaColor>? ColorIndicator { get; private set; }
+
+    /// <summary>
+    /// Stamp a printed color indicator on this card. Called by
+    /// <see cref="Majik.Core.CardData.ScryfallCardFactory.Create"/> (when
+    /// the seed row's <c>Colors</c> field carries colors not derivable
+    /// from the mana cost — Dryad Arbor's <c>colors:["G"]</c> with empty
+    /// mana cost) and by <see cref="Majik.Core.CardData.Definitions.CardDefinitionFactory"/>
+    /// (when the JSON card definition explicitly stamps a
+    /// <c>colorIndicator</c>). Idempotent; later calls overwrite earlier
+    /// ones.
+    /// </summary>
+    public void SetColorIndicator(IReadOnlyList<ValueObjects.ManaColor> colors)
+    {
+        if (colors == null) throw new ArgumentNullException(nameof(colors));
+        ColorIndicator = colors;
+    }
+
     public Card(string name, string manaCost = "", IEnumerable<CardType>? cardTypes = null, IEnumerable<CardSupertype>? supertypes = null, IEnumerable<CardSubtype>? subtypes = null)
     {
         if (string.IsNullOrWhiteSpace(name))

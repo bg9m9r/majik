@@ -76,13 +76,18 @@ public sealed class RealDeckLoader : IDeckLoader
     /// <summary>Instantiates a typed <see cref="ICard"/> shell from a
     /// <see cref="CardEntity"/> without setting an owner. Mirrors the
     /// type-dispatch in <see cref="ScryfallCardFactory"/> but omits ability
-    /// binding which requires a live <see cref="Majik.Core.Players.Player"/>.</summary>
+    /// binding which requires a live <see cref="Majik.Core.Players.Player"/>.
+    /// Also stamps the Scryfall <c>colors</c> array as a
+    /// <see cref="Card.ColorIndicator"/> (CR 202.2c) so color-matters
+    /// tutors (Green Sun's Zenith, Summoner's Pact) match cards like Dryad
+    /// Arbor whose color comes from the printed indicator rather than from
+    /// mana-cost pips.</summary>
     private static ICard CreateCard(CardEntity entity)
     {
         var parsed = TypeLineParser.Parse(entity.TypeLine);
         var manaCost = entity.ManaCost ?? "";
 
-        return PickPrimaryType(parsed.Types) switch
+        ICard card = PickPrimaryType(parsed.Types) switch
         {
             CardType.Creature => new Creature(
                 entity.Name, manaCost,
@@ -99,6 +104,22 @@ public sealed class RealDeckLoader : IDeckLoader
                 parsed.Supertypes, parsed.Subtypes),
             _ => new Card(entity.Name, manaCost, parsed.Types, parsed.Supertypes, parsed.Subtypes),
         };
+
+        // CR 202.2c — stamp the printed color indicator (parsed from the
+        // seed's `colors` JSON) so CardColors.GetColors yields the right
+        // answer for Dryad Arbor and any other indicator-only card. Plain
+        // mana-cost colors are duplicate-safe; the indicator is unioned
+        // with the mana-cost pip scan, not substituted for it.
+        if (card is Card concrete)
+        {
+            var colors = CardColors.ParseScryfallColors(entity.Colors);
+            if (colors.Count > 0)
+            {
+                concrete.SetColorIndicator(colors);
+            }
+        }
+
+        return card;
     }
 
     private static CardType? PickPrimaryType(IEnumerable<CardType> types)
