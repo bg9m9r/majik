@@ -53,7 +53,10 @@ public sealed class GameDriver
         Majik.Core.Events.IEventBus? eventBus = null,
         Func<Majik.Core.Cards.ICard, Player, Majik.Core.Stack.Stack?, SpellDefinition?>? spellDefinitionResolver = null,
         Majik.Core.Effects.ContinuousEffectsService? continuousEffects = null,
-        LandDropTracker? landDropTracker = null)
+        LandDropTracker? landDropTracker = null,
+        Func<Player, IAutoPassPrefsView?>? autoPassPrefsProvider = null,
+        Func<GameContext, bool>? isPassOnlyDeadWindow = null,
+        Func<DateTime>? clock = null)
     {
         _players = players ?? throw new ArgumentNullException(nameof(players));
         _agents = agents ?? throw new ArgumentNullException(nameof(agents));
@@ -109,7 +112,12 @@ public sealed class GameDriver
             eventBus: eventBus,
             spellDefinitionResolver: spellDefinitionResolver,
             continuousEffects: continuousEffects,
-            landDropTracker: tracker);
+            landDropTracker: tracker,
+            // Slice 5a — forward server-side auto-pass plumbing down to
+            // each per-round PriorityLoop. Null = pre-Slice-5a behaviour.
+            autoPassPrefsProvider: autoPassPrefsProvider,
+            isPassOnlyDeadWindow: isPassOnlyDeadWindow,
+            clock: clock);
     }
 
     public async Task<GameResult> RunGameAsync(

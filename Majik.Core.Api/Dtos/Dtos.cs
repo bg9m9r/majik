@@ -99,3 +99,36 @@ public sealed record PromptDto(
     IReadOnlyList<string> ExpectedKinds,
     IReadOnlyList<CardSnapshotDto>? Candidates = null,
     string? Label = null);
+
+/// <summary>
+/// Per-viewer auto-pass policy. Mirrors the portal-side
+/// <c>AutoPassDeps</c> contract so the engine can apply the SAME
+/// "should I pass this dead priority window?" decision server-side and
+/// skip the HTTP round-trip volley (Slice 5a).
+///
+/// <list type="bullet">
+///   <item><see cref="FullControl"/> — when <c>true</c>, the user is
+///     holding the Full Control modifier (Ctrl). Auto-pass is suppressed
+///     for every priority window; the human MUST be prompted.</item>
+///   <item><see cref="PhaseStops"/> — sparse map from wire phase label
+///     ("Untap", "Upkeep", "PreCombatMain", "PostCombatMain", …) to the
+///     side the stop applies to: <c>"mine"</c> (stop on the viewer's
+///     own turn) or <c>"theirs"</c> (stop on the opponent's turn).
+///     Keys/values match the portal's <c>PhaseStops</c> shape.</item>
+/// </list>
+///
+/// <para>Defaults: <see cref="FullControl"/> = false,
+/// <see cref="PhaseStops"/> empty — auto-pass enabled, no per-phase
+/// stops, which is the closest match to the v1 "always prompt" behaviour
+/// short-circuited only by the engine-narrowed dead-window detection.</para>
+/// </summary>
+public sealed record AutoPassPrefs(
+    bool FullControl,
+    IReadOnlyDictionary<string, string> PhaseStops)
+    : Majik.Core.Game.IAutoPassPrefsView
+{
+    /// <summary>Default prefs: FullControl off, no phase stops.</summary>
+    public static readonly AutoPassPrefs Default = new(
+        FullControl: false,
+        PhaseStops: new Dictionary<string, string>());
+}

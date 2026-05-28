@@ -65,6 +65,12 @@ public sealed class TurnDriver
 
     private readonly Majik.Core.Events.IEventBus? _eventBus;
     private readonly Func<ICard, Player, Majik.Core.Stack.Stack?, Majik.Core.Game.SpellDefinition?>? _spellDefResolver;
+    // Slice 5a — server-side auto-pass plumbing forwarded into every
+    // per-round PriorityLoop. Null = pre-Slice-5a behaviour (always
+    // prompt). Wired by GameFacade.StartFullGameAsync.
+    private readonly Func<Player, IAutoPassPrefsView?>? _autoPassPrefsProvider;
+    private readonly Func<GameContext, bool>? _isPassOnlyDeadWindow;
+    private readonly Func<DateTime>? _clock;
 
     public TurnDriver(
         IReadOnlyList<Player> players,
@@ -80,8 +86,14 @@ public sealed class TurnDriver
         LandDropTracker? landDropTracker = null,
         Majik.Core.Events.IEventBus? eventBus = null,
         Func<ICard, Player, Majik.Core.Stack.Stack?, Majik.Core.Game.SpellDefinition?>? spellDefinitionResolver = null,
-        Majik.Core.Effects.ReplacementBus? replacements = null)
+        Majik.Core.Effects.ReplacementBus? replacements = null,
+        Func<Player, IAutoPassPrefsView?>? autoPassPrefsProvider = null,
+        Func<GameContext, bool>? isPassOnlyDeadWindow = null,
+        Func<DateTime>? clock = null)
     {
+        _autoPassPrefsProvider = autoPassPrefsProvider;
+        _isPassOnlyDeadWindow = isPassOnlyDeadWindow;
+        _clock = clock;
         _continuousEffects = continuousEffects;
         _replacements = replacements;
         // CR 305.2 — PriorityLoop requires a non-null LandDropTracker. Callers
@@ -611,9 +623,27 @@ public sealed class TurnDriver
             landDropTracker: _landDropTracker,
             castDispatcher: DispatchCast,
             activateDispatcher: DispatchActivate,
-            manaAbilityDispatcher: DispatchManaAbility);
+            manaAbilityDispatcher: DispatchManaAbility,
+            // Slice 5a — forward server-side auto-pass plumbing into
+            // every priority round. All four are null in the legacy
+            // bot-vs-bot harnesses (TurnDriver constructed without these
+            // params) — PriorityLoop's auto-pass gate is then disabled.
+            autoPassPrefsProvider: _autoPassPrefsProvider,
+            isPassOnlyDeadWindow: _isPassOnlyDeadWindow,
+            eventBus: _eventBus,
+            clock: _clock);
 
-        await loop.RunUntilRoundEndsAsync(activePlayer, ct);
+        try
+        {
+            await loop.RunUntilRoundEndsAsync(activePlayer, ct);
+        }
+        finally
+        {
+            // Slice 5a — TurnDriver constructs a fresh PriorityLoop per
+            // priority round; without detach the bus would accumulate
+            // two handlers per round across the full game lifetime.
+            loop.DetachFromBus();
+        }
     }
 
     private async Task RunCombat(Player attacker, Player defender, CancellationToken ct)
