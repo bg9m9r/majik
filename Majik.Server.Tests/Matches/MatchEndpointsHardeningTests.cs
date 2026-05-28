@@ -308,9 +308,9 @@ public class MatchEndpointsHardeningTests : IClassFixture<TestMongoFixture>
         var joined = await bobClient.PostAsJsonAsync($"/matches/{matchDto!.Id}/join",
             new { deckId = bobDeckId.ToString() });
 
-        // Status is left unchanged by the hardening (only the message is
-        // genericized), so assert on the body fields + no-leak rather than a
-        // specific status code.
+        // A deck with invalid/unimplemented cards is a CLIENT error → 400,
+        // not a 500 server fault (which would false-alert + mislead the client).
+        joined.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         var body = await joined.Content.ReadAsStringAsync();
         var err = System.Text.Json.JsonSerializer.Deserialize<MatchError>(body,
             new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));

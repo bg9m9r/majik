@@ -59,9 +59,10 @@ public static class MatchEndpoints
 
     private static IResult ErrorToResult(MatchError err) => err.Error switch
     {
-        "match-not-found"          => Results.NotFound(err),
+        "match-not-found" or "deck-not-found"
+                                   => Results.NotFound(err),
         "invalid-request" or "invalid-choice" or "invalid-clock-minutes"
-            or "invalid-command"
+            or "invalid-command" or "deck-invalid"
                                    => Results.BadRequest(err),
         "match-not-open" or "not-rolling" or "cannot-concede"
             or "match-in-progress" or "game-not-started" or "self-join-forbidden"
