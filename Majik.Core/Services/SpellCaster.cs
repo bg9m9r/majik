@@ -67,7 +67,14 @@ public class SpellCaster
     /// <summary>
     /// Cast a spell with targets and costs (full casting process per Rule 601.2a-h).
     /// </summary>
-    public void CastSpell(ICard card, Player player, IEnumerable<ITarget>? targets = null, IEnumerable<ICost>? costs = null, bool isMainPhase = false, bool isStackEmpty = true)
+    /// <remarks>
+    /// <paramref name="isMainPhase"/> and <paramref name="isStackEmpty"/>
+    /// default to <c>true</c> — i.e. "no timing restriction" — so a bare
+    /// <c>CastSpell(card, player)</c> call casts at instant speed
+    /// regardless of card type. Sorcery-speed callers that want to
+    /// exercise the timing gate (CR 307.1) must pass them explicitly.
+    /// </remarks>
+    public void CastSpell(ICard card, Player player, IEnumerable<ITarget>? targets = null, IEnumerable<ICost>? costs = null, bool isMainPhase = true, bool isStackEmpty = true)
     {
         if (card == null)
         {
@@ -119,16 +126,5 @@ public class SpellCaster
             _eventBus?.Publish(new TargetsChosenEvent(spell, targetList));
         }
         _eventBus?.Publish(new CostsPaidEvent(spell, costList));
-    }
-
-    /// <summary>
-    /// Cast a spell (simplified version for backward compatibility).
-    /// Assumes instant speed (can be cast anytime) for backward compatibility.
-    /// </summary>
-    public void CastSpell(ICard card, Player player)
-    {
-        // For backward compatibility, assume instant speed casting
-        // In a real game, this would check the current phase/stack state
-        CastSpell(card, player, null, null, true, true);
     }
 }

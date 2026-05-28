@@ -110,22 +110,17 @@ public static class CharmingPrinceFactory
     };
 
     /// <summary>
-    /// Construct Charming Prince with no live wiring. The ETB trigger is
-    /// attached for shape inspection. Defaults to mode 1 (gain 3 life) since
-    /// mode 2 (blink) requires a target to be useful. Suitable for
-    /// dispatcher / structural tests.
+    /// Construct Charming Prince. The ETB trigger is attached for shape
+    /// inspection; supplying a <see cref="TriggerManager"/> additionally
+    /// registers it (and mode 2's delayed end-step return) on the bus.
     /// </summary>
-    public static Creature Create(Player owner) =>
-        Create(owner, mode: ModeGainLife, triggers: null);
-
-    /// <summary>
-    /// Construct Charming Prince with an explicit mode and optional
-    /// <see cref="TriggerManager"/>. The mode is captured into the ETB
-    /// effect closure so tests can exercise each arm without a full agent.
-    /// When <paramref name="triggers"/> is supplied, the ETB trigger is
-    /// registered with the bus and (for mode 2) the delayed end-step return
-    /// is registered after exile resolves.
-    /// </summary>
+    /// <remarks>
+    /// <paramref name="mode"/> defaults to <see cref="ModeGainLife"/>
+    /// since mode 2 (blink) requires a target to be useful — the bare
+    /// <c>Create(owner)</c> call is suitable for dispatcher / structural
+    /// tests. The mode is captured into the ETB effect closure so tests
+    /// can exercise each arm without a full agent.
+    /// </remarks>
     /// <param name="owner">Card owner / initial controller.</param>
     /// <param name="mode">Pre-selected mode (0=scry, 1=gain life, 2=blink).
     /// Overridden by a registered <see cref="IPlayerAgent"/> if one is
