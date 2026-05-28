@@ -1,5 +1,7 @@
 # Majik — engine + server
 
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=bg9m9r_majik&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=bg9m9r_majik)
+
 Open-source Magic: The Gathering rules engine in C# / .NET 10. UI-agnostic, event-driven, state-machine based. Pairs with [`majik.portal`](https://github.com/bg9m9r/majik.portal) (Angular web client) — together they back [majik.tech](https://majik.tech), a free 1v1 client.
 
 Authoritative rules source: Wizards of the Coast's [Comprehensive Rules](https://magic.wizards.com/en/rules) (this repo targets the **2025-11-14** release). The Comp Rules text is **not redistributed here** — download the TXT from that page and (optionally) drop it at `MagicCompRules 20251114.txt` (gitignored) for local searching. [`RULES_REFERENCE.md`](./RULES_REFERENCE.md) indexes the most-touched rules.
