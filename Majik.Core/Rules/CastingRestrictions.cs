@@ -76,6 +76,15 @@ public static class CastingRestrictions
     // begins and removes them (via RemoveCannotCastAnySpell) when the turn
     // ends, so a registered entry already means the block is active.
     private static readonly List<(object Token, Player Player)> _cannotCastAnySpell = new();
+    // CR 701.5b — "The next spell you cast this turn can't be countered."
+    // One-shot per-player flag: consumed (cleared) on the first spell the
+    // registered player casts. Distinct from the all-turn uncounterable rail
+    // (_uncounterableControllers) used by Veil of Summer — Mistrise Village's
+    // oracle is explicitly "the next spell", not "spells you control this
+    // turn". SpellCastFlow consumes this flag at cast-time via
+    // <see cref="ConsumeNextSpellUncounterableForTurn"/> and stamps
+    // <see cref="Majik.Core.Spells.Spell.CannotBeCountered"/> when it fires.
+    private static readonly HashSet<Guid> _nextSpellUncounterable = new();
     private static readonly object _gate = new();
 
     /// <summary>
@@ -163,6 +172,44 @@ public static class CastingRestrictions
     public static void ClearUncounterableForTurn()
     {
         lock (_gate) _uncounterableControllers.Clear();
+    }
+
+    /// <summary>
+    /// Register a one-shot "the next spell <paramref name="player"/> casts
+    /// this turn can't be countered" rider (CR 701.5b — Mistrise Village,
+    /// Vexing Shusher per-activation shape). Idempotent. Consumed by
+    /// <see cref="ConsumeNextSpellUncounterableForTurn"/>: the first call
+    /// after this registration returns true and clears the entry; subsequent
+    /// casts by the same player are unaffected. Cleared by <see cref="Clear"/>
+    /// in tests.
+    /// </summary>
+    public static void AddNextSpellUncounterableForTurn(Player player)
+    {
+        ArgumentNullException.ThrowIfNull(player);
+        lock (_gate) _nextSpellUncounterable.Add(player.Id);
+    }
+
+    /// <summary>
+    /// Consume the one-shot next-spell-uncounterable rider for
+    /// <paramref name="player"/>. Returns true (and clears the entry) if the
+    /// rider was registered, false otherwise. Called by
+    /// <see cref="Majik.Core.Game.SpellCastFlow"/> at cast-time to stamp
+    /// <see cref="Majik.Core.Spells.Spell.CannotBeCountered"/> on the newly
+    /// created spell — the one-shot is consumed on the first cast so only
+    /// that spell benefits. CR 514.2 — "this turn" effects expire at
+    /// cleanup; the one-shot is structurally limited to a single spell
+    /// anyway so no explicit end-of-turn clear is required beyond the
+    /// general <see cref="Clear"/> call in tests.
+    /// </summary>
+    public static bool ConsumeNextSpellUncounterableForTurn(Player player)
+    {
+        if (player == null) return false;
+        lock (_gate)
+        {
+            if (!_nextSpellUncounterable.Contains(player.Id)) return false;
+            _nextSpellUncounterable.Remove(player.Id);
+            return true;
+        }
     }
 
     /// <summary>
@@ -512,6 +559,7 @@ public static class CastingRestrictions
             _noncreatureRestrictedPlayers.Clear();
             _globalCastZoneBlocks.Clear();
             _cannotCastAnySpell.Clear();
+            _nextSpellUncounterable.Clear();
         }
     }
 }
