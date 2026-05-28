@@ -210,6 +210,9 @@ public enum CardSubtype
     /// Devastation), Lorthos, the Tidemaker, Quest for Ula's Temple
     /// payoffs. CR 205.3m.</summary>
     Serpent,
+    /// <summary>Whale creature subtype — Waker of Waves (Magic 2021 / Modern
+    /// Horizons 2), Ula's Temple creature type payoff. CR 205.3m.</summary>
+    Whale,
     /// <summary>Imp creature subtype — Vault Skirge (New Phyrexia), Ravenous Rats'
     /// adjacent imp lineage (Hypnotic Specter / Mind Twist-adjacent). CR 205.3m.</summary>
     Imp,
