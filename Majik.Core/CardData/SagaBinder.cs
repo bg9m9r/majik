@@ -393,6 +393,17 @@ public static class SagaBinder
     /// Mirrors <see cref="LightUpTheStageFactory.BuildResolveEffect"/>.</summary>
     private static void RokuImpulseExile(Player controller, int n, IEventBus? eventBus)
     {
+        var stamped = ExileTopAndGrantRuntimeCast(controller, n);
+        if (stamped.Count == 0 || eventBus == null) return;
+        ScheduleRokuGrantCleanup(controller, stamped, eventBus);
+    }
+
+    /// <summary>CR 701.20 / 118.9 — exile the top <paramref name="n"/> cards
+    /// of <paramref name="controller"/>'s library and stamp each with a
+    /// runtime exile-cast grant (printed mana cost). Returns the stamped
+    /// cards so the caller can schedule the grant cleanup.</summary>
+    private static List<Card> ExileTopAndGrantRuntimeCast(Player controller, int n)
+    {
         var stamped = new List<Card>(n);
         for (var i = 0; i < n; i++)
         {
@@ -409,12 +420,17 @@ public static class SagaBinder
                 stamped.Add(concrete);
             }
         }
+        return stamped;
+    }
 
-        if (stamped.Count == 0 || eventBus == null) return;
-
-        // CR 514.2 — first Cleanup owned by the controller is THIS turn's
-        // (Saga ticks on the controller's main phase), the second is the
-        // controller's NEXT turn's cleanup → clear the grant then.
+    /// <summary>CR 514.2 — schedule the "until end of your next turn"
+    /// cleanup on the controller's NEXT turn Cleanup step. The first
+    /// Cleanup owned by the controller is THIS turn's (Saga ticks on the
+    /// controller's main phase); the second is next turn's, when we clear
+    /// the grant + unsubscribe.</summary>
+    private static void ScheduleRokuGrantCleanup(
+        Player controller, IReadOnlyList<Card> stamped, IEventBus eventBus)
+    {
         var cleanupsSeen = 0;
         Action<StepStartedEvent>? handler = null;
         handler = e =>

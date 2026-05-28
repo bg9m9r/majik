@@ -344,20 +344,31 @@ public sealed class ContinuousEffectsService
         if (creature == null) throw new ArgumentNullException(nameof(creature));
         foreach (var e in _effects)
         {
-            if (e is not CombatRestrictionEffect r) continue;
-            if (!r.IsActive()) continue;
-            if (r.Restriction != restriction) continue;
-            // Predicate mode (Ensnaring Bridge): evaluate against the queried
-            // creature directly so dynamic conditions (power > controller's
-            // hand size, etc.) are recomputed every validation pass.
-            if (r.Predicate != null)
-            {
-                if (r.Predicate(creature)) return true;
-                continue;
-            }
-            if (r.Target == null || ReferenceEquals(r.Target, creature)) return true;
+            if (MatchesCombatRestriction(e, creature, restriction)) return true;
         }
         return false;
+    }
+
+    /// <summary>True iff <paramref name="effect"/> is an active
+    /// <see cref="CombatRestrictionEffect"/> of the queried
+    /// <paramref name="restriction"/> kind that applies to
+    /// <paramref name="creature"/> — either via its dynamic predicate
+    /// (Ensnaring Bridge), a direct target match, or a mass effect
+    /// (no target).</summary>
+    private static bool MatchesCombatRestriction(
+        ContinuousEffect effect, Creature creature, CombatRestriction restriction)
+    {
+        if (effect is not CombatRestrictionEffect r) return false;
+        if (!r.IsActive()) return false;
+        if (r.Restriction != restriction) return false;
+        // Predicate mode (Ensnaring Bridge): evaluate against the queried
+        // creature directly so dynamic conditions (power > controller's
+        // hand size, etc.) are recomputed every validation pass.
+        if (r.Predicate != null)
+        {
+            return r.Predicate(creature);
+        }
+        return r.Target == null || ReferenceEquals(r.Target, creature);
     }
 
     /// <summary>

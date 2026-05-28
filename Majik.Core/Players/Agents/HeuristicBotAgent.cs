@@ -80,200 +80,32 @@ public sealed class HeuristicBotAgent : IPlayerAgent
 
     public Task<PriorityAction> ChoosePriorityActionAsync(GameContext ctx, CancellationToken ct = default)
     {
-        // Reset failure memo on turn boundary.
-        if (ctx.TurnNumber != _failedTurnNumber)
-        {
-            _failedThisTurn.Clear();
-            _abilityFiredThisTurn.Clear();
-            _failedTurnNumber = ctx.TurnNumber;
-            _lastProposed = null;
-            _lastAbilityProposed = null;
-        }
-        // Memo previous activation proposals that didn't fire (dispatcher
-        // rejected them — bad targets, can't pay, etc.).
-        if (_lastAbilityProposed is Guid prevAbil)
-        {
-            _abilityFiredThisTurn.Add(prevAbil);
-        }
-        _lastAbilityProposed = null;
-        // If our previous proposal is still in hand, the dispatcher rotated
-        // it on failure — mark it dead for this turn.
-        if (_lastProposed is Guid prev
-            && ctx.Self.Zones.Hand.GetCards().Any(c => c.InstanceId == prev))
-        {
-            _failedThisTurn.Add(prev);
-        }
-        _lastProposed = null;
-        // Sorcery window: own main phase, empty stack — full hand + land
-        // drop available. Instant window: any other priority opportunity
-        // when there's something worth reacting to (opponent's combat phase,
-        // a spell on the stack, opponent's end step). Outside both → pass.
-        var phase = ctx.CurrentPhase;
-        var sorceryWindow = phase is { } p && p.IsMain()
+        UpdateFailureMemos(ctx);
+
+        // Sorcery window: own main phase, empty stack. Instant window: any
+        // other priority opportunity worth reacting to. Outside both → pass.
+        var sorceryWindow = ctx.CurrentPhase is { } p && p.IsMain()
             && ReferenceEquals(ctx.Self, ctx.ActivePlayer)
             && ctx.Stack.IsEmpty;
         var instantWindow = !sorceryWindow && IsReactiveWindow(ctx);
 
         if (!sorceryWindow && !instantWindow) return Task.FromResult(PriorityAction.Pass);
 
-        // 1. Land drop, if we have one and haven't dropped this turn.
-        //    Land drops are sorcery-speed only.
-        //
-        //    CR 305.2 — the engine's LandDropTracker is the authoritative
-        //    gate on the per-turn cap (one normally, more with effects like
-        //    Azusa / Exploration). The bot doesn't replicate that check
-        //    here; instead it re-uses the standard failed-proposal memo:
-        //    if a previously-proposed land got rejected by PriorityLoop
-        //    (cap reached, stack non-empty, wrong phase), the dispatcher
-        //    left it in hand and the same per-turn memo populated above
-        //    will short-circuit re-proposing it. Filtering on
-        //    _failedThisTurn lets the bot move on to spells instead of
-        //    spinning on the rejected land until the action-count safety
-        //    cap kicks in. Recording _lastProposed enables the
-        //    "still-in-hand → mark failed" sweep at the top of the next
-        //    ChoosePriorityActionAsync call.
-        if (sorceryWindow)
+        // 1. Land drop (sorcery-speed only) — CR 305.2 cap is enforced by
+        //    PriorityLoop's LandDropTracker; we rely on the failed-proposal
+        //    memo to avoid spinning on a rejected land.
+        if (sorceryWindow && PickLandDrop(ctx) is { } landDrop)
         {
-            var land = ctx.Self.Zones.Hand.GetCards()
-                .FirstOrDefault(c => c.HasType(CardType.Land)
-                    && !_failedThisTurn.Contains(c.InstanceId));
-            if (land != null)
-            {
-                _lastProposed = land.InstanceId;
-                return Task.FromResult<PriorityAction>(new PriorityAction.PlayLand(land));
-            }
+            return Task.FromResult<PriorityAction>(landDrop);
         }
 
-        // 2. Highest-CMC affordable spell — permanents (resolve via vanilla
-        //    SpellDefinition) plus instants/sorceries (caller's
-        //    SpellDefinitionResolver may bind effects; if not, the dispatcher
-        //    rotates the card on fail so we don't waste it).
-        //
-        //    Enumerated set covers both hand (printed-cost path) AND
-        //    graveyard (alt-cost-only paths like flashback) so a probe
-        //    can elect e.g. Lava Dart from the yard.
-        var hand = ctx.Self.Zones.Hand.GetCards();
-        var graveyard = ctx.Self.Zones.Graveyard.GetCards();
-        var pool = hand.Concat(graveyard)
-            .Where(c => !c.HasType(CardType.Land))
-            .Where(IsCastableSpell)
-            .Where(c => sorceryWindow || IsInstantSpeed(c))
-            .Where(c => !_failedThisTurn.Contains(c.InstanceId))
-            .ToList();
-
-        // Each candidate yields one or more (cost, alt) bids; the bot then
-        // picks the highest-CMC affordable bid across the pool. "Cost" is
-        // the mana the bot must produce — alt cost replaces printed cost
-        // when supplied (CR 118.9). Bids from a graveyard card REQUIRE an
-        // alt cost (printed cost from graveyard is illegal).
-        var bids = new List<(ICard Card, ManaCost Cost, IAlternativeCost? Alt, int Priority)>();
-        foreach (var card in pool)
+        // 2. Highest-priority affordable spell across hand+graveyard.
+        if (PickHighestPriorityCast(ctx, sorceryWindow) is { } castAction)
         {
-            // Vanilla-shell graceful degrade. Notice + heavily downscore so
-            // the bid loop only proposes an unimplemented card when no
-            // implemented alternative bid wins. The penalty (-100) sinks
-            // even a 6+ CMC vanilla shell below every printed-cost bid in
-            // a normal-curve deck; a future per-card EV override can lift
-            // the penalty back to zero for cards whose vanilla resolution
-            // is actually fine (e.g. a creature whose body alone is worth
-            // the cast).
-            if (card.IsVanillaShell)
-            {
-                _vanillaTracker?.Notice(card, ctx.Self, "castable-spell enumeration");
-            }
-            var vanillaPenalty = card.IsVanillaShell ? -100 : 0;
-
-            // CR 117.7 / 601.2f — bot affordability must mirror the real cast
-            // pipeline. Three-arg overload also walks each player's battlefield
-            // for SpellCostIncreaseAbility riders (Sphere of Resistance,
-            // Trinisphere, Thalia, Damping Sphere) so the bot's bid pool
-            // doesn't propose casts it can't actually afford under a tax.
-            var printedCost = Majik.Core.Costs.CostReduction.GetEffectiveCost(card, ctx.Self, ctx.AllPlayers);
-            var inHand = card.Zone == ZoneType.Hand;
-
-            // Alt-cost bids (probe may yield 0..N candidates per card).
-            var altBids = new List<(ManaCost Cost, IAlternativeCost Alt)>();
-            if (_altCostProbe != null)
-            {
-                foreach (var alt in _altCostProbe.CandidatesFor(card, ctx.Self, ctx))
-                {
-                    if (!alt.CanCastFor(card, ctx.Self)) continue;
-                    if (TryPickManaSources(ctx.Self, alt.AlternativeManaCost) == null) continue;
-                    altBids.Add((alt.AlternativeManaCost, alt));
-                }
-            }
-
-            if (inHand)
-            {
-                // Printed-cost bid (affordable check). Priority is CMC plus
-                // sequencing bonuses: creatures get a board-building bonus
-                // when our battlefield is light on creatures (stabilise
-                // before casting reactive spells). Instants get a small
-                // saved-for-instant-window penalty during sorcery windows
-                // since they'd usually be saved for opp's turn.
-                //
-                // Mana-holding gate: during sorcery windows, when we have
-                // an instant in hand and opp has potential threats, hold
-                // back the cheapest-instant's worth of mana so we can
-                // actually respond. Skipped when this bid IS the held-
-                // instant (we're casting our reactive card, which is fine).
-                var reserve = sorceryWindow && !IsInstantSpeed(card)
-                    ? ManaHoldReserve(ctx) : 0;
-                if (CanAffordWithReserve(ctx.Self, printedCost, reserve))
-                {
-                    var intent = _cardRepository?.IntentFor(card.Name) ?? BotIntent.None;
-                    bids.Add((card, printedCost, null, printedCost.TotalValue
-                        + SequencingBonus(card, ctx, sorceryWindow, intent)
-                        + vanillaPenalty));
-                }
-                // Alt-cost bids prefer the cheapest alt that is strictly
-                // cheaper than the printed cost (else stick with printed
-                // because alt usually has a downside — pitch a card, etc.).
-                var cheapestAlt = altBids
-                    .Where(b => b.Cost.TotalValue < printedCost.TotalValue)
-                    .OrderBy(b => b.Cost.TotalValue)
-                    .Cast<(ManaCost Cost, IAlternativeCost Alt)?>()
-                    .FirstOrDefault();
-                if (cheapestAlt is { } chosen)
-                {
-                    // Bid priority uses the PRINTED cost so a $1 spectacle
-                    // on a {2}{R} card still ranks as a {2}{R}-priority bid,
-                    // i.e. the bot picks it over a vanilla 1-drop.
-                    bids.Add((card, chosen.Cost, chosen.Alt, printedCost.TotalValue + vanillaPenalty));
-                }
-            }
-            else
-            {
-                // Graveyard (or other off-hand zone) — alt cost is the
-                // ONLY legal path. Pick the cheapest alt.
-                var cheapestAlt = altBids
-                    .OrderBy(b => b.Cost.TotalValue)
-                    .Cast<(ManaCost Cost, IAlternativeCost Alt)?>()
-                    .FirstOrDefault();
-                if (cheapestAlt is { } chosen)
-                {
-                    bids.Add((card, chosen.Cost, chosen.Alt, printedCost.TotalValue + vanillaPenalty));
-                }
-            }
+            return Task.FromResult<PriorityAction>(castAction);
         }
 
-        var best = bids.OrderByDescending(b => b.Priority).FirstOrDefault();
-        if (best.Card != null)
-        {
-            _lastProposed = best.Card.InstanceId;
-            return Task.FromResult<PriorityAction>(
-                new PriorityAction.CastSpell(
-                    best.Card,
-                    Array.Empty<object>(),
-                    AlternativeCost: best.Alt));
-        }
-
-        // 3. Activated-ability hook (CR 602). After exhausting castable
-        //    spells, see if any non-mana activated ability on our permanents
-        //    is affordable + hasn't fired this turn. Skips abilities that
-        //    need targets (target threading through PriorityAction.Activate
-        //    + ChooseTargetsAsync is future work). Mana abilities aren't
-        //    actions — they're handled by the mana-payment resolver.
+        // 3. CR 602 activated-ability hook.
         var fired = PickActivatedAbility(ctx);
         if (fired != null)
         {
@@ -283,6 +115,176 @@ public sealed class HeuristicBotAgent : IPlayerAgent
         }
 
         return Task.FromResult(PriorityAction.Pass);
+    }
+
+    /// <summary>Maintain the per-turn failed-proposal + fired-ability memos.
+    /// Reset on a fresh turn; treat any prior proposal whose card is still
+    /// in hand as "dispatcher rejected" so we don't re-offer it.</summary>
+    private void UpdateFailureMemos(GameContext ctx)
+    {
+        if (ctx.TurnNumber != _failedTurnNumber)
+        {
+            _failedThisTurn.Clear();
+            _abilityFiredThisTurn.Clear();
+            _failedTurnNumber = ctx.TurnNumber;
+            _lastProposed = null;
+            _lastAbilityProposed = null;
+        }
+        if (_lastAbilityProposed is Guid prevAbil)
+        {
+            _abilityFiredThisTurn.Add(prevAbil);
+        }
+        _lastAbilityProposed = null;
+        if (_lastProposed is Guid prev
+            && ctx.Self.Zones.Hand.GetCards().Any(c => c.InstanceId == prev))
+        {
+            _failedThisTurn.Add(prev);
+        }
+        _lastProposed = null;
+    }
+
+    /// <summary>Pick the first land in hand that hasn't been failed this
+    /// turn, recording it as the last proposal so a dispatcher rejection
+    /// can be detected on the next call.</summary>
+    private PriorityAction.PlayLand? PickLandDrop(GameContext ctx)
+    {
+        var land = ctx.Self.Zones.Hand.GetCards()
+            .FirstOrDefault(c => c.HasType(CardType.Land)
+                && !_failedThisTurn.Contains(c.InstanceId));
+        if (land == null) return null;
+        _lastProposed = land.InstanceId;
+        return new PriorityAction.PlayLand(land);
+    }
+
+    /// <summary>Score every castable spell across hand + graveyard, pick
+    /// the highest-priority bid, and return the corresponding CastSpell
+    /// action. Returns null when no spell is affordable.</summary>
+    private PriorityAction.CastSpell? PickHighestPriorityCast(GameContext ctx, bool sorceryWindow)
+    {
+        var hand = ctx.Self.Zones.Hand.GetCards();
+        var graveyard = ctx.Self.Zones.Graveyard.GetCards();
+        var pool = hand.Concat(graveyard)
+            .Where(c => !c.HasType(CardType.Land))
+            .Where(IsCastableSpell)
+            .Where(c => sorceryWindow || IsInstantSpeed(c))
+            .Where(c => !_failedThisTurn.Contains(c.InstanceId))
+            .ToList();
+
+        var bids = new List<(ICard Card, ManaCost Cost, IAlternativeCost? Alt, int Priority)>();
+        foreach (var card in pool)
+        {
+            CollectCastBidsForCard(ctx, sorceryWindow, card, bids);
+        }
+
+        var best = bids.OrderByDescending(b => b.Priority).FirstOrDefault();
+        if (best.Card == null) return null;
+        _lastProposed = best.Card.InstanceId;
+        return new PriorityAction.CastSpell(
+            best.Card,
+            Array.Empty<object>(),
+            AlternativeCost: best.Alt);
+    }
+
+    /// <summary>Enumerate printed- and alt-cost bids for a single card,
+    /// appending each to <paramref name="bids"/>. Encapsulates the vanilla-
+    /// shell penalty, mana-hold reserve, and graveyard-requires-alt-cost
+    /// rules so <see cref="PickHighestPriorityCast"/> remains a flat
+    /// "iterate + argmax" loop.</summary>
+    private void CollectCastBidsForCard(
+        GameContext ctx,
+        bool sorceryWindow,
+        ICard card,
+        List<(ICard Card, ManaCost Cost, IAlternativeCost? Alt, int Priority)> bids)
+    {
+        // Vanilla-shell graceful degrade: notice + apply a -100 penalty so
+        // the bot only picks an unimplemented card when no implemented
+        // alternative bid wins.
+        if (card.IsVanillaShell)
+        {
+            _vanillaTracker?.Notice(card, ctx.Self, "castable-spell enumeration");
+        }
+        var vanillaPenalty = card.IsVanillaShell ? -100 : 0;
+
+        // CR 117.7 / 601.2f — bot affordability mirrors the real cast
+        // pipeline (includes SpellCostIncreaseAbility riders from each
+        // player's battlefield).
+        var printedCost = Majik.Core.Costs.CostReduction.GetEffectiveCost(card, ctx.Self, ctx.AllPlayers);
+        var inHand = card.Zone == ZoneType.Hand;
+
+        var altBids = EnumerateAlternativeCostBids(ctx, card);
+
+        if (inHand)
+        {
+            AppendInHandBids(ctx, sorceryWindow, card, printedCost, altBids, vanillaPenalty, bids);
+        }
+        else
+        {
+            // Graveyard / off-hand zone — alt cost is the ONLY legal path.
+            var cheapestAlt = altBids
+                .OrderBy(b => b.Cost.TotalValue)
+                .Cast<(ManaCost Cost, IAlternativeCost Alt)?>()
+                .FirstOrDefault();
+            if (cheapestAlt is { } chosen)
+            {
+                bids.Add((card, chosen.Cost, chosen.Alt, printedCost.TotalValue + vanillaPenalty));
+            }
+        }
+    }
+
+    /// <summary>Walk the alt-cost probe for a card, filtering to those that
+    /// pass CanCastFor and whose mana cost is actually payable by the
+    /// current pool.</summary>
+    private List<(ManaCost Cost, IAlternativeCost Alt)> EnumerateAlternativeCostBids(
+        GameContext ctx, ICard card)
+    {
+        var altBids = new List<(ManaCost Cost, IAlternativeCost Alt)>();
+        if (_altCostProbe == null) return altBids;
+        foreach (var alt in _altCostProbe.CandidatesFor(card, ctx.Self, ctx))
+        {
+            if (!alt.CanCastFor(card, ctx.Self)) continue;
+            if (TryPickManaSources(ctx.Self, alt.AlternativeManaCost) == null) continue;
+            altBids.Add((alt.AlternativeManaCost, alt));
+        }
+        return altBids;
+    }
+
+    /// <summary>Append in-hand bids for a single card: printed-cost bid
+    /// (affordable + sequencing bonus + mana-hold reserve), and the
+    /// cheapest strictly-cheaper alt-cost bid. Bid priority uses the
+    /// printed cost so a $1 alt on {2}{R} still ranks as a {2}{R} bid.
+    /// </summary>
+    private void AppendInHandBids(
+        GameContext ctx,
+        bool sorceryWindow,
+        ICard card,
+        ManaCost printedCost,
+        List<(ManaCost Cost, IAlternativeCost Alt)> altBids,
+        int vanillaPenalty,
+        List<(ICard Card, ManaCost Cost, IAlternativeCost? Alt, int Priority)> bids)
+    {
+        // Mana-hold reserve: during sorcery windows, hold back the cheapest
+        // reactive instant's worth of mana when opp has potential threats.
+        // Skipped when this bid IS the reactive card (we're casting it).
+        var reserve = sorceryWindow && !IsInstantSpeed(card)
+            ? ManaHoldReserve(ctx) : 0;
+        if (CanAffordWithReserve(ctx.Self, printedCost, reserve))
+        {
+            var intent = _cardRepository?.IntentFor(card.Name) ?? BotIntent.None;
+            bids.Add((card, printedCost, null, printedCost.TotalValue
+                + SequencingBonus(card, ctx, sorceryWindow, intent)
+                + vanillaPenalty));
+        }
+        // Alt-cost bids: cheapest alt strictly cheaper than printed cost
+        // (alts usually have a downside — pitch a card, etc.).
+        var cheapestAlt = altBids
+            .Where(b => b.Cost.TotalValue < printedCost.TotalValue)
+            .OrderBy(b => b.Cost.TotalValue)
+            .Cast<(ManaCost Cost, IAlternativeCost Alt)?>()
+            .FirstOrDefault();
+        if (cheapestAlt is { } chosen)
+        {
+            bids.Add((card, chosen.Cost, chosen.Alt, printedCost.TotalValue + vanillaPenalty));
+        }
     }
 
     /// <summary>Mana to reserve for reactive instants during a sorcery

@@ -171,8 +171,16 @@ public sealed class RingState
     {
         if (_triggers == null) return;
 
-        // 2+ — "Whenever your Ring-bearer attacks, draw a card, then discard
-        //       a card." (CR 508.1f)
+        RegisterAttackDrawDiscardTrigger();
+        RegisterBlockedSacrificeTrigger();
+        RegisterCombatDamageLifeLossTrigger();
+    }
+
+    /// <summary>CR 701.54c (2+) — "Whenever your Ring-bearer attacks, draw a
+    /// card, then discard a card." (CR 508.1f). Guards on the live
+    /// <see cref="TemptCount"/> threshold at fire time.</summary>
+    private void RegisterAttackDrawDiscardTrigger()
+    {
         Creature? attackingBearer = null;
         var attackTrigger = new TriggeredAbility(
             source: _owner,
@@ -195,11 +203,17 @@ public sealed class RingState
                 }),
             },
             activeZones: new[] { ZoneType.Battlefield, ZoneType.Command });
-        _triggers.RegisterTriggeredAbility(attackTrigger);
+        _triggers!.RegisterTriggeredAbility(attackTrigger);
+    }
 
-        // 3+ — "Whenever your Ring-bearer becomes blocked by a creature, the
-        //       blocking creature's controller sacrifices it at end of
-        //       combat." (CR 509.1g / CR 701.54c)
+    /// <summary>CR 701.54c (3+) / CR 509.1g — "Whenever your Ring-bearer
+    /// becomes blocked by a creature, the blocking creature's controller
+    /// sacrifices it at end of combat." Splits across two bus listeners:
+    /// the BlockersDeclaredEvent trigger queues each blocker, and a
+    /// CombatEndedEvent drain executes the sacrifices (CR 701.54c /
+    /// 701.16).</summary>
+    private void RegisterBlockedSacrificeTrigger()
+    {
         var blockedTrigger = new TriggeredAbility(
             source: _owner,
             controller: _owner,
@@ -207,8 +221,6 @@ public sealed class RingState
             {
                 if (TemptCount < 3) return false;
                 if (_ringBearer == null) return false;
-                // Did the Ring-bearer become blocked? Find the attacker entry
-                // whose creature is our Ring-bearer and that has ≥1 blocker.
                 var attacker = e.Combat.Attackers
                     .FirstOrDefault(a => ReferenceEquals(a.Creature, _ringBearer));
                 return attacker != null && attacker.Blockers.Count > 0;
@@ -217,8 +229,6 @@ public sealed class RingState
             {
                 new Effect("The Ring (3+): queue blocker sacrifice at end of combat", () =>
                 {
-                    // The condition already validated the Ring-bearer is
-                    // blocked; enqueue each blocker for end-of-combat sacrifice.
                     if (_ringBearer == null) return;
                     var atk = _lastBlockedCombat?.Attackers
                         .FirstOrDefault(a => ReferenceEquals(a.Creature, _ringBearer));
@@ -232,31 +242,35 @@ public sealed class RingState
                 }),
             },
             activeZones: new[] { ZoneType.Battlefield, ZoneType.Command });
-        _triggers.RegisterTriggeredAbility(blockedTrigger);
+        _triggers!.RegisterTriggeredAbility(blockedTrigger);
 
-        // The 3+ trigger needs the Combat handle at resolution time; capture
-        // it from the BlockersDeclaredEvent via a lightweight bus listener so
-        // the effect closure can read the blockers without re-deriving them.
+        // Capture the Combat handle so the effect closure can read blockers.
         _eventBus?.Subscribe<BlockersDeclaredEvent>(e => _lastBlockedCombat = e.Combat);
 
-        // End-of-combat: each queued blocker's controller sacrifices it
-        // (CR 701.54c / CR 701.16). Drains the queue.
-        _eventBus?.Subscribe<CombatEndedEvent>(_ =>
-        {
-            foreach (var (controller, blocker) in _pendingEndOfCombatSacrifices.ToList())
-            {
-                if (blocker.Zone != ZoneType.Battlefield) continue;
-                if (!ReferenceEquals(blocker.Controller, controller)) continue;
-                var owner = blocker.Owner ?? controller;
-                controller.Zones.Battlefield.RemoveCard(blocker);
-                owner.Zones.Graveyard.AddCard(blocker);
-            }
-            _pendingEndOfCombatSacrifices.Clear();
-            _lastBlockedCombat = null;
-        });
+        // CR 701.54c / CR 701.16 — drain the queue at end of combat.
+        _eventBus?.Subscribe<CombatEndedEvent>(_ => DrainPendingEndOfCombatSacrifices());
+    }
 
-        // 4+ — "Whenever your Ring-bearer deals combat damage to a player,
-        //       each opponent loses 3 life." (CR 510 / CR 701.54c)
+    /// <summary>End-of-combat drain — each queued blocker's controller
+    /// sacrifices it.</summary>
+    private void DrainPendingEndOfCombatSacrifices()
+    {
+        foreach (var (controller, blocker) in _pendingEndOfCombatSacrifices.ToList())
+        {
+            if (blocker.Zone != ZoneType.Battlefield) continue;
+            if (!ReferenceEquals(blocker.Controller, controller)) continue;
+            var owner = blocker.Owner ?? controller;
+            controller.Zones.Battlefield.RemoveCard(blocker);
+            owner.Zones.Graveyard.AddCard(blocker);
+        }
+        _pendingEndOfCombatSacrifices.Clear();
+        _lastBlockedCombat = null;
+    }
+
+    /// <summary>CR 701.54c (4+) / CR 510 — "Whenever your Ring-bearer deals
+    /// combat damage to a player, each opponent loses 3 life."</summary>
+    private void RegisterCombatDamageLifeLossTrigger()
+    {
         var combatDamageTrigger = new TriggeredAbility(
             source: _owner,
             controller: _owner,
@@ -265,7 +279,6 @@ public sealed class RingState
                 if (TemptCount < 4) return false;
                 if (_ringBearer == null) return false;
                 if (!ReferenceEquals(e.Source, _ringBearer)) return false;
-                // "to a player" — TargetPlayer is non-null for player damage.
                 return e.TargetPlayer != null;
             }),
             effects: new IEffect[]
@@ -276,14 +289,14 @@ public sealed class RingState
                         ?? (IReadOnlyList<Player>)new[] { _owner };
                     foreach (var p in everyone)
                     {
-                        if (ReferenceEquals(p, _owner)) continue; // opponents only
+                        if (ReferenceEquals(p, _owner)) continue;
                         if (p.HasLost) continue;
                         p.LoseLife(3);
                     }
                 }),
             },
             activeZones: new[] { ZoneType.Battlefield, ZoneType.Command });
-        _triggers.RegisterTriggeredAbility(combatDamageTrigger);
+        _triggers!.RegisterTriggeredAbility(combatDamageTrigger);
     }
 
     private Majik.Core.Combat.Combat? _lastBlockedCombat;

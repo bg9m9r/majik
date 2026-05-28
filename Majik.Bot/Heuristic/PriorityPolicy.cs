@@ -171,54 +171,62 @@ public class PriorityPolicy
 
         if (sorceryWindow)
         {
-            var landInHand = self.Zones.Hand.GetCards().OfType<Land>().FirstOrDefault();
-            if (landInHand != null)
-            {
-                // Playing a land (CR 305.2) is a free special action — credit
-                // the mana-source gain without deducting hand size, since the
-                // card converts into a long-term battlefield asset.
-                var projected = current + _weights.ManaSources * 1;
-                yield return (new PriorityAction.PlayLand(landInHand), projected);
-            }
+            foreach (var bid in EnumerateLandDropBids(self, current))
+                yield return bid;
         }
 
         if (ctx.ActivePlayer == self)
         {
-            var manaAvailable = UntappedManaSources(self);
-            foreach (var card in self.Zones.Hand.GetCards())
-            {
-                if (card is Land) continue;
-                // Sorcery-speed cards only castable in our main with empty stack.
-                if (!IsInstantSpeed(card) && !sorceryWindow) continue;
-
-                var cmc = ApproxCmc(card);
-                if (cmc > manaAvailable) continue;
-
-                // Vanilla-shell graceful degrade: the engine doesn't enforce
-                // this card's rules text, so casting it is mostly a tempo
-                // loss (mana + a card from hand for no observable effect
-                // beyond zone change for permanents). Notice it (one-shot
-                // WARN + bus event) and apply a -CMC EV penalty so the bot
-                // only casts it when nothing better is in hand.
-                if (card.IsVanillaShell)
-                {
-                    _vanillaTracker?.Notice(card, self, "castable-spell enumeration");
-                }
-
-                var projected = current + ProjectCastDelta(card);
-                yield return (new PriorityAction.CastSpell(card, Array.Empty<object>()), projected);
-            }
+            foreach (var bid in EnumerateCastSpellBids(self, sorceryWindow, current))
+                yield return bid;
         }
 
-        // Activated abilities of permanents we control (CR 602). Mana
-        // abilities are excluded — they aren't priority actions; the
-        // ManaPaymentResolver fires them as part of paying a cost. The
-        // ActivatedAbilityPolicy projects an EV delta per ability;
+        // CR 602 — activated abilities of permanents we control. Mana
+        // abilities are excluded (the ManaPaymentResolver fires them as part
+        // of paying a cost). ActivatedAbilityPolicy projects an EV delta;
         // negative-delta activations stay below `current` and the outer
         // argmax falls through to Pass.
         foreach (var (action, projected) in EnumerateActivatedAbilities(ctx, self, current))
         {
             yield return (action, projected);
+        }
+    }
+
+    /// <summary>CR 305.2 — playing a land is a free special action. Credit
+    /// the mana-source gain without deducting hand size since the card
+    /// converts into a long-term battlefield asset.</summary>
+    private IEnumerable<(PriorityAction action, double projected)>
+        EnumerateLandDropBids(Player self, double current)
+    {
+        var landInHand = self.Zones.Hand.GetCards().OfType<Land>().FirstOrDefault();
+        if (landInHand == null) yield break;
+        var projected = current + _weights.ManaSources * 1;
+        yield return (new PriorityAction.PlayLand(landInHand), projected);
+    }
+
+    /// <summary>Enumerate affordable cast-spell bids from hand. Sorcery-
+    /// speed cards are gated on <paramref name="sorceryWindow"/>; vanilla
+    /// shells are noticed (one-shot WARN + bus event) before the bid yields
+    /// so the bot's -CMC penalty surfaces in diagnostics.</summary>
+    private IEnumerable<(PriorityAction action, double projected)>
+        EnumerateCastSpellBids(Player self, bool sorceryWindow, double current)
+    {
+        var manaAvailable = UntappedManaSources(self);
+        foreach (var card in self.Zones.Hand.GetCards())
+        {
+            if (card is Land) continue;
+            if (!IsInstantSpeed(card) && !sorceryWindow) continue;
+
+            var cmc = ApproxCmc(card);
+            if (cmc > manaAvailable) continue;
+
+            if (card.IsVanillaShell)
+            {
+                _vanillaTracker?.Notice(card, self, "castable-spell enumeration");
+            }
+
+            var projected = current + ProjectCastDelta(card);
+            yield return (new PriorityAction.CastSpell(card, Array.Empty<object>()), projected);
         }
     }
 

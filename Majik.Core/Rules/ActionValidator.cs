@@ -49,9 +49,20 @@ public class ActionValidator
     /// </summary>
     private ValidationResult ValidateCastSpell(CastSpellAction action)
     {
-        // CR 117.1 / 302.1 — non-instant non-Flash cards need sorcery speed
-        // (active player's main phase, empty stack). Caller marks the
-        // timing window via SorcerySpeedAvailable.
+        return CheckCastTimingGates(action)
+            ?? CheckCastZoneGates(action)
+            ?? CheckCastRestrictionGates(action)
+            ?? CheckPlayerHexproofGate(action.Player, action.Targets)
+            ?? ValidationResult.Valid();
+    }
+
+    /// <summary>CR 117.1 / 302.1 / 117.1a — timing-axis cast gates: sorcery-
+    /// speed restriction (intrinsic non-instant) AND external sorcery-speed
+    /// restriction (Teferi, Time Raveler). Returns the first failure or
+    /// null when both pass.</summary>
+    private static ValidationResult? CheckCastTimingGates(CastSpellAction action)
+    {
+        // CR 117.1 / 302.1 — non-instant non-Flash cards need sorcery speed.
         if (!action.SorcerySpeedAvailable
             && !TimingRules.CanCastAtInstantSpeed(action.Card))
         {
@@ -60,11 +71,7 @@ public class ActionValidator
                 new RuleViolation("117.1", "non-instant cast at non-sorcery speed"));
         }
 
-        // CR 601.3 / 117.1a — external sorcery-speed restrictions (e.g.
-        // Teferi, Time Raveler: "Each opponent can cast spells only any
-        // time they could cast a sorcery."). Even an instant or
-        // Flash-bearing card is forced to sorcery speed when the casting
-        // player is restricted.
+        // CR 601.3 / 117.1a — external sorcery-speed restrictions (Teferi).
         if (!action.SorcerySpeedAvailable
             && action.Player != null
             && CastingRestrictions.MustCastAtSorcerySpeed(action.Player))
@@ -74,14 +81,16 @@ public class ActionValidator
                 new RuleViolation("117.1a", "external sorcery-speed restriction"));
         }
 
-        // CR 601.2a / CR 117.6 — printed cast-from-zone restriction baked
-        // onto the card itself (Hogaak, Arisen Necropolis: "Hogaak,
-        // Arisen Necropolis can't be cast from your hand."). When the
-        // caller declares a source zone and that zone is in the card's
-        // RestrictedCastZones list, reject. Inverse of the Drannith
-        // Magistrate gate below: that one is keyed by player and allows
-        // only Hand; this one is keyed by card and forbids the listed
-        // zones. Both gates run independently.
+        return null;
+    }
+
+    /// <summary>CR 601.2a / 117.6 / 113.6 / 601.3 — from-zone-axis cast
+    /// gates: card-baked restricted zones (Hogaak), cast-from-hand-only
+    /// player restrictions (Drannith Magistrate), and globally-blocked
+    /// zones (Grafdigger's Cage).</summary>
+    private static ValidationResult? CheckCastZoneGates(CastSpellAction action)
+    {
+        // CR 601.2a / 117.6 — card-baked restricted zones (Hogaak).
         if (action.Card is Card concreteCard
             && action.FromZone.HasValue
             && concreteCard.RestrictedCastZones.Contains(action.FromZone.Value))
@@ -91,15 +100,8 @@ public class ActionValidator
                 new RuleViolation("601.2a", $"{action.Card.Name} can't be cast from {action.FromZone.Value}"));
         }
 
-        // CR 113.6 / 601.3 — external cast-from-hand-only restrictions
-        // (e.g. Drannith Magistrate: "Your opponents can't cast spells
-        // from anywhere other than their hands."). When the casting
-        // player is restricted, reject any cast whose declared source
-        // zone is not the hand — including spells cast from exile
-        // (cascade, suspend, foretell, alt-cost from-exile flows), the
-        // graveyard (flashback / disturb / aftermath / escape /
-        // jump-start), the library (Mishra's Workshop-style tutors that
-        // also cast), or the command zone.
+        // CR 113.6 / 601.3 — cast-from-hand-only player restriction
+        // (Drannith Magistrate: opponents can only cast from their hands).
         if (action.Player != null
             && action.FromZone.HasValue
             && action.FromZone.Value != ZoneType.Hand
@@ -109,13 +111,8 @@ public class ActionValidator
                 $"{action.Player.Name} can't cast spells from {action.FromZone.Value}",
                 new RuleViolation("113.6", "cast-from-hand-only restriction"));
         }
-        // CR 601.3 — global cast-from-zone block (Grafdigger's Cage:
-        // "Players can't cast spells from graveyards or libraries."). When
-        // the caller declares a source zone and that zone is currently
-        // registered as globally blocked, reject the cast for every player.
-        // Distinct from the cast-from-hand-only rail above: this rail
-        // blocklists specific zones for everyone, rather than allowlisting
-        // Hand for individual players.
+
+        // CR 601.3 — global cast-from-zone block (Grafdigger's Cage).
         if (action.FromZone.HasValue
             && CastingRestrictions.IsCastFromZoneGloballyBlocked(action.FromZone.Value))
         {
@@ -124,9 +121,16 @@ public class ActionValidator
                 new RuleViolation("601.3", $"global cast-from-zone block on {action.FromZone.Value}"));
         }
 
-        // CR 601.3 — named-card cast block (Meddling Mage: "spells with the
-        // chosen name can't be cast"). Reject a cast when the spell's card
-        // name is currently registered as blocked.
+        return null;
+    }
+
+    /// <summary>CR 601.3 — registered casting-restriction gates: named-card
+    /// block (Meddling Mage), per-player named-card block (Reflector Mage),
+    /// total-cast block (Grand Abolisher), and noncreature-spell block
+    /// (Ranger-Captain of Eos).</summary>
+    private static ValidationResult? CheckCastRestrictionGates(CastSpellAction action)
+    {
+        // CR 601.3 — named-card cast block (Meddling Mage).
         if (action.Card != null
             && CastingRestrictions.IsCardNameBlocked(action.Card.Name))
         {
@@ -135,11 +139,7 @@ public class ActionValidator
                 new RuleViolation("601.3", "named-card cast restriction"));
         }
 
-        // CR 601.3 — per-player named-card cast block (Reflector Mage:
-        // "That player can't cast spells with the same name as that
-        // creature until your next turn"). Reject a cast when the casting
-        // player has a per-player block registered against the spell's
-        // card name.
+        // CR 601.3 — per-player named-card cast block (Reflector Mage).
         if (action.Card != null
             && action.Player != null
             && CastingRestrictions.IsCardNameBlockedForPlayer(action.Player, action.Card.Name))
@@ -149,12 +149,7 @@ public class ActionValidator
                 new RuleViolation("601.3", "per-player named-card cast restriction"));
         }
 
-        // CR 601.3 — total cast block (Voice of Victory / Grand Abolisher:
-        // "Your opponents can't cast spells during your turn."). Reject ANY
-        // cast — creature and noncreature alike — when the casting player is
-        // currently restricted. The source manages the "during your turn"
-        // window (register at the controller's turn start, clear at turn end),
-        // so a registered restriction is unconditionally active here.
+        // CR 601.3 — total cast block (Voice of Victory / Grand Abolisher).
         if (action.Player != null
             && CastingRestrictions.CannotCastAnySpell(action.Player))
         {
@@ -164,10 +159,7 @@ public class ActionValidator
         }
 
         // CR 601.3 — turn-scoped noncreature-spell restriction
-        // (Ranger-Captain of Eos: "Your opponents can't cast noncreature
-        // spells this turn."). Reject a noncreature cast when the casting
-        // player is currently restricted. Creature spells pass through —
-        // CardType.Creature is the only exemption.
+        // (Ranger-Captain of Eos).
         if (action.Card != null
             && action.Player != null
             && !action.Card.HasType(Cards.Types.CardType.Creature)
@@ -178,28 +170,30 @@ public class ActionValidator
                 new RuleViolation("601.3", "noncreature-spell restriction"));
         }
 
-        // CR 702.11 / CR 113.5 — player-hexproof gate. When the cast
-        // names one or more player targets, reject the cast if any
-        // target is a player who has hexproof and isn't the caster.
-        // Self-targeting (e.g. casting Healing Salve on yourself) is
-        // explicitly allowed — hexproof only blocks spells controlled
-        // by opponents.
-        if (action.Targets != null && action.Player != null)
+        return null;
+    }
+
+    /// <summary>CR 702.11 / 113.5 — player-hexproof gate. Reject when any
+    /// player target has hexproof and isn't the source player. Self-
+    /// targeting is explicitly allowed (hexproof only blocks opponents).
+    /// Shared between <see cref="ValidateCastSpell"/> and
+    /// <see cref="ValidateActivateAbility"/>.</summary>
+    private static ValidationResult? CheckPlayerHexproofGate(
+        Player? sourcePlayer, IReadOnlyList<object>? targets)
+    {
+        if (targets == null || sourcePlayer == null) return null;
+        foreach (var target in targets)
         {
-            foreach (var target in action.Targets)
+            if (target is Player targetPlayer
+                && targetPlayer.HasHexproof
+                && !ReferenceEquals(targetPlayer, sourcePlayer))
             {
-                if (target is Player targetPlayer
-                    && targetPlayer.HasHexproof
-                    && !ReferenceEquals(targetPlayer, action.Player))
-                {
-                    return ValidationResult.Invalid(
-                        $"{targetPlayer.Name} has hexproof",
-                        new RuleViolation("702.11", "player-hexproof"));
-                }
+                return ValidationResult.Invalid(
+                    $"{targetPlayer.Name} has hexproof",
+                    new RuleViolation("702.11", "player-hexproof"));
             }
         }
-
-        return ValidationResult.Valid();
+        return null;
     }
 
     /// <summary>
@@ -241,28 +235,9 @@ public class ActionValidator
                 new RuleViolation("307.5", "activate-only-as-a-sorcery"));
         }
 
-        // CR 702.11 / CR 113.5 — player-hexproof gate. When the
-        // activation names one or more player targets, reject the
-        // activation if any target is a player who has hexproof and
-        // isn't the activator. Self-targeting (e.g. activating a
-        // "you gain N life" ability on yourself) is explicitly allowed
-        // — hexproof only blocks abilities controlled by opponents.
-        if (action.Targets != null && action.Player != null)
-        {
-            foreach (var target in action.Targets)
-            {
-                if (target is Player targetPlayer
-                    && targetPlayer.HasHexproof
-                    && !ReferenceEquals(targetPlayer, action.Player))
-                {
-                    return ValidationResult.Invalid(
-                        $"{targetPlayer.Name} has hexproof",
-                        new RuleViolation("702.11", "player-hexproof"));
-                }
-            }
-        }
-
-        return ValidationResult.Valid();
+        // CR 702.11 / 113.5 — player-hexproof gate (shared with cast path).
+        return CheckPlayerHexproofGate(action.Player, action.Targets)
+            ?? ValidationResult.Valid();
     }
 
     /// <summary>

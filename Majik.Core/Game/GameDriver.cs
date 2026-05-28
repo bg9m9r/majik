@@ -133,24 +133,41 @@ public sealed class GameDriver
             ShuffleLibrary(p);
         }
 
-        // CR 103.2 / 103.4 / 103.7 — determine the starting player. In a
-        // real match this is settled UPSTREAM: the pre-game die roll picks a
-        // winner (CR 103.2) who then chooses to play or draw (CR 103.4/103.7).
-        // The caller (GameFacade) encodes that decision by passing the
-        // intended seat in startingPlayerIndex (it orders the chosen player
-        // into players[0]). When no index is supplied — bot-vs-bot sims and
-        // unit tests that genuinely want CR 103.2 randomness — fall back to a
-        // random pick (a coin flip for 2 players, generalised to N).
-        var startingIndex = startingPlayerIndex is { } idx
-            ? (idx >= 0 && idx < _players.Count
-                ? idx
-                : throw new ArgumentOutOfRangeException(
-                    nameof(startingPlayerIndex),
-                    $"startingPlayerIndex {idx} is outside [0,{_players.Count})."))
-            : _rng.Next(_players.Count);
+        var startingIndex = ResolveStartingIndex(startingPlayerIndex);
         var startingPlayer = _players[startingIndex];
 
-        // CR 103.4 — mulligan loop per player.
+        await RunMulligansAsync(startingPlayer, ct);
+
+        // CR 103.5 — opening-hand check (Leyline alt-cost + reveal-from-hand).
+        if (_eventBus is not null)
+        {
+            await RunOpeningHandCheckAsync(startingIndex);
+        }
+
+        return await RunTurnLoopAsync(startingIndex, startingPlayer, maxTurns, ct);
+    }
+
+    /// <summary>CR 103.2 / 103.4 / 103.7 — resolve the starting seat. In a
+    /// real match the pre-game die roll + play/draw decision is settled
+    /// upstream and encoded in <paramref name="startingPlayerIndex"/>. When
+    /// no index is supplied (bot-vs-bot sims, unit tests that want CR 103.2
+    /// randomness) fall back to a random pick (coin flip for 2 players,
+    /// generalised to N).</summary>
+    private int ResolveStartingIndex(int? startingPlayerIndex)
+    {
+        if (startingPlayerIndex is not { } idx) return _rng.Next(_players.Count);
+        if (idx < 0 || idx >= _players.Count)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(startingPlayerIndex),
+                $"startingPlayerIndex {idx} is outside [0,{_players.Count}).");
+        }
+        return idx;
+    }
+
+    /// <summary>CR 103.4 — per-player London mulligan loop.</summary>
+    private async Task RunMulligansAsync(Player startingPlayer, CancellationToken ct)
+    {
         var mulligan = new MulliganController();
         foreach (var p in _players)
         {
@@ -159,41 +176,37 @@ public sealed class GameDriver
                 new Majik.Core.Stack.Stack());
             await mulligan.RunAsync(p, _agents[p], ctx, ct: ct);
         }
+    }
 
-        // CR 103.5 — opening-hand check. Fired AFTER all mulligans
-        // resolve, in starting-player-first turn order. The Leyline
-        // cycle's opening-hand alt-cost (CR 702.95) subscribes to this
-        // event via OpeningHandLeylineAlternativeCost; the subscriber
-        // walks each player's hand for KeywordAbility("OpeningHandLeyline")
-        // markers and prompts via IPlayerAgent.ChooseYesNoAsync.
-        if (_eventBus is not null)
+    /// <summary>CR 103.5 — attach the opening-hand subscribers (Leyline
+    /// alt-cost CR 702.95, reveal-from-opening-hand CR 603.7 follow-ups),
+    /// then publish OpeningHandCheckEvent in turn order ("starting with the
+    /// starting player").</summary>
+    private async Task RunOpeningHandCheckAsync(int startingIndex)
+    {
+        var leylineAltCost = new OpeningHandLeylineAlternativeCost(_zoneService, _agents);
+        leylineAltCost.Attach(_eventBus!);
+
+        // Leyline subscribes first → reveals run after Leylines settle.
+        var revealLook4 = new OpeningHandRevealLook4Trigger(_agents, _triggerManager);
+        revealLook4.Attach(_eventBus!);
+
+        for (var i = 0; i < _players.Count; i++)
         {
-            var leylineAltCost = new OpeningHandLeylineAlternativeCost(
-                _zoneService, _agents);
-            leylineAltCost.Attach(_eventBus);
-
-            // CR 103.5 / CR 603.7 — reveal-from-opening-hand → schedule
-            // first-upkeep look-at-top-4-keep-1-on-top-exile-rest
-            // (Devourer of Destiny). Sibling to the Leyline subscriber;
-            // both Attach against the same event so order is the
-            // subscription order on the bus (Leyline first → reveals run
-            // after Leylines settle).
-            var revealLook4 = new OpeningHandRevealLook4Trigger(
-                _agents, _triggerManager);
-            revealLook4.Attach(_eventBus);
-
-            // Publish in turn order: starting player first, then the
-            // remaining seats cycling forward. Matches CR 103.5
-            // ("starting with the starting player").
-            for (var i = 0; i < _players.Count; i++)
-            {
-                var seat = _players[(startingIndex + i) % _players.Count];
-                var snapshot = seat.Zones.Hand.GetCards().ToList();
-                await _eventBus.PublishAsync(
-                    new Majik.Core.Events.OpeningHandCheckEvent(seat, snapshot));
-            }
+            var seat = _players[(startingIndex + i) % _players.Count];
+            var snapshot = seat.Zones.Hand.GetCards().ToList();
+            await _eventBus!.PublishAsync(
+                new Majik.Core.Events.OpeningHandCheckEvent(seat, snapshot));
         }
+    }
 
+    /// <summary>Main turn loop: SBA → loss check → pick next active seat
+    /// (CR 500.7 extra-turn queue takes precedence over round-robin) →
+    /// RunTurnAsync. Stops when only one (or zero) players remain alive or
+    /// the turn cap is hit.</summary>
+    private async Task<GameResult> RunTurnLoopAsync(
+        int startingIndex, Player startingPlayer, int maxTurns, CancellationToken ct)
+    {
         var turnNumber = 0;
         var activeIndex = startingIndex;
         while (turnNumber < maxTurns)
@@ -202,20 +215,16 @@ public sealed class GameDriver
                 _players,
                 _players.SelectMany(p => p.Zones.Battlefield.GetCards()).ToList());
 
-            var alive = _players.Where(p => !p.HasLost).ToList();
-            if (alive.Count == 1) return new GameResult(turnNumber, alive[0], startingPlayer);
-            if (alive.Count == 0) return new GameResult(turnNumber, null, startingPlayer);
+            if (TryFinalizeOnSurvivorCount(turnNumber, startingPlayer) is { } early)
+                return early;
 
             turnNumber++;
 
-            // CR 500.7 — check extra-turn queue before round-robin pickup.
+            // CR 500.7 — extra-turn queue takes precedence over round-robin.
             Player active;
             if (_extraTurns.TryDequeueNext(out var extra))
             {
                 active = extra!;
-                // Active player index doesn't advance for an extra turn;
-                // the queue may interrupt the normal cadence multiple
-                // times in a row.
             }
             else
             {
@@ -231,6 +240,17 @@ public sealed class GameDriver
         var stillAlive = _players.Where(p => !p.HasLost).ToList();
         return new GameResult(
             turnNumber, stillAlive.Count == 1 ? stillAlive[0] : null, startingPlayer);
+    }
+
+    /// <summary>If exactly one (or zero) players remain alive, build the
+    /// terminating <see cref="GameResult"/>. Returns null when the game
+    /// should continue.</summary>
+    private GameResult? TryFinalizeOnSurvivorCount(int turnNumber, Player startingPlayer)
+    {
+        var alive = _players.Where(p => !p.HasLost).ToList();
+        if (alive.Count == 1) return new GameResult(turnNumber, alive[0], startingPlayer);
+        if (alive.Count == 0) return new GameResult(turnNumber, null, startingPlayer);
+        return null;
     }
 
     private void ShuffleLibrary(Player p)
