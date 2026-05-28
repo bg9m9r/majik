@@ -482,6 +482,18 @@ public sealed class SpellCastFlow
             }
         }
 
+        // CR 601.2f + CR 117.7c — March cycle generic reduction (cards
+        // exiled from hand in the additional-cost loop above). {2} per
+        // exiled card, floored at zero. Applied AFTER X is folded into
+        // Generic so the reduction can eat the X portion uniformly.
+        foreach (var addCost in mergedAdditional)
+        {
+            if (addCost is MarchAdditionalCost march && march.ReductionAmount > 0)
+            {
+                totalCost = march.ApplyTo(totalCost);
+            }
+        }
+
         return totalCost;
     }
 
