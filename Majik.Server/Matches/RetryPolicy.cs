@@ -42,7 +42,7 @@ public static class RetryPolicy
         var @base = baseDelay ?? TimeSpan.FromMilliseconds(100);
         var cap = maxDelay ?? TimeSpan.FromSeconds(1);
 
-        for (var attempt = 1; ; attempt++)
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
         {
             try
             {
@@ -71,6 +71,13 @@ public static class RetryPolicy
                 throw;
             }
         }
+
+        // Unreachable — the loop either returns from the try, or the final
+        // attempt's catch rethrows. Required to satisfy CS0161 with the
+        // bounded for-condition (preferred over an open-ended loop per
+        // Sonar S1994).
+        throw new InvalidOperationException(
+            $"RetryPolicy.ExecuteAsync: unreachable fall-through after {maxAttempts} attempts on {operationName}.");
     }
 
     /// <summary>Same as <see cref="ExecuteAsync{T}"/> for void operations.</summary>

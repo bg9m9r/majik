@@ -230,9 +230,9 @@ public static class ThievesGuildEnforcerFactory
         /// </summary>
         public Type EventType => typeof(CardMovedEvent);
 
-        public bool Matches(GameEvent gameEvent, ITriggeredAbility ability)
+        public bool Matches(GameEvent e, ITriggeredAbility ability)
         {
-            switch (gameEvent)
+            switch (e)
             {
                 case CardMovedEvent cme
                         when ReferenceEquals(cme.Card, _source)
