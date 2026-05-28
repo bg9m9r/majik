@@ -23,6 +23,27 @@ public static class CombatAbilities
     public static bool HasMenace(Creature c) => Has(c, "Menace");
     public static bool HasDefender(Creature c) => Has(c, "Defender");
 
+    /// <summary>
+    /// CR 509.1b — returns the minimum number of blockers required to
+    /// legally block this creature (from a
+    /// <see cref="KeywordAbility"/> with keyword
+    /// <c>"CantBeBlockedExceptByMinBlockers"</c> and
+    /// <see cref="KeywordAbility.Arg"/> = N), or null if no such
+    /// restriction exists. Menace is NOT counted here — use
+    /// <see cref="HasMenace"/> for the two-or-more check.
+    /// </summary>
+    public static int? GetMinBlockerRestriction(Creature? c)
+    {
+        if (c == null) return null;
+        var marker = c.Abilities
+            .OfType<KeywordAbility>()
+            .FirstOrDefault(k => string.Equals(
+                k.Keyword,
+                "CantBeBlockedExceptByMinBlockers",
+                StringComparison.OrdinalIgnoreCase));
+        return marker?.Arg;
+    }
+
     public static bool CanBlockFlying(Creature c) => HasFlying(c) || HasReach(c);
 
     private static bool Has(Creature? creature, string keyword)
