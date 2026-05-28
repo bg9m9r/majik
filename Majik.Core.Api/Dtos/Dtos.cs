@@ -92,13 +92,25 @@ public sealed record EventEnvelope(
 /// safe way to render the choice. Opponent visibility is unaffected
 /// (opponents already know the searcher is thinking).
 /// </para>
+/// <para>
+/// <see cref="LibraryView"/> is the full snapshot of the searching player's
+/// library (top-to-bottom order) at the time the search prompt fires
+/// (CR 701.19a — while searching, a player may look at their own library).
+/// Non-null only on library-search prompts; null on every other prompt kind.
+/// <c>Candidates.Select(c =&gt; c.InstanceId)</c> is the engine-filtered
+/// eligible subset — the portal highlights those cards and mutes the rest
+/// so it renders like flipping through the deck.
+/// Serialized as <c>libraryView</c> (camelCase) on the wire via
+/// System.Text.Json default policy.
+/// </para>
 /// </summary>
 public sealed record PromptDto(
     Guid GameId,
     Guid PlayerId,
     IReadOnlyList<string> ExpectedKinds,
     IReadOnlyList<CardSnapshotDto>? Candidates = null,
-    string? Label = null);
+    string? Label = null,
+    IReadOnlyList<CardSnapshotDto>? LibraryView = null);
 
 /// <summary>
 /// Per-viewer auto-pass policy. Mirrors the portal-side

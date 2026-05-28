@@ -555,10 +555,20 @@ public sealed class RemoteAgent : IPlayerAgent
             throw new InvalidOperationException("A prompt is already pending.");
         }
         var snapshots = candidates.Select(StateSnapshotter.SnapshotCard).ToList();
+        // CR 701.19a — while a player is searching their library, that player
+        // may look at it. Snapshot the full library (top-to-bottom order) so
+        // the portal can render a deck-flip view with candidates highlighted
+        // and ineligible cards muted. The prompt is published only to the
+        // searching player (per-recipient SignalR routing), so the opponent
+        // never sees the library order.
+        var libraryView = _player.Zones.Library.GetCards()
+            .Select(StateSnapshotter.SnapshotCard)
+            .ToList();
         _pendingLibraryCandidates = candidates;
         _pendingPayload = new PromptPayload(
             Candidates: snapshots,
-            Label: kindLabel);
+            Label: kindLabel,
+            LibraryView: libraryView);
         try
         {
             return Prompt<ICard?>(ct, typeof(ChooseLibraryPickCommand));
@@ -599,4 +609,21 @@ public sealed class RemoteAgent : IPlayerAgent
 /// </summary>
 public sealed record PromptPayload(
     IReadOnlyList<CardSnapshotDto>? Candidates = null,
-    string? Label = null);
+    string? Label = null,
+    /// <summary>
+    /// Full snapshot of the searching player's library (top-to-bottom order)
+    /// at the time the search prompt fires (CR 701.19a — while searching, a
+    /// player may look at their own library). Non-null only on library-search
+    /// prompts; null on every other prompt kind.
+    /// <para>
+    /// <c>Candidates.Select(c =&gt; c.InstanceId)</c> is the engine-filtered
+    /// eligible subset — the portal highlights those cards and mutes the rest
+    /// so it renders like flipping through the deck.
+    /// </para>
+    /// <para>
+    /// Privacy: the prompt envelope is published only to the searching player
+    /// (per-recipient SignalR routing). The full library order is never
+    /// broadcast to the opponent or spectators via this path.
+    /// </para>
+    /// </summary>
+    IReadOnlyList<CardSnapshotDto>? LibraryView = null);

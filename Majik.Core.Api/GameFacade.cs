@@ -756,10 +756,14 @@ public sealed class GameFacade
     }
 
     // Forward the agent's per-prompt payload (currently: library-search
-    // candidate list + label, see RemoteAgent.ChooseLibraryPickAsync) onto
-    // the wire PromptDto. Read synchronously inside PromptRequested —
-    // RemoteAgent stashes PendingPayload before invoking the observer, so
-    // the field is populated for the kinds that need it (null otherwise).
+    // candidate list + label + full library view,
+    // see RemoteAgent.ChooseLibraryPickAsync) onto the wire PromptDto.
+    // Read synchronously inside PromptRequested — RemoteAgent stashes
+    // PendingPayload before invoking the observer, so the field is populated
+    // for the kinds that need it (null otherwise).
+    // Privacy: the PromptDto is published only to the seat whose agent fired
+    // PromptRequested (per-recipient SignalR routing in MatchFacadeBridge).
+    // LibraryView is therefore never visible to the opponent.
     private PromptDto BuildPrompt(Player player, RemoteAgent agent, IReadOnlyList<Type> kinds)
     {
         var payload = agent.PendingPayload;
@@ -768,7 +772,8 @@ public sealed class GameFacade
             PlayerId: player.Id,
             ExpectedKinds: kinds.Select(t => t.Name).ToList(),
             Candidates: payload?.Candidates,
-            Label: payload?.Label);
+            Label: payload?.Label,
+            LibraryView: payload?.LibraryView);
     }
 
     private void BridgeEvent(GameEvent e)
