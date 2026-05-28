@@ -57,7 +57,7 @@ services:
     plan: starter
     region: oregon
     image:
-      url: docker.io/library/mongo:8.0
+      url: docker.io/library/mongo:8.2
     disk:
       name: mongo-data
       mountPath: /data/db
