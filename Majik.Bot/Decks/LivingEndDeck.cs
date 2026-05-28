@@ -1,15 +1,15 @@
 namespace Majik.Bot.Decks;
 
 /// <summary>
-/// Living End archetype — Modern cycling-reanimator combo. Pitch big
-/// creatures (Striped Riverwinder, Waker of Waves, Curator of Mysteries,
-/// Colossal Skyturtle, Street Wraith, Architects of Will) into the
-/// graveyard via cycling, then cascade Violent Outburst / Shardless
-/// Agent into Living End to mass-reanimate the team. Subtlety / Endurance
-/// / Force of Negation / Foundation Breaker for free disruption.
+/// Living End archetype — Modern cycling-cascade combo. Pitch cyclers
+/// (Street Wraith, Generous Ent, Curator of Mysteries, Waker of Waves,
+/// Wistfulness, Colossal Skyturtle) into the graveyard, then cascade
+/// Violent Outburst / Shardless Agent into Living End to mass-reanimate.
+/// Subtlety / Endurance / Force of Negation provide free disruption.
 /// Sideboard NOT wired in v1.
 ///
-/// Source: MTGGoldfish Modern metagame (Living End, current snapshot).
+/// Source: MTGGoldfish Modern metagame (verified 2026-05 against current
+/// archetype top-3 mainboards; representative list snapshotted).
 ///
 /// Many cards in this list are not yet IsImplemented=true; BotDeckValidator
 /// logs warnings at startup. Engine treats unknown cards as vanilla until
@@ -19,37 +19,31 @@ internal static class LivingEndDeck
 {
     public static IReadOnlyList<string> Cards { get; } = new[]
     {
-        // Creatures (24)
-        "Striped Riverwinder", "Striped Riverwinder", "Striped Riverwinder", "Striped Riverwinder",
-        "Curator of Mysteries", "Curator of Mysteries",
-        "Architects of Will", "Architects of Will", "Architects of Will", "Architects of Will",
-        "Street Wraith", "Street Wraith", "Street Wraith", "Street Wraith",
-        "Waker of Waves", "Waker of Waves", "Waker of Waves", "Waker of Waves",
+        "Breeding Pool",
         "Colossal Skyturtle", "Colossal Skyturtle",
-        "Subtlety", "Subtlety",
-        "Endurance", "Endurance",
-
-        // Spells (17)
-        "Living End", "Living End", "Living End", "Living End",
-        "Violent Outburst", "Violent Outburst", "Violent Outburst", "Violent Outburst",
+        "Commercial District",
+        "Curator of Mysteries", "Curator of Mysteries", "Curator of Mysteries", "Curator of Mysteries",
+        "Endurance", "Endurance", "Endurance", "Endurance",
+        "Force of Negation", "Force of Negation", "Force of Negation", "Force of Negation",
+        "Forest",
+        "Generous Ent", "Generous Ent", "Generous Ent", "Generous Ent",
+        "Hedge Maze",
+        "Island",
+        "Living End", "Living End", "Living End",
+        "Mistrise Village",
+        "Misty Rainforest", "Misty Rainforest", "Misty Rainforest", "Misty Rainforest",
+        "Oliphaunt",
+        "Otawara, Soaring City",
+        "Scalding Tarn",
         "Shardless Agent", "Shardless Agent", "Shardless Agent", "Shardless Agent",
-        "Force of Negation", "Force of Negation",
-        "Foundation Breaker", "Foundation Breaker",
-        "Brazen Borrower",
-
-        // Lands (19)
-        "Verdant Catacombs", "Verdant Catacombs", "Verdant Catacombs", "Verdant Catacombs",
-        "Misty Rainforest", "Misty Rainforest",
-        "Wooded Foothills", "Wooded Foothills",
+        "Sink into Stupor", "Sink into Stupor",
         "Steam Vents",
         "Stomping Ground",
-        "Breeding Pool",
-        "Forest", "Forest",
-        "Island",
-        "Botanical Sanctum",
-        "Spara's Headquarters",
-        "Ziatora's Proving Ground",
-        "Fiery Islet",
-        "Waterlogged Grove",
+        "Street Wraith", "Street Wraith", "Street Wraith", "Street Wraith",
+        "Subtlety", "Subtlety", "Subtlety", "Subtlety",
+        "Thundering Falls",
+        "Violent Outburst", "Violent Outburst", "Violent Outburst", "Violent Outburst",
+        "Waker of Waves",
+        "Wistfulness", "Wistfulness", "Wistfulness", "Wistfulness",
     };
 }

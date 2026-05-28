@@ -1,13 +1,14 @@
 namespace Majik.Bot.Decks;
 
 /// <summary>
-/// Belcher archetype — Modern mono-red ritual-fueled combo aimed at
-/// resolving Goblin Charbelcher with zero non-Mountain lands cast yet
-/// (Irencrag Feat + rituals dump six mana into Belcher activation;
-/// Reforge the Soul / Burning Inquiry refill; Geological Appraiser
-/// discovers more rituals). Sideboard NOT wired in v1.
+/// Belcher archetype — Modern Boros-touched ritual combo. Cast a chain of
+/// rituals + cantrip enablers (Witch Enchanter, Pinnacle Monk, Sundering
+/// Eruption) into Goblin Charbelcher activation via Irencrag Feat /
+/// Stormscale Scion floors. Orim's Chant taxes the opponent's turn; Legion
+/// Leadership gives a backup creature win. Sideboard NOT wired in v1.
 ///
-/// Source: MTGGoldfish Modern metagame (Belcher, current snapshot).
+/// Source: MTGGoldfish Modern metagame (verified 2026-05 against current
+/// archetype top-3 mainboards; representative list snapshotted).
 ///
 /// Many cards in this list are not yet IsImplemented=true; BotDeckValidator
 /// logs warnings at startup. Engine treats unknown cards as vanilla until
@@ -17,26 +18,21 @@ internal static class BelcherDeck
 {
     public static IReadOnlyList<string> Cards { get; } = new[]
     {
-        // Creatures (8)
-        "Insolent Neonate", "Insolent Neonate", "Insolent Neonate", "Insolent Neonate",
-        "Geological Appraiser", "Geological Appraiser", "Geological Appraiser", "Geological Appraiser",
-
-        // Spells / artifacts (47)
-        "Goblin Charbelcher", "Goblin Charbelcher", "Goblin Charbelcher", "Goblin Charbelcher",
         "Desperate Ritual", "Desperate Ritual", "Desperate Ritual", "Desperate Ritual",
-        "Pyretic Ritual", "Pyretic Ritual", "Pyretic Ritual", "Pyretic Ritual",
+        "Goblin Charbelcher", "Goblin Charbelcher", "Goblin Charbelcher", "Goblin Charbelcher",
+        "Irencrag Feat", "Irencrag Feat", "Irencrag Feat", "Irencrag Feat",
+        "Legion Leadership", "Legion Leadership", "Legion Leadership", "Legion Leadership",
         "Manamorphose", "Manamorphose", "Manamorphose", "Manamorphose",
-        "Burning Inquiry", "Burning Inquiry", "Burning Inquiry", "Burning Inquiry",
-        "Reforge the Soul", "Reforge the Soul", "Reforge the Soul", "Reforge the Soul",
-        "Reckless Impulse", "Reckless Impulse", "Reckless Impulse", "Reckless Impulse",
-        "Pentad Prism", "Pentad Prism", "Pentad Prism", "Pentad Prism",
-        "Mishra's Bauble", "Mishra's Bauble", "Mishra's Bauble", "Mishra's Bauble",
-        "Galvanic Iteration", "Galvanic Iteration",
-        "Past in Flames", "Past in Flames",
-        "Irencrag Feat", "Irencrag Feat", "Irencrag Feat",
-        "Light Up the Stage", "Light Up the Stage", "Light Up the Stage", "Light Up the Stage",
-
-        // Lands (5)
-        "Mountain", "Mountain", "Mountain", "Mountain", "Mountain",
+        "March of Reckless Joy", "March of Reckless Joy", "March of Reckless Joy",
+        "Orim's Chant", "Orim's Chant", "Orim's Chant", "Orim's Chant",
+        "Pinnacle Monk", "Pinnacle Monk", "Pinnacle Monk", "Pinnacle Monk",
+        "Pyretic Ritual", "Pyretic Ritual", "Pyretic Ritual", "Pyretic Ritual",
+        "Razorgrass Ambush",
+        "Shatterskull Smashing", "Shatterskull Smashing", "Shatterskull Smashing", "Shatterskull Smashing",
+        "Stormscale Scion", "Stormscale Scion", "Stormscale Scion", "Stormscale Scion",
+        "Strike It Rich", "Strike It Rich", "Strike It Rich", "Strike It Rich",
+        "Sundering Eruption", "Sundering Eruption", "Sundering Eruption", "Sundering Eruption",
+        "Talisman of Conviction", "Talisman of Conviction", "Talisman of Conviction", "Talisman of Conviction",
+        "Witch Enchanter", "Witch Enchanter", "Witch Enchanter", "Witch Enchanter",
     };
 }

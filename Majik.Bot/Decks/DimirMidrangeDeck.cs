@@ -1,13 +1,14 @@
 namespace Majik.Bot.Decks;
 
 /// <summary>
-/// Dimir Midrange archetype — Modern UB tempo/midrange. Murktide Regent
-/// + Psychic Frog as the threat base, Orcish Bowmasters for board
-/// presence + Bowmaster trigger, Subtlety as a free bounce/protection.
-/// Discard (Thoughtseize) + removal (Fatal Push) + Counterspell hold
-/// the game while threats close. Sideboard NOT wired in v1.
+/// Dimir Midrange archetype — Modern UB tempo. Psychic Frog + Orcish
+/// Bowmasters + Tasigur as the threat base, Quantum Riddler as a counter on
+/// legs, Tamiyo flipping into a draw engine. Thoughtseize + Fatal Push +
+/// Counterspell + Force of Negation defends. Drown in the Loch + Spell
+/// Snare punish curves. Sideboard NOT wired in v1.
 ///
-/// Source: MTGGoldfish Modern metagame (Dimir Midrange, current snapshot).
+/// Source: MTGGoldfish Modern metagame (verified 2026-05 against current
+/// archetype top-3 mainboards; representative list snapshotted).
 ///
 /// Many cards in this list are not yet IsImplemented=true; BotDeckValidator
 /// logs warnings at startup. Engine treats unknown cards as vanilla until
@@ -17,32 +18,32 @@ internal static class DimirMidrangeDeck
 {
     public static IReadOnlyList<string> Cards { get; } = new[]
     {
-        // Creatures (15)
-        "Murktide Regent", "Murktide Regent", "Murktide Regent", "Murktide Regent",
-        "Psychic Frog", "Psychic Frog", "Psychic Frog", "Psychic Frog",
-        "Orcish Bowmasters", "Orcish Bowmasters", "Orcish Bowmasters", "Orcish Bowmasters",
-        "Subtlety", "Subtlety", "Subtlety",
-
-        // Spells (25)
-        "Thoughtseize", "Thoughtseize", "Thoughtseize", "Thoughtseize",
+        "Agna Qel'a",
+        "Cling to Dust",
+        "Consign to Memory",
+        "Counterspell", "Counterspell", "Counterspell",
+        "Darkslick Shores",
+        "Drown in the Loch", "Drown in the Loch",
         "Fatal Push", "Fatal Push", "Fatal Push", "Fatal Push",
-        "Counterspell", "Counterspell", "Counterspell", "Counterspell",
-        "Drown in the Loch", "Drown in the Loch", "Drown in the Loch",
-        "Preordain", "Preordain", "Preordain", "Preordain",
-        "Mishra's Bauble", "Mishra's Bauble", "Mishra's Bauble", "Mishra's Bauble",
-        "Force of Negation", "Force of Negation",
-
-        // Lands (20)
-        "Watery Grave", "Watery Grave", "Watery Grave",
-        "Underground Mortuary", "Underground Mortuary",
-        "Otawara, Soaring City",
-        "Takenuma, Abandoned Mire",
-        "Misty Rainforest", "Misty Rainforest", "Misty Rainforest",
-        "Verdant Catacombs", "Verdant Catacombs",
-        "Bloodstained Mire", "Bloodstained Mire",
+        "Flooded Strand", "Flooded Strand", "Flooded Strand",
+        "Force of Despair", "Force of Despair",
+        "Force of Negation", "Force of Negation", "Force of Negation",
+        "Gloomlake Verge",
+        "Island", "Island",
+        "Kaito, Bane of Nightmares",
         "Marsh Flats", "Marsh Flats",
-        "Scalding Tarn", "Scalding Tarn",
-        "Polluted Delta",
-        "Island",
+        "Orcish Bowmasters", "Orcish Bowmasters", "Orcish Bowmasters",
+        "Polluted Delta", "Polluted Delta", "Polluted Delta", "Polluted Delta",
+        "Psychic Frog", "Psychic Frog", "Psychic Frog", "Psychic Frog",
+        "Quantum Riddler", "Quantum Riddler", "Quantum Riddler",
+        "Sink into Stupor", "Sink into Stupor",
+        "Spell Snare", "Spell Snare",
+        "Subtlety", "Subtlety",
+        "Swamp",
+        "Tamiyo, Inquisitive Student", "Tamiyo, Inquisitive Student",
+        "Tasigur, the Golden Fang", "Tasigur, the Golden Fang",
+        "Thoughtseize", "Thoughtseize", "Thoughtseize", "Thoughtseize",
+        "Undercity Sewers", "Undercity Sewers",
+        "Watery Grave", "Watery Grave",
     };
 }
