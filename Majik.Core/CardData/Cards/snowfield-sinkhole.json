@@ -1,0 +1,10 @@
+{
+  "name": "Snowfield Sinkhole",
+  "types": ["Land"],
+  "supertypes": ["Snow"],
+  "subtypes": ["Plains", "Swamp"],
+  "abilities": [
+    { "kind": "mana", "produces": "W" },
+    { "kind": "mana", "produces": "B" }
+  ]
+}
