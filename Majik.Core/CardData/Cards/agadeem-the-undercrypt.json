@@ -1,0 +1,7 @@
+{
+  "name": "Agadeem, the Undercrypt",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "B" }
+  ]
+}
