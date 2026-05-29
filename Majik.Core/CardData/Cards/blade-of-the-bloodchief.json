@@ -1,0 +1,6 @@
+{
+  "name": "Blade of the Bloodchief",
+  "types": ["Artifact"],
+  "subtypes": ["Equipment"],
+  "manaCost": "{1}"
+}
