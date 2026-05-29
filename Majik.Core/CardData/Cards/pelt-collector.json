@@ -1,0 +1,8 @@
+{
+  "name": "Pelt Collector",
+  "types": ["Creature"],
+  "subtypes": ["Elf", "Warrior"],
+  "manaCost": "{G}",
+  "power": 1,
+  "toughness": 1
+}
