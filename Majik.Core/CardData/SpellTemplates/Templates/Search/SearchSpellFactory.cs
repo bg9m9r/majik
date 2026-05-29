@@ -67,15 +67,38 @@ internal static class SearchSpellFactory
     private static readonly HashSet<string> BasicLandNames =
         new(StringComparer.OrdinalIgnoreCase) { "Plains", "Island", "Swamp", "Mountain", "Forest", "Wastes" };
 
+    // The four "Farseek" basic land TYPES (CR 305.6) — note this is a TYPE
+    // match (CardSubtype), not a name match, so it catches nonbasic duals /
+    // shocks / triomes that carry one of these subtypes, and deliberately
+    // EXCLUDES the fifth basic land type, Forest.
+    private static readonly CardSubtype[] FarseekLandTypes =
+        { CardSubtype.Plains, CardSubtype.Island, CardSubtype.Swamp, CardSubtype.Mountain };
+
+    /// <summary>Sentinel <c>kindRaw</c> for the Farseek family — match any
+    /// land card whose subtypes include Plains, Island, Swamp, or Mountain
+    /// (CR 305.6 basic land types), basic or not.</summary>
+    internal const string PlainsIslandSwampMountainKind = "plains/island/swamp/mountain land type";
+
     internal static SpellDefinition SearchLandToBattlefieldSpell(
         Player caster, string kindRaw, bool tapped) => new(
         Modes: Array.Empty<string>(), HasVariableX: false,
         TargetRequests: Array.Empty<TargetRequest>(),
         EffectFactory: p => new IEffect[] { new Effect($"tutor land -> battlefield{(tapped ? " tapped" : "")}", () =>
         {
+            bool MatchesFarseekType(ICard c) =>
+                Array.Exists(FarseekLandTypes, c.HasSubtype);
+
+            bool isFarseekKind = string.Equals(
+                kindRaw, PlainsIslandSwampMountainKind, StringComparison.OrdinalIgnoreCase);
+
             bool Pred(ICard c)
             {
                 if (!c.HasType(CardType.Land)) return false;
+                // Farseek (CR 305.6): match by basic land TYPE — catches
+                // nonbasic duals/shocks/triomes carrying one of the four
+                // subtypes; excludes Forest. Distinct from the basic-NAME
+                // match used by Rampant Growth / Cultivate.
+                if (isFarseekKind) return MatchesFarseekType(c);
                 if (kindRaw.Contains("basic", StringComparison.OrdinalIgnoreCase))
                     return BasicLandNames.Contains(c.Name);
                 return true;
@@ -89,8 +112,10 @@ internal static class SearchSpellFactory
             var pickCtx = BuildPickContext(caster, p);
             var pick = LibrarySearch.PromptOnly(
                 caster, candidates,
-                kindRaw.Contains("basic", StringComparison.OrdinalIgnoreCase)
-                    ? "basic land card" : "land card",
+                isFarseekKind
+                    ? "Plains, Island, Swamp, or Mountain card"
+                    : kindRaw.Contains("basic", StringComparison.OrdinalIgnoreCase)
+                        ? "basic land card" : "land card",
                 pickCtx);
             if (pick != null)
             {
