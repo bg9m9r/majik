@@ -1,0 +1,10 @@
+{
+  "name": "Kozilek, the Great Distortion",
+  "types": ["Creature"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Eldrazi"],
+  "manaCost": "{8}{C}{C}",
+  "power": 12,
+  "toughness": 12,
+  "abilities": []
+}
