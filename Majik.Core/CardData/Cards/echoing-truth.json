@@ -1,0 +1,5 @@
+{
+  "name": "Echoing Truth",
+  "types": ["Instant"],
+  "manaCost": "{1}{U}"
+}
