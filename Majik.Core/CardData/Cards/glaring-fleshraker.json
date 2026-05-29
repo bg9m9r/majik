@@ -1,0 +1,9 @@
+{
+  "name": "Glaring Fleshraker",
+  "types": ["Creature"],
+  "subtypes": ["Eldrazi", "Drone"],
+  "manaCost": "{2}{C}",
+  "power": 2,
+  "toughness": 2,
+  "abilities": []
+}
