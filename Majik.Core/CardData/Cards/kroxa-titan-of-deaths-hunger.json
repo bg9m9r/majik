@@ -1,0 +1,10 @@
+{
+  "name": "Kroxa, Titan of Death's Hunger",
+  "types": ["Creature"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Elder", "Giant"],
+  "manaCost": "{B}{R}",
+  "power": 6,
+  "toughness": 6,
+  "abilities": []
+}

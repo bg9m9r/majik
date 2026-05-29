@@ -104,6 +104,7 @@ public sealed class EscapeAltCostProbe : IAlternativeCostProbe
         {
             "Uro, Titan of Nature's Wrath" => new EscapeDescriptor(ManaCost.Parse("{G}{G}{U}{U}"), 5),
             "Phlage, Titan of Fire's Fury" => new EscapeDescriptor(ManaCost.Parse("{R}{R}{W}{W}"), 5),
+            "Kroxa, Titan of Death's Hunger" => new EscapeDescriptor(ManaCost.Parse("{B}{B}{R}{R}"), 5),
             "Phoenix of Ash"               => new EscapeDescriptor(ManaCost.Parse("{3}{R}{R}"), 4),
             "Cling to Dust"                => new EscapeDescriptor(ManaCost.Parse("{3}{B}"), 5),
             _ => null,
