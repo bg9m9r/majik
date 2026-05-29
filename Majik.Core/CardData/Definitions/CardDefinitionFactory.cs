@@ -246,6 +246,7 @@ public static class CardDefinitionFactory
             DealDamageStubEffectDef stub => BuildDealDamageStubEffect(stub, card),
             DrawCardEffectDef draw => BuildDrawCardEffect(draw, card, controller),
             SurveilSelfEffectDef surveil => BuildSurveilSelfEffect(surveil, card, controller),
+            ScrySelfEffectDef scry => BuildScrySelfEffect(scry, card, controller),
             DestroyTargetStubEffectDef destroy => BuildDestroyTargetStubEffect(destroy, card),
             UntapTargetStubEffectDef untap => BuildUntapTargetStubEffect(untap, card),
             GainLifeSelfEffectDef gain => BuildGainLifeSelfEffect(gain, card, controller),
@@ -334,6 +335,39 @@ public static class CardDefinitionFactory
         return new Effect(
             $"{card.Name}: untap target {def.TargetFilter} (stub — no targeting yet)",
             () => { /* untap target deferred */ });
+    }
+
+    private static IEffect BuildScrySelfEffect(ScrySelfEffectDef def, ICard card, Player controller)
+    {
+        var amount = def.Amount;
+        return new Effect(
+            $"{card.Name}: scry {amount}",
+            () =>
+            {
+                // CR 701.20 — look at the top N, then choose any subset to put
+                // on the bottom; the rest stay on top in chosen order.
+                var peeked = Majik.Core.Keywords.ScryAction.Peek(controller, amount);
+                if (peeked.Count == 0) return;
+
+                // Consult the registered agent when available; fall back to the
+                // all-to-bottom default when none is registered. Exact parallel
+                // of BuildSurveilSelfEffect. TODO: remove sync-over-async once
+                // IEffect.Execute becomes async.
+                var agent = Majik.Core.Players.Agents.AgentRegistry.Get(controller);
+                Majik.Core.Keywords.ScryAction.ScryDecision decision;
+                if (agent != null)
+                {
+                    decision = agent.ChooseScryDecisionAsync(null, peeked)
+                        .GetAwaiter().GetResult();
+                }
+                else
+                {
+                    decision = new Majik.Core.Keywords.ScryAction.ScryDecision(
+                        ToBottom: peeked.ToList(),
+                        TopOrder: Array.Empty<Majik.Core.Cards.ICard>());
+                }
+                Majik.Core.Keywords.ScryAction.Apply(controller, amount, decision);
+            });
     }
 
     private static IEffect BuildSurveilSelfEffect(SurveilSelfEffectDef def, ICard card, Player controller)
