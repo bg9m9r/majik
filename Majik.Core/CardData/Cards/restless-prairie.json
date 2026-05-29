@@ -1,0 +1,8 @@
+{
+  "name": "Restless Prairie",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "G" },
+    { "kind": "mana", "produces": "W" }
+  ]
+}
