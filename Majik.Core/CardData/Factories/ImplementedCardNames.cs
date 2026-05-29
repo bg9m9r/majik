@@ -45,15 +45,38 @@ public static class ImplementedCardNames
     private static readonly Lazy<ImmutableHashSet<string>> _all =
         new(Compute, LazyThreadSafetyMode.ExecutionAndPublication);
 
+    private static readonly Lazy<ImmutableHashSet<string>> _factoryBacked =
+        new(ComputeFactoryBacked, LazyThreadSafetyMode.ExecutionAndPublication);
+
     /// <summary>The implemented-name set, computed once and cached.
     /// Case-sensitive (<see cref="StringComparer.Ordinal"/>) to match how
     /// the dispatch table and the seed's <c>Name</c> column are keyed.</summary>
     public static ImmutableHashSet<string> All => _all.Value;
 
+    /// <summary>
+    /// The subset of <see cref="All"/> that is backed by a real
+    /// <c>[CardName]</c> <c>*Factory</c> class — i.e. <see cref="All"/> MINUS
+    /// the <see cref="InlineFallbackNames"/> (basic lands + the four vanilla
+    /// test creatures, which <c>NamedCardFactory.Create</c> builds inline
+    /// without dispatching to a factory). These are the names whose factory
+    /// can carry bespoke abilities the binder chain does not synthesize, so
+    /// they are the candidates for production routing through their factory.
+    /// </summary>
+    public static ImmutableHashSet<string> FactoryBackedNames => _factoryBacked.Value;
+
     /// <summary>True when <paramref name="name"/> is backed by a
     /// <c>[CardName]</c> factory or an inline fallback.</summary>
     public static bool Contains(string name) =>
         !string.IsNullOrEmpty(name) && _all.Value.Contains(name);
+
+    /// <summary>True when <paramref name="name"/> is backed by a real
+    /// <c>[CardName]</c> <c>*Factory</c> class (i.e. it is in
+    /// <see cref="FactoryBackedNames"/>, not merely an inline fallback).</summary>
+    public static bool HasRealFactory(string name) =>
+        !string.IsNullOrEmpty(name) && _factoryBacked.Value.Contains(name);
+
+    private static ImmutableHashSet<string> ComputeFactoryBacked() =>
+        _all.Value.Except(InlineFallbackNames);
 
     private static ImmutableHashSet<string> Compute()
     {
