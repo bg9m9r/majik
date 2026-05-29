@@ -1,0 +1,7 @@
+{
+  "name": "Grimclimb Pathway",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "B" }
+  ]
+}
