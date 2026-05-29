@@ -1,0 +1,17 @@
+{
+  "name": "Castle Vantress",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "U" },
+    {
+      "kind": "activated",
+      "costs": [
+        { "type": "mana", "amount": "{2}{U}{U}" },
+        { "type": "tap_self" }
+      ],
+      "effects": [
+        { "type": "scry_self", "amount": 2 }
+      ]
+    }
+  ]
+}
