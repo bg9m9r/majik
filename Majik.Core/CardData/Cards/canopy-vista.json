@@ -1,0 +1,9 @@
+{
+  "name": "Canopy Vista",
+  "types": ["Land"],
+  "subtypes": ["Forest", "Plains"],
+  "abilities": [
+    { "kind": "mana", "produces": "G" },
+    { "kind": "mana", "produces": "W" }
+  ]
+}
