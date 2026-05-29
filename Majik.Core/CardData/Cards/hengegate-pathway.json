@@ -1,0 +1,7 @@
+{
+  "name": "Hengegate Pathway",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "W" }
+  ]
+}
