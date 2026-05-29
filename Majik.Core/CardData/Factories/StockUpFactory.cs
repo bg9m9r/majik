@@ -1,4 +1,5 @@
 using Majik.Core.Abilities;
+using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
 using Majik.Core.Players;
 using Majik.Core.Zones;
@@ -38,16 +39,35 @@ public static class StockUpFactory
 {
     public const string CardName = "Stock Up";
     public const string PrintedManaCost = "{2}{U}";
+
+    /// <summary>JSON slug for the embedded base-shape definition.</summary>
+    public const string Slug = "stock-up";
+
     private const int PeekAmount = 5;
     private const int HandAmount = 2;
 
+    /// <summary>
+    /// Base card shape (name / Sorcery type / {2}{U} cost) is materialised
+    /// from the embedded JSON definition (<c>stock-up.json</c>) via
+    /// <see cref="CardDefinitionLoader.FromEmbeddedResource"/> +
+    /// <see cref="CardDefinitionFactory.Build"/> (same posture as
+    /// <see cref="ArdentPleaFactory"/>). The look-5 / hand-2 / bottom-rest
+    /// resolve body lives in <see cref="BuildResolveEffect"/> because the JSON
+    /// <c>AbilityDefinition</c> schema cannot express that shape yet.
+    /// </summary>
     public static Sorcery Create(Player owner)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
-        var card = new Sorcery(name: CardName, manaCost: PrintedManaCost);
-        card.SetOwner(owner);
-        card.SetController(owner);
+        var definition = CardDefinitionLoader.FromEmbeddedResource(Slug);
+        var built = CardDefinitionFactory.Build(definition, owner);
+        if (built is not Sorcery card)
+        {
+            throw new InvalidOperationException(
+                $"Expected '{CardName}' to materialise as a Sorcery but got "
+                + $"'{built.GetType().Name}'.");
+        }
+
         return card;
     }
 
