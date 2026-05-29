@@ -1,0 +1,11 @@
+{
+  "name": "Druid of the Cowl",
+  "types": ["Creature"],
+  "subtypes": ["Elf", "Druid"],
+  "manaCost": "{1}{G}",
+  "power": 1,
+  "toughness": 3,
+  "abilities": [
+    { "kind": "mana", "produces": "G" }
+  ]
+}
