@@ -1,0 +1,9 @@
+{
+  "name": "Gruul Guildgate",
+  "types": ["Land"],
+  "subtypes": ["Gate"],
+  "abilities": [
+    { "kind": "mana", "produces": "R" },
+    { "kind": "mana", "produces": "G" }
+  ]
+}
