@@ -66,23 +66,20 @@ public sealed class RevealNPutOneCreatureOntoBattlefieldTemplate : ISpellTemplat
         TargetRequests: Array.Empty<TargetRequest>(),
         EffectFactory: _ => new IEffect[] { new Effect("RevealNPutOneCreatureOntoBattlefield", () =>
         {
-            var revealed = caster.Zones.Library.GetCards().Take(n).ToList();
-            ICard? chosen = revealed.FirstOrDefault(c => c.HasType(CardType.Creature));
-
-            foreach (var card in revealed)
-            {
-                caster.Zones.Library.RemoveCard(card);
-                if (ReferenceEquals(card, chosen))
-                {
-                    caster.Zones.Battlefield.AddCard(card);
-                    card.SetZone(ZoneType.Battlefield);
-                }
-                else
-                {
-                    // Bottomed — append in reveal order (lossy "random/any order" v1).
-                    caster.Zones.Library.AddCard(card);
-                    card.SetZone(ZoneType.Library);
-                }
-            }
+            // CR 701.15 — reveal top N, may put a creature card onto the
+            // battlefield, rest to the bottom (lossy "any/random order"
+            // collapses to reveal order — see class docs). Shared helper
+            // surfaces the reveal pile to the agent (RemoteAgent →
+            // portal modal with eligible cards highlighted, ineligibles
+            // muted) instead of auto-picking the first creature.
+            Majik.Core.Zones.RevealAndChoose.RevealTopAndChoose(
+                caster: caster,
+                count: n,
+                eligiblePredicate: c => c.HasType(CardType.Creature),
+                optional: true,
+                label: "Creature to put onto the battlefield",
+                pickedDestination: ZoneType.Battlefield,
+                restDestination: ZoneType.Library,
+                sourceTag: $"reveal-{n}-put-creature-bf");
         }) });
 }

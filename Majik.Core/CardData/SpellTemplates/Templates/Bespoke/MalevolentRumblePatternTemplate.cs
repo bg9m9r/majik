@@ -35,50 +35,42 @@ public sealed class MalevolentRumblePatternTemplate : ISpellTemplate
 
     /// <summary>
     /// Malevolent Rumble (Duskmourn).
-    /// Reveal top 4 — auto-pick first permanent card to caster's hand, rest to
-    /// graveyard, create one Eldrazi Spawn token.
-    ///
-    /// v1 gaps (deferred):
-    /// - Real player choice among the revealed permanents (no prompt yet).
-    /// - "You may put … into your hand" is optional — v1 always picks if a
-    ///   permanent is present (opt-out awaits agent prompt system).
+    /// Reveal top 4, prompt the caster (CR 701.15) for a permanent card to
+    /// put into hand (optional — "you may"), rest to graveyard, then create
+    /// one Eldrazi Spawn token.
     /// </summary>
     private static SpellDefinition MalevolentRumbleSpell(Player caster) => new(
         Modes: Array.Empty<string>(), HasVariableX: false,
         TargetRequests: Array.Empty<TargetRequest>(),
         EffectFactory: _ => new IEffect[] { new Effect("Malevolent Rumble", () =>
         {
-            // Reveal top 4 (may be fewer if library is smaller).
-            var top4 = caster.Zones.Library.GetCards().Take(4).ToList();
-
-            if (top4.Count > 0)
-            {
-                // CR 603 / 700.3a: permanent cards — creature, artifact, enchantment,
-                // land, planeswalker, battle.
-                var permanentCard = top4.FirstOrDefault(c =>
-                    c.HasType(CardType.Creature) ||
-                    c.HasType(CardType.Artifact) ||
-                    c.HasType(CardType.Enchantment) ||
-                    c.HasType(CardType.Land) ||
-                    c.HasType(CardType.Planeswalker));
-
-                foreach (var c in top4)
-                {
-                    caster.Zones.Library.RemoveCard(c);
-                    if (ReferenceEquals(c, permanentCard))
-                    {
-                        caster.Zones.Hand.AddCard(c);
-                        c.SetZone(ZoneType.Hand);
-                    }
-                    else
-                    {
-                        caster.Zones.Graveyard.AddCard(c);
-                        c.SetZone(ZoneType.Graveyard);
-                    }
-                }
-            }
+            // CR 701.15 — reveal top 4, may put a permanent card into hand,
+            // rest into graveyard. Shared helper handles agent prompting
+            // (including the "you may" opt-out + empty-eligible reveal so
+            // the player still sees the reveal pile) and routes zone moves
+            // through ZoneServiceRegistry so ETB-from-graveyard observers
+            // see the discarded cards.
+            RevealAndChoose.RevealTopAndChoose(
+                caster: caster,
+                count: 4,
+                eligiblePredicate: IsPermanentCard,
+                optional: true,
+                label: "Permanent to put into hand",
+                pickedDestination: ZoneType.Hand,
+                restDestination: ZoneType.Graveyard,
+                sourceTag: "malevolent-rumble");
 
             // Token creation is unconditional — not gated on library size.
             TokenFactory.CreateEldraziSpawn(caster);
         }) });
+
+    // CR 110.1 — permanent card types (artifact, creature, enchantment,
+    // land, planeswalker, battle). Battle is in the printed list but
+    // the engine's CardType enum predates MoM; add it here when shipped.
+    private static bool IsPermanentCard(ICard c) =>
+        c.HasType(CardType.Creature) ||
+        c.HasType(CardType.Artifact) ||
+        c.HasType(CardType.Enchantment) ||
+        c.HasType(CardType.Land) ||
+        c.HasType(CardType.Planeswalker);
 }

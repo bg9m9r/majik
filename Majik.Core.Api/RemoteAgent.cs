@@ -46,6 +46,18 @@ public sealed class RemoteAgent : IPlayerAgent
     // and resolve each InstanceId back to an ICard. Cleared on prompt
     // resolution; replaced on each new surveil prompt.
     private IReadOnlyList<ICard>? _pendingSurveilPeeked;
+    // Engine-supplied eligible-card list for the most recent reveal-and-
+    // choose prompt (CR 701.15 — Malevolent Rumble, Impulse, Sleight of
+    // Hand, See the Unwritten and friends). Stashed so Submit can resolve
+    // the picked InstanceId back to an ICard and reject IDs not in the
+    // offered eligible subset. Cleared on prompt resolution; replaced on
+    // each new reveal prompt.
+    private IReadOnlyList<ICard>? _pendingRevealedEligible;
+    // Whether the most recent reveal-and-choose prompt is optional ("you
+    // may put"). When false the engine treats a null InstanceId as an
+    // agent misbehaviour rather than a legal decline (see Resolve). Reset
+    // alongside _pendingRevealedEligible.
+    private bool _pendingRevealedOptional;
     // Per-prompt extra payload (currently: library-search candidates +
     // label, surveil peeked view) surfaced via PendingPayload for
     // GameFacade.BuildPrompt to copy into the wire PromptDto. Null on
@@ -114,13 +126,17 @@ public sealed class RemoteAgent : IPlayerAgent
         var triggerOrder = _pendingTriggerOrder;
         var libraryCandidates = _pendingLibraryCandidates;
         var surveilPeeked = _pendingSurveilPeeked;
+        var revealedEligible = _pendingRevealedEligible;
+        var revealedOptional = _pendingRevealedOptional;
         _pending = null;
         _pendingKinds = null;
         _pendingTriggerOrder = null;
         _pendingLibraryCandidates = null;
         _pendingSurveilPeeked = null;
+        _pendingRevealedEligible = null;
+        _pendingRevealedOptional = false;
         _pendingPayload = null;
-        Resolve(pending, command, triggerOrder, libraryCandidates, surveilPeeked);
+        Resolve(pending, command, triggerOrder, libraryCandidates, surveilPeeked, revealedEligible, revealedOptional);
     }
 
     private void Resolve(
@@ -128,7 +144,9 @@ public sealed class RemoteAgent : IPlayerAgent
         GameCommand command,
         IReadOnlyList<ITriggeredAbility>? triggerOrder,
         IReadOnlyList<ICard>? libraryCandidates,
-        IReadOnlyList<ICard>? surveilPeeked)
+        IReadOnlyList<ICard>? surveilPeeked,
+        IReadOnlyList<ICard>? revealedEligible,
+        bool revealedOptional)
     {
         switch (command)
         {
@@ -345,6 +363,57 @@ public sealed class RemoteAgent : IPlayerAgent
                 // intended this prompt; nothing further to validate.
                 ((TaskCompletionSource<bool>)tcs).SetResult(yn.Answer);
                 break;
+            case ChooseFromRevealedCommand cr:
+            {
+                // CR 701.15 — translate the wire command into the ICard the
+                // engine's reveal-and-choose effect expects, or null for
+                // "decline" (only legal when the prompt was optional OR
+                // the eligible set was empty). Verify the pick is from the
+                // engine-offered eligible subset so the client can't smuggle
+                // an arbitrary revealed-but-ineligible card past the filter.
+                //
+                // Server-side validation posture (per spec): if the wire
+                // submits an InstanceId not in the eligible set, return
+                // null + log to console rather than throwing. The brief
+                // explicitly calls this out so a malicious / buggy client
+                // can't crash a live match — better to no-op the pick.
+                if (revealedEligible == null)
+                {
+                    throw new InvalidOperationException(
+                        "ChooseFromRevealedCommand resolved without a pending eligible-card list.");
+                }
+                ICard? picked = null;
+                if (cr.InstanceId is Guid pickedId)
+                {
+                    picked = revealedEligible.FirstOrDefault(c => c.InstanceId == pickedId);
+                    if (picked == null)
+                    {
+                        // Out-of-set pick — coerce to decline + warn. The
+                        // engine sees the same null payload it would on a
+                        // legitimate decline, but the log surfaces the
+                        // client misbehaviour for diagnostics.
+                        Console.Error.WriteLine(
+                            $"WARN: ChooseFromRevealedCommand selected instance {pickedId} " +
+                            $"is not in the offered eligible list — treating as decline.");
+                    }
+                }
+                // When the prompt was MANDATORY (Optional=false) AND the
+                // eligible set is non-empty, a null pick is an agent
+                // misbehaviour, not a legal decline. Fall back to the first
+                // eligible card so the engine doesn't see a no-op on a
+                // "put one of them" clause. When eligible is empty, null
+                // is always legal — mandatory clauses can't force a pick
+                // from nothing.
+                if (picked == null && !revealedOptional && revealedEligible.Count > 0)
+                {
+                    Console.Error.WriteLine(
+                        "WARN: ChooseFromRevealedCommand declined on a mandatory prompt " +
+                        "with non-empty eligible set — falling back to first eligible.");
+                    picked = revealedEligible[0];
+                }
+                ((TaskCompletionSource<ICard?>)tcs).SetResult(picked);
+                break;
+            }
             case ChooseLibraryPickCommand lp:
             {
                 // CR 701.19a — translate the wire command into the
@@ -687,6 +756,73 @@ public sealed class RemoteAgent : IPlayerAgent
     }
 
     /// <summary>
+    /// CR 701.15 — reveal-and-choose prompt (Malevolent Rumble, Impulse,
+    /// Sleight of Hand, See the Unwritten, …). Default in
+    /// <see cref="IPlayerAgent"/> auto-picks the first eligible card,
+    /// which causes remote (human) users to see the spell resolve
+    /// silently. Override snapshots every revealed card (full set —
+    /// so the portal can render the reveal pile) plus the eligible
+    /// subset's instance IDs onto the prompt payload, then awaits a
+    /// <see cref="ChooseFromRevealedCommand"/> back from the client.
+    /// The command's <c>InstanceId</c> is resolved against the eligible
+    /// set in <see cref="Resolve"/>; a <see langword="null"/> id models
+    /// the legal "decline" branch (only legal when
+    /// <paramref name="optional"/> = true OR <paramref name="eligible"/>
+    /// is empty).
+    /// <para>
+    /// Empty eligible still fires the prompt so the player sees the
+    /// reveal — matches the "search prompt on empty candidates" UX
+    /// principle from <see cref="ChooseLibraryPickAsync"/> (the silent-
+    /// no-op bug we already fixed for tutors).
+    /// </para>
+    /// </summary>
+    public Task<ICard?> ChooseFromRevealedAsync(
+        GameContext? ctx,
+        IReadOnlyList<ICard> revealed,
+        IReadOnlyList<ICard> eligible,
+        bool optional,
+        string label,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(revealed);
+        ArgumentNullException.ThrowIfNull(eligible);
+        ArgumentNullException.ThrowIfNull(label);
+        // Mirror ChooseLibraryPickAsync / ChooseSurveilDecisionAsync: stash
+        // before Prompt fires PromptRequested observers, guard by checking
+        // _pending so we don't smear stash on top of a still-pending prompt.
+        if (_pending != null)
+        {
+            throw new InvalidOperationException("A prompt is already pending.");
+        }
+        var revealedSnapshots = revealed.Select(StateSnapshotter.SnapshotCard).ToList();
+        var eligibleIds = new HashSet<Guid>(eligible.Select(c => c.InstanceId));
+        _pendingRevealedEligible = eligible;
+        _pendingRevealedOptional = optional;
+        _pendingPayload = new PromptPayload(
+            Candidates: null,
+            Label: label,
+            LibraryView: null,
+            SurveilView: null,
+            YesNoView: null,
+            RevealView: new RevealView(
+                Revealed: revealedSnapshots,
+                EligibleInstanceIds: eligibleIds,
+                Optional: optional,
+                Label: label));
+        try
+        {
+            return Prompt<ICard?>(ct, typeof(ChooseFromRevealedCommand));
+        }
+        catch
+        {
+            _pendingRevealedEligible = null;
+            _pendingRevealedOptional = false;
+            _pendingPayload = null;
+            throw;
+        }
+    }
+
+    /// <summary>
     /// CR 117.x / 605.1 — wire-shaped Yes/No prompt. Default in
     /// <see cref="IPlayerAgent"/> delegates to the legacy intent-driven
     /// overload which is fine for bot agents but auto-decides for remote
@@ -788,4 +924,18 @@ public sealed record PromptPayload(
     /// <see cref="GameFacade.BuildPrompt"/> forwards this onto
     /// <see cref="PromptDto.YesNoView"/>.
     /// </summary>
-    YesNoViewDto? YesNoView = null);
+    YesNoViewDto? YesNoView = null,
+    /// <summary>
+    /// CR 701.15 — reveal-and-choose prompt body (Malevolent Rumble,
+    /// Impulse, Sleight of Hand, See the Unwritten, …). Non-null only on
+    /// <c>chooseFromRevealed</c> prompts; null on every other prompt kind.
+    /// <see cref="GameFacade.BuildPrompt"/> forwards this onto
+    /// <see cref="PromptDto.RevealView"/>. Privacy posture matches
+    /// <see cref="LibraryView"/>: shipped per-recipient, never broadcast
+    /// to opponents or spectators (a reveal-and-choose still privately
+    /// surfaces non-eligible cards back to the caster only — Malevolent
+    /// Rumble's losers go to the graveyard publicly, but the prompt
+    /// itself ships before the moves resolve so the opponent shouldn't
+    /// see the candidates yet).
+    /// </summary>
+    RevealView? RevealView = null);
