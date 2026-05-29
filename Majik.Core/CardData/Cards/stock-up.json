@@ -1,0 +1,5 @@
+{
+  "name": "Stock Up",
+  "types": ["Sorcery"],
+  "manaCost": "{2}{U}"
+}
