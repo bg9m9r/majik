@@ -1,0 +1,9 @@
+{
+  "name": "Overgrown Battlement",
+  "types": ["Creature"],
+  "subtypes": ["Wall"],
+  "manaCost": "{1}{G}",
+  "power": 0,
+  "toughness": 4,
+  "abilities": []
+}
