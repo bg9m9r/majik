@@ -1,0 +1,9 @@
+{
+  "name": "Island",
+  "types": ["Land"],
+  "supertypes": ["Basic"],
+  "subtypes": ["Island"],
+  "abilities": [
+    { "kind": "mana", "produces": "U" }
+  ]
+}

@@ -81,6 +81,16 @@ public static partial class NamedCardFactory
 
     private static void AttachBasicLandMana(ICard land, Player controller)
     {
+        // Idempotent: if the card already carries a mana ability (e.g. it was
+        // built through the JSON-driven CardDefinitionFactory route, which
+        // emits the intrinsic "{T}: Add {C}" ability from the card def), do
+        // not attach a second identical one. A basic land has exactly one
+        // intrinsic mana ability per its subtype (CR 305.6).
+        if (land.Abilities.OfType<ManaAbility>().Any())
+        {
+            return;
+        }
+
         var color = land.HasSubtype(CardSubtype.Mountain) ? "R"
                   : land.HasSubtype(CardSubtype.Forest)   ? "G"
                   : land.HasSubtype(CardSubtype.Plains)   ? "W"
