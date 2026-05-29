@@ -1,0 +1,8 @@
+{
+  "name": "Solemn Simulacrum",
+  "types": ["Creature", "Artifact"],
+  "subtypes": ["Golem"],
+  "manaCost": "{4}",
+  "power": 2,
+  "toughness": 2
+}
