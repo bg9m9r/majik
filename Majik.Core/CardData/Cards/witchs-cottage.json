@@ -1,0 +1,8 @@
+{
+  "name": "Witch's Cottage",
+  "types": ["Land"],
+  "subtypes": ["Swamp"],
+  "abilities": [
+    { "kind": "mana", "produces": "B" }
+  ]
+}
