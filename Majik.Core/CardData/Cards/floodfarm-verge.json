@@ -1,0 +1,8 @@
+{
+  "name": "Floodfarm Verge",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "W" },
+    { "kind": "mana", "produces": "U" }
+  ]
+}
