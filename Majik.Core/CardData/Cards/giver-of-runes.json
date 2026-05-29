@@ -1,0 +1,9 @@
+{
+  "name": "Giver of Runes",
+  "types": ["Creature"],
+  "subtypes": ["Kor", "Cleric"],
+  "manaCost": "{W}",
+  "power": 1,
+  "toughness": 2,
+  "abilities": []
+}
