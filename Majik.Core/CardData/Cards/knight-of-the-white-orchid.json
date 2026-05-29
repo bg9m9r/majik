@@ -1,0 +1,9 @@
+{
+  "name": "Knight of the White Orchid",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Knight"],
+  "manaCost": "{W}{W}",
+  "power": 2,
+  "toughness": 2,
+  "abilities": []
+}
