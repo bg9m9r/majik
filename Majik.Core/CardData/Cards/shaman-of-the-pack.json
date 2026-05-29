@@ -1,0 +1,9 @@
+{
+  "name": "Shaman of the Pack",
+  "types": ["Creature"],
+  "subtypes": ["Elf", "Shaman"],
+  "manaCost": "{1}{B}{G}",
+  "power": 3,
+  "toughness": 2,
+  "abilities": []
+}
