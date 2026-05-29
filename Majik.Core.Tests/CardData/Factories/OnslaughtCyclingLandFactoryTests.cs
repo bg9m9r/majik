@@ -37,6 +37,7 @@ public class OnslaughtCyclingLandFactoryTests
     {
         new object[] { "Tranquil Thicket", "G", CardSubtype.Forest },
         new object[] { "Lonely Sandbar",   "U", CardSubtype.Island },
+        new object[] { "Barren Moor",      "B", CardSubtype.Swamp },
     };
 
     // -----------------------------------------------------------------------
@@ -167,6 +168,59 @@ public class OnslaughtCyclingLandFactoryTests
         mana.Blue.Should().Be(1, "Lonely Sandbar's cycling cost is {U}");
         mana.Green.Should().Be(0);
         mana.Generic.Should().Be(0);
+    }
+
+    [Fact]
+    public void BarrenMoor_Cycling_ChargesBlackManaSpecifically()
+    {
+        var moor = (Land)NamedCardFactory.Create("Barren Moor", _alice);
+        _alice.Zones.Hand.AddCard(moor);
+        moor.SetZone(ZoneType.Hand);
+
+        var cycling = moor.Abilities.OfType<ActivatedAbility>().Single();
+        var mana = cycling.Costs.OfType<ManaCostCost>().Single().Cost;
+
+        mana.Black.Should().Be(1, "Barren Moor's cycling cost is {B}");
+        mana.Green.Should().Be(0);
+        mana.Generic.Should().Be(0);
+    }
+
+    [Fact]
+    public void BarrenMoor_Cycling_EndToEnd_PaysBlackDiscardsSelfDrawsOne()
+    {
+        // Seed library so the draw resolves.
+        var topCard = new Card("Dark Ritual", "{B}");
+        topCard.SetOwner(_alice);
+        _alice.Zones.Library.AddCard(topCard);
+        topCard.SetZone(ZoneType.Library);
+
+        var bus = new Majik.Core.Events.EventBus();
+        Majik.Core.Events.CardCycledEvent? captured = null;
+        bus.Subscribe<Majik.Core.Events.CardCycledEvent>(e => captured = e);
+
+        var moor = OnslaughtCyclingLandFactory.Create(
+            _alice,
+            new[] { "Barren Moor", "B", "Swamp" },
+            eventBus: bus,
+            replacements: null);
+        _alice.Zones.Hand.AddCard(moor);
+        moor.SetZone(ZoneType.Hand);
+
+        _alice.AddManaToPool(ManaCost.Parse("B"));
+
+        var cycling = moor.Abilities.OfType<ActivatedAbility>().Single();
+        foreach (var cost in cycling.Costs)
+        {
+            cost.CanPay(_alice).Should().BeTrue($"{cost.Description}");
+            cost.Pay(_alice);
+        }
+        moor.Zone.Should().Be(ZoneType.Graveyard, "discarded self");
+
+        foreach (var effect in cycling.Effects) effect.Execute();
+
+        _alice.Zones.Hand.GetCards().Should().Contain(topCard, "cycle drew one card");
+        captured.Should().NotBeNull("CR 702.32d publication");
+        captured!.Card.Should().BeSameAs(moor);
     }
 
     // -----------------------------------------------------------------------

@@ -68,6 +68,11 @@ namespace Majik.Core.CardData.Factories;
 /// </summary>
 [CardName("Tranquil Thicket", "G", "Forest")]
 [CardName("Lonely Sandbar",   "U", "Island")]
+// Barren Moor (Onslaught) — {T}: Add {B}; Cycling {B}; enters tapped.
+// Verified against Scryfall: type_line "Land", no printed land subtype
+// (the engine-internal Swamp tag mirrors the cycle's modeling posture
+// for the basic-land-flavoured members; see the class doc above).
+[CardName("Barren Moor",      "B", "Swamp")]
 public static class OnslaughtCyclingLandFactory
 {
     /// <summary>
