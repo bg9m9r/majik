@@ -131,7 +131,52 @@ public sealed record PromptDto(
     /// dispatches a <c>ChooseYesNoCommand</c> with the bool answer on
     /// click.
     /// </summary>
-    YesNoViewDto? YesNoView = null);
+    YesNoViewDto? YesNoView = null,
+    /// <summary>
+    /// CR 701.15 — payload for a reveal-and-choose prompt (Malevolent
+    /// Rumble, Impulse, Sleight of Hand, See the Unwritten, …). Non-null
+    /// only on <c>chooseFromRevealed</c> prompts; null on every other
+    /// prompt kind. The portal renders every card in
+    /// <see cref="RevealView.Revealed"/>; cards whose <c>InstanceId</c> is
+    /// in <see cref="RevealView.EligibleInstanceIds"/> are clickable +
+    /// highlighted, the rest are muted/non-clickable. A
+    /// <see cref="ChooseFromRevealedCommand"/> with the picked InstanceId
+    /// (or null when <see cref="RevealView.Optional"/> = true and the
+    /// player declines) is dispatched on submit.
+    /// </summary>
+    RevealView? RevealView = null);
+
+/// <summary>
+/// CR 701.15 — per-prompt body for reveal-and-choose prompts surfaced on
+/// <see cref="PromptDto.RevealView"/>. The engine peeked the top of the
+/// caster's library (or any equivalent "reveal these cards" effect) and
+/// shipped every revealed card via <see cref="Revealed"/>.
+/// <see cref="EligibleInstanceIds"/> is the subset the player may pick
+/// from (filtered by the calling effect — e.g. "permanent card" for
+/// Malevolent Rumble, "creature card" for See the Unwritten). The
+/// remaining revealed cards are visible-only and not picking targets.
+/// <para>
+/// <see cref="Optional"/> mirrors the oracle "you may". When <c>true</c>
+/// the portal renders a Decline button alongside the picker; the player
+/// may dispatch a <see cref="ChooseFromRevealedCommand"/> with a null
+/// <c>InstanceId</c>. When <c>false</c> the player must pick from
+/// <see cref="EligibleInstanceIds"/> if non-empty; the Decline button is
+/// hidden. When the eligible set is empty the engine treats the prompt
+/// as informational-only — even mandatory "put one of them" clauses
+/// can't force a pick from an empty set, so Decline is always the only
+/// legal action there.
+/// </para>
+/// <para>
+/// <see cref="Label"/> is human-readable describing the choice
+/// ("Permanent to put into hand", "Creature to put onto the
+/// battlefield"); surfaced verbatim by the portal modal header.
+/// </para>
+/// </summary>
+public sealed record RevealView(
+    IReadOnlyList<CardSnapshotDto> Revealed,
+    IReadOnlySet<Guid> EligibleInstanceIds,
+    bool Optional,
+    string Label);
 
 /// <summary>
 /// Per-prompt body for CR 117.x / 605.1 Yes/No prompts surfaced on

@@ -59,6 +59,10 @@ public sealed class ImpulseMayRevealFilterTemplate : ISpellTemplate
         var dest = @params.GetValueOrDefault("dest", "bottom") == "graveyard"
             ? ZoneType.Graveyard
             : ZoneType.Library;
-        return LibrarySpellFactory.LookAtTopPutOneInHandSpell(ctx.Caster, n, dest);
+        // "You may reveal" — optional cycle (Ancient Stirrings, Commune
+        // with Nature, Adventurous Impulse). Helper surfaces a Decline
+        // button so the player can leave the reveal pile in the rest
+        // destination if no card looks worth picking.
+        return LibrarySpellFactory.LookAtTopPutOneInHandSpell(ctx.Caster, n, dest, optional: true);
     }
 }

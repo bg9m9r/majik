@@ -242,39 +242,40 @@ internal static class LibrarySpellFactory
 
     // Impulse-style: look at top N, put one of those N into hand,
     // remaining N-1 go to <restDestination> (bottom of library or graveyard).
-    // v1 stub: pick the top card of those N for the hand-card slot; preserve
-    // order for the rest going to bottom; graveyard order doesn't matter.
+    // Routes through RevealAndChoose so the registered agent picks the
+    // hand card (CR 701.15) instead of the historical FirstOrDefault
+    // auto-pick. Bot agents pick the highest-value card; remote agents
+    // surface the reveal modal.
+    //
+    // ImpulseMayRevealFilterTemplate calls this with optional=true (the
+    // "you may reveal" cycle: Ancient Stirrings / Adventurous Impulse /
+    // Commune with Nature etc.); LookAtTopPutOneInHandTemplate calls it
+    // with optional=false (the mandatory "put one of them" cycle:
+    // Impulse / Anticipate / Sleight of Hand). The shared
+    // <see cref="Majik.Core.Zones.RevealAndChoose"/> helper handles both
+    // optional and mandatory shapes uniformly — when eligible is empty
+    // (which never happens in this template, since the predicate accepts
+    // every revealed card) it returns null gracefully.
     internal static SpellDefinition LookAtTopPutOneInHandSpell(
-        Player caster, int n, ZoneType restDestination) => new(
+        Player caster, int n, ZoneType restDestination, bool optional = false) => new(
         Modes: Array.Empty<string>(), HasVariableX: false,
         TargetRequests: Array.Empty<TargetRequest>(),
         EffectFactory: _ => new IEffect[] { new Effect($"impulse {n} -> {restDestination}", () =>
         {
-            // Take up to N cards off the top of the library.
-            var library = caster.Zones.Library.GetCards().Take(n).ToList();
-            if (library.Count == 0) return;
-            var keep = library[0];
-            caster.Zones.Library.RemoveCard(keep);
-            caster.Zones.Hand.AddCard(keep);
-            keep.SetZone(ZoneType.Hand);
-            // The rest: remove from library and re-place.
-            // For "bottom" we let the natural order push them to the back;
-            // for "graveyard" we move them to graveyard.
-            for (var i = 1; i < library.Count; i++)
-            {
-                var c = library[i];
-                caster.Zones.Library.RemoveCard(c);
-                if (restDestination == ZoneType.Graveyard)
-                {
-                    caster.Zones.Graveyard.AddCard(c);
-                    c.SetZone(ZoneType.Graveyard);
-                }
-                else
-                {
-                    caster.Zones.Library.AddCard(c);
-                    c.SetZone(ZoneType.Library);
-                }
-            }
+            // Every revealed card is eligible at this template tier — the
+            // calling template doesn't enforce a type / colour filter
+            // (cards that need a filter use the named factory pattern
+            // like Ancient Stirrings). The agent therefore picks freely
+            // from the entire reveal pile.
+            Majik.Core.Zones.RevealAndChoose.RevealTopAndChoose(
+                caster: caster,
+                count: n,
+                eligiblePredicate: _ => true,
+                optional: optional,
+                label: "Card to put into your hand",
+                pickedDestination: ZoneType.Hand,
+                restDestination: restDestination,
+                sourceTag: $"impulse-{n}");
         }) });
 
     /// <summary>

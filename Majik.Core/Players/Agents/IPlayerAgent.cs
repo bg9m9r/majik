@@ -350,4 +350,52 @@ public interface IPlayerAgent
         BotIntent intent,
         CancellationToken ct = default)
         => Task.FromResult<ICard?>(candidates.Count > 0 ? candidates[0] : null);
+
+    /// <summary>
+    /// CR 701.15 — "reveal top N, you may put one matching card into [zone],
+    /// rest go to [zone]" prompt (Malevolent Rumble, Impulse, Sleight of
+    /// Hand, See the Unwritten and friends). Distinct from
+    /// <see cref="ChooseLibraryPickAsync"/> in two ways:
+    /// <list type="bullet">
+    /// <item>The agent receives the FULL <paramref name="revealed"/> list so
+    /// the UI can render every revealed card (CR 701.15 — revealed cards
+    /// are publicly visible). <paramref name="eligible"/> is the subset
+    /// the player may pick from (filtered by the calling effect, e.g.
+    /// "permanent card", "colorless card", "creature card").</item>
+    /// <item><paramref name="optional"/> controls whether the player may
+    /// decline. When <see langword="true"/> the agent may return
+    /// <see langword="null"/> to leave every revealed card in the rest
+    /// pile (matching "you may"). When <see langword="false"/> the agent
+    /// must return a card from <paramref name="eligible"/> if any exist
+    /// (matching "put one of them" mandatory clauses); a null return
+    /// when eligible is non-empty falls back to the first eligible (the
+    /// engine treats it as an agent misbehaviour, not a legal decline).
+    /// When eligible is empty the agent must return <see langword="null"/>.
+    /// </item>
+    /// </list>
+    /// <para>
+    /// <paramref name="ctx"/> may be <see langword="null"/> in v1 effect
+    /// closures (same sync-over-async wart as <see cref="ChooseScryDecisionAsync"/>).
+    /// </para>
+    /// <para>
+    /// <paramref name="label"/> is human-readable describing the choice
+    /// ("Permanent to put into hand", "Colorless card to reveal and put
+    /// into hand"); surfaced verbatim by remote-agent UIs.
+    /// </para>
+    /// <para>
+    /// Default implementation picks the first eligible card (deterministic
+    /// pre-agent behaviour matching the legacy <c>FirstOrDefault</c> in
+    /// every retrofitted factory). Empty <paramref name="eligible"/> returns
+    /// <see langword="null"/>. Smart bots override with value heuristics;
+    /// remote agents prompt the UI.
+    /// </para>
+    /// </summary>
+    Task<ICard?> ChooseFromRevealedAsync(
+        GameContext? ctx,
+        IReadOnlyList<ICard> revealed,
+        IReadOnlyList<ICard> eligible,
+        bool optional,
+        string label,
+        CancellationToken ct = default)
+        => Task.FromResult<ICard?>(eligible.Count > 0 ? eligible[0] : null);
 }

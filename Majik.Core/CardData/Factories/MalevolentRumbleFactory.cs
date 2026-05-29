@@ -97,41 +97,22 @@ public static class MalevolentRumbleFactory
                 "rest into graveyard, then create a 0/1 colorless Eldrazi Spawn token.",
                 () =>
                 {
-                    // Reveal top 4 (may be fewer if library is smaller —
-                    // CR 121.2 / CR 701.15a: revealing N when the library
-                    // has fewer than N is legal; the player reveals what's
-                    // there).
-                    var top4 = caster.Zones.Library.GetCards().Take(4).ToList();
-
-                    if (top4.Count > 0)
-                    {
-                        // CR 110.1 — permanent card types. Battle is in the
-                        // printed list but the engine's CardType enum
-                        // predates MoM; the predicate walks the five types
-                        // currently modelled. When Battle ships, add it
-                        // here.
-                        var permanentCard = top4.FirstOrDefault(c =>
-                            c.HasType(CardType.Creature) ||
-                            c.HasType(CardType.Artifact) ||
-                            c.HasType(CardType.Enchantment) ||
-                            c.HasType(CardType.Land) ||
-                            c.HasType(CardType.Planeswalker));
-
-                        foreach (var c in top4)
-                        {
-                            caster.Zones.Library.RemoveCard(c);
-                            if (ReferenceEquals(c, permanentCard))
-                            {
-                                caster.Zones.Hand.AddCard(c);
-                                c.SetZone(ZoneType.Hand);
-                            }
-                            else
-                            {
-                                caster.Zones.Graveyard.AddCard(c);
-                                c.SetZone(ZoneType.Graveyard);
-                            }
-                        }
-                    }
+                    // CR 701.15 — reveal top 4, may put a permanent card
+                    // into hand, rest into graveyard. Shared helper handles
+                    // library underflow, agent prompting (including the
+                    // "you may" opt-out + the empty-eligible reveal so the
+                    // player still sees the reveal pile), and routes zone
+                    // moves through ZoneServiceRegistry when registered so
+                    // ETB-from-graveyard observers see the discarded cards.
+                    RevealAndChoose.RevealTopAndChoose(
+                        caster: caster,
+                        count: 4,
+                        eligiblePredicate: IsPermanentCard,
+                        optional: true,
+                        label: "Permanent to put into hand",
+                        pickedDestination: ZoneType.Hand,
+                        restDestination: ZoneType.Graveyard,
+                        sourceTag: "malevolent-rumble");
 
                     // Token creation is unconditional — not gated on
                     // library size. Even an empty library yields a Spawn.
@@ -139,4 +120,14 @@ public static class MalevolentRumbleFactory
                 }),
         };
     }
+
+    // CR 110.1 — permanent card types (artifact, creature, enchantment,
+    // land, planeswalker, battle). Battle is in the printed list but the
+    // engine's CardType enum predates MoM; add it here when shipped.
+    private static bool IsPermanentCard(ICard c) =>
+        c.HasType(CardType.Creature) ||
+        c.HasType(CardType.Artifact) ||
+        c.HasType(CardType.Enchantment) ||
+        c.HasType(CardType.Land) ||
+        c.HasType(CardType.Planeswalker);
 }

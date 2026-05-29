@@ -30,6 +30,7 @@ public sealed class ScriptedAgent : IPlayerAgent
     private readonly Queue<Func<IReadOnlyList<ICard>, ICard?>> _fromHandChoices = new();
     private readonly Queue<Func<IReadOnlyList<ICard>, ICard?>> _fromBattlefieldChoices = new();
     private readonly Queue<Func<IReadOnlyList<ICard>, ICard?>> _fromPileChoices = new();
+    private readonly Queue<Func<IReadOnlyList<ICard>, IReadOnlyList<ICard>, ICard?>> _fromRevealedChoices = new();
 
     public void QueuePriority(PriorityAction a) => _priorityActions.Enqueue(a);
     public void QueueMulligan(MulliganDecision d) => _mulligans.Enqueue(d);
@@ -85,6 +86,19 @@ public sealed class ScriptedAgent : IPlayerAgent
     public void QueueFromPile(Func<IReadOnlyList<ICard>, ICard?> chooser) => _fromPileChoices.Enqueue(chooser);
     /// <summary>Convenience: pre-queue a single fixed pile pick (or decline-null).</summary>
     public void QueueFromPile(ICard? pick) => _fromPileChoices.Enqueue(_ => pick);
+    /// <summary>Pre-queue a reveal-and-choose chooser for the next
+    /// <see cref="IPlayerAgent.ChooseFromRevealedAsync"/> call. The
+    /// chooser receives the full revealed list + the eligible subset and
+    /// returns the picked card or <c>null</c> to decline. Falls back to
+    /// deterministic first-eligible pick when no chooser is queued
+    /// (matches the default interface implementation + the historical
+    /// FirstOrDefault auto-pick). Used by Malevolent Rumble / Impulse /
+    /// See the Unwritten and friends (CR 701.15).</summary>
+    public void QueueFromRevealed(Func<IReadOnlyList<ICard>, IReadOnlyList<ICard>, ICard?> chooser)
+        => _fromRevealedChoices.Enqueue(chooser);
+    /// <summary>Convenience: pre-queue a single fixed reveal-and-choose pick
+    /// (or decline-null).</summary>
+    public void QueueFromRevealed(ICard? pick) => _fromRevealedChoices.Enqueue((_, _) => pick);
 
     public Task<PriorityAction> ChoosePriorityActionAsync(GameContext ctx, CancellationToken ct = default)
         => Task.FromResult(Pop(_priorityActions, "priority"));
@@ -195,6 +209,26 @@ public sealed class ScriptedAgent : IPlayerAgent
         }
         var chooserFn = _fromPileChoices.Dequeue();
         return Task.FromResult(chooserFn(candidates));
+    }
+
+    public Task<ICard?> ChooseFromRevealedAsync(
+        GameContext? ctx,
+        IReadOnlyList<ICard> revealed,
+        IReadOnlyList<ICard> eligible,
+        bool optional,
+        string label,
+        CancellationToken ct = default)
+    {
+        if (_fromRevealedChoices.Count == 0)
+        {
+            // No script entry queued — fall back to the deterministic
+            // default (first eligible, or null when empty). Matches the
+            // IPlayerAgent default + the historical FirstOrDefault
+            // auto-pick in every retrofitted factory.
+            return Task.FromResult<ICard?>(eligible.Count > 0 ? eligible[0] : null);
+        }
+        var chooserFn = _fromRevealedChoices.Dequeue();
+        return Task.FromResult(chooserFn(revealed, eligible));
     }
 
     public Task<Player?> ChooseGiftRecipientAsync(

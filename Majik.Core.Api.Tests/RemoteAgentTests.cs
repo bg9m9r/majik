@@ -1399,4 +1399,174 @@ public class RemoteAgentTests
 
     private GameContext NewContext() =>
         new(_alice, new[] { _alice }, _alice, 1, PhaseStateType.PreCombatMain, new Majik.Core.Stack.Stack());
+
+    // -----------------------------------------------------------------------
+    // CR 701.15 — reveal-and-choose prompt (Malevolent Rumble, Impulse,
+    // Sleight of Hand, See the Unwritten, …).
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task ChooseFromRevealed_Submit_ResolvesToPickedEligibleCard()
+    {
+        // Reveal pile contains both a creature (eligible) and an instant
+        // (not eligible). The portal must be able to ship the picked
+        // creature's instance id; the wire command resolves to the
+        // matching ICard.
+        var bear = new Creature("Bear", "1G", 2, 2) { Owner = _alice };
+        var bolt = new Instant("Bolt", "R") { Owner = _alice };
+        var revealed = new ICard[] { bolt, bear };
+        var eligible = new ICard[] { bear };
+        var agent = new RemoteAgent(_alice);
+
+        var task = agent.ChooseFromRevealedAsync(
+            ctx: null,
+            revealed: revealed,
+            eligible: eligible,
+            optional: true,
+            label: "Permanent to put into hand");
+        agent.HasPending.Should().BeTrue();
+        agent.ExpectedCommandKinds.Should().ContainSingle()
+            .Which.Should().Be(typeof(ChooseFromRevealedCommand));
+
+        agent.Submit(new ChooseFromRevealedCommand(bear.InstanceId) { PlayerId = _alice.Id });
+        var picked = await task;
+
+        picked.Should().BeSameAs(bear);
+    }
+
+    [Fact]
+    public async Task ChooseFromRevealed_SubmitNull_OptionalPrompt_ResolvesToDecline()
+    {
+        // CR 116.1b — "you may" decline. Optional prompt + null InstanceId
+        // resolves to null without falling back to the first eligible.
+        var bear = new Creature("Bear", "1G", 2, 2) { Owner = _alice };
+        var agent = new RemoteAgent(_alice);
+
+        var task = agent.ChooseFromRevealedAsync(
+            ctx: null,
+            revealed: new ICard[] { bear },
+            eligible: new ICard[] { bear },
+            optional: true,
+            label: "Permanent to put into hand");
+        agent.Submit(new ChooseFromRevealedCommand(InstanceId: null) { PlayerId = _alice.Id });
+
+        (await task).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ChooseFromRevealed_InvalidInstanceId_CoercedToDecline()
+    {
+        // Defence: out-of-set InstanceId is logged + coerced to null
+        // rather than throwing — a buggy or malicious client must never
+        // crash a live match. Distinct from ChooseLibraryPickCommand which
+        // throws on invalid IDs (that prompt is per-search, mid-resolve,
+        // and a malformed pick there indicates a wire bug worth surfacing
+        // immediately).
+        var bear = new Creature("Bear", "1G", 2, 2) { Owner = _alice };
+        var agent = new RemoteAgent(_alice);
+
+        var task = agent.ChooseFromRevealedAsync(
+            ctx: null,
+            revealed: new ICard[] { bear },
+            eligible: new ICard[] { bear },
+            optional: true,
+            label: "Permanent to put into hand");
+        agent.Submit(new ChooseFromRevealedCommand(Guid.NewGuid()) { PlayerId = _alice.Id });
+
+        (await task).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ChooseFromRevealed_MandatoryPromptNullSubmit_FallsBackToFirstEligible()
+    {
+        // Mandatory prompt ("put one of them into your hand") with non-
+        // empty eligible. A null pick is treated as agent misbehaviour,
+        // not a legal decline — fall back to the first eligible so the
+        // engine doesn't see a no-op on a "put one" clause.
+        var bear = new Creature("Bear", "1G", 2, 2) { Owner = _alice };
+        var elf = new Creature("Elf", "G", 1, 1) { Owner = _alice };
+        var agent = new RemoteAgent(_alice);
+
+        var task = agent.ChooseFromRevealedAsync(
+            ctx: null,
+            revealed: new ICard[] { bear, elf },
+            eligible: new ICard[] { bear, elf },
+            optional: false,
+            label: "Card to put into hand");
+        agent.Submit(new ChooseFromRevealedCommand(InstanceId: null) { PlayerId = _alice.Id });
+
+        (await task).Should().BeSameAs(bear,
+            "mandatory prompt + null pick coerces to first eligible");
+    }
+
+    [Fact]
+    public async Task ChooseFromRevealed_MandatoryPromptEmptyEligible_AcceptsNullDecline()
+    {
+        // Even mandatory clauses can't force a pick from an empty set —
+        // null is legal here (matches "if any" or "if able" wording the
+        // engine surfaces when the predicate excludes every revealed
+        // card).
+        var bolt = new Instant("Bolt", "R") { Owner = _alice };
+        var agent = new RemoteAgent(_alice);
+
+        var task = agent.ChooseFromRevealedAsync(
+            ctx: null,
+            revealed: new ICard[] { bolt },
+            eligible: Array.Empty<ICard>(),
+            optional: false,
+            label: "Permanent to put into hand");
+        agent.Submit(new ChooseFromRevealedCommand(InstanceId: null) { PlayerId = _alice.Id });
+
+        (await task).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task ChooseFromRevealed_PromptPayload_ShipsRevealViewWithEligibleSubset()
+    {
+        // The portal needs every revealed card to render the reveal pile
+        // (CR 701.15 — revealed cards are publicly visible to the
+        // caster's UI) plus the eligible InstanceIds so it knows which
+        // cards are clickable vs muted. Verify both ship on PromptPayload.
+        var bear = new Creature("Bear", "1G", 2, 2) { Owner = _alice };
+        var bolt = new Instant("Bolt", "R") { Owner = _alice };
+        var agent = new RemoteAgent(_alice);
+
+        _ = agent.ChooseFromRevealedAsync(
+            ctx: null,
+            revealed: new ICard[] { bolt, bear },
+            eligible: new ICard[] { bear },
+            optional: true,
+            label: "Permanent to put into hand");
+
+        agent.PendingPayload.Should().NotBeNull();
+        var view = agent.PendingPayload!.RevealView;
+        view.Should().NotBeNull();
+        view!.Revealed.Should().HaveCount(2);
+        view!.EligibleInstanceIds.Should().Contain(bear.InstanceId);
+        view!.EligibleInstanceIds.Should().NotContain(bolt.InstanceId);
+        view!.Optional.Should().BeTrue();
+        view!.Label.Should().Be("Permanent to put into hand");
+        await Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task ChooseFromRevealed_PromptPayload_ClearedAfterSubmit()
+    {
+        var bear = new Creature("Bear", "1G", 2, 2) { Owner = _alice };
+        var agent = new RemoteAgent(_alice);
+
+        var task = agent.ChooseFromRevealedAsync(
+            ctx: null,
+            revealed: new ICard[] { bear },
+            eligible: new ICard[] { bear },
+            optional: true,
+            label: "Permanent to put into hand");
+        agent.PendingPayload.Should().NotBeNull();
+
+        agent.Submit(new ChooseFromRevealedCommand(bear.InstanceId) { PlayerId = _alice.Id });
+        await task;
+
+        agent.PendingPayload.Should().BeNull();
+        agent.HasPending.Should().BeFalse();
+    }
 }

@@ -1230,6 +1230,33 @@ public sealed class HeuristicBotAgent : IPlayerAgent
         => Task.FromResult<ICard?>(candidates.Count > 0 ? candidates[0] : null);
 
     /// <summary>
+    /// CR 701.15 — reveal-and-choose heuristic. Picks the highest-mana-
+    /// value eligible card (biggest tempo / card-quality from the
+    /// shipped reveal pile). Returns <see langword="null"/> when the
+    /// eligible set is empty — works for both mandatory (no legal pick)
+    /// and optional ("you may" decline) clauses. Aggressive accept is
+    /// the right posture: every reveal-and-choose card in the audit
+    /// (Malevolent Rumble, Impulse, See the Unwritten, Ancient
+    /// Stirrings) is a card-advantage upgrade — declining squanders the
+    /// effect.
+    /// </summary>
+    public Task<ICard?> ChooseFromRevealedAsync(
+        GameContext? ctx,
+        IReadOnlyList<ICard> revealed,
+        IReadOnlyList<ICard> eligible,
+        bool optional,
+        string label,
+        CancellationToken ct = default)
+    {
+        if (eligible == null || eligible.Count == 0)
+            return Task.FromResult<ICard?>(null);
+        var pick = eligible
+            .OrderByDescending(c => Majik.Core.ValueObjects.ManaCost.Parse(c.ManaCost ?? "").TotalValue)
+            .First();
+        return Task.FromResult<ICard?>(pick);
+    }
+
+    /// <summary>
     /// CR 701.59 — Bloomburrow Gift heuristic. The bot defaults to
     /// promising the gift to the first opponent: the upgrade clause on
     /// every printed Gift spell so far (Into the Flood Maw bounce →

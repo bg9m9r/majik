@@ -27,6 +27,7 @@ namespace Majik.Core.Api.Commands;
 [JsonDerivedType(typeof(ChooseLibraryPickCommand), "chooseLibraryPick")]
 [JsonDerivedType(typeof(ChooseSurveilCommand), "chooseSurveil")]
 [JsonDerivedType(typeof(ChooseYesNoCommand), "chooseYesNo")]
+[JsonDerivedType(typeof(ChooseFromRevealedCommand), "chooseFromRevealed")]
 public abstract record GameCommand
 {
     /// <summary>The player who submitted the command.</summary>
@@ -146,3 +147,24 @@ public sealed record ChooseSurveilCommand(
 /// PR body).
 /// </summary>
 public sealed record ChooseYesNoCommand(bool Answer) : GameCommand;
+
+/// <summary>
+/// CR 701.15 — response to a "reveal top N, may put one into hand/zone X"
+/// prompt
+/// (<see cref="Majik.Core.Players.Agents.IPlayerAgent.ChooseFromRevealedAsync"/>).
+/// Used by Malevolent Rumble, Impulse, Sleight of Hand, See the Unwritten
+/// and the rest of the reveal-and-choose family.
+/// <para>
+/// <see cref="InstanceId"/> is the <c>InstanceId</c> of the card the player
+/// picked from the prompt's eligible subset (carried in
+/// <see cref="Majik.Core.Api.Dtos.RevealView.EligibleInstanceIds"/>), or
+/// <see langword="null"/> to decline. Decline is only legal when the
+/// prompt's <see cref="Majik.Core.Api.Dtos.RevealView.Optional"/> flag is
+/// <c>true</c> AND/OR the eligible set is empty (a player can never be
+/// forced to pick from an empty set). The engine rejects instance IDs
+/// that aren't in the eligible set; the engine logs a warning and falls
+/// back to a null pick rather than throwing so a malicious client can't
+/// crash a live match.
+/// </para>
+/// </summary>
+public sealed record ChooseFromRevealedCommand(Guid? InstanceId) : GameCommand;
