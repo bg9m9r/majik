@@ -1,0 +1,9 @@
+{
+  "name": "Spikeshot Goblin",
+  "types": ["Creature"],
+  "subtypes": ["Goblin", "Shaman"],
+  "manaCost": "{2}{R}",
+  "power": 1,
+  "toughness": 2,
+  "abilities": []
+}
