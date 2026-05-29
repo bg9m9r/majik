@@ -1,0 +1,9 @@
+{
+  "name": "Orzhov Guildgate",
+  "types": ["Land"],
+  "subtypes": ["Gate"],
+  "abilities": [
+    { "kind": "mana", "produces": "W" },
+    { "kind": "mana", "produces": "B" }
+  ]
+}
