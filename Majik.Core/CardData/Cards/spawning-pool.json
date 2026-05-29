@@ -1,0 +1,7 @@
+{
+  "name": "Spawning Pool",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "B" }
+  ]
+}
