@@ -1,0 +1,9 @@
+{
+  "name": "Teferi, Hero of Dominaria",
+  "types": ["Planeswalker"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Teferi"],
+  "manaCost": "{3}{W}{U}",
+  "loyalty": 4,
+  "abilities": []
+}
