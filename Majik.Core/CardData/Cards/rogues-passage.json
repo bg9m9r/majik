@@ -1,0 +1,7 @@
+{
+  "name": "Rogue's Passage",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "C" }
+  ]
+}
