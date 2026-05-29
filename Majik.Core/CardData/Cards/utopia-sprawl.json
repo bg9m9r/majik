@@ -1,0 +1,7 @@
+{
+  "name": "Utopia Sprawl",
+  "types": ["Enchantment"],
+  "subtypes": ["Aura"],
+  "manaCost": "{G}",
+  "colors": ["G"]
+}
