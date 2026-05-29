@@ -1,0 +1,9 @@
+{
+  "name": "Twin-Silk Spider",
+  "types": ["Creature"],
+  "subtypes": ["Spider"],
+  "manaCost": "{2}{G}",
+  "power": 1,
+  "toughness": 2,
+  "abilities": []
+}
