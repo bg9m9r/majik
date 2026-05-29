@@ -326,12 +326,25 @@ public sealed class LayerAgreementHarness : IDisposable
     public async Task AdvanceByPassAsync(string sub)
     {
         var client = sub == CreatorSub ? _creatorClient : ClientFor(sub);
-        var resp = await client.PostAsJsonAsync(
-            $"/matches/{MatchId}/commands",
-            new Dictionary<string, object> { ["$type"] = "pass" });
-        // No-content on accept; a non-success here is tolerated (the engine
-        // may have moved past the point where this seat holds priority).
-        _ = resp;
+        // Most steps advance on a bare priority pass. But once the bot seat's
+        // creatures actually attack (which now happens with factory-routing
+        // making creatures functional), the active seat is asked for
+        // DeclareAttackers and the defending seat for DeclareBlockers — a
+        // bare "pass" is rejected at those windows and the turn would stall.
+        // Try the empty declarations as fallbacks so the driver walks through
+        // combat to the genuine turn handoff. First accepted command wins;
+        // the others 400 (tolerated — the engine isn't at that window).
+        var attempts = new[]
+        {
+            new Dictionary<string, object> { ["$type"] = "pass" },
+            new Dictionary<string, object> { ["$type"] = "attackers", ["attackers"] = System.Array.Empty<object>() },
+            new Dictionary<string, object> { ["$type"] = "blockers", ["blockers"] = System.Array.Empty<object>() },
+        };
+        foreach (var body in attempts)
+        {
+            var resp = await client.PostAsJsonAsync($"/matches/{MatchId}/commands", body);
+            if (resp.IsSuccessStatusCode) return;
+        }
     }
 
     private HttpClient ClientFor(string sub)
