@@ -1,0 +1,10 @@
+{
+  "name": "Glacial Floodplain",
+  "types": ["Land"],
+  "supertypes": ["Snow"],
+  "subtypes": ["Plains", "Island"],
+  "abilities": [
+    { "kind": "mana", "produces": "W" },
+    { "kind": "mana", "produces": "U" }
+  ]
+}
