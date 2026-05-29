@@ -114,6 +114,9 @@ public enum CardSubtype
     /// <summary>Lizard creature subtype — Rapid Hybridization's 3/3 Frog
     /// Lizard token (Gatecrash). CR 205.3m.</summary>
     Lizard,
+    /// <summary>Llama creature subtype — Restless Prairie's animated 3/3
+    /// green and white Llama body (Murders at Karlov Manor). CR 205.3m.</summary>
+    Llama,
     /// <summary>Mutant creature subtype — Psychic Frog, Mutavault's
     /// changeling base type. CR 205.3m.</summary>
     Mutant,
