@@ -1,0 +1,9 @@
+{
+  "name": "Third Path Iconoclast",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Monk"],
+  "manaCost": "{U}{R}",
+  "power": 2,
+  "toughness": 1,
+  "abilities": []
+}
