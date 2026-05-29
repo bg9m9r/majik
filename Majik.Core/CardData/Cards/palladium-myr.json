@@ -1,0 +1,11 @@
+{
+  "name": "Palladium Myr",
+  "types": ["Creature", "Artifact"],
+  "subtypes": ["Myr"],
+  "manaCost": "{4}",
+  "power": 2,
+  "toughness": 2,
+  "abilities": [
+    { "kind": "mana", "produces": "CC" }
+  ]
+}
