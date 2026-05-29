@@ -101,6 +101,7 @@ public sealed class KickerAltCostProbe : IAlternativeCostProbe
             "Burst Lightning" => ManaCost.Parse("{4}"),
             "Goblin Bushwhacker" => ManaCost.Parse("{R}"),
             "Vines of Vastwood" => ManaCost.Parse("{G}"),
+            "Consult the Star Charts" => ManaCost.Parse("{1}{U}"),
             _ => null,
         };
     }
