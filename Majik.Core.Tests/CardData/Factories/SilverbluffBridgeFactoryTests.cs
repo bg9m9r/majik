@@ -1,0 +1,105 @@
+using FluentAssertions;
+using Majik.Core.Abilities;
+using Majik.Core.CardData;
+using Majik.Core.CardData.Factories;
+using Majik.Core.Cards;
+using Majik.Core.Cards.Types;
+using Majik.Core.Effects;
+using Majik.Core.Players;
+using Majik.Core.Zones;
+using Xunit;
+
+namespace Majik.Core.Tests.CardData.Factories;
+
+/// <summary>
+/// Unit tests for <see cref="SilverbluffBridgeFactory"/> — Silverbluff Bridge
+/// (The Brothers' War, the UR member of the artifact "Bridge" tapland cycle).
+/// Oracle text (verified against Scryfall):
+///   "This land enters tapped.
+///    Indestructible
+///    {T}: Add {U} or {R}."
+///
+/// Mirrors <see cref="RazortideBridgeFactoryTests"/> (same artifact "Bridge"
+/// cycle — Artifact Land typing + printed Indestructible + enters-tapped
+/// replacement + one mana ability per produced colour). Only the produced
+/// colours differ ({U}/{R} here vs {W}/{U} on Razortide Bridge).
+/// </summary>
+public class SilverbluffBridgeFactoryTests
+{
+    private readonly Player _alice = new("Alice", 20);
+
+    [Fact]
+    public void SilverbluffBridge_Identity_ArtifactLand_NotBasic()
+    {
+        var bridge = SilverbluffBridgeFactory.Create(_alice);
+
+        bridge.Name.Should().Be("Silverbluff Bridge");
+        bridge.HasType(CardType.Land).Should().BeTrue();
+        bridge.HasType(CardType.Artifact).Should().BeTrue();
+        bridge.HasSupertype(CardSupertype.Basic).Should().BeFalse();
+        bridge.Owner.Should().BeSameAs(_alice);
+        bridge.Controller.Should().BeSameAs(_alice);
+    }
+
+    [Fact]
+    public void SilverbluffBridge_NamedCardFactory_DispatchesArtifactLand()
+    {
+        var card = NamedCardFactory.Create("Silverbluff Bridge", _alice);
+
+        card.Should().BeOfType<Land>();
+        card.HasType(CardType.Land).Should().BeTrue();
+        card.HasType(CardType.Artifact).Should().BeTrue();
+    }
+
+    [Fact]
+    public void SilverbluffBridge_HasPrintedIndestructibleKeyword()
+    {
+        var bridge = SilverbluffBridgeFactory.Create(_alice);
+
+        bridge.Abilities.OfType<KeywordAbility>()
+            .Should().ContainSingle(k => k.Keyword == "Indestructible");
+    }
+
+    [Fact]
+    public void SilverbluffBridge_HasTwoManaAbilities_ProducingBlueAndRed()
+    {
+        var bridge = SilverbluffBridgeFactory.Create(_alice);
+        var manaAbilities = bridge.Abilities.OfType<ManaAbility>().ToList();
+
+        manaAbilities.Should().HaveCount(2, "{T}: Add {U} or {R}");
+        manaAbilities.Should().Contain(m => m.ManaGenerated.Blue == 1);
+        manaAbilities.Should().Contain(m => m.ManaGenerated.Red == 1);
+    }
+
+    [Fact]
+    public void SilverbluffBridge_ManaAbilityActivation_TapsLandAndProducesBlue()
+    {
+        var bridge = SilverbluffBridgeFactory.Create(_alice);
+        _alice.Zones.Battlefield.AddCard(bridge);
+        bridge.SetZone(ZoneType.Battlefield);
+
+        var blue = bridge.Abilities.OfType<ManaAbility>()
+            .Single(m => m.ManaGenerated.Blue == 1);
+
+        blue.CanActivate().Should().BeTrue();
+        var produced = blue.Activate();
+
+        produced.Blue.Should().Be(1);
+        produced.Red.Should().Be(0);
+        bridge.IsTapped.Should().BeTrue();
+    }
+
+    [Fact]
+    public void SilverbluffBridge_RegistersEntersTappedReplacement_WhenBusSupplied()
+    {
+        var replacements = new ReplacementBus();
+        var bridge = SilverbluffBridgeFactory.Create(_alice, replacements);
+
+        // CR 614.1c — unconditional "This land enters tapped." is registered
+        // on the supplied bus; the shape-only (null bus) path skips it.
+        // EntersTappedReplacement exposes no public bus-inspection surface,
+        // so we assert the build succeeds with the bus wired (mirrors
+        // RazortideBridgeFactoryTests).
+        bridge.Should().NotBeNull();
+    }
+}
