@@ -1,0 +1,9 @@
+{
+  "name": "Blade Splicer",
+  "types": ["Creature"],
+  "subtypes": ["Phyrexian", "Human", "Artificer"],
+  "manaCost": "{2}{W}",
+  "power": 1,
+  "toughness": 1,
+  "abilities": []
+}
