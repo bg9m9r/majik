@@ -1,0 +1,10 @@
+{
+  "name": "Kozilek, Butcher of Truth",
+  "types": ["Creature"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Eldrazi"],
+  "manaCost": "{10}",
+  "power": 12,
+  "toughness": 12,
+  "abilities": []
+}
