@@ -1,0 +1,9 @@
+{
+  "name": "Firebrand Archer",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Archer"],
+  "manaCost": "{1}{R}",
+  "power": 2,
+  "toughness": 1,
+  "abilities": []
+}
