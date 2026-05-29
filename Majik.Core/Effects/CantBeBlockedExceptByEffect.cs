@@ -27,7 +27,7 @@ namespace Majik.Core.Effects;
 /// creature's <see cref="Creature.ActiveEffects"/> list. Layer is set to
 /// Abilities (6) which is benign because Apply is a no-op.
 /// </summary>
-public sealed class CantBeBlockedExceptByEffect : ContinuousEffect
+public class CantBeBlockedExceptByEffect : ContinuousEffect
 {
     /// <summary>
     /// The attacker the restriction applies to. Block legality is queried
