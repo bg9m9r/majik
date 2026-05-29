@@ -1,0 +1,10 @@
+{
+  "name": "Zagoth Triome",
+  "types": ["Land"],
+  "subtypes": ["Swamp", "Forest", "Island"],
+  "abilities": [
+    { "kind": "mana", "produces": "B" },
+    { "kind": "mana", "produces": "G" },
+    { "kind": "mana", "produces": "U" }
+  ]
+}
