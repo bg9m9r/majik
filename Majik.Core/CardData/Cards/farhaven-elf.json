@@ -1,0 +1,8 @@
+{
+  "name": "Farhaven Elf",
+  "types": ["Creature"],
+  "subtypes": ["Elf", "Druid"],
+  "manaCost": "{2}{G}",
+  "power": 1,
+  "toughness": 1
+}
