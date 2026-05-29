@@ -1,0 +1,9 @@
+{
+  "name": "Heartfire Hero",
+  "types": ["Creature"],
+  "subtypes": ["Mouse", "Soldier"],
+  "manaCost": "{R}",
+  "power": 1,
+  "toughness": 1,
+  "abilities": []
+}
