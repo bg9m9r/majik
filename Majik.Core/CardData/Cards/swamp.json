@@ -1,0 +1,9 @@
+{
+  "name": "Swamp",
+  "types": ["Land"],
+  "supertypes": ["Basic"],
+  "subtypes": ["Swamp"],
+  "abilities": [
+    { "kind": "mana", "produces": "B" }
+  ]
+}
