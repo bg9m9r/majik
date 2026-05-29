@@ -123,12 +123,54 @@ public static class CardDefinitionFactory
     private static IAbility BuildAbility(AbilityDefinition definition, ICard card, Player controller, ReplacementBus? replacements) =>
         definition switch
         {
-            ManaAbilityDefinition mana => new ManaAbility(card, controller, ManaCost.Parse(mana.Produces)),
+            ManaAbilityDefinition mana => BuildManaAbility(mana, card, controller),
             ActivatedAbilityDefinition activated => BuildActivatedAbility(activated, card, controller, replacements),
             TriggeredAbilityDefinition triggered => BuildTriggeredAbility(triggered, card, controller, replacements),
             _ => throw new NotSupportedException(
                 $"Ability '{definition.GetType().Name}' is not yet supported by CardDefinitionFactory."),
         };
+
+    /// <summary>
+    /// Build a <see cref="ManaAbility"/> from a
+    /// <see cref="ManaAbilityDefinition"/>. The vanilla shape
+    /// ("{T}: Add &lt;Produces&gt;") uses the simple constructor. When the
+    /// definition carries an additional mana <see cref="ManaAbilityDefinition.Cost"/>
+    /// (the signet shape "{1}, {T}: Add {U}{R}") the additional-cost
+    /// overload is used — gating activation on the untapped state plus
+    /// affordability of the extra mana, and deducting that mana from the
+    /// controller's pool on activation. This mirrors the filter-land cycle
+    /// (<see cref="Majik.Core.CardData.Factories.FilterLandCycleFactory"/>),
+    /// the in-engine home of the "{1}, {T}: Add &lt;pips&gt;" mana-ability
+    /// pattern. CR 605.1 — still a mana ability; the extra mana is part of
+    /// the activation cost, not a resolution effect, so the stack is never
+    /// used.
+    /// </summary>
+    private static ManaAbility BuildManaAbility(ManaAbilityDefinition mana, ICard card, Player controller)
+    {
+        var produced = ManaCost.Parse(mana.Produces);
+
+        if (string.IsNullOrWhiteSpace(mana.Cost))
+        {
+            return new ManaAbility(card, controller, produced);
+        }
+
+        if (card is not Permanent permanent)
+        {
+            throw new InvalidOperationException(
+                $"Card '{card.Name}' is not a Permanent — cannot pay {{T}} for a mana ability with an additional cost.");
+        }
+
+        var extra = ManaCost.Parse(mana.Cost);
+        return new ManaAbility(
+            source: permanent,
+            controller: controller,
+            manaGenerated: produced,
+            // {T} half: the engine taps in ManaAbility.Activate; the extra
+            // mana must already be affordable from the pool (no auto-tap
+            // look-ahead — same posture as FilterLandCycleFactory).
+            canActivateCheck: () => !permanent.IsTapped && controller.ManaPool.CanPay(extra),
+            additionalCostPayer: p => p.PayMana(extra));
+    }
 
     private static TriggeredAbility BuildTriggeredAbility(
         TriggeredAbilityDefinition definition, ICard card, Player controller, ReplacementBus? replacements)

@@ -86,10 +86,26 @@ public abstract class AbilityDefinition { }
 /// CR 605.1 — mana abilities don't use the stack. The runtime factory
 /// builds a <see cref="Majik.Core.Abilities.ManaAbility"/> with the
 /// parsed cost; no priority round is incurred when activated.
+///
+/// <see cref="Cost"/> is an OPTIONAL additional mana cost paid alongside
+/// the implicit {T} when the ability is activated — the mana-rock
+/// "signet" shape <c>{1}, {T}: Add {U}{R}</c>. When present it is parsed
+/// with <see cref="Majik.Core.ValueObjects.ManaCost.Parse"/> and threaded
+/// through the additional-cost overload of
+/// <see cref="Majik.Core.Abilities.ManaAbility"/> — the same path the
+/// filter-land cycle uses (deduct the extra mana from the pool, gate
+/// activation on affordability + untapped state). Null / empty means the
+/// vanilla "{T}: Add &lt;Produces&gt;" shape with no extra cost. CR 605.1 —
+/// the extra mana cost is part of activation, the ability still does not
+/// use the stack.
 /// </summary>
 public sealed class ManaAbilityDefinition : AbilityDefinition
 {
     public string Produces { get; set; } = "";
+
+    /// <summary>Optional additional mana cost paid alongside {T}
+    /// (e.g. "1" for the signet shape). Null/empty = no extra cost.</summary>
+    public string? Cost { get; set; }
 }
 
 /// <summary>
