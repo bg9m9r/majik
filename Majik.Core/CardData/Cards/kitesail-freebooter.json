@@ -1,0 +1,9 @@
+{
+  "name": "Kitesail Freebooter",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Pirate"],
+  "manaCost": "{1}{B}",
+  "power": 1,
+  "toughness": 2,
+  "abilities": []
+}
