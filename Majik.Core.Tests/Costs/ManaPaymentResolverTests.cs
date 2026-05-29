@@ -154,4 +154,113 @@ public class ManaPaymentResolverTests
         colors.Should().BeEmpty(
             "no colored mana was spent → empty colors-spent ledger");
     }
+
+    // -----------------------------------------------------------------------
+    // TryAutoSelectSources — portal "Auto-pay" (empty source list) support
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void TryAutoSelectSources_PicksUntappedSourcesToCoverCost()
+    {
+        // Two untapped Forests cover {1}{G}.
+        var f1 = NamedCardFactory.Create("Forest", _alice);
+        var f2 = NamedCardFactory.Create("Forest", _alice);
+        OnBattlefield(f1, f2);
+        var resolver = new ManaPaymentResolver();
+
+        var ok = resolver.TryAutoSelectSources(_alice, ManaCost.Parse("1G"), out var payment);
+
+        ok.Should().BeTrue();
+        payment.Sources.Should().HaveCount(2);
+        payment.IsCancelled.Should().BeFalse();
+
+        resolver.Pay(_alice, ManaCost.Parse("1G"), payment).Should().BeTrue();
+        ((Permanent)f1).IsTapped.Should().BeTrue();
+        ((Permanent)f2).IsTapped.Should().BeTrue();
+    }
+
+    [Fact]
+    public void TryAutoSelectSources_PrefersColorMatchingSource()
+    {
+        // {R}: a Forest and a Mountain are untapped; only the Mountain is
+        // selected (it produces the needed R).
+        var forest = NamedCardFactory.Create("Forest", _alice);
+        var mountain = NamedCardFactory.Create("Mountain", _alice);
+        OnBattlefield(forest, mountain);
+        var resolver = new ManaPaymentResolver();
+
+        var ok = resolver.TryAutoSelectSources(_alice, ManaCost.Parse("R"), out var payment);
+
+        ok.Should().BeTrue();
+        payment.Sources.Should().ContainSingle().Which.Should().BeSameAs(mountain);
+    }
+
+    [Fact]
+    public void TryAutoSelectSources_UsesFloatingPoolBeforeSelectingSources()
+    {
+        // 1 floating G already covers the colored pip of {1}{G}; one Forest
+        // covers the generic remainder.
+        _alice.AddManaToPool(ManaCost.Parse("G"));
+        var forest = NamedCardFactory.Create("Forest", _alice);
+        OnBattlefield(forest);
+        var resolver = new ManaPaymentResolver();
+
+        var ok = resolver.TryAutoSelectSources(_alice, ManaCost.Parse("1G"), out var payment);
+
+        ok.Should().BeTrue();
+        payment.Sources.Should().ContainSingle().Which.Should().BeSameAs(forest);
+    }
+
+    [Fact]
+    public void TryAutoSelectSources_InsufficientSources_ReturnsFalse_EmptyPayment()
+    {
+        // {G}{G} but only one untapped Forest.
+        var forest = NamedCardFactory.Create("Forest", _alice);
+        OnBattlefield(forest);
+        var resolver = new ManaPaymentResolver();
+
+        var ok = resolver.TryAutoSelectSources(_alice, ManaCost.Parse("GG"), out var payment);
+
+        ok.Should().BeFalse();
+        payment.Should().BeSameAs(ManaPayment.Empty);
+        ((Permanent)forest).IsTapped.Should().BeFalse("selection-only — nothing tapped.");
+    }
+
+    [Fact]
+    public void TryAutoSelectSources_SkipsTappedSources()
+    {
+        // {G}: the only Forest is already tapped → can't auto-select.
+        var forest = NamedCardFactory.Create("Forest", _alice);
+        OnBattlefield(forest);
+        ((Permanent)forest).Tap();
+        var resolver = new ManaPaymentResolver();
+
+        var ok = resolver.TryAutoSelectSources(_alice, ManaCost.Parse("G"), out var payment);
+
+        ok.Should().BeFalse();
+        payment.Should().BeSameAs(ManaPayment.Empty);
+    }
+
+    [Fact]
+    public void TryAutoSelectSources_HybridCost_ReturnsFalse_OutOfScope()
+    {
+        // {R/G} hybrid pip needs an explicit choice — auto-select bails.
+        var forest = NamedCardFactory.Create("Forest", _alice);
+        OnBattlefield(forest);
+        var resolver = new ManaPaymentResolver();
+
+        var ok = resolver.TryAutoSelectSources(_alice, ManaCost.Parse("{R/G}"), out var payment);
+
+        ok.Should().BeFalse();
+        payment.Should().BeSameAs(ManaPayment.Empty);
+    }
+
+    private void OnBattlefield(params ICard[] cards)
+    {
+        foreach (var c in cards)
+        {
+            c.SetZone(ZoneType.Battlefield);
+            _alice.Zones.Battlefield.AddCard(c);
+        }
+    }
 }

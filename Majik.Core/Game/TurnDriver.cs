@@ -497,6 +497,21 @@ public sealed class TurnDriver
                 {
                     return;
                 }
+
+                // Portal "Auto-pay": the mana-cost prompt's Auto-pay button
+                // returns an empty (non-cancelled) source list meaning
+                // "tap my untapped lands for me". When the floating pool
+                // doesn't already cover the cost, ask the resolver to
+                // greedily auto-select untapped sources. If it can't (hybrid/
+                // Phyrexian pips, or not enough mana), fall through to the
+                // existing Pay call — which fails gracefully and rotates the
+                // hand, same as before.
+                if (payment.Sources.Count == 0
+                    && !actor.ManaPool.CanPay(cost)
+                    && manaResolver.TryAutoSelectSources(actor, cost, out var autoPayment))
+                {
+                    payment = autoPayment;
+                }
             }
             if (!manaResolver.Pay(actor, cost, payment, out var colorsSpent))
             {

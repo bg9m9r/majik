@@ -258,6 +258,17 @@ public sealed class GameFacade : IDisposable
                 {
                     return;
                 }
+
+                // Portal "Auto-pay" — empty (non-cancelled) source list means
+                // "tap my untapped lands for me". When the floating pool can't
+                // already cover the cost, auto-select untapped sources.
+                // Mirrors TurnDriver.DispatchCast.
+                if (payment.Sources.Count == 0
+                    && !actor.ManaPool.CanPay(cost)
+                    && manaResolver.TryAutoSelectSources(actor, cost, out var autoPayment))
+                {
+                    payment = autoPayment;
+                }
             }
             if (!manaResolver.Pay(actor, cost, payment))
             {
