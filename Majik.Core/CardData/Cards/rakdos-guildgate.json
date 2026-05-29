@@ -1,0 +1,9 @@
+{
+  "name": "Rakdos Guildgate",
+  "types": ["Land"],
+  "subtypes": ["Gate"],
+  "abilities": [
+    { "kind": "mana", "produces": "B" },
+    { "kind": "mana", "produces": "R" }
+  ]
+}
