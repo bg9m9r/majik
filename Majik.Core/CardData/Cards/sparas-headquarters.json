@@ -1,0 +1,10 @@
+{
+  "name": "Spara's Headquarters",
+  "types": ["Land"],
+  "subtypes": ["Forest", "Plains", "Island"],
+  "abilities": [
+    { "kind": "mana", "produces": "G" },
+    { "kind": "mana", "produces": "W" },
+    { "kind": "mana", "produces": "U" }
+  ]
+}
