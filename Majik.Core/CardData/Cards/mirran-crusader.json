@@ -1,0 +1,9 @@
+{
+  "name": "Mirran Crusader",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Knight"],
+  "manaCost": "{1}{W}{W}",
+  "power": 2,
+  "toughness": 2,
+  "abilities": []
+}
