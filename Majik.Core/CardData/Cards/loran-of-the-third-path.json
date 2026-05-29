@@ -1,0 +1,10 @@
+{
+  "name": "Loran of the Third Path",
+  "types": ["Creature"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Human", "Artificer"],
+  "manaCost": "{2}{W}",
+  "power": 2,
+  "toughness": 1,
+  "abilities": []
+}
