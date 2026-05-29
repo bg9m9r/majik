@@ -1,0 +1,15 @@
+{
+  "name": "Paradise Druid",
+  "types": ["Creature"],
+  "subtypes": ["Elf", "Druid"],
+  "manaCost": "{1}{G}",
+  "power": 2,
+  "toughness": 1,
+  "abilities": [
+    { "kind": "mana", "produces": "W" },
+    { "kind": "mana", "produces": "U" },
+    { "kind": "mana", "produces": "B" },
+    { "kind": "mana", "produces": "R" },
+    { "kind": "mana", "produces": "G" }
+  ]
+}
