@@ -30,9 +30,9 @@ namespace Majik.Core.CardData.Factories;
 /// - Sacrifice cost still records intent only — see
 ///   <see cref="HorizonLandBinder.AttachSacDraw"/>.
 ///
-/// ## Cycle members not yet shipped
-/// Waterlogged Grove.
-/// Adding any of them is a one-line edit — append a new <c>[CardName]</c>
+/// ## Cycle members
+/// All six Modern Horizons painless-dual lands are now shipped.
+/// Adding a new member is a one-line edit — append a new <c>[CardName]</c>
 /// attribute with the colour pair.
 /// </summary>
 [CardName("Horizon Canopy",     "G", "W")]
@@ -40,6 +40,7 @@ namespace Majik.Core.CardData.Factories;
 [CardName("Sunbaked Canyon",    "R", "W")]
 [CardName("Silent Clearing",    "W", "B")]
 [CardName("Nurturing Peatland", "B", "G")]
+[CardName("Waterlogged Grove",  "G", "U")]
 public static class HorizonLandCycleFactory
 {
     /// <summary>

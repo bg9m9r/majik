@@ -1,0 +1,8 @@
+{
+  "name": "Waterlogged Grove",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "G" },
+    { "kind": "mana", "produces": "U" }
+  ]
+}
