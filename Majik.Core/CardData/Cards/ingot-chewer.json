@@ -1,0 +1,9 @@
+{
+  "name": "Ingot Chewer",
+  "types": ["Creature"],
+  "subtypes": ["Elemental"],
+  "manaCost": "{4}{R}",
+  "power": 3,
+  "toughness": 3,
+  "abilities": []
+}
