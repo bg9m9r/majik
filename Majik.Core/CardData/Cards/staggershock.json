@@ -1,0 +1,5 @@
+{
+  "name": "Staggershock",
+  "types": ["Instant"],
+  "manaCost": "{2}{R}"
+}
