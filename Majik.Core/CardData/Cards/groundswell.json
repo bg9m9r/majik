@@ -1,0 +1,5 @@
+{
+  "name": "Groundswell",
+  "types": ["Instant"],
+  "manaCost": "{G}"
+}
