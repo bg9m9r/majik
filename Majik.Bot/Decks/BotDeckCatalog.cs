@@ -24,6 +24,13 @@ public static class BotDeckCatalog
         ["EsperBlink"]        = EsperBlinkDeck.Cards,
         ["SultaiMidrange"]    = SultaiMidrangeDeck.Cards,
         ["MonoBlackMidrange"] = MonoBlackMidrangeDeck.Cards,
+        ["AzoriusBlink"]        = AzoriusBlinkDeck.Cards,
+        ["AzoriusControl"]      = AzoriusControlDeck.Cards,
+        ["BorosLandDestruction"] = BorosLandDestructionDeck.Cards,
+        ["Rhinos"]              = RhinosDeck.Cards,
+        ["DomainZoo"]           = DomainZooDeck.Cards,
+        ["GruulBroodscale"]     = GruulBroodscaleDeck.Cards,
+        ["EldraziBroodscale"]   = EldraziBroodscaleDeck.Cards,
     };
 
     public static IReadOnlyCollection<string> Archetypes => _decks.Keys;
@@ -52,6 +59,25 @@ public static class BotDeckCatalog
         "EsperBlink"        => "Bot — Esper Blink",
         "SultaiMidrange"    => "Bot — Sultai Midrange",
         "MonoBlackMidrange" => "Bot — Mono-Black Midrange",
+        "AzoriusBlink"        => "Bot — Azorius Blink",
+        "AzoriusControl"      => "Bot — Azorius Control",
+        "BorosLandDestruction" => "Bot — Boros Land Destruction",
+        "Rhinos"              => "Bot — Rhinos",
+        "DomainZoo"           => "Bot — Domain Zoo",
+        "GruulBroodscale"     => "Bot — Gruul Broodscale",
+        "EldraziBroodscale"   => "Bot — Eldrazi Broodscale",
         _ => $"Bot — {archetype}",
     };
+
+    /// <summary>Human-friendly archetype name with spaces, WITHOUT the
+    /// "Bot — " prefix — for client dropdowns where the field is already
+    /// labelled "Bot Archetype". Derived from <see cref="DisplayName"/>.</summary>
+    public static string Label(string archetype)
+    {
+        const string prefix = "Bot — ";
+        var name = DisplayName(archetype);
+        return name.StartsWith(prefix, StringComparison.Ordinal)
+            ? name[prefix.Length..]
+            : name;
+    }
 }

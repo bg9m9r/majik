@@ -27,6 +27,14 @@ public static class MatchEndpoints
         // --- "expensive" routes (inherit group policy) ---
         group.MapPost("/", Create).WithName("CreateMatch");
         group.MapGet("/", List).WithName("ListMatches");
+
+        // Selectable bot archetypes (key + spaced label) for the
+        // create-match wizard's "Bot Archetype" dropdown. Static catalog
+        // data — no Mongo dependency, so it works even when Mongo is down.
+        group.MapGet("/archetypes", ListBotArchetypes)
+            .WithName("ListBotArchetypes")
+            .Produces<IReadOnlyList<BotArchetypeDto>>(StatusCodes.Status200OK);
+
         group.MapGet("/{id:guid}", Get).WithName("GetMatch");
         group.MapPost("/{id:guid}/join", Join).WithName("JoinMatch");
         group.MapDelete("/{id:guid}", Abandon).WithName("AbandonMatch");
@@ -80,6 +88,11 @@ public static class MatchEndpoints
 
         return routes;
     }
+
+    private static IResult ListBotArchetypes() =>
+        Results.Ok(Majik.Bot.Decks.BotDeckCatalog.Archetypes
+            .Select(a => new BotArchetypeDto(a, Majik.Bot.Decks.BotDeckCatalog.Label(a)))
+            .ToList());
 
     private static IResult MongoUnavailable() =>
         Results.Json(new MatchError("mongo-not-configured"), statusCode: StatusCodes.Status503ServiceUnavailable);

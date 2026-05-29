@@ -15,7 +15,16 @@ public class BotDeckCatalogTests
             "Affinity", "RubyStorm", "Belcher", "GoryoVengeance", "LivingEnd",
             "EldraziTron", "GrixisReanimator", "DimirMidrange", "EldraziRamp",
             "Neobrand", "EsperBlink", "SultaiMidrange", "MonoBlackMidrange",
+            "AzoriusBlink", "AzoriusControl", "BorosLandDestruction", "Rhinos",
+            "DomainZoo", "GruulBroodscale", "EldraziBroodscale",
         });
+    }
+
+    [Fact]
+    public void Label_StripsBotPrefix_AndSpacesName()
+    {
+        BotDeckCatalog.Label("BorosEnergy").Should().Be("Boros Energy");
+        BotDeckCatalog.Label("DomainZoo").Should().Be("Domain Zoo");
     }
 
     [Fact]

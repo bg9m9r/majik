@@ -40,5 +40,11 @@ public sealed record CreateMatchRequest(
 /// creation.</summary>
 public sealed record BotOpponentRequest(string Archetype);
 
+/// <summary>One selectable bot archetype: <paramref name="Key"/> is the value
+/// posted back in <see cref="BotOpponentRequest.Archetype"/>; <paramref
+/// name="Label"/> is the spaced, human-friendly name for the dropdown (e.g.
+/// key "BorosEnergy" → label "Boros Energy").</summary>
+public sealed record BotArchetypeDto(string Key, string Label);
+
 public sealed record JoinMatchRequest(string DeckId);
 public sealed record PlayDrawRequest(string Choice);
