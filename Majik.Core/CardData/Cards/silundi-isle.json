@@ -1,0 +1,7 @@
+{
+  "name": "Silundi Isle",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "U" }
+  ]
+}
