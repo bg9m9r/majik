@@ -1,0 +1,7 @@
+{
+  "name": "Forbidding Watchtower",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "W" }
+  ]
+}
