@@ -1,0 +1,8 @@
+{
+  "name": "Razorverge Thicket",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "G" },
+    { "kind": "mana", "produces": "W" }
+  ]
+}
