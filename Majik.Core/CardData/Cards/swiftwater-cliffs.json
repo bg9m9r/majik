@@ -1,0 +1,15 @@
+{
+  "name": "Swiftwater Cliffs",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "U" },
+    { "kind": "mana", "produces": "R" },
+    {
+      "kind": "triggered",
+      "trigger": { "type": "etb_self" },
+      "effects": [
+        { "type": "gain_life_self", "amount": 1 }
+      ]
+    }
+  ]
+}
