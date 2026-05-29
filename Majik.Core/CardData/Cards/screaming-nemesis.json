@@ -1,0 +1,9 @@
+{
+  "name": "Screaming Nemesis",
+  "types": ["Creature"],
+  "subtypes": ["Spirit"],
+  "manaCost": "{2}{R}",
+  "power": 3,
+  "toughness": 3,
+  "abilities": []
+}
