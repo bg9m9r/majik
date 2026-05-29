@@ -141,4 +141,50 @@ public class GameFacadeTests
 
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
+
+    [Fact]
+    public async Task BottomChoicePrompt_PromptDtoCarriesBottomCount()
+    {
+        // CR 103.4 — after N mulligans the player bottoms N cards. The wire
+        // PromptDto built by GameFacade.BuildPrompt must forward BottomCount
+        // (= N) from PendingPayload so the portal can render the "bottom N
+        // card(s)" label and gate the submission to exactly N picks.
+        var facade = GameFacade.Create(
+            "Alice", "Bob",
+            aliceDeck: Array.Empty<ICard>(),
+            bobDeck: Array.Empty<ICard>());
+
+        // Seed Alice's hand with two cards so the bottom prompt has subjects.
+        var c1 = new Creature("Bear", "1G", 2, 2);
+        var c2 = new Creature("Elf", "G", 1, 1);
+        foreach (var c in new[] { c1, c2 })
+        {
+            c.SetOwner(facade.Alice);
+            facade.Alice.Zones.Hand.AddCard(c);
+        }
+
+        var prompts = new List<PromptDto>();
+        using var _ = facade.SubscribePrompts(prompts.Add);
+
+        var aliceAgent = (RemoteAgent)typeof(GameFacade)
+            .GetField("_aliceAgent",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+            .GetValue(facade)!;
+
+        // Simulate the post-mulligan "put 2 on the bottom" prompt.
+        var task = aliceAgent.ChooseCardsToBottomAsync(
+            ctx: null!, hand: new ICard[] { c1, c2 }, countToBottom: 2);
+
+        prompts.Should().ContainSingle("one bottom-choice prompt fired");
+        prompts[0].BottomCount.Should().Be(2,
+            "BottomCount equals the number of mulligans taken");
+        prompts[0].ExpectedKinds.Should().Contain("ChooseCardsToBottomCommand");
+
+        // Cleanup — resolve so the agent isn't left hanging.
+        aliceAgent.Submit(new ChooseCardsToBottomCommand(new[] { c1.InstanceId, c2.InstanceId })
+        {
+            PlayerId = facade.Alice.Id,
+        });
+        await task;
+    }
 }

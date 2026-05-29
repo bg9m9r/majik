@@ -144,7 +144,17 @@ public sealed record PromptDto(
     /// (or null when <see cref="RevealView.Optional"/> = true and the
     /// player declines) is dispatched on submit.
     /// </summary>
-    RevealView? RevealView = null);
+    RevealView? RevealView = null,
+    /// <summary>
+    /// CR 103.4 — number of cards the player must put on the bottom of their
+    /// library after a London mulligan (equals the number of mulligans
+    /// taken). Non-null only on <c>ChooseCardsToBottomCommand</c> prompts;
+    /// null on every other prompt kind. The portal renders a "bottom N
+    /// card(s)" label and gates submission to exactly this many picks. A
+    /// matching <c>ChooseCardsToBottomCommand</c> carrying exactly
+    /// <see cref="BottomCount"/> in-hand instance ids is dispatched on submit.
+    /// </summary>
+    int? BottomCount = null);
 
 /// <summary>
 /// CR 701.15 — per-prompt body for reveal-and-choose prompts surfaced on
