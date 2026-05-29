@@ -1,0 +1,9 @@
+{
+  "name": "Wall of Blossoms",
+  "types": ["Creature"],
+  "subtypes": ["Plant", "Wall"],
+  "manaCost": "{1}{G}",
+  "power": 0,
+  "toughness": 4,
+  "abilities": []
+}
