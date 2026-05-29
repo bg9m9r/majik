@@ -1,0 +1,7 @@
+{
+  "name": "Searstep Pathway",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "R" }
+  ]
+}
