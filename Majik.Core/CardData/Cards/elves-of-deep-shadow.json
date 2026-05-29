@@ -1,0 +1,9 @@
+{
+  "name": "Elves of Deep Shadow",
+  "types": ["Creature"],
+  "subtypes": ["Elf", "Druid"],
+  "manaCost": "{G}",
+  "power": 1,
+  "toughness": 1,
+  "abilities": []
+}
