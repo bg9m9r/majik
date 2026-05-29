@@ -1,0 +1,9 @@
+{
+  "name": "Quirion Ranger",
+  "types": ["Creature"],
+  "subtypes": ["Elf", "Ranger"],
+  "manaCost": "{G}",
+  "power": 1,
+  "toughness": 1,
+  "abilities": []
+}
