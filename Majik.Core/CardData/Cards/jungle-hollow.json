@@ -1,0 +1,15 @@
+{
+  "name": "Jungle Hollow",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "B" },
+    { "kind": "mana", "produces": "G" },
+    {
+      "kind": "triggered",
+      "trigger": { "type": "etb_self" },
+      "effects": [
+        { "type": "gain_life_self", "amount": 1 }
+      ]
+    }
+  ]
+}
