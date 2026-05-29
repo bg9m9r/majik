@@ -1,0 +1,7 @@
+{
+  "name": "Barkchannel Pathway",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "G" }
+  ]
+}
