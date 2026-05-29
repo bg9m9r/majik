@@ -170,6 +170,24 @@ public class ActionValidator
                 new RuleViolation("601.3", "noncreature-spell restriction"));
         }
 
+        // CR 601.3 — noncreature-spell mana-value block (Sanctum Prelate:
+        // "Noncreature spells with mana value equal to the chosen number
+        // can't be cast."). Gated to noncreature spells here; the registry
+        // rail itself is mana-value-keyed and player-agnostic (symmetric).
+        // Mana value is computed as printed MV + chosen X (CR 202.3b), the
+        // same convention Chalice of the Void uses for its MV comparison.
+        if (action.Card is Card mvCard
+            && !mvCard.HasType(Cards.Types.CardType.Creature))
+        {
+            var manaValue = mvCard.ManaCostValue.TotalValue + (mvCard.PendingCastX ?? 0);
+            if (CastingRestrictions.IsNoncreatureManaValueBlocked(manaValue))
+            {
+                return ValidationResult.Invalid(
+                    $"Noncreature spells with mana value {manaValue} can't be cast (Sanctum Prelate)",
+                    new RuleViolation("601.3", "noncreature mana-value cast restriction"));
+            }
+        }
+
         // CR 601.3 — turn-scoped additional-spell cap (Irencrag Feat:
         // "You can cast only one more spell this turn."). Rejected when
         // the counter has been fully consumed.

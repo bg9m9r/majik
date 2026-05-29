@@ -1,0 +1,9 @@
+{
+  "name": "Sanctum Prelate",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Cleric"],
+  "manaCost": "{1}{W}{W}",
+  "power": 2,
+  "toughness": 2,
+  "abilities": []
+}
