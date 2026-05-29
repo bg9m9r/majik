@@ -1,0 +1,9 @@
+{
+  "name": "Mountain",
+  "types": ["Land"],
+  "supertypes": ["Basic"],
+  "subtypes": ["Mountain"],
+  "abilities": [
+    { "kind": "mana", "produces": "R" }
+  ]
+}
