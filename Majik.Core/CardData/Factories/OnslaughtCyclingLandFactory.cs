@@ -73,6 +73,9 @@ namespace Majik.Core.CardData.Factories;
 // (the engine-internal Swamp tag mirrors the cycle's modeling posture
 // for the basic-land-flavoured members; see the class doc above).
 [CardName("Barren Moor",      "B", "Swamp")]
+// Forgotten Cave (Onslaught) — {T}: Add {R}; Cycling {R}; enters tapped.
+// Verified against Scryfall: type_line "Land".
+[CardName("Forgotten Cave",   "R", "Mountain")]
 public static class OnslaughtCyclingLandFactory
 {
     /// <summary>
