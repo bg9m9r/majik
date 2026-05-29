@@ -121,4 +121,17 @@ public sealed record CounterType(string Name)
     /// no built-in P/T or ability semantics.
     /// </summary>
     public static readonly CounterType Fate = new("Fate");
+
+    /// <summary>
+    /// CR 122 — Luck counters. Card-specific marker used by Gemstone Caverns
+    /// (Coldsnap). If Gemstone Caverns is in a player's opening hand and that
+    /// player is not the starting player, they may begin the game with it on
+    /// the battlefield with a luck counter on it (CR 103.5-style opening-hand
+    /// action). While Gemstone Caverns has a luck counter on it, its
+    /// "{T}: Add {C}" mana ability instead produces one mana of any color.
+    /// The counter is an opaque marker — no built-in P/T or ability semantics;
+    /// the conditional mana production is encoded by
+    /// <see cref="Majik.Core.CardData.Factories.GemstoneCavernsFactory"/>.
+    /// </summary>
+    public static readonly CounterType Luck = new("Luck");
 }
