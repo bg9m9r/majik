@@ -1,0 +1,10 @@
+{
+  "name": "Rimewood Falls",
+  "types": ["Land"],
+  "supertypes": ["Snow"],
+  "subtypes": ["Forest", "Island"],
+  "abilities": [
+    { "kind": "mana", "produces": "G" },
+    { "kind": "mana", "produces": "U" }
+  ]
+}
