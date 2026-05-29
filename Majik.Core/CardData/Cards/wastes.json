@@ -1,0 +1,8 @@
+{
+  "name": "Wastes",
+  "types": ["Land"],
+  "supertypes": ["Basic"],
+  "abilities": [
+    { "kind": "mana", "produces": "C" }
+  ]
+}
