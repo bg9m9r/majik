@@ -170,6 +170,17 @@ public class ActionValidator
                 new RuleViolation("601.3", "noncreature-spell restriction"));
         }
 
+        // CR 601.3 — turn-scoped additional-spell cap (Irencrag Feat:
+        // "You can cast only one more spell this turn."). Rejected when
+        // the counter has been fully consumed.
+        if (action.Player != null
+            && CastingRestrictions.HasExhaustedAdditionalSpellAllowance(action.Player))
+        {
+            return ValidationResult.Invalid(
+                $"{action.Player.Name} can't cast any more spells this turn (additional-spell cap reached)",
+                new RuleViolation("601.3", "additional-spell cap exhausted"));
+        }
+
         return null;
     }
 
