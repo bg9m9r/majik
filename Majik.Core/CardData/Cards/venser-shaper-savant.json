@@ -1,0 +1,10 @@
+{
+  "name": "Venser, Shaper Savant",
+  "types": ["Creature"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Human", "Wizard"],
+  "manaCost": "{2}{U}{U}",
+  "power": 2,
+  "toughness": 2,
+  "abilities": []
+}
