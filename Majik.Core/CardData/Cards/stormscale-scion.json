@@ -1,0 +1,9 @@
+{
+  "name": "Stormscale Scion",
+  "types": ["Creature"],
+  "subtypes": ["Dragon"],
+  "manaCost": "{4}{R}{R}",
+  "power": 4,
+  "toughness": 4,
+  "abilities": []
+}
