@@ -1,0 +1,5 @@
+{
+  "name": "Renegade Map",
+  "types": ["Artifact"],
+  "manaCost": "{1}"
+}
