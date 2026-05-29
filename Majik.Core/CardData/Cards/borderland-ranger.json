@@ -1,0 +1,8 @@
+{
+  "name": "Borderland Ranger",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Scout", "Ranger"],
+  "manaCost": "{2}{G}",
+  "power": 2,
+  "toughness": 2
+}
