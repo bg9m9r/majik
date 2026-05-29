@@ -1,0 +1,8 @@
+{
+  "name": "Restless Spire",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "U" },
+    { "kind": "mana", "produces": "R" }
+  ]
+}
