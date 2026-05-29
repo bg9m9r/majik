@@ -39,6 +39,7 @@ public class OnslaughtCyclingLandFactoryTests
         new object[] { "Lonely Sandbar",   "U", CardSubtype.Island },
         new object[] { "Barren Moor",      "B", CardSubtype.Swamp },
         new object[] { "Forgotten Cave",   "R", CardSubtype.Mountain },
+        new object[] { "Secluded Steppe",  "W", CardSubtype.Plains },
     };
 
     // -----------------------------------------------------------------------
@@ -154,6 +155,67 @@ public class OnslaughtCyclingLandFactoryTests
         _alice.Zones.Hand.GetCards().Should().Contain(topCard, "cycle drew one card");
         captured.Should().NotBeNull("CR 702.32d publication");
         captured!.Card.Should().BeSameAs(thicket);
+    }
+
+    [Fact]
+    public void SecludedSteppe_Cycling_EndToEnd_PaysWhiteDiscardsSelfDrawsOne()
+    {
+        // Seed library so the draw resolves.
+        var topCard = new Card("Savannah Lions", "{W}");
+        topCard.SetOwner(_alice);
+        _alice.Zones.Library.AddCard(topCard);
+        topCard.SetZone(ZoneType.Library);
+
+        var bus = new Majik.Core.Events.EventBus();
+        Majik.Core.Events.CardCycledEvent? captured = null;
+        bus.Subscribe<Majik.Core.Events.CardCycledEvent>(e => captured = e);
+
+        var steppe = OnslaughtCyclingLandFactory.Create(
+            _alice,
+            new[] { "Secluded Steppe", "W", "Plains" },
+            eventBus: bus,
+            replacements: null);
+        _alice.Zones.Hand.AddCard(steppe);
+        steppe.SetZone(ZoneType.Hand);
+
+        _alice.AddManaToPool(ManaCost.Parse("W"));
+
+        var cycling = steppe.Abilities.OfType<ActivatedAbility>().Single();
+        foreach (var cost in cycling.Costs)
+        {
+            cost.CanPay(_alice).Should().BeTrue($"{cost.Description}");
+            cost.Pay(_alice);
+        }
+        steppe.Zone.Should().Be(ZoneType.Graveyard, "discarded self");
+
+        foreach (var effect in cycling.Effects) effect.Execute();
+
+        _alice.Zones.Hand.GetCards().Should().Contain(topCard, "cycle drew one card");
+        captured.Should().NotBeNull("CR 702.32d publication");
+        captured!.Card.Should().BeSameAs(steppe);
+    }
+
+    [Fact]
+    public void SecludedSteppe_Cycling_ChargesWhiteManaSpecifically()
+    {
+        var steppe = (Land)NamedCardFactory.Create("Secluded Steppe", _alice);
+        _alice.Zones.Hand.AddCard(steppe);
+        steppe.SetZone(ZoneType.Hand);
+
+        var cycling = steppe.Abilities.OfType<ActivatedAbility>().Single();
+        var mana = cycling.Costs.OfType<ManaCostCost>().Single().Cost;
+
+        mana.White.Should().Be(1, "Secluded Steppe's cycling cost is {W}");
+        mana.Blue.Should().Be(0);
+        mana.Generic.Should().Be(0);
+    }
+
+    [Fact]
+    public void SecludedSteppe_HasManaAbilityProducingWhite()
+    {
+        var land = (Land)NamedCardFactory.Create("Secluded Steppe", _alice);
+        var mana = land.Abilities.OfType<ManaAbility>().Should().ContainSingle().Subject;
+        mana.ManaGenerated.White.Should().Be(1, "{T}: Add {W}");
     }
 
     [Fact]
