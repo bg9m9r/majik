@@ -1,0 +1,9 @@
+{
+  "name": "Spark Elemental",
+  "types": ["Creature"],
+  "subtypes": ["Elemental"],
+  "manaCost": "{R}",
+  "power": 3,
+  "toughness": 1,
+  "abilities": []
+}
