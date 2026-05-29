@@ -1,0 +1,9 @@
+{
+  "name": "Selesnya Guildgate",
+  "types": ["Land"],
+  "subtypes": ["Gate"],
+  "abilities": [
+    { "kind": "mana", "produces": "G" },
+    { "kind": "mana", "produces": "W" }
+  ]
+}
