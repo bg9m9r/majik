@@ -1,0 +1,10 @@
+{
+  "name": "Ketria Triome",
+  "types": ["Land"],
+  "subtypes": ["Forest", "Island", "Mountain"],
+  "abilities": [
+    { "kind": "mana", "produces": "G" },
+    { "kind": "mana", "produces": "U" },
+    { "kind": "mana", "produces": "R" }
+  ]
+}
