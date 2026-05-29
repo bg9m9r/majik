@@ -1,0 +1,8 @@
+{
+  "name": "Willowrush Verge",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "U" },
+    { "kind": "mana", "produces": "G" }
+  ]
+}
