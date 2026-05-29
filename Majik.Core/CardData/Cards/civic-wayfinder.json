@@ -1,0 +1,9 @@
+{
+  "name": "Civic Wayfinder",
+  "types": ["Creature"],
+  "subtypes": ["Elf", "Druid", "Warrior"],
+  "manaCost": "{2}{G}",
+  "power": 2,
+  "toughness": 2,
+  "abilities": []
+}
