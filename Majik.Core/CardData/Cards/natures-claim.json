@@ -1,0 +1,5 @@
+{
+  "name": "Nature's Claim",
+  "types": ["Instant"],
+  "manaCost": "{G}"
+}
