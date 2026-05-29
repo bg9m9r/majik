@@ -1387,6 +1387,173 @@ public class RemoteAgentTests
         await Task.CompletedTask;
     }
 
+    // -----------------------------------------------------------------------
+    // CR 103.4 — London mulligan "put N on the bottom" prompt
+    // (ChooseCardsToBottomCommand). Before the fix RemoteAgent.Resolve had
+    // no case for this command, so the wire command fell through to the
+    // default throw → MatchService surfaced HTTP 400 invalid-command and the
+    // mulligan flow never completed (game stuck). These tests pin the
+    // round-trip + the count/in-hand validation + the BottomCount payload.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task ChooseCardsToBottom_Submit_ResolvesToChosenCards()
+    {
+        // After 1 mulligan the player must bottom exactly 1 card. The wire
+        // ChooseCardsToBottomCommand carrying that single in-hand instance id
+        // must resolve the prompt to the matching ICard (the failing repro of
+        // the 400 invalid-command bug).
+        var c1 = new Creature("Bear", "1G", 2, 2) { Owner = _alice };
+        var c2 = new Creature("Elf", "G", 1, 1) { Owner = _alice };
+        _alice.Zones.Hand.AddCard(c1);
+        _alice.Zones.Hand.AddCard(c2);
+        var agent = new RemoteAgent(_alice,
+            cardLookup: id => id == c1.InstanceId ? (ICard)c1 : id == c2.InstanceId ? c2 : null);
+
+        var task = agent.ChooseCardsToBottomAsync(
+            ctx: null!, hand: new ICard[] { c1, c2 }, countToBottom: 1);
+        agent.HasPending.Should().BeTrue();
+        agent.ExpectedCommandKinds.Should().ContainSingle()
+            .Which.Should().Be(typeof(ChooseCardsToBottomCommand));
+
+        agent.Submit(new ChooseCardsToBottomCommand(new[] { c2.InstanceId })
+            { PlayerId = _alice.Id });
+        var chosen = await task;
+
+        chosen.Should().ContainSingle().Which.Should().BeSameAs(c2);
+    }
+
+    [Fact]
+    public async Task ChooseCardsToBottom_TwoMulligans_BottomsExactlyTwo()
+    {
+        // After 2 mulligans the player must bottom exactly 2 cards; the
+        // command listing both in-hand instance ids resolves cleanly.
+        var c1 = new Creature("Bear", "1G", 2, 2) { Owner = _alice };
+        var c2 = new Creature("Elf", "G", 1, 1) { Owner = _alice };
+        var c3 = new Creature("Wolf", "2G", 3, 3) { Owner = _alice };
+        _alice.Zones.Hand.AddCard(c1);
+        _alice.Zones.Hand.AddCard(c2);
+        _alice.Zones.Hand.AddCard(c3);
+        var agent = new RemoteAgent(_alice,
+            cardLookup: id => new ICard[] { c1, c2, c3 }.FirstOrDefault(c => c.InstanceId == id));
+
+        var task = agent.ChooseCardsToBottomAsync(
+            ctx: null!, hand: new ICard[] { c1, c2, c3 }, countToBottom: 2);
+        agent.Submit(new ChooseCardsToBottomCommand(new[] { c1.InstanceId, c3.InstanceId })
+            { PlayerId = _alice.Id });
+        var chosen = await task;
+
+        chosen.Should().BeEquivalentTo(new[] { c1, c3 });
+    }
+
+    [Fact]
+    public async Task ChooseCardsToBottom_WrongCount_Throws()
+    {
+        // Server-side defence: the count must equal the required bottom count
+        // for the pending prompt. Sending 2 when 1 is required is rejected,
+        // and the prompt stays unsatisfied (game not corrupted).
+        var c1 = new Creature("Bear", "1G", 2, 2) { Owner = _alice };
+        var c2 = new Creature("Elf", "G", 1, 1) { Owner = _alice };
+        _alice.Zones.Hand.AddCard(c1);
+        _alice.Zones.Hand.AddCard(c2);
+        var agent = new RemoteAgent(_alice,
+            cardLookup: id => id == c1.InstanceId ? (ICard)c1 : id == c2.InstanceId ? c2 : null);
+
+        var task = agent.ChooseCardsToBottomAsync(
+            ctx: null!, hand: new ICard[] { c1, c2 }, countToBottom: 1);
+        var act = () => agent.Submit(new ChooseCardsToBottomCommand(
+            new[] { c1.InstanceId, c2.InstanceId }) { PlayerId = _alice.Id });
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*1*");
+        task.IsCompleted.Should().BeFalse("the rejected submit must leave the prompt unsatisfied");
+        await Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task ChooseCardsToBottom_ZeroWhenOneRequired_Throws()
+    {
+        // Sending an empty list when 1 is required is likewise rejected.
+        var c1 = new Creature("Bear", "1G", 2, 2) { Owner = _alice };
+        _alice.Zones.Hand.AddCard(c1);
+        var agent = new RemoteAgent(_alice,
+            cardLookup: id => id == c1.InstanceId ? (ICard)c1 : null);
+
+        var task = agent.ChooseCardsToBottomAsync(
+            ctx: null!, hand: new ICard[] { c1 }, countToBottom: 1);
+        var act = () => agent.Submit(new ChooseCardsToBottomCommand(Array.Empty<Guid>())
+            { PlayerId = _alice.Id });
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*1*");
+        task.IsCompleted.Should().BeFalse();
+        await Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task ChooseCardsToBottom_CardNotInHand_Throws()
+    {
+        // Server-side defence: every chosen card must currently be in the
+        // player's hand. A card resolvable by lookup but living elsewhere
+        // (here: never added to hand) is rejected.
+        var inHand = new Creature("Bear", "1G", 2, 2) { Owner = _alice };
+        var elsewhere = new Creature("Elf", "G", 1, 1) { Owner = _alice };
+        _alice.Zones.Hand.AddCard(inHand);
+        var agent = new RemoteAgent(_alice,
+            cardLookup: id => id == inHand.InstanceId ? (ICard)inHand
+                : id == elsewhere.InstanceId ? elsewhere : null);
+
+        var task = agent.ChooseCardsToBottomAsync(
+            ctx: null!, hand: new ICard[] { inHand }, countToBottom: 1);
+        var act = () => agent.Submit(new ChooseCardsToBottomCommand(
+            new[] { elsewhere.InstanceId }) { PlayerId = _alice.Id });
+
+        act.Should().Throw<InvalidOperationException>()
+            .WithMessage("*hand*");
+        task.IsCompleted.Should().BeFalse();
+        await Task.CompletedTask;
+    }
+
+    [Fact]
+    public async Task ChooseCardsToBottom_PromptPayload_CarriesBottomCount()
+    {
+        // The portal renders a "bottom N card(s)" label and gates submission
+        // to exactly N. RemoteAgent stashes the required count on the prompt
+        // payload so GameFacade.BuildPrompt can forward it onto
+        // PromptDto.BottomCount.
+        var c1 = new Creature("Bear", "1G", 2, 2) { Owner = _alice };
+        var c2 = new Creature("Elf", "G", 1, 1) { Owner = _alice };
+        _alice.Zones.Hand.AddCard(c1);
+        _alice.Zones.Hand.AddCard(c2);
+        var agent = new RemoteAgent(_alice);
+
+        _ = agent.ChooseCardsToBottomAsync(
+            ctx: null!, hand: new ICard[] { c1, c2 }, countToBottom: 2);
+
+        agent.PendingPayload.Should().NotBeNull();
+        agent.PendingPayload!.BottomCount.Should().Be(2);
+    }
+
+    [Fact]
+    public async Task ChooseCardsToBottom_PromptPayload_ClearedAfterSubmit()
+    {
+        var c1 = new Creature("Bear", "1G", 2, 2) { Owner = _alice };
+        _alice.Zones.Hand.AddCard(c1);
+        var agent = new RemoteAgent(_alice,
+            cardLookup: id => id == c1.InstanceId ? (ICard)c1 : null);
+
+        var task = agent.ChooseCardsToBottomAsync(
+            ctx: null!, hand: new ICard[] { c1 }, countToBottom: 1);
+        agent.PendingPayload.Should().NotBeNull();
+
+        agent.Submit(new ChooseCardsToBottomCommand(new[] { c1.InstanceId })
+            { PlayerId = _alice.Id });
+        await task;
+
+        agent.PendingPayload.Should().BeNull();
+        agent.HasPending.Should().BeFalse();
+    }
+
     private sealed class TestStackObject : Majik.Core.Stack.IStackObject
     {
         public Guid Id { get; } = Guid.NewGuid();

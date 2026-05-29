@@ -58,6 +58,12 @@ public sealed class RemoteAgent : IPlayerAgent
     // agent misbehaviour rather than a legal decline (see Resolve). Reset
     // alongside _pendingRevealedEligible.
     private bool _pendingRevealedOptional;
+    // CR 103.4 — required number of cards to put on the bottom of the
+    // library for the most recent London-mulligan bottom prompt (equals the
+    // number of mulligans taken). Stashed so Resolve can validate the wire
+    // ChooseCardsToBottomCommand picks exactly this many cards. Cleared on
+    // prompt resolution; replaced on each new bottom prompt.
+    private int? _pendingBottomCount;
     // Per-prompt extra payload (currently: library-search candidates +
     // label, surveil peeked view) surfaced via PendingPayload for
     // GameFacade.BuildPrompt to copy into the wire PromptDto. Null on
@@ -128,6 +134,7 @@ public sealed class RemoteAgent : IPlayerAgent
         var surveilPeeked = _pendingSurveilPeeked;
         var revealedEligible = _pendingRevealedEligible;
         var revealedOptional = _pendingRevealedOptional;
+        var bottomCount = _pendingBottomCount;
         _pending = null;
         _pendingKinds = null;
         _pendingTriggerOrder = null;
@@ -135,8 +142,9 @@ public sealed class RemoteAgent : IPlayerAgent
         _pendingSurveilPeeked = null;
         _pendingRevealedEligible = null;
         _pendingRevealedOptional = false;
+        _pendingBottomCount = null;
         _pendingPayload = null;
-        Resolve(pending, command, triggerOrder, libraryCandidates, surveilPeeked, revealedEligible, revealedOptional);
+        Resolve(pending, command, triggerOrder, libraryCandidates, surveilPeeked, revealedEligible, revealedOptional, bottomCount);
     }
 
     private void Resolve(
@@ -146,7 +154,8 @@ public sealed class RemoteAgent : IPlayerAgent
         IReadOnlyList<ICard>? libraryCandidates,
         IReadOnlyList<ICard>? surveilPeeked,
         IReadOnlyList<ICard>? revealedEligible,
-        bool revealedOptional)
+        bool revealedOptional,
+        int? bottomCount)
     {
         switch (command)
         {
@@ -443,6 +452,48 @@ public sealed class RemoteAgent : IPlayerAgent
                 ((TaskCompletionSource<ICard?>)tcs).SetResult(picked);
                 break;
             }
+            case ChooseCardsToBottomCommand cb:
+            {
+                // CR 103.4 — after a London mulligan the player puts N cards
+                // on the bottom of their library, where N = mulligans taken.
+                // Resolve each wire instance id to an ICard, then validate the
+                // pick before applying ANYTHING (no partial application):
+                //   1. the count must equal the required bottom count for the
+                //      pending prompt (the portal gates to exactly N; this is
+                //      server-side defence — surfaces as 400 invalid-command);
+                //   2. every chosen card must currently be in the player's hand
+                //      (the client can't smuggle a card from another zone onto
+                //      the bottom of the library).
+                // Pre-fix this command had no case here and fell through to the
+                // default throw, which MatchService turned into HTTP 400
+                // invalid-command — the mulligan flow (MulliganController
+                // awaiting ChooseCardsToBottomAsync) never completed and the
+                // game stuck.
+                if (bottomCount is not int required)
+                {
+                    throw new InvalidOperationException(
+                        "ChooseCardsToBottomCommand resolved without a pending bottom count.");
+                }
+                if (cb.CardInstanceIds.Count != required)
+                {
+                    throw new InvalidOperationException(
+                        $"ChooseCardsToBottomCommand listed {cb.CardInstanceIds.Count} cards " +
+                        $"but the player must put exactly {required} on the bottom.");
+                }
+                var chosen = new List<ICard>(cb.CardInstanceIds.Count);
+                foreach (var id in cb.CardInstanceIds)
+                {
+                    var resolved = ResolveCard(id);
+                    if (!_player.Zones.Hand.ContainsCard(resolved))
+                    {
+                        throw new InvalidOperationException(
+                            $"ChooseCardsToBottomCommand card {id} is not in the player's hand.");
+                    }
+                    chosen.Add(resolved);
+                }
+                ((TaskCompletionSource<IReadOnlyList<ICard>>)tcs).SetResult(chosen);
+                break;
+            }
             default:
                 throw new InvalidOperationException($"Unhandled command {command.GetType().Name}.");
         }
@@ -517,8 +568,43 @@ public sealed class RemoteAgent : IPlayerAgent
     public Task<MulliganDecision> ChooseMulliganAsync(GameContext ctx, IReadOnlyList<ICard> hand, int mulligansTaken, CancellationToken ct = default)
         => Prompt<MulliganDecision>(ct, typeof(MulliganCommand));
 
+    /// <summary>
+    /// CR 103.4 — after a London mulligan the player puts
+    /// <paramref name="countToBottom"/> cards (= mulligans taken) on the
+    /// bottom of their library. The base <see cref="IPlayerAgent"/> default
+    /// auto-bottoms the first N, which silently picked for remote (human)
+    /// players. This override stashes the required count on the prompt
+    /// payload (so the portal can render the "bottom N card(s)" label and
+    /// gate to exactly N) and awaits a <see cref="ChooseCardsToBottomCommand"/>
+    /// back from the client. The command's <c>CardInstanceIds</c> are
+    /// validated against the count + the player's hand in
+    /// <see cref="Resolve"/> before the cards are bottomed.
+    /// </summary>
     public Task<IReadOnlyList<ICard>> ChooseCardsToBottomAsync(GameContext ctx, IReadOnlyList<ICard> hand, int countToBottom, CancellationToken ct = default)
-        => Prompt<IReadOnlyList<ICard>>(ct, typeof(ChooseCardsToBottomCommand));
+    {
+        // Mirror ChooseLibraryPickAsync / ChooseSurveilDecisionAsync: stash
+        // before Prompt fires PromptRequested observers, guard by checking
+        // _pending so we don't smear stash on top of a still-pending prompt.
+        if (_pending != null)
+        {
+            throw new InvalidOperationException("A prompt is already pending.");
+        }
+        _pendingBottomCount = countToBottom;
+        _pendingPayload = new PromptPayload(
+            Candidates: null,
+            Label: countToBottom == 1 ? "bottom 1 card" : $"bottom {countToBottom} cards",
+            BottomCount: countToBottom);
+        try
+        {
+            return Prompt<IReadOnlyList<ICard>>(ct, typeof(ChooseCardsToBottomCommand));
+        }
+        catch
+        {
+            _pendingBottomCount = null;
+            _pendingPayload = null;
+            throw;
+        }
+    }
 
     public Task<IReadOnlyList<object>> ChooseTargetsAsync(GameContext ctx, TargetRequest request, CancellationToken ct = default)
         => Prompt<IReadOnlyList<object>>(ct, typeof(ChooseTargetsCommand));
@@ -938,4 +1024,12 @@ public sealed record PromptPayload(
     /// itself ships before the moves resolve so the opponent shouldn't
     /// see the candidates yet).
     /// </summary>
-    RevealView? RevealView = null);
+    RevealView? RevealView = null,
+    /// <summary>
+    /// CR 103.4 — number of cards the player must put on the bottom of their
+    /// library after a London mulligan (equals the number of mulligans
+    /// taken). Non-null only on <c>ChooseCardsToBottomCommand</c> prompts;
+    /// null on every other prompt kind. <see cref="GameFacade.BuildPrompt"/>
+    /// forwards this onto <see cref="PromptDto.BottomCount"/>.
+    /// </summary>
+    int? BottomCount = null);

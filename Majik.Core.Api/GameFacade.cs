@@ -803,7 +803,8 @@ public sealed class GameFacade : IDisposable
             LibraryView: payload?.LibraryView,
             SurveilView: payload?.SurveilView,
             YesNoView: payload?.YesNoView,
-            RevealView: payload?.RevealView);
+            RevealView: payload?.RevealView,
+            BottomCount: payload?.BottomCount);
     }
 
     private void BridgeEvent(GameEvent e)
