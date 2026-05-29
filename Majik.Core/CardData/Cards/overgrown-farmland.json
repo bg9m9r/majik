@@ -1,0 +1,8 @@
+{
+  "name": "Overgrown Farmland",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "G" },
+    { "kind": "mana", "produces": "W" }
+  ]
+}
