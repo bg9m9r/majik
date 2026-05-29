@@ -1,0 +1,9 @@
+{
+  "name": "Plains",
+  "types": ["Land"],
+  "supertypes": ["Basic"],
+  "subtypes": ["Plains"],
+  "abilities": [
+    { "kind": "mana", "produces": "W" }
+  ]
+}
