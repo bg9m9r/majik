@@ -1,0 +1,17 @@
+{
+  "name": "Thought Monitor",
+  "types": ["Creature", "Artifact"],
+  "subtypes": ["Construct"],
+  "manaCost": "{6}{U}",
+  "power": 2,
+  "toughness": 2,
+  "abilities": [
+    {
+      "kind": "triggered",
+      "trigger": { "type": "etb_self" },
+      "effects": [
+        { "type": "draw_card", "amount": 2 }
+      ]
+    }
+  ]
+}
