@@ -62,10 +62,10 @@ public sealed class CascadeAltCostProbe : IAlternativeCostProbe
 
     /// <summary>
     /// Built-in name-based lookup for shipped cascade cards. Crashing
-    /// Footfalls, Living End, Shardless Agent, Bloodbraid Elf, and Violent
-    /// Outburst are the current ship list; when further cascade cards
-    /// land (Demonic Dread, Bituminous Blast, Etali, Maelstrom Wanderer,
-    /// etc.) add them here.
+    /// Footfalls, Living End, Shardless Agent, Bloodbraid Elf, Violent
+    /// Outburst, Ardent Plea, and Bituminous Blast are the current ship list;
+    /// when further cascade cards land (Demonic Dread, Etali, Maelstrom
+    /// Wanderer, etc.) add them here.
     /// </summary>
     public static bool DefaultIsCascadeCard(ICard card)
     {
@@ -78,6 +78,7 @@ public sealed class CascadeAltCostProbe : IAlternativeCostProbe
             "Bloodbraid Elf" => true,
             "Violent Outburst" => true,
             "Ardent Plea" => true,
+            "Bituminous Blast" => true,
             _ => false,
         };
     }
