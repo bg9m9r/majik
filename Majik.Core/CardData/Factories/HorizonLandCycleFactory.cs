@@ -31,13 +31,14 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="HorizonLandBinder.AttachSacDraw"/>.
 ///
 /// ## Cycle members not yet shipped
-/// Nurturing Peatland, Silent Clearing, Waterlogged Grove.
+/// Nurturing Peatland, Waterlogged Grove.
 /// Adding any of them is a one-line edit — append a new <c>[CardName]</c>
 /// attribute with the colour pair.
 /// </summary>
 [CardName("Horizon Canopy",  "G", "W")]
 [CardName("Fiery Islet",     "U", "R")]
 [CardName("Sunbaked Canyon", "R", "W")]
+[CardName("Silent Clearing", "W", "B")]
 public static class HorizonLandCycleFactory
 {
     /// <summary>
