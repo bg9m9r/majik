@@ -1,0 +1,5 @@
+{
+  "name": "Defense Grid",
+  "types": ["Artifact"],
+  "manaCost": "{2}"
+}
