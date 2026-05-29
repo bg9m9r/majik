@@ -169,6 +169,9 @@ public enum CardSubtype
     /// <summary>Jock creature subtype — Slickshot Show-Off (Outlaws of Thunder
     /// Junction). One of the OTJ "outlaw" character class subtypes. CR 205.3m.</summary>
     Jock,
+    /// <summary>Mouse creature subtype — Emberheart Challenger (Bloomburrow),
+    /// and the rest of the Bloomburrow Mouse "Valiant" lineage. CR 205.3m.</summary>
+    Mouse,
     /// <summary>Faerie creature subtype — Sprite Dragon (Ikoria), Spellstutter Sprite,
     /// Bitterblossom tokens. CR 205.3m.</summary>
     Faerie,
