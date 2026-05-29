@@ -182,6 +182,9 @@ public enum CardSubtype
     /// <summary>Beholder creature subtype — Hive of the Eye Tyrant (Adventures
     /// in the Forgotten Realms manland cycle). CR 205.3m.</summary>
     Beholder,
+    /// <summary>Shark creature subtype — Restless Reef (Outlaws of Thunder
+    /// Junction restless-land cycle), Shark Typhoon tokens. CR 205.3m.</summary>
+    Shark,
     /// <summary>Robot creature subtype — Pinnacle Emissary (Edge of Eternities)
     /// and the EOE robot lineage. CR 205.3m.</summary>
     Robot,
