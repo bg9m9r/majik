@@ -1,0 +1,9 @@
+{
+  "name": "Sling-Gang Lieutenant",
+  "types": ["Creature"],
+  "subtypes": ["Goblin"],
+  "manaCost": "{3}{B}",
+  "power": 1,
+  "toughness": 1,
+  "abilities": []
+}
