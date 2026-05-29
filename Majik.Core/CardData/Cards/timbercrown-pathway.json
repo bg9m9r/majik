@@ -1,0 +1,7 @@
+{
+  "name": "Timbercrown Pathway",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "G" }
+  ]
+}
