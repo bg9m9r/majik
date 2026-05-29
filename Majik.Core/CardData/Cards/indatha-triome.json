@@ -1,0 +1,10 @@
+{
+  "name": "Indatha Triome",
+  "types": ["Land"],
+  "subtypes": ["Plains", "Swamp", "Forest"],
+  "abilities": [
+    { "kind": "mana", "produces": "W" },
+    { "kind": "mana", "produces": "B" },
+    { "kind": "mana", "produces": "G" }
+  ]
+}
