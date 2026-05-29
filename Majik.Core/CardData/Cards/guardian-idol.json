@@ -1,0 +1,8 @@
+{
+  "name": "Guardian Idol",
+  "types": ["Artifact"],
+  "manaCost": "{2}",
+  "abilities": [
+    { "kind": "mana", "produces": "C" }
+  ]
+}
