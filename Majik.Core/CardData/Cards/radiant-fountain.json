@@ -1,0 +1,14 @@
+{
+  "name": "Radiant Fountain",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "C" },
+    {
+      "kind": "triggered",
+      "trigger": { "type": "etb_self" },
+      "effects": [
+        { "type": "gain_life_self", "amount": 2 }
+      ]
+    }
+  ]
+}
