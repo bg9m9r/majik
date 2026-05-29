@@ -126,6 +126,10 @@ public enum CardSubtype
     /// <summary>Phoenix creature subtype — Arclight Phoenix, Rekindling
     /// Phoenix, Skarrgan Pit-Skulk-adjacent. CR 205.3m.</summary>
     Phoenix,
+    /// <summary>Hydra creature subtype — Lair of the Hydra (the X/X animated
+    /// body of the Modern Horizons 2 creature land), Managorger Hydra,
+    /// Hydra Broodmaster. CR 205.3m.</summary>
+    Hydra,
     /// <summary>Fish creature subtype — Gurmag Angler, Tatsumasa, the Dragon's Fang's
     /// Dragon Fish token. CR 205.3m.</summary>
     Fish,

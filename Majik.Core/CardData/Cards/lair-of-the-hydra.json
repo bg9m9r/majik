@@ -1,0 +1,7 @@
+{
+  "name": "Lair of the Hydra",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "G" }
+  ]
+}
