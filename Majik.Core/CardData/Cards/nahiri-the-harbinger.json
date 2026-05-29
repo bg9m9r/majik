@@ -1,0 +1,9 @@
+{
+  "name": "Nahiri, the Harbinger",
+  "types": ["Planeswalker"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Nahiri"],
+  "manaCost": "{2}{R}{W}",
+  "loyalty": 4,
+  "abilities": []
+}

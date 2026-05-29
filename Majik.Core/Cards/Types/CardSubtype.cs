@@ -349,6 +349,7 @@ public enum CardSubtype
     Grist,
     Jace,
     Liliana,
+    Nahiri,
     Narset,
     Garruk,
     Nissa,
