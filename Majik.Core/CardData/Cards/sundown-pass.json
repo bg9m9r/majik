@@ -1,0 +1,8 @@
+{
+  "name": "Sundown Pass",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "R" },
+    { "kind": "mana", "produces": "W" }
+  ]
+}
