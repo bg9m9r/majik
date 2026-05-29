@@ -1,0 +1,9 @@
+{
+  "name": "Abraded Bluffs",
+  "types": ["Land"],
+  "subtypes": ["Desert"],
+  "abilities": [
+    { "kind": "mana", "produces": "R" },
+    { "kind": "mana", "produces": "W" }
+  ]
+}
