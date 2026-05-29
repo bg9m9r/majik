@@ -1,0 +1,9 @@
+{
+  "name": "Goblin Instigator",
+  "types": ["Creature"],
+  "subtypes": ["Goblin", "Rogue"],
+  "manaCost": "{1}{R}",
+  "power": 1,
+  "toughness": 1,
+  "abilities": []
+}
