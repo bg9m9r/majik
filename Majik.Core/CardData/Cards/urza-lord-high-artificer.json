@@ -1,0 +1,10 @@
+{
+  "name": "Urza, Lord High Artificer",
+  "types": ["Creature"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Human", "Artificer"],
+  "manaCost": "{2}{U}{U}",
+  "power": 1,
+  "toughness": 4,
+  "abilities": []
+}
