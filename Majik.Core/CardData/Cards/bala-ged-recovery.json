@@ -1,0 +1,7 @@
+{
+  "name": "Bala Ged Sanctuary",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "G" }
+  ]
+}
