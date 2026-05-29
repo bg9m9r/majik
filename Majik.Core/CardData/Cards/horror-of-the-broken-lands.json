@@ -1,0 +1,9 @@
+{
+  "name": "Horror of the Broken Lands",
+  "types": ["Creature"],
+  "subtypes": ["Horror"],
+  "manaCost": "{4}{B}",
+  "power": 4,
+  "toughness": 4,
+  "abilities": []
+}
