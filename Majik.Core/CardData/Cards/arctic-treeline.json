@@ -1,0 +1,10 @@
+{
+  "name": "Arctic Treeline",
+  "types": ["Land"],
+  "supertypes": ["Snow"],
+  "subtypes": ["Forest", "Plains"],
+  "abilities": [
+    { "kind": "mana", "produces": "G" },
+    { "kind": "mana", "produces": "W" }
+  ]
+}
