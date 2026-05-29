@@ -1,0 +1,5 @@
+{
+  "name": "Infernal Grasp",
+  "types": ["Instant"],
+  "manaCost": "{1}{B}"
+}
