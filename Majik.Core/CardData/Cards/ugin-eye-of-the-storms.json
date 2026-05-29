@@ -1,0 +1,9 @@
+{
+  "name": "Ugin, Eye of the Storms",
+  "types": ["Planeswalker"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Ugin"],
+  "manaCost": "{7}",
+  "loyalty": 7,
+  "abilities": []
+}
