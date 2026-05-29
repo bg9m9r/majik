@@ -1,0 +1,8 @@
+{
+  "name": "Simian Spirit Guide",
+  "types": ["Creature"],
+  "subtypes": ["Ape", "Spirit"],
+  "manaCost": "{2}{R}",
+  "power": 2,
+  "toughness": 2
+}
