@@ -1,0 +1,9 @@
+{
+  "name": "Wood Elves",
+  "types": ["Creature"],
+  "subtypes": ["Elf", "Scout"],
+  "manaCost": "{2}{G}",
+  "power": 1,
+  "toughness": 1,
+  "abilities": []
+}
