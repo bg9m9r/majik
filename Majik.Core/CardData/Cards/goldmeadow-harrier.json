@@ -1,0 +1,9 @@
+{
+  "name": "Goldmeadow Harrier",
+  "types": ["Creature"],
+  "subtypes": ["Kithkin", "Soldier"],
+  "manaCost": "{W}",
+  "power": 1,
+  "toughness": 1,
+  "abilities": []
+}
