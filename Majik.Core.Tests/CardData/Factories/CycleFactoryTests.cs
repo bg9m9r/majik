@@ -294,10 +294,12 @@ public class CycleFactoryTests
     }
 
     // -----------------------------------------------------------------------
-    // Horizon-land cycle — 2 members shipped (Fiery Islet, Sunbaked Canyon)
+    // Horizon-land cycle — 3 members shipped (Horizon Canopy, Fiery Islet,
+    // Sunbaked Canyon)
     // -----------------------------------------------------------------------
 
     [Theory]
+    [InlineData("Horizon Canopy")]
     [InlineData("Fiery Islet")]
     [InlineData("Sunbaked Canyon")]
     public void HorizonLand_Dispatch_ReturnsLandWithPrintedName(string cardName)
@@ -308,6 +310,7 @@ public class CycleFactoryTests
     }
 
     [Theory]
+    [InlineData("Horizon Canopy")]
     [InlineData("Fiery Islet")]
     [InlineData("Sunbaked Canyon")]
     public void HorizonLand_HasManaAndSacDrawAbilities(string cardName)
