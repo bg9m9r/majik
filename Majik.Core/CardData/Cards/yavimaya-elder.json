@@ -1,0 +1,9 @@
+{
+  "name": "Yavimaya Elder",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Druid"],
+  "manaCost": "{1}{G}{G}",
+  "power": 2,
+  "toughness": 1,
+  "abilities": []
+}
