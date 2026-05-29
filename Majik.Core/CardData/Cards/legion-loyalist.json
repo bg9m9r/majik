@@ -1,0 +1,9 @@
+{
+  "name": "Legion Loyalist",
+  "types": ["Creature"],
+  "subtypes": ["Goblin", "Soldier"],
+  "manaCost": "{R}",
+  "power": 1,
+  "toughness": 1,
+  "abilities": []
+}
