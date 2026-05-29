@@ -1,0 +1,9 @@
+{
+  "name": "Kessig Flamebreather",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Shaman"],
+  "manaCost": "{1}{R}",
+  "power": 1,
+  "toughness": 3,
+  "abilities": []
+}
