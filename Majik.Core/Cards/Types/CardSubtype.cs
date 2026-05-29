@@ -316,6 +316,12 @@ public enum CardSubtype
     Spawn,
     Scion,
 
+    /// <summary>Fungus creature subtype — Sporecrown Thallid, Sowing
+    /// Mycospawn (an Eldrazi Fungus from MH3), Thelon of Havenwood,
+    /// the Saproling-producing Thallid cycle from Fallen Empires /
+    /// Time Spiral. CR 205.3m.</summary>
+    Fungus,
+
     /// <summary>Spike creature subtype — Urza's Saga / Exodus cycle of
     /// counter-shifting creatures (Spike Feeder, Spike Weaver, Spike
     /// Tiller). CR 205.3m.</summary>
