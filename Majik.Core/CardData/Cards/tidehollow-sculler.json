@@ -1,0 +1,9 @@
+{
+  "name": "Tidehollow Sculler",
+  "types": ["Creature", "Artifact"],
+  "subtypes": ["Zombie"],
+  "manaCost": "{W}{B}",
+  "power": 2,
+  "toughness": 2,
+  "abilities": []
+}
