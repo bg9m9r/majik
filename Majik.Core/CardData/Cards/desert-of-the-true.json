@@ -1,0 +1,8 @@
+{
+  "name": "Desert of the True",
+  "types": ["Land"],
+  "subtypes": ["Desert"],
+  "abilities": [
+    { "kind": "mana", "produces": "W" }
+  ]
+}
