@@ -1,0 +1,9 @@
+{
+  "name": "Oblivion Sower",
+  "types": ["Creature"],
+  "subtypes": ["Eldrazi"],
+  "manaCost": "{6}",
+  "power": 5,
+  "toughness": 8,
+  "abilities": []
+}
