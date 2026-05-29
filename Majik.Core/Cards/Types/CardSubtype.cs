@@ -39,6 +39,9 @@ public enum CardSubtype
     /// Eldraine, front face), Withengar Unbound. CR 205.3m.</summary>
     Warlock,
     Wizard,
+    /// <summary>Moonfolk creature subtype — Tamiyo, Inquisitive Student
+    /// (front face), Soratami creatures of Kamigawa. CR 205.3m.</summary>
+    Moonfolk,
     Cleric,
     Rogue,
     Knight,
@@ -346,6 +349,9 @@ public enum CardSubtype
     Bolas,
     Wrenn,
     Oko,
+    /// <summary>Tamiyo planeswalker subtype — Tamiyo, Seasoned Scholar
+    /// (back face of Tamiyo, Inquisitive Student). CR 205.3m.</summary>
+    Tamiyo,
 
     /// <summary>Homarid creature subtype — Hedron Crab, Homarid. CR 205.3m.
     /// Crustacean-flavoured creature type that originated in Fallen Empires
