@@ -1,0 +1,10 @@
+{
+  "name": "Xander's Lounge",
+  "types": ["Land"],
+  "subtypes": ["Island", "Swamp", "Mountain"],
+  "abilities": [
+    { "kind": "mana", "produces": "U" },
+    { "kind": "mana", "produces": "B" },
+    { "kind": "mana", "produces": "R" }
+  ]
+}
