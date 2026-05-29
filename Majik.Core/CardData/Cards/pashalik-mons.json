@@ -1,0 +1,10 @@
+{
+  "name": "Pashalik Mons",
+  "types": ["Creature"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Goblin", "Warrior"],
+  "manaCost": "{3}{R}{R}",
+  "power": 3,
+  "toughness": 3,
+  "abilities": []
+}
