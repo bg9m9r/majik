@@ -1,0 +1,9 @@
+{
+  "name": "Beast Whisperer",
+  "types": ["Creature"],
+  "subtypes": ["Elf", "Druid"],
+  "manaCost": "{2}{G}{G}",
+  "power": 2,
+  "toughness": 3,
+  "abilities": []
+}
