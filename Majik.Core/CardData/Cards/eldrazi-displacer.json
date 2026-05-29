@@ -1,0 +1,8 @@
+{
+  "name": "Eldrazi Displacer",
+  "types": ["Creature"],
+  "subtypes": ["Eldrazi"],
+  "manaCost": "{2}{C}",
+  "power": 3,
+  "toughness": 3
+}
