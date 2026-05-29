@@ -1,0 +1,12 @@
+{
+  "name": "Boros Signet",
+  "types": ["Artifact"],
+  "manaCost": "{2}",
+  "abilities": [
+    {
+      "kind": "mana",
+      "cost": "1",
+      "produces": "RW"
+    }
+  ]
+}

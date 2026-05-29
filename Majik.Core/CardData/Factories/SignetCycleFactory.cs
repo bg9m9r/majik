@@ -65,16 +65,16 @@ namespace Majik.Core.CardData.Factories;
 ///   cost activated ability takes (filter lands, Mind Stone's draw cost,
 ///   Springleaf Drum, etc.).
 /// </summary>
+// Dimir / Rakdos / Boros / Izzet Signet each ship a dedicated per-member
+// factory (JSON-def + named factory) and so are intentionally NOT registered
+// here — a name may map to only one [CardName] factory (source-gen MJK001).
+// This parametric cycle factory still owns the remaining six members.
 [CardName("Azorius Signet",  "W", "U")]
-[CardName("Dimir Signet",    "U", "B")]
-[CardName("Rakdos Signet",   "B", "R")]
 [CardName("Gruul Signet",    "R", "G")]
 [CardName("Selesnya Signet", "G", "W")]
 [CardName("Orzhov Signet",   "W", "B")]
 [CardName("Simic Signet",    "G", "U")]
 [CardName("Golgari Signet",  "B", "G")]
-[CardName("Boros Signet",    "W", "R")]
-[CardName("Izzet Signet",    "U", "R")]
 public static class SignetCycleFactory
 {
     /// <summary>Printed mana cost shared by every cycle member.</summary>
