@@ -1,0 +1,9 @@
+{
+  "name": "Deadshot Minotaur",
+  "types": ["Creature"],
+  "subtypes": ["Minotaur"],
+  "manaCost": "{3}{R}{G}",
+  "power": 3,
+  "toughness": 4,
+  "abilities": []
+}
