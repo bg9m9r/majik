@@ -1,0 +1,10 @@
+{
+  "name": "Raffine's Tower",
+  "types": ["Land"],
+  "subtypes": ["Plains", "Island", "Swamp"],
+  "abilities": [
+    { "kind": "mana", "produces": "W" },
+    { "kind": "mana", "produces": "U" },
+    { "kind": "mana", "produces": "B" }
+  ]
+}
