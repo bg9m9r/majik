@@ -18,6 +18,7 @@ namespace Majik.Core.CardData.Definitions;
 [JsonDerivedType(typeof(DrawCardEffectDef), "draw_card")]
 [JsonDerivedType(typeof(SurveilSelfEffectDef), "surveil_self")]
 [JsonDerivedType(typeof(DestroyTargetStubEffectDef), "destroy_target_stub")]
+[JsonDerivedType(typeof(UntapTargetStubEffectDef), "untap_target_stub")]
 [JsonDerivedType(typeof(GainLifeSelfEffectDef), "gain_life_self")]
 [JsonDerivedType(typeof(MillThenPickFirstMatchingToHandEffectDef), "mill_then_pick_first_matching_to_hand")]
 [JsonDerivedType(typeof(ConniveSelfEffectDef), "connive_self")]
@@ -84,6 +85,26 @@ public sealed class SurveilSelfEffectDef : EffectDefinition
 /// targeting layer will translate (e.g. <c>"artifact_enchantment_nonbasic_land"</c>).
 /// </summary>
 public sealed class DestroyTargetStubEffectDef : EffectDefinition
+{
+    public string TargetFilter { get; set; } = "permanent";
+}
+
+/// <summary>
+/// "Untap target [filter]" — stub effect. Records the target filter
+/// describing what's untappable but resolves as a no-op because the
+/// targeting prompt system isn't wired yet (mirrors the existing
+/// <see cref="DestroyTargetStubEffectDef"/> / <see cref="DealDamageStubEffectDef"/>
+/// deferred-targeting pattern). Untapping itself is a CR 701.21 action
+/// the engine already supports (<c>Permanent.Untap</c>); the gap is
+/// purely target selection. When the targeting prompt lands, this type
+/// upgrades to a real <c>untap_target</c> effect without breaking JSON
+/// files. Canonical case: Minamo, School at Water's Edge —
+/// <c>"{U}, {T}: Untap target legendary permanent."</c>
+///
+/// <see cref="TargetFilter"/> is a free-form string the future targeting
+/// layer will translate (e.g. <c>"legendary_permanent"</c>).
+/// </summary>
+public sealed class UntapTargetStubEffectDef : EffectDefinition
 {
     public string TargetFilter { get; set; } = "permanent";
 }
