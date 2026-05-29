@@ -1,0 +1,8 @@
+{
+  "name": "Bleachbone Verge",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "B" },
+    { "kind": "mana", "produces": "W" }
+  ]
+}
