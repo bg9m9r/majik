@@ -1,0 +1,5 @@
+{
+  "name": "Ancient Grudge",
+  "types": ["Instant"],
+  "manaCost": "{1}{R}"
+}
