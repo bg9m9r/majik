@@ -1,0 +1,15 @@
+{
+  "name": "Sylvan Caryatid",
+  "types": ["Creature"],
+  "subtypes": ["Plant"],
+  "manaCost": "{1}{G}",
+  "power": 0,
+  "toughness": 3,
+  "abilities": [
+    { "kind": "mana", "produces": "W" },
+    { "kind": "mana", "produces": "U" },
+    { "kind": "mana", "produces": "B" },
+    { "kind": "mana", "produces": "R" },
+    { "kind": "mana", "produces": "G" }
+  ]
+}
