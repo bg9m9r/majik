@@ -191,6 +191,10 @@ public sealed class GameDriver
         var revealLook4 = new OpeningHandRevealLook4Trigger(_agents, _triggerManager);
         revealLook4.Attach(_eventBus!);
 
+        // Chancellor-style "reveal → add mana at first main phase" riders.
+        var revealAddMana = new OpeningHandRevealAddManaTrigger(_agents, _triggerManager);
+        revealAddMana.Attach(_eventBus!);
+
         for (var i = 0; i < _players.Count; i++)
         {
             var seat = _players[(startingIndex + i) % _players.Count];
