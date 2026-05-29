@@ -1,0 +1,9 @@
+{
+  "name": "Adanto Vanguard",
+  "types": ["Creature"],
+  "subtypes": ["Vampire", "Soldier"],
+  "manaCost": "{1}{W}",
+  "power": 1,
+  "toughness": 1,
+  "abilities": []
+}
