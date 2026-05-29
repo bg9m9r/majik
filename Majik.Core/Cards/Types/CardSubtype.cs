@@ -395,4 +395,11 @@ public enum CardSubtype
     /// Mirror Entity. The flavour-canonical home of the Changeling keyword
     /// (CR 702.73) and Mutavault's "every creature type" animate. CR 205.3m.</summary>
     Shapeshifter,
+
+    /// <summary>Blinkmoth creature subtype — Blinkmoth Nexus (Darksteel /
+    /// Modern Masters) animates into a "1/1 Blinkmoth artifact creature",
+    /// and its third ability pumps "target Blinkmoth creature" (so the
+    /// subtype is that ability's target filter). Also Blinkmoth Well,
+    /// Blinkmoth token producers in the Mirrodin lineage. CR 205.3m.</summary>
+    Blinkmoth,
 }
