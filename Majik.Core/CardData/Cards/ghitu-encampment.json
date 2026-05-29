@@ -1,0 +1,7 @@
+{
+  "name": "Ghitu Encampment",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "R" }
+  ]
+}
