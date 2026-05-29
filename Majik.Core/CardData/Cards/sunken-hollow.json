@@ -1,0 +1,9 @@
+{
+  "name": "Sunken Hollow",
+  "types": ["Land"],
+  "subtypes": ["Island", "Swamp"],
+  "abilities": [
+    { "kind": "mana", "produces": "U" },
+    { "kind": "mana", "produces": "B" }
+  ]
+}
