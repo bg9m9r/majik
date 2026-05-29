@@ -1,0 +1,9 @@
+{
+  "name": "Scrapheap Scrounger",
+  "types": ["Creature", "Artifact"],
+  "subtypes": ["Construct"],
+  "manaCost": "{2}",
+  "power": 3,
+  "toughness": 2,
+  "abilities": []
+}
