@@ -1,0 +1,10 @@
+{
+  "name": "Glissa Sunslayer",
+  "types": ["Creature"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Phyrexian", "Zombie", "Elf"],
+  "manaCost": "{B}{G}",
+  "power": 3,
+  "toughness": 3,
+  "abilities": []
+}
