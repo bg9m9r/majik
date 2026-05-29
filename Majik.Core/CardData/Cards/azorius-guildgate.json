@@ -1,0 +1,9 @@
+{
+  "name": "Azorius Guildgate",
+  "types": ["Land"],
+  "subtypes": ["Gate"],
+  "abilities": [
+    { "kind": "mana", "produces": "W" },
+    { "kind": "mana", "produces": "U" }
+  ]
+}
