@@ -1,0 +1,8 @@
+{
+  "name": "Loam Lion",
+  "types": ["Creature"],
+  "subtypes": ["Cat"],
+  "manaCost": "{W}",
+  "power": 1,
+  "toughness": 1
+}
