@@ -1,0 +1,19 @@
+{
+  "name": "Crystal Grotto",
+  "types": ["Land"],
+  "abilities": [
+    {
+      "kind": "triggered",
+      "trigger": { "type": "etb_self" },
+      "effects": [
+        { "type": "scry_self", "amount": 1 }
+      ]
+    },
+    { "kind": "mana", "produces": "C" },
+    { "kind": "mana", "cost": "1", "produces": "W" },
+    { "kind": "mana", "cost": "1", "produces": "U" },
+    { "kind": "mana", "cost": "1", "produces": "B" },
+    { "kind": "mana", "cost": "1", "produces": "R" },
+    { "kind": "mana", "cost": "1", "produces": "G" }
+  ]
+}
