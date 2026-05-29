@@ -1,0 +1,9 @@
+{
+  "name": "Porcelain Legionnaire",
+  "types": ["Creature", "Artifact"],
+  "subtypes": ["Phyrexian", "Soldier"],
+  "manaCost": "{2}{W/P}",
+  "power": 3,
+  "toughness": 1,
+  "abilities": []
+}
