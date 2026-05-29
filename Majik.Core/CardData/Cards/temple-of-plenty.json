@@ -1,0 +1,15 @@
+{
+  "name": "Temple of Plenty",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "G" },
+    { "kind": "mana", "produces": "W" },
+    {
+      "kind": "triggered",
+      "trigger": { "type": "etb_self" },
+      "effects": [
+        { "type": "scry_self", "amount": 1 }
+      ]
+    }
+  ]
+}
