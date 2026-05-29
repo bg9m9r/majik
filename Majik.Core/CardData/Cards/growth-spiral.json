@@ -1,0 +1,5 @@
+{
+  "name": "Growth Spiral",
+  "types": ["Instant"],
+  "manaCost": "{G}{U}"
+}
