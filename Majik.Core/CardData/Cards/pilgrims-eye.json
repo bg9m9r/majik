@@ -1,0 +1,8 @@
+{
+  "name": "Pilgrim's Eye",
+  "types": ["Creature", "Artifact"],
+  "subtypes": ["Thopter"],
+  "manaCost": "{3}",
+  "power": 1,
+  "toughness": 1
+}
