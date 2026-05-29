@@ -1,0 +1,10 @@
+{
+  "name": "Thalia, Heretic Cathar",
+  "types": ["Creature"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Human", "Soldier"],
+  "manaCost": "{2}{W}",
+  "power": 3,
+  "toughness": 2,
+  "abilities": []
+}
