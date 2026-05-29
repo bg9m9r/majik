@@ -38,6 +38,7 @@ public class OnslaughtCyclingLandFactoryTests
         new object[] { "Tranquil Thicket", "G", CardSubtype.Forest },
         new object[] { "Lonely Sandbar",   "U", CardSubtype.Island },
         new object[] { "Barren Moor",      "B", CardSubtype.Swamp },
+        new object[] { "Forgotten Cave",   "R", CardSubtype.Mountain },
     };
 
     // -----------------------------------------------------------------------
@@ -186,6 +187,22 @@ public class OnslaughtCyclingLandFactoryTests
     }
 
     [Fact]
+    public void ForgottenCave_Cycling_ChargesRedManaSpecifically()
+    {
+        // CR 702.32 — Forgotten Cave's printed cycling cost is {R}.
+        var cave = (Land)NamedCardFactory.Create("Forgotten Cave", _alice);
+        _alice.Zones.Hand.AddCard(cave);
+        cave.SetZone(ZoneType.Hand);
+
+        var cycling = cave.Abilities.OfType<ActivatedAbility>().Single();
+        var mana = cycling.Costs.OfType<ManaCostCost>().Single().Cost;
+
+        mana.Red.Should().Be(1, "Forgotten Cave's cycling cost is {R}");
+        mana.Blue.Should().Be(0);
+        mana.Generic.Should().Be(0);
+    }
+
+    [Fact]
     public void BarrenMoor_Cycling_EndToEnd_PaysBlackDiscardsSelfDrawsOne()
     {
         // Seed library so the draw resolves.
@@ -221,6 +238,44 @@ public class OnslaughtCyclingLandFactoryTests
         _alice.Zones.Hand.GetCards().Should().Contain(topCard, "cycle drew one card");
         captured.Should().NotBeNull("CR 702.32d publication");
         captured!.Card.Should().BeSameAs(moor);
+    }
+
+    [Fact]
+    public void ForgottenCave_Cycling_EndToEnd_PaysRedDiscardsSelfDrawsOne()
+    {
+        // Seed library so the draw resolves.
+        var topCard = new Card("Goblin Guide", "{R}");
+        topCard.SetOwner(_alice);
+        _alice.Zones.Library.AddCard(topCard);
+        topCard.SetZone(ZoneType.Library);
+
+        var bus = new Majik.Core.Events.EventBus();
+        Majik.Core.Events.CardCycledEvent? captured = null;
+        bus.Subscribe<Majik.Core.Events.CardCycledEvent>(e => captured = e);
+
+        var cave = OnslaughtCyclingLandFactory.Create(
+            _alice,
+            new[] { "Forgotten Cave", "R", "Mountain" },
+            eventBus: bus,
+            replacements: null);
+        _alice.Zones.Hand.AddCard(cave);
+        cave.SetZone(ZoneType.Hand);
+
+        _alice.AddManaToPool(ManaCost.Parse("R"));
+
+        var cycling = cave.Abilities.OfType<ActivatedAbility>().Single();
+        foreach (var cost in cycling.Costs)
+        {
+            cost.CanPay(_alice).Should().BeTrue($"{cost.Description}");
+            cost.Pay(_alice);
+        }
+        cave.Zone.Should().Be(ZoneType.Graveyard, "discarded self");
+
+        foreach (var effect in cycling.Effects) effect.Execute();
+
+        _alice.Zones.Hand.GetCards().Should().Contain(topCard, "cycle drew one card");
+        captured.Should().NotBeNull("CR 702.32d publication");
+        captured!.Card.Should().BeSameAs(cave);
     }
 
     // -----------------------------------------------------------------------
