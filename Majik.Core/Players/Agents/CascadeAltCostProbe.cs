@@ -77,6 +77,7 @@ public sealed class CascadeAltCostProbe : IAlternativeCostProbe
             "Shardless Agent" => true,
             "Bloodbraid Elf" => true,
             "Violent Outburst" => true,
+            "Ardent Plea" => true,
             _ => false,
         };
     }
