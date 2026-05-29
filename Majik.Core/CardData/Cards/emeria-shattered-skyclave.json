@@ -1,0 +1,7 @@
+{
+  "name": "Emeria, Shattered Skyclave",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "W" }
+  ]
+}
