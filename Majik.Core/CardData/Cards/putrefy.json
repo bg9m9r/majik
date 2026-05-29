@@ -1,0 +1,5 @@
+{
+  "name": "Putrefy",
+  "types": ["Instant"],
+  "manaCost": "{1}{B}{G}"
+}
