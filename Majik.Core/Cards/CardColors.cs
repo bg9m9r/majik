@@ -51,6 +51,18 @@ public static class CardColors
             return overrideSet;
         }
 
+        // CR 702.114 — Devoid. "This card is colorless." Devoid overrides
+        // any mana-cost-derived color (the printed color indicator on a
+        // Devoid card is a colorless indicator that strips the colored
+        // pips in the cost — Eldrazi Skyspawner's {1}{U} cost notwithstanding,
+        // the card itself is colorless for all rules purposes including
+        // tutor / color-matters predicates). Empty set short-circuits
+        // before the mana-cost pip scan runs.
+        if (card is Card devoid && devoid.IsDevoid)
+        {
+            return new HashSet<ManaColor>();
+        }
+
         var set = new HashSet<ManaColor>();
         var cost = string.IsNullOrEmpty(card.ManaCost)
             ? ManaCost.Zero : ManaCost.Parse(card.ManaCost);

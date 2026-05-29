@@ -845,6 +845,29 @@ public class Card : ICard
     public IReadOnlyList<ValueObjects.ManaColor>? ColorIndicator { get; private set; }
 
     /// <summary>
+    /// CR 702.114 — Devoid. "[This card] is colorless." When true,
+    /// <see cref="Majik.Core.Cards.CardColors.GetColors"/> returns the
+    /// empty set regardless of the mana-cost pips. Set by named-card
+    /// factories that print the Devoid keyword (Eldrazi Skyspawner,
+    /// Sowing Mycospawn, Ulamog's Reclaimer, the Battle for Zendikar /
+    /// Oath of the Gatewatch Devoid Eldrazi cycle). Independent of
+    /// <see cref="ColorIndicator"/> — Devoid is the printed keyword that
+    /// strips colors; the color indicator is an unrelated CR 202.2c
+    /// mechanism (Dryad Arbor's green indicator on an empty cost).
+    /// <para>Default <c>false</c>; non-Devoid cards keep the mana-cost
+    /// pip scan path.</para>
+    /// </summary>
+    public bool IsDevoid { get; private set; }
+
+    /// <summary>Stamp the Devoid keyword on this card. Called by the
+    /// named-card factory for any Devoid Eldrazi. Idempotent; later
+    /// calls overwrite earlier ones.</summary>
+    public void SetDevoid(bool value)
+    {
+        IsDevoid = value;
+    }
+
+    /// <summary>
     /// Stamp a printed color indicator on this card. Called by
     /// <see cref="Majik.Core.CardData.ScryfallCardFactory.Create"/> (when
     /// the seed row's <c>Colors</c> field carries colors not derivable
