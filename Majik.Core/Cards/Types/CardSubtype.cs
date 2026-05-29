@@ -35,6 +35,9 @@ public enum CardSubtype
     Insect,
     Spirit,
     Warrior,
+    /// <summary>Warlock creature subtype — Witch Enchanter (Wilds of
+    /// Eldraine, front face), Withengar Unbound. CR 205.3m.</summary>
+    Warlock,
     Wizard,
     Cleric,
     Rogue,
