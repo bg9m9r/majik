@@ -1,0 +1,7 @@
+{
+  "name": "Seal of Fire",
+  "types": ["Enchantment"],
+  "manaCost": "{R}",
+  "colors": ["R"],
+  "abilities": []
+}
