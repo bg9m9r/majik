@@ -1,0 +1,9 @@
+{
+  "name": "Electrostatic Field",
+  "types": ["Creature"],
+  "subtypes": ["Wall"],
+  "manaCost": "{1}{R}",
+  "power": 0,
+  "toughness": 4,
+  "abilities": []
+}
