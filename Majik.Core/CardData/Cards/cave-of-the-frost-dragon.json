@@ -1,0 +1,7 @@
+{
+  "name": "Cave of the Frost Dragon",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "W" }
+  ]
+}
