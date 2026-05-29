@@ -1,0 +1,5 @@
+{
+  "name": "Demand Answers",
+  "types": ["Instant"],
+  "manaCost": "{1}{R}"
+}
