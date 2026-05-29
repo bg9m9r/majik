@@ -1,0 +1,10 @@
+{
+  "name": "Woodland Chasm",
+  "types": ["Land"],
+  "supertypes": ["Snow"],
+  "subtypes": ["Swamp", "Forest"],
+  "abilities": [
+    { "kind": "mana", "produces": "B" },
+    { "kind": "mana", "produces": "G" }
+  ]
+}
