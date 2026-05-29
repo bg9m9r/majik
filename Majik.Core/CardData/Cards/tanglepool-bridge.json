@@ -1,0 +1,8 @@
+{
+  "name": "Tanglepool Bridge",
+  "types": ["Land", "Artifact"],
+  "abilities": [
+    { "kind": "mana", "produces": "G" },
+    { "kind": "mana", "produces": "U" }
+  ]
+}
