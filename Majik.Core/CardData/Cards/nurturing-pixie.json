@@ -1,0 +1,9 @@
+{
+  "name": "Nurturing Pixie",
+  "types": ["Creature"],
+  "subtypes": ["Faerie", "Rogue"],
+  "manaCost": "{W}",
+  "power": 1,
+  "toughness": 1,
+  "abilities": []
+}
