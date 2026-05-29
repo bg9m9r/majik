@@ -1,0 +1,9 @@
+{
+  "name": "Irrigated Farmland",
+  "types": ["Land"],
+  "subtypes": ["Plains", "Island"],
+  "abilities": [
+    { "kind": "mana", "produces": "W" },
+    { "kind": "mana", "produces": "U" }
+  ]
+}
