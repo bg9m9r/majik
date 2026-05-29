@@ -1,0 +1,9 @@
+{
+  "name": "Goblin Dark-Dwellers",
+  "types": ["Creature"],
+  "subtypes": ["Goblin"],
+  "manaCost": "{3}{R}{R}",
+  "power": 4,
+  "toughness": 4,
+  "abilities": []
+}
