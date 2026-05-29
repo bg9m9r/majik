@@ -104,6 +104,15 @@ public sealed record CounterType(string Name)
     public static readonly CounterType Finality = new("Finality");
 
     /// <summary>
+    /// CR 122 — Mining counters. Card-specific marker used by Gemstone Mine
+    /// (Weatherlight / reprints). Gemstone Mine enters with three mining
+    /// counters; its mana ability removes one mining counter as a cost, and
+    /// the land sacrifices itself once no mining counters remain. The
+    /// counter is an opaque marker — no built-in P/T or ability semantics.
+    /// </summary>
+    public static readonly CounterType Mining = new("Mining");
+
+    /// <summary>
     /// CR 122 — Fate counters. Card-specific marker used by Oblivion Stone
     /// (Mirrodin). Oblivion Stone's first activated ability puts a fate
     /// counter on each nonland permanent; its second destroys each nonland
