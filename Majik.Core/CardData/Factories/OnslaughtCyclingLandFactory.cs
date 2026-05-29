@@ -37,7 +37,7 @@ namespace Majik.Core.CardData.Factories;
 /// <c>{color}</c> for this cycle).
 ///
 /// ## Implemented (v1)
-/// - <b>Land</b> with the printed subtype (Forest / Island). NOT
+/// - <b>Land</b> with the printed subtype (Forest / Island / Plains). NOT
 ///   Basic — these are nonbasic land-types-as-subtype lands (CR 305.6 —
 ///   the subtype grants the mana ability through the L4 type-derivation
 ///   pipeline) but the printed mana ability is also declared inline
@@ -76,6 +76,10 @@ namespace Majik.Core.CardData.Factories;
 // Forgotten Cave (Onslaught) — {T}: Add {R}; Cycling {R}; enters tapped.
 // Verified against Scryfall: type_line "Land".
 [CardName("Forgotten Cave",   "R", "Mountain")]
+// Secluded Steppe (Onslaught) — {T}: Add {W}; Cycling {W}; enters tapped.
+// Verified against Scryfall: type_line "Land", no printed land subtype
+// (the engine-internal Plains tag mirrors the cycle's modeling posture).
+[CardName("Secluded Steppe",  "W", "Plains")]
 public static class OnslaughtCyclingLandFactory
 {
     /// <summary>
