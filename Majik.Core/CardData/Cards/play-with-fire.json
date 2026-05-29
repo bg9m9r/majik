@@ -1,0 +1,5 @@
+{
+  "name": "Play with Fire",
+  "types": ["Instant"],
+  "manaCost": "{R}"
+}
