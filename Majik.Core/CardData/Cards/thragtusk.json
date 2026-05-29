@@ -1,0 +1,9 @@
+{
+  "name": "Thragtusk",
+  "types": ["Creature"],
+  "subtypes": ["Beast"],
+  "manaCost": "{4}{G}",
+  "power": 5,
+  "toughness": 3,
+  "abilities": []
+}
