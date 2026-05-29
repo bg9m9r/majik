@@ -387,4 +387,9 @@ public enum CardSubtype
     /// Teenage Mutant Ninja Turtles). The Utroms are an alien brain-shaped
     /// species from the TMNT universe; Krang is the most prominent. CR 205.3m.</summary>
     Utrom,
+
+    /// <summary>Shapeshifter creature subtype — Mutable Explorer, Cryptoplasm,
+    /// Mirror Entity. The flavour-canonical home of the Changeling keyword
+    /// (CR 702.73) and Mutavault's "every creature type" animate. CR 205.3m.</summary>
+    Shapeshifter,
 }
