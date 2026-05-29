@@ -1,0 +1,9 @@
+{
+  "name": "Metallic Mimic",
+  "types": ["Creature", "Artifact"],
+  "subtypes": ["Shapeshifter"],
+  "manaCost": "{2}",
+  "power": 2,
+  "toughness": 1,
+  "abilities": []
+}
