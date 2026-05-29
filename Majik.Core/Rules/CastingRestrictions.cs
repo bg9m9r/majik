@@ -85,6 +85,14 @@ public static class CastingRestrictions
     // <see cref="ConsumeNextSpellUncounterableForTurn"/> and stamps
     // <see cref="Majik.Core.Spells.Spell.CannotBeCountered"/> when it fires.
     private static readonly HashSet<Guid> _nextSpellUncounterable = new();
+    // CR 601.3 — "You can cast only N more spell(s) this turn" cap (Irencrag
+    // Feat: "You can cast only one more spell this turn."). Stored as a per-
+    // player remaining-spells counter; a player with a registered entry of 0
+    // is blocked from casting further spells this turn. SpellCastFlow
+    // decrements the counter after each successful cast via
+    // <see cref="ConsumeAdditionalSpellAllowance"/>. Cleared by the caller at
+    // end of turn or via <see cref="Clear"/> in tests.
+    private static readonly Dictionary<Guid, int> _maxAdditionalSpells = new();
     private static readonly object _gate = new();
 
     /// <summary>
@@ -546,6 +554,80 @@ public static class CastingRestrictions
         }
     }
 
+    /// <summary>
+    /// Register a turn-scoped "you can cast only N more spell(s) this turn"
+    /// cap (CR 601.3 — Irencrag Feat: "You can cast only one more spell this
+    /// turn."). The <paramref name="remaining"/> value is the number of
+    /// ADDITIONAL spells the player may still cast after this registration
+    /// (Irencrag Feat passes 1). If an entry for <paramref name="player"/>
+    /// already exists, the LOWER of the existing and incoming values is kept
+    /// so multiple caps compose correctly (the tighter restriction wins).
+    /// <see cref="ConsumeAdditionalSpellAllowance"/> is called by
+    /// <see cref="Majik.Core.Game.SpellCastFlow"/> after each successful cast
+    /// to decrement the counter. <see cref="ActionValidator"/> rejects the
+    /// cast when the counter reaches zero.
+    /// </summary>
+    public static void SetMaxAdditionalSpellsThisTurn(Player player, int remaining)
+    {
+        ArgumentNullException.ThrowIfNull(player);
+        if (remaining < 0) remaining = 0;
+        lock (_gate)
+        {
+            if (_maxAdditionalSpells.TryGetValue(player.Id, out var existing))
+            {
+                _maxAdditionalSpells[player.Id] = Math.Min(existing, remaining);
+            }
+            else
+            {
+                _maxAdditionalSpells[player.Id] = remaining;
+            }
+        }
+    }
+
+    /// <summary>
+    /// True if <paramref name="player"/> is currently barred from casting
+    /// another spell because their turn-scoped spell-count cap has been
+    /// exhausted (counter == 0). Returns false (no restriction) when no cap
+    /// is registered for this player. Consulted by
+    /// <see cref="ActionValidator.ValidateCastSpell"/>.
+    /// </summary>
+    public static bool HasExhaustedAdditionalSpellAllowance(Player player)
+    {
+        if (player == null) return false;
+        lock (_gate)
+        {
+            return _maxAdditionalSpells.TryGetValue(player.Id, out var v) && v <= 0;
+        }
+    }
+
+    /// <summary>
+    /// Decrement the per-player additional-spell counter by one (floor 0).
+    /// Called by <see cref="Majik.Core.Game.SpellCastFlow"/> immediately after
+    /// a successful cast to track progress toward the cap. No-op when no cap
+    /// is registered for <paramref name="player"/>.
+    /// </summary>
+    public static void ConsumeAdditionalSpellAllowance(Player player)
+    {
+        if (player == null) return;
+        lock (_gate)
+        {
+            if (_maxAdditionalSpells.TryGetValue(player.Id, out var v))
+            {
+                _maxAdditionalSpells[player.Id] = Math.Max(0, v - 1);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Clear the turn-scoped additional-spell cap for all players. Called at
+    /// end of turn / cleanup; tests may also call this directly via
+    /// <see cref="Clear"/>.
+    /// </summary>
+    public static void ClearMaxAdditionalSpellsThisTurn()
+    {
+        lock (_gate) _maxAdditionalSpells.Clear();
+    }
+
     /// <summary>Reset the registry. Test-only.</summary>
     public static void Clear()
     {
@@ -560,6 +642,7 @@ public static class CastingRestrictions
             _globalCastZoneBlocks.Clear();
             _cannotCastAnySpell.Clear();
             _nextSpellUncounterable.Clear();
+            _maxAdditionalSpells.Clear();
         }
     }
 }

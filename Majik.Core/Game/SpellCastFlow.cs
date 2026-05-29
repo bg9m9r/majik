@@ -226,6 +226,11 @@ public sealed class SpellCastFlow
             concreteToClear.ClearPendingCastTargets();
         }
 
+        // CR 601.3 — decrement the per-player additional-spell allowance
+        // counter (Irencrag Feat: "You can cast only one more spell this turn.")
+        // so ActionValidator can gate the next cast attempt.
+        Majik.Core.Rules.CastingRestrictions.ConsumeAdditionalSpellAllowance(caster);
+
         return spell;
     }
 
