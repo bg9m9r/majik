@@ -1,0 +1,9 @@
+{
+  "name": "Gilded Goose",
+  "types": ["Creature"],
+  "subtypes": ["Bird"],
+  "manaCost": "{G}",
+  "power": 0,
+  "toughness": 2,
+  "abilities": []
+}
