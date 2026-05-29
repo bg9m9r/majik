@@ -1,0 +1,9 @@
+{
+  "name": "Adaptive Automaton",
+  "types": ["Creature", "Artifact"],
+  "subtypes": ["Construct"],
+  "manaCost": "{3}",
+  "power": 2,
+  "toughness": 2,
+  "abilities": []
+}
