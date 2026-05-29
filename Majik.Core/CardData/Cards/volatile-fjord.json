@@ -1,0 +1,10 @@
+{
+  "name": "Volatile Fjord",
+  "types": ["Land"],
+  "supertypes": ["Snow"],
+  "subtypes": ["Island", "Mountain"],
+  "abilities": [
+    { "kind": "mana", "produces": "U" },
+    { "kind": "mana", "produces": "R" }
+  ]
+}
