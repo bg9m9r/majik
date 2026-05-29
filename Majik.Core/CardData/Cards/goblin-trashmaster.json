@@ -1,0 +1,9 @@
+{
+  "name": "Goblin Trashmaster",
+  "types": ["Creature"],
+  "subtypes": ["Goblin", "Warrior"],
+  "manaCost": "{2}{R}{R}",
+  "power": 3,
+  "toughness": 3,
+  "abilities": []
+}
