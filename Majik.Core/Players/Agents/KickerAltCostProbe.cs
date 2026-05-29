@@ -102,6 +102,7 @@ public sealed class KickerAltCostProbe : IAlternativeCostProbe
             "Goblin Bushwhacker" => ManaCost.Parse("{R}"),
             "Vines of Vastwood" => ManaCost.Parse("{G}"),
             "Consult the Star Charts" => ManaCost.Parse("{1}{U}"),
+            "Sea Gate Stormcaller" => ManaCost.Parse("{4}{U}"),
             _ => null,
         };
     }
