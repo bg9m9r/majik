@@ -17,6 +17,7 @@ namespace Majik.Core.CardData.Definitions;
 [JsonDerivedType(typeof(DealDamageStubEffectDef), "deal_damage_stub")]
 [JsonDerivedType(typeof(DrawCardEffectDef), "draw_card")]
 [JsonDerivedType(typeof(SurveilSelfEffectDef), "surveil_self")]
+[JsonDerivedType(typeof(ScrySelfEffectDef), "scry_self")]
 [JsonDerivedType(typeof(DestroyTargetStubEffectDef), "destroy_target_stub")]
 [JsonDerivedType(typeof(UntapTargetStubEffectDef), "untap_target_stub")]
 [JsonDerivedType(typeof(GainLifeSelfEffectDef), "gain_life_self")]
@@ -69,6 +70,23 @@ public sealed class DrawCardEffectDef : EffectDefinition
 /// Underground Mortuary path).
 /// </summary>
 public sealed class SurveilSelfEffectDef : EffectDefinition
+{
+    public int Amount { get; set; } = 1;
+}
+
+/// <summary>
+/// "Scry N" — controller looks at the top N cards of their library, then
+/// puts any number of them on the bottom of their library and the rest
+/// back on top in any order (CR 701.20). Consults the registered agent
+/// for the player's decision; falls back to the all-to-bottom default
+/// when no agent is registered (matches the <see cref="ScriptedAgent"/> /
+/// <see cref="Majik.Core.Players.Agents.DeterministicBotAgent"/> default
+/// scry policy). Wraps the existing <see cref="Majik.Core.Keywords.ScryAction"/>
+/// keyword action — exact parallel of <see cref="SurveilSelfEffectDef"/>.
+/// Canonical case: the Theros scry-land cycle (e.g. Temple of Triumph,
+/// "When this land enters, scry 1.").
+/// </summary>
+public sealed class ScrySelfEffectDef : EffectDefinition
 {
     public int Amount { get; set; } = 1;
 }
