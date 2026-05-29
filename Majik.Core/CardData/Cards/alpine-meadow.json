@@ -1,0 +1,10 @@
+{
+  "name": "Alpine Meadow",
+  "types": ["Land"],
+  "supertypes": ["Snow"],
+  "subtypes": ["Mountain", "Plains"],
+  "abilities": [
+    { "kind": "mana", "produces": "R" },
+    { "kind": "mana", "produces": "W" }
+  ]
+}
