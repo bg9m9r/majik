@@ -1,0 +1,15 @@
+{
+  "name": "Temple of Malady",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "B" },
+    { "kind": "mana", "produces": "G" },
+    {
+      "kind": "triggered",
+      "trigger": { "type": "etb_self" },
+      "effects": [
+        { "type": "scry_self", "amount": 1 }
+      ]
+    }
+  ]
+}
