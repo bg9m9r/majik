@@ -1,0 +1,8 @@
+{
+  "name": "Kird Ape",
+  "types": ["Creature"],
+  "subtypes": ["Ape"],
+  "manaCost": "{R}",
+  "power": 1,
+  "toughness": 1
+}
