@@ -247,6 +247,7 @@ public static class CardDefinitionFactory
             DrawCardEffectDef draw => BuildDrawCardEffect(draw, card, controller),
             SurveilSelfEffectDef surveil => BuildSurveilSelfEffect(surveil, card, controller),
             DestroyTargetStubEffectDef destroy => BuildDestroyTargetStubEffect(destroy, card),
+            UntapTargetStubEffectDef untap => BuildUntapTargetStubEffect(untap, card),
             GainLifeSelfEffectDef gain => BuildGainLifeSelfEffect(gain, card, controller),
             MillThenPickFirstMatchingToHandEffectDef mp => BuildMillThenPickEffect(mp, card, controller),
             ConniveSelfEffectDef connive => BuildConniveSelfEffect(connive, card),
@@ -319,6 +320,20 @@ public static class CardDefinitionFactory
         return new Effect(
             $"{card.Name}: destroy target {def.TargetFilter} (stub — no targeting yet)",
             () => { /* destroy deferred */ });
+    }
+
+    private static IEffect BuildUntapTargetStubEffect(UntapTargetStubEffectDef def, ICard card)
+    {
+        // Stub: mirrors the Boseiju destroy_target_stub deferred behavior.
+        // Untapping itself is a supported CR 701.21 action, but choosing
+        // the target requires the targeting/prompt system that isn't wired
+        // yet, so resolution proceeds as a no-op. Upgrades to a real
+        // untap_target effect (Permanent.Untap on the chosen target) once
+        // targeting lands, without changing JSON files. Canonical case:
+        // Minamo, School at Water's Edge ("Untap target legendary permanent").
+        return new Effect(
+            $"{card.Name}: untap target {def.TargetFilter} (stub — no targeting yet)",
+            () => { /* untap target deferred */ });
     }
 
     private static IEffect BuildSurveilSelfEffect(SurveilSelfEffectDef def, ICard card, Player controller)
