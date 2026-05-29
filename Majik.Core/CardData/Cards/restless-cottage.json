@@ -1,0 +1,8 @@
+{
+  "name": "Restless Cottage",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "B" },
+    { "kind": "mana", "produces": "G" }
+  ]
+}
