@@ -1,0 +1,8 @@
+{
+  "name": "Desert of the Fervent",
+  "types": ["Land"],
+  "subtypes": ["Desert"],
+  "abilities": [
+    { "kind": "mana", "produces": "R" }
+  ]
+}
