@@ -1,0 +1,9 @@
+{
+  "name": "Nishoba Brawler",
+  "types": ["Creature"],
+  "subtypes": ["Cat", "Warrior"],
+  "manaCost": "{1}{G}",
+  "power": 0,
+  "toughness": 3,
+  "abilities": []
+}
