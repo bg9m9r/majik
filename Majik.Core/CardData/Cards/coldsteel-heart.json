@@ -1,0 +1,6 @@
+{
+  "name": "Coldsteel Heart",
+  "types": ["Artifact"],
+  "supertypes": ["Snow"],
+  "manaCost": "{2}"
+}
