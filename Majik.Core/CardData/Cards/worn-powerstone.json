@@ -1,0 +1,11 @@
+{
+  "name": "Worn Powerstone",
+  "types": ["Artifact"],
+  "manaCost": "{3}",
+  "abilities": [
+    {
+      "kind": "mana",
+      "produces": "CC"
+    }
+  ]
+}
