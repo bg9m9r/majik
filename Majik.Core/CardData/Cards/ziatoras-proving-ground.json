@@ -1,0 +1,10 @@
+{
+  "name": "Ziatora's Proving Ground",
+  "types": ["Land"],
+  "subtypes": ["Swamp", "Mountain", "Forest"],
+  "abilities": [
+    { "kind": "mana", "produces": "B" },
+    { "kind": "mana", "produces": "R" },
+    { "kind": "mana", "produces": "G" }
+  ]
+}
