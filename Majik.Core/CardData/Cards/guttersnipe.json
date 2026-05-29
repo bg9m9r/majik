@@ -1,0 +1,9 @@
+{
+  "name": "Guttersnipe",
+  "types": ["Creature"],
+  "subtypes": ["Goblin", "Shaman"],
+  "manaCost": "{2}{R}",
+  "power": 2,
+  "toughness": 2,
+  "abilities": []
+}
