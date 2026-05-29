@@ -51,6 +51,26 @@ public sealed class GameFacade : IDisposable
     /// </summary>
     public static Action<Exception, GameEvent>? OnEventHandlerError { get; set; }
 
+    /// <summary>
+    /// Feature flag (DEFAULT TRUE): when on, factory-backed NON-LAND deck
+    /// cards are built through their <c>[CardName]</c> <c>*Factory</c> during
+    /// <see cref="Create"/> rather than arriving as ability-less binder-chain
+    /// shells. The per-card factories were historically TEST-ONLY (only
+    /// <c>NamedCardFactory.Create</c> dispatched to them, which prod never
+    /// called), so bespoke factory abilities — Agatha's Soul Cauldron's
+    /// <c>{T}</c>, Dredger's Insight's JSON ETB triggers, … — did nothing in a
+    /// real match even though their unit tests passed. Routing closes that
+    /// gap. Flip to <c>false</c> to fall back to the pure binder chain without
+    /// a revert (kill-switch). Lands are NEVER routed regardless — their
+    /// factories deliberately omit enters-tapped/shock and rely on the binder
+    /// chain (see <c>SurveilLandCycleFactory</c> / <c>ShockLandBinder</c>).
+    /// </summary>
+    public static bool RouteThroughNamedFactories
+    {
+        get => Majik.Core.CardData.FactoryRouting.RouteThroughNamedFactories;
+        set => Majik.Core.CardData.FactoryRouting.RouteThroughNamedFactories = value;
+    }
+
     private readonly EventBus _bus = new();
     private readonly Majik.Core.Stack.Stack _stack;
     private readonly TriggerManager _triggers;
@@ -446,18 +466,149 @@ public sealed class GameFacade : IDisposable
 
         foreach (var card in aliceDeck)
         {
-            card.SetOwner(alice);
-            BindCardAbilities(card, alice, cardRepo, bus, facade.ContinuousEffects);
-            alice.Zones.GetZone(ZoneType.Library).AddCard(card);
+            var live = BuildDeckCard(card, alice, cardRepo, bus, facade.ContinuousEffects);
+            alice.Zones.GetZone(ZoneType.Library).AddCard(live);
         }
         foreach (var card in bobDeck)
         {
-            card.SetOwner(bob);
-            BindCardAbilities(card, bob, cardRepo, bus, facade.ContinuousEffects);
-            bob.Zones.GetZone(ZoneType.Library).AddCard(card);
+            var live = BuildDeckCard(card, bob, cardRepo, bus, facade.ContinuousEffects);
+            bob.Zones.GetZone(ZoneType.Library).AddCard(live);
         }
 
         return facade;
+    }
+
+    /// <summary>
+    /// Produce the live deck-card instance for <paramref name="shell"/>.
+    ///
+    /// <para>Default path (binder chain): set owner on the incoming shell and
+    /// run <see cref="BindCardAbilities"/> on it — historical behaviour.</para>
+    ///
+    /// <para>Routed path (<see cref="RouteThroughNamedFactories"/> on AND
+    /// <see cref="Majik.Core.CardData.Factories.ImplementedCardNames.HasRealFactory"/>
+    /// AND the card is NOT a Land): build a fresh instance via the card's
+    /// <c>[CardName]</c> factory so its bespoke abilities (closures that
+    /// capture the factory's own card as <c>source</c>) function in prod. The
+    /// returned instance REPLACES the shell. We then re-stamp the color
+    /// indicator the shell loader applied (CR 202.2c) and overlay only the
+    /// additive/generic binders (keywords, mana, and the ETB
+    /// replacement/counter/copy binders) with a dedup guard. We deliberately
+    /// do NOT run the triggered-ability / saga / affinity / loyalty binders
+    /// on routed cards — the factory owns those bespoke abilities and the
+    /// binders would double-add ETB triggers.</para>
+    /// </summary>
+    private static ICard BuildDeckCard(
+        ICard shell,
+        Player owner,
+        ICardRepository? cardRepo,
+        ReplacementBus replacements,
+        ContinuousEffectsService effects)
+    {
+        if (RouteThroughNamedFactories
+            && !shell.HasType(Majik.Core.Cards.Types.CardType.Land)
+            && Majik.Core.CardData.Factories.ImplementedCardNames.HasRealFactory(shell.Name))
+        {
+            // APPROACH B — instance swap. Build the card through its factory
+            // (owner == controller, matching what GameFacade already assigns).
+            var built = Majik.Core.CardData.NamedCardFactory.Create(shell.Name, owner);
+
+            // Hook the CES so creatures get layer-system P/T (mirrors
+            // BindCardAbilities). The factory does not wire this.
+            if (built is Majik.Core.Cards.Creature creature)
+            {
+                creature.ActiveEffects = effects;
+            }
+
+            var entity = cardRepo?.GetByName(shell.Name);
+            if (entity != null)
+            {
+                // Re-apply the color indicator the shell loader stamped
+                // (CR 202.2c) — the factory may not. SetColorIndicator is
+                // idempotent; the union with mana-cost pips is duplicate-safe.
+                if (built is Majik.Core.Cards.Card concrete)
+                {
+                    var colors = Majik.Core.Cards.CardColors.ParseScryfallColors(entity.Colors);
+                    if (colors.Count > 0) concrete.SetColorIndicator(colors);
+                }
+
+                OverlayAdditiveBinders(built, entity, owner, replacements, effects);
+            }
+
+            return built;
+        }
+
+        shell.SetOwner(owner);
+        BindCardAbilities(shell, owner, cardRepo, replacements, effects);
+        return shell;
+    }
+
+    /// <summary>
+    /// Overlay ONLY the additive/generic binders onto a factory-built card,
+    /// each guarded so a keyword or mana ability the factory already added is
+    /// never doubled. Runs the ETB replacement/counter/copy chain (which the
+    /// factory may not register for non-land permanents). Does NOT run the
+    /// triggered-ability / saga / affinity / loyalty binders — the factory
+    /// owns those.
+    /// </summary>
+    private static void OverlayAdditiveBinders(
+        ICard card,
+        CardEntity entity,
+        Player controller,
+        ReplacementBus replacements,
+        ContinuousEffectsService effects)
+    {
+        // Snapshot the keyword + mana abilities the factory already attached
+        // so the binders' additions can be deduped.
+        var existingKeywords = card.Abilities.OfType<KeywordAbility>()
+            .Select(k => k.Keyword)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var hadManaAbility = card.Abilities.OfType<Majik.Core.Abilities.IManaAbility>().Any();
+
+        // KeywordBinder — dedup any keyword the factory already added.
+        var beforeKeyword = card.Abilities.OfType<KeywordAbility>().Count();
+        KeywordBinder.Bind(card, entity, controller, effects);
+        DedupKeywordAbilities(card, existingKeywords, beforeKeyword);
+
+        // OracleManaBinder — if the factory already gave the card a mana
+        // ability, skip the binder entirely (it cannot know the factory's
+        // intent and would double the source).
+        if (!hadManaAbility)
+        {
+            OracleManaBinder.Bind(card, entity, controller);
+        }
+
+        // ETB replacement / counter / copy chain — generic, additive, and not
+        // something a non-land factory typically registers. Mirrors
+        // ScryfallCardFactory so the two binder entry points don't diverge.
+        if (!ShockLandBinder.Bind(card, entity, replacements) &&
+            !SubtypeEntersTappedBinder.Bind(card, entity, replacements) &&
+            !ConditionalEntersTappedBinder.Bind(card, entity, replacements))
+        {
+            EntersTappedBinder.Bind(card, entity, replacements);
+        }
+        EntersWithCountersBinder.Bind(card, entity, replacements);
+        EntersAsCopyBinder.Bind(card, entity, replacements, effects);
+    }
+
+    /// <summary>
+    /// Remove any <see cref="KeywordAbility"/> the binder just added whose
+    /// keyword the factory had already attached (snapshot in
+    /// <paramref name="preexisting"/>). <paramref name="boundBefore"/> is the
+    /// keyword-ability count before the binder ran, so we only inspect the
+    /// abilities the binder appended.
+    /// </summary>
+    private static void DedupKeywordAbilities(
+        ICard card, HashSet<string> preexisting, int boundBefore)
+    {
+        if (card is not Card concrete) return;
+        var keywordAbilities = card.Abilities.OfType<KeywordAbility>().ToList();
+        for (var i = keywordAbilities.Count - 1; i >= boundBefore; i--)
+        {
+            if (preexisting.Contains(keywordAbilities[i].Keyword))
+            {
+                concrete.RemoveAbility(keywordAbilities[i]);
+            }
+        }
     }
 
     /// <summary>
@@ -500,7 +651,23 @@ public sealed class GameFacade : IDisposable
                 {
                     card.AddAbility(trig);
                 }
-                ShockLandBinder.Bind(card, entity, replacements);
+                // ETB replacement chain (CR 614). Reconciles a long-standing
+                // asymmetry with ScryfallCardFactory: BindCardAbilities used to
+                // register ONLY the shock-land replacement, so subtype /
+                // conditional / unconditional enters-tapped lands (surveil
+                // lands, "this land enters tapped", check lands) entered
+                // UNTAPPED in real matches. Run the full short-circuit chain
+                // (Shock → Subtype → Conditional → Unconditional) plus the
+                // independent counter / copy binders so the prod card-build
+                // path matches the factory path exactly.
+                if (!ShockLandBinder.Bind(card, entity, replacements) &&
+                    !SubtypeEntersTappedBinder.Bind(card, entity, replacements) &&
+                    !ConditionalEntersTappedBinder.Bind(card, entity, replacements))
+                {
+                    EntersTappedBinder.Bind(card, entity, replacements);
+                }
+                EntersWithCountersBinder.Bind(card, entity, replacements);
+                EntersAsCopyBinder.Bind(card, entity, replacements, effects);
                 OracleLandActivatedAbilityBinder.Bind(card, entity, controller);
                 OracleLoyaltyAbilityBinder.Bind(card, entity, controller);
                 return;

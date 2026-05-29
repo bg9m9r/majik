@@ -26,11 +26,17 @@ public class LegacyStartAsyncCastDispatchTests
         // onto the battlefield. The point of the test is the absence of
         // "no castDispatcher was supplied" — not the mechanical correctness
         // of the cast.
-        var bear = new Creature("Memnite", "0", 1, 1);
         var facade = GameFacade.Create(
             "Alice", "Bob",
-            new ICard[] { bear },
+            new ICard[] { new Creature("Memnite", "0", 1, 1) },
             Array.Empty<ICard>());
+
+        // Pull the LIVE deck-card instance from the library. GameFacade.Create
+        // may replace the supplied shell with a factory-built instance when
+        // RouteThroughNamedFactories is on (Memnite is factory-backed), so we
+        // must operate on whatever instance actually landed in the library —
+        // not the throwaway shell we passed in.
+        var bear = facade.Alice.Zones.Library.GetCards().Single(c => c.Name == "Memnite");
 
         // Move bear into hand BEFORE StartAsync so the priority prompt's
         // legality-narrowed ExpectedKinds includes CastSpellCommand.
