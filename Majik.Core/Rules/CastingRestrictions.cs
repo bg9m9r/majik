@@ -59,6 +59,17 @@ public static class CastingRestrictions
     // <see cref="Clear"/> in tests). Same lifecycle posture as the
     // turn-scoped uncounterable rider.
     private static readonly HashSet<Guid> _noncreatureRestrictedPlayers = new();
+    // CR 601.3 — "noncreature spells with mana value N can't be cast" rail
+    // (Sanctum Prelate: "Noncreature spells with mana value equal to the
+    // chosen number can't be cast."). Stored as (token, manaValue) entries;
+    // a mana value is blocked for noncreature spells while at least one entry
+    // targeting it exists. Symmetric — applies to every player's noncreature
+    // spells (same global posture as _namedCardBlocks, but keyed on mana
+    // value and gated to noncreature spells by ActionValidator). Distinct
+    // from the per-player turn-scoped _noncreatureRestrictedPlayers rail
+    // above (Ranger-Captain), which blocks ALL noncreature spells for a
+    // specific player; this rail blocks a SINGLE mana value for everyone.
+    private static readonly List<(object Token, int ManaValue)> _noncreatureManaValueBlocks = new();
     // CR 601.3 — global "no player may cast spells from this zone" rail
     // (Grafdigger's Cage: "Players can't cast spells from graveyards or
     // libraries."). Stored as (token, zone); a zone is blocked for every
@@ -432,6 +443,68 @@ public static class CastingRestrictions
     }
 
     /// <summary>
+    /// Register a "noncreature spells with mana value
+    /// <paramref name="manaValue"/> can't be cast" restriction (CR 601.3 —
+    /// Sanctum Prelate: "Noncreature spells with mana value equal to the
+    /// chosen number can't be cast."), keyed by <paramref name="token"/>.
+    /// Idempotent for the same (token, manaValue) pair. Global / symmetric:
+    /// applies to every player's noncreature spells (gating to noncreature
+    /// is <see cref="ActionValidator"/>'s responsibility — it only consults
+    /// <see cref="IsNoncreatureManaValueBlocked"/> for non-creature cards).
+    /// Removed when the source permanent leaves the battlefield via
+    /// <see cref="RemoveNoncreatureManaValueBlock"/>.
+    /// </summary>
+    public static void AddNoncreatureManaValueBlock(object token, int manaValue)
+    {
+        ArgumentNullException.ThrowIfNull(token);
+        if (manaValue < 0) return;
+        lock (_gate)
+        {
+            foreach (var entry in _noncreatureManaValueBlocks)
+            {
+                if (ReferenceEquals(entry.Token, token) && entry.ManaValue == manaValue)
+                {
+                    return;
+                }
+            }
+            _noncreatureManaValueBlocks.Add((token, manaValue));
+        }
+    }
+
+    /// <summary>
+    /// Remove every noncreature-mana-value block registered under
+    /// <paramref name="token"/>. Used when the Sanctum Prelate (or similar
+    /// source) leaves the battlefield. Scoped by token, so removing one
+    /// source does not tear down blocks contributed by other sources.
+    /// </summary>
+    public static void RemoveNoncreatureManaValueBlock(object token)
+    {
+        ArgumentNullException.ThrowIfNull(token);
+        lock (_gate)
+        {
+            _noncreatureManaValueBlocks.RemoveAll(e => ReferenceEquals(e.Token, token));
+        }
+    }
+
+    /// <summary>
+    /// True if at least one registered block currently prevents casting a
+    /// noncreature spell with mana value <paramref name="manaValue"/>
+    /// (CR 601.3 — Sanctum Prelate). The caller (<see cref="ActionValidator"/>)
+    /// is responsible for gating this check to noncreature spells.
+    /// </summary>
+    public static bool IsNoncreatureManaValueBlocked(int manaValue)
+    {
+        lock (_gate)
+        {
+            foreach (var entry in _noncreatureManaValueBlocks)
+            {
+                if (entry.ManaValue == manaValue) return true;
+            }
+            return false;
+        }
+    }
+
+    /// <summary>
     /// Register a global "no player may cast spells from
     /// <paramref name="zone"/>" restriction (CR 601.3 — Grafdigger's Cage:
     /// "Players can't cast spells from graveyards or libraries."), keyed
@@ -639,6 +712,7 @@ public static class CastingRestrictions
             _namedCardBlocks.Clear();
             _namedCardBlocksByPlayer.Clear();
             _noncreatureRestrictedPlayers.Clear();
+            _noncreatureManaValueBlocks.Clear();
             _globalCastZoneBlocks.Clear();
             _cannotCastAnySpell.Clear();
             _nextSpellUncounterable.Clear();
