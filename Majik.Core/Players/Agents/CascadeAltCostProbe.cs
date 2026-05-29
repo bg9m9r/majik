@@ -79,6 +79,7 @@ public sealed class CascadeAltCostProbe : IAlternativeCostProbe
             "Violent Outburst" => true,
             "Ardent Plea" => true,
             "Bituminous Blast" => true,
+            "Demonic Dread" => true,
             _ => false,
         };
     }
