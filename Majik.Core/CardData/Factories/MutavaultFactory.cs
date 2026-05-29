@@ -4,7 +4,9 @@ using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
 using Majik.Core.Effects;
 using Majik.Core.Players;
+using Majik.Core.Services;
 using Majik.Core.ValueObjects;
+using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
 
@@ -136,6 +138,70 @@ public static class MutavaultFactory
             effects: new IEffect[] { animateEffect }));
 
         return land;
+    }
+
+    /// <summary>
+    /// Construct a Mutavault token (CR 111) and put it onto the battlefield
+    /// under <paramref name="controller"/>. The token is a Land with the
+    /// same ability shape as the printed card (<c>{T}: Add {C}</c> +
+    /// <c>{1}: become a 2/2 every-creature-type creature until EOT, it's
+    /// still a land</c>), stamped with <see cref="Permanent.IsToken"/> so
+    /// SBA 704.5d removes it from any zone other than the battlefield.
+    ///
+    /// Created by spells / abilities that print "create a Mutavault
+    /// token" (Mutable Explorer's ETB trigger is the in-Modern source).
+    /// </summary>
+    /// <param name="controller">Initial controller / owner of the token.</param>
+    /// <param name="effects">Continuous-effects service for Layer 4 / 7b
+    /// registration of the animate ability. May be null — the ability
+    /// still resolves but no continuous effect is recorded
+    /// (shape-only path).</param>
+    /// <param name="zones">When supplied, the token enters via
+    /// <see cref="ZoneService.MoveCardTo"/> so CardMovedEvent fires for
+    /// downstream triggers / log subscribers. Without it the token is
+    /// placed directly into <c>controller.Zones.Battlefield</c>.</param>
+    /// <param name="tapped">When true, the token is tapped on the way in
+    /// (Mutable Explorer's oracle: "create a tapped Mutavault token").
+    /// </param>
+    public static Land CreateAsToken(
+        Player controller,
+        ContinuousEffectsService? effects = null,
+        ZoneService? zones = null,
+        bool tapped = false)
+    {
+        if (controller == null) throw new ArgumentNullException(nameof(controller));
+
+        var token = Create(controller, effects);
+        token.MarkAsToken();
+
+        // Tokens enter the battlefield directly (CR 111.6) — sentinel
+        // "from Library" pattern mirrors TokenFactory.CreateOnBattlefield
+        // so ZoneService.MoveCardTo's from-zone check passes and
+        // CardMovedEvent fires for downstream subscribers.
+        token.SetZone(ZoneType.Library);
+        controller.Zones.Library.AddCard(token);
+
+        if (zones != null)
+        {
+            zones.MoveCardTo(token, ZoneType.Battlefield, controller);
+        }
+        else
+        {
+            controller.Zones.Library.RemoveCard(token);
+            token.SetZone(ZoneType.Battlefield);
+            controller.Zones.Battlefield.AddCard(token);
+        }
+
+        // CR 614.1c — "create a tapped …": tap after the move so the
+        // CardMovedEvent fired untapped; the resulting permanent state
+        // is tapped, which is what matters for subsequent SBAs / mana
+        // ability legality (Land.CanTapForMana returns false).
+        if (tapped)
+        {
+            token.Tap();
+        }
+
+        return token;
     }
 }
 
