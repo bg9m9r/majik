@@ -1,0 +1,9 @@
+{
+  "name": "Vexing Devil",
+  "types": ["Creature"],
+  "subtypes": ["Devil"],
+  "manaCost": "{R}",
+  "power": 4,
+  "toughness": 3,
+  "abilities": []
+}
