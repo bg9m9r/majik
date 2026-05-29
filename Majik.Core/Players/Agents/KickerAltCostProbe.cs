@@ -103,6 +103,7 @@ public sealed class KickerAltCostProbe : IAlternativeCostProbe
             "Vines of Vastwood" => ManaCost.Parse("{G}"),
             "Consult the Star Charts" => ManaCost.Parse("{1}{U}"),
             "Sea Gate Stormcaller" => ManaCost.Parse("{4}{U}"),
+            "Scourge of the Skyclaves" => ManaCost.Parse("{4}{B}"),
             _ => null,
         };
     }
