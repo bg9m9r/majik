@@ -1,0 +1,9 @@
+{
+  "name": "Grim Lavamancer",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Wizard"],
+  "manaCost": "{R}",
+  "power": 1,
+  "toughness": 1,
+  "abilities": []
+}
