@@ -1,0 +1,9 @@
+{
+  "name": "Smoldering Marsh",
+  "types": ["Land"],
+  "subtypes": ["Swamp", "Mountain"],
+  "abilities": [
+    { "kind": "mana", "produces": "B" },
+    { "kind": "mana", "produces": "R" }
+  ]
+}
