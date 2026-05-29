@@ -1,0 +1,15 @@
+{
+  "name": "Temple of Silence",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "W" },
+    { "kind": "mana", "produces": "B" },
+    {
+      "kind": "triggered",
+      "trigger": { "type": "etb_self" },
+      "effects": [
+        { "type": "scry_self", "amount": 1 }
+      ]
+    }
+  ]
+}
