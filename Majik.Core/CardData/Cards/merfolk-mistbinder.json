@@ -1,0 +1,9 @@
+{
+  "name": "Merfolk Mistbinder",
+  "types": ["Creature"],
+  "subtypes": ["Merfolk", "Shaman"],
+  "manaCost": "{G}{U}",
+  "power": 2,
+  "toughness": 2,
+  "abilities": []
+}
