@@ -39,6 +39,14 @@ public class AbilityActivator
             return false;
         }
 
+        // CR 602.5c / 605.1a — "Activate only if <condition>" gate. Reject
+        // when the ability carries a condition predicate that is currently
+        // unsatisfied (Metalcraft, Delirium, "you control a Forest", …).
+        if (!ability.CanActivateNow())
+        {
+            return false;
+        }
+
         // Basic validation - full implementation in Phase 4
         // For now, just check if player controls the source
         return true;
@@ -90,7 +98,8 @@ public class AbilityActivator
             costs: costList,
             effects: sourceAbility?.Effects,
             targetRequests: sourceAbility?.TargetRequests,
-            sorcerySpeed: ability.IsSorcerySpeed);
+            sorcerySpeed: ability.IsSorcerySpeed,
+            canActivateCheck: sourceAbility?.CanActivateCheck);
         if (sourceAbility != null && sourceAbility.ChosenTargets.Count > 0)
         {
             activatedAbility.SetChosenTargets(sourceAbility.ChosenTargets);

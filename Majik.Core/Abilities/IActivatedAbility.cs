@@ -33,4 +33,14 @@ public interface IActivatedAbility : IStackObject, IAbility
     /// timing rules).
     /// </summary>
     bool IsSorcerySpeed { get; }
+
+    /// <summary>
+    /// CR 602.5c / 605.1a — true iff this ability's "Activate only if
+    /// &lt;condition&gt;" gate (if any) is currently satisfied. Always true
+    /// for abilities without such a restriction. Re-evaluated against live
+    /// game state on each call. The <see cref="Rules.ActionValidator"/> and
+    /// <see cref="Services.AbilityActivator"/> consult this before allowing
+    /// an activation.
+    /// </summary>
+    bool CanActivateNow();
 }
