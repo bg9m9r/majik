@@ -1,0 +1,10 @@
+{
+  "name": "Hazoret the Fervent",
+  "types": ["Creature"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["God"],
+  "manaCost": "{3}{R}",
+  "power": 5,
+  "toughness": 4,
+  "abilities": []
+}
