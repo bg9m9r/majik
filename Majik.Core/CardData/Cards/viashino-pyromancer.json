@@ -1,0 +1,9 @@
+{
+  "name": "Viashino Pyromancer",
+  "types": ["Creature"],
+  "subtypes": ["Lizard", "Wizard"],
+  "manaCost": "{1}{R}",
+  "power": 2,
+  "toughness": 1,
+  "abilities": []
+}
