@@ -1,0 +1,9 @@
+{
+  "name": "Goblin Ringleader",
+  "types": ["Creature"],
+  "subtypes": ["Goblin"],
+  "manaCost": "{3}{R}",
+  "power": 2,
+  "toughness": 2,
+  "abilities": []
+}
