@@ -226,6 +226,20 @@ public class ShiftingWoodlandFactoryTests
             "creature + artifact + enchantment + land = four card types");
     }
 
+    [Fact]
+    public void CopyAbility_CanActivateNow_GatedByDelirium()
+    {
+        var land = ShiftingWoodlandFactory.Create(_alice);
+        var ability = CopyAbility(land);
+
+        // CR 602.5c — the engine "Activate only if" gate is wired to the
+        // delirium count, re-evaluated live.
+        ability.CanActivateNow().Should().BeFalse("empty graveyard — no delirium");
+
+        SatisfyDelirium(_alice);
+        ability.CanActivateNow().Should().BeTrue("four card types now in the graveyard");
+    }
+
     // -----------------------------------------------------------------------
     // Graveyard target candidates (CR 110.4a — permanent cards only)
     // -----------------------------------------------------------------------
