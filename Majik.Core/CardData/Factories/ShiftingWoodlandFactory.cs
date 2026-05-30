@@ -50,22 +50,17 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="TarmogoyfFactory.CountDistinctCardTypes"/>).</item>
 /// </list>
 ///
-/// ## Delirium / target gating posture (shared with Tectonic Edge)
-/// <see cref="ActivatedAbility"/> does not yet expose a generic
-/// <c>CanActivate</c> hook for non-mana activations (only the
-/// <see cref="ActivatedAbility.IsSorcerySpeed"/> rider is wired), so the
-/// "activate only if delirium" restriction (CR 602.5b) is enforced two ways,
-/// identical to <see cref="TectonicEdgeFactory"/>:
-/// <list type="bullet">
-///   <item>At <em>action-enumeration time</em>: callers (bot policies / agent
-///   legal-action probes) consult the public static predicate
-///   <see cref="UnholyHeatFactory.IsDeliriumActive"/> BEFORE paying the
-///   cost.</item>
-///   <item>At <em>resolve time</em>: the effect closure re-checks delirium and
-///   short-circuits cleanly when the rule was violated. CR 117.x — the
-///   {2}{G}{G} cost was already paid by the cost layer, so only the
-///   copy body is skipped.</item>
-/// </list>
+/// ## Delirium activation gating posture
+/// The "Activate only if there are four or more card types among cards in
+/// your graveyard" restriction (CR 602.5c) is enforced authoritatively via
+/// the ability's <c>canActivateCheck</c> — the general "Activate only if
+/// &lt;condition&gt;" gate (consulted by <see cref="Rules.ActionValidator"/>
+/// and <see cref="Services.AbilityActivator"/>), re-evaluated live against
+/// the controller's graveyard. As belt-and-braces (CR 117.x — should the
+/// condition lapse between activation and resolution, after the {2}{G}{G}
+/// cost is already paid), the resolution closure re-checks delirium and
+/// short-circuits cleanly. The delirium count itself reuses the existing
+/// <see cref="UnholyHeatFactory.IsDeliriumActive"/> predicate.
 ///
 /// ## Graveyard targeting
 /// "Target permanent card in your graveyard" — a 1..1
@@ -170,12 +165,13 @@ public static class ShiftingWoodlandFactory
                 var controller = land.Controller ?? owner;
 
                 // CR 602.5b delirium activation gate — defensive resolve-time
-                // re-check. The gate should already have been enforced at
-                // activation time via UnholyHeatFactory.IsDeliriumActive, but
-                // until IActivatedAbility.CanActivate ships an authoritative
-                // hook this is the safety net. Fail-closed: if delirium isn't
-                // active the copy body is skipped (the {2}{G}{G} cost was
-                // already paid — Tectonic Edge / Magmatic Channeler posture).
+                // re-check. The gate is authoritatively enforced at activation
+                // time by the ability's canActivateCheck (CR 602.5c — see the
+                // ActivatedAbility construction below, consulted by
+                // ActionValidator / AbilityActivator). This resolve-time
+                // re-check is belt-and-braces: fail-closed if delirium lapsed
+                // between activation and resolution (the {2}{G}{G} cost was
+                // already paid).
                 if (!UnholyHeatFactory.IsDeliriumActive(controller)) return;
 
                 // No service wired — shape-only path (NamedCardFactory.Create).
@@ -211,7 +207,14 @@ public static class ShiftingWoodlandFactory
                     LegalCandidates: Array.Empty<object>(),
                     Intent: BotIntent.None,
                     CandidateGatherer: _ => GraveyardPermanentCards(land.Controller ?? owner)),
-            });
+            },
+            // CR 602.5c — "Activate only if there are four or more card types
+            // among cards in your graveyard" (Delirium). Authoritative
+            // activation gate, consulted by ActionValidator / AbilityActivator
+            // (merged via the general canActivateCheck seam). Re-evaluated live
+            // against the controller's graveyard on each check.
+            canActivateCheck: () =>
+                UnholyHeatFactory.IsDeliriumActive(land.Controller ?? owner));
 
         land.AddAbility(copyAbility);
 
