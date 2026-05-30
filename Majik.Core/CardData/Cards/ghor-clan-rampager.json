@@ -1,0 +1,9 @@
+{
+  "name": "Ghor-Clan Rampager",
+  "types": ["Creature"],
+  "subtypes": ["Beast"],
+  "manaCost": "{2}{R}{G}",
+  "power": 4,
+  "toughness": 4,
+  "abilities": []
+}
