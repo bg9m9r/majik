@@ -1,0 +1,7 @@
+{
+  "name": "Browbeat",
+  "types": ["Sorcery"],
+  "manaCost": "{2}{R}",
+  "colors": ["R"],
+  "abilities": []
+}
