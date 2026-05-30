@@ -1,0 +1,9 @@
+{
+  "name": "Invisible Stalker",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Rogue"],
+  "manaCost": "{1}{U}",
+  "power": 1,
+  "toughness": 1,
+  "abilities": []
+}
