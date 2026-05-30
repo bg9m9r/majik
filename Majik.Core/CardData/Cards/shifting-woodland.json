@@ -1,0 +1,7 @@
+{
+  "name": "Shifting Woodland",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "G" }
+  ]
+}
