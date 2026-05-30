@@ -116,6 +116,16 @@ public sealed class GameDriver
             // per resolving player, mirroring the ZoneService registration.
             Majik.Core.Players.ControlPlayerRegistryProvider.Set(p, _controlPlayers);
         }
+
+        // CR 500.7 — Emrakul's "After that turn, that player takes an extra
+        // turn" rider. When a control grant carrying the rider ends (the
+        // controlled turn finishes, TurnDriver calls ClearActiveControl), the
+        // registry asks us to schedule the controlled player's extra turn.
+        // Enqueue onto the same ExtraTurnQueue the turn loop already drains
+        // before round-robin advancement, so the extra turn is taken directly
+        // after the controlled turn.
+        _controlPlayers.ScheduleExtraTurnAfterControl =
+            controlled => _extraTurns.EnqueueExtraTurn(controlled);
         Majik.Core.Random.GameRandomRegistry.SetDefault(_rng);
         if (_eventBus is not null)
         {

@@ -3,9 +3,12 @@ using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
+using Majik.Core.Domain.DomainEvents;
 using Majik.Core.Keywords;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
 using Majik.Core.Spells;
+using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
 
@@ -61,21 +64,27 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="Majik.Core.Rules.Protection.HasProtectionFromSpell"/>. The
 ///   quality string "instants" is the discoverability / marker label.
 ///
-/// ## Deferred (v1 gap — known, named precisely)
-/// - <b>Cast trigger — "gain control of target opponent during that
-///   player's next turn" (Mindslaver / CR 720 "Controlling Another
-///   Player")</b>: the engine has NO take-control-of-opponent's-turn
-///   primitive. <see cref="MindslaverFactory"/> documents the same gap (its
-///   activated ability records the chosen target via a sink and sacrifices
-///   the artifact, but no turn-substitution runs). Until a ControlPlayer
-///   primitive lands there is no faithful way to model "you gain control of
-///   target opponent during that player's next turn. After that turn, that
-///   player takes an extra turn." Rather than half-build a cast trigger that
-///   silently does nothing (or worse, mis-models the extra-turn rider in
-///   isolation), the cast trigger is deliberately NOT attached here — it
-///   ships when the take-control-of-opponent's-turn infra ships, alongside
-///   Mindslaver's mind-control half. Emrakul's body (stats, keywords, cost
-///   reduction) is fully faithful; only the cast trigger is deferred.
+/// - <b>Cast trigger — "When you cast this spell, you gain control of target
+///   opponent during that player's next turn. After that turn, that player
+///   takes an extra turn." (CR 603.1 / CR 720.1 / CR 500.7)</b>: attached as
+///   a <see cref="TriggeredAbility"/> on Emrakul's own
+///   <see cref="SpellCastEvent"/> while it is on the stack
+///   (<c>activeZones = {Stack}</c>, same shape as Bloodbraid Elf's cascade —
+///   the <see cref="TriggerManager"/> auto-binds the card on its Hand → Stack
+///   move and registers the trigger). A 1..1 "target opponent" request
+///   gathers the controller's opponents live; on resolution the chosen
+///   opponent's next turn is taken over via the
+///   <see cref="ControlPlayerRegistry"/> (shipped #1688, wired through
+///   <see cref="ControlPlayerRegistryProvider"/> exactly as
+///   <see cref="MindslaverFactory"/>), carrying the extra-turn-after rider so
+///   the controlled opponent takes an extra turn once the controlled turn
+///   ends.
+///
+/// ## Deferred sub-caveats (CR 720.5 / 720.6 — documented, not modelled)
+/// - The controller still can't make the controlled opponent concede
+///   (CR 720.6); engine-resolved random choices (discard at random) are
+///   unaffected. Neither regresses existing behaviour — see
+///   <see cref="ControlPlayerRegistry"/>'s class doc.
 /// </summary>
 [CardName("Emrakul, the Promised End")]
 public static class EmrakulThePromisedEndFactory
@@ -167,12 +176,94 @@ public static class EmrakulThePromisedEndFactory
             "instants",
             spellPredicate: spell => spell.Card.HasType(CardType.Instant)));
 
-        // NOTE (deferred): the on-cast trigger "you gain control of target
-        // opponent during that player's next turn. After that turn, that
-        // player takes an extra turn." is NOT attached — the engine has no
-        // CR 720 take-control-of-opponent's-turn (Mindslaver) primitive.
-        // See class xmldoc + MindslaverFactory for the shared gap.
+        // ----------------------------------------------------------------
+        // Cast trigger (CR 603.1 / CR 720.1 / CR 500.7):
+        //   "When you cast this spell, you gain control of target opponent
+        //    during that player's next turn. After that turn, that player
+        //    takes an extra turn."
+        // Fires on Emrakul's own SpellCastEvent while it's on the stack
+        // (activeZones = {Stack}, same shape as Bloodbraid Elf's cascade —
+        // the TriggerManager auto-binds the card's triggers when it crosses
+        // Hand → Stack, and registers this one because its active zone is the
+        // Stack). The 1..1 target-opponent request gathers opponents live
+        // from the controller's GameContext; on resolution the chosen
+        // opponent's next turn is taken over via the live
+        // ControlPlayerRegistry, with Emrakul's extra-turn rider
+        // (CR 500.7) so that opponent takes an extra turn afterwards.
+        // ----------------------------------------------------------------
+        var castTrigger = BuildCastTrigger(card, owner);
+        card.AddAbility(castTrigger);
 
         return card;
+    }
+
+    /// <summary>
+    /// CR 603.1 / CR 720.1 / CR 500.7 — Emrakul's on-cast take-control
+    /// trigger. Fires on Emrakul's own <see cref="SpellCastEvent"/> while it
+    /// is on the stack. The 1..1 target request gathers the controller's
+    /// opponents live; on resolution the chosen opponent's next turn is taken
+    /// over via the live <see cref="ControlPlayerRegistry"/> (resolved through
+    /// <see cref="ControlPlayerRegistryProvider"/>, the same indirection
+    /// Mindslaver uses), carrying the extra-turn-after rider so the controlled
+    /// opponent takes an extra turn once the controlled turn ends.
+    /// </summary>
+    private static TriggeredAbility BuildCastTrigger(Creature card, Player owner)
+    {
+        // CR 603.6a — "when you cast this spell": fires only for Emrakul's
+        // own SpellCastEvent (reference identity against the card).
+        var condition = new EventTriggerCondition<SpellCastEvent>(
+            (e, _) => ReferenceEquals(e.Spell.Card, card));
+
+        TriggeredAbility? trigger = null;
+        var effect = new Effect(
+            $"{CardName}: control target opponent's next turn + extra turn after (CR 720.1, 500.7)",
+            () =>
+            {
+                if (trigger == null) return;
+                if (trigger.ChosenTargets.Count == 0) return;
+                if (trigger.ChosenTargets[0].Count == 0) return;
+                // CR 608.2b — illegal / no target → no-op.
+                if (trigger.ChosenTargets[0][0] is not Player targetOpponent) return;
+
+                // CR 720.1 + CR 500.7 — gain control of the target opponent's
+                // next turn, with Emrakul's "after that turn, that player
+                // takes an extra turn" rider. Registry resolved at resolution
+                // time via the provider (keyed by the controlling player).
+                // Null in shape-only construction → no-op (the trigger is
+                // still attached for shape inspection).
+                var registry = ControlPlayerRegistryProvider.Get(owner);
+                registry?.GrantControl(
+                    controller: owner,
+                    controlled: targetOpponent,
+                    extraTurnAfter: true);
+            });
+
+        trigger = new TriggeredAbility(
+            source: card,
+            controller: owner,
+            condition: condition,
+            effects: new IEffect[] { effect },
+            targetRequests: new[]
+            {
+                new TargetRequest(
+                    Description: "target opponent",
+                    MinTargets: 1,
+                    MaxTargets: 1,
+                    LegalCandidates: Array.Empty<object>(),
+                    // CR 109.5 / 720.1 — "target opponent": every player in
+                    // the game except Emrakul's controller (ctx.Self is the
+                    // trigger's controller when the agent is prompted).
+                    CandidateGatherer: ctx => ctx.AllPlayers
+                        .Where(p => !ReferenceEquals(p, ctx.Self))
+                        .Cast<object>()
+                        .ToList()),
+            },
+            // CR 702.85-style on-cast trigger — active while the spell is on
+            // the stack (mirrors Bloodbraid Elf's cascade). The TriggerManager
+            // auto-binds the card on its Hand → Stack move and registers this
+            // trigger because its active zone is the Stack.
+            activeZones: new[] { ZoneType.Stack });
+
+        return trigger;
     }
 }
