@@ -367,6 +367,11 @@ public enum CardSubtype
     /// (back face of Tamiyo, Inquisitive Student). CR 205.3m.</summary>
     Tamiyo,
 
+    /// <summary>Samurai creature subtype — Kamigawa-block warriors plus the
+    /// 2/2 white Samurai token created by The Wandering Emperor's −1.
+    /// CR 205.3m.</summary>
+    Samurai,
+
     /// <summary>Homarid creature subtype — Hedron Crab, Homarid. CR 205.3m.
     /// Crustacean-flavoured creature type that originated in Fallen Empires
     /// and was reused by Zendikar's Hedron Crab.</summary>

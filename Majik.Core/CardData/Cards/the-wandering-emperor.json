@@ -1,0 +1,9 @@
+{
+  "name": "The Wandering Emperor",
+  "types": ["Planeswalker"],
+  "supertypes": ["Legendary"],
+  "subtypes": [],
+  "manaCost": "{2}{W}{W}",
+  "loyalty": 3,
+  "abilities": []
+}
