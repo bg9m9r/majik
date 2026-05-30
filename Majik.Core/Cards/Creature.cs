@@ -79,13 +79,10 @@ public class Creature : Permanent
         BaseToughness = toughness;
         _damage = 0;
     }
-
-    /// <summary>
-    /// Optional reference to the <see cref="Majik.Core.Effects.ContinuousEffectsService"/>
-    /// that owns this creature. When set, P/T and keyword lookups consult
-    /// it (CR 613 layer system). When null, base values are returned.
-    /// </summary>
-    public Majik.Core.Effects.ContinuousEffectsService? ActiveEffects { get; set; }
+    // ActiveEffects moved up to Permanent (CR 613) so non-creature
+    // permanents can also consult the layer system (e.g. Layer-5
+    // colour-changing on artifacts / enchantments). P/T and keyword
+    // lookups below read the inherited property.
 
     /// <summary>Get the current power after applying continuous effects.
     /// CR 708.2 — face-down creatures are 2/2 with no other characteristics,

@@ -128,7 +128,10 @@ public class CombatValidator
 
     private static bool AttackerProtectedFromBlocker(Creature attacker, Creature blocker)
     {
-        var blockerColors = Majik.Core.Cards.CardColors.GetColors(blocker);
+        // CR 105.3 / 702.16e — use the blocker's EFFECTIVE colour so a
+        // Layer-5 colour-changing effect (e.g. "is all colors") is honoured.
+        // Falls back to the printed/static colour when no effect is active.
+        var blockerColors = blocker.GetEffectiveColors();
         foreach (var c in blockerColors)
         {
             if (Majik.Core.Rules.Protection.HasProtectionFromColor(attacker, c))

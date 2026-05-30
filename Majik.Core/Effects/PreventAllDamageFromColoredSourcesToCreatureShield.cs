@@ -58,11 +58,15 @@ public sealed class PreventAllDamageFromColoredSourcesToCreatureShield
         if (intent.Amount <= 0) return false;
         if (!ReferenceEquals(intent.TargetCreature, _target)) return false;
 
-        // CR 105 — source colour. ICard sources route through CardColors;
-        // Player or unknown sources are treated as colourless and skip
-        // the shield (the printed clause names a colour, not "any source").
+        // CR 105.3 — source colour. ICard sources route through the
+        // effective colour (a battlefield Permanent's colour can be changed
+        // by a Layer-5 effect); Player or unknown sources are treated as
+        // colourless and skip the shield (the printed clause names a colour,
+        // not "any source").
         if (intent.Source is not ICard sourceCard) return false;
-        var colors = CardColors.GetColors(sourceCard);
+        IReadOnlySet<ManaColor> colors = sourceCard is Permanent perm
+            ? perm.GetEffectiveColors()
+            : CardColors.GetColors(sourceCard);
         return colors.Contains(_color);
     }
 

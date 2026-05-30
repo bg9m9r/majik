@@ -254,7 +254,13 @@ public sealed class CombatFlow
 
     private static bool HasProtectionFromSource(ICard target, ICard source)
     {
-        var sourceColors = Majik.Core.Cards.CardColors.GetColors(source);
+        // CR 105.3 / 702.16e — a battlefield source's colour can be changed
+        // by a Layer-5 effect; use its effective colour. Non-permanent
+        // sources (instants/sorceries) have no Layer-5 colour effect, so the
+        // printed/static colour applies.
+        var sourceColors = source is Permanent perm
+            ? perm.GetEffectiveColors()
+            : Majik.Core.Cards.CardColors.GetColors(source);
         foreach (var c in sourceColors)
         {
             if (Majik.Core.Rules.Protection.HasProtectionFromColor(target, c))
