@@ -1,5 +1,6 @@
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
+using Majik.Core.Events;
 using Majik.Core.Players;
 
 namespace Majik.Core.Effects;
@@ -19,16 +20,102 @@ public sealed class ContinuousEffectsService
 {
     private readonly List<ContinuousEffect> _effects = new();
 
+    // -----------------------------------------------------------------------
+    // CR 613 layer-pipeline memoization.
+    //
+    // INVARIANT: the cache key is (generation, Permanent) ONLY — it is NEVER
+    // keyed or invalidated by effect type. Any mutation that can change ANY
+    // permanent's computed characteristics bumps the single global
+    // _generation counter, which invalidates the whole cache at once. This is
+    // what makes new effect classes auto-covered: an author adding a brand-new
+    // ContinuousEffect subclass need only route its registration through
+    // Register/Unregister (or whatever mutator already bumps generation) and
+    // the cache stays correct with zero per-type plumbing.
+    //
+    // The cached value is the LAYERED result only. The cheap Layer-7c counter
+    // arithmetic (CR 122.1g) is deliberately EXCLUDED from the cache and
+    // re-applied on every Compute after the cache lookup, so counter changes
+    // (CounterCollection mutation) never need to bump generation.
+    // -----------------------------------------------------------------------
+    private long _generation;
+    private readonly Dictionary<Permanent, (long gen, PermanentCharacteristics chars)> _cache
+        = new(ReferenceEqualityComparer.Instance);
+    private readonly IEventBus? _eventBus;
+    private readonly Action<GameEvent>? _busHandler;
+
+    public ContinuousEffectsService()
+    {
+    }
+
+    /// <summary>
+    /// Wire the service to the engine <see cref="IEventBus"/> so the
+    /// memoization cache stays fresh against external characteristic-defining
+    /// inputs. CDAs like Tarmogoyf (graveyard card-type count), Death's
+    /// Shadow (controller's life total), and Master of Etherium (artifact
+    /// count) read game state that changes WITHOUT touching <c>_effects</c>;
+    /// those changes surface as <see cref="CardMovedEvent"/> /
+    /// <see cref="LifeChangedEvent"/> / <see cref="CounterAddedEvent"/>
+    /// (control changes also ride <see cref="CardMovedEvent"/>). We bump the
+    /// global generation on every event — conservative but always correct, and
+    /// the P/T-read multipliers (combat damage, the SBA fixed-point loop,
+    /// StateSnapshotter) still issue many cached Compute calls between events.
+    /// </summary>
+    public ContinuousEffectsService(IEventBus eventBus)
+    {
+        _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
+        _busHandler = OnBusEvent;
+        _eventBus.SubscribeAll(_busHandler);
+    }
+
+    private void OnBusEvent(GameEvent _)
+    {
+        // Any game event can shift an external CDA input (graveyard contents,
+        // life totals, control, counts of artifacts/etc.). Bump unconditionally
+        // — a spurious bump only costs a recompute, never correctness.
+        BumpGeneration();
+    }
+
+    /// <summary>
+    /// Invalidate the whole memoization cache by advancing the global
+    /// generation. Called by every mutator that can change a computed
+    /// characteristic (see the INVARIANT note on the cache fields).
+    /// </summary>
+    internal void BumpGeneration() => _generation++;
+
+    /// <summary>
+    /// CR 613 — full invalidate (mirror of <c>TriggerManager.Clear</c>).
+    /// Drops every cache entry and advances the generation. Safe to call at
+    /// any reset boundary.
+    /// </summary>
+    public void Clear()
+    {
+        _cache.Clear();
+        _generation++;
+    }
+
     public void Register(ContinuousEffect effect)
     {
         if (effect == null) throw new ArgumentNullException(nameof(effect));
         _effects.Add(effect);
+        // CR 613 — an effect's existence/applicability frequently gates on its
+        // SOURCE permanent's state (IsActive() ⇒ source on battlefield; "you
+        // control" ⇒ source's controller; etc.). Wire the source to this
+        // service so its zone/control/tap/counter/ability mutations bump the
+        // generation and invalidate the cache. In production every battlefield
+        // permanent already carries ActiveEffects; this also covers sources
+        // that callers forgot to wire. Never overwrites an existing link.
+        if (effect.Source is { ActiveEffects: null } src)
+        {
+            src.ActiveEffects = this;
+        }
+        BumpGeneration();
     }
 
     public void Unregister(ContinuousEffect effect)
     {
         if (effect is GrantAbilityEffect grant) grant.Revoke();
         _effects.Remove(effect);
+        BumpGeneration();
     }
 
     /// <summary>Drop any inactive (expired) effects.</summary>
@@ -42,6 +129,11 @@ public sealed class ContinuousEffectsService
             if (!grant.IsActive()) grant.Revoke();
         }
         _effects.RemoveAll(e => !e.IsActive());
+        // Effects may have changed AND permanents may have left play; clear
+        // opportunistically to bound cache growth, and bump so any survivor's
+        // recompute reflects the dropped effects.
+        _cache.Clear();
+        BumpGeneration();
     }
 
     /// <summary>
@@ -67,38 +159,49 @@ public sealed class ContinuousEffectsService
     {
         if (permanent == null) throw new ArgumentNullException(nameof(permanent));
 
-        PermanentCharacteristics chars;
-        if (permanent is Creature creature)
+        // Snapshot the generation at entry. The full pipeline below has SIDE
+        // EFFECTS (SyncAbilityGrants attaches/removes KeywordAbility markers on
+        // bearers via AddAbility/RemoveAbility), and those mutators bump the
+        // generation. We must store the cache entry against the generation we
+        // SEEDED from — not the post-side-effect value — so a grant attached
+        // mid-pass correctly invalidates this entry. The next Compute then
+        // re-seeds with the freshly-attached marker and (because Sync is
+        // idempotent) stabilizes without further bumps. Storing the
+        // post-mutation generation would mark a pre-grant seed as "fresh" and
+        // hand back stale keywords.
+        var genAtEntry = _generation;
+
+        // ----- (b) generation-counter cache -----------------------------
+        // Serve a fresh-generation cached LAYERED result if present. The
+        // returned value is a defensive clone (some callers read-mutate the
+        // working set), with the cheap Layer-7c counter delta re-applied on
+        // top per-call (counters are excluded from the cache — see the field
+        // INVARIANT note).
+        if (_cache.TryGetValue(permanent, out var entry) && entry.gen == genAtEntry)
         {
-            chars = new CreatureCharacteristics
-            {
-                Power = creature.BasePower,
-                Toughness = creature.BaseToughness,
-            };
-        }
-        else
-        {
-            chars = new PermanentCharacteristics();
+            var clone = CloneLayered(entry.chars, permanent);
+            ApplyCounterPostlude(clone, permanent);
+            return clone;
         }
 
-        // Seed printed types; Layer 4 effects add/remove on top.
-        foreach (var t in permanent.CardTypes) chars.Types.Add(t);
-        // Seed printed subtypes; Layer 4 effects add/remove on top.
-        foreach (var st in permanent.Subtypes) chars.Subtypes.Add(st);
-        // Bake in keywords already attached as KeywordAbility markers
-        // (printed evergreens like Flying on Air Elemental).
-        foreach (var kw in permanent.Abilities.OfType<KeywordAbility>())
+        // ----- (a) zero-effect fast path --------------------------------
+        // With no continuous effects registered, the entire CR-613 layer
+        // pipeline (ComputeStrippedSet / SyncAbilityGrants / the LINQ filter /
+        // GroupBy / per-layer TopoSort) collapses to "printed values + the
+        // Layer-7c counter delta". This is a strict simplification under the
+        // _effects.Count == 0 precondition — behaviourally identical to the
+        // full path, just allocation-free. Cache the printed (layered) result
+        // and re-apply the counter delta on the returned clone.
+        if (_effects.Count == 0)
         {
-            chars.Keywords.Add(kw.Keyword);
+            var printed = SeedPrintedCharacteristics(permanent);
+            _cache[permanent] = (genAtEntry, printed);
+            var result = CloneLayered(printed, permanent);
+            ApplyCounterPostlude(result, permanent);
+            return result;
         }
-        // CR 105 / 613.1e — seed the printed/static colour set (mana-cost
-        // pips + colour indicator + token override + Devoid). Layer 5
-        // SET / ADD colour effects mutate this on top during the layer
-        // walk below.
-        foreach (var c in Majik.Core.Cards.CardColors.GetColors(permanent))
-        {
-            chars.Colors.Add(c);
-        }
+
+        var chars = SeedPrintedCharacteristics(permanent);
 
         // CR 613.6 — pre-compute the set of creatures whose abilities have been
         // stripped by an active Layer 6 ability-removing effect. We then drop
@@ -141,25 +244,104 @@ public sealed class ContinuousEffectsService
             }
         }
 
-        // Layer 7c — +1/+1, -1/-1, and -0/-1 counter P/T adjustment
-        // (CR 122.1g). Applied after other 7c effects per CR 613.7
-        // (counters last). Only meaningful for creatures.
-        //   - +1/+1 and -1/-1 both shift power and toughness.
-        //   - -0/-1 (Wall of Roots cost-counter, Phyrexian Furnace's stress
-        //     cycle) shifts only toughness. The named counter type is
-        //     opaque to the +1/+1 / -1/-1 SBA cancellation (CR 704.5q
-        //     names only that pair), so it can stack to lethal-toughness
-        //     on Wall of Roots without being cancelled out.
-        if (chars is CreatureCharacteristics cc && permanent is Permanent perm)
+        // Cache the LAYERED result against the generation we SEEDED from
+        // (genAtEntry), not the possibly-bumped current value — see the
+        // snapshot note at the top of this method. Counter delta excluded
+        // (field INVARIANT); re-apply it only to the returned value.
+        _cache[permanent] = (genAtEntry, chars);
+        var computed = CloneLayered(chars, permanent);
+        ApplyCounterPostlude(computed, permanent);
+        return computed;
+    }
+
+    /// <summary>
+    /// CR 613.1 — seed a permanent's printed/static working set: printed P/T
+    /// (creatures), printed card types + subtypes, printed keyword markers,
+    /// and the printed/static colour set. SHARED by both the zero-effect fast
+    /// path and the full layer pipeline so the two can never diverge.
+    /// </summary>
+    private static PermanentCharacteristics SeedPrintedCharacteristics(Permanent permanent)
+    {
+        PermanentCharacteristics chars;
+        if (permanent is Creature creature)
         {
-            var plus = perm.Counters.Count(Majik.Core.Counters.CounterType.PlusOnePlusOne);
-            var minus = perm.Counters.Count(Majik.Core.Counters.CounterType.MinusOneMinusOne);
-            var minusZeroMinusOne = perm.Counters.Count(Majik.Core.Counters.CounterType.MinusZeroMinusOne);
-            cc.Power += plus - minus;
-            cc.Toughness += plus - minus - minusZeroMinusOne;
+            chars = new CreatureCharacteristics
+            {
+                Power = creature.BasePower,
+                Toughness = creature.BaseToughness,
+            };
+        }
+        else
+        {
+            chars = new PermanentCharacteristics();
+        }
+
+        // Seed printed types; Layer 4 effects add/remove on top.
+        foreach (var t in permanent.CardTypes) chars.Types.Add(t);
+        // Seed printed subtypes; Layer 4 effects add/remove on top.
+        foreach (var st in permanent.Subtypes) chars.Subtypes.Add(st);
+        // Bake in keywords already attached as KeywordAbility markers
+        // (printed evergreens like Flying on Air Elemental).
+        foreach (var kw in permanent.Abilities.OfType<KeywordAbility>())
+        {
+            chars.Keywords.Add(kw.Keyword);
+        }
+        // CR 105 / 613.1e — seed the printed/static colour set (mana-cost
+        // pips + colour indicator + token override + Devoid). Layer 5
+        // SET / ADD colour effects mutate this on top.
+        foreach (var c in Majik.Core.Cards.CardColors.GetColors(permanent))
+        {
+            chars.Colors.Add(c);
         }
 
         return chars;
+    }
+
+    /// <summary>
+    /// Deep-copy the layered working set (everything EXCEPT the Layer-7c
+    /// counter delta, which is re-applied per-call). Callers may read-mutate
+    /// the returned set, so cache hits must never hand back the stored
+    /// instance.
+    /// </summary>
+    private static PermanentCharacteristics CloneLayered(PermanentCharacteristics src, Permanent permanent)
+    {
+        PermanentCharacteristics dst;
+        if (src is CreatureCharacteristics scc)
+        {
+            dst = new CreatureCharacteristics { Power = scc.Power, Toughness = scc.Toughness };
+        }
+        else
+        {
+            dst = new PermanentCharacteristics();
+        }
+        foreach (var t in src.Types) dst.Types.Add(t);
+        foreach (var st in src.Subtypes) dst.Subtypes.Add(st);
+        foreach (var kw in src.Keywords) dst.Keywords.Add(kw);
+        foreach (var c in src.Colors) dst.Colors.Add(c);
+        return dst;
+    }
+
+    /// <summary>
+    /// Layer 7c — +1/+1, -1/-1, and -0/-1 counter P/T adjustment
+    /// (CR 122.1g). Applied after other 7c effects per CR 613.7 (counters
+    /// last). Only meaningful for creatures. SHARED, and deliberately run
+    /// OUTSIDE the cache (post cache-lookup) so counter mutation never has to
+    /// bump the generation.
+    ///   - +1/+1 and -1/-1 both shift power and toughness.
+    ///   - -0/-1 (Wall of Roots cost-counter, Phyrexian Furnace's stress
+    ///     cycle) shifts only toughness. The named counter type is opaque to
+    ///     the +1/+1 / -1/-1 SBA cancellation (CR 704.5q names only that
+    ///     pair), so it can stack to lethal-toughness on Wall of Roots
+    ///     without being cancelled out.
+    /// </summary>
+    private static void ApplyCounterPostlude(PermanentCharacteristics chars, Permanent permanent)
+    {
+        if (chars is not CreatureCharacteristics cc) return;
+        var plus = permanent.Counters.Count(Majik.Core.Counters.CounterType.PlusOnePlusOne);
+        var minus = permanent.Counters.Count(Majik.Core.Counters.CounterType.MinusOneMinusOne);
+        var minusZeroMinusOne = permanent.Counters.Count(Majik.Core.Counters.CounterType.MinusZeroMinusOne);
+        cc.Power += plus - minus;
+        cc.Toughness += plus - minus - minusZeroMinusOne;
     }
 
     /// <summary>
@@ -278,6 +460,9 @@ public sealed class ContinuousEffectsService
             if (grant.ExpiresAtEndOfTurn) grant.Revoke();
         }
         _effects.RemoveAll(e => e.ExpiresAtEndOfTurn);
+        // Effects dropped → clear opportunistically (bounds growth) and bump.
+        _cache.Clear();
+        BumpGeneration();
     }
 
     /// <summary>

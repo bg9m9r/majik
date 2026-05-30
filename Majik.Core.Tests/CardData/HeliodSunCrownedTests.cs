@@ -336,9 +336,13 @@ public class HeliodSunCrownedTests
 
         service.Compute((Permanent)heliod).Types.Should().NotContain(CardType.Creature);
 
+        // Wire the bystander's ActiveEffects so its zone entry (devotion input)
+        // invalidates the layer-system cache, as production's CardMovedEvent
+        // would.
         var triplePip = new Creature("White Knight 3W", "{W}{W}{W}", 2, 2);
         triplePip.SetOwner(_alice);
         triplePip.SetController(_alice);
+        triplePip.ActiveEffects = service;
         _alice.Zones.Battlefield.AddCard(triplePip);
         triplePip.SetZone(ZoneType.Battlefield);
 
@@ -358,9 +362,12 @@ public class HeliodSunCrownedTests
         _alice.Zones.Battlefield.AddCard(heliod);
         heliod.SetZone(ZoneType.Battlefield);
 
+        // Wire ActiveEffects so the bystander's zone entry/exit (devotion
+        // input) invalidates the layer-system cache.
         var triplePip = new Creature("White Knight 3W", "{W}{W}{W}", 2, 2);
         triplePip.SetOwner(_alice);
         triplePip.SetController(_alice);
+        triplePip.ActiveEffects = service;
         _alice.Zones.Battlefield.AddCard(triplePip);
         triplePip.SetZone(ZoneType.Battlefield);
 

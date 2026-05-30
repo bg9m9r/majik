@@ -64,7 +64,10 @@ public sealed class GameDependencies
         var bus = eventBus ?? new EventBus();
         var zoneService = new ZoneService(bus);
         var stateBasedActions = new StateBasedActions(bus, zoneService);
-        var continuousEffects = new ContinuousEffectsService();
+        // Wire the bus so the layer-system memoization cache invalidates on
+        // external CDA inputs (graveyard contents, life totals, control,
+        // artifact counts — all of which ride game events).
+        var continuousEffects = new ContinuousEffectsService(bus);
         var combatManager = new CombatManager(bus, stateBasedActions, zoneService, continuousEffects);
 
         return new GameDependencies(

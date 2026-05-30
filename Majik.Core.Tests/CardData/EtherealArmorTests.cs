@@ -80,6 +80,9 @@ public class EtherealArmorTests
             supertypes: null, subtypes: new[] { CardSubtype.Aura });
         pacifism.SetOwner(_alice);
         pacifism.SetController(_alice);
+        // Wire ActiveEffects so the bystander's zone entry invalidates the
+        // layer-system cache (as production does for battlefield permanents).
+        pacifism.ActiveEffects = effects;
         _alice.Zones.Battlefield.AddCard(pacifism);
         pacifism.SetZone(ZoneType.Battlefield);
 

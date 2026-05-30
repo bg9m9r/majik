@@ -149,8 +149,11 @@ public class AllosaurusRiderTests
         rider.Power.Should().Be(1);
         rider.Toughness.Should().Be(1);
 
-        // Add a land — CDA re-evaluates immediately.
+        // Add a land — CDA re-evaluates immediately. Wire the bystander's
+        // ActiveEffects so its zone entry invalidates the layer-system cache
+        // (as production does for battlefield permanents).
         var land = MakeLand(_alice);
+        land.ActiveEffects = rider.ActiveEffects;
         _alice.Zones.Battlefield.AddCard(land);
         land.SetZone(ZoneType.Battlefield);
 

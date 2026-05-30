@@ -27,6 +27,9 @@ public class Creature : Permanent
                 throw new ArgumentException("Power cannot be negative", nameof(value));
             }
             _basePower = value;
+            // CR 613 — base P/T feeds the layer pipeline's seed; invalidate the
+            // owning service's memoization cache so a later GetPower recomputes.
+            ActiveEffects?.BumpGeneration();
         }
     }
 
@@ -43,6 +46,8 @@ public class Creature : Permanent
                 throw new ArgumentException("Toughness cannot be negative", nameof(value));
             }
             _baseToughness = value;
+            // CR 613 — invalidate memoization (see BasePower).
+            ActiveEffects?.BumpGeneration();
         }
     }
 

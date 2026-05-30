@@ -133,14 +133,19 @@ public class ArdentRecruitFactoryTests
         // Below threshold.
         ar.Power.Should().Be(1);
 
-        // Third artifact arrives → Metalcraft flips on.
+        // Third artifact arrives → Metalcraft flips on. Bystander artifacts
+        // are added via raw zone ops (no ActiveEffects wired); invalidate the
+        // layer-system cache explicitly via Clear() — production's
+        // CardMovedEvent does this.
         var a3 = NewArtifact(_alice, "A3");
+        ar.ActiveEffects!.Clear();
         ar.Power.Should().Be(3);
         ar.Toughness.Should().Be(3);
 
         // Remove the third → Metalcraft flips off.
         _alice.Zones.Battlefield.RemoveCard(a3);
         a3.SetZone(ZoneType.Graveyard);
+        ar.ActiveEffects!.Clear();
         ar.Power.Should().Be(1);
         ar.Toughness.Should().Be(1);
     }

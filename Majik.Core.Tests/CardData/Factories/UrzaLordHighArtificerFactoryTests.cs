@@ -137,6 +137,10 @@ public class UrzaLordHighArtificerFactoryTests
             var art = new Artifact($"Bauble{i}", "0") { Owner = _alice, Controller = _alice };
             PutOntoBattlefield(art, _alice);
         }
+        // Bystander artifacts entered via raw zone ops (no ActiveEffects
+        // wired); invalidate the layer-system cache explicitly, as production's
+        // CardMovedEvent would.
+        effects.Clear();
 
         construct.GetPower().Should().Be(4);
         construct.GetToughness().Should().Be(4);
