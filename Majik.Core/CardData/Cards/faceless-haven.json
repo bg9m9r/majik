@@ -1,0 +1,8 @@
+{
+  "name": "Faceless Haven",
+  "types": ["Land"],
+  "supertypes": ["Snow"],
+  "abilities": [
+    { "kind": "mana", "produces": "C" }
+  ]
+}
