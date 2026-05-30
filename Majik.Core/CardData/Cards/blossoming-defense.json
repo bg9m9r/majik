@@ -1,0 +1,5 @@
+{
+  "name": "Blossoming Defense",
+  "types": ["Instant"],
+  "manaCost": "{G}"
+}
