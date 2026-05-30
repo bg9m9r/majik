@@ -1,0 +1,10 @@
+{
+  "name": "Ketria Crystal",
+  "types": ["Artifact"],
+  "manaCost": "{3}",
+  "abilities": [
+    { "kind": "mana", "produces": "G" },
+    { "kind": "mana", "produces": "U" },
+    { "kind": "mana", "produces": "R" }
+  ]
+}
