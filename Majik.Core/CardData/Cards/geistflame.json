@@ -1,0 +1,5 @@
+{
+  "name": "Geistflame",
+  "types": ["Instant"],
+  "manaCost": "{R}"
+}
