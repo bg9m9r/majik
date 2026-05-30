@@ -1,0 +1,9 @@
+{
+  "name": "Siege-Gang Commander",
+  "types": ["Creature"],
+  "subtypes": ["Goblin"],
+  "manaCost": "{3}{R}{R}",
+  "power": 2,
+  "toughness": 2,
+  "abilities": []
+}
