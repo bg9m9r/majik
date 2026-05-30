@@ -1,0 +1,12 @@
+{
+  "name": "Gilded Lotus",
+  "types": ["Artifact"],
+  "manaCost": "{5}",
+  "abilities": [
+    { "kind": "mana", "produces": "WWW" },
+    { "kind": "mana", "produces": "UUU" },
+    { "kind": "mana", "produces": "BBB" },
+    { "kind": "mana", "produces": "RRR" },
+    { "kind": "mana", "produces": "GGG" }
+  ]
+}
