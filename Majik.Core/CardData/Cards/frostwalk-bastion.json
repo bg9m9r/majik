@@ -1,0 +1,8 @@
+{
+  "name": "Frostwalk Bastion",
+  "types": ["Land"],
+  "supertypes": ["Snow"],
+  "abilities": [
+    { "kind": "mana", "produces": "C" }
+  ]
+}
