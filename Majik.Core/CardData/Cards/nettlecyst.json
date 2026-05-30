@@ -1,0 +1,6 @@
+{
+  "name": "Nettlecyst",
+  "types": ["Artifact"],
+  "subtypes": ["Equipment"],
+  "manaCost": "{3}"
+}
