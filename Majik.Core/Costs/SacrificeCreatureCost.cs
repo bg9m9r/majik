@@ -188,3 +188,50 @@ public sealed class SacrificeAGoblinAdditionalCost : IAdditionalCost
         return true;
     }
 }
+
+/// <summary>
+/// "As an additional cost to cast this spell, sacrifice a land." —
+/// land variant of <see cref="SacrificeACreatureAdditionalCost"/> /
+/// <see cref="SacrificeAnArtifactAdditionalCost"/>. Used by Shard Volley
+/// (CR 601.2f). Any land qualifies — basic or nonbasic — so the filter is
+/// the broad <see cref="CardType.Land"/> type (CR 305), not a basic-land
+/// subtype like <see cref="SacrificeBasicLandCost"/>.
+///
+/// Picks the first eligible land the caster controls on the battlefield
+/// (deterministic v1 — same posture as the sibling sacrifice-picker costs
+/// in this file). A real "choose a land to sacrifice" agent prompt is
+/// deferred behind the same prompting MVP those costs wait on.
+///
+/// <para><see cref="Sacrificed"/> exposes the sacrificed land after payment.
+/// Shard Volley doesn't read it (the 3 damage is a flat amount independent
+/// of the land), but the property mirrors the other costs' shape.</para>
+/// </summary>
+public sealed class SacrificeALandAdditionalCost : IAdditionalCost
+{
+    /// <summary>The land that was sacrificed (null before <see cref="Pay"/>).</summary>
+    public Permanent? Sacrificed { get; private set; }
+
+    public string Description => "sacrifice a land";
+
+    public bool CanPay(Player caster)
+    {
+        if (caster == null) return false;
+        return caster.Zones.Battlefield.GetCards()
+            .OfType<Permanent>()
+            .Any(p => p.HasType(CardType.Land));
+    }
+
+    public bool Pay(Player caster)
+    {
+        if (caster == null) return false;
+        var pick = caster.Zones.Battlefield.GetCards()
+            .OfType<Permanent>()
+            .FirstOrDefault(p => p.HasType(CardType.Land));
+        if (pick == null) return false;
+        caster.Zones.Battlefield.RemoveCard(pick);
+        caster.Zones.Graveyard.AddCard(pick);
+        pick.SetZone(ZoneType.Graveyard);
+        Sacrificed = pick;
+        return true;
+    }
+}
