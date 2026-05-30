@@ -1,0 +1,5 @@
+{
+  "name": "Flame Javelin",
+  "types": ["Instant"],
+  "manaCost": "{2/R}{2/R}{2/R}"
+}
