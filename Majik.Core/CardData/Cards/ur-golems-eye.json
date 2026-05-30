@@ -1,0 +1,11 @@
+{
+  "name": "Ur-Golem's Eye",
+  "types": ["Artifact"],
+  "manaCost": "{4}",
+  "abilities": [
+    {
+      "kind": "mana",
+      "produces": "CC"
+    }
+  ]
+}
