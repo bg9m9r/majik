@@ -8,7 +8,9 @@
   "supertypes": [
     "Legendary"
   ],
-  "subtypes": [],
+  "subtypes": [
+    "Sliver"
+  ],
   "power": 5,
   "toughness": 5,
   "loyalty": null,
