@@ -372,7 +372,27 @@ public sealed class TurnDriver
         var changed = DayNight.CheckUntapTransition(_previousTurnActivePlayerSpellsCast);
         if (changed)
         {
+            // CR 702.145c / 702.145f — transform daybound/nightbound
+            // permanents to reflect the new designation BEFORE announcing
+            // the change, so DayNightChangedEvent subscribers observe the
+            // already-transformed faces.
+            ApplyDayboundNightboundTransforms();
             _eventBus?.Publish(new Majik.Core.Events.DayNightChangedEvent(DayNight.Designation));
+        }
+    }
+
+    /// <summary>
+    /// CR 702.145c / 702.145f — flip every daybound/nightbound permanent on
+    /// every player's battlefield to match the current day/night designation
+    /// (front-face daybound → back when night; back-face nightbound → front
+    /// when day). Driven by the live <see cref="DayNightState"/>.
+    /// </summary>
+    private void ApplyDayboundNightboundTransforms()
+    {
+        foreach (var p in _players)
+        {
+            var permanents = p.Zones.Battlefield.GetCards().OfType<Card>().ToList();
+            Majik.Core.Keywords.DayboundNightbound.OnDayNightChanged(permanents, DayNight.Designation);
         }
     }
 
