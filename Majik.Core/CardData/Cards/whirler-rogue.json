@@ -1,0 +1,9 @@
+{
+  "name": "Whirler Rogue",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Rogue", "Artificer"],
+  "manaCost": "{2}{U}{U}",
+  "power": 2,
+  "toughness": 2,
+  "abilities": []
+}
