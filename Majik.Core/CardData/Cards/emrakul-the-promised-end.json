@@ -1,0 +1,10 @@
+{
+  "name": "Emrakul, the Promised End",
+  "types": ["Creature"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Eldrazi"],
+  "manaCost": "{13}",
+  "power": 13,
+  "toughness": 13,
+  "abilities": []
+}
