@@ -1,0 +1,7 @@
+{
+  "name": "Riverglide Pathway",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "U" }
+  ]
+}
