@@ -1,0 +1,8 @@
+{
+  "name": "Fauna Shaman",
+  "types": ["Creature"],
+  "subtypes": ["Elf", "Shaman"],
+  "manaCost": "{1}{G}",
+  "power": 2,
+  "toughness": 2
+}
