@@ -250,6 +250,20 @@ public class ActionValidator
                 new RuleViolation("602.5c", "name-targeted activated-ability suppression"));
         }
 
+        // CR 602.5c / 605.1a — "Activate only if <condition>" gate
+        // (Metalcraft, Delirium, "you control a Forest", a hand-size check,
+        // …). The ability carries a live predicate; reject the activation
+        // when the condition is currently unsatisfied. Distinct from the
+        // timing-only sorcery-speed rider below — this is a game-state gate
+        // that holds at any speed.
+        if (!action.Ability.CanActivateNow())
+        {
+            var sourceName = (action.Ability.Source as Cards.ICard)?.Name ?? "<unknown>";
+            return ValidationResult.Invalid(
+                $"{sourceName}'s ability: Activate only if its condition is met",
+                new RuleViolation("602.5c", "activate-only-if-condition"));
+        }
+
         // CR 117.1a / 307.5 — "Activate only as a sorcery" rider.
         // Sorcery-speed-only activations require the controller's main
         // phase with an empty stack. Caller marks the timing window via

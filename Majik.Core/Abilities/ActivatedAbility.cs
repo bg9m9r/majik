@@ -48,6 +48,34 @@ public class ActivatedAbility : IActivatedAbility
     public bool IsSorcerySpeed { get; }
 
     /// <summary>
+    /// CR 602.5c / 605.1a — optional "Activate only if &lt;condition&gt;"
+    /// gate evaluated against live game state. Distinct from the timing-only
+    /// <see cref="IsSorcerySpeed"/> rider: this carries an arbitrary
+    /// predicate (Metalcraft, Delirium, "you control a Forest", a hand-size
+    /// check, …). <see cref="Rules.ActionValidator"/> and
+    /// <see cref="Services.AbilityActivator"/> reject the activation when it
+    /// returns false. Null ⇒ no extra gate (always activatable, subject to
+    /// the usual timing rules). Re-evaluated on every call so the condition
+    /// reflects current state.
+    /// </summary>
+    private readonly Func<bool>? _canActivateCheck;
+
+    /// <summary>
+    /// CR 602.5c — true iff this ability's "Activate only if" condition (if
+    /// any) is currently satisfied. Always true when no gate was supplied.
+    /// Re-evaluates the predicate on each call.
+    /// </summary>
+    public bool CanActivateNow() => _canActivateCheck?.Invoke() ?? true;
+
+    /// <summary>
+    /// The "Activate only if" gate predicate, exposed so the activation
+    /// service can mirror it onto the copy it puts on the stack (CR 602.4 —
+    /// the stack object must carry the same characteristics as the
+    /// original). Null when no gate was supplied.
+    /// </summary>
+    public Func<bool>? CanActivateCheck => _canActivateCheck;
+
+    /// <summary>
     /// The targets chosen by the activating player's agent (parallel
     /// list-of-lists matching <see cref="TargetRequests"/>). Populated by
     /// <see cref="SetChosenTargets"/> after the agent responds. Effects
@@ -63,7 +91,8 @@ public class ActivatedAbility : IActivatedAbility
         IEnumerable<ICost>? costs = null,
         IEnumerable<IEffect>? effects = null,
         IEnumerable<TargetRequest>? targetRequests = null,
-        bool sorcerySpeed = false)
+        bool sorcerySpeed = false,
+        Func<bool>? canActivateCheck = null)
     {
         if (source == null)
         {
@@ -80,6 +109,7 @@ public class ActivatedAbility : IActivatedAbility
         Id = Guid.NewGuid();
         Timestamp = DateTime.UtcNow;
         IsSorcerySpeed = sorcerySpeed;
+        _canActivateCheck = canActivateCheck;
         _resolutionState = ResolutionState.NotResolving();
 
         TargetRequests = targetRequests is null
