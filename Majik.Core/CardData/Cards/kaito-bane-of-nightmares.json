@@ -1,0 +1,9 @@
+{
+  "name": "Kaito, Bane of Nightmares",
+  "types": ["Planeswalker"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Kaito"],
+  "manaCost": "{2}{U}{B}",
+  "loyalty": 4,
+  "abilities": []
+}

@@ -372,10 +372,21 @@ public enum CardSubtype
     /// (back face of Tamiyo, Inquisitive Student). CR 205.3m.</summary>
     Tamiyo,
 
+    /// <summary>Kaito planeswalker subtype — Kaito, Bane of Nightmares
+    /// (Murders at Karlov Manor / Modern Horizons line). CR 205.3m.</summary>
+    Kaito,
+
     /// <summary>Samurai creature subtype — Kamigawa-block warriors plus the
     /// 2/2 white Samurai token created by The Wandering Emperor's −1.
     /// CR 205.3m.</summary>
     Samurai,
+
+    /// <summary>Ninja creature subtype — the Ninjutsu mechanic's body type
+    /// (Kamigawa block onward). Kaito, Bane of Nightmares becomes a 3/4
+    /// Ninja creature during its controller's turn, and the emblem from his
+    /// +1 ("Ninjas you control get +1/+1") keys off this subtype.
+    /// CR 205.3m.</summary>
+    Ninja,
 
     /// <summary>Homarid creature subtype — Hedron Crab, Homarid. CR 205.3m.
     /// Crustacean-flavoured creature type that originated in Fallen Empires
