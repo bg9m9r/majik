@@ -1,0 +1,17 @@
+{
+  "name": "Voltaic Key",
+  "types": ["Artifact"],
+  "manaCost": "{1}",
+  "abilities": [
+    {
+      "kind": "activated",
+      "costs": [
+        { "type": "mana", "amount": "{1}" },
+        { "type": "tap_self" }
+      ],
+      "effects": [
+        { "type": "untap_target_stub", "targetFilter": "artifact" }
+      ]
+    }
+  ]
+}
