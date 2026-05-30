@@ -1,0 +1,8 @@
+{
+  "name": "Snow-Covered Wastes",
+  "types": ["Land"],
+  "supertypes": ["Basic", "Snow"],
+  "abilities": [
+    { "kind": "mana", "produces": "C" }
+  ]
+}
