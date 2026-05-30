@@ -1,0 +1,9 @@
+{
+  "name": "Cauldron Familiar",
+  "types": ["Creature"],
+  "subtypes": ["Cat"],
+  "manaCost": "{B}",
+  "power": 1,
+  "toughness": 1,
+  "abilities": []
+}
