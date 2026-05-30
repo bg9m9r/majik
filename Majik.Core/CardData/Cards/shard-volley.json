@@ -1,0 +1,5 @@
+{
+  "name": "Shard Volley",
+  "types": ["Instant"],
+  "manaCost": "{R}"
+}
