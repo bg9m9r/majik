@@ -34,9 +34,22 @@ public sealed class GameDriver
     private readonly TriggerManager _triggerManager;
     private readonly ExtraTurnQueue _extraTurns = new();
 
+    // CR 720 — per-game registry of "control another player" grants. Effects
+    // (Mindslaver, Emrakul) call ControlPlayer.Grant against this; the
+    // TurnDriver consumes a pending grant at the controlled player's
+    // turn-start and the ControlAware agent map reroutes that player's
+    // decisions to the controller for the turn.
+    private readonly Majik.Core.Players.ControlPlayerRegistry _controlPlayers = new();
+
     /// <summary>Effects that grant an extra turn enqueue here; the loop
     /// consults this before round-robin advancement.</summary>
     public ExtraTurnQueue ExtraTurns => _extraTurns;
+
+    /// <summary>CR 720 — registry of active "control another player" grants.
+    /// Effects (Mindslaver's activated ability, Emrakul's cast trigger) call
+    /// <see cref="Majik.Core.Players.ControlPlayerRegistry.GrantControl"/> on
+    /// this to take control of an opponent's next turn.</summary>
+    public Majik.Core.Players.ControlPlayerRegistry ControlPlayers => _controlPlayers;
 
     public sealed record GameResult(int TurnsPlayed, Player? Winner, Player? StartingPlayer);
 
@@ -60,7 +73,15 @@ public sealed class GameDriver
         Func<DateTime>? clock = null)
     {
         _players = players ?? throw new ArgumentNullException(nameof(players));
-        _agents = agents ?? throw new ArgumentNullException(nameof(agents));
+        // CR 720 — route every agent lookup through the control registry so a
+        // controlled player's decisions go to the controller's agent during
+        // the controlled turn. Transparent when no control is active (the
+        // wrapper returns the queried player's own agent). Every downstream
+        // consumer (TurnDriver, PriorityLoop, CombatFlow, mulligan / opening-
+        // hand subscribers) reads from this single wrapped map.
+        _agents = new Majik.Core.Players.Agents.ControlAwareAgentMap(
+            agents ?? throw new ArgumentNullException(nameof(agents)),
+            _controlPlayers);
         _sba = stateBasedActions ?? throw new ArgumentNullException(nameof(stateBasedActions));
         _rng = rng ?? new Majik.Core.Random.GameRandom();
         _eventBus = eventBus;
@@ -109,7 +130,11 @@ public sealed class GameDriver
         var tracker = landDropTracker ?? new LandDropTracker();
 
         _turnDriver = new TurnDriver(
-            players, agents, stack, zoneService, triggerManager,
+            // CR 720 — pass the control-aware wrapped map (not the raw
+            // agents) so the driver's per-player agent lookups reroute to
+            // the controller during a controlled turn, plus the registry so
+            // the driver can consume/clear control at turn boundaries.
+            players, _agents, stack, zoneService, triggerManager,
             stackResolver, stateBasedActions, priorityManager, combatFlow,
             eventBus: eventBus,
             spellDefinitionResolver: spellDefinitionResolver,
@@ -119,7 +144,8 @@ public sealed class GameDriver
             // each per-round PriorityLoop. Null = pre-Slice-5a behaviour.
             autoPassPrefsProvider: autoPassPrefsProvider,
             isPassOnlyDeadWindow: isPassOnlyDeadWindow,
-            clock: clock);
+            clock: clock,
+            controlRegistry: _controlPlayers);
     }
 
     public async Task<GameResult> RunGameAsync(

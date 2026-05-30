@@ -91,6 +91,15 @@ public sealed class TurnDriver
     private readonly Func<GameContext, bool>? _isPassOnlyDeadWindow;
     private readonly Func<DateTime>? _clock;
 
+    // CR 720 — registry of "control another player" grants (Mindslaver,
+    // Emrakul, the Promised End). At turn-start the driver consumes any
+    // grant pending for the active player so every agent lookup for that
+    // player (priority, targets, combat, mana) routes to the controller's
+    // agent for the duration of the turn; at turn-end the grant is cleared.
+    // Null in legacy / unit harnesses that don't wire control — control is
+    // then simply never active.
+    private readonly Majik.Core.Players.ControlPlayerRegistry? _controlRegistry;
+
     public TurnDriver(
         IReadOnlyList<Player> players,
         IReadOnlyDictionary<Player, IPlayerAgent> agents,
@@ -108,8 +117,10 @@ public sealed class TurnDriver
         Majik.Core.Effects.ReplacementBus? replacements = null,
         Func<Player, IAutoPassPrefsView?>? autoPassPrefsProvider = null,
         Func<GameContext, bool>? isPassOnlyDeadWindow = null,
-        Func<DateTime>? clock = null)
+        Func<DateTime>? clock = null,
+        Majik.Core.Players.ControlPlayerRegistry? controlRegistry = null)
     {
+        _controlRegistry = controlRegistry;
         _autoPassPrefsProvider = autoPassPrefsProvider;
         _isPassOnlyDeadWindow = isPassOnlyDeadWindow;
         _clock = clock;
@@ -239,6 +250,19 @@ public sealed class TurnDriver
 
         _currentTurnNumber = turnNumber;
         _activePlayerForStepEvents = activePlayer;
+
+        // CR 720.1 — if another player was granted control of this turn's
+        // player (Mindslaver / Emrakul), promote that pending grant to
+        // active control now, before any decision is solicited. While
+        // active, every `_agents[activePlayer]` lookup (the ControlAware
+        // agent map wired by GameDriver) routes to the controller's agent,
+        // so the controller makes all of this player's plays (CR 720.2/720.3
+        // — only decisions move; the active player's cards, hand, life, and
+        // library stay theirs and their permanents still untap below).
+        // Consumed here = a grant lasts exactly one turn (CR 720.1 — "that
+        // player's next turn").
+        _controlRegistry?.ConsumeControlFor(activePlayer, out _);
+
         _eventBus?.Publish(new Majik.Core.Events.TurnStartedEvent(activePlayer, turnNumber));
 
         // CR 305.2 — land drops reset at turn start.
@@ -351,6 +375,12 @@ public sealed class TurnDriver
         // captured (the snapshot read happens at the top of the next
         // RunTurnAsync, before TurnState.Reset()).
         _previousTurnActivePlayer = activePlayer;
+
+        // CR 720.1 — control lasts only for "that player's next turn". Now
+        // that the turn is over, drop the active control so the following
+        // turn's player makes their own decisions again. No-op when no
+        // control was active this turn.
+        _controlRegistry?.ClearActiveControl();
     }
 
     /// <summary>
