@@ -1,0 +1,9 @@
+{
+  "name": "Snow-Covered Plains",
+  "types": ["Land"],
+  "supertypes": ["Basic", "Snow"],
+  "subtypes": ["Plains"],
+  "abilities": [
+    { "kind": "mana", "produces": "W" }
+  ]
+}
