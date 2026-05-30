@@ -1,0 +1,19 @@
+{
+  "name": "Mana Geode",
+  "types": ["Artifact"],
+  "manaCost": "{3}",
+  "abilities": [
+    {
+      "kind": "triggered",
+      "trigger": { "type": "etb_self" },
+      "effects": [
+        { "type": "scry_self", "amount": 1 }
+      ]
+    },
+    { "kind": "mana", "produces": "W" },
+    { "kind": "mana", "produces": "U" },
+    { "kind": "mana", "produces": "B" },
+    { "kind": "mana", "produces": "R" },
+    { "kind": "mana", "produces": "G" }
+  ]
+}
