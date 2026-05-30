@@ -1,0 +1,10 @@
+{
+  "name": "Indatha Crystal",
+  "types": ["Artifact"],
+  "manaCost": "{3}",
+  "abilities": [
+    { "kind": "mana", "produces": "W" },
+    { "kind": "mana", "produces": "B" },
+    { "kind": "mana", "produces": "G" }
+  ]
+}
