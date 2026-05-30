@@ -1,0 +1,7 @@
+{
+  "name": "Stalking Stones",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "C" }
+  ]
+}
