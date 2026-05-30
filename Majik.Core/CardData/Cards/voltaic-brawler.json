@@ -1,0 +1,9 @@
+{
+  "name": "Voltaic Brawler",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Warrior"],
+  "manaCost": "{R}{G}",
+  "power": 3,
+  "toughness": 2,
+  "abilities": []
+}
