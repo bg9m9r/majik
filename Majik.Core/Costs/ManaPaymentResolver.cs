@@ -199,9 +199,31 @@ public sealed class ManaPaymentResolver
         Player payer,
         ManaCost cost,
         ManaPayment payment,
-        out IReadOnlyList<ValueObjects.ManaColor> colorsSpent)
+        out IReadOnlyList<ValueObjects.ManaColor> colorsSpent) =>
+        Pay(payer, cost, payment, out colorsSpent, out _);
+
+    /// <summary>
+    /// Mana-provenance overload that reports BOTH the distinct colors spent
+    /// (<paramref name="colorsSpent"/>, the Sunburst / CR 702.44b set) AND
+    /// the per-color spent <em>count</em> (<paramref name="colorCounts"/>),
+    /// preserving multiplicity so an intervening-if can tell "{R}{R} spent"
+    /// from "{R}{G} spent" (the hybrid Elemental Incarnation family). The
+    /// distinct set is exactly the count ledger collapsed to "> 0", so a
+    /// caller that stamps the counts onto the card
+    /// (<see cref="Cards.Card.SetPendingCastColorCounts"/>) gets the distinct
+    /// set derived for free. Both are empty when payment failed or no colored
+    /// mana was spent (e.g. {2} paid entirely from generic floating mana).
+    /// Counts are keyed by color; only positive counts appear.
+    /// </summary>
+    public bool Pay(
+        Player payer,
+        ManaCost cost,
+        ManaPayment payment,
+        out IReadOnlyList<ValueObjects.ManaColor> colorsSpent,
+        out IReadOnlyDictionary<ValueObjects.ManaColor, int> colorCounts)
     {
         colorsSpent = Array.Empty<ValueObjects.ManaColor>();
+        colorCounts = new Dictionary<ValueObjects.ManaColor, int>();
         if (payer == null) throw new ArgumentNullException(nameof(payer));
         if (cost == null) throw new ArgumentNullException(nameof(cost));
         if (payment == null) throw new ArgumentNullException(nameof(payment));
@@ -302,13 +324,26 @@ public sealed class ManaPaymentResolver
             availableR += p.Red;
             availableG += p.Green;
         }
+        // CR 702.44b — the per-color pool delta IS the multiplicity of that
+        // color's mana spent (colored pips + colored mana used to cover
+        // generic). The distinct set is just this ledger collapsed to "> 0".
+        // Keep BOTH: counts preserve multiplicity so "{R}{R} was spent"
+        // intervening-ifs (Vibrance / Wistfulness) can distinguish {R}{R}
+        // from {R}{G}; the distinct list keeps Sunburst working unchanged.
+        var counts = new Dictionary<ValueObjects.ManaColor, int>(5);
         var spent = new List<ValueObjects.ManaColor>(5);
-        if (availableW - poolAfter.White > 0) spent.Add(ValueObjects.ManaColor.White);
-        if (availableU - poolAfter.Blue  > 0) spent.Add(ValueObjects.ManaColor.Blue);
-        if (availableB - poolAfter.Black > 0) spent.Add(ValueObjects.ManaColor.Black);
-        if (availableR - poolAfter.Red   > 0) spent.Add(ValueObjects.ManaColor.Red);
-        if (availableG - poolAfter.Green > 0) spent.Add(ValueObjects.ManaColor.Green);
+        var deltaW = availableW - poolAfter.White;
+        var deltaU = availableU - poolAfter.Blue;
+        var deltaB = availableB - poolAfter.Black;
+        var deltaR = availableR - poolAfter.Red;
+        var deltaG = availableG - poolAfter.Green;
+        if (deltaW > 0) { spent.Add(ValueObjects.ManaColor.White); counts[ValueObjects.ManaColor.White] = deltaW; }
+        if (deltaU > 0) { spent.Add(ValueObjects.ManaColor.Blue);  counts[ValueObjects.ManaColor.Blue]  = deltaU; }
+        if (deltaB > 0) { spent.Add(ValueObjects.ManaColor.Black); counts[ValueObjects.ManaColor.Black] = deltaB; }
+        if (deltaR > 0) { spent.Add(ValueObjects.ManaColor.Red);   counts[ValueObjects.ManaColor.Red]   = deltaR; }
+        if (deltaG > 0) { spent.Add(ValueObjects.ManaColor.Green); counts[ValueObjects.ManaColor.Green] = deltaG; }
         colorsSpent = spent;
+        colorCounts = counts;
         return true;
     }
 }
