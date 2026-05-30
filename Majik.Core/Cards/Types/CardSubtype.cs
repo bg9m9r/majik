@@ -427,4 +427,12 @@ public enum CardSubtype
     /// subtype is that ability's target filter). Also Blinkmoth Well,
     /// Blinkmoth token producers in the Mirrodin lineage. CR 205.3m.</summary>
     Blinkmoth,
+
+    /// <summary>Sliver creature subtype — Striking Sliver (M14 / many
+    /// reprints), Galerider Sliver, Sliver Hivelord, the Tempest-onward
+    /// Sliver tribal lineage whose lords each grant a keyword/anthem to
+    /// "Sliver creatures you control". The Slivercycling keyword
+    /// (see <see cref="Majik.Core.Keywords.TypedCyclingFactory"/>) also
+    /// keys off this subtype. CR 205.3m.</summary>
+    Sliver,
 }

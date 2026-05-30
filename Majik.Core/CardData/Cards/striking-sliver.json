@@ -1,0 +1,9 @@
+{
+  "name": "Striking Sliver",
+  "types": ["Creature"],
+  "subtypes": ["Sliver"],
+  "manaCost": "{R}",
+  "power": 1,
+  "toughness": 1,
+  "abilities": []
+}
