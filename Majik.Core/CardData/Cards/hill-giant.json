@@ -1,0 +1,9 @@
+{
+  "name": "Hill Giant",
+  "types": ["Creature"],
+  "subtypes": ["Giant"],
+  "manaCost": "{3}{R}",
+  "power": 3,
+  "toughness": 3,
+  "abilities": []
+}
