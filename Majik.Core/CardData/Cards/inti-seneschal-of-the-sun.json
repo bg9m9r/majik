@@ -1,0 +1,10 @@
+{
+  "name": "Inti, Seneschal of the Sun",
+  "types": ["Creature"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Human", "Knight"],
+  "manaCost": "{1}{R}",
+  "power": 2,
+  "toughness": 2,
+  "abilities": []
+}
