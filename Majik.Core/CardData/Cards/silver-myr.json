@@ -1,0 +1,14 @@
+{
+  "name": "Silver Myr",
+  "types": ["Creature", "Artifact"],
+  "subtypes": ["Myr"],
+  "manaCost": "{2}",
+  "power": 1,
+  "toughness": 1,
+  "abilities": [
+    {
+      "kind": "mana",
+      "produces": "U"
+    }
+  ]
+}
