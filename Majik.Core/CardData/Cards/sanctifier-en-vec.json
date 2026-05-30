@@ -1,0 +1,9 @@
+{
+  "name": "Sanctifier en-Vec",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Cleric"],
+  "manaCost": "{W}{W}",
+  "power": 2,
+  "toughness": 2,
+  "abilities": []
+}
