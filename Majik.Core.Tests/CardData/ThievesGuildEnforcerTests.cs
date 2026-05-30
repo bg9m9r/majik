@@ -227,9 +227,12 @@ public class ThievesGuildEnforcerTests
         svc.Compute(c).Keywords.Should().Contain("Deathtouch");
 
         // Bob's graveyard drops below threshold — predicate re-evaluates on
-        // next Compute.
+        // next Compute. The graveyard remove bypasses the event bus, so
+        // invalidate the layer-system cache explicitly via Clear() —
+        // production's CardMovedEvent would do this.
         var top = _bob.Zones.Graveyard.GetCards().First();
         _bob.Zones.Graveyard.RemoveCard(top);
+        svc.Clear();
 
         c.GetPower().Should().Be(1, "predicate re-reads each Compute — bonus lifts dynamically.");
         c.GetToughness().Should().Be(1);

@@ -89,10 +89,12 @@ public class AllThatGlittersTests
         bear.GetPower().Should().Be(2 + 1, "+1/+1 from one enchantment (the aura itself)");
         bear.GetToughness().Should().Be(2 + 1);
 
-        // Add an artifact under Alice's control.
+        // Add an artifact under Alice's control. Wire ActiveEffects so its zone
+        // entry invalidates the layer-system cache.
         var bauble = new Artifact("Bauble", "0");
         bauble.SetOwner(_alice);
         bauble.SetController(_alice);
+        bauble.ActiveEffects = svc;
         bauble.Zone = ZoneType.Battlefield;
         _alice.Zones.Battlefield.AddCard(bauble);
 
@@ -103,6 +105,7 @@ public class AllThatGlittersTests
         var ench = new Enchantment("Trinket", "{1}", supertypes: null, subtypes: null);
         ench.SetOwner(_alice);
         ench.SetController(_alice);
+        ench.ActiveEffects = svc;
         ench.Zone = ZoneType.Battlefield;
         _alice.Zones.Battlefield.AddCard(ench);
 

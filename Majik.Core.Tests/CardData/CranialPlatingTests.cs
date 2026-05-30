@@ -142,10 +142,13 @@ public class CranialPlatingTests
         bear.GetPower().Should().Be(2 + 1, "+1/+0 from one artifact (the plating itself)");
         bear.GetToughness().Should().Be(2, "Cranial Plating adds only +N/+0");
 
-        // Add a second artifact under Alice's control.
+        // Add a second artifact under Alice's control. Wire its ActiveEffects
+        // (as production does for battlefield permanents) so its zone entry
+        // invalidates the layer-system cache.
         var bauble = new Artifact("Bauble", "0");
         bauble.SetOwner(_alice);
         bauble.SetController(_alice);
+        bauble.ActiveEffects = svc;
         bauble.Zone = ZoneType.Battlefield;
         _alice.Zones.Battlefield.AddCard(bauble);
 

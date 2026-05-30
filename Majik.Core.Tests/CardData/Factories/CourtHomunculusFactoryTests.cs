@@ -126,14 +126,19 @@ public class CourtHomunculusFactoryTests
         var (ch, _) = NewHomunculusOnBattlefield();
         ch.Power.Should().Be(1);
 
-        // Another artifact arrives → bonus flips on.
+        // Another artifact arrives → bonus flips on. Bystander artifacts are
+        // added via raw zone ops (no ActiveEffects wired); invalidate the
+        // layer-system cache explicitly via Clear() — production's
+        // CardMovedEvent does this.
         var a1 = NewArtifact(_alice, "A1");
+        ch.ActiveEffects!.Clear();
         ch.Power.Should().Be(2);
         ch.Toughness.Should().Be(2);
 
         // It leaves → bonus flips off.
         _alice.Zones.Battlefield.RemoveCard(a1);
         a1.SetZone(ZoneType.Graveyard);
+        ch.ActiveEffects!.Clear();
         ch.Power.Should().Be(1);
         ch.Toughness.Should().Be(1);
     }

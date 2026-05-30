@@ -251,6 +251,9 @@ public class CracklingDrakeFactoryTests
         var bolt = MakeInstant("Bolt", _alice);
         _alice.Zones.Graveyard.AddCard(bolt);
         bolt.SetZone(ZoneType.Graveyard);
+        // Graveyard add bypasses the event bus; invalidate the layer-system
+        // cache explicitly, as production's CardMovedEvent would.
+        drake.ActiveEffects!.Clear();
 
         drake.Power.Should().Be(1, "CDA re-evaluates every Compute (CR 613.2)");
     }

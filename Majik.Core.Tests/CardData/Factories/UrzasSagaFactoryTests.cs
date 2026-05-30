@@ -139,6 +139,10 @@ public class UrzasSagaFactoryTests
             var art = new Artifact($"Bauble{i}", "0") { Owner = _alice, Controller = _alice };
             PutOntoBattlefield(art, _alice);
         }
+        // Bystander artifacts entered via raw zone ops (no ActiveEffects
+        // wired); invalidate the layer-system cache explicitly, as production's
+        // CardMovedEvent would.
+        effects.Clear();
 
         // 1 (self) + 3 (added) = 4.
         firstConstruct.GetPower().Should().Be(4);

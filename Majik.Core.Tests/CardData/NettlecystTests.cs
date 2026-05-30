@@ -147,10 +147,12 @@ public class NettlecystTests
         bear.GetPower().Should().Be(2 + 1, "+1/+1 from one artifact (Nettlecyst itself)");
         bear.GetToughness().Should().Be(2 + 1, "Nettlecyst adds +1/+1 (both stats)");
 
-        // Add an enchantment under Alice's control → counts toward N.
+        // Add an enchantment under Alice's control → counts toward N. Wire its
+        // ActiveEffects so its zone entry invalidates the layer-system cache.
         var enchant = new Enchantment("Aura", "1W");
         enchant.SetOwner(_alice);
         enchant.SetController(_alice);
+        enchant.ActiveEffects = svc;
         enchant.Zone = ZoneType.Battlefield;
         _alice.Zones.Battlefield.AddCard(enchant);
 
@@ -161,6 +163,7 @@ public class NettlecystTests
         var bauble = new Artifact("Bauble", "0");
         bauble.SetOwner(_alice);
         bauble.SetController(_alice);
+        bauble.ActiveEffects = svc;
         bauble.Zone = ZoneType.Battlefield;
         _alice.Zones.Battlefield.AddCard(bauble);
 

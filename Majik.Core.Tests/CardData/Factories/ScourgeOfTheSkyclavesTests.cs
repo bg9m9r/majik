@@ -144,12 +144,17 @@ public class ScourgeOfTheSkyclavesTests
         scourge.Power.Should().Be(0);
         scourge.Toughness.Should().Be(0);
 
-        // Alice drops to 5, Bob still 20 → highest 20 → still 0/0.
+        // Alice drops to 5, Bob still 20 → highest 20 → still 0/0. Life loss
+        // here pokes Player.LoseLife directly (no PlayerService/event), so
+        // invalidate the layer-system cache explicitly via Clear() —
+        // production's LifeChangedEvent would do this.
         _alice.LoseLife(15);
+        effects.Clear();
         scourge.Power.Should().Be(0);
 
         // Bob drops to 12 → highest now 12 → 20-12 = 8/8.
         _bob.LoseLife(8);
+        effects.Clear();
         scourge.Power.Should().Be(8);
         scourge.Toughness.Should().Be(8);
     }

@@ -239,10 +239,13 @@ public class DragonsRageChannelerTests
         CombatAbilities.HasFlying(drc).Should().BeFalse();
 
         // Drop a fourth distinct type into the graveyard — delirium lights
-        // up live on the next P/T / keyword read.
+        // up live on the next P/T / keyword read. The graveyard add bypasses
+        // the event bus, so invalidate the layer-system cache explicitly via
+        // Clear() — production's CardMovedEvent would do this.
         var enchant = new Card("Holy Aura", "1W", new[] { CardType.Enchantment });
         enchant.SetOwner(_alice);
         _alice.Zones.Graveyard.AddCard(enchant);
+        effects.Clear();
 
         drc.Power.Should().Be(3);
         drc.Toughness.Should().Be(3);

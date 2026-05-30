@@ -70,8 +70,11 @@ public class MasterOfEtheriumFactoryTests
     [Fact]
     public void MasterOfEtherium_CdaPT_TracksArtifactCount_IncludingSelf()
     {
-        var svc = new ContinuousEffectsService();
         var bus = new EventBus();
+        // Wire the service to the bus so the CR-613 memoization cache
+        // invalidates on the CardMovedEvent each artifact entry fires
+        // (matches production GameDependencies).
+        var svc = new ContinuousEffectsService(bus);
         var zones = new ZoneService(bus);
 
         var master = MasterOfEtheriumFactory.Create(_alice, svc, bus);
@@ -86,15 +89,19 @@ public class MasterOfEtheriumFactoryTests
             "the master itself is an artifact you control");
         master.GetToughness().Should().Be(1);
 
-        // Add two more artifacts.
+        // Add two more artifacts. Route through the zone service so each
+        // entry fires a CardMovedEvent (the production ETB path that
+        // invalidates the layer-system cache).
         var memnite = new Artifact("Memnite", "0") { Owner = _alice };
         memnite.SetController(_alice);
-        _alice.Zones.Battlefield.AddCard(memnite);
+        _alice.Zones.Library.AddCard(memnite);
+        zones.MoveCard(memnite, ZoneType.Library, ZoneType.Battlefield, _alice);
 
         var orni = new Artifact("Ornithopter", "0",
             subtypes: new[] { CardSubtype.Thopter }) { Owner = _alice };
         orni.SetController(_alice);
-        _alice.Zones.Battlefield.AddCard(orni);
+        _alice.Zones.Library.AddCard(orni);
+        zones.MoveCard(orni, ZoneType.Library, ZoneType.Battlefield, _alice);
 
         // Master + Memnite + Ornithopter = 3 artifacts.
         master.GetPower().Should().Be(3);

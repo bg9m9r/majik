@@ -137,14 +137,18 @@ public class KirdApeFactoryTests
         // No Forest yet.
         ape.Power.Should().Be(1);
 
-        // A Forest arrives → bonus flips on.
+        // A Forest arrives → bonus flips on. The bystander Forest is added via
+        // raw zone ops (no ActiveEffects wired), so invalidate the layer-system
+        // cache explicitly via Clear() — production's CardMovedEvent does this.
         var forest = NewForest(_alice);
+        ape.ActiveEffects!.Clear();
         ape.Power.Should().Be(2);
         ape.Toughness.Should().Be(3);
 
         // Last Forest leaves → bonus flips off.
         _alice.Zones.Battlefield.RemoveCard(forest);
         forest.SetZone(ZoneType.Graveyard);
+        ape.ActiveEffects!.Clear();
         ape.Power.Should().Be(1);
         ape.Toughness.Should().Be(1);
     }

@@ -28,11 +28,14 @@ public class DeathsShadowTests
 {
     private readonly Player _alice = new("Alice", 20);
     private readonly EventBus _bus = new();
-    private readonly ContinuousEffectsService _effects = new();
+    private readonly ContinuousEffectsService _effects;
     private readonly ZoneService _zones;
 
     public DeathsShadowTests()
     {
+        // Wire the effects service to the bus so its CR-613 memoization cache
+        // invalidates on game events (matches production GameDependencies).
+        _effects = new ContinuousEffectsService(_bus);
         _zones = new ZoneService(_bus);
     }
 
@@ -149,11 +152,19 @@ public class DeathsShadowTests
 
         shadow.Power.Should().Be(0);
 
+        // In production life loss flows through PlayerService, which fires a
+        // LifeChangedEvent that invalidates the memoization cache. This test
+        // pokes Player.LoseLife directly (no service/bus), so publish the
+        // event the production path would emit so the CDA re-reads.
+        var beforeFirst = _alice.LifeTotal;
         _alice.LoseLife(15); // 20 -> 5
+        _bus.Publish(new LifeChangedEvent(_alice, beforeFirst, _alice.LifeTotal));
         shadow.Power.Should().Be(8);
         shadow.Toughness.Should().Be(8);
 
+        var beforeSecond = _alice.LifeTotal;
         _alice.LoseLife(5); // 5 -> 0
+        _bus.Publish(new LifeChangedEvent(_alice, beforeSecond, _alice.LifeTotal));
         shadow.Power.Should().Be(13);
         shadow.Toughness.Should().Be(13);
     }

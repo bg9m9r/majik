@@ -71,13 +71,29 @@ public class Card : ICard
     public Player? Controller
     {
         get => _controller;
-        internal set => _controller = value;
+        internal set
+        {
+            _controller = value;
+            // CR 613 — see ChangeController: control-scoped effects re-evaluate.
+            if (this is Permanent p) p.ActiveEffects?.BumpGeneration();
+        }
     }
 
     public ZoneType Zone
     {
         get => _zone;
-        internal set => _zone = value;
+        internal set
+        {
+            _zone = value;
+            // CR 613 — a permanent's battlefield presence is an input to the
+            // layer system: lords/anthems/CDAs scoped to "permanents you
+            // control" change as ANY permanent enters/leaves play, and an
+            // effect's own IsActive() battlefield gate keys off its source's
+            // zone. Because the continuous-effects service is shared across
+            // every permanent in a game, bumping its generation here
+            // invalidates the whole memoization cache on any zone change.
+            if (this is Permanent p) p.ActiveEffects?.BumpGeneration();
+        }
     }
 
     /// <summary>
@@ -87,6 +103,9 @@ public class Card : ICard
     public void ChangeController(Player? newController)
     {
         _controller = newController;
+        // CR 613 — control-scoped lords/anthems ("creatures you control")
+        // re-evaluate when control changes; invalidate the shared cache.
+        if (this is Permanent p) p.ActiveEffects?.BumpGeneration();
     }
 
     /// <summary>
@@ -1068,6 +1087,11 @@ public class Card : ICard
         }
 
         _abilities.Add(ability);
+        // CR 613 — the layer pipeline seeds chars.Keywords from this card's
+        // KeywordAbility markers, and Layer-6 ability grants attach markers
+        // here as a side effect of Compute. Invalidate so the next Compute
+        // re-seeds with the freshly-attached ability (when wired).
+        if (this is Permanent p) p.ActiveEffects?.BumpGeneration();
     }
 
     /// <summary>
@@ -1083,7 +1107,10 @@ public class Card : ICard
             throw new ArgumentNullException(nameof(ability));
         }
 
-        return _abilities.Remove(ability);
+        var removed = _abilities.Remove(ability);
+        // CR 613 — see AddAbility: revoking a granted marker must re-seed.
+        if (removed && this is Permanent p) p.ActiveEffects?.BumpGeneration();
+        return removed;
     }
 
     /// <summary>

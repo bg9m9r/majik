@@ -45,7 +45,9 @@ public class AnthemEffectTests
     public void Anthem_ExpiresWhenSourceLeavesBattlefield()
     {
         var svc = new ContinuousEffectsService();
-        var anthem = new Enchantment("Glorious Anthem", "1WW") { Owner = _alice, Controller = _alice };
+        // Wire the source's ActiveEffects (as production does for every
+        // battlefield permanent) so its zone change invalidates the cache.
+        var anthem = new Enchantment("Glorious Anthem", "1WW") { Owner = _alice, Controller = _alice, ActiveEffects = svc };
         anthem.SetZone(ZoneType.Battlefield);
         _alice.Zones.Battlefield.AddCard(anthem);
 

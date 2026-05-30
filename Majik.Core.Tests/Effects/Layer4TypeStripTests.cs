@@ -75,10 +75,16 @@ public class Layer4TypeStripTests
 
         service.Compute((Permanent)target).Types.Should().NotContain(CardType.Creature);
 
+        // The predicate reads an out-of-band closure variable with no event
+        // or registration hook. In production such a flip rides a game event
+        // (which bumps the memoization generation); here we invalidate
+        // explicitly via the documented Clear() path so the predicate re-reads.
         gate = false;
+        service.Clear();
         service.Compute((Permanent)target).Types.Should().Contain(CardType.Creature);
 
         gate = true;
+        service.Clear();
         service.Compute((Permanent)target).Types.Should().NotContain(CardType.Creature);
     }
 

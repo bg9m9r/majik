@@ -171,7 +171,10 @@ public class KarnScionOfUrzaTests
         token.GetToughness().Should().Be(3);
 
         // Add a third printed artifact — the token's P/T tracks it.
+        // Wire the bystander's ActiveEffects so its zone entry invalidates the
+        // layer-system cache (as production does for battlefield permanents).
         var another = new Artifact("Aether Vial", "1") { Owner = _alice, Controller = _alice };
+        another.ActiveEffects = effects;
         _alice.Zones.Battlefield.AddCard(another);
         another.SetZone(ZoneType.Battlefield);
 

@@ -139,23 +139,31 @@ public class WildNacatlFactoryTests
     [Fact]
     public void DynamicallyReevaluates_OnLandComingAndGoing()
     {
-        var (n, _) = NewNacatlOnBattlefield();
+        var (n, effects) = NewNacatlOnBattlefield();
 
         n.Power.Should().Be(1);
 
+        // Bystander lands here are added/removed via raw zone ops with no
+        // ActiveEffects wired, so they don't bump the layer-system generation.
+        // In production a land ETB/LTB rides a CardMovedEvent that invalidates
+        // the cache; invalidate explicitly via Clear() at each such point.
         var mountain = NewBasic(_alice, CardSubtype.Mountain, "Mountain");
+        effects.Clear();
         n.Power.Should().Be(2);
 
         var plains = NewBasic(_alice, CardSubtype.Plains, "Plains");
+        effects.Clear();
         n.Power.Should().Be(3);
         n.Toughness.Should().Be(3);
 
         _alice.Zones.Battlefield.RemoveCard(mountain);
         mountain.SetZone(ZoneType.Graveyard);
+        effects.Clear();
         n.Power.Should().Be(2, "Mountain gone -> only the Plains clause remains");
 
         _alice.Zones.Battlefield.RemoveCard(plains);
         plains.SetZone(ZoneType.Graveyard);
+        effects.Clear();
         n.Power.Should().Be(1);
         n.Toughness.Should().Be(1);
     }

@@ -97,6 +97,11 @@ public class Permanent : Card
     public void MarkFaceDown()
     {
         IsFaceDown = true;
+        // CR 708.2 — face-down flips the permanent to a 2/2 with no other
+        // characteristics. Creature.GetPower/GetToughness short-circuit on
+        // IsFaceDown, but the layer pipeline's seed (types/subtypes/keywords/
+        // colours) also changes, so invalidate the memoization cache.
+        ActiveEffects?.BumpGeneration();
     }
 
     /// <summary>
@@ -109,6 +114,9 @@ public class Permanent : Card
     public void TurnFaceUp()
     {
         IsFaceDown = false;
+        // CR 708.6 — restoring native characteristics changes the layer
+        // pipeline's seed; invalidate the memoization cache (see MarkFaceDown).
+        ActiveEffects?.BumpGeneration();
     }
 
     /// <summary>
@@ -198,6 +206,12 @@ public class Permanent : Card
         Unattach();
         AttachedTo = target;
         target._attachments.Add(this);
+        // CR 613 — equipment/aura attach changes which permanent a Layer-6
+        // grant (Sword of Fire and Ice protection, etc.) reconciles onto. The
+        // grant lifecycle runs as a side effect of the Compute pipeline, so a
+        // stale cache hit would skip it; invalidate both sides.
+        ActiveEffects?.BumpGeneration();
+        target.ActiveEffects?.BumpGeneration();
     }
 
     /// <summary>Detach this permanent from its current parent (if any).
@@ -205,8 +219,13 @@ public class Permanent : Card
     public void Unattach()
     {
         if (AttachedTo == null) return;
+        var formerHost = AttachedTo;
         AttachedTo._attachments.Remove(this);
         AttachedTo = null;
+        // CR 613.6e — detach lifts grants the equipment fed onto its host;
+        // invalidate so the next Compute re-runs the grant reconciliation.
+        ActiveEffects?.BumpGeneration();
+        formerHost.ActiveEffects?.BumpGeneration();
     }
 
     /// <summary>
@@ -247,6 +266,10 @@ public class Permanent : Card
         _isTapped = false;
         _hasSummoningSickness = true;
         _enteredBattlefieldTimestamp = null;
+        // CR 613 — counter mutations gate layered effects (counter-threshold
+        // statics, CDAs) as well as the per-Compute P/T arithmetic; invalidate
+        // the memoization cache whenever the bag changes.
+        Counters.OnMutated = () => ActiveEffects?.BumpGeneration();
     }
 
     /// <summary>
@@ -272,6 +295,9 @@ public class Permanent : Card
         }
 
         _isTapped = true;
+        // CR 613 — tap state gates some continuous effects (Paradise Druid's
+        // "hexproof as long as untapped", vehicles, etc.); invalidate.
+        ActiveEffects?.BumpGeneration();
     }
 
     /// <summary>
@@ -285,6 +311,8 @@ public class Permanent : Card
         }
 
         _isTapped = false;
+        // CR 613 — see Tap(): tap state gates some continuous effects.
+        ActiveEffects?.BumpGeneration();
     }
 
     /// <summary>True if a loyalty ability (CR 606.5) has been activated

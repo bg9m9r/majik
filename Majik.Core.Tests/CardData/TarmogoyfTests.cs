@@ -32,11 +32,14 @@ public class TarmogoyfTests
     private readonly Player _alice = new("Alice", 20);
     private readonly Player _bob = new("Bob", 20);
     private readonly EventBus _bus = new();
-    private readonly ContinuousEffectsService _effects = new();
+    private readonly ContinuousEffectsService _effects;
     private readonly ZoneService _zones;
 
     public TarmogoyfTests()
     {
+        // Wire the effects service to the bus so its CR-613 memoization cache
+        // invalidates on game events (matches production GameDependencies).
+        _effects = new ContinuousEffectsService(_bus);
         _zones = new ZoneService(_bus);
     }
 
