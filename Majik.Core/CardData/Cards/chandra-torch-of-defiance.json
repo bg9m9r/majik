@@ -1,0 +1,9 @@
+{
+  "name": "Chandra, Torch of Defiance",
+  "types": ["Planeswalker"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Chandra"],
+  "manaCost": "{2}{R}{R}",
+  "loyalty": 4,
+  "abilities": []
+}
