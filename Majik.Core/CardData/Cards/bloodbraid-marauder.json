@@ -1,0 +1,8 @@
+{
+  "name": "Bloodbraid Marauder",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Berserker"],
+  "manaCost": "{1}{R}",
+  "power": 3,
+  "toughness": 1
+}
