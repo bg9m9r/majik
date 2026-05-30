@@ -1,0 +1,7 @@
+{
+  "name": "Pillarverge Pathway",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "W" }
+  ]
+}
