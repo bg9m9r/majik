@@ -22,6 +22,36 @@ public class Permanent : Card
     /// </summary>
     public Majik.Core.Counters.CounterCollection Counters { get; } = new();
 
+    /// <summary>
+    /// Optional reference to the
+    /// <see cref="Majik.Core.Effects.ContinuousEffectsService"/> that owns
+    /// this permanent. When set, characteristic lookups that go through the
+    /// layer system (P/T and keywords on creatures via
+    /// <see cref="Creature"/>; effective colour via
+    /// <see cref="GetEffectiveColors"/> on any permanent) consult it (CR
+    /// 613). When null, printed/static values are returned.
+    /// </summary>
+    public Majik.Core.Effects.ContinuousEffectsService? ActiveEffects { get; set; }
+
+    /// <summary>
+    /// CR 105.3 / CR 613.1e — this permanent's <em>effective</em> colour
+    /// set after the Layer-5 colour-changing pass. When
+    /// <see cref="ActiveEffects"/> is set this consults the layer system
+    /// (so "is all colors" / "becomes blue" effects are honoured); when
+    /// null — or when no Layer-5 colour effect is active — it falls back to
+    /// the printed/static derivation in
+    /// <see cref="Majik.Core.Cards.CardColors.GetColors(Majik.Core.Cards.ICard)"/>.
+    /// Returns only the five real colours; an empty set is colourless.
+    /// </summary>
+    public IReadOnlySet<ValueObjects.ManaColor> GetEffectiveColors()
+    {
+        if (ActiveEffects == null)
+        {
+            return Majik.Core.Cards.CardColors.GetColors(this);
+        }
+        return ActiveEffects.Compute(this).Colors;
+    }
+
     /// <summary>True if this is a token (CR 111). Tokens cease to exist
     /// off battlefield via SBA 704.5d. Set via <see cref="MarkAsToken"/>.</summary>
     public bool IsToken { get; internal set; }

@@ -91,6 +91,14 @@ public sealed class ContinuousEffectsService
         {
             chars.Keywords.Add(kw.Keyword);
         }
+        // CR 105 / 613.1e — seed the printed/static colour set (mana-cost
+        // pips + colour indicator + token override + Devoid). Layer 5
+        // SET / ADD colour effects mutate this on top during the layer
+        // walk below.
+        foreach (var c in Majik.Core.Cards.CardColors.GetColors(permanent))
+        {
+            chars.Colors.Add(c);
+        }
 
         // CR 613.6 — pre-compute the set of creatures whose abilities have been
         // stripped by an active Layer 6 ability-removing effect. We then drop
