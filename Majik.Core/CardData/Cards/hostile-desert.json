@@ -1,0 +1,8 @@
+{
+  "name": "Hostile Desert",
+  "types": ["Land"],
+  "subtypes": ["Desert"],
+  "abilities": [
+    { "kind": "mana", "produces": "C" }
+  ]
+}
