@@ -1,0 +1,5 @@
+{
+  "name": "Genesis Wave",
+  "types": ["Sorcery"],
+  "manaCost": "{X}{G}{G}{G}"
+}
