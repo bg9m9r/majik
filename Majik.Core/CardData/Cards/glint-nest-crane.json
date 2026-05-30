@@ -1,0 +1,9 @@
+{
+  "name": "Glint-Nest Crane",
+  "types": ["Creature"],
+  "subtypes": ["Bird"],
+  "manaCost": "{1}{U}",
+  "power": 1,
+  "toughness": 3,
+  "abilities": []
+}
