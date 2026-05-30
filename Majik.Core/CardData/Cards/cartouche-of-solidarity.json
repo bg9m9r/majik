@@ -1,0 +1,7 @@
+{
+  "name": "Cartouche of Solidarity",
+  "types": ["Enchantment"],
+  "subtypes": ["Aura", "Cartouche"],
+  "manaCost": "{W}",
+  "colors": ["W"]
+}
