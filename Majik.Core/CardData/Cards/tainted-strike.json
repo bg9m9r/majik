@@ -1,0 +1,5 @@
+{
+  "name": "Tainted Strike",
+  "types": ["Instant"],
+  "manaCost": "{B}"
+}
