@@ -363,23 +363,125 @@ public class Card : ICard
     /// </summary>
     public IReadOnlyList<ManaColor>? PendingCastColors { get; private set; }
 
+    /// <summary>
+    /// Per-color multiplicity of mana actually spent to pay this card's cast
+    /// cost. Where <see cref="PendingCastColors"/> records only the distinct
+    /// <em>set</em> of colors (CR 702.44 / Sunburst — counters per color), this
+    /// ledger preserves the <em>count</em> so an intervening-if can tell
+    /// "{R}{R} was spent" from "{R}{G} was spent" (the hybrid Elemental
+    /// Incarnation family — Vibrance / Wistfulness — keys off this).
+    /// <para>
+    /// Stamped by <see cref="Majik.Core.Game.TurnDriver"/> alongside
+    /// <see cref="PendingCastColors"/>, computed by the same cross-spend pool
+    /// diff in <see cref="Majik.Core.Costs.ManaPaymentResolver"/> (the
+    /// per-color delta IS the count; the distinct set is just that delta
+    /// collapsed to "> 0"). Colorless / generic mana is not colored and is
+    /// never recorded. Only colors with a positive count appear as keys.
+    /// Null when no cast has happened yet, or after the stamp is consumed /
+    /// cleared. An empty (non-null) dictionary = cast but no colored mana
+    /// spent.
+    /// </para>
+    /// </summary>
+    public IReadOnlyDictionary<ManaColor, int>? PendingCastColorCounts { get; private set; }
+
     /// <summary>Stamp the distinct colors paid for this card's cast.
     /// Called by <see cref="Majik.Core.Game.TurnDriver"/> right after
     /// the mana resolver commits payment. Empty list = no colored mana
     /// was spent (CR 702.44b — Sunburst yields zero counters in that
     /// case). Null is reserved for "no cast has happened yet"; pass an
-    /// empty list to explicitly record "cast but no colors paid".</summary>
+    /// empty list to explicitly record "cast but no colors paid".
+    /// <para>
+    /// Back-compat overload for callers that only know the distinct colors
+    /// (Sunburst-era tests). Each distinct color back-fills a count of 1 in
+    /// <see cref="PendingCastColorCounts"/> — a color appearing in the
+    /// distinct set implies at least one of it was spent — so the count
+    /// ledger and the predicate (<see cref="SpentAtLeast"/>) stay consistent.
+    /// Callers that know exact multiplicity should prefer
+    /// <see cref="SetPendingCastColorCounts"/>.
+    /// </para></summary>
     public void SetPendingCastColors(IReadOnlyList<ManaColor> colors)
     {
-        PendingCastColors = colors ?? throw new ArgumentNullException(nameof(colors));
+        if (colors == null) throw new ArgumentNullException(nameof(colors));
+        PendingCastColors = colors;
+        // Back-fill the count ledger: one per distinct color.
+        var counts = new Dictionary<ManaColor, int>();
+        foreach (var color in colors)
+        {
+            counts[color] = counts.TryGetValue(color, out var n) ? n + 1 : 1;
+        }
+        PendingCastColorCounts = counts;
     }
 
-    /// <summary>Clear the stamped colors-paid ledger. Called by any ETB
-    /// consumer (e.g. SunburstFactory's ETB effect) once it has used the
-    /// value, so a later non-cast battlefield entry doesn't reuse it.</summary>
+    /// <summary>Stamp the per-color spent-count ledger for this card's cast,
+    /// and derive <see cref="PendingCastColors"/> (the distinct set, in
+    /// canonical WUBRG order) from it. This is the authoritative stamp the
+    /// mana resolver uses — it knows exact multiplicity. Only positive counts
+    /// are retained; zero / negative entries are dropped. An empty dictionary
+    /// records "cast but no colored mana spent" (both ledgers become empty,
+    /// not null).</summary>
+    public void SetPendingCastColorCounts(IReadOnlyDictionary<ManaColor, int> counts)
+    {
+        if (counts == null) throw new ArgumentNullException(nameof(counts));
+
+        // Retain only positive counts; colorless/generic mana never reaches
+        // here, but a defensive filter keeps the ledger meaningful.
+        var ledger = new Dictionary<ManaColor, int>();
+        foreach (var (color, n) in counts)
+        {
+            if (n > 0) ledger[color] = n;
+        }
+        PendingCastColorCounts = ledger;
+
+        // Derive the distinct set in canonical WUBRG order (matches the
+        // engine's color iteration order so Sunburst counter placement and
+        // any existing consumer stay deterministic).
+        var distinct = new List<ManaColor>(ledger.Count);
+        foreach (var color in WubrgOrder)
+        {
+            if (ledger.ContainsKey(color)) distinct.Add(color);
+        }
+        PendingCastColors = distinct;
+    }
+
+    /// <summary>
+    /// Intervening-if predicate "≥<paramref name="count"/> mana of
+    /// <paramref name="color"/> was spent to cast this" — the gate the
+    /// hybrid Elemental Incarnations read ("if {R}{R} was spent ...").
+    /// Reads <see cref="PendingCastColorCounts"/>. Returns false when no
+    /// cast has happened (null ledger). Mirrors how Sunburst ETB effects
+    /// read the distinct set; designed to be wired as a
+    /// <see cref="Majik.Core.Abilities.TriggeredAbility"/> intervening-if.
+    /// </summary>
+    /// <param name="count">Required multiplicity, must be ≥ 1 (asking for
+    /// "at least 0" is degenerate and surfaces a caller mistake).</param>
+    public bool SpentAtLeast(ManaColor color, int count)
+    {
+        if (count < 1)
+            throw new ArgumentOutOfRangeException(
+                nameof(count), count, "count must be ≥ 1.");
+
+        var ledger = PendingCastColorCounts;
+        if (ledger == null) return false;
+        return ledger.TryGetValue(color, out var spent) && spent >= count;
+    }
+
+    /// <summary>Canonical WUBRG color iteration order used to derive the
+    /// distinct-color set from the count ledger.</summary>
+    private static readonly ManaColor[] WubrgOrder =
+    {
+        ManaColor.White, ManaColor.Blue, ManaColor.Black,
+        ManaColor.Red, ManaColor.Green,
+    };
+
+    /// <summary>Clear the stamped colors-paid ledger (both the distinct set
+    /// and the count ledger). Called by any ETB consumer (e.g.
+    /// SunburstFactory's ETB effect, or a conditional-ETB incarnation
+    /// trigger) once it has used the value, so a later non-cast battlefield
+    /// entry doesn't reuse it.</summary>
     public void ClearPendingCastColors()
     {
         PendingCastColors = null;
+        PendingCastColorCounts = null;
     }
 
     /// <summary>

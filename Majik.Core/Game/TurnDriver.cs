@@ -513,22 +513,26 @@ public sealed class TurnDriver
                     payment = autoPayment;
                 }
             }
-            if (!manaResolver.Pay(actor, cost, payment, out var colorsSpent))
+            if (!manaResolver.Pay(actor, cost, payment, out _, out var colorCounts))
             {
                 RotateHand(cast.Card, "Pay failed");
                 return;
             }
 
-            // CR 702.44b — stamp the distinct colors of mana actually
-            // spent on this cast so Sunburst ETB effects can read them
-            // off the resolving permanent (parallels PendingCastX). The
-            // resolver computed this by diffing the pool across the
-            // spend (colored pips + colored mana used to satisfy
-            // generic). Empty list = no colored mana spent → Sunburst
-            // yields zero counters. Consumed + cleared by the ETB effect.
+            // CR 702.44b — stamp the per-color spent ledger on this cast so
+            // ETB effects can read it off the resolving permanent (parallels
+            // PendingCastX). SetPendingCastColorCounts also derives the
+            // distinct-color set (PendingCastColors) for Sunburst, while the
+            // count ledger preserves multiplicity so "{R}{R} was spent"
+            // intervening-ifs (Vibrance / Wistfulness) can distinguish
+            // {R}{R} from {R}{G}. The resolver computed the per-color counts
+            // by diffing the pool across the spend (colored pips + colored
+            // mana used to satisfy generic). Empty ledger = no colored mana
+            // spent → Sunburst yields zero counters. Consumed + cleared by
+            // the ETB effect.
             if (cast.Card is Majik.Core.Cards.Card concreteForColors)
             {
-                concreteForColors.SetPendingCastColors(colorsSpent);
+                concreteForColors.SetPendingCastColorCounts(colorCounts);
             }
 
             try
