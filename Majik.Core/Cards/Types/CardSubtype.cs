@@ -440,4 +440,10 @@ public enum CardSubtype
     /// (see <see cref="Majik.Core.Keywords.TypedCyclingFactory"/>) also
     /// keys off this subtype. CR 205.3m.</summary>
     Sliver,
+
+    /// <summary>Weird creature subtype — Spellgorger Weird (Guilds of
+    /// Ravnica), Nivix Cyclops, Wee Dragonauts. Izzet-flavoured
+    /// spellslinger creatures whose payoffs key off casting noncreature
+    /// (instant/sorcery) spells. CR 205.3m.</summary>
+    Weird,
 }
