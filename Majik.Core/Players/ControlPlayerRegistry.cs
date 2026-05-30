@@ -40,13 +40,25 @@ public sealed class ControlPlayerRegistry
     // Pending grants keyed by the controlled player's Id. A later grant for
     // the same controlled player overwrites an earlier one (CR 720.4 — the
     // most recent control-changing effect's controller wins for that turn).
-    private readonly Dictionary<Guid, Player> _pending = new();
+    // ExtraTurnAfter carries Emrakul's rider ("After that turn, that player
+    // takes an extra turn"); Mindslaver grants it false.
+    private readonly Dictionary<Guid, (Player Controller, bool ExtraTurnAfter)> _pending = new();
 
     // The control in force for the turn currently being driven. Populated by
     // ConsumeControlFor at turn-start; cleared by ClearActiveControl at
     // turn-end. Null when the active turn's player is making their own
     // decisions.
-    private (Player Controlled, Player Controller)? _active;
+    private (Player Controlled, Player Controller, bool ExtraTurnAfter)? _active;
+
+    /// <summary>
+    /// CR 500.7 — invoked by <see cref="ClearActiveControl"/> when a control
+    /// grant that carried the "extra turn after" rider (Emrakul, the Promised
+    /// End) ends. The argument is the player who gets the extra turn (the
+    /// player who was controlled). The orchestrator
+    /// (<see cref="Majik.Core.Game.GameDriver"/>) wires this to enqueue the
+    /// extra turn. Null when no rider scheduling is wired (unit harnesses).
+    /// </summary>
+    public Action<Player>? ScheduleExtraTurnAfterControl { get; set; }
 
     /// <summary>True when a control grant is in force for the turn currently
     /// being driven.</summary>
@@ -69,11 +81,22 @@ public sealed class ControlPlayerRegistry
     /// the first (CR 720.4).
     /// </summary>
     public void GrantControl(Player controller, Player controlled)
+        => GrantControl(controller, controlled, extraTurnAfter: false);
+
+    /// <summary>
+    /// CR 720.1 + CR 500.7 — as <see cref="GrantControl(Player,Player)"/>, but
+    /// <paramref name="extraTurnAfter"/> carries Emrakul, the Promised End's
+    /// rider: "After that turn, that player takes an extra turn." When set,
+    /// the controlled player is scheduled an extra turn (via
+    /// <see cref="ScheduleExtraTurnAfterControl"/>) once the controlled turn
+    /// ends. Mindslaver passes <see langword="false"/> (no rider).
+    /// </summary>
+    public void GrantControl(Player controller, Player controlled, bool extraTurnAfter)
     {
         ArgumentNullException.ThrowIfNull(controller);
         ArgumentNullException.ThrowIfNull(controlled);
         if (ReferenceEquals(controller, controlled)) return;
-        _pending[controlled.Id] = controller;
+        _pending[controlled.Id] = (controller, extraTurnAfter);
     }
 
     /// <summary>True when a control grant is pending for
@@ -95,11 +118,11 @@ public sealed class ControlPlayerRegistry
     public bool ConsumeControlFor(Player turnPlayer, out Player? controller)
     {
         ArgumentNullException.ThrowIfNull(turnPlayer);
-        if (_pending.TryGetValue(turnPlayer.Id, out var c))
+        if (_pending.TryGetValue(turnPlayer.Id, out var grant))
         {
             _pending.Remove(turnPlayer.Id);
-            _active = (turnPlayer, c);
-            controller = c;
+            _active = (turnPlayer, grant.Controller, grant.ExtraTurnAfter);
+            controller = grant.Controller;
             return true;
         }
         controller = null;
@@ -111,8 +134,21 @@ public sealed class ControlPlayerRegistry
     /// makes their own decisions again (CR 720.1 — control lasts for "that
     /// player's next turn", a single turn). Safe to call when no control is
     /// active.
+    ///
+    /// <para>CR 500.7 — if the grant carried the "extra turn after" rider
+    /// (Emrakul), schedule the controlled player's extra turn via
+    /// <see cref="ScheduleExtraTurnAfterControl"/> as the active control is
+    /// torn down (the extra turn is added directly after the controlled turn
+    /// that just ended).</para>
     /// </summary>
-    public void ClearActiveControl() => _active = null;
+    public void ClearActiveControl()
+    {
+        if (_active is { ExtraTurnAfter: true } a)
+        {
+            ScheduleExtraTurnAfterControl?.Invoke(a.Controlled);
+        }
+        _active = null;
+    }
 
     /// <summary>
     /// CR 720.1 — resolve the player who currently makes

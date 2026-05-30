@@ -34,10 +34,12 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     floor at zero).
 ///   - Duplicate card types in graveyard only count once.
 ///
-/// The on-cast take-control trigger (CR 720 "Controlling Another Player" /
-/// Mindslaver) is deliberately deferred — no ControlPlayer primitive exists
-/// in the engine — so there is no cast-trigger test here (mirrors the same
-/// gap documented on <see cref="MindslaverFactory"/>).
+/// The on-cast take-control trigger (CR 603.1 / CR 720.1 / CR 500.7 —
+/// "you gain control of target opponent during that player's next turn.
+/// After that turn, that player takes an extra turn.") is now attached and
+/// covered below: shape (Stack-active SpellCastEvent trigger with a 1..1
+/// target-opponent request) and resolution (grants control of the target's
+/// next turn with the extra-turn rider via the live ControlPlayerRegistry).
 /// </summary>
 public class EmrakulThePromisedEndFactoryTests
 {
@@ -187,6 +189,110 @@ public class EmrakulThePromisedEndFactoryTests
 
         effective.Generic.Should().Be(5,
             "all eight card types → {8} reduction: {13} - {8} = {5}");
+    }
+
+    // -----------------------------------------------------------------------
+    // CR 603.1 / CR 720.1 / CR 500.7 — on-cast take-control trigger
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void CastTrigger_Shape_StackActive_WithTargetOpponentRequest()
+    {
+        var emrakul = EmrakulThePromisedEndFactory.Create(_alice);
+
+        var trigger = emrakul.Abilities.OfType<TriggeredAbility>().Single();
+
+        // CR 702.85-style on-cast trigger — active on the stack so it fires
+        // while Emrakul is being cast.
+        trigger.ActiveZones.Should().Contain(ZoneType.Stack);
+
+        // 1..1 "target opponent" request.
+        trigger.TargetRequests.Should().HaveCount(1);
+        trigger.TargetRequests[0].MinTargets.Should().Be(1);
+        trigger.TargetRequests[0].MaxTargets.Should().Be(1);
+        trigger.TargetRequests[0].Description.Should().Contain("opponent");
+    }
+
+    [Fact]
+    public void CastTrigger_Condition_FiresOnEmrakulsOwnCast_NotOthers()
+    {
+        var emrakul = EmrakulThePromisedEndFactory.Create(_alice);
+        var trigger = emrakul.Abilities.OfType<TriggeredAbility>().Single();
+
+        // CR 603.6a — "when you cast THIS spell": matches Emrakul's own cast.
+        var ownCast = new Majik.Core.Domain.DomainEvents.SpellCastEvent(
+            new Majik.Core.Spells.Spell(emrakul, _alice));
+        trigger.Condition.Matches(ownCast, trigger).Should().BeTrue();
+
+        // A different spell does not trigger it.
+        var other = new Majik.Core.Cards.Creature("Grizzly Bears", "{1}{G}", 2, 2);
+        var otherCast = new Majik.Core.Domain.DomainEvents.SpellCastEvent(
+            new Majik.Core.Spells.Spell(other, _bob));
+        trigger.Condition.Matches(otherCast, trigger).Should().BeFalse();
+    }
+
+    [Fact]
+    public void CastTrigger_TargetGatherer_ReturnsOpponentsOnly()
+    {
+        var emrakul = EmrakulThePromisedEndFactory.Create(_alice);
+        var trigger = emrakul.Abilities.OfType<TriggeredAbility>().Single();
+        var req = trigger.TargetRequests[0];
+
+        var ctx = new Majik.Core.Game.GameContext(
+            self: _alice,
+            allPlayers: new[] { _alice, _bob },
+            activePlayer: _alice,
+            turnNumber: 1,
+            currentPhase: Majik.Core.StateMachine.PhaseStateType.PreCombatMain,
+            stack: new Majik.Core.Stack.Stack());
+
+        var candidates = req.ResolveCandidates(ctx);
+
+        // CR 720.1 — "target opponent": Bob is a legal target; Alice (the
+        // controller) is not.
+        candidates.Should().ContainSingle();
+        candidates.Should().Contain(_bob);
+        candidates.Should().NotContain(_alice);
+    }
+
+    [Fact]
+    public void CastTrigger_Resolution_GrantsControlOfTargetsNextTurn_WithExtraTurnRider()
+    {
+        // CR 720.1 + CR 500.7 — register a live registry so the resolution
+        // closure's provider lookup resolves it; capture the extra-turn-after
+        // schedule to prove Emrakul's rider is carried.
+        var registry = new ControlPlayerRegistry();
+        Player? extraTurnScheduledFor = null;
+        registry.ScheduleExtraTurnAfterControl = p => extraTurnScheduledFor = p;
+        ControlPlayerRegistryProvider.Set(_alice, registry);
+        try
+        {
+            var emrakul = EmrakulThePromisedEndFactory.Create(_alice);
+            var trigger = emrakul.Abilities.OfType<TriggeredAbility>().Single();
+            trigger.SetChosenTargets(new IReadOnlyList<object>[]
+            {
+                new object[] { _bob },
+            });
+
+            registry.HasPendingControl(_bob).Should().BeFalse("no grant before resolution");
+
+            foreach (var e in trigger.Effects) e.Execute();
+
+            // CR 720.1 — Bob's next turn is now under Alice's control.
+            registry.HasPendingControl(_bob).Should().BeTrue();
+            registry.ConsumeControlFor(_bob, out var controller).Should().BeTrue();
+            controller.Should().BeSameAs(_alice);
+
+            // CR 500.7 — Emrakul's rider: when the controlled turn ends, Bob
+            // takes an extra turn. ClearActiveControl fires the schedule.
+            registry.ClearActiveControl();
+            extraTurnScheduledFor.Should().BeSameAs(_bob,
+                "CR 500.7 — after the controlled turn, the controlled player takes an extra turn");
+        }
+        finally
+        {
+            ControlPlayerRegistryProvider.Remove(_alice);
+        }
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────────
