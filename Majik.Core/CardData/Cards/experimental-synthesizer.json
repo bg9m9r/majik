@@ -1,0 +1,6 @@
+{
+  "name": "Experimental Synthesizer",
+  "types": ["Artifact"],
+  "manaCost": "{R}",
+  "abilities": []
+}
