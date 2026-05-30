@@ -57,6 +57,25 @@ public sealed class TurnDriver
     /// </summary>
     public TurnState TurnState { get; } = new();
 
+    /// <summary>
+    /// The game-level day/night designation (CR 730, "Day and Night").
+    /// Starts at <see cref="DayNightDesignation.Neither"/>; the untap-step
+    /// check (CR 502.2 / 730.2) is applied at the start of each turn from
+    /// the previous turn's active player's spell count. Daybound/nightbound
+    /// permanents (CR 702.145) and "becomes day/night" effects drive it day
+    /// or night.
+    /// </summary>
+    public DayNightState DayNight { get; } = new();
+
+    // CR 502.2 / 730.2 — the untap-step day/night check inspects the
+    // PREVIOUS turn's active player and how many spells they cast THAT turn.
+    // TurnState.Reset() (run at the top of each RunTurnAsync) wipes the
+    // per-turn spell tally, so we snapshot the just-ended turn's active
+    // player + their cast count here before the reset and feed it into the
+    // check during this turn's untap step. Null before the first turn ends.
+    private Player? _previousTurnActivePlayer;
+    private int _previousTurnActivePlayerSpellsCast;
+
     /// <summary>Effects that grant the current turn an additional combat
     /// phase (Aggravated Assault, Combat Celebrant, Relentless Assault)
     /// enqueue here. The turn loop re-runs the combat sequence as long
@@ -234,6 +253,15 @@ public sealed class TurnDriver
             p.ResetTurnTrackers();
         }
 
+        // CR 502.2 / 730.2 — snapshot the JUST-ENDED turn's active player and
+        // their spell count BEFORE TurnState.Reset() wipes the tally. The
+        // untap-step day/night check (below) reads this snapshot; it inspects
+        // the previous turn's active player, not the player whose turn is now
+        // beginning.
+        _previousTurnActivePlayerSpellsCast = _previousTurnActivePlayer != null
+            ? TurnState.SpellsCastByPlayer(_previousTurnActivePlayer)
+            : 0;
+
         // Reset per-turn event tally (revolt, connive X, draw watchers).
         TurnState.Reset();
 
@@ -245,6 +273,17 @@ public sealed class TurnDriver
         // Beginning phase (CR 501-504: Untap, Upkeep, Draw).
         SetTurnState(TurnStateType.TurnBeginning);
         SetPhase(PhaseStateType.Untap);
+
+        // CR 502.2 / 730.2 — the second turn-based action of the untap step:
+        // the day/night check. If it's day and the previous turn's active
+        // player cast no spells, it becomes night; if it's night and they
+        // cast two or more, it becomes day; if it's neither, no check. Runs
+        // before untap proper (order among untap turn-based actions is
+        // immaterial — none interact). On the very first turn there is no
+        // previous active player, so the snapshot is 0 and the game (still
+        // "neither" until a daybound permanent/effect cares) is unaffected.
+        CheckDayNightUntapTransition();
+
         UntapStep(activePlayer);
 
         SetPhase(PhaseStateType.Upkeep);
@@ -305,6 +344,36 @@ public sealed class TurnDriver
 
         SetPhase(PhaseStateType.Cleanup);
         Cleanup(activePlayer);
+
+        // CR 502.2 / 730.2 — remember this turn's active player so the NEXT
+        // turn's untap-step day/night check can read how many spells they
+        // cast. Recorded after the turn's body so their full spell count is
+        // captured (the snapshot read happens at the top of the next
+        // RunTurnAsync, before TurnState.Reset()).
+        _previousTurnActivePlayer = activePlayer;
+    }
+
+    /// <summary>
+    /// CR 502.2 / CR 730.2 — the untap-step day/night check. If it's day and
+    /// the previous turn's active player cast no spells, it becomes night; if
+    /// it's night and they cast two or more, it becomes day; if it's neither,
+    /// no check happens (CR 730.2c). Publishes a
+    /// <see cref="Majik.Core.Events.DayNightChangedEvent"/> when the
+    /// designation actually changes so daybound/nightbound transform logic
+    /// (CR 702.145) and clients can react.
+    /// </summary>
+    private void CheckDayNightUntapTransition()
+    {
+        // CR 730.2 — the check inspects the PREVIOUS turn. On the very first
+        // turn of the game there is no previous turn, so the check doesn't
+        // happen (it can't flip day→night off a phantom zero-spell turn).
+        if (_previousTurnActivePlayer == null) return;
+
+        var changed = DayNight.CheckUntapTransition(_previousTurnActivePlayerSpellsCast);
+        if (changed)
+        {
+            _eventBus?.Publish(new Majik.Core.Events.DayNightChangedEvent(DayNight.Designation));
+        }
     }
 
     private Player? _activePlayerForStepEvents;
