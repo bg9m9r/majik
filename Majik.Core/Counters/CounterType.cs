@@ -134,4 +134,17 @@ public sealed record CounterType(string Name)
     /// <see cref="Majik.Core.CardData.Factories.GemstoneCavernsFactory"/>.
     /// </summary>
     public static readonly CounterType Luck = new("Luck");
+
+    /// <summary>
+    /// CR 122.1c / CR 701.xx — Stun counters. "If a permanent with a stun
+    /// counter on it would become untapped, instead remove a stun counter
+    /// from it." (Kaito, Bane of Nightmares' −2 puts two stun counters on a
+    /// tapped creature.) The on-permanent counter is modelled here as an
+    /// opaque marker so it is observable on the permanent's
+    /// <see cref="CounterCollection"/>; the untap-replacement that consumes
+    /// one stun counter in place of untapping is a separate engine surface
+    /// not yet wired (recorded as a v1 deferral on the placing card's
+    /// factory).
+    /// </summary>
+    public static readonly CounterType Stun = new("Stun");
 }
