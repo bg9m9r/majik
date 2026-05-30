@@ -1,0 +1,9 @@
+{
+  "name": "Plaguecrafter",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Shaman"],
+  "manaCost": "{2}{B}",
+  "power": 3,
+  "toughness": 2,
+  "abilities": []
+}
