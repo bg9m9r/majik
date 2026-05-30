@@ -1,0 +1,7 @@
+{
+  "name": "Ethereal Armor",
+  "types": ["Enchantment"],
+  "subtypes": ["Aura"],
+  "manaCost": "{W}",
+  "colors": ["W"]
+}
