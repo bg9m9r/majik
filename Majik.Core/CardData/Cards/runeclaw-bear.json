@@ -1,0 +1,9 @@
+{
+  "name": "Runeclaw Bear",
+  "types": ["Creature"],
+  "subtypes": ["Bear"],
+  "manaCost": "{1}{G}",
+  "power": 2,
+  "toughness": 2,
+  "abilities": []
+}
