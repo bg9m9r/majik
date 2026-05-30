@@ -1,0 +1,9 @@
+{
+  "name": "Centaur Courser",
+  "types": ["Creature"],
+  "subtypes": ["Centaur", "Warrior"],
+  "manaCost": "{2}{G}",
+  "power": 3,
+  "toughness": 3,
+  "abilities": []
+}
