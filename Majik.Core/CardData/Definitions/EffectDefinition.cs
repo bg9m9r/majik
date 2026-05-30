@@ -20,6 +20,7 @@ namespace Majik.Core.CardData.Definitions;
 [JsonDerivedType(typeof(ScrySelfEffectDef), "scry_self")]
 [JsonDerivedType(typeof(DestroyTargetStubEffectDef), "destroy_target_stub")]
 [JsonDerivedType(typeof(UntapTargetStubEffectDef), "untap_target_stub")]
+[JsonDerivedType(typeof(PreventDamageTargetStubEffectDef), "prevent_damage_target_stub")]
 [JsonDerivedType(typeof(GainLifeSelfEffectDef), "gain_life_self")]
 [JsonDerivedType(typeof(MillThenPickFirstMatchingToHandEffectDef), "mill_then_pick_first_matching_to_hand")]
 [JsonDerivedType(typeof(ConniveSelfEffectDef), "connive_self")]
@@ -125,6 +126,33 @@ public sealed class DestroyTargetStubEffectDef : EffectDefinition
 public sealed class UntapTargetStubEffectDef : EffectDefinition
 {
     public string TargetFilter { get; set; } = "permanent";
+}
+
+/// <summary>
+/// "Prevent the next N damage that would be dealt to target [filter] this
+/// turn" — stub effect. Records the prevention <see cref="Amount"/> and the
+/// <see cref="TargetFilter"/> describing what can be shielded, but resolves
+/// as a no-op because the targeting/prompt system isn't wired yet (mirrors
+/// the existing <see cref="UntapTargetStubEffectDef"/> /
+/// <see cref="DestroyTargetStubEffectDef"/> deferred-targeting pattern).
+///
+/// The prevention shield itself (CR 615 — a per-turn pool of prevented
+/// damage points) is already supported by the engine via
+/// <see cref="Majik.Core.Effects.PreventNextNDamageToAnyTargetShield"/>; the
+/// gap is purely target selection. When the targeting prompt lands, this
+/// type upgrades to a real <c>prevent_damage_target</c> effect (register the
+/// shield against the chosen target) without breaking JSON files. Canonical
+/// case: Eiganjo Castle —
+/// <c>"{W}, {T}: Prevent the next 2 damage that would be dealt to target
+/// legendary creature this turn."</c>
+///
+/// <see cref="TargetFilter"/> is a free-form string the future targeting
+/// layer will translate (e.g. <c>"legendary_creature"</c>).
+/// </summary>
+public sealed class PreventDamageTargetStubEffectDef : EffectDefinition
+{
+    public int Amount { get; set; } = 1;
+    public string TargetFilter { get; set; } = "creature";
 }
 
 /// <summary>"Controller gains N life." Default <see cref="Amount"/> = 1.</summary>

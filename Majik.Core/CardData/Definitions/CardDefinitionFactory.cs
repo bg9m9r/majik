@@ -291,6 +291,7 @@ public static class CardDefinitionFactory
             ScrySelfEffectDef scry => BuildScrySelfEffect(scry, card, controller),
             DestroyTargetStubEffectDef destroy => BuildDestroyTargetStubEffect(destroy, card),
             UntapTargetStubEffectDef untap => BuildUntapTargetStubEffect(untap, card),
+            PreventDamageTargetStubEffectDef prevent => BuildPreventDamageTargetStubEffect(prevent, card),
             GainLifeSelfEffectDef gain => BuildGainLifeSelfEffect(gain, card, controller),
             MillThenPickFirstMatchingToHandEffectDef mp => BuildMillThenPickEffect(mp, card, controller),
             ConniveSelfEffectDef connive => BuildConniveSelfEffect(connive, card),
@@ -377,6 +378,24 @@ public static class CardDefinitionFactory
         return new Effect(
             $"{card.Name}: untap target {def.TargetFilter} (stub — no targeting yet)",
             () => { /* untap target deferred */ });
+    }
+
+    private static IEffect BuildPreventDamageTargetStubEffect(
+        PreventDamageTargetStubEffectDef def, ICard card)
+    {
+        // Stub: mirrors the Minamo untap_target_stub deferred behavior. The
+        // damage-prevention shield itself (CR 615 — a per-turn pool of
+        // prevented damage points) is supported by the engine via
+        // PreventNextNDamageToAnyTargetShield, but choosing the target
+        // requires the targeting/prompt system that isn't wired yet, so
+        // resolution proceeds as a no-op. Upgrades to a real
+        // prevent_damage_target effect (register the shield against the
+        // chosen target) once targeting lands, without changing JSON files.
+        // Canonical case: Eiganjo Castle ("Prevent the next 2 damage that
+        // would be dealt to target legendary creature this turn").
+        return new Effect(
+            $"{card.Name}: prevent next {def.Amount} damage to target {def.TargetFilter} this turn (stub — no targeting yet)",
+            () => { /* prevent-damage target deferred */ });
     }
 
     private static IEffect BuildScrySelfEffect(ScrySelfEffectDef def, ICard card, Player controller)
