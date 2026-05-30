@@ -1,0 +1,9 @@
+{
+  "name": "Vibrance",
+  "types": ["Creature"],
+  "subtypes": ["Elemental", "Incarnation"],
+  "manaCost": "{3}{R/G}{R/G}",
+  "power": 4,
+  "toughness": 4,
+  "abilities": []
+}
