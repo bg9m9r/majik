@@ -28,20 +28,27 @@ namespace Majik.Core.CardData.Factories;
 ///   the effect closure (mirrors Aether Spellbomb — the generic
 ///   <see cref="AdditionalCost.Pay"/> sacrifice path is a stub).
 ///
-/// ## Deferred (v1 gaps — known)
-/// - <b>Mind-control of a player</b>: CR 720 ("Controlling Another Player")
-///   — the engine has no primitive for swapping a player's decision-
-///   making agent for one turn. The resolution closure records the
-///   intended target via the optional <paramref name="mindControlSink"/>
-///   callback (caller-supplied — typically a test hook or future
-///   ControlPlayer service shim) and sacrifices Mindslaver, but the
-///   actual turn-substitution does not happen. This is the same gap
-///   listed for the unimplemented Emrakul, the Promised End (cast
-///   trigger "you control target opponent during that player's next
-///   turn") — when a ControlPlayer primitive lands, both cards switch
-///   over to it. Until then Mindslaver is shape-only on the mind-
-///   control half: the cost is paid, the target is recorded, the
-///   artifact is sacrificed, but no turn is taken over.
+/// ## Mind-control (CR 720 — implemented)
+/// - On resolution the closure resolves the chosen target player, sacrifices
+///   Mindslaver, then takes control of that player's next turn via the live
+///   <see cref="Majik.Core.Players.ControlPlayerRegistry"/> (looked up at
+///   resolution time through
+///   <see cref="Majik.Core.Players.ControlPlayerRegistryProvider"/> — the v1
+///   sync effect model has no service parameter, so the registry is resolved
+///   the same way tutor closures resolve their ZoneService). The controller
+///   (Mindslaver's controller) then makes every decision the target player
+///   would make during that player's next turn (CR 720.1); the target keeps
+///   their own cards, hand, life, and library (CR 720.2 / CR 720.3).
+/// - The optional <paramref name="mindControlSink"/> is still invoked with
+///   the chosen target (after the grant) as a test / observability hook. In
+///   shape-only construction (no live registry registered — the single-arg
+///   dispatcher / shape tests) the grant is a no-op and only the sink fires.
+///
+/// ## Deferred sub-caveats (CR 720.5 / 720.6 — documented, not modelled)
+/// - The controller still can't make the controlled player concede
+///   (CR 720.6) and engine-resolved random choices (discard at random) are
+///   unaffected. Neither regresses existing behaviour — see
+///   <see cref="Majik.Core.Players.ControlPlayerRegistry"/>'s class doc.
 /// </summary>
 [CardName("Mindslaver")]
 public static class MindslaverFactory
@@ -104,8 +111,16 @@ public static class MindslaverFactory
                 if (mindControlAbility.ChosenTargets[0][0] is not Player targetPlayer)
                     return; // CR 608.2b — illegal target → no-op
 
-                // v1 gap — no ControlPlayer primitive. Record the intent
-                // via the sink (test hook / future service shim).
+                // CR 720.1 — "You control target player during that player's
+                // next turn." Take control via the live ControlPlayerRegistry,
+                // resolved at resolution time through the provider (keyed by
+                // the controlling player). Null in shape-only construction
+                // (single-arg dispatcher / shape tests) → grant is a no-op.
+                var registry = Majik.Core.Players.ControlPlayerRegistryProvider.Get(owner);
+                registry?.GrantControl(controller: owner, controlled: targetPlayer);
+
+                // Test / observability hook — fires after the grant with the
+                // chosen target (see class doc).
                 mindControlSink?.Invoke(targetPlayer);
             });
 
