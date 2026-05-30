@@ -1,0 +1,8 @@
+{
+  "name": "Werewolf Pack Leader",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Werewolf"],
+  "manaCost": "{G}{G}",
+  "power": 3,
+  "toughness": 3
+}
