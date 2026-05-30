@@ -1,0 +1,9 @@
+{
+  "name": "Kor Spiritdancer",
+  "types": ["Creature"],
+  "subtypes": ["Kor", "Wizard"],
+  "manaCost": "{1}{W}",
+  "power": 0,
+  "toughness": 2,
+  "abilities": []
+}
