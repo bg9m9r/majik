@@ -152,4 +152,47 @@ public class MindslaverTests
         slaver.Zone.Should().Be(ZoneType.Graveyard,
             "the cost was paid before the resolution-time legality check");
     }
+
+    // -----------------------------------------------------------------------
+    // CR 720 — live control grant via the ControlPlayerRegistry
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void Activate_WithLiveRegistry_GrantsControlOfTargetsNextTurn()
+    {
+        // CR 720.1 — "You control target player during that player's next
+        // turn." Register a live ControlPlayerRegistry for the controller so
+        // the effect's provider lookup resolves it, then resolve Mindslaver
+        // and assert the grant landed.
+        var registry = new ControlPlayerRegistry();
+        ControlPlayerRegistryProvider.Set(_alice, registry);
+        try
+        {
+            var slaver = MindslaverFactory.Create(_alice);
+            _alice.Zones.Battlefield.AddCard(slaver);
+            slaver.SetZone(ZoneType.Battlefield);
+
+            var ability = slaver.Abilities.OfType<ActivatedAbility>().Single();
+            ability.SetChosenTargets(new IReadOnlyList<object>[]
+            {
+                new object[] { _bob },
+            });
+
+            registry.HasPendingControl(_bob).Should().BeFalse("no grant before resolution");
+
+            foreach (var e in ability.Effects) e.Execute();
+
+            // CR 720.1 — Bob's next turn is now under Alice's control.
+            registry.HasPendingControl(_bob).Should().BeTrue();
+            registry.ConsumeControlFor(_bob, out var controller).Should().BeTrue();
+            controller.Should().BeSameAs(_alice);
+
+            // CR 701.16 — Mindslaver was sacrificed as part of the cost.
+            slaver.Zone.Should().Be(ZoneType.Graveyard);
+        }
+        finally
+        {
+            ControlPlayerRegistryProvider.Remove(_alice);
+        }
+    }
 }

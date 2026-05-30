@@ -108,6 +108,13 @@ public sealed class GameDriver
             // instead of raw zone mutation, so ETB triggers fire and
             // enters-tapped replacements run on tutored permanents.
             Majik.Core.Services.ZoneServiceRegistry.Set(p, _zoneService);
+
+            // CR 720 — register the live ControlPlayerRegistry so take-
+            // control effect closures (Mindslaver's activated ability,
+            // Emrakul's cast trigger) can resolve it at resolution time and
+            // call GrantControl without a parameter-threading rewrite. Keyed
+            // per resolving player, mirroring the ZoneService registration.
+            Majik.Core.Players.ControlPlayerRegistryProvider.Set(p, _controlPlayers);
         }
         Majik.Core.Random.GameRandomRegistry.SetDefault(_rng);
         if (_eventBus is not null)
