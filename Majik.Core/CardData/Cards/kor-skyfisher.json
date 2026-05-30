@@ -1,0 +1,9 @@
+{
+  "name": "Kor Skyfisher",
+  "types": ["Creature"],
+  "subtypes": ["Kor", "Soldier"],
+  "manaCost": "{1}{W}",
+  "power": 2,
+  "toughness": 3,
+  "abilities": []
+}
