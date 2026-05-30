@@ -1,0 +1,9 @@
+{
+  "name": "Reveillark",
+  "types": ["Creature"],
+  "subtypes": ["Elemental"],
+  "manaCost": "{4}{W}",
+  "power": 4,
+  "toughness": 3,
+  "abilities": []
+}
