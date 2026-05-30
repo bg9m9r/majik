@@ -1,0 +1,22 @@
+{
+  "name": "Dreamstone Hedron",
+  "types": ["Artifact"],
+  "manaCost": "{6}",
+  "abilities": [
+    {
+      "kind": "mana",
+      "produces": "CCC"
+    },
+    {
+      "kind": "activated",
+      "costs": [
+        { "type": "mana", "amount": "{3}" },
+        { "type": "tap_self" },
+        { "type": "sacrifice_self" }
+      ],
+      "effects": [
+        { "type": "draw_card", "amount": 3 }
+      ]
+    }
+  ]
+}
