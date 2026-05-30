@@ -1,0 +1,9 @@
+{
+  "name": "Plated Geopede",
+  "types": ["Creature"],
+  "subtypes": ["Insect"],
+  "manaCost": "{1}{R}",
+  "power": 1,
+  "toughness": 1,
+  "abilities": []
+}
