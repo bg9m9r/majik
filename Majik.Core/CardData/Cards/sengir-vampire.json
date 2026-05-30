@@ -1,0 +1,8 @@
+{
+  "name": "Sengir Vampire",
+  "types": ["Creature"],
+  "subtypes": ["Vampire"],
+  "manaCost": "{3}{B}{B}",
+  "power": 4,
+  "toughness": 4
+}
