@@ -299,6 +299,11 @@ public enum CardSubtype
     /// shape (Stormchaser's Talent, Modern Horizons 3 and the Adventures in
     /// the Forgotten Realms cycle). CR 205.3h.</summary>
     Class,
+    /// <summary>Cartouche enchantment subtype — CR 205.3h. Aura subtype
+    /// shared by the Amonkhet Cartouche cycle (Cartouche of Solidarity,
+    /// Cartouche of Zeal, ...). Always paired with the Enchantment type +
+    /// Aura subtype.</summary>
+    Cartouche,
 
     // Artifact subtypes (examples)
     Equipment,
