@@ -1,0 +1,7 @@
+{
+  "name": "Grove of the Burnwillows",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "C" }
+  ]
+}
