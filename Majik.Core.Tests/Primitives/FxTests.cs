@@ -351,6 +351,108 @@ public class FxTests
     }
 
     // ------------------------------------------------------------------
+    // AddMana (PLAN 03 S1) — parses + adds to the controller's pool.
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void AddMana_AddsParsedManaToPool()
+    {
+        var p = new Player("Alice", 20);
+        Fx.AddMana(p, "{R}{R}{R}");
+        p.ManaPool.Red.Should().Be(3);
+    }
+
+    [Fact]
+    public void AddMana_EmptyOrWhitespace_NoOp()
+    {
+        var p = new Player("Alice", 20);
+        Fx.AddMana(p, "");
+        Fx.AddMana(p, "   ");
+        p.ManaPool.Total.Should().Be(0);
+    }
+
+    [Fact]
+    public void AddMana_NullPlayer_Throws()
+    {
+        Action act = () => Fx.AddMana(null!, "{R}");
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    // ------------------------------------------------------------------
+    // Connive (PLAN 03 S1) — aliases ConniveAction.ApplyN.
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void Connive_NonZero_AddsCounterOnNonlandDiscard()
+    {
+        var p = new Player("Alice", 20);
+        var creature = new Creature("Conniver", "{1}{U}", 1, 1);
+        creature.SetOwner(p);
+        creature.SetController(p);
+        p.Zones.Battlefield.AddCard(creature);
+        creature.SetZone(ZoneType.Battlefield);
+
+        // One card in library to draw, then it is discarded (nonland) →
+        // a +1/+1 counter lands on the conniver.
+        var spell = new Instant("Some Spell", "{R}");
+        p.Zones.Library.AddCard(spell);
+        spell.SetZone(ZoneType.Library);
+
+        Fx.Connive(creature, 1);
+
+        creature.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(1);
+    }
+
+    [Fact]
+    public void Connive_ZeroOrNegative_NoOp()
+    {
+        var p = new Player("Alice", 20);
+        var creature = new Creature("Conniver", "{1}{U}", 1, 1);
+        creature.SetOwner(p);
+        creature.SetController(p);
+
+        Fx.Connive(creature, 0);
+
+        creature.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(0);
+    }
+
+    [Fact]
+    public void Connive_NullCreature_Throws()
+    {
+        Action act = () => Fx.Connive(null!, 1);
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    // ------------------------------------------------------------------
+    // Amass (PLAN 03 S1) — aliases AmassAction.Apply.
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void Amass_NonZero_CreatesArmyWithCounters()
+    {
+        var p = new Player("Alice", 20);
+        var army = Fx.Amass(p, 2, Majik.Core.Cards.Types.CardSubtype.Zombie);
+
+        army.Should().NotBeNull();
+        army!.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(2);
+    }
+
+    [Fact]
+    public void Amass_ZeroOrNegative_NoOpReturnsNull()
+    {
+        var p = new Player("Alice", 20);
+        var army = Fx.Amass(p, 0, Majik.Core.Cards.Types.CardSubtype.Zombie);
+        army.Should().BeNull();
+    }
+
+    [Fact]
+    public void Amass_NullController_Throws()
+    {
+        Action act = () => Fx.Amass(null!, 1, Majik.Core.Cards.Types.CardSubtype.Zombie);
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    // ------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------
 

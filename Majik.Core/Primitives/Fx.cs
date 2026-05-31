@@ -1,5 +1,6 @@
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
+using Majik.Core.Cards.Types;
 using Majik.Core.CardData;
 using Majik.Core.Counters;
 using Majik.Core.Events;
@@ -7,6 +8,7 @@ using Majik.Core.Keywords;
 using Majik.Core.Players;
 using Majik.Core.Services;
 using Majik.Core.Tokens;
+using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
 
 namespace Majik.Core.Primitives;
@@ -501,6 +503,58 @@ public static class Fx
     /// <see cref="TokenFactory.CreateEldraziSpawn"/>.</summary>
     public static Creature CreateEldraziSpawn(Player controller, ZoneService? zones = null)
         => TokenFactory.CreateEldraziSpawn(controller, zones);
+
+    // ------------------------------------------------------------------
+    // Mana pool (CR 106.4) — add mana to a player's pool.
+    // ------------------------------------------------------------------
+
+    /// <summary>
+    /// CR 106.4 — add the mana parsed from <paramref name="manaShortForm"/>
+    /// (e.g. <c>"BBB"</c>, <c>"{R}{R}"</c>) to <paramref name="player"/>'s
+    /// mana pool. Empty / whitespace adds nothing. Backs the DSL
+    /// <c>AddMana</c> resolve-kind (ritual-shaped spells).
+    /// </summary>
+    public static void AddMana(Player player, string manaShortForm)
+    {
+        if (player is null) throw new ArgumentNullException(nameof(player));
+        if (string.IsNullOrWhiteSpace(manaShortForm)) return;
+        player.AddManaToPool(ManaCost.Parse(manaShortForm));
+    }
+
+    // ------------------------------------------------------------------
+    // Keyword resolve verbs (CR 701) — connive / amass. Re-export the
+    // ConniveAction / AmassAction keyword helpers so the declarative card
+    // systems route their resolve bodies through Fx rather than reaching
+    // into Majik.Core.Keywords directly.
+    // ------------------------------------------------------------------
+
+    /// <summary>
+    /// CR 701.50 — <paramref name="creature"/> connives
+    /// <paramref name="amount"/> times (draw then discard; a +1/+1 counter
+    /// per nonland discard). No-op for <paramref name="amount"/> ≤ 0.
+    /// Aliases <see cref="ConniveAction.ApplyN"/>.
+    /// </summary>
+    public static void Connive(Creature creature, int amount = 1)
+    {
+        if (creature is null) throw new ArgumentNullException(nameof(creature));
+        if (amount <= 0) return;
+        ConniveAction.ApplyN(creature, amount);
+    }
+
+    /// <summary>
+    /// CR 701.49 — Amass <paramref name="tribe"/> <paramref name="amount"/>
+    /// for <paramref name="controller"/>: ensure an Army of the tribe
+    /// exists, then put <paramref name="amount"/> +1/+1 counters on it.
+    /// No-op for <paramref name="amount"/> ≤ 0. Aliases
+    /// <see cref="AmassAction.Apply"/>; returns the affected Army (null on
+    /// no-op).
+    /// </summary>
+    public static Creature? Amass(Player controller, int amount, CardSubtype tribe, ZoneService? zones = null)
+    {
+        if (controller is null) throw new ArgumentNullException(nameof(controller));
+        if (amount <= 0) return null;
+        return AmassAction.Apply(controller, amount, tribe, zones);
+    }
 
     // ------------------------------------------------------------------
     // Effect wrappers — convenience helpers so factories can build a

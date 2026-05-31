@@ -30,13 +30,18 @@ namespace Majik.Core.CardData.Definitions;
 /// shape-only DSL usage doesn't pay for the resolve interpreter.
 /// </para>
 ///
-/// ## TODO — effects-primitive integration
+/// ## Shared primitive vocabulary (PLAN 03)
 ///
-/// PR #1 (<c>feat/effects-primitives</c>) is growing a shared
-/// <c>Majik.Core.Effects.Primitives.*</c> module. When it lands,
-/// <see cref="BuildSpellResolveEffects"/> stops inlining the action body
-/// and instead composes the corresponding primitive — same call-site
-/// signature, primitive-backed implementation.
+/// Resolve steps compile to the shared primitive set that also backs the
+/// JSON <see cref="CardDefinitionFactory"/>:
+/// <see cref="Majik.Core.Primitives.Fx"/> (effects),
+/// <see cref="Majik.Core.Primitives.Costs"/> (costs),
+/// <see cref="Majik.Core.Abilities.Triggers"/> (triggers). The canonical
+/// home is <c>Majik.Core/Primitives/</c> — the older TODOs pointed at a
+/// never-built <c>Majik.Core/Effects/Primitives/</c>. As the primitives
+/// grow coverage, each remaining inline branch in
+/// <see cref="MaterializeStep"/> converges onto an <c>Fx.*</c> call where
+/// the result is byte-identical; the call-site signature never moves.
 /// </summary>
 public static class CardDefRuntime
 {
@@ -155,8 +160,12 @@ public static class CardDefRuntime
         Majik.Core.Stack.Stack? stack,
         Majik.Core.Services.ZoneService? zones)
     {
-        // TODO(effects-primitives): swap each branch for the matching
-        // primitive once Majik.Core/Effects/Primitives/ lands.
+        // PLAN 03 — each branch converges onto the shared Fx/Costs/Triggers
+        // vocabulary in Majik.Core/Primitives/ where the result is
+        // byte-identical (Mill / DestroyTarget / Counter already do). The
+        // remaining inline branches keep their exact boundary semantics
+        // (e.g. no ≤0 guard) until the matching primitive is proven
+        // behaviour-neutral for them.
         switch (step.Kind)
         {
             case ResolveEffectKind.DealDamage:
@@ -205,7 +214,7 @@ public static class CardDefRuntime
             case ResolveEffectKind.Mill:
                 return new Effect(
                     $"{def.Name}: mill {step.IntArg}",
-                    () => Majik.Core.Keywords.MillAction.Apply(controller, step.IntArg));
+                    () => Fx.Mill(controller, step.IntArg));
 
             case ResolveEffectKind.DrawCards:
                 return new Effect(
