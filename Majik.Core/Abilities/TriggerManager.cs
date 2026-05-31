@@ -32,6 +32,17 @@ public class TriggerManager
     private readonly HashSet<ITriggeredAbility> _abilities = new();
     private readonly List<ITriggeredAbility> _pending = new();
     private readonly HashSet<ICard> _boundCards = new();
+
+    // Cached snapshot of _abilities for the evaluation loops. Rebuilt lazily
+    // when _abilitiesDirty is set by any mutator of _abilities. The loops
+    // capture this array BEFORE iterating, so a registration/unregistration
+    // performed mid-loop marks the snapshot dirty for the NEXT event but does
+    // not affect the in-flight loop — exactly reproducing the old
+    // `_abilities.ToList()` snapshot-per-call semantics with zero allocation
+    // on the steady-state hot path (snapshot reused while membership is
+    // stable).
+    private ITriggeredAbility[] _abilitiesSnapshot = Array.Empty<ITriggeredAbility>();
+    private bool _abilitiesDirty = true;
     private readonly Majik.Core.Stack.Stack _stack;
     private readonly IEventBus? _eventBus;
     private readonly Action<GameEvent>? _globalHandler;
@@ -61,6 +72,36 @@ public class TriggerManager
 
     public bool IsRegistered(ITriggeredAbility ability) => _abilities.Contains(ability);
 
+    /// <summary>Add to the registered set, marking the snapshot dirty if membership changed.</summary>
+    private void AddAbility(ITriggeredAbility ability)
+    {
+        if (_abilities.Add(ability)) _abilitiesDirty = true;
+    }
+
+    /// <summary>Remove from the registered set, marking the snapshot dirty if membership changed.</summary>
+    private bool RemoveAbility(ITriggeredAbility ability)
+    {
+        if (_abilities.Remove(ability))
+        {
+            _abilitiesDirty = true;
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>Rebuild the cached snapshot if a mutator marked it dirty since the last capture.</summary>
+    private ITriggeredAbility[] AbilitiesSnapshot()
+    {
+        if (_abilitiesDirty)
+        {
+            _abilitiesSnapshot = _abilities.Count == 0
+                ? Array.Empty<ITriggeredAbility>()
+                : _abilities.ToArray();
+            _abilitiesDirty = false;
+        }
+        return _abilitiesSnapshot;
+    }
+
     /// <summary>
     /// Explicitly register an ability so it participates in evaluation. Idempotent.
     /// </summary>
@@ -71,7 +112,7 @@ public class TriggerManager
             throw new ArgumentNullException(nameof(ability));
         }
 
-        _abilities.Add(ability);
+        AddAbility(ability);
     }
 
     /// <summary>
@@ -86,7 +127,7 @@ public class TriggerManager
             throw new ArgumentNullException(nameof(ability));
         }
 
-        _abilities.Add(ability);
+        AddAbility(ability);
     }
 
     public void UnregisterTriggeredAbility(ITriggeredAbility ability)
@@ -96,7 +137,7 @@ public class TriggerManager
             return;
         }
 
-        _abilities.Remove(ability);
+        RemoveAbility(ability);
         _pending.RemoveAll(t => ReferenceEquals(t, ability));
     }
 
@@ -140,7 +181,11 @@ public class TriggerManager
             return;
         }
 
-        foreach (var ability in _abilities.ToList())
+        // Capture the snapshot BEFORE the loop. A mid-loop register/unregister
+        // marks the snapshot dirty for the next event but does not affect this
+        // iteration (matches the old `_abilities.ToList()` per-call copy).
+        var snapshot = AbilitiesSnapshot();
+        foreach (var ability in snapshot)
         {
             if (!ability.IsTriggered(gameEvent))
             {
@@ -167,7 +212,7 @@ public class TriggerManager
 
             if (ability is DelayedTriggeredAbility)
             {
-                _abilities.Remove(ability);
+                RemoveAbility(ability);
             }
 
             _eventBus?.Publish(new TriggeredAbilityTriggeredEvent(ability, gameEvent));
@@ -207,7 +252,8 @@ public class TriggerManager
     /// </summary>
     public void EvaluateStateChangeTriggers()
     {
-        foreach (var ability in _abilities.ToList())
+        var snapshot = AbilitiesSnapshot();
+        foreach (var ability in snapshot)
         {
             if (ability.Condition is not StateChangeTriggerCondition sc)
             {
@@ -302,6 +348,7 @@ public class TriggerManager
 
     public void Clear()
     {
+        if (_abilities.Count > 0) _abilitiesDirty = true;
         _abilities.Clear();
         _pending.Clear();
         _boundCards.Clear();
@@ -342,11 +389,11 @@ public class TriggerManager
         {
             if (ability.ActiveZones.Contains(card.Zone))
             {
-                _abilities.Add(ability);
+                AddAbility(ability);
             }
             else
             {
-                _abilities.Remove(ability);
+                RemoveAbility(ability);
             }
         }
     }

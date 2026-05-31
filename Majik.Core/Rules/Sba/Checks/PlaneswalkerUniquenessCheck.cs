@@ -16,7 +16,7 @@ public sealed class PlaneswalkerUniquenessCheck : IStateBasedActionCheck
     public bool Execute(SbaContext ctx)
     {
         var anyExecuted = false;
-        var planeswalkers = ctx.Cards.OfType<Planeswalker>()
+        var planeswalkers = ctx.Permanents.OfType<Planeswalker>()
             .Where(p => p.Zone == ZoneType.Battlefield)
             .ToList();
 

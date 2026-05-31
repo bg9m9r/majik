@@ -13,7 +13,7 @@ public sealed class CounterCancellationCheck : IStateBasedActionCheck
     public bool Execute(SbaContext ctx)
     {
         var anyExecuted = false;
-        foreach (var perm in ctx.Cards.OfType<Permanent>())
+        foreach (var perm in ctx.Permanents)
         {
             if (perm.Zone != ZoneType.Battlefield) continue;
             var plus = perm.Counters.Count(CounterType.PlusOnePlusOne);

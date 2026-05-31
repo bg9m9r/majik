@@ -51,7 +51,7 @@ public sealed class ContainmentPriestExileReplacementEffect
     private readonly Permanent? _source;
     private readonly ReplacementBus _bus;
     private readonly IEventBus? _eventBus;
-    private readonly Action<GameEvent> _handler;
+    private readonly Action<CardMovedEvent> _handler;
     private readonly LambdaReplacement<ZoneMoveIntent> _effect;
     private bool _attached;
     private bool _registered;
@@ -102,7 +102,7 @@ public sealed class ContainmentPriestExileReplacementEffect
     {
         if (_attached) return;
         _attached = true;
-        _eventBus?.SubscribeAll(_handler);
+        _eventBus?.Subscribe(_handler);
         Sync();
     }
 
@@ -113,13 +113,13 @@ public sealed class ContainmentPriestExileReplacementEffect
     {
         if (!_attached) return;
         _attached = false;
-        _eventBus?.UnsubscribeAll(_handler);
+        _eventBus?.Unsubscribe(_handler);
         Unregister();
     }
 
-    private void OnEvent(GameEvent e)
+    private void OnEvent(CardMovedEvent e)
     {
-        if (e is not CardMovedEvent moved) return;
+        var moved = e;
         if (!ReferenceEquals(moved.Card, _source)) return;
         Sync();
     }

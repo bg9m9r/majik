@@ -88,7 +88,15 @@ public class StateBasedActions
             {
                 if (check.Execute(ctx)) anyExecuted = true;
             }
-            ctx.Cards = allCards.ToList();
+            // Only re-materialize the world (and invalidate the shared
+            // Permanents/Creatures projections) when a check actually moved a
+            // card this pass — i.e. when the fixed-point loop is still making
+            // progress. A quiescent pass changes nothing, so the snapshot is
+            // already current and the rebuild is skipped.
+            if (anyExecuted)
+            {
+                ctx.SetCards(allCards.ToList());
+            }
         } while (anyExecuted);
 
         _triggerManager?.EvaluateStateChangeTriggers();

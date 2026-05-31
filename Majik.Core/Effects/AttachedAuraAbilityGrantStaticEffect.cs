@@ -33,7 +33,7 @@ public sealed class AttachedAuraAbilityGrantStaticEffect
     private readonly Permanent _aura;
     private readonly IEventBus? _eventBus;
     private readonly Func<Permanent, IAbility> _abilityFactory;
-    private readonly Action<GameEvent> _handler;
+    private readonly Action<CardMovedEvent> _handler;
     private Permanent? _grantedTo;
     private IAbility? _grantedAbility;
     private bool _attached;
@@ -71,7 +71,7 @@ public sealed class AttachedAuraAbilityGrantStaticEffect
     {
         if (_attached) return;
         _attached = true;
-        _eventBus?.SubscribeAll(_handler);
+        _eventBus?.Subscribe(_handler);
         Sync();
     }
 
@@ -82,7 +82,7 @@ public sealed class AttachedAuraAbilityGrantStaticEffect
     {
         if (!_attached) return;
         _attached = false;
-        _eventBus?.UnsubscribeAll(_handler);
+        _eventBus?.Unsubscribe(_handler);
         Revoke();
     }
 
@@ -114,9 +114,9 @@ public sealed class AttachedAuraAbilityGrantStaticEffect
         }
     }
 
-    private void OnEvent(GameEvent e)
+    private void OnEvent(CardMovedEvent e)
     {
-        if (e is not CardMovedEvent moved) return;
+        var moved = e;
         // We care when the aura itself moves (LTB → revoke); the bearer
         // moving is handled by AttachmentLegalityCheck nulling AttachedTo
         // before the bearer's LTB publishes (CR 704.5n) — that change is

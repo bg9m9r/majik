@@ -171,17 +171,17 @@ public static class ArenaOfGloryFactory
 
                 if (eventBus != null)
                 {
-                    Action<GameEvent>? cleanup = null;
+                    Action<StepStartedEvent>? cleanup = null;
                     cleanup = ev =>
                     {
-                        if (ev is not StepStartedEvent sse) return;
+                        var sse = ev;
                         if (sse.StepType != PhaseStateType.Untap) return;
                         if (!ReferenceEquals(sse.Player, controller)) return;
 
                         UntapStepRestrictions.RemoveAll(skipToken);
-                        if (cleanup != null) eventBus.UnsubscribeAll(cleanup);
+                        if (cleanup != null) eventBus.Unsubscribe(cleanup);
                     };
-                    eventBus.SubscribeAll(cleanup);
+                    eventBus.Subscribe(cleanup);
                 }
 
                 // CR 702.10 / CR 106.4 — tag the produced {R}{R} as

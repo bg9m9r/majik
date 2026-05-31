@@ -36,7 +36,7 @@ public sealed class TorporOrbStaticEffect
     private readonly ICard _orb;
     private readonly TriggerManager _triggerManager;
     private readonly IEventBus? _eventBus;
-    private readonly Action<GameEvent> _handler;
+    private readonly Action<CardMovedEvent> _handler;
     private bool _attached;
     private bool _currentlyActive; // tracks whether we've incremented the counter
 
@@ -56,7 +56,7 @@ public sealed class TorporOrbStaticEffect
     {
         if (_attached) return;
         _attached = true;
-        _eventBus?.SubscribeAll(_handler);
+        _eventBus?.Subscribe(_handler);
         SyncSuppression();
     }
 
@@ -67,7 +67,7 @@ public sealed class TorporOrbStaticEffect
     {
         if (!_attached) return;
         _attached = false;
-        _eventBus?.UnsubscribeAll(_handler);
+        _eventBus?.Unsubscribe(_handler);
         if (_currentlyActive)
         {
             _triggerManager.CreatureEtbTriggerSuppressionCount--;
@@ -78,9 +78,9 @@ public sealed class TorporOrbStaticEffect
     /// <summary>Whether the suppression is currently applied.</summary>
     public bool IsActive => _currentlyActive;
 
-    private void OnEvent(GameEvent e)
+    private void OnEvent(CardMovedEvent e)
     {
-        if (e is not CardMovedEvent moved) return;
+        var moved = e;
         if (!ReferenceEquals(moved.Card, _orb)) return;
         SyncSuppression();
     }

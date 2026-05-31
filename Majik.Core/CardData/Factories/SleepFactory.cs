@@ -159,10 +159,10 @@ public static class SleepFactory
         // (CR 502.1 / "next untap step"). Uses the same SubscribeAll pattern
         // as FrostLynxFactory to receive every event type with a single
         // subscription.
-        Action<GameEvent>? cleanupHandler = null;
+        Action<StepStartedEvent>? cleanupHandler = null;
         cleanupHandler = ev =>
         {
-            if (ev is not StepStartedEvent sse) return;
+            var sse = ev;
             if (sse.StepType != PhaseStateType.Untap) return;
             if (!ReferenceEquals(sse.Player, target)) return;
 
@@ -172,8 +172,8 @@ public static class SleepFactory
             }
 
             if (cleanupHandler != null)
-                eventBus.UnsubscribeAll(cleanupHandler);
+                eventBus.Unsubscribe(cleanupHandler);
         };
-        eventBus.SubscribeAll(cleanupHandler);
+        eventBus.Subscribe(cleanupHandler);
     }
 }

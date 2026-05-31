@@ -16,7 +16,7 @@ public sealed class LegendRuleCheck : IStateBasedActionCheck
     public bool Execute(SbaContext ctx)
     {
         var anyExecuted = false;
-        var permanents = ctx.Cards.OfType<Permanent>()
+        var permanents = ctx.Permanents
             .Where(p => p.Zone == ZoneType.Battlefield)
             .Where(p => p.HasSupertype(CardSupertype.Legendary))
             .ToList();

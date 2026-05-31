@@ -16,9 +16,14 @@ public sealed class CreatureDeathCheck : IStateBasedActionCheck
     public bool Execute(SbaContext ctx)
     {
         var anyExecuted = false;
-        foreach (var creature in ctx.Cards.OfType<Creature>().ToList())
+        // Shared per-pass projection (materialized once on SbaContext) rather
+        // than a fresh OfType<Creature>().ToList() per check. Membership by CLR
+        // type is stable for the pass, so iterating it while the loop moves
+        // cards to the graveyard is equivalent to the old defensive copy.
+        var creatures = ctx.Creatures;
+        for (var i = 0; i < creatures.Count; i++)
         {
-            if (TryDestroyCreature(creature, ctx)) anyExecuted = true;
+            if (TryDestroyCreature(creatures[i], ctx)) anyExecuted = true;
         }
         return anyExecuted;
     }

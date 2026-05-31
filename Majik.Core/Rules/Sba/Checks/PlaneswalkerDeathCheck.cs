@@ -12,7 +12,7 @@ public sealed class PlaneswalkerDeathCheck : IStateBasedActionCheck
     public bool Execute(SbaContext ctx)
     {
         var anyExecuted = false;
-        foreach (var pw in ctx.Cards.OfType<Planeswalker>().ToList())
+        foreach (var pw in ctx.Permanents.OfType<Planeswalker>())
         {
             if (pw.Zone != ZoneType.Battlefield) continue;
             if (!pw.IsDead()) continue;

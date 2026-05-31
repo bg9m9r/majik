@@ -146,7 +146,7 @@ public static class TarmogoyfFactory
         private readonly ContinuousEffectsService _effects;
         private readonly IEventBus? _eventBus;
         private readonly Func<IEnumerable<ICard>> _graveyardSource;
-        private readonly Action<GameEvent> _handler;
+        private readonly Action<CardMovedEvent> _handler;
         private CdaPowerToughnessEffect? _registered;
         private bool _attached;
 
@@ -167,13 +167,13 @@ public static class TarmogoyfFactory
         {
             if (_attached) return;
             _attached = true;
-            _eventBus?.SubscribeAll(_handler);
+            _eventBus?.Subscribe(_handler);
             Sync();
         }
 
-        private void OnEvent(GameEvent e)
+        private void OnEvent(CardMovedEvent e)
         {
-            if (e is not CardMovedEvent moved) return;
+            var moved = e;
             if (!ReferenceEquals(moved.Card, _source)) return;
             Sync();
         }

@@ -44,7 +44,7 @@ public sealed class LeoninArbiterSearchRestrictionEffect : ContinuousEffect
     private readonly ICard _source;
     private readonly ContinuousEffectsService _effects;
     private readonly IEventBus? _eventBus;
-    private readonly Action<GameEvent> _handler;
+    private readonly Action<CardMovedEvent> _handler;
     private bool _attached;
     private bool _currentlyActive;
 
@@ -67,7 +67,7 @@ public sealed class LeoninArbiterSearchRestrictionEffect : ContinuousEffect
     {
         if (_attached) return;
         _attached = true;
-        _eventBus?.SubscribeAll(_handler);
+        _eventBus?.Subscribe(_handler);
         SyncRegistration();
     }
 
@@ -78,7 +78,7 @@ public sealed class LeoninArbiterSearchRestrictionEffect : ContinuousEffect
     {
         if (!_attached) return;
         _attached = false;
-        _eventBus?.UnsubscribeAll(_handler);
+        _eventBus?.Unsubscribe(_handler);
         if (_currentlyActive)
         {
             _effects.Unregister(this);
@@ -117,9 +117,9 @@ public sealed class LeoninArbiterSearchRestrictionEffect : ContinuousEffect
     // entry from us).
     public override bool IsActive() => true;
 
-    private void OnEvent(GameEvent e)
+    private void OnEvent(CardMovedEvent e)
     {
-        if (e is not CardMovedEvent moved) return;
+        var moved = e;
         if (!ReferenceEquals(moved.Card, _source)) return;
         SyncRegistration();
     }

@@ -15,7 +15,7 @@ public sealed class AttachmentLegalityCheck : IStateBasedActionCheck
     public bool Execute(SbaContext ctx)
     {
         var anyExecuted = false;
-        foreach (var perm in ctx.Cards.OfType<Permanent>().ToList())
+        foreach (var perm in ctx.Permanents)
         {
             if (perm.Zone != ZoneType.Battlefield) continue;
             if (perm.AttachedTo == null) continue;
