@@ -185,7 +185,7 @@ public static class AnimationModuleFactory
 
         var triggerEffect = new Effect(
             $"{CardName}: may pay {{{TriggerOptionalManaCost}}} → create 1/1 Servo token",
-            () =>
+            async ctx =>
             {
                 if (trigger is null) return;
                 // CR 603.6c — source must still be on the battlefield to
@@ -201,13 +201,13 @@ public static class AnimationModuleFactory
                 // v1 falls back to "auto-pay if able" (Daze / Lightning
                 // Rift posture) when no agent is registered.
                 var oneGeneric = ManaCost.Zero.AddGenericCost(TriggerOptionalManaCost);
-                var agent = AgentRegistry.Get(triggerController);
+                var agent = ctx.Agent ?? AgentRegistry.Get(triggerController);
                 bool pay;
                 if (agent != null)
                 {
-                    pay = agent.ChooseYesNoAsync(
+                    pay = (await agent.ChooseYesNoAsync(
                         $"Pay {{{TriggerOptionalManaCost}}} to create a 1/1 Servo token?",
-                        BotIntent.Token).GetAwaiter().GetResult();
+                        BotIntent.Token).ConfigureAwait(false));
                 }
                 else
                 {

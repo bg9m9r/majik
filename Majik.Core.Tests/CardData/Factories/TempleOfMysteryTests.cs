@@ -4,7 +4,9 @@ using Majik.Core.CardData;
 using Majik.Core.CardData.Factories;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Keywords;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
 using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
 using Xunit;
@@ -127,6 +129,41 @@ public class TempleOfMysteryTests
 
         act.Should().NotThrow();
         alice.Zones.Library.GetCards().Should().BeEmpty();
+        alice.Zones.Graveyard.GetCards().Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task TempleOfMystery_EtbEffect_PromptsCtxAgent_HonoursKeepTop()
+    {
+        // PLAN 01 (Slice D) — the migrated CardDefinitionFactory scry effect
+        // now prompts the agent off the ResolutionContext rather than
+        // auto-bottoming. A scripted agent that KEEPS the top card must be
+        // honoured: Top stays on top instead of being bottomed.
+        var alice = new Player("Alice", 20);
+        var top = new Card("Top", ""); top.SetOwner(alice);
+        var second = new Card("Second", ""); second.SetOwner(alice);
+        foreach (var c in new[] { top, second })
+        {
+            alice.Zones.Library.AddCard(c);
+            c.SetZone(ZoneType.Library);
+        }
+
+        var agent = new ScriptedAgent();
+        // Keep the peeked top card on top (nothing to bottom).
+        agent.QueueScryDecision(new ScryAction.ScryDecision(
+            ToBottom: System.Array.Empty<ICard>(),
+            TopOrder: new[] { (ICard)top }));
+
+        var land = TempleOfMysteryFactory.Create(alice);
+        var etb = land.Abilities.OfType<TriggeredAbility>().Single();
+        var rc = ResolutionContext.For(alice, agent, game: null, chosenTargets: null);
+        foreach (var effect in etb.Effects)
+        {
+            await effect.ExecuteAsync(rc);
+        }
+
+        // Agent kept Top on top — library order unchanged.
+        alice.Zones.Library.GetCards().Should().Equal(new[] { top, second });
         alice.Zones.Graveyard.GetCards().Should().BeEmpty();
     }
 }

@@ -108,7 +108,7 @@ public static class NarcomoebaFactory
         // ----------------------------------------------------------------
         var returnEffect = new Effect(
             $"{CardName}: put onto the battlefield from graveyard (mill trigger)",
-            () =>
+            async ctx =>
             {
                 // CR 608.2b — re-check the zone at resolution. If the
                 // card has already left the graveyard, the effect no-ops.
@@ -118,9 +118,9 @@ public static class NarcomoebaFactory
                 // "You may" — consult agent when wired; else auto-accept.
                 if (agent != null)
                 {
-                    var yes = agent.ChooseYesNoAsync(
+                    var yes = (await agent.ChooseYesNoAsync(
                         "Put Narcomoeba onto the battlefield?",
-                        BotIntent.Reanimate).GetAwaiter().GetResult();
+                        BotIntent.Reanimate).ConfigureAwait(false));
                     if (!yes) return;
                 }
 

@@ -130,7 +130,7 @@ public static class SojournersCompanionFactory
         // ----------------------------------------------------------------
         var tutorEffect = new Effect(
             $"{CardName}: tutor a basic land -> battlefield tapped + sac self",
-            () =>
+            async ctx =>
             {
                 SacrificeSelf(card, owner);
 
@@ -146,13 +146,11 @@ public static class SojournersCompanionFactory
                     return;
                 }
 
-                var agent = AgentRegistry.Get(owner);
+                var agent = ctx.Agent ?? AgentRegistry.Get(owner);
                 ICard? pick = agent != null
-                    ? agent.ChooseLibraryPickAsync(
-                            ctx: null,
+                    ? (await agent.ChooseLibraryPickAsync( ctx: ctx.Game,
                             candidates: candidates,
-                            kindLabel: "basic land card")
-                        .GetAwaiter().GetResult()
+                            kindLabel: "basic land card").ConfigureAwait(false))
                     : candidates[0];
 
                 if (pick != null)

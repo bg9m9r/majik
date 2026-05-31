@@ -144,10 +144,10 @@ public static class IsochronScepterFactory
 
         var etbEffect = new Effect(
             $"{CardName}: you may exile an instant MV<=2 card from your hand",
-            () =>
+            async ctx =>
             {
                 var controller = scepter.Controller ?? owner;
-                var agent = AgentRegistry.Get(controller);
+                var agent = ctx.Agent ?? AgentRegistry.Get(controller);
 
                 // Eligible: instant cards (CR 205.2a) with mana value ≤ 2
                 // (CR 202.3 — printed-cost total value).
@@ -162,16 +162,15 @@ public static class IsochronScepterFactory
                 // (imprinting an instant is the card's whole purpose).
                 bool wantsToExile = agent == null
                     ? true
-                    : agent.ChooseYesNoAsync(
+                    : (await agent.ChooseYesNoAsync(
                         $"Exile an instant (MV 2 or less) from your hand to imprint on {CardName}?",
-                        BotIntent.CheatIntoPlay).GetAwaiter().GetResult();
+                        BotIntent.CheatIntoPlay).ConfigureAwait(false));
 
                 if (!wantsToExile) return;
 
                 ICard? pick = agent != null
-                    ? agent.ChooseFromHandAsync(
-                            controller, candidates, BotIntent.CheatIntoPlay)
-                        .GetAwaiter().GetResult()
+                    ? (await agent.ChooseFromHandAsync(
+                            controller, candidates, BotIntent.CheatIntoPlay).ConfigureAwait(false))
                     : candidates[0];
 
                 if (pick == null) return;

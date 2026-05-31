@@ -132,7 +132,7 @@ public static class ThoughtKnotSeerFactory
 
         var etbEffect = new Effect(
             $"{CardName}: target opponent reveals hand → controller exiles a nonland card",
-            () =>
+            async ctx =>
             {
                 if (etb == null) return;
                 var chosen = etb.ChosenTargets;
@@ -159,8 +159,7 @@ public static class ThoughtKnotSeerFactory
                 var agent = agentSelector?.Invoke(chooser);
                 if (agent != null)
                 {
-                    pick = agent.ChooseFromHandAsync(victim, nonlandHand, BotIntent.HandHate)
-                        .GetAwaiter().GetResult();
+                    pick = (await agent.ChooseFromHandAsync(victim, nonlandHand, BotIntent.HandHate).ConfigureAwait(false));
                     // Guard: agent may return an illegal pick (left hand,
                     // is a land). Fall back deterministically.
                     if (pick == null

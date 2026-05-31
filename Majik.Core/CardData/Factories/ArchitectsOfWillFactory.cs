@@ -127,7 +127,7 @@ public static class ArchitectsOfWillFactory
 
         var etbEffect = new Effect(
             $"{CardName}: look at top {LookAtCount}, put back in any order",
-            () =>
+            async ctx =>
             {
                 if (etbTrigger is null) return;
                 if (etbTrigger.ChosenTargets.Count == 0
@@ -146,13 +146,12 @@ public static class ArchitectsOfWillFactory
                 if (peeked.Count == 0) return;
 
                 var controller = card.Controller ?? owner;
-                var agent = AgentRegistry.Get(controller);
+                var agent = ctx.Agent ?? AgentRegistry.Get(controller);
                 ScryAction.ScryDecision decision;
                 if (agent != null)
                 {
                     // TODO: drop sync-over-async once IEffect.Execute becomes async.
-                    var agentDecision = agent.ChooseScryDecisionAsync(null, peeked)
-                        .GetAwaiter().GetResult();
+                    var agentDecision = (await agent.ChooseScryDecisionAsync( ctx.Game, peeked).ConfigureAwait(false));
                     // Architects of Will is reorder-only — current oracle
                     // does not include "you may put them on the bottom".
                     // Collapse any ToBottom entries into the TopOrder

@@ -112,20 +112,18 @@ public static class GoblinMatronFactory
         // ----------------------------------------------------------------
         var etbEffect = new Effect(
             "Goblin Matron: tutor a Goblin card to hand",
-            () =>
+            async ctx =>
             {
                 var candidates = owner.Zones.Library.GetCards()
                     .Where(c => c.HasSubtype(CardSubtype.Goblin))
                     .ToList();
                 if (candidates.Count == 0) return;
 
-                var agent = AgentRegistry.Get(owner);
+                var agent = ctx.Agent ?? AgentRegistry.Get(owner);
                 ICard? pick = agent != null
-                    ? agent.ChooseLibraryPickAsync(
-                        ctx: null,
+                    ? (await agent.ChooseLibraryPickAsync( ctx: ctx.Game,
                         candidates,
-                        "Goblin card")
-                        .GetAwaiter().GetResult()
+                        "Goblin card").ConfigureAwait(false))
                     : candidates[0];
                 if (pick == null) return; // CR 701.19a — decline is legal.
 

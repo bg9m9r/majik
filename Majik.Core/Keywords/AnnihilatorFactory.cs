@@ -102,7 +102,7 @@ public static class AnnihilatorFactory
 
         var effect = new Effect(
             $"Annihilator {n}: defending player sacrifices {n} permanent{(n == 1 ? "" : "s")}",
-            () =>
+            async ctx =>
             {
                 var victim = capturedDefender;
                 if (victim == null) return;
@@ -124,11 +124,10 @@ public static class AnnihilatorFactory
                     var agent = agentSelector?.Invoke(victim);
                     if (agent != null)
                     {
-                        pick = agent.ChooseFromBattlefieldAsync(
+                        pick = (await agent.ChooseFromBattlefieldAsync(
                                 victim,
                                 candidates,
-                                Cards.BotIntent.Removal)
-                            .GetAwaiter().GetResult();
+                                Cards.BotIntent.Removal).ConfigureAwait(false));
                         // CR 608.2b — illegal-on-resolution check. If
                         // the agent returns something not on the
                         // defender's battlefield anymore (or null),

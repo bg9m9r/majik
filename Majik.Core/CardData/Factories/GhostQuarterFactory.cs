@@ -102,7 +102,7 @@ public static class GhostQuarterFactory
         ActivatedAbility? destroyAbility = null;
         var destroyEffect = new Effect(
             "Ghost Quarter: destroy target land; its controller may tutor a basic land",
-            () =>
+            async ctx =>
             {
                 if (destroyAbility == null) return;
 
@@ -136,12 +136,12 @@ public static class GhostQuarterFactory
                 // accepts Tutor-tagged prompts (free basic land is strict
                 // upside), preserving the auto-accept posture for
                 // agentless test paths.
-                var agent = AgentRegistry.Get(destroyedController);
+                var agent = ctx.Agent ?? AgentRegistry.Get(destroyedController);
                 if (agent != null)
                 {
-                    var yes = agent.ChooseYesNoAsync(
+                    var yes = (await agent.ChooseYesNoAsync(
                         "Search your library for a basic land card?",
-                        BotIntent.Tutor).GetAwaiter().GetResult();
+                        BotIntent.Tutor).ConfigureAwait(false));
                     if (!yes)
                     {
                         // CR 701.20a — even when the player declines the

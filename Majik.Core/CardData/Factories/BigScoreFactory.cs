@@ -122,7 +122,7 @@ public static class BigScoreFactory
         {
             new Effect(
                 "Big Score: discard a card, draw two cards, create two Treasure tokens.",
-                () =>
+                async ctx =>
                 {
                     // ------------------------------------------------------
                     // CR 601.2f — "As an additional cost to cast this spell,
@@ -139,8 +139,7 @@ public static class BigScoreFactory
                         ICard? pick;
                         if (agent != null)
                         {
-                            pick = agent.ChooseFromHandAsync(caster, hand, BotIntent.Discard)
-                                .GetAwaiter().GetResult();
+                            pick = (await agent.ChooseFromHandAsync(caster, hand, BotIntent.Discard).ConfigureAwait(false));
                             // null = decline. The discard is mandatory; fall
                             // back to the deterministic pick so the effect
                             // stays observable (Cathartic Reunion parity).

@@ -55,7 +55,7 @@ public static class PreordainFactory
         ArgumentNullException.ThrowIfNull(caster);
         return new IEffect[]
         {
-            new Effect("Preordain: scry 2, then draw a card.", () =>
+            new Effect("Preordain: scry 2, then draw a card.", async ctx =>
             {
                 // CR 701.20 — Scry 2. Look at the top two cards; the
                 // controller chooses which (if any) to put on the bottom of
@@ -65,13 +65,12 @@ public static class PreordainFactory
                 var peeked = ScryAction.Peek(caster, ScryAmount);
                 if (peeked.Count > 0)
                 {
-                    var agent = AgentRegistry.Get(caster);
+                    var agent = ctx.Agent ?? AgentRegistry.Get(caster);
                     ScryAction.ScryDecision decision;
                     if (agent != null)
                     {
                         // TODO: drop sync-over-async once IEffect.Execute becomes async.
-                        decision = agent.ChooseScryDecisionAsync(null, peeked)
-                            .GetAwaiter().GetResult();
+                        decision = (await agent.ChooseScryDecisionAsync( ctx.Game, peeked).ConfigureAwait(false));
                     }
                     else
                     {

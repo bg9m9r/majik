@@ -184,11 +184,11 @@ internal static class SearchSpellFactory
         Player caster, string effectLabel) => new(
         Modes: Array.Empty<string>(), HasVariableX: false,
         TargetRequests: Array.Empty<TargetRequest>(),
-        EffectFactory: p => new IEffect[] { new Effect($"{effectLabel}: up to two basics -> battlefield-tapped + hand", () =>
+        EffectFactory: p => new IEffect[] { new Effect($"{effectLabel}: up to two basics -> battlefield-tapped + hand", async ctx =>
         {
             bool IsBasicLand(ICard c) => c.HasType(CardType.Land) && BasicLandNames.Contains(c.Name);
 
-            var agent = AgentRegistry.Get(caster);
+            var agent = ctx.Agent ?? AgentRegistry.Get(caster);
             var pickCtx = BuildPickContext(caster, p);
             var picks = new List<ICard>(capacity: 2);
 
@@ -197,9 +197,8 @@ internal static class SearchSpellFactory
             if (firstCandidates.Count > 0)
             {
                 ICard? first = agent != null
-                    ? agent.ChooseLibraryPickAsync(pickCtx, firstCandidates,
-                        "basic land card to put onto the battlefield tapped")
-                        .GetAwaiter().GetResult()
+                    ? (await agent.ChooseLibraryPickAsync(pickCtx, firstCandidates,
+                        "basic land card to put onto the battlefield tapped").ConfigureAwait(false))
                     : firstCandidates[0];
                 if (first != null) picks.Add(first);
             }
@@ -211,9 +210,8 @@ internal static class SearchSpellFactory
             if (secondCandidates.Count > 0)
             {
                 ICard? second = agent != null
-                    ? agent.ChooseLibraryPickAsync(pickCtx, secondCandidates,
-                        "basic land card to put into your hand")
-                        .GetAwaiter().GetResult()
+                    ? (await agent.ChooseLibraryPickAsync(pickCtx, secondCandidates,
+                        "basic land card to put into your hand").ConfigureAwait(false))
                     : secondCandidates[0];
                 if (second != null) picks.Add(second);
             }

@@ -74,7 +74,7 @@ public static class VisceraSeerFactory
             sacrificeCost: sacrificeCost,
             scryEffect: new Effect(
                 "Viscera Seer: scry 1",
-                () =>
+                async ctx =>
                 {
                     var peeked = ScryAction.Peek(owner, 1);
                     if (peeked.Count == 0) return;
@@ -84,12 +84,11 @@ public static class VisceraSeerFactory
                     // LibrarySpellFactory.ScryNSpell).
                     // TODO: remove sync-over-async once IEffect.Execute
                     // becomes async.
-                    var agent = AgentRegistry.Get(owner);
+                    var agent = ctx.Agent ?? AgentRegistry.Get(owner);
                     ScryAction.ScryDecision decision;
                     if (agent != null)
                     {
-                        decision = agent.ChooseScryDecisionAsync(null, peeked)
-                            .GetAwaiter().GetResult();
+                        decision = (await agent.ChooseScryDecisionAsync( ctx.Game, peeked).ConfigureAwait(false));
                     }
                     else
                     {

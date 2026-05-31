@@ -58,7 +58,7 @@ public static class SerumVisionsFactory
         ArgumentNullException.ThrowIfNull(caster);
         return new IEffect[]
         {
-            new Effect("Serum Visions: draw a card, then scry 2.", () =>
+            new Effect("Serum Visions: draw a card, then scry 2.", async ctx =>
             {
                 // CR 121.1 — "Draw a card." Route through Fx.DrawCards so a
                 // ReplacementBus (Dredge etc.) gets a shot; an empty library
@@ -76,13 +76,12 @@ public static class SerumVisionsFactory
                     return;
                 }
 
-                var agent = AgentRegistry.Get(caster);
+                var agent = ctx.Agent ?? AgentRegistry.Get(caster);
                 ScryAction.ScryDecision decision;
                 if (agent != null)
                 {
                     // TODO: drop sync-over-async once IEffect.Execute becomes async.
-                    decision = agent.ChooseScryDecisionAsync(null, peeked)
-                        .GetAwaiter().GetResult();
+                    decision = (await agent.ChooseScryDecisionAsync( ctx.Game, peeked).ConfigureAwait(false));
                 }
                 else
                 {

@@ -408,23 +408,23 @@ public static class CardDefinitionFactory
         var amount = def.Amount;
         return new Effect(
             $"{card.Name}: scry {amount}",
-            () =>
+            async ctx =>
             {
                 // CR 701.20 — look at the top N, then choose any subset to put
                 // on the bottom; the rest stay on top in chosen order.
                 var peeked = Majik.Core.Keywords.ScryAction.Peek(controller, amount);
                 if (peeked.Count == 0) return;
 
-                // Consult the registered agent when available; fall back to the
-                // all-to-bottom default when none is registered. Exact parallel
-                // of BuildSurveilSelfEffect. TODO: remove sync-over-async once
-                // IEffect.Execute becomes async.
-                var agent = Majik.Core.Players.Agents.AgentRegistry.Get(controller);
+                // PLAN 01 (Slice D) — prompt the live agent off the resolution
+                // context (bot returns its scry policy; remote agent surfaces a
+                // real prompt). Fall back to the registry, then to the
+                // all-to-bottom default when no agent is reachable.
+                var agent = ctx.Agent ?? Majik.Core.Players.Agents.AgentRegistry.Get(controller);
                 Majik.Core.Keywords.ScryAction.ScryDecision decision;
                 if (agent != null)
                 {
-                    decision = agent.ChooseScryDecisionAsync(null, peeked)
-                        .GetAwaiter().GetResult();
+                    decision = await agent.ChooseScryDecisionAsync(ctx.Game, peeked, ctx.Ct)
+                        .ConfigureAwait(false);
                 }
                 else
                 {
@@ -441,22 +441,21 @@ public static class CardDefinitionFactory
         var amount = def.Amount;
         return new Effect(
             $"{card.Name}: surveil {amount}",
-            () =>
+            async ctx =>
             {
                 var peeked = Majik.Core.Keywords.SurveilAction.Peek(controller, amount);
                 if (peeked.Count == 0) return;
 
-                // Consult the registered agent when available; fall back to
-                // the pre-agent default (all-to-graveyard) when none is
-                // registered. Mirrors the existing C# Underground Mortuary
-                // path. TODO: remove sync-over-async once IEffect.Execute
-                // becomes async.
-                var agent = Majik.Core.Players.Agents.AgentRegistry.Get(controller);
+                // PLAN 01 (Slice D) — prompt the live agent off the resolution
+                // context (bot returns its surveil policy; remote agent surfaces
+                // a real prompt). Fall back to the registry, then to the
+                // all-to-graveyard default when no agent is reachable.
+                var agent = ctx.Agent ?? Majik.Core.Players.Agents.AgentRegistry.Get(controller);
                 Majik.Core.Keywords.SurveilAction.SurveilDecision decision;
                 if (agent != null)
                 {
-                    decision = agent.ChooseSurveilDecisionAsync(null, peeked)
-                        .GetAwaiter().GetResult();
+                    decision = await agent.ChooseSurveilDecisionAsync(ctx.Game, peeked, ctx.Ct)
+                        .ConfigureAwait(false);
                 }
                 else
                 {

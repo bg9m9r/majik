@@ -133,7 +133,7 @@ public static class MentorOfTheMeekFactory
 
         var triggerEffect = new Effect(
             $"{CardName}: may pay {{{OptionalManaCost}}} → draw a card",
-            () =>
+            async ctx =>
             {
                 // CR 603.6c — Mentor must still be on the battlefield to
                 // fire. activeZones gates the event match; the in-effect
@@ -146,13 +146,13 @@ public static class MentorOfTheMeekFactory
                 // Agent-less fallback: auto-pay if able (Animation
                 // Module / Lightning Rift posture).
                 var oneGeneric = ManaCost.Zero.AddGenericCost(OptionalManaCost);
-                var agent = AgentRegistry.Get(triggerController);
+                var agent = ctx.Agent ?? AgentRegistry.Get(triggerController);
                 bool pay;
                 if (agent != null)
                 {
-                    pay = agent.ChooseYesNoAsync(
+                    pay = (await agent.ChooseYesNoAsync(
                         $"Pay {{{OptionalManaCost}}} to draw a card?",
-                        BotIntent.Draw).GetAwaiter().GetResult();
+                        BotIntent.Draw).ConfigureAwait(false));
                 }
                 else
                 {

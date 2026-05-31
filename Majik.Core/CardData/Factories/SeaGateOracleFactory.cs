@@ -101,7 +101,7 @@ public static class SeaGateOracleFactory
         // ----------------------------------------------------------------
         var etbEffect = new Effect(
             $"{CardName}: look at top 2, put one to hand, other to bottom",
-            () =>
+            async ctx =>
             {
                 var library = owner.Zones.Library.GetCards().Take(2).ToList();
 
@@ -119,17 +119,15 @@ public static class SeaGateOracleFactory
                 }
 
                 // Two cards available: let the agent (or fallback) choose.
-                var agent = AgentRegistry.Get(owner);
+                var agent = ctx.Agent ?? AgentRegistry.Get(owner);
                 ICard? chosen;
                 if (agent != null)
                 {
                     // TODO: remove sync-over-async once IEffect.Execute becomes async.
-                    chosen = agent.ChooseLibraryPickAsync(
-                        ctx: null,
+                    chosen = (await agent.ChooseLibraryPickAsync( ctx: ctx.Game,
                         candidates: library,
                         kindLabel: "card",
-                        ct: default)
-                        .GetAwaiter().GetResult();
+                        ct: default).ConfigureAwait(false));
                 }
                 else
                 {

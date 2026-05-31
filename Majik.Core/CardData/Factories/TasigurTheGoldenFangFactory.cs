@@ -124,7 +124,7 @@ public static class TasigurTheGoldenFangFactory
 
         var returnEffect = new Effect(
             "Tasigur: target opponent chooses a card in your graveyard → hand",
-            () =>
+            async ctx =>
             {
                 var candidates = owner.Zones.Graveyard.GetCards().ToList();
                 if (candidates.Count == 0) return;
@@ -149,13 +149,11 @@ public static class TasigurTheGoldenFangFactory
                 // fall back to the first card deterministically if no
                 // agent is registered (mirrors Wishclaw Talisman's
                 // tutor fallback).
-                var agent = AgentRegistry.Get(opponent);
+                var agent = ctx.Agent ?? AgentRegistry.Get(opponent);
                 ICard? pick = agent != null
-                    ? agent.ChooseLibraryPickAsync(
-                        ctx: null,
+                    ? (await agent.ChooseLibraryPickAsync( ctx: ctx.Game,
                         candidates: candidates,
-                        kindLabel: "card in opponent's graveyard")
-                        .GetAwaiter().GetResult()
+                        kindLabel: "card in opponent's graveyard").ConfigureAwait(false))
                     : candidates[0];
 
                 // CR 113.3 — a player who's required to choose must do

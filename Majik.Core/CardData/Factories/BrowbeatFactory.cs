@@ -128,7 +128,7 @@ public static class BrowbeatFactory
                 {
                     new Effect(
                         "Browbeat — any player may take 5 damage; if no one does, target player draws three",
-                        () =>
+                        async ctx =>
                         {
                             // "Any player" = every player in the game, sourced
                             // from the cast-time AllPlayers snapshot.
@@ -142,7 +142,7 @@ public static class BrowbeatFactory
                             var anyAccepted = false;
                             foreach (var p in players)
                             {
-                                var agent = AgentRegistry.Get(p);
+                                var agent = ctx.Agent ?? AgentRegistry.Get(p);
                                 var accepts = agent?
                                     .ChooseYesNoAsync(
                                         $"Have {CardName} deal {DamageAmount} damage to you?",

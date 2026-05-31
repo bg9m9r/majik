@@ -175,7 +175,7 @@ public static class BloodghastFactory
         // ----------------------------------------------------------------
         var returnEffect = new Effect(
             $"{CardName}: return from graveyard to battlefield (landfall trigger)",
-            () =>
+            async ctx =>
             {
                 // CR 603.6d — re-check zone at resolution.
                 // "You may" — when an agent is wired, consult
@@ -184,9 +184,9 @@ public static class BloodghastFactory
                 if (!owner.Zones.Graveyard.GetCards().Contains(card)) return;
                 if (agent != null)
                 {
-                    var yes = agent.ChooseYesNoAsync(
+                    var yes = (await agent.ChooseYesNoAsync(
                         "Return Bloodghast from graveyard to battlefield?",
-                        BotIntent.Reanimate).GetAwaiter().GetResult();
+                        BotIntent.Reanimate).ConfigureAwait(false));
                     if (!yes) return;
                 }
 

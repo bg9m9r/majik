@@ -220,7 +220,7 @@ public static class KozileksReturnFactory
         {
             new Effect(
                 $"{CardName}: optional exile-from-graveyard -> {RecursionDamage} to each creature",
-                () =>
+                async ctx =>
                 {
                     // CR 608.2b — the card must still be in the graveyard for
                     // the optional exile to be possible.
@@ -233,12 +233,12 @@ public static class KozileksReturnFactory
                     // (BotIntent.Wrath falls through to the neutral
                     // auto-accept posture).
                     bool yes = true;
-                    var agent = AgentRegistry.Get(controller);
+                    var agent = ctx.Agent ?? AgentRegistry.Get(controller);
                     if (agent != null)
                     {
-                        yes = agent.ChooseYesNoAsync(
+                        yes = (await agent.ChooseYesNoAsync(
                             $"Exile {CardName} from your graveyard to deal {RecursionDamage} damage to each creature?",
-                            BotIntent.Wrath).GetAwaiter().GetResult();
+                            BotIntent.Wrath).ConfigureAwait(false));
                     }
                     if (!yes) return;
 

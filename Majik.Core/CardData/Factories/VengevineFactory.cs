@@ -143,7 +143,7 @@ public static class VengevineFactory
 
         var returnEffect = new Effect(
             $"{CardName}: return from graveyard to battlefield (second creature spell)",
-            () =>
+            async ctx =>
             {
                 // CR 608.2b — re-check the zone at resolution. If Vengevine
                 // has already left the graveyard (replay, second copy in
@@ -155,9 +155,9 @@ public static class VengevineFactory
                 // (same posture as Bloodghast / Narcomoeba).
                 if (agent != null)
                 {
-                    var yes = agent.ChooseYesNoAsync(
+                    var yes = (await agent.ChooseYesNoAsync(
                         "Return Vengevine from graveyard to the battlefield?",
-                        BotIntent.Reanimate).GetAwaiter().GetResult();
+                        BotIntent.Reanimate).ConfigureAwait(false));
                     if (!yes) return;
                 }
 

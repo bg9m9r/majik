@@ -115,7 +115,7 @@ public static class SakuraTribeScoutFactory
         // ----------------------------------------------------------------
         var activatedEffect = new Effect(
             "Sakura-Tribe Scout: put a land card from hand onto the battlefield",
-            () =>
+            async ctx =>
             {
                 var controller = card.Controller ?? owner;
 
@@ -125,7 +125,7 @@ public static class SakuraTribeScoutFactory
                     .ToList();
                 if (candidates.Count == 0) return; // No lands → "may" no-op.
 
-                var agent = AgentRegistry.Get(controller);
+                var agent = ctx.Agent ?? AgentRegistry.Get(controller);
 
                 // "You may" — CR 117.1a optional gesture. Smart agent path
                 // via ChooseYesNoAsync(BotIntent.Ramp); no-agent fallback
@@ -134,10 +134,9 @@ public static class SakuraTribeScoutFactory
                 // Stoneforge Mystic).
                 if (agent != null)
                 {
-                    var optIn = agent.ChooseYesNoAsync(
+                    var optIn = (await agent.ChooseYesNoAsync(
                             "Put a land card from your hand onto the battlefield?",
-                            BotIntent.Ramp)
-                        .GetAwaiter().GetResult();
+                            BotIntent.Ramp).ConfigureAwait(false));
                     if (!optIn) return;
                 }
 
@@ -147,8 +146,7 @@ public static class SakuraTribeScoutFactory
                 ICard? land;
                 if (agent != null)
                 {
-                    land = agent.ChooseFromHandAsync(controller, candidates, BotIntent.Ramp)
-                        .GetAwaiter().GetResult();
+                    land = (await agent.ChooseFromHandAsync(controller, candidates, BotIntent.Ramp).ConfigureAwait(false));
                     // Re-validate at resolution (CR 608.2b).
                     if (land == null || !candidates.Contains(land))
                     {

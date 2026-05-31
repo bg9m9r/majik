@@ -91,7 +91,7 @@ public static class BrainstormFactory
         ArgumentNullException.ThrowIfNull(caster);
         return new IEffect[]
         {
-            new Effect($"{CardName}: draw three cards, then put two cards from your hand on top of your library.", () =>
+            new Effect($"{CardName}: draw three cards, then put two cards from your hand on top of your library.", async ctx =>
             {
                 // -----------------------------------------------------------
                 // CR 121.1 — "Draw three cards." Per-card guard so the
@@ -132,8 +132,7 @@ public static class BrainstormFactory
                     ICard? pick;
                     if (agent != null)
                     {
-                        pick = agent.ChooseFromHandAsync(caster, hand, BotIntent.LibraryReorder)
-                            .GetAwaiter().GetResult();
+                        pick = (await agent.ChooseFromHandAsync(caster, hand, BotIntent.LibraryReorder).ConfigureAwait(false));
                         // Null = decline, or agent returned a card that
                         // is no longer in hand (mis-wired agent). Fall
                         // back to the deterministic pick — Brainstorm's

@@ -75,7 +75,7 @@ public static class WorldlyTutorFactory
             TargetRequests: Array.Empty<TargetRequest>(),
             EffectFactory: _ => new IEffect[]
             {
-                new Effect("tutor creature -> top of library", () =>
+                new Effect("tutor creature -> top of library", async ctx =>
                 {
                     static bool Pred(ICard c) => c.HasType(CardType.Creature);
 
@@ -86,13 +86,11 @@ public static class WorldlyTutorFactory
                     // deterministic first-match fallback. The kindLabel is
                     // the prompt string surfaced to the agent so
                     // LibraryPickPolicy can score by oracle wording.
-                    var agent = AgentRegistry.Get(caster);
+                    var agent = ctx.Agent ?? AgentRegistry.Get(caster);
                     ICard? pick = agent != null
-                        ? agent.ChooseLibraryPickAsync(
-                            ctx: null,
+                        ? (await agent.ChooseLibraryPickAsync( ctx: ctx.Game,
                             candidates,
-                            "creature card")
-                            .GetAwaiter().GetResult()
+                            "creature card").ConfigureAwait(false))
                         : candidates[0];
                     if (pick == null) return;
 

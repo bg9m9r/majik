@@ -108,7 +108,7 @@ public static class TaintedIndulgenceFactory
         {
             new Effect(
                 $"{CardName}: draw two cards, then discard unless ≥5 distinct MV in graveyard.",
-                () =>
+                async ctx =>
                 {
                     // -------------------------------------------------------
                     // CR 121.1 — draw 2. Routes through Fx.DrawCards so the
@@ -142,8 +142,7 @@ public static class TaintedIndulgenceFactory
                     ICard pick;
                     if (agent != null)
                     {
-                        var chosen = agent.ChooseFromHandAsync(caster, hand, BotIntent.Discard)
-                            .GetAwaiter().GetResult();
+                        var chosen = (await agent.ChooseFromHandAsync(caster, hand, BotIntent.Discard).ConfigureAwait(false));
                         pick = (chosen != null && chosen.Zone == ZoneType.Hand)
                             ? chosen
                             : hand[^1];

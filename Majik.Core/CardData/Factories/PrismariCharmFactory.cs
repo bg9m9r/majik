@@ -182,7 +182,7 @@ public static class PrismariCharmFactory
     // -----------------------------------------------------------------------
 
     private static IEffect BuildSurveilDrawEffect(Player caster) =>
-        new Effect($"Prismari Charm — surveil {SurveilCount}, then draw a card", () =>
+        new Effect($"Prismari Charm — surveil {SurveilCount}, then draw a card", async ctx =>
         {
             // CR 701.42 — surveil 2 (agent-driven via AgentRegistry; falls
             // back to all-to-graveyard when no agent is registered, same as
@@ -191,13 +191,12 @@ public static class PrismariCharmFactory
             if (peeked.Count > 0)
             {
                 SurveilAction.SurveilDecision decision;
-                var agent = AgentRegistry.Get(caster);
+                var agent = ctx.Agent ?? AgentRegistry.Get(caster);
                 if (agent != null)
                 {
                     // TODO: remove sync-over-async once IEffect.Execute becomes
                     // async (same posture as LibrarySpellFactory.SurveilSelfSpell).
-                    decision = agent.ChooseSurveilDecisionAsync(null, peeked)
-                        .GetAwaiter().GetResult();
+                    decision = (await agent.ChooseSurveilDecisionAsync( ctx.Game, peeked).ConfigureAwait(false));
                 }
                 else
                 {

@@ -139,7 +139,7 @@ public static class MastermindsAcquisitionFactory
     }
 
     private static IEffect BuildLibraryTutorEffect(Player caster) =>
-        new Effect("Mastermind's Acquisition — tutor any card from library", () =>
+        new Effect("Mastermind's Acquisition — tutor any card from library", async ctx =>
         {
             // CR 701.19a — library search consults the agent. "A card"
             // accepts the entire library; predicate is the trivial
@@ -147,10 +147,9 @@ public static class MastermindsAcquisitionFactory
             var candidates = caster.Zones.Library.GetCards().ToList();
             if (candidates.Count == 0) return;
 
-            var agent = AgentRegistry.Get(caster);
+            var agent = ctx.Agent ?? AgentRegistry.Get(caster);
             ICard? pick = agent != null
-                ? agent.ChooseLibraryPickAsync(ctx: null, candidates, "card")
-                    .GetAwaiter().GetResult()
+                ? (await agent.ChooseLibraryPickAsync( ctx: ctx.Game, candidates, "card").ConfigureAwait(false))
                 : candidates[0];
             if (pick == null) return; // CR 701.19a — decline is legal.
 

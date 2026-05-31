@@ -64,7 +64,7 @@ public static class PonderFactory
         ArgumentNullException.ThrowIfNull(caster);
         return new IEffect[]
         {
-            new Effect("Ponder: look at top 3, reorder, may shuffle, draw 1.", () =>
+            new Effect("Ponder: look at top 3, reorder, may shuffle, draw 1.", async ctx =>
             {
                 // Peek up to 3 cards. ScryAction.Peek tolerates short libraries
                 // (returns up to N) so empty-library handling falls out for free.
@@ -75,13 +75,12 @@ public static class PonderFactory
                     // Ponder puts ALL peeked cards back on top in a chosen
                     // order. Sourced from the registered agent; the pre-agent
                     // default keeps the original order (TopOrder = peeked).
-                    var agent = AgentRegistry.Get(caster);
+                    var agent = ctx.Agent ?? AgentRegistry.Get(caster);
                     ScryAction.ScryDecision decision;
                     if (agent != null)
                     {
                         // TODO: drop sync-over-async once IEffect.Execute becomes async.
-                        var agentDecision = agent.ChooseScryDecisionAsync(null, peeked)
-                            .GetAwaiter().GetResult();
+                        var agentDecision = (await agent.ChooseScryDecisionAsync( ctx.Game, peeked).ConfigureAwait(false));
                         // Defensive: if an agent returns a non-empty ToBottom
                         // (Ponder is reorder-only, not partition), collapse it
                         // into TopOrder so the engine still puts everything
@@ -118,13 +117,13 @@ public static class PonderFactory
                 // tutor factories use). With no agent registered the
                 // IPlayerAgent default-heuristic accept branch fires, so
                 // legacy callers get the historical auto-shuffle posture.
-                var shuffleAgent = AgentRegistry.Get(caster);
+                var shuffleAgent = ctx.Agent ?? AgentRegistry.Get(caster);
                 if (shuffleAgent != null)
                 {
                     // TODO: drop sync-over-async once IEffect.Execute becomes async.
-                    var shouldShuffle = shuffleAgent.ChooseYesNoAsync(
+                    var shouldShuffle = (await shuffleAgent.ChooseYesNoAsync(
                         "Shuffle your library?",
-                        BotIntent.LibraryReorder).GetAwaiter().GetResult();
+                        BotIntent.LibraryReorder).ConfigureAwait(false));
                     if (shouldShuffle)
                     {
                         Majik.Core.Zones.LibraryShuffle.ShuffleLibrary(caster, "ponder");

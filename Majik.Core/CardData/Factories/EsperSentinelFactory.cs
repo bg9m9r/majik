@@ -145,7 +145,7 @@ public static class EsperSentinelFactory
 
         var taxEffect = new Effect(
             $"{CardName}: opponent pays {{X}} (X = creatures you control) or you draw a card",
-            () =>
+            async ctx =>
             {
                 var caster = pendingCaster[0];
                 pendingCaster[0] = null;
@@ -174,9 +174,9 @@ public static class EsperSentinelFactory
                 var oppAgent = opponentAgentSelector?.Invoke(caster);
                 if (oppAgent != null)
                 {
-                    var pay = oppAgent.ChooseYesNoAsync(
+                    var pay = (await oppAgent.ChooseYesNoAsync(
                         $"Pay {{{x}}} to suppress Esper Sentinel's draw?",
-                        BotIntent.CostToDecline).GetAwaiter().GetResult();
+                        BotIntent.CostToDecline).ConfigureAwait(false));
                     if (pay && caster.PayMana(ManaCost.Zero.AddGenericCost(x)))
                         return;
                     Fx.DrawCards(owner, 1);

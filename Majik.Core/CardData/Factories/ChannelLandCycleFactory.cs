@@ -266,7 +266,7 @@ public static class ChannelLandCycleFactory
     {
         var effect = new Effect(
             $"{land.Name} (Channel): look at top 4, creature/planeswalker → hand, rest → graveyard",
-            () =>
+            async ctx =>
             {
                 var top4 = controller.Zones.Library.GetCards().Take(4).ToList();
                 if (top4.Count == 0) return;
@@ -277,10 +277,9 @@ public static class ChannelLandCycleFactory
                 ICard? pick = null;
                 if (eligible.Count > 0)
                 {
-                    var agent = AgentRegistry.Get(controller);
+                    var agent = ctx.Agent ?? AgentRegistry.Get(controller);
                     pick = agent != null
-                        ? agent.ChooseLibraryPickAsync(ctx: null, eligible, "creature or planeswalker card")
-                            .GetAwaiter().GetResult()
+                        ? (await agent.ChooseLibraryPickAsync( ctx: ctx.Game, eligible, "creature or planeswalker card").ConfigureAwait(false))
                         : eligible[0];
                 }
 

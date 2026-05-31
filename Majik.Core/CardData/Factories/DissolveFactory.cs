@@ -77,7 +77,7 @@ public static class DissolveFactory
                 var resolved = targetResolver(raw);
                 return new IEffect[]
                 {
-                    new Effect("Dissolve — counter target spell, then scry 1", () =>
+                    new Effect("Dissolve — counter target spell, then scry 1", async ctx =>
                     {
                         // CR 701.5 — "Counter target spell."
                         if (stack != null && resolved is ISpell spell)
@@ -95,13 +95,12 @@ public static class DissolveFactory
                         var peeked = ScryAction.Peek(caster, 1);
                         if (peeked.Count == 0) return;
 
-                        var agent = AgentRegistry.Get(caster);
+                        var agent = ctx.Agent ?? AgentRegistry.Get(caster);
                         ScryAction.ScryDecision decision;
                         if (agent != null)
                         {
                             // TODO: drop sync-over-async once IEffect.Execute becomes async.
-                            decision = agent.ChooseScryDecisionAsync(null, peeked)
-                                .GetAwaiter().GetResult();
+                            decision = (await agent.ChooseScryDecisionAsync( ctx.Game, peeked).ConfigureAwait(false));
                         }
                         else
                         {

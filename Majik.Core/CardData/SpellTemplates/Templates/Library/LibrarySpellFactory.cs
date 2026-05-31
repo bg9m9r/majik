@@ -70,7 +70,7 @@ internal static class LibrarySpellFactory
     internal static SpellDefinition SurveilSelfSpell(Player caster, int n) => new(
         Modes: Array.Empty<string>(), HasVariableX: false,
         TargetRequests: Array.Empty<TargetRequest>(),
-        EffectFactory: _ => new IEffect[] { new Effect($"surveil {n}", () =>
+        EffectFactory: _ => new IEffect[] { new Effect($"surveil {n}", async ctx =>
         {
             var peeked = SurveilAction.Peek(caster, n);
             if (peeked.Count == 0) return;
@@ -78,12 +78,11 @@ internal static class LibrarySpellFactory
             // Consult the registered agent when available; fall back to the
             // pre-agent default (all-to-graveyard) when none is registered.
             // TODO: remove sync-over-async once IEffect.Execute becomes async.
-            var agent = AgentRegistry.Get(caster);
+            var agent = ctx.Agent ?? AgentRegistry.Get(caster);
             SurveilAction.SurveilDecision decision;
             if (agent != null)
             {
-                decision = agent.ChooseSurveilDecisionAsync(null, peeked)
-                    .GetAwaiter().GetResult();
+                decision = (await agent.ChooseSurveilDecisionAsync( ctx.Game, peeked).ConfigureAwait(false));
             }
             else
             {
@@ -97,7 +96,7 @@ internal static class LibrarySpellFactory
     internal static SpellDefinition ScryNSpell(Player caster, string oracleText, int n) => new(
         Modes: Array.Empty<string>(), HasVariableX: false,
         TargetRequests: Array.Empty<TargetRequest>(),
-        EffectFactory: _ => new IEffect[] { new Effect("scry+draw", () =>
+        EffectFactory: _ => new IEffect[] { new Effect("scry+draw", async ctx =>
         {
             var peeked = ScryAction.Peek(caster, n);
             if (peeked.Count > 0)
@@ -105,12 +104,11 @@ internal static class LibrarySpellFactory
                 // Consult the registered agent when available; fall back to the
                 // pre-agent default (all-to-bottom) when none is registered.
                 // TODO: remove sync-over-async once IEffect.Execute becomes async.
-                var agent = AgentRegistry.Get(caster);
+                var agent = ctx.Agent ?? AgentRegistry.Get(caster);
                 ScryAction.ScryDecision decision;
                 if (agent != null)
                 {
-                    decision = agent.ChooseScryDecisionAsync(null, peeked)
-                        .GetAwaiter().GetResult();
+                    decision = (await agent.ChooseScryDecisionAsync( ctx.Game, peeked).ConfigureAwait(false));
                 }
                 else
                 {

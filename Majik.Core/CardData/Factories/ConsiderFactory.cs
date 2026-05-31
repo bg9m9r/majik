@@ -59,7 +59,7 @@ public static class ConsiderFactory
         ArgumentNullException.ThrowIfNull(caster);
         return new IEffect[]
         {
-            new Effect("Consider: surveil 1, then draw a card.", () =>
+            new Effect("Consider: surveil 1, then draw a card.", async ctx =>
             {
                 // CR 701.42 — Surveil 1. Look at the top card; the controller
                 // chooses whether to send it to the graveyard or leave it on
@@ -70,13 +70,12 @@ public static class ConsiderFactory
                 var peeked = SurveilAction.Peek(caster, 1);
                 if (peeked.Count > 0)
                 {
-                    var agent = AgentRegistry.Get(caster);
+                    var agent = ctx.Agent ?? AgentRegistry.Get(caster);
                     SurveilAction.SurveilDecision decision;
                     if (agent != null)
                     {
                         // TODO: drop sync-over-async once IEffect.Execute becomes async.
-                        decision = agent.ChooseSurveilDecisionAsync(null, peeked)
-                            .GetAwaiter().GetResult();
+                        decision = (await agent.ChooseSurveilDecisionAsync( ctx.Game, peeked).ConfigureAwait(false));
                     }
                     else
                     {
