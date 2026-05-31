@@ -96,11 +96,11 @@ public static class BuriedAliveFactory
             {
                 new Effect(
                     $"{CardName}: search library for up to {MaxCreatureCount} creature cards → graveyard, then shuffle",
-                    () => Resolve(caster, zones)),
+                    ctx => ResolveAsync(caster, zones, ctx)),
             });
     }
 
-    private static void Resolve(Player caster, ZoneService? zones)
+    private static async ValueTask ResolveAsync(Player caster, ZoneService? zones, ResolutionContext ctx)
     {
         var effectiveZones = zones ?? ZoneServiceRegistry.Get(caster);
 
@@ -123,9 +123,9 @@ public static class BuriedAliveFactory
             // search and there's nothing more to surface.
             if (candidates.Count == 0 && i > 0) break;
 
-            var pick = Majik.Core.Zones.LibrarySearch.PromptOnly(
-                caster, candidates,
-                $"creature card #{i + 1} of up to {MaxCreatureCount}");
+            var pick = await Majik.Core.Zones.LibrarySearch.PromptOnlyAsync(
+                ctx, caster, candidates,
+                $"creature card #{i + 1} of up to {MaxCreatureCount}").ConfigureAwait(false);
 
             // CR 701.19a — "find nothing" / decline short-circuits the
             // remaining picks (the printed "up to three" caps but doesn't

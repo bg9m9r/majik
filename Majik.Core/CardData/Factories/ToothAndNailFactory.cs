@@ -179,7 +179,7 @@ public static class ToothAndNailFactory
     /// CR 701.19a + CR 701.20a.
     /// </summary>
     private static IEffect BuildTutorEffect(Player caster) =>
-        new Effect("Tooth and Nail — search library for up to two creatures", () =>
+        new Effect("Tooth and Nail — search library for up to two creatures", async ctx =>
         {
             // CR 701.19a — library search. Use LibrarySearch.PromptOnly so
             // the first prompt fires even with zero candidates (a human
@@ -197,8 +197,8 @@ public static class ToothAndNailFactory
                 // has already acknowledged the search.
                 if (candidates.Count == 0 && slot > 0) break;
 
-                var pick = Majik.Core.Zones.LibrarySearch.PromptOnly(
-                    caster, candidates, "creature card");
+                var pick = await Majik.Core.Zones.LibrarySearch.PromptOnlyAsync(
+                    ctx, caster, candidates, "creature card").ConfigureAwait(false);
                 if (pick == null) break; // CR 701.19a — decline / nothing found.
                 picks.Add(pick);
             }

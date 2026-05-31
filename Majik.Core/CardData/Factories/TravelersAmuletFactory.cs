@@ -93,7 +93,7 @@ public static class TravelersAmuletFactory
         // ----------------------------------------------------------------
         var tutorEffect = new Effect(
             "Traveler's Amulet: tutor a basic land -> hand + sac self",
-            () =>
+            async ctx =>
             {
                 var controller = amulet.Controller ?? owner;
                 SacrificeSelf(amulet, owner, controller);
@@ -104,8 +104,8 @@ public static class TravelersAmuletFactory
 
                 // CR 701.19a — prompt the agent even on zero candidates so a
                 // human searcher sees the failed search.
-                var pick = LibrarySearch.PromptOnly(
-                    controller, candidates, "basic land card");
+                var pick = await LibrarySearch.PromptOnlyAsync(
+                    ctx, controller, candidates, "basic land card").ConfigureAwait(false);
 
                 if (pick != null)
                 {

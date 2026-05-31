@@ -110,7 +110,7 @@ public static class ScapeshiftFactory
 
         return new IEffect[]
         {
-            new Effect($"{CardName}: sacrifice N lands, tutor N lands -> battlefield.", () =>
+            new Effect($"{CardName}: sacrifice N lands, tutor N lands -> battlefield.", async ctx =>
             {
                 // ---- 1. Sacrifice phase (CR 701.16) -----------------------
                 int sacrificed = 0;
@@ -169,8 +169,8 @@ public static class ScapeshiftFactory
                         .ToList();
                     if (candidates.Count == 0 && slot > 0) break;
 
-                    var pick = Majik.Core.Zones.LibrarySearch.PromptOnly(
-                        caster, candidates, "land card");
+                    var pick = await Majik.Core.Zones.LibrarySearch.PromptOnlyAsync(
+                        ctx, caster, candidates, "land card").ConfigureAwait(false);
                     if (pick == null) break; // CR 701.19a — decline is legal.
 
                     MoveLibraryToBattlefield(caster, pick);

@@ -83,7 +83,7 @@ public static class PathToExileFactory
                 var raw = resolver(chosen.Targets[0][0]);
                 return new IEffect[]
                 {
-                    new Effect("Path to Exile: exile target creature + basic-land tutor", () =>
+                    new Effect("Path to Exile: exile target creature + basic-land tutor", async ctx =>
                     {
                         if (raw is not Creature target) return;
                         if (target.Zone != ZoneType.Battlefield) return; // illegal at resolution
@@ -107,7 +107,17 @@ public static class PathToExileFactory
                         // put that card onto the battlefield tapped,
                         // then shuffle their library" (CR 701.19a).
                         if (targetController == null) return;
-                        TutorBasicLandTapped(targetController);
+                        // The searcher is the exiled creature's controller (the
+                        // OTHER player when you Path an opponent's creature), so
+                        // bind the prompt to THAT player's agent — not ctx.Agent
+                        // (the Path caster). CR 701.19a — they search their own
+                        // library.
+                        var searchCtx = ResolutionContext.For(
+                            targetController,
+                            AgentRegistry.Get(targetController),
+                            ctx.Game, chosenTargets: null, ctx.Ct);
+                        await TutorBasicLandTappedAsync(targetController, searchCtx)
+                            .ConfigureAwait(false);
                     }),
                 };
             });
@@ -121,7 +131,7 @@ public static class PathToExileFactory
     /// registered, falls back to first basic candidate (deterministic
     /// test default — mirrors <c>SearchSpellFactory</c>).
     /// </summary>
-    private static void TutorBasicLandTapped(Player player)
+    private static async ValueTask TutorBasicLandTappedAsync(Player player, ResolutionContext ctx)
     {
         var candidates = player.Zones.Library.GetCards()
             .Where(c => c.HasType(CardType.Land) && BasicLandNames.Contains(c.Name))
@@ -130,8 +140,8 @@ public static class PathToExileFactory
         // CR 701.19a — prompt agent even on zero candidates so the human
         // searcher sees the failed search rather than a silent no-op
         // (see LibrarySearch xmldoc).
-        var pick = Majik.Core.Zones.LibrarySearch.PromptOnly(
-            player, candidates, "basic land card");
+        var pick = await Majik.Core.Zones.LibrarySearch.PromptOnlyAsync(
+            ctx, player, candidates, "basic land card").ConfigureAwait(false);
 
         if (pick != null)
         {

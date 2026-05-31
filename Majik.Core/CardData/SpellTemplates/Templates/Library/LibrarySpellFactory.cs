@@ -258,14 +258,15 @@ internal static class LibrarySpellFactory
         Player caster, int n, ZoneType restDestination, bool optional = false) => new(
         Modes: Array.Empty<string>(), HasVariableX: false,
         TargetRequests: Array.Empty<TargetRequest>(),
-        EffectFactory: _ => new IEffect[] { new Effect($"impulse {n} -> {restDestination}", () =>
+        EffectFactory: _ => new IEffect[] { new Effect($"impulse {n} -> {restDestination}", async ctx =>
         {
             // Every revealed card is eligible at this template tier — the
             // calling template doesn't enforce a type / colour filter
             // (cards that need a filter use the named factory pattern
             // like Ancient Stirrings). The agent therefore picks freely
             // from the entire reveal pile.
-            Majik.Core.Zones.RevealAndChoose.RevealTopAndChoose(
+            await Majik.Core.Zones.RevealAndChoose.RevealTopAndChooseAsync(
+                ctx: ctx,
                 caster: caster,
                 count: n,
                 eligiblePredicate: _ => true,
@@ -273,7 +274,7 @@ internal static class LibrarySpellFactory
                 label: "Card to put into your hand",
                 pickedDestination: ZoneType.Hand,
                 restDestination: restDestination,
-                sourceTag: $"impulse-{n}");
+                sourceTag: $"impulse-{n}").ConfigureAwait(false);
         }) });
 
     /// <summary>

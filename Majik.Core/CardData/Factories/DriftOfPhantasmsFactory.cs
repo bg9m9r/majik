@@ -126,7 +126,7 @@ public static class DriftOfPhantasmsFactory
 
         var transmuteEffect = new Effect(
             $"{CardName}: transmute — tutor MV {card.ManaCostValue.TotalValue} card to hand",
-            () =>
+            async ctx =>
             {
                 var targetMv = card.ManaCostValue.TotalValue;
 
@@ -152,8 +152,8 @@ public static class DriftOfPhantasmsFactory
                 // CR 701.19a — prompt agent even on zero candidates so
                 // the human searcher sees the failed search (see
                 // LibrarySearch xmldoc).
-                var pick = Majik.Core.Zones.LibrarySearch.PromptOnly(
-                    owner, candidates, $"card with mana value {targetMv}");
+                var pick = await Majik.Core.Zones.LibrarySearch.PromptOnlyAsync(
+                    ctx, owner, candidates, $"card with mana value {targetMv}").ConfigureAwait(false);
 
                 if (pick != null)
                 {

@@ -42,7 +42,7 @@ public sealed class MalevolentRumblePatternTemplate : ISpellTemplate
     private static SpellDefinition MalevolentRumbleSpell(Player caster) => new(
         Modes: Array.Empty<string>(), HasVariableX: false,
         TargetRequests: Array.Empty<TargetRequest>(),
-        EffectFactory: _ => new IEffect[] { new Effect("Malevolent Rumble", () =>
+        EffectFactory: _ => new IEffect[] { new Effect("Malevolent Rumble", async ctx =>
         {
             // CR 701.15 — reveal top 4, may put a permanent card into hand,
             // rest into graveyard. Shared helper handles agent prompting
@@ -50,7 +50,8 @@ public sealed class MalevolentRumblePatternTemplate : ISpellTemplate
             // the player still sees the reveal pile) and routes zone moves
             // through ZoneServiceRegistry so ETB-from-graveyard observers
             // see the discarded cards.
-            RevealAndChoose.RevealTopAndChoose(
+            await RevealAndChoose.RevealTopAndChooseAsync(
+                ctx: ctx,
                 caster: caster,
                 count: 4,
                 eligiblePredicate: IsPermanentCard,
@@ -58,7 +59,7 @@ public sealed class MalevolentRumblePatternTemplate : ISpellTemplate
                 label: "Permanent to put into hand",
                 pickedDestination: ZoneType.Hand,
                 restDestination: ZoneType.Graveyard,
-                sourceTag: "malevolent-rumble");
+                sourceTag: "malevolent-rumble").ConfigureAwait(false);
 
             // Token creation is unconditional — not gated on library size.
             TokenFactory.CreateEldraziSpawn(caster);

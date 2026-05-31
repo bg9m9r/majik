@@ -60,7 +60,7 @@ public static class EvolvingWildsFactory
         ActivatedAbility? fetchAbility = null;
         var fetchEffect = new Effect(
             $"{CardName}: sacrifice self + tutor basic land -> battlefield tapped, shuffle",
-            () =>
+            async ctx =>
             {
                 if (fetchAbility == null) return;
 
@@ -72,7 +72,8 @@ public static class EvolvingWildsFactory
                 // so the land is no longer on the battlefield during the tutor.
                 SacrificeToOwnersGraveyard(land);
 
-                TutorBasicLandToBattlefieldTapped(controller);
+                await TutorBasicLandToBattlefieldTappedAsync(controller, ctx)
+                    .ConfigureAwait(false);
             });
 
         fetchAbility = new ActivatedAbility(
@@ -105,7 +106,7 @@ public static class EvolvingWildsFactory
     /// rider, then shuffle (CR 701.20a — shuffle whether or not a card was
     /// found).
     /// </summary>
-    private static void TutorBasicLandToBattlefieldTapped(Player player)
+    private static async ValueTask TutorBasicLandToBattlefieldTappedAsync(Player player, ResolutionContext ctx)
     {
         var candidates = player.Zones.Library.GetCards()
             .Where(c => c.HasType(CardType.Land) && c.HasSupertype(CardSupertype.Basic))
@@ -113,7 +114,8 @@ public static class EvolvingWildsFactory
 
         // CR 701.19a — prompt agent even on zero candidates so the human
         // searcher sees the failed search rather than a silent no-op.
-        var pick = LibrarySearch.PromptOnly(player, candidates, "basic land card");
+        var pick = await LibrarySearch.PromptOnlyAsync(ctx, player, candidates, "basic land card")
+            .ConfigureAwait(false);
 
         if (pick != null)
         {

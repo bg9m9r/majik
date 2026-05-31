@@ -1,3 +1,4 @@
+using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Game;
 using Majik.Core.Players;
@@ -59,32 +60,64 @@ public static class LibrarySearch
     /// matching cards exist (CR 701.19a).</param>
     /// <param name="kindLabel">Human-readable description ("green creature
     /// card with mana value 3 or less", "basic land card").</param>
-    /// <param name="ctx">Optional game context for the agent's scoring
-    /// policy. Null is acceptable — same sync-over-async wart as the rest
-    /// of the v1 effect closures.</param>
     /// <returns>The card the agent picked, or <see langword="null"/> for
     /// "find nothing" (which is always legal under CR 701.19a, and is
     /// also the only option when <paramref name="candidates"/> is empty).</returns>
+    /// <remarks>
+    /// PLAN 01 (Slice D) — the <c>GameContext? ctx = null</c> overload was
+    /// dropped: no production caller threads a context through this sync
+    /// shim anymore (every tutor effect closure now calls the async
+    /// <see cref="PromptOnlyAsync"/> with its live <see cref="ResolutionContext"/>).
+    /// This sync entry point survives only for direct-call unit tests; it
+    /// routes through the async path on a registry-derived agent so the
+    /// agent is still genuinely prompted.
+    /// </remarks>
     public static ICard? PromptOnly(
         Player searcher,
         IReadOnlyList<ICard> candidates,
-        string kindLabel,
-        GameContext? ctx = null)
+        string kindLabel)
     {
         ArgumentNullException.ThrowIfNull(searcher);
         ArgumentNullException.ThrowIfNull(candidates);
 
-        var agent = AgentRegistry.Get(searcher);
+        return PromptOnlyAsync(
+                ResolutionContext.For(
+                    searcher, AgentRegistry.Get(searcher), game: null, chosenTargets: null),
+                searcher, candidates, kindLabel)
+            .GetAwaiter().GetResult();
+    }
+
+    /// <summary>
+    /// PLAN 01 (Slice D) — async prompt-only. Reads the resolving player's
+    /// agent + live game off <paramref name="ctx"/> and genuinely
+    /// <c>await</c>s <see cref="IPlayerAgent.ChooseLibraryPickAsync"/> so
+    /// every tutor routing through this primitive prompts for real instead
+    /// of auto-picking <c>candidates[0]</c>. Falls back to
+    /// <see cref="AgentRegistry"/> (and finally the deterministic first
+    /// candidate) only when no agent is available on the context / registry.
+    /// Does NOT shuffle — the caller owns the post-search shuffle.
+    /// </summary>
+    public static async ValueTask<ICard?> PromptOnlyAsync(
+        ResolutionContext ctx,
+        Player searcher,
+        IReadOnlyList<ICard> candidates,
+        string kindLabel)
+    {
+        ArgumentNullException.ThrowIfNull(ctx);
+        ArgumentNullException.ThrowIfNull(searcher);
+        ArgumentNullException.ThrowIfNull(candidates);
+
+        var agent = ctx.Agent ?? AgentRegistry.Get(searcher);
         if (agent != null)
         {
             // Prompt the agent even when candidates is empty — remote-agent
             // UIs render the full library with all cards muted and a single
             // Acknowledge button so the player SEES the failed search.
             // CR 701.19a — declining (returning null) is always legal.
-            return agent.ChooseLibraryPickAsync(ctx, candidates, kindLabel)
-                .GetAwaiter().GetResult();
+            return await agent.ChooseLibraryPickAsync(ctx.Game, candidates, kindLabel, ctx.Ct)
+                .ConfigureAwait(false);
         }
-        // No agent registered (shape / dispatcher test path) — deterministic
+        // No agent available (shape / dispatcher test path) — deterministic
         // first-candidate behaviour matches the historical short-circuit.
         return candidates.Count > 0 ? candidates[0] : null;
     }
@@ -102,10 +135,28 @@ public static class LibrarySearch
         Player searcher,
         IReadOnlyList<ICard> candidates,
         string kindLabel,
-        string shuffleReason,
-        GameContext? ctx = null)
+        string shuffleReason)
     {
-        var pick = PromptOnly(searcher, candidates, kindLabel, ctx);
+        var pick = PromptOnly(searcher, candidates, kindLabel);
+        // CR 701.20a — shuffle whether or not a card was found.
+        LibraryShuffle.ShuffleLibrary(searcher, shuffleReason);
+        return pick;
+    }
+
+    /// <summary>
+    /// PLAN 01 (Slice D) — async <see cref="PromptOnlyAsync"/> followed by
+    /// the CR 701.20a shuffle. Use from tutor effect closures built on the
+    /// async <see cref="Effect"/> ctor so the search genuinely prompts.
+    /// </summary>
+    public static async ValueTask<ICard?> PromptAndShuffleAsync(
+        ResolutionContext ctx,
+        Player searcher,
+        IReadOnlyList<ICard> candidates,
+        string kindLabel,
+        string shuffleReason)
+    {
+        var pick = await PromptOnlyAsync(ctx, searcher, candidates, kindLabel)
+            .ConfigureAwait(false);
         // CR 701.20a — shuffle whether or not a card was found.
         LibraryShuffle.ShuffleLibrary(searcher, shuffleReason);
         return pick;

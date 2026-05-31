@@ -162,7 +162,7 @@ public static class SwordOfHearthAndHomeFactory
         TriggeredAbility? combatTrigger = null;
         var combatEffect = new Effect(
             $"{CardName}: exile+return another your creature, then tutor basic land tapped",
-            () =>
+            async ctx =>
             {
                 if (card.Zone != ZoneType.Battlefield) return;
                 if (combatTrigger == null) return;
@@ -188,7 +188,7 @@ public static class SwordOfHearthAndHomeFactory
                 //    enters the basic with its Tapped flag set; tutor is
                 //    not a targeted rider so it always resolves
                 //    (CR 608.2b).
-                TutorBasicLandTapped(controller);
+                await TutorBasicLandTappedAsync(controller, ctx).ConfigureAwait(false);
             });
 
         combatTrigger = new TriggeredAbility(
@@ -283,7 +283,7 @@ public static class SwordOfHearthAndHomeFactory
     /// fallback when no agent is registered); the result is tapped on
     /// arrival.
     /// </summary>
-    private static void TutorBasicLandTapped(Player player)
+    private static async ValueTask TutorBasicLandTappedAsync(Player player, ResolutionContext ctx)
     {
         var candidates = player.Zones.Library.GetCards()
             .Where(c => c.HasType(CardType.Land) && BasicLandNames.Contains(c.Name))
@@ -291,8 +291,8 @@ public static class SwordOfHearthAndHomeFactory
 
         // CR 701.19a — prompt agent even on zero candidates so the human
         // searcher sees the failed search (see LibrarySearch xmldoc).
-        var pick = Majik.Core.Zones.LibrarySearch.PromptOnly(
-            player, candidates, "basic land card");
+        var pick = await Majik.Core.Zones.LibrarySearch.PromptOnlyAsync(
+            ctx, player, candidates, "basic land card").ConfigureAwait(false);
 
         if (pick != null)
         {

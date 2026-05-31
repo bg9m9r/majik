@@ -152,7 +152,16 @@ public static class GhostQuarterFactory
                     }
                 }
 
-                TutorBasicLandToBattlefield(destroyedController);
+                // The searcher is the destroyed land's controller (which may
+                // be an opponent of the Ghost Quarter activator) — prompt
+                // THAT player's agent, not ctx.Agent. Thread it through a
+                // context bound to the destroyed-land controller.
+                var searchCtx = ResolutionContext.For(
+                    destroyedController,
+                    agent ?? AgentRegistry.Get(destroyedController),
+                    ctx.Game, chosenTargets: null, ctx.Ct);
+                await TutorBasicLandToBattlefieldAsync(destroyedController, searchCtx)
+                    .ConfigureAwait(false);
             });
 
         destroyAbility = new ActivatedAbility(
@@ -214,7 +223,7 @@ public static class GhostQuarterFactory
     /// fire, then shuffle (CR 701.20a). Mirrors
     /// <see cref="PrismaticVistaFactory"/>.
     /// </summary>
-    private static void TutorBasicLandToBattlefield(Player player)
+    private static async ValueTask TutorBasicLandToBattlefieldAsync(Player player, ResolutionContext ctx)
     {
         var candidates = player.Zones.Library.GetCards()
             .Where(c => c.HasType(CardType.Land) && c.HasSupertype(CardSupertype.Basic))
@@ -222,8 +231,8 @@ public static class GhostQuarterFactory
 
         // CR 701.19a — prompt agent even on zero candidates so the human
         // searcher sees the failed search (see LibrarySearch xmldoc).
-        var pick = Majik.Core.Zones.LibrarySearch.PromptOnly(
-            player, candidates, "basic land card");
+        var pick = await Majik.Core.Zones.LibrarySearch.PromptOnlyAsync(
+            ctx, player, candidates, "basic land card").ConfigureAwait(false);
 
         if (pick != null)
         {

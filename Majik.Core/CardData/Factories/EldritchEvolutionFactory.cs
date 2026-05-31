@@ -134,7 +134,7 @@ public static class EldritchEvolutionFactory
 
                 return new IEffect[]
                 {
-                    new Effect("Eldritch Evolution: tutor creature mv <= sac.mv + 2", () =>
+                    new Effect("Eldritch Evolution: tutor creature mv <= sac.mv + 2", async ctx =>
                     {
                         // CR 701.19a — find / no-find both legal. No
                         // sacrificed reference (cost not paid via the
@@ -153,9 +153,9 @@ public static class EldritchEvolutionFactory
                         // CR 701.19a — prompt agent even on zero candidates
                         // so the human searcher sees the failed search
                         // (see LibrarySearch xmldoc).
-                        var pick = Majik.Core.Zones.LibrarySearch.PromptOnly(
-                            caster, candidates,
-                            $"creature card with mana value {cap} or less");
+                        var pick = await Majik.Core.Zones.LibrarySearch.PromptOnlyAsync(
+                            ctx, caster, candidates,
+                            $"creature card with mana value {cap} or less").ConfigureAwait(false);
 
                         if (pick != null)
                         {

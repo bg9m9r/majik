@@ -98,14 +98,14 @@ public static class OracleLandActivatedAbilityBinder
             {
                 new Effect(
                     $"search library for {subtypeNameA} or {subtypeNameB} and put onto battlefield",
-                    () => FetchEffect(ctrl, subtypeA, subtypeB)),
+                    ctx => FetchEffectAsync(ctrl, subtypeA, subtypeB, ctx)),
             });
 
         fetchLand.AddAbility(ability);
         return true;
     }
 
-    private static void FetchEffect(Player controller, CardSubtype subtypeA, CardSubtype subtypeB)
+    private static async ValueTask FetchEffectAsync(Player controller, CardSubtype subtypeA, CardSubtype subtypeB, ResolutionContext ctx)
     {
         // CR 701.19a / CR 701.19c — gather the legal candidates (lands whose
         // subtypes include either of the two basics the fetchland names), let
@@ -137,8 +137,8 @@ public static class OracleLandActivatedAbilityBinder
         // CR 701.19a — LibrarySearch.PromptOnly always prompts the agent
         // even when candidates is empty so a human searcher sees the
         // failed search rather than a silent no-op.
-        var pick = Majik.Core.Zones.LibrarySearch.PromptOnly(
-            controller, candidates, "land card");
+        var pick = await Majik.Core.Zones.LibrarySearch.PromptOnlyAsync(
+            ctx, controller, candidates, "land card").ConfigureAwait(false);
 
         if (pick != null)
         {

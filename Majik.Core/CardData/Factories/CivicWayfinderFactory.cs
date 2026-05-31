@@ -112,16 +112,17 @@ public static class CivicWayfinderFactory
         // ----------------------------------------------------------------
         var etbEffect = new Effect(
             $"{CardName}: search library for a basic land card, put it into hand, then shuffle",
-            () =>
+            async ctx =>
             {
                 var controller = card.Controller ?? owner;
-                TypedCyclingFactory.TutorTypedCard(
+                await TypedCyclingFactory.TutorTypedCardAsync(
+                    ctx: ctx,
                     owner: controller,
                     predicate: c =>
                         c.HasType(CardType.Land)
                         && c.HasSupertype(CardSupertype.Basic),
                     kindLabel: "basic land card",
-                    shuffleReason: "civic-wayfinder");
+                    shuffleReason: "civic-wayfinder").ConfigureAwait(false);
             });
 
         var etbTrigger = new TriggeredAbility(

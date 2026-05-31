@@ -123,7 +123,7 @@ public static class GreenSunsZenithFactory
                 var x = p.X ?? 0;
                 return new IEffect[]
                 {
-                    new Effect($"Green Sun's Zenith: tutor green creature with mv ≤ {x} → battlefield", () =>
+                    new Effect($"Green Sun's Zenith: tutor green creature with mv ≤ {x} → battlefield", async ctx =>
                     {
                         // CR 701.19a — search consults the controller's
                         // agent (if any). Pre-filter to green creature
@@ -144,9 +144,9 @@ public static class GreenSunsZenithFactory
                         // so a human searcher sees the full library with
                         // no eligible cards and a single Acknowledge
                         // button rather than the spell silently no-opping).
-                        var pick = Majik.Core.Zones.LibrarySearch.PromptOnly(
-                            caster, candidates,
-                            $"green creature card with mana value {x} or less");
+                        var pick = await Majik.Core.Zones.LibrarySearch.PromptOnlyAsync(
+                            ctx, caster, candidates,
+                            $"green creature card with mana value {x} or less").ConfigureAwait(false);
 
                         // CR 603.6a — prefer caller-supplied zoneService;
                         // fall back to ZoneServiceRegistry so the

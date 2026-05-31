@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Events;
 using Majik.Core.Game;
@@ -205,6 +206,28 @@ public class LibrarySearchTests : IDisposable
         // CR 701.20a — the search happened (even though the agent
         // declined to find), so the library still shuffles.
         observed.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public async Task PromptOnlyAsync_HonorsAgentsNonFirstChoice_ViaCtxAgent()
+    {
+        // PLAN 01 (Slice D) — the async primitive must genuinely prompt the
+        // agent ON THE CONTEXT and honour a NON-first pick, rather than the
+        // legacy auto-pick-first. No agent is registered in the AgentRegistry;
+        // the only agent is the one carried on the ResolutionContext, so a
+        // returned pick proves the ctx.Agent path was taken.
+        var elf = new Creature("Llanowar Elves", "G", 1, 1);
+        var bop = new Creature("Birds of Paradise", "G", 0, 1);
+        var ctxAgent = new RecordingAgent { PickToReturn = bop }; // NON-first
+
+        var ctx = ResolutionContext.For(
+            _alice, ctxAgent, game: null, chosenTargets: null);
+
+        var pick = await LibrarySearch.PromptOnlyAsync(
+            ctx, _alice, new ICard[] { elf, bop }, "green creature");
+
+        pick.Should().BeSameAs(bop, "the ctx.Agent's non-first choice must be honoured");
+        ctxAgent.CallCount.Should().Be(1);
     }
 
     [Fact]

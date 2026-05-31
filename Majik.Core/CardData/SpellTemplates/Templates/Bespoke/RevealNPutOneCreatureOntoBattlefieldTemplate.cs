@@ -64,7 +64,7 @@ public sealed class RevealNPutOneCreatureOntoBattlefieldTemplate : ISpellTemplat
     private static SpellDefinition RevealNPutOneCreatureSpell(Player caster, int n) => new(
         Modes: Array.Empty<string>(), HasVariableX: false,
         TargetRequests: Array.Empty<TargetRequest>(),
-        EffectFactory: _ => new IEffect[] { new Effect("RevealNPutOneCreatureOntoBattlefield", () =>
+        EffectFactory: _ => new IEffect[] { new Effect("RevealNPutOneCreatureOntoBattlefield", async ctx =>
         {
             // CR 701.15 — reveal top N, may put a creature card onto the
             // battlefield, rest to the bottom (lossy "any/random order"
@@ -72,7 +72,8 @@ public sealed class RevealNPutOneCreatureOntoBattlefieldTemplate : ISpellTemplat
             // surfaces the reveal pile to the agent (RemoteAgent →
             // portal modal with eligible cards highlighted, ineligibles
             // muted) instead of auto-picking the first creature.
-            Majik.Core.Zones.RevealAndChoose.RevealTopAndChoose(
+            await Majik.Core.Zones.RevealAndChoose.RevealTopAndChooseAsync(
+                ctx: ctx,
                 caster: caster,
                 count: n,
                 eligiblePredicate: c => c.HasType(CardType.Creature),
@@ -80,6 +81,6 @@ public sealed class RevealNPutOneCreatureOntoBattlefieldTemplate : ISpellTemplat
                 label: "Creature to put onto the battlefield",
                 pickedDestination: ZoneType.Battlefield,
                 restDestination: ZoneType.Library,
-                sourceTag: $"reveal-{n}-put-creature-bf");
+                sourceTag: $"reveal-{n}-put-creature-bf").ConfigureAwait(false);
         }) });
 }

@@ -95,11 +95,12 @@ public static class SakuraTribeElderFactory
         // ----------------------------------------------------------------
         var tutorEffect = new Effect(
             $"{CardName}: sac self + tutor basic land -> battlefield tapped",
-            () =>
+            async ctx =>
             {
                 var controller = card.Controller ?? owner;
                 SacrificeSelf(card, owner, controller);
-                TutorBasicLandToBattlefieldTapped(controller);
+                await TutorBasicLandToBattlefieldTappedAsync(controller, ctx)
+                    .ConfigureAwait(false);
             });
 
         var tutorAbility = new ActivatedAbility(
@@ -139,7 +140,7 @@ public static class SakuraTribeElderFactory
     /// match), move the chosen card to the battlefield, apply the printed
     /// "tapped" rider, then shuffle (CR 701.20a).
     /// </summary>
-    private static void TutorBasicLandToBattlefieldTapped(Player player)
+    private static async ValueTask TutorBasicLandToBattlefieldTappedAsync(Player player, ResolutionContext ctx)
     {
         var candidates = player.Zones.Library.GetCards()
             .Where(c => c.HasType(CardType.Land) && c.HasSupertype(CardSupertype.Basic))
@@ -147,7 +148,8 @@ public static class SakuraTribeElderFactory
 
         // CR 701.19a — prompt agent even on zero candidates so the human
         // searcher sees the failed search (see LibrarySearch xmldoc).
-        var pick = LibrarySearch.PromptOnly(player, candidates, "basic land card");
+        var pick = await LibrarySearch.PromptOnlyAsync(ctx, player, candidates, "basic land card")
+            .ConfigureAwait(false);
 
         if (pick != null)
         {

@@ -88,7 +88,7 @@ public static class SpellseekerFactory
         // ----------------------------------------------------------------
         var etbEffect = new Effect(
             $"{CardName}: tutor an instant/sorcery (mv ≤ 2) to hand",
-            () =>
+            async ctx =>
             {
                 var controller = card.Controller ?? owner;
 
@@ -102,9 +102,9 @@ public static class SpellseekerFactory
                 // CR 701.19a — prompt agent even on zero candidates so
                 // the human searcher sees the failed search (see
                 // LibrarySearch xmldoc).
-                var pick = Majik.Core.Zones.LibrarySearch.PromptOnly(
-                    controller, candidates,
-                    "instant or sorcery card with mana value 2 or less");
+                var pick = await Majik.Core.Zones.LibrarySearch.PromptOnlyAsync(
+                    ctx, controller, candidates,
+                    "instant or sorcery card with mana value 2 or less").ConfigureAwait(false);
 
                 if (pick != null)
                 {
