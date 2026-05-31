@@ -207,7 +207,7 @@ public static class FlickerwispFactory
         // Skipped when no TriggerManager is wired (shape-only tests).
         if (triggers == null) return;
 
-        var resolvedAt = DateTime.UtcNow;
+        var resolvedAt = Majik.Core.Game.LogicalClockScope.Current.NextTimestamp();
         var returnEffect = new Effect(
             $"{CardName}: return exiled permanent to owner's battlefield at next end step (CR 603.7)",
             () =>

@@ -216,7 +216,7 @@ public static class NecropotenceFactory
                             return;
                         }
 
-                        var activatedAt = DateTime.UtcNow;
+                        var activatedAt = Majik.Core.Game.LogicalClockScope.Current.NextTimestamp();
                         var exiledCard = top;
                         var returnEffect = new Effect(
                             "Necropotence: put exiled card into hand (delayed end step)",

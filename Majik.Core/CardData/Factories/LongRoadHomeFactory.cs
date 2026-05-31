@@ -167,7 +167,7 @@ public static class LongRoadHomeFactory
                             // (matches TouchTheSpiritRealm shape-only fallback).
                             if (triggers == null) return;
 
-                            var resolvedAt = DateTime.UtcNow;
+                            var resolvedAt = Majik.Core.Game.LogicalClockScope.Current.NextTimestamp();
                             var returnEffect = new Effect(
                                 $"{CardName}: return exiled creature at next end step with +1/+1 counter (CR 603.7 + CR 614)",
                                 () =>

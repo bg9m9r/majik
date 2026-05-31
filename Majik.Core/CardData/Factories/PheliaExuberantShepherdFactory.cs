@@ -182,7 +182,7 @@ public static class PheliaExuberantShepherdFactory
                 // as TouchTheSpiritRealmFactory / WrennsResolveFactory).
                 if (triggers == null) return;
 
-                var resolvedAt = DateTime.UtcNow;
+                var resolvedAt = Majik.Core.Game.LogicalClockScope.Current.NextTimestamp();
                 var returnEffect = new Effect(
                     $"{CardName}: return exiled card at next end step (CR 603.7)",
                     () =>

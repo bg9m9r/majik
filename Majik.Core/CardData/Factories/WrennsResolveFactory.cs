@@ -115,7 +115,7 @@ public static class WrennsResolveFactory
                 // TriggerManager auto-unregisters delayed triggers after
                 // they fire (see TriggerManager.EvaluateTriggers).
                 // ----------------------------------------------------------
-                var resolvedAt = DateTime.UtcNow;
+                var resolvedAt = Majik.Core.Game.LogicalClockScope.Current.NextTimestamp();
                 var exileEffect = new Effect(
                     "Wrenn's Resolve: exile cards drawn this way (delayed end step)",
                     () =>

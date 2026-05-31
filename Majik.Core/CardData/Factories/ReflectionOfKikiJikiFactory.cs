@@ -237,7 +237,7 @@ public static class ReflectionOfKikiJikiFactory
         ZoneService? zoneService,
         TriggerManager triggers)
     {
-        var resolvedAt = DateTime.UtcNow;
+        var resolvedAt = Majik.Core.Game.LogicalClockScope.Current.NextTimestamp();
         var sacEffect = new Effect(
             $"{CardName}: sacrifice token at next end step",
             () => SacrificeToken(token, controller, zoneService));

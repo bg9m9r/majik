@@ -248,7 +248,7 @@ public static class ThroughTheBreachFactory
         // -------------------------------------------------------------------
         if (triggers == null) return;
 
-        var resolvedAt = DateTime.UtcNow;
+        var resolvedAt = Majik.Core.Game.LogicalClockScope.Current.NextTimestamp();
         var sacEffect = new Effect(
             $"Through the Breach: sacrifice {pick.Name} at next end step",
             () =>

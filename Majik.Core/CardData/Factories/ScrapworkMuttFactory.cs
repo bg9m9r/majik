@@ -275,7 +275,7 @@ public static class ScrapworkMuttFactory
         // this resolution so the current end step (if any) doesn't trip it.
         if (triggers == null) return;
 
-        var resolvedAt = DateTime.UtcNow;
+        var resolvedAt = Majik.Core.Game.LogicalClockScope.Current.NextTimestamp();
         var exileEffect = new Effect(
             $"{CardName}: unearth — exile at next end step",
             () =>

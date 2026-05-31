@@ -265,7 +265,7 @@ public static class NahiriTheHarbingerFactory
         TriggerManager triggers,
         ZoneService? zoneService)
     {
-        var resolvedAt = DateTime.UtcNow;
+        var resolvedAt = Majik.Core.Game.LogicalClockScope.Current.NextTimestamp();
         var returnEffect = Fx.Inline(
             $"{CardName} — return {permanent.Name} to its owner's hand at next end step (CR 603.7)",
             () =>

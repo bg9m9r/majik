@@ -189,7 +189,7 @@ public static class PersistCardFactory
         // already left the battlefield doesn't get yanked from elsewhere.
         if (triggers == null) return;
 
-        var resolvedAt = DateTime.UtcNow;
+        var resolvedAt = Majik.Core.Game.LogicalClockScope.Current.NextTimestamp();
         var exileEffect = new Effect(
             $"{CardName}: exile {picked.Name} at next end step",
             () =>

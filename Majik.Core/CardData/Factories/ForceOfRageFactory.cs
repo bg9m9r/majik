@@ -151,7 +151,7 @@ public static class ForceOfRageFactory
         // Sacrifices every token in `spawned` still on the battlefield
         // (CR 701.16 — controller's battlefield → owner's graveyard, then
         // SBA 704.5d removes the token).
-        var resolvedAt = DateTime.UtcNow;
+        var resolvedAt = Majik.Core.Game.LogicalClockScope.Current.NextTimestamp();
         var sacEffect = new Effect(
             $"{CardName} — sacrifice the three Elemental tokens at next end step",
             () =>

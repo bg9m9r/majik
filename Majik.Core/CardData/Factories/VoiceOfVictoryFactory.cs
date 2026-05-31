@@ -238,7 +238,7 @@ public static class VoiceOfVictoryFactory
         IReadOnlyList<Creature> tokens,
         TriggerManager triggers)
     {
-        var resolvedAt = DateTime.UtcNow;
+        var resolvedAt = Majik.Core.Game.LogicalClockScope.Current.NextTimestamp();
 
         var sacEffect = new Effect(
             $"{CardName}: sacrifice {tokens.Count} Mobilize tokens at next end step",

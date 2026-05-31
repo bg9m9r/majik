@@ -160,7 +160,7 @@ public static class GlimpseTheImpossibleFactory
                     // MishrasBaubleFactory). TriggerManager auto-unregisters
                     // delayed triggers after they fire.
                     // ----------------------------------------------------------
-                    var resolvedAt = DateTime.UtcNow;
+                    var resolvedAt = Majik.Core.Game.LogicalClockScope.Current.NextTimestamp();
 
                     var endStepEffect = new Effect(
                         "Glimpse the Impossible: exile → graveyard + create Eldrazi Spawn tokens (delayed end step)",

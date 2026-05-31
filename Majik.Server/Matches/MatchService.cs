@@ -209,6 +209,11 @@ public sealed class MatchService
             ClockMinutes = clockMinutes,
             Creator = creator,
             Opponent = null,
+            // Determinism (PLAN 08 prerequisite): pin + persist the RNG seed at
+            // match creation so the engine's GameRandom is reproducible and a
+            // future replay / rehydration can reconstruct the same (seed,
+            // commands) game.
+            GameSeed = NewGameSeed(),
             CreatorMillisRemaining = initialBalance,
             OpponentMillisRemaining = initialBalance,
             PriorityHolderSub = null,
@@ -397,6 +402,9 @@ public sealed class MatchService
             // GameId is set up-front now that the facade is created first;
             // this eliminates a separate post-Insert CAS round-trip.
             GameId = facade?.GameId,
+            // Determinism (PLAN 08 prerequisite): pin + persist the RNG seed at
+            // match creation (see human-vs-human path above).
+            GameSeed = NewGameSeed(),
             CreatorMillisRemaining = initialBalance,
             OpponentMillisRemaining = initialBalance,
             PriorityHolderSub = null,
@@ -691,6 +699,12 @@ public sealed class MatchService
             ? callerSub
             : callerSub == match.Creator.Sub ? match.Opponent!.Sub : match.Creator.Sub;
 
+    /// <summary>Determinism (PLAN 08 prerequisite): mint a fresh RNG seed for a
+    /// new match. Stored on the Match doc and used to build the engine's
+    /// <c>GameRandom(seed)</c> so the game is reproducible given (seed,
+    /// commands).</summary>
+    private static int NewGameSeed() => System.Random.Shared.Next();
+
     /// <summary>Boot the engine for the just-decided first-player slot and
     /// wire the Slice 5a auto-pass prefs provider so the engine can short-
     /// circuit the human's priority prompt when prefs match.</summary>
@@ -699,7 +713,13 @@ public sealed class MatchService
         if (_gameFactory == null || match.GameId is not Guid gid) return;
         var facade = _gameFactory.Get(gid);
         var prefsProvider = BuildAutoPassPrefsProvider(match, facade);
-        facade?.StartFullGameAsync(firstPlayerSlot, autoPassPrefsProvider: prefsProvider);
+        // Determinism (PLAN 08 prerequisite): build the engine RNG from the
+        // seed pinned + persisted at match creation, instead of letting the
+        // driver mint a fresh, unpersisted GameRandom. This is what makes the
+        // game reproducible from (stored seed, command log) for later replay /
+        // rehydration (the rehydration body itself remains out of scope).
+        var rng = new Majik.Core.Random.GameRandom(match.GameSeed);
+        facade?.StartFullGameAsync(firstPlayerSlot, rng: rng, autoPassPrefsProvider: prefsProvider);
     }
 
     /// <summary>Slice 5a — build the per-seat AutoPassPrefs provider. The

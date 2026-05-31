@@ -205,7 +205,7 @@ public static class DalkovanEncampmentFactory
         // CR 603.7 — DelayedTriggeredAbility to unregister the attack
         // trigger at the start of the next end step, modelling the
         // "this turn" duration of the printed effect.
-        var resolvedAt = DateTime.UtcNow;
+        var resolvedAt = Majik.Core.Game.LogicalClockScope.Current.NextTimestamp();
         var cleanupEffect = new Effect(
             $"{CardName}: unregister attack-token trigger (EOT cleanup)",
             () => triggers.UnregisterTriggeredAbility(attackTrigger));

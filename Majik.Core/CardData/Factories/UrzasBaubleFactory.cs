@@ -126,7 +126,7 @@ public static class UrzasBaubleFactory
                 // ----------------------------------------------------------
                 if (triggerManager == null) return;
 
-                var activatedAt = DateTime.UtcNow;
+                var activatedAt = Majik.Core.Game.LogicalClockScope.Current.NextTimestamp();
                 var drawEffect = new Effect(
                     $"{CardName}: draw a card (delayed upkeep)",
                     () =>

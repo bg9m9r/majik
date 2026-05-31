@@ -69,7 +69,13 @@ public class TriggeredAbility : ITriggeredAbility
         Condition = condition ?? throw new ArgumentNullException(nameof(condition));
 
         Id = Guid.NewGuid();
-        Timestamp = DateTime.UtcNow;
+        // Determinism (PLAN 08 prerequisite): order-determining timestamp comes
+        // from the per-game logical clock, not wall-clock. Consumed by
+        // ApnapOrdering (.ThenBy(t => t.Timestamp)) + TriggerManager
+        // (OrderBy(t => t.Timestamp)). The clock assigns in construction order
+        // (the same order UtcNow approximated) so trigger ordering is unchanged
+        // but now reproducible on replay.
+        Timestamp = LogicalClockScope.Current.NextTimestamp();
         _resolutionState = ResolutionState.NotResolving();
         InterveningIf = interveningIf;
         ActiveZones = activeZones is null
