@@ -171,9 +171,13 @@ public static class TypedCyclingFactory
         // activated-from-hand zone gate (CR 702.32a).
         var tutorEffect = new Effect(
             $"{source.Name}: {typedKeyword} — tutor a {label} -> hand + shuffle",
-            () =>
+            async ctx =>
             {
-                TutorTypedCard(owner, predicate, label, source.Name);
+                // PLAN 01 (Slice D) — genuinely prompt the controller off
+                // the live ResolutionContext rather than auto-picking the
+                // first match.
+                await TutorTypedCardAsync(ctx, owner, predicate, label, source.Name)
+                    .ConfigureAwait(false);
 
                 // CR 702.32d — publish the "cycled" event after the
                 // tutor + shuffle so subscribers (Lightning Rift,
@@ -228,6 +232,37 @@ public static class TypedCyclingFactory
         string shuffleReason)
     {
         ArgumentNullException.ThrowIfNull(owner);
+
+        // Legacy sync entry point (direct-call tests + any not-yet-migrated
+        // caller). Routes through the async path on a registry-derived
+        // context so the agent is still genuinely prompted. The typed-cycling
+        // resolve closure now calls TutorTypedCardAsync with the live
+        // ResolutionContext — see PLAN 01 Slice D.
+        return TutorTypedCardAsync(
+                ResolutionContext.For(
+                    owner, AgentRegistry.Get(owner), game: null, chosenTargets: null),
+                owner, predicate, kindLabel, shuffleReason)
+            .GetAwaiter().GetResult();
+    }
+
+    /// <summary>
+    /// PLAN 01 (Slice D) — async typed-tutor body. Reads the resolving
+    /// player's agent + live game off <paramref name="ctx"/> and genuinely
+    /// <c>await</c>s <see cref="IPlayerAgent.ChooseLibraryPickAsync"/> so
+    /// every typed-cycling / typed-tutor caller routing through this
+    /// primitive prompts for real instead of auto-picking the first match.
+    /// Falls back to <see cref="AgentRegistry"/> (then the deterministic
+    /// first candidate) only when no agent is available.
+    /// </summary>
+    public static async ValueTask<ICard?> TutorTypedCardAsync(
+        ResolutionContext ctx,
+        Player owner,
+        Func<ICard, bool> predicate,
+        string kindLabel,
+        string shuffleReason)
+    {
+        ArgumentNullException.ThrowIfNull(ctx);
+        ArgumentNullException.ThrowIfNull(owner);
         ArgumentNullException.ThrowIfNull(predicate);
 
         var candidates = owner.Zones.Library.GetCards()
@@ -242,13 +277,14 @@ public static class TypedCyclingFactory
             return null;
         }
 
-        var agent = AgentRegistry.Get(owner);
+        var agent = ctx.Agent ?? AgentRegistry.Get(owner);
         ICard? pick = agent != null
-            ? agent.ChooseLibraryPickAsync(
-                    ctx: null,
+            ? await agent.ChooseLibraryPickAsync(
+                    ctx: ctx.Game,
                     candidates: candidates,
-                    kindLabel: kindLabel)
-                .GetAwaiter().GetResult()
+                    kindLabel: kindLabel,
+                    ct: ctx.Ct)
+                .ConfigureAwait(false)
             : candidates[0];
 
         if (pick != null)

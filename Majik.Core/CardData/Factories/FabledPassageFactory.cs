@@ -85,7 +85,7 @@ public static class FabledPassageFactory
         ActivatedAbility? fetchAbility = null;
         var fetchEffect = new Effect(
             "Fabled Passage: sac self + tutor basic land -> battlefield tapped, shuffle, untap if 4+ lands",
-            () =>
+            async ctx =>
             {
                 if (fetchAbility == null) return;
 
@@ -98,7 +98,8 @@ public static class FabledPassageFactory
                 // so it does not count toward the four-or-more-lands rider.
                 SacrificeToOwnersGraveyard(land);
 
-                TutorBasicLandThenMaybeUntap(controller);
+                await TutorBasicLandThenMaybeUntapAsync(controller, ctx)
+                    .ConfigureAwait(false);
             });
 
         fetchAbility = new ActivatedAbility(
@@ -131,7 +132,7 @@ public static class FabledPassageFactory
     /// 614), then shuffle (CR 701.20a). Finally, if the controller now controls
     /// four or more lands (the fetched land included), untap that land.
     /// </summary>
-    private static void TutorBasicLandThenMaybeUntap(Player player)
+    private static async ValueTask TutorBasicLandThenMaybeUntapAsync(Player player, ResolutionContext ctx)
     {
         var candidates = player.Zones.Library.GetCards()
             .Where(c => c.HasType(CardType.Land) && c.HasSupertype(CardSupertype.Basic))
@@ -139,8 +140,8 @@ public static class FabledPassageFactory
 
         // CR 701.19a — prompt the agent even on zero candidates so the human
         // searcher sees the failed search rather than a silent no-op.
-        var pick = LibrarySearch.PromptOnly(
-            player, candidates, "basic land card");
+        var pick = await LibrarySearch.PromptOnlyAsync(
+            ctx, player, candidates, "basic land card").ConfigureAwait(false);
 
         if (pick != null)
         {

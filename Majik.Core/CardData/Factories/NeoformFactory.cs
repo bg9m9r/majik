@@ -126,7 +126,7 @@ public static class NeoformFactory
 
                 return new IEffect[]
                 {
-                    new Effect($"{CardName}: tutor creature mv = sac.mv + 1, put onto battlefield with +1/+1 counter, shuffle", () =>
+                    new Effect($"{CardName}: tutor creature mv = sac.mv + 1, put onto battlefield with +1/+1 counter, shuffle", async ctx =>
                     {
                         // No sacrificed reference → can't compute MV;
                         // resolve as no-op to avoid tutoring at an
@@ -154,9 +154,9 @@ public static class NeoformFactory
 
                         // CR 701.19a — prompt agent even on zero candidates
                         // so the human searcher sees the failed search.
-                        var pick = Majik.Core.Zones.LibrarySearch.PromptOnly(
-                            caster, candidates,
-                            $"creature card with mana value exactly {targetMv}");
+                        var pick = await Majik.Core.Zones.LibrarySearch.PromptOnlyAsync(
+                            ctx, caster, candidates,
+                            $"creature card with mana value exactly {targetMv}").ConfigureAwait(false);
 
                         if (pick != null)
                         {

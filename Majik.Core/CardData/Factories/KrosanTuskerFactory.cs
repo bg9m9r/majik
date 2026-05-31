@@ -140,15 +140,16 @@ public static class KrosanTuskerFactory
         // ----------------------------------------------------------------
         var tutorEffect = new Effect(
             $"{CardName}: tutor a basic land -> hand + shuffle",
-            () =>
+            async ctx =>
             {
-                TypedCyclingFactory.TutorTypedCard(
+                await TypedCyclingFactory.TutorTypedCardAsync(
+                    ctx: ctx,
                     owner: owner,
                     predicate: c =>
                         c.HasType(CardType.Land)
                         && c.HasSupertype(CardSupertype.Basic),
                     kindLabel: "basic land card",
-                    shuffleReason: "krosan-tusker-cycle");
+                    shuffleReason: "krosan-tusker-cycle").ConfigureAwait(false);
             });
 
         var cycleCondition = new EventTriggerCondition<CardCycledEvent>(

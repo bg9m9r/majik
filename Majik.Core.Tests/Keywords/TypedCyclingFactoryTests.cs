@@ -233,6 +233,42 @@ public class TypedCyclingFactoryTests
     }
 
     [Fact]
+    public async Task TutorTypedCardAsync_HonorsCtxAgentNonFirstChoice()
+    {
+        // PLAN 01 (Slice D) — the async typed-tutor primitive prompts the
+        // controller's agent ON THE CONTEXT and honours a NON-first match
+        // (not auto-pick-first). Two Forest candidates; the ctx agent
+        // returns the SECOND one.
+        var forestA = new Land("Forest A",
+            supertypes: new[] { CardSupertype.Basic },
+            subtypes: new[] { CardSubtype.Forest });
+        var forestB = new Land("Forest B",
+            supertypes: new[] { CardSupertype.Basic },
+            subtypes: new[] { CardSubtype.Forest });
+        forestA.SetOwner(_alice);
+        forestB.SetOwner(_alice);
+        _alice.Zones.Library.AddCard(forestA); // first match
+        forestA.SetZone(ZoneType.Library);
+        _alice.Zones.Library.AddCard(forestB); // second match
+        forestB.SetZone(ZoneType.Library);
+
+        var ctxAgent = new ScriptedLibraryPickAgent(forestB); // NON-first
+        var ctx = ResolutionContext.For(
+            _alice, ctxAgent, game: null, chosenTargets: null);
+
+        var pick = await TypedCyclingFactory.TutorTypedCardAsync(
+            ctx,
+            owner: _alice,
+            predicate: c => c.HasSubtype(CardSubtype.Forest),
+            kindLabel: "Forest card",
+            shuffleReason: "test");
+
+        pick.Should().BeSameAs(forestB, "the ctx.Agent's non-first choice must be honoured");
+        ctxAgent.CallCount.Should().Be(1);
+        forestB.Zone.Should().Be(ZoneType.Hand);
+    }
+
+    [Fact]
     public void TutorTypedCard_EmptyLibrary_ReturnsNullCleanly()
     {
         var pick = TypedCyclingFactory.TutorTypedCard(
@@ -346,5 +382,42 @@ public class TypedCyclingFactoryTests
         _alice.Zones.Hand.AddCard(card);
         card.SetZone(ZoneType.Hand);
         return card;
+    }
+
+    /// <summary>
+    /// Minimal scripted agent that returns a fixed card from the declarative
+    /// <see cref="Majik.Core.Players.Agents.IPlayerAgent.ChooseAsync"/> sink
+    /// (which the default <c>ChooseLibraryPickAsync</c> shim routes through).
+    /// Throws on every other surface so an accidental unrelated prompt fails
+    /// loudly.
+    /// </summary>
+    private sealed class ScriptedLibraryPickAgent : Majik.Core.Players.Agents.IPlayerAgent
+    {
+        private readonly ICard _pick;
+        public int CallCount { get; private set; }
+
+        public ScriptedLibraryPickAgent(ICard pick) => _pick = pick;
+
+        public Task<IReadOnlyList<object>> ChooseAsync(
+            Majik.Core.Game.GameContext ctx,
+            Majik.Core.Players.Agents.ChoiceRequest request,
+            CancellationToken ct = default)
+        {
+            CallCount++;
+            return Task.FromResult<IReadOnlyList<object>>(new object[] { _pick });
+        }
+
+        public Task<Majik.Core.Players.Agents.PriorityAction> ChoosePriorityActionAsync(Majik.Core.Game.GameContext ctx, CancellationToken ct = default) => throw new NotImplementedException();
+        public Task<Majik.Core.Players.Agents.MulliganDecision> ChooseMulliganAsync(Majik.Core.Game.GameContext ctx, IReadOnlyList<ICard> hand, int mulligansTaken, CancellationToken ct = default) => throw new NotImplementedException();
+        public Task<IReadOnlyList<ICard>> ChooseCardsToBottomAsync(Majik.Core.Game.GameContext ctx, IReadOnlyList<ICard> hand, int countToBottom, CancellationToken ct = default) => throw new NotImplementedException();
+        public Task<IReadOnlyList<object>> ChooseTargetsAsync(Majik.Core.Game.GameContext ctx, Majik.Core.Players.Agents.TargetRequest request, CancellationToken ct = default) => throw new NotImplementedException();
+        public Task<int> ChooseXAsync(Majik.Core.Game.GameContext ctx, ICard source, CancellationToken ct = default) => throw new NotImplementedException();
+        public Task<int> ChooseModeAsync(Majik.Core.Game.GameContext ctx, IReadOnlyList<string> modes, IReadOnlyList<BotIntent>? modeIntents = null, CancellationToken ct = default) => throw new NotImplementedException();
+        public Task<IReadOnlyList<ITriggeredAbility>> OrderTriggersAsync(Majik.Core.Game.GameContext ctx, IReadOnlyList<ITriggeredAbility> mine, CancellationToken ct = default) => throw new NotImplementedException();
+        public Task<Majik.Core.Players.Agents.ManaPayment> ChooseManaSourcesAsync(Majik.Core.Game.GameContext ctx, ManaCost cost, CancellationToken ct = default) => throw new NotImplementedException();
+        public Task<Majik.Core.Players.Agents.CombatPlan> DeclareAttackersAsync(Majik.Core.Game.GameContext ctx, IReadOnlyList<Creature> eligibleAttackers, CancellationToken ct = default) => throw new NotImplementedException();
+        public Task<Majik.Core.Players.Agents.BlockPlan> DeclareBlockersAsync(Majik.Core.Game.GameContext ctx, IReadOnlyList<Creature> attackers, IReadOnlyList<Creature> eligibleBlockers, CancellationToken ct = default) => throw new NotImplementedException();
+        public Task<ScryAction.ScryDecision> ChooseScryDecisionAsync(Majik.Core.Game.GameContext? ctx, IReadOnlyList<ICard> peeked, CancellationToken ct = default) => throw new NotImplementedException();
+        public Task<SurveilAction.SurveilDecision> ChooseSurveilDecisionAsync(Majik.Core.Game.GameContext? ctx, IReadOnlyList<ICard> peeked, CancellationToken ct = default) => throw new NotImplementedException();
     }
 }

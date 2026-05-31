@@ -115,7 +115,7 @@ public static class WishclawTalismanFactory
         // ----------------------------------------------------------------
         var tutorEffect = new Effect(
             "Wishclaw Talisman: tutor any card → hand",
-            () =>
+            async ctx =>
             {
                 // CR 701.19a — search consults the agent. Mirrors
                 // SearchSpellFactory.SearchLibrarySpell ("card") semantics:
@@ -124,8 +124,8 @@ public static class WishclawTalismanFactory
                 // when candidates is empty so a human searcher sees the
                 // failed search rather than a silent no-op.
                 var candidates = owner.Zones.Library.GetCards().ToList();
-                var pick = Majik.Core.Zones.LibrarySearch.PromptOnly(
-                    owner, candidates, "card");
+                var pick = await Majik.Core.Zones.LibrarySearch.PromptOnlyAsync(
+                    ctx, owner, candidates, "card").ConfigureAwait(false);
 
                 if (pick != null)
                 {

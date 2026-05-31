@@ -149,7 +149,7 @@ public static class ChordOfCallingFactory
                 var x = p.X ?? 0;
                 return new IEffect[]
                 {
-                    new Effect($"Chord of Calling: tutor creature with mv ≤ {x} → battlefield", () =>
+                    new Effect($"Chord of Calling: tutor creature with mv ≤ {x} → battlefield", async ctx =>
                     {
                         // CR 701.19a — search consults the controller's
                         // agent (if any). Pre-filter to creature cards
@@ -165,9 +165,9 @@ public static class ChordOfCallingFactory
                         // CR 701.19a — prompt agent even on zero candidates
                         // so the human searcher sees the failed search
                         // (see LibrarySearch xmldoc).
-                        var pick = Majik.Core.Zones.LibrarySearch.PromptOnly(
-                            caster, candidates,
-                            $"creature card with mana value {x} or less");
+                        var pick = await Majik.Core.Zones.LibrarySearch.PromptOnlyAsync(
+                            ctx, caster, candidates,
+                            $"creature card with mana value {x} or less").ConfigureAwait(false);
 
                         if (pick != null)
                         {

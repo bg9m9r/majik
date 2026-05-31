@@ -95,7 +95,7 @@ public static class MalevolentRumbleFactory
             new Effect(
                 "Malevolent Rumble: reveal top 4, may put a permanent into hand, " +
                 "rest into graveyard, then create a 0/1 colorless Eldrazi Spawn token.",
-                () =>
+                async ctx =>
                 {
                     // CR 701.15 — reveal top 4, may put a permanent card
                     // into hand, rest into graveyard. Shared helper handles
@@ -104,7 +104,8 @@ public static class MalevolentRumbleFactory
                     // player still sees the reveal pile), and routes zone
                     // moves through ZoneServiceRegistry when registered so
                     // ETB-from-graveyard observers see the discarded cards.
-                    RevealAndChoose.RevealTopAndChoose(
+                    await RevealAndChoose.RevealTopAndChooseAsync(
+                        ctx: ctx,
                         caster: caster,
                         count: 4,
                         eligiblePredicate: IsPermanentCard,
@@ -112,7 +113,7 @@ public static class MalevolentRumbleFactory
                         label: "Permanent to put into hand",
                         pickedDestination: ZoneType.Hand,
                         restDestination: ZoneType.Graveyard,
-                        sourceTag: "malevolent-rumble");
+                        sourceTag: "malevolent-rumble").ConfigureAwait(false);
 
                     // Token creation is unconditional — not gated on
                     // library size. Even an empty library yields a Spawn.

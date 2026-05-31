@@ -99,10 +99,10 @@ public static class WoodElvesFactory
         // ----------------------------------------------------------------
         var etbEffect = new Effect(
             $"{CardName}: search library for a Forest card, put onto battlefield, then shuffle",
-            () =>
+            ctx =>
             {
                 var controller = card.Controller ?? owner;
-                TutorForestToBattlefield(controller);
+                return TutorForestToBattlefieldAsync(controller, ctx);
             });
 
         var etbTrigger = new TriggeredAbility(
@@ -125,7 +125,7 @@ public static class WoodElvesFactory
     /// candidates (deterministic first-match fallback), move the chosen card
     /// onto the battlefield UNTAPPED, then shuffle (CR 701.20a).
     /// </summary>
-    private static void TutorForestToBattlefield(Player player)
+    private static async ValueTask TutorForestToBattlefieldAsync(Player player, ResolutionContext ctx)
     {
         var candidates = player.Zones.Library.GetCards()
             .Where(c => c.HasType(CardType.Land) && c.HasSubtype(CardSubtype.Forest))
@@ -133,7 +133,8 @@ public static class WoodElvesFactory
 
         // CR 701.19a — prompt the agent even on zero candidates so the human
         // searcher sees the (failed) search.
-        var pick = LibrarySearch.PromptOnly(player, candidates, "Forest card");
+        var pick = await LibrarySearch.PromptOnlyAsync(ctx, player, candidates, "Forest card")
+            .ConfigureAwait(false);
 
         if (pick != null)
         {

@@ -15,7 +15,7 @@ internal static class SearchSpellFactory
     internal static SpellDefinition SearchLibrarySpell(Player caster, string kindRaw) => new(
         Modes: Array.Empty<string>(), HasVariableX: false,
         TargetRequests: Array.Empty<TargetRequest>(),
-        EffectFactory: p => new IEffect[] { new Effect($"tutor {kindRaw}", () =>
+        EffectFactory: p => new IEffect[] { new Effect($"tutor {kindRaw}", async ctx =>
         {
             // CR 701.19a — searches consult the agent. The kind predicate
             // pre-filters the candidate list; the agent picks zero or one.
@@ -43,12 +43,14 @@ internal static class SearchSpellFactory
             // that surprised the user on a Green Sun's Zenith into a deck
             // with zero green creatures is exactly what this helper is
             // designed to prevent).
-            // TODO: remove sync-over-async once IEffect.Execute becomes async.
             var pickCtx = BuildPickContext(caster, p);
-            var pick = LibrarySearch.PromptOnly(
+            var pick = await LibrarySearch.PromptOnlyAsync(
+                ResolutionContext.For(
+                    caster, ctx.Agent ?? AgentRegistry.Get(caster),
+                    ctx.Game ?? pickCtx, chosenTargets: null, ctx.Ct),
                 caster, candidates,
-                string.IsNullOrEmpty(kindRaw) ? "card" : kindRaw + " card",
-                pickCtx);
+                string.IsNullOrEmpty(kindRaw) ? "card" : kindRaw + " card")
+                .ConfigureAwait(false);
             if (pick != null)
             {
                 caster.Zones.Library.RemoveCard(pick);
@@ -83,7 +85,7 @@ internal static class SearchSpellFactory
         Player caster, string kindRaw, bool tapped) => new(
         Modes: Array.Empty<string>(), HasVariableX: false,
         TargetRequests: Array.Empty<TargetRequest>(),
-        EffectFactory: p => new IEffect[] { new Effect($"tutor land -> battlefield{(tapped ? " tapped" : "")}", () =>
+        EffectFactory: p => new IEffect[] { new Effect($"tutor land -> battlefield{(tapped ? " tapped" : "")}", async ctx =>
         {
             bool MatchesFarseekType(ICard c) =>
                 Array.Exists(FarseekLandTypes, c.HasSubtype);
@@ -110,13 +112,16 @@ internal static class SearchSpellFactory
             // human searcher sees the failed search rather than a silent
             // no-op (see LibrarySearch xmldoc).
             var pickCtx = BuildPickContext(caster, p);
-            var pick = LibrarySearch.PromptOnly(
+            var pick = await LibrarySearch.PromptOnlyAsync(
+                ResolutionContext.For(
+                    caster, ctx.Agent ?? AgentRegistry.Get(caster),
+                    ctx.Game ?? pickCtx, chosenTargets: null, ctx.Ct),
                 caster, candidates,
                 isFarseekKind
                     ? "Plains, Island, Swamp, or Mountain card"
                     : kindRaw.Contains("basic", StringComparison.OrdinalIgnoreCase)
-                        ? "basic land card" : "land card",
-                pickCtx);
+                        ? "basic land card" : "land card")
+                .ConfigureAwait(false);
             if (pick != null)
             {
                 // CR 603.6a / CR 614 — route through ZoneService so ETB
@@ -280,7 +285,7 @@ internal static class SearchSpellFactory
                 "green"  => ManaColor.Green,
                 _        => ManaColor.Green,
             };
-            return new IEffect[] { new Effect($"GSZ x={x}", () =>
+            return new IEffect[] { new Effect($"GSZ x={x}", async ctx =>
             {
                 var candidates = caster.Zones.Library.GetCards()
                     .Where(c =>
@@ -294,10 +299,13 @@ internal static class SearchSpellFactory
                 // silently no-op'd when a user cast GSZ into a deck with
                 // no green creatures matching the chosen X.
                 var pickCtx = BuildPickContext(caster, p);
-                var pick = LibrarySearch.PromptOnly(
+                var pick = await LibrarySearch.PromptOnlyAsync(
+                    ResolutionContext.For(
+                        caster, ctx.Agent ?? AgentRegistry.Get(caster),
+                        ctx.Game ?? pickCtx, chosenTargets: null, ctx.Ct),
                     caster, candidates,
-                    $"{colorRaw} creature card with mana value {x} or less",
-                    pickCtx);
+                    $"{colorRaw} creature card with mana value {x} or less")
+                    .ConfigureAwait(false);
                 if (pick != null)
                 {
                     // CR 603.6a — route through ZoneService so ETB triggers

@@ -183,6 +183,36 @@ public class RevealAndChooseTests : IDisposable
     }
 
     [Fact]
+    public async Task RevealTopAndChooseAsync_HonorsCtxAgentNonFirstChoice()
+    {
+        // PLAN 01 (Slice D) — the async primitive prompts the agent ON THE
+        // CONTEXT and honours a NON-first eligible pick (not auto-pick-first).
+        // Two eligible permanents; the ctx agent returns the SECOND one.
+        var bearA = Creat("Bear A", _alice);
+        var bearB = Creat("Bear B", _alice);
+        _alice.Zones.Library.AddCard(bearB); // bottom
+        bearB.SetZone(ZoneType.Library);
+        _alice.Zones.Library.AddCard(bearA); // top
+        bearA.SetZone(ZoneType.Library);
+
+        // No agent in the registry — only on the context — so honouring the
+        // pick proves the ctx.Agent path was taken.
+        var ctxAgent = new RecordingAgent { PickToReturn = bearB }; // NON-first eligible
+        var ctx = ResolutionContext.For(
+            _alice, ctxAgent, game: null, chosenTargets: null);
+
+        var result = await RevealAndChoose.RevealTopAndChooseAsync(
+            ctx, _alice, count: 4, IsPermanent, optional: true,
+            "permanent", ZoneType.Hand, ZoneType.Graveyard,
+            sourceTag: "test");
+
+        result.Should().BeSameAs(bearB, "the ctx.Agent's non-first choice must be honoured");
+        ctxAgent.CallCount.Should().Be(1);
+        _alice.Zones.Hand.GetCards().Should().Contain(bearB);
+        _alice.Zones.Graveyard.GetCards().Should().Contain(bearA);
+    }
+
+    [Fact]
     public void RevealTopAndChoose_OptionalAgentDeclines_AllToRestDestination()
     {
         var bear = Creat("Bear", _alice);

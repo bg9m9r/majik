@@ -93,10 +93,10 @@ public static class PilgrimsEyeFactory
         // ----------------------------------------------------------------
         var etbEffect = new Effect(
             $"{CardName}: search a basic land -> hand, then shuffle",
-            () =>
+            ctx =>
             {
                 var controller = card.Controller ?? owner;
-                TutorOneBasicToHand(controller);
+                return TutorOneBasicToHandAsync(controller, ctx);
             });
 
         var etbTrigger = new TriggeredAbility(
@@ -122,7 +122,7 @@ public static class PilgrimsEyeFactory
     /// <see cref="SolemnSimulacrumFactory"/>'s tutor closure (to-battlefield)
     /// and <see cref="ExpeditionMapFactory"/>'s to-hand land tutor.
     /// </summary>
-    private static void TutorOneBasicToHand(Player player)
+    private static async ValueTask TutorOneBasicToHandAsync(Player player, ResolutionContext ctx)
     {
         bool IsBasicLand(ICard c) =>
             c.HasType(CardType.Land) && c.HasSupertype(CardSupertype.Basic);
@@ -132,8 +132,9 @@ public static class PilgrimsEyeFactory
         // CR 701.19a — prompt even on zero candidates so the human searcher
         // sees the failed search; the agent may decline (null) to honour the
         // printed "you may".
-        var pick = LibrarySearch.PromptOnly(
-            player, candidates, "basic land card to put into your hand");
+        var pick = await LibrarySearch.PromptOnlyAsync(
+            ctx, player, candidates, "basic land card to put into your hand")
+            .ConfigureAwait(false);
 
         if (pick != null)
         {

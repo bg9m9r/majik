@@ -51,7 +51,7 @@ public static class PrismaticVistaFactory
         ActivatedAbility? fetchAbility = null;
         var fetchEffect = new Effect(
             "Prismatic Vista: search library for a basic land, put onto battlefield, shuffle",
-            () =>
+            async ctx =>
             {
                 if (fetchAbility == null) return;
 
@@ -65,7 +65,8 @@ public static class PrismaticVistaFactory
                 // library search so the land is no longer in the library.
                 SacrificeToOwnersGraveyard(land);
 
-                TutorBasicLandToBattlefield(controller);
+                await TutorBasicLandToBattlefieldAsync(controller, ctx)
+                    .ConfigureAwait(false);
             });
 
         fetchAbility = new ActivatedAbility(
@@ -97,7 +98,7 @@ public static class PrismaticVistaFactory
     /// move the chosen card to the battlefield untapped (CR 305), then
     /// shuffle (CR 701.20a).
     /// </summary>
-    private static void TutorBasicLandToBattlefield(Player player)
+    private static async ValueTask TutorBasicLandToBattlefieldAsync(Player player, ResolutionContext ctx)
     {
         var candidates = player.Zones.Library.GetCards()
             .Where(c => c.HasType(CardType.Land) && c.HasSupertype(CardSupertype.Basic))
@@ -106,8 +107,8 @@ public static class PrismaticVistaFactory
         // CR 701.19a — prompt agent even on zero candidates so the human
         // searcher sees the failed search rather than a silent no-op
         // (see LibrarySearch xmldoc).
-        var pick = Majik.Core.Zones.LibrarySearch.PromptOnly(
-            player, candidates, "basic land card");
+        var pick = await Majik.Core.Zones.LibrarySearch.PromptOnlyAsync(
+            ctx, player, candidates, "basic land card").ConfigureAwait(false);
 
         if (pick != null)
         {

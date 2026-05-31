@@ -115,7 +115,7 @@ public static class AssassinsTrophyFactory
                 {
                     new Effect(
                         $"{CardName}: destroy target permanent + basic-land tutor",
-                        () =>
+                        async ctx =>
                         {
                             if (raw is not Permanent target) return;
 
@@ -139,7 +139,15 @@ public static class AssassinsTrophyFactory
                             // the battlefield" (CR 701.19a). The land enters
                             // untapped — no "tapped" qualifier in the oracle text.
                             if (targetController == null) return;
-                            TutorBasicLandUntapped(targetController);
+                            // Searcher is the destroyed permanent's controller
+                            // (the opponent, guarded != caster above) — bind the
+                            // prompt to THAT player's agent, not ctx.Agent.
+                            var searchCtx = ResolutionContext.For(
+                                targetController,
+                                AgentRegistry.Get(targetController),
+                                ctx.Game, chosenTargets: null, ctx.Ct);
+                            await TutorBasicLandUntappedAsync(targetController, searchCtx)
+                                .ConfigureAwait(false);
                         }),
                 };
             });
@@ -153,7 +161,7 @@ public static class AssassinsTrophyFactory
     /// agent is registered, falls back to first basic candidate
     /// (deterministic test default — mirrors PathToExileFactory).
     /// </summary>
-    private static void TutorBasicLandUntapped(Player player)
+    private static async ValueTask TutorBasicLandUntappedAsync(Player player, ResolutionContext ctx)
     {
         var candidates = player.Zones.Library.GetCards()
             .Where(c => c.HasType(CardType.Land) && BasicLandNames.Contains(c.Name))
@@ -161,8 +169,8 @@ public static class AssassinsTrophyFactory
 
         // CR 701.19a — prompt agent even on zero candidates so the human
         // searcher sees the failed search (see LibrarySearch xmldoc).
-        var pick = Majik.Core.Zones.LibrarySearch.PromptOnly(
-            player, candidates, "basic land card");
+        var pick = await Majik.Core.Zones.LibrarySearch.PromptOnlyAsync(
+            ctx, player, candidates, "basic land card").ConfigureAwait(false);
 
         if (pick != null)
         {

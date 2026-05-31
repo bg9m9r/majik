@@ -1,3 +1,4 @@
+using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Game;
 using Majik.Core.Players;
@@ -98,6 +99,42 @@ public static class RevealAndChoose
         string sourceTag)
     {
         ArgumentNullException.ThrowIfNull(caster);
+
+        // Legacy sync entry point (direct-call tests + any not-yet-migrated
+        // caller). Routes through the async path on a registry-derived
+        // context so the agent is still genuinely prompted. Production
+        // reveal-and-choose closures now call RevealTopAndChooseAsync with
+        // the live ResolutionContext — see PLAN 01 Slice D.
+        return RevealTopAndChooseAsync(
+                ResolutionContext.For(
+                    caster, AgentRegistry.Get(caster), game: null, chosenTargets: null),
+                caster, count, eligiblePredicate, optional, label,
+                pickedDestination, restDestination, sourceTag)
+            .GetAwaiter().GetResult();
+    }
+
+    /// <summary>
+    /// PLAN 01 (Slice D) — async reveal-and-choose. Reads the resolving
+    /// player's agent + live game off <paramref name="ctx"/> and genuinely
+    /// <c>await</c>s <see cref="IPlayerAgent.ChooseFromRevealedAsync"/> so
+    /// every reveal-and-choose effect routing through this primitive prompts
+    /// for real instead of auto-picking the first eligible card. Falls back
+    /// to <see cref="AgentRegistry"/> (then the deterministic first eligible)
+    /// only when no agent is available.
+    /// </summary>
+    public static async ValueTask<ICard?> RevealTopAndChooseAsync(
+        ResolutionContext ctx,
+        Player caster,
+        int count,
+        Func<ICard, bool> eligiblePredicate,
+        bool optional,
+        string label,
+        ZoneType pickedDestination,
+        ZoneType restDestination,
+        string sourceTag)
+    {
+        ArgumentNullException.ThrowIfNull(ctx);
+        ArgumentNullException.ThrowIfNull(caster);
         ArgumentNullException.ThrowIfNull(eligiblePredicate);
         ArgumentNullException.ThrowIfNull(label);
         ArgumentNullException.ThrowIfNull(sourceTag);
@@ -122,16 +159,17 @@ public static class RevealAndChoose
         // eligible when no agent is registered (matches the historical
         // FirstOrDefault auto-pick the helper replaces).
         ICard? picked;
-        var agent = AgentRegistry.Get(caster);
+        var agent = ctx.Agent ?? AgentRegistry.Get(caster);
         if (agent != null)
         {
-            // TODO: remove sync-over-async once IEffect.Execute becomes async.
-            picked = agent.ChooseFromRevealedAsync(
-                ctx: null,
+            // PLAN 01 (Slice D) — genuinely prompt off the live context.
+            picked = await agent.ChooseFromRevealedAsync(
+                ctx: ctx.Game,
                 revealed: revealed,
                 eligible: eligible,
                 optional: optional,
-                label: label).GetAwaiter().GetResult();
+                label: label,
+                ct: ctx.Ct).ConfigureAwait(false);
 
             // Defensive: if the agent returns a card that isn't in the
             // eligible set, fall back to declining. (RemoteAgent already

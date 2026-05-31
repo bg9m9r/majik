@@ -74,7 +74,7 @@ public static class TerramorphicExpanseFactory
         ActivatedAbility? fetchAbility = null;
         var fetchEffect = new Effect(
             "Terramorphic Expanse: sac self + tutor basic land -> battlefield tapped, shuffle",
-            () =>
+            async ctx =>
             {
                 if (fetchAbility == null) return;
 
@@ -86,7 +86,8 @@ public static class TerramorphicExpanseFactory
                 // library search so the land is no longer in the library.
                 SacrificeToOwnersGraveyard(land);
 
-                TutorBasicLandToBattlefieldTapped(controller);
+                await TutorBasicLandToBattlefieldTappedAsync(controller, ctx)
+                    .ConfigureAwait(false);
             });
 
         fetchAbility = new ActivatedAbility(
@@ -118,7 +119,7 @@ public static class TerramorphicExpanseFactory
     /// move the chosen card to the battlefield, tap it (printed rider; CR
     /// 305 / 614), then shuffle (CR 701.20a).
     /// </summary>
-    private static void TutorBasicLandToBattlefieldTapped(Player player)
+    private static async ValueTask TutorBasicLandToBattlefieldTappedAsync(Player player, ResolutionContext ctx)
     {
         var candidates = player.Zones.Library.GetCards()
             .Where(c => c.HasType(CardType.Land) && c.HasSupertype(CardSupertype.Basic))
@@ -126,8 +127,8 @@ public static class TerramorphicExpanseFactory
 
         // CR 701.19a — prompt the agent even on zero candidates so the human
         // searcher sees the failed search rather than a silent no-op.
-        var pick = LibrarySearch.PromptOnly(
-            player, candidates, "basic land card");
+        var pick = await LibrarySearch.PromptOnlyAsync(
+            ctx, player, candidates, "basic land card").ConfigureAwait(false);
 
         if (pick != null)
         {

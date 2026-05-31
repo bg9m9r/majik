@@ -92,11 +92,11 @@ public static class RenegadeMapFactory
         // ----------------------------------------------------------------
         var tutorEffect = new Effect(
             $"{CardName}: tutor a basic land -> hand + sac self",
-            () =>
+            async ctx =>
             {
                 var controller = map.Controller ?? owner;
                 SacrificeSelf(map, owner, controller);
-                TutorOneBasicToHand(controller);
+                await TutorOneBasicToHandAsync(controller, ctx).ConfigureAwait(false);
             });
 
         var tutorAbility = new ActivatedAbility(
@@ -135,7 +135,7 @@ public static class RenegadeMapFactory
     /// (CR 701.20a) whether or not a card was found. Mirrors
     /// <see cref="PilgrimsEyeFactory"/>'s to-hand basic tutor.
     /// </summary>
-    private static void TutorOneBasicToHand(Player player)
+    private static async ValueTask TutorOneBasicToHandAsync(Player player, ResolutionContext ctx)
     {
         bool IsBasicLand(ICard c) =>
             c.HasType(CardType.Land) && c.HasSupertype(CardSupertype.Basic);
@@ -144,8 +144,9 @@ public static class RenegadeMapFactory
 
         // CR 701.19a — prompt even on zero candidates so the human searcher
         // sees the failed search.
-        var pick = LibrarySearch.PromptOnly(
-            player, candidates, "basic land card to put into your hand");
+        var pick = await LibrarySearch.PromptOnlyAsync(
+            ctx, player, candidates, "basic land card to put into your hand")
+            .ConfigureAwait(false);
 
         if (pick != null)
         {

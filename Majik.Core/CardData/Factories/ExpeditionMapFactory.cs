@@ -74,7 +74,7 @@ public static class ExpeditionMapFactory
         // ----------------------------------------------------------------
         var tutorEffect = new Effect(
             "Expedition Map: tutor a land -> hand + sac self",
-            () =>
+            async ctx =>
             {
                 SacrificeSelf(map, owner);
 
@@ -85,8 +85,8 @@ public static class ExpeditionMapFactory
                 // CR 701.19a — prompt agent even on zero candidates so the
                 // human searcher sees the failed search (see LibrarySearch
                 // xmldoc).
-                var pick = LibrarySearch.PromptOnly(
-                    owner, candidates, "land card");
+                var pick = await LibrarySearch.PromptOnlyAsync(
+                    ctx, owner, candidates, "land card").ConfigureAwait(false);
 
                 if (pick != null)
                 {
