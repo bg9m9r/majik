@@ -21,7 +21,7 @@ public class TriggerOrderPolicyTests
     {
         public FakeEffect(string description) { Description = description; }
         public string Description { get; }
-        public void Execute() { }
+        public ValueTask ExecuteAsync(ResolutionContext ctx) => ValueTask.CompletedTask;
     }
 
     private static TriggeredAbility MakeTrig(Player controller, string sourceName, string effectText)

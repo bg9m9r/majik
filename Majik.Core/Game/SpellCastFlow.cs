@@ -399,22 +399,16 @@ public sealed class SpellCastFlow
     private static async Task<List<IReadOnlyList<object>>> CollectTargetsAsync(
         SpellDefinition definition, ICard card, GameContext ctx, IPlayerAgent agent, CancellationToken ct)
     {
-        var collectedTargets = new List<IReadOnlyList<object>>(definition.TargetRequests.Count);
-        foreach (var req in definition.TargetRequests)
-        {
-            var live = req.ResolveCandidates(ctx);
-            var promptReq = ReferenceEquals(live, req.LegalCandidates)
-                ? req
-                : req.WithCandidates(live);
-            var picked = await agent.ChooseTargetsAsync(ctx, promptReq, ct);
-            if (picked.Count < req.MinTargets)
-            {
-                throw new InvalidOperationException(
-                    $"Cannot cast {card.Name}: target request '{req.Description}' " +
-                    $"needs {req.MinTargets}, agent provided {picked.Count}.");
-            }
-            collectedTargets.Add(picked);
-        }
+        // PLAN 01 (Slice E) — one shared targeting pipeline. CR 601.2c: an
+        // agent that can't supply enough legal targets makes the cast illegal,
+        // so the spell path enforces min cardinality.
+        var collectedTargets = await Targeting.TargetCollection.CollectAsync(
+            definition.TargetRequests,
+            card,
+            ctx,
+            agent,
+            throwOnInsufficient: true,
+            ct);
 
         // CR 601.2f — stamp the freshly-picked targets onto the card so any
         // cost-reduction ability on the card itself can read them during cost

@@ -2,7 +2,9 @@ using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Domain.DomainEvents;
 using Majik.Core.Events;
+using Majik.Core.Game;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
 using Majik.Core.Rules;
 using Majik.Core.Spells;
 using Majik.Core.Stack;
@@ -28,9 +30,33 @@ public class StackResolver
     }
 
     /// <summary>
-    /// Resolve the top object on the stack.
+    /// Resolve the top object on the stack (synchronous shim over
+    /// <see cref="ResolveTopAsync"/>; CR 608). Retained so callers not yet
+    /// converted to the async driver keep working.
     /// </summary>
     public IStackObject? ResolveTop(Majik.Core.Stack.Stack stack)
+        => ResolveTopAsync(stack).GetAwaiter().GetResult();
+
+    /// <summary>
+    /// PLAN 01 — resolve the top object on the stack on the async path
+    /// (CR 608). The CR 603.4 intervening-if recheck and the CR 608.2b
+    /// target-legality recheck stay SYNCHRONOUS and run before the await, so
+    /// resolution ordering is unchanged. The resolving object's effects are
+    /// awaited via <see cref="IStackObject.ResolveAsync"/>, threading the
+    /// agent for the object's controller (resolved via
+    /// <paramref name="agentLookup"/>) plus the live <paramref name="game"/>.
+    /// </summary>
+    /// <param name="agentLookup">
+    /// Maps a controller to its agent for the resolution context. Null (the
+    /// default) leaves the agent unbound — effects on the legacy sync path
+    /// don't read it. The async driver supplies <c>AgentRegistry.Get</c>.
+    /// </param>
+    /// <param name="game">Live game context for async effects; may be null.</param>
+    public async Task<IStackObject?> ResolveTopAsync(
+        Majik.Core.Stack.Stack stack,
+        Func<Player, IPlayerAgent?>? agentLookup = null,
+        GameContext? game = null,
+        CancellationToken ct = default)
     {
         if (stack == null)
         {
@@ -48,6 +74,7 @@ public class StackResolver
         {
             // Rule 603.4: re-check intervening-if for triggered abilities. If false,
             // the ability is removed from the stack and its effects do not occur.
+            // SYNCHRONOUS — runs before the resolution await (CR 603.4 / 608.2b).
             if (top is ITriggeredAbility triggered && !triggered.CanBePutOnStack())
             {
                 _eventBus?.Publish(new TriggeredAbilityCounteredEvent(
@@ -57,6 +84,7 @@ public class StackResolver
 
             // CR 608.2b — spell with at least one chosen target: if every
             // target is now illegal, the spell is countered on resolution.
+            // SYNCHRONOUS — runs before the resolution await.
             if (top is Majik.Core.Spells.Spell spellRecheck
                 && spellRecheck.ChosenTargets.Count > 0
                 && spellRecheck.TargetLegalityPredicate != null)
@@ -72,8 +100,9 @@ public class StackResolver
                 }
             }
 
-            // Resolve the object (Rule 608.1)
-            top.Resolve();
+            // Resolve the object (Rule 608.1) on the async path.
+            var agent = agentLookup?.Invoke(top.Controller);
+            await top.ResolveAsync(agent, game, ct).ConfigureAwait(false);
 
             // Handle spell resolution (Rule 608.2)
             if (top is ISpell spell)
@@ -219,8 +248,21 @@ public class StackResolver
 
     /// <summary>
     /// Resolve all objects on the stack (used for testing/debugging).
+    /// Synchronous shim over <see cref="ResolveAllAsync"/>.
     /// </summary>
     public void ResolveAll(Majik.Core.Stack.Stack stack)
+        => ResolveAllAsync(stack).GetAwaiter().GetResult();
+
+    /// <summary>
+    /// PLAN 01 — resolve every object on the stack on the async path, one at
+    /// a time in LIFO order (CR 608.1). Threads the agent lookup + live game
+    /// through each <see cref="ResolveTopAsync"/> call.
+    /// </summary>
+    public async Task ResolveAllAsync(
+        Majik.Core.Stack.Stack stack,
+        Func<Player, IPlayerAgent?>? agentLookup = null,
+        GameContext? game = null,
+        CancellationToken ct = default)
     {
         if (stack == null)
         {
@@ -229,7 +271,7 @@ public class StackResolver
 
         while (!stack.IsEmpty)
         {
-            ResolveTop(stack);
+            await ResolveTopAsync(stack, agentLookup, game, ct).ConfigureAwait(false);
         }
     }
 }

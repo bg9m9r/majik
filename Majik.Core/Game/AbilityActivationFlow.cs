@@ -44,22 +44,18 @@ public sealed class AbilityActivationFlow
         if (ability == null) throw new ArgumentNullException(nameof(ability));
         if (agent == null) throw new ArgumentNullException(nameof(agent));
 
-        // Targets (if any) — Rule 602.2b. Collect and store on the ability so
-        // effects at resolution time can read ability.ChosenTargets[n][0] etc.
-        var collected = new List<IReadOnlyList<object>>();
-        foreach (var req in targetRequests ?? Array.Empty<TargetRequest>())
-        {
-            // Resolve any lazy CandidateGatherer against the live ctx, then
-            // hand the agent the merged candidate list. Same pattern used
-            // by SpellCastFlow + TriggerManager so factories can declare
-            // gatherers once and have them honored on every prompt path.
-            var live = req.ResolveCandidates(ctx);
-            var promptReq = ReferenceEquals(live, req.LegalCandidates)
-                ? req
-                : req.WithCandidates(live);
-            var picked = await agent.ChooseTargetsAsync(ctx, promptReq, ct);
-            collected.Add(picked);
-        }
+        // Targets (if any) — Rule 602.2b. Collect via the shared PLAN 01
+        // (Slice E) pipeline and store on the ability so effects at resolution
+        // time can read ability.ChosenTargets[n][0] etc. The ability path does
+        // NOT gate on min cardinality (behaviour-preserving — the legacy inline
+        // loop accepted under-filled picks).
+        var collected = await Targeting.TargetCollection.CollectAsync(
+            targetRequests ?? Array.Empty<TargetRequest>(),
+            card: null,
+            ctx,
+            agent,
+            throwOnInsufficient: false,
+            ct);
 
         if (ability is ActivatedAbility aa)
         {

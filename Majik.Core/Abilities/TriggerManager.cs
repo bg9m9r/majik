@@ -279,23 +279,19 @@ public class TriggerManager
                 // straight to the push.
                 if (ability is TriggeredAbility ta && ta.TargetRequests.Count > 0)
                 {
-                    var collected = new List<IReadOnlyList<object>>();
-                    foreach (var req in ta.TargetRequests)
-                    {
-                        // Resolve any lazy CandidateGatherer (TargetRequest.ResolveCandidates)
-                        // against the live ctx so triggers that compute candidates at
-                        // resolution time (e.g. opponent's creatures, your graveyard)
-                        // get a fresh pool every fire. Static LegalCandidates pass
-                        // through unchanged.
-                        var live = req.ResolveCandidates(ctx);
-                        var promptReq = ReferenceEquals(live, req.LegalCandidates)
-                            ? req
-                            : req.WithCandidates(live);
-                        var picked = agent != null
-                            ? await agent.ChooseTargetsAsync(ctx, promptReq, ct)
-                            : Array.Empty<object>();
-                        collected.Add(picked);
-                    }
+                    // PLAN 01 (Slice E) — shared targeting pipeline (CR 603.3).
+                    // Triggers that compute candidates at resolution time (e.g.
+                    // opponent's creatures, your graveyard) get a fresh pool
+                    // every fire via each request's CandidateGatherer. A null
+                    // agent (no agent registered for this controller) resolves
+                    // every request to an empty pick — behaviour-preserving.
+                    var collected = await Targeting.TargetCollection.CollectAsync(
+                        ta.TargetRequests,
+                        card: ta.Source as Cards.ICard,
+                        ctx,
+                        agent,
+                        throwOnInsufficient: false,
+                        ct);
                     ta.SetChosenTargets(collected);
                 }
 

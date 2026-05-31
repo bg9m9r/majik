@@ -3,7 +3,9 @@ using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
 using Majik.Core.Domain.ValueObjects;
+using Majik.Core.Game;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
 using Majik.Core.Stack;
 using Majik.Core.Targeting;
 using Majik.Core.Zones;
@@ -231,7 +233,21 @@ public class Spell : ISpell
         return true;
     }
 
-    public void Resolve()
+    public void Resolve() => ResolveAsync(null, null).GetAwaiter().GetResult();
+
+    /// <summary>
+    /// PLAN 01 — resolve the spell's effects (CR 608) on the async path.
+    /// Builds a <see cref="ResolutionContext"/> from this spell's
+    /// <see cref="Controller"/> + <see cref="ChosenTargets"/> (wrapped as a
+    /// single target group to fit the list-of-lists shape) and the
+    /// resolver-supplied <paramref name="agent"/> / <paramref name="game"/> /
+    /// <paramref name="ct"/>, then awaits each effect in declaration order.
+    /// The synchronous <see cref="Resolve"/> is a thin shim over this.
+    /// </summary>
+    public async ValueTask ResolveAsync(
+        IPlayerAgent? agent,
+        GameContext? game,
+        CancellationToken ct = default)
     {
         if (_resolutionState.IsResolving)
         {
@@ -239,14 +255,21 @@ public class Spell : ISpell
         }
 
         _resolutionState = ResolutionState.Resolving();
-        
-        // Resolution logic (Rule 608)
-        // Execute all effects
+
+        // Spell.ChosenTargets is a flat list (CR 601.2c); present it to the
+        // resolution context as a single target group so async effects can
+        // read ChosenTargets[0] uniformly with the ability paths.
+        var chosen = ChosenTargets.Count > 0
+            ? new IReadOnlyList<object>[] { ChosenTargets.ToList() }
+            : Array.Empty<IReadOnlyList<object>>();
+        var rc = ResolutionContext.For(Controller, agent, game, chosen, ct);
+
+        // Resolution logic (Rule 608) — await each effect in order.
         foreach (var effect in _effects)
         {
-            effect.Execute();
+            await effect.ExecuteAsync(rc).ConfigureAwait(false);
         }
-        
+
         _resolutionState = ResolutionState.Resolved(DateTime.UtcNow);
     }
 

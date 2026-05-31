@@ -1291,6 +1291,32 @@ public sealed class HeuristicBotAgent : IPlayerAgent
     /// posture). Falls back to the legacy auto-accept default for unknown
     /// intent.
     /// </summary>
+    /// <summary>
+    /// PLAN 01 (Slice C) — declarative choice sink. Routes Yes/No through
+    /// this agent's intent-aware <see cref="ChooseYesNoAsync(string,BotIntent,CancellationToken)"/>
+    /// policy; PickOne/PickN return the first candidate(s) (or decline when
+    /// optional), matching the agent's first-pick posture on the bespoke
+    /// methods that don't carry a richer heuristic.
+    /// </summary>
+    public Task<IReadOnlyList<object>> ChooseAsync(
+        GameContext ctx, ChoiceRequest req, CancellationToken ct = default)
+    {
+        var candidates = req.Candidates ?? Array.Empty<object>();
+        if (req.Kind == ChoiceKind.YesNo)
+        {
+            var yes = ChooseYesNoAsync(req.Description, req.Intent, ct).GetAwaiter().GetResult();
+            IReadOnlyList<object> r = yes
+                ? (candidates.Count > 0 ? new[] { candidates[0] } : new object[] { true })
+                : Array.Empty<object>();
+            return Task.FromResult(r);
+        }
+        if (req.Optional && candidates.Count == 0)
+            return Task.FromResult<IReadOnlyList<object>>(Array.Empty<object>());
+        var take = Math.Max(req.Min, candidates.Count > 0 ? 1 : 0);
+        IReadOnlyList<object> picked = candidates.Take(Math.Min(take, candidates.Count)).ToList();
+        return Task.FromResult(picked);
+    }
+
     public Task<bool> ChooseYesNoAsync(
         string question,
         BotIntent intent,

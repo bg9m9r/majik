@@ -40,6 +40,72 @@ public interface IPlayerAgent
         GameContext ctx, TargetRequest request, CancellationToken ct = default);
 
     /// <summary>
+    /// PLAN 01 (Slice C) — the single declarative non-targeting choice sink.
+    /// Every bespoke <c>ChooseXxxAsync</c> prompt (Yes/No, pick-one-from-hand,
+    /// library search, reveal-and-choose, gift recipient, …) is expressible as
+    /// a <see cref="ChoiceRequest"/> handed to this method; the legacy methods
+    /// are now default-implemented shims over it (preserving their historical
+    /// <c>candidates[0]</c> / decline defaults).
+    ///
+    /// <para>
+    /// Returns the chosen candidates (a subset of
+    /// <see cref="ChoiceRequest.Candidates"/>). For <see cref="ChoiceKind.YesNo"/>
+    /// a single-element non-empty list means "yes" and an empty list means "no".
+    /// For <see cref="ChoiceKind.PickOne"/> an empty list means "decline" (only
+    /// legal when <see cref="ChoiceRequest.Optional"/>).
+    /// </para>
+    ///
+    /// <para>
+    /// Default implementation preserves the pre-agent posture: Yes/No applies
+    /// the same intent heuristic as
+    /// <see cref="ChooseYesNoAsync(string,BotIntent,CancellationToken)"/>;
+    /// non-optional picks return the first <see cref="ChoiceRequest.Min"/>
+    /// candidates; optional picks decline. Smart bots / remote agents override
+    /// to route through their decision policy / wire channel.
+    /// </para>
+    /// </summary>
+    Task<IReadOnlyList<object>> ChooseAsync(
+        GameContext ctx, ChoiceRequest req, CancellationToken ct = default)
+    {
+        var candidates = req.Candidates ?? Array.Empty<object>();
+
+        if (req.Kind == ChoiceKind.YesNo)
+        {
+            // Reuse the legacy intent heuristic. "Yes" → one sentinel
+            // candidate (the candidate list itself, when supplied, or a
+            // boxed true); "no" → empty.
+            var yes = ChooseYesNoAsync(req.Description, req.Intent, ct).GetAwaiter().GetResult();
+            if (!yes) return Task.FromResult<IReadOnlyList<object>>(Array.Empty<object>());
+            IReadOnlyList<object> yesResult = candidates.Count > 0
+                ? new[] { candidates[0] }
+                : new object[] { true };
+            return Task.FromResult(yesResult);
+        }
+
+        if (req.Optional)
+        {
+            // Decline by default (gift-recipient posture).
+            return Task.FromResult<IReadOnlyList<object>>(Array.Empty<object>());
+        }
+
+        // Non-optional PickOne / PickN / Order — return the first Min
+        // candidates (deterministic pre-agent first-pick).
+        var take = Math.Max(0, req.Min);
+        if (take == 0 || candidates.Count == 0)
+        {
+            // PickOne with Min==1 but treated leniently: fall back to the
+            // first candidate so "put one of them" mandatory clauses pick.
+            IReadOnlyList<object> firstOrNone = candidates.Count > 0
+                ? new[] { candidates[0] }
+                : Array.Empty<object>();
+            return Task.FromResult(firstOrNone);
+        }
+
+        IReadOnlyList<object> picked = candidates.Take(take).ToList();
+        return Task.FromResult(picked);
+    }
+
+    /// <summary>
     /// Choose the value of X for a variable cost.
     /// </summary>
     Task<int> ChooseXAsync(
@@ -130,14 +196,22 @@ public interface IPlayerAgent
     /// <paramref name="kindLabel"/> is human-readable ("creature",
     /// "instant or sorcery card", "basic land card") for prompt UIs.
     /// </summary>
-    Task<ICard?> ChooseLibraryPickAsync(
+    async Task<ICard?> ChooseLibraryPickAsync(
         GameContext? ctx,
         IReadOnlyList<ICard> candidates,
         string kindLabel,
         CancellationToken ct = default)
-        // Default: pick the first candidate (legacy pre-agent behavior).
-        // Smart bots override with heuristics; remote agents prompt the UI.
-        => Task.FromResult<ICard?>(candidates.Count > 0 ? candidates[0] : null);
+    {
+        // PLAN 01 (Slice C) shim — express as a declarative PickOne and route
+        // through ChooseAsync. Default ChooseAsync returns the first candidate
+        // (legacy pre-agent behaviour). Smart bots / remote agents that
+        // override this method keep their bespoke logic.
+        var req = new ChoiceRequest(
+            ChoiceKind.PickOne, kindLabel, Min: 1, Max: 1,
+            Candidates: candidates, Intent: BotIntent.Tutor, Optional: false);
+        var chosen = await ChooseAsync(ctx!, req, ct).ConfigureAwait(false);
+        return chosen.Count > 0 ? (ICard)chosen[0] : null;
+    }
 
     /// <summary>
     /// CR 701.59 — Bloomburrow "Gift" cast-time prompt. Called by
@@ -162,13 +236,24 @@ public interface IPlayerAgent
     /// alt-cost prompts); scripted-test agents return their queued pick.
     /// </para>
     /// </summary>
-    Task<Player?> ChooseGiftRecipientAsync(
+    async Task<Player?> ChooseGiftRecipientAsync(
         GameContext ctx,
         ICard source,
         string giftDescription,
         IReadOnlyList<Player> opponents,
         CancellationToken ct = default)
-        => Task.FromResult<Player?>(null);
+    {
+        // PLAN 01 (Slice C) shim — declarative optional PickOne. Default
+        // ChooseAsync declines (Optional: true ⇒ empty), preserving the
+        // legacy "decline the gift" default. Smart / scripted agents that
+        // override this method keep their bespoke pick.
+        var req = new ChoiceRequest(
+            ChoiceKind.PickOne, giftDescription, Min: 0, Max: 1,
+            Candidates: opponents.Cast<object>().ToList(),
+            Intent: BotIntent.None, Optional: true);
+        var chosen = await ChooseAsync(ctx, req, ct).ConfigureAwait(false);
+        return chosen.Count > 0 ? (Player)chosen[0] : null;
+    }
 
     /// <summary>
     /// Generic Yes/No prompt for optional "may" clauses (CR 117.x / 605.1).
@@ -212,15 +297,24 @@ public interface IPlayerAgent
     /// after the triggering permanent / spell.
     /// </para>
     /// </summary>
-    Task<bool> ChooseYesNoAsync(
+    async Task<bool> ChooseYesNoAsync(
         GameContext? ctx,
         string question,
         string? sourceCardName,
         CancellationToken ct = default)
-        => ChooseYesNoAsync(
-            question,
-            BotIntent.LoseLife | BotIntent.CostToDecline,
-            ct);
+    {
+        // PLAN 01 (Slice C) shim — declarative YesNo. Default ChooseAsync
+        // applies the legacy intent heuristic (here the conservative
+        // shock-land classifier). Remote agents override this method to
+        // prompt the UI.
+        var req = new ChoiceRequest(
+            ChoiceKind.YesNo, question, Min: 0, Max: 1,
+            Candidates: Array.Empty<object>(),
+            Intent: BotIntent.LoseLife | BotIntent.CostToDecline,
+            Optional: true);
+        var chosen = await ChooseAsync(ctx!, req, ct).ConfigureAwait(false);
+        return chosen.Count > 0;
+    }
 
     Task<bool> ChooseYesNoAsync(
         string question,
@@ -276,12 +370,23 @@ public interface IPlayerAgent
     /// "no eligible card in hand, no-op".
     /// </para>
     /// </summary>
-    Task<ICard?> ChooseFromHandAsync(
+    async Task<ICard?> ChooseFromHandAsync(
         Player chooser,
         IReadOnlyList<ICard> candidates,
         BotIntent intent,
         CancellationToken ct = default)
-        => Task.FromResult<ICard?>(candidates.Count > 0 ? candidates[0] : null);
+    {
+        // PLAN 01 (Slice C) shim — declarative PickOne. Default ChooseAsync
+        // returns the first candidate (legacy pre-agent behaviour). No
+        // GameContext on this prompt surface, so pass null — the default
+        // ChooseAsync never dereferences it, and every agent that overrides
+        // this method (scripted / heuristic) keeps its bespoke pick.
+        var req = new ChoiceRequest(
+            ChoiceKind.PickOne, "choose from hand", Min: 1, Max: 1,
+            Candidates: candidates, Intent: intent, Optional: false);
+        var chosen = await ChooseAsync(null!, req, ct).ConfigureAwait(false);
+        return chosen.Count > 0 ? (ICard)chosen[0] : null;
+    }
 
     /// <summary>
     /// Pick exactly one permanent from a candidate set on the
@@ -305,12 +410,19 @@ public interface IPlayerAgent
     /// Empty candidate list returns <see langword="null"/>.
     /// </para>
     /// </summary>
-    Task<ICard?> ChooseFromBattlefieldAsync(
+    async Task<ICard?> ChooseFromBattlefieldAsync(
         Player chooser,
         IReadOnlyList<ICard> candidates,
         BotIntent intent,
         CancellationToken ct = default)
-        => Task.FromResult<ICard?>(candidates.Count > 0 ? candidates[0] : null);
+    {
+        // PLAN 01 (Slice C) shim — declarative PickOne, first-candidate default.
+        var req = new ChoiceRequest(
+            ChoiceKind.PickOne, "choose from battlefield", Min: 1, Max: 1,
+            Candidates: candidates, Intent: intent, Optional: false);
+        var chosen = await ChooseAsync(null!, req, ct).ConfigureAwait(false);
+        return chosen.Count > 0 ? (ICard)chosen[0] : null;
+    }
 
     /// <summary>
     /// Pick exactly one card from a generic "pile" of candidates that does
@@ -343,13 +455,20 @@ public interface IPlayerAgent
     /// returns <see langword="null"/>.
     /// </para>
     /// </summary>
-    Task<ICard?> ChooseFromPileAsync(
+    async Task<ICard?> ChooseFromPileAsync(
         Player chooser,
         IReadOnlyList<ICard> candidates,
         string pileLabel,
         BotIntent intent,
         CancellationToken ct = default)
-        => Task.FromResult<ICard?>(candidates.Count > 0 ? candidates[0] : null);
+    {
+        // PLAN 01 (Slice C) shim — declarative PickOne, first-candidate default.
+        var req = new ChoiceRequest(
+            ChoiceKind.PickOne, pileLabel, Min: 1, Max: 1,
+            Candidates: candidates, Intent: intent, Optional: false);
+        var chosen = await ChooseAsync(null!, req, ct).ConfigureAwait(false);
+        return chosen.Count > 0 ? (ICard)chosen[0] : null;
+    }
 
     /// <summary>
     /// CR 701.15 — "reveal top N, you may put one matching card into [zone],
@@ -390,12 +509,25 @@ public interface IPlayerAgent
     /// remote agents prompt the UI.
     /// </para>
     /// </summary>
-    Task<ICard?> ChooseFromRevealedAsync(
+    async Task<ICard?> ChooseFromRevealedAsync(
         GameContext? ctx,
         IReadOnlyList<ICard> revealed,
         IReadOnlyList<ICard> eligible,
         bool optional,
         string label,
         CancellationToken ct = default)
-        => Task.FromResult<ICard?>(eligible.Count > 0 ? eligible[0] : null);
+    {
+        // PLAN 01 (Slice C) shim — declarative PickOne over the ELIGIBLE
+        // subset. Default ChooseAsync returns the first eligible card
+        // (legacy FirstOrDefault auto-pick). Optional is surfaced on the
+        // request for remote/UI agents that override; the default ignores
+        // it and still first-picks so mandatory "put one of them" clauses
+        // resolve. Remote agents override this method with the full-reveal
+        // wire prompt.
+        var req = new ChoiceRequest(
+            ChoiceKind.PickOne, label, Min: optional ? 0 : 1, Max: 1,
+            Candidates: eligible, Intent: BotIntent.None, Optional: false);
+        var chosen = await ChooseAsync(ctx!, req, ct).ConfigureAwait(false);
+        return chosen.Count > 0 ? (ICard)chosen[0] : null;
+    }
 }
