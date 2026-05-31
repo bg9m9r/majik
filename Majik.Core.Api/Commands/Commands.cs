@@ -28,6 +28,7 @@ namespace Majik.Core.Api.Commands;
 [JsonDerivedType(typeof(ChooseSurveilCommand), "chooseSurveil")]
 [JsonDerivedType(typeof(ChooseYesNoCommand), "chooseYesNo")]
 [JsonDerivedType(typeof(ChooseFromRevealedCommand), "chooseFromRevealed")]
+[JsonDerivedType(typeof(ChoiceCommand), "choice")]
 public abstract record GameCommand
 {
     /// <summary>The player who submitted the command.</summary>
@@ -168,3 +169,25 @@ public sealed record ChooseYesNoCommand(bool Answer) : GameCommand;
 /// </para>
 /// </summary>
 public sealed record ChooseFromRevealedCommand(Guid? InstanceId) : GameCommand;
+
+/// <summary>
+/// PLAN 01 (Slice C) — the single declarative-choice wire command, mirroring
+/// <see cref="Majik.Core.Players.Agents.ChoiceRequest"/> /
+/// <see cref="Majik.Core.Players.Agents.IPlayerAgent.ChooseAsync"/>. Replaces
+/// (additively, for now) the per-prompt choice commands as callers migrate to
+/// the unified sink. <see cref="Kind"/> is the
+/// <see cref="Majik.Core.Players.Agents.ChoiceKind"/> name; the engine
+/// switches on it in <see cref="Majik.Core.Api.RemoteAgent"/> to validate +
+/// resolve the picks.
+/// <list type="bullet">
+/// <item>For <c>YesNo</c>, <see cref="SelectedInstanceIds"/> empty = "no", any
+/// element (or the <see cref="YesNo"/> flag) = "yes".</item>
+/// <item>For <c>PickOne</c> / <c>PickN</c> / <c>Order</c>, the list carries the
+/// InstanceIds the player chose, in order. Each must be in the offered
+/// candidate set (validated engine-side) or it is dropped.</item>
+/// </list>
+/// </summary>
+public sealed record ChoiceCommand(
+    string Kind,
+    IReadOnlyList<Guid> SelectedInstanceIds,
+    bool YesNo = false) : GameCommand;

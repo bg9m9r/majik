@@ -168,6 +168,32 @@ public sealed class ScriptedAgent : IPlayerAgent
         string question, BotIntent intent, CancellationToken ct = default)
         => Task.FromResult(Pop(_yesNoAnswers, "yes/no"));
 
+    /// <summary>
+    /// PLAN 01 (Slice C) — declarative choice sink. Yes/No dequeues a queued
+    /// answer (throws if none queued — a missing entry is a test bug, matching
+    /// <see cref="ChooseYesNoAsync(string,BotIntent,CancellationToken)"/>);
+    /// PickOne/PickN return the first candidate(s) (or decline when optional
+    /// with no candidates).
+    /// </summary>
+    public Task<IReadOnlyList<object>> ChooseAsync(
+        GameContext ctx, ChoiceRequest req, CancellationToken ct = default)
+    {
+        var candidates = req.Candidates ?? Array.Empty<object>();
+        if (req.Kind == ChoiceKind.YesNo)
+        {
+            var yes = Pop(_yesNoAnswers, "yes/no");
+            IReadOnlyList<object> r = yes
+                ? (candidates.Count > 0 ? new[] { candidates[0] } : new object[] { true })
+                : Array.Empty<object>();
+            return Task.FromResult(r);
+        }
+        if (req.Optional && candidates.Count == 0)
+            return Task.FromResult<IReadOnlyList<object>>(Array.Empty<object>());
+        var take = Math.Max(req.Min, candidates.Count > 0 ? 1 : 0);
+        IReadOnlyList<object> picked = candidates.Take(Math.Min(take, candidates.Count)).ToList();
+        return Task.FromResult(picked);
+    }
+
     public Task<ICard?> ChooseFromHandAsync(
         Player chooser, IReadOnlyList<ICard> candidates, BotIntent intent, CancellationToken ct = default)
     {

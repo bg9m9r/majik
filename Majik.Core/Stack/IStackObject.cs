@@ -1,4 +1,7 @@
+using Majik.Core.Abilities;
+using Majik.Core.Game;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
 
 namespace Majik.Core.Stack;
 
@@ -32,4 +35,21 @@ public interface IStackObject
     /// Resolve this stack object.
     /// </summary>
     void Resolve();
+
+    /// <summary>
+    /// PLAN 01 — resolve this stack object on the async path (CR 608),
+    /// threading the resolver-supplied agent + live game so effects can
+    /// await player prompts. Default shim calls the synchronous
+    /// <see cref="Resolve"/> so any implementer that has not yet migrated
+    /// keeps working. The concrete spell / activated-ability /
+    /// triggered-ability classes override this with a real async body.
+    /// </summary>
+    ValueTask ResolveAsync(
+        IPlayerAgent? agent,
+        GameContext? game,
+        CancellationToken ct = default)
+    {
+        Resolve();
+        return ValueTask.CompletedTask;
+    }
 }

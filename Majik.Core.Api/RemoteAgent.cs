@@ -64,6 +64,13 @@ public sealed class RemoteAgent : IPlayerAgent
     // ChooseCardsToBottomCommand picks exactly this many cards. Cleared on
     // prompt resolution; replaced on each new bottom prompt.
     private int? _pendingBottomCount;
+    // PLAN 01 (Slice C) — engine-supplied candidate pool + kind for the most
+    // recent unified ChooseAsync prompt. Stashed so Resolve can validate the
+    // ChoiceCommand's SelectedInstanceIds came from the offered set and map
+    // each back to its candidate object (ICard or Player). Cleared on prompt
+    // resolution; replaced on each new ChooseAsync prompt.
+    private IReadOnlyList<object>? _pendingChoiceCandidates;
+    private ChoiceKind? _pendingChoiceKind;
     // Per-prompt extra payload (currently: library-search candidates +
     // label, surveil peeked view) surfaced via PendingPayload for
     // GameFacade.BuildPrompt to copy into the wire PromptDto. Null on
@@ -135,6 +142,8 @@ public sealed class RemoteAgent : IPlayerAgent
         var revealedEligible = _pendingRevealedEligible;
         var revealedOptional = _pendingRevealedOptional;
         var bottomCount = _pendingBottomCount;
+        var choiceCandidates = _pendingChoiceCandidates;
+        var choiceKind = _pendingChoiceKind;
         _pending = null;
         _pendingKinds = null;
         _pendingTriggerOrder = null;
@@ -143,8 +152,10 @@ public sealed class RemoteAgent : IPlayerAgent
         _pendingRevealedEligible = null;
         _pendingRevealedOptional = false;
         _pendingBottomCount = null;
+        _pendingChoiceCandidates = null;
+        _pendingChoiceKind = null;
         _pendingPayload = null;
-        Resolve(pending, command, triggerOrder, libraryCandidates, surveilPeeked, revealedEligible, revealedOptional, bottomCount);
+        Resolve(pending, command, triggerOrder, libraryCandidates, surveilPeeked, revealedEligible, revealedOptional, bottomCount, choiceCandidates, choiceKind);
     }
 
     private void Resolve(
@@ -155,7 +166,9 @@ public sealed class RemoteAgent : IPlayerAgent
         IReadOnlyList<ICard>? surveilPeeked,
         IReadOnlyList<ICard>? revealedEligible,
         bool revealedOptional,
-        int? bottomCount)
+        int? bottomCount,
+        IReadOnlyList<object>? choiceCandidates,
+        ChoiceKind? choiceKind)
     {
         switch (command)
         {
@@ -494,10 +507,69 @@ public sealed class RemoteAgent : IPlayerAgent
                 ((TaskCompletionSource<IReadOnlyList<ICard>>)tcs).SetResult(chosen);
                 break;
             }
+            case ChoiceCommand choice:
+            {
+                // PLAN 01 (Slice C) — unified declarative choice. Validate the
+                // submitted Kind matches the outstanding prompt, then map each
+                // SelectedInstanceId back to its offered candidate object
+                // (ICard by InstanceId, Player by Id). Out-of-set ids are
+                // dropped (logged) rather than thrown — same don't-crash-a-
+                // live-match posture as ChooseFromRevealedCommand.
+                if (choiceCandidates == null || choiceKind == null)
+                {
+                    throw new InvalidOperationException(
+                        "ChoiceCommand resolved without a pending choice context.");
+                }
+                if (!string.Equals(choice.Kind, choiceKind.Value.ToString(), StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidOperationException(
+                        $"ChoiceCommand kind '{choice.Kind}' does not match the pending '{choiceKind.Value}' prompt.");
+                }
+
+                IReadOnlyList<object> result;
+                if (choiceKind.Value == ChoiceKind.YesNo)
+                {
+                    // Yes = any selected id OR the explicit flag; No = empty.
+                    var yes = choice.YesNo || choice.SelectedInstanceIds.Count > 0;
+                    result = yes
+                        ? (choiceCandidates.Count > 0
+                            ? new[] { choiceCandidates[0] }
+                            : new object[] { true })
+                        : Array.Empty<object>();
+                }
+                else
+                {
+                    var picked = new List<object>(choice.SelectedInstanceIds.Count);
+                    foreach (var id in choice.SelectedInstanceIds)
+                    {
+                        var match = choiceCandidates.FirstOrDefault(c => CandidateMatchesId(c, id));
+                        if (match == null)
+                        {
+                            Console.Error.WriteLine(
+                                $"WARN: ChoiceCommand selected instance {id} is not in the offered " +
+                                "candidate set — dropping.");
+                            continue;
+                        }
+                        picked.Add(match);
+                    }
+                    result = picked;
+                }
+                ((TaskCompletionSource<IReadOnlyList<object>>)tcs).SetResult(result);
+                break;
+            }
             default:
                 throw new InvalidOperationException($"Unhandled command {command.GetType().Name}.");
         }
     }
+
+    // PLAN 01 (Slice C) — match a ChoiceCommand instance id to a candidate
+    // object (cards carry InstanceId, players carry Id).
+    private static bool CandidateMatchesId(object candidate, Guid id) => candidate switch
+    {
+        ICard card => card.InstanceId == id,
+        Player player => player.Id == id,
+        _ => false,
+    };
 
     /// <summary>
     /// CR 605 — pick which mana ability on <paramref name="permanent"/> the
@@ -608,6 +680,41 @@ public sealed class RemoteAgent : IPlayerAgent
 
     public Task<IReadOnlyList<object>> ChooseTargetsAsync(GameContext ctx, TargetRequest request, CancellationToken ct = default)
         => Prompt<IReadOnlyList<object>>(ct, typeof(ChooseTargetsCommand));
+
+    /// <summary>
+    /// PLAN 01 (Slice C) — unified declarative choice sink. Resolves any lazy
+    /// candidate gatherer against the live ctx, stashes the candidate pool +
+    /// kind so <see cref="Resolve"/> can validate + map the
+    /// <see cref="ChoiceCommand"/> picks, then awaits the command from the
+    /// client. The legacy per-prompt overrides (Yes/No, library pick, reveal,
+    /// …) remain for callers that haven't migrated to <c>ChooseAsync</c>.
+    /// </summary>
+    public Task<IReadOnlyList<object>> ChooseAsync(
+        GameContext ctx, ChoiceRequest req, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(req);
+        if (_pending != null)
+        {
+            throw new InvalidOperationException("A prompt is already pending.");
+        }
+        var live = req.ResolveCandidates(ctx);
+        _pendingChoiceCandidates = live;
+        _pendingChoiceKind = req.Kind;
+        _pendingPayload = new PromptPayload(
+            Candidates: null,
+            Label: req.Description);
+        try
+        {
+            return Prompt<IReadOnlyList<object>>(ct, typeof(ChoiceCommand));
+        }
+        catch
+        {
+            _pendingChoiceCandidates = null;
+            _pendingChoiceKind = null;
+            _pendingPayload = null;
+            throw;
+        }
+    }
 
     public Task<int> ChooseXAsync(GameContext ctx, ICard source, CancellationToken ct = default)
         => Prompt<int>(ct, typeof(ChooseXCommand));

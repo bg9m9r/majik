@@ -210,7 +210,16 @@ public sealed class PriorityLoop
                 return;
             }
 
-            _stackResolver.ResolveTop(_stack);
+            // PLAN 01 — resolve the top object on the async path so its
+            // effects can await player prompts. The resolution context's
+            // agent is looked up per the resolving object's controller
+            // (engine seat agents first, AgentRegistry fallback); the live
+            // game context is built for the active player.
+            await _stackResolver.ResolveTopAsync(
+                _stack,
+                ResolveAgentForController,
+                MakeContext(activePlayer, activePlayer),
+                ct);
             // Loop back: start a fresh priority round with active player.
         }
     }
@@ -361,6 +370,18 @@ public sealed class PriorityLoop
 
     private GameContext MakeContext(Player self, Player activePlayer) =>
         new(self, _players, activePlayer, _turnNumberAccessor(), _phaseAccessor(), _stack);
+
+    // PLAN 01 — resolve the agent for a stack object's controller when
+    // resolving its effects. Prefer the engine-supplied seat agents (this
+    // loop already holds them); fall back to the ambient AgentRegistry for
+    // controllers not in the local map (e.g. tokens / effects that resolve
+    // for a player the loop wasn't constructed with).
+    private IPlayerAgent? ResolveAgentForController(Player controller)
+    {
+        if (controller == null) return null;
+        if (_agents.TryGetValue(controller, out var seatAgent)) return seatAgent;
+        return AgentRegistry.Get(controller);
+    }
 
     private static bool HoldsPriority(PriorityAction action) => action switch
     {

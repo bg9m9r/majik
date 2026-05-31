@@ -1,6 +1,7 @@
 using Majik.Core.Cards;
 using Majik.Core.Domain.ValueObjects;
 using Majik.Core.Events;
+using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
 using Majik.Core.Targeting;
@@ -117,7 +118,20 @@ public class TriggeredAbility : ITriggeredAbility
 
     public bool CanBePutOnStack() => InterveningIf?.Invoke() ?? true;
 
-    public void Resolve()
+    public void Resolve() => ResolveAsync(null, null).GetAwaiter().GetResult();
+
+    /// <summary>
+    /// PLAN 01 — resolve the triggered ability's effects (CR 608) on the
+    /// async path. Builds a <see cref="ResolutionContext"/> from this
+    /// ability's <see cref="Controller"/> + <see cref="ChosenTargets"/> and
+    /// the resolver-supplied <paramref name="agent"/> / <paramref name="game"/>
+    /// / <paramref name="ct"/>, then awaits each effect in declaration order.
+    /// The synchronous <see cref="Resolve"/> is a thin shim over this.
+    /// </summary>
+    public async ValueTask ResolveAsync(
+        IPlayerAgent? agent,
+        GameContext? game,
+        CancellationToken ct = default)
     {
         if (_resolutionState.IsResolving)
         {
@@ -126,9 +140,11 @@ public class TriggeredAbility : ITriggeredAbility
 
         _resolutionState = ResolutionState.Resolving();
 
+        var rc = ResolutionContext.For(Controller, agent, game, _chosenTargets, ct);
+
         foreach (var effect in _effects)
         {
-            effect.Execute();
+            await effect.ExecuteAsync(rc).ConfigureAwait(false);
         }
 
         _resolutionState = ResolutionState.Resolved(DateTime.UtcNow);

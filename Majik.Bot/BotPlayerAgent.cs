@@ -112,4 +112,26 @@ public sealed class BotPlayerAgent : IPlayerAgent
         string? sourceCardName,
         CancellationToken ct = default)
         => WrapAsync(() => true, ct);
+
+    /// <summary>
+    /// PLAN 01 (Slice C) — declarative choice sink. Yes/No routes through this
+    /// bot's wire Yes/No posture (always accept); PickOne/PickN return the
+    /// first candidate(s) (or decline when optional with no candidates),
+    /// matching the bot's first-pick posture on bespoke pick prompts.
+    /// </summary>
+    public Task<IReadOnlyList<object>> ChooseAsync(
+        GameContext ctx, ChoiceRequest req, CancellationToken ct = default)
+        => WrapAsync<IReadOnlyList<object>>(() =>
+        {
+            var candidates = req.Candidates ?? Array.Empty<object>();
+            if (req.Kind == ChoiceKind.YesNo)
+            {
+                // Bot always accepts (mirrors the wire Yes/No posture above).
+                return candidates.Count > 0 ? new[] { candidates[0] } : new object[] { true };
+            }
+            if (req.Optional && candidates.Count == 0)
+                return Array.Empty<object>();
+            var take = Math.Max(req.Min, candidates.Count > 0 ? 1 : 0);
+            return candidates.Take(Math.Min(take, candidates.Count)).ToList();
+        }, ct);
 }
