@@ -6,9 +6,9 @@ namespace Majik.Core.CardData.Definitions;
 /// Discriminated-union base for activated-ability cost specs. JSON
 /// discriminator: <c>type</c>. New variants register via
 /// <see cref="JsonDerivedTypeAttribute"/> + a matching switch arm in
-/// <see cref="CardDefinitionFactory.BuildCost"/>.
+/// <see cref="CardDefRuntime.BuildJsonCost"/> (reached via <see cref="ToCost"/>).
 ///
-/// Convergence (PLAN 03): <see cref="CardDefinitionFactory.BuildCost"/>
+/// Convergence (PLAN 03): <see cref="CardDefRuntime.BuildJsonCost"/>
 /// builds these via the shared <see cref="Majik.Core.Primitives.Costs"/>
 /// vocabulary (the cost-side companion to
 /// <see cref="Majik.Core.Primitives.Fx"/> / <see cref="Majik.Core.Abilities.Triggers"/>).
@@ -21,7 +21,19 @@ namespace Majik.Core.CardData.Definitions;
 [JsonDerivedType(typeof(TapSelfCostDef), "tap_self")]
 [JsonDerivedType(typeof(SacrificeSelfCostDef), "sacrifice_self")]
 [JsonDerivedType(typeof(DiscardSelfCostDef), "discard_self")]
-public abstract class CostDefinition { }
+public abstract class CostDefinition
+{
+    /// <summary>
+    /// Map this JSON cost onto a canonical cost-builder closure (PLAN 03 S2).
+    /// The closure defers to <see cref="CardDefRuntime.BuildJsonCost"/> (which
+    /// routes through the shared <see cref="Majik.Core.Primitives.Costs"/>
+    /// vocabulary) against the live card, so the produced
+    /// <see cref="Majik.Core.Costs.ICost"/> is byte-identical to the legacy
+    /// direct build.
+    /// </summary>
+    public Func<Majik.Core.Cards.ICard, Majik.Core.Costs.ICost> ToCost() =>
+        card => CardDefRuntime.BuildJsonCost(this, card);
+}
 
 /// <summary>Mana cost — parsed via <see cref="Majik.Core.ValueObjects.ManaCost.Parse"/>.
 /// <see cref="Amount"/> accepts bracketed (<c>"{1}{R}"</c>) or unbracketed

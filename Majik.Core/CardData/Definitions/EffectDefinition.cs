@@ -6,7 +6,8 @@ namespace Majik.Core.CardData.Definitions;
 /// Discriminated-union base for activated-ability effect specs. JSON
 /// discriminator: <c>type</c>. New variants register via
 /// <see cref="JsonDerivedTypeAttribute"/> + a matching switch arm in
-/// <see cref="CardDefinitionFactory.BuildEffect"/>.
+/// <see cref="CardDefRuntime.BuildJsonEffect"/> (reached via
+/// <see cref="ToResolveEffect"/>).
 ///
 /// Build semantics: each variant produces an
 /// <see cref="Majik.Core.Abilities.IEffect"/> whose lambda captures the
@@ -33,7 +34,20 @@ namespace Majik.Core.CardData.Definitions;
 [JsonDerivedType(typeof(MillThenPickFirstMatchingToHandEffectDef), "mill_then_pick_first_matching_to_hand")]
 [JsonDerivedType(typeof(ConniveSelfEffectDef), "connive_self")]
 [JsonDerivedType(typeof(AmassSelfEffectDef), "amass_self")]
-public abstract class EffectDefinition { }
+public abstract class EffectDefinition
+{
+    /// <summary>
+    /// Map this JSON effect onto a canonical effect-builder closure (PLAN 03
+    /// S2). The closure defers to <see cref="CardDefRuntime.BuildJsonEffect"/>
+    /// (which routes through the shared <see cref="Majik.Core.Primitives.Fx"/>
+    /// vocabulary) against the live card / controller / replacement bus, so
+    /// the produced <see cref="Majik.Core.Effects.IEffect"/> is byte-identical
+    /// to the legacy direct build. Named <c>ToResolveEffect</c> per the PLAN
+    /// 03 convergence vocabulary (the effect is the in-memory resolve unit).
+    /// </summary>
+    public Func<Majik.Core.Cards.ICard, Majik.Core.Players.Player, Majik.Core.Effects.ReplacementBus?, Majik.Core.Abilities.IEffect> ToResolveEffect() =>
+        (card, controller, replacements) => CardDefRuntime.BuildJsonEffect(this, card, controller, replacements);
+}
 
 /// <summary>Add N counters of the given type to a target permanent.
 /// v1 only supports <c>"target": "self"</c>; "target creature" + chosen
