@@ -163,7 +163,7 @@ public static class SaffiEriksdotterFactory
                 // delayed-trigger card uses.
                 if (triggers == null) return;
 
-                var resolvedAt = DateTime.UtcNow;
+                var resolvedAt = Majik.Core.Game.LogicalClockScope.Current.NextTimestamp();
                 var reanimateEffect = new Effect(
                     $"{CardName}: return {target.Name} to battlefield under owner's control",
                     () =>

@@ -34,6 +34,16 @@ public sealed class GameDriver
     private readonly TriggerManager _triggerManager;
     private readonly ExtraTurnQueue _extraTurns = new();
 
+    // Determinism (PLAN 08 prerequisite): the per-game monotonic logical clock
+    // that assigns ORDER-DETERMINING timestamps (trigger APNAP, layer ordering,
+    // legend / planeswalker-uniqueness ETB order, delayed-trigger event fences).
+    // Installed as the ambient clock for the whole RunGameAsync flow so every
+    // object constructed while the game advances — on any threadpool thread the
+    // async continuation resumes on — reads from THIS game's clock. A fresh
+    // clock per game replaces wall-clock UtcNow; given (seed, command order) the
+    // sequence of assigned timestamps is reproducible.
+    private readonly ILogicalClock _logicalClock;
+
     // CR 720 — per-game registry of "control another player" grants. Effects
     // (Mindslaver, Emrakul) call ControlPlayer.Grant against this; the
     // TurnDriver consumes a pending grant at the controlled player's
@@ -50,6 +60,10 @@ public sealed class GameDriver
     /// <see cref="Majik.Core.Players.ControlPlayerRegistry.GrantControl"/> on
     /// this to take control of an opponent's next turn.</summary>
     public Majik.Core.Players.ControlPlayerRegistry ControlPlayers => _controlPlayers;
+
+    /// <summary>Determinism (PLAN 08 prerequisite): the per-game logical clock
+    /// this driver installs as ambient for the duration of <see cref="RunGameAsync"/>.</summary>
+    public ILogicalClock LogicalClock => _logicalClock;
 
     public sealed record GameResult(int TurnsPlayed, Player? Winner, Player? StartingPlayer);
 
@@ -70,9 +84,14 @@ public sealed class GameDriver
         LandDropTracker? landDropTracker = null,
         Func<Player, IAutoPassPrefsView?>? autoPassPrefsProvider = null,
         Func<GameContext, bool>? isPassOnlyDeadWindow = null,
-        Func<DateTime>? clock = null)
+        Func<DateTime>? clock = null,
+        ILogicalClock? logicalClock = null)
     {
         _players = players ?? throw new ArgumentNullException(nameof(players));
+        // Determinism (PLAN 08 prerequisite): own a logical clock for the game.
+        // Callers that want reproducible ordering (replay / determinism tests)
+        // pass an explicit clock; otherwise default to a fresh per-game one.
+        _logicalClock = logicalClock ?? new LogicalClock();
         // CR 720 — route every agent lookup through the control registry so a
         // controlled player's decisions go to the controller's agent during
         // the controlled turn. Transparent when no control is active (the
@@ -170,6 +189,14 @@ public sealed class GameDriver
         int? startingPlayerIndex = null,
         CancellationToken ct = default)
     {
+        // Determinism (PLAN 08 prerequisite): install this game's logical clock
+        // as the ambient clock for the entire run. The AsyncLocal scope flows
+        // across every await continuation the driver hits, so trigger / effect /
+        // permanent / event construction anywhere under this call (on whatever
+        // threadpool thread resumes the continuation) reads THIS game's
+        // monotonic clock — never wall-clock, never another game's clock.
+        using var clockScope = LogicalClockScope.Push(_logicalClock);
+
         // CR 103.1 — shuffle libraries.
         foreach (var p in _players)
         {

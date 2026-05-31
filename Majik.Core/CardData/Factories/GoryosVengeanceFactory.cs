@@ -218,7 +218,7 @@ public static class GoryosVengeanceFactory
         // -------------------------------------------------------------------
         if (triggers == null) return;
 
-        var resolvedAt = DateTime.UtcNow;
+        var resolvedAt = Majik.Core.Game.LogicalClockScope.Current.NextTimestamp();
         var exileEffect = new Effect(
             $"{CardName}: exile {pick.Name} at next end step",
             () =>

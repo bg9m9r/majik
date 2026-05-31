@@ -49,6 +49,20 @@ public sealed class Match
     [BsonRepresentation(BsonType.String)]
     public Guid? GameId { get; set; }
 
+    /// <summary>
+    /// Determinism (PLAN 08 prerequisite): the RNG seed pinned at match
+    /// creation and stored here. The engine's <c>GameRandom(seed)</c> is built
+    /// from this value when the game boots, so the (seed, command order) pair
+    /// is reproducible. Persisting the seed is the prerequisite that makes
+    /// later command-log replay / replica rehydration (PLAN 08 body) possible;
+    /// the durable command log + rehydration constructor remain out of scope.
+    /// <para>Not <c>required</c> so a Match doc persisted before this field
+    /// existed still deserializes (it reads back as 0); every code path that
+    /// CREATES a match sets it explicitly via <c>NewGameSeed()</c>.</para>
+    /// </summary>
+    [BsonElement("gameSeed")]
+    public int GameSeed { get; init; }
+
     [BsonElement("creatorMillisRemaining")]
     public long CreatorMillisRemaining { get; set; }
 

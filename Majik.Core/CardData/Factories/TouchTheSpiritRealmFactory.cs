@@ -248,7 +248,7 @@ public static class TouchTheSpiritRealmFactory
                 // / Yorion shape-only fallback).
                 if (triggers == null) return;
 
-                var resolvedAt = DateTime.UtcNow;
+                var resolvedAt = Majik.Core.Game.LogicalClockScope.Current.NextTimestamp();
                 var returnEffect = new Effect(
                     $"{CardName} (Channel): return exiled card at next end step (CR 603.7)",
                     () =>

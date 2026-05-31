@@ -156,7 +156,7 @@ public static class SummonersPactFactory
     {
         if (triggers == null) return;
 
-        var resolvedAt = DateTime.UtcNow;
+        var resolvedAt = Majik.Core.Game.LogicalClockScope.Current.NextTimestamp();
         var pactCost = ManaCost.Parse(DelayedUpkeepCost);
 
         var payOrLoseEffect = new Effect(

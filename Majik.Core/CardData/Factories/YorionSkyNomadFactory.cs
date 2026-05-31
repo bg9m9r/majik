@@ -224,7 +224,7 @@ public static class YorionSkyNomadFactory
         // ----------------------------------------------------------------
         if (exiled.Count > 0 && triggers != null && eventBus != null)
         {
-            var resolvedAt = DateTime.UtcNow;
+            var resolvedAt = Majik.Core.Game.LogicalClockScope.Current.NextTimestamp();
             var returnEffect = new Effect(
                 $"{CardName} — return {exiled.Count} exiled card(s) to the battlefield",
                 () =>

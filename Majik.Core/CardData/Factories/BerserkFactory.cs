@@ -170,7 +170,7 @@ public static class BerserkFactory
         // fence mirrors Sneak Attack / Through the Breach). On fire, if the
         // creature attacked this turn, destroy it (CR 701.7 — honours
         // indestructible/regeneration via OracleSpellBinder.MoveToGraveyard).
-        var resolvedAt = DateTime.UtcNow;
+        var resolvedAt = Majik.Core.Game.LogicalClockScope.Current.NextTimestamp();
         var destroyEffect = new Effect(
             $"{CardName}: destroy {target.Name} at next end step if attacked",
             () =>

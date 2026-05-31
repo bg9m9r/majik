@@ -190,7 +190,7 @@ public static class KikiJikiMirrorBreakerFactory
                 // multiple activations register independent triggers.
                 if (triggers != null)
                 {
-                    var resolvedAt = DateTime.UtcNow;
+                    var resolvedAt = Majik.Core.Game.LogicalClockScope.Current.NextTimestamp();
                     var exileEffect = new Effect(
                         $"{CardName}: exile token at next end step",
                         () =>

@@ -134,7 +134,7 @@ public static class PrizedAmalgamFactory
                 // CR 603.7 — capture the registration moment so the
                 // delayed trigger fires on the NEXT End step, not one
                 // that has already fired in the same priority window.
-                var registeredAt = DateTime.UtcNow;
+                var registeredAt = Majik.Core.Game.LogicalClockScope.Current.NextTimestamp();
 
                 var returnTappedEffect = new Effect(
                     $"{CardName}: return from graveyard to battlefield tapped (delayed)",

@@ -133,7 +133,7 @@ public static class MishrasBaubleFactory
                 // but the simplest correct approximation — match the FIRST
                 // Upkeep event seen with a timestamp strictly after this
                 // ability was set up — is what we go with here.
-                var activatedAt = DateTime.UtcNow;
+                var activatedAt = Majik.Core.Game.LogicalClockScope.Current.NextTimestamp();
                 DelayedTriggeredAbility? delayed = null;
                 var drawEffect = new Effect(
                     "Mishra's Bauble: draw a card (delayed upkeep)",

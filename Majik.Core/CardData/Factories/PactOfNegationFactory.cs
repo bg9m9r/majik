@@ -128,7 +128,7 @@ public static class PactOfNegationFactory
                         // ----------------------------------------------------
                         if (triggers == null) return;
 
-                        var resolvedAt = DateTime.UtcNow;
+                        var resolvedAt = Majik.Core.Game.LogicalClockScope.Current.NextTimestamp();
                         var pactCost = Majik.Core.ValueObjects.ManaCost.Parse("{3}{U}{U}");
 
                         var payOrLoseEffect = new Effect(

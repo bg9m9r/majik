@@ -140,7 +140,7 @@ public static class SearingBloodFactory
         // Battlefield→Graveyard strictly after this resolution (timestamp
         // fence — a creature that already died earlier this turn isn't
         // retroactively counted). CR 700.4 — Battlefield→Graveyard = dies.
-        var resolvedAt = DateTime.UtcNow;
+        var resolvedAt = Majik.Core.Game.LogicalClockScope.Current.NextTimestamp();
         var damageEffect = new Effect(
             $"{CardName}: 3 damage to {controllerAtResolution.Name} ({target.Name} died this turn)",
             // CR 119 — this is *damage* to the player (relevant for lifelink /

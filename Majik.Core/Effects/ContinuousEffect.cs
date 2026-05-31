@@ -1,4 +1,5 @@
 using Majik.Core.Cards;
+using Majik.Core.Game;
 
 namespace Majik.Core.Effects;
 
@@ -42,7 +43,12 @@ public abstract class ContinuousEffect
         if (chars is CreatureCharacteristics cc) Apply(cc);
     }
 
-    public DateTime Timestamp { get; } = DateTime.UtcNow;
+    // Determinism (PLAN 08 prerequisite): CR 613.7 layer-ordering timestamp
+    // comes from the per-game logical clock, not wall-clock. Consumed by
+    // ContinuousEffectsService layer ordering. Assigned in construction order
+    // (the order UtcNow approximated) so layer ordering is unchanged but
+    // reproducible on replay.
+    public DateTime Timestamp { get; } = LogicalClockScope.Current.NextTimestamp();
 
     /// <summary>
     /// CR 613.1g — the permanent generating this continuous effect, when one

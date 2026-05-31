@@ -1,4 +1,5 @@
 using Majik.Core.Cards.Types;
+using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
@@ -280,7 +281,12 @@ public class Permanent : Card
     {
         if (_enteredBattlefieldTimestamp == null)
         {
-            _enteredBattlefieldTimestamp = DateTime.UtcNow;
+            // Determinism (PLAN 08 prerequisite): the ETB timestamp that
+            // decides WHICH legendary survives (LegendRuleCheck) / which
+            // planeswalker survives (PlaneswalkerUniquenessCheck) — a true
+            // game-decision divergence on replay — comes from the per-game
+            // logical clock, not wall-clock. Assigned in ETB order.
+            _enteredBattlefieldTimestamp = LogicalClockScope.Current.NextTimestamp();
         }
     }
 

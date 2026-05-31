@@ -327,7 +327,7 @@ public static class CharmingPrinceFactory
         // Skipped when no TriggerManager is wired (shape-only tests).
         if (triggers == null) return;
 
-        var resolvedAt = DateTime.UtcNow;
+        var resolvedAt = Majik.Core.Game.LogicalClockScope.Current.NextTimestamp();
         var returnEffect = new Effect(
             $"{CardName}: return exiled creature at next end step (CR 603.7)",
             () =>

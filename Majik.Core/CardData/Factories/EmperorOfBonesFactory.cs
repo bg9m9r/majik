@@ -387,7 +387,7 @@ public static class EmperorOfBonesFactory
         // --------------------------------------------------------------
         if (triggers != null)
         {
-            var resolvedAt = DateTime.UtcNow;
+            var resolvedAt = Majik.Core.Game.LogicalClockScope.Current.NextTimestamp();
             var sacEffect = new Effect(
                 $"{CardName}: sacrifice {pick.Name} at next end step",
                 () =>
