@@ -70,5 +70,11 @@ public class EventPayloadOpenApiTests : IClassFixture<TestAppFactory>
         // individual payload schemas into the reachable graph under
         // ignoreUnusedModels:true on the portal side).
         schemas.TryGetProperty("EventPayloadCatalog", out _).Should().BeTrue();
+
+        // PromptDto is anchored via /matches/_promptschema so the portal
+        // prompt subscriber can consume the generated model (PLAN 07).
+        schemas.TryGetProperty("PromptDto", out _).Should().BeTrue(
+            "PromptDto must be exposed via the /matches/_promptschema anchor " +
+            "so ng-openapi-gen emits it for the portal prompt subscriber.");
     }
 }
