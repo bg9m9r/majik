@@ -144,7 +144,7 @@ public static class GenesisWaveFactory
                     new Effect(
                         $"Genesis Wave: reveal top {x}, put any number of permanents " +
                         $"with mv ≤ {x} onto the battlefield, rest to graveyard.",
-                        () => Resolve(caster, x, zoneService)),
+                        ctx => ResolveAsync(caster, x, ctx, zoneService)),
                 };
             });
     }
@@ -163,9 +163,10 @@ public static class GenesisWaveFactory
     /// pick decisions. When null, falls back to <see cref="AgentRegistry.Get"/>;
     /// when no agent is registered either, greedily puts every eligible
     /// permanent onto the battlefield (deterministic pre-agent posture).</param>
-    public static void Resolve(
+    public static async ValueTask ResolveAsync(
         Player caster,
         int x,
+        ResolutionContext ctx,
         ZoneService? zoneService = null,
         IPlayerAgent? agent = null)
     {
@@ -185,7 +186,7 @@ public static class GenesisWaveFactory
             IsPermanentType(c) &&
             ManaCost.Parse(c.ManaCost ?? string.Empty).TotalValue <= x;
 
-        agent ??= AgentRegistry.Get(caster);
+        agent = ctx.Agent ?? agent ?? AgentRegistry.Get(caster);
 
         // CR 122.1c — "you may put any number". Unbounded pick loop: each pass
         // offers the remaining eligible permanents; the agent picks one (→
@@ -204,11 +205,11 @@ public static class GenesisWaveFactory
             ICard? pick;
             if (agent != null)
             {
-                pick = agent.ChooseLibraryPickAsync(
-                        ctx: null,
+                pick = await agent.ChooseLibraryPickAsync(
+                        ctx.Game,
                         candidates: candidates,
                         kindLabel: $"permanent card with mana value {x} or less")
-                    .GetAwaiter().GetResult();
+                    .ConfigureAwait(false);
 
                 // CR 122.1c — declining ends the "any number" loop.
                 if (pick == null) break;

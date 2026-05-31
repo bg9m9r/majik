@@ -108,9 +108,9 @@ public static class OmenOfTheSeaFactory
         // ----------------------------------------------------------------
         var etbEffect = new Effect(
             $"{CardName} — scry 2, then draw a card on ETB",
-            () =>
+            async ctx =>
             {
-                Scry2(owner);
+                await Scry2Async(owner, ctx).ConfigureAwait(false);
 
                 // "Then draw a card." Top-of-library draw; an empty library
                 // flags the SBA-driven loss (CR 104.3c / CR 704.5b).
@@ -144,13 +144,13 @@ public static class OmenOfTheSeaFactory
         // ----------------------------------------------------------------
         var scryEffect = new Effect(
             $"{CardName} — {{2}}{{U}}, Sacrifice this: scry 2",
-            () =>
+            async ctx =>
             {
                 // Sacrifice payment stub: move Battlefield → Graveyard.
                 SacrificeSelf(card, owner);
 
                 // CR 701.20 — Scry 2.
-                Scry2(owner);
+                await Scry2Async(owner, ctx).ConfigureAwait(false);
             });
 
         var scryAbility = new ActivatedAbility(
@@ -174,18 +174,18 @@ public static class OmenOfTheSeaFactory
     /// pre-agent default sends both peeked cards to the bottom (same fallback
     /// as <see cref="PreordainFactory"/>). No-op on an empty library.
     /// </summary>
-    private static void Scry2(Player player)
+    private static async ValueTask Scry2Async(Player player, ResolutionContext ctx)
     {
         var peeked = ScryAction.Peek(player, ScryAmount);
         if (peeked.Count == 0) return;
 
-        var agent = AgentRegistry.Get(player);
+        var agent = ctx.Agent ?? AgentRegistry.Get(player);
         ScryAction.ScryDecision decision;
         if (agent != null)
         {
             // TODO: drop sync-over-async once IEffect.Execute becomes async.
-            decision = agent.ChooseScryDecisionAsync(null, peeked)
-                .GetAwaiter().GetResult();
+            decision = await agent.ChooseScryDecisionAsync(ctx.Game, peeked)
+                .ConfigureAwait(false);
         }
         else
         {

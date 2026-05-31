@@ -142,7 +142,7 @@ public static class BirthingRitualFactory
         // ----------------------------------------------------------------
         var resolveEffect = new Effect(
             $"{CardName}: end-step look at top 7, may-sac → may-put creature card with mv ≤ X+1, bottom rest randomly",
-            () =>
+            async ctx =>
             {
                 if (card.Zone != ZoneType.Battlefield) return;
 
@@ -153,7 +153,7 @@ public static class BirthingRitualFactory
                 var controller = card.Controller ?? owner;
                 if (!ControllerHasCreature(controller)) return;
 
-                Resolve(controller, zoneService);
+                await ResolveAsync(controller, ctx, zoneService).ConfigureAwait(false);
             });
 
         var endStepTrigger = new TriggeredAbility(
@@ -187,8 +187,9 @@ public static class BirthingRitualFactory
     /// either, declines both decisions (deterministic conservative
     /// fallback — same posture as <see cref="CollectedCompanyFactory"/>
     /// for the agentless test path).</param>
-    public static void Resolve(
+    public static async ValueTask ResolveAsync(
         Player controller,
+        ResolutionContext ctx,
         ZoneService? zoneService = null,
         IPlayerAgent? agent = null)
     {
@@ -215,7 +216,7 @@ public static class BirthingRitualFactory
         // 2. "Then you may sacrifice a creature." Prompt the controller's
         //    agent. Empty candidate list (no creatures) is a no-op for the
         //    rest of the body — we still bottom the peek randomly.
-        agent ??= AgentRegistry.Get(controller);
+        agent = ctx.Agent ?? agent ?? AgentRegistry.Get(controller);
 
         var sacCandidates = controller.Zones.Battlefield.GetCards()
             .OfType<Creature>()
@@ -229,11 +230,11 @@ public static class BirthingRitualFactory
             // a (usually larger) creature onto the battlefield without
             // paying its mana cost. Heuristic / EV agents score the
             // tradeoff via the live agent.
-            var pick = agent.ChooseFromBattlefieldAsync(
+            var pick = await agent.ChooseFromBattlefieldAsync(
                 chooser: controller,
                 candidates: sacCandidates,
                 intent: BotIntent.CheatIntoPlay)
-                .GetAwaiter().GetResult();
+                .ConfigureAwait(false);
 
             // CR 117 — "may" allows null. Defensive: only accept picks
             // from the offered candidates.
@@ -267,11 +268,11 @@ public static class BirthingRitualFactory
             var libraryCandidates = peeked.Where(IsEligible).ToList();
             if (libraryCandidates.Count > 0 && agent != null)
             {
-                var pick = agent.ChooseLibraryPickAsync(
-                    ctx: null,
+                var pick = await agent.ChooseLibraryPickAsync(
+                    ctx.Game,
                     candidates: libraryCandidates,
                     kindLabel: $"creature card with mana value {xCap} or less")
-                    .GetAwaiter().GetResult();
+                    .ConfigureAwait(false);
 
                 // CR 117 — "may" allows null. Defensive: the pick must be
                 // in the eligibility-filtered set so an over-cost choice

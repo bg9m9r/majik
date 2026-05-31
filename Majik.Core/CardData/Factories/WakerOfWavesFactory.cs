@@ -141,7 +141,7 @@ public static class WakerOfWavesFactory
             {
                 new Effect(
                     $"{CardName}: look at top 2, put one into hand and other into graveyard",
-                    () => ResolveTopTwoPick(controller)),
+                    ctx => ResolveTopTwoPickAsync(controller, ctx)),
             },
             targetRequests: Array.Empty<TargetRequest>());
 
@@ -153,17 +153,17 @@ public static class WakerOfWavesFactory
     /// consult the registered agent (or fall back to first card) to choose
     /// 1 for hand; the other goes to graveyard.
     /// </summary>
-    private static void ResolveTopTwoPick(Player controller)
+    private static async ValueTask ResolveTopTwoPickAsync(Player controller, ResolutionContext ctx)
     {
         var top2 = controller.Zones.Library.GetCards().Take(2).ToList();
         if (top2.Count == 0) return;
 
         // Agent chooses which card goes to hand; fallback = first card.
         ICard? pick;
-        var agent = AgentRegistry.Get(controller);
+        var agent = ctx.Agent ?? AgentRegistry.Get(controller);
         pick = agent != null
-            ? agent.ChooseLibraryPickAsync(ctx: null, top2, "any card")
-                .GetAwaiter().GetResult()
+            ? await agent.ChooseLibraryPickAsync(ctx.Game, top2, "any card")
+                .ConfigureAwait(false)
             : top2[0];
 
         // Ensure pick is actually one of the two cards (guard against

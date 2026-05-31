@@ -139,7 +139,7 @@ public static class HarnessedLightningFactory
                 {
                     Fx.Inline(
                         $"{CardName}: gain {{E}}{{E}}{{E}}, optional pay X {{E}} → X damage",
-                        () =>
+                        async ctx =>
                         {
                             // CR 106.13b — the {E}{E}{E} gain is
                             // unconditional and fires before the
@@ -160,12 +160,12 @@ public static class HarnessedLightningFactory
                             // v1 reuses it at resolve as the pragmatic
                             // "may pay X" prompt — see factory xmldoc
                             // "Deferred (v1 gaps)".
-                            var agent = AgentRegistry.Get(controller);
+                            var agent = ctx.Agent ?? AgentRegistry.Get(controller);
                             int x;
                             if (agent != null)
                             {
-                                x = agent.ChooseXAsync(ctx: null!, source: source)
-                                    .GetAwaiter().GetResult();
+                                x = await agent.ChooseXAsync(ctx.Game!, source: source)
+                                    .ConfigureAwait(false);
                             }
                             else
                             {

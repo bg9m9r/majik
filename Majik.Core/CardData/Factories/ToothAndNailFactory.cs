@@ -222,10 +222,10 @@ public static class ToothAndNailFactory
     /// (when registered) so ETB triggers fire.
     /// </summary>
     private static IEffect BuildReanimateFromHandEffect(Player caster) =>
-        new Effect("Tooth and Nail — put up to two creatures from hand onto the battlefield", () =>
+        new Effect("Tooth and Nail — put up to two creatures from hand onto the battlefield", async ctx =>
         {
-            var picks = PickUpToTwoCreatures(caster.Zones.Hand, caster,
-                "creature card from hand to put onto the battlefield");
+            var picks = await PickUpToTwoCreaturesAsync(caster.Zones.Hand, caster,
+                "creature card from hand to put onto the battlefield", ctx).ConfigureAwait(false);
             PutCreaturesOntoBattlefield(picks, caster);
         });
 
@@ -233,25 +233,25 @@ public static class ToothAndNailFactory
 
     private static bool IsCreature(ICard c) => c.HasType(CardType.Creature);
 
-    private static List<ICard> PickUpToTwoCreatures(IZone zone, Player caster, string kindLabel)
+    private static async ValueTask<List<ICard>> PickUpToTwoCreaturesAsync(IZone zone, Player caster, string kindLabel, ResolutionContext ctx)
     {
         var picks = new List<ICard>(capacity: MaxCreaturesPerMode);
-        var agent = AgentRegistry.Get(caster);
+        var agent = ctx.Agent ?? AgentRegistry.Get(caster);
 
         // First pick — agent may decline (return null) for "up to two".
-        var first = PickOne(zone, agent, kindLabel, excluded: null);
+        var first = await PickOneAsync(zone, agent, kindLabel, excluded: null, ctx).ConfigureAwait(false);
         if (first != null) picks.Add(first);
 
         // Second pick — exclude the first.
         if (picks.Count > 0)
         {
-            var second = PickOne(zone, agent, kindLabel, excluded: picks[0]);
+            var second = await PickOneAsync(zone, agent, kindLabel, excluded: picks[0], ctx).ConfigureAwait(false);
             if (second != null) picks.Add(second);
         }
         return picks;
     }
 
-    private static ICard? PickOne(IZone zone, IPlayerAgent? agent, string kindLabel, ICard? excluded)
+    private static async ValueTask<ICard?> PickOneAsync(IZone zone, IPlayerAgent? agent, string kindLabel, ICard? excluded, ResolutionContext ctx)
     {
         var candidates = zone.GetCards()
             .Where(c => IsCreature(c) && (excluded == null || !ReferenceEquals(c, excluded)))
@@ -259,8 +259,8 @@ public static class ToothAndNailFactory
         if (candidates.Count == 0) return null;
 
         if (agent == null) return candidates[0];
-        return agent.ChooseLibraryPickAsync(ctx: null, candidates, kindLabel)
-            .GetAwaiter().GetResult();
+        return await agent.ChooseLibraryPickAsync(ctx.Game, candidates, kindLabel)
+            .ConfigureAwait(false);
     }
 
     private static void PutCreaturesOntoBattlefield(List<ICard> picks, Player caster)

@@ -78,11 +78,11 @@ public static class WayfarersBaubleFactory
         // ----------------------------------------------------------------
         var tutorEffect = new Effect(
             $"{CardName}: sac self + tutor basic land -> battlefield tapped",
-            () =>
+            async ctx =>
             {
                 var controller = bauble.Controller ?? owner;
                 SacrificeSelf(bauble, owner, controller);
-                TutorBasicLandToBattlefieldTapped(controller);
+                await TutorBasicLandToBattlefieldTappedAsync(controller, ctx).ConfigureAwait(false);
             });
 
         var tutorAbility = new ActivatedAbility(
@@ -121,7 +121,7 @@ public static class WayfarersBaubleFactory
     /// match), move the chosen card to the battlefield, apply the printed
     /// "tapped" rider, then shuffle (CR 701.20a).
     /// </summary>
-    private static void TutorBasicLandToBattlefieldTapped(Player player)
+    private static async ValueTask TutorBasicLandToBattlefieldTappedAsync(Player player, ResolutionContext ctx)
     {
         var candidates = player.Zones.Library.GetCards()
             .Where(c => c.HasType(CardType.Land) && c.HasSupertype(CardSupertype.Basic))
@@ -132,10 +132,10 @@ public static class WayfarersBaubleFactory
             return;
         }
 
-        var agent = AgentRegistry.Get(player);
+        var agent = ctx.Agent ?? AgentRegistry.Get(player);
         ICard? pick = agent != null
-            ? agent.ChooseLibraryPickAsync(ctx: null, candidates, "basic land card")
-                .GetAwaiter().GetResult()
+            ? await agent.ChooseLibraryPickAsync(ctx.Game, candidates, "basic land card")
+                .ConfigureAwait(false)
             : candidates[0];
         if (pick == null)
         {

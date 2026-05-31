@@ -36,6 +36,9 @@ namespace Majik.Core.Tests.CardData;
 /// </summary>
 public class CollectedCompanyTests
 {
+    private static ResolutionContext Rc(Player controller) =>
+        ResolutionContext.For(controller, agent: null, game: null, chosenTargets: null);
+
     private readonly Player _alice = new("Alice", 20);
 
     public CollectedCompanyTests()
@@ -70,7 +73,7 @@ public class CollectedCompanyTests
     }
 
     [Fact]
-    public void Resolve_TwoEligibleCreatures_BothEtb_RestToBottom()
+    public async System.Threading.Tasks.Task Resolve_TwoEligibleCreatures_BothEtb_RestToBottom()
     {
         // Top 6: two mv≤3 creatures, four non-creatures / non-eligible.
         var bear      = SeedCreatureInLibrary(_alice, "Grizzly Bears", "{1}{G}", 2, 2);
@@ -80,7 +83,7 @@ public class CollectedCompanyTests
         var forest    = SeedLandInLibrary(_alice, "Forest");
         var bigTitan  = SeedCreatureInLibrary(_alice, "Primeval Titan", "{4}{G}{G}", 6, 6); // mv 6 → excluded
 
-        CollectedCompanyFactory.Resolve(_alice);
+        await CollectedCompanyFactory.ResolveAsync(_alice, Rc(_alice));
 
         var bf = _alice.Zones.Battlefield.GetCards().ToList();
         bf.Should().Contain(bear);
@@ -94,7 +97,7 @@ public class CollectedCompanyTests
     }
 
     [Fact]
-    public void Resolve_FourDropCreature_Excluded()
+    public async System.Threading.Tasks.Task Resolve_FourDropCreature_Excluded()
     {
         // Only ineligible creatures (mv=4) plus a mv=3 creature.
         var fourDrop = SeedCreatureInLibrary(_alice, "Tireless Tracker", "{2}{G}{G}", 3, 2);
@@ -103,7 +106,7 @@ public class CollectedCompanyTests
         for (int i = 0; i < 4; i++)
             SeedInstantInLibrary(_alice, $"Pad{i}", "{1}");
 
-        CollectedCompanyFactory.Resolve(_alice);
+        await CollectedCompanyFactory.ResolveAsync(_alice, Rc(_alice));
 
         var bf = _alice.Zones.Battlefield.GetCards().ToList();
         bf.Should().Contain(threeDrop);
@@ -112,13 +115,13 @@ public class CollectedCompanyTests
     }
 
     [Fact]
-    public void Resolve_NoCreaturesInTopSix_NoEtb_AllBottom()
+    public async System.Threading.Tasks.Task Resolve_NoCreaturesInTopSix_NoEtb_AllBottom()
     {
         var bolt   = SeedInstantInLibrary(_alice, "Lightning Bolt", "{R}");
         var wrath  = SeedSorceryInLibrary(_alice, "Wrath of God", "{2}{W}{W}");
         var forest = SeedLandInLibrary(_alice, "Forest");
 
-        CollectedCompanyFactory.Resolve(_alice);
+        await CollectedCompanyFactory.ResolveAsync(_alice, Rc(_alice));
 
         _alice.Zones.Battlefield.GetCards().Should().BeEmpty();
         var lib = _alice.Zones.Library.GetCards().ToList();
@@ -126,29 +129,29 @@ public class CollectedCompanyTests
     }
 
     [Fact]
-    public void Resolve_ShortLibrary_WorksOnAvailableCards()
+    public async System.Threading.Tasks.Task Resolve_ShortLibrary_WorksOnAvailableCards()
     {
         // Two cards total: one creature, one instant.
         var elves = SeedCreatureInLibrary(_alice, "Llanowar Elves", "{G}", 1, 1);
         var bolt = SeedInstantInLibrary(_alice, "Lightning Bolt", "{R}");
 
-        CollectedCompanyFactory.Resolve(_alice);
+        await CollectedCompanyFactory.ResolveAsync(_alice, Rc(_alice));
 
         _alice.Zones.Battlefield.GetCards().Should().Contain(elves);
         _alice.Zones.Library.GetCards().Should().BeEquivalentTo(new[] { bolt });
     }
 
     [Fact]
-    public void Resolve_EmptyLibrary_NoOp()
+    public async System.Threading.Tasks.Task Resolve_EmptyLibrary_NoOp()
     {
-        CollectedCompanyFactory.Resolve(_alice);
+        await CollectedCompanyFactory.ResolveAsync(_alice, Rc(_alice));
 
         _alice.Zones.Battlefield.GetCards().Should().BeEmpty();
         _alice.Zones.Library.GetCards().Should().BeEmpty();
     }
 
     [Fact]
-    public void Resolve_AgentDeclinesAfterFirstPick_OnlyOneEtb()
+    public async System.Threading.Tasks.Task Resolve_AgentDeclinesAfterFirstPick_OnlyOneEtb()
     {
         var first = SeedCreatureInLibrary(_alice, "Llanowar Elves", "{G}", 1, 1);
         var second = SeedCreatureInLibrary(_alice, "Grizzly Bears", "{1}{G}", 2, 2);
@@ -161,7 +164,7 @@ public class CollectedCompanyTests
         // so the test doesn't depend on shared AgentRegistry state.
         var agent = new DeclineAfterFirstAgent();
 
-        CollectedCompanyFactory.Resolve(_alice, zoneService: null, agent: agent);
+        await CollectedCompanyFactory.ResolveAsync(_alice, Rc(_alice), zoneService: null, agent: agent);
 
         var bf = _alice.Zones.Battlefield.GetCards().ToList();
         bf.Should().HaveCount(1);
@@ -171,14 +174,14 @@ public class CollectedCompanyTests
     }
 
     [Fact]
-    public void Resolve_TwoEligibleButOnlyOnePickedIfAgentDeclines_RestBottomed()
+    public async System.Threading.Tasks.Task Resolve_TwoEligibleButOnlyOnePickedIfAgentDeclines_RestBottomed()
     {
         // Top 6 mixed; the one creature is mv 3 elf.
         var elves = SeedCreatureInLibrary(_alice, "Llanowar Elves", "{G}", 1, 1);
         for (int i = 0; i < 5; i++)
             SeedInstantInLibrary(_alice, $"Filler{i}", "{1}");
 
-        CollectedCompanyFactory.Resolve(_alice);
+        await CollectedCompanyFactory.ResolveAsync(_alice, Rc(_alice));
 
         _alice.Zones.Battlefield.GetCards().Should().Contain(elves);
         _alice.Zones.Battlefield.GetCards().Count().Should().Be(1);

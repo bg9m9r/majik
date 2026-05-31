@@ -297,4 +297,35 @@ public class SneakAttackTests
         triggers.PendingCount.Should().Be(0,
             "no creature placed → no delayed end-step sacrifice registered");
     }
+
+    [Fact]
+    public async System.Threading.Tasks.Task ExecuteAsync_HonoursScriptedAgentSecondCreaturePick()
+    {
+        // PLAN 01 Slice D — the cheat-into-play body now prompts the agent off
+        // the ResolutionContext (yes/no + from-hand). A scripted agent that
+        // accepts and picks the SECOND creature must be honoured.
+        var first = new Majik.Core.Cards.Creature("Goblin", "{R}", 1, 1)
+        { Owner = _alice, Zone = ZoneType.Hand };
+        var second = new Majik.Core.Cards.Creature("Dragon", "{4}{R}{R}", 5, 5)
+        { Owner = _alice, Zone = ZoneType.Hand };
+        _alice.Zones.Hand.AddCard(first);
+        _alice.Zones.Hand.AddCard(second);
+
+        var agent = new Majik.Core.Players.Agents.ScriptedAgent();
+        agent.QueueYesNo(true);                       // "Put a creature?" → yes
+        agent.QueueFromHand(second);                  // pick the second creature
+
+        var sneakAttack = SneakAttackFactory.Create(_alice, _zones, triggers: null);
+        _alice.Zones.Battlefield.AddCard(sneakAttack);
+        sneakAttack.SetZone(ZoneType.Battlefield);
+
+        var ability = sneakAttack.Abilities.OfType<ActivatedAbility>().Single();
+        var rc = ResolutionContext.For(_alice, agent, game: null, chosenTargets: null);
+        foreach (var e in ability.Effects) await e.ExecuteAsync(rc);
+
+        second.Zone.Should().Be(ZoneType.Battlefield,
+            "the agent's chosen (second) creature is cheated into play");
+        first.Zone.Should().Be(ZoneType.Hand,
+            "the first creature was not auto-picked");
+    }
 }

@@ -145,10 +145,10 @@ public static class GlintNestCraneFactory
         // ----------------------------------------------------------------
         var etbEffect = new Effect(
             $"{CardName} — look at top {LookCount}, may reveal an artifact to hand, rest on bottom",
-            () =>
+            async ctx =>
             {
                 var controller = card.Controller ?? owner;
-                var result = ResolveEtb(controller, choosePick);
+                var result = await ResolveEtbAsync(controller, ctx, choosePick).ConfigureAwait(false);
                 onEtbResolved?.Invoke(result);
             });
 
@@ -178,8 +178,9 @@ public static class GlintNestCraneFactory
     /// to reveal and put into hand. The picked card is moved Library → Hand;
     /// all others are moved to the bottom of the library in snapshot order.
     /// </summary>
-    public static Result ResolveEtb(
+    public static async ValueTask<Result> ResolveEtbAsync(
         Player controller,
+        ResolutionContext ctx,
         Func<IReadOnlyList<ICard>, ICard?>? choosePick = null)
     {
         ArgumentNullException.ThrowIfNull(controller);
@@ -218,16 +219,14 @@ public static class GlintNestCraneFactory
             }
             else
             {
-                var agent = AgentRegistry.Get(controller);
+                var agent = ctx.Agent ?? AgentRegistry.Get(controller);
                 if (agent != null)
                 {
-                    // TODO: drop sync-over-async once IEffect.Execute is async
-                    // (same pattern as AugurOfBolasFactory).
-                    pick = agent.ChooseLibraryPickAsync(
-                        ctx: null,
+                    pick = await agent.ChooseLibraryPickAsync(
+                        ctx.Game,
                         candidates: eligible,
                         kindLabel: "artifact card")
-                        .GetAwaiter().GetResult();
+                        .ConfigureAwait(false);
                 }
                 else
                 {

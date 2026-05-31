@@ -160,17 +160,17 @@ public static class CharmingPrinceFactory
 
         var etbEffect = new Effect(
             $"{CardName}: choose one — scry 2; you gain 3 life; blink creature you own",
-            () =>
+            async ctx =>
             {
                 if (etbTrigger == null) return;
 
                 var controller = card.Controller ?? owner;
-                var chosenMode = PickMode(controller, mode);
+                var chosenMode = await PickModeAsync(controller, mode, ctx).ConfigureAwait(false);
 
                 switch (chosenMode)
                 {
                     case ModeScry:
-                        ExecuteScry(controller);
+                        await ExecuteScryAsync(controller, ctx).ConfigureAwait(false);
                         break;
 
                     case ModeGainLife:
@@ -226,18 +226,18 @@ public static class CharmingPrinceFactory
     /// back to the captured <paramref name="defaultMode"/> (the factory-
     /// time mode parameter).
     /// </summary>
-    private static int PickMode(Player controller, int defaultMode)
+    private static async ValueTask<int> PickModeAsync(Player controller, int defaultMode, ResolutionContext ctx)
     {
-        var agent = AgentRegistry.Get(controller);
+        var agent = ctx.Agent ?? AgentRegistry.Get(controller);
         if (agent == null) return defaultMode;
 
         try
         {
-            var pick = agent.ChooseModeAsync(
-                    ctx: null!,
+            var pick = await agent.ChooseModeAsync(
+                    ctx.Game!,
                     modes: Modes,
                     modeIntents: ModeIntents)
-                .GetAwaiter().GetResult();
+                .ConfigureAwait(false);
 
             if (pick >= 0 && pick < Modes.Count) return pick;
         }
@@ -255,19 +255,17 @@ public static class CharmingPrinceFactory
     /// Mode 0 — Scry 2 (CR 701.20). Identical to
     /// <see cref="PreordainFactory"/>'s scry body (N=2) without the draw.
     /// </summary>
-    private static void ExecuteScry(Player controller)
+    private static async ValueTask ExecuteScryAsync(Player controller, ResolutionContext ctx)
     {
         var peeked = ScryAction.Peek(controller, ScryAmount);
         if (peeked.Count == 0) return;
 
-        var agent = AgentRegistry.Get(controller);
+        var agent = ctx.Agent ?? AgentRegistry.Get(controller);
         ScryAction.ScryDecision decision;
         if (agent != null)
         {
-            // Sync-over-async — same posture as Preordain / Opt factories.
-            // TODO: drop sync-over-async once IEffect.Execute becomes async.
-            decision = agent.ChooseScryDecisionAsync(null, peeked)
-                .GetAwaiter().GetResult();
+            decision = await agent.ChooseScryDecisionAsync(ctx.Game, peeked)
+                .ConfigureAwait(false);
         }
         else
         {

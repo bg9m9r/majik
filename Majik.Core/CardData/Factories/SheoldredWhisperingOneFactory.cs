@@ -203,16 +203,20 @@ public static class SheoldredWhisperingOneFactory
                 // player controls no creatures; the ability still resolves).
                 if (candidates.Count == 0) return;
 
-                // "Sacrifices a creature" — the victim chooses. Their agent
-                // drives the pick (BotIntent.Removal) with a deterministic
-                // fallback to the first creature in battlefield order.
+                // "Sacrifices a creature" — the VICTIM (an opponent) chooses,
+                // NOT the resolving controller. Do not point this at ctx.Agent;
+                // the victim's own agent drives the pick (CR 701.16) with a
+                // deterministic fallback to the first creature in battlefield
+                // order. This stays a sync-over-async site — the different-
+                // player prompt path is a later slice (only controller-acting
+                // prompts migrate in this batch).
                 ICard sacrificed;
-                var agent = ctx.Agent ?? AgentRegistry.Get(victim);
+                var agent = AgentRegistry.Get(victim);
                 if (agent != null)
                 {
-                    var chosen = agent
+                    var chosen = await agent
                         .ChooseFromBattlefieldAsync(victim, candidates, BotIntent.Removal)
-                        .GetAwaiter().GetResult();
+                        .ConfigureAwait(false);
 
                     // Validate the agent pick: must still be a creature on
                     // the victim's battlefield. Invalid → deterministic

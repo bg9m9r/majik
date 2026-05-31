@@ -100,7 +100,7 @@ public static class PrimevalTitanFactory
         // CR 701.19a (search), CR 701.20a (shuffle after — see helper call).
         // ----------------------------------------------------------------
         IEffect BuildTutorEffect(string label) =>
-            new Effect(label, () => TutorUpToTwoLandsTapped(owner, selector));
+            new Effect(label, ctx => TutorUpToTwoLandsTappedAsync(owner, selector, ctx));
 
         // ----------------------------------------------------------------
         // ETB triggered ability — CR 603.1.
@@ -146,9 +146,10 @@ public static class PrimevalTitanFactory
     /// via <see cref="IPlayerAgent.ChooseLibraryPickAsync"/>. The agent
     /// may return null per slot to decline (legal under CR 701.19a).
     /// </summary>
-    private static void TutorUpToTwoLandsTapped(
+    private static async ValueTask TutorUpToTwoLandsTappedAsync(
         Player caster,
-        Func<Player, IReadOnlyList<ICard>>? selector)
+        Func<Player, IReadOnlyList<ICard>>? selector,
+        ResolutionContext ctx)
     {
         // Deterministic selector path (tests). Filter to lands actually
         // present in the library, dedupe by reference, and clamp to 2.
@@ -176,7 +177,7 @@ public static class PrimevalTitanFactory
         // Agent-driven path: two sequential single-land tutors. Each call
         // refilters the library so the agent never sees the previously
         // picked land in the candidate set.
-        var agent = AgentRegistry.Get(caster);
+        var agent = ctx.Agent ?? AgentRegistry.Get(caster);
         for (int slot = 0; slot < 2; slot++)
         {
             var candidates = caster.Zones.Library.GetCards()
@@ -185,8 +186,8 @@ public static class PrimevalTitanFactory
             if (candidates.Count == 0) break;
 
             ICard? pick = agent != null
-                ? agent.ChooseLibraryPickAsync(ctx: null, candidates, "land card")
-                    .GetAwaiter().GetResult()
+                ? await agent.ChooseLibraryPickAsync(ctx.Game, candidates, "land card")
+                    .ConfigureAwait(false)
                 : candidates[0];
             if (pick == null) break; // CR 701.19a — decline is legal.
 

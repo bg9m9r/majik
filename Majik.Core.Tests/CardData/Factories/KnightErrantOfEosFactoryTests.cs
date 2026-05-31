@@ -29,6 +29,12 @@ public class KnightErrantOfEosFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
 
+    // PLAN 01 Slice D — ResolveEtb is now async; tests drive it through a
+    // legacy ResolutionContext (no live agent → first-pick fallback, same
+    // posture these tests already assert).
+    private static ResolutionContext Rc(Player controller) =>
+        ResolutionContext.For(controller, agent: null, game: null, chosenTargets: null);
+
     [Fact]
     public void KnightErrant_IsCreature_ElfKnight_4_4_AtCost3GW()
     {
@@ -56,7 +62,7 @@ public class KnightErrantOfEosFactoryTests
     }
 
     [Fact]
-    public void ResolveEtb_TakesUpToTwoMv2OrLessCreatures_RestToBottomRandom()
+    public async System.Threading.Tasks.Task ResolveEtb_TakesUpToTwoMv2OrLessCreatures_RestToBottomRandom()
     {
         // Library top → bottom: 6 creature cards all mv ≤ 2.
         var lib = new[]
@@ -72,7 +78,7 @@ public class KnightErrantOfEosFactoryTests
 
         // No agent registered → falls back to "take first" — first two
         // eligible creatures are C1, C2.
-        KnightErrantOfEosFactory.ResolveEtb(_alice);
+        await KnightErrantOfEosFactory.ResolveEtbAsync(_alice, Rc(_alice));
 
         var hand = _alice.Zones.Hand.GetCards().ToList();
         hand.Should().HaveCount(2);
@@ -87,7 +93,7 @@ public class KnightErrantOfEosFactoryTests
     }
 
     [Fact]
-    public void ResolveEtb_FiltersOutNonCreaturesAndHighMv()
+    public async System.Threading.Tasks.Task ResolveEtb_FiltersOutNonCreaturesAndHighMv()
     {
         // 4 cards in library — Knight-Errant peeks all of them (< 6).
         var creature1 = BuildCreature("Tiny Bird", "{1}");        // creature mv 1 → eligible
@@ -101,7 +107,7 @@ public class KnightErrantOfEosFactoryTests
         _alice.Zones.Library.AddCard(noncreature);
         _alice.Zones.Library.AddCard(smallCreature);
 
-        KnightErrantOfEosFactory.ResolveEtb(_alice);
+        await KnightErrantOfEosFactory.ResolveEtbAsync(_alice, Rc(_alice));
 
         var hand = _alice.Zones.Hand.GetCards().ToList();
         // Only creature1 + smallCreature are eligible. With no agent the
@@ -113,15 +119,15 @@ public class KnightErrantOfEosFactoryTests
     }
 
     [Fact]
-    public void ResolveEtb_EmptyLibrary_IsNoOp()
+    public async System.Threading.Tasks.Task ResolveEtb_EmptyLibrary_IsNoOp()
     {
-        var act = () => KnightErrantOfEosFactory.ResolveEtb(_alice);
-        act.Should().NotThrow();
+        var act = async () => await KnightErrantOfEosFactory.ResolveEtbAsync(_alice, Rc(_alice));
+        await act.Should().NotThrowAsync();
         _alice.Zones.Hand.GetCards().Should().BeEmpty();
     }
 
     [Fact]
-    public void ResolveEtb_LibraryHasOnlyOneEligibleCard_TakesOne()
+    public async System.Threading.Tasks.Task ResolveEtb_LibraryHasOnlyOneEligibleCard_TakesOne()
     {
         // Only one creature mv ≤ 2 in library — the second prompt has an
         // empty eligible list and the loop exits early without erroring.
@@ -130,7 +136,7 @@ public class KnightErrantOfEosFactoryTests
         _alice.Zones.Library.AddCard(c1);
         _alice.Zones.Library.AddCard(bigCreature);
 
-        KnightErrantOfEosFactory.ResolveEtb(_alice);
+        await KnightErrantOfEosFactory.ResolveEtbAsync(_alice, Rc(_alice));
 
         _alice.Zones.Hand.GetCards().Should().ContainSingle().Which.Should().Be(c1);
         _alice.Zones.Library.GetCards().Should().Contain(bigCreature);

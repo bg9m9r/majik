@@ -111,10 +111,10 @@ public static class YavimayaElderFactory
         // ----------------------------------------------------------------
         var diesEffect = new Effect(
             $"{CardName} dies: search up to two basic lands -> hand, then shuffle",
-            () =>
+            async ctx =>
             {
                 var controller = card.Controller ?? owner;
-                TutorUpToTwoBasicsToHand(controller);
+                await TutorUpToTwoBasicsToHandAsync(controller, ctx).ConfigureAwait(false);
             });
 
         var diesTrigger = new TriggeredAbility(
@@ -181,12 +181,12 @@ public static class YavimayaElderFactory
     /// search effect even when multiple cards are found). Mirrors
     /// <see cref="BurnishedHartFactory"/>, retargeted to the hand.
     /// </summary>
-    private static void TutorUpToTwoBasicsToHand(Player player)
+    private static async ValueTask TutorUpToTwoBasicsToHandAsync(Player player, ResolutionContext ctx)
     {
         bool IsBasicLand(ICard c) =>
             c.HasType(CardType.Land) && c.HasSupertype(CardSupertype.Basic);
 
-        var agent = AgentRegistry.Get(player);
+        var agent = ctx.Agent ?? AgentRegistry.Get(player);
         var picks = new List<ICard>(capacity: 2);
 
         // First pick.
@@ -195,9 +195,9 @@ public static class YavimayaElderFactory
         if (firstCandidates.Count > 0)
         {
             ICard? first = agent != null
-                ? agent.ChooseLibraryPickAsync(ctx: null, firstCandidates,
+                ? await agent.ChooseLibraryPickAsync(ctx.Game, firstCandidates,
                         "basic land card to put into your hand")
-                    .GetAwaiter().GetResult()
+                    .ConfigureAwait(false)
                 : firstCandidates[0];
             if (first != null) picks.Add(first);
         }
@@ -209,9 +209,9 @@ public static class YavimayaElderFactory
         if (secondCandidates.Count > 0)
         {
             ICard? second = agent != null
-                ? agent.ChooseLibraryPickAsync(ctx: null, secondCandidates,
+                ? await agent.ChooseLibraryPickAsync(ctx.Game, secondCandidates,
                         "basic land card to put into your hand")
-                    .GetAwaiter().GetResult()
+                    .ConfigureAwait(false)
                 : secondCandidates[0];
             if (second != null) picks.Add(second);
         }

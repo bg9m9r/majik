@@ -94,7 +94,7 @@ public static class SenseisDiviningTopFactory
         // ----------------------------------------------------------------
         var peekEffect = new Effect(
             "Sensei's Divining Top: peek top 3, reorder",
-            () => PeekAndReorder(owner));
+            ctx => PeekAndReorderAsync(owner, ctx));
 
         var peekAbility = new ActivatedAbility(
             source: top,
@@ -135,18 +135,17 @@ public static class SenseisDiviningTopFactory
     /// card back on top (Top is reorder-only, CR 701.20 does not apply —
     /// Top is a look/reorder, not a scry).
     /// </summary>
-    private static void PeekAndReorder(Player controller)
+    private static async ValueTask PeekAndReorderAsync(Player controller, ResolutionContext ctx)
     {
         var peeked = ScryAction.Peek(controller, 3);
         if (peeked.Count == 0) return;
 
-        var agent = AgentRegistry.Get(controller);
+        var agent = ctx.Agent ?? AgentRegistry.Get(controller);
         ScryAction.ScryDecision decision;
         if (agent != null)
         {
-            // TODO: drop sync-over-async once IEffect.Execute becomes async.
-            var agentDecision = agent.ChooseScryDecisionAsync(null, peeked)
-                .GetAwaiter().GetResult();
+            var agentDecision = await agent.ChooseScryDecisionAsync(ctx.Game, peeked)
+                .ConfigureAwait(false);
             if (agentDecision.ToBottom.Count > 0)
             {
                 var collapsed = agentDecision.TopOrder

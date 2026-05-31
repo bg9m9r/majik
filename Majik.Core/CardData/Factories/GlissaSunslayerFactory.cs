@@ -152,12 +152,12 @@ public static class GlissaSunslayerFactory
 
         var effect = new Effect(
             $"{CardName}: choose one — draw + lose 1; destroy enchantment; remove up to 3 counters",
-            () =>
+            async ctx =>
             {
                 if (trigger == null) return;
 
                 var controller = card.Controller ?? owner;
-                var chosenMode = PickMode(controller, mode);
+                var chosenMode = await PickModeAsync(controller, mode, ctx).ConfigureAwait(false);
 
                 switch (chosenMode)
                 {
@@ -220,15 +220,15 @@ public static class GlissaSunslayerFactory
     /// to the captured <paramref name="defaultMode"/> (same pattern as
     /// <see cref="CharmingPrinceFactory"/>).
     /// </summary>
-    private static int PickMode(Player controller, int defaultMode)
+    private static async ValueTask<int> PickModeAsync(Player controller, int defaultMode, ResolutionContext ctx)
     {
-        var agent = AgentRegistry.Get(controller);
+        var agent = ctx.Agent ?? AgentRegistry.Get(controller);
         if (agent == null) return defaultMode;
 
         try
         {
-            var pick = agent.ChooseModeAsync(ctx: null!, modes: Modes, modeIntents: ModeIntents)
-                .GetAwaiter().GetResult();
+            var pick = await agent.ChooseModeAsync(ctx.Game!, modes: Modes, modeIntents: ModeIntents)
+                .ConfigureAwait(false);
 
             if (pick >= 0 && pick < Modes.Count) return pick;
         }

@@ -154,7 +154,7 @@ public static class TurntimberSymbiosisFactory
                     $"Turntimber Symbiosis: peek top {PeekCount}, put a creature card onto the " +
                     $"battlefield (+{AdditionalCounters} +1/+1 counters if mv ≤ {CounterThresholdManaValue}), " +
                     "rest to bottom in random order.",
-                    () => Resolve(caster, zoneService)),
+                    ctx => ResolveAsync(caster, ctx, zoneService)),
             });
     }
 
@@ -171,8 +171,9 @@ public static class TurntimberSymbiosisFactory
     /// <see cref="AgentRegistry.Get"/>; when no agent is registered either,
     /// picks the first eligible creature (deterministic pre-agent posture,
     /// matching <see cref="CollectedCompanyFactory"/>).</param>
-    public static void Resolve(
+    public static async ValueTask ResolveAsync(
         Player caster,
+        ResolutionContext ctx,
         ZoneService? zoneService = null,
         IPlayerAgent? agent = null)
     {
@@ -194,13 +195,13 @@ public static class TurntimberSymbiosisFactory
         ICard? pick = null;
         if (candidates.Count > 0)
         {
-            agent ??= AgentRegistry.Get(caster);
+            agent = ctx.Agent ?? agent ?? AgentRegistry.Get(caster);
             pick = agent != null
-                ? agent.ChooseLibraryPickAsync(
-                    ctx: null,
+                ? await agent.ChooseLibraryPickAsync(
+                    ctx.Game,
                     candidates: candidates,
                     kindLabel: "creature card")
-                    .GetAwaiter().GetResult()
+                    .ConfigureAwait(false)
                 : candidates[0];
 
             // CR 117.x — "you may" lets the agent decline (null).

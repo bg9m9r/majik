@@ -151,7 +151,7 @@ public static class ThroughTheBreachFactory
         {
             new Effect(
                 "Through the Breach: put creature from hand → battlefield, haste EOT, sac next end step.",
-                () => ResolveBody(caster, zoneService, triggers, agent)),
+                ctx => ResolveBodyAsync(caster, zoneService, triggers, agent, ctx)),
         };
     }
 
@@ -162,12 +162,14 @@ public static class ThroughTheBreachFactory
     /// end-step sacrifice for that specific creature instance.
     /// No-ops cleanly when no creature is in hand.
     /// </summary>
-    private static void ResolveBody(
+    private static async ValueTask ResolveBodyAsync(
         Player caster,
         ZoneService? zoneService,
         TriggerManager? triggers,
-        IPlayerAgent? agent)
+        IPlayerAgent? agent,
+        ResolutionContext ctx)
     {
+        agent = ctx.Agent ?? agent ?? AgentRegistry.Get(caster);
         // -------------------------------------------------------------------
         // "You may put a creature card from your hand onto the battlefield."
         // With an agent supplied: ChooseYesNoAsync(CheatIntoPlay) +
@@ -183,13 +185,13 @@ public static class ThroughTheBreachFactory
         Creature? pick;
         if (agent != null)
         {
-            var yes = agent.ChooseYesNoAsync(
+            var yes = await agent.ChooseYesNoAsync(
                 "Put a creature card from your hand onto the battlefield?",
-                BotIntent.CheatIntoPlay).GetAwaiter().GetResult();
+                BotIntent.CheatIntoPlay).ConfigureAwait(false);
             if (!yes) return;
-            var chosen = agent.ChooseFromHandAsync(
+            var chosen = await agent.ChooseFromHandAsync(
                 caster, creatures, BotIntent.CheatIntoPlay)
-                .GetAwaiter().GetResult();
+                .ConfigureAwait(false);
             if (chosen is not Creature c) return;
             if (c.Zone != ZoneType.Hand) return;
             pick = c;

@@ -114,15 +114,16 @@ public static class FetchLandCycleFactory
         // sacrifice or the life payment.
         var fetchEffect = new Effect(
             $"{cardName}: search library for {subtypeA} or {subtypeB}, put onto battlefield",
-            () =>
+            async ctx =>
             {
                 var controller = land.Controller ?? land.Owner;
                 if (controller == null) return;
 
-                TutorLandToBattlefield(
+                await TutorLandToBattlefieldAsync(
                     controller,
                     c => c.HasType(CardType.Land)
-                         && (c.HasSubtype(subtypeA) || c.HasSubtype(subtypeB)));
+                         && (c.HasSubtype(subtypeA) || c.HasSubtype(subtypeB)),
+                    ctx).ConfigureAwait(false);
             });
 
         var fetchAbility = new ActivatedAbility(
@@ -157,17 +158,17 @@ public static class FetchLandCycleFactory
     /// among candidates (falls back to the first deterministic match), and
     /// move the chosen card to the battlefield untapped (CR 305).
     /// </summary>
-    private static void TutorLandToBattlefield(Player player, Func<ICard, bool> predicate)
+    private static async ValueTask TutorLandToBattlefieldAsync(Player player, Func<ICard, bool> predicate, ResolutionContext ctx)
     {
         var candidates = player.Zones.Library.GetCards()
             .Where(predicate)
             .ToList();
         if (candidates.Count == 0) return;
 
-        var agent = AgentRegistry.Get(player);
+        var agent = ctx.Agent ?? AgentRegistry.Get(player);
         ICard? pick = agent != null
-            ? agent.ChooseLibraryPickAsync(ctx: null, candidates, "land card")
-                .GetAwaiter().GetResult()
+            ? await agent.ChooseLibraryPickAsync(ctx.Game, candidates, "land card")
+                .ConfigureAwait(false)
             : candidates[0];
         if (pick == null) return;
 

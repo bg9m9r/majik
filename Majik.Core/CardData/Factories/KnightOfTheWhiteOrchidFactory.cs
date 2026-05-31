@@ -144,12 +144,12 @@ public static class KnightOfTheWhiteOrchidFactory
 
         var etbEffect = new Effect(
             $"{CardName}: if an opponent controls more lands, may tutor a Plains to battlefield, then shuffle",
-            () =>
+            async ctx =>
             {
                 // CR 603.4 — resolution-time re-check of the intervening-if.
                 if (!AnOpponentControlsMoreLands()) return;
                 var controller = card.Controller ?? owner;
-                TutorPlainsToBattlefield(controller);
+                await TutorPlainsToBattlefieldAsync(controller, ctx).ConfigureAwait(false);
             });
 
         var etb = new TriggeredAbility(
@@ -188,7 +188,7 @@ public static class KnightOfTheWhiteOrchidFactory
     /// "A Plains card" reads the Plains land subtype (CR 305.6) — matches
     /// basic Plains and any non-basic land typed Plains.
     /// </summary>
-    private static void TutorPlainsToBattlefield(Player player)
+    private static async ValueTask TutorPlainsToBattlefieldAsync(Player player, ResolutionContext ctx)
     {
         bool IsPlainsCard(ICard c) => c.HasSubtype(CardSubtype.Plains);
 
@@ -197,10 +197,10 @@ public static class KnightOfTheWhiteOrchidFactory
         ICard? pick = null;
         if (candidates.Count > 0)
         {
-            var agent = AgentRegistry.Get(player);
+            var agent = ctx.Agent ?? AgentRegistry.Get(player);
             pick = agent != null
-                ? agent.ChooseLibraryPickAsync(ctx: null, candidates,
-                        "Plains card to put onto the battlefield").GetAwaiter().GetResult()
+                ? await agent.ChooseLibraryPickAsync(ctx.Game, candidates,
+                        "Plains card to put onto the battlefield").ConfigureAwait(false)
                 : candidates[0];
         }
 

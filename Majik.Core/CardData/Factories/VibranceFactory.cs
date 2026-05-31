@@ -159,10 +159,10 @@ public static class VibranceFactory
         // ----------------------------------------------------------------
         var ggEffect = new Effect(
             $"{CardName}: tutor a land to hand + gain {LifeGain} life (if GG spent)",
-            () =>
+            async ctx =>
             {
                 var controller = card.Controller ?? owner;
-                TutorOneLandToHand(controller);
+                await TutorOneLandToHandAsync(controller, ctx).ConfigureAwait(false);
                 controller.GainLife(LifeGain);
                 card.ClearPendingCastColors();
             });
@@ -189,20 +189,20 @@ public static class VibranceFactory
     /// step is a no-op signal in v1 (same gap as every tutor factory) — the
     /// card still reaches the hand so observable state is correct.
     /// </summary>
-    private static void TutorOneLandToHand(Player player)
+    private static async ValueTask TutorOneLandToHandAsync(Player player, ResolutionContext ctx)
     {
         bool IsLand(ICard c) => c.HasType(CardType.Land);
 
-        var agent = AgentRegistry.Get(player);
+        var agent = ctx.Agent ?? AgentRegistry.Get(player);
         var candidates = player.Zones.Library.GetCards().Where(IsLand).ToList();
 
         ICard? pick = null;
         if (candidates.Count > 0)
         {
             pick = agent != null
-                ? agent.ChooseLibraryPickAsync(ctx: null, candidates,
+                ? await agent.ChooseLibraryPickAsync(ctx.Game, candidates,
                         "land card to put into your hand")
-                    .GetAwaiter().GetResult()
+                    .ConfigureAwait(false)
                 : candidates[0];
         }
 

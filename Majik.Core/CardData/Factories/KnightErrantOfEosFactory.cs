@@ -127,7 +127,7 @@ public static class KnightErrantOfEosFactory
         // ----------------------------------------------------------------
         var etbEffect = new Effect(
             $"{CardName}: peek top {PeekCount}, take up to {MaxPicks} creature cards mv≤{ManaValueCeiling} to hand, rest to bottom random",
-            () => ResolveEtb(owner));
+            ctx => ResolveEtbAsync(owner, ctx));
 
         var etb = new TriggeredAbility(
             source: card,
@@ -172,7 +172,7 @@ public static class KnightErrantOfEosFactory
     /// re-bottoms the remainder in a randomised order via the active
     /// <see cref="Random.GameRandom"/>.
     /// </summary>
-    public static void ResolveEtb(Player controller)
+    public static async ValueTask ResolveEtbAsync(Player controller, ResolutionContext ctx)
     {
         ArgumentNullException.ThrowIfNull(controller);
 
@@ -189,7 +189,7 @@ public static class KnightErrantOfEosFactory
             .ToList();
 
         var picks = new List<ICard>(MaxPicks);
-        var agent = AgentRegistry.Get(controller);
+        var agent = ctx.Agent ?? AgentRegistry.Get(controller);
 
         // Up to MaxPicks sequential prompts. "Up to two" — the agent may
         // decline at any iteration by returning null; once eligible is
@@ -199,11 +199,11 @@ public static class KnightErrantOfEosFactory
             ICard? pick;
             if (agent is not null)
             {
-                pick = agent.ChooseLibraryPickAsync(
-                    ctx: null,
+                pick = await agent.ChooseLibraryPickAsync(
+                    ctx.Game,
                     candidates: eligible,
                     kindLabel: $"creature card with mana value {ManaValueCeiling} or less (pick {i + 1} of up to {MaxPicks})")
-                    .GetAwaiter().GetResult();
+                    .ConfigureAwait(false);
             }
             else
             {
