@@ -133,10 +133,10 @@ Living tracker for Modern-format card + mechanic implementation in the Majik eng
 
 | Metric | Count |
 |---|---|
-| Named factories | 1549 |
+| Named factories | 1559 |
 | Bespoke templates | 28 |
 | Generic templates | 97 |
-| JSON-defined cards | 404 |
+| JSON-defined cards | 411 |
 | Distinct implemented card names (`[CardName]`) | 822 |
 | Estimated Modern played-staple coverage | ~50% |
 
