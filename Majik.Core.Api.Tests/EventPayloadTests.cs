@@ -186,6 +186,150 @@ public class EventPayloadTests
             .Should().BeFalse();
     }
 
+    // ---- PLAN 04: enriched → Battlefield CardMovedEvent (revealed branch) ----
+
+    [Fact]
+    public void CardMovedEvent_ToBattlefield_RevealedBranchCarriesPermanentFields()
+    {
+        // A Hand→Battlefield move always touches a public zone → revealed
+        // branch. The portal reducer applies the ETB in place from these
+        // enriched fields instead of forcing a full GET /state.
+        var alice = new Player("Alice");
+        var bob = new Player("Bob");
+        var bear = new Creature("Grizzly Bears", "1G", 2, 2) { Owner = alice };
+        var e = new CardMovedEvent(bear, ZoneType.Hand, ZoneType.Battlefield);
+
+        // Opponent view: still revealed (public footprint), so enrichment
+        // is present here too — there is nothing hidden about an ETB.
+        var payload = EventPayloadBuilder.Build(e, bob);
+
+        payload.GetProperty("cardName").GetString().Should().Be("Grizzly Bears");
+        payload.GetProperty("to").GetString().Should().Be("Battlefield");
+        payload.GetProperty("power").GetInt32().Should().Be(2);
+        payload.GetProperty("toughness").GetInt32().Should().Be(2);
+        payload.GetProperty("tapped").GetBoolean().Should().BeFalse();
+        // A freshly-entered creature has summoning sickness by default.
+        payload.GetProperty("summoningSickness").GetBoolean().Should().BeTrue();
+        payload.GetProperty("abilities").ValueKind.Should().Be(System.Text.Json.JsonValueKind.Array);
+        payload.TryGetProperty("producedManaColors", out _).Should().BeTrue();
+        payload.GetProperty("counters").ValueKind.Should().Be(System.Text.Json.JsonValueKind.Object);
+        payload.GetProperty("counters").EnumerateObject().Should().BeEmpty();
+    }
+
+    [Fact]
+    public void CardMovedEvent_ToBattlefield_CountersReflectPermanentCounters()
+    {
+        // Enriched ETB carries the live counter map (e.g. a creature that
+        // enters with +1/+1 counters), matching the snapshot's Counters.
+        var alice = new Player("Alice");
+        var hydra = new Creature("Counter Hydra", "2GG", 0, 0) { Owner = alice };
+        hydra.Counters.Add(Majik.Core.Counters.CounterType.PlusOnePlusOne, 3);
+        var e = new CardMovedEvent(hydra, ZoneType.Hand, ZoneType.Battlefield);
+
+        var payload = EventPayloadBuilder.Build(e, viewer: null);
+
+        var counters = payload.GetProperty("counters");
+        counters.GetProperty("+1/+1").GetInt32().Should().Be(3);
+    }
+
+    [Fact]
+    public void CardMovedEvent_EnrichedFieldsMatchFreshSnapshot()
+    {
+        // The enriched event MUST agree with a fresh /state snapshot for the
+        // same permanent — they share StateSnapshotter.BuildPermanentFields.
+        // This is the parity guarantee the portal reducer relies on. We
+        // compare against the public Snapshot zone path (the same shape a
+        // GET /state returns).
+        var alice = new Player("Alice");
+        var bear = new Creature("Grizzly Bears", "1G", 2, 2) { Owner = alice };
+        alice.Zones.Battlefield.AddCard(bear);
+
+        var e = new CardMovedEvent(bear, ZoneType.Hand, ZoneType.Battlefield);
+        var eventPayload = EventPayloadBuilder.Build(e, viewer: null);
+
+        var snapshot = StateSnapshotter.Snapshot(
+            Guid.NewGuid(), 1, Majik.Core.StateMachine.PhaseStateType.PreCombatMain,
+            alice, new[] { alice }, new Majik.Core.Stack.Stack(new EventBus()));
+        var snap = snapshot.Players.Single(p => p.Id == alice.Id)
+                           .Battlefield.Cards.Single(c => c.InstanceId == bear.InstanceId);
+
+        eventPayload.GetProperty("power").GetInt32().Should().Be(snap.Power);
+        eventPayload.GetProperty("toughness").GetInt32().Should().Be(snap.Toughness);
+        eventPayload.GetProperty("tapped").GetBoolean().Should().Be(snap.Tapped);
+        eventPayload.GetProperty("summoningSickness").GetBoolean().Should().Be(snap.SummoningSickness);
+        eventPayload.GetProperty("producedManaColors").GetString().Should().Be(snap.ProducedManaColors);
+    }
+
+    [Fact]
+    public void CardMovedEvent_MaskedHandToLibrary_StaysExactlyMasked_NoEnrichmentLeak()
+    {
+        // MASKING EXACTNESS (CR 706): a Hand→Library move is hidden→hidden,
+        // so the opponent's variant must carry ONLY {ownerId, from, to,
+        // hidden}. None of the enriched permanent fields (power, toughness,
+        // tapped, abilities, counters, …) and no card identity may leak.
+        var alice = new Player("Alice");
+        var bob = new Player("Bob");
+        var secret = new Creature("Tarmogoyf", "1G", 4, 5) { Owner = alice };
+        secret.Counters.Add(Majik.Core.Counters.CounterType.PlusOnePlusOne, 2);
+        var e = new CardMovedEvent(secret, ZoneType.Hand, ZoneType.Library);
+
+        var opp = EventPayloadBuilder.Build(e, bob);
+
+        // Exactly four properties, exactly these names.
+        opp.EnumerateObject().Select(p => p.Name).Should()
+            .BeEquivalentTo(new[] { "ownerId", "from", "to", "hidden" });
+        opp.GetProperty("ownerId").GetGuid().Should().Be(alice.Id);
+        opp.GetProperty("from").GetString().Should().Be("Hand");
+        opp.GetProperty("to").GetString().Should().Be("Library");
+        opp.GetProperty("hidden").GetBoolean().Should().BeTrue();
+        // No leaked card data or enrichment.
+        foreach (var leaked in new[] { "cardId", "cardName", "manaCost", "types",
+            "power", "toughness", "tapped", "summoningSickness", "abilities",
+            "producedManaColors", "counters" })
+        {
+            opp.TryGetProperty(leaked, out _).Should().BeFalse(
+                $"masked variant must not leak '{leaked}'");
+        }
+    }
+
+    // ---- PLAN 04: CounterAddedEvent payload ----
+
+    [Fact]
+    public void CounterAddedEvent_PayloadCarriesTargetTypeAmountController()
+    {
+        var alice = new Player("Alice");
+        var creature = new Creature("Walking Ballista", "0", 0, 0)
+        {
+            Owner = alice,
+            Controller = alice,
+            Zone = ZoneType.Battlefield,
+        };
+        var e = new CounterAddedEvent(creature, Majik.Core.Counters.CounterType.PlusOnePlusOne, 2);
+
+        var payload = EventPayloadBuilder.Build(e);
+
+        payload.GetProperty("targetInstanceId").GetGuid().Should().Be(creature.InstanceId);
+        payload.GetProperty("counterType").GetString().Should().Be("+1/+1");
+        payload.GetProperty("amount").GetInt32().Should().Be(2);
+        payload.GetProperty("controllerId").GetGuid().Should().Be(alice.Id);
+    }
+
+    [Fact]
+    public void CounterAddedEvent_NotPerViewerMasked()
+    {
+        // Counter placement on a battlefield permanent is public info.
+        var alice = new Player("Alice");
+        var creature = new Creature("Walking Ballista", "0", 0, 0)
+        {
+            Owner = alice,
+            Controller = alice,
+            Zone = ZoneType.Battlefield,
+        };
+        var e = new CounterAddedEvent(creature, Majik.Core.Counters.CounterType.Charge, 1);
+
+        EventPayloadBuilder.RequiresPerViewerMasking(e).Should().BeFalse();
+    }
+
     [Fact]
     public void LifeChangedEvent_PayloadCarriesPreviousAndCurrent()
     {

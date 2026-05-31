@@ -204,4 +204,65 @@ public class StateSnapshotterTests
                                 .Subject;
         abilityDto.Id.Should().BeNull();
     }
+
+    [Fact]
+    public void Snapshot_PopulatesCounters_FromPermanentCounters()
+    {
+        // PLAN 04 — CardSnapshotDto.Counters mirrors Permanent.Counters so the
+        // snapshot and the enriched CardMovedEvent / CounterAddedEvent payloads
+        // agree on the counter map keyed by counter-type name.
+        var alice = new Player("Alice", 20);
+        var bear = new Creature("Bear", "1G", 2, 2) { Owner = alice };
+        alice.Zones.Library.AddCard(bear);
+        var zones = new ZoneService(_bus);
+        zones.MoveCardTo(bear, ZoneType.Battlefield, controller: alice);
+
+        bear.Counters.Add(Majik.Core.Counters.CounterType.PlusOnePlusOne, 2);
+        bear.Counters.Add(Majik.Core.Counters.CounterType.Charge, 1);
+
+        var dto = StateSnapshotter.Snapshot(
+            Guid.NewGuid(), 1, PhaseStateType.PreCombatMain, alice,
+            new[] { alice }, new Majik.Core.Stack.Stack(_bus));
+
+        var cardDto = dto.Players.Single(p => p.Id == alice.Id)
+                         .Battlefield.Cards
+                         .Single(c => c.InstanceId == bear.InstanceId);
+
+        cardDto.Counters.Should().NotBeNull();
+        cardDto.Counters!["+1/+1"].Should().Be(2);
+        cardDto.Counters!["Charge"].Should().Be(1);
+    }
+
+    [Fact]
+    public void Snapshot_NoCounters_YieldsEmptyCounterMap()
+    {
+        var alice = new Player("Alice", 20);
+        var bear = new Creature("Bear", "1G", 2, 2) { Owner = alice };
+        alice.Zones.Library.AddCard(bear);
+        var zones = new ZoneService(_bus);
+        zones.MoveCardTo(bear, ZoneType.Battlefield, controller: alice);
+
+        var dto = StateSnapshotter.Snapshot(
+            Guid.NewGuid(), 1, PhaseStateType.PreCombatMain, alice,
+            new[] { alice }, new Majik.Core.Stack.Stack(_bus));
+
+        var cardDto = dto.Players.Single(p => p.Id == alice.Id)
+                         .Battlefield.Cards
+                         .Single(c => c.InstanceId == bear.InstanceId);
+
+        cardDto.Counters.Should().NotBeNull().And.BeEmpty();
+    }
+
+    [Fact]
+    public void Snapshot_Seq_ThreadsThroughToGameStateDto()
+    {
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+
+        var dto = StateSnapshotter.Snapshot(
+            Guid.NewGuid(), 1, PhaseStateType.PreCombatMain, alice,
+            new[] { alice, bob }, new Majik.Core.Stack.Stack(_bus), seq: 42);
+
+        dto.Seq.Should().Be(42);
+    }
 }
