@@ -99,13 +99,29 @@ public static class MatchEndpoints
             .AllowAnonymous()
             .Produces<EventPayloadCatalog>(StatusCodes.Status200OK);
 
+        // PLAN 07 — second schema anchor. PromptDto is pushed over the
+        // SignalR `prompt` channel (never returned by a REST endpoint), so
+        // ng-openapi-gen wouldn't otherwise emit it — yet the portal prompt
+        // subscriber wants the generated PromptDto to drop its
+        // `?? raw['Pascal']` hedges. Annotating this unused endpoint with
+        // .Produces<PromptDto> pulls PromptDto (and its nested view DTOs)
+        // into /openapi/v1.json. Same carrier pattern as _eventschemas;
+        // never called by the client.
+        group.MapGet("/_promptschema", PromptSchema)
+            .WithName("GetPromptSchema")
+            .AllowAnonymous()
+            .Produces<PromptDto>(StatusCodes.Status200OK);
+
         return routes;
     }
 
-    // Schema-anchor handler: see MapGet("/_eventschemas") above. Returns no
-    // content; its sole purpose is to pin EventPayloadCatalog (and thus every
-    // *Payload record) into the OpenAPI document.
+    // Schema-anchor handlers: see the MapGet("/_eventschemas") +
+    // MapGet("/_promptschema") registrations above. Each returns no content;
+    // their sole purpose is to pin the referenced DTO graph into the OpenAPI
+    // document so the portal's generated client emits the interfaces.
     private static IResult EventSchemas() => Results.NoContent();
+
+    private static IResult PromptSchema() => Results.NoContent();
 
     private static IResult ListBotArchetypes() =>
         Results.Ok(Majik.Bot.Decks.BotDeckCatalog.Archetypes
