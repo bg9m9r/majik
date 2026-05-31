@@ -10,7 +10,15 @@ public sealed record GameStateDto(
     Guid ActivePlayerId,
     IReadOnlyList<PlayerDto> Players,
     IReadOnlyList<StackObjectDto> Stack,
-    Guid? YouPlayerId = null);
+    Guid? YouPlayerId = null,
+    // PLAN 04 — per-game monotonic sequence number. Equals the seq of the
+    // last event folded into this snapshot (read-only: GetState does NOT
+    // advance the counter). The portal drops a snapshot whose Seq is older
+    // than its current state, and uses contiguity (event seq == current+1)
+    // to detect dropped events. Defaults to 0 so any construction that
+    // predates the seq plumbing (and any pre-deploy client) degrades to the
+    // prior always-accept behaviour.
+    long Seq = 0);
 
 public sealed record PlayerDto(
     Guid Id,
@@ -36,7 +44,14 @@ public sealed record CardSnapshotDto(
     bool Tapped,
     bool SummoningSickness,
     IReadOnlyList<AbilityDto> Abilities,
-    string ProducedManaColors = "");
+    string ProducedManaColors = "",
+    // PLAN 04 / PLAN 07 — counters on this permanent keyed by counter-type
+    // name ("+1/+1", "Loyalty", "Charge", …) → count. Populated from
+    // Permanent.Counters in StateSnapshotter.SnapshotCard so the snapshot
+    // and the enriched CardMovedEvent / CounterAddedEvent payloads agree.
+    // Empty for cards with no counters (and for non-permanents). Defaults
+    // to an empty map so pre-seq constructions stay valid.
+    IReadOnlyDictionary<string, int>? Counters = null);
 
 public sealed record AbilityDto(string Kind, string Description, Guid? Id = null);
 
@@ -51,8 +66,13 @@ public sealed record ManaPoolDto(int Generic, int White, int Blue, int Black, in
     public static readonly ManaPoolDto Empty = new(0, 0, 0, 0, 0, 0, 0);
 }
 
-/// <summary>Wire-format event. <see cref="Payload"/> holds type-specific data as raw JSON.</summary>
-public sealed record EventDto(Guid EventId, string Type, DateTime At, JsonElement Payload);
+/// <summary>Wire-format event. <see cref="Payload"/> holds type-specific data as raw JSON.
+/// <para>PLAN 04 — <see cref="Seq"/> is the per-game monotonic sequence number
+/// stamped on this event. All per-player masked variants of one engine event
+/// share the same <see cref="Seq"/> (they already share <see cref="EventId"/>),
+/// so gap-detection on the public seq never produces false positives across
+/// seats. Defaults to 0 for any construction predating the seq plumbing.</para></summary>
+public sealed record EventDto(Guid EventId, string Type, DateTime At, JsonElement Payload, long Seq = 0);
 
 /// <summary>
 /// Per-emission envelope grouping a public <see cref="EventDto"/> with

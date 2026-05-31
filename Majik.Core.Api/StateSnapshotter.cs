@@ -25,7 +25,11 @@ public static class StateSnapshotter
         IReadOnlyList<Player> players,
         Majik.Core.Stack.Stack stack,
         Player? viewer = null,
-        TurnStateType? turnState = null)
+        TurnStateType? turnState = null,
+        // PLAN 04 — the per-game seq of the last event folded into this
+        // snapshot. Threaded onto GameStateDto.Seq so the portal can drop
+        // stale snapshots. Defaults to 0 for callers that don't track seq.
+        long seq = 0)
     {
         if (players == null) throw new ArgumentNullException(nameof(players));
         if (activePlayer == null) throw new ArgumentNullException(nameof(activePlayer));
@@ -38,7 +42,8 @@ public static class StateSnapshotter
             ActivePlayerId: activePlayer.Id,
             Players: players.Select(p => SnapshotPlayer(p, viewer)).ToList(),
             Stack: stack.GetAll().Select(SnapshotStackObject).ToList(),
-            YouPlayerId: viewer?.Id);
+            YouPlayerId: viewer?.Id,
+            Seq: seq);
     }
 
     private static PlayerDto SnapshotPlayer(Player p, Player? viewer)
@@ -98,6 +103,33 @@ public static class StateSnapshotter
     /// </summary>
     internal static CardSnapshotDto SnapshotCard(ICard card)
     {
+        var f = BuildPermanentFields(card);
+        return new CardSnapshotDto(
+            InstanceId: card.InstanceId,
+            Name: card.Name,
+            ManaCost: card.ManaCost,
+            Types: card.CardTypes.Select(t => t.ToString()).ToList(),
+            Power: f.Power,
+            Toughness: f.Toughness,
+            Tapped: f.Tapped,
+            SummoningSickness: f.SummoningSickness,
+            Abilities: f.Abilities,
+            ProducedManaColors: f.ProducedManaColors,
+            Counters: f.Counters);
+    }
+
+    /// <summary>
+    /// PLAN 04 — the live permanent/creature fields a snapshot and an
+    /// enriched event payload must agree on. Shared by
+    /// <see cref="SnapshotCard"/> and
+    /// <c>EventPayloadBuilder.BuildCardMoved</c> (REVEALED branch only) so the
+    /// reducer can patch an ETB in place instead of forcing a full GET /state.
+    /// P/T are null for non-creatures; tapped / summoning-sickness false for
+    /// non-permanents; <see cref="PermanentFields.Counters"/> is an empty map
+    /// when the card carries no counters.
+    /// </summary>
+    internal static PermanentFields BuildPermanentFields(ICard card)
+    {
         int? power = null;
         int? toughness = null;
         bool tapped = false;
@@ -109,24 +141,53 @@ public static class StateSnapshotter
             toughness = c.Toughness;
         }
 
+        IReadOnlyDictionary<string, int> counters = EmptyCounters;
         if (card is Permanent perm)
         {
             tapped = perm.IsTapped;
             summoningSickness = perm.HasSummoningSickness;
+            counters = SnapshotCounters(perm);
         }
 
-        return new CardSnapshotDto(
-            InstanceId: card.InstanceId,
-            Name: card.Name,
-            ManaCost: card.ManaCost,
-            Types: card.CardTypes.Select(t => t.ToString()).ToList(),
+        return new PermanentFields(
             Power: power,
             Toughness: toughness,
             Tapped: tapped,
             SummoningSickness: summoningSickness,
             Abilities: card.Abilities.Select(SnapshotAbility).ToList(),
-            ProducedManaColors: ComputeProducedManaColors(card));
+            ProducedManaColors: ComputeProducedManaColors(card),
+            Counters: counters);
     }
+
+    private static readonly IReadOnlyDictionary<string, int> EmptyCounters =
+        new Dictionary<string, int>();
+
+    /// <summary>Project <see cref="Permanent.Counters"/> into a
+    /// name→count map keyed by <see cref="Majik.Core.Counters.CounterType.Name"/>.
+    /// Zero / negative buckets are dropped (CounterCollection already prunes
+    /// to zero on removal, but defended against here too).</summary>
+    private static IReadOnlyDictionary<string, int> SnapshotCounters(Permanent perm)
+    {
+        var all = perm.Counters.All;
+        if (all.Count == 0) return EmptyCounters;
+        var map = new Dictionary<string, int>(all.Count);
+        foreach (var kv in all)
+        {
+            if (kv.Value > 0) map[kv.Key.Name] = kv.Value;
+        }
+        return map;
+    }
+
+    /// <summary>Shared permanent-field bundle — see
+    /// <see cref="BuildPermanentFields"/>.</summary>
+    internal readonly record struct PermanentFields(
+        int? Power,
+        int? Toughness,
+        bool Tapped,
+        bool SummoningSickness,
+        IReadOnlyList<AbilityDto> Abilities,
+        string ProducedManaColors,
+        IReadOnlyDictionary<string, int> Counters);
 
     /// <summary>
     /// CR 605 — derive the WUBRG/C colour string from the card's actual

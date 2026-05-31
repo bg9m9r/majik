@@ -94,6 +94,18 @@ public sealed class GameFacade : IDisposable
     private readonly List<Action<EventEnvelope>> _envelopeSubscribers = new();
     private readonly ActionLog _log = new();
 
+    // PLAN 04 — per-game monotonic sequence counter. Every event stamped in
+    // BridgeEvent draws the next value; a state snapshot reports _lastEventSeq
+    // (the seq of the last event folded in) WITHOUT advancing the counter, so
+    // snapshot.Seq == the most recent event's Seq. The portal drops any
+    // snapshot older than its current state and detects dropped events by
+    // contiguity (next event seq must equal current+1). One game runs on one
+    // logical thread; Interlocked guards against any incidental concurrency.
+    private long _seq;
+    private long _lastEventSeq;
+
+    private long NextSeq() => Interlocked.Increment(ref _seq);
+
     // Synchronization signal that pulses every time an agent registers a
     // new prompt. StartAsync / SubmitAsync capture this BEFORE poking the
     // engine, then await it — so they return only once the engine has
@@ -878,7 +890,9 @@ public sealed class GameFacade : IDisposable
         activePlayer: _currentActivePlayer ?? _priority.CurrentPlayer ?? _alice,
         players: new[] { _alice, _bob },
         stack: _stack,
-        turnState: _currentTurnState);
+        turnState: _currentTurnState,
+        // PLAN 04 — report the last event's seq; reading does NOT advance it.
+        seq: Interlocked.Read(ref _lastEventSeq));
 
     /// <summary>Per-player snapshot. CR 706 hidden information (opponent
     /// hand) is masked. Pass the requesting player's id; returns null
@@ -894,7 +908,9 @@ public sealed class GameFacade : IDisposable
             players: new[] { _alice, _bob },
             stack: _stack,
             viewer: viewer,
-            turnState: _currentTurnState);
+            turnState: _currentTurnState,
+            // PLAN 04 — report the last event's seq; reading does NOT advance it.
+            seq: Interlocked.Read(ref _lastEventSeq));
     }
 
     private Player? ResolveSlot(Guid id)
@@ -982,17 +998,28 @@ public sealed class GameFacade : IDisposable
         // since Slice 3; turn state is carried for TurnStateChangedEvent and
         // other turn-state consumers.
         var turnState = _currentTurnState;
+
+        // PLAN 04 — stamp the seq ONCE per engine event, BEFORE the subscriber
+        // fan-out, and record it as _lastEventSeq so a subsequent GetState
+        // reports this same value. Every per-player masked variant of this one
+        // engine event shares this seq (they already share EventId), so the
+        // portal's gap-detect on the public seq never sees a false gap across
+        // seats.
+        var seq = NextSeq();
+        _lastEventSeq = seq;
+
         var publicDto = new EventDto(
             EventId: e.EventId,
             Type: type,
             At: e.Timestamp,
-            Payload: EventPayloadBuilder.Build(e, viewer: null, turnState: turnState));
+            Payload: EventPayloadBuilder.Build(e, viewer: null, turnState: turnState),
+            Seq: seq);
 
         IReadOnlyDictionary<Guid, EventDto>? perPlayer = null;
         if (EventPayloadBuilder.RequiresPerViewerMasking(e))
         {
             // Build a payload per seated player. Same EventId / Type /
-            // timestamp on each variant — only the inner payload differs.
+            // timestamp / Seq on each variant — only the inner payload differs.
             // Spectators receive the public DTO via the legacy
             // Subscribe(Action<EventDto>) channel; the bridge picks up
             // the per-player variants from the envelope and routes them
@@ -1003,12 +1030,14 @@ public sealed class GameFacade : IDisposable
                     EventId: e.EventId,
                     Type: type,
                     At: e.Timestamp,
-                    Payload: EventPayloadBuilder.Build(e, _alice, turnState)),
+                    Payload: EventPayloadBuilder.Build(e, _alice, turnState),
+                    Seq: seq),
                 [_bob.Id] = new EventDto(
                     EventId: e.EventId,
                     Type: type,
                     At: e.Timestamp,
-                    Payload: EventPayloadBuilder.Build(e, _bob, turnState)),
+                    Payload: EventPayloadBuilder.Build(e, _bob, turnState),
+                    Seq: seq),
             };
         }
 

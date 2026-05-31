@@ -169,6 +169,19 @@ public static class EventPayloadBuilder
             amount = x.Amount,
             damageType = x.DamageType.ToString(),
         }),
+        // PLAN 04 — CR 121 / CR 614 counter placement. Lean payload so the
+        // portal reducer can bump the target's counter badge in place
+        // (display only — P/T are recomputed authoritatively by the next
+        // snapshot, never derived from counters in the reducer). Counter
+        // placement is public information (a counter on a battlefield
+        // permanent is visible to all players), so no per-viewer masking.
+        CounterAddedEvent x => Serialize(new
+        {
+            targetInstanceId = x.Target.InstanceId,
+            counterType = x.CounterType.Name,
+            amount = x.Amount,
+            controllerId = x.Controller?.Id,
+        }),
         GameStartedEvent => Empty(),
         _ => Empty(),
     };
@@ -192,6 +205,10 @@ public static class EventPayloadBuilder
 
         if (mask)
         {
+            // CR 706 — masked variant MUST stay exactly {ownerId, from, to,
+            // hidden}. No enrichment ever crosses the masking boundary; an
+            // opponent must not learn the card's identity or its permanent
+            // fields from a Hand→Library (etc.) move. Do not add fields here.
             return Serialize(new
             {
                 ownerId,
@@ -201,6 +218,13 @@ public static class EventPayloadBuilder
             });
         }
 
+        // PLAN 04 — REVEALED branch only. Enrich with the same permanent
+        // fields a snapshot carries (shared StateSnapshotter.BuildPermanentFields,
+        // so snapshot + event agree) so the portal reducer can apply an ETB in
+        // place instead of forcing a full GET /state. A → Battlefield move
+        // always touches a public zone, so it is already the revealed branch —
+        // the enrichment never appears on a masked variant.
+        var f = StateSnapshotter.BuildPermanentFields(x.Card);
         return Serialize(new
         {
             cardId = x.Card.InstanceId,
@@ -210,6 +234,13 @@ public static class EventPayloadBuilder
             types = x.Card.CardTypes.Select(t => t.ToString()).ToList(),
             from = x.FromZone.ToString(),
             to = x.ToZone.ToString(),
+            power = f.Power,
+            toughness = f.Toughness,
+            tapped = f.Tapped,
+            summoningSickness = f.SummoningSickness,
+            abilities = f.Abilities,
+            producedManaColors = f.ProducedManaColors,
+            counters = f.Counters,
         });
     }
 
