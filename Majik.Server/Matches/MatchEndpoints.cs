@@ -86,8 +86,26 @@ public static class MatchEndpoints
             .Produces<MatchError>(StatusCodes.Status404NotFound)
             .Produces<MatchError>(StatusCodes.Status403Forbidden);
 
+        // PLAN 07 — OpenAPI schema anchor. Carries the EventPayloadCatalog
+        // (which references every currently-emitted *Payload record) into
+        // /openapi/v1.json so ng-openapi-gen emits a typed interface per
+        // event payload for the portal reducer. NOT a gameplay endpoint —
+        // the portal never calls it; the SignalR `event` channel ships the
+        // payloads as raw JSON. AllowAnonymous so the spec carrier needs no
+        // auth scaffolding; the handler returns 204 (the response BODY type
+        // is irrelevant — .Produces<> is what registers the schema).
+        group.MapGet("/_eventschemas", EventSchemas)
+            .WithName("GetEventPayloadSchemas")
+            .AllowAnonymous()
+            .Produces<EventPayloadCatalog>(StatusCodes.Status200OK);
+
         return routes;
     }
+
+    // Schema-anchor handler: see MapGet("/_eventschemas") above. Returns no
+    // content; its sole purpose is to pin EventPayloadCatalog (and thus every
+    // *Payload record) into the OpenAPI document.
+    private static IResult EventSchemas() => Results.NoContent();
 
     private static IResult ListBotArchetypes() =>
         Results.Ok(Majik.Bot.Decks.BotDeckCatalog.Archetypes

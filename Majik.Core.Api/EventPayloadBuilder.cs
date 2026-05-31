@@ -1,5 +1,7 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Majik.Core.Abilities;
+using Majik.Core.Api.Dtos;
 using Majik.Core.Cards;
 using Majik.Core.Domain.DomainEvents;
 using Majik.Core.Events;
@@ -40,6 +42,25 @@ public static class EventPayloadBuilder
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
     };
 
+    // PLAN 07 — the dual-shape card payload records (CardMovedPayload /
+    // CardDrawnPayload) carry the union of the masked + revealed field
+    // sets, with the variant-specific fields nullable. Serializing with
+    // WhenWritingNull collapses each constructed record back to EXACTLY
+    // the historical key set:
+    //   * masked CardMoved → {from, to, ownerId, hidden}
+    //   * revealed CardMoved → identity + permanent fields, no `hidden`
+    //     (a non-creature land's null power/toughness drop out, matching
+    //     the CardSnapshotDto contract the portal reducer reads
+    //     defensively via pickNumber).
+    // Only these two records use it; every other payload keeps the
+    // legacy Opts (null fields serialized verbatim) so non-dual-shape
+    // shapes are byte-identical to the pre-PLAN-07 anonymous objects.
+    private static readonly JsonSerializerOptions NullOmittingOpts = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+    };
+
     /// <summary>Full-reveal payload (no viewer scoping). Used for the
     /// spectator broadcast and any consumer outside the per-recipient
     /// SignalR routing path.</summary>
@@ -63,68 +84,44 @@ public static class EventPayloadBuilder
         // CardRevealedEvent: hand-reveal effects (CR 701.16) are public
         // by definition — the controller chose to show the card to all
         // players. No per-viewer masking required.
-        CardRevealedEvent x => Serialize(new
-        {
-            cardId = x.Card.InstanceId,
-            cardName = x.Card.Name,
-            playerId = x.Player.Id,
-            from = x.From.ToString(),
-            reason = x.Reason,
-        }),
-        LifeChangedEvent x => Serialize(new
-        {
-            playerId = x.Player.Id,
-            previous = x.PreviousLife,
-            current = x.NewLife,
-        }),
-        PhaseStartedEvent x => Serialize(new
-        {
-            phase = PhaseLabelResolver.Resolve(x.PhaseType, turnState),
-            playerId = x.Player.Id,
-        }),
-        PhaseEndedEvent x => Serialize(new
-        {
-            phase = PhaseLabelResolver.Resolve(x.PhaseType, turnState),
-            playerId = x.Player.Id,
-        }),
-        PhaseChangedEvent x => Serialize(new
-        {
-            from = x.PreviousPhase,
-            to = x.CurrentPhase,
-        }),
-        TurnStateChangedEvent x => Serialize(new
-        {
-            from = x.PreviousState?.ToString(),
-            to = x.CurrentState.ToString(),
-        }),
-        StepStartedEvent x => Serialize(new
-        {
-            step = PhaseLabelResolver.Resolve(x.StepType, turnState),
-            playerId = x.Player.Id,
-        }),
-        StepEndedEvent x => Serialize(new
-        {
-            step = PhaseLabelResolver.Resolve(x.StepType, turnState),
-            playerId = x.Player.Id,
-        }),
-        TurnStartedEvent x => Serialize(new
-        {
-            playerId = x.Player.Id,
-            turn = x.TurnNumber,
-        }),
-        TurnEndedEvent x => Serialize(new
-        {
-            playerId = x.Player.Id,
-            turn = x.TurnNumber,
-        }),
-        ExtraPhaseAddedEvent x => Serialize(new
-        {
-            phase = x.PhaseType.ToString(),
-        }),
-        PlayerLostEvent x => Serialize(new
-        {
-            playerId = x.Player.Id,
-        }),
+        CardRevealedEvent x => Serialize(new CardRevealedPayload(
+            CardId: x.Card.InstanceId,
+            CardName: x.Card.Name,
+            PlayerId: x.Player.Id,
+            From: x.From.ToString(),
+            Reason: x.Reason)),
+        LifeChangedEvent x => Serialize(new LifeChangedPayload(
+            PlayerId: x.Player.Id,
+            Previous: x.PreviousLife,
+            Current: x.NewLife)),
+        PhaseStartedEvent x => Serialize(new PhaseStartedPayload(
+            Phase: PhaseLabelResolver.Resolve(x.PhaseType, turnState),
+            PlayerId: x.Player.Id)),
+        PhaseEndedEvent x => Serialize(new PhaseEndedPayload(
+            Phase: PhaseLabelResolver.Resolve(x.PhaseType, turnState),
+            PlayerId: x.Player.Id)),
+        PhaseChangedEvent x => Serialize(new PhaseChangedPayload(
+            From: x.PreviousPhase,
+            To: x.CurrentPhase)),
+        TurnStateChangedEvent x => Serialize(new TurnStateChangedPayload(
+            From: x.PreviousState?.ToString(),
+            To: x.CurrentState.ToString())),
+        StepStartedEvent x => Serialize(new StepStartedPayload(
+            Step: PhaseLabelResolver.Resolve(x.StepType, turnState),
+            PlayerId: x.Player.Id)),
+        StepEndedEvent x => Serialize(new StepEndedPayload(
+            Step: PhaseLabelResolver.Resolve(x.StepType, turnState),
+            PlayerId: x.Player.Id)),
+        TurnStartedEvent x => Serialize(new TurnStartedPayload(
+            PlayerId: x.Player.Id,
+            Turn: x.TurnNumber)),
+        TurnEndedEvent x => Serialize(new TurnEndedPayload(
+            PlayerId: x.Player.Id,
+            Turn: x.TurnNumber)),
+        ExtraPhaseAddedEvent x => Serialize(new ExtraPhaseAddedPayload(
+            Phase: x.PhaseType.ToString())),
+        PlayerLostEvent x => Serialize(new PlayerLostPayload(
+            PlayerId: x.Player.Id)),
         // SpellCastEvent / StackObject*Event payloads mirror StackObjectDto
         // (see Dtos.cs + StateSnapshotter.SnapshotStackObject) so the
         // frontend can patch `state.stack` from the wire delta without
@@ -132,56 +129,49 @@ public static class EventPayloadBuilder
         // discriminator ("Spell" | "TriggeredAbility" | "ActivatedAbility")
         // and `description` mirrors the same composition rules used by the
         // snapshotter — keep these two builders in sync.
-        SpellCastEvent x => Serialize(new
-        {
-            stackId = x.Spell.Id,
-            controllerId = x.Spell.Controller.Id,
-            cardId = (x.Spell as ISpell)?.Card?.InstanceId,
-            cardName = (x.Spell as ISpell)?.Card?.Name,
-            kind = "Spell",
-            description = (x.Spell as ISpell)?.Card?.Name ?? "",
-        }),
-        StackObjectAddedEvent x => Serialize(new
-        {
-            stackId = x.StackObject.Id,
-            controllerId = x.StackObject.Controller.Id,
-            kind = StackKind(x.StackObject),
-            description = StackDescription(x.StackObject),
-        }),
-        StackObjectResolvedEvent x => Serialize(new
-        {
-            stackId = x.StackObject.Id,
-            controllerId = x.StackObject.Controller.Id,
-            kind = StackKind(x.StackObject),
-            description = StackDescription(x.StackObject),
-        }),
+        // SpellCast carries the backing-card identity; StackObjectAdded /
+        // Resolved deliberately do NOT (matching the historical wire) — the
+        // null CardId/CardName drop out via NullOmittingStack serialization.
+        SpellCastEvent x => SerializeStack(new StackObjectPayload(
+            StackId: x.Spell.Id,
+            ControllerId: x.Spell.Controller.Id,
+            Kind: "Spell",
+            Description: (x.Spell as ISpell)?.Card?.Name ?? "",
+            CardId: (x.Spell as ISpell)?.Card?.InstanceId,
+            CardName: (x.Spell as ISpell)?.Card?.Name)),
+        StackObjectAddedEvent x => SerializeStack(new StackObjectPayload(
+            StackId: x.StackObject.Id,
+            ControllerId: x.StackObject.Controller.Id,
+            Kind: StackKind(x.StackObject),
+            Description: StackDescription(x.StackObject))),
+        StackObjectResolvedEvent x => SerializeStack(new StackObjectPayload(
+            StackId: x.StackObject.Id,
+            ControllerId: x.StackObject.Controller.Id,
+            Kind: StackKind(x.StackObject),
+            Description: StackDescription(x.StackObject))),
         // Per-creature / per-player damage payload (CR 119, CR 510).
         // Frontend needs source + target Guids so it can draw a damage
         // animation from the attacker (or spell) to the victim — life
         // flash alone isn't enough at the per-creature level. We map
         // every DamageDealtEvent subclass (Combat / Spell / Ability)
         // to a single wire shape so the portal can render uniformly.
-        DamageDealtEvent x => Serialize(new
-        {
-            sourceInstanceId = x.SourceInstanceId,
-            targetInstanceId = x.TargetInstanceId,
-            targetIsPlayer = x.TargetIsPlayer,
-            amount = x.Amount,
-            damageType = x.DamageType.ToString(),
-        }),
+        DamageDealtEvent x => Serialize(new DamageDealtPayload(
+            SourceInstanceId: x.SourceInstanceId,
+            TargetInstanceId: x.TargetInstanceId,
+            TargetIsPlayer: x.TargetIsPlayer,
+            Amount: x.Amount,
+            DamageType: x.DamageType.ToString())),
         // PLAN 04 — CR 121 / CR 614 counter placement. Lean payload so the
         // portal reducer can bump the target's counter badge in place
         // (display only — P/T are recomputed authoritatively by the next
         // snapshot, never derived from counters in the reducer). Counter
         // placement is public information (a counter on a battlefield
         // permanent is visible to all players), so no per-viewer masking.
-        CounterAddedEvent x => Serialize(new
-        {
-            targetInstanceId = x.Target.InstanceId,
-            counterType = x.CounterType.Name,
-            amount = x.Amount,
-            controllerId = x.Controller?.Id,
-        }),
+        CounterAddedEvent x => Serialize(new CounterAddedPayload(
+            TargetInstanceId: x.Target.InstanceId,
+            CounterType: x.CounterType.Name,
+            Amount: x.Amount,
+            ControllerId: x.Controller?.Id)),
         GameStartedEvent => Empty(),
         _ => Empty(),
     };
@@ -208,14 +198,15 @@ public static class EventPayloadBuilder
             // CR 706 — masked variant MUST stay exactly {ownerId, from, to,
             // hidden}. No enrichment ever crosses the masking boundary; an
             // opponent must not learn the card's identity or its permanent
-            // fields from a Hand→Library (etc.) move. Do not add fields here.
-            return Serialize(new
-            {
-                ownerId,
-                from = x.FromZone.ToString(),
-                to = x.ToZone.ToString(),
-                hidden = true,
-            });
+            // fields from a Hand→Library (etc.) move. Constructing the
+            // record with only these fields populated + NullOmittingOpts
+            // drops every other (null) property so the wire stays exactly
+            // four keys.
+            return SerializeCard(new CardMovedPayload(
+                From: x.FromZone.ToString(),
+                To: x.ToZone.ToString(),
+                OwnerId: ownerId,
+                Hidden: true));
         }
 
         // PLAN 04 — REVEALED branch only. Enrich with the same permanent
@@ -225,23 +216,21 @@ public static class EventPayloadBuilder
         // always touches a public zone, so it is already the revealed branch —
         // the enrichment never appears on a masked variant.
         var f = StateSnapshotter.BuildPermanentFields(x.Card);
-        return Serialize(new
-        {
-            cardId = x.Card.InstanceId,
-            cardName = x.Card.Name,
-            ownerId,
-            manaCost = x.Card.ManaCost,
-            types = x.Card.CardTypes.Select(t => t.ToString()).ToList(),
-            from = x.FromZone.ToString(),
-            to = x.ToZone.ToString(),
-            power = f.Power,
-            toughness = f.Toughness,
-            tapped = f.Tapped,
-            summoningSickness = f.SummoningSickness,
-            abilities = f.Abilities,
-            producedManaColors = f.ProducedManaColors,
-            counters = f.Counters,
-        });
+        return SerializeCard(new CardMovedPayload(
+            From: x.FromZone.ToString(),
+            To: x.ToZone.ToString(),
+            OwnerId: ownerId,
+            CardId: x.Card.InstanceId,
+            CardName: x.Card.Name,
+            ManaCost: x.Card.ManaCost,
+            Types: x.Card.CardTypes.Select(t => t.ToString()).ToList(),
+            Power: f.Power,
+            Toughness: f.Toughness,
+            Tapped: f.Tapped,
+            SummoningSickness: f.SummoningSickness,
+            Abilities: f.Abilities,
+            ProducedManaColors: f.ProducedManaColors,
+            Counters: f.Counters));
     }
 
     private static JsonElement BuildCardDrawn(CardDrawnEvent x, Player? viewer)
@@ -253,21 +242,17 @@ public static class EventPayloadBuilder
 
         if (mask)
         {
-            return Serialize(new
-            {
-                playerId = ownerId,
-                hidden = true,
-            });
+            return SerializeCard(new CardDrawnPayload(
+                PlayerId: ownerId,
+                Hidden: true));
         }
 
-        return Serialize(new
-        {
-            cardId = x.Card.InstanceId,
-            cardName = x.Card.Name,
-            playerId = ownerId,
-            manaCost = x.Card.ManaCost,
-            types = x.Card.CardTypes.Select(t => t.ToString()).ToList(),
-        });
+        return SerializeCard(new CardDrawnPayload(
+            PlayerId: ownerId,
+            CardId: x.Card.InstanceId,
+            CardName: x.Card.Name,
+            ManaCost: x.Card.ManaCost,
+            Types: x.Card.CardTypes.Select(t => t.ToString()).ToList()));
     }
 
     private static bool ShouldMaskCardForViewer(Player? viewer, Guid? ownerId, ZoneType from, ZoneType to)
@@ -291,6 +276,20 @@ public static class EventPayloadBuilder
 
     private static JsonElement Serialize<T>(T value)
         => JsonSerializer.SerializeToElement(value, Opts);
+
+    /// <summary>Serialize a dual-shape card payload
+    /// (<see cref="CardMovedPayload"/> / <see cref="CardDrawnPayload"/>)
+    /// dropping null properties so the masked + revealed variants collapse
+    /// to their exact historical key sets (CR 706).</summary>
+    private static JsonElement SerializeCard<T>(T value)
+        => JsonSerializer.SerializeToElement(value, NullOmittingOpts);
+
+    /// <summary>Serialize a <see cref="StackObjectPayload"/> dropping null
+    /// card-identity fields so StackObjectAdded / Resolved keep their lean
+    /// {stackId, controllerId, kind, description} shape while SpellCast
+    /// additionally carries the populated cardId / cardName.</summary>
+    private static JsonElement SerializeStack(StackObjectPayload value)
+        => JsonSerializer.SerializeToElement(value, NullOmittingOpts);
 
     private static JsonElement Empty() => JsonDocument.Parse("{}").RootElement;
 
