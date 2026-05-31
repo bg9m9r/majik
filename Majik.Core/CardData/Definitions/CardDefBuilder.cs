@@ -29,6 +29,8 @@ public sealed class CardDefBuilder
     private readonly List<CardSubtype> _subtypes = new();
     private readonly List<string> _keywords = new();
     private readonly List<string> _manaAbilities = new();
+    private readonly List<CardDefAbility> _abilities = new();
+    private readonly List<string> _colorIndicator = new();
     private int? _power;
     private int? _toughness;
     private int? _loyalty;
@@ -137,6 +139,34 @@ public sealed class CardDefBuilder
     }
 
     /// <summary>
+    /// Attach a canonical activated / triggered / mana ability (PLAN 03 S2).
+    /// Used by <see cref="CardDefinition.ToCardDef"/> to carry the JSON
+    /// schema's ability union onto the <see cref="CardDef"/> so
+    /// <see cref="CardDefRuntime.Build"/> can materialize it. Multiple calls
+    /// stack in printed order.
+    /// </summary>
+    public CardDefBuilder WithAbility(CardDefAbility ability)
+    {
+        ArgumentNullException.ThrowIfNull(ability);
+        _abilities.Add(ability);
+        return this;
+    }
+
+    /// <summary>
+    /// CR 202.2c — declare a printed colour-indicator code (single-letter
+    /// Scryfall W/U/B/R/G). Used by <see cref="CardDefinition.ToCardDef"/> so
+    /// the JSON path keeps Dryad Arbor's green indicator. Multiple calls
+    /// stack.
+    /// </summary>
+    public CardDefBuilder WithColorIndicator(string colorCode)
+    {
+        if (string.IsNullOrWhiteSpace(colorCode))
+            throw new ArgumentException("Colour indicator code must be non-empty.", nameof(colorCode));
+        _colorIndicator.Add(colorCode);
+        return this;
+    }
+
+    /// <summary>
     /// Materialize the immutable <see cref="CardDef"/>.
     /// </summary>
     public CardDef Build() => new CardDef(
@@ -151,7 +181,9 @@ public sealed class CardDefBuilder
         _subtypes.ToArray(),
         _keywords.ToArray(),
         _manaAbilities.ToArray(),
-        _resolveBody);
+        _resolveBody,
+        _abilities.ToArray(),
+        _colorIndicator.ToArray());
 
     /// <summary>Lets callers omit the explicit <c>.Build()</c> call.</summary>
     public static implicit operator CardDef(CardDefBuilder b) => b.Build();

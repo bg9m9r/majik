@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Majik.Core.Cards.Types;
 
 namespace Majik.Core.CardData.Definitions;
 
@@ -64,6 +65,94 @@ public sealed class CardDefinition
     /// <summary>Ability list. Each entry is a discriminated union via
     /// the <c>kind</c> JSON property.</summary>
     public List<AbilityDefinition> Abilities { get; set; } = new();
+
+    /// <summary>
+    /// Deserialize this JSON model into the canonical fluent
+    /// <see cref="CardDef"/> (PLAN 03 S2). The JSON
+    /// <see cref="CardDefinition"/> schema is a serialization of the same
+    /// declarative shape the DSL emits; this method is the bridge. Types,
+    /// P/T, loyalty, supertypes/subtypes, colour indicator and the ability
+    /// union (mana / activated / triggered) all map onto the
+    /// <see cref="CardDef"/> via <see cref="CardDefBuilder"/>. The runtime
+    /// materializer (<see cref="CardDefRuntime.Build"/>) then turns the
+    /// <see cref="CardDef"/> into a live <see cref="Majik.Core.Cards.ICard"/>
+    /// — the single interpreter for both declarative systems.
+    /// </summary>
+    public CardDef ToCardDef()
+    {
+        if (Types.Count == 0)
+            throw new ArgumentException($"Card '{Name}' has no types.", nameof(Types));
+
+        var supertypes = Supertypes.Select(ParseSupertype).ToArray();
+        var subtypes = Subtypes.Select(ParseSubtype).ToArray();
+        var primary = ParseType(Types[0]);
+
+        // Pick the matching builder entry point + thread the required stat.
+        // ManaCost passed verbatim — JSON authors decide bracketing.
+        var builder = primary switch
+        {
+            CardType.Land => CardDef.Land(Name),
+            CardType.Creature => CardDef.Creature(
+                Name, ManaCost,
+                Power ?? throw MissingStat(Name, "power"),
+                Toughness ?? throw MissingStat(Name, "toughness")),
+            CardType.Artifact => CardDef.Artifact(Name, ManaCost),
+            CardType.Enchantment => CardDef.Enchantment(Name, ManaCost),
+            CardType.Instant => CardDef.Instant(Name, ManaCost),
+            CardType.Sorcery => CardDef.Sorcery(Name, ManaCost),
+            CardType.Planeswalker => CardDef.Planeswalker(
+                Name, ManaCost,
+                Loyalty ?? throw MissingStat(Name, "loyalty")),
+            _ => throw new NotSupportedException(
+                $"Card '{Name}' primary type '{Types[0]}' is not supported by CardDefinition.ToCardDef()."),
+        };
+
+        // Supertypes / subtypes (the CardDef.* entry points only set the
+        // primary type; everything else stacks via the builder).
+        foreach (var s in supertypes) builder.WithSupertype(s);
+        foreach (var s in subtypes) builder.WithSubtype(s);
+
+        // Additional types (Artifact Creature, …) — skip the primary at [0].
+        for (var i = 1; i < Types.Count; i++)
+        {
+            builder.WithType(ParseType(Types[i]));
+        }
+
+        // CR 202.2c — colour indicator (Dryad Arbor).
+        foreach (var letter in Colors)
+        {
+            builder.WithColorIndicator(letter);
+        }
+
+        // Ability union → canonical CardDefAbility entries. The mappers
+        // (ToCardDefAbility) close over the JSON-effect/cost/trigger builders
+        // in CardDefRuntime so the runtime card is byte-identical to the
+        // legacy direct-build path.
+        foreach (var ability in Abilities)
+        {
+            builder.WithAbility(ability.ToCardDefAbility());
+        }
+
+        return builder.Build();
+    }
+
+    private static CardType ParseType(string raw) =>
+        Enum.TryParse<CardType>(raw, ignoreCase: true, out var t)
+            ? t
+            : throw new ArgumentException($"Unknown card type '{raw}'.", nameof(raw));
+
+    private static CardSupertype ParseSupertype(string raw) =>
+        Enum.TryParse<CardSupertype>(raw, ignoreCase: true, out var s)
+            ? s
+            : throw new ArgumentException($"Unknown card supertype '{raw}'.", nameof(raw));
+
+    private static CardSubtype ParseSubtype(string raw) =>
+        Enum.TryParse<CardSubtype>(raw, ignoreCase: true, out var s)
+            ? s
+            : throw new ArgumentException($"Unknown card subtype '{raw}'.", nameof(raw));
+
+    private static ArgumentException MissingStat(string cardName, string stat) =>
+        new($"Card '{cardName}' is missing required '{stat}'.");
 }
 
 /// <summary>
@@ -75,7 +164,19 @@ public sealed class CardDefinition
 [JsonDerivedType(typeof(ManaAbilityDefinition), "mana")]
 [JsonDerivedType(typeof(ActivatedAbilityDefinition), "activated")]
 [JsonDerivedType(typeof(TriggeredAbilityDefinition), "triggered")]
-public abstract class AbilityDefinition { }
+public abstract class AbilityDefinition
+{
+    /// <summary>
+    /// Map this JSON ability onto the canonical <see cref="CardDefAbility"/>
+    /// representation carried by <see cref="CardDef.Abilities"/> (PLAN 03 S2).
+    /// The returned ability defers its cost / effect / trigger construction to
+    /// the <see cref="CardDefRuntime"/> JSON-ability builders (which route
+    /// through the shared <c>Costs.*</c> / <c>Fx.*</c> / <c>Triggers.*</c>
+    /// vocabulary), so the live ability is byte-identical to the legacy
+    /// direct build.
+    /// </summary>
+    public abstract CardDefAbility ToCardDefAbility();
+}
 
 /// <summary>
 /// Tap-to-produce-mana ability. <see cref="Produces"/> is a Scryfall
@@ -106,6 +207,11 @@ public sealed class ManaAbilityDefinition : AbilityDefinition
     /// <summary>Optional additional mana cost paid alongside {T}
     /// (e.g. "1" for the signet shape). Null/empty = no extra cost.</summary>
     public string? Cost { get; set; }
+
+    /// <inheritdoc />
+    public override CardDefAbility ToCardDefAbility() =>
+        new CardDefManaAbility((card, controller) =>
+            CardDefRuntime.BuildJsonManaAbility(this, card, controller));
 }
 
 /// <summary>
@@ -117,15 +223,23 @@ public sealed class ManaAbilityDefinition : AbilityDefinition
 /// <see cref="SorcerySpeed"/>: CR 117.1a / 307.5 — "Activate only as a
 /// sorcery" rider. Threaded onto the runtime
 /// <see cref="Majik.Core.Abilities.ActivatedAbility.IsSorcerySpeed"/> by
-/// <see cref="CardDefinitionFactory"/>; <c>ActionValidator</c> rejects
-/// activations outside the controller's main phase / empty-stack
-/// window.
+/// <see cref="CardDefRuntime"/> (via <see cref="CardDefActivatedAbility"/>);
+/// <c>ActionValidator</c> rejects activations outside the controller's main
+/// phase / empty-stack window.
 /// </summary>
 public sealed class ActivatedAbilityDefinition : AbilityDefinition
 {
     public List<CostDefinition> Costs { get; set; } = new();
     public List<EffectDefinition> Effects { get; set; } = new();
     public bool SorcerySpeed { get; set; } = false;
+
+    /// <inheritdoc />
+    public override CardDefAbility ToCardDefAbility()
+    {
+        var costBuilders = Costs.Select(c => c.ToCost()).ToArray();
+        var effectBuilders = Effects.Select(e => e.ToResolveEffect()).ToArray();
+        return new CardDefActivatedAbility(costBuilders, effectBuilders, SorcerySpeed);
+    }
 }
 
 /// <summary>
@@ -137,4 +251,12 @@ public sealed class TriggeredAbilityDefinition : AbilityDefinition
 {
     public TriggerDefinition Trigger { get; set; } = new EnterBattlefieldSelfTriggerDef();
     public List<EffectDefinition> Effects { get; set; } = new();
+
+    /// <inheritdoc />
+    public override CardDefAbility ToCardDefAbility()
+    {
+        var triggerBuilder = Trigger.ToTrigger();
+        var effectBuilders = Effects.Select(e => e.ToResolveEffect()).ToArray();
+        return new CardDefTriggeredAbility(triggerBuilder, effectBuilders);
+    }
 }

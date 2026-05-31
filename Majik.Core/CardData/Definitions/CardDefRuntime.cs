@@ -1,9 +1,12 @@
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Costs;
+using Majik.Core.Counters;
 using Majik.Core.Effects;
 using Majik.Core.Players;
 using Majik.Core.Primitives;
+using Majik.Core.Services;
 using Majik.Core.Spells;
 using Majik.Core.Tokens;
 using Majik.Core.ValueObjects;
@@ -52,7 +55,18 @@ public static class CardDefRuntime
     /// — callers route those through <see cref="BuildSpellResolveEffects"/>
     /// at cast time.
     /// </summary>
-    public static ICard Build(CardDef def, Player owner)
+    public static ICard Build(CardDef def, Player owner) =>
+        Build(def, owner, replacements: null);
+
+    /// <summary>
+    /// Materialize a card from a <see cref="CardDef"/>, optionally routing
+    /// the def's <see cref="CardDef.Abilities"/> +1/+1 counter placements
+    /// through the supplied <see cref="ReplacementBus"/> (CR 614). This is
+    /// the overload the JSON path
+    /// (<see cref="CardDefinitionFactory.Build(CardDefinition, Player, ReplacementBus?)"/>)
+    /// routes through after <see cref="CardDefinition.ToCardDef"/>.
+    /// </summary>
+    public static ICard Build(CardDef def, Player owner, ReplacementBus? replacements)
     {
         ArgumentNullException.ThrowIfNull(def);
         ArgumentNullException.ThrowIfNull(owner);
@@ -91,6 +105,22 @@ public static class CardDefRuntime
         card.SetOwner(owner);
         card.SetController(owner);
 
+        // CR 202.2c — printed colour indicator. Stamped on the concrete Card
+        // so CardColors.GetColors honours it (Dryad Arbor: no mana cost,
+        // indicator says green). Skipped when the def lists no indicator
+        // codes (the default for the overwhelming majority of cards). Mirrors
+        // the legacy CardDefinitionFactory.Build colour-indicator pass so the
+        // JSON path is byte-identical after ToCardDef().
+        if (card is Card concreteForIndicator && def.ColorIndicator.Count > 0)
+        {
+            var indicator = new List<ManaColor>(def.ColorIndicator.Count);
+            foreach (var letter in def.ColorIndicator)
+            {
+                indicator.Add(ParseColorLetter(letter));
+            }
+            concreteForIndicator.SetColorIndicator(indicator);
+        }
+
         foreach (var keyword in def.Keywords)
         {
             card.AddAbility(new KeywordAbility(keyword, card, owner));
@@ -101,8 +131,32 @@ public static class CardDefRuntime
             card.AddAbility(new ManaAbility(card, owner, ManaCost.Parse(produces)));
         }
 
+        // PLAN 03 S2 — canonical activated / triggered / mana abilities
+        // mapped from the JSON CardDefinition union by ToCardDef(). This is
+        // the single interpreter that turns each CardDefAbility into a live
+        // engine ability; the per-ability cost / effect / trigger builders
+        // (which delegate to Costs.* / Fx.* / Triggers.*) run here against the
+        // live card.
+        foreach (var ability in def.Abilities)
+        {
+            card.AddAbility(ability.Build(card, owner, replacements));
+        }
+
         return card;
     }
+
+    private static ManaColor ParseColorLetter(string raw) =>
+        raw?.Trim().ToUpperInvariant() switch
+        {
+            "W" => ManaColor.White,
+            "U" => ManaColor.Blue,
+            "B" => ManaColor.Black,
+            "R" => ManaColor.Red,
+            "G" => ManaColor.Green,
+            _ => throw new ArgumentException(
+                $"Unknown color indicator code '{raw}'. Expected single-letter Scryfall codes (W/U/B/R/G).",
+                nameof(raw)),
+        };
 
     /// <summary>
     /// Compile the resolve-body declared by a <c>Resolve(...)</c> call into
@@ -296,4 +350,343 @@ public static class CardDefRuntime
 
     private static ArgumentException MissingStat(string cardName, string stat) =>
         new($"CardDef '{cardName}' is missing required '{stat}'.");
+
+    // ====================================================================
+    // JSON-ability materializers (PLAN 03 S2).
+    //
+    // The cost / effect / trigger / mana-ability builders below were moved
+    // here verbatim from CardDefinitionFactory so this class is the ONE
+    // interpreter the plan calls for. The JSON CardDefinition union maps onto
+    // CardDefAbility builders (via ToCost() / ToResolveEffect() / ToTrigger()
+    // / ToManaBuilder() on the union types) that call straight into these —
+    // byte-for-byte the same logic that ran before the reroute, so the
+    // runtime cards are identical (behaviour-neutral).
+    // ====================================================================
+
+    internal static ManaAbility BuildJsonManaAbility(ManaAbilityDefinition mana, ICard card, Player controller)
+    {
+        var produced = ManaCost.Parse(mana.Produces);
+
+        if (string.IsNullOrWhiteSpace(mana.Cost))
+        {
+            return new ManaAbility(card, controller, produced);
+        }
+
+        if (card is not Permanent permanent)
+        {
+            throw new InvalidOperationException(
+                $"Card '{card.Name}' is not a Permanent — cannot pay {{T}} for a mana ability with an additional cost.");
+        }
+
+        var extra = ManaCost.Parse(mana.Cost);
+        return new ManaAbility(
+            source: permanent,
+            controller: controller,
+            manaGenerated: produced,
+            canActivateCheck: () => !permanent.IsTapped && controller.ManaPool.CanPay(extra),
+            additionalCostPayer: p => p.PayMana(extra));
+    }
+
+    internal static ITriggerCondition BuildJsonTrigger(TriggerDefinition definition, ICard card) =>
+        definition switch
+        {
+            EnterBattlefieldSelfTriggerDef => Triggers.OnEnterBattlefieldSelf(card),
+            CardLeavesYourGraveyardTriggerDef gy => BuildCardLeavesYourGraveyardTrigger(gy, card),
+            _ => throw new NotSupportedException(
+                $"Trigger '{definition.GetType().Name}' is not yet supported by CardDefRuntime."),
+        };
+
+    private static ITriggerCondition BuildCardLeavesYourGraveyardTrigger(
+        CardLeavesYourGraveyardTriggerDef def, ICard card)
+    {
+        var types = def.CardTypes.Select(ParseType).ToArray();
+        return new EventTriggerCondition<Majik.Core.Events.CardMovedEvent>((e, _) =>
+        {
+            if (e.FromZone != ZoneType.Graveyard) return false;
+            // "Your" graveyard — the controller of this trigger's source card.
+            var triggerController = card.Controller;
+            if (triggerController is null || !ReferenceEquals(e.Card.Owner, triggerController))
+            {
+                return false;
+            }
+            return types.Length == 0 || types.Any(t => e.Card.HasType(t));
+        });
+    }
+
+    internal static ICost BuildJsonCost(CostDefinition definition, ICard card) =>
+        definition switch
+        {
+            ManaCostDef mana => Primitives.Costs.Mana(mana.Amount),
+            RemoveCounterCostDef rc => BuildRemoveCounterCost(rc, card),
+            TapSelfCostDef => BuildTapSelfCost(card),
+            SacrificeSelfCostDef => BuildSacrificeSelfCost(card),
+            DiscardSelfCostDef => Primitives.Costs.DiscardSelf(card),
+            _ => throw new NotSupportedException(
+                $"Cost '{definition.GetType().Name}' is not yet supported by CardDefRuntime."),
+        };
+
+    private static ICost BuildTapSelfCost(ICard card)
+    {
+        if (card is not Permanent permanent)
+        {
+            throw new InvalidOperationException(
+                $"Card '{card.Name}' is not a Permanent — cannot pay {{T}} as a cost.");
+        }
+        return Primitives.Costs.TapSelf(permanent);
+    }
+
+    private static ICost BuildSacrificeSelfCost(ICard card)
+    {
+        if (card is not Permanent permanent)
+        {
+            throw new InvalidOperationException(
+                $"Card '{card.Name}' is not a Permanent — cannot pay 'sacrifice this' as a cost.");
+        }
+        return Primitives.Costs.SacrificeSelf(permanent);
+    }
+
+    private static ICost BuildRemoveCounterCost(RemoveCounterCostDef def, ICard card)
+    {
+        if (!string.Equals(def.From, "self", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new NotSupportedException(
+                $"RemoveCounterCostDef.From '{def.From}' is not yet supported (v1 = 'self').");
+        }
+        if (!string.Equals(def.Counter, "+1/+1", StringComparison.Ordinal))
+        {
+            throw new NotSupportedException(
+                $"RemoveCounterCostDef.Counter '{def.Counter}' is not yet supported (v1 = '+1/+1').");
+        }
+        if (card is not Permanent permanent)
+        {
+            throw new InvalidOperationException(
+                $"Card '{card.Name}' is not a Permanent — cannot remove counters from it as a cost.");
+        }
+        return Primitives.Costs.RemovePlusOnePlusOneCounter(permanent, def.Amount);
+    }
+
+    internal static IEffect BuildJsonEffect(EffectDefinition definition, ICard card, Player controller, ReplacementBus? replacements) =>
+        definition switch
+        {
+            PutCounterEffectDef put => BuildPutCounterEffect(put, card, replacements),
+            DealDamageStubEffectDef stub => BuildDealDamageStubEffect(stub, card),
+            DrawCardEffectDef draw => BuildDrawCardEffect(draw, card, controller),
+            SurveilSelfEffectDef surveil => BuildSurveilSelfEffect(surveil, card, controller),
+            ScrySelfEffectDef scry => BuildScrySelfEffect(scry, card, controller),
+            DestroyTargetStubEffectDef destroy => BuildDestroyTargetStubEffect(destroy, card),
+            UntapTargetStubEffectDef untap => BuildUntapTargetStubEffect(untap, card),
+            PreventDamageTargetStubEffectDef prevent => BuildPreventDamageTargetStubEffect(prevent, card),
+            GainLifeSelfEffectDef gain => BuildGainLifeSelfEffect(gain, card, controller),
+            MillThenPickFirstMatchingToHandEffectDef mp => BuildMillThenPickEffect(mp, card, controller),
+            ConniveSelfEffectDef connive => BuildConniveSelfEffect(connive, card),
+            AmassSelfEffectDef amass => BuildAmassSelfEffect(amass, card, controller),
+            _ => throw new NotSupportedException(
+                $"Effect '{definition.GetType().Name}' is not yet supported by CardDefRuntime."),
+        };
+
+    private static IEffect BuildConniveSelfEffect(ConniveSelfEffectDef def, ICard card)
+    {
+        var amount = def.Amount;
+        return new Effect(
+            $"{card.Name}: connive x{amount}",
+            () =>
+            {
+                if (card is not Creature creature) return;
+                Fx.Connive(creature, amount);
+            });
+    }
+
+    private static IEffect BuildAmassSelfEffect(AmassSelfEffectDef def, ICard card, Player controller)
+    {
+        var amount = def.Amount;
+        var tribe = ParseSubtype(def.Tribe);
+        return new Effect(
+            $"{card.Name}: amass {def.Tribe} {amount}",
+            () =>
+            {
+                Majik.Core.Keywords.AmassAction.Apply(controller, amount, tribe);
+            });
+    }
+
+    private static IEffect BuildGainLifeSelfEffect(GainLifeSelfEffectDef def, ICard card, Player controller)
+    {
+        var amount = def.Amount;
+        return new Effect(
+            $"{card.Name}: gain {amount} life",
+            () => controller.GainLife(amount));
+    }
+
+    private static IEffect BuildMillThenPickEffect(
+        MillThenPickFirstMatchingToHandEffectDef def, ICard card, Player controller)
+    {
+        var amount = def.Amount;
+        var types = def.MatchingTypes.Select(ParseType).ToArray();
+        return new Effect(
+            $"{card.Name}: mill {amount}, pick first matching",
+            () =>
+            {
+                var milled = Fx.Mill(controller, amount);
+                if (types.Length == 0) return;
+                var pick = milled.FirstOrDefault(c => types.Any(t => c.HasType(t)));
+                if (pick != null)
+                {
+                    controller.Zones.Graveyard.RemoveCard(pick);
+                    controller.Zones.Hand.AddCard(pick);
+                    pick.SetZone(ZoneType.Hand);
+                }
+            });
+    }
+
+    private static IEffect BuildDestroyTargetStubEffect(DestroyTargetStubEffectDef def, ICard card)
+    {
+        return new Effect(
+            $"{card.Name}: destroy target {def.TargetFilter} (stub — no targeting yet)",
+            () => { /* destroy deferred */ });
+    }
+
+    private static IEffect BuildUntapTargetStubEffect(UntapTargetStubEffectDef def, ICard card)
+    {
+        return new Effect(
+            $"{card.Name}: untap target {def.TargetFilter} (stub — no targeting yet)",
+            () => { /* untap target deferred */ });
+    }
+
+    private static IEffect BuildPreventDamageTargetStubEffect(
+        PreventDamageTargetStubEffectDef def, ICard card)
+    {
+        return new Effect(
+            $"{card.Name}: prevent next {def.Amount} damage to target {def.TargetFilter} this turn (stub — no targeting yet)",
+            () => { /* prevent-damage target deferred */ });
+    }
+
+    private static IEffect BuildScrySelfEffect(ScrySelfEffectDef def, ICard card, Player controller)
+    {
+        var amount = def.Amount;
+        return new Effect(
+            $"{card.Name}: scry {amount}",
+            async ctx =>
+            {
+                var peeked = Majik.Core.Keywords.ScryAction.Peek(controller, amount);
+                if (peeked.Count == 0) return;
+
+                // PLAN 01 (Slice D) — prompt the live agent off the resolution
+                // context; fall back to the registry, then all-to-bottom.
+                var agent = ctx.Agent ?? Majik.Core.Players.Agents.AgentRegistry.Get(controller);
+                Majik.Core.Keywords.ScryAction.ScryDecision decision;
+                if (agent != null)
+                {
+                    decision = await agent.ChooseScryDecisionAsync(ctx.Game, peeked, ctx.Ct)
+                        .ConfigureAwait(false);
+                }
+                else
+                {
+                    decision = new Majik.Core.Keywords.ScryAction.ScryDecision(
+                        ToBottom: peeked.ToList(),
+                        TopOrder: Array.Empty<ICard>());
+                }
+                Fx.Scry(controller, amount, decision);
+            });
+    }
+
+    private static IEffect BuildSurveilSelfEffect(SurveilSelfEffectDef def, ICard card, Player controller)
+    {
+        var amount = def.Amount;
+        return new Effect(
+            $"{card.Name}: surveil {amount}",
+            async ctx =>
+            {
+                var peeked = Majik.Core.Keywords.SurveilAction.Peek(controller, amount);
+                if (peeked.Count == 0) return;
+
+                // PLAN 01 (Slice D) — prompt the live agent off the resolution
+                // context; fall back to the registry, then all-to-graveyard.
+                var agent = ctx.Agent ?? Majik.Core.Players.Agents.AgentRegistry.Get(controller);
+                Majik.Core.Keywords.SurveilAction.SurveilDecision decision;
+                if (agent != null)
+                {
+                    decision = await agent.ChooseSurveilDecisionAsync(ctx.Game, peeked, ctx.Ct)
+                        .ConfigureAwait(false);
+                }
+                else
+                {
+                    decision = new Majik.Core.Keywords.SurveilAction.SurveilDecision(
+                        ToGraveyard: peeked.ToList(),
+                        TopOrder: Array.Empty<ICard>());
+                }
+                Majik.Core.Keywords.SurveilAction.Apply(controller, amount, decision);
+            });
+    }
+
+    private static IEffect BuildDrawCardEffect(DrawCardEffectDef def, ICard card, Player controller)
+    {
+        var amount = def.Amount;
+        return new Effect(
+            $"{card.Name}: draw {amount} card(s)",
+            () =>
+            {
+                for (var i = 0; i < amount; i++)
+                {
+                    var top = controller.Zones.Library.GetCards().FirstOrDefault();
+                    if (top == null) return; // empty library — SBAs handle loss elsewhere
+                    controller.Zones.Library.RemoveCard(top);
+                    controller.Zones.Hand.AddCard(top);
+                    top.SetZone(ZoneType.Hand);
+                }
+            });
+    }
+
+    private static IEffect BuildPutCounterEffect(PutCounterEffectDef def, ICard card, ReplacementBus? replacements)
+    {
+        if (!string.Equals(def.Target, "self", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new NotSupportedException(
+                $"PutCounterEffectDef.Target '{def.Target}' is not yet supported (v1 = 'self').");
+        }
+        var counterType = ParseCounterType(def.Counter);
+        var amount = def.Amount;
+        return new Effect(
+            $"{card.Name}: put {amount} {def.Counter} counter(s) on self",
+            () =>
+            {
+                if (card is Permanent permanent)
+                {
+                    if (counterType == CounterType.PlusOnePlusOne)
+                    {
+                        CountersService.Add(permanent, counterType, amount, replacements);
+                    }
+                    else
+                    {
+                        permanent.Counters.Add(counterType, amount);
+                    }
+                }
+            });
+    }
+
+    private static IEffect BuildDealDamageStubEffect(DealDamageStubEffectDef def, ICard card)
+    {
+        return new Effect(
+            $"{card.Name}: deal {def.Amount} damage to {def.Target} (stub — no targeting yet)",
+            () => { /* target damage deferred */ });
+    }
+
+    private static CounterType ParseCounterType(string raw) => raw switch
+    {
+        "+1/+1" => CounterType.PlusOnePlusOne,
+        "-1/-1" => CounterType.MinusOneMinusOne,
+        "Loyalty" => CounterType.Loyalty,
+        "Charge" => CounterType.Charge,
+        "Defense" => CounterType.Defense,
+        "Poison" => CounterType.Poison,
+        _ => throw new NotSupportedException($"Counter type '{raw}' is not yet supported."),
+    };
+
+    private static CardType ParseType(string raw) =>
+        Enum.TryParse<CardType>(raw, ignoreCase: true, out var t)
+            ? t
+            : throw new ArgumentException($"Unknown card type '{raw}'.", nameof(raw));
+
+    private static CardSubtype ParseSubtype(string raw) =>
+        Enum.TryParse<CardSubtype>(raw, ignoreCase: true, out var s)
+            ? s
+            : throw new ArgumentException($"Unknown card subtype '{raw}'.", nameof(raw));
 }

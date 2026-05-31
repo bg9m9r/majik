@@ -93,6 +93,28 @@ public sealed class CardDef
     /// <see cref="CardDefBuilder.Resolve"/>. Null for shape-only cards.</summary>
     public ResolveBody? ResolveBody { get; }
 
+    /// <summary>
+    /// Canonical activated / triggered / mana abilities (PLAN 03 S2). This
+    /// is the in-memory home for the abilities the JSON
+    /// <see cref="CardDefinition"/> schema carries — <see cref="CardDefinition.ToCardDef"/>
+    /// maps its <c>Abilities</c> union onto this list, and
+    /// <see cref="CardDefRuntime.Build"/> materializes each entry into a live
+    /// <see cref="Majik.Core.Abilities.IAbility"/>. Distinct from the simple
+    /// <see cref="ManaAbilities"/> shorthand the fluent DSL emits for the
+    /// vanilla "{T}: Add X" case (which stays as-is for the DSL path).
+    /// Empty for cards with no such abilities.
+    /// </summary>
+    public IReadOnlyList<CardDefAbility> Abilities { get; }
+
+    /// <summary>
+    /// Printed colour indicator (CR 202.2c) — the round dot left of the type
+    /// line. Single-letter Scryfall codes (W/U/B/R/G). Empty means "no
+    /// indicator printed; colour derives from the mana cost". Carried so the
+    /// JSON path (Dryad Arbor) round-trips through
+    /// <see cref="CardDefinition.ToCardDef"/> without losing its indicator.
+    /// </summary>
+    public IReadOnlyList<string> ColorIndicator { get; }
+
     internal CardDef(
         string name,
         string manaCost,
@@ -105,7 +127,9 @@ public sealed class CardDef
         IReadOnlyList<CardSubtype> subtypes,
         IReadOnlyList<string> keywords,
         IReadOnlyList<string> manaAbilities,
-        ResolveBody? resolveBody)
+        ResolveBody? resolveBody,
+        IReadOnlyList<CardDefAbility>? abilities = null,
+        IReadOnlyList<string>? colorIndicator = null)
     {
         Name = name;
         ManaCost = manaCost;
@@ -119,6 +143,8 @@ public sealed class CardDef
         Keywords = keywords;
         ManaAbilities = manaAbilities;
         ResolveBody = resolveBody;
+        Abilities = abilities ?? Array.Empty<CardDefAbility>();
+        ColorIndicator = colorIndicator ?? Array.Empty<string>();
     }
 
     // ---- Entry points -----------------------------------------------------
