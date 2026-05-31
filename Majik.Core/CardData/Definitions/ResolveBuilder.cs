@@ -55,12 +55,17 @@ public enum TargetKind
 /// is read by <see cref="CardDefRuntime"/> when it materializes the
 /// resolve body into engine effects.
 ///
-/// ## Coordination with effects-primitive library
+/// ## Shared primitive vocabulary (PLAN 03)
 ///
-/// When PR #1 (<c>feat/effects-primitives</c>) lands a shared
-/// <c>Majik.Core.Effects.Primitives.*</c> module, each of these kinds
-/// becomes a thin alias for a primitive — keeping the DSL surface
-/// (<c>c.DealDamage(3)</c>, <c>c.GainLife(2)</c>) identical at call sites.
+/// Each kind materializes (in <see cref="CardDefRuntime.MaterializeStep"/>)
+/// onto the shared <see cref="Majik.Core.Primitives.Fx"/> effect vocabulary
+/// — the same one the JSON <see cref="CardDefinitionFactory"/> uses (cost
+/// shapes live in <see cref="Majik.Core.Primitives.Costs"/>, triggers in
+/// <see cref="Majik.Core.Abilities.Triggers"/>). The DSL surface
+/// (<c>c.DealDamage(3)</c>, <c>c.GainLife(2)</c>) stays identical at call
+/// sites as branches converge onto the primitives. The canonical home is
+/// <c>Majik.Core/Primitives/</c>, not the never-built
+/// <c>Majik.Core/Effects/Primitives/</c> earlier TODOs referenced.
 /// </summary>
 public enum ResolveEffectKind
 {

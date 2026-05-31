@@ -7,6 +7,13 @@ namespace Majik.Core.CardData.Definitions;
 /// discriminator: <c>type</c>. New variants register via
 /// <see cref="JsonDerivedTypeAttribute"/> + a matching switch arm in
 /// <see cref="CardDefinitionFactory.BuildCost"/>.
+///
+/// Convergence (PLAN 03): <see cref="CardDefinitionFactory.BuildCost"/>
+/// builds these via the shared <see cref="Majik.Core.Primitives.Costs"/>
+/// vocabulary (the cost-side companion to
+/// <see cref="Majik.Core.Primitives.Fx"/> / <see cref="Majik.Core.Abilities.Triggers"/>).
+/// New cost shapes should add a <c>Costs.*</c> helper (additively) rather
+/// than inline a fresh cost ctor here.
 /// </summary>
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "type")]
 [JsonDerivedType(typeof(ManaCostDef), "mana")]

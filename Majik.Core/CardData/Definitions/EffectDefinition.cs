@@ -11,6 +11,14 @@ namespace Majik.Core.CardData.Definitions;
 /// Build semantics: each variant produces an
 /// <see cref="Majik.Core.Abilities.IEffect"/> whose lambda captures the
 /// live <c>card</c> + <c>controller</c> closure from the build context.
+///
+/// Convergence (PLAN 03): this JSON union is a serialization of the same
+/// effect shapes the fluent <see cref="CardDef"/> DSL emits; both compile
+/// down to the shared <see cref="Majik.Core.Primitives.Fx"/> primitive
+/// vocabulary (cost shapes → <see cref="Majik.Core.Primitives.Costs"/>,
+/// triggers → <see cref="Majik.Core.Abilities.Triggers"/>). New verbs
+/// should reach for an existing <c>Fx.*</c> helper (or add one, additively)
+/// rather than inlining fresh resolve logic here.
 /// </summary>
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "type")]
 [JsonDerivedType(typeof(PutCounterEffectDef), "put_counter")]

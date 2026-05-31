@@ -5,6 +5,7 @@ using Majik.Core.Costs;
 using Majik.Core.Counters;
 using Majik.Core.Effects;
 using Majik.Core.Players;
+using Majik.Core.Primitives;
 using Majik.Core.Services;
 using Majik.Core.ValueObjects;
 
@@ -229,14 +230,18 @@ public static class CardDefinitionFactory
             sorcerySpeed: definition.SorcerySpeed);
     }
 
+    // Cost construction routes through the shared Majik.Core.Primitives.Costs
+    // vocabulary (PLAN 03 S1) — the Permanent / hand-zone guards stay here
+    // (they're factory-context concerns, with card-specific error text), but
+    // the cost *objects* are built by the discoverable Costs.* helpers.
     private static ICost BuildCost(CostDefinition definition, ICard card) =>
         definition switch
         {
-            ManaCostDef mana => new ManaCostCost(mana.Amount),
+            ManaCostDef mana => Primitives.Costs.Mana(mana.Amount),
             RemoveCounterCostDef rc => BuildRemoveCounterCost(rc, card),
             TapSelfCostDef => BuildTapSelfCost(card),
             SacrificeSelfCostDef => BuildSacrificeSelfCost(card),
-            DiscardSelfCostDef => new DiscardSelfCost(card),
+            DiscardSelfCostDef => Primitives.Costs.DiscardSelf(card),
             _ => throw new NotSupportedException(
                 $"Cost '{definition.GetType().Name}' is not yet supported by CardDefinitionFactory."),
         };
@@ -248,7 +253,7 @@ public static class CardDefinitionFactory
             throw new InvalidOperationException(
                 $"Card '{card.Name}' is not a Permanent — cannot pay {{T}} as a cost.");
         }
-        return AdditionalCost.Tap(permanent);
+        return Primitives.Costs.TapSelf(permanent);
     }
 
     private static ICost BuildSacrificeSelfCost(ICard card)
@@ -258,7 +263,7 @@ public static class CardDefinitionFactory
             throw new InvalidOperationException(
                 $"Card '{card.Name}' is not a Permanent — cannot pay 'sacrifice this' as a cost.");
         }
-        return AdditionalCost.Sacrifice(permanent);
+        return Primitives.Costs.SacrificeSelf(permanent);
     }
 
     private static ICost BuildRemoveCounterCost(RemoveCounterCostDef def, ICard card)
@@ -278,7 +283,7 @@ public static class CardDefinitionFactory
             throw new InvalidOperationException(
                 $"Card '{card.Name}' is not a Permanent — cannot remove counters from it as a cost.");
         }
-        return new RemovePlusOnePlusOneCounterCost(permanent, def.Amount);
+        return Primitives.Costs.RemovePlusOnePlusOneCounter(permanent, def.Amount);
     }
 
     private static IEffect BuildEffect(EffectDefinition definition, ICard card, Player controller, ReplacementBus? replacements) =>
@@ -308,7 +313,7 @@ public static class CardDefinitionFactory
             () =>
             {
                 if (card is not Creature creature) return;
-                Majik.Core.Keywords.ConniveAction.ApplyN(creature, amount);
+                Fx.Connive(creature, amount);
             });
     }
 
@@ -341,7 +346,7 @@ public static class CardDefinitionFactory
             $"{card.Name}: mill {amount}, pick first matching",
             () =>
             {
-                var milled = Majik.Core.Keywords.MillAction.Apply(controller, amount);
+                var milled = Fx.Mill(controller, amount);
                 if (types.Length == 0) return;
                 var pick = milled.FirstOrDefault(c => types.Any(t => c.HasType(t)));
                 if (pick != null)
@@ -427,7 +432,7 @@ public static class CardDefinitionFactory
                         ToBottom: peeked.ToList(),
                         TopOrder: Array.Empty<Majik.Core.Cards.ICard>());
                 }
-                Majik.Core.Keywords.ScryAction.Apply(controller, amount, decision);
+                Fx.Scry(controller, amount, decision);
             });
     }
 

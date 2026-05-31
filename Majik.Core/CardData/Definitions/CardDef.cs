@@ -28,17 +28,26 @@ namespace Majik.Core.CardData.Definitions;
 /// }
 /// </code>
 ///
-/// ## Coordination with effects-primitive library
+/// ## Convergence direction (PLAN 03)
 ///
-/// A parallel branch (<c>feat/effects-primitives</c>) is growing a shared
-/// effects-primitive library under <c>Majik.Core/Effects/Primitives/</c>.
-/// At branch time that folder is empty, so <see cref="ResolveBuilder"/>
-/// ships with minimal inline effect builders that route through the
-/// engine's existing <see cref="Majik.Core.Abilities.Effect"/> +
-/// <see cref="Majik.Core.CardData.OracleSpellBinder"/> helpers. When the
-/// primitive library lands, each <c>ResolveBuilder</c> method migrates
-/// to compose those primitives instead of inlining the action — the
-/// call sites in factories stay identical.
+/// This DSL <see cref="CardDef"/> is the <b>target model</b> for all
+/// declarative card authoring. The JSON
+/// <see cref="CardDefinition"/> schema is a serialization of the same
+/// shape (it deserializes into a <see cref="CardDef"/> in later slices),
+/// and both vocabularies compile down to <b>one</b> shared
+/// effect/cost/trigger primitive set:
+/// <list type="bullet">
+///   <item>effects → <see cref="Majik.Core.Primitives.Fx"/></item>
+///   <item>costs → <see cref="Majik.Core.Primitives.Costs"/></item>
+///   <item>triggers → <see cref="Majik.Core.Abilities.Triggers"/></item>
+/// </list>
+/// The primitive home is <c>Majik.Core/Primitives/</c> (NOT the never-built
+/// <c>Majik.Core/Effects/Primitives/</c> the older TODOs pointed at).
+/// <see cref="CardDefRuntime.MaterializeStep"/> already routes resolve
+/// steps through <c>Fx.*</c> where the inlined logic is byte-identical;
+/// remaining inline branches converge as the primitives gain coverage —
+/// the DSL call sites in factories (<c>c.DealDamage(3)</c>,
+/// <c>c.GainLife(2)</c>) stay identical throughout.
 /// </summary>
 public sealed class CardDef
 {
