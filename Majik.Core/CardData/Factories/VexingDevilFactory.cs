@@ -135,7 +135,7 @@ public static class VexingDevilFactory
         // ----------------------------------------------------------------
         var etbEffect = new Effect(
             $"{CardName}: any opponent may take {EtbDamageAmount} damage; if one does, sacrifice this creature",
-            () =>
+            async ctx =>
             {
                 var opponents = opponentResolver?.Invoke();
                 if (opponents == null) return;
@@ -148,7 +148,7 @@ public static class VexingDevilFactory
                     // 601-style "may" choice made by the opponent. Downside
                     // for the chooser (lose 4 life), so the default heuristic
                     // agent declines (BotIntent.LoseLife | CostToDecline).
-                    var agent = AgentRegistry.Get(opp);
+                    var agent = ctx.Agent ?? AgentRegistry.Get(opp);
                     var accepts = agent?
                         .ChooseYesNoAsync(
                             $"Have {CardName} deal {EtbDamageAmount} damage to you?",

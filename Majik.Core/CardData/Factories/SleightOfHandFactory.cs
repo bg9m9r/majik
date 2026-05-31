@@ -61,7 +61,7 @@ public static class SleightOfHandFactory
         ArgumentNullException.ThrowIfNull(caster);
         return new IEffect[]
         {
-            new Effect("Sleight of Hand: look at top 2, put 1 in hand, bottom the other.", () =>
+            new Effect("Sleight of Hand: look at top 2, put 1 in hand, bottom the other.", async ctx =>
             {
                 // Peek up to 2 cards. ScryAction.Peek tolerates short
                 // libraries (returns up to N) so empty- and single-card
@@ -80,15 +80,13 @@ public static class SleightOfHandFactory
                 // every other look-and-pick factory's default — e.g.
                 // MagmaticChannelerFactory).
                 ICard pickForHand;
-                var agent = AgentRegistry.Get(caster);
+                var agent = ctx.Agent ?? AgentRegistry.Get(caster);
                 if (agent != null)
                 {
                     // TODO: drop sync-over-async once IEffect.Execute becomes async.
-                    var chosen = agent.ChooseLibraryPickAsync(
-                        ctx: null,
+                    var chosen = (await agent.ChooseLibraryPickAsync( ctx: ctx.Game,
                         candidates: peeked,
-                        kindLabel: "card to put into your hand")
-                        .GetAwaiter().GetResult();
+                        kindLabel: "card to put into your hand").ConfigureAwait(false));
 
                     // Defensive: if the agent returns null (declines) or
                     // a card the peek didn't surface, fall back to the

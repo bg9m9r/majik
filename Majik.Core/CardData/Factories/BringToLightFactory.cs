@@ -137,7 +137,7 @@ public static class BringToLightFactory
         {
             new Effect(
                 $"{CardName}: Converge tutor creature/instant/sorcery mv ≤ N, exile, shuffle.",
-                () =>
+                async ctx =>
                 {
                     var cap = colorsSpentProvider?.Invoke() ?? DefaultColorsSpent;
                     if (cap < 0) cap = 0;
@@ -153,12 +153,10 @@ public static class BringToLightFactory
                         var candidates = LegalCandidates(caster, cap);
                         if (candidates.Count == 0) return; // no legal pick — CR 701.19a shuffle still runs
 
-                        var agent = AgentRegistry.Get(caster);
+                        var agent = ctx.Agent ?? AgentRegistry.Get(caster);
                         pick = agent != null
-                            ? agent.ChooseLibraryPickAsync(
-                                    ctx: null, candidates,
-                                    "creature, instant, or sorcery card with mv ≤ colors spent")
-                                .GetAwaiter().GetResult()
+                            ? (await agent.ChooseLibraryPickAsync( ctx: ctx.Game, candidates,
+                                    "creature, instant, or sorcery card with mv ≤ colors spent").ConfigureAwait(false))
                             : candidates[0];
                     }
 

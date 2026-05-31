@@ -130,19 +130,18 @@ public static class CuratorOfMysteriesFactory
         // ----------------------------------------------------------------
         var cycleEffect = new Effect(
             $"{CardName}: scry {ScryAmount}",
-            () =>
+            async ctx =>
             {
                 var controller = card.Controller ?? owner;
                 var peeked = ScryAction.Peek(controller, ScryAmount);
                 if (peeked.Count == 0) return;
 
-                var agent = AgentRegistry.Get(controller);
+                var agent = ctx.Agent ?? AgentRegistry.Get(controller);
                 ScryAction.ScryDecision decision;
                 if (agent != null)
                 {
                     // TODO: drop sync-over-async once IEffect.Execute becomes async.
-                    decision = agent.ChooseScryDecisionAsync(null, peeked)
-                        .GetAwaiter().GetResult();
+                    decision = (await agent.ChooseScryDecisionAsync( ctx.Game, peeked).ConfigureAwait(false));
                 }
                 else
                 {

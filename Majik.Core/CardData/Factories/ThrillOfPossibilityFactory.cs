@@ -122,7 +122,7 @@ public static class ThrillOfPossibilityFactory
         ArgumentNullException.ThrowIfNull(caster);
         return new IEffect[]
         {
-            new Effect("Thrill of Possibility: discard a card, then draw two cards.", () =>
+            new Effect("Thrill of Possibility: discard a card, then draw two cards.", async ctx =>
             {
                 // ----------------------------------------------------------
                 // CR 701.16 — "Discard a card." Same agent-or-fallback policy
@@ -142,8 +142,7 @@ public static class ThrillOfPossibilityFactory
                     ICard? pick;
                     if (agent != null)
                     {
-                        pick = agent.ChooseFromHandAsync(caster, hand, BotIntent.Discard)
-                            .GetAwaiter().GetResult();
+                        pick = (await agent.ChooseFromHandAsync(caster, hand, BotIntent.Discard).ConfigureAwait(false));
                         // null = decline. "Discard a card" is mandatory (not
                         // "may"); fall back to the deterministic pick so the
                         // rules-effect remains observable. Same posture as

@@ -155,7 +155,7 @@ public static class VoltaicBrawlerFactory
         // ----------------------------------------------------------------
         var attackEffect = new Effect(
             $"{CardName}: may pay {{E}} — if you do, +{PumpAmount}/+{PumpAmount} and gains trample until end of turn",
-            () =>
+            async ctx =>
             {
                 var controller = card.Controller ?? owner;
 
@@ -163,16 +163,15 @@ public static class VoltaicBrawlerFactory
                 // affordability. Decide first whether to pay.
                 if (controller.EnergyCounters < AttackEnergyCost) return;
 
-                var agent = AgentRegistry.Get(controller);
+                var agent = ctx.Agent ?? AgentRegistry.Get(controller);
                 bool pay;
                 if (agent != null)
                 {
                     // Resolution-time optional-cost prompt (CR 603.4). The
                     // rider is strict upside, so it is classified Buff.
-                    pay = agent.ChooseYesNoAsync(
+                    pay = (await agent.ChooseYesNoAsync(
                             $"{CardName}: pay {{E}} for +{PumpAmount}/+{PumpAmount} and trample until end of turn?",
-                            BotIntent.Buff)
-                        .GetAwaiter().GetResult();
+                            BotIntent.Buff).ConfigureAwait(false));
                 }
                 else
                 {

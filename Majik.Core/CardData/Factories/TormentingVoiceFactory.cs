@@ -103,7 +103,7 @@ public static class TormentingVoiceFactory
         ArgumentNullException.ThrowIfNull(caster);
         return new IEffect[]
         {
-            new Effect("Tormenting Voice: discard a card, then draw two cards.", () =>
+            new Effect("Tormenting Voice: discard a card, then draw two cards.", async ctx =>
             {
                 // ----------------------------------------------------------
                 // CR 701.16 — "Discard a card." Same agent-or-fallback
@@ -121,8 +121,7 @@ public static class TormentingVoiceFactory
                     ICard? pick;
                     if (agent != null)
                     {
-                        pick = agent.ChooseFromHandAsync(caster, hand, BotIntent.Discard)
-                            .GetAwaiter().GetResult();
+                        pick = (await agent.ChooseFromHandAsync(caster, hand, BotIntent.Discard).ConfigureAwait(false));
                         if (pick == null || pick.Zone != ZoneType.Hand)
                             pick = hand[^1];
                     }

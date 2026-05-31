@@ -81,7 +81,7 @@ public static class VampiricTutorFactory
             TargetRequests: Array.Empty<TargetRequest>(),
             EffectFactory: _ => new IEffect[]
             {
-                new Effect("tutor any card -> top of library; lose 2 life", () =>
+                new Effect("tutor any card -> top of library; lose 2 life", async ctx =>
                 {
                     var candidates = caster.Zones.Library.GetCards().ToList();
                     if (candidates.Count > 0)
@@ -91,13 +91,11 @@ public static class VampiricTutorFactory
                         // kindLabel ("any card") is the prompt string
                         // surfaced to the agent so policies can score /
                         // filter on oracle wording.
-                        var agent = AgentRegistry.Get(caster);
+                        var agent = ctx.Agent ?? AgentRegistry.Get(caster);
                         ICard? pick = agent != null
-                            ? agent.ChooseLibraryPickAsync(
-                                ctx: null,
+                            ? (await agent.ChooseLibraryPickAsync( ctx: ctx.Game,
                                 candidates,
-                                "any card")
-                                .GetAwaiter().GetResult()
+                                "any card").ConfigureAwait(false))
                             : candidates[0];
 
                         if (pick != null)

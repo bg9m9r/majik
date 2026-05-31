@@ -125,19 +125,18 @@ public static class SurveilLandCycleFactory
         // "When this land enters, surveil 1." (CR 701.42)
         var surveilEffect = new Effect(
             $"{cardName}: surveil 1",
-            () =>
+            async ctx =>
             {
                 var ctrl = land.Controller ?? land.Owner;
                 if (ctrl == null) return;
                 var peeked = SurveilAction.Peek(ctrl, 1);
                 if (peeked.Count == 0) return;
 
-                var agent = AgentRegistry.Get(ctrl);
+                var agent = ctx.Agent ?? AgentRegistry.Get(ctrl);
                 SurveilAction.SurveilDecision decision;
                 if (agent != null)
                 {
-                    decision = agent.ChooseSurveilDecisionAsync(null, peeked)
-                        .GetAwaiter().GetResult();
+                    decision = (await agent.ChooseSurveilDecisionAsync( ctx.Game, peeked).ConfigureAwait(false));
                 }
                 else
                 {

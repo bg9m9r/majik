@@ -165,7 +165,7 @@ public static class ConduitOfRuinFactory
 
         var castEffect = new Effect(
             $"{CardName}: tutor colorless creature mv >= {TutorManaValueThreshold} -> top of library",
-            () =>
+            async ctx =>
             {
                 var caster = capturedCaster ?? card.Controller ?? owner;
                 if (caster == null) return;
@@ -180,13 +180,11 @@ public static class ConduitOfRuinFactory
                 // search wiring is consistent with WorldlyTutorFactory).
                 if (candidates.Count == 0) return;
 
-                var agent = AgentRegistry.Get(caster);
+                var agent = ctx.Agent ?? AgentRegistry.Get(caster);
                 ICard? pick = agent != null
-                    ? agent.ChooseLibraryPickAsync(
-                        ctx: null,
+                    ? (await agent.ChooseLibraryPickAsync( ctx: ctx.Game,
                         candidates,
-                        "colorless creature card with mana value 7 or greater")
-                        .GetAwaiter().GetResult()
+                        "colorless creature card with mana value 7 or greater").ConfigureAwait(false))
                     : candidates[0];
                 if (pick == null) return;
 

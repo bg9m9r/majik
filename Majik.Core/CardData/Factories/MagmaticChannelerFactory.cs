@@ -157,7 +157,7 @@ public static class MagmaticChannelerFactory
         // ----------------------------------------------------------------
         var activatedEffect = new Effect(
             $"{CardName}: look at top {PeekCount}, may take a creature/instant, rest on bottom",
-            () =>
+            async ctx =>
             {
                 var controller = card.Controller ?? owner;
 
@@ -196,16 +196,14 @@ public static class MagmaticChannelerFactory
                 ICard? pick = null;
                 if (eligible.Count > 0)
                 {
-                    var agent = AgentRegistry.Get(controller);
+                    var agent = ctx.Agent ?? AgentRegistry.Get(controller);
                     if (agent != null)
                     {
                         // TODO: drop sync-over-async once IEffect.Execute
                         // becomes async (same pattern as ConsiderFactory).
-                        pick = agent.ChooseLibraryPickAsync(
-                            ctx: null,
+                        pick = (await agent.ChooseLibraryPickAsync( ctx: ctx.Game,
                             candidates: eligible,
-                            kindLabel: "creature or instant card")
-                            .GetAwaiter().GetResult();
+                            kindLabel: "creature or instant card").ConfigureAwait(false));
 
                         // Defensive — never accept a pick the candidate
                         // pool didn't surface (a mis-wired agent could

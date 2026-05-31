@@ -499,17 +499,16 @@ public static class OracleTriggeredAbilityBinder
             var n = WordToInt(m.Groups["n"].Value);
             if (n > 0)
             {
-                yield return new Effect($"surveil {n}", () =>
+                yield return new Effect($"surveil {n}", async ctx =>
                 {
                     var peeked = Majik.Core.Keywords.SurveilAction.Peek(controller, n);
                     if (peeked.Count == 0) return;
 
-                    var agent = Majik.Core.Players.Agents.AgentRegistry.Get(controller);
+                    var agent = ctx.Agent ?? Majik.Core.Players.Agents.AgentRegistry.Get(controller);
                     Majik.Core.Keywords.SurveilAction.SurveilDecision decision;
                     if (agent != null)
                     {
-                        decision = agent.ChooseSurveilDecisionAsync(null, peeked)
-                            .GetAwaiter().GetResult();
+                        decision = (await agent.ChooseSurveilDecisionAsync( ctx.Game, peeked).ConfigureAwait(false));
                     }
                     else
                     {

@@ -169,7 +169,7 @@ public static class DemilichFactory
 
         var castEffect = new Effect(
             $"{CardName}: exile two instants or sorceries from your graveyard (on cast)",
-            () =>
+            async ctx =>
             {
                 // CR 603.10b illegal-on-resolution recheck — re-pull the
                 // caster's graveyard at resolve time; the controller may
@@ -185,7 +185,7 @@ public static class DemilichFactory
                 // available (Intent: GraveyardManagement); first-N
                 // fallback otherwise. Mirrors Ledger Shredder's
                 // agent-or-default surveil-decision posture.
-                var agent = AgentRegistry.Get(controller);
+                var agent = ctx.Agent ?? AgentRegistry.Get(controller);
                 var picks = new List<ICard>(OnCastExileCount);
                 var remaining = candidates.ToList();
                 for (var i = 0; i < OnCastExileCount && remaining.Count > 0; i++)
@@ -195,12 +195,11 @@ public static class DemilichFactory
                     {
                         // TODO: drop sync-over-async once IEffect.Execute
                         // becomes async (same pattern as ConsiderFactory).
-                        choice = agent.ChooseFromPileAsync(
+                        choice = (await agent.ChooseFromPileAsync(
                             controller,
                             remaining,
                             $"{CardName}: choose an instant or sorcery to exile from your graveyard",
-                            BotIntent.None)
-                            .GetAwaiter().GetResult();
+                            BotIntent.None).ConfigureAwait(false));
                     }
                     else
                     {

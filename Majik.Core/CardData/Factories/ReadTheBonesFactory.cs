@@ -90,7 +90,7 @@ public static class ReadTheBonesFactory
         {
             new Effect(
                 $"{CardName}: scry 2, then draw 2, then lose 2 life.",
-                () =>
+                async ctx =>
                 {
                     // CR 701.20 — Scry 2. Look at top two cards; controller
                     // partitions bottom-bound vs top-ordered. Agent-driven
@@ -99,13 +99,12 @@ public static class ReadTheBonesFactory
                     var peeked = ScryAction.Peek(caster, ScryAmount);
                     if (peeked.Count > 0)
                     {
-                        var agent = AgentRegistry.Get(caster);
+                        var agent = ctx.Agent ?? AgentRegistry.Get(caster);
                         ScryAction.ScryDecision decision;
                         if (agent != null)
                         {
                             // TODO: drop sync-over-async once IEffect.Execute becomes async.
-                            decision = agent.ChooseScryDecisionAsync(null, peeked)
-                                .GetAwaiter().GetResult();
+                            decision = (await agent.ChooseScryDecisionAsync( ctx.Game, peeked).ConfigureAwait(false));
                         }
                         else
                         {

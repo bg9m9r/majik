@@ -100,7 +100,7 @@ public static class FaithfulMendingFactory
         ArgumentNullException.ThrowIfNull(caster);
         return new IEffect[]
         {
-            new Effect("Faithful Mending: gain 2 life, draw two cards, then discard two cards.", () =>
+            new Effect("Faithful Mending: gain 2 life, draw two cards, then discard two cards.", async ctx =>
             {
                 // ----------------------------------------------------------
                 // CR 119.3 — "You gain 2 life." Routed through Fx.GainLife
@@ -148,8 +148,7 @@ public static class FaithfulMendingFactory
                     ICard? pick;
                     if (agent != null)
                     {
-                        pick = agent.ChooseFromHandAsync(caster, hand, BotIntent.Discard)
-                            .GetAwaiter().GetResult();
+                        pick = (await agent.ChooseFromHandAsync(caster, hand, BotIntent.Discard).ConfigureAwait(false));
                         // null = decline. "Discard a card" is mandatory
                         // (not "may"); fall back to the deterministic pick
                         // so the rules-effect remains observable. Same

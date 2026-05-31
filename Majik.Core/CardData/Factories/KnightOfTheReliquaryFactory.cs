@@ -151,7 +151,7 @@ public static class KnightOfTheReliquaryFactory
         // ----------------------------------------------------------------
         var tutorEffect = new Effect(
             $"{CardName}: sac Forest/Plains, tutor a land -> battlefield, shuffle",
-            () =>
+            async ctx =>
             {
                 var controller = card.Controller ?? owner;
 
@@ -171,10 +171,9 @@ public static class KnightOfTheReliquaryFactory
 
                 if (candidates.Count > 0)
                 {
-                    var agent = AgentRegistry.Get(controller);
+                    var agent = ctx.Agent ?? AgentRegistry.Get(controller);
                     ICard? pick = agent != null
-                        ? agent.ChooseLibraryPickAsync(ctx: null, candidates, "land card")
-                            .GetAwaiter().GetResult()
+                        ? (await agent.ChooseLibraryPickAsync( ctx: ctx.Game, candidates, "land card").ConfigureAwait(false))
                         : candidates[0];
 
                     if (pick != null)

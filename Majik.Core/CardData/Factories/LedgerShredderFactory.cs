@@ -125,7 +125,7 @@ public static class LedgerShredderFactory
 
         var surveilEffect = new Effect(
             "Ledger Shredder: surveil 1 (whenever you cast your second spell each turn)",
-            () =>
+            async ctx =>
             {
                 var peeked = Majik.Core.Keywords.SurveilAction.Peek(owner, 1);
                 if (peeked.Count == 0)
@@ -137,12 +137,11 @@ public static class LedgerShredderFactory
                     return;
                 }
 
-                var agent = AgentRegistry.Get(owner);
+                var agent = ctx.Agent ?? AgentRegistry.Get(owner);
                 Majik.Core.Keywords.SurveilAction.SurveilDecision decision;
                 if (agent != null)
                 {
-                    decision = agent.ChooseSurveilDecisionAsync(null, peeked)
-                        .GetAwaiter().GetResult();
+                    decision = (await agent.ChooseSurveilDecisionAsync( ctx.Game, peeked).ConfigureAwait(false));
                 }
                 else
                 {

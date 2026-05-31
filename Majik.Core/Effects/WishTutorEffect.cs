@@ -1,5 +1,6 @@
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
+using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
 using Majik.Core.Zones;
@@ -119,6 +120,27 @@ public sealed class WishTutorEffect
     /// </summary>
     public ICard? Resolve(Player caster)
     {
+        // Legacy sync entry point (Karn -2 loyalty body still calls this
+        // directly). Routes through the async path with the registry-looked-up
+        // agent and no live GameContext.
+        return ResolveAsync(caster, AgentRegistry.Get(caster), game: null)
+            .GetAwaiter().GetResult();
+    }
+
+    /// <summary>
+    /// PLAN 01 (Slice D) — async resolution. Genuinely PROMPTS the supplied
+    /// <paramref name="agent"/> via <see cref="IPlayerAgent.ChooseFromPileAsync"/>
+    /// (bot returns its policy pick; remote agent surfaces a real prompt)
+    /// rather than auto-picking <c>candidates[0]</c>. When
+    /// <paramref name="agent"/> is <see langword="null"/> (no live resolution
+    /// frame) it falls back to the deterministic first candidate.
+    /// </summary>
+    public async ValueTask<ICard?> ResolveAsync(
+        Player caster,
+        IPlayerAgent? agent,
+        GameContext? game,
+        CancellationToken ct = default)
+    {
         ArgumentNullException.ThrowIfNull(caster);
 
         var candidates = caster.Wishboard.GetCards()
@@ -126,13 +148,9 @@ public sealed class WishTutorEffect
             .ToList();
         if (candidates.Count == 0) return null;
 
-        // TODO: remove sync-over-async once IEffect.Execute becomes async.
-        // Mirrors SearchSpellFactory / GoblinMatronFactory / Liliana of
-        // the Veil's deterministic agent-or-first-pick pattern.
-        var agent = AgentRegistry.Get(caster);
         ICard? pick = agent != null
-            ? agent.ChooseFromPileAsync(caster, candidates, PileLabel, Intent)
-                .GetAwaiter().GetResult()
+            ? await agent.ChooseFromPileAsync(caster, candidates, PileLabel, Intent, ct)
+                .ConfigureAwait(false)
             : candidates[0];
         if (pick == null) return null;
 
@@ -161,7 +179,16 @@ public sealed class WishTutorEffect
 
     /// <summary>Wrap this wish-tutor as an <see cref="IEffect"/> bound
     /// to <paramref name="caster"/>. Suitable for placing inside a
-    /// <see cref="SpellDefinition.EffectFactory"/> closure.</summary>
+    /// <see cref="SpellDefinition.EffectFactory"/> closure. PLAN 01 (Slice D):
+    /// built on the async <see cref="Effect"/> ctor so it reads the live
+    /// agent / game off the <see cref="ResolutionContext"/> and genuinely
+    /// prompts (falling back to the registry only when no live frame).</summary>
     public IEffect AsEffect(Player caster) =>
-        new Effect($"wish-tutor: {PileLabel}", () => Resolve(caster));
+        new Effect(
+            $"wish-tutor: {PileLabel}",
+            async ctx =>
+            {
+                var agent = ctx.Agent ?? AgentRegistry.Get(caster);
+                await ResolveAsync(caster, agent, ctx.Game, ctx.Ct).ConfigureAwait(false);
+            });
 }

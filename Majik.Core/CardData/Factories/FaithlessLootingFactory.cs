@@ -86,7 +86,7 @@ public static class FaithlessLootingFactory
         ArgumentNullException.ThrowIfNull(caster);
         return new IEffect[]
         {
-            new Effect("Faithless Looting: draw two cards, then discard two cards.", () =>
+            new Effect("Faithless Looting: draw two cards, then discard two cards.", async ctx =>
             {
                 // ----------------------------------------------------------
                 // CR 121.1 — "Draw two cards." Two simple top-of-library
@@ -128,8 +128,7 @@ public static class FaithlessLootingFactory
                     ICard? pick;
                     if (agent != null)
                     {
-                        pick = agent.ChooseFromHandAsync(caster, hand, BotIntent.Discard)
-                            .GetAwaiter().GetResult();
+                        pick = (await agent.ChooseFromHandAsync(caster, hand, BotIntent.Discard).ConfigureAwait(false));
                         // null = decline. "Discard a card" is mandatory
                         // (not "may"); fall back to the deterministic pick
                         // so the rules-effect remains observable. Same

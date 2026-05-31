@@ -130,7 +130,7 @@ public static class ModularFactory
         // ----------------------------------------------------------------
         var deathEffect = new Effect(
             $"Modular {n}: move +1/+1 counters to target artifact creature",
-            () =>
+            async ctx =>
             {
                 var counters = source.Counters.Count(CounterType.PlusOnePlusOne);
                 if (counters <= 0) return;
@@ -143,9 +143,9 @@ public static class ModularFactory
                 // preserve pre-prompt behaviour.
                 if (agent != null)
                 {
-                    var yes = agent.ChooseYesNoAsync(
+                    var yes = (await agent.ChooseYesNoAsync(
                         "Move +1/+1 counters to target artifact creature?",
-                        BotIntent.CardAdvantage).GetAwaiter().GetResult();
+                        BotIntent.CardAdvantage).ConfigureAwait(false));
                     if (!yes) return;
                 }
 

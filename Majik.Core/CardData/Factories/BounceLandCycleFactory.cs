@@ -196,7 +196,7 @@ public static class BounceLandCycleFactory
         // ----------------------------------------------------------------
         var etbEffect = new Effect(
             $"{cardName}: return a land you control to its owner's hand",
-            () =>
+            async ctx =>
             {
                 var controller = land.Controller ?? owner;
 
@@ -206,14 +206,13 @@ public static class BounceLandCycleFactory
                 if (candidates.Count == 0) return; // CR 608.2b — no legal pick.
 
                 ICard? pick;
-                var agent = AgentRegistry.Get(controller);
+                var agent = ctx.Agent ?? AgentRegistry.Get(controller);
                 if (agent != null)
                 {
-                    pick = agent.ChooseFromBattlefieldAsync(
+                    pick = (await agent.ChooseFromBattlefieldAsync(
                             controller,
                             candidates,
-                            BotIntent.Bounce)
-                        .GetAwaiter().GetResult();
+                            BotIntent.Bounce).ConfigureAwait(false));
                     // Re-validate the agent's pick at resolution (CR 608.2b).
                     if (pick == null
                         || !candidates.Contains(pick))

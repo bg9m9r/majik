@@ -112,7 +112,7 @@ public static class CreepingChillFactory
         // ----------------------------------------------------------------
         var millEffect = new Effect(
             $"{CardName}: exile from graveyard + deal {Damage} to each opp + gain {LifeGain}",
-            () =>
+            async ctx =>
             {
                 // CR 608.2b — re-check the zone at resolution.
                 if (card.Zone != ZoneType.Graveyard) return;
@@ -121,10 +121,9 @@ public static class CreepingChillFactory
                 // "You may exile it" — consult agent or auto-accept.
                 if (agent != null)
                 {
-                    var yes = agent.ChooseYesNoAsync(
+                    var yes = (await agent.ChooseYesNoAsync(
                         "Exile Creeping Chill to deal 3 to each opponent and gain 3 life?",
-                        BotIntent.LoseLife | BotIntent.Heal)
-                        .GetAwaiter().GetResult();
+                        BotIntent.LoseLife | BotIntent.Heal).ConfigureAwait(false));
                     if (!yes) return;
                 }
 

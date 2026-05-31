@@ -97,7 +97,7 @@ public static class EyeOfUginFactory
         // ----------------------------------------------------------------
         var tutorEffect = new Effect(
             $"{CardName}: tutor a colorless creature card → hand; shuffle",
-            () =>
+            async ctx =>
             {
                 static bool Pred(ICard c) =>
                     c.HasType(CardType.Creature) && CardColors.GetColors(c).Count == 0;
@@ -118,13 +118,11 @@ public static class EyeOfUginFactory
                 // deterministic first-match fallback. The kindLabel is
                 // the prompt string surfaced to the agent so policies
                 // can score / filter by oracle wording.
-                var agent = AgentRegistry.Get(owner);
+                var agent = ctx.Agent ?? AgentRegistry.Get(owner);
                 ICard? pick = agent != null
-                    ? agent.ChooseLibraryPickAsync(
-                        ctx: null,
+                    ? (await agent.ChooseLibraryPickAsync( ctx: ctx.Game,
                         candidates,
-                        "colorless creature card")
-                        .GetAwaiter().GetResult()
+                        "colorless creature card").ConfigureAwait(false))
                     : candidates[0];
 
                 if (pick == null)

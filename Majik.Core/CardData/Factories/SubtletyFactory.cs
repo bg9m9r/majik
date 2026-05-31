@@ -105,7 +105,7 @@ public static class SubtletyFactory
 
         var etbEffect = new Effect(
             "Subtlety — bounce target opponent's creature/planeswalker; that player looks at top of library and may put it on bottom",
-            () =>
+            async ctx =>
             {
                 if (etbTrigger == null) return;
                 var chosen = etbTrigger.ChosenTargets;
@@ -135,13 +135,12 @@ public static class SubtletyFactory
                 var peeked = ScryAction.Peek(targetOwner, 1);
                 if (peeked.Count == 0) return; // empty library — nothing to look at.
 
-                var agent = AgentRegistry.Get(targetOwner);
+                var agent = ctx.Agent ?? AgentRegistry.Get(targetOwner);
                 ScryAction.ScryDecision decision;
                 if (agent != null)
                 {
                     // TODO: drop sync-over-async once IEffect.Execute becomes async.
-                    decision = agent.ChooseScryDecisionAsync(null, peeked)
-                        .GetAwaiter().GetResult();
+                    decision = (await agent.ChooseScryDecisionAsync( ctx.Game, peeked).ConfigureAwait(false));
                 }
                 else
                 {

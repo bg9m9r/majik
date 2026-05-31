@@ -187,7 +187,7 @@ public static class SheoldredWhisperingOneFactory
 
         var opponentSacrificeEffect = new Effect(
             $"{CardName}: that player sacrifices a creature",
-            () =>
+            async ctx =>
             {
                 var victim = triggeringOpponent;
                 if (victim == null) return; // condition not satisfied → no-op
@@ -207,7 +207,7 @@ public static class SheoldredWhisperingOneFactory
                 // drives the pick (BotIntent.Removal) with a deterministic
                 // fallback to the first creature in battlefield order.
                 ICard sacrificed;
-                var agent = AgentRegistry.Get(victim);
+                var agent = ctx.Agent ?? AgentRegistry.Get(victim);
                 if (agent != null)
                 {
                     var chosen = agent

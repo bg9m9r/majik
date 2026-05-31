@@ -153,7 +153,7 @@ public static class ArclightPhoenixFactory
         // ----------------------------------------------------------------
         var returnEffect = new Effect(
             $"{CardName}: return from graveyard to battlefield if ≥3 instant/sorcery spells cast this turn",
-            () =>
+            async ctx =>
             {
                 // CR 603.10 — intervening "if". Re-check the count at
                 // resolve time. "May" prompt: when an agent is wired,
@@ -162,10 +162,9 @@ public static class ArclightPhoenixFactory
                 if (instantSorceryCastsThisTurn[0] < 3) return;
                 if (agent != null)
                 {
-                    var yes = agent.ChooseYesNoAsync(
+                    var yes = (await agent.ChooseYesNoAsync(
                         "Return Arclight Phoenix from graveyard to battlefield?",
-                        BotIntent.Reanimate | BotIntent.CardAdvantage)
-                        .GetAwaiter().GetResult();
+                        BotIntent.Reanimate | BotIntent.CardAdvantage).ConfigureAwait(false));
                     if (!yes) return;
                 }
 

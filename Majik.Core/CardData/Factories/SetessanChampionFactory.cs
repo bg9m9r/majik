@@ -115,7 +115,7 @@ public static class SetessanChampionFactory
 
         var constellationEffect = new Effect(
             $"{CardName} — may pay 1 life to draw a card on enchantment ETB",
-            () =>
+            async ctx =>
             {
                 // "You may pay 1 life" — consult agent when wired; else
                 // auto-accept (matches legacy may-clause posture for
@@ -123,9 +123,9 @@ public static class SetessanChampionFactory
                 bool yes = true;
                 if (agent != null)
                 {
-                    yes = agent.ChooseYesNoAsync(
+                    yes = (await agent.ChooseYesNoAsync(
                         $"Pay 1 life to draw a card from {CardName}?",
-                        BotIntent.CardAdvantage).GetAwaiter().GetResult();
+                        BotIntent.CardAdvantage).ConfigureAwait(false));
                 }
                 if (!yes) return;
 

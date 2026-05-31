@@ -109,17 +109,16 @@ public static class DragonsRageChannelerFactory
 
         var surveilEffect = new Effect(
             "Dragon's Rage Channeler — surveil 1 (whenever you cast a noncreature spell)",
-            () =>
+            async ctx =>
             {
                 var peeked = Majik.Core.Keywords.SurveilAction.Peek(owner, 1);
                 if (peeked.Count == 0) return;
 
-                var agent = AgentRegistry.Get(owner);
+                var agent = ctx.Agent ?? AgentRegistry.Get(owner);
                 Majik.Core.Keywords.SurveilAction.SurveilDecision decision;
                 if (agent != null)
                 {
-                    decision = agent.ChooseSurveilDecisionAsync(null, peeked)
-                        .GetAwaiter().GetResult();
+                    decision = (await agent.ChooseSurveilDecisionAsync( ctx.Game, peeked).ConfigureAwait(false));
                 }
                 else
                 {

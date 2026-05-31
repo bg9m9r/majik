@@ -93,7 +93,7 @@ public static class ImperialRecruiterFactory
         // ----------------------------------------------------------------
         var etbEffect = new Effect(
             $"{CardName}: tutor a creature (power ≤ 2) to hand",
-            () =>
+            async ctx =>
             {
                 var controller = card.Controller ?? owner;
 
@@ -104,13 +104,11 @@ public static class ImperialRecruiterFactory
                     .ToList();
                 if (candidates.Count == 0) return; // CR 701.19a — failure to find = no-op.
 
-                var agent = AgentRegistry.Get(controller);
+                var agent = ctx.Agent ?? AgentRegistry.Get(controller);
                 ICard? pick = agent != null
-                    ? agent.ChooseLibraryPickAsync(
-                        ctx: null,
+                    ? (await agent.ChooseLibraryPickAsync( ctx: ctx.Game,
                         candidates,
-                        "creature card with power 2 or less")
-                        .GetAwaiter().GetResult()
+                        "creature card with power 2 or less").ConfigureAwait(false))
                     : candidates[0];
                 if (pick == null) return; // CR 701.19a — failure to find.
 

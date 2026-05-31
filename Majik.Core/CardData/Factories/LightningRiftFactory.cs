@@ -107,7 +107,7 @@ public static class LightningRiftFactory
 
         var rideEffect = new Effect(
             $"{CardName}: may pay {{1}} → 2 damage to any target",
-            () =>
+            async ctx =>
             {
                 if (trigger is null) return;
                 // Source must still be on the battlefield to deal damage
@@ -121,13 +121,13 @@ public static class LightningRiftFactory
                 // posture) when no agent is registered.
                 var oneGeneric = ManaCost.Zero.AddGenericCost(OptionalManaCost);
                 var rifController = card.Controller ?? owner;
-                var agent = AgentRegistry.Get(rifController);
+                var agent = ctx.Agent ?? AgentRegistry.Get(rifController);
                 bool pay;
                 if (agent != null)
                 {
-                    pay = agent.ChooseYesNoAsync(
+                    pay = (await agent.ChooseYesNoAsync(
                         $"Pay {{{OptionalManaCost}}} for {CardName} to deal {DamageAmount} damage?",
-                        BotIntent.Burn).GetAwaiter().GetResult();
+                        BotIntent.Burn).ConfigureAwait(false));
                 }
                 else
                 {

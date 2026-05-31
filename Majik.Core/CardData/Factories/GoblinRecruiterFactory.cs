@@ -116,7 +116,7 @@ public static class GoblinRecruiterFactory
         // ----------------------------------------------------------------
         var etbEffect = new Effect(
             "Goblin Recruiter: stack a Goblin creature card on top of library",
-            () =>
+            async ctx =>
             {
                 var controller = card.Controller ?? owner;
 
@@ -125,13 +125,11 @@ public static class GoblinRecruiterFactory
                     .ToList();
                 if (candidates.Count == 0) return;
 
-                var agent = AgentRegistry.Get(controller);
+                var agent = ctx.Agent ?? AgentRegistry.Get(controller);
                 ICard? pick = agent != null
-                    ? agent.ChooseLibraryPickAsync(
-                        ctx: null,
+                    ? (await agent.ChooseLibraryPickAsync( ctx: ctx.Game,
                         candidates,
-                        "Goblin creature card")
-                        .GetAwaiter().GetResult()
+                        "Goblin creature card").ConfigureAwait(false))
                     : candidates[0];
                 if (pick == null) return; // CR 701.19a — "any number" includes zero.
 

@@ -145,7 +145,7 @@ public sealed class OpeningHandRevealLook4Trigger
 
         var effect = new Effect(
             $"{sourceCard.Name}: look at top {LookAtCount}, may keep 1 on top, exile the rest",
-            () =>
+            async ctx =>
             {
                 var peeked = revealer.Zones.Library.GetCards().Take(LookAtCount).ToList();
                 if (peeked.Count == 0) return;
@@ -157,9 +157,7 @@ public sealed class OpeningHandRevealLook4Trigger
                 // rider). Use the revealer's registered agent.
                 var pickAgent = _agents.TryGetValue(revealer, out var a) ? a : null;
                 ICard? keep = pickAgent != null
-                    ? pickAgent.ChooseLibraryPickAsync(
-                            ctx: null, peeked, "card to keep on top of your library")
-                        .GetAwaiter().GetResult()
+                    ? (await pickAgent.ChooseLibraryPickAsync( ctx: ctx.Game, peeked, "card to keep on top of your library").ConfigureAwait(false))
                     : null;
 
                 // Remove all peeked cards from the library first.

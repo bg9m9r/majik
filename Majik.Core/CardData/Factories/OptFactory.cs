@@ -64,7 +64,7 @@ public static class OptFactory
         ArgumentNullException.ThrowIfNull(caster);
         return new IEffect[]
         {
-            new Effect("Opt: look at top 1, may bottom, then draw a card.", () =>
+            new Effect("Opt: look at top 1, may bottom, then draw a card.", async ctx =>
             {
                 // CR 701.20 (functionally) — Look at the top card; the
                 // controller chooses whether to put it on the bottom of
@@ -76,13 +76,12 @@ public static class OptFactory
                 var peeked = ScryAction.Peek(caster, 1);
                 if (peeked.Count > 0)
                 {
-                    var agent = AgentRegistry.Get(caster);
+                    var agent = ctx.Agent ?? AgentRegistry.Get(caster);
                     ScryAction.ScryDecision decision;
                     if (agent != null)
                     {
                         // TODO: drop sync-over-async once IEffect.Execute becomes async.
-                        decision = agent.ChooseScryDecisionAsync(null, peeked)
-                            .GetAwaiter().GetResult();
+                        decision = (await agent.ChooseScryDecisionAsync( ctx.Game, peeked).ConfigureAwait(false));
                     }
                     else
                     {

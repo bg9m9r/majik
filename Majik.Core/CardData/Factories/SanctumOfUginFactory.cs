@@ -155,19 +155,19 @@ public static class SanctumOfUginFactory
 
         var castEffect = new Effect(
             $"{CardName}: you may sacrifice to tutor a colorless creature to hand",
-            () =>
+            async ctx =>
             {
                 var controller = land.Controller ?? owner;
-                var agent = AgentRegistry.Get(controller);
+                var agent = ctx.Agent ?? AgentRegistry.Get(controller);
 
                 // "You may sacrifice this land. If you do, ..."
                 // Default: YES — tutoring is strictly card-advantageous
                 // (same auto-accept posture as MentorOfTheMeek).
                 bool sacrifice = agent == null
                     ? true
-                    : agent.ChooseYesNoAsync(
+                    : (await agent.ChooseYesNoAsync(
                         $"Sacrifice {CardName} to search for a colorless creature?",
-                        BotIntent.Tutor).GetAwaiter().GetResult();
+                        BotIntent.Tutor).ConfigureAwait(false));
 
                 if (!sacrifice) return;
 
@@ -193,11 +193,9 @@ public static class SanctumOfUginFactory
                 }
 
                 ICard? pick = agent != null
-                    ? agent.ChooseLibraryPickAsync(
-                            ctx: null,
+                    ? (await agent.ChooseLibraryPickAsync( ctx: ctx.Game,
                             candidates: candidates,
-                            kindLabel: "colorless creature card")
-                        .GetAwaiter().GetResult()
+                            kindLabel: "colorless creature card").ConfigureAwait(false))
                     : candidates[0];
 
                 if (pick != null)

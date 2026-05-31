@@ -74,7 +74,7 @@ public static class MysticalTutorFactory
             TargetRequests: Array.Empty<TargetRequest>(),
             EffectFactory: _ => new IEffect[]
             {
-                new Effect("tutor instant/sorcery -> top of library", () =>
+                new Effect("tutor instant/sorcery -> top of library", async ctx =>
                 {
                     static bool Pred(ICard c) =>
                         c.HasType(CardType.Instant) || c.HasType(CardType.Sorcery);
@@ -86,13 +86,11 @@ public static class MysticalTutorFactory
                     // deterministic first-match fallback. The kindLabel is
                     // the prompt string surfaced to the agent so policies
                     // can score / filter by oracle wording.
-                    var agent = AgentRegistry.Get(caster);
+                    var agent = ctx.Agent ?? AgentRegistry.Get(caster);
                     ICard? pick = agent != null
-                        ? agent.ChooseLibraryPickAsync(
-                            ctx: null,
+                        ? (await agent.ChooseLibraryPickAsync( ctx: ctx.Game,
                             candidates,
-                            "instant or sorcery card")
-                            .GetAwaiter().GetResult()
+                            "instant or sorcery card").ConfigureAwait(false))
                         : candidates[0];
                     if (pick == null) return;
 

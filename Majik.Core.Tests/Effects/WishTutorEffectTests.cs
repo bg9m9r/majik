@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Majik.Core.Abilities;
 using Majik.Core.CardData;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
@@ -6,6 +7,7 @@ using Majik.Core.Effects;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
 using Majik.Core.Zones;
+using Moq;
 using Xunit;
 
 namespace Majik.Core.Tests.Effects;
@@ -218,5 +220,63 @@ public class WishTutorEffectTests : IDisposable
 
         _alice.Zones.Hand.GetCards().Should().Contain(solRing);
         _alice.Wishboard.GetCards().Should().NotContain(solRing);
+    }
+
+    // ----- PLAN 01 (Slice D) — async prompt path -----
+
+    [Fact]
+    public async Task ResolveAsync_GenuinelyPromptsSuppliedAgent_NotAutoPick()
+    {
+        // Two artifacts; the agent (passed explicitly, NOT via AgentRegistry)
+        // is consulted and its pick — the SECOND candidate — is honoured.
+        // Proves the migrated path prompts rather than auto-picking [0].
+        var solRing = new Artifact("Sol Ring", "{1}") { Owner = _alice };
+        var wurmcoil = (Card)NamedCardFactory.Create("Wurmcoil Engine", _alice);
+        _alice.Wishboard.AddCard(solRing);
+        _alice.Wishboard.AddCard(wurmcoil);
+
+        IReadOnlyList<ICard>? observed = null;
+        var agent = new Mock<IPlayerAgent>();
+        agent.Setup(a => a.ChooseFromPileAsync(
+                _alice, It.IsAny<IReadOnlyList<ICard>>(), It.IsAny<string>(),
+                It.IsAny<BotIntent>(), It.IsAny<CancellationToken>()))
+            .Returns((Player _, IReadOnlyList<ICard> cands, string _, BotIntent _, CancellationToken _) =>
+            {
+                observed = cands;
+                return Task.FromResult<ICard?>(cands[1]);
+            });
+
+        var tutor = new WishTutorEffect(WishTutorEffect.Predicates.ArtifactCard);
+        var picked = await tutor.ResolveAsync(_alice, agent.Object, game: null);
+
+        picked.Should().BeSameAs(wurmcoil, "the agent's pick must be honoured, not candidates[0]");
+        observed.Should().HaveCount(2);
+        _alice.Zones.Hand.GetCards().Should().Contain(wurmcoil);
+        agent.Verify(a => a.ChooseFromPileAsync(
+            _alice, It.IsAny<IReadOnlyList<ICard>>(), It.IsAny<string>(),
+            BotIntent.Tutor, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task AsEffect_ExecuteAsync_PromptsAgentOffResolutionContext()
+    {
+        // The IEffect built by AsEffect reads ctx.Agent off the
+        // ResolutionContext and prompts it — honouring a scripted pick.
+        var solRing = new Artifact("Sol Ring", "{1}") { Owner = _alice };
+        var wurmcoil = (Card)NamedCardFactory.Create("Wurmcoil Engine", _alice);
+        _alice.Wishboard.AddCard(solRing);
+        _alice.Wishboard.AddCard(wurmcoil);
+
+        var agent = new ScriptedAgent();
+        agent.QueueFromPile(cands => cands.Last()); // pick the second
+
+        var effect = new WishTutorEffect(WishTutorEffect.Predicates.ArtifactCard)
+            .AsEffect(_alice);
+
+        var rc = ResolutionContext.For(_alice, agent, game: null, chosenTargets: null);
+        await effect.ExecuteAsync(rc);
+
+        _alice.Zones.Hand.GetCards().Should().Contain(wurmcoil);
+        _alice.Wishboard.GetCards().Should().Contain(solRing);
     }
 }

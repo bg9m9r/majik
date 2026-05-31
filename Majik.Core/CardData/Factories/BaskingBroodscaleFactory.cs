@@ -181,7 +181,7 @@ public static class BaskingBroodscaleFactory
         // ----------------------------------------------------------------
         var tokenEffect = new Effect(
             $"{CardName}: you may create a 0/1 colourless Eldrazi Spawn creature token with \"Sacrifice this token: Add {{C}}.\"",
-            () =>
+            async ctx =>
             {
                 // CR 603.6c — the source need not still be on the
                 // battlefield for this trigger (it's not a leaves-the-
@@ -193,11 +193,11 @@ public static class BaskingBroodscaleFactory
                 // agent. v1 falls back to "auto-create" (yes) when no agent
                 // is registered, since the token is a pure-upside option
                 // with no cost (Animation Module's auto-pay posture).
-                var agent = AgentRegistry.Get(controller);
+                var agent = ctx.Agent ?? AgentRegistry.Get(controller);
                 bool create = agent == null
-                    || agent.ChooseYesNoAsync(
+                    || (await agent.ChooseYesNoAsync(
                         "Create a 0/1 colorless Eldrazi Spawn creature token?",
-                        BotIntent.Token).GetAwaiter().GetResult();
+                        BotIntent.Token).ConfigureAwait(false));
 
                 if (!create) return;
 

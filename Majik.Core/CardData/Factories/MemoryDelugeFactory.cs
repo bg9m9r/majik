@@ -155,7 +155,7 @@ public static class MemoryDelugeFactory
             new Effect(
                 $"{CardName}: look at top X (mana spent), put two into hand, "
                 + "bottom the rest in a random order.",
-                () =>
+                async ctx =>
                 {
                     var x = manaSpentProvider?.Invoke() ?? DefaultManaSpent;
                     if (x < 0) x = 0;
@@ -175,7 +175,7 @@ public static class MemoryDelugeFactory
                     // taken (deterministic, matching Sleight of Hand). When
                     // fewer than two cards were peeked, all of them go to
                     // hand and there is nothing left to bottom.
-                    var agent = AgentRegistry.Get(caster);
+                    var agent = ctx.Agent ?? AgentRegistry.Get(caster);
                     var toHand = new List<ICard>(PutIntoHandCount);
                     for (var i = 0; i < PutIntoHandCount && peeked.Count > 0; i++)
                     {
@@ -184,11 +184,9 @@ public static class MemoryDelugeFactory
                         {
                             // TODO: drop sync-over-async once IEffect.Execute
                             // becomes async.
-                            var chosen = agent.ChooseLibraryPickAsync(
-                                ctx: null,
+                            var chosen = (await agent.ChooseLibraryPickAsync( ctx: ctx.Game,
                                 candidates: peeked,
-                                kindLabel: "card to put into your hand")
-                                .GetAwaiter().GetResult();
+                                kindLabel: "card to put into your hand").ConfigureAwait(false));
 
                             // "Put two of them into your hand" is mandatory
                             // (no "may"); a null / off-list agent return is a
