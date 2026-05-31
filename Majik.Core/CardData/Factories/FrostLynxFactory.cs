@@ -173,17 +173,17 @@ public static class FrostLynxFactory
         // One-shot: remove the skip on the FIRST Untap step that belongs
         // to the target's current controller (CR 502.1 / "next untap step").
         var targetController = target.Controller;
-        Action<GameEvent>? cleanupHandler = null;
+        Action<StepStartedEvent>? cleanupHandler = null;
         cleanupHandler = ev =>
         {
-            if (ev is not StepStartedEvent sse) return;
+            var sse = ev;
             if (sse.StepType != PhaseStateType.Untap) return;
             if (!ReferenceEquals(sse.Player, targetController)) return;
 
             UntapStepRestrictions.RemoveAll(skipToken);
             if (cleanupHandler != null)
-                eventBus.UnsubscribeAll(cleanupHandler);
+                eventBus.Unsubscribe(cleanupHandler);
         };
-        eventBus.SubscribeAll(cleanupHandler);
+        eventBus.Subscribe(cleanupHandler);
     }
 }

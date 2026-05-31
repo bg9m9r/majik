@@ -46,7 +46,7 @@ public sealed class PlayerHexproofEffect
     private readonly IEventBus? _eventBus;
     private readonly Func<IReadOnlyList<Player>> _affectedPlayersResolver;
     private readonly Func<bool> _activeWhile;
-    private readonly Action<GameEvent> _handler;
+    private readonly Action<CardMovedEvent> _handler;
     private readonly object _token = new();
     private bool _attached;
     private bool _registered;
@@ -92,7 +92,7 @@ public sealed class PlayerHexproofEffect
     {
         if (_attached) return;
         _attached = true;
-        _eventBus?.SubscribeAll(_handler);
+        _eventBus?.Subscribe(_handler);
         Sync();
     }
 
@@ -103,7 +103,7 @@ public sealed class PlayerHexproofEffect
     {
         if (!_attached) return;
         _attached = false;
-        _eventBus?.UnsubscribeAll(_handler);
+        _eventBus?.Unsubscribe(_handler);
         Unregister();
     }
 
@@ -113,9 +113,9 @@ public sealed class PlayerHexproofEffect
         return _source.Zone == ZoneType.Battlefield;
     }
 
-    private void OnEvent(GameEvent e)
+    private void OnEvent(CardMovedEvent e)
     {
-        if (e is not CardMovedEvent moved) return;
+        var moved = e;
         if (_source != null && !ReferenceEquals(moved.Card, _source)) return;
         Sync();
     }

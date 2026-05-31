@@ -203,17 +203,17 @@ public static class WallOfFrostFactory
         // CR 611.2b — one-shot: remove the skip on the first Untap step
         // that belongs to the attacked creature's current controller.
         var targetController = attacked.Controller;
-        Action<GameEvent>? cleanupHandler = null;
+        Action<StepStartedEvent>? cleanupHandler = null;
         cleanupHandler = ev =>
         {
-            if (ev is not StepStartedEvent sse) return;
+            var sse = ev;
             if (sse.StepType != PhaseStateType.Untap) return;
             if (!ReferenceEquals(sse.Player, targetController)) return;
 
             UntapStepRestrictions.RemoveAll(skipToken);
             if (cleanupHandler != null)
-                eventBus.UnsubscribeAll(cleanupHandler);
+                eventBus.Unsubscribe(cleanupHandler);
         };
-        eventBus.SubscribeAll(cleanupHandler);
+        eventBus.Subscribe(cleanupHandler);
     }
 }
