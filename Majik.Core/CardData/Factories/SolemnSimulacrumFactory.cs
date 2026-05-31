@@ -97,10 +97,10 @@ public static class SolemnSimulacrumFactory
         // ----------------------------------------------------------------
         var etbEffect = new Effect(
             $"{CardName}: search a basic land -> battlefield tapped, then shuffle",
-            () =>
+            async ctx =>
             {
                 var controller = card.Controller ?? owner;
-                TutorOneBasicToBattlefieldTapped(controller);
+                await TutorOneBasicToBattlefieldTappedAsync(controller, ctx).ConfigureAwait(false);
             });
 
         var etbTrigger = new TriggeredAbility(
@@ -148,21 +148,21 @@ public static class SolemnSimulacrumFactory
     /// the pick to the battlefield with the printed "tapped" rider applied
     /// after the move (CR 701.18), then shuffle once (CR 701.20a).
     /// </summary>
-    private static void TutorOneBasicToBattlefieldTapped(Player player)
+    private static async ValueTask TutorOneBasicToBattlefieldTappedAsync(Player player, ResolutionContext ctx)
     {
         bool IsBasicLand(ICard c) =>
             c.HasType(CardType.Land) && c.HasSupertype(CardSupertype.Basic);
 
-        var agent = AgentRegistry.Get(player);
+        var agent = ctx.Agent ?? AgentRegistry.Get(player);
 
         var candidates = player.Zones.Library.GetCards().Where(IsBasicLand).ToList();
         ICard? pick = null;
         if (candidates.Count > 0)
         {
             pick = agent != null
-                ? agent.ChooseLibraryPickAsync(ctx: null, candidates,
+                ? await agent.ChooseLibraryPickAsync(ctx.Game, candidates,
                         "basic land card to put onto the battlefield tapped")
-                    .GetAwaiter().GetResult()
+                    .ConfigureAwait(false)
                 : candidates[0];
         }
 

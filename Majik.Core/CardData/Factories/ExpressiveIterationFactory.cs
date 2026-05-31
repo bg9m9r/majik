@@ -95,7 +95,7 @@ public static class ExpressiveIterationFactory
         {
             new Effect(
                 "Expressive Iteration: look at top 3, put 1 in hand, 1 on bottom, 1 in exile (may play this turn).",
-                () => Resolve(caster)),
+                ctx => ResolveAsync(caster, ctx)),
         };
     }
 
@@ -103,7 +103,7 @@ public static class ExpressiveIterationFactory
     /// Execute Expressive Iteration's resolution against
     /// <paramref name="caster"/>'s library.
     /// </summary>
-    public static void Resolve(Player caster, IPlayerAgent? agent = null)
+    public static async ValueTask ResolveAsync(Player caster, ResolutionContext ctx, IPlayerAgent? agent = null)
     {
         ArgumentNullException.ThrowIfNull(caster);
 
@@ -111,18 +111,18 @@ public static class ExpressiveIterationFactory
         var peeked = ScryAction.Peek(caster, LookAtCount).ToList();
         if (peeked.Count == 0) return;
 
-        agent ??= AgentRegistry.Get(caster);
+        agent = ctx.Agent ?? agent ?? AgentRegistry.Get(caster);
 
         // ── Slot 1: one card → hand ──────────────────────────────────────
         ICard pickForHand;
         if (agent != null && peeked.Count > 0)
         {
             // TODO: drop sync-over-async once IEffect.Execute becomes async.
-            var chosen = agent.ChooseLibraryPickAsync(
-                ctx: null,
+            var chosen = await agent.ChooseLibraryPickAsync(
+                ctx.Game,
                 candidates: peeked,
                 kindLabel: "card to put into your hand")
-                .GetAwaiter().GetResult();
+                .ConfigureAwait(false);
 
             // Defensive: fall back to first if agent returns null or invalid.
             pickForHand = chosen != null && peeked.Contains(chosen)
@@ -146,11 +146,11 @@ public static class ExpressiveIterationFactory
         if (agent != null && remaining.Count > 0)
         {
             // TODO: drop sync-over-async once IEffect.Execute becomes async.
-            var chosen = agent.ChooseLibraryPickAsync(
-                ctx: null,
+            var chosen = await agent.ChooseLibraryPickAsync(
+                ctx.Game,
                 candidates: remaining,
                 kindLabel: "card to put on the bottom of your library")
-                .GetAwaiter().GetResult();
+                .ConfigureAwait(false);
 
             pickForBottom = chosen != null && remaining.Contains(chosen)
                 ? chosen

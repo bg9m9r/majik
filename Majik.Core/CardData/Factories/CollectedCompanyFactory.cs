@@ -111,7 +111,7 @@ public static class CollectedCompanyFactory
                 new Effect(
                     $"Collected Company: peek top {PeekCount}, put up to {MaxPicks} creatures " +
                     $"with mv ≤ {MaxManaValue} onto the battlefield, rest to bottom in random order.",
-                    () => Resolve(caster, zoneService)),
+                    ctx => ResolveAsync(caster, ctx, zoneService)),
             });
     }
 
@@ -128,8 +128,9 @@ public static class CollectedCompanyFactory
     /// <see cref="AgentRegistry.Get"/>; when no agent is registered
     /// either, picks the first eligible candidate each slot
     /// (deterministic pre-agent posture).</param>
-    public static void Resolve(
+    public static async ValueTask ResolveAsync(
         Player caster,
+        ResolutionContext ctx,
         ZoneService? zoneService = null,
         IPlayerAgent? agent = null)
     {
@@ -148,7 +149,7 @@ public static class CollectedCompanyFactory
 
         // 3. Sequentially prompt for up to MaxPicks; agent may decline
         //    at any slot (null) per the printed "you may" / "up to" clause.
-        agent ??= AgentRegistry.Get(caster);
+        agent = ctx.Agent ?? agent ?? AgentRegistry.Get(caster);
         var picks = new List<ICard>(MaxPicks);
         var alreadyPicked = new HashSet<ICard>();
 
@@ -160,11 +161,11 @@ public static class CollectedCompanyFactory
             if (candidates.Count == 0) break;
 
             ICard? pick = agent != null
-                ? agent.ChooseLibraryPickAsync(
-                    ctx: null,
+                ? await agent.ChooseLibraryPickAsync(
+                    ctx.Game,
                     candidates: candidates,
                     kindLabel: $"creature card with mana value {MaxManaValue} or less")
-                    .GetAwaiter().GetResult()
+                    .ConfigureAwait(false)
                 : candidates[0];
 
             // CR 117.x — "you may" / "up to two" lets the agent decline.

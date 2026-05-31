@@ -98,7 +98,7 @@ public static class GrowthSpiralFactory
         {
             new Effect(
                 "Growth Spiral: draw a card, then you may put a land from hand onto the battlefield.",
-                () =>
+                async ctx =>
                 {
                     // CR 121.1 — "Draw a card." Empty library stamps the
                     // CR 704.5b pending-loss flag via Fx.DrawCards' internal
@@ -108,7 +108,7 @@ public static class GrowthSpiralFactory
                     // CR 113.6c — "You may put a land card from your hand
                     // onto the battlefield." The draw above runs first, so a
                     // land just drawn is a legal candidate here.
-                    PutLandFromHand(caster, zoneService);
+                    await PutLandFromHandAsync(caster, zoneService, ctx).ConfigureAwait(false);
                 }),
         };
     }
@@ -123,27 +123,27 @@ public static class GrowthSpiralFactory
     /// registry, then raw zone manipulation) so ETB-on-land triggers fire
     /// (CR 603.6a).
     /// </summary>
-    private static void PutLandFromHand(Player controller, ZoneService? zoneService)
+    private static async ValueTask PutLandFromHandAsync(Player controller, ZoneService? zoneService, ResolutionContext ctx)
     {
         var candidates = controller.Zones.Hand.GetCards()
             .Where(c => c.HasType(CardType.Land))
             .ToList();
         if (candidates.Count == 0) return; // No lands → "may" no-op.
 
-        var agent = AgentRegistry.Get(controller);
+        var agent = ctx.Agent ?? AgentRegistry.Get(controller);
 
         ICard? land;
         if (agent != null)
         {
             // CR 117.1a — optional "you may" gesture, resolved by the agent.
-            var optIn = agent.ChooseYesNoAsync(
+            var optIn = await agent.ChooseYesNoAsync(
                     "Put a land card from your hand onto the battlefield?",
                     BotIntent.Ramp)
-                .GetAwaiter().GetResult();
+                .ConfigureAwait(false);
             if (!optIn) return;
 
-            land = agent.ChooseFromHandAsync(controller, candidates, BotIntent.Ramp)
-                .GetAwaiter().GetResult();
+            land = await agent.ChooseFromHandAsync(controller, candidates, BotIntent.Ramp)
+                .ConfigureAwait(false);
             // CR 608.2b — re-validate the agent's pick at resolution.
             if (land == null || !candidates.Contains(land)) return;
         }

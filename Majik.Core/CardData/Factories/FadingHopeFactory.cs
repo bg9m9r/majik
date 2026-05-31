@@ -96,12 +96,12 @@ public static class FadingHopeFactory
                 {
                     new Effect(
                         "Fading Hope — return target creature to its owner's hand; if its mana value was 3 or less, scry 1",
-                        () => Resolve(raw, caster, zoneService)),
+                        ctx => ResolveAsync(raw, caster, zoneService, ctx)),
                 };
             });
     }
 
-    private static void Resolve(object raw, Player caster, ZoneService? zoneService)
+    private static async ValueTask ResolveAsync(object raw, Player caster, ZoneService? zoneService, ResolutionContext ctx)
     {
         // CR 608.2b — target must still be a creature on the battlefield, or
         // neither the bounce nor the scry happens.
@@ -141,13 +141,12 @@ public static class FadingHopeFactory
             var peeked = ScryAction.Peek(caster, 1);
             if (peeked.Count > 0)
             {
-                var agent = AgentRegistry.Get(caster);
+                var agent = ctx.Agent ?? AgentRegistry.Get(caster);
                 ScryAction.ScryDecision decision;
                 if (agent != null)
                 {
-                    // TODO: drop sync-over-async once IEffect.Execute becomes async.
-                    decision = agent.ChooseScryDecisionAsync(null, peeked)
-                        .GetAwaiter().GetResult();
+                    decision = await agent.ChooseScryDecisionAsync(ctx.Game, peeked)
+                        .ConfigureAwait(false);
                 }
                 else
                 {

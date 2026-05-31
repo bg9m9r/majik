@@ -131,7 +131,7 @@ public static class ScrapworkMuttFactory
         // ----------------------------------------------------------------
         var etbEffect = new Effect(
             $"{CardName}: you may discard a card; if you do, draw a card",
-            () => ResolveLoot(card, owner, agent));
+            ctx => ResolveLootAsync(card, owner, agent, ctx));
 
         var etbTrigger = new TriggeredAbility(
             source: card,
@@ -175,9 +175,10 @@ public static class ScrapworkMuttFactory
     /// ChooseFromHandAsync, last-card fallback). The draw is gated on the
     /// discard actually occurring; an empty hand → no loot.
     /// </summary>
-    private static void ResolveLoot(Creature card, Player owner, IPlayerAgent? agent)
+    private static async ValueTask ResolveLootAsync(Creature card, Player owner, IPlayerAgent? agent, ResolutionContext ctx)
     {
         var controller = card.Controller ?? owner;
+        agent = ctx.Agent ?? agent ?? AgentRegistry.Get(controller);
 
         var hand = controller.Zones.Hand.GetCards().ToList();
         if (hand.Count == 0) return; // "you may discard" — nothing to discard.
@@ -186,10 +187,10 @@ public static class ScrapworkMuttFactory
         // is card-neutral (net 0 hand size) and digs one card deep, so the
         // upside branch is the deterministic v1 default.
         bool wantsToLoot = agent == null
-            || agent.ChooseYesNoAsync(
+            || await agent.ChooseYesNoAsync(
                     $"{CardName}: discard a card to draw a card?",
                     BotIntent.Discard | BotIntent.Draw)
-                .GetAwaiter().GetResult();
+                .ConfigureAwait(false);
 
         if (!wantsToLoot) return;
 
@@ -198,8 +199,8 @@ public static class ScrapworkMuttFactory
         ICard? pick;
         if (agent != null)
         {
-            pick = agent.ChooseFromHandAsync(controller, hand, BotIntent.Discard)
-                .GetAwaiter().GetResult();
+            pick = await agent.ChooseFromHandAsync(controller, hand, BotIntent.Discard)
+                .ConfigureAwait(false);
             if (pick == null || pick.Zone != ZoneType.Hand)
                 pick = hand[^1];
         }

@@ -90,10 +90,10 @@ public static class FaunaShamanFactory
         // ----------------------------------------------------------------
         var tutorEffect = new Effect(
             $"{CardName}: search your library for a creature card -> hand, then shuffle",
-            () =>
+            ctx =>
             {
                 var controller = card.Controller ?? owner;
-                TutorOneCreatureToHand(controller);
+                return TutorOneCreatureToHandAsync(controller, ctx);
             });
 
         var activated = new ActivatedAbility(
@@ -121,20 +121,20 @@ public static class FaunaShamanFactory
     /// (same gap as every tutor factory) — the card still reaches the hand so
     /// the observable game state is correct.
     /// </summary>
-    private static void TutorOneCreatureToHand(Player player)
+    private static async ValueTask TutorOneCreatureToHandAsync(Player player, ResolutionContext ctx)
     {
         bool IsCreatureCard(ICard c) => c.HasType(CardType.Creature);
 
-        var agent = AgentRegistry.Get(player);
+        var agent = ctx.Agent ?? AgentRegistry.Get(player);
 
         var candidates = player.Zones.Library.GetCards().Where(IsCreatureCard).ToList();
         ICard? pick = null;
         if (candidates.Count > 0)
         {
             pick = agent != null
-                ? agent.ChooseLibraryPickAsync(ctx: null, candidates,
+                ? await agent.ChooseLibraryPickAsync(ctx.Game, candidates,
                         "creature card to put into your hand")
-                    .GetAwaiter().GetResult()
+                    .ConfigureAwait(false)
                 : candidates[0];
         }
 

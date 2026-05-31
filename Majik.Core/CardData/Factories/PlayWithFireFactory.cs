@@ -94,7 +94,7 @@ public static class PlayWithFireFactory
                 var target = resolver(chosen.Targets[0][0]);
                 return new IEffect[]
                 {
-                    Fx.Inline("Play with Fire: 2 damage to any target, scry 1 if a player was dealt damage", () =>
+                    Fx.Inline("Play with Fire: 2 damage to any target, scry 1 if a player was dealt damage", async ctx =>
                     {
                         // CR 120.3 / CR 608.2e step 1 — deal 2 damage.
                         Fx.DealDamageAny(target, Damage);
@@ -112,13 +112,12 @@ public static class PlayWithFireFactory
                             return; // empty library — scry short-circuits cleanly.
                         }
 
-                        var agent = AgentRegistry.Get(caster);
+                        var agent = ctx.Agent ?? AgentRegistry.Get(caster);
                         ScryAction.ScryDecision decision;
                         if (agent != null)
                         {
-                            // TODO: drop sync-over-async once IEffect.Execute becomes async.
-                            decision = agent.ChooseScryDecisionAsync(null, peeked)
-                                .GetAwaiter().GetResult();
+                            decision = await agent.ChooseScryDecisionAsync(ctx.Game, peeked)
+                                .ConfigureAwait(false);
                         }
                         else
                         {

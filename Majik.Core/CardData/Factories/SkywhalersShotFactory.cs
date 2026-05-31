@@ -99,7 +99,7 @@ public static class SkywhalersShotFactory
                 return new IEffect[]
                 {
                     Fx.Inline($"{CardName}: destroy target creature with power 3 or greater, then scry 1",
-                        () =>
+                        async ctx =>
                         {
                             // CR 608.2e step 1 — destroy target creature (power ≥ 3).
                             // CR 608.2b — resolution-time legality re-check.
@@ -122,13 +122,12 @@ public static class SkywhalersShotFactory
                                 return; // empty library — scry short-circuits cleanly.
                             }
 
-                            var agent = AgentRegistry.Get(caster);
+                            var agent = ctx.Agent ?? AgentRegistry.Get(caster);
                             ScryAction.ScryDecision decision;
                             if (agent != null)
                             {
-                                // TODO: drop sync-over-async once IEffect.Execute becomes async.
-                                decision = agent.ChooseScryDecisionAsync(null, peeked)
-                                    .GetAwaiter().GetResult();
+                                decision = await agent.ChooseScryDecisionAsync(ctx.Game, peeked)
+                                    .ConfigureAwait(false);
                             }
                             else
                             {

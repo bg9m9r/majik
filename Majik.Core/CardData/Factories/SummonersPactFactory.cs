@@ -109,9 +109,9 @@ public static class SummonersPactFactory
             TargetRequests: Array.Empty<TargetRequest>(),
             EffectFactory: p => new IEffect[]
             {
-                new Effect("Summoner's Pact: tutor green creature → hand + queue delayed upkeep pact", () =>
+                new Effect("Summoner's Pact: tutor green creature → hand + queue delayed upkeep pact", async ctx =>
                 {
-                    TutorGreenCreatureToHand(caster);
+                    await TutorGreenCreatureToHandAsync(caster, ctx).ConfigureAwait(false);
                     // CR 701.20a — shuffle after the search effect.
                     LibraryShuffle.ShuffleLibrary(caster, "summoners-pact");
                     RegisterDelayedUpkeepPact(caster, triggers);
@@ -120,7 +120,7 @@ public static class SummonersPactFactory
     }
 
     // --- Tutor: pick a green creature to hand (CR 701.19a) ---------------
-    private static void TutorGreenCreatureToHand(Player caster)
+    private static async ValueTask TutorGreenCreatureToHandAsync(Player caster, ResolutionContext ctx)
     {
         // CR 105.2a — colour derived from cost pips via CardColors.GetColors.
         var candidates = caster.Zones.Library.GetCards()
@@ -129,7 +129,7 @@ public static class SummonersPactFactory
             .ToList();
         if (candidates.Count == 0) return;
 
-        var pick = PickGreenCreature(caster, candidates);
+        var pick = await PickGreenCreatureAsync(caster, candidates, ctx).ConfigureAwait(false);
         if (pick == null) return;
 
         // Reveal + move to hand. Direct zone mutation (no public
@@ -140,15 +140,15 @@ public static class SummonersPactFactory
         pick.SetController(caster);
     }
 
-    private static ICard? PickGreenCreature(Player caster, List<ICard> candidates)
+    private static async ValueTask<ICard?> PickGreenCreatureAsync(Player caster, List<ICard> candidates, ResolutionContext ctx)
     {
-        var agent = AgentRegistry.Get(caster);
+        var agent = ctx.Agent ?? AgentRegistry.Get(caster);
         if (agent == null) return candidates[0];
-        return agent.ChooseLibraryPickAsync(
-            ctx: null,
+        return await agent.ChooseLibraryPickAsync(
+            ctx.Game,
             candidates: candidates,
             kindLabel: "green creature card")
-            .GetAwaiter().GetResult();
+            .ConfigureAwait(false);
     }
 
     // --- Delayed upkeep pact (CR 603.7 / 104.3 / 118.3) ------------------

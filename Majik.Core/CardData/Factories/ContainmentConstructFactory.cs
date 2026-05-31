@@ -167,11 +167,11 @@ public static class ContainmentConstructFactory
 
         var discardEffect = new Effect(
             $"{CardName}: may exile discarded card + grant may-play-this-turn",
-            () =>
+            async ctx =>
             {
                 var discarded = capturedDiscard;
                 capturedDiscard = null;
-                ResolveDiscardTrigger(discarded, card, owner, eventBus);
+                await ResolveDiscardTriggerAsync(discarded, card, owner, eventBus, ctx).ConfigureAwait(false);
             });
 
         var discardTrigger = new TriggeredAbility(
@@ -192,16 +192,17 @@ public static class ContainmentConstructFactory
 
     // --- Trigger resolution (CR 603.1 + CR 514.2 cleanup) ------------------
 
-    private static void ResolveDiscardTrigger(
+    private static async ValueTask ResolveDiscardTriggerAsync(
         ICard? discarded,
         Creature card,
         Player owner,
-        IEventBus? eventBus)
+        IEventBus? eventBus,
+        ResolutionContext ctx)
     {
         if (discarded == null) return;
 
         var controller = card.Controller ?? owner;
-        if (!ShouldExileDiscard(discarded, controller)) return;
+        if (!await ShouldExileDiscardAsync(discarded, controller, ctx).ConfigureAwait(false)) return;
 
         if (!MoveDiscardToExile(discarded)) return;
 
@@ -213,15 +214,15 @@ public static class ContainmentConstructFactory
         ScheduleEndOfTurnGrantClear(stampable, controller, eventBus);
     }
 
-    private static bool ShouldExileDiscard(ICard discarded, Player controller)
+    private static async ValueTask<bool> ShouldExileDiscardAsync(ICard discarded, Player controller, ResolutionContext ctx)
     {
-        var agent = AgentRegistry.Get(controller);
+        var agent = ctx.Agent ?? AgentRegistry.Get(controller);
         // CR 603.1 may-clause. Default auto-accept (BotIntent.CardAdvantage)
         // so tests with no agent registered take the upside branch.
         if (agent == null) return true;
-        return agent.ChooseYesNoAsync(
+        return await agent.ChooseYesNoAsync(
             $"Exile {discarded.Name} discarded by {controller.Name}?",
-            BotIntent.CardAdvantage).GetAwaiter().GetResult();
+            BotIntent.CardAdvantage).ConfigureAwait(false);
     }
 
     private static bool MoveDiscardToExile(ICard discarded)

@@ -39,6 +39,9 @@ public class GenesisWaveTests
 {
     private readonly Player _alice = new("Alice", 20);
 
+    private static ResolutionContext Rc(Player controller) =>
+        ResolutionContext.For(controller, agent: null, game: null, chosenTargets: null);
+
     private static ChosenSpellParams Choose(int? x) =>
         new(ModeIndex: null, X: x,
             Targets: Array.Empty<IReadOnlyList<object>>(),
@@ -149,14 +152,14 @@ public class GenesisWaveTests
     }
 
     [Fact]
-    public void Resolve_AgentDeclines_CardGoesToGraveyard()
+    public async System.Threading.Tasks.Task Resolve_AgentDeclines_CardGoesToGraveyard()
     {
         var elves = SeedCreatureInLibrary("Llanowar Elves", "{G}", 1, 1);
 
         var declining = new DecliningAgent();
         var spell = GenesisWaveFactory.BuildSpellDefinition(_alice, GenesisWaveFactory.Create(_alice));
         // Drive Resolve directly so we can inject the declining agent.
-        GenesisWaveFactory.Resolve(_alice, x: 3, agent: declining);
+        await GenesisWaveFactory.ResolveAsync(_alice, x: 3, Rc(_alice), agent: declining);
 
         _alice.Zones.Battlefield.GetCards().Should().BeEmpty();
         _alice.Zones.Graveyard.GetCards().Should().Contain(elves);
@@ -176,12 +179,12 @@ public class GenesisWaveTests
     }
 
     [Fact]
-    public void Resolve_ShortLibrary_RevealsWhatIsAvailable()
+    public async System.Threading.Tasks.Task Resolve_ShortLibrary_RevealsWhatIsAvailable()
     {
         var elves = SeedCreatureInLibrary("Llanowar Elves", "{G}", 1, 1);
 
         // X = 5 but only one card in library.
-        GenesisWaveFactory.Resolve(_alice, x: 5);
+        await GenesisWaveFactory.ResolveAsync(_alice, x: 5, Rc(_alice));
 
         _alice.Zones.Battlefield.GetCards().Should().Contain(elves);
         _alice.Zones.Library.GetCards().Should().BeEmpty();

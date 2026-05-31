@@ -135,10 +135,10 @@ public static class AugurOfBolasFactory
         var etbEffect = new Effect(
             $"{CardName} — look at top {LookCount}, may reveal an instant or sorcery to hand, " +
             "rest on bottom",
-            () =>
+            async ctx =>
             {
                 var controller = card.Controller ?? owner;
-                var result = ResolveEtb(controller, choosePick);
+                var result = await ResolveEtbAsync(controller, ctx, choosePick).ConfigureAwait(false);
                 onEtbResolved?.Invoke(result);
             });
 
@@ -168,8 +168,9 @@ public static class AugurOfBolasFactory
     /// to reveal and put into hand. The picked card is moved Library → Hand;
     /// all others are moved to the bottom of the library in snapshot order.
     /// </summary>
-    public static Result ResolveEtb(
+    public static async ValueTask<Result> ResolveEtbAsync(
         Player controller,
+        ResolutionContext ctx,
         Func<IReadOnlyList<ICard>, ICard?>? choosePick = null)
     {
         ArgumentNullException.ThrowIfNull(controller);
@@ -209,16 +210,14 @@ public static class AugurOfBolasFactory
             }
             else
             {
-                var agent = AgentRegistry.Get(controller);
+                var agent = ctx.Agent ?? AgentRegistry.Get(controller);
                 if (agent != null)
                 {
-                    // TODO: drop sync-over-async once IEffect.Execute is async
-                    // (same pattern as MagmaticChannelerFactory / ConsiderFactory).
-                    pick = agent.ChooseLibraryPickAsync(
-                        ctx: null,
+                    pick = await agent.ChooseLibraryPickAsync(
+                        ctx.Game,
                         candidates: eligible,
                         kindLabel: "instant or sorcery card")
-                        .GetAwaiter().GetResult();
+                        .ConfigureAwait(false);
 
                     // Defensive — never accept a pick outside the eligible pile.
                     if (pick != null && !eligible.Contains(pick))

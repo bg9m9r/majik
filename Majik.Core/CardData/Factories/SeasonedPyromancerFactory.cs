@@ -135,7 +135,7 @@ public static class SeasonedPyromancerFactory
 
         var etbEffect = new Effect(
             $"{CardName}: discard two, draw two, create Elemental token per nonland discarded",
-            () => ResolveEtbTrigger(card, owner, zoneService));
+            ctx => ResolveEtbTriggerAsync(card, owner, zoneService, ctx));
 
         var etbTrigger = new TriggeredAbility(
             source: card,
@@ -202,12 +202,12 @@ public static class SeasonedPyromancerFactory
     }
 
     // --- ETB body (discard two, draw two, token per nonland discarded) ----
-    private static void ResolveEtbTrigger(Creature card, Player owner, ZoneService? zoneService)
+    private static async ValueTask ResolveEtbTriggerAsync(Creature card, Player owner, ZoneService? zoneService, ResolutionContext ctx)
     {
         var controller = card.Controller ?? owner;
-        var agent = AgentRegistry.Get(controller);
+        var agent = ctx.Agent ?? AgentRegistry.Get(controller);
 
-        var discarded = DiscardN(controller, agent, EtbDiscardCount);
+        var discarded = await DiscardNAsync(controller, agent, EtbDiscardCount).ConfigureAwait(false);
         DrawN(controller, EtbDrawCount);
 
         // CR 305.1 / CR 205.2a — only nonland discards create a token.
@@ -220,7 +220,7 @@ public static class SeasonedPyromancerFactory
         }
     }
 
-    private static List<ICard> DiscardN(Player controller, IPlayerAgent? agent, int count)
+    private static async ValueTask<List<ICard>> DiscardNAsync(Player controller, IPlayerAgent? agent, int count)
     {
         // CR 701.16. Same agent-or-fallback policy as CatharticReunion.
         var discarded = new List<ICard>(count);
@@ -229,7 +229,7 @@ public static class SeasonedPyromancerFactory
             var hand = controller.Zones.Hand.GetCards().ToList();
             if (hand.Count == 0) break;
 
-            var pick = PickDiscard(agent, controller, hand);
+            var pick = await PickDiscardAsync(agent, controller, hand).ConfigureAwait(false);
 
             controller.Zones.Hand.RemoveCard(pick);
             controller.Zones.Graveyard.AddCard(pick);
@@ -239,11 +239,11 @@ public static class SeasonedPyromancerFactory
         return discarded;
     }
 
-    private static ICard PickDiscard(IPlayerAgent? agent, Player controller, List<ICard> hand)
+    private static async ValueTask<ICard> PickDiscardAsync(IPlayerAgent? agent, Player controller, List<ICard> hand)
     {
         if (agent == null) return hand[^1];
-        var pick = agent.ChooseFromHandAsync(controller, hand, BotIntent.Discard)
-            .GetAwaiter().GetResult();
+        var pick = await agent.ChooseFromHandAsync(controller, hand, BotIntent.Discard)
+            .ConfigureAwait(false);
         if (pick == null || pick.Zone != ZoneType.Hand) return hand[^1];
         return pick;
     }

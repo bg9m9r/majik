@@ -136,12 +136,12 @@ public static class ValakutAwakeningFactory
         {
             Fx.Inline(
                 $"{CardName}: bottom any number of cards from hand, then draw that many plus one.",
-                () =>
+                async ctx =>
                 {
                     // 1) "Put any number of cards from your hand on the
                     //    bottom of your library." Consult the agent for the
                     //    chosen subset (CR 601.3h-style player choice).
-                    var bottomed = ChooseCardsToBottom(caster);
+                    var bottomed = await ChooseCardsToBottomAsync(caster, ctx).ConfigureAwait(false);
                     var bottomedCount = 0;
                     foreach (var card in bottomed)
                     {
@@ -169,25 +169,21 @@ public static class ValakutAwakeningFactory
     /// may return any subset, including zero. No agent registered → bottom
     /// nothing (minimal legal resolution: just draw one).
     /// </summary>
-    private static IReadOnlyList<ICard> ChooseCardsToBottom(Player caster)
+    private static async ValueTask<IReadOnlyList<ICard>> ChooseCardsToBottomAsync(Player caster, ResolutionContext ctx)
     {
         var hand = caster.Zones.Hand.GetCards().ToList();
         if (hand.Count == 0) return Array.Empty<ICard>();
 
-        var agent = AgentRegistry.Get(caster);
+        var agent = ctx.Agent ?? AgentRegistry.Get(caster);
         if (agent == null) return Array.Empty<ICard>();
 
         try
         {
-            // TODO: drop sync-over-async once IEffect.Execute becomes async.
-            // ctx is null here (v1 effect closures don't carry a GameContext;
-            // same posture as the scry/surveil prompt paths). The agents in
-            // the engine do not dereference ctx for this prompt.
-            var chosen = agent.ChooseCardsToBottomAsync(
-                    ctx: null!,
+            var chosen = await agent.ChooseCardsToBottomAsync(
+                    ctx.Game!,
                     hand: hand,
                     countToBottom: hand.Count)
-                .GetAwaiter().GetResult();
+                .ConfigureAwait(false);
             return chosen ?? (IReadOnlyList<ICard>)Array.Empty<ICard>();
         }
         catch

@@ -106,7 +106,7 @@ public static class ConsultTheStarChartsFactory
 
         return new IEffect[]
         {
-            new Effect($"{CardName}: look at top X (lands), put 1 (2 if kicked) in hand, rest to bottom.", () =>
+            new Effect($"{CardName}: look at top X (lands), put 1 (2 if kicked) in hand, rest to bottom.", async ctx =>
             {
                 // CR 109.5 / 700.3 — X = number of lands the caster controls,
                 // counted at resolution. Battlefield permanents typed Land.
@@ -136,7 +136,7 @@ public static class ConsultTheStarChartsFactory
                 bool wasKicked = card is Card concrete && concrete.WasKicked;
                 int take = Math.Min(wasKicked ? KickedTake : UnkickedTake, peeked.Count);
 
-                var taken = SelectForHand(caster, peeked, take);
+                var taken = await SelectForHandAsync(caster, peeked, take, ctx).ConfigureAwait(false);
 
                 // Move each chosen card Library → Hand.
                 foreach (var pick in taken)
@@ -175,9 +175,9 @@ public static class ConsultTheStarChartsFactory
     /// look-and-pick factory. Consult is mandatory: the controller MUST put
     /// the cards into their hand.
     /// </summary>
-    private static List<ICard> SelectForHand(Player caster, List<ICard> peeked, int take)
+    private static async ValueTask<List<ICard>> SelectForHandAsync(Player caster, List<ICard> peeked, int take, ResolutionContext ctx)
     {
-        var agent = AgentRegistry.Get(caster);
+        var agent = ctx.Agent ?? AgentRegistry.Get(caster);
         var remaining = new List<ICard>(peeked);
         var chosen = new List<ICard>(take);
 
@@ -186,12 +186,11 @@ public static class ConsultTheStarChartsFactory
             ICard pick;
             if (agent != null)
             {
-                // TODO: drop sync-over-async once IEffect.Execute becomes async.
-                var result = agent.ChooseLibraryPickAsync(
-                    ctx: null,
+                var result = await agent.ChooseLibraryPickAsync(
+                    ctx.Game,
                     candidates: remaining,
                     kindLabel: "card to put into your hand")
-                    .GetAwaiter().GetResult();
+                    .ConfigureAwait(false);
 
                 pick = result != null && remaining.Contains(result)
                     ? result

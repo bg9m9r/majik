@@ -87,10 +87,10 @@ public static class BorderlandRangerFactory
         // ----------------------------------------------------------------
         var etbEffect = new Effect(
             $"{CardName}: search a basic land -> hand, then shuffle",
-            () =>
+            ctx =>
             {
                 var controller = card.Controller ?? owner;
-                TutorOneBasicToHand(controller);
+                return TutorOneBasicToHandAsync(controller, ctx);
             });
 
         var etbTrigger = new TriggeredAbility(
@@ -114,21 +114,21 @@ public static class BorderlandRangerFactory
     /// it" step is a no-op signal in v1 (same gap as every tutor factory) — the
     /// card still reaches the hand so the observable game state is correct.
     /// </summary>
-    private static void TutorOneBasicToHand(Player player)
+    private static async ValueTask TutorOneBasicToHandAsync(Player player, ResolutionContext ctx)
     {
         bool IsBasicLand(ICard c) =>
             c.HasType(CardType.Land) && c.HasSupertype(CardSupertype.Basic);
 
-        var agent = AgentRegistry.Get(player);
+        var agent = ctx.Agent ?? AgentRegistry.Get(player);
 
         var candidates = player.Zones.Library.GetCards().Where(IsBasicLand).ToList();
         ICard? pick = null;
         if (candidates.Count > 0)
         {
             pick = agent != null
-                ? agent.ChooseLibraryPickAsync(ctx: null, candidates,
+                ? await agent.ChooseLibraryPickAsync(ctx.Game, candidates,
                         "basic land card to put into your hand")
-                    .GetAwaiter().GetResult()
+                    .ConfigureAwait(false)
                 : candidates[0];
         }
 

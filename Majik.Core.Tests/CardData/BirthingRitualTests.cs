@@ -47,6 +47,9 @@ public class BirthingRitualTests
     private readonly Player _alice = new("Alice", 20);
     private readonly Player _bob = new("Bob", 20);
 
+    private static ResolutionContext Rc(Player controller) =>
+        ResolutionContext.For(controller, agent: null, game: null, chosenTargets: null);
+
     // ----------------------------------------------------------------------
     // Identity + dispatch
     // ----------------------------------------------------------------------
@@ -152,7 +155,7 @@ public class BirthingRitualTests
     // ----------------------------------------------------------------------
 
     [Fact]
-    public void Resolve_DeclineSacrifice_BottomsAllSeven_NothingEntersBattlefield()
+    public async System.Threading.Tasks.Task Resolve_DeclineSacrifice_BottomsAllSeven_NothingEntersBattlefield()
     {
         // Put a fodder creature on battlefield so the intervening-if
         // would pass, but we drive the agent to DECLINE the sacrifice.
@@ -169,7 +172,7 @@ public class BirthingRitualTests
 
         var agent = new RitualTestAgent(sacrificePick: null /* decline */, libraryPick: null);
 
-        BirthingRitualFactory.Resolve(_alice, agent: agent);
+        await BirthingRitualFactory.ResolveAsync(_alice, Rc(_alice), agent: agent);
 
         // No new permanents — fodder stays, nothing else hit the battlefield.
         _alice.Zones.Battlefield.GetCards().OfType<Creature>().Should().ContainSingle()
@@ -185,7 +188,7 @@ public class BirthingRitualTests
     }
 
     [Fact]
-    public void Resolve_NoSacrificableCreature_BottomsAllSeven_NothingHappens()
+    public async System.Threading.Tasks.Task Resolve_NoSacrificableCreature_BottomsAllSeven_NothingHappens()
     {
         // No creatures on Alice's battlefield: the intervening-if has
         // already blocked stack entry in normal flow. This test exercises
@@ -198,7 +201,7 @@ public class BirthingRitualTests
         var bolt = SeedInstantInLibrary(_alice, "Lightning Bolt", "{R}");
         var bear = SeedCreatureInLibrary(_alice, "Grizzly Bears", "{1}{G}", 2, 2);
 
-        BirthingRitualFactory.Resolve(_alice);
+        await BirthingRitualFactory.ResolveAsync(_alice, Rc(_alice));
 
         _alice.Zones.Battlefield.GetCards().OfType<Creature>().Should().BeEmpty();
         _alice.Zones.Library.GetCards().Should().BeEquivalentTo(new ICard[] { bolt, bear });
@@ -210,7 +213,7 @@ public class BirthingRitualTests
     // ----------------------------------------------------------------------
 
     [Fact]
-    public void Resolve_AcceptSacrifice_PutsEligibleCreatureOntoBattlefield_RestBottomed()
+    public async System.Threading.Tasks.Task Resolve_AcceptSacrifice_PutsEligibleCreatureOntoBattlefield_RestBottomed()
     {
         // Fodder MV 1 (Llanowar Elves). X = 1 + 1 = 2 → can put MV-≤-2.
         var fodder = SeedCreatureOnBattlefield(_alice, "Llanowar Elves", "{G}", 1, 1);
@@ -227,7 +230,7 @@ public class BirthingRitualTests
         // Agent: sacrifice the fodder, then pick the Grizzly Bears from the 7.
         var agent = new RitualTestAgent(sacrificePick: fodder, libraryPick: bears);
 
-        BirthingRitualFactory.Resolve(_alice, agent: agent);
+        await BirthingRitualFactory.ResolveAsync(_alice, Rc(_alice), agent: agent);
 
         // Bears ETB on Alice's battlefield, controlled by Alice.
         var bf = _alice.Zones.Battlefield.GetCards().ToList();
@@ -247,7 +250,7 @@ public class BirthingRitualTests
     }
 
     [Fact]
-    public void Resolve_AcceptSacrifice_XCappedBySacMv_HigherMvCreatureExcluded()
+    public async System.Threading.Tasks.Task Resolve_AcceptSacrifice_XCappedBySacMv_HigherMvCreatureExcluded()
     {
         // Fodder MV 1 → X = 2. Top 7 has only an MV-3 creature, so the
         // agent's library pick of that creature must be REJECTED by the
@@ -264,7 +267,7 @@ public class BirthingRitualTests
         // Agent picks the (illegal) three-drop; factory must reject it.
         var agent = new RitualTestAgent(sacrificePick: fodder, libraryPick: threeDrop);
 
-        BirthingRitualFactory.Resolve(_alice, agent: agent);
+        await BirthingRitualFactory.ResolveAsync(_alice, Rc(_alice), agent: agent);
 
         // Three-drop stayed in the library.
         _alice.Zones.Battlefield.GetCards().OfType<Creature>().Should().BeEmpty();
@@ -275,7 +278,7 @@ public class BirthingRitualTests
     }
 
     [Fact]
-    public void Resolve_AcceptSacrifice_ShortLibrary_StillWorks()
+    public async System.Threading.Tasks.Task Resolve_AcceptSacrifice_ShortLibrary_StillWorks()
     {
         // Library shorter than 7 is fine — peek takes what's there.
         var fodder = SeedCreatureOnBattlefield(_alice, "Llanowar Elves", "{G}", 1, 1);
@@ -285,7 +288,7 @@ public class BirthingRitualTests
 
         var agent = new RitualTestAgent(sacrificePick: fodder, libraryPick: bears);
 
-        BirthingRitualFactory.Resolve(_alice, agent: agent);
+        await BirthingRitualFactory.ResolveAsync(_alice, Rc(_alice), agent: agent);
 
         _alice.Zones.Battlefield.GetCards().Should().Contain(bears);
         _alice.Zones.Library.GetCards().Should().BeEquivalentTo(new[] { bolt });
@@ -293,7 +296,7 @@ public class BirthingRitualTests
     }
 
     [Fact]
-    public void Resolve_AcceptSacrifice_BiggerXEnablesBiggerPick()
+    public async System.Threading.Tasks.Task Resolve_AcceptSacrifice_BiggerXEnablesBiggerPick()
     {
         // Sac MV 2 → X = 3. An MV-3 creature in the 7 is now eligible.
         var fodder = SeedCreatureOnBattlefield(_alice, "Grizzly Bears", "{1}{G}", 2, 2);
@@ -305,7 +308,7 @@ public class BirthingRitualTests
 
         var agent = new RitualTestAgent(sacrificePick: fodder, libraryPick: threeDrop);
 
-        BirthingRitualFactory.Resolve(_alice, agent: agent);
+        await BirthingRitualFactory.ResolveAsync(_alice, Rc(_alice), agent: agent);
 
         _alice.Zones.Battlefield.GetCards().Should().Contain(threeDrop);
         _alice.Zones.Battlefield.GetCards().Should().NotContain(titan);

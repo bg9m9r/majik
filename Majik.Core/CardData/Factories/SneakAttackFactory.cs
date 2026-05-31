@@ -141,7 +141,7 @@ public static class SneakAttackFactory
         // ----------------------------------------------------------------
         var effect = new Effect(
             $"{CardName}: put creature from hand → battlefield, haste, sac next end step",
-            () => ResolveActivation(card, owner, zoneService, triggers, agent));
+            ctx => ResolveActivationAsync(card, owner, zoneService, triggers, agent, ctx));
 
         var ability = new ActivatedAbility(
             source: card,
@@ -161,13 +161,15 @@ public static class SneakAttackFactory
     /// end-step sacrifice trigger that closes over the placed creature.
     /// No-ops cleanly when no creature is in hand.
     /// </summary>
-    private static void ResolveActivation(
+    private static async ValueTask ResolveActivationAsync(
         Enchantment source,
         Player controller,
         ZoneService? zoneService,
         TriggerManager? triggers,
-        IPlayerAgent? agent)
+        IPlayerAgent? agent,
+        ResolutionContext ctx)
     {
+        agent = ctx.Agent ?? agent ?? AgentRegistry.Get(controller);
         // -------------------------------------------------------------------
         // "You may put a creature card from your hand onto the battlefield."
         // Agent path (prompts MVP): ChooseYesNoAsync(CheatIntoPlay) +
@@ -186,14 +188,14 @@ public static class SneakAttackFactory
         {
             // CR 117.x — "you may" prompt. Decline = no-op (the {R} was
             // still paid for the activation).
-            var yes = agent.ChooseYesNoAsync(
+            var yes = await agent.ChooseYesNoAsync(
                 "Put a creature card from your hand onto the battlefield?",
-                BotIntent.CheatIntoPlay).GetAwaiter().GetResult();
+                BotIntent.CheatIntoPlay).ConfigureAwait(false);
             if (!yes) return;
 
-            var chosen = agent.ChooseFromHandAsync(
+            var chosen = await agent.ChooseFromHandAsync(
                 controller, creatures, BotIntent.CheatIntoPlay)
-                .GetAwaiter().GetResult();
+                .ConfigureAwait(false);
             if (chosen is not Creature c) return;
             // Sanity — pick must still be in hand.
             if (c.Zone != ZoneType.Hand) return;

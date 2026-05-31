@@ -128,7 +128,7 @@ public static class OverlordOfTheBalemurkFactory
         // graveyard to your hand." (CR 701.13 mill + CR 117.x "may".)
         // ----------------------------------------------------------------
         IEffect BuildTriggerEffect(string label) =>
-            new Effect(label, () => MillFourThenMayReturn(owner, returnSelector));
+            new Effect(label, ctx => MillFourThenMayReturnAsync(owner, returnSelector, ctx));
 
         // ETB trigger — CR 603.1.
         var etbTrigger = new TriggeredAbility(
@@ -163,9 +163,10 @@ public static class OverlordOfTheBalemurkFactory
     /// otherwise the registered agent is consulted. Returning
     /// <see langword="null"/> is a legal decline (CR 117.x).
     /// </summary>
-    public static void MillFourThenMayReturn(
+    public static async ValueTask MillFourThenMayReturnAsync(
         Player controller,
-        Func<IReadOnlyList<ICard>, ICard?>? returnSelector)
+        Func<IReadOnlyList<ICard>, ICard?>? returnSelector,
+        ResolutionContext ctx)
     {
         ArgumentNullException.ThrowIfNull(controller);
 
@@ -189,14 +190,14 @@ public static class OverlordOfTheBalemurkFactory
         }
         else
         {
-            var agent = AgentRegistry.Get(controller);
+            var agent = ctx.Agent ?? AgentRegistry.Get(controller);
             pick = agent != null
-                ? agent.ChooseFromPileAsync(
+                ? await agent.ChooseFromPileAsync(
                     chooser: controller,
                     candidates: candidates,
                     pileLabel: "a non-Avatar creature or planeswalker in your graveyard",
                     intent: BotIntent.Reanimate)
-                    .GetAwaiter().GetResult()
+                    .ConfigureAwait(false)
                 // No agent registered — deterministic accept-first (matches
                 // every retrofitted "may" factory's pre-agent posture; the
                 // upside Reanimate intent makes the default agent do this too).

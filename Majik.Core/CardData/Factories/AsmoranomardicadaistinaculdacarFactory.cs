@@ -137,10 +137,10 @@ public static class AsmoranomardicadaistinaculdacarFactory
         // ----------------------------------------------------------------
         var tutorEffect = new Effect(
             $"{CardName}: tutor a Food card to hand",
-            () =>
+            ctx =>
             {
                 var controller = card.Controller ?? owner;
-                ResolveFoodTutor(controller);
+                return ResolveFoodTutorAsync(controller, ctx);
             });
 
         var ability = new ActivatedAbility(
@@ -162,7 +162,7 @@ public static class AsmoranomardicadaistinaculdacarFactory
     /// (matches WorldlyTutorFactory's posture); moves Library → Hand and
     /// shuffles (CR 701.20a).
     /// </summary>
-    private static void ResolveFoodTutor(Player controller)
+    private static async ValueTask ResolveFoodTutorAsync(Player controller, ResolutionContext ctx)
     {
         bool Pred(ICard c) =>
             c.HasType(CardType.Artifact) && c.HasSubtype(CardSubtype.Food);
@@ -177,13 +177,13 @@ public static class AsmoranomardicadaistinaculdacarFactory
             return;
         }
 
-        var agent = AgentRegistry.Get(controller);
+        var agent = ctx.Agent ?? AgentRegistry.Get(controller);
         ICard? pick = agent != null
-            ? agent.ChooseLibraryPickAsync(
-                ctx: null,
+            ? await agent.ChooseLibraryPickAsync(
+                ctx.Game,
                 candidates,
                 "Food card")
-                .GetAwaiter().GetResult()
+                .ConfigureAwait(false)
             : candidates[0];
 
         if (pick == null)

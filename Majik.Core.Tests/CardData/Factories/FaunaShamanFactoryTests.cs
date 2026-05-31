@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Moq;
 using Majik.Core.Abilities;
 using Majik.Core.CardData;
 using Majik.Core.CardData.Factories;
@@ -173,6 +174,47 @@ public class FaunaShamanFactoryTests
         _alice.Zones.Hand.GetCards().Count().Should().Be(startHand,
             "no creature card in library → nothing put into hand");
         _alice.Zones.Library.GetCards().Should().Contain(bog);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task ExecuteAsync_HonoursScriptedLibraryPick_NotFirstCandidate()
+    {
+        // PLAN 01 Slice D — the tutor helper now prompts the agent off the
+        // ResolutionContext. A scripted agent that picks the SECOND eligible
+        // creature must be honoured through ExecuteAsync (not silently
+        // first-picked).
+        var c = FaunaShamanFactory.Create(_alice);
+        c.SetZone(ZoneType.Battlefield);
+
+        var first = MakeCreatureInLibrary(_alice, "Tarmogoyf");
+        var second = MakeCreatureInLibrary(_alice, "Wild Mongrel");
+
+        // Agent returns the SECOND candidate (proves real consultation).
+        var agent = new Moq.Mock<Majik.Core.Players.Agents.IPlayerAgent>();
+        agent.Setup(a => a.ChooseLibraryPickAsync(
+                It.IsAny<Majik.Core.Game.GameContext?>(),
+                It.IsAny<IReadOnlyList<ICard>>(),
+                It.IsAny<string>(),
+                It.IsAny<System.Threading.CancellationToken>()))
+            .Returns<Majik.Core.Game.GameContext?, IReadOnlyList<ICard>, string, System.Threading.CancellationToken>(
+                (_, cands, _, _) => System.Threading.Tasks.Task.FromResult<ICard?>(cands[1]));
+
+        var ability = c.Abilities.OfType<ActivatedAbility>().Single();
+        var rc = ResolutionContext.For(_alice, agent.Object, game: null, chosenTargets: null);
+        foreach (var effect in ability.Effects)
+        {
+            await effect.ExecuteAsync(rc);
+        }
+
+        _alice.Zones.Hand.ContainsCard(second).Should().BeTrue(
+            "the agent's chosen (second) creature is the one tutored");
+        _alice.Zones.Hand.ContainsCard(first).Should().BeFalse(
+            "the first candidate was not auto-picked");
+        agent.Verify(a => a.ChooseLibraryPickAsync(
+            It.IsAny<Majik.Core.Game.GameContext?>(),
+            It.IsAny<IReadOnlyList<ICard>>(),
+            It.IsAny<string>(),
+            It.IsAny<System.Threading.CancellationToken>()), Times.Once);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────

@@ -126,10 +126,10 @@ public static class TirelessProvisionerFactory
 
         var modalEffect = new Effect(
             $"{CardName}: choose one — create a Treasure token; or create a Food token",
-            () =>
+            async ctx =>
             {
                 var controller = card.Controller ?? owner;
-                var mode = PickMode(controller);
+                var mode = await PickModeAsync(controller, ctx).ConfigureAwait(false);
                 if (mode == ModeFood)
                 {
                     TokenFactory.CreateFood(controller, zoneService);
@@ -161,19 +161,19 @@ public static class TirelessProvisionerFactory
     /// registered. Sync-over-async pattern mirrors ScapeshiftFactory's
     /// library-tutor call site.
     /// </summary>
-    private static int PickMode(Player controller)
+    private static async ValueTask<int> PickModeAsync(Player controller, ResolutionContext ctx)
     {
-        var agent = AgentRegistry.Get(controller);
+        var agent = ctx.Agent ?? AgentRegistry.Get(controller);
         if (agent == null) return ModeTreasure;
 
         int pick;
         try
         {
-            pick = agent.ChooseModeAsync(
-                    ctx: null!,
+            pick = await agent.ChooseModeAsync(
+                    ctx.Game!,
                     modes: Modes,
                     modeIntents: ModeIntents)
-                .GetAwaiter().GetResult();
+                .ConfigureAwait(false);
         }
         catch
         {

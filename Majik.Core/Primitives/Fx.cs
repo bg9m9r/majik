@@ -571,4 +571,13 @@ public static class Fx
     /// </summary>
     public static IEffect Inline(string description, Action body)
         => new Effect(description, body);
+
+    /// <summary>
+    /// PLAN 01 Slice D — async overload of <see cref="Inline(string, Action)"/>.
+    /// Wraps an async body that reads the live <see cref="ResolutionContext"/>
+    /// (agent / game / chosen targets) so resolve-time inline effects can
+    /// genuinely prompt instead of blocking on a sync-over-async wart.
+    /// </summary>
+    public static IEffect Inline(string description, Func<ResolutionContext, ValueTask> body)
+        => new Effect(description, body);
 }

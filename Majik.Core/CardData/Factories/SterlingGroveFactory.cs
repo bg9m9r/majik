@@ -127,14 +127,14 @@ public static class SterlingGroveFactory
         // -------------------------------------------------------------------
         var tutorEffect = new Effect(
             "Sterling Grove: sacrifice self, tutor enchantment -> top of library",
-            () =>
+            async ctx =>
             {
                 var controller = card.Controller ?? card.Owner ?? owner;
 
                 // Self-sacrifice (CR 701.16) — controller's battlefield -> owner's graveyard.
                 SacrificeToOwnersGraveyard(card);
 
-                TutorEnchantmentToTopOfLibrary(controller);
+                await TutorEnchantmentToTopOfLibraryAsync(controller, ctx).ConfigureAwait(false);
             });
 
         var ability = new ActivatedAbility(
@@ -181,7 +181,7 @@ public static class SterlingGroveFactory
     /// though the printed oracle still says "Then shuffle" so we shuffle
     /// regardless to match Mystical / Vampiric / Worldly Tutor.
     /// </summary>
-    private static void TutorEnchantmentToTopOfLibrary(Player player)
+    private static async ValueTask TutorEnchantmentToTopOfLibraryAsync(Player player, ResolutionContext ctx)
     {
         var candidates = player.Zones.Library.GetCards()
             .Where(c => c.HasType(CardType.Enchantment))
@@ -194,10 +194,10 @@ public static class SterlingGroveFactory
             return;
         }
 
-        var agent = AgentRegistry.Get(player);
+        var agent = ctx.Agent ?? AgentRegistry.Get(player);
         ICard? pick = agent != null
-            ? agent.ChooseLibraryPickAsync(ctx: null, candidates, "enchantment card")
-                .GetAwaiter().GetResult()
+            ? await agent.ChooseLibraryPickAsync(ctx.Game, candidates, "enchantment card")
+                .ConfigureAwait(false)
             : candidates[0];
 
         if (pick == null)

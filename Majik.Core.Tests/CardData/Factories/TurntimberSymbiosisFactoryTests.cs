@@ -56,6 +56,9 @@ public class TurntimberSymbiosisFactoryTests : IDisposable
 {
     private readonly Player _alice = new("Alice", 20);
 
+    private static ResolutionContext Rc(Player controller) =>
+        ResolutionContext.For(controller, agent: null, game: null, chosenTargets: null);
+
     public TurntimberSymbiosisFactoryTests()
     {
         AgentRegistry.Clear();
@@ -164,7 +167,7 @@ public class TurntimberSymbiosisFactoryTests : IDisposable
     // =========================================================================
 
     [Fact]
-    public void Resolve_PutsCreatureMvAtMostThree_WithThreeCounters()
+    public async System.Threading.Tasks.Task Resolve_PutsCreatureMvAtMostThree_WithThreeCounters()
     {
         // Llanowar Elves: mana value 1 ≤ 3 → enters with three +1/+1 counters.
         var elves = SeedCreatureInLibrary(_alice, "Llanowar Elves", "{G}", 1, 1);
@@ -172,7 +175,7 @@ public class TurntimberSymbiosisFactoryTests : IDisposable
         for (int i = 0; i < 6; i++)
             SeedInstantInLibrary(_alice, $"Pad{i}", "{1}");
 
-        TurntimberSymbiosisFactory.Resolve(_alice);
+        await TurntimberSymbiosisFactory.ResolveAsync(_alice, Rc(_alice));
 
         elves.Zone.Should().Be(ZoneType.Battlefield,
             "a creature card is put onto the battlefield");
@@ -187,14 +190,14 @@ public class TurntimberSymbiosisFactoryTests : IDisposable
     // =========================================================================
 
     [Fact]
-    public void Resolve_PutsCreatureMvAboveThree_WithoutCounters()
+    public async System.Threading.Tasks.Task Resolve_PutsCreatureMvAboveThree_WithoutCounters()
     {
         // Primeval Titan: mana value 6 > 3 → no bonus counters.
         var titan = SeedCreatureInLibrary(_alice, "Primeval Titan", "{4}{G}{G}", 6, 6);
         for (int i = 0; i < 6; i++)
             SeedInstantInLibrary(_alice, $"Pad{i}", "{1}");
 
-        TurntimberSymbiosisFactory.Resolve(_alice);
+        await TurntimberSymbiosisFactory.ResolveAsync(_alice, Rc(_alice));
 
         titan.Zone.Should().Be(ZoneType.Battlefield,
             "any creature card is eligible — the mv cap only gates the counters");
@@ -207,14 +210,14 @@ public class TurntimberSymbiosisFactoryTests : IDisposable
     // =========================================================================
 
     [Fact]
-    public void Resolve_RestGoToBottomOfLibrary()
+    public async System.Threading.Tasks.Task Resolve_RestGoToBottomOfLibrary()
     {
         var elves = SeedCreatureInLibrary(_alice, "Llanowar Elves", "{G}", 1, 1);
         var rest = new List<ICard>();
         for (int i = 0; i < 6; i++)
             rest.Add(SeedInstantInLibrary(_alice, $"Pad{i}", "{1}"));
 
-        TurntimberSymbiosisFactory.Resolve(_alice);
+        await TurntimberSymbiosisFactory.ResolveAsync(_alice, Rc(_alice));
 
         _alice.Zones.Battlefield.GetCards().Should().Contain(elves);
         var lib = _alice.Zones.Library.GetCards().ToList();
@@ -228,13 +231,13 @@ public class TurntimberSymbiosisFactoryTests : IDisposable
     // =========================================================================
 
     [Fact]
-    public void Resolve_NoCreaturesInTopSeven_NoPut_AllBottom()
+    public async System.Threading.Tasks.Task Resolve_NoCreaturesInTopSeven_NoPut_AllBottom()
     {
         var rest = new List<ICard>();
         for (int i = 0; i < 7; i++)
             rest.Add(SeedInstantInLibrary(_alice, $"Pad{i}", "{1}"));
 
-        TurntimberSymbiosisFactory.Resolve(_alice);
+        await TurntimberSymbiosisFactory.ResolveAsync(_alice, Rc(_alice));
 
         _alice.Zones.Battlefield.GetCards().Should().BeEmpty(
             "no creature card among the top seven → nothing to put");
@@ -246,21 +249,21 @@ public class TurntimberSymbiosisFactoryTests : IDisposable
     // =========================================================================
 
     [Fact]
-    public void Resolve_ShortLibrary_WorksOnAvailableCards()
+    public async System.Threading.Tasks.Task Resolve_ShortLibrary_WorksOnAvailableCards()
     {
         var elves = SeedCreatureInLibrary(_alice, "Llanowar Elves", "{G}", 1, 1);
         var bolt = SeedInstantInLibrary(_alice, "Lightning Bolt", "{R}");
 
-        TurntimberSymbiosisFactory.Resolve(_alice);
+        await TurntimberSymbiosisFactory.ResolveAsync(_alice, Rc(_alice));
 
         _alice.Zones.Battlefield.GetCards().Should().Contain(elves);
         _alice.Zones.Library.GetCards().Should().BeEquivalentTo(new[] { bolt });
     }
 
     [Fact]
-    public void Resolve_EmptyLibrary_NoOp()
+    public async System.Threading.Tasks.Task Resolve_EmptyLibrary_NoOp()
     {
-        TurntimberSymbiosisFactory.Resolve(_alice);
+        await TurntimberSymbiosisFactory.ResolveAsync(_alice, Rc(_alice));
 
         _alice.Zones.Battlefield.GetCards().Should().BeEmpty();
         _alice.Zones.Library.GetCards().Should().BeEmpty();
@@ -271,7 +274,7 @@ public class TurntimberSymbiosisFactoryTests : IDisposable
     // =========================================================================
 
     [Fact]
-    public void Resolve_AgentDeclines_NothingPut_AllBottom()
+    public async System.Threading.Tasks.Task Resolve_AgentDeclines_NothingPut_AllBottom()
     {
         var elves = SeedCreatureInLibrary(_alice, "Llanowar Elves", "{G}", 1, 1);
         var rest = new List<ICard> { elves };
@@ -281,7 +284,7 @@ public class TurntimberSymbiosisFactoryTests : IDisposable
         // Agent that declines (returns null) — legal under "you may".
         var agent = new DeclineLibraryPickAgent();
 
-        TurntimberSymbiosisFactory.Resolve(_alice, zoneService: null, agent: agent);
+        await TurntimberSymbiosisFactory.ResolveAsync(_alice, Rc(_alice), zoneService: null, agent: agent);
 
         _alice.Zones.Battlefield.GetCards().Should().BeEmpty(
             "the agent declined the optional put");
