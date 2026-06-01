@@ -1,0 +1,14 @@
+{
+  "name": "Sentinel Totem",
+  "types": ["Artifact"],
+  "manaCost": "{1}",
+  "abilities": [
+    {
+      "kind": "triggered",
+      "trigger": { "type": "etb_self" },
+      "effects": [
+        { "type": "scry_self", "amount": 1 }
+      ]
+    }
+  ]
+}
