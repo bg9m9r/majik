@@ -15,9 +15,10 @@ namespace Majik.Core.CardData.Factories;
 ///   "When this creature enters, draw a card."
 ///
 /// ## Implemented (v1)
-/// - 1/1 Creature — Dog at {1}{W}, mana value 2, white.
-///   (The "Enchantment" supertype is not tracked separately in v1 — modelled
-///   as a plain Creature, consistent with ReflectionOfKikiJikiFactory.)
+/// - 1/1 Enchantment Creature — Dog at {1}{W}, mana value 2, white.
+///   Both Creature AND Enchantment card types (CR 205.2a) via
+///   <see cref="Majik.Core.Cards.PermanentBuilders.EnchantmentCreature"/>,
+///   so it counts toward "enchantments you control".
 /// - <b>ETB triggered ability (CR 603.6a)</b> via
 ///   <see cref="Triggers.OnEnterBattlefieldSelf"/>: on resolve the
 ///   controller draws 1 card via <see cref="Fx.DrawCards"/>.
@@ -52,7 +53,8 @@ public static class SpiritedCompanionFactory
     {
         ArgumentNullException.ThrowIfNull(owner);
 
-        var card = new Creature(
+        // CR 205.2a — Enchantment Creature: Creature + Enchantment card types.
+        var card = PermanentBuilders.EnchantmentCreature(
             name: CardName,
             manaCost: PrintedManaCost,
             power: 1,

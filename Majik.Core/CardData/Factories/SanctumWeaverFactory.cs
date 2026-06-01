@@ -20,12 +20,14 @@ namespace Majik.Core.CardData.Factories;
 ///   "{T}: Add X mana of any one color, where X is the number of
 ///    enchantments you control."
 ///
-/// ## v1 Representation
+/// ## Representation
 ///
-/// Enchantment Creatures are modeled as plain <see cref="Creature"/> in v1
-/// (matching the <see cref="ReflectionOfKikiJikiFactory"/> and
-/// <see cref="SythisHarvestsHandFactory"/> conventions). The
-/// <see cref="CardType.Enchantment"/> card type is NOT added.
+/// Enchantment Creatures carry BOTH the Creature AND Enchantment card types
+/// (CR 205.2a). Built via
+/// <see cref="Majik.Core.Cards.PermanentBuilders.EnchantmentCreature"/>, which
+/// additively stamps <see cref="CardType.Enchantment"/> on the
+/// <see cref="Creature"/> shell. Sanctum Weaver therefore counts itself among
+/// the controller's enchantments.
 ///
 /// ## Mana Ability
 ///
@@ -44,9 +46,9 @@ namespace Majik.Core.CardData.Factories;
 ///
 /// <see cref="CountEnchantments"/> counts permanents on the controller's
 /// battlefield that have the <see cref="CardType.Enchantment"/> card type.
-/// This includes Auras, pure Enchantments, and Enchantment Artifacts, but
-/// NOT Enchantment Creatures that are modeled as plain Creatures in v1 —
-/// see v1 gap below.
+/// This includes Auras, pure Enchantments, Enchantment Artifacts, AND
+/// Enchantment Creatures (which now carry both card types — see
+/// <see cref="Majik.Core.Cards.PermanentBuilders.EnchantmentCreature"/>).
 ///
 /// ## Zero-enchantment activation (CR 605.1c)
 ///
@@ -65,16 +67,6 @@ namespace Majik.Core.CardData.Factories;
 ///
 /// ## Deferred (v1 gaps)
 ///
-/// - <b>Enchantment Creatures not counted</b>: v1 models Enchantment
-///   Creatures (e.g. Sanctum Weaver itself, Reflection of Kiki-Jiki) as
-///   plain <c>Creature</c> without <see cref="CardType.Enchantment"/>.
-///   Therefore <see cref="CountEnchantments"/> does NOT count them.
-///   Per the Magic rules (CR 205.2a) an Enchantment Creature has BOTH
-///   the Creature AND Enchantment card types and would count for Sanctum
-///   Weaver's ability. This gap is shared with any count-enchantments
-///   ability in v1. Once v1 starts attaching <c>CardType.Enchantment</c>
-///   to Enchantment Creatures, no change to this factory is needed —
-///   <c>HasType(CardType.Enchantment)</c> will naturally pick them up.
 /// - <b>Bot policy</b>: EV scoring for the {T} activation is inherited
 ///   from the generic "add mana" bot policy (<see cref="ManaAbility"/>
 ///   activation). Colour selection is determined by which slot the bot
@@ -97,9 +89,10 @@ public static class SanctumWeaverFactory
     {
         ArgumentNullException.ThrowIfNull(owner);
 
-        // CR 205.2a — Enchantment Creature. v1 models as plain Creature
-        // (no CardType.Enchantment added — see class xmldoc for v1 gap).
-        var card = new Creature(
+        // CR 205.2a — Enchantment Creature: Creature + Enchantment card
+        // types, additively stamped via PermanentBuilders.EnchantmentCreature.
+        // So Sanctum Weaver counts itself among the controller's enchantments.
+        var card = PermanentBuilders.EnchantmentCreature(
             name: CardName,
             manaCost: ManaCostString,
             power: Power,
@@ -154,9 +147,8 @@ public static class SanctumWeaverFactory
     ///
     /// Counts permanents that have <see cref="CardType.Enchantment"/> in
     /// their card types (CR 109.2 — includes Auras, pure Enchantments,
-    /// Enchantment Artifacts). In v1, Enchantment Creatures are modeled
-    /// as plain Creatures and are NOT counted — see class xmldoc for the
-    /// v1 gap.
+    /// Enchantment Artifacts, AND Enchantment Creatures, which now carry
+    /// both Creature and Enchantment types).
     ///
     /// Returns 0 for null input.
     /// </summary>

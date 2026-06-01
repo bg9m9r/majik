@@ -11,18 +11,23 @@ namespace Majik.Core.CardData.Factories;
 /// Named-card factory for Sythis, Harvest's Hand (Modern Horizons 2 / Theros
 /// Beyond Death — {G}{W}).
 ///
-/// Legendary Creature — Nymph 1/2. Oracle text:
+/// Legendary Enchantment Creature — Nymph 1/2. Oracle text:
 ///   "Constellation — Whenever an enchantment enters under your control, you
 ///    gain 1 life and draw a card."
 ///
 /// ## Implementation
 ///
+/// Sythis is an Enchantment Creature (CR 205.2a) — both Creature AND
+/// Enchantment card types via
+/// <see cref="Majik.Core.Cards.PermanentBuilders.EnchantmentCreature"/>.
+///
 /// Constellation (CR 702.144) is a trigger-templating keyword: "Whenever an
 /// enchantment you control or an enchantment you both own and control enters,
-/// ..." In practice for Sythis the trigger fires whenever ANY enchantment
-/// enters under the controller's control — including Sythis itself when
-/// cast as a creature with enchantment-type would not apply (Sythis is a
-/// Creature, not an Enchantment), but Auras + plain Enchantments do qualify.
+/// ..." The trigger fires whenever ANY enchantment enters under the
+/// controller's control — Auras, plain Enchantments, other Enchantment
+/// Creatures, AND Sythis itself (since Sythis carries the Enchantment card
+/// type, its own entry satisfies the predicate, matching real-rules
+/// constellation self-triggering).
 ///
 /// Shape mirrors <see cref="PuresteelPaladinFactory"/> (Equipment-ETB → draw):
 /// one <see cref="TriggeredAbility"/> over <see cref="CardMovedEvent"/>,
@@ -39,8 +44,9 @@ namespace Majik.Core.CardData.Factories;
 /// <see cref="UpTheBeanstalkFactory"/> and <see cref="PuresteelPaladinFactory"/>).
 ///
 /// ## Notes
-/// - Sythis itself (a Creature, not an Enchantment) cannot self-trigger via
-///   constellation — the predicate gates on <c>CardType.Enchantment</c>.
+/// - Sythis is an Enchantment Creature, so its own entry satisfies the
+///   <c>CardType.Enchantment</c> predicate (real-rules constellation
+///   self-trigger).
 /// - The trigger fires for the controller's own enchantment plays AND for
 ///   any other move that lands an enchantment under their control (e.g.
 ///   reanimation, blink). Opponent enchantments do not qualify.
@@ -73,7 +79,11 @@ public static class SythisHarvestsHandFactory
     {
         ArgumentNullException.ThrowIfNull(owner);
 
-        var card = new Creature(
+        // CR 205.2a — Legendary Enchantment Creature: Creature + Enchantment
+        // card types (so Sythis counts toward "enchantments you control" and
+        // its own constellation never depends on that, but Sterling Grove /
+        // Sanctum Weaver style counts pick it up).
+        var card = PermanentBuilders.EnchantmentCreature(
             name: CardName,
             manaCost: Cost,
             power: 1,

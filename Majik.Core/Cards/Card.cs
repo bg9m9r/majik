@@ -1127,6 +1127,25 @@ public class Card : ICard
             _cardTypes.Add(type);
     }
 
+    /// <summary>
+    /// CR 205.4 — add a printed supertype after construction. Used by
+    /// named-card factories / designations that grant a supertype to a card
+    /// (e.g. the Ring-bearer "is legendary" clause routes through this and a
+    /// <see cref="Majik.Core.Effects.GrantSupertypeEffect"/>). Idempotent —
+    /// adding the same supertype twice is a no-op. Invalidates the layer-
+    /// system cache so the next Compute re-seeds the effective supertype set.
+    /// </summary>
+    internal void AddSupertype(CardSupertype supertype)
+    {
+        if (!_supertypes.Contains(supertype))
+        {
+            _supertypes.Add(supertype);
+            // CR 613.1d — the layer pipeline seeds chars.Supertypes from this
+            // list; a printed-supertype mutation must re-seed.
+            if (this is Permanent p) p.ActiveEffects?.BumpGeneration();
+        }
+    }
+
     public bool HasType(CardType type)
     {
         return _cardTypes.Contains(type);

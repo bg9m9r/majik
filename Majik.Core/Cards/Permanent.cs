@@ -53,6 +53,33 @@ public class Permanent : Card
         return ActiveEffects.Compute(this).Colors;
     }
 
+    /// <summary>
+    /// CR 205.4 / CR 613.1d — this permanent's <em>effective</em> supertype
+    /// set after the Layer-4 type-changing pass. When
+    /// <see cref="ActiveEffects"/> is set this consults the layer system
+    /// (so a granted supertype — the Ring-bearer "is legendary" clause via
+    /// <see cref="Majik.Core.Effects.GrantSupertypeEffect"/> — is honoured);
+    /// when null it falls back to the printed supertypes. Mirrors
+    /// <see cref="GetEffectiveColors"/>.
+    /// </summary>
+    public IReadOnlySet<Types.CardSupertype> GetEffectiveSupertypes()
+    {
+        if (ActiveEffects == null)
+        {
+            return Supertypes.ToHashSet();
+        }
+        return ActiveEffects.EffectiveSupertypes(this);
+    }
+
+    /// <summary>
+    /// CR 205.4 — true iff this permanent currently has
+    /// <paramref name="supertype"/> as an effective supertype (printed OR
+    /// granted by an active <see cref="Majik.Core.Effects.GrantSupertypeEffect"/>).
+    /// The legend-rule SBA reads through this so a granted Legendary counts.
+    /// </summary>
+    public bool HasEffectiveSupertype(Types.CardSupertype supertype) =>
+        GetEffectiveSupertypes().Contains(supertype);
+
     /// <summary>True if this is a token (CR 111). Tokens cease to exist
     /// off battlefield via SBA 704.5d. Set via <see cref="MarkAsToken"/>.</summary>
     public bool IsToken { get; internal set; }

@@ -347,6 +347,9 @@ public sealed class ContinuousEffectsService
         foreach (var t in permanent.CardTypes) chars.Types.Add(t);
         // Seed printed subtypes; Layer 4 effects add/remove on top.
         foreach (var st in permanent.Subtypes) chars.Subtypes.Add(st);
+        // CR 205.4 / 613.1d — seed printed supertypes; GrantSupertypeEffect
+        // (Layer 4) adds on top. Mirrors the colour-set seed below.
+        foreach (var sup in permanent.Supertypes) chars.Supertypes.Add(sup);
         // Bake in keywords already attached as KeywordAbility markers
         // (printed evergreens like Flying on Air Elemental).
         foreach (var kw in permanent.Abilities.OfType<KeywordAbility>())
@@ -383,6 +386,7 @@ public sealed class ContinuousEffectsService
         }
         foreach (var t in src.Types) dst.Types.Add(t);
         foreach (var st in src.Subtypes) dst.Subtypes.Add(st);
+        foreach (var sup in src.Supertypes) dst.Supertypes.Add(sup);
         foreach (var kw in src.Keywords) dst.Keywords.Add(kw);
         foreach (var c in src.Colors) dst.Colors.Add(c);
         return dst;
@@ -654,6 +658,22 @@ public sealed class ContinuousEffectsService
             if (r.Target == null || ReferenceEquals(r.Target, permanent)) return true;
         }
         return false;
+    }
+
+    /// <summary>
+    /// CR 205.4 / CR 613.1d — current (effective) supertype set of a
+    /// permanent after the Layer-4 type-changing pass, including any active
+    /// <see cref="GrantSupertypeEffect"/> (e.g. the Ring-bearer "is legendary"
+    /// clause). Mirrors the <c>Compute(perm).Colors</c> read behind
+    /// <see cref="Permanent.GetEffectiveColors"/>: it runs the full layer
+    /// pipeline and returns the resulting supertype set. The legend-rule and
+    /// other supertype-sensitive SBAs read through this so a granted
+    /// Legendary is honoured and revoked with the granting effect.
+    /// </summary>
+    public IReadOnlySet<Majik.Core.Cards.Types.CardSupertype> EffectiveSupertypes(Permanent perm)
+    {
+        if (perm == null) throw new ArgumentNullException(nameof(perm));
+        return Compute(perm).Supertypes;
     }
 
     /// <summary>
