@@ -40,6 +40,30 @@ public sealed class ContinuousEffectsService
     private long _generation;
     private readonly Dictionary<Permanent, (long gen, PermanentCharacteristics chars)> _cache
         = new(ReferenceEqualityComparer.Instance);
+
+    // -----------------------------------------------------------------------
+    // Scalar (Power, Toughness) hot-path cache.
+    //
+    // Creature.GetPower() and GetToughness() are SEPARATE Compute calls, and
+    // both StateSnapshotter and the SBA fixed-point loop read each per creature
+    // many times per pass. Serving those through the full Compute() — even on a
+    // cache HIT — allocated a fresh CloneLayered() (a PermanentCharacteristics
+    // plus four HashSets) just to read two ints back off it.
+    //
+    // This parallel cache stores the FINAL scalar P/T (the layered result with
+    // the Layer-7c counter postlude already folded in), keyed by the SAME
+    // generation as the layered cache. A hit returns two ints with ZERO heap
+    // allocation and never touches a HashSet. Invalidation is identical to the
+    // layered cache: any mutation that can change computed P/T bumps
+    // _generation, and counter mutations also bump it
+    // (CounterCollection.OnMutated → BumpGeneration), so a generation match is
+    // sufficient to serve the cached scalars — counter delta included — without
+    // recomputing. Entries are dropped alongside the layered cache in Clear /
+    // Prune / ExpireEndOfTurn so the two never diverge.
+    // -----------------------------------------------------------------------
+    private readonly Dictionary<Permanent, (long gen, int power, int toughness)> _ptCache
+        = new(ReferenceEqualityComparer.Instance);
+
     private readonly IEventBus? _eventBus;
     private readonly Action<GameEvent>? _busHandler;
 
@@ -90,6 +114,7 @@ public sealed class ContinuousEffectsService
     public void Clear()
     {
         _cache.Clear();
+        _ptCache.Clear();
         _generation++;
     }
 
@@ -133,6 +158,7 @@ public sealed class ContinuousEffectsService
         // opportunistically to bound cache growth, and bump so any survivor's
         // recompute reflects the dropped effects.
         _cache.Clear();
+        _ptCache.Clear();
         BumpGeneration();
     }
 
@@ -252,6 +278,47 @@ public sealed class ContinuousEffectsService
         var computed = CloneLayered(chars, permanent);
         ApplyCounterPostlude(computed, permanent);
         return computed;
+    }
+
+    /// <summary>
+    /// CR 613 / 708.2 — current (power, toughness) of a creature after the full
+    /// layer pipeline + Layer-7c counter postlude, served from a dedicated
+    /// SCALAR cache so the hot P/T read path allocates nothing on a cache hit.
+    ///
+    /// <para>This is the zero-allocation fast lane behind
+    /// <see cref="Creature.GetPower"/> / <see cref="Creature.GetToughness"/>.
+    /// On a hit it returns two ints without cloning the layered working set or
+    /// touching any HashSet; on a miss it falls back to the full
+    /// <see cref="Compute(Permanent)"/> (populating BOTH the layered and the
+    /// scalar caches) and returns the freshly-computed P/T. The value is
+    /// identical to reading <c>Compute(creature).Power/.Toughness</c> — the
+    /// scalar cache is keyed by the same generation, so any P/T-affecting
+    /// mutation (anthem register/unregister, base-P/T setter, counter add/
+    /// remove, strip, EOT expiry, CDA input via the event bus) invalidates it
+    /// in lock-step with the layered cache.</para>
+    /// </summary>
+    public (int Power, int Toughness) ComputePowerToughness(Creature creature)
+    {
+        if (creature == null) throw new ArgumentNullException(nameof(creature));
+
+        var genAtEntry = _generation;
+
+        // Zero-allocation hit: fresh-generation scalar entry → return the two
+        // ints directly. No CloneLayered, no HashSet allocations.
+        if (_ptCache.TryGetValue(creature, out var pt) && pt.gen == genAtEntry)
+        {
+            return (pt.power, pt.toughness);
+        }
+
+        // Miss → run the full pipeline once (this also (re)populates the layered
+        // _cache). Compute folds in the Layer-7c counter postlude, so the P/T it
+        // returns is final. Store the scalars against the generation we SEEDED
+        // from — matching Compute's own cache-store discipline (mid-pass grant
+        // side-effects may have bumped _generation; keying on genAtEntry keeps
+        // this entry invalidated exactly when the layered entry is).
+        var chars = (CreatureCharacteristics)Compute((Permanent)creature);
+        _ptCache[creature] = (genAtEntry, chars.Power, chars.Toughness);
+        return (chars.Power, chars.Toughness);
     }
 
     /// <summary>
@@ -462,6 +529,7 @@ public sealed class ContinuousEffectsService
         _effects.RemoveAll(e => e.ExpiresAtEndOfTurn);
         // Effects dropped → clear opportunistically (bounds growth) and bump.
         _cache.Clear();
+        _ptCache.Clear();
         BumpGeneration();
     }
 
