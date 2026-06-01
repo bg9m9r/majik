@@ -1,0 +1,9 @@
+{
+  "name": "Spirit of the Labyrinth",
+  "types": ["Creature", "Enchantment"],
+  "subtypes": ["Spirit"],
+  "manaCost": "{1}{W}",
+  "power": 3,
+  "toughness": 1,
+  "abilities": []
+}
