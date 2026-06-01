@@ -2,6 +2,7 @@ using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.CardData.MDFCs;
+using Majik.Core.Costs;
 using Majik.Core.Events;
 using Majik.Core.Keywords;
 using Majik.Core.Players;
@@ -49,12 +50,15 @@ namespace Majik.Core.CardData.Factories;
 ///   available graveyard card, else no-op (CR 608.2b — "up to one" may pick
 ///   zero).
 ///
+/// ## Implemented (Ward)
+/// - <b>Ward—Discard a card (CR 702.21c non-mana ward).</b> Shipped as a
+///   <see cref="KeywordAbility"/>("Ward") marker plus a bound
+///   <see cref="WardEffect"/> (<see cref="BuildWardEffect"/>) whose payment is
+///   a real <see cref="DiscardACardCost"/>. <see cref="WardEffect.Resolve"/>
+///   counters an opponent's targeting spell/ability unless they discard a
+///   card — the discard tax is now functional.
+///
 /// ## Deferred (v1 gaps)
-/// - <b>Ward—Discard a card (CR 702.21d non-mana ward).</b> The engine's
-///   <see cref="WardEffect"/> models mana-cost ward only; "Ward—Discard a
-///   card" (a non-mana ward cost) is not yet supported. Omitted here — the
-///   creature is targetable without the discard tax. Same gap surfaces on
-///   every "Ward—[non-mana cost]" card.
 /// - <b>Back-face hot-swap (Graveyard Glutton 4/4 + exile-up-to-two).</b> As
 ///   with every v1 DFC (Delver, Ajani), the transform flips the MdfcState
 ///   only; the live Creature object stays a 3/3 Human Werewolf with the
@@ -69,6 +73,21 @@ public static class GraveyardTrespasserFactory
     public const string FrontCost = "{2}{B}";
     public const int Power = 3;
     public const int Toughness = 3;
+
+    /// <summary>Printed Ward cost — non-mana (discard a card), CR 702.21c.</summary>
+    public const string WardDiscardCost = "Discard a card";
+
+    /// <summary>
+    /// CR 702.21 — Graveyard Trespasser's printed "Ward—Discard a card"
+    /// effect, bound to the supplied <paramref name="card"/>. The ward cost is
+    /// a real <see cref="DiscardACardCost"/> (non-mana ward); the mana portion
+    /// is <see cref="Majik.Core.ValueObjects.ManaCost.Zero"/>.
+    /// <see cref="WardEffect.Resolve"/> counters an opponent's targeting
+    /// spell/ability unless they discard a card (same posture as
+    /// <see cref="RealitySmasherFactory.BuildWardEffect"/>).
+    /// </summary>
+    public static WardEffect BuildWardEffect(Creature card) =>
+        new(card, new DiscardACardCost());
 
     /// <summary>
     /// Construct Graveyard Trespasser with no live TriggerManager wiring
@@ -103,6 +122,11 @@ public static class GraveyardTrespasserFactory
         // CR 711 — DFC face tracker. Front = Graveyard Trespasser (daybound),
         // back = Graveyard Glutton (nightbound). Starts front-face up.
         card.MdfcState = new MdfcState(FrontName, BackName);
+
+        // CR 702.21 — Ward—Discard a card. Marker keyword for discovery; the
+        // functional non-mana ward rider is exposed via BuildWardEffect /
+        // WardEffect.Resolve (charges DiscardACardCost).
+        card.AddAbility(new KeywordAbility("Ward", card, owner));
 
         // CR 702.145 — Daybound (front) + Nightbound (back) markers consumed
         // by DayboundNightbound. The Werewolf carries both; the transform

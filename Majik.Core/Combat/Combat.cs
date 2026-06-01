@@ -190,4 +190,16 @@ public class Combat
     {
         return _attackers.SelectMany(a => a.Blockers);
     }
+
+    /// <summary>
+    /// CR 506.4 — remove the attacker entry for <paramref name="creature"/>
+    /// from this combat (e.g. it was returned to hand / left the battlefield,
+    /// as Ninjutsu does to the unblocked attacker it bounces — CR 702.49e).
+    /// Returns true if an entry was removed.
+    /// </summary>
+    public bool RemoveAttacker(Cards.Creature creature)
+    {
+        if (creature == null) throw new ArgumentNullException(nameof(creature));
+        return _attackers.RemoveAll(a => ReferenceEquals(a.Creature, creature)) > 0;
+    }
 }

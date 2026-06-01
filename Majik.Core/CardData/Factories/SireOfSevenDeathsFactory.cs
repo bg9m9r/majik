@@ -1,6 +1,7 @@
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Costs;
 using Majik.Core.Keywords;
 using Majik.Core.Players;
 using Majik.Core.ValueObjects;
@@ -31,20 +32,12 @@ namespace Majik.Core.CardData.Factories;
 /// - <b>Printed "Pay 7 life" Ward variant (CR 702.21)</b>: shipped as a
 ///   <see cref="KeywordAbility"/>("Ward") marker so the discovery surface
 ///   stays uniform with Reality Smasher / Kappa Cannoneer / other Ward
-///   carriers. The accompanying <see cref="BuildWardEffect"/> exposes a
-///   bound <see cref="WardEffect"/> instance whose mana portion is
-///   <see cref="ManaCost.Zero"/> — Sire's printed cost is a life payment,
-///   not mana — with the life rider exposed via <see cref="WardLifeCost"/>
-///   as documentation for callers wiring the spell-resolution path.
-///
-/// ## Deferred (v1 gaps)
-/// - <b>Ward {Pay 7 life} trigger wiring</b>: <see cref="WardEffect"/> only
-///   carries the mana portion (mirrors Reality Smasher's "discard a card"
-///   and Kappa Cannoneer's Ward {4} gaps). The targeted-by-opponent-spell
-///   trigger primitive + non-mana (life-payment) Ward rider isn't shipped
-///   yet; the marker keeps Sire of Seven Deaths discoverable on the bot
-///   rail and the helper provides the bound instance for the spell-
-///   resolution path once that lands.
+///   carriers, plus a bound <see cref="WardEffect"/> via
+///   <see cref="BuildWardEffect"/> whose payment is a real
+///   <see cref="PayLifeCost"/>(7) (non-mana ward, CR 702.21c).
+///   <see cref="WardEffect.Resolve"/> counters an opponent's targeting
+///   spell/ability unless they pay 7 life — the life rider is now
+///   functional, not structural-only.
 /// </summary>
 [CardName("Sire of Seven Deaths")]
 public static class SireOfSevenDeathsFactory
@@ -59,17 +52,20 @@ public static class SireOfSevenDeathsFactory
     /// gap.</summary>
     public const string WardLifeCost = "Pay 7 life";
 
+    /// <summary>The amount of life an opponent pays for Sire's Ward.</summary>
+    public const int WardLifeAmount = 7;
+
     /// <summary>
     /// CR 702.21 — Sire of Seven Deaths' printed Ward effect, bound to the
-    /// supplied <paramref name="card"/>. The mana portion is
-    /// <see cref="ManaCost.Zero"/> because the printed cost is the non-mana
-    /// "Pay 7 life" rider (see <see cref="WardLifeCost"/>). Exposed as a
-    /// builder so the spell-resolution path can opt-in once the non-mana
-    /// Ward rider primitive lands (same posture as
-    /// <see cref="RealitySmasherFactory.BuildWardEffect"/>).
+    /// supplied <paramref name="card"/>. The ward cost is the non-mana
+    /// "Pay 7 life" rider (see <see cref="WardLifeCost"/>), modelled via
+    /// <see cref="PayLifeCost"/>; the mana portion is
+    /// <see cref="ManaCost.Zero"/>. <see cref="WardEffect.Resolve"/> charges
+    /// the 7-life payment when an opponent's spell/ability targets Sire (same
+    /// posture as <see cref="RealitySmasherFactory.BuildWardEffect"/>).
     /// </summary>
     public static WardEffect BuildWardEffect(Creature card) =>
-        new(card, ManaCost.Zero);
+        new(card, new PayLifeCost(WardLifeAmount));
 
     /// <summary>
     /// Construct Sire of Seven Deaths. All six combat keyword markers plus

@@ -1,6 +1,7 @@
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Costs;
 using Majik.Core.Keywords;
 using Majik.Core.Players;
 using Majik.Core.ValueObjects;
@@ -21,22 +22,12 @@ namespace Majik.Core.CardData.Factories;
 ///   markers — same wiring shape as Slickshot Show-Off's Flying + Haste pair.
 /// - <b>Printed "discard a card" Ward variant (CR 702.21)</b>: shipped as
 ///   a <see cref="KeywordAbility"/>("Ward") marker so the discovery surface
-///   stays uniform with Kappa Cannoneer / other future Ward carriers. The
-///   accompanying <see cref="BuildWardEffect"/> exposes a bound
-///   <see cref="WardEffect"/> instance — Reality Smasher's printed cost is
-///   <em>discard a card</em>, not a mana payment, so the helper's cost is
-///   <see cref="ManaCost.Zero"/> and the discard rider is exposed via
-///   <see cref="WardDiscardCost"/> as documentation for callers wiring the
-///   spell-resolution path. Until a non-mana Ward primitive lands the
-///   discard rider is structural only.
-///
-/// ## Deferred (v1 gaps)
-/// - <b>Ward {discard a card} trigger wiring</b>: <see cref="WardEffect"/>
-///   only carries the mana portion (mirrors Kappa Cannoneer's Ward {4} gap).
-///   The targeted-by-opponent-spell trigger primitive + non-mana Ward rider
-///   isn't shipped yet; the marker keeps Reality Smasher discoverable on
-///   the bot rail and the helper provides the bound instance for the spell-
-///   resolution path once that lands.
+///   stays uniform with Kappa Cannoneer / other Ward carriers, plus a bound
+///   <see cref="WardEffect"/> via <see cref="BuildWardEffect"/> whose payment
+///   is a real <see cref="DiscardACardCost"/> (non-mana ward, CR 702.21c).
+///   <see cref="WardEffect.Resolve"/> counters an opponent's targeting
+///   spell/ability unless they discard a card — the discard rider is now
+///   functional, not structural-only.
 /// </summary>
 [CardName("Reality Smasher")]
 public static class RealitySmasherFactory
@@ -53,15 +44,16 @@ public static class RealitySmasherFactory
 
     /// <summary>
     /// CR 702.21 — Reality Smasher's printed Ward effect, bound to the
-    /// supplied <paramref name="card"/>. The mana portion is
-    /// <see cref="ManaCost.Zero"/> because the printed cost is the non-mana
-    /// "discard a card" rider (see <see cref="WardDiscardCost"/>). Exposed
-    /// as a builder so the spell-resolution path can opt-in once the non-
-    /// mana Ward rider primitive lands (same posture as
-    /// <see cref="KappaCannoneerFactory.BuildWardEffect"/>).
+    /// supplied <paramref name="card"/>. The ward cost is the non-mana
+    /// "discard a card" rider (see <see cref="WardDiscardCost"/>), modelled
+    /// via <see cref="DiscardACardCost"/>; the mana portion is
+    /// <see cref="ManaCost.Zero"/>. <see cref="WardEffect.Resolve"/> charges
+    /// the discard when an opponent's spell/ability targets Reality Smasher
+    /// (same posture as <see cref="KappaCannoneerFactory.BuildWardEffect"/>'s
+    /// mana ward).
     /// </summary>
     public static WardEffect BuildWardEffect(Creature card) =>
-        new(card, ManaCost.Zero);
+        new(card, new DiscardACardCost());
 
     /// <summary>
     /// Construct Reality Smasher. Trample + Haste + Ward keyword markers
