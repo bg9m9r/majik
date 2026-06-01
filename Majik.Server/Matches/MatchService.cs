@@ -827,6 +827,19 @@ public sealed class MatchService
         };
     }
 
+    /// <summary>
+    /// Extract the bot archetype from an opponent sub. vs-bot opponents are
+    /// synthesized with <c>Sub = "bot:&lt;archetype&gt;"</c> (see
+    /// <see cref="CreateBotMatchAsync"/>); a human opponent's sub does not carry
+    /// the prefix. Returns the archetype for a bot seat, or null for a
+    /// human/absent opponent — so the rehydration path only re-installs a
+    /// BotPlayerAgent when the original match actually had one.
+    /// </summary>
+    private static string? BotArchetypeFromSub(string? sub) =>
+        sub != null && sub.StartsWith("bot:", StringComparison.Ordinal)
+            ? sub["bot:".Length..]
+            : null;
+
     /// <summary>Fan out the post-PlayDraw events (timeout schedule + SignalR
     /// hub publishes for play-draw-chosen / state-changed / clock-update).</summary>
     private void PublishPlayDrawTransitionEvents(
@@ -1448,12 +1461,22 @@ public sealed class MatchService
             var creatorDeck = await _decks.LoadFromCardNamesAsync(creatorNames, ct);
             var opponentDeck = await _decks.LoadFromCardNamesAsync(opponentNames, ct);
 
+            // vs-bot match: re-install the deterministic BotPlayerAgent on the
+            // Bob seat of the rehydrated facade. The bot opponent is synthesized
+            // with Sub = "bot:<archetype>" (see CreateBotMatchAsync); the
+            // archetype is the suffix. Without re-installing, the rehydrated bot
+            // seat falls back to the default RemoteAgent and the prompt-driven
+            // replay dequeues human commands against bot prompts → desync. Same
+            // archetype + same persisted seed ⇒ the bot re-makes identical
+            // in-engine decisions and its prompts never consume a logged command.
+            var botArchetype = BotArchetypeFromSub(match.Opponent?.Sub);
+
             var rebuilt = await _persistence.TryRehydrateAsync(
                 matchId,
                 match.GameSeed,
                 buildFreshFacade: () => _gameFactory.BuildUnregisteredFacade(
                     match.Creator.Handle, match.Opponent?.Handle ?? "Opponent",
-                    creatorDeck, opponentDeck),
+                    creatorDeck, opponentDeck, botSeatArchetype: botArchetype),
                 ct);
 
             if (rebuilt == null)

@@ -201,7 +201,17 @@ public static class BoromirWardenOfTheTowerFactory
                         .OfType<Creature>()
                         .ToList())
                     {
-                        creature.ActiveEffects ??= new ContinuousEffectsService();
+                        // Fallback path (no live game CES supplied). Mint the
+                        // per-creature layers service BUS-WIRED when a bus is
+                        // available so its generation cache invalidates on
+                        // external events (CR 613 memoization) — a creature here
+                        // may be a CDA (Tarmogoyf, Death's Shadow, …) whose P/T
+                        // reads external state via this same ActiveEffects
+                        // instance; a busless one would go stale. Busless only
+                        // when no bus is threaded in (standalone construction).
+                        creature.ActiveEffects ??= eventBus != null
+                            ? new ContinuousEffectsService(eventBus)
+                            : new ContinuousEffectsService();
                         creature.ActiveEffects.Register(
                             new GrantKeywordUntilEndOfTurnEffect(creature, "Indestructible"));
                     }

@@ -111,6 +111,12 @@ public static class AbbotOfKeralKeepFactory
         // supplies one we bind it onto the card and register the pump live,
         // otherwise we hand the builder a throwaway service so the trigger
         // shape still attaches but the pump silently no-ops on execute.
+        // The busless fallback here is a THROWAWAY: it is handed to
+        // ProwessFactory.Build only to satisfy its non-null layers requirement
+        // and is NEVER bound onto card.ActiveEffects (only the bus-wired live
+        // `effects` is, line below). So no CDA ever reads through this instance
+        // — no stale-cache exposure, no bus wiring needed. The pump simply
+        // no-ops in the no-service path.
         var prowessEffects = effects ?? new ContinuousEffectsService();
         if (effects != null)
         {

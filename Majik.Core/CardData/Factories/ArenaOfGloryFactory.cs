@@ -192,7 +192,7 @@ public static class ArenaOfGloryFactory
         // CR 702.10 — "If that mana is spent on a creature spell, it gains
         // haste until end of turn." Fired by the payment resolver for each
         // exert-tagged {R} that pays a cost, carrying the cast card.
-        exert.ProvenanceReaction = spentOn => GrantHasteIfCreature(spentOn);
+        exert.ProvenanceReaction = spentOn => GrantHasteIfCreature(spentOn, eventBus);
 
         land.AddAbility(exert);
 
@@ -216,10 +216,19 @@ public static class ArenaOfGloryFactory
     /// multiple exert pips pay for the same creature spell — re-granting the
     /// same keyword is harmless.
     /// </summary>
-    private static void GrantHasteIfCreature(ICard? spentOn)
+    private static void GrantHasteIfCreature(ICard? spentOn, IEventBus? eventBus)
     {
         if (spentOn is not Creature creature) return;
-        creature.ActiveEffects ??= new ContinuousEffectsService();
+        // If the creature has no layers service yet, mint one BUS-WIRED when a
+        // bus is available so its generation cache invalidates on external
+        // events (CR 613 memoization). The grant here is keyword-only (Haste,
+        // not P/T), but the same ActiveEffects instance backs every later
+        // characteristic-defining effect on this creature; a busless instance
+        // would let a future CDA read go stale. Falls back to a busless service
+        // only on the no-bus overloads (test/standalone construction).
+        creature.ActiveEffects ??= eventBus != null
+            ? new ContinuousEffectsService(eventBus)
+            : new ContinuousEffectsService();
         creature.ActiveEffects.Register(
             new GrantKeywordUntilEndOfTurnEffect(creature, "Haste"));
     }

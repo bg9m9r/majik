@@ -263,6 +263,15 @@ public static class LegionWarbossFactory
         // EOT grant against it (the grant expires via the service's cleanup
         // pass, CR 514.2). HasHaste reads the computed keyword set off this
         // service.
+        //
+        // Busless CES is safe here: this token is a fixed 1/1 red Goblin
+        // (TokenPower/TokenToughness), NOT a characteristic-defining-ability
+        // permanent — its P/T never depends on external game state, and the
+        // only effect ever registered on this service is the keyword-only Haste
+        // grant above. With no CDA read, the generation cache never needs to
+        // invalidate on an external event, so no bus wiring is required (the
+        // bus is also not threaded this deep — CreateGoblinToken only has the
+        // ZoneService). If this token ever gains a CDA, bus-wire this instance.
         token.ActiveEffects ??= new ContinuousEffectsService();
         token.ActiveEffects.Register(
             new GrantKeywordUntilEndOfTurnEffect(token, "Haste"));
