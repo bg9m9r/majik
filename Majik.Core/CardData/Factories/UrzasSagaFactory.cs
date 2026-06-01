@@ -64,10 +64,16 @@ namespace Majik.Core.CardData.Factories;
 ///   route through <see cref="Majik.Core.Players.Agents.AgentRegistry"/>'s
 ///   <c>ChooseLibraryPickAsync</c> for parity with
 ///   <see cref="ChordOfCallingFactory"/>.
-/// - <b>"Sacrifice after III" sentinel timing</b>: SBA fires immediately
-///   when the lore counter hits 3, matching the engine's synchronous
-///   chapter resolution. Stack-driven chapter triggers (so III can be
-///   responded to before resolution) is a deeper Saga-engine cut.
+///
+/// ## Chapter abilities on the stack (CR 714.2b — closed deferral #5)
+/// When bound with a live <see cref="TriggerManager"/> (the production path),
+/// each chapter ability is enqueued as a triggered ability and resolves off the
+/// stack — an opponent gets a priority window before it resolves, and the
+/// Saga-sacrifice SBA (CR 704.5r) defers via
+/// <see cref="Majik.Core.CardData.Sagas.SagaState.ChapterTriggerOnStack"/>
+/// until the final chapter resolves. See
+/// <see cref="Majik.Core.CardData.Sagas.SagaState"/>. Bound without a trigger
+/// manager (shape tests) the chapter resolves synchronously.
 /// </summary>
 [CardName("Urza's Saga")]
 public static class UrzasSagaFactory

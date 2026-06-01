@@ -497,12 +497,16 @@ public sealed class TurnDriver
 
     private void AdvanceSagas(Player active)
     {
-        // CR 714.2 — at the precombat main, each Saga its controller
+        // CR 714.2 / 714.2b — at the precombat main, each Saga its controller
         // controls adds a lore counter and triggers the matching chapter
-        // ability. SagaState.AdvanceAndChapter invokes the onChapter
-        // callback synchronously; the chapter's effect (token spawn,
-        // etc.) lands immediately. Future cut: route through the stack
-        // so the chapter ability respects priority + responses.
+        // ability. When the Saga was bound with a live TriggerManager (the
+        // production path), AdvanceAndChapter ENQUEUES the chapter ability as a
+        // triggered ability rather than resolving it in-line; the PreCombatMain
+        // PriorityRound that runs immediately after this call drains it onto the
+        // stack (CR 603.3), so an opponent gets a priority window to respond
+        // before the chapter resolves (e.g. before a transforming Saga's
+        // chapter III flips). Sagas bound without a TriggerManager fall back to
+        // synchronous chapter resolution.
         foreach (var perm in active.Zones.Battlefield.GetCards()
                      .OfType<Permanent>().ToList())
         {

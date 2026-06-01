@@ -45,16 +45,22 @@ namespace Majik.Core.CardData.Factories;
 ///       the generic Saga-sacrifice SBA (CR 704.5r) does not fire on the
 ///       transformed creature.
 ///
-/// ## Deferred (v1 gaps)
-/// - <b>Stack-driven chapter triggers</b>: chapters resolve synchronously
-///   on <c>SagaState.AdvanceAndChapter</c> (same posture as Urza's Saga) —
-///   no priority window between adding the lore counter and the chapter
-///   effect resolving.
-/// - <b>Agent-driven rummage pick</b>: chapter II discards the front
-///   <c>N</c> cards of hand and draws <c>N</c>; the per-card discard
-///   selection is deterministic (same queue as Cathartic Reunion /
-///   Faithless Looting). <paramref name="rummageChoice"/> only chooses the
-///   count.
+/// ## Chapter abilities on the stack (CR 714.2b — closed deferral #5)
+/// When a <see cref="TriggerManager"/> is supplied (the production path), the
+/// chapter ability is enqueued as a triggered ability and resolves OFF THE
+/// STACK, so an opponent gets a priority window to respond before it resolves
+/// — chapter III's transform is responded-to-able. See
+/// <see cref="Majik.Core.CardData.Sagas.SagaState"/>. Without a trigger manager
+/// (shape tests) the chapter still resolves synchronously.
+///
+/// ## Rummage choice (CR 701.7 — closed deferral #6)
+/// Chapter II is modelled verbatim as "you MAY discard up to two cards. If you
+/// do, draw that many." With no explicit <paramref name="rummageChoice"/> the
+/// controller's <see cref="Majik.Core.Players.Agents.IPlayerAgent"/> (resolved
+/// via <see cref="Majik.Core.Players.Agents.AgentRegistry"/>) is prompted to
+/// pick up to two cards to discard — declining honours the "you may" (discard
+/// 0 → draw 0). The legacy <paramref name="rummageChoice"/> count override is
+/// retained for bespoke wiring / tests.
 /// </summary>
 [CardName("Fable of the Mirror-Breaker")]
 public static class FableOfTheMirrorBreakerFactory
@@ -83,9 +89,10 @@ public static class FableOfTheMirrorBreakerFactory
     /// <param name="triggers">Optional trigger manager — registers the
     /// chapter-I Goblin's attack→Treasure trigger and the transformed
     /// Reflection's delayed end-step token sacrifice.</param>
-    /// <param name="rummageChoice">Optional chapter-II rummage count
-    /// chooser ("you may discard up to two"). Clamped to [0, 2] and the
-    /// hand size. Null defaults to rummaging maximally.</param>
+    /// <param name="rummageChoice">Optional chapter-II rummage count override
+    /// ("you may discard up to two"). Clamped to [0, 2] and the hand size. When
+    /// null, the controller's agent is prompted to pick which cards to discard
+    /// (CR 701.7), declining → discard 0 / draw 0.</param>
     public static Enchantment Create(
         Player owner,
         ZoneService? zoneService,

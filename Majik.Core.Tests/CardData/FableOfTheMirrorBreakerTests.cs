@@ -110,7 +110,12 @@ public class FableOfTheMirrorBreakerTests
             _alice, _zones, _bus, triggers);
         _zones.MoveCard(fable, ZoneType.Library, ZoneType.Battlefield, _alice);
 
-        fable.SagaState!.AdvanceAndChapter(); // chapter I → goblin token
+        // CR 714.2b — chapter I is enqueued as a triggered ability. Drain it
+        // onto the stack and resolve to spawn the Goblin token.
+        fable.SagaState!.AdvanceAndChapter();
+        var resolver = new StackResolver(_bus, _zones);
+        triggers.PutPendingTriggersOnStack(_alice);
+        while (!stack.IsEmpty) resolver.ResolveTop(stack);
 
         var goblin = _alice.Zones.Battlefield.GetCards()
             .OfType<Creature>().Single(c => c.IsToken);
@@ -123,7 +128,6 @@ public class FableOfTheMirrorBreakerTests
         _bus.Publish(new CreatureAttacksEvent(goblin, _alice));
         triggers.PutPendingTriggersOnStack(_alice);
 
-        var resolver = new StackResolver(_bus, _zones);
         while (!stack.IsEmpty) resolver.ResolveTop(stack);
 
         _alice.Zones.Battlefield.GetCards()

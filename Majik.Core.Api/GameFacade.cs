@@ -522,12 +522,14 @@ public sealed class GameFacade : IDisposable
 
         foreach (var card in aliceDeck)
         {
-            var live = BuildDeckCard(card, alice, cardRepo, bus, facade.ContinuousEffects);
+            var live = BuildDeckCard(card, alice, cardRepo, bus, facade.ContinuousEffects,
+                facade._triggers, facade._zones, facade._bus);
             alice.Zones.GetZone(ZoneType.Library).AddCard(live);
         }
         foreach (var card in bobDeck)
         {
-            var live = BuildDeckCard(card, bob, cardRepo, bus, facade.ContinuousEffects);
+            var live = BuildDeckCard(card, bob, cardRepo, bus, facade.ContinuousEffects,
+                facade._triggers, facade._zones, facade._bus);
             bob.Zones.GetZone(ZoneType.Library).AddCard(live);
         }
 
@@ -558,7 +560,10 @@ public sealed class GameFacade : IDisposable
         Player owner,
         ICardRepository? cardRepo,
         ReplacementBus replacements,
-        ContinuousEffectsService effects)
+        ContinuousEffectsService effects,
+        TriggerManager? triggers = null,
+        ZoneService? zones = null,
+        IEventBus? eventBus = null)
     {
         if (RouteThroughNamedFactories
             && !shell.HasType(Majik.Core.Cards.Types.CardType.Land)
@@ -588,13 +593,31 @@ public sealed class GameFacade : IDisposable
                 }
 
                 OverlayAdditiveBinders(built, entity, owner, replacements, effects);
+
+                // CR 714.2b — the [CardName] factory attached a SagaState with
+                // no live runtime services (NamedCardFactory.Create takes only
+                // the owner), so chapters would resolve synchronously and the
+                // chapter-I/III triggers + rummage prompt would be inert in a
+                // real match. Re-bind the Saga with the live TriggerManager /
+                // ZoneService / EventBus so chapter abilities go on the stack
+                // (an opponent can respond) and the Fable rummage prompts the
+                // controller's agent. Idempotent: SagaBinder.Bind overwrites
+                // the SagaState in place.
+                if (built is Majik.Core.Cards.Permanent sagaPerm
+                    && sagaPerm.SagaState != null
+                    && triggers != null)
+                {
+                    Majik.Core.CardData.SagaBinder.Bind(
+                        built, entity, effects, zones, triggers, eventBus);
+                }
             }
 
             return built;
         }
 
         shell.SetOwner(owner);
-        BindCardAbilities(shell, owner, cardRepo, replacements, effects);
+        BindCardAbilities(shell, owner, cardRepo, replacements, effects,
+            triggers, zones, eventBus);
         return shell;
     }
 
@@ -684,7 +707,10 @@ public sealed class GameFacade : IDisposable
         Player controller,
         ICardRepository? cardRepo,
         ReplacementBus replacements,
-        ContinuousEffectsService effects)
+        ContinuousEffectsService effects,
+        TriggerManager? triggers = null,
+        ZoneService? zones = null,
+        IEventBus? eventBus = null)
     {
         // Every creature consults the game's CES for current P/T and keywords
         // (CR 613). Hook it up regardless of repo presence so vanilla creatures
@@ -702,7 +728,10 @@ public sealed class GameFacade : IDisposable
                 KeywordBinder.Bind(card, entity, controller, effects);
                 OracleManaBinder.Bind(card, entity, controller);
                 AffinityBinder.Bind(card, entity);
-                SagaBinder.Bind(card, entity);
+                // CR 714.2b — pass live runtime services so Saga chapter
+                // abilities route through the stack (responder priority window)
+                // and the Fable rummage prompts the controller's agent.
+                SagaBinder.Bind(card, entity, effects, zones, triggers, eventBus);
                 foreach (var trig in OracleTriggeredAbilityBinder.Bind(card, entity, controller))
                 {
                     card.AddAbility(trig);

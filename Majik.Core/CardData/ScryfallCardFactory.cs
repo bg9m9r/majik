@@ -93,7 +93,12 @@ public sealed class ScryfallCardFactory
         KeywordBinder.Bind(card, entity, owner);
         OracleManaBinder.Bind(card, entity, owner);
         AffinityBinder.Bind(card, entity);
-        SagaBinder.Bind(card, entity, _effects, _zones);
+        // CR 714.2b — pass the live TriggerManager so Saga chapter abilities
+        // are routed through the stack (an opponent can respond before they
+        // resolve), and the event bus so Roku's "until end of next turn" exile
+        // grant cleanup schedules. Without a TriggerManager the binder falls
+        // back to synchronous chapter resolution.
+        SagaBinder.Bind(card, entity, _effects, _zones, _triggers, _eventBus);
         foreach (var trig in OracleTriggeredAbilityBinder.Bind(card, entity, owner))
         {
             card.AddAbility(trig);

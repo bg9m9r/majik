@@ -39,8 +39,9 @@ namespace Majik.Core.CardData;
 ///   - Fable of the Mirror-Breaker (// Reflection of Kiki-Jiki): I →
 ///     spawn a 2/2 red Goblin Shaman token whose attack trigger creates a
 ///     Treasure (CR 508.1f / 111.10), wired live when a TriggerManager
-///     is supplied; II → "you may discard up to two, then draw that many"
-///     (count chosen via the supplied chooser; default rummages maximally);
+///     is supplied; II → "you MAY discard up to two cards, then draw that many"
+///     (CR 701.7 — the controller's agent picks which cards to discard, or
+///     declines to honour the "you may"; the supplied chooser overrides it);
 ///     III → exile this Saga and return it transformed into Reflection of
 ///     Kiki-Jiki (CR 714.4 / 712.4) via ReflectionOfKikiJikiFactory, then
 ///     clear SagaState so the sacrifice SBA does not fire.
@@ -102,7 +103,13 @@ public static class SagaBinder
             _ => _ => { /* generic saga — no-op effect, state still ticks */ },
         };
 
-        perm.SagaState = new SagaState(perm, finalChapter, onChapter);
+        // CR 714.2b — when a TriggerManager is supplied, the chapter ability
+        // is routed through the stack (it can be responded to before it
+        // resolves); without one, SagaState runs the chapter synchronously
+        // (shape / direct-call tests). The Fable rummage chapter II prompts
+        // the controller's agent for the optional "discard up to two" choice
+        // (CR 701.7), so the rummage handler resolves the agent itself.
+        perm.SagaState = new SagaState(perm, finalChapter, onChapter, triggers);
         return true;
     }
 
@@ -275,21 +282,88 @@ public static class SagaBinder
 
     /// <summary>
     /// Fable chapter II — CR 701.7. "You may discard up to two cards, then
-    /// draw that many cards." <paramref name="rummageChoice"/> picks how
-    /// many cards to discard (the "you may"/"up to two" decision); the
-    /// result is clamped to [0, 2] and to the current hand size. The
-    /// default policy (null choice) discards as many as possible, up to
-    /// two — matching the deterministic looter posture used elsewhere
-    /// (Cathartic Reunion / Faithless Looting).
+    /// draw that many cards." Modelled verbatim:
+    /// <list type="bullet">
+    /// <item>When <paramref name="rummageChoice"/> is supplied, it picks the
+    /// count to discard (the legacy / explicit-wiring contract); the count is
+    /// clamped to [0, 2] and the hand size, the front N cards are discarded,
+    /// and exactly N are drawn.</item>
+    /// <item>Otherwise the controller's <see cref="IPlayerAgent"/> (resolved
+    /// via <see cref="AgentRegistry"/>) is prompted to pick UP TO two cards to
+    /// discard, one at a time — declining (no pick) honours the "you may" and
+    /// stops the loop. Exactly as many cards as were discarded are then drawn.
+    /// No agent registered → discard nothing, draw nothing (the safe "may"
+    /// opt-out).</item>
+    /// </list>
     /// </summary>
     private static void FableRummage(Player player, Func<int>? rummageChoice)
     {
-        var handCount = player.Zones.Hand.GetCards().Count();
-        var want = rummageChoice?.Invoke() ?? 2;
-        var n = Math.Clamp(want, 0, Math.Min(2, handCount));
-        if (n <= 0) return; // "you may" opt-out — discard 0, draw 0.
+        // Explicit count override (tests / bespoke wiring) — discard the front
+        // N and draw N. Preserves the established count-based contract.
+        if (rummageChoice != null)
+        {
+            var handCount = player.Zones.Hand.GetCards().Count();
+            var n = Math.Clamp(rummageChoice.Invoke(), 0, Math.Min(2, handCount));
+            if (n <= 0) return; // "you may" opt-out — discard 0, draw 0.
+            DiscardFrontAndDraw(player, count: n);
+            return;
+        }
 
-        DiscardUpToAndDraw(player, max: n);
+        // Unified agent path — "you may discard up to two cards." Prompt the
+        // controller to pick which cards to discard (0, 1, or 2), declining to
+        // stop. Draw exactly that many (CR 701.7).
+        var agent = Majik.Core.Players.Agents.AgentRegistry.Get(player);
+        var discarded = 0;
+        for (var i = 0; i < 2; i++)
+        {
+            var hand = player.Zones.Hand.GetCards().ToList();
+            if (hand.Count == 0) break;
+
+            var pick = agent?
+                .ChooseFromHandAsync(player, hand, Majik.Core.Cards.BotIntent.Discard)
+                .GetAwaiter().GetResult();
+            if (pick == null) break; // declined → honour "you may", stop.
+
+            player.Zones.Hand.RemoveCard(pick);
+            player.Zones.Graveyard.AddCard(pick);
+            pick.SetZone(ZoneType.Graveyard);
+            discarded++;
+        }
+
+        DrawCards(player, discarded);
+    }
+
+    /// <summary>CR 701.7 — discard the front <paramref name="count"/> cards of
+    /// <paramref name="player"/>'s hand and draw the same number (the
+    /// count-override path; deterministic per-card selection).</summary>
+    private static void DiscardFrontAndDraw(Player player, int count)
+    {
+        var hand = player.Zones.Hand.GetCards().Take(count).ToList();
+        foreach (var card in hand)
+        {
+            player.Zones.Hand.RemoveCard(card);
+            player.Zones.Graveyard.AddCard(card);
+            card.SetZone(ZoneType.Graveyard);
+        }
+        DrawCards(player, hand.Count);
+    }
+
+    /// <summary>Draw exactly <paramref name="count"/> cards, flagging the
+    /// player for the empty-library SBA (CR 704.5c) on underflow.</summary>
+    private static void DrawCards(Player player, int count)
+    {
+        for (var i = 0; i < count; i++)
+        {
+            var top = player.Zones.Library.GetCards().FirstOrDefault();
+            if (top == null)
+            {
+                player.MarkTriedToDrawFromEmptyLibrary();
+                return;
+            }
+            player.Zones.Library.RemoveCard(top);
+            player.Zones.Hand.AddCard(top);
+            top.SetZone(ZoneType.Hand);
+        }
     }
 
     /// <summary>
@@ -507,35 +581,6 @@ public static class SagaBinder
         ManaColor.Green => "G",
         _ => "R",
     };
-
-    /// <summary>CR 701.7 — discard up to <paramref name="max"/> cards from
-    /// the front of <paramref name="player"/>'s hand and draw the same
-    /// number. v1: deterministic (no agent prompt). Player-choice opt-out
-    /// ("you may") is deferred.</summary>
-    private static void DiscardUpToAndDraw(Player player, int max)
-    {
-        var hand = player.Zones.Hand.GetCards().Take(max).ToList();
-        foreach (var card in hand)
-        {
-            player.Zones.Hand.RemoveCard(card);
-            player.Zones.Graveyard.AddCard(card);
-            card.SetZone(ZoneType.Graveyard);
-        }
-
-        var count = hand.Count;
-        for (var i = 0; i < count; i++)
-        {
-            var top = player.Zones.Library.GetCards().FirstOrDefault();
-            if (top == null)
-            {
-                player.MarkTriedToDrawFromEmptyLibrary();
-                return;
-            }
-            player.Zones.Library.RemoveCard(top);
-            player.Zones.Hand.AddCard(top);
-            top.SetZone(ZoneType.Hand);
-        }
-    }
 
     private static int ParseFinalChapter(string oracleText)
     {
