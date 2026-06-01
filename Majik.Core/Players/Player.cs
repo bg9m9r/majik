@@ -13,6 +13,7 @@ public class Player
 {
     private LifeTotal _lifeTotal;
     private ValueObjects.ManaPool _manaPool;
+    private readonly List<Mana.ManaProvenanceSlot> _manaProvenance = new();
     private bool _hasLost;
 
     /// <summary>
@@ -398,9 +399,22 @@ public class Player
     }
 
     /// <summary>
-    /// Add mana to the player's mana pool.
+    /// Add mana to the player's mana pool. Optionally tag every colored unit
+    /// added with the <see cref="Abilities.IManaAbility"/> that produced it
+    /// (slot-level provenance, CR 106.4) so cards can react to "if THAT mana
+    /// is spent on X" (Arena of Glory's exert haste rider; Roku's firebending
+    /// "lasts until end of combat"). When <paramref name="provenanceSource"/>
+    /// is null no slots are recorded (plain mana). Generic mana is never
+    /// tagged — provenance is matched by color at spend time.
     /// </summary>
-    public void AddManaToPool(ValueObjects.ManaCost mana)
+    /// <param name="onSpent">Optional reaction fired by
+    /// <see cref="Majik.Core.Costs.ManaPaymentResolver"/> for each tagged slot
+    /// it consumes, carrying the object the mana was spent on (the cast card,
+    /// or null for an ability-activation context).</param>
+    public void AddManaToPool(
+        ValueObjects.ManaCost mana,
+        object? provenanceSource = null,
+        Action<Cards.ICard?>? onSpent = null)
     {
         if (mana == null)
         {
@@ -413,6 +427,97 @@ public class Player
         }
 
         _manaPool = _manaPool.Add(mana);
+
+        if (provenanceSource != null)
+        {
+            AddProvenanceSlots(provenanceSource, ValueObjects.ManaColor.White, mana.White, onSpent);
+            AddProvenanceSlots(provenanceSource, ValueObjects.ManaColor.Blue, mana.Blue, onSpent);
+            AddProvenanceSlots(provenanceSource, ValueObjects.ManaColor.Black, mana.Black, onSpent);
+            AddProvenanceSlots(provenanceSource, ValueObjects.ManaColor.Red, mana.Red, onSpent);
+            AddProvenanceSlots(provenanceSource, ValueObjects.ManaColor.Green, mana.Green, onSpent);
+        }
+    }
+
+    private void AddProvenanceSlots(
+        object source,
+        ValueObjects.ManaColor color,
+        int count,
+        Action<Cards.ICard?>? onSpent)
+    {
+        for (var i = 0; i < count; i++)
+        {
+            _manaProvenance.Add(new Mana.ManaProvenanceSlot(source, color, onSpent));
+        }
+    }
+
+    /// <summary>
+    /// Slot-level mana provenance — one entry per colored floating unit a
+    /// provenance-stamped source added (CR 106.4). Read-only view; mirrors the
+    /// colored buckets of <see cref="ManaPool"/>. Consumed FIFO-by-color by
+    /// <see cref="Majik.Core.Costs.ManaPaymentResolver"/> on spend; cleared
+    /// when the pool empties (CR 500.4).
+    /// </summary>
+    public IReadOnlyList<Mana.ManaProvenanceSlot> ManaProvenance => _manaProvenance;
+
+    /// <summary>
+    /// Consume up to <paramref name="count"/> provenance slots matching
+    /// <paramref name="source"/> + <paramref name="color"/>, FIFO. Returns how
+    /// many were actually removed (clamped to available). Does NOT touch the
+    /// mana pool — callers that also want to remove the mana itself (Roku's
+    /// end-of-combat expiry) pay it separately. Used to keep the ledger in
+    /// sync when tagged mana leaves the pool by a path other than a normal
+    /// cost payment.
+    /// </summary>
+    public int RemoveProvenanceSlots(
+        object source,
+        ValueObjects.ManaColor color,
+        int count)
+    {
+        if (source == null) throw new ArgumentNullException(nameof(source));
+        var removed = 0;
+        for (var i = _manaProvenance.Count - 1; i >= 0 && removed < count; i--)
+        {
+            var slot = _manaProvenance[i];
+            if (ReferenceEquals(slot.Source, source) && slot.Color == color)
+            {
+                _manaProvenance.RemoveAt(i);
+                removed++;
+            }
+        }
+        return removed;
+    }
+
+    /// <summary>
+    /// Consume up to <paramref name="count"/> provenance slots of
+    /// <paramref name="color"/> (FIFO, any source), firing each slot's
+    /// <see cref="Mana.ManaProvenanceSlot.OnSpent"/> reaction with
+    /// <paramref name="spentOn"/>. Called by
+    /// <see cref="Majik.Core.Costs.ManaPaymentResolver"/> after a payment to
+    /// report exactly which tagged units paid the cost (CR 106.4 / 702.10).
+    /// Returns the number of slots consumed.
+    /// </summary>
+    public int ConsumeProvenanceSlotsOnSpend(
+        ValueObjects.ManaColor color,
+        int count,
+        Cards.ICard? spentOn)
+    {
+        var consumed = 0;
+        // FIFO: oldest matching slot first (front of the list).
+        for (var i = 0; i < _manaProvenance.Count && consumed < count;)
+        {
+            var slot = _manaProvenance[i];
+            if (slot.Color == color)
+            {
+                _manaProvenance.RemoveAt(i);
+                slot.OnSpent?.Invoke(spentOn);
+                consumed++;
+            }
+            else
+            {
+                i++;
+            }
+        }
+        return consumed;
     }
 
     /// <summary>
@@ -440,61 +545,13 @@ public class Player
     }
 
     /// <summary>
-    /// CR 106.4 / CR 702.10 — minimal mana-provenance side-channel for the
-    /// "if that mana is spent on a creature spell, it gains haste" rider
-    /// (Arena of Glory's exert ability). Counts units of red mana currently
-    /// floating in the pool that, if spent on a creature spell, grant that
-    /// creature haste until end of turn.
-    ///
-    /// <para><b>Why a side-channel and not per-slot pool tags:</b>
-    /// <see cref="ValueObjects.ManaPool"/> stores bucketed colour counts
-    /// with no slot-level provenance, and rewriting it to a list-of-tags is
-    /// a separate slice (see <see cref="Majik.Core.Mana.ManaTag"/> /
-    /// <see cref="Majik.Core.Mana.SpendRestriction"/> xmldoc). This counter
-    /// is the least-invasive correct mechanism: the exert ability stamps it
-    /// when it adds {R}{R}, <see cref="Majik.Core.Game.SpellCastFlow"/>
-    /// consumes it at the next spell cast, and it dies with the floating
-    /// mana when the pool empties (CR 500.4 — see
-    /// <see cref="EmptyManaPool"/>). v1 consumes the provenance on the first
-    /// spell cast after the exert (granting haste only when that spell is a
-    /// creature spell); per-pip "exactly which mana paid which pip"
-    /// accounting is the same deferred slice as ManaTag.</para>
-    /// </summary>
-    public int PendingHasteGrantingRedMana { get; private set; }
-
-    /// <summary>
-    /// Record <paramref name="amount"/> units of haste-granting red mana
-    /// floating in the pool (CR 702.10 rider). Additive across multiple
-    /// exert activations in the same step. Negative amounts are rejected.
-    /// </summary>
-    public void AddHasteGrantingRedMana(int amount)
-    {
-        if (amount < 0) throw new ArgumentOutOfRangeException(nameof(amount));
-        PendingHasteGrantingRedMana += amount;
-    }
-
-    /// <summary>
-    /// Consume the pending haste-granting provenance — clears the counter and
-    /// returns whether any was pending. Called by
-    /// <see cref="Majik.Core.Game.SpellCastFlow"/> when a spell is cast: when
-    /// the spell is a creature spell and this returns <c>true</c>, the
-    /// resulting creature gains haste until end of turn (CR 702.10).
-    /// </summary>
-    public bool ConsumeHasteGrantingMana()
-    {
-        var had = PendingHasteGrantingRedMana > 0;
-        PendingHasteGrantingRedMana = 0;
-        return had;
-    }
-
-    /// <summary>
     /// Empty the mana pool (happens at end of steps/phases per Rule 500.4).
-    /// The haste-granting provenance dies with the floating mana.
+    /// All slot-level mana provenance (CR 106.4) dies with the floating mana.
     /// </summary>
     public void EmptyManaPool()
     {
         _manaPool = _manaPool.EmptyPool();
-        PendingHasteGrantingRedMana = 0;
+        _manaProvenance.Clear();
     }
 
     public override string ToString()

@@ -46,14 +46,18 @@ namespace Majik.Core.CardData.Factories;
 ///   token (<see cref="TokenFactory"/>) with Flying and the same firebending-4
 ///   attack trigger attached.
 ///
+/// ## Provenance (CR 106.4)
+/// The firebending mana is slot-tagged with a fresh per-fire token (deferral
+/// #1), so the end-of-combat expiry removes EXACTLY the firebending {R} that
+/// is still floating — any pip spent during combat already had its slot
+/// consumed by the <see cref="Majik.Core.Costs.ManaPaymentResolver"/>, so it
+/// is not double-counted, and unrelated red the player floated is untouched.
+///
 /// ## Deferred (v1 gaps)
-/// - <b>Stack-driven firebending trigger</b>: the firebending mana is added
-///   when the attack trigger resolves; the per-pip "until end of combat"
-///   accounting removes red mana in bulk (the pool has no per-slot provenance,
-///   same posture as Arena of Glory's haste-mana side-channel).
 /// - <b>Mana spent constraint</b>: real firebending mana can only be spent
-///   during combat; v1 simply expires it at end of combat (a strict superset
-///   of the printed timing in this engine's coarse pool model).
+///   during combat; v1 simply expires the unspent remainder at end of combat
+///   (a strict superset of the printed timing — it does not forbid spending
+///   the mana outside combat before then).
 /// </summary>
 [CardName("Avatar Roku")]
 public static class AvatarRokuFactory
@@ -152,21 +156,33 @@ public static class AvatarRokuFactory
             () =>
             {
                 var controller = creature.Controller ?? owner;
-                controller.AddManaToPool(redMana);
+
+                // CR 106.4 — slot-level provenance (deferral #1). Tag each {R}
+                // this firebending adds with a fresh per-fire token so the
+                // end-of-combat expiry removes EXACTLY the firebending mana
+                // that is still floating — any pip spent during combat already
+                // had its slot consumed by the payment resolver, so it isn't
+                // double-counted. No OnSpent reaction (firebending grants no
+                // rider when spent; the provenance is bookkeeping only).
+                var fireToken = new object();
+                controller.AddManaToPool(redMana, provenanceSource: fireToken);
 
                 if (eventBus == null || amount <= 0) return;
 
-                // CR 500.4 — "this mana lasts until end of combat." Remove up
-                // to `amount` red mana when the controller's end-of-combat step
-                // begins (one-shot). Clamp to red currently floating so only
-                // the unspent firebending mana is removed.
+                // CR 500.4 — "this mana lasts until end of combat." When the
+                // controller's end-of-combat step begins, drop the remaining
+                // firebending slots and remove that many red from the pool
+                // (one-shot). RemoveProvenanceSlots returns how many of THIS
+                // fire's slots survived — exactly the unspent firebending mana.
                 Action<StepStartedEvent>? handler = null;
                 handler = e =>
                 {
                     if (e.StepType != PhaseStateType.EndOfCombat) return;
                     if (!ReferenceEquals(e.Player, controller)) return;
 
-                    var removable = Math.Min(amount, controller.ManaPool.Red);
+                    var unspent = controller.RemoveProvenanceSlots(
+                        fireToken, ManaColor.Red, amount);
+                    var removable = Math.Min(unspent, controller.ManaPool.Red);
                     if (removable > 0)
                         controller.PayMana(ManaCost.Parse(new string('R', removable)));
 

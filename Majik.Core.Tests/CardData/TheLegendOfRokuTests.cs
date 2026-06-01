@@ -286,6 +286,43 @@ public class TheLegendOfRokuTests
         _alice.ManaPool.Red.Should().Be(0, "the firebending mana lasts only until end of combat");
     }
 
+    [Fact]
+    public void AvatarRoku_Firebending_OnlyUnspentManaExpires_NonFirebendingSurvives()
+    {
+        // Slot-level provenance (deferral #1): firebending tags its {R}×4. If
+        // some is spent during combat its slots are consumed by the payment
+        // resolver, so only the UNSPENT firebending mana expires at end of
+        // combat — unrelated red mana the player floated is untouched.
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var triggers = new TriggerManager(stack, _bus);
+
+        var avatar = AvatarRokuFactory.Create(_alice, _zones, _bus, triggers);
+        _zones.MoveCard(avatar, ZoneType.Library, ZoneType.Battlefield, _alice);
+
+        _bus.Publish(new CreatureAttacksEvent(avatar, _alice));
+        triggers.PutPendingTriggersOnStack(_alice);
+        var resolver = new StackResolver(_bus, _zones);
+        while (!stack.IsEmpty) resolver.ResolveTop(stack);
+        _alice.ManaPool.Red.Should().Be(4, "firebending 4 added {R}{R}{R}{R}");
+
+        // Float one extra NON-firebending red (untagged), then spend 2 red on a
+        // creature spell — FIFO consumes two firebending slots.
+        _alice.AddManaToPool(ManaCost.Parse("R"));
+        var creature = new Creature("Spender", "RR", 2, 2) { Owner = _alice, Zone = ZoneType.Hand };
+        new Majik.Core.Costs.ManaPaymentResolver()
+            .Pay(_alice, ManaCost.Parse("RR"),
+                Majik.Core.Players.Agents.ManaPayment.Empty, spentOn: creature, out _, out _)
+            .Should().BeTrue();
+        _alice.ManaPool.Red.Should().Be(3, "5 red − 2 spent");
+
+        // End of combat: only the 2 remaining firebending slots expire; the
+        // untagged red the player floated survives.
+        _bus.Publish(new StepStartedEvent(PhaseStateType.EndOfCombat, _alice));
+
+        _alice.ManaPool.Red.Should().Be(1,
+            "2 unspent firebending {R} expired; the 1 non-firebending {R} survives");
+    }
+
     // -----------------------------------------------------------------------
     // Back face — {8}: create a 4/4 red Dragon with flying + firebending 4
     // -----------------------------------------------------------------------

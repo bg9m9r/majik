@@ -632,7 +632,10 @@ public sealed class TurnDriver
                     payment = autoPayment;
                 }
             }
-            if (!manaResolver.Pay(actor, cost, payment, out _, out var colorCounts))
+            // CR 106.4 — pass the cast card as the "spent on" context so
+            // slot-level mana provenance (Arena of Glory's exert haste rider,
+            // deferral #1) can react to "if THAT mana is spent on THIS spell".
+            if (!manaResolver.Pay(actor, cost, payment, spentOn: cast.Card, out _, out var colorCounts))
             {
                 RotateHand(cast.Card, "Pay failed");
                 return;
