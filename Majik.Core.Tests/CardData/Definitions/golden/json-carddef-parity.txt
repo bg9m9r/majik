@@ -13606,6 +13606,56 @@
   "mdfc": null,
   "colors": []
 }
+==== resplendent-angel ====
+{
+  "name": "Resplendent Angel",
+  "manaCost": "{1}{W}{W}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Angel"
+  ],
+  "power": 3,
+  "toughness": 3,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "White"
+  ]
+}
 ==== restless-bivouac ====
 {
   "name": "Restless Bivouac",
