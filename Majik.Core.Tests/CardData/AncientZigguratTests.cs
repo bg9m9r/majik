@@ -92,7 +92,7 @@ public class AncientZigguratTests
     [Fact]
     public void AncientZiggurat_OwnerAndControllerAreSet()
     {
-        var land = AncientZigguratFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Ancient Ziggurat", _alice);
 
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);

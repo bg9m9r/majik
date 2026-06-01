@@ -35,7 +35,7 @@ public class IronMyrFactoryTests
     [Fact]
     public void IronMyr_Identity()
     {
-        var c = IronMyrFactory.Create(_alice);
+        var c = (Creature)NamedCardFactory.Create("Iron Myr", _alice);
 
         c.Name.Should().Be("Iron Myr");
         c.ManaCost.Should().Be("{2}");
@@ -69,7 +69,7 @@ public class IronMyrFactoryTests
     [Fact]
     public void IronMyr_TapForRed_TapsCreatureAndProducesOneRed()
     {
-        var c = IronMyrFactory.Create(_alice);
+        var c = (Creature)NamedCardFactory.Create("Iron Myr", _alice);
         // CR 302.6 — clear summoning sickness so this test exercises the
         // {T}: Add {R} mana production rather than the sickness gate.
         c.ClearSummoningSickness();
@@ -93,7 +93,7 @@ public class IronMyrFactoryTests
     [Fact]
     public void IronMyr_ManaAbility_CannotActivateWhileTapped()
     {
-        var c = IronMyrFactory.Create(_alice);
+        var c = (Creature)NamedCardFactory.Create("Iron Myr", _alice);
         // CR 302.6 — clear summoning sickness so the first activation is legal
         // and the test asserts the !IsTapped re-activation gate specifically.
         c.ClearSummoningSickness();

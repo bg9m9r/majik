@@ -1,3 +1,4 @@
+using Majik.Core.CardData;
 using FluentAssertions;
 using Majik.Core.Abilities;
 using Majik.Core.CardData.Factories;
@@ -19,7 +20,7 @@ public class DelightedHalflingTests
     [Fact]
     public void DelightedHalfling_OneTwo()
     {
-        var hh = DelightedHalflingFactory.Create(_alice);
+        var hh = (Creature)NamedCardFactory.Create("Delighted Halfling", _alice);
 
         hh.Power.Should().Be(1);
         hh.Toughness.Should().Be(2);
@@ -32,7 +33,7 @@ public class DelightedHalflingTests
     [Fact]
     public void DelightedHalfling_HasFiveManaAbilities_OnePerColor()
     {
-        var hh = DelightedHalflingFactory.Create(_alice);
+        var hh = (Creature)NamedCardFactory.Create("Delighted Halfling", _alice);
         var mas = hh.Abilities.OfType<ManaAbility>().ToList();
 
         mas.Should().HaveCount(5, "one ManaAbility per WUBRG colour");
@@ -45,7 +46,7 @@ public class DelightedHalflingTests
     [Fact]
     public void DelightedHalfling_HasHalflingAndCitizenSubtypes()
     {
-        var hh = DelightedHalflingFactory.Create(_alice);
+        var hh = (Creature)NamedCardFactory.Create("Delighted Halfling", _alice);
 
         hh.HasSubtype(CardSubtype.Halfling).Should().BeTrue("Delighted Halfling is a Halfling");
         hh.HasSubtype(CardSubtype.Citizen).Should().BeTrue("Delighted Halfling is a Citizen");
@@ -58,7 +59,7 @@ public class DelightedHalflingTests
     [Fact]
     public void DelightedHalfling_IsLegendary()
     {
-        var hh = DelightedHalflingFactory.Create(_alice);
+        var hh = (Creature)NamedCardFactory.Create("Delighted Halfling", _alice);
 
         hh.HasSupertype(CardSupertype.Legendary).Should().BeTrue("Delighted Halfling is a Legendary Creature");
     }
@@ -70,7 +71,7 @@ public class DelightedHalflingTests
     [Fact]
     public void DelightedHalfling_OwnerAndControllerAreSet()
     {
-        var hh = DelightedHalflingFactory.Create(_alice);
+        var hh = (Creature)NamedCardFactory.Create("Delighted Halfling", _alice);
 
         hh.Owner.Should().BeSameAs(_alice);
         hh.Controller.Should().BeSameAs(_alice);
@@ -83,7 +84,7 @@ public class DelightedHalflingTests
     [Fact]
     public void DelightedHalfling_ManaCostIsGreen()
     {
-        var hh = DelightedHalflingFactory.Create(_alice);
+        var hh = (Creature)NamedCardFactory.Create("Delighted Halfling", _alice);
 
         hh.ManaCost.Should().Be("{G}");
     }

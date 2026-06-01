@@ -26,7 +26,7 @@ public class OvergrownFarmlandTests
     [Fact]
     public void OvergrownFarmland_IsLand()
     {
-        var land = OvergrownFarmlandFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Overgrown Farmland", _alice);
 
         land.HasType(CardType.Land).Should().BeTrue();
     }
@@ -34,7 +34,7 @@ public class OvergrownFarmlandTests
     [Fact]
     public void OvergrownFarmland_NameIsCorrect()
     {
-        var land = OvergrownFarmlandFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Overgrown Farmland", _alice);
 
         land.Name.Should().Be("Overgrown Farmland");
     }
@@ -42,7 +42,7 @@ public class OvergrownFarmlandTests
     [Fact]
     public void OvergrownFarmland_OwnerAndControllerAreSet()
     {
-        var land = OvergrownFarmlandFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Overgrown Farmland", _alice);
 
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
@@ -51,7 +51,7 @@ public class OvergrownFarmlandTests
     [Fact]
     public void OvergrownFarmland_IsNotLegendary()
     {
-        var land = OvergrownFarmlandFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Overgrown Farmland", _alice);
 
         land.HasSupertype(CardSupertype.Legendary).Should().BeFalse();
     }
@@ -59,7 +59,7 @@ public class OvergrownFarmlandTests
     [Fact]
     public void OvergrownFarmland_HasTwoManaAbilities()
     {
-        var land = OvergrownFarmlandFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Overgrown Farmland", _alice);
 
         land.Abilities.OfType<ManaAbility>().Should().HaveCount(2);
     }
@@ -67,7 +67,7 @@ public class OvergrownFarmlandTests
     [Fact]
     public void OvergrownFarmland_HasGreenManaAbility()
     {
-        var land = OvergrownFarmlandFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Overgrown Farmland", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Green == 1 && m.ManaGenerated.White == 0);
@@ -76,7 +76,7 @@ public class OvergrownFarmlandTests
     [Fact]
     public void OvergrownFarmland_HasWhiteManaAbility()
     {
-        var land = OvergrownFarmlandFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Overgrown Farmland", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.White == 1 && m.ManaGenerated.Green == 0);
@@ -85,7 +85,7 @@ public class OvergrownFarmlandTests
     [Fact]
     public void OvergrownFarmland_HasNoTriggeredAbilities()
     {
-        var land = OvergrownFarmlandFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Overgrown Farmland", _alice);
 
         land.Abilities.OfType<TriggeredAbility>().Should().BeEmpty(
             "ETB-tapped-unless-N-other-lands is a replacement effect, not a trigger");
@@ -94,7 +94,7 @@ public class OvergrownFarmlandTests
     [Fact]
     public void OvergrownFarmland_HasNoActivatedAbilities()
     {
-        var land = OvergrownFarmlandFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Overgrown Farmland", _alice);
 
         land.Abilities.OfType<ActivatedAbility>().Should().BeEmpty();
     }

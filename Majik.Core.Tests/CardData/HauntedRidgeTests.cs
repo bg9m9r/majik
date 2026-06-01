@@ -36,7 +36,7 @@ public class HauntedRidgeTests
     [Fact]
     public void HauntedRidge_IsLand()
     {
-        var land = HauntedRidgeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Haunted Ridge", _alice);
 
         land.HasType(CardType.Land).Should().BeTrue();
     }
@@ -44,7 +44,7 @@ public class HauntedRidgeTests
     [Fact]
     public void HauntedRidge_NameIsCorrect()
     {
-        var land = HauntedRidgeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Haunted Ridge", _alice);
 
         land.Name.Should().Be("Haunted Ridge");
     }
@@ -52,7 +52,7 @@ public class HauntedRidgeTests
     [Fact]
     public void HauntedRidge_OwnerAndControllerAreSet()
     {
-        var land = HauntedRidgeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Haunted Ridge", _alice);
 
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
@@ -61,7 +61,7 @@ public class HauntedRidgeTests
     [Fact]
     public void HauntedRidge_IsNotLegendary()
     {
-        var land = HauntedRidgeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Haunted Ridge", _alice);
 
         land.HasSupertype(CardSupertype.Legendary).Should().BeFalse();
     }
@@ -69,7 +69,7 @@ public class HauntedRidgeTests
     [Fact]
     public void HauntedRidge_HasTwoManaAbilities()
     {
-        var land = HauntedRidgeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Haunted Ridge", _alice);
 
         land.Abilities.OfType<ManaAbility>().Should().HaveCount(2);
     }
@@ -77,7 +77,7 @@ public class HauntedRidgeTests
     [Fact]
     public void HauntedRidge_HasBlackManaAbility()
     {
-        var land = HauntedRidgeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Haunted Ridge", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Black == 1 && m.ManaGenerated.Red == 0);
@@ -86,7 +86,7 @@ public class HauntedRidgeTests
     [Fact]
     public void HauntedRidge_HasRedManaAbility()
     {
-        var land = HauntedRidgeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Haunted Ridge", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Red == 1 && m.ManaGenerated.Black == 0);
@@ -95,7 +95,7 @@ public class HauntedRidgeTests
     [Fact]
     public void HauntedRidge_HasNoTriggeredAbilities()
     {
-        var land = HauntedRidgeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Haunted Ridge", _alice);
 
         land.Abilities.OfType<TriggeredAbility>().Should().BeEmpty(
             "ETB-tapped-unless-two-or-more-other-lands is a replacement effect, not a trigger");
@@ -104,7 +104,7 @@ public class HauntedRidgeTests
     [Fact]
     public void HauntedRidge_HasNoActivatedAbilities()
     {
-        var land = HauntedRidgeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Haunted Ridge", _alice);
 
         land.Abilities.OfType<ActivatedAbility>().Should().BeEmpty();
     }
@@ -128,7 +128,7 @@ public class HauntedRidgeTests
     public void HauntedRidge_BinderRegistersTwoOrMoreOtherLandsReplacement()
     {
         var bus = new ReplacementBus();
-        var land = HauntedRidgeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Haunted Ridge", _alice);
         var entity = new CardEntity
         {
             Name = "Haunted Ridge",
@@ -144,7 +144,7 @@ public class HauntedRidgeTests
     public void HauntedRidge_EntersTapped_WithFewerThanTwoOtherLands()
     {
         var bus = new ReplacementBus();
-        var land = HauntedRidgeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Haunted Ridge", _alice);
         var entity = new CardEntity { Name = "Haunted Ridge", OracleText = Oracle, TypeLine = "Land" };
         ConditionalEntersTappedBinder.Bind(land, entity, bus).Should().BeTrue();
 
@@ -169,7 +169,7 @@ public class HauntedRidgeTests
     public void HauntedRidge_EntersUntapped_WithTwoOrMoreOtherLands()
     {
         var bus = new ReplacementBus();
-        var land = HauntedRidgeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Haunted Ridge", _alice);
         var entity = new CardEntity { Name = "Haunted Ridge", OracleText = Oracle, TypeLine = "Land" };
         ConditionalEntersTappedBinder.Bind(land, entity, bus).Should().BeTrue();
 

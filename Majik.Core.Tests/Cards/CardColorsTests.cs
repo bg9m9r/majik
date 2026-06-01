@@ -34,7 +34,7 @@ public class CardColorsTests
         // findable by "green creature" tutors (Green Sun's Zenith,
         // Summoner's Pact, Chord of Calling).
         var owner = new Player("Alice", 20);
-        var arbor = DryadArborFactory.Create(owner);
+        var arbor = (Creature)NamedCardFactory.Create("Dryad Arbor", owner);
 
         var colors = CardColors.GetColors(arbor);
 

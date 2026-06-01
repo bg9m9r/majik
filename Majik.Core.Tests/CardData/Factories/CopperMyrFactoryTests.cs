@@ -37,7 +37,7 @@ public class CopperMyrFactoryTests
     [Fact]
     public void CopperMyr_Identity()
     {
-        var c = CopperMyrFactory.Create(_alice);
+        var c = (Creature)NamedCardFactory.Create("Copper Myr", _alice);
 
         c.Name.Should().Be("Copper Myr");
         c.ManaCost.Should().Be("{2}");
@@ -71,7 +71,7 @@ public class CopperMyrFactoryTests
     [Fact]
     public void CopperMyr_TapForGreen_TapsCreatureAndProducesOneGreen()
     {
-        var c = CopperMyrFactory.Create(_alice);
+        var c = (Creature)NamedCardFactory.Create("Copper Myr", _alice);
         // CR 302.6 — clear summoning sickness so this test exercises the
         // {T}: Add {G} mana production rather than the sickness gate.
         c.ClearSummoningSickness();
@@ -95,7 +95,7 @@ public class CopperMyrFactoryTests
     [Fact]
     public void CopperMyr_ManaAbility_CannotActivateWhileTapped()
     {
-        var c = CopperMyrFactory.Create(_alice);
+        var c = (Creature)NamedCardFactory.Create("Copper Myr", _alice);
         // CR 302.6 — clear summoning sickness so the first activation is legal
         // and the test asserts the !IsTapped re-activation gate specifically.
         c.ClearSummoningSickness();

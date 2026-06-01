@@ -25,7 +25,7 @@ public class GrizzlyBearsFactoryTests
     [Fact]
     public void GrizzlyBears_Identity()
     {
-        var c = GrizzlyBearsFactory.Create(_alice);
+        var c = (Creature)NamedCardFactory.Create("Grizzly Bears", _alice);
 
         c.Name.Should().Be("Grizzly Bears");
         c.ManaCost.Should().Be("{1}{G}");
@@ -40,7 +40,7 @@ public class GrizzlyBearsFactoryTests
     [Fact]
     public void GrizzlyBears_ManaValue_IsTwo()
     {
-        var c = GrizzlyBearsFactory.Create(_alice);
+        var c = (Creature)NamedCardFactory.Create("Grizzly Bears", _alice);
 
         // {1}{G} = 1 generic + 1 green = mana value 2 (CR 202.3).
         c.ManaCost.Should().Be("{1}{G}");
@@ -51,7 +51,7 @@ public class GrizzlyBearsFactoryTests
     [Fact]
     public void GrizzlyBears_IsVanilla_NoAbilities()
     {
-        var c = GrizzlyBearsFactory.Create(_alice);
+        var c = (Creature)NamedCardFactory.Create("Grizzly Bears", _alice);
 
         c.Abilities.OfType<KeywordAbility>().Should().BeEmpty(
             "Grizzly Bears is vanilla — no printed keywords");

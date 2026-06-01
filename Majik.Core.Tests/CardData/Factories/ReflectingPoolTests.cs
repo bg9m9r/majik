@@ -111,7 +111,7 @@ public class ReflectingPoolTests
     public void ReflectingPool_WithForest_OnlyGreenActive()
     {
         var pool = PoolOnBattlefield();
-        PutOnBattlefield(ForestFactory.Create(_alice));
+        PutOnBattlefield((Land)NamedCardFactory.Create("Forest", _alice));
 
         ColorAbility(pool, "G").CanActivate().Should().BeTrue(
             "a Forest you control could produce {G}");
@@ -131,8 +131,8 @@ public class ReflectingPoolTests
     public void ReflectingPool_WithForestAndIsland_GreenAndBlueActive()
     {
         var pool = PoolOnBattlefield();
-        PutOnBattlefield(ForestFactory.Create(_alice));
-        PutOnBattlefield(IslandFactory.Create(_alice));
+        PutOnBattlefield((Land)NamedCardFactory.Create("Forest", _alice));
+        PutOnBattlefield((Land)NamedCardFactory.Create("Island", _alice));
 
         ColorAbility(pool, "G").CanActivate().Should().BeTrue();
         ColorAbility(pool, "U").CanActivate().Should().BeTrue();
@@ -173,7 +173,7 @@ public class ReflectingPoolTests
     public void ReflectingPool_WithForest_TapsForGreen()
     {
         var pool = PoolOnBattlefield();
-        PutOnBattlefield(ForestFactory.Create(_alice));
+        PutOnBattlefield((Land)NamedCardFactory.Create("Forest", _alice));
 
         var green = ColorAbility(pool, "G");
         var produced = green.Activate();
@@ -191,7 +191,7 @@ public class ReflectingPoolTests
     public void ReflectingPool_Tapped_CannotActivate()
     {
         var pool = PoolOnBattlefield();
-        PutOnBattlefield(ForestFactory.Create(_alice));
+        PutOnBattlefield((Land)NamedCardFactory.Create("Forest", _alice));
         pool.Tap();
 
         ColorAbility(pool, "G").CanActivate().Should().BeFalse(

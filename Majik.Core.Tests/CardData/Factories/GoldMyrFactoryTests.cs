@@ -34,7 +34,7 @@ public class GoldMyrFactoryTests
     [Fact]
     public void GoldMyr_Identity()
     {
-        var c = GoldMyrFactory.Create(_alice);
+        var c = (Creature)NamedCardFactory.Create("Gold Myr", _alice);
 
         c.Name.Should().Be("Gold Myr");
         c.ManaCost.Should().Be("{2}");
@@ -68,7 +68,7 @@ public class GoldMyrFactoryTests
     [Fact]
     public void GoldMyr_TapForWhite_TapsCreatureAndProducesOneWhite()
     {
-        var c = GoldMyrFactory.Create(_alice);
+        var c = (Creature)NamedCardFactory.Create("Gold Myr", _alice);
         // CR 302.6 — clear summoning sickness so this test exercises the
         // {T}: Add {W} mana production rather than the sickness gate.
         c.ClearSummoningSickness();
@@ -92,7 +92,7 @@ public class GoldMyrFactoryTests
     [Fact]
     public void GoldMyr_ManaAbility_CannotActivateWhileTapped()
     {
-        var c = GoldMyrFactory.Create(_alice);
+        var c = (Creature)NamedCardFactory.Create("Gold Myr", _alice);
         // CR 302.6 — clear summoning sickness so the first activation is legal
         // and the test asserts the !IsTapped re-activation gate specifically.
         c.ClearSummoningSickness();

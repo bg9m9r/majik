@@ -42,7 +42,7 @@ public class SejiriRefugeTests
     [Fact]
     public void SejiriRefuge_IsLand_WithCorrectName()
     {
-        var land = SejiriRefugeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Sejiri Refuge", _alice);
 
         land.Name.Should().Be("Sejiri Refuge");
         land.HasType(CardType.Land).Should().BeTrue();
@@ -65,7 +65,7 @@ public class SejiriRefugeTests
     [Fact]
     public void SejiriRefuge_HasManaAbility_ForWhite()
     {
-        var land = SejiriRefugeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Sejiri Refuge", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.White == 1 && m.ManaGenerated.Blue == 0);
@@ -74,7 +74,7 @@ public class SejiriRefugeTests
     [Fact]
     public void SejiriRefuge_HasManaAbility_ForBlue()
     {
-        var land = SejiriRefugeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Sejiri Refuge", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Blue == 1 && m.ManaGenerated.White == 0);
@@ -83,7 +83,7 @@ public class SejiriRefugeTests
     [Fact]
     public void SejiriRefuge_EtbTrigger_IsBattlefieldActive()
     {
-        var land = SejiriRefugeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Sejiri Refuge", _alice);
         var trigger = land.Abilities.OfType<TriggeredAbility>().Single();
 
         trigger.ActiveZones.Should().Contain(ZoneType.Battlefield);
@@ -93,7 +93,7 @@ public class SejiriRefugeTests
     public void SejiriRefuge_EtbEffect_GainsOneLife()
     {
         var alice = new Player("Alice", 20);
-        var land = SejiriRefugeFactory.Create(alice);
+        var land = (Land)NamedCardFactory.Create("Sejiri Refuge", alice);
         var etb = land.Abilities.OfType<TriggeredAbility>().Single();
 
         foreach (var effect in etb.Effects) effect.Execute();

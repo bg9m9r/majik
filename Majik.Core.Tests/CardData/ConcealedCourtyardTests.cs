@@ -24,7 +24,7 @@ public class ConcealedCourtyardTests
     [Fact]
     public void ConcealedCourtyard_IsLand()
     {
-        var land = ConcealedCourtyardFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Concealed Courtyard", _alice);
 
         land.HasType(CardType.Land).Should().BeTrue();
     }
@@ -32,7 +32,7 @@ public class ConcealedCourtyardTests
     [Fact]
     public void ConcealedCourtyard_NameIsCorrect()
     {
-        var land = ConcealedCourtyardFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Concealed Courtyard", _alice);
 
         land.Name.Should().Be("Concealed Courtyard");
     }
@@ -40,7 +40,7 @@ public class ConcealedCourtyardTests
     [Fact]
     public void ConcealedCourtyard_OwnerAndControllerAreSet()
     {
-        var land = ConcealedCourtyardFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Concealed Courtyard", _alice);
 
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
@@ -49,7 +49,7 @@ public class ConcealedCourtyardTests
     [Fact]
     public void ConcealedCourtyard_IsNotLegendary()
     {
-        var land = ConcealedCourtyardFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Concealed Courtyard", _alice);
 
         land.HasSupertype(CardSupertype.Legendary).Should().BeFalse();
     }
@@ -57,7 +57,7 @@ public class ConcealedCourtyardTests
     [Fact]
     public void ConcealedCourtyard_HasTwoManaAbilities()
     {
-        var land = ConcealedCourtyardFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Concealed Courtyard", _alice);
 
         land.Abilities.OfType<ManaAbility>().Should().HaveCount(2);
     }
@@ -65,7 +65,7 @@ public class ConcealedCourtyardTests
     [Fact]
     public void ConcealedCourtyard_HasWhiteManaAbility()
     {
-        var land = ConcealedCourtyardFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Concealed Courtyard", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.White == 1 && m.ManaGenerated.Black == 0);
@@ -74,7 +74,7 @@ public class ConcealedCourtyardTests
     [Fact]
     public void ConcealedCourtyard_HasBlackManaAbility()
     {
-        var land = ConcealedCourtyardFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Concealed Courtyard", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Black == 1 && m.ManaGenerated.White == 0);
@@ -83,7 +83,7 @@ public class ConcealedCourtyardTests
     [Fact]
     public void ConcealedCourtyard_HasNoTriggeredAbilities()
     {
-        var land = ConcealedCourtyardFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Concealed Courtyard", _alice);
 
         land.Abilities.OfType<TriggeredAbility>().Should().BeEmpty(
             "ETB-tapped-unless-N-other-lands is a replacement effect, not a trigger");
@@ -92,7 +92,7 @@ public class ConcealedCourtyardTests
     [Fact]
     public void ConcealedCourtyard_HasNoActivatedAbilities()
     {
-        var land = ConcealedCourtyardFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Concealed Courtyard", _alice);
 
         land.Abilities.OfType<ActivatedAbility>().Should().BeEmpty();
     }

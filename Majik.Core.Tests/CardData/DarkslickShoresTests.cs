@@ -24,7 +24,7 @@ public class DarkslickShoresTests
     [Fact]
     public void DarkslickShores_IsLand()
     {
-        var land = DarkslickShoresFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Darkslick Shores", _alice);
 
         land.HasType(CardType.Land).Should().BeTrue();
     }
@@ -32,7 +32,7 @@ public class DarkslickShoresTests
     [Fact]
     public void DarkslickShores_NameIsCorrect()
     {
-        var land = DarkslickShoresFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Darkslick Shores", _alice);
 
         land.Name.Should().Be("Darkslick Shores");
     }
@@ -40,7 +40,7 @@ public class DarkslickShoresTests
     [Fact]
     public void DarkslickShores_OwnerAndControllerAreSet()
     {
-        var land = DarkslickShoresFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Darkslick Shores", _alice);
 
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
@@ -49,7 +49,7 @@ public class DarkslickShoresTests
     [Fact]
     public void DarkslickShores_IsNotLegendary()
     {
-        var land = DarkslickShoresFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Darkslick Shores", _alice);
 
         land.HasSupertype(CardSupertype.Legendary).Should().BeFalse();
     }
@@ -57,7 +57,7 @@ public class DarkslickShoresTests
     [Fact]
     public void DarkslickShores_HasTwoManaAbilities()
     {
-        var land = DarkslickShoresFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Darkslick Shores", _alice);
 
         land.Abilities.OfType<ManaAbility>().Should().HaveCount(2);
     }
@@ -65,7 +65,7 @@ public class DarkslickShoresTests
     [Fact]
     public void DarkslickShores_HasBlueManaAbility()
     {
-        var land = DarkslickShoresFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Darkslick Shores", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Blue == 1 && m.ManaGenerated.Black == 0);
@@ -74,7 +74,7 @@ public class DarkslickShoresTests
     [Fact]
     public void DarkslickShores_HasBlackManaAbility()
     {
-        var land = DarkslickShoresFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Darkslick Shores", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Black == 1 && m.ManaGenerated.Blue == 0);
@@ -83,7 +83,7 @@ public class DarkslickShoresTests
     [Fact]
     public void DarkslickShores_HasNoTriggeredAbilities()
     {
-        var land = DarkslickShoresFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Darkslick Shores", _alice);
 
         land.Abilities.OfType<TriggeredAbility>().Should().BeEmpty(
             "ETB-tapped-unless-N-other-lands is a replacement effect, not a trigger");
@@ -92,7 +92,7 @@ public class DarkslickShoresTests
     [Fact]
     public void DarkslickShores_HasNoActivatedAbilities()
     {
-        var land = DarkslickShoresFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Darkslick Shores", _alice);
 
         land.Abilities.OfType<ActivatedAbility>().Should().BeEmpty();
     }

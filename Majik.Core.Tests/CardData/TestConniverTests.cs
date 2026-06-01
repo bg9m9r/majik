@@ -1,3 +1,4 @@
+using Majik.Core.CardData;
 using FluentAssertions;
 using Majik.Core.Abilities;
 using Majik.Core.CardData.Factories;
@@ -26,7 +27,7 @@ public class TestConniverTests
     [Fact]
     public void TestConniver_IsCreature()
     {
-        var card = TestConniverFactory.Create(_alice);
+        var card = (Creature)NamedCardFactory.Create("Test Conniver", _alice);
 
         card.HasType(CardType.Creature).Should().BeTrue();
     }
@@ -34,7 +35,7 @@ public class TestConniverTests
     [Fact]
     public void TestConniver_HasExpectedShape()
     {
-        var creature = TestConniverFactory.Create(_alice);
+        var creature = (Creature)NamedCardFactory.Create("Test Conniver", _alice);
 
         creature.Name.Should().Be("Test Conniver");
         creature.Owner.Should().BeSameAs(_alice);
@@ -48,7 +49,7 @@ public class TestConniverTests
     [Fact]
     public void TestConniver_HasSingleEtbTrigger_NoManaAbility()
     {
-        var creature = TestConniverFactory.Create(_alice);
+        var creature = (Creature)NamedCardFactory.Create("Test Conniver", _alice);
 
         creature.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1);
         creature.Abilities.OfType<ManaAbility>().Should().BeEmpty();
@@ -63,7 +64,7 @@ public class TestConniverTests
         alice.Zones.Library.AddCard(bolt);
         bolt.SetZone(ZoneType.Library);
 
-        var creature = TestConniverFactory.Create(alice);
+        var creature = (Creature)NamedCardFactory.Create("Test Conniver", alice);
         var etb = creature.Abilities.OfType<TriggeredAbility>().First();
         foreach (var effect in etb.Effects) effect.Execute();
 
@@ -81,7 +82,7 @@ public class TestConniverTests
         alice.Zones.Library.AddCard(forest);
         forest.SetZone(ZoneType.Library);
 
-        var creature = TestConniverFactory.Create(alice);
+        var creature = (Creature)NamedCardFactory.Create("Test Conniver", alice);
         var etb = creature.Abilities.OfType<TriggeredAbility>().First();
         foreach (var effect in etb.Effects) effect.Execute();
 

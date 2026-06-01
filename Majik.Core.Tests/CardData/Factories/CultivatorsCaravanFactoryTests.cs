@@ -43,7 +43,7 @@ public class CultivatorsCaravanFactoryTests
     [Fact]
     public void CultivatorsCaravan_Identity()
     {
-        var c = CultivatorsCaravanFactory.Create(_alice);
+        var c = (Creature)NamedCardFactory.Create("Cultivator's Caravan", _alice);
 
         c.Name.Should().Be("Cultivator's Caravan");
         c.HasType(CardType.Artifact).Should().BeTrue(
@@ -78,7 +78,7 @@ public class CultivatorsCaravanFactoryTests
     [Fact]
     public void CultivatorsCaravan_HasFiveColoredManaAbilities()
     {
-        var c = CultivatorsCaravanFactory.Create(_alice);
+        var c = (Creature)NamedCardFactory.Create("Cultivator's Caravan", _alice);
 
         var mana = c.Abilities.OfType<ManaAbility>().ToList();
         mana.Should().HaveCount(
@@ -90,7 +90,7 @@ public class CultivatorsCaravanFactoryTests
     [Fact]
     public void CultivatorsCaravan_HasOneAbilityPerColor_ProducingThatColor()
     {
-        var c = CultivatorsCaravanFactory.Create(_alice);
+        var c = (Creature)NamedCardFactory.Create("Cultivator's Caravan", _alice);
         var mana = c.Abilities.OfType<ManaAbility>().ToList();
 
         mana.Count(a => a.ManaGenerated.White == 1).Should().Be(1);
@@ -103,7 +103,7 @@ public class CultivatorsCaravanFactoryTests
     [Fact]
     public void CultivatorsCaravan_ColoredAbilities_AreFree_CanActivateWithEmptyPool()
     {
-        var c = CultivatorsCaravanFactory.Create(_alice);
+        var c = (Creature)NamedCardFactory.Create("Cultivator's Caravan", _alice);
         // CR 302.6 / 605.3a — the v1 Vehicle shell is a Creature, so its {T}
         // mana ability is subject to summoning sickness. Clear it to model a
         // permanent that has been under its controller's control (the normal
@@ -122,7 +122,7 @@ public class CultivatorsCaravanFactoryTests
     [Fact]
     public void CultivatorsCaravan_GreenActivation_AddsGreen_AndTapsSelf()
     {
-        var c = CultivatorsCaravanFactory.Create(_alice);
+        var c = (Creature)NamedCardFactory.Create("Cultivator's Caravan", _alice);
         // CR 302.6 / 605.3a — clear summoning sickness (Creature shell) so the
         // {T} mana ability is activatable.
         c.HasSummoningSickness = false;
@@ -144,7 +144,7 @@ public class CultivatorsCaravanFactoryTests
     [Fact]
     public void CultivatorsCaravan_HasNoActivatedOrTriggeredAbilities()
     {
-        var c = CultivatorsCaravanFactory.Create(_alice);
+        var c = (Creature)NamedCardFactory.Create("Cultivator's Caravan", _alice);
 
         c.Abilities.OfType<ActivatedAbility>().Should().BeEmpty(
             "the only printed activated ability is the mana ability");
@@ -159,7 +159,7 @@ public class CultivatorsCaravanFactoryTests
     public void CultivatorsCaravan_Crew3_PromotesToCreatureUntilEndOfTurn()
     {
         var effects = new ContinuousEffectsService();
-        var caravan = CultivatorsCaravanFactory.Create(_alice);
+        var caravan = (Creature)NamedCardFactory.Create("Cultivator's Caravan", _alice);
         caravan.ActiveEffects = effects;
         caravan.HasSummoningSickness = false;
 
@@ -173,9 +173,9 @@ public class CultivatorsCaravanFactoryTests
 
         var result = CrewAction.Crew(
             caravan,
-            crewCost: CultivatorsCaravanFactory.CrewCost,
-            vehiclePower: CultivatorsCaravanFactory.VehiclePower,
-            vehicleToughness: CultivatorsCaravanFactory.VehicleToughness,
+            crewCost: 3,
+            vehiclePower: 5,
+            vehicleToughness: 5,
             new[] { crew },
             effects);
 
@@ -189,7 +189,7 @@ public class CultivatorsCaravanFactoryTests
     public void CultivatorsCaravan_Crew3_FailsWhenTotalPowerTooLow()
     {
         var effects = new ContinuousEffectsService();
-        var caravan = CultivatorsCaravanFactory.Create(_alice);
+        var caravan = (Creature)NamedCardFactory.Create("Cultivator's Caravan", _alice);
         caravan.ActiveEffects = effects;
 
         var weak = new Creature("Mouse", "W", 2, 2)
@@ -201,9 +201,9 @@ public class CultivatorsCaravanFactoryTests
 
         var result = CrewAction.Crew(
             caravan,
-            crewCost: CultivatorsCaravanFactory.CrewCost,
-            vehiclePower: CultivatorsCaravanFactory.VehiclePower,
-            vehicleToughness: CultivatorsCaravanFactory.VehicleToughness,
+            crewCost: 3,
+            vehiclePower: 5,
+            vehicleToughness: 5,
             new[] { weak },
             effects);
 

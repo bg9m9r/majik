@@ -25,7 +25,7 @@ public class RazorvergeThicketTests
     [Fact]
     public void RazorvergeThicket_IsLand()
     {
-        var land = RazorvergeThicketFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Razorverge Thicket", _alice);
 
         land.HasType(CardType.Land).Should().BeTrue();
     }
@@ -33,7 +33,7 @@ public class RazorvergeThicketTests
     [Fact]
     public void RazorvergeThicket_NameIsCorrect()
     {
-        var land = RazorvergeThicketFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Razorverge Thicket", _alice);
 
         land.Name.Should().Be("Razorverge Thicket");
     }
@@ -41,7 +41,7 @@ public class RazorvergeThicketTests
     [Fact]
     public void RazorvergeThicket_OwnerAndControllerAreSet()
     {
-        var land = RazorvergeThicketFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Razorverge Thicket", _alice);
 
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
@@ -50,7 +50,7 @@ public class RazorvergeThicketTests
     [Fact]
     public void RazorvergeThicket_IsNotLegendary()
     {
-        var land = RazorvergeThicketFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Razorverge Thicket", _alice);
 
         land.HasSupertype(CardSupertype.Legendary).Should().BeFalse();
     }
@@ -58,7 +58,7 @@ public class RazorvergeThicketTests
     [Fact]
     public void RazorvergeThicket_HasTwoManaAbilities()
     {
-        var land = RazorvergeThicketFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Razorverge Thicket", _alice);
 
         land.Abilities.OfType<ManaAbility>().Should().HaveCount(2);
     }
@@ -66,7 +66,7 @@ public class RazorvergeThicketTests
     [Fact]
     public void RazorvergeThicket_HasGreenManaAbility()
     {
-        var land = RazorvergeThicketFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Razorverge Thicket", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Green == 1 && m.ManaGenerated.White == 0);
@@ -75,7 +75,7 @@ public class RazorvergeThicketTests
     [Fact]
     public void RazorvergeThicket_HasWhiteManaAbility()
     {
-        var land = RazorvergeThicketFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Razorverge Thicket", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.White == 1 && m.ManaGenerated.Green == 0);
@@ -84,7 +84,7 @@ public class RazorvergeThicketTests
     [Fact]
     public void RazorvergeThicket_HasNoTriggeredAbilities()
     {
-        var land = RazorvergeThicketFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Razorverge Thicket", _alice);
 
         land.Abilities.OfType<TriggeredAbility>().Should().BeEmpty(
             "ETB-tapped-unless-N-other-lands is a replacement effect, not a trigger");
@@ -93,7 +93,7 @@ public class RazorvergeThicketTests
     [Fact]
     public void RazorvergeThicket_HasNoActivatedAbilities()
     {
-        var land = RazorvergeThicketFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Razorverge Thicket", _alice);
 
         land.Abilities.OfType<ActivatedAbility>().Should().BeEmpty();
     }

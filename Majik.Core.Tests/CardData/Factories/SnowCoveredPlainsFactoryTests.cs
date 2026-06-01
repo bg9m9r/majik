@@ -37,7 +37,7 @@ public class SnowCoveredPlainsFactoryTests
     [Fact]
     public void SnowCoveredPlains_IsALand()
     {
-        var plains = SnowCoveredPlainsFactory.Create(_alice);
+        var plains = (Land)NamedCardFactory.Create("Snow-Covered Plains", _alice);
 
         plains.HasType(CardType.Land).Should().BeTrue(
             "Snow-Covered Plains is a Land (CR 305.1)");
@@ -46,7 +46,7 @@ public class SnowCoveredPlainsFactoryTests
     [Fact]
     public void SnowCoveredPlains_HasBasicSupertype()
     {
-        var plains = SnowCoveredPlainsFactory.Create(_alice);
+        var plains = (Land)NamedCardFactory.Create("Snow-Covered Plains", _alice);
 
         plains.HasSupertype(CardSupertype.Basic).Should().BeTrue(
             "Snow-Covered Plains has the Basic supertype (CR 205.4)");
@@ -55,7 +55,7 @@ public class SnowCoveredPlainsFactoryTests
     [Fact]
     public void SnowCoveredPlains_HasSnowSupertype()
     {
-        var plains = SnowCoveredPlainsFactory.Create(_alice);
+        var plains = (Land)NamedCardFactory.Create("Snow-Covered Plains", _alice);
 
         plains.HasSupertype(CardSupertype.Snow).Should().BeTrue(
             "Snow-Covered Plains has the Snow supertype (CR 205.4d)");
@@ -64,7 +64,7 @@ public class SnowCoveredPlainsFactoryTests
     [Fact]
     public void SnowCoveredPlains_HasPlainsSubtype()
     {
-        var plains = SnowCoveredPlainsFactory.Create(_alice);
+        var plains = (Land)NamedCardFactory.Create("Snow-Covered Plains", _alice);
 
         plains.HasSubtype(CardSubtype.Plains).Should().BeTrue(
             "Snow-Covered Plains is a Plains land (CR 205.3i)");
@@ -73,7 +73,7 @@ public class SnowCoveredPlainsFactoryTests
     [Fact]
     public void SnowCoveredPlains_HasCorrectName()
     {
-        var plains = SnowCoveredPlainsFactory.Create(_alice);
+        var plains = (Land)NamedCardFactory.Create("Snow-Covered Plains", _alice);
 
         plains.Name.Should().Be("Snow-Covered Plains");
     }
@@ -81,7 +81,7 @@ public class SnowCoveredPlainsFactoryTests
     [Fact]
     public void SnowCoveredPlains_OwnerAndControllerAreSet()
     {
-        var plains = SnowCoveredPlainsFactory.Create(_alice);
+        var plains = (Land)NamedCardFactory.Create("Snow-Covered Plains", _alice);
 
         plains.Owner.Should().BeSameAs(_alice);
         plains.Controller.Should().BeSameAs(_alice);
@@ -94,7 +94,7 @@ public class SnowCoveredPlainsFactoryTests
     [Fact]
     public void SnowCoveredPlains_HasWhiteManaAbility()
     {
-        var plains = SnowCoveredPlainsFactory.Create(_alice);
+        var plains = (Land)NamedCardFactory.Create("Snow-Covered Plains", _alice);
 
         var manaAbilities = plains.Abilities.OfType<ManaAbility>().ToList();
         manaAbilities.Should().HaveCount(1,
@@ -132,7 +132,7 @@ public class SnowCoveredPlainsFactoryTests
     [Fact]
     public void SnowCoveredPlains_ThrowsOnNullOwner()
     {
-        var act = () => SnowCoveredPlainsFactory.Create(null!);
+        var act = () => (Land)NamedCardFactory.Create("Snow-Covered Plains", null!);
 
         act.Should().Throw<ArgumentNullException>();
     }

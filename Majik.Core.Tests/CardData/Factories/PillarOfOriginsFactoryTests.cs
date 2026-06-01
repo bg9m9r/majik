@@ -35,7 +35,7 @@ public class PillarOfOriginsFactoryTests
     [Fact]
     public void PillarOfOrigins_Identity()
     {
-        var pillar = PillarOfOriginsFactory.Create(_alice);
+        var pillar = (Artifact)NamedCardFactory.Create("Pillar of Origins", _alice);
 
         pillar.Name.Should().Be("Pillar of Origins");
         pillar.HasType(CardType.Artifact).Should().BeTrue();
@@ -46,7 +46,7 @@ public class PillarOfOriginsFactoryTests
     [Fact]
     public void PillarOfOrigins_ManaCostIsTwoGeneric()
     {
-        var pillar = PillarOfOriginsFactory.Create(_alice);
+        var pillar = (Artifact)NamedCardFactory.Create("Pillar of Origins", _alice);
 
         pillar.ManaCost.Should().Be("{2}");
     }
@@ -54,7 +54,7 @@ public class PillarOfOriginsFactoryTests
     [Fact]
     public void PillarOfOrigins_IsNotLegendary()
     {
-        var pillar = PillarOfOriginsFactory.Create(_alice);
+        var pillar = (Artifact)NamedCardFactory.Create("Pillar of Origins", _alice);
 
         pillar.HasSupertype(CardSupertype.Legendary).Should().BeFalse();
     }
@@ -76,7 +76,7 @@ public class PillarOfOriginsFactoryTests
     [Fact]
     public void PillarOfOrigins_HasFiveManaAbilities_OnePerColor()
     {
-        var pillar = PillarOfOriginsFactory.Create(_alice);
+        var pillar = (Artifact)NamedCardFactory.Create("Pillar of Origins", _alice);
         var coloured = pillar.Abilities.OfType<ManaAbility>()
             .Where(m =>
                 m.ManaGenerated.White == 1 ||
@@ -98,7 +98,7 @@ public class PillarOfOriginsFactoryTests
     [Fact]
     public void PillarOfOrigins_AllManaAbilities_AreActivatable_WhenUntapped()
     {
-        var pillar = PillarOfOriginsFactory.Create(_alice);
+        var pillar = (Artifact)NamedCardFactory.Create("Pillar of Origins", _alice);
 
         foreach (var m in pillar.Abilities.OfType<ManaAbility>())
         {
@@ -110,7 +110,7 @@ public class PillarOfOriginsFactoryTests
     [Fact]
     public void PillarOfOrigins_ManaAbilities_NotActivatable_WhenTapped()
     {
-        var pillar = PillarOfOriginsFactory.Create(_alice);
+        var pillar = (Artifact)NamedCardFactory.Create("Pillar of Origins", _alice);
         pillar.Tap();
 
         foreach (var m in pillar.Abilities.OfType<ManaAbility>())
@@ -123,7 +123,7 @@ public class PillarOfOriginsFactoryTests
     [Fact]
     public void PillarOfOrigins_HasNoTriggeredAbilities()
     {
-        var pillar = PillarOfOriginsFactory.Create(_alice);
+        var pillar = (Artifact)NamedCardFactory.Create("Pillar of Origins", _alice);
 
         pillar.Abilities.OfType<TriggeredAbility>().Should().BeEmpty(
             "v1 defers the as-enters type choice — no triggered abilities");
@@ -132,7 +132,7 @@ public class PillarOfOriginsFactoryTests
     [Fact]
     public void PillarOfOrigins_HasNoNonManaActivatedAbilities()
     {
-        var pillar = PillarOfOriginsFactory.Create(_alice);
+        var pillar = (Artifact)NamedCardFactory.Create("Pillar of Origins", _alice);
 
         pillar.Abilities.OfType<ActivatedAbility>().Should().BeEmpty(
             "Pillar of Origins has only mana abilities");

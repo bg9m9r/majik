@@ -1,3 +1,4 @@
+using Majik.Core.CardData;
 using FluentAssertions;
 using Majik.Core.Abilities;
 using Majik.Core.CardData.Factories;
@@ -33,7 +34,7 @@ public class DredgersInsightTests
     [Fact]
     public void DredgersInsight_IsEnchantment()
     {
-        var enchant = DredgersInsightFactory.Create(_alice);
+        var enchant = (Enchantment)NamedCardFactory.Create("Dredger's Insight", _alice);
 
         enchant.HasType(CardType.Enchantment).Should().BeTrue();
     }
@@ -41,7 +42,7 @@ public class DredgersInsightTests
     [Fact]
     public void DredgersInsight_NameIsCorrect()
     {
-        var enchant = DredgersInsightFactory.Create(_alice);
+        var enchant = (Enchantment)NamedCardFactory.Create("Dredger's Insight", _alice);
 
         enchant.Name.Should().Be("Dredger's Insight");
     }
@@ -49,7 +50,7 @@ public class DredgersInsightTests
     [Fact]
     public void DredgersInsight_OwnerAndControllerAreSet()
     {
-        var enchant = DredgersInsightFactory.Create(_alice);
+        var enchant = (Enchantment)NamedCardFactory.Create("Dredger's Insight", _alice);
 
         enchant.Owner.Should().BeSameAs(_alice);
         enchant.Controller.Should().BeSameAs(_alice);
@@ -58,7 +59,7 @@ public class DredgersInsightTests
     [Fact]
     public void DredgersInsight_HasExactlyTwoTriggeredAbilities()
     {
-        var enchant = DredgersInsightFactory.Create(_alice);
+        var enchant = (Enchantment)NamedCardFactory.Create("Dredger's Insight", _alice);
 
         enchant.Abilities.OfType<TriggeredAbility>().Should().HaveCount(2,
             "one ETB mill-and-pick trigger and one lifegain-on-graveyard-leave trigger");
@@ -67,7 +68,7 @@ public class DredgersInsightTests
     [Fact]
     public void DredgersInsight_HasNoManaAbilities()
     {
-        var enchant = DredgersInsightFactory.Create(_alice);
+        var enchant = (Enchantment)NamedCardFactory.Create("Dredger's Insight", _alice);
 
         enchant.Abilities.OfType<ManaAbility>().Should().BeEmpty(
             "Dredger's Insight produces no mana");
@@ -89,7 +90,7 @@ public class DredgersInsightTests
             c.SetZone(ZoneType.Library);
         }
 
-        var enchant = DredgersInsightFactory.Create(alice);
+        var enchant = (Enchantment)NamedCardFactory.Create("Dredger's Insight", alice);
         var etb = enchant.Abilities.OfType<TriggeredAbility>().First();
         foreach (var effect in etb.Effects) effect.Execute();
 
@@ -113,7 +114,7 @@ public class DredgersInsightTests
         alice.Zones.Library.AddCard(creature);
         creature.SetZone(ZoneType.Library);
 
-        var enchant = DredgersInsightFactory.Create(alice);
+        var enchant = (Enchantment)NamedCardFactory.Create("Dredger's Insight", alice);
         var etb = enchant.Abilities.OfType<TriggeredAbility>().First();
         foreach (var effect in etb.Effects) effect.Execute();
 
@@ -135,7 +136,7 @@ public class DredgersInsightTests
         alice.Zones.Library.AddCard(artifact);
         artifact.SetZone(ZoneType.Library);
 
-        var enchant = DredgersInsightFactory.Create(alice);
+        var enchant = (Enchantment)NamedCardFactory.Create("Dredger's Insight", alice);
         var etb = enchant.Abilities.OfType<TriggeredAbility>().First();
         foreach (var effect in etb.Effects) effect.Execute();
 
@@ -153,7 +154,7 @@ public class DredgersInsightTests
         alice.Zones.Library.AddCard(land);
         land.SetZone(ZoneType.Library);
 
-        var enchant = DredgersInsightFactory.Create(alice);
+        var enchant = (Enchantment)NamedCardFactory.Create("Dredger's Insight", alice);
         var etb = enchant.Abilities.OfType<TriggeredAbility>().First();
         foreach (var effect in etb.Effects) effect.Execute();
 
@@ -171,7 +172,7 @@ public class DredgersInsightTests
         alice.Zones.Library.AddCard(instant);
         instant.SetZone(ZoneType.Library);
 
-        var enchant = DredgersInsightFactory.Create(alice);
+        var enchant = (Enchantment)NamedCardFactory.Create("Dredger's Insight", alice);
         var etb = enchant.Abilities.OfType<TriggeredAbility>().First();
         foreach (var effect in etb.Effects) effect.Execute();
 
@@ -185,7 +186,7 @@ public class DredgersInsightTests
     {
         var alice = new Player("Alice", 20);
 
-        var enchant = DredgersInsightFactory.Create(alice);
+        var enchant = (Enchantment)NamedCardFactory.Create("Dredger's Insight", alice);
         var etb = enchant.Abilities.OfType<TriggeredAbility>().First();
 
         var act = () => { foreach (var effect in etb.Effects) effect.Execute(); };
@@ -204,7 +205,7 @@ public class DredgersInsightTests
         var creature = new Creature("Bear", "1G", 2, 2);
         creature.SetOwner(alice);
 
-        var enchant = DredgersInsightFactory.Create(alice);
+        var enchant = (Enchantment)NamedCardFactory.Create("Dredger's Insight", alice);
         // The second trigger is the lifegain trigger (ETB first, lifegain second).
         var lifegainTrigger = enchant.Abilities.OfType<TriggeredAbility>().Skip(1).First();
 
@@ -224,7 +225,7 @@ public class DredgersInsightTests
         var artifact = new Artifact("Sol Ring", "1");
         artifact.SetOwner(alice);
 
-        var enchant = DredgersInsightFactory.Create(alice);
+        var enchant = (Enchantment)NamedCardFactory.Create("Dredger's Insight", alice);
         var lifegainTrigger = enchant.Abilities.OfType<TriggeredAbility>().Skip(1).First();
 
         var moveEvent = new Majik.Core.Events.CardMovedEvent(
@@ -243,7 +244,7 @@ public class DredgersInsightTests
         var instant = new Instant("Counterspell", "UU");
         instant.SetOwner(alice);
 
-        var enchant = DredgersInsightFactory.Create(alice);
+        var enchant = (Enchantment)NamedCardFactory.Create("Dredger's Insight", alice);
         var lifegainTrigger = enchant.Abilities.OfType<TriggeredAbility>().Skip(1).First();
 
         var moveEvent = new Majik.Core.Events.CardMovedEvent(
@@ -264,7 +265,7 @@ public class DredgersInsightTests
         var creature = new Creature("Bear", "1G", 2, 2);
         creature.SetOwner(bob);
 
-        var enchant = DredgersInsightFactory.Create(alice);
+        var enchant = (Enchantment)NamedCardFactory.Create("Dredger's Insight", alice);
         var lifegainTrigger = enchant.Abilities.OfType<TriggeredAbility>().Skip(1).First();
 
         var moveEvent = new Majik.Core.Events.CardMovedEvent(
@@ -280,7 +281,7 @@ public class DredgersInsightTests
     public void DredgersInsight_LifegainEffect_GainsOneLife()
     {
         var alice = new Player("Alice", 20);
-        var enchant = DredgersInsightFactory.Create(alice);
+        var enchant = (Enchantment)NamedCardFactory.Create("Dredger's Insight", alice);
         var lifegainTrigger = enchant.Abilities.OfType<TriggeredAbility>().Skip(1).First();
 
         foreach (var effect in lifegainTrigger.Effects) effect.Execute();

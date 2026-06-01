@@ -24,7 +24,7 @@ public class DeathcapGladeTests
     [Fact]
     public void DeathcapGlade_IsLand()
     {
-        var land = DeathcapGladeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Deathcap Glade", _alice);
 
         land.HasType(CardType.Land).Should().BeTrue();
     }
@@ -32,7 +32,7 @@ public class DeathcapGladeTests
     [Fact]
     public void DeathcapGlade_NameIsCorrect()
     {
-        var land = DeathcapGladeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Deathcap Glade", _alice);
 
         land.Name.Should().Be("Deathcap Glade");
     }
@@ -40,7 +40,7 @@ public class DeathcapGladeTests
     [Fact]
     public void DeathcapGlade_OwnerAndControllerAreSet()
     {
-        var land = DeathcapGladeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Deathcap Glade", _alice);
 
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
@@ -49,7 +49,7 @@ public class DeathcapGladeTests
     [Fact]
     public void DeathcapGlade_IsNotLegendary()
     {
-        var land = DeathcapGladeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Deathcap Glade", _alice);
 
         land.HasSupertype(CardSupertype.Legendary).Should().BeFalse();
     }
@@ -57,7 +57,7 @@ public class DeathcapGladeTests
     [Fact]
     public void DeathcapGlade_HasTwoManaAbilities()
     {
-        var land = DeathcapGladeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Deathcap Glade", _alice);
 
         land.Abilities.OfType<ManaAbility>().Should().HaveCount(2);
     }
@@ -65,7 +65,7 @@ public class DeathcapGladeTests
     [Fact]
     public void DeathcapGlade_HasBlackManaAbility()
     {
-        var land = DeathcapGladeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Deathcap Glade", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Black == 1 && m.ManaGenerated.Green == 0);
@@ -74,7 +74,7 @@ public class DeathcapGladeTests
     [Fact]
     public void DeathcapGlade_HasGreenManaAbility()
     {
-        var land = DeathcapGladeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Deathcap Glade", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Green == 1 && m.ManaGenerated.Black == 0);
@@ -83,7 +83,7 @@ public class DeathcapGladeTests
     [Fact]
     public void DeathcapGlade_HasNoTriggeredAbilities()
     {
-        var land = DeathcapGladeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Deathcap Glade", _alice);
 
         land.Abilities.OfType<TriggeredAbility>().Should().BeEmpty(
             "ETB-tapped-unless-N-or-more-other-lands is a replacement effect, not a trigger");
@@ -92,7 +92,7 @@ public class DeathcapGladeTests
     [Fact]
     public void DeathcapGlade_HasNoActivatedAbilities()
     {
-        var land = DeathcapGladeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Deathcap Glade", _alice);
 
         land.Abilities.OfType<ActivatedAbility>().Should().BeEmpty();
     }

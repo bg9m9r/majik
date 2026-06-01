@@ -36,7 +36,7 @@ public class WastesFactoryTests
     [Fact]
     public void Wastes_IsALand()
     {
-        var wastes = WastesFactory.Create(_alice);
+        var wastes = (Land)NamedCardFactory.Create("Wastes", _alice);
 
         wastes.HasType(CardType.Land).Should().BeTrue(
             "Wastes is a Land (CR 305.1)");
@@ -45,7 +45,7 @@ public class WastesFactoryTests
     [Fact]
     public void Wastes_HasBasicSupertype()
     {
-        var wastes = WastesFactory.Create(_alice);
+        var wastes = (Land)NamedCardFactory.Create("Wastes", _alice);
 
         wastes.HasSupertype(CardSupertype.Basic).Should().BeTrue(
             "Wastes has the Basic supertype (CR 205.4)");
@@ -54,7 +54,7 @@ public class WastesFactoryTests
     [Fact]
     public void Wastes_HasNoLandSubtype()
     {
-        var wastes = WastesFactory.Create(_alice);
+        var wastes = (Land)NamedCardFactory.Create("Wastes", _alice);
 
         wastes.Subtypes.Should().BeEmpty(
             "Wastes is a basic land with no land subtype (CR 205.3i)");
@@ -63,7 +63,7 @@ public class WastesFactoryTests
     [Fact]
     public void Wastes_HasCorrectName()
     {
-        var wastes = WastesFactory.Create(_alice);
+        var wastes = (Land)NamedCardFactory.Create("Wastes", _alice);
 
         wastes.Name.Should().Be("Wastes");
     }
@@ -71,7 +71,7 @@ public class WastesFactoryTests
     [Fact]
     public void Wastes_OwnerAndControllerAreSet()
     {
-        var wastes = WastesFactory.Create(_alice);
+        var wastes = (Land)NamedCardFactory.Create("Wastes", _alice);
 
         wastes.Owner.Should().BeSameAs(_alice);
         wastes.Controller.Should().BeSameAs(_alice);
@@ -84,7 +84,7 @@ public class WastesFactoryTests
     [Fact]
     public void Wastes_HasColorlessManaAbility()
     {
-        var wastes = WastesFactory.Create(_alice);
+        var wastes = (Land)NamedCardFactory.Create("Wastes", _alice);
 
         var manaAbilities = wastes.Abilities.OfType<ManaAbility>().ToList();
         manaAbilities.Should().HaveCount(1,
@@ -121,7 +121,7 @@ public class WastesFactoryTests
     [Fact]
     public void Wastes_ThrowsOnNullOwner()
     {
-        var act = () => WastesFactory.Create(null!);
+        var act = () => (Land)NamedCardFactory.Create("Wastes", null!);
 
         act.Should().Throw<ArgumentNullException>();
     }

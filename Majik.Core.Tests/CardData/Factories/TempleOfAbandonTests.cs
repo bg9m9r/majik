@@ -43,7 +43,7 @@ public class TempleOfAbandonTests
     [Fact]
     public void TempleOfAbandon_IsLand_WithCorrectName()
     {
-        var land = TempleOfAbandonFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Temple of Abandon", _alice);
 
         land.Name.Should().Be("Temple of Abandon");
         land.HasType(CardType.Land).Should().BeTrue();
@@ -66,7 +66,7 @@ public class TempleOfAbandonTests
     [Fact]
     public void TempleOfAbandon_HasManaAbility_ForRed()
     {
-        var land = TempleOfAbandonFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Temple of Abandon", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Red == 1 && m.ManaGenerated.Green == 0);
@@ -75,7 +75,7 @@ public class TempleOfAbandonTests
     [Fact]
     public void TempleOfAbandon_HasManaAbility_ForGreen()
     {
-        var land = TempleOfAbandonFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Temple of Abandon", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Green == 1 && m.ManaGenerated.Red == 0);
@@ -84,7 +84,7 @@ public class TempleOfAbandonTests
     [Fact]
     public void TempleOfAbandon_EtbTrigger_IsBattlefieldActive()
     {
-        var land = TempleOfAbandonFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Temple of Abandon", _alice);
         var trigger = land.Abilities.OfType<TriggeredAbility>().Single();
 
         trigger.ActiveZones.Should().Contain(ZoneType.Battlefield);
@@ -102,7 +102,7 @@ public class TempleOfAbandonTests
             c.SetZone(ZoneType.Library);
         }
 
-        var land = TempleOfAbandonFactory.Create(alice);
+        var land = (Land)NamedCardFactory.Create("Temple of Abandon", alice);
         var etb = land.Abilities.OfType<TriggeredAbility>().Single();
         foreach (var effect in etb.Effects) effect.Execute();
 
@@ -117,7 +117,7 @@ public class TempleOfAbandonTests
     {
         var alice = new Player("Alice", 20);
 
-        var land = TempleOfAbandonFactory.Create(alice);
+        var land = (Land)NamedCardFactory.Create("Temple of Abandon", alice);
         var etb = land.Abilities.OfType<TriggeredAbility>().Single();
         Action act = () =>
         {

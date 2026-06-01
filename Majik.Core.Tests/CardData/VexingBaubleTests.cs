@@ -1,3 +1,4 @@
+using Majik.Core.CardData;
 using FluentAssertions;
 using Majik.Core.Abilities;
 using Majik.Core.CardData.Factories;
@@ -31,7 +32,7 @@ public class VexingBaubleTests
     [Fact]
     public void VexingBauble_IsArtifact()
     {
-        var bauble = VexingBaubleFactory.Create(_alice);
+        var bauble = (Artifact)NamedCardFactory.Create("Vexing Bauble", _alice);
 
         bauble.HasType(CardType.Artifact).Should().BeTrue();
     }
@@ -39,7 +40,7 @@ public class VexingBaubleTests
     [Fact]
     public void VexingBauble_NameIsCorrect()
     {
-        var bauble = VexingBaubleFactory.Create(_alice);
+        var bauble = (Artifact)NamedCardFactory.Create("Vexing Bauble", _alice);
 
         bauble.Name.Should().Be("Vexing Bauble");
     }
@@ -47,7 +48,7 @@ public class VexingBaubleTests
     [Fact]
     public void VexingBauble_OwnerAndControllerAreSet()
     {
-        var bauble = VexingBaubleFactory.Create(_alice);
+        var bauble = (Artifact)NamedCardFactory.Create("Vexing Bauble", _alice);
 
         bauble.Owner.Should().BeSameAs(_alice);
         bauble.Controller.Should().BeSameAs(_alice);
@@ -56,7 +57,7 @@ public class VexingBaubleTests
     [Fact]
     public void VexingBauble_HasNoManaAbilities()
     {
-        var bauble = VexingBaubleFactory.Create(_alice);
+        var bauble = (Artifact)NamedCardFactory.Create("Vexing Bauble", _alice);
 
         bauble.Abilities.OfType<ManaAbility>().Should().BeEmpty(
             "Vexing Bauble produces no mana");
@@ -69,7 +70,7 @@ public class VexingBaubleTests
     [Fact]
     public void VexingBauble_HasExactlyOneActivatedAbility()
     {
-        var bauble = VexingBaubleFactory.Create(_alice);
+        var bauble = (Artifact)NamedCardFactory.Create("Vexing Bauble", _alice);
 
         bauble.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1);
     }
@@ -77,7 +78,7 @@ public class VexingBaubleTests
     [Fact]
     public void VexingBauble_DrawAbility_HasExactlyThreeCosts()
     {
-        var bauble = VexingBaubleFactory.Create(_alice);
+        var bauble = (Artifact)NamedCardFactory.Create("Vexing Bauble", _alice);
         var ability = bauble.Abilities.OfType<ActivatedAbility>().Single();
 
         ability.Costs.Should().HaveCount(3,
@@ -87,7 +88,7 @@ public class VexingBaubleTests
     [Fact]
     public void VexingBauble_DrawAbility_HasManaCostCostOf1()
     {
-        var bauble = VexingBaubleFactory.Create(_alice);
+        var bauble = (Artifact)NamedCardFactory.Create("Vexing Bauble", _alice);
         var ability = bauble.Abilities.OfType<ActivatedAbility>().Single();
         var manaCost = ability.Costs.OfType<ManaCostCost>().Single().Cost;
 
@@ -102,7 +103,7 @@ public class VexingBaubleTests
     [Fact]
     public void VexingBauble_DrawAbility_HasTapCost()
     {
-        var bauble = VexingBaubleFactory.Create(_alice);
+        var bauble = (Artifact)NamedCardFactory.Create("Vexing Bauble", _alice);
         var ability = bauble.Abilities.OfType<ActivatedAbility>().Single();
 
         ability.Costs.OfType<AdditionalCost>()
@@ -113,7 +114,7 @@ public class VexingBaubleTests
     [Fact]
     public void VexingBauble_DrawAbility_HasSacrificeCost()
     {
-        var bauble = VexingBaubleFactory.Create(_alice);
+        var bauble = (Artifact)NamedCardFactory.Create("Vexing Bauble", _alice);
         var ability = bauble.Abilities.OfType<ActivatedAbility>().Single();
 
         ability.Costs.OfType<AdditionalCost>()
@@ -133,7 +134,7 @@ public class VexingBaubleTests
         alice.Zones.Library.AddCard(topCard);
         topCard.SetZone(ZoneType.Library);
 
-        var bauble = VexingBaubleFactory.Create(alice);
+        var bauble = (Artifact)NamedCardFactory.Create("Vexing Bauble", alice);
         var ability = bauble.Abilities.OfType<ActivatedAbility>().Single();
         foreach (var effect in ability.Effects) effect.Execute();
 
@@ -155,7 +156,7 @@ public class VexingBaubleTests
         alice.Zones.Library.AddCard(second);
         second.SetZone(ZoneType.Library);
 
-        var bauble = VexingBaubleFactory.Create(alice);
+        var bauble = (Artifact)NamedCardFactory.Create("Vexing Bauble", alice);
         var ability = bauble.Abilities.OfType<ActivatedAbility>().Single();
         foreach (var effect in ability.Effects) effect.Execute();
 
@@ -171,7 +172,7 @@ public class VexingBaubleTests
         var alice = new Player("Alice", 20);
         // Library intentionally empty
 
-        var bauble = VexingBaubleFactory.Create(alice);
+        var bauble = (Artifact)NamedCardFactory.Create("Vexing Bauble", alice);
         var ability = bauble.Abilities.OfType<ActivatedAbility>().Single();
 
         var act = () => { foreach (var effect in ability.Effects) effect.Execute(); };
@@ -187,7 +188,7 @@ public class VexingBaubleTests
         alice.Zones.Library.AddCard(card);
         card.SetZone(ZoneType.Library);
 
-        var bauble = VexingBaubleFactory.Create(alice);
+        var bauble = (Artifact)NamedCardFactory.Create("Vexing Bauble", alice);
         var ability = bauble.Abilities.OfType<ActivatedAbility>().Single();
 
         var act = () => ability.Resolve();

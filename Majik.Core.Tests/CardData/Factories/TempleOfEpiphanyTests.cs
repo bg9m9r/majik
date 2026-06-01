@@ -43,7 +43,7 @@ public class TempleOfEpiphanyTests
     [Fact]
     public void TempleOfEpiphany_IsLand_WithCorrectName()
     {
-        var land = TempleOfEpiphanyFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Temple of Epiphany", _alice);
 
         land.Name.Should().Be("Temple of Epiphany");
         land.HasType(CardType.Land).Should().BeTrue();
@@ -66,7 +66,7 @@ public class TempleOfEpiphanyTests
     [Fact]
     public void TempleOfEpiphany_HasManaAbility_ForBlue()
     {
-        var land = TempleOfEpiphanyFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Temple of Epiphany", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Blue == 1 && m.ManaGenerated.Red == 0);
@@ -75,7 +75,7 @@ public class TempleOfEpiphanyTests
     [Fact]
     public void TempleOfEpiphany_HasManaAbility_ForRed()
     {
-        var land = TempleOfEpiphanyFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Temple of Epiphany", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Red == 1 && m.ManaGenerated.Blue == 0);
@@ -84,7 +84,7 @@ public class TempleOfEpiphanyTests
     [Fact]
     public void TempleOfEpiphany_EtbTrigger_IsBattlefieldActive()
     {
-        var land = TempleOfEpiphanyFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Temple of Epiphany", _alice);
         var trigger = land.Abilities.OfType<TriggeredAbility>().Single();
 
         trigger.ActiveZones.Should().Contain(ZoneType.Battlefield);
@@ -102,7 +102,7 @@ public class TempleOfEpiphanyTests
             c.SetZone(ZoneType.Library);
         }
 
-        var land = TempleOfEpiphanyFactory.Create(alice);
+        var land = (Land)NamedCardFactory.Create("Temple of Epiphany", alice);
         var etb = land.Abilities.OfType<TriggeredAbility>().Single();
         foreach (var effect in etb.Effects) effect.Execute();
 
@@ -117,7 +117,7 @@ public class TempleOfEpiphanyTests
     {
         var alice = new Player("Alice", 20);
 
-        var land = TempleOfEpiphanyFactory.Create(alice);
+        var land = (Land)NamedCardFactory.Create("Temple of Epiphany", alice);
         var etb = land.Abilities.OfType<TriggeredAbility>().Single();
         Action act = () =>
         {

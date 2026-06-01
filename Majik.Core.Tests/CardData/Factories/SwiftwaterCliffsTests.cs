@@ -42,7 +42,7 @@ public class SwiftwaterCliffsTests
     [Fact]
     public void SwiftwaterCliffs_IsLand_WithCorrectName()
     {
-        var land = SwiftwaterCliffsFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Swiftwater Cliffs", _alice);
 
         land.Name.Should().Be("Swiftwater Cliffs");
         land.HasType(CardType.Land).Should().BeTrue();
@@ -66,7 +66,7 @@ public class SwiftwaterCliffsTests
     [Fact]
     public void SwiftwaterCliffs_HasManaAbility_ForBlue()
     {
-        var land = SwiftwaterCliffsFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Swiftwater Cliffs", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Blue == 1 && m.ManaGenerated.Red == 0);
@@ -75,7 +75,7 @@ public class SwiftwaterCliffsTests
     [Fact]
     public void SwiftwaterCliffs_HasManaAbility_ForRed()
     {
-        var land = SwiftwaterCliffsFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Swiftwater Cliffs", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Red == 1 && m.ManaGenerated.Blue == 0);
@@ -84,7 +84,7 @@ public class SwiftwaterCliffsTests
     [Fact]
     public void SwiftwaterCliffs_EtbTrigger_IsBattlefieldActive()
     {
-        var land = SwiftwaterCliffsFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Swiftwater Cliffs", _alice);
         var trigger = land.Abilities.OfType<TriggeredAbility>().Single();
 
         trigger.ActiveZones.Should().Contain(ZoneType.Battlefield);
@@ -94,7 +94,7 @@ public class SwiftwaterCliffsTests
     public void SwiftwaterCliffs_EtbEffect_GainsOneLife()
     {
         var alice = new Player("Alice", 20);
-        var land = SwiftwaterCliffsFactory.Create(alice);
+        var land = (Land)NamedCardFactory.Create("Swiftwater Cliffs", alice);
         var etb = land.Abilities.OfType<TriggeredAbility>().Single();
 
         foreach (var effect in etb.Effects) effect.Execute();

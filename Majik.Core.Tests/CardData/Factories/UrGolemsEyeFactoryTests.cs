@@ -40,7 +40,7 @@ public class UrGolemsEyeFactoryTests
     {
         var alice = new Player("Alice", 20);
 
-        var eye = UrGolemsEyeFactory.Create(alice);
+        var eye = (Artifact)NamedCardFactory.Create("Ur-Golem's Eye", alice);
 
         eye.Should().BeOfType<Artifact>();
         eye.HasType(CardType.Artifact).Should().BeTrue();
@@ -52,7 +52,7 @@ public class UrGolemsEyeFactoryTests
     {
         var alice = new Player("Alice", 20);
 
-        var eye = UrGolemsEyeFactory.Create(alice);
+        var eye = (Artifact)NamedCardFactory.Create("Ur-Golem's Eye", alice);
 
         eye.Owner.Should().BeSameAs(alice);
         eye.Controller.Should().BeSameAs(alice);
@@ -63,7 +63,7 @@ public class UrGolemsEyeFactoryTests
     {
         var alice = new Player("Alice", 20);
 
-        var eye = UrGolemsEyeFactory.Create(alice);
+        var eye = (Artifact)NamedCardFactory.Create("Ur-Golem's Eye", alice);
 
         // {4} — four generic, no coloured pips.
         var cost = eye.ManaCostValue;
@@ -80,7 +80,7 @@ public class UrGolemsEyeFactoryTests
     {
         var alice = new Player("Alice", 20);
 
-        var eye = UrGolemsEyeFactory.Create(alice);
+        var eye = (Artifact)NamedCardFactory.Create("Ur-Golem's Eye", alice);
 
         eye.HasSupertype(CardSupertype.Basic).Should().BeFalse();
         eye.HasSupertype(CardSupertype.Legendary).Should().BeFalse();
@@ -106,7 +106,7 @@ public class UrGolemsEyeFactoryTests
     {
         var alice = new Player("Alice", 20);
 
-        var eye = UrGolemsEyeFactory.Create(alice);
+        var eye = (Artifact)NamedCardFactory.Create("Ur-Golem's Eye", alice);
 
         var manaAbilities = eye.Abilities.OfType<ManaAbility>().ToList();
         manaAbilities.Should().ContainSingle("Ur-Golem's Eye has one {T}: Add {C}{C} ability");
@@ -127,7 +127,7 @@ public class UrGolemsEyeFactoryTests
     {
         var alice = new Player("Alice", 20);
 
-        var eye = UrGolemsEyeFactory.Create(alice);
+        var eye = (Artifact)NamedCardFactory.Create("Ur-Golem's Eye", alice);
 
         eye.Abilities.OfType<ActivatedAbility>().Should().BeEmpty(
             "the only ability is a mana ability");
@@ -141,7 +141,7 @@ public class UrGolemsEyeFactoryTests
     [Fact]
     public void UrGolemsEye_Create_ThrowsOnNullOwner()
     {
-        var act = () => UrGolemsEyeFactory.Create(null!);
+        var act = () => (Artifact)NamedCardFactory.Create("Ur-Golem's Eye", null!);
         act.Should().Throw<ArgumentNullException>();
     }
 }

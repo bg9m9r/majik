@@ -46,7 +46,7 @@ public class TempleOfMysteryTests
     [Fact]
     public void TempleOfMystery_IsLand_WithCorrectName()
     {
-        var land = TempleOfMysteryFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Temple of Mystery", _alice);
 
         land.Name.Should().Be("Temple of Mystery");
         land.HasType(CardType.Land).Should().BeTrue();
@@ -69,7 +69,7 @@ public class TempleOfMysteryTests
     [Fact]
     public void TempleOfMystery_HasManaAbility_ForGreen()
     {
-        var land = TempleOfMysteryFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Temple of Mystery", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Green == 1 && m.ManaGenerated.Blue == 0);
@@ -78,7 +78,7 @@ public class TempleOfMysteryTests
     [Fact]
     public void TempleOfMystery_HasManaAbility_ForBlue()
     {
-        var land = TempleOfMysteryFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Temple of Mystery", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Blue == 1 && m.ManaGenerated.Green == 0);
@@ -87,7 +87,7 @@ public class TempleOfMysteryTests
     [Fact]
     public void TempleOfMystery_EtbTrigger_IsBattlefieldActive()
     {
-        var land = TempleOfMysteryFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Temple of Mystery", _alice);
         var trigger = land.Abilities.OfType<TriggeredAbility>().Single();
 
         trigger.ActiveZones.Should().Contain(ZoneType.Battlefield);
@@ -105,7 +105,7 @@ public class TempleOfMysteryTests
             c.SetZone(ZoneType.Library);
         }
 
-        var land = TempleOfMysteryFactory.Create(alice);
+        var land = (Land)NamedCardFactory.Create("Temple of Mystery", alice);
         var etb = land.Abilities.OfType<TriggeredAbility>().Single();
         foreach (var effect in etb.Effects) effect.Execute();
 
@@ -120,7 +120,7 @@ public class TempleOfMysteryTests
     {
         var alice = new Player("Alice", 20);
 
-        var land = TempleOfMysteryFactory.Create(alice);
+        var land = (Land)NamedCardFactory.Create("Temple of Mystery", alice);
         var etb = land.Abilities.OfType<TriggeredAbility>().Single();
         Action act = () =>
         {
@@ -154,7 +154,7 @@ public class TempleOfMysteryTests
             ToBottom: System.Array.Empty<ICard>(),
             TopOrder: new[] { (ICard)top }));
 
-        var land = TempleOfMysteryFactory.Create(alice);
+        var land = (Land)NamedCardFactory.Create("Temple of Mystery", alice);
         var etb = land.Abilities.OfType<TriggeredAbility>().Single();
         var rc = ResolutionContext.For(alice, agent, game: null, chosenTargets: null);
         foreach (var effect in etb.Effects)

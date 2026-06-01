@@ -42,7 +42,7 @@ public class RuggedHighlandsTests
     [Fact]
     public void RuggedHighlands_IsLand_WithCorrectName()
     {
-        var land = RuggedHighlandsFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Rugged Highlands", _alice);
 
         land.Name.Should().Be("Rugged Highlands");
         land.HasType(CardType.Land).Should().BeTrue();
@@ -66,7 +66,7 @@ public class RuggedHighlandsTests
     [Fact]
     public void RuggedHighlands_HasManaAbility_ForRed()
     {
-        var land = RuggedHighlandsFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Rugged Highlands", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Red == 1 && m.ManaGenerated.Green == 0);
@@ -75,7 +75,7 @@ public class RuggedHighlandsTests
     [Fact]
     public void RuggedHighlands_HasManaAbility_ForGreen()
     {
-        var land = RuggedHighlandsFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Rugged Highlands", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Green == 1 && m.ManaGenerated.Red == 0);
@@ -84,7 +84,7 @@ public class RuggedHighlandsTests
     [Fact]
     public void RuggedHighlands_EtbTrigger_IsBattlefieldActive()
     {
-        var land = RuggedHighlandsFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Rugged Highlands", _alice);
         var trigger = land.Abilities.OfType<TriggeredAbility>().Single();
 
         trigger.ActiveZones.Should().Contain(ZoneType.Battlefield);
@@ -94,7 +94,7 @@ public class RuggedHighlandsTests
     public void RuggedHighlands_EtbEffect_GainsOneLife()
     {
         var alice = new Player("Alice", 20);
-        var land = RuggedHighlandsFactory.Create(alice);
+        var land = (Land)NamedCardFactory.Create("Rugged Highlands", alice);
         var etb = land.Abilities.OfType<TriggeredAbility>().Single();
 
         foreach (var effect in etb.Effects) effect.Execute();

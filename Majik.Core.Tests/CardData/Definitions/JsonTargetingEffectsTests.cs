@@ -1,3 +1,4 @@
+using Majik.Core.CardData;
 using FluentAssertions;
 using Majik.Core.Abilities;
 using Majik.Core.CardData.Factories;
@@ -216,7 +217,7 @@ public class JsonTargetingEffectsTests
     [Fact]
     public async Task Minamo_UntapsChosenLegendaryPermanent()
     {
-        var minamo = MinamoSchoolAtWatersEdgeFactory.Create(_alice);
+        var minamo = (Land)NamedCardFactory.Create("Minamo, School at Water's Edge", _alice);
         var untap = minamo.Abilities.OfType<ActivatedAbility>().Single();
 
         untap.TargetRequests.Should().HaveCount(1);
@@ -236,7 +237,7 @@ public class JsonTargetingEffectsTests
     [Fact]
     public async Task VoltaicKey_UntapsChosenArtifact()
     {
-        var key = VoltaicKeyFactory.Create(_alice);
+        var key = (Artifact)NamedCardFactory.Create("Voltaic Key", _alice);
         var untap = key.Abilities.OfType<ActivatedAbility>().Single();
 
         untap.TargetRequests.Should().HaveCount(1);
@@ -253,7 +254,7 @@ public class JsonTargetingEffectsTests
     [Fact]
     public async Task VoltaicKey_NoTarget_FizzlesCleanly()
     {
-        var key = VoltaicKeyFactory.Create(_alice);
+        var key = (Artifact)NamedCardFactory.Create("Voltaic Key", _alice);
         var untap = key.Abilities.OfType<ActivatedAbility>().Single();
 
         var artifact = OnBattlefield(new Artifact("Mana Rock", "{2}"), _alice);

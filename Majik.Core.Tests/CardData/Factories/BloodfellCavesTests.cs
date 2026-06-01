@@ -41,7 +41,7 @@ public class BloodfellCavesTests
     [Fact]
     public void BloodfellCaves_IsLand_WithCorrectName()
     {
-        var land = BloodfellCavesFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Bloodfell Caves", _alice);
 
         land.Name.Should().Be("Bloodfell Caves");
         land.HasType(CardType.Land).Should().BeTrue();
@@ -65,7 +65,7 @@ public class BloodfellCavesTests
     [Fact]
     public void BloodfellCaves_HasManaAbility_ForBlack()
     {
-        var land = BloodfellCavesFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Bloodfell Caves", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Black == 1 && m.ManaGenerated.Red == 0);
@@ -74,7 +74,7 @@ public class BloodfellCavesTests
     [Fact]
     public void BloodfellCaves_HasManaAbility_ForRed()
     {
-        var land = BloodfellCavesFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Bloodfell Caves", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Red == 1 && m.ManaGenerated.Black == 0);
@@ -83,7 +83,7 @@ public class BloodfellCavesTests
     [Fact]
     public void BloodfellCaves_EtbTrigger_IsBattlefieldActive()
     {
-        var land = BloodfellCavesFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Bloodfell Caves", _alice);
         var trigger = land.Abilities.OfType<TriggeredAbility>().Single();
 
         trigger.ActiveZones.Should().Contain(ZoneType.Battlefield);
@@ -93,7 +93,7 @@ public class BloodfellCavesTests
     public void BloodfellCaves_EtbEffect_GainsOneLife_ForController()
     {
         var alice = new Player("Alice", 20);
-        var land = BloodfellCavesFactory.Create(alice);
+        var land = (Land)NamedCardFactory.Create("Bloodfell Caves", alice);
 
         var etb = land.Abilities.OfType<TriggeredAbility>().Single();
         foreach (var effect in etb.Effects) effect.Execute();

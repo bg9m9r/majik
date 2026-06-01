@@ -92,7 +92,41 @@ public sealed class NamedCardFactoryGenerator : IIncrementalGenerator
             .Select(static (entry, _) => entry!)
             .Collect();
 
-        context.RegisterSourceOutput(factoryEntries, Emit);
+        // PLAN 03 Slice 3 — fileless JSON cards. The consuming project
+        // registers `CardData/Cards/*.json` as <AdditionalFiles>; for each
+        // we extract the slug (file stem, which is also the embedded-resource
+        // id used by CardDefinitionLoader.FromEmbeddedResource) and the card
+        // `name`. A JSON card whose name is NOT claimed by a hand-written
+        // [CardName] factory gets a generated dispatch arm that loads the
+        // embedded resource and builds it — exactly what the old wrapper
+        // factory did — so the wrapper file can be deleted.
+        var jsonCards = context.AdditionalTextsProvider
+            .Where(static text => IsCardJson(text.Path))
+            .Select(static (text, ct) => JsonCardEntry.From(text, ct))
+            .Where(static entry => entry is not null)
+            .Select(static (entry, _) => entry!)
+            .Collect();
+
+        var combined = factoryEntries.Combine(jsonCards);
+
+        context.RegisterSourceOutput(
+            combined,
+            static (spc, pair) => Emit(spc, pair.Left, pair.Right));
+    }
+
+    /// <summary>
+    /// True for an embedded card-definition JSON — a file living under a
+    /// <c>CardData/Cards/</c> directory with a <c>.json</c> extension. The
+    /// match is path-segment based so it does not fire on unrelated JSON
+    /// (e.g. test fixtures or the gzipped modern seed).
+    /// </summary>
+    private static bool IsCardJson(string path)
+    {
+        if (path is null) return false;
+        if (!path.EndsWith(".json", StringComparison.OrdinalIgnoreCase)) return false;
+        var normalized = path.Replace('\\', '/');
+        return normalized.IndexOf("/CardData/Cards/", StringComparison.OrdinalIgnoreCase) >= 0
+            || normalized.StartsWith("CardData/Cards/", StringComparison.OrdinalIgnoreCase);
     }
 
     private static FactoryEntry? Transform(GeneratorAttributeSyntaxContext ctx)
@@ -213,7 +247,18 @@ public sealed class NamedCardFactoryGenerator : IIncrementalGenerator
             location);
     }
 
-    private static void Emit(SourceProductionContext spc, ImmutableArray<FactoryEntry> entries)
+    private static readonly DiagnosticDescriptor DuplicateJsonNameDescriptor = new(
+        id: "MJK003",
+        title: "Duplicate card name across JSON definitions",
+        messageFormat: "Card name \"{0}\" is declared by multiple JSON definitions ({1}); each name must map to a single embedded resource",
+        category: "Majik.CardData",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+
+    private static void Emit(
+        SourceProductionContext spc,
+        ImmutableArray<FactoryEntry> entries,
+        ImmutableArray<JsonCardEntry> jsonCards)
     {
         // Diagnostic — missing Create overload. Any of plain / named /
         // args-aware satisfies dispatch; a `CardDef Define()` also
@@ -271,10 +316,50 @@ public sealed class NamedCardFactoryGenerator : IIncrementalGenerator
                 names));
         }
 
+        // Build name -> slug for the fileless JSON cards. A JSON card whose
+        // name is ALSO claimed by a [CardName] factory keeps the factory arm
+        // (the factory may layer bespoke logic on top of the JSON shell —
+        // e.g. cycling, MDFC transform); only JSON names with NO surviving
+        // factory get a generated load-and-build arm. JSON-vs-JSON name
+        // collisions are a hard error (two files can't both own one name).
+        var jsonMap = new SortedDictionary<string, string>(StringComparer.Ordinal);
+        var jsonDuplicates = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+        foreach (var jc in jsonCards)
+        {
+            if (jsonMap.TryGetValue(jc.Name, out var existingSlug))
+            {
+                if (!jsonDuplicates.TryGetValue(jc.Name, out var list))
+                {
+                    list = new List<string> { existingSlug };
+                    jsonDuplicates[jc.Name] = list;
+                }
+                list.Add(jc.Slug);
+            }
+            else
+            {
+                jsonMap[jc.Name] = jc.Slug;
+            }
+        }
+
+        foreach (var kvp in jsonDuplicates)
+        {
+            spc.ReportDiagnostic(Diagnostic.Create(
+                DuplicateJsonNameDescriptor,
+                Location.None,
+                kvp.Key,
+                string.Join(", ", kvp.Value.Select(s => s + ".json"))));
+        }
+
+        // Fileless arms = JSON names with no [CardName] factory claiming them.
+        var filelessJson = jsonMap
+            .Where(kvp => !map.ContainsKey(kvp.Key))
+            .ToList();
+
         var sb = new StringBuilder();
         sb.AppendLine("// <auto-generated />");
         sb.AppendLine("// Generated by Majik.Core.SourceGen.NamedCardFactoryGenerator.");
-        sb.AppendLine("// Each arm is sourced from a [CardName(\"...\")] attribute on a factory class.");
+        sb.AppendLine("// Arms are sourced from [CardName(\"...\")] attributes on factory classes");
+        sb.AppendLine("// and from fileless CardData/Cards/*.json definitions (no wrapper class).");
         sb.AppendLine("#nullable enable");
         sb.AppendLine();
         sb.AppendLine("using Majik.Core.Cards;");
@@ -286,6 +371,23 @@ public sealed class NamedCardFactoryGenerator : IIncrementalGenerator
         sb.AppendLine("{");
         sb.AppendLine($"    /// <summary>Total card names registered via <c>[CardName]</c> at compile time.</summary>");
         sb.AppendLine($"    public static int GeneratedRegistrationCount => {map.Count};");
+        sb.AppendLine();
+        sb.AppendLine($"    /// <summary>Total fileless JSON card names dispatched without a wrapper factory.</summary>");
+        sb.AppendLine($"    public static int GeneratedJsonCardCount => {filelessJson.Count};");
+        sb.AppendLine();
+        sb.AppendLine($"    /// <summary>");
+        sb.AppendLine($"    /// Card names sourced directly from an embedded <c>CardData/Cards/*.json</c>");
+        sb.AppendLine($"    /// definition with no hand-written <c>[CardName]</c> wrapper factory. These");
+        sb.AppendLine($"    /// names are folded into <c>ImplementedCardNames.All</c> so deleting the");
+        sb.AppendLine($"    /// wrappers does not regress the implemented-name set (PLAN 03 Slice 3).");
+        sb.AppendLine($"    /// </summary>");
+        sb.AppendLine($"    public static readonly string[] GeneratedJsonCardNames =");
+        sb.AppendLine("    {");
+        foreach (var kvp in filelessJson)
+        {
+            sb.AppendLine($"        {SymbolDisplay.FormatLiteral(kvp.Key, true)},");
+        }
+        sb.AppendLine("    };");
         sb.AppendLine();
         sb.AppendLine($"    /// <summary>");
         sb.AppendLine($"    /// Compile-time-generated dispatch table. Returns the constructed");
@@ -333,6 +435,22 @@ public sealed class NamedCardFactoryGenerator : IIncrementalGenerator
 
             sb.AppendLine($"            {literal} => {call},");
         }
+
+        // Fileless JSON arms. Equivalent to the deleted wrapper factory:
+        //   (Cast)CardDefinitionFactory.Build(FromEmbeddedResource("slug"), owner)
+        // — only the dispatch is generated; the JSON stays an EmbeddedResource
+        // so runtime loading is byte-identical to the wrapper path.
+        foreach (var kvp in filelessJson)
+        {
+            var literal = SymbolDisplay.FormatLiteral(kvp.Key, true);
+            var slugLiteral = SymbolDisplay.FormatLiteral(kvp.Value, true);
+            var call =
+                "global::Majik.Core.CardData.Definitions.CardDefinitionFactory.Build(" +
+                "global::Majik.Core.CardData.Definitions.CardDefinitionLoader.FromEmbeddedResource(" +
+                $"{slugLiteral}), owner)";
+            sb.AppendLine($"            {literal} => {call},");
+        }
+
         sb.AppendLine("            _ => null,");
         sb.AppendLine("        };");
         sb.AppendLine("    }");
@@ -354,4 +472,119 @@ public sealed class NamedCardFactoryGenerator : IIncrementalGenerator
         Location? Location);
 
     private sealed record DispatchArm(FactoryEntry Entry, ImmutableArray<string> Args);
+
+    /// <summary>
+    /// A fileless JSON card definition. <see cref="Slug"/> is the file stem
+    /// (also the embedded-resource id consumed by
+    /// <c>CardDefinitionLoader.FromEmbeddedResource</c>); <see cref="Name"/>
+    /// is the printed card name read from the JSON <c>"name"</c> field.
+    /// </summary>
+    private sealed record JsonCardEntry(string Slug, string Name)
+    {
+        public static JsonCardEntry? From(AdditionalText text, System.Threading.CancellationToken ct)
+        {
+            var slug = SlugOf(text.Path);
+            if (string.IsNullOrEmpty(slug)) return null;
+
+            var content = text.GetText(ct)?.ToString();
+            if (string.IsNullOrEmpty(content)) return null;
+
+            var name = ExtractName(content!);
+            if (string.IsNullOrWhiteSpace(name)) return null;
+
+            return new JsonCardEntry(slug, name!);
+        }
+
+        /// <summary>File name without the <c>.json</c> extension.</summary>
+        private static string SlugOf(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return string.Empty;
+            var normalized = path.Replace('\\', '/');
+            var lastSlash = normalized.LastIndexOf('/');
+            var file = lastSlash >= 0 ? normalized.Substring(lastSlash + 1) : normalized;
+            return file.EndsWith(".json", StringComparison.OrdinalIgnoreCase)
+                ? file.Substring(0, file.Length - ".json".Length)
+                : file;
+        }
+
+        /// <summary>
+        /// Pull the top-level <c>"name": "..."</c> value out of a card JSON.
+        /// The generator targets netstandard2.0 (no System.Text.Json), and
+        /// the card schema always declares <c>name</c> as a top-level string,
+        /// so a focused scan that respects JSON string escaping is sufficient
+        /// and avoids a parser dependency.
+        /// </summary>
+        private static string? ExtractName(string json)
+        {
+            const string key = "\"name\"";
+            var idx = json.IndexOf(key, StringComparison.Ordinal);
+            while (idx >= 0)
+            {
+                var i = idx + key.Length;
+                // Skip whitespace then the ':'.
+                while (i < json.Length && char.IsWhiteSpace(json[i])) i++;
+                if (i < json.Length && json[i] == ':')
+                {
+                    i++;
+                    while (i < json.Length && char.IsWhiteSpace(json[i])) i++;
+                    if (i < json.Length && json[i] == '"')
+                    {
+                        return ReadJsonString(json, i + 1);
+                    }
+                }
+                idx = json.IndexOf(key, idx + key.Length, StringComparison.Ordinal);
+            }
+            return null;
+        }
+
+        /// <summary>Read a JSON string body starting just past the opening
+        /// quote, honouring the standard escape sequences.</summary>
+        private static string? ReadJsonString(string json, int start)
+        {
+            var sb = new StringBuilder();
+            var i = start;
+            while (i < json.Length)
+            {
+                var ch = json[i];
+                if (ch == '\\')
+                {
+                    if (i + 1 >= json.Length) return null;
+                    var esc = json[i + 1];
+                    switch (esc)
+                    {
+                        case '"': sb.Append('"'); break;
+                        case '\\': sb.Append('\\'); break;
+                        case '/': sb.Append('/'); break;
+                        case 'b': sb.Append('\b'); break;
+                        case 'f': sb.Append('\f'); break;
+                        case 'n': sb.Append('\n'); break;
+                        case 'r': sb.Append('\r'); break;
+                        case 't': sb.Append('\t'); break;
+                        case 'u':
+                            if (i + 5 < json.Length
+                                && int.TryParse(
+                                    json.Substring(i + 2, 4),
+                                    System.Globalization.NumberStyles.HexNumber,
+                                    System.Globalization.CultureInfo.InvariantCulture,
+                                    out var code))
+                            {
+                                sb.Append((char)code);
+                                i += 4;
+                            }
+                            break;
+                        default: sb.Append(esc); break;
+                    }
+                    i += 2;
+                    continue;
+                }
+                if (ch == '"')
+                {
+                    return sb.ToString();
+                }
+                sb.Append(ch);
+                i++;
+            }
+            return null;
+        }
+    }
 }

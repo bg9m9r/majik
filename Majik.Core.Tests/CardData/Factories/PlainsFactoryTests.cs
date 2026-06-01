@@ -32,7 +32,7 @@ public class PlainsFactoryTests
     [Fact]
     public void Plains_IsALand()
     {
-        var plains = PlainsFactory.Create(_alice);
+        var plains = (Land)NamedCardFactory.Create("Plains", _alice);
 
         plains.HasType(CardType.Land).Should().BeTrue(
             "Plains is a Land (CR 305.1)");
@@ -41,7 +41,7 @@ public class PlainsFactoryTests
     [Fact]
     public void Plains_HasBasicSupertype()
     {
-        var plains = PlainsFactory.Create(_alice);
+        var plains = (Land)NamedCardFactory.Create("Plains", _alice);
 
         plains.HasSupertype(CardSupertype.Basic).Should().BeTrue(
             "Plains has the Basic supertype (CR 205.4)");
@@ -50,7 +50,7 @@ public class PlainsFactoryTests
     [Fact]
     public void Plains_HasPlainsSubtype()
     {
-        var plains = PlainsFactory.Create(_alice);
+        var plains = (Land)NamedCardFactory.Create("Plains", _alice);
 
         plains.HasSubtype(CardSubtype.Plains).Should().BeTrue(
             "Plains is a Plains land (CR 205.3i)");
@@ -59,7 +59,7 @@ public class PlainsFactoryTests
     [Fact]
     public void Plains_HasCorrectName()
     {
-        var plains = PlainsFactory.Create(_alice);
+        var plains = (Land)NamedCardFactory.Create("Plains", _alice);
 
         plains.Name.Should().Be("Plains");
     }
@@ -67,7 +67,7 @@ public class PlainsFactoryTests
     [Fact]
     public void Plains_OwnerAndControllerAreSet()
     {
-        var plains = PlainsFactory.Create(_alice);
+        var plains = (Land)NamedCardFactory.Create("Plains", _alice);
 
         plains.Owner.Should().BeSameAs(_alice);
         plains.Controller.Should().BeSameAs(_alice);
@@ -80,7 +80,7 @@ public class PlainsFactoryTests
     [Fact]
     public void Plains_HasWhiteManaAbility()
     {
-        var plains = PlainsFactory.Create(_alice);
+        var plains = (Land)NamedCardFactory.Create("Plains", _alice);
 
         var manaAbilities = plains.Abilities.OfType<ManaAbility>().ToList();
         manaAbilities.Should().HaveCount(1,
@@ -117,7 +117,7 @@ public class PlainsFactoryTests
     [Fact]
     public void Plains_ThrowsOnNullOwner()
     {
-        var act = () => PlainsFactory.Create(null!);
+        var act = () => (Land)NamedCardFactory.Create("Plains", null!);
 
         act.Should().Throw<ArgumentNullException>();
     }

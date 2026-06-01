@@ -50,7 +50,7 @@ public class WornPowerstoneFactoryTests
     {
         var alice = new Player("Alice", 20);
 
-        var stone = WornPowerstoneFactory.Create(alice);
+        var stone = (Artifact)NamedCardFactory.Create("Worn Powerstone", alice);
 
         stone.Should().BeOfType<Artifact>();
         stone.HasType(CardType.Artifact).Should().BeTrue();
@@ -62,7 +62,7 @@ public class WornPowerstoneFactoryTests
     {
         var alice = new Player("Alice", 20);
 
-        var stone = WornPowerstoneFactory.Create(alice);
+        var stone = (Artifact)NamedCardFactory.Create("Worn Powerstone", alice);
 
         stone.Owner.Should().BeSameAs(alice);
         stone.Controller.Should().BeSameAs(alice);
@@ -73,7 +73,7 @@ public class WornPowerstoneFactoryTests
     {
         var alice = new Player("Alice", 20);
 
-        var stone = WornPowerstoneFactory.Create(alice);
+        var stone = (Artifact)NamedCardFactory.Create("Worn Powerstone", alice);
 
         // {3} — three generic, no coloured pips.
         var cost = stone.ManaCostValue;
@@ -90,7 +90,7 @@ public class WornPowerstoneFactoryTests
     {
         var alice = new Player("Alice", 20);
 
-        var stone = WornPowerstoneFactory.Create(alice);
+        var stone = (Artifact)NamedCardFactory.Create("Worn Powerstone", alice);
 
         stone.HasSupertype(CardSupertype.Basic).Should().BeFalse();
         stone.HasSupertype(CardSupertype.Legendary).Should().BeFalse();
@@ -116,7 +116,7 @@ public class WornPowerstoneFactoryTests
     {
         var alice = new Player("Alice", 20);
 
-        var stone = WornPowerstoneFactory.Create(alice);
+        var stone = (Artifact)NamedCardFactory.Create("Worn Powerstone", alice);
 
         var manaAbilities = stone.Abilities.OfType<ManaAbility>().ToList();
         manaAbilities.Should().ContainSingle("Worn Powerstone has one {T}: Add {C}{C} ability");
@@ -137,7 +137,7 @@ public class WornPowerstoneFactoryTests
     {
         var alice = new Player("Alice", 20);
 
-        var stone = WornPowerstoneFactory.Create(alice);
+        var stone = (Artifact)NamedCardFactory.Create("Worn Powerstone", alice);
 
         stone.Abilities.OfType<ActivatedAbility>().Should().BeEmpty(
             "the only ability is a mana ability");
@@ -153,7 +153,7 @@ public class WornPowerstoneFactoryTests
     {
         var bus = new ReplacementBus();
         var alice = new Player("Alice", 20);
-        var stone = WornPowerstoneFactory.Create(alice);
+        var stone = (Artifact)NamedCardFactory.Create("Worn Powerstone", alice);
         var entity = new CardEntity
         {
             Name = "Worn Powerstone",
@@ -173,7 +173,7 @@ public class WornPowerstoneFactoryTests
         var zones = new ZoneService(eventBus, rep);
 
         var alice = new Player("Alice", 20);
-        var stone = WornPowerstoneFactory.Create(alice);
+        var stone = (Artifact)NamedCardFactory.Create("Worn Powerstone", alice);
         alice.Zones.Hand.AddCard(stone);
         stone.SetZone(ZoneType.Hand);
 
@@ -199,7 +199,7 @@ public class WornPowerstoneFactoryTests
     [Fact]
     public void WornPowerstone_Create_ThrowsOnNullOwner()
     {
-        var act = () => WornPowerstoneFactory.Create(null!);
+        var act = () => (Artifact)NamedCardFactory.Create("Worn Powerstone", null!);
         act.Should().Throw<ArgumentNullException>();
     }
 }

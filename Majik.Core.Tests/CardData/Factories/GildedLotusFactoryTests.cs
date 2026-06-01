@@ -39,7 +39,7 @@ public class GildedLotusFactoryTests
     [Fact]
     public void GildedLotus_IsArtifact_WithCorrectName_NonLegendary()
     {
-        var lotus = GildedLotusFactory.Create(_alice);
+        var lotus = (Artifact)NamedCardFactory.Create("Gilded Lotus", _alice);
 
         lotus.Should().BeOfType<Artifact>();
         lotus.HasType(CardType.Artifact).Should().BeTrue();
@@ -53,7 +53,7 @@ public class GildedLotusFactoryTests
     [Fact]
     public void GildedLotus_HasPrintedManaCostFive()
     {
-        var lotus = GildedLotusFactory.Create(_alice);
+        var lotus = (Artifact)NamedCardFactory.Create("Gilded Lotus", _alice);
 
         var cost = lotus.ManaCostValue;
         cost.Generic.Should().Be(5);
@@ -77,7 +77,7 @@ public class GildedLotusFactoryTests
     [Fact]
     public void GildedLotus_HasFiveManaAbilities_OnePerColor_EachProducesThree()
     {
-        var lotus = GildedLotusFactory.Create(_alice);
+        var lotus = (Artifact)NamedCardFactory.Create("Gilded Lotus", _alice);
         var mas = lotus.Abilities.OfType<ManaAbility>().ToList();
 
         mas.Should().HaveCount(5, "one ManaAbility per WUBRG colour");
@@ -97,7 +97,7 @@ public class GildedLotusFactoryTests
     [Fact]
     public void GildedLotus_HasNoActivatedOrTriggeredAbilities()
     {
-        var lotus = GildedLotusFactory.Create(_alice);
+        var lotus = (Artifact)NamedCardFactory.Create("Gilded Lotus", _alice);
 
         lotus.Abilities.OfType<ActivatedAbility>().Should().BeEmpty(
             "the only abilities are mana abilities");
@@ -111,7 +111,7 @@ public class GildedLotusFactoryTests
     [Fact]
     public void GildedLotus_Activate_ProducesThreeOfChosenColor_AndTaps_StaysOnBattlefield()
     {
-        var lotus = GildedLotusFactory.Create(_alice);
+        var lotus = (Artifact)NamedCardFactory.Create("Gilded Lotus", _alice);
         _alice.Zones.Battlefield.AddCard(lotus);
 
         var mas = lotus.Abilities.OfType<ManaAbility>().ToList();
@@ -143,7 +143,7 @@ public class GildedLotusFactoryTests
     [Fact]
     public void GildedLotus_ActivateViaActivator_CreditsManaPool()
     {
-        var lotus = GildedLotusFactory.Create(_alice);
+        var lotus = (Artifact)NamedCardFactory.Create("Gilded Lotus", _alice);
         _alice.Zones.Battlefield.AddCard(lotus);
 
         var activator = new ManaAbilityActivator();
@@ -163,7 +163,7 @@ public class GildedLotusFactoryTests
     [Fact]
     public void GildedLotus_CannotActivateWhenTapped()
     {
-        var lotus = GildedLotusFactory.Create(_alice);
+        var lotus = (Artifact)NamedCardFactory.Create("Gilded Lotus", _alice);
         _alice.Zones.Battlefield.AddCard(lotus);
         lotus.Tap();
 
@@ -181,7 +181,7 @@ public class GildedLotusFactoryTests
     [Fact]
     public void GildedLotus_Create_ThrowsOnNullOwner()
     {
-        var act = () => GildedLotusFactory.Create(null!);
+        var act = () => (Artifact)NamedCardFactory.Create("Gilded Lotus", null!);
         act.Should().Throw<ArgumentNullException>();
     }
 }

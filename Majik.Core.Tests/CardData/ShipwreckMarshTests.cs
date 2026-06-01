@@ -25,7 +25,7 @@ public class ShipwreckMarshTests
     [Fact]
     public void ShipwreckMarsh_IsLand()
     {
-        var land = ShipwreckMarshFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Shipwreck Marsh", _alice);
 
         land.HasType(CardType.Land).Should().BeTrue();
     }
@@ -33,7 +33,7 @@ public class ShipwreckMarshTests
     [Fact]
     public void ShipwreckMarsh_NameIsCorrect()
     {
-        var land = ShipwreckMarshFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Shipwreck Marsh", _alice);
 
         land.Name.Should().Be("Shipwreck Marsh");
     }
@@ -41,7 +41,7 @@ public class ShipwreckMarshTests
     [Fact]
     public void ShipwreckMarsh_OwnerAndControllerAreSet()
     {
-        var land = ShipwreckMarshFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Shipwreck Marsh", _alice);
 
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
@@ -50,7 +50,7 @@ public class ShipwreckMarshTests
     [Fact]
     public void ShipwreckMarsh_IsNotLegendary()
     {
-        var land = ShipwreckMarshFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Shipwreck Marsh", _alice);
 
         land.HasSupertype(CardSupertype.Legendary).Should().BeFalse();
     }
@@ -58,7 +58,7 @@ public class ShipwreckMarshTests
     [Fact]
     public void ShipwreckMarsh_HasTwoManaAbilities()
     {
-        var land = ShipwreckMarshFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Shipwreck Marsh", _alice);
 
         land.Abilities.OfType<ManaAbility>().Should().HaveCount(2);
     }
@@ -66,7 +66,7 @@ public class ShipwreckMarshTests
     [Fact]
     public void ShipwreckMarsh_HasBlueManaAbility()
     {
-        var land = ShipwreckMarshFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Shipwreck Marsh", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Blue == 1 && m.ManaGenerated.Black == 0);
@@ -75,7 +75,7 @@ public class ShipwreckMarshTests
     [Fact]
     public void ShipwreckMarsh_HasBlackManaAbility()
     {
-        var land = ShipwreckMarshFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Shipwreck Marsh", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Black == 1 && m.ManaGenerated.Blue == 0);
@@ -84,7 +84,7 @@ public class ShipwreckMarshTests
     [Fact]
     public void ShipwreckMarsh_HasNoTriggeredAbilities()
     {
-        var land = ShipwreckMarshFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Shipwreck Marsh", _alice);
 
         land.Abilities.OfType<TriggeredAbility>().Should().BeEmpty(
             "ETB-tapped-unless-N-other-lands is a replacement effect, not a trigger");
@@ -93,7 +93,7 @@ public class ShipwreckMarshTests
     [Fact]
     public void ShipwreckMarsh_HasNoActivatedAbilities()
     {
-        var land = ShipwreckMarshFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Shipwreck Marsh", _alice);
 
         land.Abilities.OfType<ActivatedAbility>().Should().BeEmpty();
     }

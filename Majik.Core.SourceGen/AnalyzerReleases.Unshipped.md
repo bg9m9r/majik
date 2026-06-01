@@ -6,3 +6,4 @@ Rule ID | Category         | Severity | Notes
 --------|------------------|----------|------
 MJK001  | Majik.CardData   | Error    | Duplicate [CardName] across factories.
 MJK002  | Majik.CardData   | Error    | Factory missing Create(Player) overload.
+MJK003  | Majik.CardData   | Error    | Duplicate card name across JSON definitions.

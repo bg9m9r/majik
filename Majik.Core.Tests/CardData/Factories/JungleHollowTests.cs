@@ -42,7 +42,7 @@ public class JungleHollowTests
     [Fact]
     public void JungleHollow_IsLand_WithCorrectName()
     {
-        var land = JungleHollowFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Jungle Hollow", _alice);
 
         land.Name.Should().Be("Jungle Hollow");
         land.HasType(CardType.Land).Should().BeTrue();
@@ -66,7 +66,7 @@ public class JungleHollowTests
     [Fact]
     public void JungleHollow_HasManaAbility_ForBlack()
     {
-        var land = JungleHollowFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Jungle Hollow", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Black == 1 && m.ManaGenerated.Green == 0);
@@ -75,7 +75,7 @@ public class JungleHollowTests
     [Fact]
     public void JungleHollow_HasManaAbility_ForGreen()
     {
-        var land = JungleHollowFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Jungle Hollow", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Green == 1 && m.ManaGenerated.Black == 0);
@@ -84,7 +84,7 @@ public class JungleHollowTests
     [Fact]
     public void JungleHollow_EtbTrigger_IsBattlefieldActive()
     {
-        var land = JungleHollowFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Jungle Hollow", _alice);
         var trigger = land.Abilities.OfType<TriggeredAbility>().Single();
 
         trigger.ActiveZones.Should().Contain(ZoneType.Battlefield);
@@ -94,7 +94,7 @@ public class JungleHollowTests
     public void JungleHollow_EtbEffect_GainsOneLife_ForController()
     {
         var alice = new Player("Alice", 20);
-        var land = JungleHollowFactory.Create(alice);
+        var land = (Land)NamedCardFactory.Create("Jungle Hollow", alice);
 
         var etb = land.Abilities.OfType<TriggeredAbility>().Single();
         foreach (var effect in etb.Effects) effect.Execute();

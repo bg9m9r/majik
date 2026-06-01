@@ -1,3 +1,4 @@
+using Majik.Core.CardData;
 using FluentAssertions;
 using Majik.Core.Abilities;
 using Majik.Core.CardData.Factories;
@@ -19,7 +20,7 @@ public class DryadArborTests
     [Fact]
     public void DryadArbor_IsBothLandAndCreature()
     {
-        var arbor = DryadArborFactory.Create(_alice);
+        var arbor = (Creature)NamedCardFactory.Create("Dryad Arbor", _alice);
 
         arbor.HasType(CardType.Land).Should().BeTrue("Dryad Arbor is a Land");
         arbor.HasType(CardType.Creature).Should().BeTrue("Dryad Arbor is a Creature");
@@ -32,7 +33,7 @@ public class DryadArborTests
     [Fact]
     public void DryadArbor_IsOneOne()
     {
-        var arbor = DryadArborFactory.Create(_alice);
+        var arbor = (Creature)NamedCardFactory.Create("Dryad Arbor", _alice);
 
         arbor.Power.Should().Be(1);
         arbor.Toughness.Should().Be(1);
@@ -45,7 +46,7 @@ public class DryadArborTests
     [Fact]
     public void DryadArbor_HasForestAndDryadSubtypes()
     {
-        var arbor = DryadArborFactory.Create(_alice);
+        var arbor = (Creature)NamedCardFactory.Create("Dryad Arbor", _alice);
 
         arbor.HasSubtype(CardSubtype.Forest).Should().BeTrue("Dryad Arbor has the Forest land subtype");
         arbor.HasSubtype(CardSubtype.Dryad).Should().BeTrue("Dryad Arbor has the Dryad creature subtype");
@@ -58,7 +59,7 @@ public class DryadArborTests
     [Fact]
     public void DryadArbor_HasGreenManaAbility()
     {
-        var arbor = DryadArborFactory.Create(_alice);
+        var arbor = (Creature)NamedCardFactory.Create("Dryad Arbor", _alice);
 
         arbor.Abilities.OfType<ManaAbility>().Should().HaveCount(1,
             "Dryad Arbor has exactly one {T}: Add {G} mana ability from its Forest subtype");
@@ -71,7 +72,7 @@ public class DryadArborTests
     [Fact]
     public void DryadArbor_NoManaCost()
     {
-        var arbor = DryadArborFactory.Create(_alice);
+        var arbor = (Creature)NamedCardFactory.Create("Dryad Arbor", _alice);
 
         arbor.ManaCost.Should().BeEmpty("Dryad Arbor has no mana cost — CR 305.8");
     }
@@ -83,7 +84,7 @@ public class DryadArborTests
     [Fact]
     public void DryadArbor_OwnerAndControllerAreSet()
     {
-        var arbor = DryadArborFactory.Create(_alice);
+        var arbor = (Creature)NamedCardFactory.Create("Dryad Arbor", _alice);
 
         arbor.Owner.Should().BeSameAs(_alice);
         arbor.Controller.Should().BeSameAs(_alice);

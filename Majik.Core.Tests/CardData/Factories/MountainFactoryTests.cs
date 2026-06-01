@@ -32,7 +32,7 @@ public class MountainFactoryTests
     [Fact]
     public void Mountain_IsALand()
     {
-        var mountain = MountainFactory.Create(_alice);
+        var mountain = (Land)NamedCardFactory.Create("Mountain", _alice);
 
         mountain.HasType(CardType.Land).Should().BeTrue(
             "Mountain is a Land (CR 305.1)");
@@ -41,7 +41,7 @@ public class MountainFactoryTests
     [Fact]
     public void Mountain_HasBasicSupertype()
     {
-        var mountain = MountainFactory.Create(_alice);
+        var mountain = (Land)NamedCardFactory.Create("Mountain", _alice);
 
         mountain.HasSupertype(CardSupertype.Basic).Should().BeTrue(
             "Mountain has the Basic supertype (CR 205.4)");
@@ -50,7 +50,7 @@ public class MountainFactoryTests
     [Fact]
     public void Mountain_HasMountainSubtype()
     {
-        var mountain = MountainFactory.Create(_alice);
+        var mountain = (Land)NamedCardFactory.Create("Mountain", _alice);
 
         mountain.HasSubtype(CardSubtype.Mountain).Should().BeTrue(
             "Mountain is a Mountain land (CR 205.3i)");
@@ -59,7 +59,7 @@ public class MountainFactoryTests
     [Fact]
     public void Mountain_HasCorrectName()
     {
-        var mountain = MountainFactory.Create(_alice);
+        var mountain = (Land)NamedCardFactory.Create("Mountain", _alice);
 
         mountain.Name.Should().Be("Mountain");
     }
@@ -67,7 +67,7 @@ public class MountainFactoryTests
     [Fact]
     public void Mountain_OwnerAndControllerAreSet()
     {
-        var mountain = MountainFactory.Create(_alice);
+        var mountain = (Land)NamedCardFactory.Create("Mountain", _alice);
 
         mountain.Owner.Should().BeSameAs(_alice);
         mountain.Controller.Should().BeSameAs(_alice);
@@ -80,7 +80,7 @@ public class MountainFactoryTests
     [Fact]
     public void Mountain_HasRedManaAbility()
     {
-        var mountain = MountainFactory.Create(_alice);
+        var mountain = (Land)NamedCardFactory.Create("Mountain", _alice);
 
         var manaAbilities = mountain.Abilities.OfType<ManaAbility>().ToList();
         manaAbilities.Should().HaveCount(1,
@@ -117,7 +117,7 @@ public class MountainFactoryTests
     [Fact]
     public void Mountain_ThrowsOnNullOwner()
     {
-        var act = () => MountainFactory.Create(null!);
+        var act = () => (Land)NamedCardFactory.Create("Mountain", null!);
 
         act.Should().Throw<ArgumentNullException>();
     }

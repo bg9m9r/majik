@@ -35,7 +35,7 @@ public class ManalithTests
     [Fact]
     public void Manalith_IsArtifact_ThreeCost()
     {
-        var rock = ManalithFactory.Create(_alice);
+        var rock = (Artifact)NamedCardFactory.Create("Manalith", _alice);
 
         rock.Name.Should().Be("Manalith");
         rock.HasType(CardType.Artifact).Should().BeTrue();
@@ -62,7 +62,7 @@ public class ManalithTests
     [Fact]
     public void Manalith_HasFiveManaAbilities_OnePerColor()
     {
-        var rock = ManalithFactory.Create(_alice);
+        var rock = (Artifact)NamedCardFactory.Create("Manalith", _alice);
 
         var manaAbilities = rock.Abilities.OfType<ManaAbility>().ToList();
         manaAbilities.Should().HaveCount(5);
@@ -74,7 +74,7 @@ public class ManalithTests
     [Fact]
     public void Manalith_ProducesEveryColor()
     {
-        var rock = ManalithFactory.Create(_alice);
+        var rock = (Artifact)NamedCardFactory.Create("Manalith", _alice);
 
         var produced = rock.Abilities.OfType<ManaAbility>()
             .Select(ma => ma.ManaGenerated)

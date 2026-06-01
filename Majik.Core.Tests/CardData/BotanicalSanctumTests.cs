@@ -24,7 +24,7 @@ public class BotanicalSanctumTests
     [Fact]
     public void BotanicalSanctum_IsLand()
     {
-        var land = BotanicalSanctumFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Botanical Sanctum", _alice);
 
         land.HasType(CardType.Land).Should().BeTrue();
     }
@@ -32,7 +32,7 @@ public class BotanicalSanctumTests
     [Fact]
     public void BotanicalSanctum_NameIsCorrect()
     {
-        var land = BotanicalSanctumFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Botanical Sanctum", _alice);
 
         land.Name.Should().Be("Botanical Sanctum");
     }
@@ -40,7 +40,7 @@ public class BotanicalSanctumTests
     [Fact]
     public void BotanicalSanctum_OwnerAndControllerAreSet()
     {
-        var land = BotanicalSanctumFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Botanical Sanctum", _alice);
 
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
@@ -49,7 +49,7 @@ public class BotanicalSanctumTests
     [Fact]
     public void BotanicalSanctum_IsNotLegendary()
     {
-        var land = BotanicalSanctumFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Botanical Sanctum", _alice);
 
         land.HasSupertype(CardSupertype.Legendary).Should().BeFalse();
     }
@@ -57,7 +57,7 @@ public class BotanicalSanctumTests
     [Fact]
     public void BotanicalSanctum_HasTwoManaAbilities()
     {
-        var land = BotanicalSanctumFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Botanical Sanctum", _alice);
 
         land.Abilities.OfType<ManaAbility>().Should().HaveCount(2);
     }
@@ -65,7 +65,7 @@ public class BotanicalSanctumTests
     [Fact]
     public void BotanicalSanctum_HasGreenManaAbility()
     {
-        var land = BotanicalSanctumFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Botanical Sanctum", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Green == 1 && m.ManaGenerated.Blue == 0);
@@ -74,7 +74,7 @@ public class BotanicalSanctumTests
     [Fact]
     public void BotanicalSanctum_HasBlueManaAbility()
     {
-        var land = BotanicalSanctumFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Botanical Sanctum", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Blue == 1 && m.ManaGenerated.Green == 0);
@@ -83,7 +83,7 @@ public class BotanicalSanctumTests
     [Fact]
     public void BotanicalSanctum_HasNoTriggeredAbilities()
     {
-        var land = BotanicalSanctumFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Botanical Sanctum", _alice);
 
         land.Abilities.OfType<TriggeredAbility>().Should().BeEmpty(
             "ETB-tapped-unless-N-other-lands is a replacement effect, not a trigger");
@@ -92,7 +92,7 @@ public class BotanicalSanctumTests
     [Fact]
     public void BotanicalSanctum_HasNoActivatedAbilities()
     {
-        var land = BotanicalSanctumFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Botanical Sanctum", _alice);
 
         land.Abilities.OfType<ActivatedAbility>().Should().BeEmpty();
     }

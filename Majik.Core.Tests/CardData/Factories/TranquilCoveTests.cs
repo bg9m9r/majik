@@ -42,7 +42,7 @@ public class TranquilCoveTests
     [Fact]
     public void TranquilCove_IsLand_WithCorrectName()
     {
-        var land = TranquilCoveFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Tranquil Cove", _alice);
 
         land.Name.Should().Be("Tranquil Cove");
         land.HasType(CardType.Land).Should().BeTrue();
@@ -66,7 +66,7 @@ public class TranquilCoveTests
     [Fact]
     public void TranquilCove_HasManaAbility_ForWhite()
     {
-        var land = TranquilCoveFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Tranquil Cove", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.White == 1 && m.ManaGenerated.Blue == 0);
@@ -75,7 +75,7 @@ public class TranquilCoveTests
     [Fact]
     public void TranquilCove_HasManaAbility_ForBlue()
     {
-        var land = TranquilCoveFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Tranquil Cove", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Blue == 1 && m.ManaGenerated.White == 0);
@@ -84,7 +84,7 @@ public class TranquilCoveTests
     [Fact]
     public void TranquilCove_EtbTrigger_IsBattlefieldActive()
     {
-        var land = TranquilCoveFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Tranquil Cove", _alice);
         var trigger = land.Abilities.OfType<TriggeredAbility>().Single();
 
         trigger.ActiveZones.Should().Contain(ZoneType.Battlefield);
@@ -95,7 +95,7 @@ public class TranquilCoveTests
     {
         // CR 119.3 — "you gain 1 life" raises the controller's life total by 1.
         var alice = new Player("Alice", 20);
-        var land = TranquilCoveFactory.Create(alice);
+        var land = (Land)NamedCardFactory.Create("Tranquil Cove", alice);
         var etb = land.Abilities.OfType<TriggeredAbility>().Single();
 
         foreach (var effect in etb.Effects) effect.Execute();

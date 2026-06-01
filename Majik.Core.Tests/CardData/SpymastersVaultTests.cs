@@ -1,3 +1,4 @@
+using Majik.Core.CardData;
 using FluentAssertions;
 using Majik.Core.Abilities;
 using Majik.Core.CardData.Factories;
@@ -27,7 +28,7 @@ public class SpymastersVaultTests
     [Fact]
     public void SpymastersVault_IsLand()
     {
-        var land = SpymastersVaultFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Spymaster's Vault", _alice);
 
         land.HasType(CardType.Land).Should().BeTrue();
     }
@@ -35,7 +36,7 @@ public class SpymastersVaultTests
     [Fact]
     public void SpymastersVault_NameIsCorrect()
     {
-        var land = SpymastersVaultFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Spymaster's Vault", _alice);
 
         land.Name.Should().Be("Spymaster's Vault");
     }
@@ -43,7 +44,7 @@ public class SpymastersVaultTests
     [Fact]
     public void SpymastersVault_IsNotLegendary()
     {
-        var land = SpymastersVaultFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Spymaster's Vault", _alice);
 
         land.HasSupertype(CardSupertype.Legendary).Should().BeFalse();
     }
@@ -51,7 +52,7 @@ public class SpymastersVaultTests
     [Fact]
     public void SpymastersVault_OwnerAndControllerAreSet()
     {
-        var land = SpymastersVaultFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Spymaster's Vault", _alice);
 
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
@@ -64,7 +65,7 @@ public class SpymastersVaultTests
     [Fact]
     public void SpymastersVault_HasExactlyOneManaAbility()
     {
-        var land = SpymastersVaultFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Spymaster's Vault", _alice);
 
         land.Abilities.OfType<ManaAbility>().Should().HaveCount(1,
             "only {T}: Add {B} is wired in v1");
@@ -73,7 +74,7 @@ public class SpymastersVaultTests
     [Fact]
     public void SpymastersVault_ManaAbility_ProducesBlack()
     {
-        var land = SpymastersVaultFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Spymaster's Vault", _alice);
         var mana = land.Abilities.OfType<ManaAbility>().Single();
 
         mana.ManaGenerated.Black.Should().Be(1, "Spymaster's Vault taps for exactly one {B}");
@@ -82,7 +83,7 @@ public class SpymastersVaultTests
     [Fact]
     public void SpymastersVault_ManaAbility_ProducesOnlyBlack()
     {
-        var land = SpymastersVaultFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Spymaster's Vault", _alice);
         var mana = land.Abilities.OfType<ManaAbility>().Single();
 
         mana.ManaGenerated.Generic.Should().Be(0);
@@ -95,7 +96,7 @@ public class SpymastersVaultTests
     [Fact]
     public void SpymastersVault_HasNoTriggeredAbilities()
     {
-        var land = SpymastersVaultFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Spymaster's Vault", _alice);
 
         land.Abilities.OfType<TriggeredAbility>().Should().BeEmpty(
             "ETB and connive triggers are deferred in v1");
@@ -104,7 +105,7 @@ public class SpymastersVaultTests
     [Fact]
     public void SpymastersVault_HasNoActivatedAbilities()
     {
-        var land = SpymastersVaultFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Spymaster's Vault", _alice);
 
         land.Abilities.OfType<ActivatedAbility>().Should().BeEmpty(
             "connive activated ability is deferred in v1");

@@ -42,7 +42,7 @@ public class ScouredBarrensTests
     [Fact]
     public void ScouredBarrens_IsLand_WithCorrectName()
     {
-        var land = ScouredBarrensFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Scoured Barrens", _alice);
 
         land.Name.Should().Be("Scoured Barrens");
         land.HasType(CardType.Land).Should().BeTrue();
@@ -66,7 +66,7 @@ public class ScouredBarrensTests
     [Fact]
     public void ScouredBarrens_HasManaAbility_ForWhite()
     {
-        var land = ScouredBarrensFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Scoured Barrens", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.White == 1 && m.ManaGenerated.Black == 0);
@@ -75,7 +75,7 @@ public class ScouredBarrensTests
     [Fact]
     public void ScouredBarrens_HasManaAbility_ForBlack()
     {
-        var land = ScouredBarrensFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Scoured Barrens", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Black == 1 && m.ManaGenerated.White == 0);
@@ -84,7 +84,7 @@ public class ScouredBarrensTests
     [Fact]
     public void ScouredBarrens_EtbTrigger_IsBattlefieldActive()
     {
-        var land = ScouredBarrensFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Scoured Barrens", _alice);
         var trigger = land.Abilities.OfType<TriggeredAbility>().Single();
 
         trigger.ActiveZones.Should().Contain(ZoneType.Battlefield);
@@ -95,7 +95,7 @@ public class ScouredBarrensTests
     {
         // CR 119.3 — "you gain 1 life" raises the controller's life total by 1.
         var alice = new Player("Alice", 20);
-        var land = ScouredBarrensFactory.Create(alice);
+        var land = (Land)NamedCardFactory.Create("Scoured Barrens", alice);
         var etb = land.Abilities.OfType<TriggeredAbility>().Single();
 
         foreach (var effect in etb.Effects) effect.Execute();

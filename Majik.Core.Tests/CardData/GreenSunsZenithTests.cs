@@ -224,7 +224,7 @@ public class GreenSunsZenithTests
         caster.Zones.Hand.AddCard(gsz);
         gsz.SetZone(ZoneType.Hand);
 
-        var arbor = DryadArborFactory.Create(caster);
+        var arbor = (Creature)NamedCardFactory.Create("Dryad Arbor", caster);
         caster.Zones.Library.AddCard(arbor);
         arbor.SetZone(ZoneType.Library);
 

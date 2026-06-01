@@ -50,7 +50,7 @@ public class DismalBackwaterFactoryTests
     [Fact]
     public void DismalBackwater_IsLand_WithCorrectName()
     {
-        var land = DismalBackwaterFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Dismal Backwater", _alice);
 
         land.Name.Should().Be("Dismal Backwater");
         land.HasType(CardType.Land).Should().BeTrue();
@@ -78,7 +78,7 @@ public class DismalBackwaterFactoryTests
     [Fact]
     public void DismalBackwater_HasManaAbility_ForBlue()
     {
-        var land = DismalBackwaterFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Dismal Backwater", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => ColorOf(m.ManaGenerated, "U") == 1
@@ -88,7 +88,7 @@ public class DismalBackwaterFactoryTests
     [Fact]
     public void DismalBackwater_HasManaAbility_ForBlack()
     {
-        var land = DismalBackwaterFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Dismal Backwater", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => ColorOf(m.ManaGenerated, "B") == 1
@@ -102,7 +102,7 @@ public class DismalBackwaterFactoryTests
     [Fact]
     public void DismalBackwater_EtbTrigger_IsBattlefieldActive()
     {
-        var land = DismalBackwaterFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Dismal Backwater", _alice);
         var trigger = land.Abilities.OfType<TriggeredAbility>().Single();
 
         trigger.ActiveZones.Should().Contain(ZoneType.Battlefield);

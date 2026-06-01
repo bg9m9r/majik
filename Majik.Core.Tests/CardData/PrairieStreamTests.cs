@@ -34,7 +34,7 @@ public class PrairieStreamTests
     [Fact]
     public void PrairieStream_IsLand()
     {
-        var land = PrairieStreamFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Prairie Stream", _alice);
 
         land.HasType(CardType.Land).Should().BeTrue();
     }
@@ -42,7 +42,7 @@ public class PrairieStreamTests
     [Fact]
     public void PrairieStream_NameIsCorrect()
     {
-        var land = PrairieStreamFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Prairie Stream", _alice);
 
         land.Name.Should().Be("Prairie Stream");
     }
@@ -50,7 +50,7 @@ public class PrairieStreamTests
     [Fact]
     public void PrairieStream_OwnerAndControllerAreSet()
     {
-        var land = PrairieStreamFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Prairie Stream", _alice);
 
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
@@ -59,7 +59,7 @@ public class PrairieStreamTests
     [Fact]
     public void PrairieStream_HasPrintedPlainsAndIslandSubtypes()
     {
-        var land = PrairieStreamFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Prairie Stream", _alice);
 
         // Type line "Land — Plains Island": both basic-land subtypes are
         // printed on this battle land (unlike the M10/Innistrad check lands,
@@ -71,7 +71,7 @@ public class PrairieStreamTests
     [Fact]
     public void PrairieStream_IsNotBasic_NotLegendary()
     {
-        var land = PrairieStreamFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Prairie Stream", _alice);
 
         land.HasSupertype(CardSupertype.Basic).Should().BeFalse(
             "battle lands are nonbasic despite their Plains/Island subtypes");
@@ -81,7 +81,7 @@ public class PrairieStreamTests
     [Fact]
     public void PrairieStream_HasTwoManaAbilities()
     {
-        var land = PrairieStreamFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Prairie Stream", _alice);
 
         land.Abilities.OfType<ManaAbility>().Should().HaveCount(2);
     }
@@ -89,7 +89,7 @@ public class PrairieStreamTests
     [Fact]
     public void PrairieStream_HasWhiteManaAbility()
     {
-        var land = PrairieStreamFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Prairie Stream", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.White == 1 && m.ManaGenerated.Blue == 0);
@@ -98,7 +98,7 @@ public class PrairieStreamTests
     [Fact]
     public void PrairieStream_HasBlueManaAbility()
     {
-        var land = PrairieStreamFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Prairie Stream", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Blue == 1 && m.ManaGenerated.White == 0);
@@ -107,7 +107,7 @@ public class PrairieStreamTests
     [Fact]
     public void PrairieStream_HasNoTriggeredAbilities()
     {
-        var land = PrairieStreamFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Prairie Stream", _alice);
 
         land.Abilities.OfType<TriggeredAbility>().Should().BeEmpty(
             "ETB-tapped-unless-two-or-more-basics is a replacement effect, not a trigger");
@@ -116,7 +116,7 @@ public class PrairieStreamTests
     [Fact]
     public void PrairieStream_HasNoActivatedAbilities()
     {
-        var land = PrairieStreamFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Prairie Stream", _alice);
 
         land.Abilities.OfType<ActivatedAbility>().Should().BeEmpty();
     }

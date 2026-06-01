@@ -51,7 +51,7 @@ public class PropheticPrismFactoryTests
     [Fact]
     public void PropheticPrism_IsArtifact_WithCorrectName()
     {
-        var prism = PropheticPrismFactory.Create(_alice);
+        var prism = (Artifact)NamedCardFactory.Create("Prophetic Prism", _alice);
 
         prism.Should().BeOfType<Artifact>();
         prism.Name.Should().Be("Prophetic Prism");
@@ -81,7 +81,7 @@ public class PropheticPrismFactoryTests
     [Fact]
     public void PropheticPrism_HasSingleEtbTrigger()
     {
-        var prism = PropheticPrismFactory.Create(_alice);
+        var prism = (Artifact)NamedCardFactory.Create("Prophetic Prism", _alice);
 
         prism.Abilities.OfType<TriggeredAbility>().Should().HaveCount(
             1, "the prism cantrips on a single enters-the-battlefield trigger");
@@ -90,7 +90,7 @@ public class PropheticPrismFactoryTests
     [Fact]
     public void PropheticPrism_HasFiveColoredManaAbilities_OnePerColor()
     {
-        var prism = PropheticPrismFactory.Create(_alice);
+        var prism = (Artifact)NamedCardFactory.Create("Prophetic Prism", _alice);
         var mana = prism.Abilities.OfType<ManaAbility>().ToList();
 
         mana.Should().HaveCount(
@@ -106,7 +106,7 @@ public class PropheticPrismFactoryTests
     [Fact]
     public void PropheticPrism_HasNoColorlessManaAbility()
     {
-        var prism = PropheticPrismFactory.Create(_alice);
+        var prism = (Artifact)NamedCardFactory.Create("Prophetic Prism", _alice);
 
         prism.Abilities.OfType<ManaAbility>()
             .Where(a => a.ManaGenerated.Generic >= 1)
@@ -126,7 +126,7 @@ public class PropheticPrismFactoryTests
         alice.Zones.Library.AddCard(top);
         top.SetZone(ZoneType.Library);
 
-        var prism = PropheticPrismFactory.Create(alice);
+        var prism = (Artifact)NamedCardFactory.Create("Prophetic Prism", alice);
         var etb = prism.Abilities.OfType<TriggeredAbility>().Single();
         foreach (var effect in etb.Effects) effect.Execute();
 
@@ -141,7 +141,7 @@ public class PropheticPrismFactoryTests
     {
         var alice = new Player("Alice", 20);
 
-        var prism = PropheticPrismFactory.Create(alice);
+        var prism = (Artifact)NamedCardFactory.Create("Prophetic Prism", alice);
         var etb = prism.Abilities.OfType<TriggeredAbility>().Single();
         Action act = () =>
         {
@@ -159,7 +159,7 @@ public class PropheticPrismFactoryTests
     [Fact]
     public void PropheticPrism_ColoredAbilities_CannotActivate_WithEmptyPool()
     {
-        var prism = PropheticPrismFactory.Create(_alice);
+        var prism = (Artifact)NamedCardFactory.Create("Prophetic Prism", _alice);
 
         foreach (var ability in prism.Abilities.OfType<ManaAbility>())
         {
@@ -171,7 +171,7 @@ public class PropheticPrismFactoryTests
     [Fact]
     public void PropheticPrism_ColoredAbilities_CanActivate_WithOneGenericInPool()
     {
-        var prism = PropheticPrismFactory.Create(_alice);
+        var prism = (Artifact)NamedCardFactory.Create("Prophetic Prism", _alice);
         _alice.AddManaToPool(ManaCost.Parse("1"));
 
         foreach (var ability in prism.Abilities.OfType<ManaAbility>())
@@ -183,7 +183,7 @@ public class PropheticPrismFactoryTests
     [Fact]
     public void PropheticPrism_BlueActivation_PaysOneGeneric_TapsSelf_AndAddsBlue()
     {
-        var prism = PropheticPrismFactory.Create(_alice);
+        var prism = (Artifact)NamedCardFactory.Create("Prophetic Prism", _alice);
         _alice.AddManaToPool(ManaCost.Parse("1"));
         var blue = prism.Abilities.OfType<ManaAbility>()
             .Single(a => a.ManaGenerated.Blue == 1);
@@ -207,7 +207,7 @@ public class PropheticPrismFactoryTests
     [Fact]
     public void PropheticPrism_NoAbilityCanActivate_WhenTapped()
     {
-        var prism = PropheticPrismFactory.Create(_alice);
+        var prism = (Artifact)NamedCardFactory.Create("Prophetic Prism", _alice);
         // Plenty of mana so any rejection is solely from the tap state.
         _alice.AddManaToPool(ManaCost.Parse("5"));
         var blue = prism.Abilities.OfType<ManaAbility>()

@@ -43,7 +43,7 @@ public class TempleOfDeceitTests
     [Fact]
     public void TempleOfDeceit_IsLand_WithCorrectName()
     {
-        var land = TempleOfDeceitFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Temple of Deceit", _alice);
 
         land.Name.Should().Be("Temple of Deceit");
         land.HasType(CardType.Land).Should().BeTrue();
@@ -66,7 +66,7 @@ public class TempleOfDeceitTests
     [Fact]
     public void TempleOfDeceit_HasManaAbility_ForBlue()
     {
-        var land = TempleOfDeceitFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Temple of Deceit", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Blue == 1 && m.ManaGenerated.Black == 0);
@@ -75,7 +75,7 @@ public class TempleOfDeceitTests
     [Fact]
     public void TempleOfDeceit_HasManaAbility_ForBlack()
     {
-        var land = TempleOfDeceitFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Temple of Deceit", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Black == 1 && m.ManaGenerated.Blue == 0);
@@ -84,7 +84,7 @@ public class TempleOfDeceitTests
     [Fact]
     public void TempleOfDeceit_EtbTrigger_IsBattlefieldActive()
     {
-        var land = TempleOfDeceitFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Temple of Deceit", _alice);
         var trigger = land.Abilities.OfType<TriggeredAbility>().Single();
 
         trigger.ActiveZones.Should().Contain(ZoneType.Battlefield);
@@ -102,7 +102,7 @@ public class TempleOfDeceitTests
             c.SetZone(ZoneType.Library);
         }
 
-        var land = TempleOfDeceitFactory.Create(alice);
+        var land = (Land)NamedCardFactory.Create("Temple of Deceit", alice);
         var etb = land.Abilities.OfType<TriggeredAbility>().Single();
         foreach (var effect in etb.Effects) effect.Execute();
 
@@ -117,7 +117,7 @@ public class TempleOfDeceitTests
     {
         var alice = new Player("Alice", 20);
 
-        var land = TempleOfDeceitFactory.Create(alice);
+        var land = (Land)NamedCardFactory.Create("Temple of Deceit", alice);
         var etb = land.Abilities.OfType<TriggeredAbility>().Single();
         Action act = () =>
         {

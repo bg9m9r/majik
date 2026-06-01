@@ -51,7 +51,7 @@ public class ManaGeodeTests
     [Fact]
     public void ManaGeode_IsArtifact_WithCorrectName()
     {
-        var geode = ManaGeodeFactory.Create(_alice);
+        var geode = (Artifact)NamedCardFactory.Create("Mana Geode", _alice);
 
         geode.Should().BeOfType<Artifact>();
         geode.Name.Should().Be("Mana Geode");
@@ -82,7 +82,7 @@ public class ManaGeodeTests
     [Fact]
     public void ManaGeode_HasFiveManaAbilities_OnePerColor()
     {
-        var geode = ManaGeodeFactory.Create(_alice);
+        var geode = (Artifact)NamedCardFactory.Create("Mana Geode", _alice);
         var mana = geode.Abilities.OfType<ManaAbility>().ToList();
 
         mana.Should().HaveCount(5, "one {T}: Add <color> ability per WUBRG");
@@ -96,7 +96,7 @@ public class ManaGeodeTests
     [Fact]
     public void ManaGeode_HasNoColorlessOrActivatedAbility()
     {
-        var geode = ManaGeodeFactory.Create(_alice);
+        var geode = (Artifact)NamedCardFactory.Create("Mana Geode", _alice);
 
         // Mana Geode (unlike Prismatic Lens) has NO separate {T}: Add {C} mode.
         geode.Abilities.OfType<ManaAbility>()
@@ -114,7 +114,7 @@ public class ManaGeodeTests
     [InlineData("G")]
     public void ManaGeode_HasAnyColorManaAbility_PerColor(string color)
     {
-        var geode = ManaGeodeFactory.Create(_alice);
+        var geode = (Artifact)NamedCardFactory.Create("Mana Geode", _alice);
         var match = ManaCost.Parse(color);
 
         geode.Abilities.OfType<ManaAbility>().Should().ContainSingle(m =>
@@ -133,7 +133,7 @@ public class ManaGeodeTests
     [Fact]
     public void ManaGeode_ColoredAbilities_CanActivate_WithEmptyPool()
     {
-        var geode = ManaGeodeFactory.Create(_alice);
+        var geode = (Artifact)NamedCardFactory.Create("Mana Geode", _alice);
 
         foreach (var ability in geode.Abilities.OfType<ManaAbility>())
         {
@@ -145,7 +145,7 @@ public class ManaGeodeTests
     [Fact]
     public void ManaGeode_BlueActivation_AddsBlue_AndTapsSelf()
     {
-        var geode = ManaGeodeFactory.Create(_alice);
+        var geode = (Artifact)NamedCardFactory.Create("Mana Geode", _alice);
         var blue = geode.Abilities.OfType<ManaAbility>()
             .Single(a => a.ManaGenerated.Blue == 1);
         var activator = new ManaAbilityActivator();
@@ -164,7 +164,7 @@ public class ManaGeodeTests
     [Fact]
     public void ManaGeode_NoAbilityCanActivate_WhenTapped()
     {
-        var geode = ManaGeodeFactory.Create(_alice);
+        var geode = (Artifact)NamedCardFactory.Create("Mana Geode", _alice);
         var white = geode.Abilities.OfType<ManaAbility>()
             .Single(a => a.ManaGenerated.White == 1);
         var activator = new ManaAbilityActivator();
@@ -186,7 +186,7 @@ public class ManaGeodeTests
     [Fact]
     public void ManaGeode_EtbTrigger_IsBattlefieldActive()
     {
-        var geode = ManaGeodeFactory.Create(_alice);
+        var geode = (Artifact)NamedCardFactory.Create("Mana Geode", _alice);
         var trigger = geode.Abilities.OfType<TriggeredAbility>().Single();
 
         trigger.ActiveZones.Should().Contain(ZoneType.Battlefield);
@@ -204,7 +204,7 @@ public class ManaGeodeTests
             c.SetZone(ZoneType.Library);
         }
 
-        var geode = ManaGeodeFactory.Create(alice);
+        var geode = (Artifact)NamedCardFactory.Create("Mana Geode", alice);
         var etb = geode.Abilities.OfType<TriggeredAbility>().Single();
         foreach (var effect in etb.Effects) effect.Execute();
 
@@ -219,7 +219,7 @@ public class ManaGeodeTests
     {
         var alice = new Player("Alice", 20);
 
-        var geode = ManaGeodeFactory.Create(alice);
+        var geode = (Artifact)NamedCardFactory.Create("Mana Geode", alice);
         var etb = geode.Abilities.OfType<TriggeredAbility>().Single();
         Action act = () =>
         {

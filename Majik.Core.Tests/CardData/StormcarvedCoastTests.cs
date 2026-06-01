@@ -25,7 +25,7 @@ public class StormcarvedCoastTests
     [Fact]
     public void StormcarvedCoast_IsLand()
     {
-        var land = StormcarvedCoastFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Stormcarved Coast", _alice);
 
         land.HasType(CardType.Land).Should().BeTrue();
     }
@@ -33,7 +33,7 @@ public class StormcarvedCoastTests
     [Fact]
     public void StormcarvedCoast_NameIsCorrect()
     {
-        var land = StormcarvedCoastFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Stormcarved Coast", _alice);
 
         land.Name.Should().Be("Stormcarved Coast");
     }
@@ -41,7 +41,7 @@ public class StormcarvedCoastTests
     [Fact]
     public void StormcarvedCoast_OwnerAndControllerAreSet()
     {
-        var land = StormcarvedCoastFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Stormcarved Coast", _alice);
 
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
@@ -50,7 +50,7 @@ public class StormcarvedCoastTests
     [Fact]
     public void StormcarvedCoast_IsNotLegendary()
     {
-        var land = StormcarvedCoastFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Stormcarved Coast", _alice);
 
         land.HasSupertype(CardSupertype.Legendary).Should().BeFalse();
     }
@@ -58,7 +58,7 @@ public class StormcarvedCoastTests
     [Fact]
     public void StormcarvedCoast_HasTwoManaAbilities()
     {
-        var land = StormcarvedCoastFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Stormcarved Coast", _alice);
 
         land.Abilities.OfType<ManaAbility>().Should().HaveCount(2);
     }
@@ -66,7 +66,7 @@ public class StormcarvedCoastTests
     [Fact]
     public void StormcarvedCoast_HasBlueManaAbility()
     {
-        var land = StormcarvedCoastFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Stormcarved Coast", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Blue == 1 && m.ManaGenerated.Red == 0);
@@ -75,7 +75,7 @@ public class StormcarvedCoastTests
     [Fact]
     public void StormcarvedCoast_HasRedManaAbility()
     {
-        var land = StormcarvedCoastFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Stormcarved Coast", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Red == 1 && m.ManaGenerated.Blue == 0);
@@ -84,7 +84,7 @@ public class StormcarvedCoastTests
     [Fact]
     public void StormcarvedCoast_HasNoTriggeredAbilities()
     {
-        var land = StormcarvedCoastFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Stormcarved Coast", _alice);
 
         land.Abilities.OfType<TriggeredAbility>().Should().BeEmpty(
             "ETB-tapped-unless-N-other-lands is a replacement effect, not a trigger");
@@ -93,7 +93,7 @@ public class StormcarvedCoastTests
     [Fact]
     public void StormcarvedCoast_HasNoActivatedAbilities()
     {
-        var land = StormcarvedCoastFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Stormcarved Coast", _alice);
 
         land.Abilities.OfType<ActivatedAbility>().Should().BeEmpty();
     }

@@ -41,7 +41,7 @@ public class AkoumRefugeTests
     [Fact]
     public void AkoumRefuge_IsLand_WithCorrectName()
     {
-        var land = AkoumRefugeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Akoum Refuge", _alice);
 
         land.Name.Should().Be("Akoum Refuge");
         land.HasType(CardType.Land).Should().BeTrue();
@@ -65,7 +65,7 @@ public class AkoumRefugeTests
     [Fact]
     public void AkoumRefuge_HasManaAbility_ForBlack()
     {
-        var land = AkoumRefugeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Akoum Refuge", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Black == 1 && m.ManaGenerated.Red == 0);
@@ -74,7 +74,7 @@ public class AkoumRefugeTests
     [Fact]
     public void AkoumRefuge_HasManaAbility_ForRed()
     {
-        var land = AkoumRefugeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Akoum Refuge", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Red == 1 && m.ManaGenerated.Black == 0);
@@ -83,7 +83,7 @@ public class AkoumRefugeTests
     [Fact]
     public void AkoumRefuge_EtbTrigger_IsBattlefieldActive()
     {
-        var land = AkoumRefugeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Akoum Refuge", _alice);
         var trigger = land.Abilities.OfType<TriggeredAbility>().Single();
 
         trigger.ActiveZones.Should().Contain(ZoneType.Battlefield);
@@ -94,7 +94,7 @@ public class AkoumRefugeTests
     {
         // CR 119.3 — "you gain 1 life" raises the controller's life total by 1.
         var alice = new Player("Alice", 20);
-        var land = AkoumRefugeFactory.Create(alice);
+        var land = (Land)NamedCardFactory.Create("Akoum Refuge", alice);
         var etb = land.Abilities.OfType<TriggeredAbility>().Single();
 
         foreach (var effect in etb.Effects) effect.Execute();

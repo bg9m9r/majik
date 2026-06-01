@@ -41,7 +41,7 @@ public class KazanduRefugeTests
     [Fact]
     public void KazanduRefuge_IsLand_WithCorrectName()
     {
-        var land = KazanduRefugeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Kazandu Refuge", _alice);
 
         land.Name.Should().Be("Kazandu Refuge");
         land.HasType(CardType.Land).Should().BeTrue();
@@ -65,7 +65,7 @@ public class KazanduRefugeTests
     [Fact]
     public void KazanduRefuge_HasManaAbility_ForRed()
     {
-        var land = KazanduRefugeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Kazandu Refuge", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Red == 1 && m.ManaGenerated.Green == 0);
@@ -74,7 +74,7 @@ public class KazanduRefugeTests
     [Fact]
     public void KazanduRefuge_HasManaAbility_ForGreen()
     {
-        var land = KazanduRefugeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Kazandu Refuge", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Green == 1 && m.ManaGenerated.Red == 0);
@@ -83,7 +83,7 @@ public class KazanduRefugeTests
     [Fact]
     public void KazanduRefuge_EtbTrigger_IsBattlefieldActive()
     {
-        var land = KazanduRefugeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Kazandu Refuge", _alice);
         var trigger = land.Abilities.OfType<TriggeredAbility>().Single();
 
         trigger.ActiveZones.Should().Contain(ZoneType.Battlefield);
@@ -94,7 +94,7 @@ public class KazanduRefugeTests
     {
         // CR 119.3 — "you gain 1 life" raises the controller's life total by 1.
         var alice = new Player("Alice", 20);
-        var land = KazanduRefugeFactory.Create(alice);
+        var land = (Land)NamedCardFactory.Create("Kazandu Refuge", alice);
         var etb = land.Abilities.OfType<TriggeredAbility>().Single();
 
         foreach (var effect in etb.Effects) effect.Execute();

@@ -1,3 +1,4 @@
+using Majik.Core.CardData;
 using FluentAssertions;
 using Majik.Core.Abilities;
 using Majik.Core.CardData.Factories;
@@ -35,7 +36,7 @@ public class MinamoSchoolAtWatersEdgeTests
     [Fact]
     public void Minamo_IsLegendary()
     {
-        var minamo = MinamoSchoolAtWatersEdgeFactory.Create(_alice);
+        var minamo = (Land)NamedCardFactory.Create("Minamo, School at Water's Edge", _alice);
 
         minamo.HasSupertype(CardSupertype.Legendary).Should().BeTrue();
     }
@@ -43,7 +44,7 @@ public class MinamoSchoolAtWatersEdgeTests
     [Fact]
     public void Minamo_IsLand()
     {
-        var minamo = MinamoSchoolAtWatersEdgeFactory.Create(_alice);
+        var minamo = (Land)NamedCardFactory.Create("Minamo, School at Water's Edge", _alice);
 
         minamo.HasType(CardType.Land).Should().BeTrue();
     }
@@ -51,7 +52,7 @@ public class MinamoSchoolAtWatersEdgeTests
     [Fact]
     public void Minamo_OwnerAndControllerAreSet()
     {
-        var minamo = MinamoSchoolAtWatersEdgeFactory.Create(_alice);
+        var minamo = (Land)NamedCardFactory.Create("Minamo, School at Water's Edge", _alice);
 
         minamo.Owner.Should().BeSameAs(_alice);
         minamo.Controller.Should().BeSameAs(_alice);
@@ -64,7 +65,7 @@ public class MinamoSchoolAtWatersEdgeTests
     [Fact]
     public void Minamo_HasExactlyOneManaAbility()
     {
-        var minamo = MinamoSchoolAtWatersEdgeFactory.Create(_alice);
+        var minamo = (Land)NamedCardFactory.Create("Minamo, School at Water's Edge", _alice);
 
         minamo.Abilities.OfType<ManaAbility>().Should().HaveCount(1);
     }
@@ -72,7 +73,7 @@ public class MinamoSchoolAtWatersEdgeTests
     [Fact]
     public void Minamo_ManaAbility_ProducesBlue()
     {
-        var minamo = MinamoSchoolAtWatersEdgeFactory.Create(_alice);
+        var minamo = (Land)NamedCardFactory.Create("Minamo, School at Water's Edge", _alice);
         var mana = minamo.Abilities.OfType<ManaAbility>().Single();
 
         mana.ManaGenerated.Blue.Should().Be(1, "Minamo taps for exactly one {U}");
@@ -86,7 +87,7 @@ public class MinamoSchoolAtWatersEdgeTests
     [Fact]
     public void Minamo_HasExactlyOneActivatedAbility()
     {
-        var minamo = MinamoSchoolAtWatersEdgeFactory.Create(_alice);
+        var minamo = (Land)NamedCardFactory.Create("Minamo, School at Water's Edge", _alice);
 
         minamo.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1,
             "only the untap ability; the mana ability is a ManaAbility, not ActivatedAbility");
@@ -95,7 +96,7 @@ public class MinamoSchoolAtWatersEdgeTests
     [Fact]
     public void Minamo_UntapAbility_HasManaCostCost()
     {
-        var minamo = MinamoSchoolAtWatersEdgeFactory.Create(_alice);
+        var minamo = (Land)NamedCardFactory.Create("Minamo, School at Water's Edge", _alice);
         var ability = minamo.Abilities.OfType<ActivatedAbility>().Single();
 
         ability.Costs.OfType<ManaCostCost>().Should().HaveCount(1);
@@ -104,7 +105,7 @@ public class MinamoSchoolAtWatersEdgeTests
     [Fact]
     public void Minamo_UntapAbility_ManaCostIsU()
     {
-        var minamo = MinamoSchoolAtWatersEdgeFactory.Create(_alice);
+        var minamo = (Land)NamedCardFactory.Create("Minamo, School at Water's Edge", _alice);
         var ability = minamo.Abilities.OfType<ActivatedAbility>().Single();
         var manaCost = ability.Costs.OfType<ManaCostCost>().Single().Cost;
 
@@ -115,7 +116,7 @@ public class MinamoSchoolAtWatersEdgeTests
     [Fact]
     public void Minamo_UntapAbility_HasTapSelfCost()
     {
-        var minamo = MinamoSchoolAtWatersEdgeFactory.Create(_alice);
+        var minamo = (Land)NamedCardFactory.Create("Minamo, School at Water's Edge", _alice);
         var ability = minamo.Abilities.OfType<ActivatedAbility>().Single();
 
         // The {T} symbol is built as an AdditionalCost.Tap on the source.
@@ -126,7 +127,7 @@ public class MinamoSchoolAtWatersEdgeTests
     [Fact]
     public void Minamo_UntapAbility_HasExactlyTwoCosts()
     {
-        var minamo = MinamoSchoolAtWatersEdgeFactory.Create(_alice);
+        var minamo = (Land)NamedCardFactory.Create("Minamo, School at Water's Edge", _alice);
         var ability = minamo.Abilities.OfType<ActivatedAbility>().Single();
 
         ability.Costs.Should().HaveCount(2, "ManaCostCost({U}) + tap-self");
@@ -139,7 +140,7 @@ public class MinamoSchoolAtWatersEdgeTests
     [Fact]
     public void Minamo_UntapAbility_DeclaresOneTargetRequest()
     {
-        var minamo = MinamoSchoolAtWatersEdgeFactory.Create(_alice);
+        var minamo = (Land)NamedCardFactory.Create("Minamo, School at Water's Edge", _alice);
         var ability = minamo.Abilities.OfType<ActivatedAbility>().Single();
 
         ability.TargetRequests.Should().ContainSingle(
@@ -149,7 +150,7 @@ public class MinamoSchoolAtWatersEdgeTests
     [Fact]
     public void Minamo_UntapAbility_NoTargetChosen_ResolvesWithoutThrowing()
     {
-        var minamo = MinamoSchoolAtWatersEdgeFactory.Create(_alice);
+        var minamo = (Land)NamedCardFactory.Create("Minamo, School at Water's Edge", _alice);
         var ability = minamo.Abilities.OfType<ActivatedAbility>().Single();
 
         // No ChosenTargets set → CR 608.2b fizzle (clean no-op, no throw).
