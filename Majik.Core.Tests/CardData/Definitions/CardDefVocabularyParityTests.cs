@@ -19,9 +19,10 @@ namespace Majik.Core.Tests.CardData.Definitions;
 /// <para>
 /// The sample spans every JSON cost type (<c>mana</c>, <c>tap_self</c>,
 /// <c>sacrifice_self</c>, <c>remove_counter</c>, <c>discard_self</c>) and
-/// every JSON effect verb (counter / damage-stub / draw / surveil / scry /
-/// destroy-stub / untap-stub / gain-life / mill-then-pick / connive /
-/// amass), plus a DSL <c>Define()</c> card. The
+/// every JSON effect verb (counter / deal-damage / draw / surveil / scry /
+/// destroy-target / untap-target / gain-life / mill-then-pick / connive /
+/// amass — the targeted verbs are real after PLAN 01 Slice F), plus a DSL
+/// <c>Define()</c> card. The
 /// <see cref="SnapshotSummary"/> ability digest (<c>act:&lt;costs&gt;=&gt;&lt;effects&gt;</c>
 /// / <c>trig:&lt;event&gt;=&gt;&lt;effects&gt;</c> / <c>mana:&lt;produced&gt;</c>) is the
 /// stable shape fingerprint — a change in any cost / effect / ability
@@ -49,16 +50,18 @@ public class CardDefVocabularyParityTests
 
     [Theory]
     // Walking Ballista: {4}=>put_counter (ManaCostCost) +
-    //   remove_counter=>deal_damage_stub (RemovePlusOnePlusOneCounterCost).
+    //   remove_counter=>deal_damage (RemovePlusOnePlusOneCounterCost). The
+    //   damage verb is real (PLAN 01 Slice F) but still materializes to an
+    //   Effect closure, so the shape digest is unchanged.
     [InlineData("walking-ballista",
         "act:ManaCostCost=>Effect", "act:RemovePlusOnePlusOneCounterCost=>Effect")]
     // Dreamstone Hedron: {3},{T},Sacrifice => draw 3.
     [InlineData("dreamstone-hedron",
         "act:AdditionalCost+AdditionalCost+ManaCostCost=>Effect")]
-    // Boseiju: {1}{G}, Discard self => destroy stub.
+    // Boseiju: {1}{G}, Discard self => destroy target (real, Slice F).
     [InlineData("boseiju",
         "act:DiscardSelfCost+ManaCostCost=>Effect")]
-    // Voltaic Key: {1},{T} => untap stub.
+    // Voltaic Key: {1},{T} => untap target (real, Slice F).
     [InlineData("voltaic-key",
         "act:AdditionalCost+ManaCostCost=>Effect")]
     // Castle Vantress: {2}{U}{U},{T} => scry 2.

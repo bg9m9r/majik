@@ -31,11 +31,17 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="Majik.Core.CardData.ScryfallCardFactory"/>. This named-card
 ///   factory builds the land without the replacement (test convenience).
 ///
-/// ## Deferred (v1 gaps)
+/// ## Implemented (PLAN 01 Slice F)
 /// - <b>Channel effect — target selection + actual destroy</b>: the
-///   effect is a stub closure. When the targeting prompt system lands,
-///   <c>destroy_target_stub</c> upgrades to a real <c>destroy_target</c>
-///   without breaking the JSON file.
+///   activated ability emits a real <c>destroy_target</c> effect declaring a
+///   1..1 target request over artifact / enchantment / nonbasic-land
+///   candidates. The shared <see cref="Majik.Core.Targeting.TargetCollection"/>
+///   pipeline prompts the controller's agent, and the effect destroys the
+///   chosen permanent via
+///   <see cref="Majik.Core.Primitives.Fx.MoveToGraveyard(Majik.Core.Cards.ICard, Majik.Core.Zones.ZoneMoveReason)"/>
+///   (CR 701.7 / 608.2b — Indestructible / regeneration gated).
+///
+/// ## Deferred (v1 gaps)
 /// - <b>Channel effect — basic-land-search follow-up</b>: when the
 ///   destroyed permanent was a land, the opponent may search their
 ///   library for a basic land. Deferred entirely (requires

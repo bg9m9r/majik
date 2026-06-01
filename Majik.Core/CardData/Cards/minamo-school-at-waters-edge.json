@@ -11,7 +11,7 @@
         { "type": "tap_self" }
       ],
       "effects": [
-        { "type": "untap_target_stub", "targetFilter": "legendary_permanent" }
+        { "type": "untap_target", "targetFilter": "legendary_permanent" }
       ]
     }
   ]

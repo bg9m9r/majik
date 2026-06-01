@@ -23,12 +23,12 @@ namespace Majik.Core.CardData.Definitions;
 /// </summary>
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "type")]
 [JsonDerivedType(typeof(PutCounterEffectDef), "put_counter")]
-[JsonDerivedType(typeof(DealDamageStubEffectDef), "deal_damage_stub")]
+[JsonDerivedType(typeof(DealDamageEffectDef), "deal_damage")]
 [JsonDerivedType(typeof(DrawCardEffectDef), "draw_card")]
 [JsonDerivedType(typeof(SurveilSelfEffectDef), "surveil_self")]
 [JsonDerivedType(typeof(ScrySelfEffectDef), "scry_self")]
-[JsonDerivedType(typeof(DestroyTargetStubEffectDef), "destroy_target_stub")]
-[JsonDerivedType(typeof(UntapTargetStubEffectDef), "untap_target_stub")]
+[JsonDerivedType(typeof(DestroyTargetEffectDef), "destroy_target")]
+[JsonDerivedType(typeof(UntapTargetEffectDef), "untap_target")]
 [JsonDerivedType(typeof(PreventDamageTargetStubEffectDef), "prevent_damage_target_stub")]
 [JsonDerivedType(typeof(GainLifeSelfEffectDef), "gain_life_self")]
 [JsonDerivedType(typeof(MillThenPickFirstMatchingToHandEffectDef), "mill_then_pick_first_matching_to_hand")]
@@ -44,9 +44,36 @@ public abstract class EffectDefinition
     /// the produced <see cref="Majik.Core.Effects.IEffect"/> is byte-identical
     /// to the legacy direct build. Named <c>ToResolveEffect</c> per the PLAN
     /// 03 convergence vocabulary (the effect is the in-memory resolve unit).
+    ///
+    /// <para>
+    /// PLAN 01 (Slice F) — the closure also receives a
+    /// <paramref name="targetRequestIndex" />: the slot into the resolving
+    /// ability's <see cref="Majik.Core.Abilities.ResolutionContext.ChosenTargets"/>
+    /// that a targeted effect reads its chosen target from. Untargeted effects
+    /// ignore it; targeted effects (<see cref="DealDamageEffectDef"/> /
+    /// <see cref="DestroyTargetEffectDef"/> / <see cref="UntapTargetEffectDef"/>)
+    /// emit a matching <see cref="ToTargetRequest"/> so the ability declares
+    /// the target and the shared <see cref="Majik.Core.Targeting.TargetCollection"/>
+    /// pipeline collects it.
+    /// </para>
     /// </summary>
-    public Func<Majik.Core.Cards.ICard, Majik.Core.Players.Player, Majik.Core.Effects.ReplacementBus?, Majik.Core.Abilities.IEffect> ToResolveEffect() =>
-        (card, controller, replacements) => CardDefRuntime.BuildJsonEffect(this, card, controller, replacements);
+    public Func<Majik.Core.Cards.ICard, Majik.Core.Players.Player, Majik.Core.Effects.ReplacementBus?, int, Majik.Core.Abilities.IEffect> ToResolveEffect() =>
+        (card, controller, replacements, targetRequestIndex) =>
+            CardDefRuntime.BuildJsonEffect(this, card, controller, replacements, targetRequestIndex);
+
+    /// <summary>
+    /// PLAN 01 (Slice F) — the targeting declaration this effect needs, or
+    /// <c>null</c> for an untargeted effect. Targeted effects translate their
+    /// <c>TargetFilter</c> string into a <see cref="Majik.Core.Players.Agents.TargetRequest"/>
+    /// (cardinality + a <see cref="Majik.Core.Players.Agents.TargetRequest.CandidateGatherer"/>
+    /// over the right zone/predicate) which the runtime attaches to the
+    /// owning ability's <c>TargetRequests</c>. The shared
+    /// <see cref="Majik.Core.Targeting.TargetCollection"/> pipeline then prompts
+    /// the controller's agent and stores the pick on
+    /// <see cref="Majik.Core.Abilities.ActivatedAbility.ChosenTargets"/> — the
+    /// same path a hand-written factory uses. Default: untargeted.
+    /// </summary>
+    public virtual Majik.Core.Players.Agents.TargetRequest? ToTargetRequest() => null;
 }
 
 /// <summary>Add N counters of the given type to a target permanent.
@@ -60,17 +87,28 @@ public sealed class PutCounterEffectDef : EffectDefinition
 }
 
 /// <summary>
-/// "Deals N damage to any target" — stub effect. Records the intent
-/// but doesn't actually route damage anywhere because the targeting
-/// system isn't ready (matches the existing C# Walking Ballista's
-/// behavior — "target damage deferred"). When targeting lands, this
-/// type splits into <c>deal_damage</c> (real) + the stub stays
-/// available for incremental migration.
+/// "Deals N damage to [target]" — real targeted effect (PLAN 01 Slice F,
+/// replaces the former <c>deal_damage_stub</c> no-op). At resolution the
+/// effect reads the chosen target off
+/// <see cref="Majik.Core.Abilities.ResolutionContext.ChosenTargets"/> and
+/// routes <see cref="Amount"/> damage through
+/// <see cref="Majik.Core.Primitives.Fx.DealDamageAny"/> (Player / Creature /
+/// Planeswalker). CR 608.2b — illegal target at resolution fizzles the
+/// damage. Canonical case: Walking Ballista's "Remove a +1/+1 counter:
+/// It deals 1 damage to any target."
+///
+/// <see cref="Target"/> is the filter string (<c>"any"</c> /
+/// <c>"creature"</c> / <c>"creature_or_player"</c>) the runtime translates
+/// into a <see cref="Majik.Core.Players.Agents.TargetRequest"/>.
 /// </summary>
-public sealed class DealDamageStubEffectDef : EffectDefinition
+public sealed class DealDamageEffectDef : EffectDefinition
 {
     public int Amount { get; set; } = 1;
     public string Target { get; set; } = "any";
+
+    /// <inheritdoc />
+    public override Majik.Core.Players.Agents.TargetRequest? ToTargetRequest() =>
+        TargetFilters.ToTargetRequest(Target, $"deal {Amount} damage");
 }
 
 /// <summary>
@@ -115,56 +153,69 @@ public sealed class ScrySelfEffectDef : EffectDefinition
 }
 
 /// <summary>
-/// "Destroy target [filter]" — stub effect. Records the target filter
-/// describing what's destructible but resolves as a no-op because the
-/// targeting system isn't wired yet (matches the existing C# Boseiju's
-/// Channel-effect deferred behavior). When the targeting prompt lands,
-/// this type upgrades to a real <c>destroy_target</c> effect without
-/// breaking JSON files.
+/// "Destroy target [filter]" — real targeted effect (PLAN 01 Slice F,
+/// replaces the former <c>destroy_target_stub</c> no-op). At resolution the
+/// effect reads the chosen permanent off
+/// <see cref="Majik.Core.Abilities.ResolutionContext.ChosenTargets"/> and
+/// destroys it via <see cref="Majik.Core.Primitives.Fx.MoveToGraveyard(Majik.Core.Cards.ICard, Majik.Core.Zones.ZoneMoveReason)"/>
+/// with <see cref="Majik.Core.Zones.ZoneMoveReason.Destroy"/> (Indestructible
+/// / regeneration gates apply — CR 702.12 / 701.15). CR 608.2b — illegal
+/// target at resolution fizzles. Canonical case: Boseiju, Who Endures —
+/// "Destroy target artifact, enchantment, or nonbasic land."
 ///
-/// <see cref="TargetFilter"/> is a free-form string the future
-/// targeting layer will translate (e.g. <c>"artifact_enchantment_nonbasic_land"</c>).
+/// <see cref="TargetFilter"/> is the filter string the runtime translates
+/// into a <see cref="Majik.Core.Players.Agents.TargetRequest"/> (e.g.
+/// <c>"artifact_enchantment_nonbasic_land"</c>, <c>"nonbasic_land"</c>,
+/// <c>"permanent"</c>).
 /// </summary>
-public sealed class DestroyTargetStubEffectDef : EffectDefinition
+public sealed class DestroyTargetEffectDef : EffectDefinition
 {
     public string TargetFilter { get; set; } = "permanent";
+
+    /// <inheritdoc />
+    public override Majik.Core.Players.Agents.TargetRequest? ToTargetRequest() =>
+        TargetFilters.ToTargetRequest(TargetFilter, "destroy");
 }
 
 /// <summary>
-/// "Untap target [filter]" — stub effect. Records the target filter
-/// describing what's untappable but resolves as a no-op because the
-/// targeting prompt system isn't wired yet (mirrors the existing
-/// <see cref="DestroyTargetStubEffectDef"/> / <see cref="DealDamageStubEffectDef"/>
-/// deferred-targeting pattern). Untapping itself is a CR 701.21 action
-/// the engine already supports (<c>Permanent.Untap</c>); the gap is
-/// purely target selection. When the targeting prompt lands, this type
-/// upgrades to a real <c>untap_target</c> effect without breaking JSON
-/// files. Canonical case: Minamo, School at Water's Edge —
+/// "Untap target [filter]" — real targeted effect (PLAN 01 Slice F,
+/// replaces the former <c>untap_target_stub</c> no-op). At resolution the
+/// effect reads the chosen permanent off
+/// <see cref="Majik.Core.Abilities.ResolutionContext.ChosenTargets"/> and
+/// untaps it (CR 701.21, <c>Permanent.Untap</c>). CR 608.2b — illegal target
+/// at resolution fizzles. Canonical case: Minamo, School at Water's Edge —
 /// <c>"{U}, {T}: Untap target legendary permanent."</c>
 ///
-/// <see cref="TargetFilter"/> is a free-form string the future targeting
-/// layer will translate (e.g. <c>"legendary_permanent"</c>).
+/// <see cref="TargetFilter"/> is the filter string the runtime translates
+/// into a <see cref="Majik.Core.Players.Agents.TargetRequest"/> (e.g.
+/// <c>"legendary_permanent"</c>, <c>"permanent"</c>).
 /// </summary>
-public sealed class UntapTargetStubEffectDef : EffectDefinition
+public sealed class UntapTargetEffectDef : EffectDefinition
 {
     public string TargetFilter { get; set; } = "permanent";
+
+    /// <inheritdoc />
+    public override Majik.Core.Players.Agents.TargetRequest? ToTargetRequest() =>
+        TargetFilters.ToTargetRequest(TargetFilter, "untap");
 }
 
 /// <summary>
 /// "Prevent the next N damage that would be dealt to target [filter] this
 /// turn" — stub effect. Records the prevention <see cref="Amount"/> and the
 /// <see cref="TargetFilter"/> describing what can be shielded, but resolves
-/// as a no-op because the targeting/prompt system isn't wired yet (mirrors
-/// the existing <see cref="UntapTargetStubEffectDef"/> /
-/// <see cref="DestroyTargetStubEffectDef"/> deferred-targeting pattern).
+/// as a no-op because registering a prevention shield against a CHOSEN target
+/// is not yet wired (distinct from the damage / destroy / untap verbs which
+/// the PLAN 01 Slice F targeting now drives — those upgraded to real
+/// <see cref="DealDamageEffectDef"/> / <see cref="DestroyTargetEffectDef"/> /
+/// <see cref="UntapTargetEffectDef"/>).
 ///
 /// The prevention shield itself (CR 615 — a per-turn pool of prevented
 /// damage points) is already supported by the engine via
 /// <see cref="Majik.Core.Effects.PreventNextNDamageToAnyTargetShield"/>; the
-/// gap is purely target selection. When the targeting prompt lands, this
-/// type upgrades to a real <c>prevent_damage_target</c> effect (register the
-/// shield against the chosen target) without breaking JSON files. Canonical
-/// case: Eiganjo Castle —
+/// remaining gap is binding that shield to the chosen target object. When that
+/// lands, this type upgrades to a real <c>prevent_damage_target</c> effect
+/// (declare a <see cref="ToTargetRequest"/> + register the shield against the
+/// chosen target) without breaking JSON files. Canonical case: Eiganjo Castle —
 /// <c>"{W}, {T}: Prevent the next 2 damage that would be dealt to target
 /// legendary creature this turn."</c>
 ///

@@ -10,7 +10,7 @@
         { "type": "tap_self" }
       ],
       "effects": [
-        { "type": "untap_target_stub", "targetFilter": "artifact" }
+        { "type": "untap_target", "targetFilter": "artifact" }
       ]
     }
   ]

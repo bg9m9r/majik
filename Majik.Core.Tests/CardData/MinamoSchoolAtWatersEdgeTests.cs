@@ -20,8 +20,9 @@ namespace Majik.Core.Tests.CardData;
 /// - Card identity (name, Legendary supertype, Land type)
 /// - {T}: Add {U} mana ability (presence + blue output)
 /// - {U}, {T} activated ability cost composition (ManaCostCost({U}) + Tap)
-/// - The untap-target effect resolves without throwing (stub — targeting
-///   system not wired yet; mirrors Boseiju's destroy_target_stub).
+/// - The untap-target effect resolves without throwing when no target is
+///   chosen (CR 608.2b fizzle). Full chosen-target untap behaviour is covered
+///   end-to-end in JsonTargetingEffectsTests (PLAN 01 Slice F).
 /// </summary>
 public class MinamoSchoolAtWatersEdgeTests
 {
@@ -132,17 +133,28 @@ public class MinamoSchoolAtWatersEdgeTests
     }
 
     // -----------------------------------------------------------------------
-    // Untap-target effect resolve (stub — targeting not wired yet)
+    // Untap-target effect (PLAN 01 Slice F — real targeting).
     // -----------------------------------------------------------------------
 
     [Fact]
-    public void Minamo_UntapAbility_ResolvesWithoutThrowing()
+    public void Minamo_UntapAbility_DeclaresOneTargetRequest()
     {
         var minamo = MinamoSchoolAtWatersEdgeFactory.Create(_alice);
         var ability = minamo.Abilities.OfType<ActivatedAbility>().Single();
 
+        ability.TargetRequests.Should().ContainSingle(
+            "untap target legendary permanent declares one 1..1 target");
+    }
+
+    [Fact]
+    public void Minamo_UntapAbility_NoTargetChosen_ResolvesWithoutThrowing()
+    {
+        var minamo = MinamoSchoolAtWatersEdgeFactory.Create(_alice);
+        var ability = minamo.Abilities.OfType<ActivatedAbility>().Single();
+
+        // No ChosenTargets set → CR 608.2b fizzle (clean no-op, no throw).
         var act = () => ability.Resolve();
 
-        act.Should().NotThrow("v1 untap-target effect is a no-op stub");
+        act.Should().NotThrow("an unfilled target fizzles cleanly");
     }
 }
