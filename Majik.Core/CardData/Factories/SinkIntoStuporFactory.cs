@@ -23,32 +23,34 @@ namespace Majik.Core.CardData.Factories;
 /// "As this land enters, you may pay 3 life. If you don't, it enters
 /// tapped.").
 ///
-/// ## MDFC infra (CR 712.3 / 712.4 / 712.6)
+/// ## MDFC infra (CR 712.3 / 712.4 / 712.6) — real cast-either-face (deferral #3)
 ///
 /// This card is a Modal Double-Faced Card: the two faces share a physical
 /// card but each face has its own complete characteristics (cost, type,
-/// effect). At cast / play time the controller chooses which face to use,
-/// the cost / effect of that face is what applies, and the resulting
-/// stack object / permanent is the chosen face (no transform happens on
-/// the battlefield — the OTHER face simply isn't there).
+/// effect). At cast / play time the controller CHOOSES which face to use
+/// (CR 712.3), the cost / effect of that face is what applies, and the
+/// resulting stack object / permanent is the chosen face. No transform
+/// happens (CR 712.4 — MDFC faces don't transform); the OTHER face simply
+/// isn't there.
 ///
-/// v1 cast-either-face is modelled by giving each printed face its own
-/// <c>[CardName]</c>-dispatched factory:
+/// The front-face card built here carries an <see cref="MdfcState"/> with a
+/// castable <see cref="MdfcFace"/> back-face descriptor (the back face is the
+/// LAND Soporific Springs). At cast time <see cref="MdfcCastFlow"/> reads that
+/// descriptor and prompts the controller to pick a face:
 /// <list type="bullet">
-///   <item>Casting the front face → <see cref="NamedCardFactory"/>
-///     resolves <c>"Sink into Stupor"</c> → this factory → an
-///     <see cref="Instant"/> with the bounce effect.</item>
-///   <item>Playing the back face → <see cref="NamedCardFactory"/>
-///     resolves <c>"Soporific Springs"</c> →
-///     <see cref="SoporificSpringsFactory"/> → a <see cref="Land"/> with
-///     the painland-style ETB + {T}: Add {U}.</item>
+///   <item><b>Front</b> — cast this <see cref="Instant"/> via the normal spell
+///     path with {1}{U}{U} and the bounce effect.</item>
+///   <item><b>Back (Soporific Springs)</b> — played as a LAND with no stack
+///     (CR 305): <see cref="MdfcCastFlow"/> materializes a fresh Soporific
+///     Springs land instance via <see cref="SoporificSpringsFactory.Create(Player, ReplacementBus?)"/>
+///     (wired to the live <see cref="ReplacementBus"/> so its painland-style
+///     "pay 3 life or enter tapped" ETB fires), and the front-face card is
+///     removed from hand — only the chosen land enters.</item>
 /// </list>
-/// Both face cards carry an <see cref="MdfcState"/> tracker so callers
-/// (hand UI / bot policy / serialisation) can see the printed back-face
-/// name without holding two object handles. The state is informational —
-/// the engine treats each face as its own freshly-built card on the
-/// chosen path, matching the minimal-MDFC posture used elsewhere in the
-/// engine (<see cref="DelverOfSecretsFactory"/> for the transform variant).
+/// <see cref="SoporificSpringsFactory"/> still also dispatches its own
+/// <c>[CardName]</c> arm (for shape / dispatcher tests and the back-face
+/// builder above); the rules-correct cast path no longer relies on the
+/// back-face card being separately present in hand.
 ///
 /// ## Implemented (v1)
 /// - Instant identity at {1}{U}{U}, blue (mono-U from the printed pips),
@@ -104,10 +106,20 @@ public static class SinkIntoStuporFactory
         card.SetOwner(owner);
         card.SetController(owner);
 
-        // CR 711 / 712 — attach the MDFC face tracker so the printed
-        // back-face name (Soporific Springs) is observable from the
-        // front-face card object. Starts on the front face.
-        card.MdfcState = new MdfcState(CardName, BackName);
+        // CR 712.3 / 712.4 — attach the MDFC face tracker WITH a castable
+        // back-face descriptor (deferral #3, real cast-either-face). The
+        // front face is this Instant; the back face (Soporific Springs) is a
+        // LAND played with no stack. MdfcCastFlow consults the descriptor to
+        // offer the controller a face choice at cast time and, when the back
+        // face is chosen, materializes a fresh Soporific Springs land instance
+        // (wired to the live ReplacementBus so its "pay 3 life or enter
+        // tapped" ETB fires). No transform happens — only the chosen face
+        // exists on the battlefield.
+        var backFace = MdfcFace.Land(
+            BackName,
+            (landOwner, replacements) =>
+                SoporificSpringsFactory.Create(landOwner, replacements));
+        card.MdfcState = new MdfcState(CardName, BackName, backFace);
         return card;
     }
 

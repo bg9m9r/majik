@@ -86,7 +86,16 @@ public static class KhalniAmbushFactory
         // CR 711 / 712 — attach the MDFC face tracker so the printed back-face
         // name (Khalni Territory) is observable from the front-face card
         // object. Starts on the front face.
-        card.MdfcState = new MdfcState(CardName, BackName);
+        // CR 712.3 / 712.4 — attach the MDFC face tracker WITH a castable
+        // back-face descriptor (deferral #3, real cast-either-face). The
+        // back face is the LAND back face played with no stack; MdfcCastFlow
+        // offers the controller a face choice at cast time and materializes
+        // a fresh back-face land instance when chosen. No transform happens.
+        var backFace = MdfcFace.Land(
+            BackName,
+            (landOwner, replacements) =>
+                KhalniTerritoryFactory.Create(landOwner, replacements));
+        card.MdfcState = new MdfcState(CardName, BackName, backFace);
         return card;
     }
 

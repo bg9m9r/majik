@@ -116,7 +116,16 @@ public static class EmeriasCallFactory
 
         // CR 711 / 712 — attach the MDFC face tracker so the printed
         // back-face name is observable from the front-face card object.
-        card.MdfcState = new MdfcState(CardName, BackName);
+        // CR 712.3 / 712.4 — attach the MDFC face tracker WITH a castable
+        // back-face descriptor (deferral #3, real cast-either-face). The
+        // back face is the LAND back face played with no stack; MdfcCastFlow
+        // offers the controller a face choice at cast time and materializes
+        // a fresh back-face land instance when chosen. No transform happens.
+        var backFace = MdfcFace.Land(
+            BackName,
+            (landOwner, replacements) =>
+                EmeriaShatteredSkyclaveFactory.Create(landOwner, replacements));
+        card.MdfcState = new MdfcState(CardName, BackName, backFace);
 
         return card;
     }
