@@ -1,0 +1,10 @@
+{
+  "name": "Lyra Dawnbringer",
+  "types": ["Creature"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Angel"],
+  "manaCost": "{3}{W}{W}",
+  "power": 5,
+  "toughness": 5,
+  "abilities": []
+}
