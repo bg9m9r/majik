@@ -4,6 +4,7 @@ using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Effects;
 using Majik.Core.Players;
+using Majik.Core.ValueObjects;
 using Xunit;
 
 namespace Majik.Core.Tests.Effects;
@@ -114,6 +115,70 @@ public class CopyCharacteristicsEffectTests
         // copied identity).
         effect.CopiedName.Should().Be("Grizzly Bears");
         effect.CopiedManaCost.Should().Be("{1}{G}");
+    }
+
+    [Fact]
+    public void Copy_OfLegendarySource_SurfacesCopiedLegendarySupertype()
+    {
+        var svc = new ContinuousEffectsService();
+        var land = BattlefieldLand(_alice);
+
+        // Source is a Legendary creature. CR 707.2 — supertypes are copiable.
+        var legend = new Creature("Kytheon", "{W}", 2, 1,
+            supertypes: new[] { CardSupertype.Legendary });
+
+        svc.Register(new CopyCharacteristicsEffect(land, legend));
+
+        // #1715 slot — copied Legendary surfaces through Compute, so the
+        // legend-rule SBA (reads HasEffectiveSupertype) now counts it.
+        svc.Compute(land).Supertypes.Should().Contain(CardSupertype.Legendary);
+    }
+
+    [Fact]
+    public void Copy_OntoCreature_SurfacesCopiedColorAndSupertype()
+    {
+        var svc = new ContinuousEffectsService();
+        // Copier is itself a creature so Compute seeds a CreatureCharacteristics.
+        var copier = new Creature("Clone", "{3}{U}", 0, 0)
+        {
+            Owner = _alice,
+            Controller = _alice,
+            ActiveEffects = svc,
+            Zone = Majik.Core.Zones.ZoneType.Battlefield,
+        };
+        // Source: a mono-green Legendary bear.
+        var original = new Creature("Legendary Bear", "{1}{G}", 2, 2,
+            supertypes: new[] { CardSupertype.Legendary });
+
+        svc.Register(new CopyCharacteristicsEffect(copier, original));
+
+        // #1681 Layer-5 colour slot — the copy now copies the source's colour.
+        copier.GetEffectiveColors().Should().BeEquivalentTo(new[] { ManaColor.Green });
+        copier.GetEffectiveColors().Should().NotContain(ManaColor.Blue,
+            "the clone's printed blue is overwritten by the copied green");
+        // #1715 supertype slot — and copies Legendary.
+        copier.HasEffectiveSupertype(CardSupertype.Legendary).Should().BeTrue();
+    }
+
+    [Fact]
+    public void Copy_OfColorlessSource_ClearsTargetPrintedColor()
+    {
+        var svc = new ContinuousEffectsService();
+        var copier = new Creature("Clone", "{3}{U}", 0, 0)
+        {
+            Owner = _alice,
+            Controller = _alice,
+            ActiveEffects = svc,
+            Zone = Majik.Core.Zones.ZoneType.Battlefield,
+        };
+        // CR 707.2 — copying a colourless artifact creature makes the copy
+        // colourless (the printed blue is overwritten, not unioned).
+        var golem = new Creature("Colorless Golem", "{4}", 3, 3);
+
+        svc.Register(new CopyCharacteristicsEffect(copier, golem));
+
+        copier.GetEffectiveColors().Should().BeEmpty(
+            "a copy of a colourless source is colourless");
     }
 
     [Fact]

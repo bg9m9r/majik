@@ -33,18 +33,38 @@ public static class TargetLegality
     /// CR 702.16e — protection from <em>colour</em> prevents targeting from
     /// any source matching that colour. Use this overload when the caller
     /// has the source card available (e.g. a spell being cast).
+    ///
+    /// CR 105.3 / 613.1e — the source's colour can be changed by a Layer-5
+    /// colour-changing effect (Painter's Servant making a spell red, an
+    /// animated land "is all colours"). The protection check therefore reads
+    /// the source's <em>effective</em> colour via
+    /// <see cref="Permanent.GetEffectiveColors"/> when the source is a
+    /// permanent; a non-permanent source with no Layer-5 colour effect falls
+    /// back to its printed/static colour. Mirrors the combat-protection path in
+    /// <see cref="Majik.Core.Combat.CombatFlow"/>.
     /// </summary>
     public static bool CanBeTargetedBy(Creature target, ICard source, Player caster)
     {
         if (!CanBeTargetedBy(target, caster)) return false;
         if (source == null) return true;
 
-        foreach (var c in Majik.Core.Cards.CardColors.GetColors(source))
+        foreach (var c in EffectiveColorsOf(source))
         {
             if (Protection.HasProtectionFromColor(target, c)) return false;
         }
         return true;
     }
+
+    /// <summary>
+    /// CR 105.3 / 613.1e — the source's effective colour set: the Layer-5
+    /// colour-changing pass via <see cref="Permanent.GetEffectiveColors"/> when
+    /// the source is a permanent, otherwise the printed/static colour (a
+    /// non-permanent source carries no Layer-5 colour effect).
+    /// </summary>
+    private static IReadOnlySet<Majik.Core.ValueObjects.ManaColor> EffectiveColorsOf(ICard source) =>
+        source is Permanent perm
+            ? perm.GetEffectiveColors()
+            : Majik.Core.Cards.CardColors.GetColors(source);
 
     private static bool Has(Creature c, string kw) =>
         c.Abilities.OfType<KeywordAbility>().Any(k =>
