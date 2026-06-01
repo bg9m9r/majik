@@ -58,7 +58,9 @@ public sealed class Emblem
         Controller = controller ?? throw new ArgumentNullException(nameof(controller));
         SourceName = sourceName ?? string.Empty;
         Abilities = abilities?.ToArray() ?? Array.Empty<IAbility>();
-        Id = Guid.NewGuid();
+        // PLAN 08 — per-game deterministic id; Guid.NewGuid() fallback outside
+        // a game scope.
+        Id = Majik.Core.Game.DeterministicIdScope.NewId();
     }
 
     /// <summary>

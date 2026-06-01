@@ -107,7 +107,10 @@ public class ActivatedAbility : IActivatedAbility
 
         Source = source;
         Controller = controller;
-        Id = Guid.NewGuid();
+        // PLAN 08 — per-game deterministic id. Reseeded from the ambient
+        // DeterministicIdSource inside a game scope; Guid.NewGuid() fallback
+        // outside one.
+        Id = Majik.Core.Game.DeterministicIdScope.NewId();
         Timestamp = DateTime.UtcNow;
         IsSorcerySpeed = sorcerySpeed;
         _canActivateCheck = canActivateCheck;

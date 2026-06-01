@@ -68,7 +68,10 @@ public class TriggeredAbility : ITriggeredAbility
         Controller = controller ?? throw new ArgumentNullException(nameof(controller));
         Condition = condition ?? throw new ArgumentNullException(nameof(condition));
 
-        Id = Guid.NewGuid();
+        // PLAN 08 — per-game deterministic id. Reseeded from the ambient
+        // DeterministicIdSource inside a game scope; Guid.NewGuid() fallback
+        // outside one.
+        Id = DeterministicIdScope.NewId();
         // Determinism (PLAN 08 prerequisite): order-determining timestamp comes
         // from the per-game logical clock, not wall-clock. Consumed by
         // ApnapOrdering (.ThenBy(t => t.Timestamp)) + TriggerManager

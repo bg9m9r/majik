@@ -17,9 +17,12 @@ public class Player
 
     /// <summary>
     /// Stable per-instance identifier. Used by DTO/web layer to reference
-    /// players across requests without serializing object graphs.
+    /// players across requests without serializing object graphs (portal's
+    /// <c>controllerId</c>, and the key for the per-game ambient registries).
+    /// PLAN 08 — per-game deterministic id when a game scope is installed;
+    /// falls back to <see cref="Guid.NewGuid"/> for scope-less construction.
     /// </summary>
-    public Guid Id { get; } = Guid.NewGuid();
+    public Guid Id { get; } = Majik.Core.Game.DeterministicIdScope.NewId();
 
     /// <summary>
     /// The player's name.

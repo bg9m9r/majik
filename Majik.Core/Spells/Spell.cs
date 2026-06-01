@@ -191,7 +191,10 @@ public class Spell : ISpell
 
         Card = card;
         Controller = controller;
-        Id = Guid.NewGuid();
+        // PLAN 08 — per-game deterministic id (portal's `stackId`). Reseeded
+        // from the ambient DeterministicIdSource inside a game scope; falls back
+        // to Guid.NewGuid() for scope-less direct construction.
+        Id = Majik.Core.Game.DeterministicIdScope.NewId();
         Timestamp = DateTime.UtcNow;
         _resolutionState = ResolutionState.NotResolving();
 

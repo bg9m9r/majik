@@ -130,7 +130,8 @@ public static class UrzasSagaFactory
         // the I/II Construct token + III tutor closures.
         var entity = new CardEntity
         {
-            ScryfallId = Guid.NewGuid().ToString(),
+            // PLAN 08 — deterministic (cosmetic) id; reproducible on replay.
+            ScryfallId = Majik.Core.Game.DeterministicIdScope.NewId().ToString(),
             Name = CardName,
             TypeLine = "Legendary Enchantment Land — Urza's Saga",
             OracleText = OracleText,

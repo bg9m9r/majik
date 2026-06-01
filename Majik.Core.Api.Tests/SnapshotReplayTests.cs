@@ -71,6 +71,47 @@ public class SnapshotReplayTests
     }
 
     [Fact]
+    public async Task FromSnapshot_RebuildsIdIdenticalState_WhenBoardBuiltUnderIdScope()
+    {
+        // PLAN 08 — the id-reseeding payoff. When the initial board is built
+        // under a per-game deterministic id source (seeded from the game seed)
+        // for BOTH the original run and the rebuild, FromSnapshot reproduces the
+        // game ID-IDENTICALLY: every Player.Id / Card.InstanceId / stack id
+        // matches byte-for-byte, not just structurally. That is the property the
+        // portal reducer (keyed by these ids) needs for client-facing rehydration.
+
+        // ── Original run (board + run under one seed-Seed id scope) ──────────
+        GameStateDto originalState;
+        GameSnapshot snapshot;
+        using (DeterministicIdScope.Push(new DeterministicIdSource(Seed)))
+        {
+            var original = BuildSeededFacade();
+            await DriveAsync(original);
+            originalState = original.GetState();
+            snapshot = original.SaveSnapshot();
+        }
+
+        // ── Replay run (board rebuilt under the SAME seed-Seed id scope) ─────
+        // The rebuild's initial board mints the same ids 1..N, and FromSnapshot's
+        // internal driver continues the SAME source (PushIfNone), so run-minted
+        // ids continue the sequence identically.
+        GameFacade rebuilt;
+        using (DeterministicIdScope.Push(new DeterministicIdSource(Seed)))
+        {
+            rebuilt = await GameFacade.FromSnapshot(
+                snapshot, buildFreshFacade: BuildSeededFacade);
+        }
+
+        IdProjection(rebuilt.GetState()).Should().BeEquivalentTo(
+            IdProjection(originalState), opts => opts.WithStrictOrdering());
+
+        // Sanity: the ids really are the deterministic ones (the first object
+        // minted under the seed-Seed scope is a Player and carries source id #1).
+        var firstId = new DeterministicIdSource(Seed).NextId();
+        originalState.Players.Select(p => p.Id).Should().Contain(firstId);
+    }
+
+    [Fact]
     public async Task FromSnapshot_LiveSubscribersAttachedAfterReplay_ReceiveNewEvents()
     {
         // Regression guard: suppression is for the REPLAY window only. After
@@ -234,6 +275,28 @@ public class SnapshotReplayTests
         }).ToList(),
         Stack = s.Stack.Select(o => $"{o.Kind}|{o.Description}").ToList(),
     };
+
+    // -----------------------------------------------------------------------
+    // Id projection — the portal-facing ids only (name-tagged for legible diffs).
+    // Two id-identical runs produce equal projections.
+    // -----------------------------------------------------------------------
+    private static object IdProjection(GameStateDto s) => new
+    {
+        Players = s.Players.Select(p => new
+        {
+            p.Name,
+            p.Id,
+            Hand = ZoneIds(p.Hand),
+            Battlefield = p.Battlefield.Cards.Select(c => $"{c.Name}|{c.InstanceId}").ToList(),
+            Graveyard = ZoneIds(p.Graveyard),
+            Library = ZoneIds(p.Library),
+            Exile = ZoneIds(p.Exile),
+        }).ToList(),
+        Stack = s.Stack.Select(o => $"{o.Kind}|{o.Id}").ToList(),
+    };
+
+    private static List<string> ZoneIds(ZoneDto z) =>
+        z.Cards.Select(c => $"{c.Name}|{c.InstanceId}").ToList();
 
     private static string Counters(CardSnapshotDto c) =>
         c.Counters == null || c.Counters.Count == 0
