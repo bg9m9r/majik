@@ -1,0 +1,5 @@
+{
+  "name": "Generous Gift",
+  "types": ["Instant"],
+  "manaCost": "{2}{W}"
+}

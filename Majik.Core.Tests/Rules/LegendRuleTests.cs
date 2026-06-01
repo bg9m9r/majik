@@ -60,13 +60,53 @@ public class LegendRuleTests
     }
 
     [Fact]
+    public void CheckLegendRule_CloneCopiesLegendarySupertype_TriggersLegendRule()
+    {
+        // CR 707.2 — supertypes are copiable. A non-legendary permanent that
+        // becomes a copy of a Legendary source (via CopyCharacteristicsEffect)
+        // gains the Legendary supertype and, sharing a name with an existing
+        // legend, triggers the legend-rule SBA. Without the copy-supertype fix
+        // the second permanent stays non-legendary and no SBA fires.
+        var player = new Player("Alice", 20);
+        var svc = new ContinuousEffectsService();
+
+        var printedLegend = new Creature("Kaheera", "1G", 3, 2,
+            supertypes: new[] { CardSupertype.Legendary }) { Owner = player, Controller = player };
+
+        // Same name, but printed NON-legendary; it becomes a copy of a Legendary
+        // source so its EFFECTIVE supertype set gains Legendary.
+        var copier = new Creature("Kaheera", "1G", 3, 2) { Owner = player, Controller = player };
+        copier.ActiveEffects = svc;
+        var legendarySource = new Creature("Some Legend", "1G", 3, 2,
+            supertypes: new[] { CardSupertype.Legendary });
+
+        printedLegend.SetZone(ZoneType.Battlefield);
+        copier.SetZone(ZoneType.Battlefield);
+        _zoneService.MoveCardTo(printedLegend, ZoneType.Battlefield, player);
+        _zoneService.MoveCardTo(copier, ZoneType.Battlefield, player);
+
+        svc.Register(new CopyCharacteristicsEffect(copier, legendarySource));
+        copier.HasEffectiveSupertype(CardSupertype.Legendary).Should().BeTrue(
+            "the copy effect confers the source's Legendary supertype");
+
+        var players = new List<Player> { player };
+        var cards = new List<ICard> { printedLegend, copier };
+
+        _sba.CheckStateBasedActions(players, cards);
+
+        cards.Count(c => c.Zone == ZoneType.Battlefield).Should().Be(1,
+            "two same-named legendaries (one via copied supertype) → legend rule keeps one");
+        cards.Count(c => c.Zone == ZoneType.Graveyard).Should().Be(1);
+    }
+
+    [Fact]
     public void CheckLegendRule_TwoLegendaryCreaturesDifferentNames_NoAction()
     {
         // Arrange
         var player = new Player("Alice", 20);
-        var creature1 = new Creature("Jace, Vryn's Prodigy", "1U", 0, 1, 
+        var creature1 = new Creature("Jace, Vryn's Prodigy", "1U", 0, 1,
             supertypes: new[] { CardSupertype.Legendary }) { Owner = player, Controller = player };
-        var creature2 = new Creature("Liliana, Heretical Healer", "1B", 0, 1, 
+        var creature2 = new Creature("Liliana, Heretical Healer", "1B", 0, 1,
             supertypes: new[] { CardSupertype.Legendary }) { Owner = player, Controller = player };
         
         creature1.SetZone(ZoneType.Battlefield);

@@ -1,0 +1,9 @@
+{
+  "name": "Stormwing Entity",
+  "types": ["Creature"],
+  "subtypes": ["Elemental"],
+  "manaCost": "{3}{U}{U}",
+  "power": 3,
+  "toughness": 3,
+  "abilities": []
+}
