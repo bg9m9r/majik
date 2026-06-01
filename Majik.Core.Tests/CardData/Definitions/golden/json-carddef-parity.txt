@@ -7677,7 +7677,10 @@
     "Land"
   ],
   "supertypes": [],
-  "subtypes": [],
+  "subtypes": [
+    "Forest",
+    "Island"
+  ],
   "power": null,
   "toughness": null,
   "loyalty": null,
