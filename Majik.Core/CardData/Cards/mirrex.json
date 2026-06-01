@@ -1,0 +1,8 @@
+{
+  "name": "Mirrex",
+  "types": ["Land"],
+  "subtypes": ["Sphere"],
+  "abilities": [
+    { "kind": "mana", "produces": "C" }
+  ]
+}
