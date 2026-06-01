@@ -245,4 +245,39 @@ public class FactoryRoutingTests
         mystic.Abilities.OfType<ManaAbility>().Should().HaveCount(1,
             "exactly one {T}: Add {G} — the binder overlay must not double the factory's mana ability");
     }
+
+    // -----------------------------------------------------------------------
+    // CR 712.3 — MDFC cast-either-face routing (deferral #3). The seed stores
+    // "Sink into Stupor // Soporific Springs" under the composite name; the
+    // production deck-build must route the FRONT face through its factory so
+    // the card carries the castable back-face descriptor.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void Mdfc_SinkIntoStupor_RoutedThroughFrontFactory_CarriesCastableBackFace()
+    {
+        var deck = new List<ICard>
+        {
+            // Composite name exactly as a real decklist / seed row carries it.
+            new Instant("Sink into Stupor // Soporific Springs", "{1}{U}{U}"),
+        };
+
+        var facade = GameFacade.Create("Alice", "Bob", deck, Array.Empty<ICard>(), cardRepo: Repo());
+
+        // The routed card's Name is the FRONT face (the front factory sets it),
+        // NOT the composite — GetByName resolves it back to the composite row.
+        var lib = facade.Alice.Zones.GetZone(ZoneType.Library).GetCards();
+        lib.Should().ContainSingle().Which.Name.Should().Be("Sink into Stupor",
+            "the MDFC front factory names the card after the front face");
+        var sink = lib.Single();
+
+        sink.Should().BeOfType<Instant>("the front face is the instant");
+        var mdfc = ((Card)sink).MdfcState;
+        mdfc.Should().NotBeNull("a routed MDFC front carries the face tracker");
+        mdfc!.CanCastEitherFace.Should().BeTrue(
+            "production deck-build must attach the castable back-face descriptor (CR 712.3)");
+        mdfc.BackFace.Should().NotBeNull();
+        mdfc.BackFace!.IsLand.Should().BeTrue("Soporific Springs is a land back face");
+        mdfc.BackFace!.Name.Should().Be("Soporific Springs");
+    }
 }
