@@ -1,4 +1,5 @@
 using Majik.Core.Cards;
+using Majik.Core.Game;
 
 namespace Majik.Core.Rules;
 
@@ -25,8 +26,19 @@ namespace Majik.Core.Rules;
 /// </summary>
 public static class FlashGrantRegistry
 {
-    private static readonly List<(object Token, Func<ICard, bool> Predicate)> _grants = new();
-    private static readonly object _gate = new();
+    /// <summary>Per-game store: the token-keyed grant list and its lock.</summary>
+    public sealed class Store
+    {
+        internal readonly List<(object Token, Func<ICard, bool> Predicate)> Grants = new();
+        internal readonly object Gate = new();
+    }
+
+    private static readonly AmbientRegistryStore<Store> _ambient = new();
+
+    private static Store Current => _ambient.Current;
+
+    /// <summary>Install a fresh per-game store. See <see cref="GameRegistryScope"/>.</summary>
+    public static IDisposable PushScope() => _ambient.Push(new Store());
 
     /// <summary>
     /// Register a flash-grant predicate keyed by <paramref name="token"/>.
@@ -38,17 +50,18 @@ public static class FlashGrantRegistry
     {
         ArgumentNullException.ThrowIfNull(token);
         ArgumentNullException.ThrowIfNull(predicate);
-        lock (_gate)
+        var store = Current;
+        lock (store.Gate)
         {
-            for (int i = 0; i < _grants.Count; i++)
+            for (int i = 0; i < store.Grants.Count; i++)
             {
-                if (ReferenceEquals(_grants[i].Token, token))
+                if (ReferenceEquals(store.Grants[i].Token, token))
                 {
-                    _grants[i] = (token, predicate);
+                    store.Grants[i] = (token, predicate);
                     return;
                 }
             }
-            _grants.Add((token, predicate));
+            store.Grants.Add((token, predicate));
         }
     }
 
@@ -60,9 +73,10 @@ public static class FlashGrantRegistry
     public static void RemoveGrant(object token)
     {
         ArgumentNullException.ThrowIfNull(token);
-        lock (_gate)
+        var store = Current;
+        lock (store.Gate)
         {
-            _grants.RemoveAll(g => ReferenceEquals(g.Token, token));
+            store.Grants.RemoveAll(g => ReferenceEquals(g.Token, token));
         }
     }
 
@@ -74,9 +88,10 @@ public static class FlashGrantRegistry
     public static bool HasGrantedFlash(ICard card)
     {
         if (card == null) return false;
-        lock (_gate)
+        var store = Current;
+        lock (store.Gate)
         {
-            foreach (var (_, predicate) in _grants)
+            foreach (var (_, predicate) in store.Grants)
             {
                 bool match;
                 try { match = predicate(card); }
@@ -87,12 +102,13 @@ public static class FlashGrantRegistry
         }
     }
 
-    /// <summary>Reset the registry. Test-only.</summary>
+    /// <summary>Reset the active store. Test-only.</summary>
     public static void Clear()
     {
-        lock (_gate)
+        var store = Current;
+        lock (store.Gate)
         {
-            _grants.Clear();
+            store.Grants.Clear();
         }
     }
 }

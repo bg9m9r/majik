@@ -1,3 +1,5 @@
+using Majik.Core.Game;
+
 namespace Majik.Core.Players;
 
 /// <summary>
@@ -22,21 +24,33 @@ namespace Majik.Core.Players;
 /// </summary>
 public static class ControlPlayerRegistryProvider
 {
-    private static readonly Dictionary<Guid, ControlPlayerRegistry> _byPlayer = new();
-    private static readonly object _lock = new();
-    private static ControlPlayerRegistry? _default;
+    /// <summary>Per-game store: the player→registry map, its default slot, and lock.</summary>
+    public sealed class Store
+    {
+        internal readonly Dictionary<Guid, ControlPlayerRegistry> ByPlayer = new();
+        internal ControlPlayerRegistry? Default;
+        internal readonly object Lock = new();
+    }
+
+    private static readonly AmbientRegistryStore<Store> _ambient = new();
+
+    private static Store Current => _ambient.Current;
+
+    /// <summary>Install a fresh per-game store. See <see cref="GameRegistryScope"/>.</summary>
+    public static IDisposable PushScope() => _ambient.Push(new Store());
 
     /// <summary>Process-wide fallback registry, or <see langword="null"/> if
     /// none has been registered.</summary>
     public static ControlPlayerRegistry? Default
     {
-        get { lock (_lock) return _default; }
+        get { var store = Current; lock (store.Lock) return store.Default; }
     }
 
     /// <summary>Replace the process-wide fallback registry.</summary>
     public static void SetDefault(ControlPlayerRegistry? registry)
     {
-        lock (_lock) { _default = registry; }
+        var store = Current;
+        lock (store.Lock) { store.Default = registry; }
     }
 
     /// <summary>Associate <paramref name="registry"/> with
@@ -46,7 +60,8 @@ public static class ControlPlayerRegistryProvider
     {
         ArgumentNullException.ThrowIfNull(player);
         ArgumentNullException.ThrowIfNull(registry);
-        lock (_lock) { _byPlayer[player.Id] = registry; }
+        var store = Current;
+        lock (store.Lock) { store.ByPlayer[player.Id] = registry; }
     }
 
     /// <summary>Return the registry registered for <paramref name="player"/>,
@@ -54,10 +69,11 @@ public static class ControlPlayerRegistryProvider
     /// when neither is set.</summary>
     public static ControlPlayerRegistry? Get(Player? player)
     {
-        lock (_lock)
+        var store = Current;
+        lock (store.Lock)
         {
-            if (player is not null && _byPlayer.TryGetValue(player.Id, out var r)) return r;
-            return _default;
+            if (player is not null && store.ByPlayer.TryGetValue(player.Id, out var r)) return r;
+            return store.Default;
         }
     }
 
@@ -66,13 +82,15 @@ public static class ControlPlayerRegistryProvider
     public static void Remove(Player player)
     {
         if (player is null) return;
-        lock (_lock) { _byPlayer.Remove(player.Id); }
+        var store = Current;
+        lock (store.Lock) { store.ByPlayer.Remove(player.Id); }
     }
 
     /// <summary>Remove all registrations (call at game teardown / test
     /// cleanup).</summary>
     public static void Clear()
     {
-        lock (_lock) { _byPlayer.Clear(); _default = null; }
+        var store = Current;
+        lock (store.Lock) { store.ByPlayer.Clear(); store.Default = null; }
     }
 }

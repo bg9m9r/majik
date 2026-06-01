@@ -1,3 +1,4 @@
+using Majik.Core.Game;
 using Majik.Core.Players;
 
 namespace Majik.Core.Rules;
@@ -15,13 +16,33 @@ namespace Majik.Core.Rules;
 /// via a card's static-ability lifecycle while its source is on the
 /// battlefield; callers Remove on the source leaving the battlefield.
 ///
+/// <para>
+/// The backing state is scoped per-game via an
+/// <see cref="AmbientRegistryStore{TStore}"/> /
+/// <see cref="GameRegistryScope.PushForGame"/> (same pattern as
+/// <see cref="CastingRestrictions"/>): concurrent matches see independent
+/// state, and direct-construction tests resolve a process-wide fallback so
+/// the static call sites keep working unchanged.
+/// </para>
+///
 /// Tests that mutate the registry should call <see cref="Clear"/> in a
 /// fixture/dispose path to avoid leakage across cases.
 /// </summary>
 public static class SkipDrawRegistry
 {
-    private static readonly List<(object Token, Func<Player, bool> Predicate)> _grants = new();
-    private static readonly object _gate = new();
+    /// <summary>Per-game store: the token-keyed grant list and its lock.</summary>
+    public sealed class Store
+    {
+        internal readonly List<(object Token, Func<Player, bool> Predicate)> Grants = new();
+        internal readonly object Gate = new();
+    }
+
+    private static readonly AmbientRegistryStore<Store> _ambient = new();
+
+    private static Store Current => _ambient.Current;
+
+    /// <summary>Install a fresh per-game store. See <see cref="GameRegistryScope"/>.</summary>
+    public static IDisposable PushScope() => _ambient.Push(new Store());
 
     /// <summary>
     /// Register a skip-draw predicate keyed by <paramref name="token"/>.
@@ -32,17 +53,18 @@ public static class SkipDrawRegistry
     {
         ArgumentNullException.ThrowIfNull(token);
         ArgumentNullException.ThrowIfNull(predicate);
-        lock (_gate)
+        var store = Current;
+        lock (store.Gate)
         {
-            for (int i = 0; i < _grants.Count; i++)
+            for (int i = 0; i < store.Grants.Count; i++)
             {
-                if (ReferenceEquals(_grants[i].Token, token))
+                if (ReferenceEquals(store.Grants[i].Token, token))
                 {
-                    _grants[i] = (token, predicate);
+                    store.Grants[i] = (token, predicate);
                     return;
                 }
             }
-            _grants.Add((token, predicate));
+            store.Grants.Add((token, predicate));
         }
     }
 
@@ -54,9 +76,10 @@ public static class SkipDrawRegistry
     public static void RemoveSkip(object token)
     {
         ArgumentNullException.ThrowIfNull(token);
-        lock (_gate)
+        var store = Current;
+        lock (store.Gate)
         {
-            _grants.RemoveAll(g => ReferenceEquals(g.Token, token));
+            store.Grants.RemoveAll(g => ReferenceEquals(g.Token, token));
         }
     }
 
@@ -68,9 +91,10 @@ public static class SkipDrawRegistry
     public static bool ShouldSkipDraw(Player player)
     {
         if (player == null) return false;
-        lock (_gate)
+        var store = Current;
+        lock (store.Gate)
         {
-            foreach (var (_, predicate) in _grants)
+            foreach (var (_, predicate) in store.Grants)
             {
                 bool match;
                 try { match = predicate(player); }
@@ -81,12 +105,13 @@ public static class SkipDrawRegistry
         }
     }
 
-    /// <summary>Reset the registry. Test-only.</summary>
+    /// <summary>Reset the active store. Test-only.</summary>
     public static void Clear()
     {
-        lock (_gate)
+        var store = Current;
+        lock (store.Gate)
         {
-            _grants.Clear();
+            store.Grants.Clear();
         }
     }
 }

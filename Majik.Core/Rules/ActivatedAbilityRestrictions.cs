@@ -1,5 +1,6 @@
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
+using Majik.Core.Game;
 
 namespace Majik.Core.Rules;
 
@@ -46,15 +47,26 @@ namespace Majik.Core.Rules;
 /// </summary>
 public static class ActivatedAbilityRestrictions
 {
-    // Each entry: (token, chosen-name). The same token may register only
-    // one chosen name in practice (one Needle = one chosen name) but the
-    // structure tolerates re-registration without enforcing uniqueness.
-    private static readonly List<(object Token, string Name)> _byName = new();
-    // Each entry: (token, predicate). Predicate returns true when the
-    // ability should be suppressed. Mana-ability exemption applies before
-    // predicates are consulted (see IsActivatedAbilityRestricted).
-    private static readonly List<(object Token, Predicate<IActivatedAbility> Match)> _byPredicate = new();
-    private static readonly object _gate = new();
+    /// <summary>Per-game store: the name + predicate restriction rails and lock.</summary>
+    public sealed class Store
+    {
+        // Each entry: (token, chosen-name). The same token may register only
+        // one chosen name in practice (one Needle = one chosen name) but the
+        // structure tolerates re-registration without enforcing uniqueness.
+        internal readonly List<(object Token, string Name)> ByName = new();
+        // Each entry: (token, predicate). Predicate returns true when the
+        // ability should be suppressed. Mana-ability exemption applies before
+        // predicates are consulted (see IsActivatedAbilityRestricted).
+        internal readonly List<(object Token, Predicate<IActivatedAbility> Match)> ByPredicate = new();
+        internal readonly object Gate = new();
+    }
+
+    private static readonly AmbientRegistryStore<Store> _ambient = new();
+
+    private static Store Current => _ambient.Current;
+
+    /// <summary>Install a fresh per-game store. See <see cref="GameRegistryScope"/>.</summary>
+    public static IDisposable PushScope() => _ambient.Push(new Store());
 
     /// <summary>
     /// Register a name-targeted activated-ability suppression under
@@ -69,9 +81,10 @@ public static class ActivatedAbilityRestrictions
         {
             throw new ArgumentException("Name required", nameof(name));
         }
-        lock (_gate)
+        var store = Current;
+        lock (store.Gate)
         {
-            foreach (var entry in _byName)
+            foreach (var entry in store.ByName)
             {
                 if (ReferenceEquals(entry.Token, token)
                     && string.Equals(entry.Name, name, StringComparison.Ordinal))
@@ -79,7 +92,7 @@ public static class ActivatedAbilityRestrictions
                     return;
                 }
             }
-            _byName.Add((token, name));
+            store.ByName.Add((token, name));
         }
     }
 
@@ -90,9 +103,10 @@ public static class ActivatedAbilityRestrictions
     public static void RemoveNameRestriction(object token)
     {
         ArgumentNullException.ThrowIfNull(token);
-        lock (_gate)
+        var store = Current;
+        lock (store.Gate)
         {
-            _byName.RemoveAll(e => ReferenceEquals(e.Token, token));
+            store.ByName.RemoveAll(e => ReferenceEquals(e.Token, token));
         }
     }
 
@@ -104,9 +118,10 @@ public static class ActivatedAbilityRestrictions
     public static bool IsNameRestricted(string name)
     {
         if (string.IsNullOrEmpty(name)) return false;
-        lock (_gate)
+        var store = Current;
+        lock (store.Gate)
         {
-            foreach (var entry in _byName)
+            foreach (var entry in store.ByName)
             {
                 if (string.Equals(entry.Name, name, StringComparison.Ordinal))
                 {
@@ -134,16 +149,17 @@ public static class ActivatedAbilityRestrictions
     {
         ArgumentNullException.ThrowIfNull(token);
         ArgumentNullException.ThrowIfNull(match);
-        lock (_gate)
+        var store = Current;
+        lock (store.Gate)
         {
-            foreach (var entry in _byPredicate)
+            foreach (var entry in store.ByPredicate)
             {
                 if (ReferenceEquals(entry.Token, token) && ReferenceEquals(entry.Match, match))
                 {
                     return;
                 }
             }
-            _byPredicate.Add((token, match));
+            store.ByPredicate.Add((token, match));
         }
     }
 
@@ -155,9 +171,10 @@ public static class ActivatedAbilityRestrictions
     public static void RemovePredicateRestriction(object token)
     {
         ArgumentNullException.ThrowIfNull(token);
-        lock (_gate)
+        var store = Current;
+        lock (store.Gate)
         {
-            _byPredicate.RemoveAll(e => ReferenceEquals(e.Token, token));
+            store.ByPredicate.RemoveAll(e => ReferenceEquals(e.Token, token));
         }
     }
 
@@ -191,9 +208,10 @@ public static class ActivatedAbilityRestrictions
             return true;
         }
 
-        lock (_gate)
+        var store = Current;
+        lock (store.Gate)
         {
-            foreach (var entry in _byPredicate)
+            foreach (var entry in store.ByPredicate)
             {
                 if (entry.Match(ability)) return true;
             }
@@ -201,13 +219,14 @@ public static class ActivatedAbilityRestrictions
         }
     }
 
-    /// <summary>Reset the registry. Test-only.</summary>
+    /// <summary>Reset the active store. Test-only.</summary>
     public static void Clear()
     {
-        lock (_gate)
+        var store = Current;
+        lock (store.Gate)
         {
-            _byName.Clear();
-            _byPredicate.Clear();
+            store.ByName.Clear();
+            store.ByPredicate.Clear();
         }
     }
 }
