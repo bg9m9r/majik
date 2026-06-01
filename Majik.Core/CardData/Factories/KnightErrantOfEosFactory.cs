@@ -229,11 +229,16 @@ public static class KnightErrantOfEosFactory
         }
 
         // CR 701.20a — remainder of the peeked pool to bottom in a random
-        // order. Pulls from the active GameRandom for replay determinism
-        // (same posture as <see cref="AtraxaGrandUnifierFactory.Shuffle"/>).
+        // order. Pulls from the CONTROLLER's registered GameRandom for replay
+        // determinism (same posture as
+        // <see cref="AtraxaGrandUnifierFactory.Shuffle"/>). Using
+        // GameRandomRegistry.Get(controller) — not .Default — is correctness-
+        // critical: under concurrent matches .Default is the most-recently-
+        // constructed game's RNG, so this would otherwise shuffle with the
+        // WRONG game's RNG and corrupt both games.
         var remainder = peeked.Where(c => !picks.Contains(c)).ToList();
         foreach (var c in remainder) library.RemoveCard(c);
-        Majik.Core.Random.GameRandomRegistry.Default.Shuffle(remainder);
+        Majik.Core.Random.GameRandomRegistry.Get(controller).Shuffle(remainder);
         foreach (var c in remainder)
         {
             library.AddCard(c);

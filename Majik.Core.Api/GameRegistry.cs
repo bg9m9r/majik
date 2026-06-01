@@ -35,7 +35,20 @@ public sealed class GameRegistry
 
     public GameFacade? Get(Guid gameId) => _games.TryGetValue(gameId, out var facade) ? facade : null;
 
-    public bool Remove(Guid gameId) => _games.TryRemove(gameId, out _);
+    /// <summary>
+    /// Evict a finished match. Disposes the removed <see cref="GameFacade"/>
+    /// so it prunes its two players from the process-level registries
+    /// (agents, RNG, event bus, zone service) — before this fix
+    /// <c>TryRemove</c> ran but <see cref="GameFacade.Dispose"/> never did, so
+    /// every finished match leaked its fallback-store entries permanently in a
+    /// process that runs for days. Returns true when a facade was removed.
+    /// </summary>
+    public bool Remove(Guid gameId)
+    {
+        if (!_games.TryRemove(gameId, out var facade)) return false;
+        facade.Dispose();
+        return true;
+    }
 
     public int Count => _games.Count;
 }

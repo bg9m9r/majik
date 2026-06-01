@@ -706,8 +706,30 @@ public sealed class GameFacade : IDisposable
         // synchronously up to its first agent.Prompt<T> call, which fires
         // PromptRequested → PulsePromptSignal completes the captured TCS.
         var settled = _nextPromptSignal.Task;
-        _loopTask = _loop.RunUntilRoundEndsAsync(_alice, ct);
+        // Single-round path (test-only — production drives StartFullGameAsync).
+        // The full-game path installs its per-game registry scope inside
+        // GameDriver.RunGameAsync; this path has no driver, so the facade
+        // installs the scope itself for the duration of the background loop
+        // task (the scope must live on the loop's async flow, NOT this
+        // synchronous StartAsync call, so it stays active across every later
+        // SubmitAsync continuation that resumes the loop). Concurrent
+        // single-round facades therefore get isolated registry stores.
+        _loopTask = RunSingleRoundWithScopeAsync(ct);
         await WaitForPromptOrLoopAsync(settled, _loopTask, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Run the single-round priority loop inside this game's ambient registry
+    /// scope. Seeds the per-game AgentRegistry store with both seats' effective
+    /// agents (so effect closures prompt the right player) and disposes the
+    /// scope when the round ends, reclaiming the entries.
+    /// </summary>
+    private async Task RunSingleRoundWithScopeAsync(CancellationToken ct)
+    {
+        using var registryScope = Majik.Core.Game.GameRegistryScope.PushForGame();
+        AgentRegistry.Set(_alice, _aliceAgentEffective);
+        AgentRegistry.Set(_bob, _bobAgentEffective);
+        await _loop.RunUntilRoundEndsAsync(_alice, ct).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -1118,14 +1140,33 @@ public sealed class GameFacade : IDisposable
     }
 
     /// <summary>
-    /// Unregister this facade's player→agent bindings from the static
-    /// <see cref="AgentRegistry"/>. Per-player <c>Remove</c> instead of
-    /// <see cref="AgentRegistry.Clear"/> so concurrent matches keep their
-    /// own seats. Idempotent.
+    /// Prune this facade's two players from every process-level registry
+    /// (agents, RNG, event bus, zone service). Per-player <c>Remove</c>
+    /// instead of <c>Clear</c> so concurrent matches keep their own seats.
+    /// Idempotent.
+    ///
+    /// <para>
+    /// During a live run the registries are backed by per-game ambient stores
+    /// (installed in <c>GameDriver.RunGameAsync</c> / the single-round
+    /// <see cref="StartAsync"/> wrapper) that are reclaimed automatically when
+    /// the run scope ends. This prune targets the process-wide FALLBACK store,
+    /// which the <see cref="GameFacade"/> constructor (and any direct-effect
+    /// test that never starts a run) seeds with the two seats' agents — those
+    /// entries would otherwise leak for the lifetime of the process. The other
+    /// three registries are pruned too for symmetry / defence-in-depth in case
+    /// a caller seeded the fallback directly. Called from
+    /// <c>GameRegistry.Remove</c> when a finished match is evicted.
+    /// </para>
     /// </summary>
     public void Dispose()
     {
         AgentRegistry.Remove(_alice);
         AgentRegistry.Remove(_bob);
+        Majik.Core.Random.GameRandomRegistry.Remove(_alice);
+        Majik.Core.Random.GameRandomRegistry.Remove(_bob);
+        Majik.Core.Events.EventBusRegistry.Remove(_alice);
+        Majik.Core.Events.EventBusRegistry.Remove(_bob);
+        Majik.Core.Services.ZoneServiceRegistry.Remove(_alice);
+        Majik.Core.Services.ZoneServiceRegistry.Remove(_bob);
     }
 }

@@ -150,7 +150,7 @@ public static class AtraxaGrandUnifierFactory
         // Remainder → bottom in a random order (CR 701.20a).
         var remainder = peeked.Where(c => !picks.Contains(c)).ToList();
         foreach (var c in remainder) library.RemoveCard(c);
-        Shuffle(remainder);
+        Shuffle(remainder, controller);
         foreach (var c in remainder)
         {
             library.AddCard(c);
@@ -183,12 +183,17 @@ public static class AtraxaGrandUnifierFactory
         return picks;
     }
 
-    private static void Shuffle<T>(IList<T> list)
+    private static void Shuffle<T>(IList<T> list, Player controller)
     {
-        // Fisher-Yates via the active GameRandom (per CR 100.6) so
-        // deterministic replay is preserved. Falls back to a shared
-        // default when no per-player RNG is registered (tests that
-        // need determinism call GameRandomRegistry.SetDefault).
-        Majik.Core.Random.GameRandomRegistry.Default.Shuffle(list);
+        // Fisher-Yates via the controller's registered GameRandom (per
+        // CR 100.6) so deterministic replay is preserved AND the shuffle uses
+        // THIS game's RNG. Using GameRandomRegistry.Get(controller) — not
+        // .Default — is correctness-critical under concurrent matches in one
+        // process: .Default resolves the most-recently-constructed game's RNG,
+        // so two games' Atraxa resolutions would shuffle with each other's RNG
+        // and corrupt both. Falls back to the store's default when no
+        // per-player RNG is registered (tests that need determinism call
+        // GameRandomRegistry.SetDefault).
+        Majik.Core.Random.GameRandomRegistry.Get(controller).Shuffle(list);
     }
 }
