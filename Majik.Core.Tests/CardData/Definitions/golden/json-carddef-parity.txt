@@ -3834,9 +3834,7 @@
   "cardTypes": [
     "Creature"
   ],
-  "supertypes": [
-    "Legendary"
-  ],
+  "supertypes": [],
   "subtypes": [
     "Citizen",
     "Halfling"
@@ -3850,13 +3848,9 @@
       "list": []
     },
     "mana": {
-      "count": 5,
+      "count": 1,
       "list": [
-        "mana:B",
-        "mana:G",
-        "mana:R",
-        "mana:U",
-        "mana:W"
+        "mana:1"
       ]
     },
     "activated": {
