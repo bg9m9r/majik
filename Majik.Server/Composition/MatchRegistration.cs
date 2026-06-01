@@ -1,5 +1,6 @@
 using Majik.Core.Api;
 using Majik.Server.Matches;
+using Majik.Server.Matches.Persistence;
 using Microsoft.Extensions.Logging;
 
 namespace Majik.Server.Composition;
@@ -10,6 +11,13 @@ public static class MatchRegistration
     {
         if (!MongoRegistration.IsConfigured(config))
             return services;
+
+        // PLAN 08 (body) — durable engine-state persistence, gated behind the
+        // EnginePersistence:Enabled flag (DEFAULT OFF). With the flag off the
+        // coordinator no-ops every call, so no durable writes happen and the
+        // claim→rehydrate path is skipped — behaviour is exactly as today and the
+        // deploy posture is unchanged until an operator flips the flag.
+        AddEnginePersistence(services, config);
 
         // Wire the per-match EventBus error sink to a structured logger.
         // Without this, GameFacade leaves EventBus.OnHandlerError null and
@@ -91,5 +99,52 @@ public static class MatchRegistration
         services.AddHostedService<MatchIndexInitializer>();
         services.AddHostedService<MatchCleanupService>();
         return services;
+    }
+
+    /// <summary>
+    /// PLAN 08 (body) — wire the durable-persistence stores + coordinator. The
+    /// EnginePersistence:Enabled flag is bound from config (DEFAULT FALSE). When
+    /// the flag is ON, the durable stores are Mongo-backed (the same database the
+    /// matches use) and their indexes are ensured at startup; when OFF, in-memory
+    /// stores are registered so the graph still composes but nothing is written
+    /// (the coordinator no-ops on the flag anyway). The coordinator itself is
+    /// always registered so MatchService can resolve it; its <c>Enabled</c>
+    /// property is the single gate the request path checks.
+    /// </summary>
+    private static void AddEnginePersistence(IServiceCollection services, IConfiguration config)
+    {
+        services.Configure<EnginePersistenceOptions>(
+            config.GetSection(EnginePersistenceOptions.SectionName));
+
+        var enabled = config.GetValue<bool>(
+            $"{EnginePersistenceOptions.SectionName}:Enabled");
+
+        if (enabled)
+        {
+            services.AddSingleton<MongoEngineCommandLogStore>(sp =>
+                new MongoEngineCommandLogStore(sp.GetRequiredService<MongoDB.Driver.IMongoDatabase>()));
+            services.AddSingleton<MongoEngineCheckpointStore>(sp =>
+                new MongoEngineCheckpointStore(sp.GetRequiredService<MongoDB.Driver.IMongoDatabase>()));
+            services.AddSingleton<IEngineCommandLogStore>(sp =>
+                sp.GetRequiredService<MongoEngineCommandLogStore>());
+            services.AddSingleton<IEngineCheckpointStore>(sp =>
+                sp.GetRequiredService<MongoEngineCheckpointStore>());
+            services.AddHostedService<EnginePersistenceIndexInitializer>();
+        }
+        else
+        {
+            // Flag off — in-memory stores so the graph composes; never written
+            // (the coordinator gates on Enabled before any store call).
+            services.AddSingleton<IEngineCommandLogStore, InMemoryEngineCommandLogStore>();
+            services.AddSingleton<IEngineCheckpointStore, InMemoryEngineCheckpointStore>();
+        }
+
+        services.AddSingleton<EnginePersistenceCoordinator>(sp =>
+            new EnginePersistenceCoordinator(
+                sp.GetRequiredService<IEngineCommandLogStore>(),
+                sp.GetRequiredService<IEngineCheckpointStore>(),
+                sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<EnginePersistenceOptions>>(),
+                clock: null,
+                logger: sp.GetService<ILogger<EnginePersistenceCoordinator>>()));
     }
 }

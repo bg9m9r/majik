@@ -73,6 +73,34 @@ public sealed class ServerGameFactory
         return facade;
     }
 
+    /// <summary>
+    /// PLAN 08 (body) — build a facade WITHOUT registering it (no GameRegistry
+    /// entry, no bot-agent swap). Used as the <c>buildFreshFacade</c> step inside
+    /// <see cref="GameFacade.Rehydrate"/>: the rehydration replays the durable log
+    /// onto this fresh facade under a seed-scope, and only the FINISHED live
+    /// facade is registered (via <see cref="RegisterRehydrated"/>) under the
+    /// original match game id. Building through the registry here would mint +
+    /// register a throwaway GameId and collide on rebuild. The same
+    /// <see cref="ICardRepository"/> the live game used is threaded in so the
+    /// rebuilt deck cards bind identically.
+    /// </summary>
+    public GameFacade BuildUnregisteredFacade(
+        string aliceName,
+        string bobName,
+        IReadOnlyList<ICard> aliceDeck,
+        IReadOnlyList<ICard> bobDeck)
+        => GameFacade.Create(aliceName, bobName, aliceDeck, bobDeck, _cardRepo);
+
+    /// <summary>
+    /// PLAN 08 (body) — register an already-rehydrated facade under the original
+    /// match game id. The caller (MatchService, under a won ownership claim) has
+    /// re-stamped <paramref name="facade"/>'s GameId to <paramref name="gameId"/>.
+    /// Returns false when the id was concurrently registered (the live facade
+    /// wins — no clobber).
+    /// </summary>
+    public bool RegisterRehydrated(Guid gameId, GameFacade facade)
+        => _registry.RegisterRehydrated(gameId, facade);
+
     public GameFacade? Get(Guid id) => _registry.Get(id);
 
     public int Count => _registry.Count;
