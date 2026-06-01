@@ -5,6 +5,7 @@ using Majik.Core.CardData.Factories;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Combat;
+using Majik.Core.Costs;
 using Majik.Core.Effects;
 using Majik.Core.Events;
 using Majik.Core.Game;
@@ -295,115 +296,159 @@ public class ArenaOfGloryFactoryTests : IDisposable
     // haste until end of turn" (CR 702.10)
     // -----------------------------------------------------------------------
 
-    private sealed class TestFlow
-    {
-        public EventBus Bus { get; } = new();
-        public Majik.Core.Stack.Stack Stack { get; }
-        public ZoneService Zones { get; }
-        public SpellCastFlow Flow { get; }
-
-        public TestFlow()
-        {
-            Stack = new Majik.Core.Stack.Stack(Bus);
-            Zones = new ZoneService(Bus);
-            Flow = new SpellCastFlow(Stack, Zones, Bus);
-        }
-    }
-
     [Fact]
-    public void ArenaOfGlory_ExertActivation_RecordsHasteGrantingMana()
+    public void ArenaOfGlory_ExertActivation_TagsManaWithSlotProvenance()
     {
         var alice = new Player("Alice", 20);
         alice.AddManaToPool(ManaCost.Parse("R"));
         var land = ArenaOfGloryFactory.Create(alice);
+        var exert = ExertDoubleRed(land);
 
-        alice.PendingHasteGrantingRedMana.Should().Be(0);
+        alice.ManaProvenance.Should().BeEmpty();
 
-        new ManaAbilityActivator().ActivateManaAbility(ExertDoubleRed(land), alice);
+        new ManaAbilityActivator().ActivateManaAbility(exert, alice);
 
-        alice.PendingHasteGrantingRedMana.Should().Be(2,
-            "the exert ability tags its {R}{R} as haste-granting provenance");
+        // {R}{R} produced → two red provenance slots tagged with the exert
+        // ability (CR 106.4). The paid {R} from the pool was untagged, so it
+        // adds no slots.
+        alice.ManaProvenance.Should().HaveCount(2);
+        alice.ManaProvenance.Should().OnlyContain(s =>
+            s.Color == ManaColor.Red && ReferenceEquals(s.Source, exert));
     }
 
     [Fact]
-    public async Task ArenaOfGlory_CreatureSpellPaidWithExertMana_GainsHaste()
+    public void ArenaOfGlory_CreatureSpellPaidWithExertMana_GainsHaste()
     {
-        var t = new TestFlow();
         var alice = new Player("Alice", 20);
         alice.AddManaToPool(ManaCost.Parse("R"));
         var land = ArenaOfGloryFactory.Create(alice);
 
         // Exert: produces {R}{R} provenance-tagged for haste.
-        new ManaAbilityActivator(t.Bus).ActivateManaAbility(ExertDoubleRed(land), alice);
+        new ManaAbilityActivator().ActivateManaAbility(ExertDoubleRed(land), alice);
 
+        // Pay {R} for a creature spell from the exert-tagged floating pool —
+        // the realistic flow the engine drives in TurnDriver.DispatchCast.
         var goblin = new Creature("Goblin", "R", 1, 1) { Owner = alice, Zone = ZoneType.Hand };
-        var agent = new ScriptedAgent();
-        agent.QueueMana(ManaPayment.Empty);
-
-        await t.Flow.CastAsync(alice, goblin,
-            SpellDefinition.Vanilla(_ => Array.Empty<IEffect>()),
-            agent,
-            new GameContext(alice, new[] { alice }, alice, 1, PhaseStateType.PreCombatMain, t.Stack));
+        var resolver = new ManaPaymentResolver();
+        resolver.Pay(alice, ManaCost.Parse("R"), ManaPayment.Empty, spentOn: goblin, out _, out _)
+            .Should().BeTrue();
 
         CombatAbilities.HasHaste(goblin).Should().BeTrue(
-            "the exert-tagged {R}{R} paid for a creature spell ⇒ it gains haste (CR 702.10)");
+            "the exert-tagged {R} paid for a creature spell ⇒ it gains haste (CR 702.10)");
     }
 
     [Fact]
-    public async Task ArenaOfGlory_NoncreatureSpellPaidWithExertMana_GetsNoHaste()
+    public void ArenaOfGlory_NoncreatureSpellPaidWithExertMana_GetsNoHaste()
     {
-        var t = new TestFlow();
         var alice = new Player("Alice", 20);
         alice.AddManaToPool(ManaCost.Parse("R"));
         var land = ArenaOfGloryFactory.Create(alice);
-
-        new ManaAbilityActivator(t.Bus).ActivateManaAbility(ExertDoubleRed(land), alice);
+        new ManaAbilityActivator().ActivateManaAbility(ExertDoubleRed(land), alice);
 
         var bolt = new Instant("Bolt", "R") { Owner = alice, Zone = ZoneType.Hand };
-        var agent = new ScriptedAgent();
-        agent.QueueMana(ManaPayment.Empty);
+        var resolver = new ManaPaymentResolver();
+        resolver.Pay(alice, ManaCost.Parse("R"), ManaPayment.Empty, spentOn: bolt, out _, out _)
+            .Should().BeTrue();
 
-        await t.Flow.CastAsync(alice, bolt,
-            SpellDefinition.Vanilla(_ => Array.Empty<IEffect>()),
-            agent,
-            new GameContext(alice, new[] { alice }, alice, 1, PhaseStateType.PreCombatMain, t.Stack));
-
-        // The provenance is consumed (spent on a noncreature) — no haste granted.
-        alice.PendingHasteGrantingRedMana.Should().Be(0,
-            "the exert mana was spent on a noncreature spell — provenance consumed, no haste");
+        // The provenance slot was consumed (spent on a noncreature) — the
+        // reaction fired but granted nothing; one tagged slot remains floating.
+        alice.ManaProvenance.Should().HaveCount(1,
+            "one exert {R} was spent on the noncreature; the other is still floating");
     }
 
     [Fact]
-    public async Task ArenaOfGlory_CreatureSpellWithoutExertMana_GetsNoHaste()
+    public void ArenaOfGlory_CreatureSpellWithoutExertMana_GetsNoHaste()
     {
-        var t = new TestFlow();
         var alice = new Player("Alice", 20);
-        // No exert — just plain red mana in the pool.
+        // No exert — just plain (untagged) red mana in the pool.
         alice.AddManaToPool(ManaCost.Parse("RR"));
 
         var goblin = new Creature("Goblin", "R", 1, 1) { Owner = alice, Zone = ZoneType.Hand };
-        var agent = new ScriptedAgent();
-        agent.QueueMana(ManaPayment.Empty);
-
-        await t.Flow.CastAsync(alice, goblin,
-            SpellDefinition.Vanilla(_ => Array.Empty<IEffect>()),
-            agent,
-            new GameContext(alice, new[] { alice }, alice, 1, PhaseStateType.PreCombatMain, t.Stack));
+        var resolver = new ManaPaymentResolver();
+        resolver.Pay(alice, ManaCost.Parse("R"), ManaPayment.Empty, spentOn: goblin, out _, out _)
+            .Should().BeTrue();
 
         CombatAbilities.HasHaste(goblin).Should().BeFalse(
             "a creature paid with ordinary mana gets no haste — provenance is required");
     }
 
     [Fact]
-    public void Player_EmptyManaPool_ClearsHasteProvenance()
+    public void ArenaOfGlory_UnrelatedLaterSpell_DoesNotGetHaste()
+    {
+        // The bug the coarse player-scoped counter had: it granted haste to
+        // the FIRST spell cast after the exert, not the spell the exert mana
+        // actually paid for. With slot-level provenance, the exert {R}{R} that
+        // fully pays creature1 leaves NO tagged mana for a later creature2 paid
+        // with fresh untapped lands.
+        var alice = new Player("Alice", 20);
+        alice.AddManaToPool(ManaCost.Parse("R"));
+        var land = ArenaOfGloryFactory.Create(alice);
+        new ManaAbilityActivator().ActivateManaAbility(ExertDoubleRed(land), alice);
+
+        var resolver = new ManaPaymentResolver();
+
+        // creature1 spends both exert {R}{R}.
+        var creature1 = new Creature("First", "RR", 2, 2) { Owner = alice, Zone = ZoneType.Hand };
+        resolver.Pay(alice, ManaCost.Parse("RR"), ManaPayment.Empty, spentOn: creature1, out _, out _)
+            .Should().BeTrue();
+        CombatAbilities.HasHaste(creature1).Should().BeTrue("creature1 was paid with the exert mana");
+
+        // creature2 is paid with fresh (untagged) mountains — no exert mana left.
+        var m1 = NamedCardFactory.Create("Mountain", alice);
+        var m2 = NamedCardFactory.Create("Mountain", alice);
+        m1.SetZone(ZoneType.Battlefield);
+        m2.SetZone(ZoneType.Battlefield);
+        var creature2 = new Creature("Second", "RR", 2, 2) { Owner = alice, Zone = ZoneType.Hand };
+        resolver.Pay(alice, ManaCost.Parse("RR"),
+            new ManaPayment(new ICard[] { m1, m2 }), spentOn: creature2, out _, out _)
+            .Should().BeTrue();
+
+        CombatAbilities.HasHaste(creature2).Should().BeFalse(
+            "the exert mana was already spent on creature1 — an unrelated later spell gets no haste");
+    }
+
+    [Fact]
+    public void ArenaOfGlory_ManaFromTaggedSource_TriggersReaction_UntaggedSourceDoesNot()
+    {
+        // Mana from source A (tagged with a reaction) spent on a spell fires
+        // the reaction; mana from source B (untagged) spent on the same spell
+        // does not. Strict per-source provenance.
+        var alice = new Player("Alice", 20);
+        var land = ArenaOfGloryFactory.Create(alice);
+        alice.AddManaToPool(ManaCost.Parse("R")); // for the exert's {R} cost
+        new ManaAbilityActivator().ActivateManaAbility(ExertDoubleRed(land), alice);
+        // Now pool = {R}{R} both tagged by the exert (source A).
+
+        // Add one untagged {R} (source B — plain mana, no provenance).
+        alice.AddManaToPool(ManaCost.Parse("R"));
+
+        alice.ManaProvenance.Should().HaveCount(2, "only source A's {R}{R} is tagged");
+
+        // Spend exactly {R} on a creature — FIFO consumes one source-A slot,
+        // firing its haste reaction.
+        var goblin = new Creature("Goblin", "R", 1, 1) { Owner = alice, Zone = ZoneType.Hand };
+        var resolver = new ManaPaymentResolver();
+        resolver.Pay(alice, ManaCost.Parse("R"), ManaPayment.Empty, spentOn: goblin, out _, out _)
+            .Should().BeTrue();
+
+        CombatAbilities.HasHaste(goblin).Should().BeTrue(
+            "the spent {R} came from the tagged exert source ⇒ reaction fired");
+        alice.ManaProvenance.Should().HaveCount(1,
+            "one tagged slot consumed; one tagged + one untagged {R} remain");
+    }
+
+    [Fact]
+    public void Player_EmptyManaPool_ClearsSlotProvenance()
     {
         var alice = new Player("Alice", 20);
-        alice.AddHasteGrantingRedMana(2);
-        alice.PendingHasteGrantingRedMana.Should().Be(2);
+        alice.AddManaToPool(ManaCost.Parse("R"));
+        var land = ArenaOfGloryFactory.Create(alice);
+        new ManaAbilityActivator().ActivateManaAbility(ExertDoubleRed(land), alice);
+        alice.ManaProvenance.Should().HaveCount(2);
 
         alice.EmptyManaPool();
 
-        alice.PendingHasteGrantingRedMana.Should().Be(0,
-            "haste-granting provenance dies with the floating mana at end of step/phase (CR 500.4)");
+        alice.ManaProvenance.Should().BeEmpty(
+            "slot provenance dies with the floating mana at end of step/phase (CR 500.4)");
     }
 }

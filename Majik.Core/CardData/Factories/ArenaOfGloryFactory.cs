@@ -52,18 +52,19 @@ namespace Majik.Core.CardData.Factories;
 ///   skip persists in the registry until <see cref="UntapStepRestrictions.Clear"/>
 ///   is called (shared test-isolation posture with Mana Vault / Frost Lynx).
 /// - <b>Mana provenance — "if that mana is spent on a creature spell, it
-///   gains haste until end of turn" (CR 702.10)</b> — the exert ability
-///   stamps <see cref="Player.AddHasteGrantingRedMana"/> with 2 when it
-///   produces {R}{R}. <see cref="Majik.Core.Game.SpellCastFlow"/> consumes
-///   that provenance at the next spell cast: if the spell is a creature
-///   spell, the resulting creature gets a Layer-6
-///   <see cref="GrantKeywordUntilEndOfTurnEffect"/>("Haste") that expires in
-///   the cleanup step. This is the least-invasive correct mechanism — see
-///   <see cref="Player.PendingHasteGrantingRedMana"/> xmldoc for why a
-///   player-scoped counter is used instead of per-slot
-///   <see cref="ValueObjects.ManaPool"/> tags (that pool rewrite is a
-///   separate slice; see <see cref="Majik.Core.Mana.ManaTag"/> /
-///   <see cref="Majik.Core.Mana.SpendRestriction"/> xmldoc).
+///   gains haste until end of turn" (CR 702.10)</b> — slot-level provenance
+///   (CR 106.4). The exert ability sets a
+///   <see cref="ManaAbility.ProvenanceReaction"/>; the
+///   <see cref="Majik.Core.Services.ManaAbilityActivator"/> tags each {R} it
+///   produces with a <see cref="Majik.Core.Mana.ManaProvenanceSlot"/> whose
+///   source is the exert ability and whose OnSpent is that reaction. When the
+///   <see cref="Majik.Core.Costs.ManaPaymentResolver"/> consumes one of those
+///   tagged units paying a cost, it fires the reaction with the cast card; a
+///   creature spell gets a Layer-6
+///   <see cref="GrantKeywordUntilEndOfTurnEffect"/>("Haste") expiring in the
+///   cleanup step. This is strictly per-pip: the haste attaches to the
+///   creature the exert mana actually paid for, not "the first spell cast
+///   after the exert" (the prior coarse player-scoped counter).
 ///
 /// ## Deferred (v1 gaps)
 /// - Single-arg dispatcher path constructs without a
@@ -71,9 +72,6 @@ namespace Majik.Core.CardData.Factories;
 ///   (shape-only posture matching <see cref="CheckLandCycleFactory"/> and
 ///   every other ETB-replacement factory's single-arg path). Lands enter
 ///   untapped on this code path; the full overload wires the predicate.
-/// - Provenance accounting is "first spell cast after the exert" granularity
-///   (consume-on-next-cast), not strict per-pip tracking — same deferred
-///   slice as <see cref="Majik.Core.Mana.ManaTag"/>.
 /// </summary>
 [CardName("Arena of Glory")]
 public static class ArenaOfGloryFactory
@@ -142,11 +140,17 @@ public static class ArenaOfGloryFactory
         // {R}, {T}, Exert this land: Add {R}{R}.
         //   - canActivateCheck: untapped land AND ≥1 {R} in the pool for the
         //     printed {R} portion of the cost.
-        //   - additionalCostPayer (after the {T} tap): pay {R}, mark the
+        //   - additionalCostPayer (after the {T} tap): pay {R} and mark the
         //     land "doesn't untap during your next untap step" (Exert, CR
-        //     502.1), and stamp the haste-granting provenance (CR 702.10).
+        //     502.1).
+        //   - ProvenanceReaction (CR 702.10 / 106.4): the {R}{R} this ability
+        //     produces is slot-tagged with this ability as its source; when
+        //     one of those units is spent paying for a creature spell, that
+        //     creature gains haste until end of turn. Strictly per-pip — the
+        //     reaction fires only for the spell the exert mana actually paid,
+        //     not "the first spell after the exert" (the old coarse counter).
         // ----------------------------------------------------------------
-        land.AddAbility(new ManaAbility(
+        var exert = new ManaAbility(
             source: land,
             controller: owner,
             manaGenerated: ManaCost.Parse("RR"),
@@ -183,13 +187,14 @@ public static class ArenaOfGloryFactory
                     };
                     eventBus.Subscribe(cleanup);
                 }
+            });
 
-                // CR 702.10 / CR 106.4 — tag the produced {R}{R} as
-                // haste-granting provenance. SpellCastFlow consumes this on
-                // the next spell cast; a creature spell paid with it gains
-                // haste until end of turn. See Player.PendingHasteGrantingRedMana.
-                controller.AddHasteGrantingRedMana(2);
-            }));
+        // CR 702.10 — "If that mana is spent on a creature spell, it gains
+        // haste until end of turn." Fired by the payment resolver for each
+        // exert-tagged {R} that pays a cost, carrying the cast card.
+        exert.ProvenanceReaction = spentOn => GrantHasteIfCreature(spentOn);
+
+        land.AddAbility(exert);
 
         return land;
     }
@@ -200,4 +205,22 @@ public static class ArenaOfGloryFactory
         CardSubtype subtype) =>
         controller.Zones.Battlefield.GetCards()
             .Any(c => !ReferenceEquals(c, self) && c.HasSubtype(subtype));
+
+    /// <summary>
+    /// CR 702.10 — grant the creature the exert mana paid for haste until end
+    /// of turn. No-op when the mana was spent on a noncreature spell or a
+    /// non-spell context (<paramref name="spentOn"/> is null or not a
+    /// <see cref="Creature"/>). Registers a Layer-6
+    /// <see cref="GrantKeywordUntilEndOfTurnEffect"/>("Haste") on the
+    /// creature's active effects, expiring in the cleanup step. Idempotent if
+    /// multiple exert pips pay for the same creature spell — re-granting the
+    /// same keyword is harmless.
+    /// </summary>
+    private static void GrantHasteIfCreature(ICard? spentOn)
+    {
+        if (spentOn is not Creature creature) return;
+        creature.ActiveEffects ??= new ContinuousEffectsService();
+        creature.ActiveEffects.Register(
+            new GrantKeywordUntilEndOfTurnEffect(creature, "Haste"));
+    }
 }

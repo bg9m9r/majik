@@ -88,40 +88,33 @@ public static class CabalCoffersFactory
         //
         // CR 605.1 — mana ability (produces mana, no target, doesn't use
         // the stack). The {2} is an additional mana cost paid as part of
-        // the activation alongside the {T}.
-        //
-        // Implementation approach:
-        //   We use the Func<ManaCost> overload so the Swamp count is
-        //   evaluated at activation time rather than factory-build time.
-        //   The {2} payment is inlined inside the generator because the
-        //   existing ManaAbility API has no Func<ManaCost> + additionalCostPayer
-        //   constructor. The canActivateCheck guards both conditions so the
-        //   lambda is only reached when the full cost ({2} + {T}) is payable.
+        // the activation alongside the {T}, declared via the dynamic-mana +
+        // additionalCostPayer ctor (deferral #2) so it composes cleanly with
+        // the Func<ManaCost> Swamp-counting generator instead of being inlined
+        // inside the generator lambda.
         //
         //   canActivateCheck:
         //     1. Land is not already tapped (standard {T} gate).
         //     2. Controller's mana pool can pay {2}
         //        (owner.ManaPool.CanPay — does NOT consume mana; read-only).
         //
-        //   manaGenerator lambda (runs inside ManaAbility.Activate before tap):
-        //     1. owner.PayMana({2}) — drains 2 generic mana from pool.
-        //     2. Count Swamps the owner controls (DefileFactory.CountSwamps).
-        //     3. Return N × {B} (ManaCost.Zero when N == 0).
+        //   manaGenerator lambda:
+        //     1. Count Swamps the owner controls (DefileFactory.CountSwamps).
+        //     2. Return N × {B} (ManaCost.Zero when N == 0).
+        //
+        //   additionalCostPayer (runs after the {T} tap):
+        //     owner.PayMana({2}) — drains 2 generic mana from pool. Part of the
+        //     same atomic activation cost (CR 602.2a); the canActivateCheck
+        //     already verified affordability.
         // ----------------------------------------------------------------
         land.AddAbility(new ManaAbility(
             source: land,
             controller: owner,
-            manaGenerator: () =>
-            {
-                // Pay the {2} portion of the activation cost.
-                owner.PayMana(TapAdditionalCost);
-                // Count Swamps the controller currently controls.
-                var n = DefileFactory.CountSwamps(owner);
-                return BuildBlackMana(n);
-            },
+            manaGenerator: () => BuildBlackMana(DefileFactory.CountSwamps(owner)),
             canActivateCheck: () =>
                 !land.IsTapped
-                && owner.ManaPool.CanPay(TapAdditionalCost)));
+                && owner.ManaPool.CanPay(TapAdditionalCost),
+            additionalCostPayer: controller => controller.PayMana(TapAdditionalCost)));
 
         return land;
     }

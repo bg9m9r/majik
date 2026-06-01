@@ -220,6 +220,29 @@ public sealed class ManaPaymentResolver
         ManaCost cost,
         ManaPayment payment,
         out IReadOnlyList<ValueObjects.ManaColor> colorsSpent,
+        out IReadOnlyDictionary<ValueObjects.ManaColor, int> colorCounts) =>
+        Pay(payer, cost, payment, spentOn: null, out colorsSpent, out colorCounts);
+
+    /// <summary>
+    /// Slot-level mana-provenance overload (CR 106.4 — deferral #1). Identical
+    /// to the count-reporting overload, but additionally consumes the payer's
+    /// per-color <see cref="Majik.Core.Mana.ManaProvenanceSlot"/> ledger by the
+    /// same per-color spent counts and fires each consumed slot's
+    /// <see cref="Majik.Core.Mana.ManaProvenanceSlot.OnSpent"/> reaction with
+    /// <paramref name="spentOn"/> — the object the mana was spent on (the cast
+    /// card for a spell, or <c>null</c> for an ability-activation context).
+    /// This is the "if THAT mana (from this specific source) is spent on THIS
+    /// spell" mechanism: a card stamps its produced mana with a reaction
+    /// (Arena of Glory's exert → grant haste to a creature spell), and the
+    /// reaction fires precisely when one of its tagged units pays a cost —
+    /// strictly per-pip, not "the first spell after the source resolved".
+    /// </summary>
+    public bool Pay(
+        Player payer,
+        ManaCost cost,
+        ManaPayment payment,
+        Cards.ICard? spentOn,
+        out IReadOnlyList<ValueObjects.ManaColor> colorsSpent,
         out IReadOnlyDictionary<ValueObjects.ManaColor, int> colorCounts)
     {
         colorsSpent = Array.Empty<ValueObjects.ManaColor>();
@@ -344,6 +367,20 @@ public sealed class ManaPaymentResolver
         if (deltaG > 0) { spent.Add(ValueObjects.ManaColor.Green); counts[ValueObjects.ManaColor.Green] = deltaG; }
         colorsSpent = spent;
         colorCounts = counts;
+
+        // CR 106.4 — slot-level provenance (deferral #1). Consume the payer's
+        // provenance ledger by exactly the per-color spent counts, firing each
+        // tagged slot's OnSpent reaction with what the mana was spent on. The
+        // pool delta is the multiplicity of mana spent of that color, so we
+        // pop that many matching slots FIFO — untagged spends pop nothing, and
+        // a slot's reaction (e.g. Arena of Glory's haste grant) fires only
+        // when one of its units actually paid.
+        if (deltaW > 0) payer.ConsumeProvenanceSlotsOnSpend(ValueObjects.ManaColor.White, deltaW, spentOn);
+        if (deltaU > 0) payer.ConsumeProvenanceSlotsOnSpend(ValueObjects.ManaColor.Blue,  deltaU, spentOn);
+        if (deltaB > 0) payer.ConsumeProvenanceSlotsOnSpend(ValueObjects.ManaColor.Black, deltaB, spentOn);
+        if (deltaR > 0) payer.ConsumeProvenanceSlotsOnSpend(ValueObjects.ManaColor.Red,   deltaR, spentOn);
+        if (deltaG > 0) payer.ConsumeProvenanceSlotsOnSpend(ValueObjects.ManaColor.Green, deltaG, spentOn);
+
         return true;
     }
 }

@@ -36,6 +36,20 @@ public class ManaAbility : IManaAbility
     /// </summary>
     public SpendRestriction? SpendRestriction { get; }
 
+    /// <summary>
+    /// Optional slot-level provenance reaction (CR 106.4 — deferral #1). When
+    /// non-null, the <see cref="Majik.Core.Services.ManaAbilityActivator"/>
+    /// stamps every colored unit this ability produces with a
+    /// <see cref="Majik.Core.Mana.ManaProvenanceSlot"/> whose source is THIS
+    /// ability and whose <c>OnSpent</c> is this delegate — so the
+    /// <see cref="Majik.Core.Costs.ManaPaymentResolver"/> can fire the
+    /// reaction precisely when one of those units pays a cost, carrying the
+    /// object the mana was spent on (the cast card, or null). Arena of Glory's
+    /// exert ability sets this to "grant haste to a creature spell"
+    /// (CR 702.10). <c>null</c> ⇒ vanilla mana, no slot tagging.
+    /// </summary>
+    public Action<Cards.ICard?>? ProvenanceReaction { get; set; }
+
     public ManaAbility(object source, Player controller, ManaCost manaGenerated, Func<bool>? canActivateCheck = null)
         : this(source, controller, manaGenerated, canActivateCheck, spendRestriction: null)
     {
@@ -71,6 +85,40 @@ public class ManaAbility : IManaAbility
         Controller = controller ?? throw new ArgumentNullException(nameof(controller));
         _manaGenerator = manaGenerator ?? throw new ArgumentNullException(nameof(manaGenerator));
         _canActivateCheck = canActivateCheck;
+        ManaGenerated = ManaCost.Zero; // Will be set when activated
+        _tapsAsCost = true;
+    }
+
+    /// <summary>
+    /// Construct a DYNAMIC-mana ability ("{N},{T}: Add … for each …") whose
+    /// activation also pays an additional cost via
+    /// <paramref name="additionalCostPayer"/> — Cabal Coffers'
+    /// "{2},{T}: Add {B} for each Swamp you control" (deferral #2). Composes
+    /// the additional-cost payer with the <paramref name="manaGenerator"/>
+    /// <c>Func&lt;ManaCost&gt;</c> so the {N} mana payment is declared cleanly
+    /// instead of being inlined inside the generator lambda.
+    ///
+    /// <para>Order in <see cref="Activate"/>: evaluate the generator
+    /// (counts the dynamic quantity, e.g. Swamps), tap the source ({T}), then
+    /// run <paramref name="additionalCostPayer"/> (pay the {N}). The {N}
+    /// payment and the mana production are part of the same atomic activation
+    /// cost (CR 602.2a / 605.1) — the observable post-activation state is the
+    /// same regardless of intra-step ordering. <paramref name="canActivateCheck"/>
+    /// gates legality (untapped AND can afford {N}) so the generator is only
+    /// ever reached when the full cost is payable (CR 119.4).</para>
+    /// </summary>
+    public ManaAbility(
+        object source,
+        Player controller,
+        Func<ManaCost> manaGenerator,
+        Func<bool> canActivateCheck,
+        Action<Player> additionalCostPayer)
+    {
+        Source = source ?? throw new ArgumentNullException(nameof(source));
+        Controller = controller ?? throw new ArgumentNullException(nameof(controller));
+        _manaGenerator = manaGenerator ?? throw new ArgumentNullException(nameof(manaGenerator));
+        _canActivateCheck = canActivateCheck ?? throw new ArgumentNullException(nameof(canActivateCheck));
+        _additionalCostPayer = additionalCostPayer ?? throw new ArgumentNullException(nameof(additionalCostPayer));
         ManaGenerated = ManaCost.Zero; // Will be set when activated
         _tapsAsCost = true;
     }

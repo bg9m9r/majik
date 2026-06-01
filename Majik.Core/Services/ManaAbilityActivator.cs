@@ -47,8 +47,21 @@ public class ManaAbilityActivator
         // Activate the ability and generate mana
         var manaGenerated = ability.Activate();
 
-        // Add mana to player's pool
-        player.AddManaToPool(manaGenerated);
+        // Add mana to player's pool. CR 106.4 — when the ability declares a
+        // slot-level provenance reaction (Arena of Glory's exert: "if that
+        // mana is spent on a creature spell, it gains haste"), tag every
+        // colored unit with this ability as source + that reaction, so the
+        // payment resolver can fire it precisely when one of those units pays
+        // a cost (deferral #1). Vanilla mana abilities add untagged mana.
+        var provenance = (ability as Majik.Core.Abilities.ManaAbility)?.ProvenanceReaction;
+        if (provenance != null)
+        {
+            player.AddManaToPool(manaGenerated, provenanceSource: ability, onSpent: provenance);
+        }
+        else
+        {
+            player.AddManaToPool(manaGenerated);
+        }
 
         // CR 605 — publish so "whenever a player taps X for mana" triggers
         // (Manabarbs, Badgermole Cub, etc.) and analytics subscribers can

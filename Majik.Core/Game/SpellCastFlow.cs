@@ -213,8 +213,12 @@ public sealed class SpellCastFlow
             spell, card, caster, alternativeCost, totalCost,
             hasKickerPayment, giftRecipient, sourceZoneAtCast);
 
-        // CR 702.10 / 106.4 — mana-provenance haste rider (Arena of Glory).
-        ApplyHasteGrantingManaProvenance(card, caster);
+        // CR 702.10 / 106.4 — the mana-provenance haste rider (Arena of Glory)
+        // is now applied at PAY time by ManaPaymentResolver firing the tagged
+        // mana's OnSpent reaction (slot-level provenance, deferral #1), so it
+        // attaches strictly to the creature the exert mana paid for — not to
+        // "the first spell cast after the exert" as the old player-scoped
+        // counter did. No cast-time provenance step is needed here.
 
         _stack.Push(spell);
         _eventBus.Publish(new SpellCastEvent(spell));
@@ -696,19 +700,6 @@ public sealed class SpellCastFlow
                 concreteForLibraryCast.SetWasCastFromLibrary(true);
             }
         }
-    }
-
-    /// <summary>CR 702.10 / CR 106.4 — mana-provenance haste rider (Arena of
-    /// Glory's exert: "If that mana is spent on a creature spell, it gains
-    /// haste until end of turn"). Casting a noncreature consumes the
-    /// provenance but grants nothing.</summary>
-    private static void ApplyHasteGrantingManaProvenance(ICard card, Player caster)
-    {
-        if (!caster.ConsumeHasteGrantingMana()) return;
-        if (card is not Cards.Creature hasteCreature) return;
-        hasteCreature.ActiveEffects ??= new ContinuousEffectsService();
-        hasteCreature.ActiveEffects.Register(
-            new GrantKeywordUntilEndOfTurnEffect(hasteCreature, "Haste"));
     }
 
     /// <summary>

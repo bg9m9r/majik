@@ -258,6 +258,45 @@ public class CabalCoffersFactoryTests
     }
 
     // -----------------------------------------------------------------------
+    // Deferral #2 — dynamic mana ({B} per Swamp) composes with the {2}
+    // additional-cost payer (declared via the ManaAbility ctor, no longer
+    // inlined in the generator lambda).
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void Activate_ComposesDynamicMana_WithAdditionalTwoCost()
+    {
+        // Two Swamps + extra floating mana: the dynamic generator counts
+        // Swamps (→ {B}{B}) AND the additional {2} cost is paid from the pool
+        // in the same activation — they compose, not collide.
+        var coffers = PlaceOnBattlefield();
+        AddSwamp(_alice);
+        AddSwamp(_alice);
+        _alice.AddManaToPool(ManaCost.Parse("4")); // {2} for cost + {2} spare
+
+        var mana = ((IManaAbility)coffers.Abilities[0]).Activate();
+
+        mana.Black.Should().Be(2, "2 Swamps → {B}{B} (dynamic mana generator)");
+        _alice.ManaPool.Generic.Should().Be(2, "only the {2} additional cost was consumed");
+        coffers.IsTapped.Should().BeTrue("{T} is part of the activation cost");
+    }
+
+    [Fact]
+    public void CannotActivateWithoutTwo_AdditionalCostEnforced_LandNotTapped()
+    {
+        // The {2} additional cost gates activation: with an empty pool the
+        // ability is illegal and nothing is tapped / paid (CR 119.4 — can't
+        // pay a cost you can't afford).
+        var coffers = PlaceOnBattlefield();
+        AddSwamp(_alice);
+        var ability = (IManaAbility)coffers.Abilities[0];
+
+        ability.CanActivate().Should().BeFalse("cannot pay the {2} additional cost");
+        coffers.IsTapped.Should().BeFalse("an illegal activation taps nothing");
+        _alice.ManaPool.IsEmpty.Should().BeTrue("nothing was paid");
+    }
+
+    // -----------------------------------------------------------------------
     // BuildBlackMana internal helper
     // -----------------------------------------------------------------------
 
