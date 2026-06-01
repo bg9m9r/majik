@@ -1,0 +1,6 @@
+{
+  "name": "Whir of Invention",
+  "types": ["Instant"],
+  "manaCost": "{X}{U}{U}{U}",
+  "abilities": []
+}
