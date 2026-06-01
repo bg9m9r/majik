@@ -1,3 +1,4 @@
+using Majik.Core.Game;
 using Majik.Core.Players;
 
 namespace Majik.Core.Rules;
@@ -33,10 +34,21 @@ namespace Majik.Core.Rules;
 /// </summary>
 public static class PlayerStaticAbilities
 {
-    // Each entry: (token, player). A player has hexproof while at least
-    // one entry targeting them exists.
-    private static readonly List<(object Token, Player Player)> _hexproof = new();
-    private static readonly object _gate = new();
+    /// <summary>Per-game store: the token/player hexproof grant list and lock.</summary>
+    public sealed class Store
+    {
+        // Each entry: (token, player). A player has hexproof while at least
+        // one entry targeting them exists.
+        internal readonly List<(object Token, Player Player)> Hexproof = new();
+        internal readonly object Gate = new();
+    }
+
+    private static readonly AmbientRegistryStore<Store> _ambient = new();
+
+    private static Store Current => _ambient.Current;
+
+    /// <summary>Install a fresh per-game store. See <see cref="GameRegistryScope"/>.</summary>
+    public static IDisposable PushScope() => _ambient.Push(new Store());
 
     /// <summary>
     /// Register a hexproof grant on <paramref name="player"/>, keyed by
@@ -50,9 +62,10 @@ public static class PlayerStaticAbilities
     {
         ArgumentNullException.ThrowIfNull(token);
         ArgumentNullException.ThrowIfNull(player);
-        lock (_gate)
+        var store = Current;
+        lock (store.Gate)
         {
-            foreach (var entry in _hexproof)
+            foreach (var entry in store.Hexproof)
             {
                 if (ReferenceEquals(entry.Token, token)
                     && ReferenceEquals(entry.Player, player))
@@ -60,7 +73,7 @@ public static class PlayerStaticAbilities
                     return;
                 }
             }
-            _hexproof.Add((token, player));
+            store.Hexproof.Add((token, player));
         }
     }
 
@@ -72,9 +85,10 @@ public static class PlayerStaticAbilities
     public static void RemoveHexproof(object token)
     {
         ArgumentNullException.ThrowIfNull(token);
-        lock (_gate)
+        var store = Current;
+        lock (store.Gate)
         {
-            _hexproof.RemoveAll(e => ReferenceEquals(e.Token, token));
+            store.Hexproof.RemoveAll(e => ReferenceEquals(e.Token, token));
         }
     }
 
@@ -85,9 +99,10 @@ public static class PlayerStaticAbilities
     public static bool HasHexproof(Player player)
     {
         if (player == null) return false;
-        lock (_gate)
+        var store = Current;
+        lock (store.Gate)
         {
-            foreach (var entry in _hexproof)
+            foreach (var entry in store.Hexproof)
             {
                 if (ReferenceEquals(entry.Player, player)) return true;
             }
@@ -95,9 +110,10 @@ public static class PlayerStaticAbilities
         }
     }
 
-    /// <summary>Reset the registry. Test-only.</summary>
+    /// <summary>Reset the active store. Test-only.</summary>
     public static void Clear()
     {
-        lock (_gate) _hexproof.Clear();
+        var store = Current;
+        lock (store.Gate) store.Hexproof.Clear();
     }
 }

@@ -130,7 +130,12 @@ public class LayerAgreementInvariantTests : IClassFixture<TestMongoFixture>
         var expectedActive = h.Facade.ActivePlayerId;
         string? holder = null;
         Guid holderSeatId = System.Guid.Empty;
-        for (var i = 0; i < 50; i++)
+        // Deadline-based poll (was a fixed 50 × 20 ms = 1 s budget, which
+        // flaked when the async clock-handoff round-trip ran slow under CI
+        // load). The loop still exits the instant the holder converges, so the
+        // happy path is unchanged; only the worst-case ceiling is generous.
+        var convergeDeadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
+        while (DateTime.UtcNow < convergeDeadline)
         {
             holder = h.LatestClockHolderSub();
             if (holder != null)

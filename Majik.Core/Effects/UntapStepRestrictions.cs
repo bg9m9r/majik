@@ -1,5 +1,6 @@
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Game;
 using Majik.Core.Players;
 
 namespace Majik.Core.Effects;
@@ -43,26 +44,56 @@ namespace Majik.Core.Effects;
 /// (<see cref="DoesNotUntapStaticEffect"/>, <see cref="SubtypeDoesNotUntapStaticEffect"/>,
 /// <see cref="UntapCountCapStaticEffect"/>).
 ///
+/// <para>
+/// Like its sibling <see cref="Majik.Core.Rules.CastingRestrictions"/>, the
+/// backing state is <b>not</b> a single process-global static. It lives in an
+/// <see cref="AmbientRegistryStore{TStore}"/> scoped per-game via
+/// <see cref="GameRegistryScope.PushForGame"/> (installed at game start),
+/// so concurrent matches see independent untap-skip state and a finished
+/// match's entries are reclaimed when its scope ends. Outside any game scope
+/// (direct-construction unit tests) the static API resolves a process-wide
+/// fallback store, so the existing call sites keep working unchanged.
+/// </para>
+///
 /// Tests that mutate the registry should call <see cref="Clear"/> in a
 /// fixture/dispose path to avoid leakage across cases.
 /// </summary>
 public static class UntapStepRestrictions
 {
-    // Per-permanent skip: while at least one entry targets a permanent, it
-    // does not untap. Entries keyed by source token so multiple effects can
-    // stack without trampling each other.
-    private static readonly List<(object Token, Permanent Target)> _permanentSkips = new();
-    // Subtype skip: while at least one entry targets a subtype, every
-    // permanent with that subtype is skipped regardless of controller. The
-    // token guarantees per-source removability.
-    private static readonly List<(object Token, CardSubtype Subtype)> _subtypeSkips = new();
-    // Count caps: while at least one cap is registered, the untap step's
-    // candidate list (after ShouldSkipUntap thinning) is filtered through
-    // ApplyCountCaps so any cap's filter selects at most MaxCount survivors.
-    // Each cap has an IsActive gate so "as long as <source> is untapped"
-    // riders re-check at consultation time without a tap-event surface.
-    private static readonly List<UntapCountCap> _countCaps = new();
-    private static readonly object _gate = new();
+    /// <summary>
+    /// Per-game store: the three untap-skip rails plus the lock that guards
+    /// them. One instance is minted per game scope (and one process-wide
+    /// fallback backs direct-construction call sites).
+    /// </summary>
+    public sealed class Store
+    {
+        // Per-permanent skip: while at least one entry targets a permanent, it
+        // does not untap. Entries keyed by source token so multiple effects can
+        // stack without trampling each other.
+        internal readonly List<(object Token, Permanent Target)> PermanentSkips = new();
+        // Subtype skip: while at least one entry targets a subtype, every
+        // permanent with that subtype is skipped regardless of controller. The
+        // token guarantees per-source removability.
+        internal readonly List<(object Token, CardSubtype Subtype)> SubtypeSkips = new();
+        // Count caps: while at least one cap is registered, the untap step's
+        // candidate list (after ShouldSkipUntap thinning) is filtered through
+        // ApplyCountCaps so any cap's filter selects at most MaxCount survivors.
+        // Each cap has an IsActive gate so "as long as <source> is untapped"
+        // riders re-check at consultation time without a tap-event surface.
+        internal readonly List<UntapCountCap> CountCaps = new();
+        internal readonly object Gate = new();
+    }
+
+    private static readonly AmbientRegistryStore<Store> _ambient = new();
+
+    private static Store Current => _ambient.Current;
+
+    /// <summary>
+    /// Install a fresh per-game store as the ambient store for the current
+    /// async flow until the returned scope is disposed. Used at game start so
+    /// concurrent matches are isolated. See <see cref="GameRegistryScope"/>.
+    /// </summary>
+    public static IDisposable PushScope() => _ambient.Push(new Store());
 
     /// <summary>
     /// Internal record for a count cap. <see cref="IsActive"/> is consulted
@@ -96,9 +127,10 @@ public static class UntapStepRestrictions
     {
         ArgumentNullException.ThrowIfNull(token);
         ArgumentNullException.ThrowIfNull(permanent);
-        lock (_gate)
+        var store = Current;
+        lock (store.Gate)
         {
-            foreach (var entry in _permanentSkips)
+            foreach (var entry in store.PermanentSkips)
             {
                 if (ReferenceEquals(entry.Token, token)
                     && ReferenceEquals(entry.Target, permanent))
@@ -106,7 +138,7 @@ public static class UntapStepRestrictions
                     return;
                 }
             }
-            _permanentSkips.Add((token, permanent));
+            store.PermanentSkips.Add((token, permanent));
         }
     }
 
@@ -119,16 +151,17 @@ public static class UntapStepRestrictions
     public static void MarkSubtypeDoesNotUntap(object token, CardSubtype subtype)
     {
         ArgumentNullException.ThrowIfNull(token);
-        lock (_gate)
+        var store = Current;
+        lock (store.Gate)
         {
-            foreach (var entry in _subtypeSkips)
+            foreach (var entry in store.SubtypeSkips)
             {
                 if (ReferenceEquals(entry.Token, token) && entry.Subtype == subtype)
                 {
                     return;
                 }
             }
-            _subtypeSkips.Add((token, subtype));
+            store.SubtypeSkips.Add((token, subtype));
         }
     }
 
@@ -150,10 +183,11 @@ public static class UntapStepRestrictions
         ArgumentNullException.ThrowIfNull(token);
         ArgumentNullException.ThrowIfNull(filter);
         ArgumentNullException.ThrowIfNull(isActive);
-        lock (_gate)
+        var store = Current;
+        lock (store.Gate)
         {
-            _countCaps.RemoveAll(e => ReferenceEquals(e.Token, token));
-            _countCaps.Add(new UntapCountCap(token, maxCount, filter, isActive));
+            store.CountCaps.RemoveAll(e => ReferenceEquals(e.Token, token));
+            store.CountCaps.Add(new UntapCountCap(token, maxCount, filter, isActive));
         }
     }
 
@@ -165,11 +199,12 @@ public static class UntapStepRestrictions
     public static void RemoveAll(object token)
     {
         ArgumentNullException.ThrowIfNull(token);
-        lock (_gate)
+        var store = Current;
+        lock (store.Gate)
         {
-            _permanentSkips.RemoveAll(e => ReferenceEquals(e.Token, token));
-            _subtypeSkips.RemoveAll(e => ReferenceEquals(e.Token, token));
-            _countCaps.RemoveAll(e => ReferenceEquals(e.Token, token));
+            store.PermanentSkips.RemoveAll(e => ReferenceEquals(e.Token, token));
+            store.SubtypeSkips.RemoveAll(e => ReferenceEquals(e.Token, token));
+            store.CountCaps.RemoveAll(e => ReferenceEquals(e.Token, token));
         }
     }
 
@@ -186,13 +221,14 @@ public static class UntapStepRestrictions
     {
         if (permanent == null) return false;
         _ = untappingPlayer; // reserved for future controller-scoped filters
-        lock (_gate)
+        var store = Current;
+        lock (store.Gate)
         {
-            foreach (var entry in _permanentSkips)
+            foreach (var entry in store.PermanentSkips)
             {
                 if (ReferenceEquals(entry.Target, permanent)) return true;
             }
-            foreach (var entry in _subtypeSkips)
+            foreach (var entry in store.SubtypeSkips)
             {
                 if (permanent.HasSubtype(entry.Subtype)) return true;
             }
@@ -233,10 +269,11 @@ public static class UntapStepRestrictions
         // so caller-supplied gate predicates can touch any state without
         // re-entering the registry's monitor.
         List<UntapCountCap> snapshot;
-        lock (_gate)
+        var store = Current;
+        lock (store.Gate)
         {
-            if (_countCaps.Count == 0) return blocked;
-            snapshot = new List<UntapCountCap>(_countCaps);
+            if (store.CountCaps.Count == 0) return blocked;
+            snapshot = new List<UntapCountCap>(store.CountCaps);
         }
 
         foreach (var cap in snapshot)
@@ -270,18 +307,20 @@ public static class UntapStepRestrictions
     {
         get
         {
-            lock (_gate) return _countCaps.Count > 0;
+            var store = Current;
+            lock (store.Gate) return store.CountCaps.Count > 0;
         }
     }
 
-    /// <summary>Reset the registry. Test-only.</summary>
+    /// <summary>Reset the active store. Test-only.</summary>
     public static void Clear()
     {
-        lock (_gate)
+        var store = Current;
+        lock (store.Gate)
         {
-            _permanentSkips.Clear();
-            _subtypeSkips.Clear();
-            _countCaps.Clear();
+            store.PermanentSkips.Clear();
+            store.SubtypeSkips.Clear();
+            store.CountCaps.Clear();
         }
     }
 }

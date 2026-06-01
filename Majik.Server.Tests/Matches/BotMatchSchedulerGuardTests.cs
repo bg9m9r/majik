@@ -40,6 +40,38 @@ public class BotMatchSchedulerGuardTests : IClassFixture<TestMongoFixture>
         }
     }
 
+    // Generous ceiling for the fire-and-forget callbacks (which run with zero
+    // configured delay) to settle. We poll well below this and bail the
+    // instant the count reaches/exceeds the target, so the happy path is
+    // fast; the ceiling only matters under heavy CI contention.
+    private static readonly TimeSpan SettleTimeout = TimeSpan.FromSeconds(10);
+
+    /// <summary>
+    /// Poll until <paramref name="counting"/> has created at least
+    /// <paramref name="target"/> scopes, or the timeout elapses. Replaces a
+    /// fixed Task.Delay — the old sleep flaked when a queued callback hadn't
+    /// run yet under CI load. Returns once the count settles; the assertion in
+    /// the caller then pins the EXACT expected value (so an over-count still
+    /// fails).
+    /// </summary>
+    private static async Task WaitForScopesAtLeastAsync(CountingScopeProvider counting, int target)
+    {
+        var deadline = DateTime.UtcNow + SettleTimeout;
+        while (counting.ScopesCreated < target && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(5);
+        }
+    }
+
+    /// <summary>
+    /// Give any spurious EXTRA callbacks a brief, bounded window to surface
+    /// after the expected count is reached — guards the "exactly N" assertions
+    /// (e.g. dedup must NOT create a second scope) against a false pass caused
+    /// by checking before a stray callback ran. Short and fixed because we are
+    /// proving the ABSENCE of further work, which can't be polled-for.
+    /// </summary>
+    private static Task DrainStrayCallbacksAsync() => Task.Delay(150);
+
     private ServiceProvider BuildContainer()
     {
         var db = _fixture.NewDatabase();
@@ -84,8 +116,10 @@ public class BotMatchSchedulerGuardTests : IClassFixture<TestMongoFixture>
         scheduler.ScheduleBotPlayDraw(matchId, "bot:aggro");
         scheduler.ScheduleBotPlayDraw(matchId, "bot:aggro");
 
-        // Let any queued callbacks run.
-        await Task.Delay(200);
+        // Wait for the one allowed callback to run, then give any (wrongly)
+        // queued second callback a bounded window to surface.
+        await WaitForScopesAtLeastAsync(counting, 1);
+        await DrainStrayCallbacksAsync();
 
         counting.ScopesCreated.Should().Be(1,
             "the per-match guard must let only the first ScheduleBotPlayDraw queue a callback");
@@ -103,7 +137,8 @@ public class BotMatchSchedulerGuardTests : IClassFixture<TestMongoFixture>
         scheduler.ScheduleBotPlayDraw(Guid.NewGuid(), "bot:aggro");
         scheduler.ScheduleBotPlayDraw(Guid.NewGuid(), "bot:aggro");
 
-        await Task.Delay(200);
+        await WaitForScopesAtLeastAsync(counting, 2);
+        await DrainStrayCallbacksAsync();
 
         counting.ScopesCreated.Should().Be(2, "distinct matches are independent — each schedules once");
     }
@@ -125,13 +160,24 @@ public class BotMatchSchedulerGuardTests : IClassFixture<TestMongoFixture>
 
         var matchId = Guid.NewGuid();
 
-        // First schedule — callback fires, key is evicted in finally.
+        // First schedule — callback fires (scope #1), key is evicted in the
+        // callback's finally AFTER PlayDrawAsync completes.
         scheduler.ScheduleBotPlayDraw(matchId, "bot:aggro");
-        await Task.Delay(200); // wait for callback to complete
+        await WaitForScopesAtLeastAsync(counting, 1);
 
-        // Second schedule — the dedup key is gone so a second scope is created.
-        scheduler.ScheduleBotPlayDraw(matchId, "bot:aggro");
-        await Task.Delay(200);
+        // Second schedule. The dedup key is evicted only once the first
+        // callback reaches its finally — which is NOT guaranteed merely
+        // because scope #1 was created (eviction trails the scope). The old
+        // fixed 200 ms sleep raced that window. Re-issue the schedule (a no-op
+        // while the key is still present — exactly the production behaviour)
+        // until the eviction lands and a second scope is created.
+        var rescheduleDeadline = DateTime.UtcNow + SettleTimeout;
+        while (counting.ScopesCreated < 2 && DateTime.UtcNow < rescheduleDeadline)
+        {
+            scheduler.ScheduleBotPlayDraw(matchId, "bot:aggro");
+            await Task.Delay(10);
+        }
+        await DrainStrayCallbacksAsync();
 
         counting.ScopesCreated.Should().Be(2,
             "the dedup entry is evicted after the callback completes, so a re-schedule is allowed");

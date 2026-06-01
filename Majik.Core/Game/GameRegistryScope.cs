@@ -1,6 +1,9 @@
+using Majik.Core.Effects;
 using Majik.Core.Events;
+using Majik.Core.Players;
 using Majik.Core.Players.Agents;
 using Majik.Core.Random;
+using Majik.Core.Rules;
 using Majik.Core.Services;
 
 namespace Majik.Core.Game;
@@ -8,8 +11,13 @@ namespace Majik.Core.Game;
 /// <summary>
 /// Installs a fresh per-game ambient store for every process-level registry
 /// at once — <see cref="AgentRegistry"/>, <see cref="GameRandomRegistry"/>,
-/// <see cref="EventBusRegistry"/> and <see cref="ZoneServiceRegistry"/> — for
-/// the duration of a game's run.
+/// <see cref="EventBusRegistry"/>, <see cref="ZoneServiceRegistry"/>,
+/// <see cref="CastingRestrictions"/>, <see cref="UntapStepRestrictions"/>,
+/// <see cref="FlashGrantRegistry"/>, <see cref="IndestructibleGrantRegistry"/>,
+/// <see cref="SkipDrawRegistry"/>, <see cref="PlayerStaticAbilities"/>,
+/// <see cref="ActivatedAbilityRestrictions"/> and
+/// <see cref="ControlPlayerRegistryProvider"/> — for the duration of a game's
+/// run.
 ///
 /// <para>
 /// Mirrors <see cref="LogicalClockScope"/>: the install happens at the very
@@ -34,17 +42,28 @@ namespace Majik.Core.Game;
 public static class GameRegistryScope
 {
     /// <summary>
-    /// Push a fresh per-game store for all four registries. Dispose the
+    /// Push a fresh per-game store for every per-game registry. Dispose the
     /// returned handle (typically via <c>using</c>) at the end of the game's
     /// run to restore the previous stores and reclaim this game's entries.
     /// </summary>
     public static IDisposable PushForGame()
     {
-        var agents = AgentRegistry.PushScope();
-        var rng = GameRandomRegistry.PushScope();
-        var bus = EventBusRegistry.PushScope();
-        var zones = ZoneServiceRegistry.PushScope();
-        return new CompositeScope(agents, rng, bus, zones);
+        var scopes = new IDisposable[]
+        {
+            AgentRegistry.PushScope(),
+            GameRandomRegistry.PushScope(),
+            EventBusRegistry.PushScope(),
+            ZoneServiceRegistry.PushScope(),
+            CastingRestrictions.PushScope(),
+            UntapStepRestrictions.PushScope(),
+            FlashGrantRegistry.PushScope(),
+            IndestructibleGrantRegistry.PushScope(),
+            SkipDrawRegistry.PushScope(),
+            PlayerStaticAbilities.PushScope(),
+            ActivatedAbilityRestrictions.PushScope(),
+            ControlPlayerRegistryProvider.PushScope(),
+        };
+        return new CompositeScope(scopes);
     }
 
     private sealed class CompositeScope : IDisposable

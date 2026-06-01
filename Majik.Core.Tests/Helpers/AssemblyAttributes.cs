@@ -1,27 +1,40 @@
 using Xunit;
 
-// Disable xUnit's per-collection parallel test execution for this assembly.
+// Parallel test execution is ENABLED for this assembly (xUnit's default).
 //
-// Many Majik.Core test classes mutate process-level statics without
-// consistent Clear()/Dispose pairing. Under xUnit's default parallel
-// collections these mutations race and surface as cross-class flaky failures
-// — usually as "agent was not consulted" / "expected reorder didn't happen" /
-// "restriction leaked across tests."
+// History
+// -------
+// This assembly used to be pinned to [assembly: CollectionBehavior(
+// DisableTestParallelization = true)] because many test classes mutate
+// process-level registries without consistent Clear()/Dispose pairing. Under
+// parallel collections those mutations raced on the shared statics and
+// surfaced as cross-class flaky failures — "agent was not consulted",
+// "expected reorder didn't happen", "restriction leaked across tests".
 //
-// 2026-05-31 update (scope-game-registries): the four player-keyed registries
-// (AgentRegistry, ZoneServiceRegistry, GameRandomRegistry, EventBusRegistry)
-// are now AsyncLocal-scoped per game (see GameRegistryScope / the
-// AmbientRegistryStore<T> helper), so LIVE games no longer race on them. But
-// the bulk of the unit suite constructs effects / agents directly and never
-// installs a game scope, so those tests still share the process-wide FALLBACK
-// store — and a re-enable probe (parallelism on) surfaced a non-deterministic
-// 3–8 flaky failures per run on exactly those direct-construction paths (plus
-// CastingRestrictions, which is token-/turn-scoped and deliberately left as a
-// process static). The de-static of the four registries is the shipped fix;
-// fully parallelising the suite needs either (a) per-test fallback isolation
-// (an IDisposable fixture that pushes a fresh scope around each test) or
-// (b) de-static-ing CastingRestrictions too. Tracked as a follow-up.
+// Two changes removed the root cause and let parallelism come back:
 //
-// Serializing the whole assembly remains the safe-by-default posture and adds
-// only a few seconds to the run.
-[assembly: CollectionBehavior(DisableTestParallelization = true)]
+//   1. PR #1704 de-static-ed the four player-keyed registries (AgentRegistry,
+//      ZoneServiceRegistry, GameRandomRegistry, EventBusRegistry) onto a
+//      per-game AsyncLocal ambient store (AmbientRegistryStore<T> /
+//      GameRegistryScope). This PR does the same for every remaining
+//      process-global game-state registry — CastingRestrictions,
+//      UntapStepRestrictions, FlashGrantRegistry, IndestructibleGrantRegistry,
+//      SkipDrawRegistry, PlayerStaticAbilities, ActivatedAbilityRestrictions
+//      and ControlPlayerRegistryProvider — so no registry is a shared mutable
+//      static any more; each carries a per-game store plus a process-wide
+//      fallback.
+//
+//   2. Direct-construction tests (the bulk of the suite — they build effects
+//      / agents / restriction rails with no surrounding game) would otherwise
+//      still share the process-wide FALLBACK store across parallel
+//      collections. PerTestRegistryScopeFramework (registered below) installs
+//      a FRESH GameRegistryScope.PushForGame() around EVERY test case (incl.
+//      each [Theory] row) and disposes it after, so every test gets its own
+//      private ambient store and cannot cross-contaminate another running
+//      concurrently. No per-class edits required.
+//
+// With per-test fallback isolation in place, parallel collections are safe and
+// materially faster, so the DisableTestParallelization pin is gone.
+[assembly: TestFramework(
+    "Majik.Core.Tests.Helpers.PerTestRegistryScopeFramework",
+    "Majik.Core.Tests")]
