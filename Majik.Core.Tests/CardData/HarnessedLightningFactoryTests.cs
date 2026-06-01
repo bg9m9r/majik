@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Majik.Core.Abilities;
 using Majik.Core.CardData;
 using Majik.Core.CardData.Factories;
 using Majik.Core.Cards;
@@ -6,6 +7,7 @@ using Majik.Core.Cards.Types;
 using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
+using Majik.Core.Tests.Helpers;
 using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
 using Xunit;
@@ -178,6 +180,68 @@ public class HarnessedLightningFactoryTests
         alice.EnergyCounters.Should().Be(3,
             "energy gain is unconditional even when the damage step fizzles");
         bear.Damage.Should().Be(0, "no damage when target is no longer legal");
+    }
+
+    // -----------------------------------------------------------------------
+    // PLAN 01 Slice D — the resolve-time "may pay X" prompt routes through a
+    // REAL ResolutionContext (non-null ctx.Game), not a `ctx: null!` landmine.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task HarnessedLightning_XChoice_RoutesThroughNonNullContext()
+    {
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+        var bear = new Creature("Grizzly Bears", "{1}{G}", 2, 2);
+        bear.SetOwner(bob);
+        bear.SetController(bob);
+        bear.SetZone(ZoneType.Battlefield);
+        bob.Zones.Battlefield.AddCard(bear);
+
+        var card = HarnessedLightningFactory.Create(alice);
+        var def = HarnessedLightningFactory.BuildSpellDefinition(
+            alice, card, resolver: x => x);
+        var chosen = new ChosenSpellParams(
+            ModeIndex: null,
+            X: null,
+            Targets: new[] { (IReadOnlyList<object>)new object[] { bear } },
+            Mana: ManaPayment.Empty);
+
+        // Recording agent supplied via the live ResolutionContext (the PLAN 01
+        // Slice D resolve path), NOT AgentRegistry — proves the factory reads
+        // ctx.Agent / ctx.Game rather than passing `ctx: null!`.
+        var agent = new RecordingXAgent(pick: 1);
+        var stack = new Majik.Core.Stack.Stack(new Majik.Core.Events.EventBus());
+        var gameCtx = new GameContext(
+            alice, new[] { alice, bob }, alice, turnNumber: 1,
+            currentPhase: null, stack);
+        var resCtx = ResolutionContext.For(
+            alice, agent, gameCtx, chosenTargets: null);
+
+        foreach (var effect in def.EffectFactory(chosen))
+            await effect.ExecuteAsync(resCtx);
+
+        agent.LastCtx.Should().NotBeNull(
+            "the X prompt must receive the live GameContext, never `ctx: null!`");
+        agent.LastCtx.Should().BeSameAs(gameCtx);
+        bear.Damage.Should().Be(1, "agent picked X = 1 via the wired prompt");
+    }
+
+    /// <summary>Records the ctx handed to ChooseXAsync; delegates every other
+    /// prompt to a plain ScriptedAgent (which throws if asked, surfacing any
+    /// accidental extra prompt).</summary>
+    private sealed class RecordingXAgent : DelegatingAgent
+    {
+        private readonly int _pick;
+        public GameContext? LastCtx { get; private set; }
+
+        public RecordingXAgent(int pick) => _pick = pick;
+
+        public override Task<int> ChooseXAsync(GameContext ctx, ICard source, CancellationToken ct = default)
+        {
+            LastCtx = ctx;
+            return Task.FromResult(_pick);
+        }
     }
 
     [Fact]

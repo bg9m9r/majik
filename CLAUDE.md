@@ -87,7 +87,7 @@ Phases are pluggable (`Majik.Core/Game/Phases/`). The sequence supports MTG's ex
 
 ### Abilities + effects
 
-`Majik.Core/Abilities/` — the four ability shapes (`ActivatedAbility`, `TriggeredAbility` + `TriggerManager`, `StaticAbility` + `StaticAbilityManager`, `ReplacementEffect` + `ReplacementEffectManager`) plus `ManaAbility`. Effects decoupled via `Majik.Core/Effects/EffectLibrary.cs` + `EffectFactory.cs`. Costs (`Majik.Core/Costs/`), targeting (`Majik.Core/Targeting/`), spells (`Majik.Core/Spells/`) are separate subsystems composed by `SpellCaster`, `AbilityActivator`, `ManaAbilityActivator` in `Majik.Core/Services/`.
+`Majik.Core/Abilities/` — the four ability shapes (`ActivatedAbility`, `TriggeredAbility` + `TriggerManager`, `StaticAbility` + `StaticAbilityManager`, `ReplacementEffect` + `ReplacementEffectManager`) plus `ManaAbility`. Effects live under `Majik.Core/Effects/` (each `IEffect` is its own class; one-shot effects are also built inline via `Fx.Inline`). Costs (`Majik.Core/Costs/`), targeting (`Majik.Core/Targeting/`), spells (`Majik.Core/Spells/`) are separate subsystems composed by `SpellCaster`, `AbilityActivator`, `ManaAbilityActivator` in `Majik.Core/Services/`.
 
 ### Cards + zones
 

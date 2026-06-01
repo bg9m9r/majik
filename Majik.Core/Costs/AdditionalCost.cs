@@ -7,7 +7,8 @@ using Majik.Core.Zones;
 namespace Majik.Core.Costs;
 
 /// <summary>
-/// Additional costs beyond mana (sacrifice, tap, discard, etc.).
+/// Additional costs beyond mana (sacrifice, tap, pay life).
+/// Discard-as-cost lives in <see cref="DiscardXCardsAdditionalCost"/>.
 /// </summary>
 public class AdditionalCost : ICost
 {
@@ -51,19 +52,6 @@ public class AdditionalCost : ICost
     }
 
     /// <summary>
-    /// Create a discard cost (discard a card).
-    /// </summary>
-    public static AdditionalCost Discard(ICard card)
-    {
-        if (card == null)
-        {
-            throw new ArgumentNullException(nameof(card));
-        }
-
-        return new AdditionalCost(AdditionalCostType.Discard, $"Discard {card.Name}", card);
-    }
-
-    /// <summary>
     /// Create a life cost (pay life).
     /// </summary>
     public static AdditionalCost PayLife(int amount)
@@ -97,7 +85,6 @@ public class AdditionalCost : ICost
                 && !permanent.IsTapped
                 && Abilities.SummoningSicknessTapGate.CanTapForAbility(permanent),
             AdditionalCostType.Sacrifice => _costParameter is Cards.Permanent permanent && permanent.Controller == player,
-            AdditionalCostType.Discard => _costParameter is ICard card && card.Controller == player && card.Zone == ZoneType.Hand,
             AdditionalCostType.PayLife => _costParameter is int amount && player.LifeTotal > amount,
             _ => false
         };
@@ -154,10 +141,6 @@ public class AdditionalCost : ICost
                 }
                 break;
 
-            case AdditionalCostType.Discard:
-                // TODO: Move card to graveyard (zone service)
-                break;
-
             case AdditionalCostType.PayLife:
                 if (_costParameter is int amount)
                 {
@@ -175,6 +158,5 @@ public enum AdditionalCostType
 {
     Tap,
     Sacrifice,
-    Discard,
     PayLife
 }

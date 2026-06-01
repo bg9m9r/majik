@@ -1568,6 +1568,132 @@ public class RemoteAgentTests
         new(_alice, new[] { _alice }, _alice, 1, PhaseStateType.PreCombatMain, new Majik.Core.Stack.Stack());
 
     // -----------------------------------------------------------------------
+    // PLAN 01 Slice D — the unified ChooseAsync prompts (ChooseFromHand /
+    // ChooseFromBattlefield / ChooseFromPile / ChooseGiftRecipient) reach the
+    // human via the interface-default shim, which delegates to ChooseAsync.
+    // RemoteAgent OVERRIDES ChooseAsync to fire a real ChoiceCommand wire
+    // prompt, so the human path must AWAIT a command (Brainstorm put-back,
+    // edict sacrifice, Wish pile, gift recipient) instead of silently
+    // auto-picking candidates[0]. These tests lock that in.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task ChooseFromHand_Human_AwaitsRealChoiceCommand_NoAutoPick()
+    {
+        // Brainstorm-style put-back: two distinct cards in hand. If the human
+        // path auto-picked candidates[0] the task would already be complete
+        // and the player would never get to choose which to put back.
+        var a = new Instant("Lightning Bolt", "R") { Owner = _alice };
+        var b = new Creature("Bear", "1G", 2, 2) { Owner = _alice };
+        var agent = new RemoteAgent(
+            _alice, cardLookup: id => id == a.InstanceId ? a : id == b.InstanceId ? b : null);
+
+        var task = ((IPlayerAgent)agent).ChooseFromHandAsync(
+            _alice, new ICard[] { a, b }, BotIntent.None);
+
+        task.IsCompleted.Should().BeFalse(
+            "the human must be prompted — not auto-picked to candidates[0]");
+        agent.HasPending.Should().BeTrue();
+        agent.ExpectedCommandKinds.Should().Contain(typeof(ChoiceCommand));
+
+        // Player picks the SECOND candidate (proves the pick is honoured, not
+        // a silent first-candidate default).
+        agent.Submit(new ChoiceCommand(
+            ChoiceKind.PickOne.ToString(), new[] { b.InstanceId })
+        { PlayerId = _alice.Id });
+
+        var picked = await task;
+        picked.Should().BeSameAs(b);
+    }
+
+    [Fact]
+    public async Task ChooseFromBattlefield_Human_AwaitsRealChoiceCommand_NoAutoPick()
+    {
+        // Edict / Annihilator sacrifice: the human picks which permanent to
+        // sacrifice from a multi-card battlefield.
+        var a = new Creature("Bear", "1G", 2, 2) { Owner = _alice };
+        var b = new Creature("Elk", "2G", 3, 3) { Owner = _alice };
+        var agent = new RemoteAgent(
+            _alice, cardLookup: id => id == a.InstanceId ? a : id == b.InstanceId ? b : null);
+
+        var task = ((IPlayerAgent)agent).ChooseFromBattlefieldAsync(
+            _alice, new ICard[] { a, b }, BotIntent.Removal);
+
+        task.IsCompleted.Should().BeFalse("the human must be prompted to sacrifice");
+        agent.ExpectedCommandKinds.Should().Contain(typeof(ChoiceCommand));
+
+        agent.Submit(new ChoiceCommand(
+            ChoiceKind.PickOne.ToString(), new[] { b.InstanceId })
+        { PlayerId = _alice.Id });
+
+        (await task).Should().BeSameAs(b);
+    }
+
+    [Fact]
+    public async Task ChooseFromPile_Human_AwaitsRealChoiceCommand_NoAutoPick()
+    {
+        // Wish pile (Karn / Burning Wish / Living Wish): the human picks a
+        // card from outside the game rather than auto-grabbing candidates[0].
+        var a = new Artifact("Relic", "2") { Owner = _alice };
+        var b = new Artifact("Engine", "3") { Owner = _alice };
+        var agent = new RemoteAgent(
+            _alice, cardLookup: id => id == a.InstanceId ? a : id == b.InstanceId ? b : null);
+
+        var task = ((IPlayerAgent)agent).ChooseFromPileAsync(
+            _alice, new ICard[] { a, b }, "your sideboard", BotIntent.Tutor);
+
+        task.IsCompleted.Should().BeFalse("the human must be prompted to wish");
+        agent.ExpectedCommandKinds.Should().Contain(typeof(ChoiceCommand));
+
+        agent.Submit(new ChoiceCommand(
+            ChoiceKind.PickOne.ToString(), new[] { b.InstanceId })
+        { PlayerId = _alice.Id });
+
+        (await task).Should().BeSameAs(b);
+    }
+
+    [Fact]
+    public async Task ChooseGiftRecipient_Human_AwaitsRealChoiceCommand()
+    {
+        var bob = new Player("Bob", 20);
+        var carol = new Player("Carol", 20);
+        var card = new Instant("Bolt", "R") { Owner = _alice };
+        var agent = new RemoteAgent(
+            _alice,
+            playerLookup: id => id == bob.Id ? bob : id == carol.Id ? carol : null);
+
+        var task = ((IPlayerAgent)agent).ChooseGiftRecipientAsync(
+            NewContext(), card, "a Food token", new[] { bob, carol });
+
+        task.IsCompleted.Should().BeFalse("the human must be prompted to pick a recipient");
+        agent.ExpectedCommandKinds.Should().Contain(typeof(ChoiceCommand));
+
+        agent.Submit(new ChoiceCommand(
+            ChoiceKind.PickOne.ToString(), new[] { carol.Id })
+        { PlayerId = _alice.Id });
+
+        (await task).Should().BeSameAs(carol);
+    }
+
+    [Fact]
+    public async Task ChooseFromHand_Human_DeclineEmptySelection_ReturnsNull()
+    {
+        // An empty selection (player declines) resolves to null rather than
+        // auto-picking — the optional-pickup branch human-side.
+        var a = new Instant("Bolt", "R") { Owner = _alice };
+        var agent = new RemoteAgent(
+            _alice, cardLookup: id => id == a.InstanceId ? a : null);
+
+        var task = ((IPlayerAgent)agent).ChooseFromHandAsync(_alice, new ICard[] { a }, BotIntent.None);
+
+        agent.Submit(new ChoiceCommand(
+            ChoiceKind.PickOne.ToString(), System.Array.Empty<Guid>())
+        { PlayerId = _alice.Id });
+
+        (await task).Should().BeNull("empty selection = decline, not auto-pick");
+    }
+
+    // -----------------------------------------------------------------------
     // CR 701.15 — reveal-and-choose prompt (Malevolent Rumble, Impulse,
     // Sleight of Hand, See the Unwritten, …).
     // -----------------------------------------------------------------------

@@ -173,7 +173,7 @@ public sealed class PriorityLoop
                     continue;
                 }
 
-                var action = await agent.ChoosePriorityActionAsync(ctx, ct);
+                var action = await agent.ChoosePriorityActionAsync(ctx, ct).ConfigureAwait(false);
 
                 if (action is PriorityAction.PassAction)
                 {
@@ -189,7 +189,7 @@ public sealed class PriorityLoop
                     return;
                 }
 
-                await ApplyActionAsync(current, action, ctx, ct);
+                await ApplyActionAsync(current, action, ctx, ct).ConfigureAwait(false);
 
                 if (HoldsPriority(action))
                 {
@@ -219,7 +219,7 @@ public sealed class PriorityLoop
                 _stack,
                 ResolveAgentForController,
                 MakeContext(activePlayer, activePlayer),
-                ct);
+                ct).ConfigureAwait(false);
             // Loop back: start a fresh priority round with active player.
         }
     }
@@ -256,13 +256,13 @@ public sealed class PriorityLoop
                 if (_castDispatcher == null)
                     throw new InvalidOperationException(
                         "PriorityLoop received CastSpell but no castDispatcher was supplied.");
-                await _castDispatcher(actor, cast, ctx);
+                await _castDispatcher(actor, cast, ctx).ConfigureAwait(false);
                 break;
             case PriorityAction.ActivateAbility activate:
                 if (_activateDispatcher == null)
                     throw new InvalidOperationException(
                         "PriorityLoop received ActivateAbility but no activateDispatcher was supplied.");
-                await _activateDispatcher(actor, activate, ctx);
+                await _activateDispatcher(actor, activate, ctx).ConfigureAwait(false);
                 break;
             case PriorityAction.ActivateManaAbility mana:
                 if (_manaAbilityDispatcher == null)
