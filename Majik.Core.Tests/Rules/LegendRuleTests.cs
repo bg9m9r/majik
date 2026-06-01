@@ -2,6 +2,7 @@ using FluentAssertions;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Domain.DomainEvents;
+using Majik.Core.Effects;
 using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Rules;
@@ -144,6 +145,89 @@ public class LegendRuleTests
         
         onBattlefield.Should().HaveCount(1); // One should remain
         inGraveyard.Should().HaveCount(2); // Two should be in graveyard
+    }
+
+    // -----------------------------------------------------------------------
+    // Deferral #4 — GrantSupertypeEffect (Layer-4 "is legendary") interacts
+    // with the legend rule via the EFFECTIVE supertype set (CR 205.4 / 704.5k).
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void CheckLegendRule_SecondPermanentGrantedLegendary_TriggersLegendRule()
+    {
+        // Arrange — two same-name permanents that are NOT printed legendary.
+        // The second is granted Legendary by an active GrantSupertypeEffect
+        // (the Ring-bearer "is legendary" shape). The legend rule reads the
+        // effective supertype set, so BOTH now count as legendary → one dies.
+        var effects = new ContinuousEffectsService();
+        var player = new Player("Alice", 20);
+        var c1 = new Creature("Mishra's Helix", "1U", 0, 1) { Owner = player, Controller = player };
+        var c2 = new Creature("Mishra's Helix", "1U", 0, 1) { Owner = player, Controller = player };
+        c1.ActiveEffects = effects;
+        c2.ActiveEffects = effects;
+
+        c1.SetZone(ZoneType.Battlefield);
+        c2.SetZone(ZoneType.Battlefield);
+        _zoneService.MoveCardTo(c1, ZoneType.Battlefield, player);
+        _zoneService.MoveCardTo(c2, ZoneType.Battlefield, player);
+
+        // Grant Legendary to BOTH so the legend rule applies to the pair.
+        effects.Register(GrantSupertypeEffect.ForPermanent(c1, CardSupertype.Legendary));
+        effects.Register(GrantSupertypeEffect.ForPermanent(c2, CardSupertype.Legendary));
+
+        c1.HasEffectiveSupertype(CardSupertype.Legendary).Should().BeTrue();
+        c2.HasEffectiveSupertype(CardSupertype.Legendary).Should().BeTrue();
+
+        var players = new List<Player> { player };
+        var cards = new List<ICard> { c1, c2 };
+
+        // Act
+        _sba.CheckStateBasedActions(players, cards);
+
+        // Assert — exactly one survives, one goes to the graveyard.
+        cards.Count(c => c.Zone == ZoneType.Battlefield).Should().Be(1);
+        cards.Count(c => c.Zone == ZoneType.Graveyard).Should().Be(1);
+    }
+
+    [Fact]
+    public void CheckLegendRule_GrantRevokedWhenSourceLeaves_NoLegendRule()
+    {
+        // Arrange — two same-name non-legendary permanents. A grant makes one
+        // legendary, but its SOURCE has left the battlefield, so the effect is
+        // inactive (IsActive() gates on source zone). With only one effective
+        // legendary the legend rule does NOT fire.
+        var effects = new ContinuousEffectsService();
+        var player = new Player("Alice", 20);
+        var c1 = new Creature("Mishra's Helix", "1U", 0, 1) { Owner = player, Controller = player };
+        var c2 = new Creature("Mishra's Helix", "1U", 0, 1) { Owner = player, Controller = player };
+        c1.ActiveEffects = effects;
+        c2.ActiveEffects = effects;
+
+        c1.SetZone(ZoneType.Battlefield);
+        c2.SetZone(ZoneType.Battlefield);
+        _zoneService.MoveCardTo(c1, ZoneType.Battlefield, player);
+        _zoneService.MoveCardTo(c2, ZoneType.Battlefield, player);
+
+        // A grant whose source (a third permanent) is NOT on the battlefield.
+        var grantSource = new Creature("Crown", "1", 0, 1) { Owner = player, Controller = player };
+        grantSource.ActiveEffects = effects;
+        grantSource.SetZone(ZoneType.Graveyard); // source off battlefield → grant inactive
+        effects.Register(new GrantSupertypeEffect(
+            grantSource, p => ReferenceEquals(p, c1), CardSupertype.Legendary));
+
+        c1.HasEffectiveSupertype(CardSupertype.Legendary).Should().BeFalse(
+            "the grant's source is off the battlefield, so the effect is inactive");
+
+        var players = new List<Player> { player };
+        var cards = new List<ICard> { c1, c2 };
+
+        // Act
+        _sba.CheckStateBasedActions(players, cards);
+
+        // Assert — both survive; legend rule never applied.
+        cards.All(c => c.Zone == ZoneType.Battlefield).Should().BeTrue();
+        _eventBusMock.Verify(x => x.Publish(It.Is<StateBasedActionExecutedEvent>(e =>
+            e.ActionDescription.Contains("Legend rule"))), Times.Never);
     }
 
     [Fact]

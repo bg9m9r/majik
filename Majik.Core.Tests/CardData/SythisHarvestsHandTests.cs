@@ -36,8 +36,8 @@ public class SythisHarvestsHandTests
         c.Name.Should().Be("Sythis, Harvest's Hand");
         c.ManaCost.Should().Be("{G}{W}");
         c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasType(CardType.Enchantment).Should().BeFalse(
-            "Sythis is a Creature, not itself an Enchantment");
+        c.HasType(CardType.Enchantment).Should().BeTrue(
+            "Sythis is a Legendary Enchantment Creature (CR 205.2a)");
         c.Power.Should().Be(1);
         c.Toughness.Should().Be(2);
         c.HasSupertype(CardSupertype.Legendary).Should().BeTrue();

@@ -111,14 +111,34 @@ public class SanctumWeaverFactoryTests
     }
 
     [Fact]
-    public void Create_IsNotModeledAsEnchantment_V1Gap()
+    public void Create_IsEnchantmentCreature_HasBothCardTypes()
     {
-        // v1 gap: Enchantment Creatures are modeled as plain Creature.
-        // Sanctum Weaver does NOT carry CardType.Enchantment in v1.
+        // Deferral #10: Enchantment Creatures now carry BOTH the Creature AND
+        // Enchantment card types (CR 205.2a) via PermanentBuilders.
         var weaver = SanctumWeaverFactory.Create(_alice);
 
-        weaver.HasType(CardType.Enchantment).Should().BeFalse(
-            because: "v1 models Enchantment Creatures as plain Creature (no CardType.Enchantment)");
+        weaver.HasType(CardType.Creature).Should().BeTrue();
+        weaver.HasType(CardType.Enchantment).Should().BeTrue(
+            because: "Sanctum Weaver is an Enchantment Creature (CR 205.2a)");
+    }
+
+    [Fact]
+    public void EnchantmentCreature_CountsTowardBothCreaturesAndEnchantments()
+    {
+        // Deferral #10 regression: an Enchantment Creature counts toward BOTH
+        // "creatures you control" AND "enchantments you control".
+        var weaver = SanctumWeaverFactory.Create(_alice);
+        weaver.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(weaver);
+
+        // Enchantment side (CR 109.2 via HasType(CardType.Enchantment)).
+        SanctumWeaverFactory.CountEnchantments(_alice).Should().Be(1,
+            because: "Sanctum Weaver is itself an Enchantment Creature");
+
+        // Creature side (it is, and remains, a Creature instance).
+        _alice.Zones.Battlefield.GetCards().OfType<Creature>().Should().ContainSingle()
+            .Which.Should().BeSameAs(weaver,
+                because: "an Enchantment Creature still counts as a creature you control");
     }
 
     [Fact]
@@ -222,16 +242,14 @@ public class SanctumWeaverFactoryTests
     }
 
     [Fact]
-    public void CountEnchantments_DoesNotCountWeaverItself_V1Gap()
+    public void CountEnchantments_CountsWeaverItself()
     {
-        // v1 gap: Sanctum Weaver is modeled as plain Creature — it does NOT
-        // have CardType.Enchantment and therefore does not count itself.
-        // Per CR 205.2a, an Enchantment Creature should count. This is a
-        // documented v1 gap (see SanctumWeaverFactory class xmldoc).
+        // Deferral #10 (CR 205.2a): Sanctum Weaver is an Enchantment Creature —
+        // it carries CardType.Enchantment and counts itself.
         PlaceOnBattlefield(); // Weaver on battlefield
 
-        SanctumWeaverFactory.CountEnchantments(_alice).Should().Be(0,
-            because: "v1 gap: Sanctum Weaver is plain Creature, not CardType.Enchantment");
+        SanctumWeaverFactory.CountEnchantments(_alice).Should().Be(1,
+            because: "an Enchantment Creature counts toward 'enchantments you control'");
     }
 
     [Fact]
@@ -261,8 +279,10 @@ public class SanctumWeaverFactoryTests
     // -----------------------------------------------------------------------
 
     [Fact]
-    public void Activate_Green_ThreeEnchantments_AddsThreeGreen_TapsWeaver()
+    public void Activate_Green_ThreeOtherEnchantments_AddsFourGreen_TapsWeaver()
     {
+        // Weaver itself is an Enchantment Creature (Deferral #10), so with 3
+        // OTHER enchantments the controller controls 4 enchantments total.
         var weaver = PlaceOnBattlefield();
         AddEnchantment("Enchantment 1");
         AddEnchantment("Enchantment 2");
@@ -275,7 +295,7 @@ public class SanctumWeaverFactoryTests
         var mana = ability.Activate();
 
         weaver.IsTapped.Should().BeTrue(because: "the {T} cost was paid");
-        mana.Green.Should().Be(3, because: "3 enchantments → 3{G}");
+        mana.Green.Should().Be(4, because: "Weaver + 3 enchantments → 4{G}");
         mana.White.Should().Be(0);
         mana.Blue.Should().Be(0);
         mana.Black.Should().Be(0);
@@ -284,14 +304,15 @@ public class SanctumWeaverFactoryTests
     }
 
     [Theory]
-    [InlineData("W", 1, 0, 0, 0, 0)]
-    [InlineData("U", 0, 1, 0, 0, 0)]
-    [InlineData("B", 0, 0, 1, 0, 0)]
-    [InlineData("R", 0, 0, 0, 1, 0)]
-    [InlineData("G", 0, 0, 0, 0, 1)]
-    public void Activate_OneEnchantment_ProducesOneOfChosenColor(
+    [InlineData("W", 2, 0, 0, 0, 0)]
+    [InlineData("U", 0, 2, 0, 0, 0)]
+    [InlineData("B", 0, 0, 2, 0, 0)]
+    [InlineData("R", 0, 0, 0, 2, 0)]
+    [InlineData("G", 0, 0, 0, 0, 2)]
+    public void Activate_OneOtherEnchantment_ProducesTwoOfChosenColor(
         string pip, int w, int u, int b, int r, int g)
     {
+        // Weaver (an Enchantment Creature) + 1 other enchantment = 2.
         var weaver = PlaceOnBattlefield();
         AddEnchantment();
 
@@ -309,23 +330,25 @@ public class SanctumWeaverFactoryTests
     }
 
     [Fact]
-    public void Activate_ZeroEnchantments_LegalActivation_ProducesNoMana()
+    public void Activate_OnlyWeaver_ProducesOne_FromSelfCount()
     {
-        // CR 605.1c — legal to activate even when X = 0; produces nothing.
+        // CR 605.1c — activation is always legal. With only the Weaver on the
+        // battlefield, X = 1: an Enchantment Creature counts itself (Deferral
+        // #10), so the ability produces one mana rather than zero.
         var weaver = PlaceOnBattlefield();
-        // No enchantments on battlefield.
+        // No OTHER enchantments on battlefield.
 
         var ability = weaver.Abilities.OfType<SanctumWeaverManaAbility>()
             .Single(a => a.ColorPip == "G");
 
         ability.CanActivate().Should().BeTrue(
-            because: "activation is always legal per CR 605.1c even with X = 0");
+            because: "activation is always legal per CR 605.1c");
 
         var mana = ability.Activate();
 
         weaver.IsTapped.Should().BeTrue(because: "the {T} cost was paid");
-        mana.Green.Should().Be(0);
-        mana.TotalValue.Should().Be(0);
+        mana.Green.Should().Be(1, because: "the Weaver counts itself as an enchantment");
+        mana.TotalValue.Should().Be(1);
     }
 
     // -----------------------------------------------------------------------

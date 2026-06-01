@@ -122,6 +122,47 @@ public class RingStateTests
     }
 
     // -----------------------------------------------------------------------
+    // Deferral #4 — "Your Ring-bearer is legendary" routed through a real
+    // Layer-4 GrantSupertypeEffect (CR 205.4 / 701.54c). The effective
+    // supertype set carries Legendary, and the grant follows / is revoked
+    // when the designation moves.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void RingBearer_IsEffectivelyLegendary_ViaSupertypeGrant()
+    {
+        var alice = new Player("Alice", 20);
+        var bear = MakeCreature(alice, "Grizzly Bears");
+
+        bear.HasEffectiveSupertype(CardSupertype.Legendary).Should().BeFalse(
+            "Grizzly Bears is not printed legendary");
+
+        alice.TheRingTemptsYou(bear);
+
+        bear.HasEffectiveSupertype(CardSupertype.Legendary).Should().BeTrue(
+            "CR 701.54c — the Ring-bearer is legendary via the Layer-4 grant");
+    }
+
+    [Fact]
+    public void RingBearer_LegendaryGrant_MovesWithDesignation()
+    {
+        var alice = new Player("Alice", 20);
+        var first = MakeCreature(alice, "First");
+        var second = MakeCreature(alice, "Second");
+
+        alice.TheRingTemptsYou(first);
+        first.HasEffectiveSupertype(CardSupertype.Legendary).Should().BeTrue();
+
+        // Re-designate — the grant moves off the old bearer onto the new one.
+        alice.TheRingTemptsYou(second);
+
+        first.HasEffectiveSupertype(CardSupertype.Legendary).Should().BeFalse(
+            "the 'is legendary' grant was revoked off the former bearer (CR 701.54b)");
+        second.HasEffectiveSupertype(CardSupertype.Legendary).Should().BeTrue(
+            "the grant re-anchored on the new Ring-bearer");
+    }
+
+    // -----------------------------------------------------------------------
     // 2+ — Ring-bearer attacks ⇒ draw a card, then discard a card
     // -----------------------------------------------------------------------
 

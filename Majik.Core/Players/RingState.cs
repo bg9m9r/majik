@@ -1,5 +1,6 @@
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
+using Majik.Core.Cards.Types;
 using Majik.Core.Domain.DomainEvents;
 using Majik.Core.Effects;
 using Majik.Core.Events;
@@ -60,6 +61,7 @@ public sealed class RingState
 
     private Permanent? _ringBearer;
     private CantBeBlockedExceptByEffect? _bearerBlockRestriction;
+    private GrantSupertypeEffect? _bearerLegendaryGrant;
 
     /// <summary>Pending end-of-combat sacrifices queued by the 3+ ability —
     /// blockers of the Ring-bearer whose controllers must sacrifice them at
@@ -97,8 +99,12 @@ public sealed class RingState
     public Permanent? RingBearer => _ringBearer;
 
     /// <summary>CR 701.54c — the always-on emblem clause makes the Ring-bearer
-    /// legendary. Surfaced as a designation property (the engine does not
-    /// layer-mutate the supertype list in v1).</summary>
+    /// legendary. True iff a Ring-bearer is designated. The actual supertype
+    /// is now layer-mutated: <see cref="DesignateRingBearer"/> registers a
+    /// <see cref="GrantSupertypeEffect"/> (Layer 4) granting
+    /// <see cref="CardSupertype.Legendary"/> to the bearer, so the legend-rule
+    /// SBA observes it via the effective supertype set (CR 704.5k). This
+    /// property remains as the convenience designation read.</summary>
     public bool RingBearerIsLegendary => _ringBearer != null;
 
     /// <summary>CR 701.54e — true iff <paramref name="permanent"/> is on the
@@ -148,17 +154,35 @@ public sealed class RingState
         }
         _bearerBlockRestriction = null;
 
+        // CR 701.54c / CR 205.4 — move the "is legendary" supertype grant off
+        // the old bearer (revoking the granted Legendary) before re-anchoring
+        // it on the new one. The legend rule reads effective supertypes, so an
+        // ex-bearer immediately stops counting as legendary.
+        if (_ringBearer != null && _bearerLegendaryGrant != null)
+        {
+            _ringBearer.ActiveEffects?.Unregister(_bearerLegendaryGrant);
+        }
+        _bearerLegendaryGrant = null;
+
         _ringBearer = bearer;
+
+        // CR 701.54c — "Your Ring-bearer is legendary." Layer-4 supertype
+        // grant on the new bearer (any permanent type). Routed through
+        // GrantSupertypeEffect so LegendRuleCheck's effective-supertype read
+        // sees it (closes the v1 designation-property gap).
+        bearer.ActiveEffects ??= new ContinuousEffectsService();
+        _bearerLegendaryGrant = GrantSupertypeEffect.ForPermanent(
+            bearer, CardSupertype.Legendary);
+        bearer.ActiveEffects.Register(_bearerLegendaryGrant);
 
         if (bearer is Creature newBearer)
         {
-            newBearer.ActiveEffects ??= new ContinuousEffectsService();
             // CR 701.54c — "can't be blocked by creatures with greater power".
             // A would-be blocker is legal iff its power ≤ the Ring-bearer's.
             _bearerBlockRestriction = new CantBeBlockedExceptByEffect(
                 newBearer,
                 blocker => blocker is Creature c && c.Power <= newBearer.Power);
-            newBearer.ActiveEffects.Register(_bearerBlockRestriction);
+            newBearer.ActiveEffects!.Register(_bearerBlockRestriction);
         }
     }
 

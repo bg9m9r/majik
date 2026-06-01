@@ -56,8 +56,6 @@ namespace Majik.Core.CardData.Factories;
 /// - <b>Ward {2} trigger wiring</b>: marker + BuildWardEffect exposed; the
 ///   battlefield-attached triggered-ability surface is deferred — same gap as
 ///   Tolarian Terror / Kappa Cannoneer.
-/// - <b>Enchantment card-type</b>: v1 models Enchantment Creatures as plain
-///   Creature (v1-deferrals #10 — Sanctum Weaver / Reflection convention).
 /// - <b>Agent-driven target prompt for Channel 1</b>: auto-picks the first
 ///   graveyard card when no agent target is set (same posture as Eternal
 ///   Witness / Wishclaw Talisman first-card fallback).
@@ -97,7 +95,8 @@ public static class ColossalSkyturtleFactory
     {
         ArgumentNullException.ThrowIfNull(owner);
 
-        var card = new Creature(
+        // CR 205.2a — Enchantment Creature: Creature + Enchantment card types.
+        var card = PermanentBuilders.EnchantmentCreature(
             name: CardName,
             manaCost: PrintedManaCost,
             power: Power,

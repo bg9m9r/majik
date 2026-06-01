@@ -9,6 +9,18 @@ public class PermanentCharacteristics
 {
     public HashSet<Majik.Core.Cards.Types.CardType> Types { get; } = new();
     public HashSet<Majik.Core.Cards.Types.CardSubtype> Subtypes { get; } = new();
+
+    /// <summary>
+    /// CR 205.4 / CR 613.1d — the permanent's effective supertype set after
+    /// the Layer-4 (type-changing) pass. Seeded by
+    /// <see cref="ContinuousEffectsService.Compute(Majik.Core.Cards.Permanent)"/>
+    /// from the printed supertypes, then mutated by any active
+    /// <see cref="GrantSupertypeEffect"/> (the supertype analogue of the
+    /// Layer-5 colour slot — "is legendary", "becomes basic", etc.). Mirrors
+    /// the <see cref="Colors"/> slot's seed-then-mutate shape.
+    /// </summary>
+    public HashSet<Majik.Core.Cards.Types.CardSupertype> Supertypes { get; } = new();
+
     public HashSet<string> Keywords { get; } = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>

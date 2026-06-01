@@ -18,7 +18,12 @@ public sealed class LegendRuleCheck : IStateBasedActionCheck
         var anyExecuted = false;
         var permanents = ctx.Permanents
             .Where(p => p.Zone == ZoneType.Battlefield)
-            .Where(p => p.HasSupertype(CardSupertype.Legendary))
+            // CR 704.5k / CR 205.4 — read the EFFECTIVE supertype set so a
+            // permanent that "is legendary" via a Layer-4 grant (the
+            // Ring-bearer designation routed through GrantSupertypeEffect)
+            // counts, and stops counting when the grant is revoked. Falls
+            // back to printed supertypes when no layer service is wired.
+            .Where(p => p.HasEffectiveSupertype(CardSupertype.Legendary))
             .ToList();
 
         var groups = permanents
