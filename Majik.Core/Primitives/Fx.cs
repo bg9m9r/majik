@@ -168,6 +168,49 @@ public static class Fx
     }
 
     /// <summary>
+    /// PLAN 08 — async twin of <see cref="DrawCards(Player,int)"/>. Routes each
+    /// would-draw through <see cref="Majik.Core.Effects.ReplacementBus.ApplyAsync"/>
+    /// off the live <paramref name="ctx"/> so a prompting draw-replacement
+    /// (Dredge — CR 702.52) <c>await</c>s the player's agent instead of blocking
+    /// a thread-pool thread on a sync-over-async bridge. Behaviour is otherwise
+    /// identical to the synchronous overload (cancelled draws skip the
+    /// library → hand move for that draw only; the loop continues).
+    /// </summary>
+    public static async System.Threading.Tasks.ValueTask<IReadOnlyList<ICard>> DrawCardsAsync(
+        Player player, int count, ResolutionContext ctx)
+    {
+        if (player is null) throw new ArgumentNullException(nameof(player));
+        ArgumentNullException.ThrowIfNull(ctx);
+        if (count <= 0) return Array.Empty<ICard>();
+
+        var drawn = new List<ICard>(count);
+        for (var i = 0; i < count; i++)
+        {
+            if (player.Replacements != null)
+            {
+                var intent = new Majik.Core.Effects.DrawCardIntent(player);
+                var replaced = await player.Replacements.ApplyAsync(intent, ctx).ConfigureAwait(false);
+                if (replaced is null)
+                {
+                    continue;
+                }
+            }
+
+            var top = player.Zones.Library.GetCards().FirstOrDefault();
+            if (top is null)
+            {
+                player.MarkTriedToDrawFromEmptyLibrary();
+                break;
+            }
+            player.Zones.Library.RemoveCard(top);
+            player.Zones.Hand.AddCard(top);
+            top.SetZone(ZoneType.Hand);
+            drawn.Add(top);
+        }
+        return drawn;
+    }
+
+    /// <summary>
     /// CR 701.16 — <paramref name="player"/> discards up to
     /// <paramref name="count"/> cards from hand. v1 deterministic
     /// first-card-in-hand pick (agent-driven choice is deferred — same

@@ -160,52 +160,62 @@ public static class DredgeFactory
                 if (owner.Zones.Library.Count < n) return false;
                 return true;
             },
-            replace: (intent, _) =>
+            // Sync path (ReplacementBus.Apply / direct-call unit tests) — the
+            // no-resolution-context path. CR 702.52 prompting is INTENTIONALLY
+            // NOT done here: the "dredge?" choice must be awaited, never bridged
+            // sync-over-async, so the prompt lives exclusively on the async
+            // path below. The deterministic no-prompt posture is "no" (a card
+            // without a live agent never opts INTO the alternative), so the
+            // straight draw resolves — identical to the historical no-agent
+            // fallback.
+            replace: (intent, _) => intent,
+            // PLAN 08 — async path (ReplacementBus.ApplyAsync). Awaits the
+            // owner's agent off the live ResolutionContext so the "Dredge?"
+            // prompt never blocks a thread-pool thread on a human's think-time.
+            replaceAsync: async (intent, _, ctx) =>
             {
-                // CR 702.52 — agent prompt. Default heuristic (intent
-                // CardAdvantage) accepts; scripted agents control the
-                // answer explicitly. When no agent is registered the
-                // default posture is "no" — same conservative shape as
-                // every other optional may-replacement: a card without
-                // an agent never opts INTO an alternative, so the
-                // straight draw resolves.
-                var agent = AgentRegistry.Get(owner);
+                var agent = ctx.Agent ?? AgentRegistry.Get(owner);
                 if (agent is null) return intent;
 
-                var question = $"Dredge {n}? (mill {n} and return {source.Name} from graveyard to hand)";
-                var yes = agent.ChooseYesNoAsync(
-                        question: question,
-                        intent: Majik.Core.Cards.BotIntent.CardAdvantage)
-                    .GetAwaiter().GetResult();
-                if (!yes) return intent;
-
-                // Resolve the dredge body:
-                //   1) mill N (CR 701.13). MillAction halts cleanly on
-                //      mid-mill empty-library — the empty-library loss
-                //      marker doesn't fire here because Dredge mills,
-                //      it does not draw from an empty library.
-                //   2) return source from graveyard to hand
-                //      (CR 702.52). source.Zone is guaranteed to be
-                //      Graveyard by the Applies gate above.
-                //   3) cancel the underlying draw (return null) — the
-                //      Dredge replacement consumes the draw entirely.
-                MillAction.Apply(owner, n);
-
-                if (source.Zone == ZoneType.Graveyard)
-                {
-                    owner.Zones.Graveyard.RemoveCard(source);
-                    owner.Zones.Hand.AddCard(source);
-                    source.SetZone(ZoneType.Hand);
-                }
-
-                // null → bus cancels the original draw (CR 614.6 —
-                // replacement effects can cancel the event entirely).
-                return null;
+                var yes = await agent.ChooseYesNoAsync(
+                        question: DredgeQuestion(source, n),
+                        intent: Majik.Core.Cards.BotIntent.CardAdvantage,
+                        ct: ctx.Ct)
+                    .ConfigureAwait(false);
+                return yes ? RunDredge(owner, source, n) : intent;
             },
             oneShot: false,
             tag: marker);
 
         replacementBus.Register(replacement);
         return marker;
+    }
+
+    private static string DredgeQuestion(ICard source, int n) =>
+        $"Dredge {n}? (mill {n} and return {source.Name} from graveyard to hand)";
+
+    /// <summary>
+    /// CR 702.52 — resolve the dredge body, shared by the sync + async
+    /// replacement paths:
+    ///   1) mill N (CR 701.13) — <see cref="MillAction.Apply"/> halts cleanly
+    ///      on mid-mill empty library; the empty-library loss marker does not
+    ///      fire because Dredge mills, it does not draw from an empty library.
+    ///   2) return <paramref name="source"/> from graveyard to hand
+    ///      (source.Zone is guaranteed Graveyard by the Applies gate).
+    /// Returns <c>null</c> so the bus cancels the original draw (CR 614.6 —
+    /// the Dredge replacement consumes the draw entirely).
+    /// </summary>
+    private static DrawCardIntent? RunDredge(Player owner, ICard source, int n)
+    {
+        MillAction.Apply(owner, n);
+
+        if (source.Zone == ZoneType.Graveyard)
+        {
+            owner.Zones.Graveyard.RemoveCard(source);
+            owner.Zones.Hand.AddCard(source);
+            source.SetZone(ZoneType.Hand);
+        }
+
+        return null;
     }
 }

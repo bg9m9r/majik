@@ -107,7 +107,14 @@ public class StackResolver
             // Handle spell resolution (Rule 608.2)
             if (top is ISpell spell)
             {
-                HandleSpellResolution(spell);
+                // PLAN 08 — thread the resolving controller's agent + live game
+                // into the post-resolution ETB move so prompting battlefield-
+                // entry replacements (shock land, Mox Diamond) await the agent
+                // off the resolution context instead of bridging sync-over-async.
+                var spellAgent = agentLookup?.Invoke(spell.Controller);
+                var spellCtx = ResolutionContext.For(
+                    spell.Controller, spellAgent, game, chosenTargets: null, ct);
+                await HandleSpellResolutionAsync(spell, spellCtx).ConfigureAwait(false);
             }
             // Handle ability resolution (Rule 608.2)
             else if (top is IActivatedAbility ability)
@@ -131,9 +138,14 @@ public class StackResolver
     }
 
     /// <summary>
-    /// Handle spell resolution - move card to appropriate zone (Rule 608.2).
+    /// PLAN 08 — handle spell resolution on the async path (Rule 608.2). Moves
+    /// the resolved permanent to the battlefield via
+    /// <see cref="ZoneService.MoveCardToAsync"/> so prompting ETB replacements
+    /// (shock land "pay 2 life", Mox Diamond "discard a land") <c>await</c> the
+    /// controller's agent off <paramref name="ctx"/> instead of blocking a
+    /// thread-pool thread.
     /// </summary>
-    private void HandleSpellResolution(ISpell spell)
+    private async ValueTask HandleSpellResolutionAsync(ISpell spell, ResolutionContext ctx)
     {
         if (spell == null)
         {
@@ -150,8 +162,9 @@ public class StackResolver
         // bookkeeping and silently created limbo permanents.
         if (_zoneService != null && card.Owner != null)
         {
-            _zoneService.MoveCardTo(card, destinationZone,
-                destinationZone == ZoneType.Battlefield ? spell.Controller : null);
+            await _zoneService.MoveCardToAsync(card, destinationZone, ctx,
+                destinationZone == ZoneType.Battlefield ? spell.Controller : null)
+                .ConfigureAwait(false);
         }
         else
         {

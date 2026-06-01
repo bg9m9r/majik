@@ -1,3 +1,4 @@
+using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Domain.DomainEvents;
 using Majik.Core.Events;
@@ -248,7 +249,15 @@ public sealed class PriorityLoop
                             $"PriorityLoop: rejected PlayLand({land.Land.Name}) by {actor.Name}: {reason}");
                         break;
                     }
-                    _zoneService.MoveCardTo(land.Land, ZoneType.Battlefield, controller: actor);
+                    // PLAN 08 — play the land on the async zone-move path so a
+                    // prompting ETB replacement on the land (shock-land "pay 2
+                    // life") awaits the actor's agent off the resolution context
+                    // instead of bridging sync-over-async on the priority thread.
+                    var landCtx = ResolutionContext.For(
+                        actor, ResolveAgentForController(actor), ctx, chosenTargets: null, ct);
+                    await _zoneService.MoveCardToAsync(
+                        land.Land, ZoneType.Battlefield, landCtx, controller: actor)
+                        .ConfigureAwait(false);
                     _landDropTracker.RecordLandPlayed(actor);
                 }
                 break;

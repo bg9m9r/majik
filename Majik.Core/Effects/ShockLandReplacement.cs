@@ -1,4 +1,6 @@
+using Majik.Core.Abilities;
 using Majik.Core.Cards;
+using Majik.Core.Players;
 using Majik.Core.Players.Agents;
 using Majik.Core.Zones;
 
@@ -40,13 +42,50 @@ public sealed class ShockLandReplacement : IReplacementEffect<ZoneMoveIntent>
         && intent.ToZone == ZoneType.Battlefield
         && intent.FromZone != ZoneType.Battlefield;
 
+    /// <summary>
+    /// Synchronous path (<see cref="ReplacementBus.Apply{TIntent}"/>) — the
+    /// no-resolution-context path (shape-only callers, non-cast zone moves).
+    /// CR 614 prompting is INTENTIONALLY NOT done here: a player choice must
+    /// be <c>await</c>ed, never bridged sync-over-async, so the prompt lives
+    /// exclusively on <see cref="ReplaceAsync"/> (the production cast-
+    /// resolution path). This sync path applies the deterministic no-prompt
+    /// posture: auto-pay 2 life when the controller has life to spare
+    /// (CR 119.4 — refuse at LifeTotal &lt;= 2), else enter tapped. Identical
+    /// to the historical no-agent fallback.
+    /// </summary>
     public ZoneMoveIntent? Replace(ZoneMoveIntent intent, IReadOnlyList<object> history)
     {
         var controller = intent.Controller ?? _land.Owner;
         if (controller is null)
         {
-            // No controller known — shape-only path, enter tapped (the
-            // pre-agent posture for the same intent).
+            // No controller known — shape-only path, enter tapped.
+            return intent with { EntersTapped = true };
+        }
+
+        // CR 119.4 — refuse the auto-suicide at low life.
+        if (controller.LifeTotal <= 2)
+        {
+            return intent with { EntersTapped = true };
+        }
+
+        // No prompt on the sync path — deterministic auto-pay posture.
+        return ApplyDecision(intent, controller, wantsToPay: true);
+    }
+
+    /// <summary>
+    /// PLAN 08 — async path (<see cref="ReplacementBus.ApplyAsync{TIntent}"/>).
+    /// Genuinely <c>await</c>s the controller's agent (threaded on
+    /// <paramref name="ctx"/>, falling back to <see cref="AgentRegistry"/>)
+    /// so a human's "pay 2 life?" think-time never blocks a thread-pool thread
+    /// on a sync-over-async bridge. CR 118.8 / CR 119.4 semantics are identical
+    /// to the synchronous <see cref="Replace"/>.
+    /// </summary>
+    public async ValueTask<ZoneMoveIntent?> ReplaceAsync(
+        ZoneMoveIntent intent, IReadOnlyList<object> history, ResolutionContext ctx)
+    {
+        var controller = intent.Controller ?? _land.Owner;
+        if (controller is null)
+        {
             return intent with { EntersTapped = true };
         }
 
@@ -57,12 +96,10 @@ public sealed class ShockLandReplacement : IReplacementEffect<ZoneMoveIntent>
             return intent with { EntersTapped = true };
         }
 
-        var agent = AgentRegistry.Get(controller);
+        var agent = ctx.Agent ?? AgentRegistry.Get(controller);
         if (agent is null)
         {
-            // No agent registered — preserve the legacy MVP posture
-            // (auto-pay-2-life when controller has > 2 life). Existing
-            // integration tests / shape-only paths depend on this branch.
+            // No agent — legacy MVP posture (auto-pay when life > 2).
             controller.LoseLife(2);
             return intent with { EntersTapped = false };
         }
@@ -70,14 +107,11 @@ public sealed class ShockLandReplacement : IReplacementEffect<ZoneMoveIntent>
         bool wantsToPay;
         try
         {
-            // Sync-over-async wart shared with every v1 effect closure
-            // that prompts an agent (Scry / Surveil / LibraryPick / etc.).
-            // TODO (v2): make effects async so we can await here.
-            wantsToPay = agent.ChooseYesNoAsync(
-                ctx: null,
-                question: $"Pay 2 life for {_land.Name} to enter untapped?",
+            wantsToPay = await agent.ChooseYesNoAsync(
+                ctx: ctx.Game,
+                question: PromptText,
                 sourceCardName: _land.Name,
-                ct: default).GetAwaiter().GetResult();
+                ct: ctx.Ct).ConfigureAwait(false);
         }
         catch
         {
@@ -85,13 +119,24 @@ public sealed class ShockLandReplacement : IReplacementEffect<ZoneMoveIntent>
             return intent with { EntersTapped = true };
         }
 
+        return ApplyDecision(intent, controller, wantsToPay);
+    }
+
+    private string PromptText => $"Pay 2 life for {_land.Name} to enter untapped?";
+
+    /// <summary>
+    /// CR 118.8 — apply the controller's pay/decline decision. On YES debit 2
+    /// life via <see cref="Player.LoseLife"/> (so SBA / combat listeners
+    /// observe it) and enter untapped; on NO enter tapped, no payment.
+    /// </summary>
+    private static ZoneMoveIntent ApplyDecision(
+        ZoneMoveIntent intent, Player controller, bool wantsToPay)
+    {
         if (!wantsToPay)
         {
             return intent with { EntersTapped = true };
         }
 
-        // CR 118.8 — pay 2 life via Player.LoseLife so SBA / combat
-        // listeners observe the change. Enter untapped.
         controller.LoseLife(2);
         return intent with { EntersTapped = false };
     }
