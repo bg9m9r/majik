@@ -23,6 +23,44 @@ public class PriorityPolicyTests
     }
 
     [Fact]
+    public void DoesNotReproposeLand_AfterProposingItThisTurn()
+    {
+        // Regression: the policy offered its land drop on every priority round,
+        // so once the drop was spent it kept proposing a land the engine
+        // rejects — spinning PriorityLoop + flooding the log. After proposing a
+        // land once, the same-turn memo (mirroring the activated-ability one)
+        // stops re-offering it. (The land is still in hand here because this is
+        // a pure-policy unit test that doesn't run the engine zone move.)
+        var s = new BotTestScenario();
+        var land = new Land("Mountain");
+        s.AddCardToHand(s.Self, land);
+        var pol = new PriorityPolicy(ArchetypeWeights.Burn);
+
+        pol.Pick(s.Context, s.Self).Should().BeOfType<PriorityAction.PlayLand>();
+        pol.Pick(s.Context, s.Self).Should().NotBeOfType<PriorityAction.PlayLand>(
+            "the land drop is treated as spent once proposed this turn");
+    }
+
+    [Fact]
+    public void ReproposesLand_OnNextTurn()
+    {
+        // The land memo is per-turn — a fresh turn re-enables the land drop.
+        var s = new BotTestScenario();
+        var land = new Land("Mountain");
+        s.AddCardToHand(s.Self, land);
+        var pol = new PriorityPolicy(ArchetypeWeights.Burn);
+
+        pol.Pick(s.Context, s.Self).Should().BeOfType<PriorityAction.PlayLand>();
+        pol.Pick(s.Context, s.Self).Should().NotBeOfType<PriorityAction.PlayLand>();
+
+        var turn2 = new Majik.Core.Game.GameContext(
+            s.Self, new[] { s.Self, s.Opponent }, activePlayer: s.Self,
+            turnNumber: 2, currentPhase: Majik.Core.StateMachine.PhaseStateType.PreCombatMain, stack: s.Stack);
+        pol.Pick(turn2, s.Self).Should().BeOfType<PriorityAction.PlayLand>(
+            "a new turn resets the land-drop memo");
+    }
+
+    [Fact]
     public void Passes_WhenNothingPlayable()
     {
         var s = new BotTestScenario();
