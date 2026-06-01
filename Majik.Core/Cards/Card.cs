@@ -930,7 +930,25 @@ public class Card : ICard
     /// per-face characteristic-replacement is deferred). It is the
     /// canonical observation surface for "is this card transformed?".
     /// </summary>
-    public Majik.Core.CardData.MDFCs.MdfcState? MdfcState { get; set; }
+    public Majik.Core.CardData.MDFCs.MdfcState? MdfcState
+    {
+        get => _mdfcState;
+        set
+        {
+            _mdfcState = value;
+            // CR 711 — a transform DFC's back-face Layer-0 seed changes the
+            // computed characteristics when the active face flips. Wire the
+            // state's OnTransformed callback so a Transform() bumps this
+            // permanent's ContinuousEffectsService generation, invalidating
+            // the layered + scalar-P/T memoization caches. Permanent only —
+            // Card.ActiveEffects lives on Permanent. Idempotent / null-safe.
+            if (value != null && this is Permanent perm)
+            {
+                value.OnTransformed = () => perm.ActiveEffects?.BumpGeneration();
+            }
+        }
+    }
+    private Majik.Core.CardData.MDFCs.MdfcState? _mdfcState;
 
     /// <summary>
     /// CR 715 — Adventure half descriptor. Non-null on adventurer cards

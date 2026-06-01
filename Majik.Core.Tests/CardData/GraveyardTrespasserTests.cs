@@ -82,8 +82,12 @@ public class GraveyardTrespasserTests
     {
         var gt = GraveyardTrespasserFactory.Create(_alice);
 
-        gt.Abilities.OfType<TriggeredAbility>().Should().HaveCount(2,
-            "one ETB trigger + one attack trigger (CR 603.1 / 508.1f)");
+        // CR 711.3 — both faces' enters/attacks pairs attach (front + back = 4);
+        // only the active (front) face's pair is live via ActiveWhen.
+        gt.Abilities.OfType<TriggeredAbility>().Should().HaveCount(4,
+            "front + back enters/attacks pairs (CR 603.1 / 508.1f / 711.3)");
+        gt.Abilities.OfType<TriggeredAbility>().Where(t => t.IsActiveFace())
+            .Should().HaveCount(2, "only the active front face's ETB + attack triggers fire");
     }
 
     [Fact]
@@ -149,7 +153,7 @@ public class GraveyardTrespasserTests
         corpse.SetZone(ZoneType.Graveyard);
 
         // Fire the ETB trigger effect.
-        var etb = gt.Abilities.OfType<TriggeredAbility>().First();
+        var etb = gt.Abilities.OfType<TriggeredAbility>().First(t => t.IsActiveFace());
         foreach (var fx in etb.Effects) fx.Execute();
 
         corpse.Zone.Should().Be(ZoneType.Exile, "the creature card is exiled from the graveyard");
@@ -170,7 +174,7 @@ public class GraveyardTrespasserTests
         _bob.Zones.Graveyard.AddCard(spell);
         spell.SetZone(ZoneType.Graveyard);
 
-        var etb = gt.Abilities.OfType<TriggeredAbility>().First();
+        var etb = gt.Abilities.OfType<TriggeredAbility>().First(t => t.IsActiveFace());
         foreach (var fx in etb.Effects) fx.Execute();
 
         spell.Zone.Should().Be(ZoneType.Exile, "the card is still exiled (up to one target)");
@@ -186,7 +190,7 @@ public class GraveyardTrespasserTests
         _alice.Zones.Battlefield.AddCard(gt);
         gt.SetZone(ZoneType.Battlefield);
 
-        var etb = gt.Abilities.OfType<TriggeredAbility>().First();
+        var etb = gt.Abilities.OfType<TriggeredAbility>().First(t => t.IsActiveFace());
         var act = () => { foreach (var fx in etb.Effects) fx.Execute(); };
 
         act.Should().NotThrow("up to one target — empty graveyards resolve as a no-op");

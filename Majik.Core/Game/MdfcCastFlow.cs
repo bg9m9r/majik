@@ -65,7 +65,7 @@ public static class MdfcCastFlow
         ArgumentNullException.ThrowIfNull(ctx);
 
         var state = (card as Card)?.MdfcState;
-        if (state is not { CanCastEitherFace: true } || state.BackFace is not { } back)
+        if (state is not { CanCastEitherFace: true } || state.CastableBackFace is not { } back)
         {
             // Not an MDFC with a castable back face — cast the front normally.
             return null;

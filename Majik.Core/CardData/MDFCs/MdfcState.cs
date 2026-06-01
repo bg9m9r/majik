@@ -38,40 +38,93 @@ public sealed class MdfcState
     /// <summary>
     /// CR 712.3 — descriptor for the OTHER castable face of this MDFC, when
     /// known. On a front-face card this is the back face's castable
-    /// definition (land or spell) so the cast flow can offer "cast either
-    /// face". Null on the minimal face-tracker posture (older MDFC factories
-    /// that only record the back-face NAME without a castable definition) and
-    /// on back-face card instances (which are already the chosen face).
+    /// definition (land / spell / permanent) so the cast flow can offer "cast
+    /// either face". Null on the minimal face-tracker posture (older MDFC
+    /// factories that only record the back-face NAME without a castable
+    /// definition) and on back-face card instances (which are already the
+    /// chosen face).
+    ///
+    /// <para>Distinct from <see cref="BackFaceCharacteristics"/>: this slot
+    /// drives the #3 MDFC cast-either-face flow (the two MDFC faces do NOT
+    /// transform — CR 712.4), whereas <see cref="BackFaceCharacteristics"/>
+    /// drives the #19 transform-DFC Layer-0 face replacement (CR 711, the
+    /// faces DO transform into each other).</para>
     /// </summary>
-    public MdfcFace? BackFace { get; }
+    public MdfcFace? CastableBackFace { get; }
+
+    /// <summary>
+    /// CR 711 — the printed characteristics of the TRANSFORM DFC's back face
+    /// (P/T, types, subtypes, supertypes, keywords, colours). Non-null on a
+    /// transform DFC whose factory supplies both faces; consumed by
+    /// <see cref="Majik.Core.Effects.ContinuousEffectsService"/> as the
+    /// Layer-0 printed seed while <see cref="IsBackFace"/> is true.
+    /// </summary>
+    public BackFaceCharacteristics? BackFaceCharacteristics { get; }
+
+    /// <summary>
+    /// Callback fired immediately after <see cref="Transform"/> flips the
+    /// active face. Wired by <see cref="Majik.Core.Cards.Card.MdfcState"/>'s
+    /// setter to bump the <see cref="Majik.Core.Effects.ContinuousEffectsService"/>
+    /// generation so the layered + scalar-P/T memoization caches invalidate on
+    /// a face flip (the back-face Layer-0 seed changes the computed
+    /// characteristics). Null on cards never wired to a CES.
+    /// </summary>
+    public Action? OnTransformed { get; set; }
 
     /// <summary>True when this card carries a castable back-face definition
     /// so the controller can choose either face at cast time (CR 712.3).</summary>
-    public bool CanCastEitherFace => !IsBackFace && BackFace != null;
+    public bool CanCastEitherFace => !IsBackFace && CastableBackFace != null;
 
     public MdfcState(string frontFaceName, string backFaceName)
-        : this(frontFaceName, backFaceName, backFace: null)
+        : this(frontFaceName, backFaceName, castableBackFace: null, backFaceCharacteristics: null)
     {
     }
 
     /// <summary>
     /// Construct the face tracker with an optional castable back-face
     /// descriptor (CR 712.3 — real cast-either-face). Supply
-    /// <paramref name="backFace"/> on a FRONT-face card so the cast flow can
-    /// offer the choice.
+    /// <paramref name="castableBackFace"/> on a FRONT-face card so the cast
+    /// flow can offer the choice.
     /// </summary>
-    public MdfcState(string frontFaceName, string backFaceName, MdfcFace? backFace)
+    public MdfcState(string frontFaceName, string backFaceName, MdfcFace? castableBackFace)
+        : this(frontFaceName, backFaceName, castableBackFace, backFaceCharacteristics: null)
+    {
+    }
+
+    /// <summary>
+    /// Construct the face tracker with an optional transform back-face
+    /// characteristics carrier (CR 711 — Layer-0 face replacement). Supply
+    /// <paramref name="backFaceCharacteristics"/> on a transform DFC so the
+    /// continuous-effects service seeds the back face while back-face up.
+    /// </summary>
+    public MdfcState(string frontFaceName, string backFaceName, BackFaceCharacteristics? backFaceCharacteristics)
+        : this(frontFaceName, backFaceName, castableBackFace: null, backFaceCharacteristics)
+    {
+    }
+
+    public MdfcState(
+        string frontFaceName,
+        string backFaceName,
+        MdfcFace? castableBackFace,
+        BackFaceCharacteristics? backFaceCharacteristics)
     {
         if (string.IsNullOrWhiteSpace(frontFaceName)) throw new ArgumentException(nameof(frontFaceName));
         if (string.IsNullOrWhiteSpace(backFaceName)) throw new ArgumentException(nameof(backFaceName));
         FrontFaceName = frontFaceName;
         BackFaceName = backFaceName;
-        BackFace = backFace;
+        CastableBackFace = castableBackFace;
+        BackFaceCharacteristics = backFaceCharacteristics;
     }
 
     public string ActiveFaceName => IsBackFace ? BackFaceName : FrontFaceName;
 
-    public void Transform() => IsBackFace = !IsBackFace;
+    public void Transform()
+    {
+        IsBackFace = !IsBackFace;
+        // CR 711 — the active face's characteristics just changed; invalidate
+        // any CES memoization keyed on the old face's seed.
+        OnTransformed?.Invoke();
+    }
 }
 
 /// <summary>
@@ -101,6 +154,13 @@ public sealed class MdfcFace
     /// False when it is a spell that goes on the stack.</summary>
     public bool IsLand { get; }
 
+    /// <summary>True when this face is a nonland PERMANENT (artifact / creature
+    /// / enchantment / planeswalker) cast as a spell that resolves onto the
+    /// battlefield AS that permanent (CR 712.3 / 608.3). Distinct from
+    /// <see cref="IsLand"/> (played, no stack) and from a non-permanent spell
+    /// back (instant / sorcery — false for both flags).</summary>
+    public bool IsPermanent { get; }
+
     private readonly Func<Player, ReplacementBus?, ICard> _buildCard;
 
     private readonly Func<Player, Func<object, object>, Majik.Core.Stack.Stack?, ZoneService?, SpellDefinition>? _buildDefinition;
@@ -114,6 +174,25 @@ public sealed class MdfcFace
     /// </summary>
     public static MdfcFace Land(string name, Func<Player, ReplacementBus?, ICard> buildCard) =>
         new(name, manaCost: "", isLand: true, buildCard, buildDefinition: null);
+
+    /// <summary>
+    /// Construct a nonland PERMANENT back face (CR 712.3 / 608.3): cast onto
+    /// the stack as a spell with its own <paramref name="manaCost"/> / effect,
+    /// resolving onto the battlefield AS that permanent (the
+    /// <see cref="Majik.Core.Services.StackResolver"/> routes a permanent card
+    /// to the battlefield by type). <paramref name="buildCard"/> materializes
+    /// the live permanent instance (artifact / creature / enchantment);
+    /// <paramref name="buildDefinition"/> supplies the resolve-time
+    /// <see cref="SpellDefinition"/> (e.g. <see cref="SpellDefinition.Vanilla"/>
+    /// for an ETB-less permanent). No transform — only the chosen face exists
+    /// (CR 712.4).
+    /// </summary>
+    public static MdfcFace Permanent(
+        string name,
+        string manaCost,
+        Func<Player, ICard> buildCard,
+        Func<Player, Func<object, object>, Majik.Core.Stack.Stack?, ZoneService?, SpellDefinition> buildDefinition) =>
+        new(name, manaCost, isLand: false, (owner, _) => buildCard(owner), buildDefinition, isPermanent: true);
 
     /// <summary>
     /// Construct a spell face: cast onto the stack with its own cost / effect.
@@ -133,12 +212,14 @@ public sealed class MdfcFace
         string manaCost,
         bool isLand,
         Func<Player, ReplacementBus?, ICard> buildCard,
-        Func<Player, Func<object, object>, Majik.Core.Stack.Stack?, ZoneService?, SpellDefinition>? buildDefinition)
+        Func<Player, Func<object, object>, Majik.Core.Stack.Stack?, ZoneService?, SpellDefinition>? buildDefinition,
+        bool isPermanent = false)
     {
         if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException(nameof(name));
         Name = name;
         ManaCost = manaCost ?? "";
         IsLand = isLand;
+        IsPermanent = isPermanent;
         _buildCard = buildCard ?? throw new ArgumentNullException(nameof(buildCard));
         _buildDefinition = buildDefinition;
     }

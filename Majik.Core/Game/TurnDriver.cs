@@ -617,10 +617,16 @@ public sealed class TurnDriver
                     {
                         backConcrete.SetController(actor);
                     }
-                    if (backCard is Majik.Core.Cards.Creature backCreature
+                    // CR 712.3 — a PERMANENT back (artifact / creature /
+                    // enchantment / planeswalker) resolves onto the battlefield
+                    // AS that face; wire ActiveEffects onto ANY Permanent back
+                    // (not just a Creature) so its body / Layer pipeline
+                    // computes once it enters. A non-permanent spell back
+                    // (instant / sorcery) needs no continuous-effects link.
+                    if (backCard is Majik.Core.Cards.Permanent backPermanent
                         && _continuousEffects != null)
                     {
-                        backCreature.ActiveEffects = _continuousEffects;
+                        backPermanent.ActiveEffects = _continuousEffects;
                     }
                     // Replace the front card in hand with the back-face card so
                     // the Hand → Stack move in SpellCastFlow finds it there.

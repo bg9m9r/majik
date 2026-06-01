@@ -39,6 +39,23 @@ public class TriggeredAbility : ITriggeredAbility
     public IReadOnlySet<ZoneType> ActiveZones { get; }
 
     /// <summary>
+    /// CR 711.3 — a face/state predicate gating whether this trigger's ABILITY
+    /// is currently present on the object. Distinct from
+    /// <see cref="InterveningIf"/> (which is a CR 603.4 condition re-checked at
+    /// trigger time AND on resolution for an ALREADY-present ability): a false
+    /// <see cref="ActiveWhen"/> means the ability isn't on the object at all —
+    /// it can't trigger. Used by transform DFCs to attach BOTH faces' triggered
+    /// abilities while only the active face's set fires (no register/unregister
+    /// churn across the day/night flip). Null ⇒ always active.
+    /// </summary>
+    public Func<bool>? ActiveWhen { get; }
+
+    /// <summary>True iff this trigger's ability is currently present on its
+    /// object (its <see cref="ActiveWhen"/> face/state gate passes, or there is
+    /// no gate). Reads the live face state each call — no caching.</summary>
+    public bool IsActiveFace() => ActiveWhen?.Invoke() ?? true;
+
+    /// <summary>
     /// Targeting requests that the controller's agent must satisfy when the
     /// ability is about to be placed on the stack (Rule 603.3).
     /// Empty when the ability needs no targets.
@@ -62,11 +79,13 @@ public class TriggeredAbility : ITriggeredAbility
         IEnumerable<IEffect>? effects = null,
         Func<bool>? interveningIf = null,
         IEnumerable<ZoneType>? activeZones = null,
-        IEnumerable<TargetRequest>? targetRequests = null)
+        IEnumerable<TargetRequest>? targetRequests = null,
+        Func<bool>? activeWhen = null)
     {
         Source = source ?? throw new ArgumentNullException(nameof(source));
         Controller = controller ?? throw new ArgumentNullException(nameof(controller));
         Condition = condition ?? throw new ArgumentNullException(nameof(condition));
+        ActiveWhen = activeWhen;
 
         // PLAN 08 — per-game deterministic id. Reseeded from the ambient
         // DeterministicIdSource inside a game scope; Guid.NewGuid() fallback
@@ -118,6 +137,13 @@ public class TriggeredAbility : ITriggeredAbility
         }
 
         if (Source is ICard card && !ActiveZones.Contains(card.Zone))
+        {
+            return false;
+        }
+
+        // CR 711.3 — the ability isn't on the object while its face/state gate
+        // is false (e.g. a front-face trigger on a back-face-up transform DFC).
+        if (!IsActiveFace())
         {
             return false;
         }

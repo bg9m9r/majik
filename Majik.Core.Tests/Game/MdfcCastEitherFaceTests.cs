@@ -50,10 +50,10 @@ public class MdfcCastEitherFaceTests : IDisposable
         sink.MdfcState.Should().NotBeNull();
         sink.MdfcState!.CanCastEitherFace.Should().BeTrue(
             "the front face must expose a castable back-face descriptor (CR 712.3)");
-        sink.MdfcState!.BackFace.Should().NotBeNull();
-        sink.MdfcState!.BackFace!.IsLand.Should().BeTrue(
+        sink.MdfcState!.CastableBackFace.Should().NotBeNull();
+        sink.MdfcState!.CastableBackFace!.IsLand.Should().BeTrue(
             "Soporific Springs is a land back face");
-        sink.MdfcState!.BackFace!.Name.Should().Be("Soporific Springs");
+        sink.MdfcState!.CastableBackFace!.Name.Should().Be("Soporific Springs");
     }
 
     [Fact]
@@ -149,7 +149,7 @@ public class MdfcCastEitherFaceTests : IDisposable
         var sink = SinkIntoStuporFactory.Create(alice);
         sink.SetZone(ZoneType.Hand);
         alice.Zones.Hand.AddCard(sink);
-        var backFace = sink.MdfcState!.BackFace!;
+        var backFace = sink.MdfcState!.CastableBackFace!;
 
         var played = MdfcCastFlow.PlayBackLandFace(
             frontCard: sink, backFace: backFace, caster: alice,
@@ -193,7 +193,7 @@ public class MdfcCastEitherFaceTests : IDisposable
         alice.Zones.Hand.AddCard(sink);
 
         MdfcCastFlow.PlayBackLandFace(
-            sink, sink.MdfcState!.BackFace!, alice, zones, replacements,
+            sink, sink.MdfcState!.CastableBackFace!, alice, zones, replacements,
             landDropTracker: null, alice, PhaseStateType.PreCombatMain, true);
 
         var land = alice.Zones.Battlefield.GetCards().OfType<Land>().Single();
@@ -217,7 +217,7 @@ public class MdfcCastEitherFaceTests : IDisposable
         alice.Zones.Hand.AddCard(sink);
 
         MdfcCastFlow.PlayBackLandFace(
-            sink, sink.MdfcState!.BackFace!, alice, zones, replacements,
+            sink, sink.MdfcState!.CastableBackFace!, alice, zones, replacements,
             landDropTracker: null, alice, PhaseStateType.PreCombatMain, true);
 
         var land = alice.Zones.Battlefield.GetCards().OfType<Land>().Single();
@@ -237,7 +237,7 @@ public class MdfcCastEitherFaceTests : IDisposable
         alice.Zones.Hand.AddCard(sink);
 
         MdfcCastFlow.PlayBackLandFace(
-            sink, sink.MdfcState!.BackFace!, alice, zones, replacements: null,
+            sink, sink.MdfcState!.CastableBackFace!, alice, zones, replacements: null,
             landDropTracker: null, alice, PhaseStateType.PreCombatMain, true);
 
         var land = alice.Zones.Battlefield.GetCards().OfType<Land>().Single();
@@ -259,7 +259,7 @@ public class MdfcCastEitherFaceTests : IDisposable
         alice.Zones.Hand.AddCard(sink);
 
         var played = MdfcCastFlow.PlayBackLandFace(
-            sink, sink.MdfcState!.BackFace!, alice, zones, replacements: null,
+            sink, sink.MdfcState!.CastableBackFace!, alice, zones, replacements: null,
             landDropTracker: tracker, alice, PhaseStateType.PreCombatMain, true);
 
         played.Should().BeFalse("CR 305.2 — second land drop is illegal");
