@@ -96,7 +96,10 @@ public class Creature : Permanent
     {
         if (IsFaceDown) return 2;
         if (ActiveEffects == null) return BasePower;
-        return ActiveEffects.Compute(this).Power;
+        // Hot path — the scalar P/T cache returns an int with ZERO heap
+        // allocation on a cache hit (no layered clone, no HashSets). See
+        // ContinuousEffectsService.ComputePowerToughness.
+        return ActiveEffects.ComputePowerToughness(this).Power;
     }
 
     /// <summary>Get the current toughness after applying continuous effects.
@@ -105,7 +108,8 @@ public class Creature : Permanent
     {
         if (IsFaceDown) return 2;
         if (ActiveEffects == null) return BaseToughness;
-        return ActiveEffects.Compute(this).Toughness;
+        // Hot path — see GetPower / ComputePowerToughness (zero-alloc on hit).
+        return ActiveEffects.ComputePowerToughness(this).Toughness;
     }
 
     /// <summary>

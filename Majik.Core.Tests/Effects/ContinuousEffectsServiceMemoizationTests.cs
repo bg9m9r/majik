@@ -96,6 +96,121 @@ public class ContinuousEffectsServiceMemoizationTests
     }
 
     // ----------------------------------------------------------------------
+    // (1b) Scalar P/T hot-path cache (ComputePowerToughness) — zero-alloc on
+    //      hit + value-parity with the full Compute() layered result.
+    // ----------------------------------------------------------------------
+
+    [Fact]
+    public void ScalarPt_CacheHit_AllocatesNothing_OnHotPtRead()
+    {
+        // 30-creature board with counters + a few anthems so the first read
+        // populates a non-trivial layered + scalar cache. Subsequent reads in a
+        // fresh generation must serve cached ints WITHOUT cloning the layered
+        // working set (which would allocate a PermanentCharacteristics + four
+        // HashSets per read).
+        var svc = new ContinuousEffectsService();
+        var board = new List<Creature>();
+        for (var i = 0; i < 30; i++)
+        {
+            var c = new Creature($"C{i}", "1G", 2, 2)
+            {
+                Owner = _alice, Controller = _alice, Zone = ZoneType.Battlefield, ActiveEffects = svc,
+            };
+            c.Counters.Add(CounterType.PlusOnePlusOne);
+            board.Add(c);
+        }
+        foreach (var c in board.Take(3)) svc.Register(new FlatPump(c, 1, 1));
+
+        // Warm both caches (and JIT the read path) outside the measured window.
+        long warm = 0;
+        for (var pass = 0; pass < 50; pass++)
+        {
+            foreach (var c in board) warm += c.GetPower() + c.GetToughness();
+        }
+        warm.Should().BeGreaterThan(0);
+
+        // Measure a pure cache-hit loop: no generation bump occurs between the
+        // warm-up and here, so every GetPower/GetToughness is a scalar hit.
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        long total = 0;
+        for (var pass = 0; pass < 500; pass++)
+        {
+            foreach (var c in board) total += c.GetPower() + c.GetToughness();
+        }
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+
+        total.Should().BeGreaterThan(0);
+        // 500 passes x 30 creatures x 2 reads = 30,000 hot P/T reads. The old
+        // clone-on-hit path allocated ~5 objects EACH (a CreatureCharacteristics
+        // + four HashSets) ⇒ well over a megabyte here. The scalar cache returns
+        // a value tuple with zero heap traffic; allow a tiny slack only for
+        // incidental test-harness noise.
+        allocated.Should().BeLessThan(4096,
+            $"hot P/T cache hits must not clone the layered working set (allocated {allocated} bytes for 30,000 reads)");
+    }
+
+    [Fact]
+    public void ScalarPt_MatchesLayeredCompute_AcrossCounterAndAnthemAndStrip()
+    {
+        var svc = new ContinuousEffectsService();
+        var bear = new Creature("Bear", "1G", 2, 2)
+        {
+            Owner = _alice, Controller = _alice, Zone = ZoneType.Battlefield, ActiveEffects = svc,
+        };
+
+        void AssertParity(string because)
+        {
+            var layered = (CreatureCharacteristics)svc.Compute(bear);
+            var scalar = svc.ComputePowerToughness(bear);
+            scalar.Power.Should().Be(layered.Power, because);
+            scalar.Toughness.Should().Be(layered.Toughness, because);
+            // The public Creature accessors must agree too.
+            bear.Power.Should().Be(layered.Power, because);
+            bear.Toughness.Should().Be(layered.Toughness, because);
+        }
+
+        AssertParity("printed base");
+
+        svc.Register(new FlatPump(bear, 1, 1));
+        AssertParity("after anthem register");
+
+        bear.Counters.Add(CounterType.PlusOnePlusOne, 2);
+        AssertParity("after +1/+1 counters (counter delta folded into scalar)");
+
+        bear.Counters.Add(CounterType.MinusOneMinusOne, 1);
+        AssertParity("after -1/-1 counter");
+
+        var source = new Enchantment("Humility", "2WW")
+        {
+            Owner = _alice, Controller = _alice, Zone = ZoneType.Battlefield, ActiveEffects = svc,
+        };
+        var strip = new LoseAllAbilitiesEffect(source, new[] { bear });
+        svc.Register(strip);
+        AssertParity("after strip");
+    }
+
+    [Fact]
+    public void ScalarPt_CdaInput_LifeChangeViaEvent_RefreshesScalarCache()
+    {
+        // The scalar cache must invalidate on the same out-of-band CDA surface
+        // the layered cache does (Death's Shadow reads life via LifeChanged).
+        var bus = new EventBus();
+        var effects = new ContinuousEffectsService(bus);
+        var zones = new ZoneService(bus);
+        var players = new PlayerService(bus);
+
+        _alice.LifeTotal = 10;
+        var shadow = DeathsShadowFactory.Create(_alice, effects, bus);
+        shadow.ActiveEffects = effects;
+        zones.MoveCard(shadow, ZoneType.Library, ZoneType.Battlefield, _alice);
+
+        shadow.GetPower().Should().Be(3, "13 - 10 (warms the scalar cache)");
+        players.LoseLife(_alice, 5); // 10 → 5
+        shadow.GetPower().Should().Be(8, "scalar cache must refresh after the LifeChangedEvent bump");
+        shadow.GetToughness().Should().Be(8);
+    }
+
+    // ----------------------------------------------------------------------
     // (2) Anthem +N/+N — registering a second anthem changes the value
     //     (generation bump on Register).
     // ----------------------------------------------------------------------
