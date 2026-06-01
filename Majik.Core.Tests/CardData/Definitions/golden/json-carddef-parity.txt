@@ -6972,6 +6972,56 @@
   "mdfc": null,
   "colors": []
 }
+==== grave-titan ====
+{
+  "name": "Grave Titan",
+  "manaCost": "{4}{B}{B}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Giant"
+  ],
+  "power": 6,
+  "toughness": 6,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Black"
+  ]
+}
 ==== graypelt-refuge ====
 {
   "name": "Graypelt Refuge",
