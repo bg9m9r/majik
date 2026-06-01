@@ -1655,15 +1655,22 @@ public class RemoteAgentTests
     [Fact]
     public async Task ChooseGiftRecipient_Human_AwaitsRealChoiceCommand()
     {
+        // PLAN 01 (Slice G) — the bespoke ChooseGiftRecipientAsync prompt is
+        // gone; SpellCastFlow now models the Bloomburrow Gift recipient
+        // (CR 701.59) as an optional declarative PickOne over the opponent
+        // pool, handed to the single ChooseAsync sink. The human must still be
+        // prompted with a real ChoiceCommand (no silent auto-pick).
         var bob = new Player("Bob", 20);
         var carol = new Player("Carol", 20);
-        var card = new Instant("Bolt", "R") { Owner = _alice };
         var agent = new RemoteAgent(
             _alice,
             playerLookup: id => id == bob.Id ? bob : id == carol.Id ? carol : null);
 
-        var task = ((IPlayerAgent)agent).ChooseGiftRecipientAsync(
-            NewContext(), card, "a Food token", new[] { bob, carol });
+        var giftRequest = new ChoiceRequest(
+            ChoiceKind.PickOne, "a Food token", Min: 0, Max: 1,
+            Candidates: new object[] { bob, carol },
+            Intent: BotIntent.None, Optional: true);
+        var task = ((IPlayerAgent)agent).ChooseAsync(NewContext(), giftRequest);
 
         task.IsCompleted.Should().BeFalse("the human must be prompted to pick a recipient");
         agent.ExpectedCommandKinds.Should().Contain(typeof(ChoiceCommand));
@@ -1672,7 +1679,8 @@ public class RemoteAgentTests
             ChoiceKind.PickOne.ToString(), new[] { carol.Id })
         { PlayerId = _alice.Id });
 
-        (await task).Should().BeSameAs(carol);
+        var chosen = await task;
+        chosen.Should().ContainSingle().Which.Should().BeSameAs(carol);
     }
 
     [Fact]

@@ -84,17 +84,32 @@ public class ChooseAsyncShimTests
     }
 
     [Fact]
-    public async Task GiftRecipientShim_RoutesThroughChooseAsync_AsOptionalPickOne()
+    public async Task GiftRequest_ScriptedAgent_DeclinesByDefault()
     {
-        var agent = new RecordingChooseAgent { NextResult = System.Array.Empty<object>() };
+        // PLAN 01 (Slice G) — the bespoke ChooseGiftRecipientAsync is gone.
+        // The gift recipient is now an optional declarative PickOne over the
+        // opponent Player pool. ScriptedAgent preserves the legacy default:
+        // decline when no QueueGiftRecipient pick is queued.
+        var agent = new ScriptedAgent();
         var opp = new Player("Opp", 20);
+        var req = new ChoiceRequest(ChoiceKind.PickOne, "a 1/1 Fish", Min: 0, Max: 1,
+            Candidates: new object[] { opp }, Intent: BotIntent.None, Optional: true);
 
-        var picked = await ((IPlayerAgent)agent).ChooseGiftRecipientAsync(
-            null!, Card("gift source"), "a 1/1 Fish", new[] { opp });
+        var chosen = await ((IPlayerAgent)agent).ChooseAsync(null!, req);
+        chosen.Should().BeEmpty("scripted agent declines the gift when none is queued");
+    }
 
-        agent.LastRequest!.Kind.Should().Be(ChoiceKind.PickOne);
-        agent.LastRequest.Optional.Should().BeTrue();
-        picked.Should().BeNull(); // declined (empty result)
+    [Fact]
+    public async Task GiftRequest_ScriptedAgent_HonorsQueuedRecipient()
+    {
+        var agent = new ScriptedAgent();
+        var opp = new Player("Opp", 20);
+        agent.QueueGiftRecipient(opp);
+        var req = new ChoiceRequest(ChoiceKind.PickOne, "a 1/1 Fish", Min: 0, Max: 1,
+            Candidates: new object[] { opp }, Intent: BotIntent.None, Optional: true);
+
+        var chosen = await ((IPlayerAgent)agent).ChooseAsync(null!, req);
+        chosen.Should().ContainSingle().Which.Should().BeSameAs(opp);
     }
 
     [Fact]
@@ -164,11 +179,14 @@ public class ChooseAsyncShimTests
     [Fact]
     public async Task DefaultChooseAsync_OptionalGift_Declines()
     {
+        // PLAN 01 (Slice G) — gift recipient is an optional PickOne; the
+        // interface-default ChooseAsync declines an optional pick.
         var opp = new Player("Opp", 20);
-        var picked = await ((IPlayerAgent)new DefaultAgent()).ChooseGiftRecipientAsync(
-            null!, Card("src"), "gift", new[] { opp });
+        var req = new ChoiceRequest(ChoiceKind.PickOne, "gift", Min: 0, Max: 1,
+            Candidates: new object[] { opp }, Intent: BotIntent.None, Optional: true);
+        var chosen = await ((IPlayerAgent)new DefaultAgent()).ChooseAsync(null!, req);
 
-        picked.Should().BeNull();
+        chosen.Should().BeEmpty();
     }
 
     [Fact]

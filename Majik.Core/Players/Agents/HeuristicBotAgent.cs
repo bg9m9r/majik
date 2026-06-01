@@ -1256,31 +1256,13 @@ public sealed class HeuristicBotAgent : IPlayerAgent
         return Task.FromResult<ICard?>(pick);
     }
 
-    /// <summary>
-    /// CR 701.59 — Bloomburrow Gift heuristic. The bot defaults to
-    /// promising the gift to the first opponent: the upgrade clause on
-    /// every printed Gift spell so far (Into the Flood Maw bounce →
-    /// nonland-permanent bounce; the Vivien / Yotian / etc. cycle) is
-    /// strictly better, so the "give an opponent a small token" cost is
-    /// dominated by the upgrade benefit in every static evaluation. This
-    /// matches the most-aggressive Ascend / Spectacle posture used
-    /// elsewhere in the bot. Declines when there are no eligible
-    /// opponents (e.g. <c>archenemy</c> shapes — defensive guard, not
-    /// reachable in standard 1v1).
-    ///
-    /// <para>Followup: a richer heuristic should weight token threat
-    /// (an opponent with a board full of token-sacrifice / token-tribal
-    /// outlets gets the gift LAST) against upgrade EV. Tracked in
-    /// MODERN_COVERAGE under the Bloomburrow Gift cluster.</para>
-    /// </summary>
-    public Task<Player?> ChooseGiftRecipientAsync(
-        GameContext ctx, ICard source, string giftDescription,
-        IReadOnlyList<Player> opponents, CancellationToken ct = default)
-    {
-        if (opponents == null || opponents.Count == 0)
-            return Task.FromResult<Player?>(null);
-        return Task.FromResult<Player?>(opponents[0]);
-    }
+    // PLAN 01 (Slice G) — the bespoke ChooseGiftRecipientAsync override is
+    // gone. The gift recipient now flows through this agent's ChooseAsync as
+    // an optional PickOne over the opponent pool; ChooseAsync already returns
+    // the first candidate for a non-empty optional pick, preserving the bot's
+    // most-aggressive "promise the gift to the first opponent" posture (every
+    // printed Gift spell's upgrade clause dominates the small-token cost in
+    // static evaluation — same posture as the Ascend / Spectacle prompts).
 
     /// <summary>
     /// Smarter Yes/No heuristics, intent-keyed. Upside intents always
