@@ -40,7 +40,7 @@ public static class ImplementedCardNames
     public static readonly ImmutableArray<string> InlineFallbackNames =
         ImmutableArray.Create(
             "Mountain", "Forest", "Plains", "Island", "Swamp", "Wastes",
-            "Grizzly Bears", "Runeclaw Bear", "Hill Giant", "Centaur Courser");
+            "Grizzly Bears", "Runeclaw Bear", "Hill Giant");
 
     private static readonly Lazy<ImmutableHashSet<string>> _all =
         new(Compute, LazyThreadSafetyMode.ExecutionAndPublication);

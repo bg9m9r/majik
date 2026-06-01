@@ -40,6 +40,30 @@ public static class BotDeckCatalog
             ? list
             : throw new ArgumentException($"Unknown bot archetype: {archetype}", nameof(archetype));
 
+    /// <summary>
+    /// CR 100.4 / CR 408 — the archetype's 15-card sideboard (a.k.a. the
+    /// wishboard). Defined per archetype in <see cref="BotDeckSideboards"/>;
+    /// every card name resolves in the embedded seed (audited by
+    /// <c>DeckBindingAuditTests</c>). Wish-tutor effects and nominated
+    /// companions read this pile via <see cref="Majik.Core.Players.Player.Wishboard"/>
+    /// once it is populated at match start.
+    ///
+    /// <para>Returns <see cref="System.Array.Empty{T}"/> for any
+    /// <em>known</em> archetype that does not (yet) declare a sideboard, so
+    /// the caller always gets a usable list and never a crash. Throws
+    /// <see cref="ArgumentException"/> only for an <em>unknown</em> archetype,
+    /// mirroring <see cref="Get"/>.</para>
+    /// </summary>
+    public static IReadOnlyList<string> GetSideboard(string archetype)
+    {
+        if (!_decks.ContainsKey(archetype))
+            throw new ArgumentException($"Unknown bot archetype: {archetype}", nameof(archetype));
+
+        return BotDeckSideboards.ByArchetype.TryGetValue(archetype, out var sb)
+            ? sb
+            : Array.Empty<string>();
+    }
+
     public static string DisplayName(string archetype) => archetype switch
     {
         "Burn"              => "Bot — Burn",
