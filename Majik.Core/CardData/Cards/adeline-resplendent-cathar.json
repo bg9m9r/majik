@@ -1,0 +1,10 @@
+{
+  "name": "Adeline, Resplendent Cathar",
+  "types": ["Creature"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Human", "Knight"],
+  "manaCost": "{1}{W}{W}",
+  "power": 0,
+  "toughness": 4,
+  "abilities": []
+}
