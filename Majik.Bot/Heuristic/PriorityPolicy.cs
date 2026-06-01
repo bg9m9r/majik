@@ -32,6 +32,13 @@ public class PriorityPolicy
     private int _abilityMemoTurn = -1;
     private Guid? _lastAbilityProposed;
 
+    /// <summary>CR 305.2 — at most one land per turn. Same anti-spin memo as
+    /// the activated-ability one above: once we've proposed a land this turn
+    /// we stop offering it, so a rejected/committed land can't have us
+    /// re-propose it every priority round. Reset on turn boundary.</summary>
+    private bool _landProposedThisTurn;
+    private bool _lastWasLandProposal;
+
     public PriorityPolicy(ArchetypeWeights weights)
         : this(weights, NullBotDecisionSink.Instance, vanillaTracker: null) { }
 
@@ -55,6 +62,8 @@ public class PriorityPolicy
         {
             _abilityFiredThisTurn.Clear();
             _lastAbilityProposed = null;
+            _landProposedThisTurn = false;
+            _lastWasLandProposal = false;
             _abilityMemoTurn = ctx.TurnNumber;
         }
         // If our previous proposal hasn't left the activation stream (e.g.
@@ -66,6 +75,14 @@ public class PriorityPolicy
         {
             _abilityFiredThisTurn.Add(prev);
             _lastAbilityProposed = null;
+        }
+        // Same conservative posture for the land drop: if we proposed a land
+        // last time and we're being asked again, the drop is spent (or was
+        // rejected) — don't offer it again this turn.
+        if (_lastWasLandProposal)
+        {
+            _landProposedThisTurn = true;
+            _lastWasLandProposal = false;
         }
 
         var current = BoardEval.Score(ctx, self, _weights);
@@ -91,6 +108,10 @@ public class PriorityPolicy
         if (best is PriorityAction.ActivateAbility act)
         {
             _lastAbilityProposed = act.Ability.Id;
+        }
+        else if (best is PriorityAction.PlayLand)
+        {
+            _lastWasLandProposal = true;
         }
 
         EmitDecision(ctx, self, best, bestScore, candidates);
@@ -198,6 +219,9 @@ public class PriorityPolicy
     private IEnumerable<(PriorityAction action, double projected)>
         EnumerateLandDropBids(Player self, double current)
     {
+        // Already used our land drop this turn (CR 305.2) — stop offering so
+        // the priority pump can't loop on a land the engine will reject.
+        if (_landProposedThisTurn) yield break;
         var landInHand = self.Zones.Hand.GetCards().OfType<Land>().FirstOrDefault();
         if (landInHand == null) yield break;
         var projected = current + _weights.ManaSources * 1;
