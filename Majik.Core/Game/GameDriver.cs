@@ -250,10 +250,30 @@ public sealed class GameDriver
         // If the CALLER already installed an ambient source (e.g. the replay
         // harness wraps both the initial-board construction AND the run in one
         // scope so the board's ids share the SAME monotonic sequence the run
-        // continues), KEEP it — pushing a fresh seed-restarted source here would
-        // reset the counter and collide run-minted ids with the board ids. Only
-        // push the driver's own source when no scope is active yet.
-        using var idScope = DeterministicIdScope.PushIfNone(_idSource);
+        // continues), CONTINUE that exact source — pushing a fresh seed-restarted
+        // source here would reset the counter and collide run-minted ids with the
+        // board ids. When no scope is active, use the driver's own seed-derived
+        // source.
+        //
+        // Concurrency hardening: capture the EFFECTIVE source and PUSH it onto
+        // this run's own async flow so the run OWNS the ambient for the whole
+        // RunGameAsync subtree (it flows to every awaited continuation via
+        // ExecutionContext). The previous PushIfNone left the run WITHOUT its own
+        // scope whenever a caller had already pushed one, so the run's minting
+        // correctness then borrowed the caller's scope and hinged on that scope
+        // outliving the background game task. Re-pushing the captured source
+        // roots the ambient at the run's own flow, independent of the caller's
+        // scope lifetime. Pushing the SAME source instance (when a caller already
+        // had one) is a no-op for the counter — it continues monotonically — so
+        // the board+run shared-sequence property the rehydrate path relies on is
+        // preserved exactly. (NB: the cross-game id divergence the fuzz harness
+        // surfaced was rooted not here but in the process-wide
+        // RouteThroughNamedFactories flag being toggled mid-build by a concurrent
+        // test, which changed a deck build's id-mint COUNT — fixed by snapshotting
+        // that flag per facade in GameFacade.Create. This Push is complementary
+        // ownership hygiene.)
+        var effectiveIdSource = DeterministicIdScope.Current ?? _idSource;
+        using var idScope = DeterministicIdScope.Push(effectiveIdSource);
 
         // De-static the process-level registries (agents, RNG, event bus,
         // zone service) to a per-game ambient store for the whole run — same
