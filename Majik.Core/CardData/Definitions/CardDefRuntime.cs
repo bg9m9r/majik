@@ -690,7 +690,7 @@ public static class CardDefRuntime
             ScrySelfEffectDef scry => BuildScrySelfEffect(scry, card, controller),
             DestroyTargetEffectDef destroy => BuildDestroyTargetEffect(destroy, card, targetRequestIndex),
             UntapTargetEffectDef untap => BuildUntapTargetEffect(untap, card, targetRequestIndex),
-            PreventDamageTargetStubEffectDef prevent => BuildPreventDamageTargetStubEffect(prevent, card),
+            PreventDamageTargetEffectDef prevent => BuildPreventDamageTargetEffect(prevent, card, replacements, targetRequestIndex),
             GainLifeSelfEffectDef gain => BuildGainLifeSelfEffect(gain, card, controller),
             MillThenPickFirstMatchingToHandEffectDef mp => BuildMillThenPickEffect(mp, card, controller),
             ConniveSelfEffectDef connive => BuildConniveSelfEffect(connive, card),
@@ -808,12 +808,29 @@ public static class CardDefRuntime
             });
     }
 
-    private static IEffect BuildPreventDamageTargetStubEffect(
-        PreventDamageTargetStubEffectDef def, ICard card)
+    private static IEffect BuildPreventDamageTargetEffect(
+        PreventDamageTargetEffectDef def, ICard card, ReplacementBus? replacements, int targetRequestIndex)
     {
+        // PLAN 01 (Slice F) — real targeted damage prevention (CR 615). Reads
+        // the chosen creature off ChosenTargets at the reserved index and
+        // registers a per-turn prevention shield bound to it on the
+        // controller-attached ReplacementBus. CR 608.2b — fizzle (no shield)
+        // if the target is no longer a battlefield creature, or if no bus is
+        // attached. The shield auto-expires at cleanup via IEndOfTurnExpirable.
+        var amount = def.Amount;
         return new Effect(
-            $"{card.Name}: prevent next {def.Amount} damage to target {def.TargetFilter} this turn (stub — no targeting yet)",
-            () => { /* prevent-damage target deferred */ });
+            $"{card.Name}: prevent next {amount} damage to target {def.TargetFilter} this turn",
+            ctx =>
+            {
+                if (replacements != null
+                    && ChosenTargetAt(ctx, targetRequestIndex) is Creature creature
+                    && creature.Zone == ZoneType.Battlefield)
+                {
+                    replacements.Register(
+                        new PreventNextNDamageToCreatureShield(creature, amount));
+                }
+                return ValueTask.CompletedTask;
+            });
     }
 
     private static IEffect BuildScrySelfEffect(ScrySelfEffectDef def, ICard card, Player controller)
