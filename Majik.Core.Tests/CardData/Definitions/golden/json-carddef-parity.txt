@@ -12551,6 +12551,59 @@
     "Green"
   ]
 }
+==== pia-and-kiran-nalaar ====
+{
+  "name": "Pia and Kiran Nalaar",
+  "manaCost": "{2}{R}{R}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [
+    "Legendary"
+  ],
+  "subtypes": [
+    "Artificer",
+    "Human"
+  ],
+  "power": 2,
+  "toughness": 2,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Red"
+  ]
+}
 ==== pilgrims-eye ====
 {
   "name": "Pilgrim\u0027s Eye",
