@@ -93,6 +93,46 @@ public class PriorityLoopLandDropTests
     }
 
     [Fact]
+    public async Task PlayLand_RejectedOverCap_PassesPriority_DoesNotReAskProposer()
+    {
+        // Regression: a rejected PlayLand must NOT re-hand priority to the
+        // proposing actor. The swallow-and-log path used to still honor the
+        // action's HoldPriority flag, so an agent that re-proposed the illegal
+        // land spun the round to the kActionLimit safety cap (500), flooding
+        // stderr with "rejected PlayLand" lines every round of every turn.
+        // The loop now treats a rejected proposal as a pass, so the proposer
+        // is asked exactly ONCE. We prove that by queueing ONLY the illegal
+        // land with no follow-up Pass: the old spinning loop would re-ask
+        // Alice and ScriptedAgent would throw on its now-empty queue.
+        var l1 = NamedCardFactory.Create("Mountain", _alice);
+        var l2 = NamedCardFactory.Create("Mountain", _alice);
+        l1.SetZone(ZoneType.Hand); l2.SetZone(ZoneType.Hand);
+        _alice.Zones.Hand.AddCard(l1);
+        _alice.Zones.Hand.AddCard(l2);
+        var tracker = new LandDropTracker();
+        tracker.RecordLandPlayed(_alice); // drop already spent this turn
+
+        var aliceAgent = new ScriptedAgent();
+        aliceAgent.QueuePriority(new PriorityAction.PlayLand(l2)); // the ONLY entry
+        var bobAgent = new ScriptedAgent();
+        bobAgent.QueuePriority(PriorityAction.Pass);
+        bobAgent.QueuePriority(PriorityAction.Pass);
+
+        var loop = new PriorityLoop(
+            new[] { _alice, _bob }, _priority, _stack, _resolver, _zones,
+            new Dictionary<Player, IPlayerAgent>
+            { [_alice] = aliceAgent, [_bob] = bobAgent },
+            () => 1, () => PhaseStateType.PreCombatMain, tracker);
+
+        var act = async () => await loop.RunUntilRoundEndsAsync(_alice);
+
+        await act.Should().NotThrowAsync(
+            "a rejected PlayLand should pass priority, not re-ask the proposer into an empty script");
+        l2.Zone.Should().Be(ZoneType.Hand);
+        tracker.DropsUsedThisTurn(_alice).Should().Be(1);
+    }
+
+    [Fact]
     public void Ctor_NullLandDropTracker_Throws()
     {
         // CR 305.2 — the per-turn one-land cap is engine-level and unconditional.
