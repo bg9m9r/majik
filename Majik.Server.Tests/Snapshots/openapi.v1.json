@@ -1,0 +1,3307 @@
+{
+  "components": {
+    "schemas": {
+      "AbilityDto": {
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "kind": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "description"
+        ],
+        "type": "object"
+      },
+      "AttackerDeclarationDto": {
+        "properties": {
+          "attackerInstanceId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "defenderId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "attackerInstanceId",
+          "defenderId"
+        ],
+        "type": "object"
+      },
+      "AutoPassPrefs": {
+        "properties": {
+          "fullControl": {
+            "type": "boolean"
+          },
+          "phaseStops": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "fullControl",
+          "phaseStops"
+        ],
+        "type": "object"
+      },
+      "BlockerDeclarationDto": {
+        "properties": {
+          "attackerInstanceId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "blockerInstanceId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "blockerInstanceId",
+          "attackerInstanceId"
+        ],
+        "type": "object"
+      },
+      "BotArchetypeDto": {
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "label"
+        ],
+        "type": "object"
+      },
+      "BotDecision": {
+        "properties": {
+          "alternatives": {
+            "items": {
+              "$ref": "#/components/schemas/BotDecisionAlternative"
+            },
+            "type": "array"
+          },
+          "chosen": {
+            "type": "string"
+          },
+          "chosenScore": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?(?:[eE][\u002B-]?\\d\u002B)?$",
+            "type": [
+              "number",
+              "string"
+            ]
+          },
+          "context": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "decisionType": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "decisionType",
+          "chosen",
+          "chosenScore",
+          "alternatives",
+          "context"
+        ],
+        "type": "object"
+      },
+      "BotDecisionAlternative": {
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "score": {
+            "format": "double",
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d\u002B)?(?:[eE][\u002B-]?\\d\u002B)?$",
+            "type": [
+              "number",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "score"
+        ],
+        "type": "object"
+      },
+      "BotOpponentRequest": {
+        "properties": {
+          "archetype": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "archetype"
+        ],
+        "type": "object"
+      },
+      "CardDrawnPayload": {
+        "properties": {
+          "cardId": {
+            "format": "uuid",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "cardName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "hidden": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "manaCost": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "playerId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "types": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          }
+        },
+        "required": [
+          "playerId"
+        ],
+        "type": "object"
+      },
+      "CardDto": {
+        "properties": {
+          "cmc": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ]
+          },
+          "colors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "isImplemented": {
+            "type": "boolean"
+          },
+          "manaCost": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "oracleText": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "power": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ]
+          },
+          "toughness": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ]
+          },
+          "types": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "manaCost",
+          "types",
+          "power",
+          "toughness",
+          "isImplemented",
+          "cmc",
+          "colors",
+          "oracleText"
+        ],
+        "type": "object"
+      },
+      "CardMovedPayload": {
+        "properties": {
+          "abilities": {
+            "items": {
+              "$ref": "#/components/schemas/AbilityDto"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          },
+          "cardId": {
+            "format": "uuid",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "cardName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "counters": {
+            "additionalProperties": {
+              "format": "int32",
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ]
+            },
+            "type": [
+              "null",
+              "object"
+            ]
+          },
+          "from": {
+            "type": "string"
+          },
+          "hidden": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "manaCost": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "ownerId": {
+            "format": "uuid",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "power": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ]
+          },
+          "producedManaColors": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "summoningSickness": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "tapped": {
+            "type": [
+              "null",
+              "boolean"
+            ]
+          },
+          "to": {
+            "type": "string"
+          },
+          "toughness": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ]
+          },
+          "types": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          }
+        },
+        "required": [
+          "from",
+          "to"
+        ],
+        "type": "object"
+      },
+      "CardRevealedPayload": {
+        "properties": {
+          "cardId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "cardName": {
+            "type": "string"
+          },
+          "from": {
+            "type": "string"
+          },
+          "playerId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "cardId",
+          "cardName",
+          "playerId",
+          "from",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "CardSnapshotDto": {
+        "properties": {
+          "abilities": {
+            "items": {
+              "$ref": "#/components/schemas/AbilityDto"
+            },
+            "type": "array"
+          },
+          "counters": {
+            "additionalProperties": {
+              "format": "int32",
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ]
+            },
+            "type": [
+              "null",
+              "object"
+            ]
+          },
+          "instanceId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "manaCost": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "power": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ]
+          },
+          "producedManaColors": {
+            "default": "",
+            "type": "string"
+          },
+          "summoningSickness": {
+            "type": "boolean"
+          },
+          "tapped": {
+            "type": "boolean"
+          },
+          "toughness": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ]
+          },
+          "types": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "instanceId",
+          "name",
+          "manaCost",
+          "types",
+          "power",
+          "toughness",
+          "tapped",
+          "summoningSickness",
+          "abilities"
+        ],
+        "type": "object"
+      },
+      "CardsByNameRequest": {
+        "properties": {
+          "names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "names"
+        ],
+        "type": "object"
+      },
+      "CardsError": {
+        "properties": {
+          "detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "type": "object"
+      },
+      "CounterAddedPayload": {
+        "properties": {
+          "amount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ]
+          },
+          "controllerId": {
+            "format": "uuid",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "counterType": {
+            "type": "string"
+          },
+          "targetInstanceId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "targetInstanceId",
+          "counterType",
+          "amount"
+        ],
+        "type": "object"
+      },
+      "CreateDeckRequest": {
+        "properties": {
+          "mainboard": {
+            "items": {
+              "$ref": "#/components/schemas/DeckCardEntryDto"
+            },
+            "type": "array"
+          },
+          "name": {
+            "type": "string"
+          },
+          "sideboard": {
+            "items": {
+              "$ref": "#/components/schemas/DeckCardEntryDto"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "mainboard",
+          "sideboard"
+        ],
+        "type": "object"
+      },
+      "CreateMatchRequest": {
+        "properties": {
+          "botOpponent": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/BotOpponentRequest"
+              }
+            ]
+          },
+          "clockMinutes": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ]
+          },
+          "deckId": {
+            "type": "string"
+          },
+          "format": {
+            "type": "string"
+          },
+          "visibility": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "format",
+          "visibility",
+          "deckId",
+          "clockMinutes"
+        ],
+        "type": "object"
+      },
+      "DamageDealtPayload": {
+        "properties": {
+          "amount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ]
+          },
+          "damageType": {
+            "type": "string"
+          },
+          "sourceInstanceId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "targetInstanceId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "targetIsPlayer": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "sourceInstanceId",
+          "targetInstanceId",
+          "targetIsPlayer",
+          "amount",
+          "damageType"
+        ],
+        "type": "object"
+      },
+      "DeckCardEntryDto": {
+        "properties": {
+          "count": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ]
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "count"
+        ],
+        "type": "object"
+      },
+      "DeckDto": {
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "mainboard": {
+            "items": {
+              "$ref": "#/components/schemas/DeckCardEntryDto"
+            },
+            "type": "array"
+          },
+          "name": {
+            "type": "string"
+          },
+          "ownerSub": {
+            "type": "string"
+          },
+          "sideboard": {
+            "items": {
+              "$ref": "#/components/schemas/DeckCardEntryDto"
+            },
+            "type": "array"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "ownerSub",
+          "name",
+          "mainboard",
+          "sideboard",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
+      "DeckError": {
+        "properties": {
+          "detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "error": {
+            "type": "string"
+          },
+          "validation": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "type": "object"
+      },
+      "EventDto": {
+        "properties": {
+          "at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "eventId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/JsonElement"
+          },
+          "seq": {
+            "default": 0,
+            "format": "int64",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ]
+          },
+          "type": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "eventId",
+          "type",
+          "at",
+          "payload"
+        ],
+        "type": "object"
+      },
+      "EventPayloadCatalog": {
+        "properties": {
+          "cardDrawn": {
+            "$ref": "#/components/schemas/CardDrawnPayload"
+          },
+          "cardMoved": {
+            "$ref": "#/components/schemas/CardMovedPayload"
+          },
+          "cardRevealed": {
+            "$ref": "#/components/schemas/CardRevealedPayload"
+          },
+          "counterAdded": {
+            "$ref": "#/components/schemas/CounterAddedPayload"
+          },
+          "damageDealt": {
+            "$ref": "#/components/schemas/DamageDealtPayload"
+          },
+          "extraPhaseAdded": {
+            "$ref": "#/components/schemas/ExtraPhaseAddedPayload"
+          },
+          "lifeChanged": {
+            "$ref": "#/components/schemas/LifeChangedPayload"
+          },
+          "phaseChanged": {
+            "$ref": "#/components/schemas/PhaseChangedPayload"
+          },
+          "phaseEnded": {
+            "$ref": "#/components/schemas/PhaseEndedPayload"
+          },
+          "phaseStarted": {
+            "$ref": "#/components/schemas/PhaseStartedPayload"
+          },
+          "playerLost": {
+            "$ref": "#/components/schemas/PlayerLostPayload"
+          },
+          "stackObject": {
+            "$ref": "#/components/schemas/StackObjectPayload"
+          },
+          "stepEnded": {
+            "$ref": "#/components/schemas/StepEndedPayload"
+          },
+          "stepStarted": {
+            "$ref": "#/components/schemas/StepStartedPayload"
+          },
+          "turnEnded": {
+            "$ref": "#/components/schemas/TurnEndedPayload"
+          },
+          "turnStarted": {
+            "$ref": "#/components/schemas/TurnStartedPayload"
+          },
+          "turnStateChanged": {
+            "$ref": "#/components/schemas/TurnStateChangedPayload"
+          }
+        },
+        "required": [
+          "cardMoved",
+          "cardDrawn",
+          "cardRevealed",
+          "lifeChanged",
+          "phaseStarted",
+          "phaseEnded",
+          "phaseChanged",
+          "turnStateChanged",
+          "stepStarted",
+          "stepEnded",
+          "turnStarted",
+          "turnEnded",
+          "extraPhaseAdded",
+          "playerLost",
+          "stackObject",
+          "damageDealt",
+          "counterAdded"
+        ],
+        "type": "object"
+      },
+      "ExtraPhaseAddedPayload": {
+        "properties": {
+          "phase": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "phase"
+        ],
+        "type": "object"
+      },
+      "GameCommand": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/GameCommandPassPriorityCommand"
+          },
+          {
+            "$ref": "#/components/schemas/GameCommandPlayLandCommand"
+          },
+          {
+            "$ref": "#/components/schemas/GameCommandCastSpellCommand"
+          },
+          {
+            "$ref": "#/components/schemas/GameCommandMulliganCommand"
+          },
+          {
+            "$ref": "#/components/schemas/GameCommandChooseTargetsCommand"
+          },
+          {
+            "$ref": "#/components/schemas/GameCommandChooseXCommand"
+          },
+          {
+            "$ref": "#/components/schemas/GameCommandChooseModeCommand"
+          },
+          {
+            "$ref": "#/components/schemas/GameCommandChooseManaCommand"
+          },
+          {
+            "$ref": "#/components/schemas/GameCommandCancelCastCommand"
+          },
+          {
+            "$ref": "#/components/schemas/GameCommandActivateManaAbilityCommand"
+          },
+          {
+            "$ref": "#/components/schemas/GameCommandActivateAbilityCommand"
+          },
+          {
+            "$ref": "#/components/schemas/GameCommandOrderTriggersCommand"
+          },
+          {
+            "$ref": "#/components/schemas/GameCommandDeclareAttackersCommand"
+          },
+          {
+            "$ref": "#/components/schemas/GameCommandDeclareBlockersCommand"
+          },
+          {
+            "$ref": "#/components/schemas/GameCommandChooseCardsToBottomCommand"
+          },
+          {
+            "$ref": "#/components/schemas/GameCommandChooseLibraryPickCommand"
+          },
+          {
+            "$ref": "#/components/schemas/GameCommandChooseSurveilCommand"
+          },
+          {
+            "$ref": "#/components/schemas/GameCommandChooseYesNoCommand"
+          },
+          {
+            "$ref": "#/components/schemas/GameCommandChooseFromRevealedCommand"
+          },
+          {
+            "$ref": "#/components/schemas/GameCommandChoiceCommand"
+          }
+        ],
+        "discriminator": {
+          "mapping": {
+            "activateAbility": "#/components/schemas/GameCommandActivateAbilityCommand",
+            "activateManaAbility": "#/components/schemas/GameCommandActivateManaAbilityCommand",
+            "attackers": "#/components/schemas/GameCommandDeclareAttackersCommand",
+            "blockers": "#/components/schemas/GameCommandDeclareBlockersCommand",
+            "bottom": "#/components/schemas/GameCommandChooseCardsToBottomCommand",
+            "cancelCast": "#/components/schemas/GameCommandCancelCastCommand",
+            "cast": "#/components/schemas/GameCommandCastSpellCommand",
+            "choice": "#/components/schemas/GameCommandChoiceCommand",
+            "chooseFromRevealed": "#/components/schemas/GameCommandChooseFromRevealedCommand",
+            "chooseLibraryPick": "#/components/schemas/GameCommandChooseLibraryPickCommand",
+            "chooseSurveil": "#/components/schemas/GameCommandChooseSurveilCommand",
+            "chooseYesNo": "#/components/schemas/GameCommandChooseYesNoCommand",
+            "mana": "#/components/schemas/GameCommandChooseManaCommand",
+            "mode": "#/components/schemas/GameCommandChooseModeCommand",
+            "mulligan": "#/components/schemas/GameCommandMulliganCommand",
+            "order-triggers": "#/components/schemas/GameCommandOrderTriggersCommand",
+            "pass": "#/components/schemas/GameCommandPassPriorityCommand",
+            "play-land": "#/components/schemas/GameCommandPlayLandCommand",
+            "targets": "#/components/schemas/GameCommandChooseTargetsCommand",
+            "x": "#/components/schemas/GameCommandChooseXCommand"
+          },
+          "propertyName": "$type"
+        },
+        "required": [
+          "$type"
+        ],
+        "type": "object"
+      },
+      "GameCommandActivateAbilityCommand": {
+        "properties": {
+          "$type": {
+            "enum": [
+              "activateAbility"
+            ],
+            "type": "string"
+          },
+          "abilityId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "permanentInstanceId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "playerId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "permanentInstanceId",
+          "abilityId"
+        ]
+      },
+      "GameCommandActivateManaAbilityCommand": {
+        "properties": {
+          "$type": {
+            "enum": [
+              "activateManaAbility"
+            ],
+            "type": "string"
+          },
+          "color": {
+            "type": "string"
+          },
+          "permanentInstanceId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "playerId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "permanentInstanceId",
+          "color"
+        ]
+      },
+      "GameCommandCancelCastCommand": {
+        "properties": {
+          "$type": {
+            "enum": [
+              "cancelCast"
+            ],
+            "type": "string"
+          },
+          "playerId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        }
+      },
+      "GameCommandCastSpellCommand": {
+        "properties": {
+          "$type": {
+            "enum": [
+              "cast"
+            ],
+            "type": "string"
+          },
+          "cardInstanceId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "modeIndex": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ]
+          },
+          "playerId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "targetInstanceIds": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "xValue": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "cardInstanceId",
+          "targetInstanceIds",
+          "xValue",
+          "modeIndex"
+        ]
+      },
+      "GameCommandChoiceCommand": {
+        "properties": {
+          "$type": {
+            "enum": [
+              "choice"
+            ],
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "playerId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "selectedInstanceIds": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "yesNo": {
+            "default": false,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "kind",
+          "selectedInstanceIds"
+        ]
+      },
+      "GameCommandChooseCardsToBottomCommand": {
+        "properties": {
+          "$type": {
+            "enum": [
+              "bottom"
+            ],
+            "type": "string"
+          },
+          "cardInstanceIds": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "playerId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "cardInstanceIds"
+        ]
+      },
+      "GameCommandChooseFromRevealedCommand": {
+        "properties": {
+          "$type": {
+            "enum": [
+              "chooseFromRevealed"
+            ],
+            "type": "string"
+          },
+          "instanceId": {
+            "format": "uuid",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "playerId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "instanceId"
+        ]
+      },
+      "GameCommandChooseLibraryPickCommand": {
+        "properties": {
+          "$type": {
+            "enum": [
+              "chooseLibraryPick"
+            ],
+            "type": "string"
+          },
+          "playerId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "selectedInstanceId": {
+            "format": "uuid",
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "selectedInstanceId"
+        ]
+      },
+      "GameCommandChooseManaCommand": {
+        "properties": {
+          "$type": {
+            "enum": [
+              "mana"
+            ],
+            "type": "string"
+          },
+          "playerId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "sourceInstanceIds": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "sourceInstanceIds"
+        ]
+      },
+      "GameCommandChooseModeCommand": {
+        "properties": {
+          "$type": {
+            "enum": [
+              "mode"
+            ],
+            "type": "string"
+          },
+          "modeIndex": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ]
+          },
+          "playerId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "modeIndex"
+        ]
+      },
+      "GameCommandChooseSurveilCommand": {
+        "properties": {
+          "$type": {
+            "enum": [
+              "chooseSurveil"
+            ],
+            "type": "string"
+          },
+          "playerId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "toGraveyardInstanceIds": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "topOrderInstanceIds": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "toGraveyardInstanceIds",
+          "topOrderInstanceIds"
+        ]
+      },
+      "GameCommandChooseTargetsCommand": {
+        "properties": {
+          "$type": {
+            "enum": [
+              "targets"
+            ],
+            "type": "string"
+          },
+          "playerId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "targetInstanceIds": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "targetInstanceIds"
+        ]
+      },
+      "GameCommandChooseXCommand": {
+        "properties": {
+          "$type": {
+            "enum": [
+              "x"
+            ],
+            "type": "string"
+          },
+          "playerId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "x": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "x"
+        ]
+      },
+      "GameCommandChooseYesNoCommand": {
+        "properties": {
+          "$type": {
+            "enum": [
+              "chooseYesNo"
+            ],
+            "type": "string"
+          },
+          "answer": {
+            "type": "boolean"
+          },
+          "playerId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "answer"
+        ]
+      },
+      "GameCommandDeclareAttackersCommand": {
+        "properties": {
+          "$type": {
+            "enum": [
+              "attackers"
+            ],
+            "type": "string"
+          },
+          "attackers": {
+            "items": {
+              "$ref": "#/components/schemas/AttackerDeclarationDto"
+            },
+            "type": "array"
+          },
+          "playerId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "attackers"
+        ]
+      },
+      "GameCommandDeclareBlockersCommand": {
+        "properties": {
+          "$type": {
+            "enum": [
+              "blockers"
+            ],
+            "type": "string"
+          },
+          "blockers": {
+            "items": {
+              "$ref": "#/components/schemas/BlockerDeclarationDto"
+            },
+            "type": "array"
+          },
+          "playerId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "blockers"
+        ]
+      },
+      "GameCommandMulliganCommand": {
+        "properties": {
+          "$type": {
+            "enum": [
+              "mulligan"
+            ],
+            "type": "string"
+          },
+          "keep": {
+            "type": "boolean"
+          },
+          "playerId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "keep"
+        ]
+      },
+      "GameCommandOrderTriggersCommand": {
+        "properties": {
+          "$type": {
+            "enum": [
+              "order-triggers"
+            ],
+            "type": "string"
+          },
+          "playerId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "stackObjectIdsInOrder": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "stackObjectIdsInOrder"
+        ]
+      },
+      "GameCommandPassPriorityCommand": {
+        "properties": {
+          "$type": {
+            "enum": [
+              "pass"
+            ],
+            "type": "string"
+          },
+          "playerId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        }
+      },
+      "GameCommandPlayLandCommand": {
+        "properties": {
+          "$type": {
+            "enum": [
+              "play-land"
+            ],
+            "type": "string"
+          },
+          "landInstanceId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "playerId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "landInstanceId"
+        ]
+      },
+      "GameStateDto": {
+        "properties": {
+          "activePlayerId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "gameId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "phase": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "players": {
+            "items": {
+              "$ref": "#/components/schemas/PlayerDto"
+            },
+            "type": "array"
+          },
+          "seq": {
+            "default": 0,
+            "format": "int64",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ]
+          },
+          "stack": {
+            "items": {
+              "$ref": "#/components/schemas/StackObjectDto"
+            },
+            "type": "array"
+          },
+          "turnNumber": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ]
+          },
+          "youPlayerId": {
+            "format": "uuid",
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "gameId",
+          "turnNumber",
+          "phase",
+          "activePlayerId",
+          "players",
+          "stack"
+        ],
+        "type": "object"
+      },
+      "JoinMatchRequest": {
+        "properties": {
+          "deckId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "deckId"
+        ],
+        "type": "object"
+      },
+      "JsonElement": {},
+      "LifeChangedPayload": {
+        "properties": {
+          "current": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ]
+          },
+          "playerId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "previous": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "playerId",
+          "previous",
+          "current"
+        ],
+        "type": "object"
+      },
+      "ManaPoolDto": {
+        "properties": {
+          "black": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ]
+          },
+          "blue": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ]
+          },
+          "colorless": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ]
+          },
+          "generic": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ]
+          },
+          "green": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ]
+          },
+          "red": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ]
+          },
+          "white": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "generic",
+          "white",
+          "blue",
+          "black",
+          "red",
+          "green",
+          "colorless"
+        ],
+        "type": "object"
+      },
+      "MatchError": {
+        "properties": {
+          "detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "type": "object"
+      },
+      "MatchReplayDto": {
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/ReplayEntry"
+            },
+            "type": "array"
+          },
+          "entryCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ]
+          },
+          "matchId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "sealedAt": {
+            "format": "date-time",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "matchId",
+          "sealedAt",
+          "truncated",
+          "entryCount",
+          "entries"
+        ],
+        "type": "object"
+      },
+      "ParseDeckRequest": {
+        "properties": {
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "type": "object"
+      },
+      "ParseDeckResultDto": {
+        "properties": {
+          "mainboard": {
+            "items": {
+              "$ref": "#/components/schemas/DeckCardEntryDto"
+            },
+            "type": "array"
+          },
+          "sideboard": {
+            "items": {
+              "$ref": "#/components/schemas/DeckCardEntryDto"
+            },
+            "type": "array"
+          },
+          "unknown": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "mainboard",
+          "sideboard",
+          "unknown",
+          "warnings"
+        ],
+        "type": "object"
+      },
+      "PhaseChangedPayload": {
+        "properties": {
+          "from": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "to": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "from",
+          "to"
+        ],
+        "type": "object"
+      },
+      "PhaseEndedPayload": {
+        "properties": {
+          "phase": {
+            "type": "string"
+          },
+          "playerId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "phase",
+          "playerId"
+        ],
+        "type": "object"
+      },
+      "PhaseStartedPayload": {
+        "properties": {
+          "phase": {
+            "type": "string"
+          },
+          "playerId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "phase",
+          "playerId"
+        ],
+        "type": "object"
+      },
+      "PlayDrawRequest": {
+        "properties": {
+          "choice": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "choice"
+        ],
+        "type": "object"
+      },
+      "PlayerDto": {
+        "properties": {
+          "battlefield": {
+            "$ref": "#/components/schemas/ZoneDto"
+          },
+          "exile": {
+            "$ref": "#/components/schemas/ZoneDto"
+          },
+          "graveyard": {
+            "$ref": "#/components/schemas/ZoneDto"
+          },
+          "hand": {
+            "$ref": "#/components/schemas/ZoneDto"
+          },
+          "hasLost": {
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "library": {
+            "$ref": "#/components/schemas/ZoneDto"
+          },
+          "life": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ]
+          },
+          "mana": {
+            "$ref": "#/components/schemas/ManaPoolDto"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "life",
+          "hasLost",
+          "mana",
+          "hand",
+          "battlefield",
+          "graveyard",
+          "library",
+          "exile"
+        ],
+        "type": "object"
+      },
+      "PlayerLostPayload": {
+        "properties": {
+          "playerId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "playerId"
+        ],
+        "type": "object"
+      },
+      "ProfileDto": {
+        "properties": {
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "handle": {
+            "type": "string"
+          },
+          "sub": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sub",
+          "handle",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
+      "ProfileError": {
+        "properties": {
+          "detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "type": "object"
+      },
+      "PromptDto": {
+        "properties": {
+          "bottomCount": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ]
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/CardSnapshotDto"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          },
+          "expectedKinds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "gameId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "label": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "libraryView": {
+            "items": {
+              "$ref": "#/components/schemas/CardSnapshotDto"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          },
+          "playerId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "revealView": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/RevealView"
+              }
+            ]
+          },
+          "surveilView": {
+            "items": {
+              "$ref": "#/components/schemas/CardSnapshotDto"
+            },
+            "type": [
+              "null",
+              "array"
+            ]
+          },
+          "yesNoView": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/YesNoViewDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "gameId",
+          "playerId",
+          "expectedKinds"
+        ],
+        "type": "object"
+      },
+      "PutHandleRequest": {
+        "properties": {
+          "handle": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "handle"
+        ],
+        "type": "object"
+      },
+      "ReplayEntry": {
+        "properties": {
+          "at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "decision": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/BotDecision"
+              }
+            ]
+          },
+          "event": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/EventDto"
+              }
+            ]
+          },
+          "kind": {
+            "type": "string"
+          },
+          "seq": {
+            "format": "int64",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "seq",
+          "at",
+          "kind",
+          "event",
+          "decision"
+        ],
+        "type": "object"
+      },
+      "RevealView": {
+        "properties": {
+          "eligibleInstanceIds": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "label": {
+            "type": "string"
+          },
+          "optional": {
+            "type": "boolean"
+          },
+          "revealed": {
+            "items": {
+              "$ref": "#/components/schemas/CardSnapshotDto"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "revealed",
+          "eligibleInstanceIds",
+          "optional",
+          "label"
+        ],
+        "type": "object"
+      },
+      "StackObjectDto": {
+        "properties": {
+          "controllerId": {
+            "format": "uuid",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "description": {
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "controllerId",
+          "description"
+        ],
+        "type": "object"
+      },
+      "StackObjectPayload": {
+        "properties": {
+          "cardId": {
+            "format": "uuid",
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "cardName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "controllerId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "stackId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "stackId",
+          "controllerId",
+          "kind",
+          "description"
+        ],
+        "type": "object"
+      },
+      "StepEndedPayload": {
+        "properties": {
+          "playerId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "step": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "step",
+          "playerId"
+        ],
+        "type": "object"
+      },
+      "StepStartedPayload": {
+        "properties": {
+          "playerId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "step": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "step",
+          "playerId"
+        ],
+        "type": "object"
+      },
+      "TurnEndedPayload": {
+        "properties": {
+          "playerId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "turn": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "playerId",
+          "turn"
+        ],
+        "type": "object"
+      },
+      "TurnStartedPayload": {
+        "properties": {
+          "playerId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "turn": {
+            "format": "int32",
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ]
+          }
+        },
+        "required": [
+          "playerId",
+          "turn"
+        ],
+        "type": "object"
+      },
+      "TurnStateChangedPayload": {
+        "properties": {
+          "from": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "to": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "from",
+          "to"
+        ],
+        "type": "object"
+      },
+      "UpdateDeckRequest": {
+        "properties": {
+          "mainboard": {
+            "items": {
+              "$ref": "#/components/schemas/DeckCardEntryDto"
+            },
+            "type": "array"
+          },
+          "name": {
+            "type": "string"
+          },
+          "sideboard": {
+            "items": {
+              "$ref": "#/components/schemas/DeckCardEntryDto"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "mainboard",
+          "sideboard"
+        ],
+        "type": "object"
+      },
+      "YesNoViewDto": {
+        "properties": {
+          "noLabel": {
+            "default": "No",
+            "type": "string"
+          },
+          "question": {
+            "type": "string"
+          },
+          "sourceCardName": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "yesLabel": {
+            "default": "Yes",
+            "type": "string"
+          }
+        },
+        "required": [
+          "question"
+        ],
+        "type": "object"
+      },
+      "ZoneDto": {
+        "properties": {
+          "cards": {
+            "items": {
+              "$ref": "#/components/schemas/CardSnapshotDto"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "cards"
+        ],
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "Majik.Server | v1"
+  },
+  "openapi": "3.1.1",
+  "paths": {
+    "/cards": {
+      "get": {
+        "operationId": "SearchCards",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "implementedOnly",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "format": "int32",
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "colors",
+            "schema": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          {
+            "in": "query",
+            "name": "types",
+            "schema": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cmc",
+            "schema": {
+              "items": {
+                "format": "int32",
+                "pattern": "^-?(?:0|[1-9]\\d*)$",
+                "type": [
+                  "integer",
+                  "string"
+                ]
+              },
+              "type": "array"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CardDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CardsError"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "tags": [
+          "Cards"
+        ]
+      }
+    },
+    "/cards/by-name": {
+      "post": {
+        "operationId": "GetCardsByName",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CardsByNameRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CardDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CardsError"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "tags": [
+          "Cards"
+        ]
+      }
+    },
+    "/decks": {
+      "get": {
+        "operationId": "ListDecks",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/DeckDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Decks"
+        ]
+      },
+      "post": {
+        "operationId": "CreateDeck",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDeckRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeckDto"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeckError"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeckError"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "tags": [
+          "Decks"
+        ]
+      }
+    },
+    "/decks/parse": {
+      "post": {
+        "operationId": "ParseDeck",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ParseDeckRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParseDeckResultDto"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "503": {
+            "description": "Service Unavailable"
+          }
+        },
+        "tags": [
+          "Decks"
+        ]
+      }
+    },
+    "/decks/{id}": {
+      "delete": {
+        "operationId": "DeleteDeck",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeckError"
+                }
+              }
+            },
+            "description": "Not Found"
+          }
+        },
+        "tags": [
+          "Decks"
+        ]
+      },
+      "get": {
+        "operationId": "GetDeck",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeckDto"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeckError"
+                }
+              }
+            },
+            "description": "Not Found"
+          }
+        },
+        "tags": [
+          "Decks"
+        ]
+      },
+      "put": {
+        "operationId": "UpdateDeck",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDeckRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeckDto"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeckError"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeckError"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeckError"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "tags": [
+          "Decks"
+        ]
+      }
+    },
+    "/healthz": {
+      "get": {
+        "operationId": "HealthCheck",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Meta"
+        ]
+      }
+    },
+    "/matches": {
+      "get": {
+        "operationId": "ListMatches",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "visibility",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Matches"
+        ]
+      },
+      "post": {
+        "operationId": "CreateMatch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMatchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Matches"
+        ]
+      }
+    },
+    "/matches/_eventschemas": {
+      "get": {
+        "operationId": "GetEventPayloadSchemas",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventPayloadCatalog"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Matches"
+        ]
+      }
+    },
+    "/matches/_promptschema": {
+      "get": {
+        "operationId": "GetPromptSchema",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PromptDto"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Matches"
+        ]
+      }
+    },
+    "/matches/archetypes": {
+      "get": {
+        "operationId": "ListBotArchetypes",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/BotArchetypeDto"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Matches"
+        ]
+      }
+    },
+    "/matches/{id}": {
+      "delete": {
+        "operationId": "AbandonMatch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Matches"
+        ]
+      },
+      "get": {
+        "operationId": "GetMatch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Matches"
+        ]
+      }
+    },
+    "/matches/{id}/commands": {
+      "post": {
+        "operationId": "SubmitMatchCommand",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GameCommand"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Matches"
+        ]
+      }
+    },
+    "/matches/{id}/concede": {
+      "post": {
+        "operationId": "ConcedeMatch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Matches"
+        ]
+      }
+    },
+    "/matches/{id}/join": {
+      "post": {
+        "operationId": "JoinMatch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JoinMatchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Matches"
+        ]
+      }
+    },
+    "/matches/{id}/me/prefs": {
+      "put": {
+        "operationId": "SetAutoPassPrefs",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AutoPassPrefs"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Matches"
+        ]
+      }
+    },
+    "/matches/{id}/play-draw": {
+      "post": {
+        "operationId": "ChoosePlayOrDraw",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlayDrawRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Matches"
+        ]
+      }
+    },
+    "/matches/{id}/replay": {
+      "get": {
+        "operationId": "GetMatchReplay",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchReplayDto"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchError"
+                }
+              }
+            },
+            "description": "Not Found"
+          }
+        },
+        "tags": [
+          "Matches"
+        ]
+      }
+    },
+    "/matches/{id}/roll": {
+      "post": {
+        "operationId": "SubmitRoll",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "tags": [
+          "Matches"
+        ]
+      }
+    },
+    "/matches/{id}/state": {
+      "get": {
+        "operationId": "GetMatchState",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameStateDto"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchError"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchError"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MatchError"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "tags": [
+          "Matches"
+        ]
+      }
+    },
+    "/me": {
+      "get": {
+        "operationId": "GetMyProfile",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileDto"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileError"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileError"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "tags": [
+          "Profile"
+        ]
+      },
+      "put": {
+        "operationId": "UpdateMyHandle",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "#/components/schemas/PutHandleRequest"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileDto"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileError"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileError"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileError"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "tags": [
+          "Profile"
+        ]
+      }
+    },
+    "/whoami": {
+      "get": {
+        "operationId": "WhoAmI",
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "tags": [
+          "Meta"
+        ]
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Meta"
+    },
+    {
+      "name": "Profile"
+    },
+    {
+      "name": "Cards"
+    },
+    {
+      "name": "Matches"
+    },
+    {
+      "name": "Decks"
+    }
+  ]
+}
