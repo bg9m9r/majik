@@ -102,12 +102,6 @@ public static class ActivatedAbilityPolicy
                                 delta -= weights.KeyCardInPlay * 0.5;
                             }
                             break;
-                        case AdditionalCostType.Discard:
-                            // Discarding loses one card (-HandSize). Could be a
-                            // dead card so this slightly over-charges, but the
-                            // outer argmax just needs a tiebreaker not exact EV.
-                            delta -= weights.HandSize;
-                            break;
                         case AdditionalCostType.Tap:
                             // Tapping a creature source = lose ability to attack /
                             // block this turn (Tempo). Tapping a non-creature

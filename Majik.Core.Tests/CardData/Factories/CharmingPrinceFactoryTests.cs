@@ -6,6 +6,7 @@ using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Domain.DomainEvents;
 using Majik.Core.Events;
+using Majik.Core.Game;
 using Majik.Core.Keywords;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
@@ -272,6 +273,58 @@ public class CharmingPrinceFactoryTests : IDisposable
         grizzly.Zone.Should().Be(ZoneType.Battlefield,
             "mode 2 only exiles creatures the caster OWNS; opponent-owned = no-op (CR 608.2b)");
         _bob.Zones.Exile.GetCards().Should().NotContain(grizzly);
+    }
+
+    // -----------------------------------------------------------------------
+    // PLAN 01 Slice D — the modal ETB choice routes through a REAL
+    // ResolutionContext (non-null ctx.Game), not a `ctx: null!` landmine.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task CharmingPrince_ModeChoice_RoutesThroughNonNullContext()
+    {
+        var alice = new Player("Alice", 20);
+        var prince = CharmingPrinceFactory.Create(alice);
+
+        // Recording agent supplied via the live ResolutionContext (the PLAN 01
+        // Slice D resolve path), NOT AgentRegistry — proves PickModeAsync reads
+        // ctx.Agent / ctx.Game rather than passing `ctx: null!`.
+        var agent = new RecordingModeAgent(pick: 1); // mode 1 = gain 3 life
+        var stack = new Majik.Core.Stack.Stack(new EventBus());
+        var gameCtx = new GameContext(
+            alice, new[] { alice }, alice, turnNumber: 1,
+            currentPhase: null, stack);
+        var resCtx = ResolutionContext.For(
+            alice, agent, gameCtx, chosenTargets: null);
+
+        var etb = prince.Abilities.OfType<TriggeredAbility>().Single();
+        foreach (var effect in etb.Effects) await effect.ExecuteAsync(resCtx);
+
+        agent.LastCtx.Should().NotBeNull(
+            "the mode prompt must receive the live GameContext, never `ctx: null!`");
+        agent.LastCtx.Should().BeSameAs(gameCtx);
+        alice.LifeTotal.Should().Be(23,
+            "agent picked mode 1 (gain 3 life) via the wired prompt");
+    }
+
+    /// <summary>Records the ctx handed to ChooseModeAsync; every other prompt
+    /// throws (DelegatingAgent), surfacing any accidental extra prompt.</summary>
+    private sealed class RecordingModeAgent : Helpers.DelegatingAgent
+    {
+        private readonly int _pick;
+        public GameContext? LastCtx { get; private set; }
+
+        public RecordingModeAgent(int pick) => _pick = pick;
+
+        public override Task<int> ChooseModeAsync(
+            GameContext ctx,
+            IReadOnlyList<string> modes,
+            IReadOnlyList<BotIntent>? modeIntents = null,
+            CancellationToken ct = default)
+        {
+            LastCtx = ctx;
+            return Task.FromResult(_pick);
+        }
     }
 
     // -----------------------------------------------------------------------

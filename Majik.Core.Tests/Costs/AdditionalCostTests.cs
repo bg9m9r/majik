@@ -10,7 +10,7 @@ namespace Majik.Core.Tests.Costs;
 
 /// <summary>
 /// Unit tests for AdditionalCost.
-/// Tests tap, sacrifice, discard, and life costs.
+/// Tests tap, sacrifice, and life costs.
 /// </summary>
 public class AdditionalCostTests
 {
@@ -168,17 +168,4 @@ public class AdditionalCostTests
         cost.Description.Should().Contain("Sacrifice");
     }
 
-    [Fact]
-    public void Discard_ValidCard_CreatesDiscardCost()
-    {
-        // Arrange
-        var card = new Instant("Lightning Bolt", "R");
-
-        // Act
-        var cost = AdditionalCost.Discard(card);
-
-        // Assert
-        cost.CostType.Should().Be(AdditionalCostType.Discard);
-        cost.Description.Should().Contain("Discard");
-    }
 }
