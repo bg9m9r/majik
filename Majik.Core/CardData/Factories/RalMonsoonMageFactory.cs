@@ -60,12 +60,16 @@ namespace Majik.Core.CardData.Factories;
 ///   matching the Ajani / Tamiyo transform posture. A true exile + return would
 ///   require the same Layer-0 / per-face hot-swap that DFC permanents still
 ///   lack (see Ajani deferral note).
-/// - <b>Back-face loyalty abilities + planeswalker body.</b> Ral, Leyline
-///   Prodigy's enters-with-extra-loyalty rider and [+1] / [-2] / [-8] loyalty
-///   abilities and the Planeswalker characteristics (loyalty 2) are not wired.
-///   The back face is shape-only tracked through
-///   <see cref="MdfcState.BackFaceName"/> — identical to Ajani, Nacatl Avenger
-///   / Tamiyo, Seasoned Scholar.
+/// - <b>Back-face loyalty abilities + planeswalker body (deferral #19
+///   residual).</b> The CR 711/712 Layer-0 face-replacement seed now in
+///   <see cref="Majik.Core.Effects.ContinuousEffectsService"/> swaps in a back
+///   face's CREATURE body (Delver, all MID/VOW Werewolves). A PLANESWALKER
+///   back is the remaining residual: a creature-front instance can't carry a
+///   loyalty body, and Ral, Leyline Prodigy's enters-with-extra-loyalty rider
+///   and [+1] / [-2] / [-8] abilities aren't wired. The back face stays
+///   shape-only tracked through <see cref="MdfcState.BackFaceName"/> —
+///   identical to Ajani, Nacatl Avenger / Tamiyo, Seasoned Scholar. Lower
+///   value: the played face is the front (creature).
 /// - <b>"You may exile Ral" prompt.</b> A win auto-transforms rather than
 ///   prompting whether to exile/return. Same deterministic posture as every
 ///   other v1 "you may" (Sun Titan / Stoneforge Mystic / Ajani).

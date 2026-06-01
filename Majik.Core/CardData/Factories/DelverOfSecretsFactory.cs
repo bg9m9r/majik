@@ -18,11 +18,13 @@ namespace Majik.Core.CardData.Factories;
 ///    this way, transform Delver of Secrets."
 ///
 /// Back face (Insectile Aberration): Creature — Human Insect 3/2, Flying.
-/// The back-face P/T + Flying is NOT swapped onto the live Creature object
-/// in v1 — Layer 0 / per-face characteristic replacement is deferred. The
-/// transform is observed by flipping the attached <see cref="MdfcState"/>;
-/// callers / tests inspect <see cref="MdfcState.IsBackFace"/> to determine
-/// the active face.
+/// The back-face P/T + Flying ARE swapped in through the CR 711/712 Layer-0
+/// face-replacement seed (deferral #19): the factory attaches the back face's
+/// printed characteristics to the <see cref="MdfcState"/>, and
+/// <see cref="Majik.Core.Effects.ContinuousEffectsService.Compute(Majik.Core.Cards.Permanent)"/>
+/// seeds from them while <see cref="MdfcState.IsBackFace"/> is true. So a
+/// flipped Delver reads as a 3/2 with Flying through Compute + combat, and
+/// reverts on transform-back.
 ///
 /// ## Implemented (v1)
 /// - 1/1 Creature — Human Wizard at {U}, owner / controller set.
@@ -46,12 +48,6 @@ namespace Majik.Core.CardData.Factories;
 ///   701.19), not a draw (CR 120.3).
 ///
 /// ## Deferred (v1 gaps)
-/// - <b>Back-face hot-swap on the battlefield.</b> The transform only flips
-///   the MdfcState; the Creature object remains a 1/1 Human Wizard without
-///   Flying. A full DFC characteristic-replacement (replace with a 3/2
-///   Human Insect with Flying) would require Layer 0 / per-face cardpool
-///   support that the engine does not yet have. Same v1 limit as Ajani,
-///   Nacatl Pariah.
 /// - <b>"You may" prompt.</b> Auto-reveals when the peeked card is an
 ///   instant or sorcery; non-instant/sorcery peeks skip the reveal event.
 ///   A real agent-driven yes/no prompt is deferred — same queue as Sun
@@ -101,10 +97,18 @@ public static class DelverOfSecretsFactory
         card.SetOwner(owner);
         card.SetController(owner);
 
-        // CR 711 — attach the DFC face-tracker so callers can observe the
-        // active face. Starts on the front face (Delver of Secrets);
-        // Transform() flips IsBackFace.
-        card.MdfcState = new MdfcState(FrontName, BackName);
+        // CR 711 / 712 — attach the DFC face-tracker carrying the BACK face's
+        // printed characteristics. Starts on the front face (Delver of Secrets);
+        // Transform() flips IsBackFace, at which point Compute seeds from
+        // Insectile Aberration — Creature — Human Insect 3/2 with Flying, blue.
+        card.MdfcState = new MdfcState(FrontName, BackName, new BackFaceCharacteristics(
+            name: BackName,
+            types: new[] { CardType.Creature },
+            subtypes: new[] { CardSubtype.Human, CardSubtype.Insect },
+            keywords: new[] { "Flying" },
+            colors: new[] { Majik.Core.ValueObjects.ManaColor.Blue },
+            power: 3,
+            toughness: 2));
 
         // ----------------------------------------------------------------
         // Upkeep trigger — CR 603.1, CR 500.4.
@@ -145,9 +149,9 @@ public static class DelverOfSecretsFactory
                     top, controller, ZoneType.Library, FrontName));
 
                 // CR 701.28 — transform. Flip the MdfcState to the back
-                // face (Insectile Aberration). v1 does not hot-swap P/T
-                // or Flying onto the live Creature object — see "Deferred"
-                // section in the class doc.
+                // face (Insectile Aberration). Compute now seeds the 3/2
+                // Flying body from the attached back-face characteristics
+                // (CR 711/712 Layer-0 replacement, deferral #19).
                 card.MdfcState.Transform();
             });
 

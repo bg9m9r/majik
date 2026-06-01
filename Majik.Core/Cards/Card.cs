@@ -896,12 +896,32 @@ public class Card : ICard
     /// exposes <see cref="Majik.Core.CardData.MDFCs.MdfcState.Transform"/>
     /// to flip between them. Null on single-faced cards.
     ///
-    /// v1 is a thin attachment — flipping the state does not yet swap the
-    /// runtime characteristics on the underlying Card object (full Layer 0
-    /// per-face characteristic-replacement is deferred). It is the
-    /// canonical observation surface for "is this card transformed?".
+    /// When the attached state carries a
+    /// <see cref="Majik.Core.CardData.MDFCs.BackFaceCharacteristics"/>, the
+    /// CR 613 Layer-0 seed swaps in the back face's name / types / subtypes /
+    /// supertypes / P/T / keywords / colour while the card is on its back
+    /// face (CR 712). It is also the canonical observation surface for "is
+    /// this card transformed?".
     /// </summary>
-    public Majik.Core.CardData.MDFCs.MdfcState? MdfcState { get; set; }
+    public Majik.Core.CardData.MDFCs.MdfcState? MdfcState
+    {
+        get => _mdfcState;
+        set
+        {
+            _mdfcState = value;
+            if (value != null)
+            {
+                // CR 613 — a face flip changes the Layer-0 characteristic seed;
+                // wire the owning permanent's cache invalidation into Transform.
+                value.OnTransformed = () =>
+                {
+                    if (this is Permanent p) p.ActiveEffects?.BumpGeneration();
+                };
+            }
+        }
+    }
+
+    private Majik.Core.CardData.MDFCs.MdfcState? _mdfcState;
 
     /// <summary>
     /// CR 715 — Adventure half descriptor. Non-null on adventurer cards

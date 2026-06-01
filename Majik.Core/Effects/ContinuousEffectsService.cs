@@ -326,9 +326,22 @@ public sealed class ContinuousEffectsService
     /// (creatures), printed card types + subtypes, printed keyword markers,
     /// and the printed/static colour set. SHARED by both the zero-effect fast
     /// path and the full layer pipeline so the two can never diverge.
+    ///
+    /// <para>CR 711 / 712 — Layer-0 per-face replacement: when the permanent
+    /// is a DFC currently on its BACK face (<see cref="MdfcState.IsBackFace"/>)
+    /// and the factory supplied a
+    /// <see cref="MdfcState.BackFace"/> characteristic set, the seed comes from
+    /// the BACK face (name-bearing types / subtypes / supertypes / P/T /
+    /// keywords / colour) instead of the front-printed Card values. The normal
+    /// CR 613 layer pipeline then applies on top, so anthems / counters /
+    /// type-grants stack onto the back-face body. Reverts automatically when
+    /// the card flips back to its front face.</para>
     /// </summary>
     private static PermanentCharacteristics SeedPrintedCharacteristics(Permanent permanent)
     {
+        var back = SelectBackFaceSeed(permanent);
+        if (back != null) return SeedBackFaceCharacteristics(permanent, back);
+
         PermanentCharacteristics chars;
         if (permanent is Creature creature)
         {
@@ -363,6 +376,70 @@ public sealed class ContinuousEffectsService
         {
             chars.Colors.Add(c);
         }
+
+        return chars;
+    }
+
+    /// <summary>
+    /// CR 711 / 712 — return the back-face characteristic set to seed FROM when
+    /// <paramref name="permanent"/> is a transform DFC currently on its back
+    /// face and a back-face set was supplied; otherwise null (front-face seed).
+    /// A face-down permanent (CR 708.2) is excluded — face-down overrides the
+    /// whole characteristic set regardless of which face it transformed to.
+    /// </summary>
+    private static Majik.Core.CardData.MDFCs.BackFaceCharacteristics? SelectBackFaceSeed(Permanent permanent)
+    {
+        if (permanent.IsFaceDown) return null;
+        var mdfc = permanent.MdfcState;
+        if (mdfc is { IsBackFace: true, BackFace: { } back }) return back;
+        return null;
+    }
+
+    /// <summary>
+    /// CR 712 — seed the working set from a DFC's BACK face. For a creature
+    /// back face the P/T comes from the back face's printed P/T (Insectile
+    /// Aberration 3/2, Graveyard Glutton 4/4); for a non-creature back the
+    /// front Creature subclass still produces a <see cref="CreatureCharacteristics"/>
+    /// but with the back face's (absent) P/T defaulted to 0/0 unless the back
+    /// is itself a creature — the planeswalker-loyalty body seed is a documented
+    /// residual (deferral #19). Types/subtypes/supertypes/keywords/colour all
+    /// come from the back face, fully REPLACING the front-printed seed.
+    /// </summary>
+    private static PermanentCharacteristics SeedBackFaceCharacteristics(
+        Permanent permanent, Majik.Core.CardData.MDFCs.BackFaceCharacteristics back)
+    {
+        PermanentCharacteristics chars;
+        if (permanent is Creature)
+        {
+            // A creature front always yields a CreatureCharacteristics so the
+            // P/T-reading hot path (ComputePowerToughness) keeps working. The
+            // back face supplies P/T when it is itself a creature; a
+            // non-creature back (planeswalker) leaves P/T at 0 — the loyalty
+            // body is a documented residual.
+            chars = new CreatureCharacteristics
+            {
+                Power = back.Power ?? 0,
+                Toughness = back.Toughness ?? 0,
+            };
+        }
+        else if (back.IsCreatureBack)
+        {
+            // Non-creature front transforming into a creature back is not a
+            // current shipped case (all shipped DFCs whose back is a creature
+            // have a creature front). Fall back to a plain set; the Layer-1
+            // "becomes a creature" path is the manland gap, out of scope here.
+            chars = new PermanentCharacteristics();
+        }
+        else
+        {
+            chars = new PermanentCharacteristics();
+        }
+
+        foreach (var t in back.Types) chars.Types.Add(t);
+        foreach (var st in back.Subtypes) chars.Subtypes.Add(st);
+        foreach (var sup in back.Supertypes) chars.Supertypes.Add(sup);
+        foreach (var kw in back.Keywords) chars.Keywords.Add(kw);
+        foreach (var c in back.Colors) chars.Colors.Add(c);
 
         return chars;
     }

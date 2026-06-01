@@ -23,10 +23,13 @@ namespace Majik.Core.CardData.Factories;
 ///    Daybound (If a player casts no spells during their own turn, it becomes
 ///    night next turn.)"
 ///
-/// Back face (Graveyard Glutton): Creature — Werewolf 4/4. "Ward—Discard a
-/// card. Whenever this creature enters or attacks, exile up to two target
+/// Back face (Graveyard Glutton): Creature — Werewolf 4/4, black. "Ward—Discard
+/// a card. Whenever this creature enters or attacks, exile up to two target
 /// cards from graveyards. For each creature card exiled this way, each
-/// opponent loses 1 life and you gain 1 life. Nightbound (…)."
+/// opponent loses 1 life and you gain 1 life. Nightbound (…)." The 4/4
+/// Werewolf BODY is now swapped in through the CR 711/712 Layer-0 face seed
+/// (deferral #19): when the day/night transform flips to the back face,
+/// Compute reads the 4/4 black Werewolf characteristics; reverts on flip-back.
 ///
 /// ## Implemented (v1)
 /// - 3/3 Creature — Human Werewolf at {2}{B} (front face), owner / controller
@@ -55,11 +58,14 @@ namespace Majik.Core.CardData.Factories;
 ///   card" (a non-mana ward cost) is not yet supported. Omitted here — the
 ///   creature is targetable without the discard tax. Same gap surfaces on
 ///   every "Ward—[non-mana cost]" card.
-/// - <b>Back-face hot-swap (Graveyard Glutton 4/4 + exile-up-to-two).</b> As
-///   with every v1 DFC (Delver, Ajani), the transform flips the MdfcState
-///   only; the live Creature object stays a 3/3 Human Werewolf with the
-///   exile-up-to-one rider. Full Layer-0 per-face characteristic replacement
-///   (4/4 body, exile-up-to-two, "for each creature card" drain) is deferred.
+/// - <b>Back-face BODY now swapped in (deferral #19, closed).</b> The CR
+///   711/712 Layer-0 face seed swaps the 4/4 black Werewolf P/T + type line in
+///   through Compute / combat while on the back face, reverting on flip-back.
+///   The back face's distinct <i>ability text</i> (exile-up-to-TWO + the "for
+///   each creature card" drain) is NOT re-bodied — Compute is a characteristic
+///   pipeline, not an ability registry, so the front face's exile-up-to-one
+///   rider keeps firing on both faces. That ability-text delta is the only
+///   residual; the body / type / colour are correct on both faces.
 /// </summary>
 [CardName("Graveyard Trespasser")]
 public static class GraveyardTrespasserFactory
@@ -100,9 +106,18 @@ public static class GraveyardTrespasserFactory
         card.SetOwner(owner);
         card.SetController(owner);
 
-        // CR 711 — DFC face tracker. Front = Graveyard Trespasser (daybound),
-        // back = Graveyard Glutton (nightbound). Starts front-face up.
-        card.MdfcState = new MdfcState(FrontName, BackName);
+        // CR 711 / 712 — DFC face tracker carrying the BACK face's printed
+        // characteristics. Front = Graveyard Trespasser (daybound), back =
+        // Graveyard Glutton (nightbound, Creature — Werewolf 4/4, black).
+        // Starts front-face up; the day/night transform flips IsBackFace and
+        // Compute then seeds the 4/4 Werewolf body (deferral #19).
+        card.MdfcState = new MdfcState(FrontName, BackName, new BackFaceCharacteristics(
+            name: BackName,
+            types: new[] { CardType.Creature },
+            subtypes: new[] { CardSubtype.Werewolf },
+            colors: new[] { Majik.Core.ValueObjects.ManaColor.Black },
+            power: 4,
+            toughness: 4));
 
         // CR 702.145 — Daybound (front) + Nightbound (back) markers consumed
         // by DayboundNightbound. The Werewolf carries both; the transform
