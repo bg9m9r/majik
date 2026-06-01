@@ -1176,7 +1176,7 @@ Cards under `Majik.Core/CardData/Cards/*.json`:
 | Remove-counter | Done | `Costs/RemovePlusOnePlusOneCounterCost.cs` |
 | Cycling | Done | `Keywords/CyclingFactory.cs` (CR 702.32 — primitive activated-from-hand builder, takes `ICost` cycle cost so mana / pay-life / sac-rider all route through one builder; publishes `Events/CardCycledEvent` on resolve for CR 702.32d "Whenever a player cycles" triggers; legacy `Keywords/CyclingAbility.cs` stack-bypass MVP retained for its existing tests) |
 | Echo | TODO | — |
-| Kicker | TODO | — |
+| Kicker (CR 702.33) | Done | `Costs/KickerAdditionalCost.cs` (optional additive cost; `Pay` stamps `Card.WasKicked` / the cast flow stamps `Spell.WasKicked`, cleared post-resolution by `SpellCastFlow` so the sentinel doesn't leak to copies/blink — CR 400.7) + `Players/Agents/KickerAltCostProbe.cs` (bot discovery). Resolve / triggered bodies branch on the `WasKicked` sentinel (CR 702.33b). Wired on Burst Lightning, Tear Asunder, Vines of Vastwood, Bloodchief's Thirst, Sowing Mycospawn, Orim's Chant, Igneous Inspiration, Scourge of the Skyclaves, Goblin Bushwhacker, Sea Gate Stormcaller, Consult the Star Charts. Multikicker deferred. |
 | Affinity | Done | `Costs/CostReductionAbility.cs::AffinityFor` + `CardData/AffinityBinder.cs` (reminder-text regex); shipped on Emry, Cranial Plating, Frogmite, Myr Enforcer |
 | Bargain | TODO | normalizer strips (#136) |
 

@@ -37,56 +37,35 @@ public static class GiantGrowthFactory
     /// <summary>Layer 7c +P/+T magnitude (CR 613.1g).</summary>
     public const int PumpAmount = 3;
 
-    /// <summary>CardDef DSL — card shape only. The pump SpellDefinition
-    /// lives in <see cref="BuildDefinition"/>.</summary>
-    public static CardDef Define() => CardDef.Instant(CardName, PrintedManaCost);
+    /// <summary>
+    /// CardDef DSL — the full spell in one fluent declaration. "Target
+    /// creature gets +3/+3 until end of turn." compiles to a 1..1 "target
+    /// creature" <see cref="TargetRequest"/> + a
+    /// <see cref="PumpUntilEndOfTurnEffect"/>(+3,+3) resolve step via
+    /// <see cref="CardDefRuntime.BuildSpellDefinition"/>.
+    /// </summary>
+    public static CardDef Define() => CardDef
+        .Instant(CardName, PrintedManaCost)
+        .Resolve(c => c.PumpUntilEndOfTurn(PumpAmount, PumpAmount).To(TargetKind.Creature));
 
     public static Instant Create(Player owner) =>
         (Instant)CardDefRuntime.Build(Define(), owner);
 
     /// <summary>
     /// Build the "target creature gets +3/+3 until end of turn"
-    /// <see cref="SpellDefinition"/>.
+    /// <see cref="SpellDefinition"/>. Delegates entirely to the fluent
+    /// <c>.Resolve(...)</c> body via
+    /// <see cref="CardDefRuntime.BuildSpellDefinition"/> — the ~30-line
+    /// bespoke SpellDefinition collapses to one call.
     ///
-    /// On resolve: validates the target is still a <see cref="Creature"/>
-    /// on the Battlefield (CR 608.2b — illegal target → no-op). When
-    /// valid, registers a <see cref="PumpUntilEndOfTurnEffect"/>(+3, +3)
-    /// on the target's <see cref="Creature.ActiveEffects"/> (CR 514.2 —
-    /// expires in cleanup). When ActiveEffects is null (shape-only
-    /// tests without a live <see cref="ContinuousEffectsService"/>), the
-    /// registration is a no-op.
+    /// On resolve: the materializer validates the target is still a
+    /// <see cref="Creature"/> on the Battlefield (CR 608.2b — illegal
+    /// target → no-op), then registers a
+    /// <see cref="PumpUntilEndOfTurnEffect"/>(+3, +3) on its
+    /// <see cref="Creature.ActiveEffects"/> (CR 514.2 — expires in
+    /// cleanup). When ActiveEffects is null (shape-only tests) the
+    /// registration is a no-op — identical guards to the prior bespoke body.
     /// </summary>
     public static SpellDefinition BuildDefinition() =>
-        new(
-            Modes: Array.Empty<string>(),
-            HasVariableX: false,
-            TargetRequests: new[]
-            {
-                new TargetRequest(
-                    "target creature",
-                    MinTargets: 1,
-                    MaxTargets: 1,
-                    LegalCandidates: Array.Empty<object>()),
-            },
-            EffectFactory: p =>
-            {
-                var raw = p.Targets[0][0];
-                return new IEffect[]
-                {
-                    new Effect(
-                        "Giant Growth — target creature gets +3/+3 until end of turn",
-                        () => Resolve(raw)),
-                };
-            });
-
-    private static void Resolve(object raw)
-    {
-        // CR 608.2b — target must still be a creature on the battlefield.
-        if (raw is not Creature target) return;
-        if (target.Zone != ZoneType.Battlefield) return;
-        if (target.ActiveEffects == null) return;
-
-        target.ActiveEffects.Register(
-            new PumpUntilEndOfTurnEffect(target, PumpAmount, PumpAmount));
-    }
+        CardDefRuntime.BuildSpellDefinition(Define(), resolver: o => o);
 }
