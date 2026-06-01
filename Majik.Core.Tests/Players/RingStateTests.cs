@@ -308,4 +308,50 @@ public class RingStateTests
         bus.Publish(new CombatDamageDealtEvent(bearer, bob, 2));
         triggers.PendingCount.Should().Be(0, "only tempted 3 times — the 4+ ability is not live");
     }
+
+    // -----------------------------------------------------------------------
+    // Memoization soundness: the Ring-bearer's factory-local ActiveEffects must
+    // be BUS-WIRED so a characteristic-defining (CR 604.3) P/T effect on it does
+    // not serve a stale cached value after an external state change. A busless
+    // per-permanent ContinuousEffectsService never bumps its generation on an
+    // external event, so a CDA P/T would freeze at its first computed value.
+    // -----------------------------------------------------------------------
+    [Fact]
+    public void RingBearer_CdaPowerToughness_ReflectsExternalStateChange_NoStalePt()
+    {
+        var bus = new EventBus();
+        var alice = new Player("Alice", 20);
+
+        // A CDA creature: its P/T is defined by an EXTERNAL input (a mutable
+        // "score" the test controls) read fresh every Compute — the Tarmogoyf /
+        // Death's Shadow shape. The base creature is 0/0; the CDA SETS the P/T.
+        var bearer = MakeCreature(alice, "Dynamo", power: 0, toughness: 0);
+        var externalScore = 1;
+
+        // Designating the bearer WITH a bus mints its ActiveEffects bus-wired
+        // (the fix). Tempting also registers the legendary-supertype grant on
+        // that same service.
+        alice.TheRingTemptsYou(bearer, bus);
+        bearer.ActiveEffects.Should().NotBeNull("designation attaches the layers service");
+
+        bearer.ActiveEffects!.Register(new Majik.Core.Effects.CdaPowerToughnessEffect(
+            bearer,
+            powerOf: _ => externalScore,
+            toughnessOf: _ => externalScore));
+
+        // First read computes + caches against the current generation.
+        bearer.Power.Should().Be(1, "the CDA defines P/T from the external score (=1)");
+        bearer.Toughness.Should().Be(1);
+
+        // Change the EXTERNAL input WITHOUT touching the bearer's effects, then
+        // fire a game event. A bus-wired service bumps its generation on the
+        // event → the next read recomputes against the new external value.
+        externalScore = 5;
+        bus.Publish(new LifeChangedEvent(alice, 20, 19));
+
+        bearer.Power.Should().Be(5,
+            "a bus-wired ActiveEffects invalidates its P/T cache on an external event — " +
+            "no stale value (the latent bug a busless factory-local CES would have)");
+        bearer.Toughness.Should().Be(5);
+    }
 }

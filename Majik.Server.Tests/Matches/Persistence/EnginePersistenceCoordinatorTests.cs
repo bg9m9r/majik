@@ -138,9 +138,125 @@ public class EnginePersistenceCoordinatorTests
         rehydrated.Should().BeNull();
     }
 
+    // ── vs-bot rehydration: bot agent re-installed, replay stays in sync ────
+    // PLAN 08 soundness fix. A rehydrated vs-bot game must (1) re-install the
+    // deterministic BotPlayerAgent on the Bob seat and (2) answer the bot seat's
+    // re-raised prompts via that agent — NOT by dequeuing a human command
+    // (bot decisions are never logged; SubmitAsync rejects bot seats). With the
+    // agent re-installed the rebuild is id-identical AND the bot keeps playing.
+    [Fact]
+    public async Task RehydrateBotMatch_ReinstallsBotAgent_IsIdIdentical_AndBotKeepsPlaying()
+    {
+        const string archetype = "Burn";
+        var matchId = Guid.NewGuid();
+        var log = new InMemoryEngineCommandLogStore();
+        var checkpoints = new InMemoryEngineCheckpointStore();
+        var coord = Build(log, checkpoints, enabled: true, checkpointEvery: 2);
+
+        var factory = BuildServerGameFactory();
+
+        // Original vs-bot run under a seed-scope. Bob is a BotPlayerAgent, so the
+        // prompt channel only delivers Alice (human) prompts and only Alice's
+        // commands are recorded — the bot self-drives via ChooseAsync in-engine.
+        GameStateDto originalState;
+        using (DeterministicIdScope.Push(new DeterministicIdSource(Seed)))
+        {
+            var original = factory.Create(
+                "Alice", "Bob", BuildDeck(), BuildDeck(), botSeatArchetype: archetype);
+            original.IsHumanSeat(original.Bob.Id).Should().BeFalse(
+                "the original Bob seat is the bot");
+            await DriveAndRecordAsync(original, matchId, coord);
+            originalState = original.GetState();
+        }
+
+        var aliceId = originalState.Players.Single(p => p.Name == "Alice").Id;
+        var bobId = originalState.Players.Single(p => p.Name == "Bob").Id;
+        var loggedCommands = await log.ReadSinceAsync(matchId, -1, CancellationToken.None);
+        loggedCommands.Should().NotBeEmpty("the human seat submits commands");
+        loggedCommands.Should().OnlyContain(
+            a => a.Command.PlayerId == aliceId,
+            "only the human (Alice) seat's commands are ever logged — bot decisions " +
+            "go through ChooseAsync in-engine and are never recorded");
+        loggedCommands.Should().NotContain(
+            a => a.Command.PlayerId == bobId,
+            "no bot (Bob) seat command is ever recorded");
+
+        // Rehydrate WITH the bot archetype → BuildUnregisteredFacade re-installs
+        // the BotPlayerAgent on Bob before replay (the production path in
+        // MatchService.TryRehydrateAndDispatchAsync).
+        var rehydrated = await coord.TryRehydrateAsync(
+            matchId, Seed,
+            () => factory.BuildUnregisteredFacade(
+                "Alice", "Bob", BuildDeck(), BuildDeck(), botSeatArchetype: archetype),
+            CancellationToken.None);
+
+        rehydrated.Should().NotBeNull();
+        rehydrated!.IsHumanSeat(rehydrated.Bob.Id).Should().BeFalse(
+            "the rehydrated Bob seat must again be the self-driving bot");
+        rehydrated.IsHumanSeat(rehydrated.Alice.Id).Should().BeTrue(
+            "the rehydrated Alice seat is still the wire-facing human");
+
+        IdProjection(rehydrated.GetState()).Should().BeEquivalentTo(
+            IdProjection(originalState), opts => opts.WithStrictOrdering(),
+            "a rehydrated vs-bot game must reproduce the original id-identically — the " +
+            "bot's replayed in-engine decisions match, no human/bot prompt desync");
+
+        // The bot keeps playing: the rehydrated game is a normal live facade whose
+        // full-game task is still progressing (or already terminal), never faulted
+        // by a desync/deadlock, and a further human command is accepted on Alice's
+        // seat without throwing.
+        rehydrated.FullGameTask.Should().NotBeNull();
+        rehydrated.FullGameTask!.IsFaulted.Should().BeFalse(
+            "a synced rehydrated bot game must not fault");
+    }
+
+    // ── Counter-proof: omitting the bot reinstall desyncs the rehydrate ─────
+    // Guards the fix: rehydrating a vs-bot game WITHOUT the archetype leaves Bob
+    // on the default RemoteAgent, so the bot seat's prompts now reach the replay
+    // channel and dequeue Alice's logged commands against the WRONG prompts —
+    // the rebuilt state diverges from the original.
+    [Fact]
+    public async Task RehydrateBotMatch_WithoutReinstall_Desyncs()
+    {
+        const string archetype = "Burn";
+        var matchId = Guid.NewGuid();
+        var log = new InMemoryEngineCommandLogStore();
+        var checkpoints = new InMemoryEngineCheckpointStore();
+        var coord = Build(log, checkpoints, enabled: true, checkpointEvery: 2);
+
+        var factory = BuildServerGameFactory();
+
+        GameStateDto originalState;
+        using (DeterministicIdScope.Push(new DeterministicIdSource(Seed)))
+        {
+            var original = factory.Create(
+                "Alice", "Bob", BuildDeck(), BuildDeck(), botSeatArchetype: archetype);
+            await DriveAndRecordAsync(original, matchId, coord);
+            originalState = original.GetState();
+        }
+
+        // Rehydrate WITHOUT the archetype — the latent bug. Bob is a RemoteAgent,
+        // so its prompts hit the channel and steal Alice's logged commands.
+        var broken = await coord.TryRehydrateAsync(
+            matchId, Seed,
+            () => factory.BuildUnregisteredFacade("Alice", "Bob", BuildDeck(), BuildDeck()),
+            CancellationToken.None);
+
+        broken.Should().NotBeNull();
+        broken!.IsHumanSeat(broken.Bob.Id).Should().BeTrue(
+            "without the reinstall the bot seat falls back to the default RemoteAgent");
+        IdProjection(broken.GetState()).Should().NotBeEquivalentTo(
+            IdProjection(originalState), opts => opts.WithStrictOrdering(),
+            "without re-installing the bot agent the prompt-driven replay desyncs — the " +
+            "rebuilt state must NOT match the original (this is the bug the fix closes)");
+    }
+
     // -----------------------------------------------------------------------
     // Helpers
     // -----------------------------------------------------------------------
+    private static Majik.Server.Composition.ServerGameFactory BuildServerGameFactory()
+        => new(new GameRegistry());
+
     private static EnginePersistenceCoordinator Build(
         IEngineCommandLogStore log,
         IEngineCheckpointStore checkpoints,

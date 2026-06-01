@@ -170,7 +170,25 @@ public sealed class RingState
         // grant on the new bearer (any permanent type). Routed through
         // GrantSupertypeEffect so LegendRuleCheck's effective-supertype read
         // sees it (closes the v1 designation-property gap).
-        bearer.ActiveEffects ??= new ContinuousEffectsService();
+        // Mint the bearer's layers service BUS-WIRED when a bus is available so
+        // its generation cache invalidates on external events (CR 613
+        // memoization). The Ring-bearer can be ANY permanent the controller
+        // designates, including a CDA (Tarmogoyf, Death's Shadow, …) whose P/T
+        // reads external state via this same ActiveEffects instance; a busless
+        // one would serve a stale cached P/T after, e.g., a graveyard or
+        // life-total change. Busless only when no bus was supplied (standalone
+        // construction).
+        // Mint the bearer's layers service BUS-WIRED when a bus is available so
+        // its generation cache invalidates on external events (CR 613
+        // memoization). The Ring-bearer can be ANY permanent the controller
+        // designates, including a CDA (Tarmogoyf, Death's Shadow, …) whose P/T
+        // reads external state via this same ActiveEffects instance; a busless
+        // one would serve a stale cached P/T after, e.g., a graveyard or
+        // life-total change. Busless only when no bus was supplied (standalone
+        // construction).
+        bearer.ActiveEffects ??= _eventBus != null
+            ? new ContinuousEffectsService(_eventBus)
+            : new ContinuousEffectsService();
         _bearerLegendaryGrant = GrantSupertypeEffect.ForPermanent(
             bearer, CardSupertype.Legendary);
         bearer.ActiveEffects.Register(_bearerLegendaryGrant);

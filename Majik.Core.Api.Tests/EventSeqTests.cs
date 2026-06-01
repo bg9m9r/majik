@@ -75,6 +75,79 @@ public class EventSeqTests
     }
 
     [Fact]
+    public async Task EventDto_At_IsWallClockUtc_NotLogicalClockEpoch_AndSeqStillOrders()
+    {
+        // Since the LogicalClock change the engine's event Timestamp is a
+        // logical epoch (2000-01-01 + tick offset) used only for deterministic
+        // ordering; surfacing it on the wire made the portal render "Jan 1
+        // 2000". The wire EventDto.At must instead be a real wall-clock UTC
+        // time. Seq remains the load-bearing ordering field.
+        var before = DateTime.UtcNow;
+
+        var facade = GameFacade.Create("Alice", "Bob", Array.Empty<ICard>(), Array.Empty<ICard>());
+        var captured = new List<EventDto>();
+        facade.Subscribe(captured.Add);
+
+        await facade.StartAsync();
+        var state = facade.GetState();
+        await facade.SubmitAsync(new PassPriorityCommand { PlayerId = state.Players[0].Id });
+        await facade.SubmitAsync(new PassPriorityCommand { PlayerId = state.Players[1].Id });
+
+        var after = DateTime.UtcNow;
+
+        captured.Should().NotBeEmpty();
+
+        // Every At is a wall-clock UTC time within the [before, after] window of
+        // the run — proves it is NOT the year-2000 logical epoch.
+        captured.Should().OnlyContain(e => e.At >= before && e.At <= after,
+            "EventDto.At must be stamped with wall-clock UTC at the wire seam");
+        captured.Should().OnlyContain(e => e.At.Year >= before.Year,
+            "At must not be the 2000-01-01 logical-clock epoch");
+
+        // Seq still strictly orders the events (1..N, contiguous) — the At fix
+        // does not disturb the ordering contract.
+        var seqs = captured.Select(e => e.Seq).ToList();
+        seqs.Should().Equal(Enumerable.Range(1, captured.Count).Select(i => (long)i));
+    }
+
+    [Fact]
+    public void PerPlayerVariants_OfOneEngineEvent_ShareTheSameWallClockAt()
+    {
+        // The per-viewer masked variants of ONE engine event are built from a
+        // single DateTime.UtcNow read, so they must carry the SAME wall-clock At
+        // (consistency across seats) — and a real wall-clock time, not the
+        // logical epoch.
+        var before = DateTime.UtcNow;
+        var facade = GameFacade.Create("Alice", "Bob", Array.Empty<ICard>(), Array.Empty<ICard>());
+        var envelopes = new List<EventEnvelope>();
+        facade.SubscribeEnvelopes(envelopes.Add);
+
+        var alice = facade.Alice;
+        var card = new Card("Lightning Bolt", "R");
+        card.SetOwner(alice);
+
+        var bus = (Majik.Core.Events.EventBus)typeof(GameFacade)
+            .GetField("_bus", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!
+            .GetValue(facade)!;
+        bus.Publish(new Majik.Core.Events.CardDrawnEvent(card, alice));
+        var after = DateTime.UtcNow;
+
+        var withVariants = envelopes.Where(env => env.PerPlayer != null).ToList();
+        withVariants.Should().NotBeEmpty();
+
+        foreach (var env in withVariants)
+        {
+            env.Public.At.Should().BeOnOrAfter(before).And.BeOnOrBefore(after,
+                "the public variant's At is wall-clock UTC");
+            foreach (var kv in env.PerPlayer!)
+            {
+                kv.Value.At.Should().Be(env.Public.At,
+                    "every per-player variant shares the one wall-clock At read for the event");
+            }
+        }
+    }
+
+    [Fact]
     public void PerPlayerVariants_OfOneEngineEvent_ShareTheSameSeq()
     {
         // A masked event (a draw: Library→Hand) fans out into per-player

@@ -189,6 +189,24 @@ public sealed class GameFacade : IDisposable
     public Player Bob => _bob;
 
     /// <summary>
+    /// True when the seat with this id is driven by a HUMAN agent — i.e. its
+    /// effective agent is still the wire-facing <see cref="RemoteAgent"/> (a
+    /// seat whose prompts come over the wire and are answered by
+    /// <see cref="SubmitAsync"/>), as opposed to a bot seat whose
+    /// <see cref="IPlayerAgent"/> was swapped to a self-driving
+    /// <see cref="Majik.Bot.BotPlayerAgent"/>. Used by the replay loop to decide
+    /// whether a prompt consumes a logged command (human) or is answered
+    /// in-engine by the seat's own agent (bot — never logged). Unknown ids count
+    /// as non-human.
+    /// </summary>
+    public bool IsHumanSeat(Guid playerId)
+    {
+        if (playerId == _alice.Id) return ReferenceEquals(_aliceAgentEffective, _aliceAgent);
+        if (playerId == _bob.Id) return ReferenceEquals(_bobAgentEffective, _bobAgent);
+        return false;
+    }
+
+    /// <summary>
     /// The id of the engine's current active player (CR 102.1 / 103.7 —
     /// "the active player is the player whose turn it is"). Tracked from
     /// <see cref="TurnStartedEvent"/>; falls back to the priority holder
@@ -1220,10 +1238,20 @@ public sealed class GameFacade : IDisposable
             var pending = new Queue<LoggedCommand>(log);
 
             // Prompt-driven replay: the rebuilt game raises prompts in the
-            // SAME order as the original (same seed), and the original log is
-            // 1:1 with those prompts (every SubmitAsync appended exactly one
-            // command). For each prompt, pop the next logged command, rebind
-            // its ids onto this run's live objects, and submit.
+            // SAME order as the original (same seed). The original command log
+            // is 1:1 with the original's HUMAN prompts only — bot seats answer
+            // in-engine via IPlayerAgent.ChooseAsync and are NEVER logged
+            // (SubmitAsync rejects bot seats, so RecordCommand only fires on
+            // accepted human commands). For a vs-bot match the rehydrated facade
+            // re-installs the deterministic BotPlayerAgent (same archetype +
+            // seed), so the bot seat re-makes the SAME decisions in-engine and
+            // its prompts never reach this channel (they don't go through the
+            // RemoteAgent.PromptRequested path SubscribePrompts listens on). The
+            // IsHumanSeat guard below is the explicit contract: only HUMAN
+            // prompts consume a logged command; any non-human prompt that
+            // somehow surfaces is answered by its own agent, not by dequeuing a
+            // human command (which would desync the human log against the wrong
+            // prompt).
             while (pending.Count > 0)
             {
                 if (game.IsCompleted) break;
@@ -1233,6 +1261,11 @@ public sealed class GameFacade : IDisposable
                 if (winner == game) break;
                 if (!await read.ConfigureAwait(false)) break;
                 if (!channel.Reader.TryRead(out var prompt)) continue;
+
+                // Bot-seat prompt (defensive — normally never reaches here):
+                // do NOT consume a logged human command; the seat's own
+                // re-installed agent answers it in-engine.
+                if (!facade.IsHumanSeat(prompt.PlayerId)) continue;
 
                 var logged = pending.Dequeue();
                 var rebound = RebindForReplay(
@@ -1496,10 +1529,19 @@ public sealed class GameFacade : IDisposable
         var seq = NextSeq();
         _lastEventSeq = seq;
 
+        // Wire timestamp: stamp wall-clock UTC at the EventDto build seam, NOT
+        // e.Timestamp. Since the LogicalClock change e.Timestamp is a logical
+        // epoch (2000-01-01 + tick offset) used only for deterministic ordering
+        // inside the engine; surfacing it on the wire made the portal render
+        // "Jan 1 2000". Seq remains the load-bearing ordering field; At is the
+        // human-facing wall-clock display value. Read once per engine event so
+        // every per-viewer variant of this event shares the same At.
+        var wireAt = DateTime.UtcNow;
+
         var publicDto = new EventDto(
             EventId: e.EventId,
             Type: type,
-            At: e.Timestamp,
+            At: wireAt,
             Payload: EventPayloadBuilder.Build(e, viewer: null, turnState: turnState),
             Seq: seq);
 
@@ -1517,13 +1559,13 @@ public sealed class GameFacade : IDisposable
                 [_alice.Id] = new EventDto(
                     EventId: e.EventId,
                     Type: type,
-                    At: e.Timestamp,
+                    At: wireAt,
                     Payload: EventPayloadBuilder.Build(e, _alice, turnState),
                     Seq: seq),
                 [_bob.Id] = new EventDto(
                     EventId: e.EventId,
                     Type: type,
-                    At: e.Timestamp,
+                    At: wireAt,
                     Payload: EventPayloadBuilder.Build(e, _bob, turnState),
                     Seq: seq),
             };

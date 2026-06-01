@@ -51,31 +51,49 @@ public sealed class ServerGameFactory
         var facade = _registry.Create(aliceName, bobName, aliceDeck, bobDeck, _cardRepo);
         if (botSeatArchetype != null)
         {
-            // vs-Bot match: Bob seat is the bot, driven by HeuristicStrategy.
-            // onBotThinking lets the caller (MatchService) bridge the
-            // engine-internal callback to the SignalR hub without making
-            // Majik.Bot depend on Majik.Server.
-            //
-            // Sink composition rules (see CompositeBotDecisionSink.Compose):
-            //   * Both null → BotConfig.DecisionSink stays null → engine
-            //     uses NullBotDecisionSink (zero overhead).
-            //   * Exactly one non-null → that sink is used directly.
-            //   * Both non-null → wrapped in a CompositeBotDecisionSink so
-            //     each decision fans out to logger + SignalR (or whatever
-            //     extra sink the caller passed).
-            // extraDecisionSink is per-match (e.g. SignalR keyed on
-            // matchId); _botDecisionSink is the process-wide logger sink.
-            var composed = CompositeBotDecisionSink.Compose(_botDecisionSink, extraDecisionSink);
-            var effectiveSink = ReferenceEquals(composed, NullBotDecisionSink.Instance) ? null : composed;
-            var botCfg = new Majik.Bot.BotConfig(botSeatArchetype, DecisionSink: effectiveSink);
-            facade.ReplaceBobAgent(new Majik.Bot.BotPlayerAgent(facade.Bob, botCfg, onBotThinking));
+            InstallBotAgent(facade, botSeatArchetype, onBotThinking, extraDecisionSink);
         }
         return facade;
     }
 
     /// <summary>
+    /// vs-Bot match: install the Bob-seat <see cref="Majik.Bot.BotPlayerAgent"/>
+    /// (driven by HeuristicStrategy). onBotThinking lets the caller (MatchService)
+    /// bridge the engine-internal callback to the SignalR hub without making
+    /// Majik.Bot depend on Majik.Server. Shared between fresh match creation
+    /// (<see cref="Create"/>) and rehydration (<see cref="BuildUnregisteredFacade"/>)
+    /// so a rehydrated bot match comes back with the SAME deterministic agent —
+    /// without it the bot seat would be left on the default RemoteAgent and the
+    /// prompt-driven replay would dequeue human commands against bot prompts
+    /// (desync).
+    ///
+    /// Sink composition rules (see CompositeBotDecisionSink.Compose):
+    ///   * Both null → BotConfig.DecisionSink stays null → engine uses
+    ///     NullBotDecisionSink (zero overhead).
+    ///   * Exactly one non-null → that sink is used directly.
+    ///   * Both non-null → wrapped in a CompositeBotDecisionSink so each
+    ///     decision fans out to logger + SignalR (or whatever extra sink the
+    ///     caller passed).
+    /// extraDecisionSink is per-match (e.g. SignalR keyed on matchId);
+    /// _botDecisionSink is the process-wide logger sink. The sink is diagnostics
+    /// only — it does not affect the bot's deterministic decisions, so a
+    /// rehydrate can safely pass null and still reproduce the original play.
+    /// </summary>
+    private void InstallBotAgent(
+        GameFacade facade,
+        string botSeatArchetype,
+        Action<bool>? onBotThinking,
+        IBotDecisionSink? extraDecisionSink)
+    {
+        var composed = CompositeBotDecisionSink.Compose(_botDecisionSink, extraDecisionSink);
+        var effectiveSink = ReferenceEquals(composed, NullBotDecisionSink.Instance) ? null : composed;
+        var botCfg = new Majik.Bot.BotConfig(botSeatArchetype, DecisionSink: effectiveSink);
+        facade.ReplaceBobAgent(new Majik.Bot.BotPlayerAgent(facade.Bob, botCfg, onBotThinking));
+    }
+
+    /// <summary>
     /// PLAN 08 (body) — build a facade WITHOUT registering it (no GameRegistry
-    /// entry, no bot-agent swap). Used as the <c>buildFreshFacade</c> step inside
+    /// entry). Used as the <c>buildFreshFacade</c> step inside
     /// <see cref="GameFacade.Rehydrate"/>: the rehydration replays the durable log
     /// onto this fresh facade under a seed-scope, and only the FINISHED live
     /// facade is registered (via <see cref="RegisterRehydrated"/>) under the
@@ -83,13 +101,30 @@ public sealed class ServerGameFactory
     /// register a throwaway GameId and collide on rebuild. The same
     /// <see cref="ICardRepository"/> the live game used is threaded in so the
     /// rebuilt deck cards bind identically.
+    ///
+    /// <para>For a vs-bot match the caller passes <paramref name="botSeatArchetype"/>
+    /// so the deterministic <see cref="Majik.Bot.BotPlayerAgent"/> is re-installed
+    /// on the Bob seat BEFORE replay starts — same archetype + same seed ⇒ the
+    /// bot re-makes identical in-engine decisions, and its prompts never consume
+    /// a logged human command (the bot drives itself via ChooseAsync; only human
+    /// commands were ever logged). Omitting it on a bot match desyncs the replay.
+    /// onBotThinking is null on rehydrate — there is no live thinking indicator to
+    /// drive during a fast-forward.</para>
     /// </summary>
     public GameFacade BuildUnregisteredFacade(
         string aliceName,
         string bobName,
         IReadOnlyList<ICard> aliceDeck,
-        IReadOnlyList<ICard> bobDeck)
-        => GameFacade.Create(aliceName, bobName, aliceDeck, bobDeck, _cardRepo);
+        IReadOnlyList<ICard> bobDeck,
+        string? botSeatArchetype = null)
+    {
+        var facade = GameFacade.Create(aliceName, bobName, aliceDeck, bobDeck, _cardRepo);
+        if (botSeatArchetype != null)
+        {
+            InstallBotAgent(facade, botSeatArchetype, onBotThinking: null, extraDecisionSink: null);
+        }
+        return facade;
+    }
 
     /// <summary>
     /// PLAN 08 (body) — register an already-rehydrated facade under the original
