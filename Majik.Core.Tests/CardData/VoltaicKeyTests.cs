@@ -21,8 +21,9 @@ namespace Majik.Core.Tests.CardData;
 /// - Card identity (name, Artifact type, {1} mana cost, owner/controller).
 /// - NamedCardFactory dispatch.
 /// - {1}, {T} activated ability cost composition (ManaCostCost({1}) + Tap).
-/// - The untap-target effect resolves without throwing (stub — targeting
-///   system not wired yet; mirrors Minamo's untap_target_stub).
+/// - The untap-target effect declares a target request + resolves without
+///   throwing when no target is chosen (CR 608.2b fizzle). Full chosen-target
+///   untap behaviour is covered in JsonTargetingEffectsTests (PLAN 01 Slice F).
 /// </summary>
 public class VoltaicKeyTests
 {
@@ -117,17 +118,27 @@ public class VoltaicKeyTests
     }
 
     // -----------------------------------------------------------------------
-    // Untap-target effect resolve (stub — targeting not wired yet)
+    // Untap-target effect (PLAN 01 Slice F — real targeting).
     // -----------------------------------------------------------------------
 
     [Fact]
-    public void VoltaicKey_UntapAbility_ResolvesWithoutThrowing()
+    public void VoltaicKey_UntapAbility_DeclaresOneTargetRequest()
     {
         var key = VoltaicKeyFactory.Create(_alice);
         var ability = key.Abilities.OfType<ActivatedAbility>().Single();
 
+        ability.TargetRequests.Should().ContainSingle("untap target artifact declares one 1..1 target");
+    }
+
+    [Fact]
+    public void VoltaicKey_UntapAbility_NoTargetChosen_ResolvesWithoutThrowing()
+    {
+        var key = VoltaicKeyFactory.Create(_alice);
+        var ability = key.Abilities.OfType<ActivatedAbility>().Single();
+
+        // No ChosenTargets set → CR 608.2b fizzle (clean no-op, no throw).
         var act = () => ability.Resolve();
 
-        act.Should().NotThrow("v1 untap-target effect is a no-op stub");
+        act.Should().NotThrow("an unfilled target fizzles cleanly");
     }
 }

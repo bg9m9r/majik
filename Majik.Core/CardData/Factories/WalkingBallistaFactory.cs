@@ -51,10 +51,16 @@ namespace Majik.Core.CardData.Factories;
 ///   <c>CardDefinitionFactory</c> onto the runtime ActivatedAbility's
 ///   <c>IsSorcerySpeed</c> flag; ActionValidator gates the activation
 ///   on the controller's main phase + empty stack (CR 117.1a / 307.5).
-/// - <b>Target prompt for ping damage</b>: emitted as
-///   <c>deal_damage_stub</c> in JSON; the effect fires but does not
-///   route damage to a chosen target. Full targeting requires the
-///   active prompt system (ITarget / TargetResolver).
+///
+/// ## Implemented (PLAN 01 Slice F)
+/// - <b>Ping damage to any target</b>: the remove-counter ability emits a
+///   real <c>deal_damage</c> effect (JSON), declaring a 1..1 "any target"
+///   <see cref="Majik.Core.Players.Agents.TargetRequest"/>. The shared
+///   <see cref="Majik.Core.Targeting.TargetCollection"/> pipeline (driven by
+///   <c>AbilityActivationFlow</c>) prompts the controller's agent, and the
+///   effect routes 1 damage to the chosen target via
+///   <see cref="Majik.Core.Primitives.Fx.DealDamageAny"/> at resolution
+///   (CR 115.3 / 306.7 / 608.2b).
 /// </summary>
 [CardName("Walking Ballista")]
 [CardName("Assaultron Invader")]

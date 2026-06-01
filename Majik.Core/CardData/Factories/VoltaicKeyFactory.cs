@@ -25,14 +25,13 @@ namespace Majik.Core.CardData.Factories;
 /// the generic {1} cost (vs {U}) and the <c>artifact</c> target filter
 /// (vs <c>legendary_permanent</c>).
 ///
-/// ## Deferred (v1 gap — matches the existing stub pattern)
+/// ## Implemented (PLAN 01 Slice F)
 /// - <b>Untap-target effect — target selection + actual untap</b>: the
-///   effect is the <c>untap_target_stub</c> JSON variant, a no-op closure
-///   that mirrors Minamo's <c>untap_target_stub</c> and Boseiju's
-///   <c>destroy_target_stub</c>. The untap action itself (CR 701.21) is
-///   supported by the engine; the gap is purely target selection via the
-///   prompt system. When targeting lands, the stub upgrades to a real
-///   <c>untap_target</c> without breaking the JSON.
+///   effect is a real <c>untap_target</c> verb declaring a 1..1 target
+///   request over <c>artifact</c> candidates. The shared
+///   <see cref="Majik.Core.Targeting.TargetCollection"/> pipeline prompts the
+///   controller's agent, and the effect untaps the chosen artifact
+///   (CR 701.21) at resolution (CR 608.2b — illegal target fizzles).
 /// </summary>
 [CardName("Voltaic Key")]
 public static class VoltaicKeyFactory
@@ -41,8 +40,8 @@ public static class VoltaicKeyFactory
         CardDefinitionLoader.FromEmbeddedResource("voltaic-key");
 
     /// <summary>Construct Voltaic Key for the supplied owner. The
-    /// untap-target effect resolves as a no-op stub in v1 (see class
-    /// xmldoc).</summary>
+    /// untap-target effect untaps the chosen artifact at resolution
+    /// (Slice F).</summary>
     public static Artifact Create(Player owner) =>
         (Artifact)CardDefinitionFactory.Build(Definition, owner);
 }

@@ -465,16 +465,18 @@ public static class CardDefRuntime
         return Primitives.Costs.RemovePlusOnePlusOneCounter(permanent, def.Amount);
     }
 
-    internal static IEffect BuildJsonEffect(EffectDefinition definition, ICard card, Player controller, ReplacementBus? replacements) =>
+    internal static IEffect BuildJsonEffect(
+        EffectDefinition definition, ICard card, Player controller, ReplacementBus? replacements,
+        int targetRequestIndex = -1) =>
         definition switch
         {
             PutCounterEffectDef put => BuildPutCounterEffect(put, card, replacements),
-            DealDamageStubEffectDef stub => BuildDealDamageStubEffect(stub, card),
+            DealDamageEffectDef damage => BuildDealDamageEffect(damage, card, targetRequestIndex),
             DrawCardEffectDef draw => BuildDrawCardEffect(draw, card, controller),
             SurveilSelfEffectDef surveil => BuildSurveilSelfEffect(surveil, card, controller),
             ScrySelfEffectDef scry => BuildScrySelfEffect(scry, card, controller),
-            DestroyTargetStubEffectDef destroy => BuildDestroyTargetStubEffect(destroy, card),
-            UntapTargetStubEffectDef untap => BuildUntapTargetStubEffect(untap, card),
+            DestroyTargetEffectDef destroy => BuildDestroyTargetEffect(destroy, card, targetRequestIndex),
+            UntapTargetEffectDef untap => BuildUntapTargetEffect(untap, card, targetRequestIndex),
             PreventDamageTargetStubEffectDef prevent => BuildPreventDamageTargetStubEffect(prevent, card),
             GainLifeSelfEffectDef gain => BuildGainLifeSelfEffect(gain, card, controller),
             MillThenPickFirstMatchingToHandEffectDef mp => BuildMillThenPickEffect(mp, card, controller),
@@ -483,6 +485,23 @@ public static class CardDefRuntime
             _ => throw new NotSupportedException(
                 $"Effect '{definition.GetType().Name}' is not yet supported by CardDefRuntime."),
         };
+
+    /// <summary>
+    /// Read the single chosen target from the resolving context at
+    /// <paramref name="targetRequestIndex"/> (the slot the owning ability's
+    /// <c>TargetRequests</c> reserved for this effect). Returns <c>null</c>
+    /// when the index is out of range or the agent supplied no pick — the
+    /// caller then fizzles cleanly (CR 608.2b). 1..1 requests carry exactly
+    /// one object, so we take element [0].
+    /// </summary>
+    private static object? ChosenTargetAt(Majik.Core.Abilities.ResolutionContext ctx, int targetRequestIndex)
+    {
+        if (targetRequestIndex < 0) return null;
+        var chosen = ctx.ChosenTargets;
+        if (targetRequestIndex >= chosen.Count) return null;
+        var slot = chosen[targetRequestIndex];
+        return slot.Count == 0 ? null : slot[0];
+    }
 
     private static IEffect BuildConniveSelfEffect(ConniveSelfEffectDef def, ICard card)
     {
@@ -537,18 +556,43 @@ public static class CardDefRuntime
             });
     }
 
-    private static IEffect BuildDestroyTargetStubEffect(DestroyTargetStubEffectDef def, ICard card)
+    private static IEffect BuildDestroyTargetEffect(DestroyTargetEffectDef def, ICard card, int targetRequestIndex)
     {
+        // PLAN 01 (Slice F) — real targeted destroy. The chosen permanent is
+        // read off the resolving ability's ChosenTargets via the index the
+        // ability reserved for this effect; CR 608.2b — re-check legality at
+        // resolution (target must still be a battlefield permanent) and fizzle
+        // otherwise. Fx.MoveToGraveyard(…, Destroy) honours Indestructible
+        // (CR 702.12) / regeneration (CR 701.15).
         return new Effect(
-            $"{card.Name}: destroy target {def.TargetFilter} (stub — no targeting yet)",
-            () => { /* destroy deferred */ });
+            $"{card.Name}: destroy target {def.TargetFilter}",
+            ctx =>
+            {
+                var live = ChosenTargetAt(ctx, targetRequestIndex);
+                if (live is Permanent permanent && permanent.Zone == ZoneType.Battlefield)
+                {
+                    Fx.MoveToGraveyard(permanent, ZoneMoveReason.Destroy);
+                }
+                return ValueTask.CompletedTask;
+            });
     }
 
-    private static IEffect BuildUntapTargetStubEffect(UntapTargetStubEffectDef def, ICard card)
+    private static IEffect BuildUntapTargetEffect(UntapTargetEffectDef def, ICard card, int targetRequestIndex)
     {
+        // PLAN 01 (Slice F) — real targeted untap (CR 701.21). Reads the chosen
+        // permanent off ChosenTargets at the reserved index; CR 608.2b — fizzle
+        // if it is no longer a battlefield permanent.
         return new Effect(
-            $"{card.Name}: untap target {def.TargetFilter} (stub — no targeting yet)",
-            () => { /* untap target deferred */ });
+            $"{card.Name}: untap target {def.TargetFilter}",
+            ctx =>
+            {
+                var live = ChosenTargetAt(ctx, targetRequestIndex);
+                if (live is Permanent permanent && permanent.Zone == ZoneType.Battlefield)
+                {
+                    permanent.Untap();
+                }
+                return ValueTask.CompletedTask;
+            });
     }
 
     private static IEffect BuildPreventDamageTargetStubEffect(
@@ -662,11 +706,21 @@ public static class CardDefRuntime
             });
     }
 
-    private static IEffect BuildDealDamageStubEffect(DealDamageStubEffectDef def, ICard card)
+    private static IEffect BuildDealDamageEffect(DealDamageEffectDef def, ICard card, int targetRequestIndex)
     {
+        // PLAN 01 (Slice F) — real targeted damage. Reads the chosen target off
+        // ChosenTargets at the reserved index and routes through
+        // Fx.DealDamageAny (Player / Creature / Planeswalker — CR 115.3 /
+        // 306.7). CR 608.2b — a null pick (no/illegal target) fizzles.
+        var amount = def.Amount;
         return new Effect(
-            $"{card.Name}: deal {def.Amount} damage to {def.Target} (stub — no targeting yet)",
-            () => { /* target damage deferred */ });
+            $"{card.Name}: deal {amount} damage to {def.Target}",
+            ctx =>
+            {
+                var live = ChosenTargetAt(ctx, targetRequestIndex);
+                if (live != null) Fx.DealDamageAny(live, amount);
+                return ValueTask.CompletedTask;
+            });
     }
 
     private static CounterType ParseCounterType(string raw) => raw switch

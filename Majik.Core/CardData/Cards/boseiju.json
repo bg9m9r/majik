@@ -11,7 +11,7 @@
         { "type": "discard_self" }
       ],
       "effects": [
-        { "type": "destroy_target_stub", "targetFilter": "artifact_enchantment_nonbasic_land" }
+        { "type": "destroy_target", "targetFilter": "artifact_enchantment_nonbasic_land" }
       ]
     }
   ]

@@ -23,14 +23,14 @@ namespace Majik.Core.CardData.Factories;
 ///   ManaCostCost({U}) + a tap-self additional cost (the {T} symbol).</item>
 /// </list>
 ///
-/// ## Deferred (v1 gap — matches the existing stub pattern)
+/// ## Implemented (PLAN 01 Slice F)
 /// - <b>Untap-target effect — target selection + actual untap</b>: the
-///   effect is the <c>untap_target_stub</c> JSON variant, a no-op closure
-///   that mirrors Boseiju's <c>destroy_target_stub</c> and Walking
-///   Ballista's <c>deal_damage_stub</c>. The untap action itself
-///   (CR 701.21) is supported by the engine; the gap is purely target
-///   selection via the prompt system. When targeting lands, the stub
-///   upgrades to a real <c>untap_target</c> without breaking the JSON.
+///   effect is a real <c>untap_target</c> verb declaring a 1..1 target
+///   request over legendary permanents. The shared
+///   <see cref="Majik.Core.Targeting.TargetCollection"/> pipeline prompts the
+///   controller's agent, and the effect untaps the chosen permanent
+///   (CR 701.21, <c>Permanent.Untap</c>) at resolution (CR 608.2b — illegal
+///   target fizzles).
 /// </summary>
 [CardName("Minamo, School at Water's Edge")]
 public static class MinamoSchoolAtWatersEdgeFactory
@@ -39,7 +39,7 @@ public static class MinamoSchoolAtWatersEdgeFactory
         CardDefinitionLoader.FromEmbeddedResource("minamo-school-at-waters-edge");
 
     /// <summary>Construct Minamo for the supplied owner. The untap-target
-    /// effect resolves as a no-op stub in v1 (see class xmldoc).</summary>
+    /// effect untaps the chosen legendary permanent at resolution (Slice F).</summary>
     public static Land Create(Player owner) =>
         (Land)CardDefinitionFactory.Build(Definition, owner);
 }

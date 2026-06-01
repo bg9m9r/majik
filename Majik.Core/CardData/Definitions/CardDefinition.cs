@@ -237,8 +237,12 @@ public sealed class ActivatedAbilityDefinition : AbilityDefinition
     public override CardDefAbility ToCardDefAbility()
     {
         var costBuilders = Costs.Select(c => c.ToCost()).ToArray();
-        var effectBuilders = Effects.Select(e => e.ToResolveEffect()).ToArray();
-        return new CardDefActivatedAbility(costBuilders, effectBuilders, SorcerySpeed);
+        // PLAN 01 (Slice F) — pair each effect's resolve-builder with the
+        // TargetRequest it targets through (null for untargeted effects).
+        var effectSpecs = Effects
+            .Select(e => new CardDefEffectSpec(e.ToTargetRequest(), e.ToResolveEffect()))
+            .ToArray();
+        return new CardDefActivatedAbility(costBuilders, effectSpecs, SorcerySpeed);
     }
 }
 
@@ -256,7 +260,9 @@ public sealed class TriggeredAbilityDefinition : AbilityDefinition
     public override CardDefAbility ToCardDefAbility()
     {
         var triggerBuilder = Trigger.ToTrigger();
-        var effectBuilders = Effects.Select(e => e.ToResolveEffect()).ToArray();
-        return new CardDefTriggeredAbility(triggerBuilder, effectBuilders);
+        var effectSpecs = Effects
+            .Select(e => new CardDefEffectSpec(e.ToTargetRequest(), e.ToResolveEffect()))
+            .ToArray();
+        return new CardDefTriggeredAbility(triggerBuilder, effectSpecs);
     }
 }

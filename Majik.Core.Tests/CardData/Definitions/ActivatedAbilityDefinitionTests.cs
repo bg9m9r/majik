@@ -134,7 +134,7 @@ public class ActivatedAbilityDefinitionTests
                     },
                     Effects = new List<EffectDefinition>
                     {
-                        new DealDamageStubEffectDef { Amount = 1, Target = "any" },
+                        new DealDamageEffectDef { Amount = 1, Target = "any" },
                     },
                 },
             },
