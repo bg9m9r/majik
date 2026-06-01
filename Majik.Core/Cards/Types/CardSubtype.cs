@@ -12,6 +12,9 @@ public enum CardSubtype
     Dryad,
     Dwarf,
     Phyrexian,
+    /// <summary>Mite creature subtype — the Phyrexian Mite tokens minted by
+    /// Mirrex / Tarsus Mite (Phyrexia: All Will Be One). CR 205.3m.</summary>
+    Mite,
     Germ,
     Elf,
     Goblin,
@@ -285,6 +288,9 @@ public enum CardSubtype
     PowerPlant,
     Tower,
     Urzas,
+    /// <summary>Sphere land subtype — Mirrex (Phyrexia: All Will Be One).
+    /// CR 205.3i. The only land in the Sphere cycle.</summary>
+    Sphere,
 
     // Enchantment subtypes (examples)
     Aura,
