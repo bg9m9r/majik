@@ -319,7 +319,13 @@ public static class OracleSpellBinder
     {
         switch (target)
         {
-            case Player p: p.LoseLife(n); break;
+            case Player p:
+                // CR 120.3 — record damage (Bloodthirst etc.) then apply it
+                // as life loss (CR 119.3 — damage to a player causes that
+                // much life loss).
+                p.RecordDamageDealt(n);
+                p.LoseLife(n);
+                break;
             case Creature c: c.TakeDamage(n); break;
         }
     }

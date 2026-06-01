@@ -86,12 +86,37 @@ public class Player
     /// </summary>
     public int LifeLostThisTurn { get; private set; }
 
+    /// <summary>
+    /// CR 120.3 — true once this player has been dealt damage at least once
+    /// during the current turn. Distinct from <see cref="LifeLostThisTurn"/>:
+    /// damage and life loss overlap heavily (most damage is applied as life
+    /// loss) but are not the same event (CR 120.3 vs CR 119.3). Set explicitly
+    /// on the damage path via <see cref="RecordDamageDealt"/> so mechanics that
+    /// key on "was dealt damage this turn" — Bloodthirst (CR 702.54) — observe
+    /// the precise condition. Reset at turn start by
+    /// <see cref="ResetTurnTrackers"/>.
+    /// </summary>
+    public bool WasDealtDamageThisTurn { get; private set; }
+
+    /// <summary>
+    /// CR 120.3 — record that this player was dealt <paramref name="amount"/>
+    /// damage. Called from every player-damage sink (direct-damage spells,
+    /// combat damage). A non-positive amount is not "damage" and is ignored
+    /// (CR 120.3 — 0 damage isn't dealt). The life-loss bookkeeping itself is
+    /// still performed by the caller via <see cref="LoseLife"/>.
+    /// </summary>
+    public void RecordDamageDealt(int amount)
+    {
+        if (amount > 0) WasDealtDamageThisTurn = true;
+    }
+
     /// <summary>Reset per-turn life-loss tracker (and any future per-turn
     /// per-player counters). Called by <see cref="Game.TurnDriver"/> at
     /// turn start so the prior turn's loss doesn't bleed forward.</summary>
     public void ResetTurnTrackers()
     {
         LifeLostThisTurn = 0;
+        WasDealtDamageThisTurn = false;
     }
 
     /// <summary>

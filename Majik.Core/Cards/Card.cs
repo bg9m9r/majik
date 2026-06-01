@@ -782,6 +782,35 @@ public class Card : ICard
     }
 
     /// <summary>
+    /// CR 702.169 — "Bargain" runtime sentinel. Stamped <c>true</c> by
+    /// <see cref="Majik.Core.Costs.BargainAdditionalCost.Pay"/> when the caster
+    /// pays the optional bargain cost (sacrifice an artifact, enchantment, or
+    /// token) as the spell is cast. Read by the resolving spell's effect body
+    /// to branch on the "if this spell was bargained" rider.
+    ///
+    /// <para>Mirrors the established sentinel pattern (<see cref="WasKicked"/> /
+    /// <see cref="WasCastForSurge"/>): cleared after the printed body resolves
+    /// so a later re-cast / blink / token copy doesn't inherit the prior bargain
+    /// posture (CR 400.7). Defaults to <c>false</c>.</para>
+    /// </summary>
+    public bool WasBargained { get; private set; }
+
+    /// <summary>Stamp the bargain sentinel. Called by
+    /// <see cref="Majik.Core.Costs.BargainAdditionalCost.Pay"/> after the
+    /// sacrifice is performed.</summary>
+    public void SetWasBargained(bool value)
+    {
+        WasBargained = value;
+    }
+
+    /// <summary>Clear the bargain sentinel (CR 400.7) — symmetric with
+    /// <see cref="ClearWasKicked"/>.</summary>
+    public void ClearWasBargained()
+    {
+        WasBargained = false;
+    }
+
+    /// <summary>
     /// CR 702.115 — "Surge" runtime sentinel. Stamped <c>true</c> by
     /// <see cref="Majik.Core.Costs.SurgeAlternativeCost"/> at cast time
     /// (during <see cref="Majik.Core.Game.SpellCastFlow"/>'s alt-cost

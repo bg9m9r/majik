@@ -165,110 +165,13 @@ public static class VoiceOfVictoryFactory
         }
 
         // --------------------------------------------------------------------
-        // Mobilize 2 (CR 508.3g): "Whenever this creature attacks, create two
+        // Mobilize 2 (CR 702.170): "Whenever this creature attacks, create two
         // tapped and attacking 1/1 red Warrior creature tokens. Sacrifice
-        // them at the beginning of the next end step."
+        // them at the beginning of the next end step." Delegated to the shared
+        // reusable mechanic in Majik.Core/Keywords/MobilizeHelper.cs.
         // --------------------------------------------------------------------
-        var mobilizeEffect = new Effect(
-            $"{CardName}: Mobilize {MobilizeCount} — create {MobilizeCount} tapped & attacking 1/1 red Warriors",
-            () => ResolveMobilize(card, owner, combat, triggers));
-
-        var mobilizeTrigger = new TriggeredAbility(
-            source: card,
-            controller: owner,
-            condition: Triggers.OnAttackSelf(card),
-            effects: new IEffect[] { mobilizeEffect },
-            activeZones: new[] { ZoneType.Battlefield });
-
-        card.AddAbility(mobilizeTrigger);
-        triggers?.RegisterTriggeredAbility(mobilizeTrigger);
+        Majik.Core.Keywords.MobilizeHelper.AttachTo(card, MobilizeCount, triggers, combat);
 
         return card;
-    }
-
-    /// <summary>
-    /// Resolve Mobilize 2 — create the tokens, splice them into combat tapped
-    /// and attacking, and register the end-step sacrifice.
-    /// </summary>
-    private static void ResolveMobilize(
-        Creature source,
-        Player owner,
-        CombatManager? combat,
-        TriggerManager? triggers)
-    {
-        var controller = source.Controller ?? owner;
-
-        // CR 111.4 — two 1/1 red Warrior creature tokens.
-        var spec = new TokenFactory.TokenSpec(
-            Name: "Warrior",
-            Power: TokenPower,
-            Toughness: TokenToughness,
-            Subtypes: new[] { CardSubtype.Warrior },
-            Keywords: null,
-            Colors: new[] { ManaColor.Red });
-
-        var tokens = new List<Creature>(MobilizeCount);
-        for (int i = 0; i < MobilizeCount; i++)
-        {
-            var token = TokenFactory.CreateOnBattlefield(spec, controller);
-            tokens.Add(token);
-
-            // CR 508.3g — splice the token into the in-progress combat as a
-            // tapped and attacking token (the core Mobilize primitive). When
-            // no combat is live the token stays on the battlefield untapped
-            // (see class xmldoc no-combat fallback).
-            combat?.AddTappedAndAttackingToken(token);
-        }
-
-        // CR 603.7 — sacrifice the tokens at the start of the next end step.
-        if (triggers == null) return;
-        RegisterEndStepSacrifice(source, controller, tokens, triggers);
-    }
-
-    /// <summary>
-    /// CR 603.7 / 500.4 — register a one-shot delayed trigger that sacrifices
-    /// the Mobilize tokens at the start of the next end step. The trigger
-    /// fence-checks <c>e.Timestamp &gt; resolvedAt</c> so the current end step
-    /// (if Mobilize resolves during an end step) doesn't trip it (mirrors
-    /// Sneak Attack / Through the Breach).
-    /// </summary>
-    private static void RegisterEndStepSacrifice(
-        Creature source,
-        Player controller,
-        IReadOnlyList<Creature> tokens,
-        TriggerManager triggers)
-    {
-        var resolvedAt = Majik.Core.Game.LogicalClockScope.Current.NextTimestamp();
-
-        var sacEffect = new Effect(
-            $"{CardName}: sacrifice {tokens.Count} Mobilize tokens at next end step",
-            () =>
-            {
-                foreach (var token in tokens)
-                {
-                    if (token.Zone != ZoneType.Battlefield) continue;
-                    var bfPlayer = token.Controller ?? controller;
-                    if (!bfPlayer.Zones.Battlefield.GetCards().Contains(token)) continue;
-
-                    // CR 701.16 — sacrifice: controller's battlefield → owner's
-                    // graveyard. (Tokens cease to exist as an SBA after this
-                    // zone change — CR 111.7 / 704.5d — handled by the engine's
-                    // SBA pass; this move performs the sacrifice itself.)
-                    var graveyardOwner = token.Owner ?? controller;
-                    bfPlayer.Zones.Battlefield.RemoveCard(token);
-                    graveyardOwner.Zones.Graveyard.AddCard(token);
-                    token.SetZone(ZoneType.Graveyard);
-                }
-            });
-
-        var delayed = new DelayedTriggeredAbility(
-            source: source,
-            controller: controller,
-            condition: new EventTriggerCondition<StepStartedEvent>(
-                (e, _) => e.StepType == Majik.Core.StateMachine.PhaseStateType.End
-                          && e.Timestamp > resolvedAt),
-            effects: new IEffect[] { sacEffect });
-
-        triggers.RegisterDelayed(delayed);
     }
 }
