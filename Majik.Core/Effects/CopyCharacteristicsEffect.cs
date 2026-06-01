@@ -48,21 +48,25 @@ namespace Majik.Core.Effects;
 /// <see cref="CopiedToughness"/> for inspection until Compute can upgrade a
 /// non-creature row to a creature row once Layer 1/4 grants Creature type.
 ///
+/// ## Supertypes + colour (now surfaced)
+/// CR 707.2 — supertypes and colour are copiable. This effect re-seeds the
+/// target's <see cref="PermanentCharacteristics.Supertypes"/> (#1715 slot) and
+/// <see cref="PermanentCharacteristics.Colors"/> (#1681 Layer-5 slot) from the
+/// source's printed values, so a clone of a Legendary permanent copies
+/// Legendary (the legend-rule SBA reads <see cref="Permanent.HasEffectiveSupertype"/>)
+/// and a clone of a colored permanent copies its colour (read back via
+/// <see cref="Permanent.GetEffectiveColors"/>).
+///
 /// ## v1 lossy
 /// - <b>Name / mana cost</b> are copiable (CR 707.2) but
 ///   <see cref="Card.Name"/> / <see cref="Card.ManaCost"/> are immutable on
 ///   the runtime instance; the copied identity is exposed via
 ///   <see cref="CopiedName"/> / <see cref="CopiedManaCost"/> rather than
 ///   mutating the target card.
-/// - <b>Supertypes</b> — <see cref="PermanentCharacteristics"/> has no
-///   supertype slot yet, so a copied "Legendary" / "Basic" supertype is not
-///   surfaced through Compute (same limitation as every other Layer effect).
 /// - <b>Non-keyword abilities</b> — only <see cref="KeywordAbility"/>
 ///   markers are mirrored into the keyword set; arbitrary printed activated /
 ///   triggered abilities of the source are not re-instantiated on the target
 ///   (same boundary as <see cref="CopyEffect"/>).
-/// - <b>Color</b> — Layer 5 has no color primitive yet (see v1 deferral
-///   #17), so copied color is not surfaced.
 /// </summary>
 public sealed class CopyCharacteristicsEffect : ContinuousEffect
 {
@@ -147,9 +151,9 @@ public sealed class CopyCharacteristicsEffect : ContinuousEffect
     }
 
     /// <summary>
-    /// CR 707.2 — replace the target's copiable type line + keyword set with
-    /// the source's. Clears the seeded (target's printed) values first so the
-    /// copy overwrites rather than unions.
+    /// CR 707.2 — replace the target's copiable type line + supertypes +
+    /// colour + keyword set with the source's. Clears the seeded (target's
+    /// printed) values first so the copy overwrites rather than unions.
     /// </summary>
     private void ApplyShared(PermanentCharacteristics chars)
     {
@@ -158,6 +162,24 @@ public sealed class CopyCharacteristicsEffect : ContinuousEffect
 
         chars.Subtypes.Clear();
         foreach (var st in _source.Subtypes) chars.Subtypes.Add(st);
+
+        // CR 707.2 / 205.4 — supertypes are copiable. Re-seed from the source's
+        // printed supertypes (#1715 slot) so a clone of a Legendary permanent
+        // copies Legendary; the legend-rule SBA reads HasEffectiveSupertype,
+        // which consults this set via Compute.
+        chars.Supertypes.Clear();
+        foreach (var sup in _source.Supertypes) chars.Supertypes.Add(sup);
+
+        // CR 707.2 / 105.3 — colour is copiable. Re-seed the Layer-5 colour
+        // slot (#1681) from the source's printed/static colour so a clone of a
+        // colored permanent copies its colour (read back via
+        // Permanent.GetEffectiveColors). Later-timestamp Layer-5 SET/ADD colour
+        // effects still apply on top per CR 613.
+        chars.Colors.Clear();
+        foreach (var c in Majik.Core.Cards.CardColors.GetColors(_source))
+        {
+            chars.Colors.Add(c);
+        }
 
         chars.Keywords.Clear();
         foreach (var kw in _source.Abilities.OfType<KeywordAbility>())
