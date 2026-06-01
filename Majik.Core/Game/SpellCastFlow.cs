@@ -361,8 +361,20 @@ public sealed class SpellCastFlow
         var opponents = ctx.AllPlayers.Where(p => !ReferenceEquals(p, caster)).ToList();
         if (opponents.Count == 0) return null;
 
-        var giftRecipient = await agent.ChooseGiftRecipientAsync(
-            ctx, card, giftClause.Description, opponents, ct);
+        // PLAN 01 (Slice G) — the bespoke ChooseGiftRecipientAsync prompt is
+        // gone; the gift recipient is now an optional declarative PickOne over
+        // the opponent pool, surfaced through the single ChooseAsync sink.
+        // Empty result == decline the gift (CR 701.59 — "you may promise").
+        var giftRequest = new ChoiceRequest(
+            ChoiceKind.PickOne,
+            giftClause.Description,
+            Min: 0,
+            Max: 1,
+            Candidates: opponents.Cast<object>().ToList(),
+            Intent: BotIntent.None,
+            Optional: true);
+        var chosen = await agent.ChooseAsync(ctx, giftRequest, ct);
+        var giftRecipient = chosen.Count > 0 ? (Player)chosen[0] : null;
         if (giftRecipient != null)
         {
             giftCardForPrompt.SetHasGiftPromised(true);

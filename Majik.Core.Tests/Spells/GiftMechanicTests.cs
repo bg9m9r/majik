@@ -223,16 +223,21 @@ public class GiftMechanicTests
         stax.SetZone(ZoneType.Battlefield);
         _bob.Zones.Battlefield.AddCard(stax);
 
-        // Drive only the gift prompt through HeuristicBotAgent; the rest
-        // through a scripted agent shell so this test isn't a full bot
-        // E2E. We poke ChooseGiftRecipientAsync directly.
+        // PLAN 01 (Slice G) — the bespoke ChooseGiftRecipientAsync is gone.
+        // The gift recipient is now an optional declarative PickOne over the
+        // opponent pool, handed to the single ChooseAsync sink. Drive that
+        // request directly: the bot's ChooseAsync returns the first opponent
+        // for a non-empty optional pick, preserving its most-aggressive
+        // "promise the gift" posture.
         var bot = new HeuristicBotAgent();
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
-        var pick = await bot.ChooseGiftRecipientAsync(
-            ctx, card,
-            IntoTheFloodMawFactory.GiftDescription,
-            new[] { _bob });
-        pick.Should().BeSameAs(_bob,
+        var giftRequest = new Majik.Core.Players.Agents.ChoiceRequest(
+            Majik.Core.Players.Agents.ChoiceKind.PickOne,
+            IntoTheFloodMawFactory.GiftDescription, Min: 0, Max: 1,
+            Candidates: new object[] { _bob },
+            Intent: Majik.Core.Cards.BotIntent.None, Optional: true);
+        var chosen = await bot.ChooseAsync(ctx, giftRequest);
+        chosen.Should().ContainSingle().Which.Should().BeSameAs(_bob,
             because: "the bot's gift heuristic defaults to promising — the upgrade is strictly better than the base mode");
     }
 }

@@ -214,48 +214,6 @@ public interface IPlayerAgent
     }
 
     /// <summary>
-    /// CR 701.59 — Bloomburrow "Gift" cast-time prompt. Called by
-    /// <see cref="Majik.Core.Game.SpellCastFlow"/> when the spell being
-    /// cast implements <see cref="Majik.Core.Spells.IGiftClause"/>. The
-    /// agent may decline (return <see langword="null"/>) or pick exactly
-    /// one of the supplied <paramref name="opponents"/> as the gift
-    /// recipient.
-    /// <para>
-    /// <paramref name="giftDescription"/> is the human-readable gift
-    /// label sourced from <see cref="Majik.Core.Spells.IGiftClause.Description"/>
-    /// ("a tapped 1/1 blue Fish creature token"). Surfaced verbatim by
-    /// remote-agent UIs in the prompt ("Promise <em>{description}</em>
-    /// to an opponent?"); ignored by deterministic / scripted agents.
-    /// </para>
-    /// <para>
-    /// Default: decline the gift (returns <see langword="null"/>) — the
-    /// most conservative posture for legacy agents that pre-date this
-    /// prompt. Smart bots override with heuristics (HeuristicBotAgent
-    /// promises by default when the gift unlocks a strictly better
-    /// effect — same most-aggressive posture as the Ascend / Spectacle
-    /// alt-cost prompts); scripted-test agents return their queued pick.
-    /// </para>
-    /// </summary>
-    async Task<Player?> ChooseGiftRecipientAsync(
-        GameContext ctx,
-        ICard source,
-        string giftDescription,
-        IReadOnlyList<Player> opponents,
-        CancellationToken ct = default)
-    {
-        // PLAN 01 (Slice C) shim — declarative optional PickOne. Default
-        // ChooseAsync declines (Optional: true ⇒ empty), preserving the
-        // legacy "decline the gift" default. Smart / scripted agents that
-        // override this method keep their bespoke pick.
-        var req = new ChoiceRequest(
-            ChoiceKind.PickOne, giftDescription, Min: 0, Max: 1,
-            Candidates: opponents.Cast<object>().ToList(),
-            Intent: BotIntent.None, Optional: true);
-        var chosen = await ChooseAsync(ctx, req, ct).ConfigureAwait(false);
-        return chosen.Count > 0 ? (Player)chosen[0] : null;
-    }
-
-    /// <summary>
     /// Generic Yes/No prompt for optional "may" clauses (CR 117.x / 605.1).
     /// Returns <see langword="true"/> to take the action, <see langword="false"/>
     /// to decline.

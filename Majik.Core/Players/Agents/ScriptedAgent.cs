@@ -189,6 +189,25 @@ public sealed class ScriptedAgent : IPlayerAgent
         }
         if (req.Optional && candidates.Count == 0)
             return Task.FromResult<IReadOnlyList<object>>(Array.Empty<object>());
+        // PLAN 01 (Slice G) — the Bloomburrow Gift recipient prompt (CR 701.59)
+        // is an optional PickOne over the opponent Player pool. It used to live
+        // on the bespoke ChooseGiftRecipientAsync; now it flows here. Preserve
+        // the historical scripted semantics: dequeue a QueueGiftRecipient pick
+        // when one is queued, otherwise DECLINE (the legacy default) rather than
+        // auto-promising the first opponent.
+        if (req.Optional && candidates.Count > 0 && candidates.All(c => c is Player))
+        {
+            if (_giftRecipients.Count > 0)
+            {
+                var chooser = _giftRecipients.Dequeue();
+                var opponents = candidates.Cast<Player>().ToList();
+                var pick = chooser(opponents);
+                return Task.FromResult<IReadOnlyList<object>>(
+                    pick != null ? new object[] { pick } : Array.Empty<object>());
+            }
+            // No queued gift pick — decline (matches the legacy default).
+            return Task.FromResult<IReadOnlyList<object>>(Array.Empty<object>());
+        }
         var take = Math.Max(req.Min, candidates.Count > 0 ? 1 : 0);
         IReadOnlyList<object> picked = candidates.Take(Math.Min(take, candidates.Count)).ToList();
         return Task.FromResult(picked);
@@ -255,19 +274,6 @@ public sealed class ScriptedAgent : IPlayerAgent
         }
         var chooserFn = _fromRevealedChoices.Dequeue();
         return Task.FromResult(chooserFn(revealed, eligible));
-    }
-
-    public Task<Player?> ChooseGiftRecipientAsync(
-        GameContext ctx, ICard source, string giftDescription,
-        IReadOnlyList<Player> opponents, CancellationToken ct = default)
-    {
-        if (_giftRecipients.Count == 0)
-        {
-            // Decline by default — matches the IPlayerAgent default.
-            return Task.FromResult<Player?>(null);
-        }
-        var chooser = _giftRecipients.Dequeue();
-        return Task.FromResult(chooser(opponents));
     }
 
     private static T Pop<T>(Queue<T> q, string what)
