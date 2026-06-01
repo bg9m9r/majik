@@ -174,6 +174,14 @@ public class MutavaultTests
         {
             chars.Subtypes.Should().Contain(st);
         }
+
+        // CR 613.1c / 613.7b — the Compute creature-row upgrade surfaces the
+        // 2/2 body through the layer system (manland combat math unblocked).
+        chars.Should().BeOfType<CreatureCharacteristics>(
+            "the Layer-4 Creature grant upgrades the Land's row");
+        var cc = (CreatureCharacteristics)chars;
+        cc.Power.Should().Be(2, "Mutavault becomes a 2/2");
+        cc.Toughness.Should().Be(2);
     }
 
     [Fact]

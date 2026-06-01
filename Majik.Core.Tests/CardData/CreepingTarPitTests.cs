@@ -191,6 +191,14 @@ public class CreepingTarPitTests
         chars.Subtypes.Should().Contain(CardSubtype.Elemental, "Layer 4 adds Elemental subtype");
         chars.Keywords.Should().Contain("Shroud",
             "Layer 6 grants Shroud until end of turn (CR 702.18)");
+
+        // CR 613.1c / 613.7b — the Compute creature-row upgrade now surfaces
+        // the animated 3/2 through the layer system (manland combat math).
+        chars.Should().BeOfType<CreatureCharacteristics>(
+            "the Layer-4 Creature grant upgrades the Land's row to a creature row");
+        var cc = (CreatureCharacteristics)chars;
+        cc.Power.Should().Be(3, "Creeping Tar Pit becomes a 3/2");
+        cc.Toughness.Should().Be(2);
     }
 
     [Fact]

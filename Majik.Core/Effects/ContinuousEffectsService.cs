@@ -257,6 +257,23 @@ public sealed class ContinuousEffectsService
                         || !stripped.Contains(src))
             .ToList();
 
+        // CR 613.1c / 613.7b — creature-row upgrade for animated NON-creature
+        // permanents (manlands: Creeping Tar Pit, Mutavault, Blinkmoth Nexus;
+        // Earthbend on a Land; Karn-animated artifacts). A Land/Artifact built
+        // as a non-Creature C# instance seeds a plain
+        // PermanentCharacteristics with no P/T slot, so a Layer-7b "becomes a
+        // 0/0" set-base and the Layer-7c counter postlude have nowhere to
+        // land. When a Layer-4 effect in this Compute pass grants
+        // CardType.Creature to the permanent, re-seed the working set as a
+        // CreatureCharacteristics with base P/T 0/0 BEFORE the pipeline runs,
+        // so the animated form's P/T surfaces through Compute (and therefore
+        // combat math, which reads it). Printed Creature instances already
+        // seed a creature row above, so this only fires for the animate case.
+        if (chars is not CreatureCharacteristics && GrantsCreatureType(permanent, applicable, stripped))
+        {
+            chars = ReseedAsCreatureRow(chars);
+        }
+
         // CR 613.8 — group by layer, then dependency-sort within each group.
         var byLayer = applicable
             .GroupBy(e => (int)e.Layer)
@@ -365,6 +382,59 @@ public sealed class ContinuousEffectsService
         }
 
         return chars;
+    }
+
+    /// <summary>
+    /// CR 613.1c — does the Layer-4 (type-changing) pass grant
+    /// <see cref="CardType.Creature"/> to a NON-creature
+    /// <paramref name="permanent"/>? Drives the creature-row upgrade in
+    /// <see cref="Compute(Permanent)"/> so an animated Land/Artifact gets a
+    /// P/T row (manlands + Earthbend). Applies ONLY the Type-layer effects
+    /// from <paramref name="applicable"/> — in the same dependency order the
+    /// full pass uses — to a throwaway type set seeded from the printed
+    /// types, then checks for Creature. Stripped-source effects are already
+    /// filtered out of <paramref name="applicable"/>; the
+    /// <paramref name="stripped"/> set is accepted for symmetry / future use.
+    /// </summary>
+    private bool GrantsCreatureType(
+        Permanent permanent,
+        List<ContinuousEffect> applicable,
+        HashSet<Creature> stripped)
+    {
+        // Fast exit: no Layer-4 effect at all → printed types decide, and a
+        // non-Creature instance is never printed as a creature here.
+        var typeLayer = applicable
+            .Where(e => e.Layer == Layer.Type)
+            .ToList();
+        if (typeLayer.Count == 0) return false;
+
+        // Apply just the Type layer (CR 613.1c) to a probe row seeded from the
+        // printed types, honouring the same intra-layer dependency order.
+        var probe = new PermanentCharacteristics();
+        foreach (var t in permanent.CardTypes) probe.Types.Add(t);
+        foreach (var effect in TopoSortByDependencies(typeLayer))
+        {
+            effect.Apply(probe);
+        }
+        return probe.Types.Contains(Majik.Core.Cards.Types.CardType.Creature);
+    }
+
+    /// <summary>
+    /// Promote a plain <see cref="PermanentCharacteristics"/> working set to a
+    /// <see cref="CreatureCharacteristics"/> with base P/T 0/0 (CR 613.7b
+    /// default for an animated permanent), preserving every characteristic
+    /// already seeded (types, subtypes, supertypes, keywords, colours). Used
+    /// by the creature-row upgrade once a Layer-4 Creature grant is detected.
+    /// </summary>
+    private static CreatureCharacteristics ReseedAsCreatureRow(PermanentCharacteristics src)
+    {
+        var dst = new CreatureCharacteristics { Power = 0, Toughness = 0 };
+        foreach (var t in src.Types) dst.Types.Add(t);
+        foreach (var st in src.Subtypes) dst.Subtypes.Add(st);
+        foreach (var sup in src.Supertypes) dst.Supertypes.Add(sup);
+        foreach (var kw in src.Keywords) dst.Keywords.Add(kw);
+        foreach (var c in src.Colors) dst.Colors.Add(c);
+        return dst;
     }
 
     /// <summary>

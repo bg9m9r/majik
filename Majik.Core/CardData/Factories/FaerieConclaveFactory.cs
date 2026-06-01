@@ -239,9 +239,9 @@ public sealed class FaerieConclaveBecomesPTEffect : ContinuousEffect
         chars.Toughness = NewToughness;
     }
 
-    public override void Apply(PermanentCharacteristics chars)
-    {
-        // Layer 7b on a non-Creature row is observationally a no-op in the
-        // current pipeline. See class xmldoc.
-    }
+    // No Apply(PermanentCharacteristics) override: the base default
+    // dispatches to Apply(CreatureCharacteristics) when the working set is a
+    // creature row. ContinuousEffectsService.Compute upgrades an animated
+    // Land to a creature row (CR 613.1c) on a Layer-4 Creature grant, so this
+    // set-base lands and the animated body surfaces through combat math.
 }

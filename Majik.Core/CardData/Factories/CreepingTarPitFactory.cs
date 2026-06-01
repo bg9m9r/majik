@@ -251,11 +251,12 @@ public sealed class CreepingTarPitBecomesPTEffect : ContinuousEffect
         chars.Toughness = NewToughness;
     }
 
-    public override void Apply(PermanentCharacteristics chars)
-    {
-        // Layer 7b on a non-Creature row is observationally a no-op in the
-        // current pipeline. See class xmldoc.
-    }
+    // No Apply(PermanentCharacteristics) override: the base default dispatches
+    // to Apply(CreatureCharacteristics) when the working set is a creature row.
+    // Now that ContinuousEffectsService.Compute upgrades an animated Land to a
+    // creature row (CR 613.1c), this set-base lands correctly and the 3/2
+    // surfaces through combat math. (A previous no-op override here swallowed
+    // the P/T against the upgraded row — removed.)
 }
 
 /// <summary>
