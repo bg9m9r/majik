@@ -1,3 +1,14 @@
+// ─────────────────────────────────────────────────────────────────────────
+// DORMANT on the current deploy. This Redis pub/sub cross-replica command
+// forwarder is part of the horizontal scale-out chain and is INERT in
+// production today: the live deploy runs a SINGLE majik-api instance
+// (numInstances unset) with NO Redis provisioned, so every method here is a
+// no-op and SendAsync returns false — MatchService always dispatches into its
+// own in-memory GameFacade and never forwards. It exists so multi-replica
+// scaling is a future config change rather than a rewrite, and so a reader of
+// the command path knows these branches are not exercised on the
+// single-instance deploy. No behaviour change on the current topology.
+// ─────────────────────────────────────────────────────────────────────────
 using System.Collections.Concurrent;
 using System.Text.Json;
 using Majik.Core.Api.Commands;

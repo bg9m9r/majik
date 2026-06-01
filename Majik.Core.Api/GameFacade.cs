@@ -94,6 +94,19 @@ public sealed class GameFacade : IDisposable
     private readonly List<Action<EventEnvelope>> _envelopeSubscribers = new();
     private readonly ActionLog _log = new();
 
+    // Replay (PLAN 08 / Phase 29.x). When true, BridgeEvent still folds the
+    // event into the facade's tracked state + seq (so GetState stays correct)
+    // but DOES NOT fan the event out to any external subscriber — the
+    // historical events of a replayed command log must never re-reach the
+    // wire. FromSnapshot flips this on for the fast-forward and back off once
+    // the rebuilt facade has caught up to the captured state. See FromSnapshot.
+    private volatile bool _suppressEventFanout;
+
+    // The RNG seed this facade was started with (StartFullGameAsync rng.Seed).
+    // Captured into GameSnapshot so FromSnapshot can rebuild with the SAME
+    // seed. Null until a full game starts; surfaced as 0 in the snapshot.
+    private int? _gameSeed;
+
     // PLAN 04 — per-game monotonic sequence counter. Every event stamped in
     // BridgeEvent draws the next value; a state snapshot reports _lastEventSeq
     // (the seq of the last event folded in) WITHOUT advancing the counter, so
@@ -756,6 +769,12 @@ public sealed class GameFacade : IDisposable
             throw new InvalidOperationException("Game already started.");
         }
 
+        // PLAN 08 / Phase 29.x — remember the seed so SaveSnapshot can capture
+        // it and FromSnapshot can rebuild deterministically. When no rng is
+        // supplied the driver mints its own random seed (non-reproducible);
+        // record 0 (unknown) in that case.
+        _gameSeed = rng?.Seed;
+
         var orderedPlayers = firstPlayerSlot == 1
             ? new[] { _bob, _alice }
             : new[] { _alice, _bob };
@@ -900,14 +919,265 @@ public sealed class GameFacade : IDisposable
     public byte[] Save() => JsonSerializer.SerializeToUtf8Bytes(GetState());
 
     /// <summary>
-    /// Full snapshot including action log. Pair with
-    /// <see cref="GameSnapshot"/> deserialization for replay.
+    /// Full snapshot including action log + the deterministic-replay inputs
+    /// (RNG seed, seat ids, instance-id → card-name map). Pair with
+    /// <see cref="FromSnapshot"/> to fast-forward a fresh facade to this state.
     /// </summary>
     public GameSnapshot SaveSnapshot() => new(
         State: GetState(),
-        Log: _log.Actions.Select(a => new LoggedCommand(a.At, a.Command)).ToList());
+        Log: _log.Actions.Select(a => new LoggedCommand(a.At, a.Command)).ToList(),
+        Seed: _gameSeed ?? 0,
+        AliceId: _alice.Id,
+        BobId: _bob.Id,
+        InstanceNames: BuildInstanceNameMap());
+
+    /// <summary>
+    /// Map every live card instance id → its name, so <see cref="FromSnapshot"/>
+    /// can translate the action log's id-bearing commands onto the rebuilt
+    /// facade's freshly-minted cards by name + position (the verbatim ids
+    /// don't survive the rebuild — deferred id-reseeding). We snapshot the
+    /// whole board, not just ids that appear in the log, so a later id-bearing
+    /// command always resolves.
+    /// </summary>
+    private IReadOnlyDictionary<Guid, string> BuildInstanceNameMap()
+    {
+        var map = new Dictionary<Guid, string>();
+        foreach (var player in new[] { _alice, _bob })
+        {
+            foreach (var zoneType in new[]
+                     {
+                         ZoneType.Hand, ZoneType.Battlefield, ZoneType.Graveyard,
+                         ZoneType.Library, ZoneType.Exile, ZoneType.Stack,
+                     })
+            {
+                foreach (var card in player.Zones.GetZone(zoneType).GetCards())
+                {
+                    map[card.InstanceId] = card.Name;
+                }
+            }
+        }
+        return map;
+    }
 
     public byte[] SaveSnapshotBytes() => JsonSerializer.SerializeToUtf8Bytes(SaveSnapshot());
+
+    /// <summary>
+    /// Replay-from-command-log (PLAN 08 / Phase 29.x). Rebuild a fresh facade
+    /// from <paramref name="snapshot"/> and fast-forward it to the captured
+    /// state by re-applying every logged command, with event fan-out
+    /// SUPPRESSED so the historical events never re-reach a subscriber.
+    ///
+    /// <para>The fresh facade is produced by <paramref name="buildFreshFacade"/>
+    /// — the caller's own deck/board-seeding code, reused verbatim so the
+    /// initial position matches. The game is then started with the SAME
+    /// <see cref="GameSnapshot.Seed"/> + a FRESH <see cref="LogicalClock"/>, so
+    /// shuffles, draws, and order-determining timestamps replay identically.
+    /// As each prompt arrives we pop the next logged command, rebind its
+    /// nondeterministic ids (seat + card-by-name) onto the rebuilt facade's
+    /// live objects, and submit it through the real <see cref="SubmitAsync"/>
+    /// path. Suppression is lifted once the log is exhausted, so the returned
+    /// facade is a normal LIVE facade (its subscribers simply saw none of the
+    /// replayed history).</para>
+    ///
+    /// <para>Replay is STRUCTURAL, not id-identical — the rebuilt facade mints
+    /// new Guids. Full id-identical replay (client-facing rehydration) needs
+    /// the deferred id-reseeding step.</para>
+    /// </summary>
+    /// <param name="snapshot">The saved game (seed + ordered command log).</param>
+    /// <param name="buildFreshFacade">Builds a fresh facade with the SAME
+    /// initial board/decks the original snapshot started from.</param>
+    /// <param name="onFacadeCreated">Optional hook invoked the instant the
+    /// fresh facade exists, BEFORE replay starts — used by tests to attach a
+    /// subscriber and prove fan-out suppression holds across the fast-forward.</param>
+    public static async Task<GameFacade> FromSnapshot(
+        GameSnapshot snapshot,
+        Func<GameFacade> buildFreshFacade,
+        Action<GameFacade>? onFacadeCreated = null,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        ArgumentNullException.ThrowIfNull(buildFreshFacade);
+
+        var facade = buildFreshFacade();
+        onFacadeCreated?.Invoke(facade);
+
+        // Map the snapshot's original seat ids onto the rebuilt facade's
+        // freshly-minted seats so each logged command's PlayerId rebinds.
+        var seatById = new Dictionary<Guid, Player>();
+        if (snapshot.AliceId != default) seatById[snapshot.AliceId] = facade._alice;
+        if (snapshot.BobId != default) seatById[snapshot.BobId] = facade._bob;
+
+        var instanceNames = snapshot.InstanceNames
+            ?? new Dictionary<Guid, string>();
+
+        // Fan-out suppression for the whole fast-forward. Folding into state
+        // still happens (GetState stays correct); only external broadcast is
+        // gated.
+        facade._suppressEventFanout = true;
+        try
+        {
+            var channel = System.Threading.Channels.Channel.CreateUnbounded<PromptDto>();
+            using var sub = facade.SubscribePrompts(p => channel.Writer.TryWrite(p));
+
+            await facade.StartFullGameAsync(
+                maxTurns: 30,
+                rng: new Majik.Core.Random.GameRandom(snapshot.Seed),
+                logicalClock: new LogicalClock(),
+                ct: ct).ConfigureAwait(false);
+
+            var game = facade._fullGameTask!;
+            var pending = new Queue<LoggedCommand>(snapshot.Log);
+
+            // Prompt-driven replay: the rebuilt game raises prompts in the
+            // SAME order as the original (same seed), and the original log is
+            // 1:1 with those prompts (every SubmitAsync appended exactly one
+            // command). For each prompt, pop the next logged command, rebind
+            // its ids onto this run's live objects, and submit.
+            while (pending.Count > 0)
+            {
+                if (game.IsCompleted) break;
+
+                var read = channel.Reader.WaitToReadAsync(ct).AsTask();
+                var winner = await Task.WhenAny(read, game).ConfigureAwait(false);
+                if (winner == game) break;
+                if (!await read.ConfigureAwait(false)) break;
+                if (!channel.Reader.TryRead(out var prompt)) continue;
+
+                var logged = pending.Dequeue();
+                var rebound = RebindForReplay(
+                    facade, logged.Command, prompt, seatById, instanceNames);
+
+                try
+                {
+                    await facade.SubmitAsync(rebound, ct).ConfigureAwait(false);
+                }
+                catch (InvalidOperationException)
+                {
+                    // A closed/bot seat or already-finished game — stop
+                    // replaying; the state fold has already advanced as far as
+                    // the engine accepted.
+                    break;
+                }
+            }
+        }
+        finally
+        {
+            facade._suppressEventFanout = false;
+        }
+
+        return facade;
+    }
+
+    /// <summary>
+    /// Rebind a logged command onto the rebuilt facade's live objects: its
+    /// <see cref="GameCommand.PlayerId"/> is set to the seat the current prompt
+    /// targets (authoritative — the engine is asking THAT seat), and every
+    /// card instance id it carries is translated old-id → name (via
+    /// <paramref name="instanceNames"/>) → the rebuilt facade's matching live
+    /// card. Defender/player ids in combat declarations rebind through the
+    /// seat map. Ids that don't resolve are passed through unchanged (the
+    /// engine validates and the worst case is a skipped action — structural
+    /// equivalence is the bar, not verbatim ids).
+    /// </summary>
+    private static GameCommand RebindForReplay(
+        GameFacade facade,
+        GameCommand command,
+        PromptDto prompt,
+        IReadOnlyDictionary<Guid, Player> seatById,
+        IReadOnlyDictionary<Guid, string> instanceNames)
+    {
+        // PlayerId: trust the prompt — the engine is asking this exact seat.
+        var withSeat = command with { PlayerId = prompt.PlayerId };
+
+        Guid Card(Guid oldId)
+        {
+            if (oldId == default) return oldId;
+            if (!instanceNames.TryGetValue(oldId, out var name)) return oldId;
+            return facade.ResolveLiveCardByName(name, oldId, instanceNames) ?? oldId;
+        }
+
+        Guid PlayerId(Guid oldId) =>
+            seatById.TryGetValue(oldId, out var p) ? p.Id : oldId;
+
+        IReadOnlyList<Guid> Cards(IReadOnlyList<Guid> ids) =>
+            ids.Select(Card).ToList();
+
+        return withSeat switch
+        {
+            PlayLandCommand c => c with { LandInstanceId = Card(c.LandInstanceId) },
+            CastSpellCommand c => c with
+            {
+                CardInstanceId = Card(c.CardInstanceId),
+                TargetInstanceIds = Cards(c.TargetInstanceIds),
+            },
+            ChooseTargetsCommand c => c with { TargetInstanceIds = Cards(c.TargetInstanceIds) },
+            ChooseManaCommand c => c with { SourceInstanceIds = Cards(c.SourceInstanceIds) },
+            ActivateManaAbilityCommand c => c with { PermanentInstanceId = Card(c.PermanentInstanceId) },
+            ActivateAbilityCommand c => c with { PermanentInstanceId = Card(c.PermanentInstanceId) },
+            ChooseCardsToBottomCommand c => c with { CardInstanceIds = Cards(c.CardInstanceIds) },
+            ChooseLibraryPickCommand c => c with
+            {
+                SelectedInstanceId = c.SelectedInstanceId is { } id ? Card(id) : null,
+            },
+            ChooseSurveilCommand c => c with
+            {
+                ToGraveyardInstanceIds = Cards(c.ToGraveyardInstanceIds),
+                TopOrderInstanceIds = Cards(c.TopOrderInstanceIds),
+            },
+            ChooseFromRevealedCommand c => c with
+            {
+                InstanceId = c.InstanceId is { } id ? Card(id) : null,
+            },
+            ChoiceCommand c => c with { SelectedInstanceIds = Cards(c.SelectedInstanceIds) },
+            DeclareAttackersCommand c => c with
+            {
+                Attackers = c.Attackers
+                    .Select(a => new AttackerDeclarationDto(Card(a.AttackerInstanceId), PlayerId(a.DefenderId)))
+                    .ToList(),
+            },
+            DeclareBlockersCommand c => c with
+            {
+                Blockers = c.Blockers
+                    .Select(b => new BlockerDeclarationDto(Card(b.BlockerInstanceId), Card(b.AttackerInstanceId)))
+                    .ToList(),
+            },
+            // OrderTriggersCommand carries stack-object ids (not card ids) that
+            // are freshly minted per run; an empty list ("as presented") is the
+            // determinism-safe replay choice and is what the scripted driver
+            // emits. Pass through; the engine tolerates unknown ids.
+            _ => withSeat,
+        };
+    }
+
+    /// <summary>
+    /// Resolve a live card by name on the rebuilt facade, biased to the seat
+    /// that owned the original id when known. Returns the live InstanceId, or
+    /// null if no live card of that name exists. Used by replay rebinding —
+    /// best-effort, since duplicate-named cards (a legendary pair) are
+    /// interchangeable for the structural bar.
+    /// </summary>
+    private Guid? ResolveLiveCardByName(
+        string name, Guid originalId, IReadOnlyDictionary<Guid, string> instanceNames)
+    {
+        foreach (var player in new[] { _alice, _bob })
+        {
+            foreach (var zoneType in new[]
+                     {
+                         ZoneType.Battlefield, ZoneType.Hand, ZoneType.Graveyard,
+                         ZoneType.Library, ZoneType.Exile, ZoneType.Stack,
+                     })
+            {
+                foreach (var card in player.Zones.GetZone(zoneType).GetCards())
+                {
+                    if (string.Equals(card.Name, name, StringComparison.Ordinal))
+                    {
+                        return card.InstanceId;
+                    }
+                }
+            }
+        }
+        return null;
+    }
 
     /// <summary>Full-information snapshot (spectator view). Use
     /// <see cref="GetStateFor"/> for a per-player view that masks
@@ -1069,6 +1339,16 @@ public sealed class GameFacade : IDisposable
         }
 
         var envelope = new EventEnvelope(publicDto, perPlayer);
+
+        // Replay suppression (PLAN 08 / Phase 29.x): the state fold + seq stamp
+        // above ALWAYS run (so the rebuilt facade's GetState catches up to the
+        // captured state), but during a FromSnapshot fast-forward we must NOT
+        // re-broadcast the historical events to any subscriber — they already
+        // happened in the original game. Skip the external fan-out only.
+        if (_suppressEventFanout)
+        {
+            return;
+        }
 
         foreach (var sub in _subscribers.ToList())
         {

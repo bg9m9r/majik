@@ -1,3 +1,15 @@
+// ─────────────────────────────────────────────────────────────────────────
+// DORMANT on the current deploy. This Redis-backed match-ownership machinery
+// is part of the horizontal scale-out chain and is INERT in production today:
+// the live deploy runs a SINGLE majik-api instance (numInstances unset) with
+// NO Redis provisioned, so the IConnectionMultiplexer is null and the
+// no-op/local fallbacks below are the only paths ever taken (TryClaim always
+// succeeds, GetOwner returns the local instance, Release no-ops). It exists so
+// that turning on multi-replica scaling later is a config change, not a
+// rewrite — and so a reader tracing the command path knows these branches are
+// not exercised on the single-instance deploy. No behaviour change on the
+// current topology.
+// ─────────────────────────────────────────────────────────────────────────
 using System.Collections.Concurrent;
 using Majik.Server.Composition;
 using StackExchange.Redis;
