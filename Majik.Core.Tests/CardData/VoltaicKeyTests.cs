@@ -36,7 +36,7 @@ public class VoltaicKeyTests
     [Fact]
     public void VoltaicKey_Identity()
     {
-        var key = VoltaicKeyFactory.Create(_alice);
+        var key = (Artifact)NamedCardFactory.Create("Voltaic Key", _alice);
 
         key.Name.Should().Be("Voltaic Key");
         key.HasType(CardType.Artifact).Should().BeTrue();
@@ -61,7 +61,7 @@ public class VoltaicKeyTests
     [Fact]
     public void VoltaicKey_HasExactlyOneActivatedAbility()
     {
-        var key = VoltaicKeyFactory.Create(_alice);
+        var key = (Artifact)NamedCardFactory.Create("Voltaic Key", _alice);
 
         key.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1,
             "the {1}, {T}: Untap target artifact ability");
@@ -70,7 +70,7 @@ public class VoltaicKeyTests
     [Fact]
     public void VoltaicKey_UntapAbility_HasNoManaAbility()
     {
-        var key = VoltaicKeyFactory.Create(_alice);
+        var key = (Artifact)NamedCardFactory.Create("Voltaic Key", _alice);
 
         key.Abilities.OfType<ManaAbility>().Should().BeEmpty(
             "Voltaic Key has no mana ability — its only ability untaps an artifact");
@@ -79,7 +79,7 @@ public class VoltaicKeyTests
     [Fact]
     public void VoltaicKey_UntapAbility_HasManaCostCost()
     {
-        var key = VoltaicKeyFactory.Create(_alice);
+        var key = (Artifact)NamedCardFactory.Create("Voltaic Key", _alice);
         var ability = key.Abilities.OfType<ActivatedAbility>().Single();
 
         ability.Costs.OfType<ManaCostCost>().Should().HaveCount(1);
@@ -88,7 +88,7 @@ public class VoltaicKeyTests
     [Fact]
     public void VoltaicKey_UntapAbility_ManaCostIsGeneric1()
     {
-        var key = VoltaicKeyFactory.Create(_alice);
+        var key = (Artifact)NamedCardFactory.Create("Voltaic Key", _alice);
         var ability = key.Abilities.OfType<ActivatedAbility>().Single();
         var manaCost = ability.Costs.OfType<ManaCostCost>().Single().Cost;
 
@@ -100,7 +100,7 @@ public class VoltaicKeyTests
     [Fact]
     public void VoltaicKey_UntapAbility_HasTapSelfCost()
     {
-        var key = VoltaicKeyFactory.Create(_alice);
+        var key = (Artifact)NamedCardFactory.Create("Voltaic Key", _alice);
         var ability = key.Abilities.OfType<ActivatedAbility>().Single();
 
         // The {T} symbol is built as an AdditionalCost.Tap on the source.
@@ -111,7 +111,7 @@ public class VoltaicKeyTests
     [Fact]
     public void VoltaicKey_UntapAbility_HasExactlyTwoCosts()
     {
-        var key = VoltaicKeyFactory.Create(_alice);
+        var key = (Artifact)NamedCardFactory.Create("Voltaic Key", _alice);
         var ability = key.Abilities.OfType<ActivatedAbility>().Single();
 
         ability.Costs.Should().HaveCount(2, "ManaCostCost({1}) + tap-self");
@@ -124,7 +124,7 @@ public class VoltaicKeyTests
     [Fact]
     public void VoltaicKey_UntapAbility_DeclaresOneTargetRequest()
     {
-        var key = VoltaicKeyFactory.Create(_alice);
+        var key = (Artifact)NamedCardFactory.Create("Voltaic Key", _alice);
         var ability = key.Abilities.OfType<ActivatedAbility>().Single();
 
         ability.TargetRequests.Should().ContainSingle("untap target artifact declares one 1..1 target");
@@ -133,7 +133,7 @@ public class VoltaicKeyTests
     [Fact]
     public void VoltaicKey_UntapAbility_NoTargetChosen_ResolvesWithoutThrowing()
     {
-        var key = VoltaicKeyFactory.Create(_alice);
+        var key = (Artifact)NamedCardFactory.Create("Voltaic Key", _alice);
         var ability = key.Abilities.OfType<ActivatedAbility>().Single();
 
         // No ChosenTargets set → CR 608.2b fizzle (clean no-op, no throw).

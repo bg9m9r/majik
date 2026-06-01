@@ -23,7 +23,7 @@ public class HillGiantFactoryTests
     [Fact]
     public void HillGiant_Identity()
     {
-        var c = HillGiantFactory.Create(_alice);
+        var c = (Majik.Core.Cards.Creature)NamedCardFactory.Create("Hill Giant", _alice);
 
         c.Name.Should().Be("Hill Giant");
         c.ManaCost.Should().Be("{3}{R}");
@@ -38,7 +38,7 @@ public class HillGiantFactoryTests
     [Fact]
     public void HillGiant_ManaValue_IsFour()
     {
-        var c = HillGiantFactory.Create(_alice);
+        var c = (Majik.Core.Cards.Creature)NamedCardFactory.Create("Hill Giant", _alice);
 
         // {3}{R} = 3 generic + 1 red = CMC 4 (CR 202.3).
         c.ManaCost.Should().Be("{3}{R}");
@@ -49,7 +49,7 @@ public class HillGiantFactoryTests
     [Fact]
     public void HillGiant_IsVanilla_NoAbilities()
     {
-        var c = HillGiantFactory.Create(_alice);
+        var c = (Majik.Core.Cards.Creature)NamedCardFactory.Create("Hill Giant", _alice);
 
         c.Abilities.OfType<KeywordAbility>().Should().BeEmpty(
             "Hill Giant is vanilla — no printed keywords");

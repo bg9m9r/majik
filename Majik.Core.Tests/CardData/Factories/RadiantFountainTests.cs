@@ -35,7 +35,7 @@ public class RadiantFountainTests
     [Fact]
     public void RadiantFountain_IsLand_WithCorrectName()
     {
-        var land = RadiantFountainFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Radiant Fountain", _alice);
 
         land.Name.Should().Be("Radiant Fountain");
         land.HasType(CardType.Land).Should().BeTrue();
@@ -62,7 +62,7 @@ public class RadiantFountainTests
         // CR 107.4c — {C} is colourless mana. ManaCost has no dedicated
         // colourless bucket today; ManaCost.Parse("C") maps it to +1 generic
         // (same posture as Rogue's Passage / Urza's Saga "{T}: Add {C}").
-        var land = RadiantFountainFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Radiant Fountain", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Generic == 1
@@ -72,7 +72,7 @@ public class RadiantFountainTests
     [Fact]
     public void RadiantFountain_EtbTrigger_IsBattlefieldActive()
     {
-        var land = RadiantFountainFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Radiant Fountain", _alice);
         var trigger = land.Abilities.OfType<TriggeredAbility>().Single();
 
         trigger.ActiveZones.Should().Contain(ZoneType.Battlefield);
@@ -83,7 +83,7 @@ public class RadiantFountainTests
     {
         // CR 119.3 — "you gain 2 life" raises the controller's life total by 2.
         var alice = new Player("Alice", 20);
-        var land = RadiantFountainFactory.Create(alice);
+        var land = (Land)NamedCardFactory.Create("Radiant Fountain", alice);
         var etb = land.Abilities.OfType<TriggeredAbility>().Single();
 
         foreach (var effect in etb.Effects) effect.Execute();

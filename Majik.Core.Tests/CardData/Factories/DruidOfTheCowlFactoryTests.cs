@@ -30,7 +30,7 @@ public class DruidOfTheCowlFactoryTests
     [Fact]
     public void DruidOfTheCowl_IsElfDruid_At1G_OneThree()
     {
-        var c = DruidOfTheCowlFactory.Create(_alice);
+        var c = (Creature)NamedCardFactory.Create("Druid of the Cowl", _alice);
 
         c.Name.Should().Be("Druid of the Cowl");
         c.ManaCost.Should().Be("{1}{G}");
@@ -58,7 +58,7 @@ public class DruidOfTheCowlFactoryTests
     [Fact]
     public void DruidOfTheCowl_HasSingleGreenManaAbility()
     {
-        var c = DruidOfTheCowlFactory.Create(_alice);
+        var c = (Creature)NamedCardFactory.Create("Druid of the Cowl", _alice);
 
         var mana = c.Abilities.OfType<ManaAbility>().ToList();
         mana.Should().HaveCount(1, "Druid of the Cowl prints only {T}: Add {G}.");
@@ -70,7 +70,7 @@ public class DruidOfTheCowlFactoryTests
     [Fact]
     public void DruidOfTheCowl_Activate_ProducesGreenMana_AndTapsItself()
     {
-        var c = DruidOfTheCowlFactory.Create(_alice);
+        var c = (Creature)NamedCardFactory.Create("Druid of the Cowl", _alice);
         c.SetZone(ZoneType.Battlefield);
         // CR 302.6 — the {T} mana ability is only legal once the creature has
         // shed summoning sickness; clear it so this test exercises the
@@ -89,7 +89,7 @@ public class DruidOfTheCowlFactoryTests
     [Fact]
     public void DruidOfTheCowl_CannotActivate_WhileTapped()
     {
-        var c = DruidOfTheCowlFactory.Create(_alice);
+        var c = (Creature)NamedCardFactory.Create("Druid of the Cowl", _alice);
         c.SetZone(ZoneType.Battlefield);
         // CR 302.6 — clear summoning sickness so we can activate at all and
         // then assert the !IsTapped re-activation gate specifically.

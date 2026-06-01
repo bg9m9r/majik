@@ -143,7 +143,7 @@ public class FellwarStoneTests
     public void FellwarStone_OpponentForest_OnlyGreenActive()
     {
         var stone = StoneOnBattlefield(AllPlayers());
-        PutOnBattlefield(_bob, ForestFactory.Create(_bob));
+        PutOnBattlefield(_bob, (Land)NamedCardFactory.Create("Forest", _bob));
 
         ColorAbility(stone, "G").CanActivate().Should().BeTrue(
             "an opponent's Forest could produce {G}");
@@ -163,8 +163,8 @@ public class FellwarStoneTests
     public void FellwarStone_OpponentForestAndIsland_GreenAndBlueActive()
     {
         var stone = StoneOnBattlefield(AllPlayers());
-        PutOnBattlefield(_bob, ForestFactory.Create(_bob));
-        PutOnBattlefield(_bob, IslandFactory.Create(_bob));
+        PutOnBattlefield(_bob, (Land)NamedCardFactory.Create("Forest", _bob));
+        PutOnBattlefield(_bob, (Land)NamedCardFactory.Create("Island", _bob));
 
         ColorAbility(stone, "G").CanActivate().Should().BeTrue();
         ColorAbility(stone, "U").CanActivate().Should().BeTrue();
@@ -184,7 +184,7 @@ public class FellwarStoneTests
     public void FellwarStone_OwnForest_DoesNotEnableGreen()
     {
         var stone = StoneOnBattlefield(AllPlayers());
-        PutOnBattlefield(_alice, ForestFactory.Create(_alice));
+        PutOnBattlefield(_alice, (Land)NamedCardFactory.Create("Forest", _alice));
 
         ColorAbility(stone, "G").CanActivate().Should().BeFalse(
             "Fellwar Stone reflects opponents' lands, not your own");
@@ -198,7 +198,7 @@ public class FellwarStoneTests
     public void FellwarStone_OpponentForest_TapsForGreen()
     {
         var stone = StoneOnBattlefield(AllPlayers());
-        PutOnBattlefield(_bob, ForestFactory.Create(_bob));
+        PutOnBattlefield(_bob, (Land)NamedCardFactory.Create("Forest", _bob));
 
         var green = ColorAbility(stone, "G");
         var produced = green.Activate();
@@ -216,7 +216,7 @@ public class FellwarStoneTests
     public void FellwarStone_Tapped_CannotActivate()
     {
         var stone = StoneOnBattlefield(AllPlayers());
-        PutOnBattlefield(_bob, ForestFactory.Create(_bob));
+        PutOnBattlefield(_bob, (Land)NamedCardFactory.Create("Forest", _bob));
         stone.Tap();
 
         ColorAbility(stone, "G").CanActivate().Should().BeFalse(

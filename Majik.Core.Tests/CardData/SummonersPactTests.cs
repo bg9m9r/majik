@@ -113,7 +113,7 @@ public class SummonersPactTests
         // nothing or skipped to the next match. Pinning the indicator path
         // here gives Summoner's Pact its own regression coverage parallel
         // to GreenSunsZenithTests.Resolve_XEquals0_TutorsDryadArborOntoBattlefield.
-        var arbor = DryadArborFactory.Create(_alice);
+        var arbor = (Creature)NamedCardFactory.Create("Dryad Arbor", _alice);
         _alice.Zones.Library.AddCard(arbor);
         arbor.SetZone(ZoneType.Library);
 

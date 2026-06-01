@@ -1,3 +1,4 @@
+using Majik.Core.CardData;
 using FluentAssertions;
 using Majik.Core.Abilities;
 using Majik.Core.CardData.Factories;
@@ -26,7 +27,7 @@ public class LazotepRecruitTests
     [Fact]
     public void LazotepRecruit_IsCreature()
     {
-        var card = LazotepRecruitFactory.Create(_alice);
+        var card = (Creature)NamedCardFactory.Create("Lazotep Recruit", _alice);
 
         card.HasType(CardType.Creature).Should().BeTrue();
     }
@@ -34,7 +35,7 @@ public class LazotepRecruitTests
     [Fact]
     public void LazotepRecruit_HasExpectedShape()
     {
-        var creature = LazotepRecruitFactory.Create(_alice);
+        var creature = (Creature)NamedCardFactory.Create("Lazotep Recruit", _alice);
 
         creature.Name.Should().Be("Lazotep Recruit");
         creature.Owner.Should().BeSameAs(_alice);
@@ -47,7 +48,7 @@ public class LazotepRecruitTests
     [Fact]
     public void LazotepRecruit_HasSingleEtbTrigger_NoManaAbility()
     {
-        var creature = LazotepRecruitFactory.Create(_alice);
+        var creature = (Creature)NamedCardFactory.Create("Lazotep Recruit", _alice);
 
         creature.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1);
         creature.Abilities.OfType<ManaAbility>().Should().BeEmpty();
@@ -57,7 +58,7 @@ public class LazotepRecruitTests
     public void LazotepRecruit_EtbAmass_NoArmyPresent_CreatesZombieArmyTokenWithCounter()
     {
         var alice = new Player("Alice", 20);
-        var creature = LazotepRecruitFactory.Create(alice);
+        var creature = (Creature)NamedCardFactory.Create("Lazotep Recruit", alice);
         var etb = creature.Abilities.OfType<TriggeredAbility>().First();
 
         foreach (var effect in etb.Effects) effect.Execute();
@@ -83,7 +84,7 @@ public class LazotepRecruitTests
         existing.SetZone(ZoneType.Battlefield);
         alice.Zones.Battlefield.AddCard(existing);
 
-        var creature = LazotepRecruitFactory.Create(alice);
+        var creature = (Creature)NamedCardFactory.Create("Lazotep Recruit", alice);
         var etb = creature.Abilities.OfType<TriggeredAbility>().First();
         foreach (var effect in etb.Effects) effect.Execute();
 

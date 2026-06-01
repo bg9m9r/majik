@@ -43,7 +43,7 @@ public class TempleOfSilenceTests
     [Fact]
     public void TempleOfSilence_IsLand_WithCorrectName()
     {
-        var land = TempleOfSilenceFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Temple of Silence", _alice);
 
         land.Name.Should().Be("Temple of Silence");
         land.HasType(CardType.Land).Should().BeTrue();
@@ -66,7 +66,7 @@ public class TempleOfSilenceTests
     [Fact]
     public void TempleOfSilence_HasManaAbility_ForWhite()
     {
-        var land = TempleOfSilenceFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Temple of Silence", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.White == 1 && m.ManaGenerated.Black == 0);
@@ -75,7 +75,7 @@ public class TempleOfSilenceTests
     [Fact]
     public void TempleOfSilence_HasManaAbility_ForBlack()
     {
-        var land = TempleOfSilenceFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Temple of Silence", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Black == 1 && m.ManaGenerated.White == 0);
@@ -84,7 +84,7 @@ public class TempleOfSilenceTests
     [Fact]
     public void TempleOfSilence_EtbTrigger_IsBattlefieldActive()
     {
-        var land = TempleOfSilenceFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Temple of Silence", _alice);
         var trigger = land.Abilities.OfType<TriggeredAbility>().Single();
 
         trigger.ActiveZones.Should().Contain(ZoneType.Battlefield);
@@ -102,7 +102,7 @@ public class TempleOfSilenceTests
             c.SetZone(ZoneType.Library);
         }
 
-        var land = TempleOfSilenceFactory.Create(alice);
+        var land = (Land)NamedCardFactory.Create("Temple of Silence", alice);
         var etb = land.Abilities.OfType<TriggeredAbility>().Single();
         foreach (var effect in etb.Effects) effect.Execute();
 
@@ -117,7 +117,7 @@ public class TempleOfSilenceTests
     {
         var alice = new Player("Alice", 20);
 
-        var land = TempleOfSilenceFactory.Create(alice);
+        var land = (Land)NamedCardFactory.Create("Temple of Silence", alice);
         var etb = land.Abilities.OfType<TriggeredAbility>().Single();
         Action act = () =>
         {

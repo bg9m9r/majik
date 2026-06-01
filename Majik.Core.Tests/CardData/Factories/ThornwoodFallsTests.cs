@@ -42,7 +42,7 @@ public class ThornwoodFallsTests
     [Fact]
     public void ThornwoodFalls_IsLand_WithCorrectName()
     {
-        var land = ThornwoodFallsFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Thornwood Falls", _alice);
 
         land.Name.Should().Be("Thornwood Falls");
         land.HasType(CardType.Land).Should().BeTrue();
@@ -66,7 +66,7 @@ public class ThornwoodFallsTests
     [Fact]
     public void ThornwoodFalls_HasManaAbility_ForGreen()
     {
-        var land = ThornwoodFallsFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Thornwood Falls", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Green == 1 && m.ManaGenerated.Blue == 0);
@@ -75,7 +75,7 @@ public class ThornwoodFallsTests
     [Fact]
     public void ThornwoodFalls_HasManaAbility_ForBlue()
     {
-        var land = ThornwoodFallsFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Thornwood Falls", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Blue == 1 && m.ManaGenerated.Green == 0);
@@ -84,7 +84,7 @@ public class ThornwoodFallsTests
     [Fact]
     public void ThornwoodFalls_EtbTrigger_IsBattlefieldActive()
     {
-        var land = ThornwoodFallsFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Thornwood Falls", _alice);
         var trigger = land.Abilities.OfType<TriggeredAbility>().Single();
 
         trigger.ActiveZones.Should().Contain(ZoneType.Battlefield);
@@ -94,7 +94,7 @@ public class ThornwoodFallsTests
     public void ThornwoodFalls_EtbEffect_GainsOneLife()
     {
         var alice = new Player("Alice", 20);
-        var land = ThornwoodFallsFactory.Create(alice);
+        var land = (Land)NamedCardFactory.Create("Thornwood Falls", alice);
         var etb = land.Abilities.OfType<TriggeredAbility>().Single();
 
         foreach (var effect in etb.Effects) effect.Execute();

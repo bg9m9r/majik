@@ -93,6 +93,17 @@ public static class ImplementedCardNames
             }
         }
 
+        // Fileless JSON cards (PLAN 03 Slice 3) — names dispatched straight
+        // from CardData/Cards/*.json with no [CardName] wrapper class. The
+        // source generator emits them into NamedCardFactory.GeneratedJsonCardNames;
+        // folding them in here keeps the implemented-name set unchanged when a
+        // wrapper is deleted in favour of its generated arm.
+        foreach (var jsonName in Majik.Core.CardData.NamedCardFactory.GeneratedJsonCardNames)
+        {
+            if (!string.IsNullOrWhiteSpace(jsonName))
+                builder.Add(jsonName);
+        }
+
         foreach (var inline in InlineFallbackNames) builder.Add(inline);
         return builder.ToImmutable();
     }

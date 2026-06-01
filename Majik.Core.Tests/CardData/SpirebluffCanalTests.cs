@@ -24,7 +24,7 @@ public class SpirebluffCanalTests
     [Fact]
     public void SpirebluffCanal_IsLand()
     {
-        var land = SpirebluffCanalFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Spirebluff Canal", _alice);
 
         land.HasType(CardType.Land).Should().BeTrue();
     }
@@ -32,7 +32,7 @@ public class SpirebluffCanalTests
     [Fact]
     public void SpirebluffCanal_NameIsCorrect()
     {
-        var land = SpirebluffCanalFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Spirebluff Canal", _alice);
 
         land.Name.Should().Be("Spirebluff Canal");
     }
@@ -40,7 +40,7 @@ public class SpirebluffCanalTests
     [Fact]
     public void SpirebluffCanal_OwnerAndControllerAreSet()
     {
-        var land = SpirebluffCanalFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Spirebluff Canal", _alice);
 
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
@@ -49,7 +49,7 @@ public class SpirebluffCanalTests
     [Fact]
     public void SpirebluffCanal_IsNotLegendary()
     {
-        var land = SpirebluffCanalFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Spirebluff Canal", _alice);
 
         land.HasSupertype(CardSupertype.Legendary).Should().BeFalse();
     }
@@ -57,7 +57,7 @@ public class SpirebluffCanalTests
     [Fact]
     public void SpirebluffCanal_HasTwoManaAbilities()
     {
-        var land = SpirebluffCanalFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Spirebluff Canal", _alice);
 
         land.Abilities.OfType<ManaAbility>().Should().HaveCount(2);
     }
@@ -65,7 +65,7 @@ public class SpirebluffCanalTests
     [Fact]
     public void SpirebluffCanal_HasBlueManaAbility()
     {
-        var land = SpirebluffCanalFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Spirebluff Canal", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Blue == 1 && m.ManaGenerated.Red == 0);
@@ -74,7 +74,7 @@ public class SpirebluffCanalTests
     [Fact]
     public void SpirebluffCanal_HasRedManaAbility()
     {
-        var land = SpirebluffCanalFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Spirebluff Canal", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Red == 1 && m.ManaGenerated.Blue == 0);
@@ -83,7 +83,7 @@ public class SpirebluffCanalTests
     [Fact]
     public void SpirebluffCanal_HasNoTriggeredAbilities()
     {
-        var land = SpirebluffCanalFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Spirebluff Canal", _alice);
 
         land.Abilities.OfType<TriggeredAbility>().Should().BeEmpty(
             "ETB-tapped-unless-N-other-lands is a replacement effect, not a trigger");
@@ -92,7 +92,7 @@ public class SpirebluffCanalTests
     [Fact]
     public void SpirebluffCanal_HasNoActivatedAbilities()
     {
-        var land = SpirebluffCanalFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Spirebluff Canal", _alice);
 
         land.Abilities.OfType<ActivatedAbility>().Should().BeEmpty();
     }

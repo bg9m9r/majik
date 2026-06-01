@@ -29,7 +29,7 @@ public class DreamrootCascadeTests
     [Fact]
     public void DreamrootCascade_IsLand()
     {
-        var land = DreamrootCascadeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Dreamroot Cascade", _alice);
 
         land.HasType(CardType.Land).Should().BeTrue();
     }
@@ -37,7 +37,7 @@ public class DreamrootCascadeTests
     [Fact]
     public void DreamrootCascade_NameIsCorrect()
     {
-        var land = DreamrootCascadeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Dreamroot Cascade", _alice);
 
         land.Name.Should().Be("Dreamroot Cascade");
     }
@@ -45,7 +45,7 @@ public class DreamrootCascadeTests
     [Fact]
     public void DreamrootCascade_OwnerAndControllerAreSet()
     {
-        var land = DreamrootCascadeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Dreamroot Cascade", _alice);
 
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
@@ -54,7 +54,7 @@ public class DreamrootCascadeTests
     [Fact]
     public void DreamrootCascade_IsNotLegendary()
     {
-        var land = DreamrootCascadeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Dreamroot Cascade", _alice);
 
         land.HasSupertype(CardSupertype.Legendary).Should().BeFalse();
     }
@@ -62,7 +62,7 @@ public class DreamrootCascadeTests
     [Fact]
     public void DreamrootCascade_HasTwoManaAbilities()
     {
-        var land = DreamrootCascadeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Dreamroot Cascade", _alice);
 
         land.Abilities.OfType<ManaAbility>().Should().HaveCount(2);
     }
@@ -70,7 +70,7 @@ public class DreamrootCascadeTests
     [Fact]
     public void DreamrootCascade_HasGreenManaAbility()
     {
-        var land = DreamrootCascadeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Dreamroot Cascade", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Green == 1 && m.ManaGenerated.Blue == 0);
@@ -79,7 +79,7 @@ public class DreamrootCascadeTests
     [Fact]
     public void DreamrootCascade_HasBlueManaAbility()
     {
-        var land = DreamrootCascadeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Dreamroot Cascade", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Blue == 1 && m.ManaGenerated.Green == 0);
@@ -88,7 +88,7 @@ public class DreamrootCascadeTests
     [Fact]
     public void DreamrootCascade_HasNoTriggeredAbilities()
     {
-        var land = DreamrootCascadeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Dreamroot Cascade", _alice);
 
         land.Abilities.OfType<TriggeredAbility>().Should().BeEmpty(
             "ETB-tapped-unless-two-or-more-other-lands is a replacement effect, not a trigger");
@@ -97,7 +97,7 @@ public class DreamrootCascadeTests
     [Fact]
     public void DreamrootCascade_HasNoActivatedAbilities()
     {
-        var land = DreamrootCascadeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Dreamroot Cascade", _alice);
 
         land.Abilities.OfType<ActivatedAbility>().Should().BeEmpty();
     }

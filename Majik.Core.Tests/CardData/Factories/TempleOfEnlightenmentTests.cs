@@ -43,7 +43,7 @@ public class TempleOfEnlightenmentTests
     [Fact]
     public void TempleOfEnlightenment_IsLand_WithCorrectName()
     {
-        var land = TempleOfEnlightenmentFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Temple of Enlightenment", _alice);
 
         land.Name.Should().Be("Temple of Enlightenment");
         land.HasType(CardType.Land).Should().BeTrue();
@@ -66,7 +66,7 @@ public class TempleOfEnlightenmentTests
     [Fact]
     public void TempleOfEnlightenment_HasManaAbility_ForWhite()
     {
-        var land = TempleOfEnlightenmentFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Temple of Enlightenment", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.White == 1 && m.ManaGenerated.Blue == 0);
@@ -75,7 +75,7 @@ public class TempleOfEnlightenmentTests
     [Fact]
     public void TempleOfEnlightenment_HasManaAbility_ForBlue()
     {
-        var land = TempleOfEnlightenmentFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Temple of Enlightenment", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Blue == 1 && m.ManaGenerated.White == 0);
@@ -84,7 +84,7 @@ public class TempleOfEnlightenmentTests
     [Fact]
     public void TempleOfEnlightenment_EtbTrigger_IsBattlefieldActive()
     {
-        var land = TempleOfEnlightenmentFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Temple of Enlightenment", _alice);
         var trigger = land.Abilities.OfType<TriggeredAbility>().Single();
 
         trigger.ActiveZones.Should().Contain(ZoneType.Battlefield);
@@ -102,7 +102,7 @@ public class TempleOfEnlightenmentTests
             c.SetZone(ZoneType.Library);
         }
 
-        var land = TempleOfEnlightenmentFactory.Create(alice);
+        var land = (Land)NamedCardFactory.Create("Temple of Enlightenment", alice);
         var etb = land.Abilities.OfType<TriggeredAbility>().Single();
         foreach (var effect in etb.Effects) effect.Execute();
 
@@ -117,7 +117,7 @@ public class TempleOfEnlightenmentTests
     {
         var alice = new Player("Alice", 20);
 
-        var land = TempleOfEnlightenmentFactory.Create(alice);
+        var land = (Land)NamedCardFactory.Create("Temple of Enlightenment", alice);
         var etb = land.Abilities.OfType<TriggeredAbility>().Single();
         Action act = () =>
         {

@@ -32,7 +32,7 @@ public class SwampFactoryTests
     [Fact]
     public void Swamp_IsALand()
     {
-        var swamp = SwampFactory.Create(_alice);
+        var swamp = (Land)NamedCardFactory.Create("Swamp", _alice);
 
         swamp.HasType(CardType.Land).Should().BeTrue(
             "Swamp is a Land (CR 305.1)");
@@ -41,7 +41,7 @@ public class SwampFactoryTests
     [Fact]
     public void Swamp_HasBasicSupertype()
     {
-        var swamp = SwampFactory.Create(_alice);
+        var swamp = (Land)NamedCardFactory.Create("Swamp", _alice);
 
         swamp.HasSupertype(CardSupertype.Basic).Should().BeTrue(
             "Swamp has the Basic supertype (CR 205.4)");
@@ -50,7 +50,7 @@ public class SwampFactoryTests
     [Fact]
     public void Swamp_HasSwampSubtype()
     {
-        var swamp = SwampFactory.Create(_alice);
+        var swamp = (Land)NamedCardFactory.Create("Swamp", _alice);
 
         swamp.HasSubtype(CardSubtype.Swamp).Should().BeTrue(
             "Swamp is a Swamp land (CR 205.3i)");
@@ -59,7 +59,7 @@ public class SwampFactoryTests
     [Fact]
     public void Swamp_HasCorrectName()
     {
-        var swamp = SwampFactory.Create(_alice);
+        var swamp = (Land)NamedCardFactory.Create("Swamp", _alice);
 
         swamp.Name.Should().Be("Swamp");
     }
@@ -67,7 +67,7 @@ public class SwampFactoryTests
     [Fact]
     public void Swamp_OwnerAndControllerAreSet()
     {
-        var swamp = SwampFactory.Create(_alice);
+        var swamp = (Land)NamedCardFactory.Create("Swamp", _alice);
 
         swamp.Owner.Should().BeSameAs(_alice);
         swamp.Controller.Should().BeSameAs(_alice);
@@ -80,7 +80,7 @@ public class SwampFactoryTests
     [Fact]
     public void Swamp_HasBlackManaAbility()
     {
-        var swamp = SwampFactory.Create(_alice);
+        var swamp = (Land)NamedCardFactory.Create("Swamp", _alice);
 
         var manaAbilities = swamp.Abilities.OfType<ManaAbility>().ToList();
         manaAbilities.Should().HaveCount(1,
@@ -117,7 +117,7 @@ public class SwampFactoryTests
     [Fact]
     public void Swamp_ThrowsOnNullOwner()
     {
-        var act = () => SwampFactory.Create(null!);
+        var act = () => (Land)NamedCardFactory.Create("Swamp", null!);
 
         act.Should().Throw<ArgumentNullException>();
     }

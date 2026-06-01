@@ -34,7 +34,7 @@ public class LeadenMyrFactoryTests
     [Fact]
     public void LeadenMyr_Identity()
     {
-        var c = LeadenMyrFactory.Create(_alice);
+        var c = (Creature)NamedCardFactory.Create("Leaden Myr", _alice);
 
         c.Name.Should().Be("Leaden Myr");
         c.ManaCost.Should().Be("{2}");
@@ -68,7 +68,7 @@ public class LeadenMyrFactoryTests
     [Fact]
     public void LeadenMyr_TapForBlack_TapsCreatureAndProducesOneBlack()
     {
-        var c = LeadenMyrFactory.Create(_alice);
+        var c = (Creature)NamedCardFactory.Create("Leaden Myr", _alice);
         // CR 302.6 — clear summoning sickness so this test exercises the
         // {T}: Add {B} mana production rather than the sickness gate.
         c.ClearSummoningSickness();
@@ -92,7 +92,7 @@ public class LeadenMyrFactoryTests
     [Fact]
     public void LeadenMyr_ManaAbility_CannotActivateWhileTapped()
     {
-        var c = LeadenMyrFactory.Create(_alice);
+        var c = (Creature)NamedCardFactory.Create("Leaden Myr", _alice);
         // CR 302.6 — clear summoning sickness so the first activation is legal
         // and the test asserts the !IsTapped re-activation gate specifically.
         c.ClearSummoningSickness();

@@ -41,7 +41,7 @@ public class GraypeltRefugeTests
     [Fact]
     public void GraypeltRefuge_IsLand_WithCorrectName()
     {
-        var land = GraypeltRefugeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Graypelt Refuge", _alice);
 
         land.Name.Should().Be("Graypelt Refuge");
         land.HasType(CardType.Land).Should().BeTrue();
@@ -65,7 +65,7 @@ public class GraypeltRefugeTests
     [Fact]
     public void GraypeltRefuge_HasManaAbility_ForGreen()
     {
-        var land = GraypeltRefugeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Graypelt Refuge", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Green == 1 && m.ManaGenerated.White == 0);
@@ -74,7 +74,7 @@ public class GraypeltRefugeTests
     [Fact]
     public void GraypeltRefuge_HasManaAbility_ForWhite()
     {
-        var land = GraypeltRefugeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Graypelt Refuge", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.White == 1 && m.ManaGenerated.Green == 0);
@@ -83,7 +83,7 @@ public class GraypeltRefugeTests
     [Fact]
     public void GraypeltRefuge_EtbTrigger_IsBattlefieldActive()
     {
-        var land = GraypeltRefugeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Graypelt Refuge", _alice);
         var trigger = land.Abilities.OfType<TriggeredAbility>().Single();
 
         trigger.ActiveZones.Should().Contain(ZoneType.Battlefield);
@@ -94,7 +94,7 @@ public class GraypeltRefugeTests
     {
         // CR 119.3 — "you gain 1 life" raises the controller's life total by 1.
         var alice = new Player("Alice", 20);
-        var land = GraypeltRefugeFactory.Create(alice);
+        var land = (Land)NamedCardFactory.Create("Graypelt Refuge", alice);
         var etb = land.Abilities.OfType<TriggeredAbility>().Single();
 
         foreach (var effect in etb.Effects) effect.Execute();

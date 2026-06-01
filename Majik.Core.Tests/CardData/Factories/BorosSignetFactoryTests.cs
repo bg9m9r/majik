@@ -34,7 +34,7 @@ public class BorosSignetFactoryTests
     {
         var alice = new Player("Alice", 20);
 
-        var signet = BorosSignetFactory.Create(alice);
+        var signet = (Artifact)NamedCardFactory.Create("Boros Signet", alice);
 
         signet.Should().BeOfType<Artifact>();
         signet.HasType(CardType.Artifact).Should().BeTrue();
@@ -46,7 +46,7 @@ public class BorosSignetFactoryTests
     {
         var alice = new Player("Alice", 20);
 
-        var signet = BorosSignetFactory.Create(alice);
+        var signet = (Artifact)NamedCardFactory.Create("Boros Signet", alice);
 
         signet.Owner.Should().BeSameAs(alice);
         signet.Controller.Should().BeSameAs(alice);
@@ -57,7 +57,7 @@ public class BorosSignetFactoryTests
     {
         var alice = new Player("Alice", 20);
 
-        var signet = BorosSignetFactory.Create(alice);
+        var signet = (Artifact)NamedCardFactory.Create("Boros Signet", alice);
 
         // {2} — two generic, no coloured pips.
         var cost = signet.ManaCostValue;
@@ -74,7 +74,7 @@ public class BorosSignetFactoryTests
     {
         var alice = new Player("Alice", 20);
 
-        var signet = BorosSignetFactory.Create(alice);
+        var signet = (Artifact)NamedCardFactory.Create("Boros Signet", alice);
 
         signet.HasSupertype(CardSupertype.Basic).Should().BeFalse();
         signet.HasSupertype(CardSupertype.Legendary).Should().BeFalse();
@@ -100,7 +100,7 @@ public class BorosSignetFactoryTests
     {
         var alice = new Player("Alice", 20);
 
-        var signet = BorosSignetFactory.Create(alice);
+        var signet = (Artifact)NamedCardFactory.Create("Boros Signet", alice);
 
         var manaAbilities = signet.Abilities.OfType<ManaAbility>().ToList();
         manaAbilities.Should().ContainSingle("Boros Signet has one {1}, {T}: Add {R}{W} ability");
@@ -119,7 +119,7 @@ public class BorosSignetFactoryTests
     {
         var alice = new Player("Alice", 20);
 
-        var signet = BorosSignetFactory.Create(alice);
+        var signet = (Artifact)NamedCardFactory.Create("Boros Signet", alice);
 
         signet.Abilities.OfType<ActivatedAbility>().Should().BeEmpty(
             "the only ability is a mana ability");
@@ -134,7 +134,7 @@ public class BorosSignetFactoryTests
     public void BorosSignet_CannotActivateWithoutOneGenericMana()
     {
         var alice = new Player("Alice", 20);
-        var signet = BorosSignetFactory.Create(alice);
+        var signet = (Artifact)NamedCardFactory.Create("Boros Signet", alice);
 
         // Empty mana pool — the {1} extra cost can't be paid.
         signet.Abilities.OfType<ManaAbility>().Single()
@@ -145,7 +145,7 @@ public class BorosSignetFactoryTests
     public void BorosSignet_CanActivateWithOneGenericInPool()
     {
         var alice = new Player("Alice", 20);
-        var signet = BorosSignetFactory.Create(alice);
+        var signet = (Artifact)NamedCardFactory.Create("Boros Signet", alice);
         alice.AddManaToPool(ManaCost.Parse("1"));
 
         signet.Abilities.OfType<ManaAbility>().Single()
@@ -156,7 +156,7 @@ public class BorosSignetFactoryTests
     public void BorosSignet_Activation_PaysOneGeneric_AndAddsRedWhite()
     {
         var alice = new Player("Alice", 20);
-        var signet = BorosSignetFactory.Create(alice);
+        var signet = (Artifact)NamedCardFactory.Create("Boros Signet", alice);
         // Seed pool with {1} (the signet's extra cost).
         alice.AddManaToPool(ManaCost.Parse("1"));
         var mana = signet.Abilities.OfType<ManaAbility>().Single();
@@ -182,7 +182,7 @@ public class BorosSignetFactoryTests
     public void BorosSignet_CannotActivateWhenTapped()
     {
         var alice = new Player("Alice", 20);
-        var signet = BorosSignetFactory.Create(alice);
+        var signet = (Artifact)NamedCardFactory.Create("Boros Signet", alice);
         alice.AddManaToPool(ManaCost.Parse("1"));
         signet.Tap();
 
@@ -197,7 +197,7 @@ public class BorosSignetFactoryTests
     [Fact]
     public void BorosSignet_Create_ThrowsOnNullOwner()
     {
-        var act = () => BorosSignetFactory.Create(null!);
+        var act = () => (Artifact)NamedCardFactory.Create("Boros Signet", null!);
         act.Should().Throw<ArgumentNullException>();
     }
 }

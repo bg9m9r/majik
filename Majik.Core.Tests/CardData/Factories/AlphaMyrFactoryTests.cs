@@ -29,7 +29,7 @@ public class AlphaMyrFactoryTests
     [Fact]
     public void AlphaMyr_Identity()
     {
-        var c = AlphaMyrFactory.Create(_alice);
+        var c = (Creature)NamedCardFactory.Create("Alpha Myr", _alice);
 
         c.Name.Should().Be("Alpha Myr");
         c.ManaCost.Should().Be("{2}");
@@ -58,7 +58,7 @@ public class AlphaMyrFactoryTests
     [Fact]
     public void AlphaMyr_IsVanilla_NoAbilities()
     {
-        var c = AlphaMyrFactory.Create(_alice);
+        var c = (Creature)NamedCardFactory.Create("Alpha Myr", _alice);
 
         c.Abilities.OfType<KeywordAbility>().Should().BeEmpty(
             "Alpha Myr is vanilla — no printed keywords");

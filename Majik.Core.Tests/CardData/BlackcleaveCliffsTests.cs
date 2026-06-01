@@ -24,7 +24,7 @@ public class BlackcleaveCliffsTests
     [Fact]
     public void BlackcleavCliffs_IsLand()
     {
-        var land = BlackcleaveCliffsFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Blackcleave Cliffs", _alice);
 
         land.HasType(CardType.Land).Should().BeTrue();
     }
@@ -32,7 +32,7 @@ public class BlackcleaveCliffsTests
     [Fact]
     public void BlackcleavCliffs_NameIsCorrect()
     {
-        var land = BlackcleaveCliffsFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Blackcleave Cliffs", _alice);
 
         land.Name.Should().Be("Blackcleave Cliffs");
     }
@@ -40,7 +40,7 @@ public class BlackcleaveCliffsTests
     [Fact]
     public void BlackcleavCliffs_OwnerAndControllerAreSet()
     {
-        var land = BlackcleaveCliffsFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Blackcleave Cliffs", _alice);
 
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
@@ -49,7 +49,7 @@ public class BlackcleaveCliffsTests
     [Fact]
     public void BlackcleavCliffs_IsNotLegendary()
     {
-        var land = BlackcleaveCliffsFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Blackcleave Cliffs", _alice);
 
         land.HasSupertype(CardSupertype.Legendary).Should().BeFalse();
     }
@@ -57,7 +57,7 @@ public class BlackcleaveCliffsTests
     [Fact]
     public void BlackcleavCliffs_HasTwoManaAbilities()
     {
-        var land = BlackcleaveCliffsFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Blackcleave Cliffs", _alice);
 
         land.Abilities.OfType<ManaAbility>().Should().HaveCount(2);
     }
@@ -65,7 +65,7 @@ public class BlackcleaveCliffsTests
     [Fact]
     public void BlackcleavCliffs_HasBlackManaAbility()
     {
-        var land = BlackcleaveCliffsFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Blackcleave Cliffs", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Black == 1 && m.ManaGenerated.Red == 0);
@@ -74,7 +74,7 @@ public class BlackcleaveCliffsTests
     [Fact]
     public void BlackcleavCliffs_HasRedManaAbility()
     {
-        var land = BlackcleaveCliffsFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Blackcleave Cliffs", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Red == 1 && m.ManaGenerated.Black == 0);
@@ -83,7 +83,7 @@ public class BlackcleaveCliffsTests
     [Fact]
     public void BlackcleavCliffs_HasNoTriggeredAbilities()
     {
-        var land = BlackcleaveCliffsFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Blackcleave Cliffs", _alice);
 
         land.Abilities.OfType<TriggeredAbility>().Should().BeEmpty(
             "ETB-tapped-unless-N-other-lands is a replacement effect, not a trigger");
@@ -92,7 +92,7 @@ public class BlackcleaveCliffsTests
     [Fact]
     public void BlackcleavCliffs_HasNoActivatedAbilities()
     {
-        var land = BlackcleaveCliffsFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Blackcleave Cliffs", _alice);
 
         land.Abilities.OfType<ActivatedAbility>().Should().BeEmpty();
     }

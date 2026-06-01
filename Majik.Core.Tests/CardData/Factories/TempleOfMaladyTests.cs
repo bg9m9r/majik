@@ -44,7 +44,7 @@ public class TempleOfMaladyTests
     [Fact]
     public void TempleOfMalady_IsLand_WithCorrectName()
     {
-        var land = TempleOfMaladyFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Temple of Malady", _alice);
 
         land.Name.Should().Be("Temple of Malady");
         land.HasType(CardType.Land).Should().BeTrue();
@@ -67,7 +67,7 @@ public class TempleOfMaladyTests
     [Fact]
     public void TempleOfMalady_HasManaAbility_ForBlack()
     {
-        var land = TempleOfMaladyFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Temple of Malady", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Black == 1 && m.ManaGenerated.Green == 0);
@@ -76,7 +76,7 @@ public class TempleOfMaladyTests
     [Fact]
     public void TempleOfMalady_HasManaAbility_ForGreen()
     {
-        var land = TempleOfMaladyFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Temple of Malady", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Green == 1 && m.ManaGenerated.Black == 0);
@@ -85,7 +85,7 @@ public class TempleOfMaladyTests
     [Fact]
     public void TempleOfMalady_EtbTrigger_IsBattlefieldActive()
     {
-        var land = TempleOfMaladyFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Temple of Malady", _alice);
         var trigger = land.Abilities.OfType<TriggeredAbility>().Single();
 
         trigger.ActiveZones.Should().Contain(ZoneType.Battlefield);
@@ -103,7 +103,7 @@ public class TempleOfMaladyTests
             c.SetZone(ZoneType.Library);
         }
 
-        var land = TempleOfMaladyFactory.Create(alice);
+        var land = (Land)NamedCardFactory.Create("Temple of Malady", alice);
         var etb = land.Abilities.OfType<TriggeredAbility>().Single();
         foreach (var effect in etb.Effects) effect.Execute();
 
@@ -118,7 +118,7 @@ public class TempleOfMaladyTests
     {
         var alice = new Player("Alice", 20);
 
-        var land = TempleOfMaladyFactory.Create(alice);
+        var land = (Land)NamedCardFactory.Create("Temple of Malady", alice);
         var etb = land.Abilities.OfType<TriggeredAbility>().Single();
         Action act = () =>
         {

@@ -1,3 +1,4 @@
+using Majik.Core.CardData;
 using FluentAssertions;
 using Majik.Core.Abilities;
 using Majik.Core.CardData.Factories;
@@ -25,7 +26,7 @@ public class LibrarySurveyorTests
     [Fact]
     public void LibrarySurveyor_IsCreature()
     {
-        var card = LibrarySurveyorFactory.Create(_alice);
+        var card = (Creature)NamedCardFactory.Create("Library Surveyor", _alice);
 
         card.HasType(CardType.Creature).Should().BeTrue();
     }
@@ -33,7 +34,7 @@ public class LibrarySurveyorTests
     [Fact]
     public void LibrarySurveyor_HasExpectedShape()
     {
-        var creature = LibrarySurveyorFactory.Create(_alice);
+        var creature = (Creature)NamedCardFactory.Create("Library Surveyor", _alice);
 
         creature.Name.Should().Be("Library Surveyor");
         creature.Owner.Should().BeSameAs(_alice);
@@ -47,7 +48,7 @@ public class LibrarySurveyorTests
     [Fact]
     public void LibrarySurveyor_HasSingleEtbTrigger_NoManaAbility()
     {
-        var creature = LibrarySurveyorFactory.Create(_alice);
+        var creature = (Creature)NamedCardFactory.Create("Library Surveyor", _alice);
 
         creature.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1);
         creature.Abilities.OfType<ManaAbility>().Should().BeEmpty();
@@ -66,7 +67,7 @@ public class LibrarySurveyorTests
             c.SetZone(ZoneType.Library);
         }
 
-        var creature = LibrarySurveyorFactory.Create(alice);
+        var creature = (Creature)NamedCardFactory.Create("Library Surveyor", alice);
         var etb = creature.Abilities.OfType<TriggeredAbility>().First();
         foreach (var effect in etb.Effects) effect.Execute();
 
@@ -81,7 +82,7 @@ public class LibrarySurveyorTests
     {
         var alice = new Player("Alice", 20);
 
-        var creature = LibrarySurveyorFactory.Create(alice);
+        var creature = (Creature)NamedCardFactory.Create("Library Surveyor", alice);
         var etb = creature.Abilities.OfType<TriggeredAbility>().First();
         Action act = () =>
         {

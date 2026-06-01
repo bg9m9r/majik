@@ -24,7 +24,7 @@ public class BloomingMarshTests
     [Fact]
     public void BloomingMarsh_IsLand()
     {
-        var land = BloomingMarshFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Blooming Marsh", _alice);
 
         land.HasType(CardType.Land).Should().BeTrue();
     }
@@ -32,7 +32,7 @@ public class BloomingMarshTests
     [Fact]
     public void BloomingMarsh_NameIsCorrect()
     {
-        var land = BloomingMarshFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Blooming Marsh", _alice);
 
         land.Name.Should().Be("Blooming Marsh");
     }
@@ -40,7 +40,7 @@ public class BloomingMarshTests
     [Fact]
     public void BloomingMarsh_OwnerAndControllerAreSet()
     {
-        var land = BloomingMarshFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Blooming Marsh", _alice);
 
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
@@ -49,7 +49,7 @@ public class BloomingMarshTests
     [Fact]
     public void BloomingMarsh_IsNotLegendary()
     {
-        var land = BloomingMarshFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Blooming Marsh", _alice);
 
         land.HasSupertype(CardSupertype.Legendary).Should().BeFalse();
     }
@@ -57,7 +57,7 @@ public class BloomingMarshTests
     [Fact]
     public void BloomingMarsh_HasTwoManaAbilities()
     {
-        var land = BloomingMarshFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Blooming Marsh", _alice);
 
         land.Abilities.OfType<ManaAbility>().Should().HaveCount(2);
     }
@@ -65,7 +65,7 @@ public class BloomingMarshTests
     [Fact]
     public void BloomingMarsh_HasBlackManaAbility()
     {
-        var land = BloomingMarshFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Blooming Marsh", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Black == 1 && m.ManaGenerated.Green == 0);
@@ -74,7 +74,7 @@ public class BloomingMarshTests
     [Fact]
     public void BloomingMarsh_HasGreenManaAbility()
     {
-        var land = BloomingMarshFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Blooming Marsh", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Green == 1 && m.ManaGenerated.Black == 0);
@@ -83,7 +83,7 @@ public class BloomingMarshTests
     [Fact]
     public void BloomingMarsh_HasNoTriggeredAbilities()
     {
-        var land = BloomingMarshFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Blooming Marsh", _alice);
 
         land.Abilities.OfType<TriggeredAbility>().Should().BeEmpty(
             "ETB-tapped-unless-N-other-lands is a replacement effect, not a trigger");
@@ -92,7 +92,7 @@ public class BloomingMarshTests
     [Fact]
     public void BloomingMarsh_HasNoActivatedAbilities()
     {
-        var land = BloomingMarshFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Blooming Marsh", _alice);
 
         land.Abilities.OfType<ActivatedAbility>().Should().BeEmpty();
     }

@@ -25,7 +25,7 @@ public class SeachromeCoastTests
     [Fact]
     public void SeachromeCoast_IsLand()
     {
-        var land = SeachromeCoastFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Seachrome Coast", _alice);
 
         land.HasType(CardType.Land).Should().BeTrue();
     }
@@ -33,7 +33,7 @@ public class SeachromeCoastTests
     [Fact]
     public void SeachromeCoast_NameIsCorrect()
     {
-        var land = SeachromeCoastFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Seachrome Coast", _alice);
 
         land.Name.Should().Be("Seachrome Coast");
     }
@@ -41,7 +41,7 @@ public class SeachromeCoastTests
     [Fact]
     public void SeachromeCoast_OwnerAndControllerAreSet()
     {
-        var land = SeachromeCoastFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Seachrome Coast", _alice);
 
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
@@ -50,7 +50,7 @@ public class SeachromeCoastTests
     [Fact]
     public void SeachromeCoast_IsNotLegendary()
     {
-        var land = SeachromeCoastFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Seachrome Coast", _alice);
 
         land.HasSupertype(CardSupertype.Legendary).Should().BeFalse();
     }
@@ -58,7 +58,7 @@ public class SeachromeCoastTests
     [Fact]
     public void SeachromeCoast_HasTwoManaAbilities()
     {
-        var land = SeachromeCoastFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Seachrome Coast", _alice);
 
         land.Abilities.OfType<ManaAbility>().Should().HaveCount(2);
     }
@@ -66,7 +66,7 @@ public class SeachromeCoastTests
     [Fact]
     public void SeachromeCoast_HasWhiteManaAbility()
     {
-        var land = SeachromeCoastFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Seachrome Coast", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.White == 1 && m.ManaGenerated.Blue == 0);
@@ -75,7 +75,7 @@ public class SeachromeCoastTests
     [Fact]
     public void SeachromeCoast_HasBlueManaAbility()
     {
-        var land = SeachromeCoastFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Seachrome Coast", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Blue == 1 && m.ManaGenerated.White == 0);
@@ -84,7 +84,7 @@ public class SeachromeCoastTests
     [Fact]
     public void SeachromeCoast_HasNoTriggeredAbilities()
     {
-        var land = SeachromeCoastFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Seachrome Coast", _alice);
 
         land.Abilities.OfType<TriggeredAbility>().Should().BeEmpty(
             "ETB-tapped-unless-N-other-lands is a replacement effect, not a trigger");
@@ -93,7 +93,7 @@ public class SeachromeCoastTests
     [Fact]
     public void SeachromeCoast_HasNoActivatedAbilities()
     {
-        var land = SeachromeCoastFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Seachrome Coast", _alice);
 
         land.Abilities.OfType<ActivatedAbility>().Should().BeEmpty();
     }

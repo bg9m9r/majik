@@ -50,7 +50,7 @@ public class PrismaticLensFactoryTests
     [Fact]
     public void PrismaticLens_IsArtifact_WithCorrectName()
     {
-        var lens = PrismaticLensFactory.Create(_alice);
+        var lens = (Artifact)NamedCardFactory.Create("Prismatic Lens", _alice);
 
         lens.Should().BeOfType<Artifact>();
         lens.Name.Should().Be("Prismatic Lens");
@@ -78,7 +78,7 @@ public class PrismaticLensFactoryTests
     [Fact]
     public void PrismaticLens_HasSixManaAbilities_OneColorlessAndFiveColored()
     {
-        var lens = PrismaticLensFactory.Create(_alice);
+        var lens = (Artifact)NamedCardFactory.Create("Prismatic Lens", _alice);
 
         var mana = lens.Abilities.OfType<ManaAbility>().ToList();
         mana.Should().HaveCount(
@@ -89,7 +89,7 @@ public class PrismaticLensFactoryTests
     [Fact]
     public void PrismaticLens_HasNoActivatedOrTriggeredAbilities()
     {
-        var lens = PrismaticLensFactory.Create(_alice);
+        var lens = (Artifact)NamedCardFactory.Create("Prismatic Lens", _alice);
 
         lens.Abilities.OfType<ActivatedAbility>().Should().BeEmpty(
             "the lens's only abilities are mana abilities");
@@ -99,7 +99,7 @@ public class PrismaticLensFactoryTests
     [Fact]
     public void PrismaticLens_HasOneAbilityProducingColorless()
     {
-        var lens = PrismaticLensFactory.Create(_alice);
+        var lens = (Artifact)NamedCardFactory.Create("Prismatic Lens", _alice);
 
         // {C} folds into the generic bucket per CR 107.4c (ManaCost.cs:170).
         var colorless = lens.Abilities.OfType<ManaAbility>()
@@ -113,7 +113,7 @@ public class PrismaticLensFactoryTests
     [Fact]
     public void PrismaticLens_HasOneAbilityPerColor_ProducingThatColor()
     {
-        var lens = PrismaticLensFactory.Create(_alice);
+        var lens = (Artifact)NamedCardFactory.Create("Prismatic Lens", _alice);
         var mana = lens.Abilities.OfType<ManaAbility>().ToList();
 
         mana.Count(a => a.ManaGenerated.White == 1).Should().Be(1);
@@ -130,7 +130,7 @@ public class PrismaticLensFactoryTests
     [Fact]
     public void PrismaticLens_ColorlessAbility_CanActivate_WithEmptyPool()
     {
-        var lens = PrismaticLensFactory.Create(_alice);
+        var lens = (Artifact)NamedCardFactory.Create("Prismatic Lens", _alice);
         var colorless = lens.Abilities.OfType<ManaAbility>()
             .Single(a => a.ManaGenerated.Generic == 1 && a.ManaGenerated.TotalValue == 1);
 
@@ -140,7 +140,7 @@ public class PrismaticLensFactoryTests
     [Fact]
     public void PrismaticLens_ColorlessActivation_AddsOneColorless_AndTapsSelf()
     {
-        var lens = PrismaticLensFactory.Create(_alice);
+        var lens = (Artifact)NamedCardFactory.Create("Prismatic Lens", _alice);
         var colorless = lens.Abilities.OfType<ManaAbility>()
             .Single(a => a.ManaGenerated.Generic == 1 && a.ManaGenerated.TotalValue == 1);
         var activator = new ManaAbilityActivator();
@@ -164,7 +164,7 @@ public class PrismaticLensFactoryTests
     [Fact]
     public void PrismaticLens_ColoredAbilities_CannotActivate_WithEmptyPool()
     {
-        var lens = PrismaticLensFactory.Create(_alice);
+        var lens = (Artifact)NamedCardFactory.Create("Prismatic Lens", _alice);
         var colored = lens.Abilities.OfType<ManaAbility>()
             .Where(a => a.ManaGenerated.TotalValue == 1 && a.ManaGenerated.Generic == 0);
 
@@ -178,7 +178,7 @@ public class PrismaticLensFactoryTests
     [Fact]
     public void PrismaticLens_ColoredAbilities_CanActivate_WithOneGenericInPool()
     {
-        var lens = PrismaticLensFactory.Create(_alice);
+        var lens = (Artifact)NamedCardFactory.Create("Prismatic Lens", _alice);
         _alice.AddManaToPool(ManaCost.Parse("1"));
         var colored = lens.Abilities.OfType<ManaAbility>()
             .Where(a => a.ManaGenerated.TotalValue == 1 && a.ManaGenerated.Generic == 0);
@@ -192,7 +192,7 @@ public class PrismaticLensFactoryTests
     [Fact]
     public void PrismaticLens_BlueActivation_PaysOneGeneric_TapsSelf_AndAddsBlue()
     {
-        var lens = PrismaticLensFactory.Create(_alice);
+        var lens = (Artifact)NamedCardFactory.Create("Prismatic Lens", _alice);
         _alice.AddManaToPool(ManaCost.Parse("1"));
         var blue = lens.Abilities.OfType<ManaAbility>()
             .Single(a => a.ManaGenerated.Blue == 1);
@@ -216,7 +216,7 @@ public class PrismaticLensFactoryTests
     [Fact]
     public void PrismaticLens_NoAbilityCanActivate_WhenTapped()
     {
-        var lens = PrismaticLensFactory.Create(_alice);
+        var lens = (Artifact)NamedCardFactory.Create("Prismatic Lens", _alice);
         // Plenty of mana so any rejection is solely from the tap state.
         _alice.AddManaToPool(ManaCost.Parse("5"));
         var colorless = lens.Abilities.OfType<ManaAbility>()

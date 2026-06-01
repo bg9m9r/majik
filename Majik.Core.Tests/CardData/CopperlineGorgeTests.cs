@@ -25,7 +25,7 @@ public class CopperlineGorgeTests
     [Fact]
     public void CopperlineGorge_IsLand()
     {
-        var land = CopperlineGorgeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Copperline Gorge", _alice);
 
         land.HasType(CardType.Land).Should().BeTrue();
     }
@@ -33,7 +33,7 @@ public class CopperlineGorgeTests
     [Fact]
     public void CopperlineGorge_NameIsCorrect()
     {
-        var land = CopperlineGorgeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Copperline Gorge", _alice);
 
         land.Name.Should().Be("Copperline Gorge");
     }
@@ -41,7 +41,7 @@ public class CopperlineGorgeTests
     [Fact]
     public void CopperlineGorge_OwnerAndControllerAreSet()
     {
-        var land = CopperlineGorgeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Copperline Gorge", _alice);
 
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
@@ -50,7 +50,7 @@ public class CopperlineGorgeTests
     [Fact]
     public void CopperlineGorge_IsNotLegendary()
     {
-        var land = CopperlineGorgeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Copperline Gorge", _alice);
 
         land.HasSupertype(CardSupertype.Legendary).Should().BeFalse();
     }
@@ -58,7 +58,7 @@ public class CopperlineGorgeTests
     [Fact]
     public void CopperlineGorge_HasTwoManaAbilities()
     {
-        var land = CopperlineGorgeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Copperline Gorge", _alice);
 
         land.Abilities.OfType<ManaAbility>().Should().HaveCount(2);
     }
@@ -66,7 +66,7 @@ public class CopperlineGorgeTests
     [Fact]
     public void CopperlineGorge_HasRedManaAbility()
     {
-        var land = CopperlineGorgeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Copperline Gorge", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Red == 1 && m.ManaGenerated.Green == 0);
@@ -75,7 +75,7 @@ public class CopperlineGorgeTests
     [Fact]
     public void CopperlineGorge_HasGreenManaAbility()
     {
-        var land = CopperlineGorgeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Copperline Gorge", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Green == 1 && m.ManaGenerated.Red == 0);
@@ -84,7 +84,7 @@ public class CopperlineGorgeTests
     [Fact]
     public void CopperlineGorge_HasNoTriggeredAbilities()
     {
-        var land = CopperlineGorgeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Copperline Gorge", _alice);
 
         land.Abilities.OfType<TriggeredAbility>().Should().BeEmpty(
             "ETB-tapped-unless-N-other-lands is a replacement effect, not a trigger");
@@ -93,7 +93,7 @@ public class CopperlineGorgeTests
     [Fact]
     public void CopperlineGorge_HasNoActivatedAbilities()
     {
-        var land = CopperlineGorgeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Copperline Gorge", _alice);
 
         land.Abilities.OfType<ActivatedAbility>().Should().BeEmpty();
     }

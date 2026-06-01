@@ -41,7 +41,7 @@ public class IzzetSignetFactoryTests
     [Fact]
     public void IzzetSignet_IsArtifact_WithCorrectName()
     {
-        var signet = IzzetSignetFactory.Create(_alice);
+        var signet = (Artifact)NamedCardFactory.Create("Izzet Signet", _alice);
 
         signet.Should().BeOfType<Artifact>();
         signet.Name.Should().Be("Izzet Signet");
@@ -69,7 +69,7 @@ public class IzzetSignetFactoryTests
     [Fact]
     public void IzzetSignet_HasExactlyOneManaAbility_ProducingUR()
     {
-        var signet = IzzetSignetFactory.Create(_alice);
+        var signet = (Artifact)NamedCardFactory.Create("Izzet Signet", _alice);
 
         var mana = signet.Abilities.OfType<ManaAbility>().ToList();
         mana.Should().HaveCount(1, "{1}, {T}: Add {U}{R} is a single mana ability");
@@ -86,7 +86,7 @@ public class IzzetSignetFactoryTests
     [Fact]
     public void IzzetSignet_HasNoActivatedOrTriggeredAbilities()
     {
-        var signet = IzzetSignetFactory.Create(_alice);
+        var signet = (Artifact)NamedCardFactory.Create("Izzet Signet", _alice);
 
         signet.Abilities.OfType<ActivatedAbility>().Should().BeEmpty(
             "the signet's only ability is a mana ability");
@@ -100,7 +100,7 @@ public class IzzetSignetFactoryTests
     [Fact]
     public void IzzetSignet_CannotActivate_WithEmptyPool()
     {
-        var signet = IzzetSignetFactory.Create(_alice);
+        var signet = (Artifact)NamedCardFactory.Create("Izzet Signet", _alice);
         var mana = signet.Abilities.OfType<ManaAbility>().Single();
 
         mana.CanActivate().Should().BeFalse("the {1} additional cost cannot be paid from an empty pool");
@@ -109,7 +109,7 @@ public class IzzetSignetFactoryTests
     [Fact]
     public void IzzetSignet_CanActivate_WithOneGenericInPool()
     {
-        var signet = IzzetSignetFactory.Create(_alice);
+        var signet = (Artifact)NamedCardFactory.Create("Izzet Signet", _alice);
         _alice.AddManaToPool(ManaCost.Parse("1"));
         var mana = signet.Abilities.OfType<ManaAbility>().Single();
 
@@ -119,7 +119,7 @@ public class IzzetSignetFactoryTests
     [Fact]
     public void IzzetSignet_Activation_PaysOneGeneric_TapsSelf_AndAddsUR()
     {
-        var signet = IzzetSignetFactory.Create(_alice);
+        var signet = (Artifact)NamedCardFactory.Create("Izzet Signet", _alice);
         // Seed pool with {1} (the signet's additional cost).
         _alice.AddManaToPool(ManaCost.Parse("1"));
         var mana = signet.Abilities.OfType<ManaAbility>().Single();
@@ -144,7 +144,7 @@ public class IzzetSignetFactoryTests
     [Fact]
     public void IzzetSignet_CannotActivate_WhenTapped()
     {
-        var signet = IzzetSignetFactory.Create(_alice);
+        var signet = (Artifact)NamedCardFactory.Create("Izzet Signet", _alice);
         _alice.AddManaToPool(ManaCost.Parse("1"));
         var mana = signet.Abilities.OfType<ManaAbility>().Single();
         var activator = new ManaAbilityActivator();

@@ -25,7 +25,7 @@ public class SundownPassTests
     [Fact]
     public void SundownPass_IsLand()
     {
-        var land = SundownPassFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Sundown Pass", _alice);
 
         land.HasType(CardType.Land).Should().BeTrue();
     }
@@ -33,7 +33,7 @@ public class SundownPassTests
     [Fact]
     public void SundownPass_NameIsCorrect()
     {
-        var land = SundownPassFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Sundown Pass", _alice);
 
         land.Name.Should().Be("Sundown Pass");
     }
@@ -41,7 +41,7 @@ public class SundownPassTests
     [Fact]
     public void SundownPass_OwnerAndControllerAreSet()
     {
-        var land = SundownPassFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Sundown Pass", _alice);
 
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
@@ -50,7 +50,7 @@ public class SundownPassTests
     [Fact]
     public void SundownPass_IsNotLegendary()
     {
-        var land = SundownPassFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Sundown Pass", _alice);
 
         land.HasSupertype(CardSupertype.Legendary).Should().BeFalse();
     }
@@ -58,7 +58,7 @@ public class SundownPassTests
     [Fact]
     public void SundownPass_HasTwoManaAbilities()
     {
-        var land = SundownPassFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Sundown Pass", _alice);
 
         land.Abilities.OfType<ManaAbility>().Should().HaveCount(2);
     }
@@ -66,7 +66,7 @@ public class SundownPassTests
     [Fact]
     public void SundownPass_HasRedManaAbility()
     {
-        var land = SundownPassFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Sundown Pass", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Red == 1 && m.ManaGenerated.White == 0);
@@ -75,7 +75,7 @@ public class SundownPassTests
     [Fact]
     public void SundownPass_HasWhiteManaAbility()
     {
-        var land = SundownPassFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Sundown Pass", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.White == 1 && m.ManaGenerated.Red == 0);
@@ -84,7 +84,7 @@ public class SundownPassTests
     [Fact]
     public void SundownPass_HasNoTriggeredAbilities()
     {
-        var land = SundownPassFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Sundown Pass", _alice);
 
         land.Abilities.OfType<TriggeredAbility>().Should().BeEmpty(
             "ETB-tapped-unless-N-other-lands is a replacement effect, not a trigger");
@@ -93,7 +93,7 @@ public class SundownPassTests
     [Fact]
     public void SundownPass_HasNoActivatedAbilities()
     {
-        var land = SundownPassFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Sundown Pass", _alice);
 
         land.Abilities.OfType<ActivatedAbility>().Should().BeEmpty();
     }

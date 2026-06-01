@@ -43,7 +43,7 @@ public class CrystalGrottoTests
     [Fact]
     public void CrystalGrotto_IsLand_WithCorrectName()
     {
-        var land = CrystalGrottoFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Crystal Grotto", _alice);
 
         land.Name.Should().Be("Crystal Grotto");
         land.HasType(CardType.Land).Should().BeTrue();
@@ -55,7 +55,7 @@ public class CrystalGrottoTests
     [Fact]
     public void CrystalGrotto_IsNotBasic()
     {
-        var land = CrystalGrottoFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Crystal Grotto", _alice);
 
         land.HasSupertype(CardSupertype.Basic).Should().BeFalse();
     }
@@ -75,7 +75,7 @@ public class CrystalGrottoTests
     [Fact]
     public void CrystalGrotto_HasColorlessManaAbility_NoCost()
     {
-        var land = CrystalGrottoFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Crystal Grotto", _alice);
 
         // {T}: Add {C}. {C} parses to one generic-mana pip; the colourless
         // ability has no WUBRG component. It must be activatable with an
@@ -94,7 +94,7 @@ public class CrystalGrottoTests
     [InlineData("G")]
     public void CrystalGrotto_HasAnyColorManaAbility_PerColor(string color)
     {
-        var land = CrystalGrottoFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Crystal Grotto", _alice);
         var match = ManaCost.Parse(color);
 
         land.Abilities.OfType<ManaAbility>().Should().ContainSingle(m =>
@@ -113,7 +113,7 @@ public class CrystalGrottoTests
         // pool the any-colour modes can't be activated; once {1} is in the
         // pool they can. Mirrors the signet / filter-land posture.
         var alice = new Player("Alice", 20);
-        var land = CrystalGrottoFactory.Create(alice);
+        var land = (Land)NamedCardFactory.Create("Crystal Grotto", alice);
         var white = FindAnyColorAbility(land, "W");
 
         white.CanActivate().Should().BeFalse(
@@ -127,7 +127,7 @@ public class CrystalGrottoTests
     [Fact]
     public void CrystalGrotto_EtbTrigger_IsBattlefieldActive()
     {
-        var land = CrystalGrottoFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Crystal Grotto", _alice);
         var trigger = land.Abilities.OfType<TriggeredAbility>().Single();
 
         trigger.ActiveZones.Should().Contain(ZoneType.Battlefield);
@@ -145,7 +145,7 @@ public class CrystalGrottoTests
             c.SetZone(ZoneType.Library);
         }
 
-        var land = CrystalGrottoFactory.Create(alice);
+        var land = (Land)NamedCardFactory.Create("Crystal Grotto", alice);
         var etb = land.Abilities.OfType<TriggeredAbility>().Single();
         foreach (var effect in etb.Effects) effect.Execute();
 
@@ -160,7 +160,7 @@ public class CrystalGrottoTests
     {
         var alice = new Player("Alice", 20);
 
-        var land = CrystalGrottoFactory.Create(alice);
+        var land = (Land)NamedCardFactory.Create("Crystal Grotto", alice);
         var etb = land.Abilities.OfType<TriggeredAbility>().Single();
         Action act = () =>
         {

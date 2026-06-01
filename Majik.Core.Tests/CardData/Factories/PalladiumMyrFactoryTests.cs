@@ -37,7 +37,7 @@ public class PalladiumMyrFactoryTests
     [Fact]
     public void PalladiumMyr_Identity()
     {
-        var c = PalladiumMyrFactory.Create(_alice);
+        var c = (Creature)NamedCardFactory.Create("Palladium Myr", _alice);
 
         c.Name.Should().Be("Palladium Myr");
         c.ManaCost.Should().Be("{4}");
@@ -71,7 +71,7 @@ public class PalladiumMyrFactoryTests
     [Fact]
     public void PalladiumMyr_TapForColorless_TapsCreatureAndProducesTwoGeneric()
     {
-        var c = PalladiumMyrFactory.Create(_alice);
+        var c = (Creature)NamedCardFactory.Create("Palladium Myr", _alice);
         // CR 302.6 — clear summoning sickness so this test exercises the
         // {T}: Add {C}{C} mana production rather than the sickness gate.
         c.ClearSummoningSickness();
@@ -98,7 +98,7 @@ public class PalladiumMyrFactoryTests
     [Fact]
     public void PalladiumMyr_ManaAbility_CannotActivateWhileTapped()
     {
-        var c = PalladiumMyrFactory.Create(_alice);
+        var c = (Creature)NamedCardFactory.Create("Palladium Myr", _alice);
         // CR 302.6 — clear summoning sickness so the first activation is legal
         // and the test asserts the !IsTapped re-activation gate specifically.
         c.ClearSummoningSickness();

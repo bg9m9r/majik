@@ -45,7 +45,7 @@ public class FloodfarmVergeTests
     [Fact]
     public void FloodfarmVerge_IsLand()
     {
-        var land = FloodfarmVergeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Floodfarm Verge", _alice);
 
         land.HasType(CardType.Land).Should().BeTrue();
     }
@@ -53,7 +53,7 @@ public class FloodfarmVergeTests
     [Fact]
     public void FloodfarmVerge_NameIsCorrect()
     {
-        var land = FloodfarmVergeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Floodfarm Verge", _alice);
 
         land.Name.Should().Be("Floodfarm Verge");
     }
@@ -61,7 +61,7 @@ public class FloodfarmVergeTests
     [Fact]
     public void FloodfarmVerge_IsNotLegendary()
     {
-        var land = FloodfarmVergeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Floodfarm Verge", _alice);
 
         land.HasSupertype(CardSupertype.Legendary).Should().BeFalse();
     }
@@ -69,7 +69,7 @@ public class FloodfarmVergeTests
     [Fact]
     public void FloodfarmVerge_OwnerAndControllerAreSet()
     {
-        var land = FloodfarmVergeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Floodfarm Verge", _alice);
 
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
@@ -82,7 +82,7 @@ public class FloodfarmVergeTests
     [Fact]
     public void FloodfarmVerge_HasExactlyTwoManaAbilities()
     {
-        var land = FloodfarmVergeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Floodfarm Verge", _alice);
 
         land.Abilities.OfType<ManaAbility>().Should().HaveCount(2,
             "one for {W} and one for {U}");
@@ -91,7 +91,7 @@ public class FloodfarmVergeTests
     [Fact]
     public void FloodfarmVerge_HasWhiteManaAbility()
     {
-        var land = FloodfarmVergeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Floodfarm Verge", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.White == 1 && m.ManaGenerated.Blue == 0,
@@ -101,7 +101,7 @@ public class FloodfarmVergeTests
     [Fact]
     public void FloodfarmVerge_HasBlueManaAbility()
     {
-        var land = FloodfarmVergeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Floodfarm Verge", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Blue == 1 && m.ManaGenerated.White == 0,
@@ -111,7 +111,7 @@ public class FloodfarmVergeTests
     [Fact]
     public void FloodfarmVerge_WhiteManaAbility_ProducesOnlyWhite()
     {
-        var land = FloodfarmVergeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Floodfarm Verge", _alice);
         var white = land.Abilities.OfType<ManaAbility>().Single(m => m.ManaGenerated.White == 1);
 
         white.ManaGenerated.Generic.Should().Be(0);
@@ -124,7 +124,7 @@ public class FloodfarmVergeTests
     [Fact]
     public void FloodfarmVerge_BlueManaAbility_ProducesOnlyBlue()
     {
-        var land = FloodfarmVergeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Floodfarm Verge", _alice);
         var blue = land.Abilities.OfType<ManaAbility>().Single(m => m.ManaGenerated.Blue == 1);
 
         blue.ManaGenerated.Generic.Should().Be(0);
@@ -137,7 +137,7 @@ public class FloodfarmVergeTests
     [Fact]
     public void FloodfarmVerge_HasNoTriggeredAbilities()
     {
-        var land = FloodfarmVergeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Floodfarm Verge", _alice);
 
         land.Abilities.OfType<TriggeredAbility>().Should().BeEmpty(
             "Floodfarm Verge has no triggered abilities");
@@ -146,7 +146,7 @@ public class FloodfarmVergeTests
     [Fact]
     public void FloodfarmVerge_HasNoActivatedAbilities()
     {
-        var land = FloodfarmVergeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Floodfarm Verge", _alice);
 
         land.Abilities.OfType<ActivatedAbility>().Should().BeEmpty(
             "Floodfarm Verge has no non-mana activated abilities in v1");

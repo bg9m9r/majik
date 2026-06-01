@@ -37,7 +37,7 @@ public class RockfallValeTests
     [Fact]
     public void RockfallVale_IsLand()
     {
-        var land = RockfallValeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Rockfall Vale", _alice);
 
         land.HasType(CardType.Land).Should().BeTrue();
     }
@@ -45,7 +45,7 @@ public class RockfallValeTests
     [Fact]
     public void RockfallVale_NameIsCorrect()
     {
-        var land = RockfallValeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Rockfall Vale", _alice);
 
         land.Name.Should().Be("Rockfall Vale");
     }
@@ -53,7 +53,7 @@ public class RockfallValeTests
     [Fact]
     public void RockfallVale_OwnerAndControllerAreSet()
     {
-        var land = RockfallValeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Rockfall Vale", _alice);
 
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
@@ -62,7 +62,7 @@ public class RockfallValeTests
     [Fact]
     public void RockfallVale_IsNotLegendary()
     {
-        var land = RockfallValeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Rockfall Vale", _alice);
 
         land.HasSupertype(CardSupertype.Legendary).Should().BeFalse();
     }
@@ -70,7 +70,7 @@ public class RockfallValeTests
     [Fact]
     public void RockfallVale_HasTwoManaAbilities()
     {
-        var land = RockfallValeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Rockfall Vale", _alice);
 
         land.Abilities.OfType<ManaAbility>().Should().HaveCount(2);
     }
@@ -78,7 +78,7 @@ public class RockfallValeTests
     [Fact]
     public void RockfallVale_HasRedManaAbility()
     {
-        var land = RockfallValeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Rockfall Vale", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Red == 1 && m.ManaGenerated.Green == 0);
@@ -87,7 +87,7 @@ public class RockfallValeTests
     [Fact]
     public void RockfallVale_HasGreenManaAbility()
     {
-        var land = RockfallValeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Rockfall Vale", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Green == 1 && m.ManaGenerated.Red == 0);
@@ -96,7 +96,7 @@ public class RockfallValeTests
     [Fact]
     public void RockfallVale_HasNoTriggeredAbilities()
     {
-        var land = RockfallValeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Rockfall Vale", _alice);
 
         land.Abilities.OfType<TriggeredAbility>().Should().BeEmpty(
             "ETB-tapped-unless-two-or-more-other-lands is a replacement effect, not a trigger");
@@ -105,7 +105,7 @@ public class RockfallValeTests
     [Fact]
     public void RockfallVale_HasNoActivatedAbilities()
     {
-        var land = RockfallValeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Rockfall Vale", _alice);
 
         land.Abilities.OfType<ActivatedAbility>().Should().BeEmpty();
     }
@@ -129,7 +129,7 @@ public class RockfallValeTests
     public void RockfallVale_BinderRegistersReplacement_ForTwoOrMoreClause()
     {
         var bus = new ReplacementBus();
-        var land = RockfallValeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Rockfall Vale", _alice);
         var entity = new CardEntity
         {
             Name = "Rockfall Vale",
@@ -182,7 +182,7 @@ public class RockfallValeTests
         var rep = new ReplacementBus();
         var zones = new ZoneService(eventBus, rep);
         var alice = new Player("Alice", 20);
-        var land = RockfallValeFactory.Create(alice);
+        var land = (Land)NamedCardFactory.Create("Rockfall Vale", alice);
         alice.Zones.Hand.AddCard(land);
         land.SetZone(ZoneType.Hand);
         var entity = new CardEntity { Name = "Rockfall Vale", OracleText = OracleText, TypeLine = "Land" };

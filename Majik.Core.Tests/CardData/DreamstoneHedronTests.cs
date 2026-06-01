@@ -39,7 +39,7 @@ public class DreamstoneHedronTests
     [Fact]
     public void DreamstoneHedron_IsArtifact_SixCost()
     {
-        var hedron = DreamstoneHedronFactory.Create(_alice);
+        var hedron = (Artifact)NamedCardFactory.Create("Dreamstone Hedron", _alice);
 
         hedron.Name.Should().Be("Dreamstone Hedron");
         hedron.HasType(CardType.Artifact).Should().BeTrue();
@@ -66,7 +66,7 @@ public class DreamstoneHedronTests
     [Fact]
     public void DreamstoneHedron_HasOneManaAbility_AndOneActivatedAbility()
     {
-        var hedron = DreamstoneHedronFactory.Create(_alice);
+        var hedron = (Artifact)NamedCardFactory.Create("Dreamstone Hedron", _alice);
 
         hedron.Abilities.OfType<ManaAbility>().Should().HaveCount(1);
         hedron.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1);
@@ -75,7 +75,7 @@ public class DreamstoneHedronTests
     [Fact]
     public void TapForColorless_ProducesThreeGeneric()
     {
-        var hedron = DreamstoneHedronFactory.Create(_alice);
+        var hedron = (Artifact)NamedCardFactory.Create("Dreamstone Hedron", _alice);
         var ma = hedron.Abilities.OfType<ManaAbility>().Single();
 
         // {C}{C}{C} folds into the generic bucket via ManaCost.Parse (CR 107.4c).
@@ -85,7 +85,7 @@ public class DreamstoneHedronTests
     [Fact]
     public void DrawAbility_Has_ThreeMana_Tap_AndSacrifice_NoTargets()
     {
-        var hedron = DreamstoneHedronFactory.Create(_alice);
+        var hedron = (Artifact)NamedCardFactory.Create("Dreamstone Hedron", _alice);
 
         var draw = hedron.Abilities.OfType<ActivatedAbility>().Single();
 
@@ -119,7 +119,7 @@ public class DreamstoneHedronTests
             drawn.Add(c);
         }
 
-        var hedron = DreamstoneHedronFactory.Create(_alice);
+        var hedron = (Artifact)NamedCardFactory.Create("Dreamstone Hedron", _alice);
         _alice.Zones.Battlefield.AddCard(hedron);
         hedron.SetZone(ZoneType.Battlefield);
 
@@ -149,7 +149,7 @@ public class DreamstoneHedronTests
     [Fact]
     public void Activate_Cantrip_EmptyLibrary_NoDraw_StillSacrifices()
     {
-        var hedron = DreamstoneHedronFactory.Create(_alice);
+        var hedron = (Artifact)NamedCardFactory.Create("Dreamstone Hedron", _alice);
         _alice.Zones.Battlefield.AddCard(hedron);
         hedron.SetZone(ZoneType.Battlefield);
 

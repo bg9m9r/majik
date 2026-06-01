@@ -26,7 +26,7 @@ public class DesertedBeachTests
     [Fact]
     public void DesertedBeach_IsLand()
     {
-        var land = DesertedBeachFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Deserted Beach", _alice);
 
         land.HasType(CardType.Land).Should().BeTrue();
     }
@@ -34,7 +34,7 @@ public class DesertedBeachTests
     [Fact]
     public void DesertedBeach_NameIsCorrect()
     {
-        var land = DesertedBeachFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Deserted Beach", _alice);
 
         land.Name.Should().Be("Deserted Beach");
     }
@@ -42,7 +42,7 @@ public class DesertedBeachTests
     [Fact]
     public void DesertedBeach_OwnerAndControllerAreSet()
     {
-        var land = DesertedBeachFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Deserted Beach", _alice);
 
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
@@ -51,7 +51,7 @@ public class DesertedBeachTests
     [Fact]
     public void DesertedBeach_IsNotLegendary()
     {
-        var land = DesertedBeachFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Deserted Beach", _alice);
 
         land.HasSupertype(CardSupertype.Legendary).Should().BeFalse();
     }
@@ -59,7 +59,7 @@ public class DesertedBeachTests
     [Fact]
     public void DesertedBeach_HasTwoManaAbilities()
     {
-        var land = DesertedBeachFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Deserted Beach", _alice);
 
         land.Abilities.OfType<ManaAbility>().Should().HaveCount(2);
     }
@@ -67,7 +67,7 @@ public class DesertedBeachTests
     [Fact]
     public void DesertedBeach_HasWhiteManaAbility()
     {
-        var land = DesertedBeachFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Deserted Beach", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.White == 1 && m.ManaGenerated.Blue == 0);
@@ -76,7 +76,7 @@ public class DesertedBeachTests
     [Fact]
     public void DesertedBeach_HasBlueManaAbility()
     {
-        var land = DesertedBeachFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Deserted Beach", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Blue == 1 && m.ManaGenerated.White == 0);
@@ -85,7 +85,7 @@ public class DesertedBeachTests
     [Fact]
     public void DesertedBeach_HasNoTriggeredAbilities()
     {
-        var land = DesertedBeachFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Deserted Beach", _alice);
 
         land.Abilities.OfType<TriggeredAbility>().Should().BeEmpty(
             "ETB-tapped-unless-N-other-lands is a replacement effect, not a trigger");
@@ -94,7 +94,7 @@ public class DesertedBeachTests
     [Fact]
     public void DesertedBeach_HasNoActivatedAbilities()
     {
-        var land = DesertedBeachFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Deserted Beach", _alice);
 
         land.Abilities.OfType<ActivatedAbility>().Should().BeEmpty();
     }

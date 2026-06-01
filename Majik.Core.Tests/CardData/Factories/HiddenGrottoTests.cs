@@ -41,7 +41,7 @@ public class HiddenGrottoTests
     [Fact]
     public void HiddenGrotto_IsLand_WithCorrectName()
     {
-        var land = HiddenGrottoFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Hidden Grotto", _alice);
 
         land.Name.Should().Be("Hidden Grotto");
         land.HasType(CardType.Land).Should().BeTrue();
@@ -53,7 +53,7 @@ public class HiddenGrottoTests
     [Fact]
     public void HiddenGrotto_IsNotBasic()
     {
-        var land = HiddenGrottoFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Hidden Grotto", _alice);
 
         land.HasSupertype(CardSupertype.Basic).Should().BeFalse();
     }
@@ -73,7 +73,7 @@ public class HiddenGrottoTests
     [Fact]
     public void HiddenGrotto_HasColorlessManaAbility_NoCost()
     {
-        var land = HiddenGrottoFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Hidden Grotto", _alice);
 
         // {T}: Add {C}. {C} parses to one generic-mana pip; the colourless
         // ability has no WUBRG component. It must be activatable with an
@@ -92,7 +92,7 @@ public class HiddenGrottoTests
     [InlineData("G")]
     public void HiddenGrotto_HasAnyColorManaAbility_PerColor(string color)
     {
-        var land = HiddenGrottoFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Hidden Grotto", _alice);
         var match = ManaCost.Parse(color);
 
         land.Abilities.OfType<ManaAbility>().Should().ContainSingle(m =>
@@ -111,7 +111,7 @@ public class HiddenGrottoTests
         // pool the any-colour modes can't be activated; once {1} is in the
         // pool they can. Mirrors the signet / filter-land posture.
         var alice = new Player("Alice", 20);
-        var land = HiddenGrottoFactory.Create(alice);
+        var land = (Land)NamedCardFactory.Create("Hidden Grotto", alice);
         var white = FindAnyColorAbility(land, "W");
 
         white.CanActivate().Should().BeFalse(
@@ -125,7 +125,7 @@ public class HiddenGrottoTests
     [Fact]
     public void HiddenGrotto_EtbTrigger_IsBattlefieldActive()
     {
-        var land = HiddenGrottoFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Hidden Grotto", _alice);
         var trigger = land.Abilities.OfType<TriggeredAbility>().Single();
 
         trigger.ActiveZones.Should().Contain(ZoneType.Battlefield);
@@ -143,7 +143,7 @@ public class HiddenGrottoTests
             c.SetZone(ZoneType.Library);
         }
 
-        var land = HiddenGrottoFactory.Create(alice);
+        var land = (Land)NamedCardFactory.Create("Hidden Grotto", alice);
         var etb = land.Abilities.OfType<TriggeredAbility>().Single();
         foreach (var effect in etb.Effects) effect.Execute();
 
@@ -159,7 +159,7 @@ public class HiddenGrottoTests
     {
         var alice = new Player("Alice", 20);
 
-        var land = HiddenGrottoFactory.Create(alice);
+        var land = (Land)NamedCardFactory.Create("Hidden Grotto", alice);
         var etb = land.Abilities.OfType<TriggeredAbility>().Single();
         Action act = () =>
         {

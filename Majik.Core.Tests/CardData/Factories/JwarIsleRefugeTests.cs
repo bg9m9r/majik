@@ -46,7 +46,7 @@ public class JwarIsleRefugeTests
     [Fact]
     public void JwarIsleRefuge_IsLand_WithCorrectName()
     {
-        var land = JwarIsleRefugeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Jwar Isle Refuge", _alice);
 
         land.Name.Should().Be("Jwar Isle Refuge");
         land.HasType(CardType.Land).Should().BeTrue();
@@ -70,7 +70,7 @@ public class JwarIsleRefugeTests
     [Fact]
     public void JwarIsleRefuge_HasManaAbility_ForBlue()
     {
-        var land = JwarIsleRefugeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Jwar Isle Refuge", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Blue == 1 && m.ManaGenerated.Black == 0);
@@ -79,7 +79,7 @@ public class JwarIsleRefugeTests
     [Fact]
     public void JwarIsleRefuge_HasManaAbility_ForBlack()
     {
-        var land = JwarIsleRefugeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Jwar Isle Refuge", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Black == 1 && m.ManaGenerated.Blue == 0);
@@ -88,7 +88,7 @@ public class JwarIsleRefugeTests
     [Fact]
     public void JwarIsleRefuge_EtbTrigger_IsBattlefieldActive()
     {
-        var land = JwarIsleRefugeFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Jwar Isle Refuge", _alice);
         var trigger = land.Abilities.OfType<TriggeredAbility>().Single();
 
         trigger.ActiveZones.Should().Contain(ZoneType.Battlefield);
@@ -99,7 +99,7 @@ public class JwarIsleRefugeTests
     {
         var alice = new Player("Alice", 20);
 
-        var land = JwarIsleRefugeFactory.Create(alice);
+        var land = (Land)NamedCardFactory.Create("Jwar Isle Refuge", alice);
         var etb = land.Abilities.OfType<TriggeredAbility>().Single();
         foreach (var effect in etb.Effects) effect.Execute();
 

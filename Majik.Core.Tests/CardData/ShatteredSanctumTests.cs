@@ -26,7 +26,7 @@ public class ShatteredSanctumTests
     [Fact]
     public void ShatteredSanctum_IsLand()
     {
-        var land = ShatteredSanctumFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Shattered Sanctum", _alice);
 
         land.HasType(CardType.Land).Should().BeTrue();
     }
@@ -34,7 +34,7 @@ public class ShatteredSanctumTests
     [Fact]
     public void ShatteredSanctum_NameIsCorrect()
     {
-        var land = ShatteredSanctumFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Shattered Sanctum", _alice);
 
         land.Name.Should().Be("Shattered Sanctum");
     }
@@ -42,7 +42,7 @@ public class ShatteredSanctumTests
     [Fact]
     public void ShatteredSanctum_OwnerAndControllerAreSet()
     {
-        var land = ShatteredSanctumFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Shattered Sanctum", _alice);
 
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
@@ -51,7 +51,7 @@ public class ShatteredSanctumTests
     [Fact]
     public void ShatteredSanctum_IsNotLegendary()
     {
-        var land = ShatteredSanctumFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Shattered Sanctum", _alice);
 
         land.HasSupertype(CardSupertype.Legendary).Should().BeFalse();
     }
@@ -59,7 +59,7 @@ public class ShatteredSanctumTests
     [Fact]
     public void ShatteredSanctum_HasTwoManaAbilities()
     {
-        var land = ShatteredSanctumFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Shattered Sanctum", _alice);
 
         land.Abilities.OfType<ManaAbility>().Should().HaveCount(2);
     }
@@ -67,7 +67,7 @@ public class ShatteredSanctumTests
     [Fact]
     public void ShatteredSanctum_HasWhiteManaAbility()
     {
-        var land = ShatteredSanctumFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Shattered Sanctum", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.White == 1 && m.ManaGenerated.Black == 0);
@@ -76,7 +76,7 @@ public class ShatteredSanctumTests
     [Fact]
     public void ShatteredSanctum_HasBlackManaAbility()
     {
-        var land = ShatteredSanctumFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Shattered Sanctum", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Black == 1 && m.ManaGenerated.White == 0);
@@ -85,7 +85,7 @@ public class ShatteredSanctumTests
     [Fact]
     public void ShatteredSanctum_HasNoTriggeredAbilities()
     {
-        var land = ShatteredSanctumFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Shattered Sanctum", _alice);
 
         land.Abilities.OfType<TriggeredAbility>().Should().BeEmpty(
             "ETB-tapped-unless-N-other-lands is a replacement effect, not a trigger");
@@ -94,7 +94,7 @@ public class ShatteredSanctumTests
     [Fact]
     public void ShatteredSanctum_HasNoActivatedAbilities()
     {
-        var land = ShatteredSanctumFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Shattered Sanctum", _alice);
 
         land.Abilities.OfType<ActivatedAbility>().Should().BeEmpty();
     }

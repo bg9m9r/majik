@@ -32,7 +32,7 @@ public class IslandFactoryTests
     [Fact]
     public void Island_IsALand()
     {
-        var island = IslandFactory.Create(_alice);
+        var island = (Land)NamedCardFactory.Create("Island", _alice);
 
         island.HasType(CardType.Land).Should().BeTrue(
             "Island is a Land (CR 305.1)");
@@ -41,7 +41,7 @@ public class IslandFactoryTests
     [Fact]
     public void Island_HasBasicSupertype()
     {
-        var island = IslandFactory.Create(_alice);
+        var island = (Land)NamedCardFactory.Create("Island", _alice);
 
         island.HasSupertype(CardSupertype.Basic).Should().BeTrue(
             "Island has the Basic supertype (CR 205.4)");
@@ -50,7 +50,7 @@ public class IslandFactoryTests
     [Fact]
     public void Island_HasIslandSubtype()
     {
-        var island = IslandFactory.Create(_alice);
+        var island = (Land)NamedCardFactory.Create("Island", _alice);
 
         island.HasSubtype(CardSubtype.Island).Should().BeTrue(
             "Island is an Island land (CR 205.3i)");
@@ -59,7 +59,7 @@ public class IslandFactoryTests
     [Fact]
     public void Island_HasCorrectName()
     {
-        var island = IslandFactory.Create(_alice);
+        var island = (Land)NamedCardFactory.Create("Island", _alice);
 
         island.Name.Should().Be("Island");
     }
@@ -67,7 +67,7 @@ public class IslandFactoryTests
     [Fact]
     public void Island_OwnerAndControllerAreSet()
     {
-        var island = IslandFactory.Create(_alice);
+        var island = (Land)NamedCardFactory.Create("Island", _alice);
 
         island.Owner.Should().BeSameAs(_alice);
         island.Controller.Should().BeSameAs(_alice);
@@ -80,7 +80,7 @@ public class IslandFactoryTests
     [Fact]
     public void Island_HasBlueManaAbility()
     {
-        var island = IslandFactory.Create(_alice);
+        var island = (Land)NamedCardFactory.Create("Island", _alice);
 
         var manaAbilities = island.Abilities.OfType<ManaAbility>().ToList();
         manaAbilities.Should().HaveCount(1,
@@ -117,7 +117,7 @@ public class IslandFactoryTests
     [Fact]
     public void Island_ThrowsOnNullOwner()
     {
-        var act = () => IslandFactory.Create(null!);
+        var act = () => (Land)NamedCardFactory.Create("Island", null!);
 
         act.Should().Throw<ArgumentNullException>();
     }

@@ -36,7 +36,7 @@ public class SmolderingMarshFactoryTests
     [Fact]
     public void SmolderingMarsh_IsLand()
     {
-        var land = SmolderingMarshFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Smoldering Marsh", _alice);
 
         land.HasType(CardType.Land).Should().BeTrue();
     }
@@ -44,7 +44,7 @@ public class SmolderingMarshFactoryTests
     [Fact]
     public void SmolderingMarsh_NameIsCorrect()
     {
-        var land = SmolderingMarshFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Smoldering Marsh", _alice);
 
         land.Name.Should().Be("Smoldering Marsh");
     }
@@ -52,7 +52,7 @@ public class SmolderingMarshFactoryTests
     [Fact]
     public void SmolderingMarsh_OwnerAndControllerAreSet()
     {
-        var land = SmolderingMarshFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Smoldering Marsh", _alice);
 
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
@@ -61,7 +61,7 @@ public class SmolderingMarshFactoryTests
     [Fact]
     public void SmolderingMarsh_HasSwampAndMountainSubtypes()
     {
-        var land = SmolderingMarshFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Smoldering Marsh", _alice);
 
         land.HasSubtype(CardSubtype.Swamp).Should().BeTrue();
         land.HasSubtype(CardSubtype.Mountain).Should().BeTrue();
@@ -70,7 +70,7 @@ public class SmolderingMarshFactoryTests
     [Fact]
     public void SmolderingMarsh_IsNotBasic_NotLegendary()
     {
-        var land = SmolderingMarshFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Smoldering Marsh", _alice);
 
         land.HasSupertype(CardSupertype.Basic).Should().BeFalse("battle lands are nonbasic");
         land.HasSupertype(CardSupertype.Legendary).Should().BeFalse();
@@ -79,7 +79,7 @@ public class SmolderingMarshFactoryTests
     [Fact]
     public void SmolderingMarsh_HasTwoManaAbilities()
     {
-        var land = SmolderingMarshFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Smoldering Marsh", _alice);
 
         land.Abilities.OfType<ManaAbility>().Should().HaveCount(2);
     }
@@ -87,7 +87,7 @@ public class SmolderingMarshFactoryTests
     [Fact]
     public void SmolderingMarsh_HasBlackManaAbility()
     {
-        var land = SmolderingMarshFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Smoldering Marsh", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Black == 1 && m.ManaGenerated.Red == 0);
@@ -96,7 +96,7 @@ public class SmolderingMarshFactoryTests
     [Fact]
     public void SmolderingMarsh_HasRedManaAbility()
     {
-        var land = SmolderingMarshFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Smoldering Marsh", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Red == 1 && m.ManaGenerated.Black == 0);
@@ -105,7 +105,7 @@ public class SmolderingMarshFactoryTests
     [Fact]
     public void SmolderingMarsh_HasNoTriggeredAbilities()
     {
-        var land = SmolderingMarshFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Smoldering Marsh", _alice);
 
         land.Abilities.OfType<TriggeredAbility>().Should().BeEmpty(
             "ETB-tapped-unless-two-or-more-basic-lands is a replacement effect, not a trigger");
@@ -114,7 +114,7 @@ public class SmolderingMarshFactoryTests
     [Fact]
     public void SmolderingMarsh_HasNoActivatedAbilities()
     {
-        var land = SmolderingMarshFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Smoldering Marsh", _alice);
 
         land.Abilities.OfType<ActivatedAbility>().Should().BeEmpty();
     }

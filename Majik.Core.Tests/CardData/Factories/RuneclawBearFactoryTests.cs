@@ -25,7 +25,7 @@ public class RuneclawBearFactoryTests
     [Fact]
     public void RuneclawBear_Identity()
     {
-        var c = RuneclawBearFactory.Create(_alice);
+        var c = (Creature)NamedCardFactory.Create("Runeclaw Bear", _alice);
 
         c.Name.Should().Be("Runeclaw Bear");
         c.HasType(CardType.Creature).Should().BeTrue();
@@ -55,7 +55,7 @@ public class RuneclawBearFactoryTests
     [Fact]
     public void RuneclawBear_IsVanilla_NoAbilities()
     {
-        var c = RuneclawBearFactory.Create(_alice);
+        var c = (Creature)NamedCardFactory.Create("Runeclaw Bear", _alice);
 
         c.Abilities.OfType<KeywordAbility>().Should().BeEmpty(
             "Runeclaw Bear is vanilla — no printed keywords");

@@ -37,7 +37,7 @@ public class SnowCoveredWastesFactoryTests
     [Fact]
     public void SnowCoveredWastes_IsALand()
     {
-        var wastes = SnowCoveredWastesFactory.Create(_alice);
+        var wastes = (Land)NamedCardFactory.Create("Snow-Covered Wastes", _alice);
 
         wastes.HasType(CardType.Land).Should().BeTrue(
             "Snow-Covered Wastes is a Land (CR 305.1)");
@@ -46,7 +46,7 @@ public class SnowCoveredWastesFactoryTests
     [Fact]
     public void SnowCoveredWastes_HasBasicSupertype()
     {
-        var wastes = SnowCoveredWastesFactory.Create(_alice);
+        var wastes = (Land)NamedCardFactory.Create("Snow-Covered Wastes", _alice);
 
         wastes.HasSupertype(CardSupertype.Basic).Should().BeTrue(
             "Snow-Covered Wastes has the Basic supertype (CR 205.4)");
@@ -55,7 +55,7 @@ public class SnowCoveredWastesFactoryTests
     [Fact]
     public void SnowCoveredWastes_HasSnowSupertype()
     {
-        var wastes = SnowCoveredWastesFactory.Create(_alice);
+        var wastes = (Land)NamedCardFactory.Create("Snow-Covered Wastes", _alice);
 
         wastes.HasSupertype(CardSupertype.Snow).Should().BeTrue(
             "Snow-Covered Wastes has the Snow supertype (CR 205.4d)");
@@ -64,7 +64,7 @@ public class SnowCoveredWastesFactoryTests
     [Fact]
     public void SnowCoveredWastes_HasNoLandSubtype()
     {
-        var wastes = SnowCoveredWastesFactory.Create(_alice);
+        var wastes = (Land)NamedCardFactory.Create("Snow-Covered Wastes", _alice);
 
         wastes.Subtypes.Should().BeEmpty(
             "Snow-Covered Wastes is a basic land with no land subtype (CR 205.3i)");
@@ -73,7 +73,7 @@ public class SnowCoveredWastesFactoryTests
     [Fact]
     public void SnowCoveredWastes_HasCorrectName()
     {
-        var wastes = SnowCoveredWastesFactory.Create(_alice);
+        var wastes = (Land)NamedCardFactory.Create("Snow-Covered Wastes", _alice);
 
         wastes.Name.Should().Be("Snow-Covered Wastes");
     }
@@ -81,7 +81,7 @@ public class SnowCoveredWastesFactoryTests
     [Fact]
     public void SnowCoveredWastes_OwnerAndControllerAreSet()
     {
-        var wastes = SnowCoveredWastesFactory.Create(_alice);
+        var wastes = (Land)NamedCardFactory.Create("Snow-Covered Wastes", _alice);
 
         wastes.Owner.Should().BeSameAs(_alice);
         wastes.Controller.Should().BeSameAs(_alice);
@@ -94,7 +94,7 @@ public class SnowCoveredWastesFactoryTests
     [Fact]
     public void SnowCoveredWastes_HasColorlessManaAbility()
     {
-        var wastes = SnowCoveredWastesFactory.Create(_alice);
+        var wastes = (Land)NamedCardFactory.Create("Snow-Covered Wastes", _alice);
 
         var manaAbilities = wastes.Abilities.OfType<ManaAbility>().ToList();
         manaAbilities.Should().HaveCount(1,
@@ -132,7 +132,7 @@ public class SnowCoveredWastesFactoryTests
     [Fact]
     public void SnowCoveredWastes_ThrowsOnNullOwner()
     {
-        var act = () => SnowCoveredWastesFactory.Create(null!);
+        var act = () => (Land)NamedCardFactory.Create("Snow-Covered Wastes", null!);
 
         act.Should().Throw<ArgumentNullException>();
     }

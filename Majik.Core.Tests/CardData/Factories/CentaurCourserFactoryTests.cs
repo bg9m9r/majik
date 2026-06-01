@@ -30,7 +30,7 @@ public class CentaurCourserFactoryTests
     [Fact]
     public void CentaurCourser_Identity()
     {
-        var c = CentaurCourserFactory.Create(_alice);
+        var c = (Creature)NamedCardFactory.Create("Centaur Courser", _alice);
 
         c.Name.Should().Be("Centaur Courser");
         c.ManaCost.Should().Be("{2}{G}");
@@ -46,7 +46,7 @@ public class CentaurCourserFactoryTests
     [Fact]
     public void CentaurCourser_IsGreen()
     {
-        var c = CentaurCourserFactory.Create(_alice);
+        var c = (Creature)NamedCardFactory.Create("Centaur Courser", _alice);
 
         // {2}{G} = 2 generic + 1 green = CMC 3 (CR 202.3); the {G} makes it green.
         CardColors.GetColors(c).Should().Contain(ManaColor.Green,
@@ -68,7 +68,7 @@ public class CentaurCourserFactoryTests
     [Fact]
     public void CentaurCourser_IsVanilla_NoAbilities()
     {
-        var c = CentaurCourserFactory.Create(_alice);
+        var c = (Creature)NamedCardFactory.Create("Centaur Courser", _alice);
 
         c.Abilities.OfType<KeywordAbility>().Should().BeEmpty(
             "Centaur Courser is vanilla — no printed keywords");

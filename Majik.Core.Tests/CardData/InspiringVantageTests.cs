@@ -1,3 +1,4 @@
+using Majik.Core.CardData;
 using FluentAssertions;
 using Majik.Core.Abilities;
 using Majik.Core.CardData.Factories;
@@ -23,7 +24,7 @@ public class InspiringVantageTests
     [Fact]
     public void InspiringVantage_IsLand()
     {
-        var land = InspiringVantageFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Inspiring Vantage", _alice);
 
         land.HasType(CardType.Land).Should().BeTrue();
     }
@@ -31,7 +32,7 @@ public class InspiringVantageTests
     [Fact]
     public void InspiringVantage_NameIsCorrect()
     {
-        var land = InspiringVantageFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Inspiring Vantage", _alice);
 
         land.Name.Should().Be("Inspiring Vantage");
     }
@@ -39,7 +40,7 @@ public class InspiringVantageTests
     [Fact]
     public void InspiringVantage_OwnerAndControllerAreSet()
     {
-        var land = InspiringVantageFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Inspiring Vantage", _alice);
 
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
@@ -48,7 +49,7 @@ public class InspiringVantageTests
     [Fact]
     public void InspiringVantage_IsNotLegendary()
     {
-        var land = InspiringVantageFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Inspiring Vantage", _alice);
 
         land.HasSupertype(CardSupertype.Legendary).Should().BeFalse();
     }
@@ -56,7 +57,7 @@ public class InspiringVantageTests
     [Fact]
     public void InspiringVantage_HasTwoManaAbilities()
     {
-        var land = InspiringVantageFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Inspiring Vantage", _alice);
 
         land.Abilities.OfType<ManaAbility>().Should().HaveCount(2);
     }
@@ -64,7 +65,7 @@ public class InspiringVantageTests
     [Fact]
     public void InspiringVantage_HasRedManaAbility()
     {
-        var land = InspiringVantageFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Inspiring Vantage", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.Red == 1 && m.ManaGenerated.White == 0);
@@ -73,7 +74,7 @@ public class InspiringVantageTests
     [Fact]
     public void InspiringVantage_HasWhiteManaAbility()
     {
-        var land = InspiringVantageFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Inspiring Vantage", _alice);
 
         land.Abilities.OfType<ManaAbility>()
             .Should().ContainSingle(m => m.ManaGenerated.White == 1 && m.ManaGenerated.Red == 0);
@@ -82,7 +83,7 @@ public class InspiringVantageTests
     [Fact]
     public void InspiringVantage_HasNoTriggeredAbilities()
     {
-        var land = InspiringVantageFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Inspiring Vantage", _alice);
 
         land.Abilities.OfType<TriggeredAbility>().Should().BeEmpty(
             "ETB-tapped-unless-N-other-lands is a replacement effect, not a trigger");
@@ -91,7 +92,7 @@ public class InspiringVantageTests
     [Fact]
     public void InspiringVantage_HasNoActivatedAbilities()
     {
-        var land = InspiringVantageFactory.Create(_alice);
+        var land = (Land)NamedCardFactory.Create("Inspiring Vantage", _alice);
 
         land.Abilities.OfType<ActivatedAbility>().Should().BeEmpty();
     }

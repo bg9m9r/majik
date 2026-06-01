@@ -34,7 +34,7 @@ public class SilverMyrFactoryTests
     [Fact]
     public void SilverMyr_Identity()
     {
-        var c = SilverMyrFactory.Create(_alice);
+        var c = (Creature)NamedCardFactory.Create("Silver Myr", _alice);
 
         c.Name.Should().Be("Silver Myr");
         c.ManaCost.Should().Be("{2}");
@@ -68,7 +68,7 @@ public class SilverMyrFactoryTests
     [Fact]
     public void SilverMyr_TapForBlue_TapsCreatureAndProducesOneBlue()
     {
-        var c = SilverMyrFactory.Create(_alice);
+        var c = (Creature)NamedCardFactory.Create("Silver Myr", _alice);
         // CR 302.6 — clear summoning sickness so this test exercises the
         // {T}: Add {U} mana production rather than the sickness gate.
         c.ClearSummoningSickness();
@@ -92,7 +92,7 @@ public class SilverMyrFactoryTests
     [Fact]
     public void SilverMyr_ManaAbility_CannotActivateWhileTapped()
     {
-        var c = SilverMyrFactory.Create(_alice);
+        var c = (Creature)NamedCardFactory.Create("Silver Myr", _alice);
         // CR 302.6 — clear summoning sickness so the first activation is legal
         // and the test asserts the !IsTapped re-activation gate specifically.
         c.ClearSummoningSickness();
