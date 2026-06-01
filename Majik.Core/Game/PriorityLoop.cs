@@ -190,9 +190,21 @@ public sealed class PriorityLoop
                     return;
                 }
 
-                await ApplyActionAsync(current, action, ctx, ct).ConfigureAwait(false);
+                var applied = await ApplyActionAsync(current, action, ctx, ct).ConfigureAwait(false);
 
-                if (HoldsPriority(action))
+                if (!applied)
+                {
+                    // The proposal was rejected / no-op'd (e.g. an illegal
+                    // PlayLand over the CR 305.2 per-turn cap). The action
+                    // never happened, so honoring its HoldPriority flag here
+                    // would hand priority straight back to the same actor —
+                    // and a misbehaving agent that re-proposes the same
+                    // illegal action would spin the round to kActionLimit,
+                    // flooding the log. Treat a rejected proposal as a pass so
+                    // the loop always makes forward progress.
+                    _priority.PassPriority();
+                }
+                else if (HoldsPriority(action))
                 {
                     // CR 117.3c — actor keeps priority instead of passing.
                     // Reset the pass count but DO NOT shift current player.
@@ -225,7 +237,13 @@ public sealed class PriorityLoop
         }
     }
 
-    private async Task ApplyActionAsync(Player actor, PriorityAction action, GameContext ctx, CancellationToken ct)
+    /// <summary>
+    /// Applies a non-pass priority action. Returns <c>true</c> when the action
+    /// committed, <c>false</c> when it was rejected / no-op'd (e.g. an illegal
+    /// land over the CR 305.2 cap) so the caller can force a pass instead of
+    /// re-handing priority to the proposing actor.
+    /// </summary>
+    private async Task<bool> ApplyActionAsync(Player actor, PriorityAction action, GameContext ctx, CancellationToken ct)
     {
         switch (action)
         {
@@ -247,7 +265,7 @@ public sealed class PriorityLoop
                         // memo will skip it on the next priority opportunity.
                         System.Console.Error.WriteLine(
                             $"PriorityLoop: rejected PlayLand({land.Land.Name}) by {actor.Name}: {reason}");
-                        break;
+                        return false;
                     }
                     // PLAN 08 — play the land on the async zone-move path so a
                     // prompting ETB replacement on the land (shock-land "pay 2
@@ -289,6 +307,9 @@ public sealed class PriorityLoop
             default:
                 throw new InvalidOperationException($"Unknown action {action.GetType().Name}");
         }
+
+        // Every non-rejection path above committed its action.
+        return true;
     }
 
     /// <summary>
