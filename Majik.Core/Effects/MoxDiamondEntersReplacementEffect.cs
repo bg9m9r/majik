@@ -1,3 +1,4 @@
+using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Players;
@@ -92,7 +93,15 @@ public sealed class MoxDiamondEntersReplacementEffect
                 ReferenceEquals(intent.Card, _source)
                 && intent.ToZone == ZoneType.Battlefield
                 && intent.FromZone != ZoneType.Battlefield,
-            replace: (intent, _) => ResolveReplacement(intent),
+            // Sync path (ReplacementBus.Apply / direct-call unit tests):
+            // looks the agent up off the registry and bridges the already-
+            // completed scripted/heuristic prompt.
+            replace: (intent, _) => ResolveReplacement(intent, ctx: null),
+            // PLAN 08 — async path (ReplacementBus.ApplyAsync): awaits the
+            // controller's agent off the live ResolutionContext so the
+            // "discard a land?" / which-land prompt never bridges sync-over-
+            // async on a human's think-time.
+            replaceAsync: (intent, _, ctx) => ResolveReplacementAsync(intent, ctx),
             oneShot: false,
             tag: this);
     }
@@ -122,73 +131,104 @@ public sealed class MoxDiamondEntersReplacementEffect
         _registered = false;
     }
 
-    private ZoneMoveIntent ResolveReplacement(ZoneMoveIntent intent)
+    private const string DiscardQuestion =
+        "Discard a land card to keep Mox Diamond on the battlefield?";
+
+    /// <summary>
+    /// Synchronous path (<see cref="ReplacementBus.Apply{TIntent}"/>) — the
+    /// no-resolution-context path (shape-only callers, non-cast zone moves).
+    /// CR 614.6 prompting is INTENTIONALLY NOT done here: a player choice must
+    /// be <c>await</c>ed, never bridged sync-over-async, so the "discard a
+    /// land?" prompt lives exclusively on <see cref="ResolveReplacementAsync"/>
+    /// (the production cast-resolution path). This sync path applies the
+    /// deterministic no-prompt posture: sacrifice Mox Diamond (the conservative
+    /// "no" branch — a card without a live agent never opts into the alternative
+    /// discard cost). Mirrors the historical no-agent fallback.
+    /// </summary>
+    private ZoneMoveIntent ResolveReplacement(ZoneMoveIntent intent, ResolutionContext? ctx)
     {
-        // Live controller — the player making the choice is whoever is
-        // currently controlling Mox Diamond at ETB time (CR 614.6 — choice
-        // belongs to the controller of the would-enter object; falls back
-        // to owner when no controller has been set).
-        var chooser = intent.Controller ?? _source.Controller ?? _source.Owner;
-        if (chooser == null)
-        {
-            // Defensive: no chooser available → leave the move alone (Mox
-            // enters normally). Should never happen in real play.
-            return intent;
-        }
+        _ = ctx;
+        var chooser = ResolveChooser(intent);
+        if (chooser == null) return intent;
 
-        // CR 614.6 — "instead" replacement gated on whether the alternative
-        // cost can be paid. If the chooser has no land cards in hand,
-        // they cannot discard a land, so the "yes" branch is illegal —
-        // run the sacrifice tail directly.
-        var lands = chooser.Zones.Hand.GetCards()
-            .Where(c => c.HasType(CardType.Land))
-            .ToList();
+        // No prompt on the sync path — "if you don't, sacrifice Mox Diamond."
+        return intent with { ToZone = ZoneType.Graveyard };
+    }
 
-        bool wantsToDiscard = lands.Count > 0 && PromptYesNo(chooser);
+    /// <summary>
+    /// PLAN 08 — async path (<see cref="ReplacementBus.ApplyAsync{TIntent}"/>).
+    /// Genuinely <c>await</c>s the controller's agent for the "discard a land?"
+    /// yes/no and the which-land pick so a human's choice never blocks a
+    /// thread-pool thread on a sync-over-async bridge. CR 614.6 semantics
+    /// (gated on the alternative cost being payable) are identical to the
+    /// synchronous <see cref="ResolveReplacement"/>.
+    /// </summary>
+    private async ValueTask<ZoneMoveIntent?> ResolveReplacementAsync(
+        ZoneMoveIntent intent, ResolutionContext ctx)
+    {
+        var chooser = ResolveChooser(intent);
+        if (chooser == null) return intent;
 
+        var lands = LandsInHand(chooser);
+
+        bool wantsToDiscard = lands.Count > 0 && await PromptYesNoAsync(chooser, ctx).ConfigureAwait(false);
         if (!wantsToDiscard)
         {
-            // "If you don't, sacrifice Mox Diamond." Redirect the would-
-            // enter move into the graveyard so Mox Diamond never actually
-            // hits the battlefield (CR 614 — replacement effects fire
-            // before the affected event, so the original Stack →
-            // Battlefield move is rewritten Stack → Graveyard).
+            // "If you don't, sacrifice Mox Diamond." Redirect Stack →
+            // Graveyard (CR 614 — Mox Diamond never actually enters).
             return intent with { ToZone = ZoneType.Graveyard };
         }
 
-        // "You may discard a land card instead." Pick which Land to
-        // discard (deterministic first when no agent is registered) and
-        // move it Hand → Graveyard. Mox Diamond's intent passes through
-        // unchanged so it lands on the battlefield.
-        var pick = PromptLandPick(chooser, lands) ?? lands[0];
-        chooser.Zones.Hand.RemoveCard(pick);
-        chooser.Zones.Graveyard.AddCard(pick);
-        pick.SetZone(ZoneType.Graveyard);
-
+        var pick = await PromptLandPickAsync(chooser, lands, ctx).ConfigureAwait(false) ?? lands[0];
+        DiscardPick(chooser, pick);
         return intent;
     }
 
-    private bool PromptYesNo(Player chooser)
-    {
-        var agent = _agentSelector != null
-            ? _agentSelector(chooser)
-            : AgentRegistry.Get(chooser);
-        if (agent == null) return false; // no agent → default to "sacrifice"
+    // ------------------------------------------------------------------
+    // Shared helpers (sync + async paths).
+    // ------------------------------------------------------------------
 
-        return agent.ChooseYesNoAsync(
-            "Discard a land card to keep Mox Diamond on the battlefield?",
-            BotIntent.DiscardCost)
-            .GetAwaiter().GetResult();
+    /// <summary>CR 614.6 — the chooser is the controller of the would-enter
+    /// object (falls back to owner when no controller has been set).</summary>
+    private Player? ResolveChooser(ZoneMoveIntent intent) =>
+        intent.Controller ?? _source.Controller ?? _source.Owner;
+
+    /// <summary>CR 614.6 — the alternative cost ("discard a land") is only
+    /// payable when the chooser has a land card in hand.</summary>
+    private static List<ICard> LandsInHand(Player chooser) =>
+        chooser.Zones.Hand.GetCards().Where(c => c.HasType(CardType.Land)).ToList();
+
+    /// <summary>Move the chosen land Hand → Graveyard (CR 701.16).</summary>
+    private static void DiscardPick(Player chooser, ICard pick)
+    {
+        chooser.Zones.Hand.RemoveCard(pick);
+        chooser.Zones.Graveyard.AddCard(pick);
+        pick.SetZone(ZoneType.Graveyard);
     }
 
-    private ICard? PromptLandPick(Player chooser, IReadOnlyList<ICard> lands)
+    /// <summary>Async path agent resolution — the test-supplied selector wins
+    /// (so scripted tests drive a specific agent), else the live context agent,
+    /// else the ambient registry.</summary>
+    private IPlayerAgent? AgentFor(Player chooser, ResolutionContext ctx) =>
+        _agentSelector != null ? _agentSelector(chooser)
+        : ctx.Agent ?? AgentRegistry.Get(chooser);
+
+    private async ValueTask<bool> PromptYesNoAsync(Player chooser, ResolutionContext ctx)
     {
-        var agent = _agentSelector != null
-            ? _agentSelector(chooser)
-            : AgentRegistry.Get(chooser);
+        var agent = AgentFor(chooser, ctx);
+        if (agent == null) return false;
+
+        return await agent.ChooseYesNoAsync(DiscardQuestion, BotIntent.DiscardCost, ctx.Ct)
+            .ConfigureAwait(false);
+    }
+
+    private async ValueTask<ICard?> PromptLandPickAsync(
+        Player chooser, IReadOnlyList<ICard> lands, ResolutionContext ctx)
+    {
+        var agent = AgentFor(chooser, ctx);
         if (agent == null) return lands.Count > 0 ? lands[0] : null;
 
-        return agent.ChooseFromHandAsync(chooser, lands, BotIntent.DiscardCost)
-            .GetAwaiter().GetResult();
+        return await agent.ChooseFromHandAsync(chooser, lands, BotIntent.DiscardCost, ctx.Ct)
+            .ConfigureAwait(false);
     }
 }

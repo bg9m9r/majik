@@ -98,7 +98,7 @@ public class DredgeFactoryTests
     // -----------------------------------------------------------------------
 
     [Fact]
-    public void Dredge_AgentYes_MillsN_ReturnsSourceToHand_CancelsDraw()
+    public async Task Dredge_AgentYes_MillsN_ReturnsSourceToHand_CancelsDraw()
     {
         var bus = new ReplacementBus();
         _alice.AttachReplacementBus(bus);
@@ -108,35 +108,29 @@ public class DredgeFactoryTests
 
         var lib = FillLibrary(_alice, 8);
 
-        // Agent says yes to the dredge prompt.
+        // Agent says yes to the dredge prompt. CR 702.52 prompting happens on
+        // the async draw path (Fx.DrawCardsAsync → ApplyAsync).
         var agent = new ScriptedAgent();
         agent.QueueYesNo(true);
-        AgentRegistry.Set(_alice, agent);
+        var ctx = ResolutionContext.For(_alice, agent, game: null, chosenTargets: null);
 
-        try
-        {
-            var drawn = Fx.DrawCards(_alice, 1);
+        var drawn = await Fx.DrawCardsAsync(_alice, 1, ctx);
 
-            // Original draw cancelled — no card added to hand from the
-            // library top.
-            drawn.Should().BeEmpty("Dredge consumed the draw");
+        // Original draw cancelled — no card added to hand from the
+        // library top.
+        drawn.Should().BeEmpty("Dredge consumed the draw");
 
-            // Source returned from graveyard to hand.
-            imp.Zone.Should().Be(ZoneType.Hand);
-            _alice.Zones.Hand.GetCards().Should().Contain(imp);
+        // Source returned from graveyard to hand.
+        imp.Zone.Should().Be(ZoneType.Hand);
+        _alice.Zones.Hand.GetCards().Should().Contain(imp);
 
-            // N=5 cards milled from top into graveyard.
-            _alice.Zones.Graveyard.GetCards()
-                .Where(c => !ReferenceEquals(c, imp))
-                .Should().HaveCount(5,
-                    "Dredge milled exactly N=5 cards on top of the previous graveyard contents");
-            _alice.Zones.Library.GetCards().Should().HaveCount(3,
-                "8 - 5 milled = 3 remaining");
-        }
-        finally
-        {
-            AgentRegistry.Clear();
-        }
+        // N=5 cards milled from top into graveyard.
+        _alice.Zones.Graveyard.GetCards()
+            .Where(c => !ReferenceEquals(c, imp))
+            .Should().HaveCount(5,
+                "Dredge milled exactly N=5 cards on top of the previous graveyard contents");
+        _alice.Zones.Library.GetCards().Should().HaveCount(3,
+            "8 - 5 milled = 3 remaining");
     }
 
     // -----------------------------------------------------------------------
@@ -246,7 +240,7 @@ public class DredgeFactoryTests
     // -----------------------------------------------------------------------
 
     [Fact]
-    public void Dredge_EmptyLibraryMidMill_HaltsCleanly()
+    public async Task Dredge_EmptyLibraryMidMill_HaltsCleanly()
     {
         // Build a library with EXACTLY N cards. Library.Count >= N gate
         // passes; the mill empties the library completely. Subsequent
@@ -262,21 +256,14 @@ public class DredgeFactoryTests
 
         var agent = new ScriptedAgent();
         agent.QueueYesNo(true);
-        AgentRegistry.Set(_alice, agent);
+        var ctx = ResolutionContext.For(_alice, agent, game: null, chosenTargets: null);
 
-        try
-        {
-            Fx.DrawCards(_alice, 1);
+        await Fx.DrawCardsAsync(_alice, 1, ctx);
 
-            _alice.Zones.Library.Count.Should().Be(0, "all 5 cards milled");
-            imp.Zone.Should().Be(ZoneType.Hand, "Dredge returned the source to hand");
-            _alice.TriedToDrawFromEmptyLibrary.Should().BeFalse(
-                "Dredge mills (CR 701.13); milling an empty library is not a draw from empty (CR 704.5b)");
-        }
-        finally
-        {
-            AgentRegistry.Clear();
-        }
+        _alice.Zones.Library.Count.Should().Be(0, "all 5 cards milled");
+        imp.Zone.Should().Be(ZoneType.Hand, "Dredge returned the source to hand");
+        _alice.TriedToDrawFromEmptyLibrary.Should().BeFalse(
+            "Dredge mills (CR 701.13); milling an empty library is not a draw from empty (CR 704.5b)");
     }
 
     // -----------------------------------------------------------------------
@@ -299,6 +286,59 @@ public class DredgeFactoryTests
 
         drawn.Should().HaveCount(1, "no agent -> conservative posture: straight draw");
         imp.Zone.Should().Be(ZoneType.Graveyard);
+    }
+
+    // -----------------------------------------------------------------------
+    // PLAN 08 — async replacement path (Fx.DrawCardsAsync / ApplyAsync). The
+    // Dredge "dredge?" prompt is genuinely awaited off the ResolutionContext.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public async Task Dredge_Async_AgentYes_MillsN_ReturnsSourceToHand_CancelsDraw()
+    {
+        var bus = new ReplacementBus();
+        _alice.AttachReplacementBus(bus);
+
+        var imp = MakeCardInGraveyard("Stinkweed Imp");
+        DredgeFactory.Build(imp, n: 5, replacementBus: bus);
+        FillLibrary(_alice, 8);
+
+        var agent = new ScriptedAgent();
+        agent.QueueYesNo(true);
+        var ctx = ResolutionContext.For(_alice, agent, game: null, chosenTargets: null);
+
+        var drawn = await Fx.DrawCardsAsync(_alice, 1, ctx);
+
+        drawn.Should().BeEmpty("Dredge consumed the draw");
+        imp.Zone.Should().Be(ZoneType.Hand);
+        _alice.Zones.Library.Count.Should().Be(3, "8 - 5 milled = 3 remaining");
+    }
+
+    [Fact]
+    public async Task Dredge_Async_GenuinelyAwaitsHuman_NoSyncBridge()
+    {
+        var bus = new ReplacementBus();
+        _alice.AttachReplacementBus(bus);
+
+        var imp = MakeCardInGraveyard("Stinkweed Imp");
+        DredgeFactory.Build(imp, n: 5, replacementBus: bus);
+        FillLibrary(_alice, 8);
+
+        var human = new DeferredDredgeAgent();
+        var ctx = ResolutionContext.For(_alice, human, game: null, chosenTargets: null);
+
+        var drawTask = Fx.DrawCardsAsync(_alice, 1, ctx);
+
+        human.WasPrompted.Should().BeTrue("the Dredge replacement awaited the agent");
+        drawTask.IsCompleted.Should().BeFalse(
+            "the human has not answered yet — no sync-over-async bridge");
+        imp.Zone.Should().Be(ZoneType.Graveyard, "nothing happens while the human thinks");
+
+        human.Answer(true);
+        var drawn = await drawTask;
+
+        drawn.Should().BeEmpty("human dredged → original draw cancelled");
+        imp.Zone.Should().Be(ZoneType.Hand, "human's yes returned the source to hand");
     }
 
     // -----------------------------------------------------------------------
@@ -326,5 +366,39 @@ public class DredgeFactoryTests
             made.Add(c);
         }
         return made;
+    }
+
+    /// <summary>
+    /// Human-think-time agent whose Dredge yes/no parks on a TCS until
+    /// <see cref="Answer"/> is called. Proves the Dredge replacement genuinely
+    /// awaits the agent (no sync-over-async bridge). Only the yes/no prompt is
+    /// exercised; the rest of the surface throws.
+    /// </summary>
+    private sealed class DeferredDredgeAgent : Majik.Core.Players.Agents.IPlayerAgent
+    {
+        private readonly TaskCompletionSource<bool> _yesNo =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public bool WasPrompted { get; private set; }
+        public void Answer(bool yes) => _yesNo.SetResult(yes);
+
+        public Task<bool> ChooseYesNoAsync(string question, BotIntent intent, CancellationToken ct = default)
+        {
+            WasPrompted = true;
+            return _yesNo.Task;
+        }
+
+        public Task<Majik.Core.Players.Agents.PriorityAction> ChoosePriorityActionAsync(Majik.Core.Game.GameContext ctx, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<Majik.Core.Players.Agents.MulliganDecision> ChooseMulliganAsync(Majik.Core.Game.GameContext ctx, IReadOnlyList<ICard> hand, int mulligansTaken, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<IReadOnlyList<ICard>> ChooseCardsToBottomAsync(Majik.Core.Game.GameContext ctx, IReadOnlyList<ICard> hand, int countToBottom, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<IReadOnlyList<object>> ChooseTargetsAsync(Majik.Core.Game.GameContext ctx, Majik.Core.Players.Agents.TargetRequest request, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<int> ChooseXAsync(Majik.Core.Game.GameContext ctx, ICard source, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<int> ChooseModeAsync(Majik.Core.Game.GameContext ctx, IReadOnlyList<string> modes, IReadOnlyList<BotIntent>? modeIntents = null, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<IReadOnlyList<ITriggeredAbility>> OrderTriggersAsync(Majik.Core.Game.GameContext ctx, IReadOnlyList<ITriggeredAbility> mine, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<Majik.Core.Players.Agents.ManaPayment> ChooseManaSourcesAsync(Majik.Core.Game.GameContext ctx, Majik.Core.ValueObjects.ManaCost cost, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<Majik.Core.Players.Agents.CombatPlan> DeclareAttackersAsync(Majik.Core.Game.GameContext ctx, IReadOnlyList<Creature> eligibleAttackers, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<Majik.Core.Players.Agents.BlockPlan> DeclareBlockersAsync(Majik.Core.Game.GameContext ctx, IReadOnlyList<Creature> attackers, IReadOnlyList<Creature> eligibleBlockers, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<ScryAction.ScryDecision> ChooseScryDecisionAsync(Majik.Core.Game.GameContext? ctx, IReadOnlyList<ICard> peeked, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<SurveilAction.SurveilDecision> ChooseSurveilDecisionAsync(Majik.Core.Game.GameContext? ctx, IReadOnlyList<ICard> peeked, CancellationToken ct = default) => throw new NotSupportedException();
     }
 }

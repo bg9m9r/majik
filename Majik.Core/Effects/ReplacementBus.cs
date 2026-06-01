@@ -1,3 +1,5 @@
+using Majik.Core.Abilities;
+
 namespace Majik.Core.Effects;
 
 /// <summary>
@@ -83,6 +85,61 @@ public sealed class ReplacementBus
                 if (!eff.Applies(current, history)) continue;
 
                 var next = eff.Replace(current, history);
+                history.Add(eff.Tag ?? eff);
+                if (eff.OneShot) oneShotFired.Add(eff);
+
+                if (next == null)
+                {
+                    foreach (var o in oneShotFired) _effects.Remove(o);
+                    return null;
+                }
+
+                current = next;
+                fired = true;
+                break;
+            }
+
+            if (!fired) break;
+        }
+
+        foreach (var o in oneShotFired) _effects.Remove(o);
+        return current;
+    }
+
+    /// <summary>
+    /// PLAN 08 — async twin of <see cref="Apply{TIntent}"/>. Pushes an intent
+    /// through the bus, <c>await</c>ing each applicable effect's
+    /// <see cref="IReplacementEffect{TIntent}.ReplaceAsync"/> off the live
+    /// <paramref name="ctx"/> so prompting replacements (shock land, Mox
+    /// Diamond, Dredge) genuinely await the agent instead of blocking a
+    /// thread-pool thread on a sync-over-async bridge. Non-prompting
+    /// replacements inherit the default <c>ReplaceAsync</c> shim over their
+    /// synchronous <see cref="IReplacementEffect{TIntent}.Replace"/>, so this
+    /// path produces identical results to <see cref="Apply{TIntent}"/> for
+    /// every effect that does not override <c>ReplaceAsync</c>.
+    /// Each registered effect fires at most once per call (CR 616.1c).
+    /// </summary>
+    public async ValueTask<TIntent?> ApplyAsync<TIntent>(TIntent intent, ResolutionContext ctx)
+        where TIntent : class
+    {
+        if (intent == null) return null;
+        ArgumentNullException.ThrowIfNull(ctx);
+
+        var history = new List<object>();
+        var current = intent;
+        var oneShotFired = new List<object>();
+
+        while (true)
+        {
+            var fired = false;
+            foreach (var raw in _effects.ToList())
+            {
+                if (raw is not IReplacementEffect<TIntent> eff) continue;
+                // Each effect fires at most once per intent (CR 616.1c).
+                if (history.Contains((object?)eff.Tag ?? eff)) continue;
+                if (!eff.Applies(current, history)) continue;
+
+                var next = await eff.ReplaceAsync(current, history, ctx).ConfigureAwait(false);
                 history.Add(eff.Tag ?? eff);
                 if (eff.OneShot) oneShotFired.Add(eff);
 

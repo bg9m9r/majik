@@ -1,3 +1,4 @@
+using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Domain.Exceptions;
 using Majik.Core.Effects;
@@ -38,9 +39,67 @@ public class ZoneService
     public ReplacementBus? Replacements => _replacements;
 
     /// <summary>
-    /// Move a card from one zone to another.
+    /// Move a card from one zone to another (synchronous path). Routes the
+    /// would-move through <see cref="ReplacementBus.Apply{TIntent}"/>, which
+    /// drives every applicable replacement on its synchronous path. Prompting
+    /// replacements (shock land, Mox Diamond) thus fall back to their
+    /// no-context posture here; callers that hold a live
+    /// <see cref="Majik.Core.Abilities.ResolutionContext"/> (the async stack-
+    /// resolution path) should prefer <see cref="MoveCardAsync"/> so those
+    /// replacements <c>await</c> the agent instead of bridging sync-over-async.
     /// </summary>
     public void MoveCard(ICard card, ZoneType fromZone, ZoneType toZone, Player? controller = null)
+    {
+        var intent = BuildIntent(card, fromZone, toZone, controller);
+        if (_replacements != null)
+        {
+            var replaced = _replacements.Apply(intent);
+            if (replaced == null) return; // cancelled
+            intent = replaced;
+        }
+
+        CommitMove(card, fromZone, intent);
+    }
+
+    /// <summary>
+    /// PLAN 08 — async twin of <see cref="MoveCard"/>. Pushes the would-move
+    /// through <see cref="ReplacementBus.ApplyAsync{TIntent}"/> with the live
+    /// <paramref name="ctx"/> so prompting battlefield-entry replacements
+    /// (shock-land "pay 2 life", Mox Diamond "discard a land") genuinely
+    /// <c>await</c> the controller's agent rather than blocking a thread-pool
+    /// thread. Non-prompting replacements behave identically to the sync path.
+    /// </summary>
+    public async ValueTask MoveCardAsync(
+        ICard card, ZoneType fromZone, ZoneType toZone, ResolutionContext ctx,
+        Player? controller = null)
+    {
+        ArgumentNullException.ThrowIfNull(ctx);
+        var intent = BuildIntent(card, fromZone, toZone, controller);
+        if (_replacements != null)
+        {
+            var replaced = await _replacements.ApplyAsync(intent, ctx).ConfigureAwait(false);
+            if (replaced == null) return; // cancelled
+            intent = replaced;
+        }
+
+        CommitMove(card, fromZone, intent);
+    }
+
+    /// <summary>
+    /// CR 614 — validate the transition and build the would-move
+    /// <see cref="ZoneMoveIntent"/> that gets pushed through the replacement
+    /// bus. Shared by the sync (<see cref="MoveCard"/>) and async
+    /// (<see cref="MoveCardAsync"/>) entry points.
+    /// CR 113.5 — mirror the live <see cref="Card.WasCast"/> stamp onto the
+    /// intent so battlefield-entry replacements (Containment Priest's "if it
+    /// wasn't cast, exile it instead") can read the cast posture off the
+    /// in-flight intent without re-fetching the card. SpellCastFlow sets
+    /// Card.WasCast at stack push time, so the Stack → Battlefield move
+    /// propagates true; non-cast paths (reanimation, Sneak Attack, Show and
+    /// Tell, blink, token ETB, Aether Vial) leave Card.WasCast = false and
+    /// the intent mirrors that.
+    /// </summary>
+    private ZoneMoveIntent BuildIntent(ICard card, ZoneType fromZone, ZoneType toZone, Player? controller)
     {
         if (card == null) throw new ArgumentNullException(nameof(card));
 
@@ -56,25 +115,20 @@ public class ZoneService
             throw new InvalidZoneTransitionException(fromZone, toZone);
         }
 
-        // CR 614 — funnel intent through replacement bus.
-        // CR 113.5 — mirror the live <see cref="Card.WasCast"/> stamp
-        // onto the intent so battlefield-entry replacements (Containment
-        // Priest's "if it wasn't cast, exile it instead") can read the
-        // cast posture off the in-flight intent without re-fetching the
-        // card. SpellCastFlow sets Card.WasCast at stack push time, so
-        // the Stack → Battlefield move propagates true; non-cast paths
-        // (reanimation, Sneak Attack, Show and Tell, blink, token ETB,
-        // Aether Vial) leave Card.WasCast = false and the intent
-        // mirrors that.
         var wasCast = (card as Card)?.WasCast ?? false;
-        var intent = new ZoneMoveIntent(card, fromZone, toZone, controller, WasCast: wasCast);
-        if (_replacements != null)
-        {
-            var replaced = _replacements.Apply(intent);
-            if (replaced == null) return; // cancelled
-            intent = replaced;
-        }
+        return new ZoneMoveIntent(card, fromZone, toZone, controller, WasCast: wasCast);
+    }
 
+    /// <summary>
+    /// Apply the post-replacement <paramref name="intent"/> to game state —
+    /// the destination zone move, controller stamp, ETB tap / counter
+    /// bookkeeping, <see cref="CardMovedEvent"/> publish, and CR 400.7 cast-
+    /// sentinel lifecycle. Shared tail of <see cref="MoveCard"/> /
+    /// <see cref="MoveCardAsync"/>; identical behaviour regardless of which
+    /// bus path produced the intent.
+    /// </summary>
+    private void CommitMove(ICard card, ZoneType fromZone, ZoneMoveIntent intent)
+    {
         var finalToZone = intent.ToZone;
         var finalController = intent.Controller;
 
@@ -160,6 +214,18 @@ public class ZoneService
     public void MoveCardTo(ICard card, ZoneType toZone, Player? controller = null)
     {
         MoveCard(card, card.Zone, toZone, controller);
+    }
+
+    /// <summary>
+    /// PLAN 08 — async twin of <see cref="MoveCardTo"/>. Auto-determines the
+    /// source zone and routes through <see cref="MoveCardAsync"/> so prompting
+    /// battlefield-entry replacements await the agent off <paramref name="ctx"/>.
+    /// </summary>
+    public ValueTask MoveCardToAsync(
+        ICard card, ZoneType toZone, ResolutionContext ctx, Player? controller = null)
+    {
+        if (card == null) throw new ArgumentNullException(nameof(card));
+        return MoveCardAsync(card, card.Zone, toZone, ctx, controller);
     }
 
     private static bool IsValidZoneTransition(ZoneType from, ZoneType to) => true;
