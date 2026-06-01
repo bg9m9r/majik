@@ -589,6 +589,25 @@ public sealed class GameFacade : IDisposable
     /// on routed cards — the factory owns those bespoke abilities and the
     /// binders would double-add ETB triggers.</para>
     /// </summary>
+    /// <summary>
+    /// CR 712 — split a composite "Front // Back" card name into its FRONT
+    /// face. Returns false (with <paramref name="frontName"/> = the input)
+    /// for single-faced names. Used to route MDFC fronts through their
+    /// per-face <c>[CardName]</c> factory so the cast-either-face MdfcState is
+    /// attached in production (deferral #3).
+    /// </summary>
+    private static bool TrySplitMdfcFrontFace(string name, out string frontName)
+    {
+        var idx = name?.IndexOf(" // ", StringComparison.Ordinal) ?? -1;
+        if (idx < 0)
+        {
+            frontName = name ?? string.Empty;
+            return false;
+        }
+        frontName = name![..idx];
+        return true;
+    }
+
     private static ICard BuildDeckCard(
         ICard shell,
         Player owner,
@@ -599,6 +618,52 @@ public sealed class GameFacade : IDisposable
         ZoneService? zones = null,
         IEventBus? eventBus = null)
     {
+        // CR 712.3 / 712.4 — Modal Double-Faced Card: real cast-either-face
+        // (deferral #3). The seed stores MDFCs under the composite name
+        // "Front // Back"; the per-face factories register only their face
+        // names. When the FRONT face has a real factory and is NOT a land
+        // (the spell-front + land-back Modern cycle: Sink into Stupor,
+        // Valakut Awakening, Shatterskull Smashing, …), build the card through
+        // the FRONT factory so it carries the cast-either-face MdfcState (the
+        // back-face descriptor whose builder materializes a fully-wired back
+        // land instance when the controller chooses it). The front factory
+        // sets the card's Name to the front face — GetByName resolves that
+        // back to the composite entity via its "Front // ..." prefix scan, so
+        // the oracle binder + IsImplemented derivation are unaffected.
+        if (RouteThroughNamedFactories
+            && TrySplitMdfcFrontFace(shell.Name, out var mdfcFrontName)
+            && Majik.Core.CardData.Factories.ImplementedCardNames.HasRealFactory(mdfcFrontName))
+        {
+            var frontEntity = cardRepo?.GetByName(mdfcFrontName);
+            // The composite entity's TypeLine is "Front // Back" (e.g.
+            // "Instant // Land"); parse only the FRONT half so a land BACK
+            // doesn't mark the front as a land.
+            var frontTypeLine = frontEntity?.TypeLine is { } tl
+                ? (tl.IndexOf(" // ", StringComparison.Ordinal) is var ti && ti >= 0 ? tl[..ti] : tl)
+                : null;
+            var frontIsLand = frontTypeLine != null
+                && Majik.Core.CardData.TypeLineParser.Parse(frontTypeLine)
+                    .Types.Contains(Majik.Core.Cards.Types.CardType.Land);
+            if (!frontIsLand)
+            {
+                var mdfcBuilt = Majik.Core.CardData.NamedCardFactory.Create(mdfcFrontName, owner);
+                if (mdfcBuilt is Majik.Core.Cards.Creature mdfcCreature)
+                {
+                    mdfcCreature.ActiveEffects = effects;
+                }
+                if (frontEntity != null)
+                {
+                    if (mdfcBuilt is Majik.Core.Cards.Card mdfcConcrete)
+                    {
+                        var colors = Majik.Core.Cards.CardColors.ParseScryfallColors(frontEntity.Colors);
+                        if (colors.Count > 0) mdfcConcrete.SetColorIndicator(colors);
+                    }
+                    OverlayAdditiveBinders(mdfcBuilt, frontEntity, owner, replacements, effects);
+                }
+                return mdfcBuilt;
+            }
+        }
+
         if (RouteThroughNamedFactories
             && !shell.HasType(Majik.Core.Cards.Types.CardType.Land)
             && Majik.Core.CardData.Factories.ImplementedCardNames.HasRealFactory(shell.Name))

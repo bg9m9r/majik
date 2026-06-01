@@ -31,6 +31,7 @@ public sealed class ScriptedAgent : IPlayerAgent
     private readonly Queue<Func<IReadOnlyList<ICard>, ICard?>> _fromBattlefieldChoices = new();
     private readonly Queue<Func<IReadOnlyList<ICard>, ICard?>> _fromPileChoices = new();
     private readonly Queue<Func<IReadOnlyList<ICard>, IReadOnlyList<ICard>, ICard?>> _fromRevealedChoices = new();
+    private readonly Queue<Func<IReadOnlyList<object>, IReadOnlyList<object>>> _choiceSelectors = new();
 
     public void QueuePriority(PriorityAction a) => _priorityActions.Enqueue(a);
     public void QueueMulligan(MulliganDecision d) => _mulligans.Enqueue(d);
@@ -45,6 +46,23 @@ public sealed class ScriptedAgent : IPlayerAgent
     public void QueueBlockers(BlockPlan p) => _blockPlans.Enqueue(p);
     /// <summary>Pre-queue a Scry decision; falls back to all-bottom when queue is empty.</summary>
     public void QueueScryDecision(ScryAction.ScryDecision d) => _scryDecisions.Enqueue(d);
+
+    /// <summary>
+    /// Pre-queue a selector for the declarative <see cref="ChooseAsync"/> sink
+    /// (PickOne / PickN / Order). The selector receives the live candidate
+    /// pool and returns the chosen subset. Used by tests that need to pick a
+    /// candidate other than the default first one — e.g. the MDFC face choice
+    /// (CR 712.3), where the front face is candidate[0] and the back face is
+    /// candidate[1]. YesNo choices still dequeue a QueueYesNo answer.
+    /// </summary>
+    public void QueueChoice(Func<IReadOnlyList<object>, IReadOnlyList<object>> selector)
+        => _choiceSelectors.Enqueue(selector);
+
+    /// <summary>Convenience: pick the single candidate at <paramref name="index"/>.</summary>
+    public void QueueChoiceIndex(int index)
+        => _choiceSelectors.Enqueue(c => index >= 0 && index < c.Count
+            ? new[] { c[index] }
+            : Array.Empty<object>());
     /// <summary>Pre-queue a Surveil decision; falls back to all-graveyard when queue is empty.</summary>
     public void QueueSurveilDecision(SurveilAction.SurveilDecision d) => _surveilDecisions.Enqueue(d);
     /// <summary>Pre-queue a Bloomburrow Gift recipient picker (CR 701.59); receives the live opponent
@@ -189,6 +207,14 @@ public sealed class ScriptedAgent : IPlayerAgent
         }
         if (req.Optional && candidates.Count == 0)
             return Task.FromResult<IReadOnlyList<object>>(Array.Empty<object>());
+        // A queued selector takes precedence for PickOne / PickN / Order so
+        // tests can pick a non-default candidate (e.g. the MDFC back face,
+        // CR 712.3). Falls through to the legacy defaults when none queued.
+        if (_choiceSelectors.Count > 0)
+        {
+            var selector = _choiceSelectors.Dequeue();
+            return Task.FromResult(selector(candidates));
+        }
         // PLAN 01 (Slice G) — the Bloomburrow Gift recipient prompt (CR 701.59)
         // is an optional PickOne over the opponent Player pool. It used to live
         // on the bespoke ChooseGiftRecipientAsync; now it flows here. Preserve

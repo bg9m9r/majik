@@ -559,22 +559,86 @@ public sealed class TurnDriver
                 }
             }
 
+            // CR 712.3 / 712.4 — Modal Double-Faced Card: real cast-either-face
+            // (deferral #3). When the card in hand carries a castable back-face
+            // descriptor, prompt the controller to choose which face to cast.
+            //   * Front face → fall through and cast the front card normally.
+            //   * Back LAND face (Soporific Springs) → play it as a land with
+            //     no stack and return (no spell cast / mana payment).
+            //   * Back SPELL face → swap the cast card + definition + cost to
+            //     the back face and cast it onto the stack.
+            // No transform machinery — only the chosen face exists.
+            ICard castCard = cast.Card;
+            var def = (Majik.Core.Game.SpellDefinition?)null;
+            Majik.Core.ValueObjects.ManaCost? faceCostOverride = null;
+            if (cast.AlternativeCost == null && castCard is Majik.Core.Cards.Card mdfcCard
+                && mdfcCard.MdfcState is { CanCastEitherFace: true })
+            {
+                var chosenFace = await MdfcCastFlow.ResolveFaceAsync(
+                    castCard, actor, _agents[actor], ctx, ct);
+                if (chosenFace != null)
+                {
+                    if (chosenFace.IsLand)
+                    {
+                        // CR 305 / 712.3 — back land face: play, no stack.
+                        MdfcCastFlow.PlayBackLandFace(
+                            frontCard: castCard,
+                            backFace: chosenFace,
+                            caster: actor,
+                            zones: _zoneService,
+                            replacements: _replacements,
+                            landDropTracker: _landDropTracker,
+                            activePlayer: ctx.ActivePlayer,
+                            phase: _currentPhase,
+                            stackEmpty: _stack.IsEmpty,
+                            effects: _continuousEffects);
+                        return;
+                    }
+
+                    // CR 712.3 — back spell face: swap the cast object to a
+                    // freshly-built back-face spell, with its own cost / def.
+                    var backCard = chosenFace.BuildCard(actor, _replacements);
+                    backCard.SetOwner(actor);
+                    if (backCard is Majik.Core.Cards.Card backConcrete)
+                    {
+                        backConcrete.SetController(actor);
+                    }
+                    if (backCard is Majik.Core.Cards.Creature backCreature
+                        && _continuousEffects != null)
+                    {
+                        backCreature.ActiveEffects = _continuousEffects;
+                    }
+                    // Replace the front card in hand with the back-face card so
+                    // the Hand → Stack move in SpellCastFlow finds it there.
+                    if (castCard.Zone == Majik.Core.Zones.ZoneType.Hand
+                        && castCard.Owner != null)
+                    {
+                        castCard.Owner.Zones.Hand.RemoveCard(castCard);
+                    }
+                    backCard.SetZone(Majik.Core.Zones.ZoneType.Hand);
+                    actor.Zones.Hand.AddCard(backCard);
+                    castCard = backCard;
+                    def = chosenFace.BuildDefinition(actor, raw => raw, _stack, _zoneService);
+                    faceCostOverride = Majik.Core.ValueObjects.ManaCost.Parse(chosenFace.ManaCost);
+                }
+            }
+
             // Resolve a proper SpellDefinition via the injected resolver
             // (oracle-text → effects binder). Fall back to vanilla — fine
             // for permanents (StackResolver puts them on the battlefield);
             // for instants/sorceries with no binder match, casting would
             // waste the card, so we skip and rotate.
-            var resolved = _spellDefResolver?.Invoke(cast.Card, actor, _stack);
-            var isPermanent = cast.Card.HasType(Majik.Core.Cards.Types.CardType.Creature)
-                || cast.Card.HasType(Majik.Core.Cards.Types.CardType.Artifact)
-                || cast.Card.HasType(Majik.Core.Cards.Types.CardType.Enchantment)
-                || cast.Card.HasType(Majik.Core.Cards.Types.CardType.Planeswalker);
+            var resolved = def ?? _spellDefResolver?.Invoke(castCard, actor, _stack);
+            var isPermanent = castCard.HasType(Majik.Core.Cards.Types.CardType.Creature)
+                || castCard.HasType(Majik.Core.Cards.Types.CardType.Artifact)
+                || castCard.HasType(Majik.Core.Cards.Types.CardType.Enchantment)
+                || castCard.HasType(Majik.Core.Cards.Types.CardType.Planeswalker);
             if (resolved == null && !isPermanent)
             {
-                RotateHand(cast.Card, "no SpellDef for instant/sorcery");
+                RotateHand(castCard, "no SpellDef for instant/sorcery");
                 return;
             }
-            var def = resolved
+            def = resolved
                 ?? Majik.Core.Game.SpellDefinition.Vanilla(_ => Array.Empty<Majik.Core.Abilities.IEffect>());
 
             // Pay mana up front. SpellCastFlow doesn't enforce payment;
@@ -587,8 +651,9 @@ public sealed class TurnDriver
             // three-arg overload folds in SpellCostIncreaseAbility riders
             // from every player's battlefield (Sphere of Resistance,
             // Trinisphere, Thalia, Damping Sphere).
-            var cost = cast.AlternativeCost?.AlternativeManaCost
-                ?? Majik.Core.Costs.CostReduction.GetEffectiveCost(cast.Card, actor, _players);
+            var cost = faceCostOverride
+                ?? cast.AlternativeCost?.AlternativeManaCost
+                ?? Majik.Core.Costs.CostReduction.GetEffectiveCost(castCard, actor, _players);
 
             // CR 601.2g + CR 106.4 — pay from the player's already-floating
             // mana pool first. When the pool fully covers the cost we don't
@@ -639,9 +704,9 @@ public sealed class TurnDriver
             // CR 106.4 — pass the cast card as the "spent on" context so
             // slot-level mana provenance (Arena of Glory's exert haste rider,
             // deferral #1) can react to "if THAT mana is spent on THIS spell".
-            if (!manaResolver.Pay(actor, cost, payment, spentOn: cast.Card, out _, out var colorCounts))
+            if (!manaResolver.Pay(actor, cost, payment, spentOn: castCard, out _, out var colorCounts))
             {
-                RotateHand(cast.Card, "Pay failed");
+                RotateHand(castCard, "Pay failed");
                 return;
             }
 
@@ -656,7 +721,7 @@ public sealed class TurnDriver
             // mana used to satisfy generic). Empty ledger = no colored mana
             // spent → Sunburst yields zero counters. Consumed + cleared by
             // the ETB effect.
-            if (cast.Card is Majik.Core.Cards.Card concreteForColors)
+            if (castCard is Majik.Core.Cards.Card concreteForColors)
             {
                 concreteForColors.SetPendingCastColorCounts(colorCounts);
             }
@@ -666,14 +731,14 @@ public sealed class TurnDriver
                 // Forward the already-prompted mana payment so SpellCastFlow
                 // doesn't re-prompt (CR 601.2g — one mana selection per cast).
                 await castFlow.CastAsync(
-                    actor, cast.Card, def, _agents[actor], ctx, ct,
+                    actor, castCard, def, _agents[actor], ctx, ct,
                     additionalCosts: cast.AdditionalCosts,
                     alternativeCost: cast.AlternativeCost,
                     preChosenMana: payment);
             }
             catch (InvalidOperationException ex)
             {
-                RotateHand(cast.Card, $"CastAsync threw: {ex.Message}");
+                RotateHand(castCard, $"CastAsync threw: {ex.Message}");
             }
         }
 
