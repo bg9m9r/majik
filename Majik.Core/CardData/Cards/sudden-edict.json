@@ -1,0 +1,5 @@
+{
+  "name": "Sudden Edict",
+  "types": ["Instant"],
+  "manaCost": "{1}{B}"
+}
