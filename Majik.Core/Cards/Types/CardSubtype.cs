@@ -457,4 +457,10 @@ public enum CardSubtype
     /// spellslinger creatures whose payoffs key off casting noncreature
     /// (instant/sorcery) spells. CR 205.3m.</summary>
     Weird,
+
+    /// <summary>Peasant creature subtype — Samwise Gamgee (The Lord of the
+    /// Rings: Tales of Middle-earth, "Halfling Peasant"), and the broader
+    /// LTR Peasant lineage. CR 205.3m — flavour subtype with no inherent
+    /// rules meaning.</summary>
+    Peasant,
 }

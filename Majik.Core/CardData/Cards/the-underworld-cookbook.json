@@ -1,0 +1,5 @@
+{
+  "name": "The Underworld Cookbook",
+  "types": ["Artifact"],
+  "manaCost": "{1}"
+}
