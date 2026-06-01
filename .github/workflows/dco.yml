@@ -11,7 +11,11 @@ permissions:
 jobs:
   dco:
     name: dco
-    runs-on: self-hosted
+    # DCO is a trivial git-log sign-off check (seconds). Keep it on GitHub-hosted
+    # runners — putting it on the small self-hosted pool starves it behind the
+    # long build-test jobs, so PRs sit build-test=pass / dco=pending and never
+    # merge. build-test stays self-hosted (ci.yml); only dco returns to hosted.
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
