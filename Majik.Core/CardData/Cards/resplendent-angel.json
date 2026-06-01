@@ -1,0 +1,9 @@
+{
+  "name": "Resplendent Angel",
+  "types": ["Creature"],
+  "subtypes": ["Angel"],
+  "manaCost": "{1}{W}{W}",
+  "power": 3,
+  "toughness": 3,
+  "abilities": []
+}
