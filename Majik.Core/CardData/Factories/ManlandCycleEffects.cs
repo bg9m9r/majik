@@ -184,9 +184,10 @@ public sealed class ManlandCycleBecomesPTEffect : ContinuousEffect
         chars.Toughness = NewToughness;
     }
 
-    public override void Apply(PermanentCharacteristics chars)
-    {
-        // Layer 7b on a non-Creature row is observationally a no-op in
-        // the current pipeline. See class xmldoc.
-    }
+    // No Apply(PermanentCharacteristics) override: the base default dispatches
+    // to Apply(CreatureCharacteristics) when the working set is a creature row.
+    // ContinuousEffectsService.Compute now upgrades an animated Land to a
+    // creature row (CR 613.1c) when the paired Layer-4 Creature grant applies,
+    // so this set-base lands and the manland's body surfaces through combat
+    // math. (A previous no-op override swallowed the P/T — removed.)
 }
