@@ -9,13 +9,21 @@ on:
 
 jobs:
   build-test:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     steps:
       - uses: actions/checkout@v4
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
+        # On self-hosted runners setup-dotnet defaults to /usr/share/dotnet,
+        # which the unprivileged runner user can't write. Install into the
+        # runner tool cache (a shared Docker volume): writable, and persisted
+        # between jobs so the SDK is downloaded only once. setup-dotnet adds
+        # this dir to PATH for the later dotnet steps. (runner.* context is
+        # only available at step scope, not in a job-level env.)
+        env:
+          DOTNET_INSTALL_DIR: ${{ runner.tool_cache }}/dotnet
         with:
           global-json-file: global.json
 
