@@ -11,6 +11,13 @@ jobs:
   build-test:
     runs-on: self-hosted
 
+    # On self-hosted runners setup-dotnet defaults to /usr/share/dotnet, which
+    # the unprivileged runner user can't write. Point it at the runner tool
+    # cache: writable on both hosted + self-hosted, and persisted between jobs
+    # so the SDK is downloaded only once.
+    env:
+      DOTNET_INSTALL_DIR: ${{ runner.tool_cache }}/dotnet
+
     steps:
       - uses: actions/checkout@v4
 
