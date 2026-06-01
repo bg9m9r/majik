@@ -5,7 +5,9 @@ using Majik.Core.CardData.Factories;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Combat;
+using Majik.Core.Game;
 using Majik.Core.Players;
+using Majik.Core.Random;
 using Majik.Core.Zones;
 using Xunit;
 
@@ -240,5 +242,80 @@ public class AtraxaGrandUnifierTests
 
         picks.Should().HaveCount(1, "the multi-type card claims one slot only");
         picks.Should().Contain(artifactCreature);
+    }
+
+    // -----------------------------------------------------------------------
+    // Cross-game RNG isolation (the production correctness bug)
+    //
+    // The remainder is re-bottomed in random order via the CONTROLLER's
+    // registered GameRandom. Before the fix the factory used
+    // GameRandomRegistry.Default, which under concurrent matches is the
+    // most-recently-constructed game's RNG — so two games' Atraxa resolutions
+    // would shuffle with each other's RNG, corrupting both. These tests pin
+    // the controller's RNG via a per-game scope and prove the remainder order
+    // depends ONLY on this game's RNG, not on another live game's default.
+    // -----------------------------------------------------------------------
+
+    private static List<string> ResolveAndGetRemainderOrder(int seed)
+    {
+        // 5 same-type instants → SelectOnePerCardType takes exactly one,
+        // leaving a 4-card remainder whose re-bottom order the shuffle decides.
+        var player = new Player("P", 20);
+        var cards = Enumerable.Range(0, 5)
+            .Select(i => new Instant($"Ins{i}", "U"))
+            .Cast<ICard>()
+            .ToList();
+        foreach (var c in cards)
+        {
+            c.SetOwner(player);
+            player.Zones.Library.AddCard(c);
+            c.SetZone(ZoneType.Library);
+        }
+
+        using var _ = GameRegistryScope.PushForGame();
+        var rng = new GameRandom(seed);
+        GameRandomRegistry.Set(player, rng);
+        GameRandomRegistry.SetDefault(rng);
+
+        AtraxaGrandUnifierFactory.ResolveEtb(player);
+
+        // Remainder = everything still in library (the 4 unpicked instants),
+        // ordered as the shuffle left them.
+        return player.Zones.Library.GetCards().Select(c => c.Name).ToList();
+    }
+
+    [Fact]
+    public void Etb_RemainderShuffle_UsesControllersRng_NotDefaultLeakedFromAnotherGame()
+    {
+        // Reference: game A's remainder order for seed 111, run in isolation.
+        var reference = ResolveAndGetRemainderOrder(111);
+
+        // Now run game A's resolution while game B is a LIVE concurrent scope
+        // whose default RNG (seed 999) is different. If the factory used
+        // .Default leaking from B, game A's order would differ from the
+        // reference. With Get(controller) it matches.
+        List<string> underConcurrentB;
+        using (GameRegistryScope.PushForGame())
+        {
+            // Game B installs a different default — the cross-game contaminant.
+            GameRandomRegistry.SetDefault(new GameRandom(999));
+            underConcurrentB = ResolveAndGetRemainderOrder(111);
+        }
+
+        underConcurrentB.Should().Equal(reference,
+            "the remainder shuffle must use the controller's registered RNG " +
+            "(seed 111), never a concurrent game's leaked .Default (seed 999)");
+    }
+
+    [Fact]
+    public void Etb_RemainderShuffle_DifferentSeeds_ProduceDifferentOrders()
+    {
+        // Sanity: the order is actually seed-driven (so the test above isn't
+        // vacuously true because the shuffle is a no-op).
+        var a = ResolveAndGetRemainderOrder(1);
+        var b = ResolveAndGetRemainderOrder(424242);
+        a.Should().BeEquivalentTo(b, o => o.WithoutStrictOrdering(),
+            "same set of cards");
+        a.Should().NotEqual(b, "different seeds shuffle to a different order");
     }
 }

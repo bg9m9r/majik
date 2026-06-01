@@ -107,32 +107,15 @@ public sealed class GameDriver
         _zoneService = zoneService ?? throw new ArgumentNullException(nameof(zoneService));
         _triggerManager = triggerManager ?? throw new ArgumentNullException(nameof(triggerManager));
 
-        // CR 701.20 — register the game RNG + bus so factory closures
-        // (e.g. SearchSpellFactory's tutor effects) can resolve the
-        // active randomness source and emit LibraryShuffledEvent without
-        // a parameter-threading rewrite. AgentRegistry uses the same
-        // pattern for per-player agent lookup.
+        // CR 720 — register the live ControlPlayerRegistry so take-control
+        // effect closures (Mindslaver's activated ability, Emrakul's cast
+        // trigger) can resolve it at resolution time and call GrantControl
+        // without a parameter-threading rewrite. Keyed per resolving player.
+        // ControlPlayerRegistryProvider has its own per-player Set/Remove
+        // surface (it is not one of the AsyncLocal-scoped registries), so it
+        // is wired here in the constructor.
         foreach (var p in _players)
         {
-            Majik.Core.Random.GameRandomRegistry.Set(p, _rng);
-            if (_eventBus is not null)
-            {
-                Majik.Core.Events.EventBusRegistry.Set(p, _eventBus);
-            }
-            // CR 603.6a / CR 614 — register the live ZoneService so tutor
-            // / fetch effect closures (PrimevalTitan, Scapeshift,
-            // fetchlands, SearchForTomorrow, GreenSunsZenith,
-            // ChordOfCalling, EldritchEvolution, …) can route their
-            // library → battlefield moves through ZoneService.MoveCard
-            // instead of raw zone mutation, so ETB triggers fire and
-            // enters-tapped replacements run on tutored permanents.
-            Majik.Core.Services.ZoneServiceRegistry.Set(p, _zoneService);
-
-            // CR 720 — register the live ControlPlayerRegistry so take-
-            // control effect closures (Mindslaver's activated ability,
-            // Emrakul's cast trigger) can resolve it at resolution time and
-            // call GrantControl without a parameter-threading rewrite. Keyed
-            // per resolving player, mirroring the ZoneService registration.
             Majik.Core.Players.ControlPlayerRegistryProvider.Set(p, _controlPlayers);
         }
 
@@ -145,17 +128,6 @@ public sealed class GameDriver
         // after the controlled turn.
         _controlPlayers.ScheduleExtraTurnAfterControl =
             controlled => _extraTurns.EnqueueExtraTurn(controlled);
-        Majik.Core.Random.GameRandomRegistry.SetDefault(_rng);
-        if (_eventBus is not null)
-        {
-            Majik.Core.Events.EventBusRegistry.SetDefault(_eventBus);
-        }
-        // NB: deliberately no ZoneServiceRegistry.SetDefault() — per-player
-        // registration above is sufficient for tutor closures (they look up
-        // by the resolving player's id), and skipping the default keeps
-        // unrelated tests (which build a fresh Player and don't seed the
-        // registry) from inadvertently inheriting a stale ZoneService from
-        // a concurrently-running test collection.
 
         // CR 305.2 — a full game ALWAYS needs a LandDropTracker so the
         // per-turn one-land cap is enforced in PriorityLoop. Default-
@@ -184,6 +156,58 @@ public sealed class GameDriver
             controlRegistry: _controlPlayers);
     }
 
+    /// <summary>
+    /// CR 701.20 / CR 603.6a / CR 614 — seed this game's per-player RNG, event
+    /// bus and zone service into the active ambient registry stores so factory
+    /// / effect closures (SearchSpellFactory tutors, Primeval Titan,
+    /// fetchlands, …) can resolve the live randomness source, publish
+    /// <c>LibraryShuffledEvent</c>, and route library→battlefield moves through
+    /// <see cref="Majik.Core.Services.ZoneService.MoveCard"/> without a
+    /// parameter-threading rewrite. Called from <see cref="RunGameAsync"/>
+    /// AFTER <see cref="GameRegistryScope.PushForGame"/> installs the per-game
+    /// stores, so these registrations land in this game's isolated stores
+    /// rather than a process-global static (concurrent matches stay isolated;
+    /// entries are reclaimed when the scope ends).
+    /// </summary>
+    private void RegisterAmbientRegistries()
+    {
+        foreach (var p in _players)
+        {
+            Majik.Core.Random.GameRandomRegistry.Set(p, _rng);
+            if (_eventBus is not null)
+            {
+                Majik.Core.Events.EventBusRegistry.Set(p, _eventBus);
+            }
+            Majik.Core.Services.ZoneServiceRegistry.Set(p, _zoneService);
+        }
+
+        // Seed the per-game AgentRegistry store from the driver's own agent
+        // map (the real per-seat agents — control rerouting only affects the
+        // indexer, not enumeration). Effect closures that prompt a player
+        // (fetchland tutors, Sakura-Tribe Elder, Path to Exile, …) resolve
+        // their agent via AgentRegistry.Get; seeding it INSIDE the per-game
+        // scope here means the live full-game path no longer relies on the
+        // process-global static the GameFacade ctor used to write to. (The
+        // GameFacade also registers its seats for the single-round StartAsync
+        // path, which installs its own scope.)
+        foreach (var kvp in _agents)
+        {
+            Majik.Core.Players.Agents.AgentRegistry.Set(kvp.Key, kvp.Value);
+        }
+
+        Majik.Core.Random.GameRandomRegistry.SetDefault(_rng);
+        if (_eventBus is not null)
+        {
+            Majik.Core.Events.EventBusRegistry.SetDefault(_eventBus);
+        }
+        // NB: deliberately no ZoneServiceRegistry.SetDefault() — per-player
+        // registration above is sufficient for tutor closures (they look up by
+        // the resolving player's id). With per-game ambient stores there is no
+        // longer a cross-test stale-ZoneService hazard, but keeping the default
+        // unset preserves the prior behaviour (Get returns null for unrelated
+        // players rather than a foreign service).
+    }
+
     public async Task<GameResult> RunGameAsync(
         int maxTurns = 30,
         int? startingPlayerIndex = null,
@@ -196,6 +220,18 @@ public sealed class GameDriver
         // threadpool thread resumes the continuation) reads THIS game's
         // monotonic clock — never wall-clock, never another game's clock.
         using var clockScope = LogicalClockScope.Push(_logicalClock);
+
+        // De-static the process-level registries (agents, RNG, event bus,
+        // zone service) to a per-game ambient store for the whole run — same
+        // AsyncLocal pattern as the logical clock above. This isolates
+        // concurrent matches (no cross-game RNG/bus/service aliasing, no
+        // shared .Default footgun) and reclaims every entry when the scope
+        // ends at the end of the run (no per-match leak). The seeding Set
+        // calls below run INSIDE this scope so they populate the freshly
+        // minted per-game stores; before this change they ran in the ctor
+        // against the shared statics.
+        using var registryScope = GameRegistryScope.PushForGame();
+        RegisterAmbientRegistries();
 
         // CR 103.1 — shuffle libraries.
         foreach (var p in _players)

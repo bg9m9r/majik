@@ -1,3 +1,5 @@
+using Majik.Core.Game;
+
 namespace Majik.Core.Services;
 
 /// <summary>
@@ -7,15 +9,23 @@ namespace Majik.Core.Services;
 /// <see cref="Majik.Core.Abilities.IEffect.Execute"/>) look up the
 /// registered service here.
 ///
-/// Mirrors <see cref="Majik.Core.Players.Agents.AgentRegistry"/> /
-/// <see cref="Majik.Core.Random.GameRandomRegistry"/> /
-/// <see cref="Majik.Core.Events.EventBusRegistry"/>: orchestrators
-/// register the service at game start; closures call <see cref="Get"/>
-/// at runtime. Returns <see langword="null"/> when nothing is
-/// registered — callers fall back to raw zone manipulation (which is
+/// Orchestrators register the service at game start; closures call
+/// <see cref="Get"/> at runtime. Returns <see langword="null"/> when nothing
+/// is registered — callers fall back to raw zone manipulation (which is
 /// suitable for shape / dispatcher-test paths that don't need
 /// <see cref="Majik.Core.Events.CardMovedEvent"/> publication or
 /// <see cref="Majik.Core.Effects.ReplacementBus"/> hooks to fire).
+///
+/// <para>
+/// The backing map is <b>not</b> a single process-global static. It lives in
+/// an <see cref="AmbientRegistryStore{TStore}"/> scoped per-game via
+/// <see cref="GameRegistryScope.PushForGame"/> (installed at game start in
+/// <c>GameDriver.RunGameAsync</c>, mirroring <see cref="LogicalClockScope"/>),
+/// so concurrent matches see independent services and a finished match's
+/// service is reclaimed when its scope ends. Outside any game scope
+/// (direct-construction unit tests) the static API resolves a process-wide
+/// fallback store.
+/// </para>
 ///
 /// ## Why this exists
 ///
@@ -41,21 +51,37 @@ namespace Majik.Core.Services;
 /// </summary>
 public static class ZoneServiceRegistry
 {
-    private static readonly Dictionary<Guid, ZoneService> _byPlayer = new();
-    private static readonly object _lock = new();
-    private static ZoneService? _default;
+    /// <summary>Per-game store: the player→service map + fallback service.</summary>
+    public sealed class Store
+    {
+        internal readonly Dictionary<Guid, ZoneService> ByPlayer = new();
+        internal readonly object Lock = new();
+        internal ZoneService? Default;
+    }
+
+    private static readonly AmbientRegistryStore<Store> _ambient = new();
+
+    private static Store Current => _ambient.Current;
+
+    /// <summary>
+    /// Install a fresh per-game store as the ambient store for the current
+    /// async flow until the returned scope is disposed. Used at game start so
+    /// concurrent matches are isolated. See <see cref="GameRegistryScope"/>.
+    /// </summary>
+    public static IDisposable PushScope() => _ambient.Push(new Store());
 
     /// <summary>Process-wide fallback service, or <see langword="null"/>
     /// if none has been registered.</summary>
     public static ZoneService? Default
     {
-        get { lock (_lock) return _default; }
+        get { var s = Current; lock (s.Lock) return s.Default; }
     }
 
-    /// <summary>Replace the process-wide fallback service.</summary>
+    /// <summary>Replace the active store's fallback service.</summary>
     public static void SetDefault(ZoneService? zoneService)
     {
-        lock (_lock) { _default = zoneService; }
+        var s = Current;
+        lock (s.Lock) { s.Default = zoneService; }
     }
 
     /// <summary>Associate <paramref name="zoneService"/> with <paramref name="player"/>.</summary>
@@ -63,27 +89,40 @@ public static class ZoneServiceRegistry
     {
         ArgumentNullException.ThrowIfNull(player);
         ArgumentNullException.ThrowIfNull(zoneService);
-        lock (_lock) { _byPlayer[player.Id] = zoneService; }
+        var s = Current;
+        lock (s.Lock) { s.ByPlayer[player.Id] = zoneService; }
     }
 
     /// <summary>Return the registered service for <paramref name="player"/>
     /// (falls back to <see cref="Default"/>), or <see langword="null"/>.</summary>
     public static ZoneService? Get(Players.Player? player)
     {
-        lock (_lock)
+        var s = Current;
+        lock (s.Lock)
         {
-            if (player is not null && _byPlayer.TryGetValue(player.Id, out var z)) return z;
-            return _default;
+            if (player is not null && s.ByPlayer.TryGetValue(player.Id, out var z)) return z;
+            return s.Default;
         }
     }
 
-    /// <summary>Remove all per-player registrations (test teardown).</summary>
+    /// <summary>Remove the registration for <paramref name="player"/> from the
+    /// active store. No-op when nothing was registered.</summary>
+    public static void Remove(Players.Player player)
+    {
+        if (player is null) return;
+        var s = Current;
+        lock (s.Lock) { s.ByPlayer.Remove(player.Id); }
+    }
+
+    /// <summary>Remove all per-player registrations from the active store
+    /// (test teardown).</summary>
     public static void Clear()
     {
-        lock (_lock)
+        var s = Current;
+        lock (s.Lock)
         {
-            _byPlayer.Clear();
-            _default = null;
+            s.ByPlayer.Clear();
+            s.Default = null;
         }
     }
 }
