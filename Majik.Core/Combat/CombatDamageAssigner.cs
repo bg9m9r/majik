@@ -134,6 +134,8 @@ public sealed class CombatDamageAssigner
             {
                 if (attacker.TargetPlayer != null)
                 {
+                    // CR 120.3 — record damage (Bloodthirst etc.) then life loss.
+                    attacker.TargetPlayer.RecordDamageDealt(targetDamage);
                     attacker.TargetPlayer.LoseLife(targetDamage);
                     _eventBus?.Publish(new CombatDamageDealtEvent(
                         attacker.Creature, attacker.TargetPlayer, targetDamage, isFirstStrike));

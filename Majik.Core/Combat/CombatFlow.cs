@@ -233,6 +233,8 @@ public sealed class CombatFlow
         intent = _replacements?.Apply(intent) ?? intent;
         if (intent == null || intent.Amount <= 0) return;
 
+        // CR 120.3 — record damage (Bloodthirst etc.) before applying life loss.
+        target.RecordDamageDealt(intent.Amount);
         target.LoseLife(intent.Amount);
         if (CombatAbilities.HasLifelink(source) && source.Controller != null)
         {

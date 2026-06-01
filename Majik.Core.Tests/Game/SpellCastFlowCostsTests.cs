@@ -357,4 +357,80 @@ public class SpellCastFlowCostsTests
         await act.Should().ThrowAsync<System.InvalidOperationException>();
         _stack.Count.Should().Be(0);
     }
+
+    // -----------------------------------------------------------------
+    // Buyback (CR 702.27) — optional additional cost; on resolve the spell
+    // returns to its owner's hand instead of the graveyard.
+    // -----------------------------------------------------------------
+
+    [Fact]
+    public async Task Buyback_Kicked_ReturnsSpellToHandOnResolve()
+    {
+        var capsize = new Instant("Capsize", "1U") { Owner = _alice, Zone = ZoneType.Hand };
+        _alice.Zones.Hand.AddCard(capsize);
+        _alice.AddManaToPool(ManaCost.Parse("3")); // buyback {3}
+
+        var agent = new ScriptedAgent();
+        agent.QueueMana(ManaPayment.Empty);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
+
+        var ran = false;
+        var spell = await _flow.CastAsync(
+            _alice, capsize,
+            new SpellDefinition(
+                Modes: System.Array.Empty<string>(), HasVariableX: false,
+                TargetRequests: System.Array.Empty<TargetRequest>(),
+                EffectFactory: _ => new IEffect[] { new Effect("body", () => ran = true) }),
+            agent, ctx,
+            additionalCosts: new[] { new BuybackAdditionalCost(capsize, ManaCost.Parse("3")) });
+
+        capsize.Zone.Should().Be(ZoneType.Stack);
+        spell.Resolve();
+
+        ran.Should().BeTrue("the printed body still resolves");
+        capsize.Zone.Should().Be(ZoneType.Hand,
+            "CR 702.27c — a bought-back spell returns to hand instead of the graveyard");
+        _alice.Zones.Hand.GetCards().Should().Contain(capsize);
+    }
+
+    // -----------------------------------------------------------------
+    // Bargain (CR 702.169) — optional additional sacrifice; the spell is
+    // stamped WasBargained for its "if this was bargained" rider, then the
+    // sentinel clears after resolution.
+    // -----------------------------------------------------------------
+
+    [Fact]
+    public async Task Bargain_SacrificesAndStampsThenClearsAfterResolve()
+    {
+        var treasure = new Artifact("Treasure", "") { Owner = _alice, Controller = _alice, Zone = ZoneType.Battlefield };
+        _alice.Zones.Battlefield.AddCard(treasure);
+
+        var spell = new Sorcery("Pitiless Carnage", "3B") { Owner = _alice, Zone = ZoneType.Hand };
+        _alice.Zones.Hand.AddCard(spell);
+
+        var agent = new ScriptedAgent();
+        agent.QueueMana(ManaPayment.Empty);
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
+
+        bool sawBargained = false;
+        var resolved = await _flow.CastAsync(
+            _alice, spell,
+            new SpellDefinition(
+                Modes: System.Array.Empty<string>(), HasVariableX: false,
+                TargetRequests: System.Array.Empty<TargetRequest>(),
+                EffectFactory: _ => new IEffect[]
+                {
+                    new Effect("read bargained rider", () => sawBargained = spell.WasBargained),
+                }),
+            agent, ctx,
+            additionalCosts: new[] { new BargainAdditionalCost(spell) });
+
+        treasure.Zone.Should().Be(ZoneType.Graveyard, "the bargained artifact is sacrificed");
+        spell.WasBargained.Should().BeTrue("stamped at cast time for the rider");
+
+        resolved.Resolve();
+
+        sawBargained.Should().BeTrue("the resolving body saw 'if this spell was bargained' as true");
+        spell.WasBargained.Should().BeFalse("CR 400.7 — the bargain sentinel clears after resolution");
+    }
 }

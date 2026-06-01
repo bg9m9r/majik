@@ -202,7 +202,8 @@ public sealed class SpellCastFlow
         // effects (alt-cost OnResolved, Kicker/Surge/Gift sentinel-clear).
         bool hasKickerPayment = mergedAdditional.OfType<KickerAdditionalCost>().Any();
         var finalEffects = AppendCleanupEffects(
-            effects, card, caster, alternativeCost, hasKickerPayment, giftRecipient);
+            effects, card, caster, alternativeCost, hasKickerPayment, giftRecipient,
+            mergedAdditional);
 
         var spell = new Spells.Spell(card, caster, effects: finalEffects);
 
@@ -539,7 +540,8 @@ public sealed class SpellCastFlow
         Player caster,
         IAlternativeCost? alternativeCost,
         bool hasKickerPayment,
-        Player? giftRecipient)
+        Player? giftRecipient,
+        IReadOnlyList<IAdditionalCost> mergedAdditional)
     {
         IReadOnlyList<IEffect> finalEffects = effects;
         if (alternativeCost != null)
@@ -547,6 +549,33 @@ public sealed class SpellCastFlow
             finalEffects = finalEffects.Append(new Effect(
                 $"{alternativeCost.Description} cleanup",
                 () => alternativeCost.OnResolved(card, caster))).ToList();
+        }
+
+        // CR 702.27c — Buyback. If the optional buyback additional cost was
+        // paid, the spell returns to its owner's hand instead of the graveyard
+        // as it resolves. Appended as the LAST printed-body effect so the
+        // spell's own body resolves first, then the return-to-hand fires before
+        // the engine's default stack → graveyard disposition.
+        var buyback = mergedAdditional.OfType<BuybackAdditionalCost>().FirstOrDefault();
+        if (buyback != null)
+        {
+            finalEffects = finalEffects.Append(new Effect(
+                "Buyback — return spell to hand on resolve (CR 702.27c)",
+                () => buyback.ReturnOnResolve(caster))).ToList();
+        }
+
+        // CR 702.169 / CR 400.7 — Bargain sentinel clear (mirror of Kicker's).
+        if (mergedAdditional.OfType<BargainAdditionalCost>().Any())
+        {
+            finalEffects = finalEffects.Append(new Effect(
+                "Bargain cleanup — clear Card.WasBargained",
+                () =>
+                {
+                    if (card is Card concreteForBargain)
+                    {
+                        concreteForBargain.ClearWasBargained();
+                    }
+                })).ToList();
         }
         if (hasKickerPayment)
         {
