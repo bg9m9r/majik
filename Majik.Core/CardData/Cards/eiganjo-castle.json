@@ -11,7 +11,7 @@
         { "type": "tap_self" }
       ],
       "effects": [
-        { "type": "prevent_damage_target_stub", "amount": 2, "targetFilter": "legendary_creature" }
+        { "type": "prevent_damage_target", "amount": 2, "targetFilter": "legendary_creature" }
       ]
     }
   ]
