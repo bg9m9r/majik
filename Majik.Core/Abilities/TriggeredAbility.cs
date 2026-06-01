@@ -39,6 +39,21 @@ public class TriggeredAbility : ITriggeredAbility
     public IReadOnlySet<ZoneType> ActiveZones { get; }
 
     /// <summary>
+    /// CR 711 — optional face-/state-gate evaluated when deciding whether the
+    /// ability is even allowed to trigger. Distinct from
+    /// <see cref="InterveningIf"/> (CR 603.4 — checked at trigger time AND
+    /// resolution): this gate suppresses the trigger from firing at all when
+    /// the predicate is false, used to keep a double-faced card's FRONT-face
+    /// abilities dormant while it is on its BACK face (and vice-versa). The
+    /// front face's triggered abilities carry <c>() =&gt; !MdfcState.IsBackFace</c>
+    /// and the back face's carry <c>() =&gt; MdfcState.IsBackFace</c>, so only the
+    /// active face's abilities can fire (CR 711.3 — characteristics, including
+    /// abilities, are those of the face that's currently up). Null (the common
+    /// case) means "no face gate — always eligible".
+    /// </summary>
+    public Func<bool>? ActiveWhen { get; }
+
+    /// <summary>
     /// Targeting requests that the controller's agent must satisfy when the
     /// ability is about to be placed on the stack (Rule 603.3).
     /// Empty when the ability needs no targets.
@@ -62,11 +77,13 @@ public class TriggeredAbility : ITriggeredAbility
         IEnumerable<IEffect>? effects = null,
         Func<bool>? interveningIf = null,
         IEnumerable<ZoneType>? activeZones = null,
-        IEnumerable<TargetRequest>? targetRequests = null)
+        IEnumerable<TargetRequest>? targetRequests = null,
+        Func<bool>? activeWhen = null)
     {
         Source = source ?? throw new ArgumentNullException(nameof(source));
         Controller = controller ?? throw new ArgumentNullException(nameof(controller));
         Condition = condition ?? throw new ArgumentNullException(nameof(condition));
+        ActiveWhen = activeWhen;
 
         // PLAN 08 — per-game deterministic id. Reseeded from the ambient
         // DeterministicIdSource inside a game scope; Guid.NewGuid() fallback
@@ -118,6 +135,14 @@ public class TriggeredAbility : ITriggeredAbility
         }
 
         if (Source is ICard card && !ActiveZones.Contains(card.Zone))
+        {
+            return false;
+        }
+
+        // CR 711.3 — a double-faced card's abilities are those of its active
+        // face. Front-face triggers stay dormant while the card is flipped to
+        // its back face, and vice-versa.
+        if (ActiveWhen is not null && !ActiveWhen())
         {
             return false;
         }

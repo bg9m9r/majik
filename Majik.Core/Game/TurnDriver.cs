@@ -595,18 +595,28 @@ public sealed class TurnDriver
                         return;
                     }
 
-                    // CR 712.3 — back spell face: swap the cast object to a
-                    // freshly-built back-face spell, with its own cost / def.
+                    // CR 712.3 — back spell / permanent face: swap the cast
+                    // object to a freshly-built back-face card, with its own
+                    // cost / def. A PERMANENT back (creature / artifact /
+                    // enchantment / planeswalker — the Kaldheim God MDFCs)
+                    // resolves onto the battlefield AS that face (CR 608.3);
+                    // an instant / sorcery back resolves and is put into the
+                    // graveyard. Either way only the chosen face exists.
                     var backCard = chosenFace.BuildCard(actor, _replacements);
                     backCard.SetOwner(actor);
                     if (backCard is Majik.Core.Cards.Card backConcrete)
                     {
                         backConcrete.SetController(actor);
                     }
-                    if (backCard is Majik.Core.Cards.Creature backCreature
+                    // Wire the layer service onto ANY permanent back (not just
+                    // creatures) so an artifact / enchantment / planeswalker
+                    // back's P/T / static body computes correctly once it
+                    // enters (CR 613). Instant / sorcery backs have no battle-
+                    // field body and are left untouched.
+                    if (backCard is Majik.Core.Cards.Permanent backPerm
                         && _continuousEffects != null)
                     {
-                        backCreature.ActiveEffects = _continuousEffects;
+                        backPerm.ActiveEffects = _continuousEffects;
                     }
                     // Replace the front card in hand with the back-face card so
                     // the Hand → Stack move in SpellCastFlow finds it there.

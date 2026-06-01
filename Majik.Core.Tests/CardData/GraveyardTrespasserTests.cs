@@ -82,8 +82,14 @@ public class GraveyardTrespasserTests
     {
         var gt = GraveyardTrespasserFactory.Create(_alice);
 
-        gt.Abilities.OfType<TriggeredAbility>().Should().HaveCount(2,
-            "one ETB trigger + one attack trigger (CR 603.1 / 508.1f)");
+        // CR 711.3 — both faces' ability sets are attached, gated by an
+        // ActiveWhen face predicate. Front (ETB + attack) + back (ETB + attack)
+        // = 4 triggers; only the active face's 2 can fire.
+        gt.Abilities.OfType<TriggeredAbility>().Should().HaveCount(4,
+            "front + back ability sets (CR 603.1 / 508.1f / 711.3)");
+        gt.Abilities.OfType<TriggeredAbility>()
+            .Count(t => t.ActiveWhen is null || t.ActiveWhen())
+            .Should().Be(2, "only the active (front) face's two triggers fire");
     }
 
     // ------------------------------------------------------------------

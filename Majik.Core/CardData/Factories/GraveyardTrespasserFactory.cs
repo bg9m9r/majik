@@ -58,14 +58,16 @@ namespace Majik.Core.CardData.Factories;
 ///   card" (a non-mana ward cost) is not yet supported. Omitted here — the
 ///   creature is targetable without the discard tax. Same gap surfaces on
 ///   every "Ward—[non-mana cost]" card.
-/// - <b>Back-face BODY now swapped in (deferral #19, closed).</b> The CR
-///   711/712 Layer-0 face seed swaps the 4/4 black Werewolf P/T + type line in
-///   through Compute / combat while on the back face, reverting on flip-back.
-///   The back face's distinct <i>ability text</i> (exile-up-to-TWO + the "for
-///   each creature card" drain) is NOT re-bodied — Compute is a characteristic
-///   pipeline, not an ability registry, so the front face's exile-up-to-one
-///   rider keeps firing on both faces. That ability-text delta is the only
-///   residual; the body / type / colour are correct on both faces.
+/// - <b>Back-face BODY swapped in (deferral #19, closed).</b> The CR 711/712
+///   Layer-0 face seed swaps the 4/4 black Werewolf P/T + type line in through
+///   Compute / combat while on the back face, reverting on flip-back.
+/// - <b>Back-face ABILITY TEXT swapped in (deferral #19 residual b, closed).</b>
+///   Both faces' triggered-ability sets are attached and gated by an
+///   <see cref="TriggeredAbility.ActiveWhen"/> face predicate (CR 711.3): on the
+///   FRONT face only the front rider (exile up-to-ONE + drain-if-any-creature)
+///   can fire; once the day/night transform flips to the BACK face only the
+///   Glutton rider (exile up-to-TWO + drain-per-creature-card) can fire. No
+///   register/unregister churn — the dormant face's triggers simply don't match.
 /// </summary>
 [CardName("Graveyard Trespasser")]
 public static class GraveyardTrespasserFactory
@@ -125,70 +127,109 @@ public static class GraveyardTrespasserFactory
         card.AddAbility(new KeywordAbility(DayboundNightbound.DayboundKeyword, card, owner));
         card.AddAbility(new KeywordAbility(DayboundNightbound.NightboundKeyword, card, owner));
 
-        // CR 603.1 / 508.1f — "Whenever this creature enters or attacks, …"
-        // Two triggers, one shared effect body.
-        IEffect BuildEffect(string label) =>
+        // CR 603.1 / 508.1f / 711.3 — "Whenever this creature enters or
+        // attacks, …" Each face has its own distinct rider, and a DFC's
+        // abilities are those of its currently-active face. We attach BOTH
+        // face ability sets and gate each with an ActiveWhen face predicate so
+        // only the active face's triggers can fire:
+        //
+        //   FRONT (Graveyard Trespasser, daybound): exile up to ONE card; if a
+        //     creature card was exiled, each opponent loses 1 / you gain 1.
+        //   BACK  (Graveyard Glutton, nightbound): exile up to TWO cards; for
+        //     EACH creature card exiled this way, each opponent loses 1 / you
+        //     gain 1.
+        //
+        // The day/night transform flips MdfcState.IsBackFace; the front set
+        // goes dormant and the back set wakes (and vice-versa) automatically —
+        // no register/unregister churn (deferral #19 residual b, CR 711.3).
+        var mdfc = card.MdfcState!;
+        bool OnFront() => !mdfc.IsBackFace;
+        bool OnBack() => mdfc.IsBackFace;
+
+        IEffect FrontEffect(string label) =>
             new Effect(
                 $"{FrontName}: {label} — exile up to one target card from a graveyard; if a creature card, each opponent loses 1 / you gain 1",
-                () => ResolveExileAndDrain(card, owner, players));
+                () => ResolveExileAndDrain(card, owner, players, maxCards: 1, perCreatureDrain: false));
 
-        var etbTrigger = new TriggeredAbility(
-            source: card,
-            controller: owner,
-            condition: Triggers.OnEnterBattlefieldSelf(card),
-            effects: new IEffect[] { BuildEffect("ETB") },
-            activeZones: new[] { ZoneType.Battlefield });
-        card.AddAbility(etbTrigger);
-        triggers?.RegisterTriggeredAbility(etbTrigger);
+        IEffect BackEffect(string label) =>
+            new Effect(
+                $"{BackName}: {label} — exile up to two target cards from graveyards; for each creature card, each opponent loses 1 / you gain 1",
+                () => ResolveExileAndDrain(card, owner, players, maxCards: 2, perCreatureDrain: true));
 
-        var attackTrigger = new TriggeredAbility(
-            source: card,
-            controller: owner,
-            condition: Triggers.OnAttackSelf(card),
-            effects: new IEffect[] { BuildEffect("attack") },
-            activeZones: new[] { ZoneType.Battlefield });
-        card.AddAbility(attackTrigger);
-        triggers?.RegisterTriggeredAbility(attackTrigger);
+        void AddTrigger(ITriggerCondition condition, IEffect effect, Func<bool> activeWhen)
+        {
+            var trig = new TriggeredAbility(
+                source: card,
+                controller: owner,
+                condition: condition,
+                effects: new[] { effect },
+                activeZones: new[] { ZoneType.Battlefield },
+                activeWhen: activeWhen);
+            card.AddAbility(trig);
+            triggers?.RegisterTriggeredAbility(trig);
+        }
+
+        // Front face (Graveyard Trespasser) — ETB + attack, up-to-one rider.
+        AddTrigger(Triggers.OnEnterBattlefieldSelf(card), FrontEffect("ETB"), OnFront);
+        AddTrigger(Triggers.OnAttackSelf(card), FrontEffect("attack"), OnFront);
+
+        // Back face (Graveyard Glutton) — ETB + attack, up-to-two + per-creature.
+        AddTrigger(Triggers.OnEnterBattlefieldSelf(card), BackEffect("ETB"), OnBack);
+        AddTrigger(Triggers.OnAttackSelf(card), BackEffect("attack"), OnBack);
 
         return card;
     }
 
     /// <summary>
-    /// Resolve the enters/attacks effect: exile up to one target card from a
-    /// graveyard; if a creature card was exiled, each opponent loses 1 life
-    /// and the controller gains 1 (CR 119.3). v1 deterministic target pick —
-    /// prefers a creature card in any graveyard so the rider is meaningful.
+    /// Resolve the enters/attacks effect for either face (CR 119.3 / 711.3):
+    /// exile up to <paramref name="maxCards"/> target cards from graveyards;
+    /// then drain. The FRONT face (Graveyard Trespasser) passes
+    /// <paramref name="maxCards"/> = 1 and <paramref name="perCreatureDrain"/>
+    /// = false (drain 1 if <em>any</em> creature card was exiled). The BACK
+    /// face (Graveyard Glutton) passes <paramref name="maxCards"/> = 2 and
+    /// <paramref name="perCreatureDrain"/> = true (drain 1 per creature card
+    /// exiled). v1 deterministic target pick — prefers creature cards in any
+    /// graveyard so the rider is meaningful.
     /// </summary>
-    private static void ResolveExileAndDrain(Creature card, Player owner, IReadOnlyList<Player>? players)
+    private static void ResolveExileAndDrain(
+        Creature card,
+        Player owner,
+        IReadOnlyList<Player>? players,
+        int maxCards,
+        bool perCreatureDrain)
     {
         if (card.Zone != ZoneType.Battlefield) return;
 
         Player controller = card.Controller ?? owner;
 
-        // Scan every graveyard for an exile candidate. "From a graveyard"
-        // (CR 404) — any player's graveyard is legal. Prefer a creature card
-        // so the conditional drain fires (matches bot-grade play).
+        // Scan every graveyard for exile candidates. "From a graveyard"
+        // (CR 404) — any player's graveyard is legal. Prefer creature cards
+        // first so the conditional drain fires (matches bot-grade play).
         var scope = players ?? new List<Player> { controller };
         var pool = scope
             .SelectMany(p => p.Zones.Graveyard.GetCards())
+            .OrderByDescending(c => c.HasType(CardType.Creature))
             .ToList();
-        if (pool.Count == 0) return; // "up to one" — no card to exile, no-op.
+        if (pool.Count == 0) return; // "up to N" — nothing to exile, no-op.
 
-        var creatureCard = pool.FirstOrDefault(c => c.HasType(CardType.Creature));
-        var target = creatureCard ?? pool[0];
+        var targets = pool.Take(maxCards).ToList();
+        var creaturesExiled = targets.Count(c => c.HasType(CardType.Creature));
 
-        var exiledCreature = target.HasType(CardType.Creature);
+        // CR 701.10 — exile the chosen cards from their graveyards.
+        foreach (var target in targets)
+        {
+            Fx.MoveToExile(target);
+        }
 
-        // CR 701.10 — exile the chosen card from its graveyard.
-        Fx.MoveToExile(target);
+        if (creaturesExiled == 0) return;
 
-        if (!exiledCreature) return;
-
-        // CR 119.3 — "each opponent loses 1 life and you gain 1 life."
+        // CR 119.3 — drain. Front: 1 if any creature card was exiled. Back:
+        // 1 per creature card exiled ("for each creature card exiled this way").
+        int drain = perCreatureDrain ? creaturesExiled : 1;
         foreach (var opp in scope.Where(p => !ReferenceEquals(p, controller)))
         {
-            Fx.LoseLife(opp, 1);
+            Fx.LoseLife(opp, drain);
         }
-        Fx.GainLife(controller, 1);
+        Fx.GainLife(controller, drain);
     }
 }

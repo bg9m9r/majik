@@ -276,8 +276,8 @@ public class FactoryRoutingTests
         mdfc.Should().NotBeNull("a routed MDFC front carries the face tracker");
         mdfc!.CanCastEitherFace.Should().BeTrue(
             "production deck-build must attach the castable back-face descriptor (CR 712.3)");
-        mdfc.BackFace.Should().NotBeNull();
-        mdfc.BackFace!.IsLand.Should().BeTrue("Soporific Springs is a land back face");
-        mdfc.BackFace!.Name.Should().Be("Soporific Springs");
+        mdfc.CastableBackFace.Should().NotBeNull();
+        mdfc.CastableBackFace!.IsLand.Should().BeTrue("Soporific Springs is a land back face");
+        mdfc.CastableBackFace!.Name.Should().Be("Soporific Springs");
     }
 }
