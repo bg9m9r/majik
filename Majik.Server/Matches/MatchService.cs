@@ -56,6 +56,10 @@ public sealed class MatchService
     // callers / tests), and the loop falls back to its always-prompt
     // pre-Slice-5a behaviour.
     private readonly AutoPassPrefsStore? _autoPassPrefs;
+    // PLAN 08 (body) — durable command-log + checkpoint + claim→rehydrate
+    // orchestrator. Null (or its Enabled flag off, the default) → no durable
+    // writes + no rehydrate; the server behaves exactly as today.
+    private readonly Persistence.EnginePersistenceCoordinator? _persistence;
     private readonly ILogger<MatchService>? _logger;
 
     public MatchService(
@@ -77,9 +81,11 @@ public sealed class MatchService
         MatchFacadeBridge? facadeBridge = null,
         MatchReplayBuffer? replayBuffer = null,
         IBotMatchScheduler? botScheduler = null,
-        AutoPassPrefsStore? autoPassPrefs = null)
+        AutoPassPrefsStore? autoPassPrefs = null,
+        Persistence.EnginePersistenceCoordinator? persistence = null)
     {
         _autoPassPrefs = autoPassPrefs;
+        _persistence = persistence;
         _matches = matches;
         _profiles = profiles;
         _dice = dice;
@@ -270,6 +276,12 @@ public sealed class MatchService
         // close over it before the facade (and its embedded bot agent) are
         // constructed below.
         var matchId = Guid.NewGuid();
+        // PLAN 08 — pin the RNG seed up-front (not at the Match-doc build below)
+        // so the SAME value seeds both the deterministic-id scope wrapping facade
+        // creation AND the persisted Match.GameSeed. Without this the facade would
+        // be built under a different seed than the one stored, breaking
+        // id-identical rehydration.
+        var matchSeed = NewGameSeed();
 
         // 1) Load decks + create facade BEFORE any DB write so a
         //    DeckLoadException cannot leave an orphan Match document.
@@ -316,12 +328,16 @@ public sealed class MatchService
                 var extraSinkArg = ReferenceEquals(perMatchSink, Majik.Bot.Diagnostics.NullBotDecisionSink.Instance)
                     ? null
                     : perMatchSink;
-                facade = _gameFactory.Create(
-                    creator.Handle, botPlayer.Handle,
-                    creatorDeck, botDeck,
-                    botSeatArchetype: bot.Archetype,
-                    onBotThinking: onBotThinking,
-                    extraDecisionSink: extraSinkArg);
+                // PLAN 08 (body) — see the join path: build under a seed-scoped
+                // deterministic id source when persistence is on, so the original
+                // game's ids are reproducible for a later id-identical rehydrate.
+                facade = CreateFacadeUnderIdScope(matchSeed,
+                    () => _gameFactory.Create(
+                        creator.Handle, botPlayer.Handle,
+                        creatorDeck, botDeck,
+                        botSeatArchetype: bot.Archetype,
+                        onBotThinking: onBotThinking,
+                        extraDecisionSink: extraSinkArg));
                 // Wire the engine→SignalR bridge before any engine work
                 // can fire events (StartFullGameAsync happens later). The
                 // bridge holds the IDisposable subscriptions; teardown
@@ -403,8 +419,10 @@ public sealed class MatchService
             // this eliminates a separate post-Insert CAS round-trip.
             GameId = facade?.GameId,
             // Determinism (PLAN 08 prerequisite): pin + persist the RNG seed at
-            // match creation (see human-vs-human path above).
-            GameSeed = NewGameSeed(),
+            // match creation (see human-vs-human path above). Pinned up-front as
+            // matchSeed so the same value seeded the id-scope used to build the
+            // facade (PLAN 08 body — id-identical rehydration).
+            GameSeed = matchSeed,
             CreatorMillisRemaining = initialBalance,
             OpponentMillisRemaining = initialBalance,
             PriorityHolderSub = null,
@@ -574,7 +592,13 @@ public sealed class MatchService
             {
                 var creatorDeck = await _decks.LoadAsync(match.Creator.DeckId, ct);
                 var opponentDeck = await _decks.LoadAsync(opponent.DeckId, ct);
-                var facade = _gameFactory.Create(match.Creator.Handle, opponent.Handle, creatorDeck, opponentDeck);
+                // PLAN 08 (body) — when persistence is ON, build the facade (incl.
+                // its deck-card instances) under a per-game deterministic id scope
+                // seeded from the pinned match seed, so the ORIGINAL game's ids are
+                // reproducible and a later rehydrate comes out id-identical. Flag
+                // off → no scope → today's random Guid ids (unchanged behaviour).
+                var facade = CreateFacadeUnderIdScope(match.GameSeed,
+                    () => _gameFactory.Create(match.Creator.Handle, opponent.Handle, creatorDeck, opponentDeck));
                 // Wire the engine→SignalR bridge as soon as the facade
                 // exists. Subsequent state transitions (Joined→Starting→
                 // Rolling) only fire match.* publisher events, but the
@@ -704,6 +728,30 @@ public sealed class MatchService
     /// <c>GameRandom(seed)</c> so the game is reproducible given (seed,
     /// commands).</summary>
     private static int NewGameSeed() => System.Random.Shared.Next();
+
+    /// <summary>
+    /// PLAN 08 (body) — run <paramref name="create"/> under a per-game
+    /// deterministic id scope seeded from <paramref name="seed"/> when engine
+    /// persistence is ON, so every id minted while the facade + its deck cards
+    /// are constructed is seed-derived and reproducible (the property a later
+    /// id-identical rehydrate needs). When persistence is OFF the create runs
+    /// outside any scope — ids fall back to random <c>Guid.NewGuid()</c>, exactly
+    /// today's behaviour. Either way the live facade is returned unchanged.
+    /// </summary>
+    private GameFacade CreateFacadeUnderIdScope(int seed, Func<GameFacade> create)
+    {
+        if (_persistence is not { Enabled: true }) return create();
+        // ONE id source spans both the board build (pushed as the ambient scope
+        // here) AND the later run: pin it on the facade so StartFullGameAsync
+        // forwards the SAME instance into the driver, keeping a single monotonic
+        // counter. A rehydrate likewise uses one scope across board+run, so the
+        // two id sequences line up byte-for-byte.
+        var source = new Majik.Core.Game.DeterministicIdSource(seed);
+        using var idScope = Majik.Core.Game.DeterministicIdScope.Push(source);
+        var facade = create();
+        facade.UsePinnedIdSource(source);
+        return facade;
+    }
 
     /// <summary>Boot the engine for the just-decided first-player slot and
     /// wire the Slice 5a auto-pass prefs provider so the engine can short-
@@ -1211,6 +1259,19 @@ public sealed class MatchService
             return await ExecuteCommandOnLocalFacadeAsync(match!, facade, command, callerSub, matchId, gid, ct);
         }
 
+        // PLAN 08 (body) — registry MISS but the match is live (Playing) in the
+        // durable store: this replica may be able to rehydrate the crashed game.
+        // Gated behind the persistence flag (off by default → skipped entirely).
+        if (_persistence is { Enabled: true })
+        {
+            var (rehydrated, transient) =
+                await TryRehydrateAndDispatchAsync(match!, command, callerSub, matchId, gid, ct);
+            if (rehydrated != null) return rehydrated;
+            // A transient "rehydrating, retry" supersedes the cross-replica
+            // fallback — the claim winner is (re)building; the caller retries.
+            if (transient != null) return transient;
+        }
+
         // Cross-replica fallback: another replica owns the facade.
         if (await TryForwardCommandToRemoteOwnerAsync(matchId, callerSub, command, ct))
             return Result.Ok(true);
@@ -1274,6 +1335,27 @@ public sealed class MatchService
                 "invalid-command",
                 "The command was not valid for the current game state."));
         }
+        // PLAN 08 (body) — durably record the accepted command + periodic
+        // checkpoint (flag-gated; no-op when persistence is off). Seq = the
+        // command's 1-based position in the facade's append-only action log —
+        // monotonic + contiguous + identical to the replay order, so it keys the
+        // idempotent durable log directly. Failures here must not fail the
+        // command (the engine already applied it), so swallow + log.
+        if (_persistence is { Enabled: true })
+        {
+            try
+            {
+                var seq = facade.Log.Actions.Count;
+                await _persistence.RecordCommandAsync(matchId, facade, seq, command, ct);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex,
+                    "Durable command-log append failed (command already applied in-process). " +
+                    "MatchId={MatchId} GameId={GameId}", matchId, gid);
+            }
+        }
+
         // ACK the buffered prompt so a late JoinMatch doesn't replay it.
         _facadeBridge?.AckPrompt(matchId, callerSub);
         return Result.Ok(true);
@@ -1295,6 +1377,101 @@ public sealed class MatchService
             "Forwarded command to remote owner failed/timed-out. MatchId={MatchId} Owner={Owner}",
             matchId, owner);
         return false;
+    }
+
+    /// <summary>
+    /// PLAN 08 (body) — claim→rehydrate. On a registry miss for a live match,
+    /// try to win the ownership claim (the SETNX serialization point, so only the
+    /// winner rehydrates — no split-brain). On a win, reconstruct the in-flight
+    /// game from the durable command-log + latest checkpoint via
+    /// <see cref="Persistence.EnginePersistenceCoordinator.TryRehydrateAsync"/>,
+    /// register it under the ORIGINAL match game id, attach the engine→SignalR
+    /// bridge, then dispatch the just-arrived command locally.
+    ///
+    /// <para>Returns <c>(rehydrated, null)</c> on a successful rebuild+dispatch.
+    /// Returns <c>(null, transient)</c> with a retry signal when the rebuild would
+    /// race another claim winner, or when a concurrent rehydrate already
+    /// registered the facade between our claim and our register (the caller
+    /// retries and hits the now-live fast path). Returns <c>(null, null)</c> when
+    /// there's nothing to rehydrate (no durable log) or we didn't win the claim,
+    /// so the caller falls through to the cross-replica forward / not-started
+    /// path unchanged.</para>
+    /// </summary>
+    private async Task<(Result<bool>? Rehydrated, Result<bool>? Transient)>
+        TryRehydrateAndDispatchAsync(
+            Match match, GameCommand command, string callerSub, Guid matchId, Guid gid,
+            CancellationToken ct)
+    {
+        if (_persistence is not { Enabled: true } || _gameFactory == null)
+            return (null, null);
+
+        // Only the claim winner may rehydrate. With no Redis this always wins
+        // (single process); with Redis the SETNX serializes the rebuild to one
+        // replica. If we don't win, another replica owns / is rebuilding — let
+        // the cross-replica forward handle it.
+        if (_ownership != null && !await _ownership.TryClaimAsync(matchId, ct))
+            return (null, null);
+
+        GameFacade rehydrated;
+        try
+        {
+            // Reconstruct the initial decks from the persisted per-seat snapshots
+            // (card-name lists) so the rebuilt board matches the original. The
+            // seed + deck composition together make the shuffle reproducible.
+            var creatorNames = match.Creator.DeckSnapshot ?? new List<string>();
+            var opponentNames = match.Opponent?.DeckSnapshot ?? new List<string>();
+            var creatorDeck = await _decks.LoadFromCardNamesAsync(creatorNames, ct);
+            var opponentDeck = await _decks.LoadFromCardNamesAsync(opponentNames, ct);
+
+            var rebuilt = await _persistence.TryRehydrateAsync(
+                matchId,
+                match.GameSeed,
+                buildFreshFacade: () => _gameFactory.BuildUnregisteredFacade(
+                    match.Creator.Handle, match.Opponent?.Handle ?? "Opponent",
+                    creatorDeck, opponentDeck),
+                ct);
+
+            if (rebuilt == null)
+            {
+                // Nothing durably logged → nothing to rehydrate. Release the
+                // claim we speculatively took so we don't strand ownership.
+                if (_ownership != null) await _ownership.ReleaseAsync(matchId, ct);
+                return (null, null);
+            }
+            rehydrated = rebuilt;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex,
+                "Rehydration failed. MatchId={MatchId} GameId={GameId}", matchId, gid);
+            if (_ownership != null) await _ownership.ReleaseAsync(matchId, ct);
+            return (null, null);
+        }
+
+        // Serve state under the ORIGINAL match game id (registry + portal key
+        // on it), then register. A losing race (someone registered between our
+        // claim and here) → dispose our rebuild + tell the caller to retry into
+        // the now-live fast path.
+        rehydrated.OverrideGameId(gid);
+        if (!_gameFactory.RegisterRehydrated(gid, rehydrated))
+        {
+            rehydrated.Dispose();
+            return (null, Result.Ok(true));
+        }
+
+        // Attach the engine→SignalR bridge so subsequent engine events reach the
+        // wire, and re-arm cross-replica command listening for this owner.
+        _facadeBridge?.Attach(matchId, match.Creator.Sub, match.Opponent?.Sub ?? string.Empty, rehydrated);
+        if (_forwarder != null) await _forwarder.OnClaimedAsync(matchId, ct);
+
+        _logger?.LogInformation(
+            "Rehydrated crashed game on this replica. MatchId={MatchId} GameId={GameId}",
+            matchId, gid);
+
+        // Dispatch the command that triggered the rehydrate against the now-live
+        // facade — the same local path a normal command takes.
+        return (await ExecuteCommandOnLocalFacadeAsync(
+            match, rehydrated, command, callerSub, matchId, gid, ct), null);
     }
 
     // -----------------------------------------------------------------------

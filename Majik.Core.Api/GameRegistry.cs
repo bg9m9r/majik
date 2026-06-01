@@ -33,6 +33,21 @@ public sealed class GameRegistry
         return facade;
     }
 
+    /// <summary>
+    /// PLAN 08 (body) — register an already-built (rehydrated) facade under a
+    /// specific <paramref name="gameId"/> (the ORIGINAL match game id), so a
+    /// subsequent <see cref="Get"/> by that id serves the reconstructed game.
+    /// The facade should already have had its <see cref="GameFacade.GameId"/>
+    /// re-stamped to <paramref name="gameId"/>. Returns false (and does NOT
+    /// overwrite) when the id is already registered — the in-process facade wins,
+    /// so a racing claim can't clobber a live game.
+    /// </summary>
+    public bool RegisterRehydrated(Guid gameId, GameFacade facade)
+    {
+        ArgumentNullException.ThrowIfNull(facade);
+        return _games.TryAdd(gameId, facade);
+    }
+
     public GameFacade? Get(Guid gameId) => _games.TryGetValue(gameId, out var facade) ? facade : null;
 
     /// <summary>

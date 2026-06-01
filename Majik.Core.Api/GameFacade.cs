@@ -107,6 +107,26 @@ public sealed class GameFacade : IDisposable
     // seed. Null until a full game starts; surfaced as 0 in the snapshot.
     private int? _gameSeed;
 
+    // PLAN 08 (body) — a per-game deterministic id source the SERVER pinned at
+    // facade-create time (seeded from the match seed) and pushed around the deck-
+    // card construction. Stashed here so StartFullGameAsync can forward the SAME
+    // instance into the driver, keeping ONE monotonic id counter across both the
+    // board build and the run. Without this the driver would start a FRESH
+    // seed-derived source (PushIfNone, since the create-time scope is already
+    // disposed by the time the game starts on a later HTTP call) and restart the
+    // counter — colliding run-minted ids with board ids and breaking the
+    // id-identity a rehydrate (which uses ONE scope spanning board+run) needs.
+    private Majik.Core.Game.IDeterministicIdSource? _pinnedIdSource;
+
+    /// <summary>
+    /// PLAN 08 (body) — record the deterministic id source the caller pushed
+    /// around this facade's construction, so <see cref="StartFullGameAsync"/>
+    /// continues the SAME counter when the game later starts. No-op contribution
+    /// when null (the driver mints its own seed-derived source — today's path).
+    /// </summary>
+    public void UsePinnedIdSource(Majik.Core.Game.IDeterministicIdSource source)
+        => _pinnedIdSource = source;
+
     // PLAN 04 — per-game monotonic sequence counter. Every event stamped in
     // BridgeEvent draws the next value; a state snapshot reports _lastEventSeq
     // (the seq of the last event folded in) WITHOUT advancing the counter, so
@@ -145,7 +165,18 @@ public sealed class GameFacade : IDisposable
     // TurnStateChangedEvent payloads and other turn-state consumers.
     private TurnStateType? _currentTurnState;
 
-    public Guid GameId { get; } = Guid.NewGuid();
+    public Guid GameId { get; private set; } = Guid.NewGuid();
+
+    /// <summary>
+    /// PLAN 08 (body) — re-stamp this facade's <see cref="GameId"/> so a
+    /// rehydrated replica serves state under the ORIGINAL game id (the portal
+    /// keys its state DTO on it, and the registry / Match doc key on it). The
+    /// facade's GameId is the one id deliberately left non-deterministic (it's a
+    /// facade-level handle, not carried in <see cref="GameSnapshot"/>), so a
+    /// rehydrate mints a fresh one; this aligns it back to the match's gid.
+    /// Idempotent; only valid before the facade is handed to live callers.
+    /// </summary>
+    public void OverrideGameId(Guid gameId) => GameId = gameId;
 
     public bool IsRoundComplete => _loopTask?.IsCompleted ?? false;
 
@@ -776,6 +807,13 @@ public sealed class GameFacade : IDisposable
         // record 0 (unknown) in that case.
         _gameSeed = rng?.Seed;
 
+        // PLAN 08 (body) — if the caller didn't pass an id source but pinned one
+        // at construction (server create-under-id-scope path), forward THAT same
+        // instance so the run continues the board build's monotonic id counter
+        // (id-identity across board+run). When neither is set the driver seeds
+        // its own from the rng seed — today's behaviour.
+        idSource ??= _pinnedIdSource;
+
         var orderedPlayers = firstPlayerSlot == 1
             ? new[] { _bob, _alice }
             : new[] { _alice, _bob };
@@ -1003,17 +1041,102 @@ public sealed class GameFacade : IDisposable
         ArgumentNullException.ThrowIfNull(snapshot);
         ArgumentNullException.ThrowIfNull(buildFreshFacade);
 
+        return await ReplayInternalAsync(
+            buildFreshFacade,
+            seed: snapshot.Seed,
+            aliceId: snapshot.AliceId,
+            bobId: snapshot.BobId,
+            instanceNames: snapshot.InstanceNames,
+            log: snapshot.Log,
+            onFacadeCreated: onFacadeCreated,
+            ct: ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// PLAN 08 (body) — replica rehydration entry point. Reconstructs a LIVE
+    /// <see cref="GameFacade"/> from the pinned game <paramref name="seed"/> + the
+    /// ordered command log (<paramref name="commandsSinceCheckpoint"/> — the whole
+    /// log when there is no checkpoint, or the checkpoint's bundled prefix
+    /// concatenated with the commands issued since), reaching the live state by
+    /// re-applying every command through the real <see cref="SubmitAsync"/> path
+    /// with event fan-out SUPPRESSED across the replay (the bridge attaches only
+    /// AFTER replay completes, so a rehydrated facade never re-emits history).
+    ///
+    /// <para>Unlike <see cref="FromSnapshot"/>, this OWNS the per-game
+    /// <see cref="DeterministicIdScope"/> (seeded from <paramref name="seed"/>),
+    /// installing it around BOTH <paramref name="buildFreshFacade"/> (initial
+    /// board construction) AND the replay. With the same seed + same command
+    /// order, every portal-facing id (<c>Player.Id</c>, <c>Card.InstanceId</c>,
+    /// stack ids) is reproduced byte-for-byte — the property the portal reducer
+    /// needs for a crashed game to resume seamlessly on another replica.</para>
+    ///
+    /// <para>Because the rebuild is id-identical, the logged commands' verbatim
+    /// ids already match the rebuilt facade's live objects — id rebinding is a
+    /// no-op safety net rather than a correctness requirement.</para>
+    /// </summary>
+    /// <param name="buildFreshFacade">Builds a fresh facade with the SAME initial
+    /// board/decks the original started from (deck composition is reconstructable
+    /// from the persisted match seed + deck snapshot).</param>
+    /// <param name="seed">The pinned per-game RNG seed (<c>Match.GameSeed</c>).</param>
+    /// <param name="commandsSinceCheckpoint">The ordered command log to replay.</param>
+    /// <param name="onFacadeCreated">Optional hook invoked the instant the fresh
+    /// facade exists, BEFORE replay starts (tests attach a subscriber to prove
+    /// fan-out suppression holds).</param>
+    public static async Task<GameFacade> Rehydrate(
+        Func<GameFacade> buildFreshFacade,
+        int seed,
+        IReadOnlyList<LoggedCommand> commandsSinceCheckpoint,
+        Action<GameFacade>? onFacadeCreated = null,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(buildFreshFacade);
+        ArgumentNullException.ThrowIfNull(commandsSinceCheckpoint);
+
+        // OWN the id scope so the caller doesn't have to: install a per-game
+        // deterministic id source seeded from the game seed around BOTH the
+        // board build and the replay. The driver continues this source via
+        // PushIfNone, so run-minted ids continue the same monotonic sequence —
+        // the rehydrated facade comes out id-identical to the original.
+        using var idScope = DeterministicIdScope.Push(new DeterministicIdSource(seed));
+
+        return await ReplayInternalAsync(
+            buildFreshFacade,
+            seed: seed,
+            aliceId: default,
+            bobId: default,
+            instanceNames: null,
+            log: commandsSinceCheckpoint,
+            onFacadeCreated: onFacadeCreated,
+            ct: ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Shared replay engine behind <see cref="FromSnapshot"/> and
+    /// <see cref="Rehydrate"/>: build a fresh facade, start it with the given
+    /// seed + a fresh logical clock, and fast-forward by re-applying every logged
+    /// command (rebinding nondeterministic ids when a seat/name map is supplied —
+    /// a no-op under an id-identical rehydrate) with event fan-out suppressed.
+    /// </summary>
+    private static async Task<GameFacade> ReplayInternalAsync(
+        Func<GameFacade> buildFreshFacade,
+        int seed,
+        Guid aliceId,
+        Guid bobId,
+        IReadOnlyDictionary<Guid, string>? instanceNames,
+        IReadOnlyList<LoggedCommand> log,
+        Action<GameFacade>? onFacadeCreated,
+        CancellationToken ct)
+    {
         var facade = buildFreshFacade();
         onFacadeCreated?.Invoke(facade);
 
         // Map the snapshot's original seat ids onto the rebuilt facade's
         // freshly-minted seats so each logged command's PlayerId rebinds.
         var seatById = new Dictionary<Guid, Player>();
-        if (snapshot.AliceId != default) seatById[snapshot.AliceId] = facade._alice;
-        if (snapshot.BobId != default) seatById[snapshot.BobId] = facade._bob;
+        if (aliceId != default) seatById[aliceId] = facade._alice;
+        if (bobId != default) seatById[bobId] = facade._bob;
 
-        var instanceNames = snapshot.InstanceNames
-            ?? new Dictionary<Guid, string>();
+        var names = instanceNames ?? new Dictionary<Guid, string>();
 
         // Fan-out suppression for the whole fast-forward. Folding into state
         // still happens (GetState stays correct); only external broadcast is
@@ -1026,12 +1149,12 @@ public sealed class GameFacade : IDisposable
 
             await facade.StartFullGameAsync(
                 maxTurns: 30,
-                rng: new Majik.Core.Random.GameRandom(snapshot.Seed),
+                rng: new Majik.Core.Random.GameRandom(seed),
                 logicalClock: new LogicalClock(),
                 ct: ct).ConfigureAwait(false);
 
             var game = facade._fullGameTask!;
-            var pending = new Queue<LoggedCommand>(snapshot.Log);
+            var pending = new Queue<LoggedCommand>(log);
 
             // Prompt-driven replay: the rebuilt game raises prompts in the
             // SAME order as the original (same seed), and the original log is
@@ -1050,7 +1173,7 @@ public sealed class GameFacade : IDisposable
 
                 var logged = pending.Dequeue();
                 var rebound = RebindForReplay(
-                    facade, logged.Command, prompt, seatById, instanceNames);
+                    facade, logged.Command, prompt, seatById, names);
 
                 try
                 {
