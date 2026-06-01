@@ -1,0 +1,10 @@
+{
+  "name": "The Goose Mother",
+  "types": ["Creature"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Bird", "Hydra"],
+  "manaCost": "{X}{G}{U}",
+  "power": 2,
+  "toughness": 2,
+  "abilities": []
+}
