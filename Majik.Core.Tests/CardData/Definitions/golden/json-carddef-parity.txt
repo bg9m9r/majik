@@ -1050,6 +1050,55 @@
     "Green"
   ]
 }
+==== bedevil ====
+{
+  "name": "Bedevil",
+  "manaCost": "{B}{B}{R}",
+  "primaryType": "Instant",
+  "cardTypes": [
+    "Instant"
+  ],
+  "supertypes": [],
+  "subtypes": [],
+  "power": null,
+  "toughness": null,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Black",
+    "Red"
+  ]
+}
 ==== birds-of-paradise ====
 {
   "name": "Birds of Paradise",
@@ -7021,6 +7070,56 @@
   },
   "mdfc": null,
   "colors": []
+}
+==== grave-titan ====
+{
+  "name": "Grave Titan",
+  "manaCost": "{4}{B}{B}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Giant"
+  ],
+  "power": 6,
+  "toughness": 6,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Black"
+  ]
 }
 ==== graypelt-refuge ====
 {
@@ -13225,6 +13324,54 @@
   "mdfc": null,
   "colors": []
 }
+==== reality-shift ====
+{
+  "name": "Reality Shift",
+  "manaCost": "{1}{U}",
+  "primaryType": "Instant",
+  "cardTypes": [
+    "Instant"
+  ],
+  "supertypes": [],
+  "subtypes": [],
+  "power": null,
+  "toughness": null,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Blue"
+  ]
+}
 ==== reckless-rage ====
 {
   "name": "Reckless Rage",
@@ -14250,6 +14397,59 @@
     "Green"
   ]
 }
+==== samwise-gamgee ====
+{
+  "name": "Samwise Gamgee",
+  "manaCost": "{1}{W}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [
+    "Legendary"
+  ],
+  "subtypes": [
+    "Halfling",
+    "Peasant"
+  ],
+  "power": 2,
+  "toughness": 1,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "White"
+  ]
+}
 ==== sanctifier-en-vec ====
 {
   "name": "Sanctifier en-Vec",
@@ -15190,6 +15390,54 @@
   "colors": [
     "Black"
   ]
+}
+==== sentinel-totem ====
+{
+  "name": "Sentinel Totem",
+  "manaCost": "{1}",
+  "primaryType": "Artifact",
+  "cardTypes": [
+    "Artifact"
+  ],
+  "supertypes": [],
+  "subtypes": [],
+  "power": null,
+  "toughness": null,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 1,
+      "list": [
+        "trig:CardMovedEvent=\u003EEffect"
+      ]
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": []
 }
 ==== sentinels-eyes ====
 {
@@ -16586,6 +16834,57 @@
   },
   "mdfc": null,
   "colors": []
+}
+==== spirit-of-the-labyrinth ====
+{
+  "name": "Spirit of the Labyrinth",
+  "manaCost": "{1}{W}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature",
+    "Enchantment"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Spirit"
+  ],
+  "power": 3,
+  "toughness": 1,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "White"
+  ]
 }
 ==== spymasters-vault ====
 {
@@ -18391,6 +18690,52 @@
   "colors": [
     "White"
   ]
+}
+==== the-underworld-cookbook ====
+{
+  "name": "The Underworld Cookbook",
+  "manaCost": "{1}",
+  "primaryType": "Artifact",
+  "cardTypes": [
+    "Artifact"
+  ],
+  "supertypes": [],
+  "subtypes": [],
+  "power": null,
+  "toughness": null,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": []
 }
 ==== the-wandering-emperor ====
 {
