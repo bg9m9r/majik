@@ -1,0 +1,5 @@
+{
+  "name": "Mortify",
+  "types": ["Instant"],
+  "manaCost": "{1}{W}{B}"
+}
