@@ -6617,6 +6617,56 @@
     "Green"
   ]
 }
+==== glorybringer ====
+{
+  "name": "Glorybringer",
+  "manaCost": "{3}{R}{R}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Dragon"
+  ],
+  "power": 4,
+  "toughness": 4,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Red"
+  ]
+}
 ==== goblin-dark-dwellers ====
 {
   "name": "Goblin Dark-Dwellers",
