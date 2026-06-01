@@ -1,0 +1,6 @@
+{
+  "name": "Tezzeret's Touch",
+  "types": ["Enchantment"],
+  "subtypes": ["Aura"],
+  "manaCost": "{1}{U}{B}"
+}
