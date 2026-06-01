@@ -103,8 +103,18 @@ public static class DelverOfSecretsFactory
 
         // CR 711 — attach the DFC face-tracker so callers can observe the
         // active face. Starts on the front face (Delver of Secrets);
-        // Transform() flips IsBackFace.
-        card.MdfcState = new MdfcState(FrontName, BackName);
+        // Transform() flips IsBackFace. The back-face characteristics carrier
+        // (Insectile Aberration — 3/2 blue Human Insect with Flying) drives
+        // the Layer-0 per-face replacement: while back-face up,
+        // ContinuousEffectsService.Compute seeds from these values.
+        card.MdfcState = new MdfcState(FrontName, BackName,
+            BackFaceCharacteristics.Creature(
+                name: BackName,
+                power: 3,
+                toughness: 2,
+                subtypes: new[] { CardSubtype.Human, CardSubtype.Insect },
+                keywords: new[] { "Flying" },
+                colors: new[] { Majik.Core.ValueObjects.ManaColor.Blue }));
 
         // ----------------------------------------------------------------
         // Upkeep trigger — CR 603.1, CR 500.4.

@@ -346,6 +346,19 @@ public sealed class ContinuousEffectsService
     /// </summary>
     private static PermanentCharacteristics SeedPrintedCharacteristics(Permanent permanent)
     {
+        // CR 711 / Layer-0 — a transform DFC permanent that is currently
+        // back-face up (and NOT face-down — CR 708.2 wins, handled below)
+        // seeds from its BACK face's printed characteristics, replacing the
+        // front-printed values. The normal CR 613 layer pipeline (anthems,
+        // counters, type/colour grants) then applies on top of this seed.
+        var back = permanent.MdfcState?.BackFaceCharacteristics;
+        if (back != null
+            && permanent.MdfcState!.IsBackFace
+            && !permanent.IsFaceDown)
+        {
+            return SeedBackFaceCharacteristics(back);
+        }
+
         PermanentCharacteristics chars;
         if (permanent is Creature creature)
         {
@@ -381,6 +394,31 @@ public sealed class ContinuousEffectsService
             chars.Colors.Add(c);
         }
 
+        return chars;
+    }
+
+    /// <summary>
+    /// CR 711 / Layer-0 — seed the working set from a transform DFC's BACK
+    /// face printed characteristics. A creature back seeds a
+    /// <see cref="CreatureCharacteristics"/> with the back face's P/T; a
+    /// non-creature back seeds a plain <see cref="PermanentCharacteristics"/>.
+    /// Types/subtypes/supertypes/keywords/colours come straight off the
+    /// <see cref="Majik.Core.CardData.MDFCs.BackFaceCharacteristics"/> carrier;
+    /// the CR 613 layer pipeline applies on top of this seed exactly as it
+    /// does for a front-printed seed.
+    /// </summary>
+    private static PermanentCharacteristics SeedBackFaceCharacteristics(
+        Majik.Core.CardData.MDFCs.BackFaceCharacteristics back)
+    {
+        PermanentCharacteristics chars = back.IsCreature
+            ? new CreatureCharacteristics { Power = back.Power, Toughness = back.Toughness }
+            : new PermanentCharacteristics();
+
+        foreach (var t in back.Types) chars.Types.Add(t);
+        foreach (var st in back.Subtypes) chars.Subtypes.Add(st);
+        foreach (var sup in back.Supertypes) chars.Supertypes.Add(sup);
+        foreach (var kw in back.Keywords) chars.Keywords.Add(kw);
+        foreach (var c in back.Colors) chars.Colors.Add(c);
         return chars;
     }
 
