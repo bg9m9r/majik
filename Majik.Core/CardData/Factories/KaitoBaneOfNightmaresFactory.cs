@@ -69,18 +69,21 @@ namespace Majik.Core.CardData.Factories;
 ///   (NOT <c>ExpiresAtEndOfTurn</c> — it is a static ability, re-evaluated
 ///   continuously, CR 613.6).
 ///
+/// ## Implemented (Ninjutsu + Stun untap)
+/// - <b>Ninjutsu {1}{U}{B} (CR 702.49).</b> Kaito carries a
+///   <see cref="NinjutsuAbility"/> marker recording the printed ninjutsu mana
+///   cost ({1}{U}{B}). The reusable <see cref="NinjutsuAction.Execute"/>
+///   primitive performs the special action: return an unblocked attacker the
+///   caster controls to hand (CR 702.49e / CR 506.4) and put Kaito onto the
+///   battlefield from hand tapped and attacking the same defender
+///   (CR 702.49b/d, via <see cref="Majik.Core.Combat.CombatManager.AddTappedAndAttackingToken"/>).
+/// - <b>Stun-counter untap replacement (CR 122.1g).</b> The −2 puts two stun
+///   counters on the target; the untap step (in <c>TurnDriver.UntapStep</c>)
+///   now removes one stun counter INSTEAD of untapping a permanent that has
+///   one, so a creature stunned by Kaito stays tapped through one untap step
+///   per counter.
+///
 /// ## Deferred (v1 gaps)
-/// - <b>Ninjutsu {1}{U}{B}.</b> The alternative-cost ninjutsu mechanic
-///   (CR 702.49 — return an unblocked attacker you control to hand, put this
-///   onto the battlefield tapped and attacking) is not modelled. Kaito is
-///   cast for his printed mana cost only; the ninjutsu put-into-combat path
-///   is a not-yet-built engine surface (no other card in the pool exercises
-///   ninjutsu yet). Recorded as a v1 deferral.
-/// - <b>Stun-counter untap replacement.</b> The −2 puts the two stun counters
-///   on the target (observable on its <see cref="CounterCollection"/>), but
-///   the "if it would untap, remove a stun counter instead" replacement
-///   (CR 614 / the stun-counter untap rule) is not wired — same posture as
-///   the bare <see cref="CounterType.Stun"/> marker introduced for this card.
 /// - <b>Animation through Compute / combat.</b> Like Mutavault / Karn's
 ///   animate, the Layer-4 grant + Layer-7b P/T are registered for layer-system
 ///   correctness, but <see cref="ContinuousEffectsService.Compute(Permanent)"/>
@@ -101,6 +104,8 @@ public static class KaitoBaneOfNightmaresFactory
 {
     public const string CardName = "Kaito, Bane of Nightmares";
     public const string Slug = "kaito-bane-of-nightmares";
+    /// <summary>CR 702.49 — Kaito's printed ninjutsu mana cost ({1}{U}{B}).</summary>
+    public const string NinjutsuCost = "{1}{U}{B}";
     public const int StartingLoyalty = 4;
     public const int Plus1Loyalty = +1;
     public const int ZeroLoyalty = 0;
@@ -158,6 +163,13 @@ public static class KaitoBaneOfNightmaresFactory
         // abilities — everything below is layered on.
         var definition = CardDefinitionLoader.FromEmbeddedResource(Slug);
         var kaito = (Planeswalker)CardDefinitionFactory.Build(definition, owner);
+
+        // -- Ninjutsu {1}{U}{B} (CR 702.49) ---------------------------------
+        // Marker carrying the ninjutsu mana cost. The special action (return
+        // an unblocked attacker to hand, put Kaito onto the battlefield tapped
+        // and attacking) is performed by NinjutsuAction.Execute; this marker
+        // exposes the cost + keeps Kaito discoverable as a Ninjutsu carrier.
+        kaito.AddAbility(new NinjutsuAbility(kaito, NinjutsuCost, owner));
 
         // -- +1: You get an emblem with "Ninjas you control get +1/+1." -----
         // CR 606 (loyalty) + CR 114 (emblem). Structural emblem — the anthem

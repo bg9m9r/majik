@@ -74,6 +74,21 @@ public class KaitoBaneOfNightmaresFactoryTests
     }
 
     [Fact]
+    public void Kaito_HasNinjutsuMarker_At1UB()
+    {
+        var kaito = KaitoBaneOfNightmaresFactory.Create(_alice);
+
+        // CR 702.49 — Kaito carries a Ninjutsu {1}{U}{B} marker.
+        var ninjutsu = kaito.Abilities
+            .OfType<Majik.Core.Keywords.NinjutsuAbility>()
+            .SingleOrDefault();
+        ninjutsu.Should().NotBeNull("Kaito has Ninjutsu");
+        ninjutsu!.ManaCost.Should().Be(
+            Majik.Core.ValueObjects.ManaCost.Parse("{1}{U}{B}"),
+            "Kaito's printed ninjutsu cost is {1}{U}{B}");
+    }
+
+    [Fact]
     public void NamedCardFactory_Dispatches_Kaito()
     {
         var card = NamedCardFactory.Create("Kaito, Bane of Nightmares", _alice);

@@ -486,7 +486,21 @@ public sealed class TurnDriver
                 && !Majik.Core.Effects.UntapStepRestrictions.ShouldSkipUntap(card, active)
                 && !blockedByCap.Contains(card))
             {
-                card.Untap();
+                // CR 122.1g — stun counters replace untapping. If a permanent
+                // with a stun counter on it would become untapped, instead
+                // remove a stun counter from it (it stays tapped). One untap
+                // consumes exactly one stun counter; a permanent with multiple
+                // stun counters needs that many untap steps to clear them. The
+                // counter mutation is the observable surface (the permanent's
+                // CounterCollection); no untap event fires.
+                if (card.Counters.Count(Majik.Core.Counters.CounterType.Stun) > 0)
+                {
+                    card.Counters.Remove(Majik.Core.Counters.CounterType.Stun, 1);
+                }
+                else
+                {
+                    card.Untap();
+                }
             }
             // CR 502 — clears summoning sickness, loyalty-once-per-turn,
             // and any other turn-scoped per-permanent flags. Always runs,

@@ -92,4 +92,26 @@ public class SireOfSevenDeathsFactoryTests
             "printed cost is non-mana (Pay 7 life) — mana portion is zero");
         SireOfSevenDeathsFactory.WardLifeCost.Should().Be("Pay 7 life");
     }
+
+    [Fact]
+    public void SireOfSevenDeaths_Ward_OpponentTargets_PaysSevenLifeOrSpellCountered()
+    {
+        // CR 702.21c — Ward—Pay 7 life. The bound WardEffect charges a real
+        // PayLifeCost(7) on Resolve against an opponent.
+        var bob = new Player("Bob", 20);
+        var sire = SireOfSevenDeathsFactory.Create(_alice);
+        sire.SetController(_alice);
+        var ward = SireOfSevenDeathsFactory.BuildWardEffect(sire);
+
+        // Opponent with 20 life can pay → not countered, loses 7.
+        var countered = ward.Resolve(bob);
+        countered.Should().BeFalse("Bob can pay 7 life from 20");
+        bob.LifeTotal.Should().Be(13, "Ward—Pay 7 life charged 7 life");
+
+        // Opponent at 5 life cannot pay → countered, no life lost.
+        var poorBob = new Player("PoorBob", 5);
+        var countered2 = ward.Resolve(poorBob);
+        countered2.Should().BeTrue("PoorBob cannot pay 7 life from 5");
+        poorBob.LifeTotal.Should().Be(5);
+    }
 }

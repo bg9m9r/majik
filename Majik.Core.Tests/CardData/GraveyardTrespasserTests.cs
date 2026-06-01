@@ -86,6 +86,34 @@ public class GraveyardTrespasserTests
             "one ETB trigger + one attack trigger (CR 603.1 / 508.1f)");
     }
 
+    [Fact]
+    public void GraveyardTrespasser_HasWardMarker()
+    {
+        var gt = GraveyardTrespasserFactory.Create(_alice);
+
+        gt.Abilities.OfType<KeywordAbility>()
+            .Should().Contain(k => k.Keyword == "Ward",
+                "CR 702.21 — Ward—Discard a card marker");
+    }
+
+    [Fact]
+    public void GraveyardTrespasser_Ward_OpponentTargets_DiscardsOrSpellCountered()
+    {
+        // CR 702.21c — Ward—Discard a card. The bound WardEffect charges a
+        // real DiscardACardCost on Resolve against an opponent.
+        var gt = GraveyardTrespasserFactory.Create(_alice);
+        gt.SetController(_alice);
+        var ward = GraveyardTrespasserFactory.BuildWardEffect(gt);
+
+        var spare = new Creature("Spare", "{1}", 1, 1) { Owner = _bob, Controller = _bob };
+        _bob.Zones.Hand.AddCard(spare);
+
+        ward.Resolve(_bob).Should().BeFalse("Bob discards a card to pay the ward");
+        _bob.Zones.Graveyard.GetCards().Should().Contain(spare);
+
+        ward.Resolve(_bob).Should().BeTrue("Bob's hand is now empty — the ward counters his spell");
+    }
+
     // ------------------------------------------------------------------
     // CR 702.145c — front-face daybound werewolf transforms when it becomes
     // night (exercises the PR2 transform surface directly).

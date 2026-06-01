@@ -86,4 +86,27 @@ public class RealitySmasherFactoryTests
             "printed cost is non-mana — mana portion is zero");
         RealitySmasherFactory.WardDiscardCost.Should().Be("Discard a card");
     }
+
+    [Fact]
+    public void RealitySmasher_Ward_OpponentTargets_DiscardsOrSpellCountered()
+    {
+        // CR 702.21c — Ward—Discard a card. The bound WardEffect charges a
+        // real DiscardACardCost on Resolve against an opponent.
+        var bob = new Player("Bob", 20);
+        var smasher = RealitySmasherFactory.Create(_alice);
+        smasher.SetController(_alice);
+        var ward = RealitySmasherFactory.BuildWardEffect(smasher);
+
+        // Opponent with a card discards it → not countered.
+        var spare = new Creature("Spare", "{1}", 1, 1) { Owner = bob, Controller = bob };
+        bob.Zones.Hand.AddCard(spare);
+
+        var countered = ward.Resolve(bob);
+        countered.Should().BeFalse("Bob discards a card to satisfy the ward");
+        bob.Zones.Graveyard.GetCards().Should().Contain(spare);
+
+        // Opponent with empty hand cannot pay → countered.
+        var countered2 = ward.Resolve(bob);
+        countered2.Should().BeTrue("Bob's hand is now empty — the ward counters his spell");
+    }
 }
