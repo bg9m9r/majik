@@ -1,0 +1,6 @@
+{
+  "name": "The Stone Brain",
+  "types": ["Artifact"],
+  "supertypes": ["Legendary"],
+  "manaCost": "{2}"
+}
