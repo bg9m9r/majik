@@ -29,6 +29,18 @@ dotnet run --project Majik.Console -- play-triggers [etb|apnap|intervening-if|de
 dotnet run --project Majik.Console -- export-modern-cards <path-to-scryfall-all-cards.json>
 ```
 
+## OpenAPI contract (portal integration)
+
+`Majik.Server` emits its OpenAPI document at `/openapi/v1.json` (`AddOpenApi()` + `MapOpenApi()` in `Program.cs`). The portal commits that document as `majik.portal/openapi.json` and regenerates its typed Angular client from the committed copy via `npm run openapi` (`openapi:fetch` curls the deployed `/openapi/v1.json`, then `ng-openapi-gen` regenerates `src/app/core/api/`).
+
+`Majik.Server.Tests/OpenApiContractDriftTests.cs` is the **contract-drift gate**: it GETs `/openapi/v1.json` on an in-process test host, normalizes it (sorted keys; the volatile `servers` host and `info.version` stripped), and diffs against the committed snapshot `Majik.Server.Tests/Snapshots/openapi.v1.json`. Any DTO / event / endpoint change that alters the contract fails this test in core CI — at PR time, in one repo — so a forgotten portal `npm run openapi` is caught here instead of breaking at runtime.
+
+When this gate fails (or you intentionally change the contract):
+
+1. Regenerate `Majik.Server.Tests/Snapshots/openapi.v1.json` from the emitted document.
+2. In `majik.portal`, run `npm run openapi` to refresh `openapi.json` + the generated client.
+3. Ship the API change **first** (api-first deploy ordering) so the portal never builds against a contract the deployed API hasn't shipped yet.
+
 ## Card data
 
 The engine reads its Modern-legal pool from a gzipped JSON resource embedded in `Majik.Core`:
