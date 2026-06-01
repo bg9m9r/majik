@@ -262,6 +262,9 @@ public enum CardSubtype
     /// of the Dragons of Tarkir Elder Dragon cycle, Etali, Primal Storm
     /// (Elder Dinosaur), Nicol Bolas's pre-planeswalker printings. CR 205.3m.</summary>
     Elder,
+    /// <summary>Salamander creature subtype — Pteramander (Ravnica Allegiance),
+    /// the broader Simic / Izzet salamander lineage. CR 205.3m.</summary>
+    Salamander,
     /// <summary>Arcane spell subtype — Champions of Kamigawa block (Desperate
     /// Ritual, Goryo's Vengeance, Through the Breach, Glacial Ray, …). The
     /// only subtype that exists for instant / sorcery spells in the engine;
