@@ -1,0 +1,7 @@
+{
+  "name": "Roadside Reliquary",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "C" }
+  ]
+}
