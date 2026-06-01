@@ -292,6 +292,14 @@ public sealed class MatchService
             {
                 var creatorDeck = await _decks.LoadAsync(creator.DeckId, ct);
                 var botDeck = await _decks.LoadFromCardNamesAsync(botSnapshot, ct);
+                // Deferral #8 — the bot's 15-card sideboard, materialized
+                // up-front (async) so it can be folded into the under-id-scope
+                // facade build below. Empty for archetypes without a declared
+                // sideboard.
+                var botSideboardNames = Majik.Bot.Decks.BotDeckCatalog.GetSideboard(bot.Archetype);
+                var botSideboard = botSideboardNames.Count > 0
+                    ? await _decks.LoadFromCardNamesAsync(botSideboardNames, ct)
+                    : System.Array.Empty<Majik.Core.Cards.ICard>();
                 // Bridge engine-internal bot-thinking signal to the SignalR
                 // hub so the frontend can show a "Bot is thinking…"
                 // indicator while the policy runs.
@@ -331,13 +339,30 @@ public sealed class MatchService
                 // PLAN 08 (body) — see the join path: build under a seed-scoped
                 // deterministic id source when persistence is on, so the original
                 // game's ids are reproducible for a later id-identical rehydrate.
+                // Deferral #8 — wire the bot's 15-card sideboard into match
+                // start. The bot is the Bob seat; populating its sideboard
+                // (CR 100.4 / CR 408) makes the archetype's wish targets +
+                // any nominated companion live the moment the game starts —
+                // e.g. RubyStorm's maindeck Wishes can fetch Grapeshot /
+                // Empty the Warrens from the wishboard. Empty for archetypes
+                // without a declared sideboard (a clean no-op). Folded INTO
+                // the under-id-scope build so the sideboard cards' object ids
+                // stay reproducible for id-identical rehydration (PLAN 08).
                 facade = CreateFacadeUnderIdScope(matchSeed,
-                    () => _gameFactory.Create(
-                        creator.Handle, botPlayer.Handle,
-                        creatorDeck, botDeck,
-                        botSeatArchetype: bot.Archetype,
-                        onBotThinking: onBotThinking,
-                        extraDecisionSink: extraSinkArg));
+                    () =>
+                    {
+                        var f = _gameFactory.Create(
+                            creator.Handle, botPlayer.Handle,
+                            creatorDeck, botDeck,
+                            botSeatArchetype: bot.Archetype,
+                            onBotThinking: onBotThinking,
+                            extraDecisionSink: extraSinkArg);
+                        if (botSideboard.Count > 0)
+                        {
+                            f.PopulateSideboard(f.Bob, botSideboard);
+                        }
+                        return f;
+                    });
                 // Wire the engine→SignalR bridge before any engine work
                 // can fire events (StartFullGameAsync happens later). The
                 // bridge holds the IDisposable subscriptions; teardown

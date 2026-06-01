@@ -70,4 +70,30 @@ public class DeckBindingAuditTests
         missing.Should().BeEmpty(
             "every bot-deck card must resolve to a row in the embedded pool");
     }
+
+    /// <summary>
+    /// Deferral #8 — sideboard spelling sanity. Every card name in every
+    /// bot archetype's sideboard (the wishboard, CR 408) must resolve to a
+    /// row in the embedded pool, exactly like the mainboard audit above. A
+    /// typo'd sideboard name would otherwise surface as a
+    /// <c>DeckLoadException</c> at match start when the bot's sideboard is
+    /// materialized.
+    /// </summary>
+    [Fact]
+    public void Audit_EverySideboardCard_ResolvesInSeed()
+    {
+        var repo = new EmbeddedCardRepository();
+
+        var missing = BotDeckCatalog.Archetypes
+            .SelectMany(a => BotDeckCatalog.GetSideboard(a).Distinct(StringComparer.Ordinal))
+            .Where(n => repo.GetByName(n) is null)
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(n => n, StringComparer.Ordinal)
+            .ToList();
+
+        foreach (var name in missing) _out.WriteLine($"  MISSING-SB  {name}");
+
+        missing.Should().BeEmpty(
+            "every bot-deck SIDEBOARD card must resolve to a row in the embedded pool");
+    }
 }

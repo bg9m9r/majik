@@ -187,4 +187,75 @@ public class GameFacadeTests
         });
         await task;
     }
+
+    // ── PopulateSideboard (deferral #8 — bot-deck sideboard wiring) ─────
+
+    [Fact]
+    public void PopulateSideboard_PlacesLiveCardsInSeatsSideboardZone()
+    {
+        var facade = GameFacade.Create("Alice", "Bob",
+            aliceDeck: Array.Empty<ICard>(), bobDeck: Array.Empty<ICard>());
+
+        // NB: BuildDeckCard may swap the shell for a freshly-built factory
+        // instance (the production binder/factory path), so assert on the
+        // live cards in the zone by name, not on the input references.
+        facade.PopulateSideboard(facade.Bob, new ICard[]
+        {
+            new Sorcery("Grapeshot", "1R"),
+            new Sorcery("Empty the Warrens", "3RR"),
+        });
+
+        // Both cards live in Bob's sideboard zone (CR 100.4) ...
+        var live = facade.Bob.Sideboard.GetCards().ToList();
+        live.Should().HaveCount(2);
+        live.Select(c => c.Name).Should().BeEquivalentTo(new[] { "Grapeshot", "Empty the Warrens" });
+        live.Should().OnlyContain(c => c.Zone == ZoneType.Sideboard);
+
+        // ... never the opening library, and owned by the seat.
+        facade.Bob.Zones.GetZone(ZoneType.Library).Count.Should().Be(0);
+        live.Should().OnlyContain(c => ReferenceEquals(c.Owner, facade.Bob));
+
+        // Alice's sideboard is untouched.
+        facade.Alice.Sideboard.Count.Should().Be(0);
+    }
+
+    [Fact]
+    public void PopulateSideboard_IsAlsoTheWishboard_ForWishTutorEffects()
+    {
+        // CR 408 — Player.Wishboard is a semantic alias over the Sideboard
+        // zone. Wish-tutor effects ("a card you own from outside the game")
+        // read it, so populating the sideboard makes wish targets live.
+        var facade = GameFacade.Create("Alice", "Bob",
+            aliceDeck: Array.Empty<ICard>(), bobDeck: Array.Empty<ICard>());
+
+        facade.PopulateSideboard(facade.Bob, new ICard[] { new Sorcery("Grapeshot", "1R") });
+
+        facade.Bob.Wishboard.GetCards().Select(c => c.Name).Should().Contain("Grapeshot",
+            "the wishboard is the sideboard pile — wish tutors can now see it");
+    }
+
+    [Fact]
+    public void PopulateSideboard_EmptyOrNull_IsNoOp()
+    {
+        var facade = GameFacade.Create("Alice", "Bob",
+            aliceDeck: Array.Empty<ICard>(), bobDeck: Array.Empty<ICard>());
+
+        facade.PopulateSideboard(facade.Bob, Array.Empty<ICard>());
+        facade.PopulateSideboard(facade.Bob, null!);
+
+        facade.Bob.Sideboard.Count.Should().Be(0);
+    }
+
+    [Fact]
+    public void PopulateSideboard_ForeignSeat_Throws()
+    {
+        var facade = GameFacade.Create("Alice", "Bob",
+            aliceDeck: Array.Empty<ICard>(), bobDeck: Array.Empty<ICard>());
+        var stranger = new Majik.Core.Players.Player("Mallory", 20);
+
+        var act = () => facade.PopulateSideboard(stranger,
+            new ICard[] { new Sorcery("Grapeshot", "1R") });
+
+        act.Should().Throw<ArgumentException>();
+    }
 }

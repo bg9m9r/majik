@@ -60,7 +60,6 @@ public static partial class NamedCardFactory
             "Grizzly Bears"   => new Creature(name, "1G", 2, 2),
             "Runeclaw Bear"   => new Creature(name, "1G", 2, 2),
             "Hill Giant"      => new Creature(name, "3R", 3, 3),
-            "Centaur Courser" => new Creature(name, "2G", 3, 3),
 
             // 3) Unknown name — vanilla shell. Mirrors the historical
             //    behaviour of the original 317-arm switch.

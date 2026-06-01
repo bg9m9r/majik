@@ -87,7 +87,12 @@ public class MatchEndpointsBotTests : IClassFixture<TestMongoFixture>
         repo.Add("Hill Giant", "Creature — Giant");
         foreach (var archetype in BotDeckCatalog.Archetypes)
         {
+            // Mainboard AND sideboard (deferral #8 — the bot's 15-card
+            // sideboard is now materialized at match start, so the fake repo
+            // must resolve every sideboard name too or RealDeckLoader throws
+            // DeckLoadException on the sideboard load).
             foreach (var card in BotDeckCatalog.Get(archetype)
+                .Concat(BotDeckCatalog.GetSideboard(archetype))
                 .Distinct(StringComparer.OrdinalIgnoreCase))
             {
                 if (repo.GetByName(card) != null) continue;

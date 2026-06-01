@@ -143,7 +143,11 @@ public sealed class LayerAgreementHarness : IDisposable
         repo.Add("Hill Giant", "Creature — Giant");
         foreach (var archetype in BotDeckCatalog.Archetypes)
         {
+            // Mainboard AND sideboard (deferral #8 — the bot's 15-card
+            // sideboard is materialized at match start, so every sideboard
+            // name must resolve in the fake repo too).
             foreach (var card in BotDeckCatalog.Get(archetype)
+                .Concat(BotDeckCatalog.GetSideboard(archetype))
                 .Distinct(StringComparer.OrdinalIgnoreCase))
             {
                 if (repo.GetByName(card) != null) continue;

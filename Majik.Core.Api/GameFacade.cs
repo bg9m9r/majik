@@ -535,6 +535,40 @@ public sealed class GameFacade : IDisposable
     }
 
     /// <summary>
+    /// CR 100.4 / CR 408 — populate <paramref name="seat"/>'s sideboard
+    /// (a.k.a. the wishboard) with live card instances built from
+    /// <paramref name="sideboard"/>. Each shell runs through the SAME
+    /// <see cref="BuildDeckCard"/> binder/factory path the main deck uses, so
+    /// a wish-tutor effect ("a card you own from outside the game" — Wish,
+    /// Burning Wish, Karn, the Great Creator, etc.) sees a fully-bound card,
+    /// and a nominated companion can be cast from this zone.
+    ///
+    /// <para>The seat must be one of this facade's two players (<see cref="Alice"/>
+    /// or <see cref="Bob"/>). A null / empty list is a no-op — archetypes
+    /// without a defined sideboard simply get an empty wishboard, exactly as
+    /// before. Call before <see cref="StartFullGameAsync"/>; the cards land in
+    /// the <see cref="ZoneType.Sideboard"/> zone, never in the opening library.</para>
+    /// </summary>
+    public void PopulateSideboard(Player seat, IReadOnlyList<ICard> sideboard)
+    {
+        ArgumentNullException.ThrowIfNull(seat);
+        if (!ReferenceEquals(seat, _alice) && !ReferenceEquals(seat, _bob))
+        {
+            throw new ArgumentException(
+                "Sideboard can only be populated for one of this facade's two seats.",
+                nameof(seat));
+        }
+        if (sideboard == null || sideboard.Count == 0) return;
+
+        foreach (var card in sideboard)
+        {
+            var live = BuildDeckCard(card, seat, _cardRepo, Replacements, ContinuousEffects);
+            live.SetZone(ZoneType.Sideboard);
+            seat.Zones.Sideboard.AddCard(live);
+        }
+    }
+
+    /// <summary>
     /// Produce the live deck-card instance for <paramref name="shell"/>.
     ///
     /// <para>Default path (binder chain): set owner on the incoming shell and
