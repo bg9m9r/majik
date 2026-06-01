@@ -1,0 +1,5 @@
+{
+  "name": "Ghostly Flicker",
+  "types": ["Instant"],
+  "manaCost": "{2}{U}"
+}
