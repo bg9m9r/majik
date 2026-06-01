@@ -71,19 +71,89 @@ public class SagaBinderNamedCardsTests
             "Fable of the Mirror-Breaker // Reflection of Kiki-Jiki");
         SagaBinder.Bind(saga, MakeEntity(saga.Name)).Should().BeTrue();
 
-        // Stack hand: 3 cards. Library: 5 cards.
-        for (var i = 0; i < 3; i++)
-            owner.Zones.Hand.AddCard(new Card($"h{i}", ""));
-        for (var i = 0; i < 5; i++)
-            owner.Zones.Library.AddCard(new Card($"l{i}", ""));
+        // CR 701.7 — "you may discard up to two cards." The agent (resolved
+        // via AgentRegistry) is prompted to pick which cards to discard; here
+        // it discards two (the front-of-hand cards).
+        var agent = new Majik.Core.Players.Agents.ScriptedAgent();
+        agent.QueueFromHand(cs => cs[0]);
+        agent.QueueFromHand(cs => cs[0]);
+        Majik.Core.Players.Agents.AgentRegistry.Set(owner, agent);
 
-        saga.SagaState!.AdvanceAndChapter(); // I (spawns token, no hand impact)
-        saga.SagaState.AdvanceAndChapter();  // II
+        try
+        {
+            // Stack hand: 3 cards. Library: 5 cards.
+            for (var i = 0; i < 3; i++)
+                owner.Zones.Hand.AddCard(new Card($"h{i}", ""));
+            for (var i = 0; i < 5; i++)
+                owner.Zones.Library.AddCard(new Card($"l{i}", ""));
 
-        owner.Zones.Graveyard.GetCards().Count().Should().Be(2);
-        // Hand started at 3, discarded 2, drew 2 → still 3.
+            saga.SagaState!.AdvanceAndChapter(); // I (spawns token, no hand impact)
+            saga.SagaState.AdvanceAndChapter();  // II
+
+            owner.Zones.Graveyard.GetCards().Count().Should().Be(2);
+            // Hand started at 3, discarded 2, drew 2 → still 3.
+            owner.Zones.Hand.GetCards().Count().Should().Be(3);
+            owner.Zones.Library.GetCards().Count().Should().Be(3);
+        }
+        finally
+        {
+            Majik.Core.Players.Agents.AgentRegistry.Remove(owner);
+        }
+    }
+
+    // Deferral #6 — CR 701.7. Fable chapter II is "you MAY discard up to two
+    // cards. If you do, draw that many cards." The controller's agent decides
+    // how many (0, 1, or 2); exactly that many are drawn. The "may" is honoured
+    // — the controller can decline (discard 0 → draw 0).
+
+    [Fact]
+    public void Fable_ChapterII_AgentDiscardsZero_DrawsZero_MayHonoured()
+    {
+        var (owner, saga) = MakeSaga(
+            "Fable of the Mirror-Breaker // Reflection of Kiki-Jiki");
+        SagaBinder.Bind(saga, MakeEntity(saga.Name)).Should().BeTrue();
+
+        // Scripted "you may" opt-out — the agent declines on the first prompt.
+        var agent = new Majik.Core.Players.Agents.ScriptedAgent();
+        agent.QueueFromHand((Majik.Core.Cards.ICard?)null); // decline → discard 0
+        Majik.Core.Players.Agents.AgentRegistry.Set(owner, agent);
+
+        try
+        {
+            for (var i = 0; i < 3; i++) owner.Zones.Hand.AddCard(new Card($"h{i}", ""));
+            for (var i = 0; i < 5; i++) owner.Zones.Library.AddCard(new Card($"l{i}", ""));
+
+            saga.SagaState!.AdvanceAndChapter(); // I
+            saga.SagaState.AdvanceAndChapter();  // II — agent declines
+
+            owner.Zones.Graveyard.GetCards().Should().BeEmpty("declined → discard 0");
+            owner.Zones.Hand.GetCards().Count().Should().Be(3, "no discard, no draw");
+            owner.Zones.Library.GetCards().Count().Should().Be(5, "drew 0 (you may declined)");
+        }
+        finally
+        {
+            Majik.Core.Players.Agents.AgentRegistry.Remove(owner);
+        }
+    }
+
+    [Fact]
+    public void Fable_ChapterII_NoAgentRegistered_DefaultsToDeclineDiscardZero()
+    {
+        var (owner, saga) = MakeSaga(
+            "Fable of the Mirror-Breaker // Reflection of Kiki-Jiki");
+        SagaBinder.Bind(saga, MakeEntity(saga.Name)).Should().BeTrue();
+
+        // No agent registered and no explicit count override → safe "may"
+        // opt-out: discard 0, draw 0 (never auto-discards the controller's hand).
+        for (var i = 0; i < 3; i++) owner.Zones.Hand.AddCard(new Card($"h{i}", ""));
+        for (var i = 0; i < 5; i++) owner.Zones.Library.AddCard(new Card($"l{i}", ""));
+
+        saga.SagaState!.AdvanceAndChapter(); // I
+        saga.SagaState.AdvanceAndChapter();  // II — no agent → decline
+
+        owner.Zones.Graveyard.GetCards().Should().BeEmpty("no agent → honour 'may' and discard nothing");
         owner.Zones.Hand.GetCards().Count().Should().Be(3);
-        owner.Zones.Library.GetCards().Count().Should().Be(3);
+        owner.Zones.Library.GetCards().Count().Should().Be(5);
     }
 
     [Fact]

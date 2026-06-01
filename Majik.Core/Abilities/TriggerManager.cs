@@ -130,6 +130,27 @@ public class TriggerManager
         AddAbility(ability);
     }
 
+    /// <summary>
+    /// Place an already-triggered ability directly onto the pending queue
+    /// (CR 603.3) without matching it against a game event. Used by engine
+    /// surfaces that know an ability has triggered for game-state reasons the
+    /// event bus does not model — notably a Saga chapter ability, which the
+    /// engine fires when the lore counter reaches the chapter number
+    /// (CR 714.2b). The ability is drained onto the stack on the next
+    /// <see cref="PutPendingTriggersOnStack"/> / <c>...Async</c> call, exactly
+    /// like an event-matched trigger, so an opponent receives a priority
+    /// window before it resolves.
+    /// </summary>
+    public void EnqueuePending(ITriggeredAbility ability)
+    {
+        if (ability == null)
+        {
+            throw new ArgumentNullException(nameof(ability));
+        }
+
+        _pending.Add(ability);
+    }
+
     public void UnregisterTriggeredAbility(ITriggeredAbility ability)
     {
         if (ability == null)

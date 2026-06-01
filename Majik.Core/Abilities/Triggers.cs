@@ -15,6 +15,18 @@ namespace Majik.Core.Abilities;
 public static class Triggers
 {
     /// <summary>
+    /// A condition that never matches a live game event. Used for abilities
+    /// that are placed directly onto the pending queue (CR 603.3 — already
+    /// "triggered") rather than evaluated against an event — e.g. a Saga
+    /// chapter ability the engine enqueues itself when the lore counter hits
+    /// the chapter threshold (CR 714.2b). The ability still resolves off the
+    /// stack normally; this condition just guarantees it is never re-fired by
+    /// <see cref="TriggerManager.EvaluateTriggers"/>.
+    /// </summary>
+    public static ITriggerCondition Never()
+        => new EventTriggerCondition<GameEvent>((_, _) => false);
+
+    /// <summary>
     /// "When ~ enters the battlefield" — fires when the given source card moves
     /// to the battlefield.
     /// </summary>
