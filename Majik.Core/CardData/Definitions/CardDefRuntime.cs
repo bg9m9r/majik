@@ -4,7 +4,9 @@ using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
 using Majik.Core.Counters;
 using Majik.Core.Effects;
+using Majik.Core.Game;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
 using Majik.Core.Primitives;
 using Majik.Core.Services;
 using Majik.Core.Spells;
@@ -205,6 +207,211 @@ public static class CardDefRuntime
         return result;
     }
 
+    /// <summary>
+    /// Compile a fluent <c>.Resolve(...)</c> body into a full
+    /// <see cref="SpellDefinition"/> — the targeted-spell tier that previously
+    /// required a hand-written factory. Each targeted resolve step
+    /// (<see cref="ResolveEffect.Target"/> non-null) emits one
+    /// <see cref="TargetRequest"/> in printed order; the returned
+    /// <see cref="SpellDefinition.EffectFactory"/> reads the caster's chosen
+    /// target for each slot, runs the resolver, and materializes the step onto
+    /// the shared <see cref="Majik.Core.Primitives.Fx"/> vocabulary. Untargeted
+    /// steps (Mill / Draw / GainLife / AddMana / CreateToken) materialize
+    /// directly.
+    ///
+    /// <para>
+    /// This is the one-stop bridge that lets a targeted instant / sorcery be
+    /// declared in ~10 fluent lines instead of a ~60-line bespoke
+    /// <c>BuildSpellDefinition</c>:
+    /// </para>
+    /// <code>
+    /// public static SpellDefinition BuildSpellDefinition(Func&lt;object, object&gt; resolver) =>
+    ///     CardDefRuntime.BuildSpellDefinition(Define(), resolver);
+    /// // where Define() = CardDef.Instant("Shock", "{R}")
+    /// //                      .Resolve(c => c.DealDamage(2).To(TargetKind.AnyTarget));
+    /// </code>
+    /// </summary>
+    /// <param name="def">A card def carrying a <c>Resolve(...)</c> body.</param>
+    /// <param name="resolver">Maps a chosen-target token to the live game
+    /// object (Player / Creature / spell on the stack). Pass <c>o =&gt; o</c>
+    /// in tests that hand engine objects directly.</param>
+    /// <param name="controller">The spell's controller — the recipient of
+    /// controller-scoped untargeted steps (Mill / Draw / GainLife / LoseLife /
+    /// AddMana / CreateToken). Required when the body has any such step;
+    /// omit for purely target-only bodies (Shock-style burn, removal,
+    /// counters). When null, the cast flow's
+    /// <see cref="ChosenSpellParams.AllPlayers"/> first entry is used as a
+    /// best-effort fallback.</param>
+    /// <param name="stack">Live stack — required only for <c>Counter</c>
+    /// bodies (the countered spell lives there). Null elsewhere.</param>
+    /// <param name="zones">Zone service — required only for <c>CreateToken</c>
+    /// bodies. Null elsewhere.</param>
+    public static SpellDefinition BuildSpellDefinition(
+        CardDef def,
+        Func<object, object> resolver,
+        Player? controller = null,
+        Majik.Core.Stack.Stack? stack = null,
+        ZoneService? zones = null)
+    {
+        ArgumentNullException.ThrowIfNull(def);
+        ArgumentNullException.ThrowIfNull(resolver);
+        if (def.ResolveBody is null)
+        {
+            throw new InvalidOperationException(
+                $"CardDef '{def.Name}' has no Resolve(...) body — cannot build a SpellDefinition. " +
+                "Declare effects via .Resolve(c => ...) before calling BuildSpellDefinition.");
+        }
+
+        var steps = def.ResolveBody.Effects;
+
+        // One TargetRequest per targeted step, in printed order. The slot index
+        // each step reads at resolution is its position in this list.
+        var targetRequests = new List<TargetRequest>();
+        // Parallel to `steps`: the target-slot index for a targeted step, or -1
+        // for an untargeted step.
+        var slotForStep = new int[steps.Count];
+        for (var i = 0; i < steps.Count; i++)
+        {
+            var step = steps[i];
+            if (step.Target is { } kind)
+            {
+                slotForStep[i] = targetRequests.Count;
+                targetRequests.Add(BuildTargetRequest(kind));
+            }
+            else
+            {
+                slotForStep[i] = -1;
+            }
+        }
+
+        return new SpellDefinition(
+            Modes: Array.Empty<string>(),
+            HasVariableX: false,
+            TargetRequests: targetRequests,
+            EffectFactory: chosen =>
+            {
+                // Controller scope for untargeted steps: prefer the explicit
+                // caster, else the cast flow's AllPlayers[0] (best-effort), else
+                // a throwaway zero-life player so the materializers' null-guards
+                // engage instead of NRE-ing in pure-shape tests.
+                var liveController = controller
+                    ?? (chosen.AllPlayers is { Count: > 0 } all ? all[0] : null)
+                    ?? (_fallbackController ??= new Player("(unspecified)", 0));
+
+                var effects = new List<IEffect>(steps.Count);
+                for (var i = 0; i < steps.Count; i++)
+                {
+                    var step = steps[i];
+                    var slot = slotForStep[i];
+                    object? chosenTarget = null;
+                    if (slot >= 0 && slot < chosen.Targets.Count)
+                    {
+                        var picks = chosen.Targets[slot];
+                        if (picks.Count > 0) chosenTarget = picks[0];
+                    }
+
+                    effects.Add(MaterializeStep(
+                        def, step, liveController, resolver!, chosenTarget, stack, zones));
+                }
+                return effects;
+            });
+    }
+
+    [ThreadStatic]
+    private static Player? _fallbackController;
+
+    /// <summary>
+    /// Map a DSL <see cref="TargetKind"/> onto a live
+    /// <see cref="TargetRequest"/> (1..1, with the matching candidate gatherer
+    /// + bot intent). Mirrors the hand-written request shapes the bespoke
+    /// factories emit (Shock's "any target", Negate's "target noncreature
+    /// spell", etc.). Spell-targeting kinds leave the static candidate pool
+    /// empty — the cast flow gathers stack spells just as the bespoke
+    /// counterspell factories do.
+    /// </summary>
+    private static TargetRequest BuildTargetRequest(TargetKind kind) => kind switch
+    {
+        TargetKind.AnyTarget => new TargetRequest(
+            "any target", 1, 1, Array.Empty<object>(), BotIntent.Burn,
+            CandidateGatherer: AnyTargetCandidates),
+
+        TargetKind.Creature => new TargetRequest(
+            "target creature", 1, 1, Array.Empty<object>(), BotIntent.Removal,
+            CandidateGatherer: ctx => CreaturesWhere(ctx, _ => true)),
+
+        TargetKind.OpponentCreature => new TargetRequest(
+            "target creature an opponent controls", 1, 1, Array.Empty<object>(), BotIntent.Removal,
+            CandidateGatherer: ctx => CreaturesWhere(ctx,
+                c => !ReferenceEquals(c.Controller, ctx.Self))),
+
+        TargetKind.NonblackCreature => new TargetRequest(
+            "target nonblack creature", 1, 1, Array.Empty<object>(), BotIntent.Removal,
+            CandidateGatherer: ctx => CreaturesWhere(ctx,
+                c => !CardColors.GetColors(c).Contains(ManaColor.Black))),
+
+        TargetKind.NonblackNonartifactCreature => new TargetRequest(
+            "target nonblack, nonartifact creature", 1, 1, Array.Empty<object>(), BotIntent.Removal,
+            CandidateGatherer: ctx => CreaturesWhere(ctx,
+                c => !CardColors.GetColors(c).Contains(ManaColor.Black)
+                  && !c.HasType(CardType.Artifact))),
+
+        TargetKind.Permanent => new TargetRequest(
+            "target permanent", 1, 1, Array.Empty<object>(), BotIntent.Removal,
+            CandidateGatherer: ctx => ctx.AllPlayers
+                .SelectMany(p => p.Zones.Battlefield.GetCards())
+                .OfType<Permanent>()
+                .Cast<object>()
+                .ToList()),
+
+        TargetKind.Player => new TargetRequest(
+            "target player", 1, 1, Array.Empty<object>(), BotIntent.None,
+            CandidateGatherer: ctx => ctx.AllPlayers.Cast<object>().ToList()),
+
+        TargetKind.Opponent => new TargetRequest(
+            "target opponent", 1, 1, Array.Empty<object>(), BotIntent.None,
+            CandidateGatherer: ctx => ctx.AllPlayers
+                .Where(p => !ReferenceEquals(p, ctx.Self))
+                .Cast<object>()
+                .ToList()),
+
+        TargetKind.CreatureOrPlayer => new TargetRequest(
+            "target creature or player", 1, 1, Array.Empty<object>(), BotIntent.Burn,
+            CandidateGatherer: ctx => ctx.AllPlayers
+                .SelectMany(p => p.Zones.Battlefield.GetCards())
+                .OfType<Creature>()
+                .Cast<object>()
+                .Concat(ctx.AllPlayers.Cast<object>())
+                .ToList()),
+
+        // Counter targets a spell on the stack. The bespoke counterspell
+        // factories leave LegalCandidates empty (the cast flow gathers stack
+        // spells); match that posture.
+        TargetKind.Spell => new TargetRequest(
+            "target spell", 1, 1, Array.Empty<object>(), BotIntent.Counter),
+
+        TargetKind.NoncreatureSpell => new TargetRequest(
+            "target noncreature spell", 1, 1, Array.Empty<object>(), BotIntent.Counter),
+
+        _ => throw new NotSupportedException(
+            $"TargetKind '{kind}' is not yet mapped to a TargetRequest by CardDefRuntime."),
+    };
+
+    private static IReadOnlyList<object> AnyTargetCandidates(GameContext ctx) =>
+        ctx.AllPlayers
+            .SelectMany(p => p.Zones.Battlefield.GetCards())
+            .Where(c => c.HasType(CardType.Creature) || c.HasType(CardType.Planeswalker))
+            .Cast<object>()
+            .Concat(ctx.AllPlayers.Cast<object>())
+            .ToList();
+
+    private static IReadOnlyList<object> CreaturesWhere(GameContext ctx, Func<Creature, bool> filter) =>
+        ctx.AllPlayers
+            .SelectMany(p => p.Zones.Battlefield.GetCards())
+            .OfType<Creature>()
+            .Where(filter)
+            .Cast<object>()
+            .ToList();
+
     private static IEffect MaterializeStep(
         CardDef def,
         ResolveEffect step,
@@ -227,8 +434,14 @@ public static class CardDefRuntime
                     $"{def.Name}: deal {step.IntArg} damage to {step.Target}",
                     () =>
                     {
+                        // CR 119 + CR 306.7 — route through Fx.DealDamageAny so a
+                        // Planeswalker target takes loyalty removal (the
+                        // "any target" resolution shape Shock / Lightning Bolt
+                        // use). For a Player / Creature the result is identical
+                        // to the raw binder call. CR 608.2b — a null pick (no /
+                        // illegal target) fizzles.
                         var live = targetResolver(chosenTarget);
-                        if (live != null) OracleSpellBinder.DealDamage(live, step.IntArg);
+                        if (live != null) Fx.DealDamageAny(live, step.IntArg);
                     });
 
             case ResolveEffectKind.PumpUntilEndOfTurn:

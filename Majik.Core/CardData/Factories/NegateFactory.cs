@@ -35,9 +35,19 @@ public static class NegateFactory
     public const string CardName = "Negate";
     public const string PrintedManaCost = "{1}{U}";
 
-    /// <summary>CardDef DSL — card shape only. The noncreature-spell
-    /// counter SpellDefinition is built via <see cref="BuildSpellDefinition"/>.</summary>
-    public static CardDef Define() => CardDef.Instant(CardName, PrintedManaCost);
+    /// <summary>
+    /// CardDef DSL — the full spell in one fluent declaration. "Counter
+    /// target noncreature spell." compiles to a 1..1 "target noncreature
+    /// spell" <see cref="TargetRequest"/> + a
+    /// <see cref="Majik.Core.Primitives.Fx.Counter"/> resolve step (which
+    /// aliases <see cref="OracleSpellBinder.RemoveFromStack"/> + graveyard
+    /// tail, honouring uncounterable spells — CR 701.5b) with the noncreature
+    /// filter applied at resolution, via
+    /// <see cref="CardDefRuntime.BuildSpellDefinition"/>.
+    /// </summary>
+    public static CardDef Define() => CardDef
+        .Instant(CardName, PrintedManaCost)
+        .Resolve(c => c.Counter(TargetKind.NoncreatureSpell));
 
     public static Instant Create(Player owner) =>
         (Instant)CardDefRuntime.Build(Define(), owner);
@@ -46,7 +56,9 @@ public static class NegateFactory
     /// Build the "counter target noncreature spell" SpellDefinition.
     /// CR 608.2b: if the chosen target is a creature spell at resolution
     /// time, the effect does nothing (illegal target — the spell remains on
-    /// the stack).
+    /// the stack). Delegates entirely to the fluent <c>.Resolve(...)</c> body
+    /// via <see cref="CardDefRuntime.BuildSpellDefinition"/> — the ~30-line
+    /// bespoke SpellDefinition collapses to one call.
     /// </summary>
     /// <param name="targetResolver">Target resolver from the caller's
     /// <see cref="GameContext"/> (chosen → live stack object).</param>
@@ -54,35 +66,6 @@ public static class NegateFactory
     /// spell. Null in pure-shape tests; the effect becomes a no-op.</param>
     public static SpellDefinition BuildSpellDefinition(
         Func<object, object> targetResolver,
-        Majik.Core.Stack.Stack? stack)
-    {
-        ArgumentNullException.ThrowIfNull(targetResolver);
-
-        return new SpellDefinition(
-            Modes: Array.Empty<string>(),
-            HasVariableX: false,
-            TargetRequests: new[]
-            {
-                new TargetRequest("target noncreature spell", 1, 1, Array.Empty<object>()),
-            },
-            EffectFactory: p =>
-            {
-                var raw = p.Targets[0][0];
-                var resolved = targetResolver(raw);
-                return new IEffect[]
-                {
-                    new Effect("Negate — counter target noncreature spell", () =>
-                    {
-                        if (stack == null || resolved is not ISpell spell) return;
-
-                        // CR 608.2b — if the target has become a creature spell
-                        // by resolution time, the effect does nothing for it.
-                        if (spell.Card.HasType(CardType.Creature)) return;
-
-                        OracleSpellBinder.RemoveFromStack(stack, spell);
-                        spell.Card.SetZone(ZoneType.Graveyard);
-                    }),
-                };
-            });
-    }
+        Majik.Core.Stack.Stack? stack) =>
+        CardDefRuntime.BuildSpellDefinition(Define(), targetResolver, stack: stack);
 }
