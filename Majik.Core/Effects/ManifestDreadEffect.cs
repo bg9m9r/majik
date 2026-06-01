@@ -69,62 +69,10 @@ public static class ManifestDreadEffect
         // Remove the manifested card from the library.
         controller.Zones.Library.RemoveCard(toManifest);
 
-        // Wrap in a face-down 2/2 creature permanent.
-        var wrapper = new ManifestedCreature(toManifest);
-        wrapper.SetOwner(controller);
-        wrapper.SetController(controller);
-        // CR 302.1 — creatures entering the battlefield have summoning
-        // sickness; wrapper inherits this from Permanent's ctor default.
-
-        // If the underlying card is a creature, grant the "turn face up
-        // for its mana cost" activated ability (CR 701.59c / CR 708.6).
-        if (toManifest is Creature creatureUnderneath)
-        {
-            var manaCost = creatureUnderneath.ManaCost;
-            var cost = string.IsNullOrWhiteSpace(manaCost)
-                ? new ManaCostCost(Majik.Core.ValueObjects.ManaCost.Zero)
-                : new ManaCostCost(manaCost);
-
-            ManifestedCreature wrapperRef = wrapper;
-            ZoneService? zonesRef = zones;
-            var flipEffect = new Effect(
-                $"Turn face up: restore {creatureUnderneath.Name}",
-                () => wrapperRef.TryTurnFaceUp(zonesRef));
-
-            var turnFaceUp = new FaceDownActivatedAbility(
-                source: wrapper,
-                controller: controller,
-                costs: new ICost[] { cost },
-                effects: new IEffect[] { flipEffect });
-
-            wrapper.AddAbility(turnFaceUp);
-        }
-
-        // Underlying card is no longer in the library; place it in a
-        // "limbo" exile slot under the wrapper until the wrapper flips
-        // face-up. CR 708.2c — the face-down spell/permanent represents
-        // the underlying card; the underlying card object is what we
-        // swap onto the battlefield on flip. Until then we leave the
-        // underlying card's Zone set to Exile (a sentinel — it isn't
-        // actually publicly in exile, it's stashed under the wrapper)
-        // so a stray SBA pass doesn't find it lingering in the library.
-        toManifest.SetZone(ZoneType.Exile);
-
-        // Put the wrapper onto the controller's battlefield.
-        if (zones is not null)
-        {
-            // ZoneService.MoveCard expects the card to be in `fromZone`;
-            // the wrapper isn't anywhere yet, so we sentinel it through
-            // the library exactly like TokenFactory does for tokens.
-            wrapper.SetZone(ZoneType.Library);
-            controller.Zones.Library.AddCard(wrapper);
-            zones.MoveCardTo(wrapper, ZoneType.Battlefield, controller);
-        }
-        else
-        {
-            wrapper.SetZone(ZoneType.Battlefield);
-            controller.Zones.Battlefield.AddCard(wrapper);
-        }
+        // Wrap in a face-down 2/2 creature permanent and put it onto the
+        // battlefield. Shared with plain manifest (CR 701.31) via
+        // ManifestEffect.ManifestCard — same wrapper + turn-face-up shape.
+        var wrapper = ManifestEffect.ManifestCard(controller, toManifest, zones);
 
         // Put the other looked-at card into the graveyard.
         if (toGraveyard is not null)
