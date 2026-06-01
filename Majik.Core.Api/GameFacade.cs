@@ -71,6 +71,29 @@ public sealed class GameFacade : IDisposable
         set => Majik.Core.CardData.FactoryRouting.RouteThroughNamedFactories = value;
     }
 
+    // Per-facade snapshot of the routing policy, captured ONCE at construction
+    // from the process-wide flag. Every card build for THIS game reads this
+    // immutable field rather than re-reading the mutable global per card.
+    //
+    // Concurrency-determinism fix: BuildDeckCard used to read the global
+    // RouteThroughNamedFactories flag PER CARD. A test (or any caller) toggling
+    // that process-wide flag while a concurrent game's deck build was in flight
+    // made that single build STRADDLE two policies — some cards routed through
+    // the named factory (which mints a different NUMBER of object ids than the
+    // binder-chain shell), some not — so the build minted a non-deterministic
+    // count of ids from the per-game DeterministicIdSource. That desynced the
+    // id sequence and broke id-identical replay across concurrent games (the
+    // id-only divergence the fuzz harness surfaced: names / zones / P-T / life
+    // all still matched, only the InstanceIds differed). Snapshotting the flag
+    // per facade makes each game's whole card-build self-consistent and immune
+    // to a concurrent toggle, so the per-game id sequence is reproducible
+    // regardless of what other games / tests do to the global in parallel.
+    // Pin the routing policy per game via the Create(routeThroughNamedFactories:)
+    // argument (concurrency-safe kill-switch); never mutate the process-wide
+    // static while games are building.
+    private bool _routeThroughNamedFactories =
+        Majik.Core.CardData.FactoryRouting.RouteThroughNamedFactories;
+
     private readonly EventBus _bus = new();
     private readonly Majik.Core.Stack.Stack _stack;
     private readonly TriggerManager _triggers;
@@ -521,7 +544,8 @@ public sealed class GameFacade : IDisposable
         IReadOnlyList<ICard> aliceDeck,
         IReadOnlyList<ICard> bobDeck,
         ICardRepository? cardRepo = null,
-        ReplacementBus? replacements = null)
+        ReplacementBus? replacements = null,
+        bool? routeThroughNamedFactories = null)
     {
         var alice = new Player(aliceName, 20);
         var bob = new Player(bobName, 20);
@@ -530,6 +554,13 @@ public sealed class GameFacade : IDisposable
         // Any externally-supplied bus is ignored — binders register onto the
         // facade's own bus, which ZoneService already holds a reference to.
         var facade = new GameFacade(alice, bob);
+        // Per-game routing policy: an explicit argument pins it for THIS game
+        // (concurrency-safe kill-switch — no process-wide mutation); null keeps
+        // the snapshot the facade captured from the global flag at construction.
+        if (routeThroughNamedFactories is { } route0)
+        {
+            facade._routeThroughNamedFactories = route0;
+        }
         var bus = facade.Replacements;
 
         // Stash the repo so StartFullGameAsync can build a spell-definition
@@ -538,16 +569,20 @@ public sealed class GameFacade : IDisposable
         // back into hand — every non-permanent spell becomes uncastable.
         facade._cardRepo = cardRepo;
 
+        // Snapshot the routing policy ONCE for this whole deck build so a
+        // concurrent toggle of the process-wide flag can't make this build
+        // straddle two policies (which would perturb the per-game id sequence).
+        var route = facade._routeThroughNamedFactories;
         foreach (var card in aliceDeck)
         {
             var live = BuildDeckCard(card, alice, cardRepo, bus, facade.ContinuousEffects,
-                facade._triggers, facade._zones, facade._bus);
+                route, facade._triggers, facade._zones, facade._bus);
             alice.Zones.GetZone(ZoneType.Library).AddCard(live);
         }
         foreach (var card in bobDeck)
         {
             var live = BuildDeckCard(card, bob, cardRepo, bus, facade.ContinuousEffects,
-                facade._triggers, facade._zones, facade._bus);
+                route, facade._triggers, facade._zones, facade._bus);
             bob.Zones.GetZone(ZoneType.Library).AddCard(live);
         }
 
@@ -580,9 +615,10 @@ public sealed class GameFacade : IDisposable
         }
         if (sideboard == null || sideboard.Count == 0) return;
 
+        var route = _routeThroughNamedFactories;
         foreach (var card in sideboard)
         {
-            var live = BuildDeckCard(card, seat, _cardRepo, Replacements, ContinuousEffects);
+            var live = BuildDeckCard(card, seat, _cardRepo, Replacements, ContinuousEffects, route);
             live.SetZone(ZoneType.Sideboard);
             seat.Zones.Sideboard.AddCard(live);
         }
@@ -632,6 +668,7 @@ public sealed class GameFacade : IDisposable
         ICardRepository? cardRepo,
         ReplacementBus replacements,
         ContinuousEffectsService effects,
+        bool routeThroughNamedFactories,
         TriggerManager? triggers = null,
         ZoneService? zones = null,
         IEventBus? eventBus = null)
@@ -648,7 +685,7 @@ public sealed class GameFacade : IDisposable
         // sets the card's Name to the front face — GetByName resolves that
         // back to the composite entity via its "Front // ..." prefix scan, so
         // the oracle binder + IsImplemented derivation are unaffected.
-        if (RouteThroughNamedFactories
+        if (routeThroughNamedFactories
             && TrySplitMdfcFrontFace(shell.Name, out var mdfcFrontName)
             && Majik.Core.CardData.Factories.ImplementedCardNames.HasRealFactory(mdfcFrontName))
         {
@@ -682,7 +719,7 @@ public sealed class GameFacade : IDisposable
             }
         }
 
-        if (RouteThroughNamedFactories
+        if (routeThroughNamedFactories
             && !shell.HasType(Majik.Core.Cards.Types.CardType.Land)
             && Majik.Core.CardData.Factories.ImplementedCardNames.HasRealFactory(shell.Name))
         {

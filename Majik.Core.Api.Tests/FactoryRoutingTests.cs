@@ -104,26 +104,23 @@ public class FactoryRoutingTests
     [Fact]
     public void Agatha_FlagOff_FallsBackToBinderChain_NoTapAbility()
     {
-        var prev = GameFacade.RouteThroughNamedFactories;
-        try
+        // Use the PER-FACADE kill-switch (routeThroughNamedFactories: false)
+        // instead of mutating the process-wide static. Toggling the global here
+        // used to perturb the per-game deterministic id sequence of any
+        // CONCURRENTLY-building game (the cross-game id-divergence the fuzz
+        // harness surfaced); the per-facade override is concurrency-safe.
+        var deck = new List<ICard>
         {
-            GameFacade.RouteThroughNamedFactories = false;
+            new Artifact("Agatha's Soul Cauldron", "{2}"),
+        };
 
-            var deck = new List<ICard>
-            {
-                new Artifact("Agatha's Soul Cauldron", "{2}"),
-            };
+        var facade = GameFacade.Create(
+            "Alice", "Bob", deck, Array.Empty<ICard>(),
+            cardRepo: Repo(), routeThroughNamedFactories: false);
+        var cauldron = LibraryCardNamed(facade, facade.Alice, "Agatha's Soul Cauldron");
 
-            var facade = GameFacade.Create("Alice", "Bob", deck, Array.Empty<ICard>(), cardRepo: Repo());
-            var cauldron = LibraryCardNamed(facade, facade.Alice, "Agatha's Soul Cauldron");
-
-            cauldron.Abilities.OfType<ActivatedAbility>().Should().BeEmpty(
-                "with routing off, the binder chain does not synthesize Agatha's bespoke {T} ability — proving the kill-switch");
-        }
-        finally
-        {
-            GameFacade.RouteThroughNamedFactories = prev;
-        }
+        cauldron.Abilities.OfType<ActivatedAbility>().Should().BeEmpty(
+            "with routing off, the binder chain does not synthesize Agatha's bespoke {T} ability — proving the kill-switch");
     }
 
     // -----------------------------------------------------------------------
