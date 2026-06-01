@@ -762,7 +762,8 @@ public sealed class GameFacade : IDisposable
         Majik.Core.Random.GameRandom? rng = null,
         Func<Player, Majik.Core.Game.IAutoPassPrefsView?>? autoPassPrefsProvider = null,
         Func<DateTime>? clock = null,
-        Majik.Core.Game.ILogicalClock? logicalClock = null)
+        Majik.Core.Game.ILogicalClock? logicalClock = null,
+        Majik.Core.Game.IDeterministicIdSource? idSource = null)
     {
         if (_loopTask != null || _fullGameTask != null)
         {
@@ -834,7 +835,11 @@ public sealed class GameFacade : IDisposable
             // Determinism (PLAN 08 prerequisite): forward a caller-supplied
             // logical clock (replay / determinism harness). Null = the driver
             // mints a fresh per-game LogicalClock.
-            logicalClock: logicalClock);
+            logicalClock: logicalClock,
+            // PLAN 08 — forward a caller-supplied deterministic id source. Null =
+            // the driver seeds one from the game RNG seed, so replay (rebuilt with
+            // GameSnapshot.Seed) mints the SAME id sequence → id-identical replay.
+            idSource: idSource);
 
         var settled = _nextPromptSignal.Task;
         // CR 103.2 / 103.4 / 103.7 — the starting player is decided UPSTREAM

@@ -20,7 +20,10 @@ public class Card : ICard
     private readonly List<IAbility> _abilities = new();
     private readonly List<ZoneType> _restrictedCastZones = new();
 
-    public Guid InstanceId { get; } = Guid.NewGuid();
+    // PLAN 08 — per-game deterministic id (portal's `cardId`). Reseeded from
+    // the ambient DeterministicIdSource when a game scope is installed; falls
+    // back to Guid.NewGuid() for scope-less direct construction (unit tests).
+    public Guid InstanceId { get; } = Majik.Core.Game.DeterministicIdScope.NewId();
     public string Name { get; }
     public string ManaCost { get; }
 

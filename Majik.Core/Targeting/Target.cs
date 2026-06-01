@@ -15,7 +15,9 @@ public class Target : ITarget
 
     private Target(TargetType targetType, object? targetObject)
     {
-        Id = Guid.NewGuid();
+        // PLAN 08 — per-game deterministic id; Guid.NewGuid() fallback outside
+        // a game scope.
+        Id = Majik.Core.Game.DeterministicIdScope.NewId();
         TargetType = targetType;
         TargetObject = targetObject;
     }

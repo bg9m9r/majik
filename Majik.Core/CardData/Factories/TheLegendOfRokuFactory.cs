@@ -107,7 +107,8 @@ public static class TheLegendOfRokuFactory
         // services for the chapter-I cleanup window and chapter-III transform.
         var entity = new CardEntity
         {
-            ScryfallId = Guid.NewGuid().ToString(),
+            // PLAN 08 — deterministic (cosmetic) id; reproducible on replay.
+            ScryfallId = Majik.Core.Game.DeterministicIdScope.NewId().ToString(),
             Name = CardName,
             TypeLine = "Enchantment — Saga",
             OracleText = OracleText,

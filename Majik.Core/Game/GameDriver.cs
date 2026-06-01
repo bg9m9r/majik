@@ -44,6 +44,16 @@ public sealed class GameDriver
     // sequence of assigned timestamps is reproducible.
     private readonly ILogicalClock _logicalClock;
 
+    // PLAN 08 — the per-game deterministic OBJECT-ID source. Installed as the
+    // ambient id source for the whole RunGameAsync flow (same AsyncLocal pattern
+    // as the logical clock above), so every Card / Spell / ability / Target /
+    // Emblem constructed while the game advances mints its portal-facing id from
+    // THIS game's seed-derived sequence instead of Guid.NewGuid(). Given the
+    // same (seed, command order) the Nth id is reproducible — the load-bearing
+    // piece that makes GameFacade.FromSnapshot replay ID-IDENTICAL. Seeded from
+    // the game RNG seed by default so it's reproducible without extra plumbing.
+    private readonly IDeterministicIdSource _idSource;
+
     // CR 720 — per-game registry of "control another player" grants. Effects
     // (Mindslaver, Emrakul) call ControlPlayer.Grant against this; the
     // TurnDriver consumes a pending grant at the controlled player's
@@ -85,7 +95,8 @@ public sealed class GameDriver
         Func<Player, IAutoPassPrefsView?>? autoPassPrefsProvider = null,
         Func<GameContext, bool>? isPassOnlyDeadWindow = null,
         Func<DateTime>? clock = null,
-        ILogicalClock? logicalClock = null)
+        ILogicalClock? logicalClock = null,
+        IDeterministicIdSource? idSource = null)
     {
         _players = players ?? throw new ArgumentNullException(nameof(players));
         // Determinism (PLAN 08 prerequisite): own a logical clock for the game.
@@ -103,6 +114,11 @@ public sealed class GameDriver
             _controlPlayers);
         _sba = stateBasedActions ?? throw new ArgumentNullException(nameof(stateBasedActions));
         _rng = rng ?? new Majik.Core.Random.GameRandom();
+        // PLAN 08 — default the deterministic id source to one seeded from this
+        // game's RNG seed. Replay rebuilds with the SAME seed (GameSnapshot.Seed)
+        // so the rebuilt game mints the SAME id sequence → id-identical replay.
+        // Callers can pass an explicit source to pin a different sequence.
+        _idSource = idSource ?? new DeterministicIdSource(_rng.Seed);
         _eventBus = eventBus;
         _zoneService = zoneService ?? throw new ArgumentNullException(nameof(zoneService));
         _triggerManager = triggerManager ?? throw new ArgumentNullException(nameof(triggerManager));
@@ -220,6 +236,24 @@ public sealed class GameDriver
         // threadpool thread resumes the continuation) reads THIS game's
         // monotonic clock — never wall-clock, never another game's clock.
         using var clockScope = LogicalClockScope.Push(_logicalClock);
+
+        // PLAN 08 — install this game's deterministic OBJECT-ID source as ambient
+        // for the entire run, alongside the clock above. Every Card / Spell /
+        // ability / Target / Emblem minted while the game advances now draws its
+        // portal-facing id from THIS game's seed-derived sequence (counter folded
+        // with the game seed) instead of Guid.NewGuid(). Same async-flow
+        // isolation: concurrent games push independent sources, so a parallel
+        // game can't perturb this game's id counter. Given (seed, command order)
+        // the id sequence is reproducible → GameFacade.FromSnapshot replay is
+        // ID-IDENTICAL, not merely structurally equivalent.
+        //
+        // If the CALLER already installed an ambient source (e.g. the replay
+        // harness wraps both the initial-board construction AND the run in one
+        // scope so the board's ids share the SAME monotonic sequence the run
+        // continues), KEEP it — pushing a fresh seed-restarted source here would
+        // reset the counter and collide run-minted ids with the board ids. Only
+        // push the driver's own source when no scope is active yet.
+        using var idScope = DeterministicIdScope.PushIfNone(_idSource);
 
         // De-static the process-level registries (agents, RNG, event bus,
         // zone service) to a per-game ambient store for the whole run — same

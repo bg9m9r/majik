@@ -38,11 +38,8 @@ public class DeterminismReplayTests
 
         // Both runs use the SAME deterministic decision policy + the SAME RNG
         // seed + a fresh per-game logical clock, and drive the game through the
-        // real SubmitAsync path. The policy resolves each command against the
-        // run's OWN live state (so the still-nondeterministic instance ids are
-        // resolved per-run — verbatim id-keyed command replay is the deferred
-        // id-reseeding step, NOT this slice). The command-KIND sequence and the
-        // final game state must be structurally identical.
+        // real SubmitAsync path. The command-KIND sequence and the final game
+        // state must be structurally identical.
         var run1 = await RunAsync(seed);
         var run2 = await RunAsync(seed);
 
@@ -52,9 +49,48 @@ public class DeterminismReplayTests
         // The decision sequence itself is reproducible (commands modulo ids).
         run2.CommandKinds.Should().Equal(run1.CommandKinds);
 
-        // And the resulting game state is structurally identical (ids ignored).
+        // And the resulting game state is structurally identical.
         Structural(run2.State).Should().BeEquivalentTo(
             Structural(run1.State), opts => opts.WithStrictOrdering());
+    }
+
+    /// <summary>
+    /// PLAN 08 — the id-reseeding definition of done. With the per-game
+    /// <see cref="DeterministicIdSource"/> installed (ambient, seeded from the
+    /// game seed) for BOTH the initial-board construction and the whole run, two
+    /// runs with the same seed + same commands produce a state that is not just
+    /// structurally equivalent but ID-IDENTICAL: every portal-facing id
+    /// (<c>Player.Id</c>/<c>controllerId</c>, <c>Card.InstanceId</c>/<c>cardId</c>,
+    /// stack ids) matches byte-for-byte. This is what lets
+    /// <c>GameFacade.FromSnapshot</c> rehydrate the portal reducer, which keys on
+    /// these ids.
+    /// </summary>
+    [Fact]
+    public async Task SameSeedSameCommands_YieldIdIdenticalState()
+    {
+        const int seed = 42;
+
+        // Push a deterministic id source (same seed) around the ENTIRE run,
+        // including BuildSeededFacade — so even the initial board's player + card
+        // ids are seed-derived and reproducible, not the random Guid.NewGuid()
+        // they'd get when constructed outside a game scope.
+        var run1 = await RunWithIdScopeAsync(seed);
+        var run2 = await RunWithIdScopeAsync(seed);
+
+        run2.CommandKinds.Should().Equal(run1.CommandKinds);
+
+        // Full id-level equality: player ids, card instance ids, stack ids — the
+        // whole id projection of the state matches across the two runs.
+        IdProjection(run2.State).Should().BeEquivalentTo(
+            IdProjection(run1.State), opts => opts.WithStrictOrdering());
+
+        // And the ids are the DETERMINISTIC ones (not random): the first
+        // constructed object under a seed-42 source has the seed-42 source's
+        // first id. (Players are constructed first in BuildSeededFacade.)
+        var expectedFirstId = new DeterministicIdSource(seed).NextId();
+        run1.State.Players.Select(p => p.Id).Should().Contain(expectedFirstId,
+            "the first object minted under the scope (a Player) carries the " +
+            "deterministic source's first id");
     }
 
     private sealed record RunResult(GameStateDto State, IReadOnlyList<string> CommandKinds);
@@ -68,6 +104,28 @@ public class DeterminismReplayTests
             var cmd = NextCommand(facade, prompt);
             // Record the command KIND (not its nondeterministic ids) so the two
             // runs' decision sequences can be compared structurally.
+            kinds.Add(cmd.GetType().Name);
+            return cmd;
+        });
+        return new RunResult(facade.GetState(), kinds);
+    }
+
+    /// <summary>
+    /// Like <see cref="RunAsync"/> but installs a per-game deterministic id
+    /// source (seeded from <paramref name="seed"/>) as ambient across the WHOLE
+    /// run — the initial-board construction AND the driver loop — so every id is
+    /// seed-derived and the two runs come out id-identical. The driver also
+    /// re-pushes its own id source internally, but since it defaults to one
+    /// seeded from the same game seed the sequence continues deterministically.
+    /// </summary>
+    private static async Task<RunResult> RunWithIdScopeAsync(int seed)
+    {
+        using var idScope = DeterministicIdScope.Push(new DeterministicIdSource(seed));
+        var facade = BuildSeededFacade();
+        var kinds = new List<string>();
+        await DriveAsync(facade, seed, prompt =>
+        {
+            var cmd = NextCommand(facade, prompt);
             kinds.Add(cmd.GetType().Name);
             return cmd;
         });
@@ -238,6 +296,29 @@ public class DeterminismReplayTests
         }).ToList(),
         Stack = s.Stack.Select(o => $"{o.Kind}|{o.Description}").ToList(),
     };
+
+    // -----------------------------------------------------------------------
+    // Id projection — the portal-facing ids ONLY, name-tagged so a mismatch is
+    // legible. Two id-identical runs produce equal projections.
+    // -----------------------------------------------------------------------
+    private static object IdProjection(GameStateDto s) => new
+    {
+        Players = s.Players.Select(p => new
+        {
+            p.Name,
+            p.Id,
+            Hand = ZoneIds(p.Hand),
+            Battlefield = p.Battlefield.Cards
+                .Select(c => $"{c.Name}|{c.InstanceId}").ToList(),
+            Graveyard = ZoneIds(p.Graveyard),
+            Library = ZoneIds(p.Library),
+            Exile = ZoneIds(p.Exile),
+        }).ToList(),
+        Stack = s.Stack.Select(o => $"{o.Kind}|{o.Id}").ToList(),
+    };
+
+    private static List<string> ZoneIds(ZoneDto z) =>
+        z.Cards.Select(c => $"{c.Name}|{c.InstanceId}").ToList();
 
     private static List<string> ZoneNames(ZoneDto z) =>
         z.Cards.Select(c => c.Name).ToList();
