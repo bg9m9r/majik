@@ -1,0 +1,7 @@
+{
+  "name": "Fire // Ice",
+  "types": ["Instant"],
+  "manaCost": "{1}{R}",
+  "colors": ["R"],
+  "abilities": []
+}

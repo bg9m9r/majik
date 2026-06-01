@@ -29,7 +29,7 @@ namespace Majik.Core.CardData.Definitions;
 [JsonDerivedType(typeof(ScrySelfEffectDef), "scry_self")]
 [JsonDerivedType(typeof(DestroyTargetEffectDef), "destroy_target")]
 [JsonDerivedType(typeof(UntapTargetEffectDef), "untap_target")]
-[JsonDerivedType(typeof(PreventDamageTargetStubEffectDef), "prevent_damage_target_stub")]
+[JsonDerivedType(typeof(PreventDamageTargetEffectDef), "prevent_damage_target")]
 [JsonDerivedType(typeof(GainLifeSelfEffectDef), "gain_life_self")]
 [JsonDerivedType(typeof(MillThenPickFirstMatchingToHandEffectDef), "mill_then_pick_first_matching_to_hand")]
 [JsonDerivedType(typeof(ConniveSelfEffectDef), "connive_self")]
@@ -51,7 +51,8 @@ public abstract class EffectDefinition
     /// ability's <see cref="Majik.Core.Abilities.ResolutionContext.ChosenTargets"/>
     /// that a targeted effect reads its chosen target from. Untargeted effects
     /// ignore it; targeted effects (<see cref="DealDamageEffectDef"/> /
-    /// <see cref="DestroyTargetEffectDef"/> / <see cref="UntapTargetEffectDef"/>)
+    /// <see cref="DestroyTargetEffectDef"/> / <see cref="UntapTargetEffectDef"/> /
+    /// <see cref="PreventDamageTargetEffectDef"/>)
     /// emit a matching <see cref="ToTargetRequest"/> so the ability declares
     /// the target and the shared <see cref="Majik.Core.Targeting.TargetCollection"/>
     /// pipeline collects it.
@@ -201,31 +202,32 @@ public sealed class UntapTargetEffectDef : EffectDefinition
 
 /// <summary>
 /// "Prevent the next N damage that would be dealt to target [filter] this
-/// turn" — stub effect. Records the prevention <see cref="Amount"/> and the
-/// <see cref="TargetFilter"/> describing what can be shielded, but resolves
-/// as a no-op because registering a prevention shield against a CHOSEN target
-/// is not yet wired (distinct from the damage / destroy / untap verbs which
-/// the PLAN 01 Slice F targeting now drives — those upgraded to real
-/// <see cref="DealDamageEffectDef"/> / <see cref="DestroyTargetEffectDef"/> /
-/// <see cref="UntapTargetEffectDef"/>).
+/// turn" — real targeted effect (PLAN 01 Slice F, replaces the former
+/// <c>prevent_damage_target_stub</c> no-op). At resolution the effect reads
+/// the chosen creature off
+/// <see cref="Majik.Core.Abilities.ResolutionContext.ChosenTargets"/> and
+/// registers a CR 615 prevention shield bound to that creature
+/// (<see cref="Majik.Core.Effects.PreventNextNDamageToCreatureShield"/>) on
+/// the controller-attached <see cref="Majik.Core.Effects.ReplacementBus"/>.
+/// The shield soaks up to <see cref="Amount"/> damage points aimed at the
+/// chosen creature this turn and auto-expires at cleanup (CR 514.2). CR 608.2b
+/// — an illegal target at resolution fizzles (no shield registered).
 ///
-/// The prevention shield itself (CR 615 — a per-turn pool of prevented
-/// damage points) is already supported by the engine via
-/// <see cref="Majik.Core.Effects.PreventNextNDamageToAnyTargetShield"/>; the
-/// remaining gap is binding that shield to the chosen target object. When that
-/// lands, this type upgrades to a real <c>prevent_damage_target</c> effect
-/// (declare a <see cref="ToTargetRequest"/> + register the shield against the
-/// chosen target) without breaking JSON files. Canonical case: Eiganjo Castle —
-/// <c>"{W}, {T}: Prevent the next 2 damage that would be dealt to target
-/// legendary creature this turn."</c>
+/// Canonical case: Eiganjo Castle — <c>"{W}, {T}: Prevent the next 2 damage
+/// that would be dealt to target legendary creature this turn."</c>
 ///
-/// <see cref="TargetFilter"/> is a free-form string the future targeting
-/// layer will translate (e.g. <c>"legendary_creature"</c>).
+/// <see cref="TargetFilter"/> is the filter string the runtime translates into
+/// a <see cref="Majik.Core.Players.Agents.TargetRequest"/> (e.g.
+/// <c>"legendary_creature"</c>, <c>"creature"</c>).
 /// </summary>
-public sealed class PreventDamageTargetStubEffectDef : EffectDefinition
+public sealed class PreventDamageTargetEffectDef : EffectDefinition
 {
     public int Amount { get; set; } = 1;
     public string TargetFilter { get; set; } = "creature";
+
+    /// <inheritdoc />
+    public override Majik.Core.Players.Agents.TargetRequest? ToTargetRequest() =>
+        TargetFilters.ToTargetRequest(TargetFilter, $"prevent {Amount} damage to");
 }
 
 /// <summary>"Controller gains N life." Default <see cref="Amount"/> = 1.</summary>
