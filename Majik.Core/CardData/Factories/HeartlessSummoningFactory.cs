@@ -121,6 +121,7 @@ public sealed class ControllerCreatureAnthemEffect : ContinuousEffect
     private readonly int _power;
     private readonly int _toughness;
     private readonly bool _includeSelf;
+    private readonly Majik.Core.ValueObjects.ManaColor? _requiredColor;
 
     /// <summary>
     /// Construct an anthem.
@@ -133,16 +134,26 @@ public sealed class ControllerCreatureAnthemEffect : ContinuousEffect
     /// <param name="includeSelf">If the source IS a creature, whether to
     /// apply the bonus to itself. Defaults to false (Glorious Anthem
     /// shape — though it's an enchantment so the question is moot).</param>
+    /// <param name="requiredColor">Optional colour gate (CR 105 / CR 613.7c).
+    /// When non-null, only creatures whose printed colour set
+    /// (<see cref="Majik.Core.Cards.CardColors.GetColors"/>) contains this
+    /// colour are affected — the "White creatures you control get +1/+1"
+    /// (Honor of the Pure / Crusade) shape. Printed colour is used rather
+    /// than effective colour because GetEffectiveColors re-enters the layer
+    /// service and would recurse during layer evaluation. Null keeps the
+    /// all-creatures behaviour (Glorious Anthem / Heartless Summoning).</param>
     public ControllerCreatureAnthemEffect(
         Permanent source,
         int power,
         int toughness,
-        bool includeSelf = false)
+        bool includeSelf = false,
+        Majik.Core.ValueObjects.ManaColor? requiredColor = null)
     {
         _source = source ?? throw new ArgumentNullException(nameof(source));
         _power = power;
         _toughness = toughness;
         _includeSelf = includeSelf;
+        _requiredColor = requiredColor;
     }
 
     public override Layer Layer => Layer.PT_Modify;
@@ -158,6 +169,19 @@ public sealed class ControllerCreatureAnthemEffect : ContinuousEffect
         if (creature.Zone != Majik.Core.Zones.ZoneType.Battlefield) return false;
         if (!ReferenceEquals(creature.Controller, _source.Controller)) return false;
         if (!_includeSelf && ReferenceEquals(creature, _source)) return false;
+        // CR 105 / CR 613.7c — optional colour gate ("White creatures you
+        // control"). Use the printed/static colour derivation
+        // (CardColors.GetColors) rather than GetEffectiveColors() here: the
+        // latter re-enters the layer service (Compute → AppliesTo →
+        // GetEffectiveColors) and would recurse infinitely while the layers
+        // are mid-evaluation. Reading printed colour avoids the cycle.
+        // Deferred (v1 gap): a Layer-5 colour changer (e.g. a creature turned
+        // white) is not reflected by this gate. Null means no restriction.
+        if (_requiredColor != null
+            && !Majik.Core.Cards.CardColors.GetColors(creature).Contains(_requiredColor.Value))
+        {
+            return false;
+        }
         return true;
     }
 
