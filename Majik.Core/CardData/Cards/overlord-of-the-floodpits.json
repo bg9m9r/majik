@@ -1,0 +1,9 @@
+{
+  "name": "Overlord of the Floodpits",
+  "types": ["Creature", "Enchantment"],
+  "subtypes": ["Avatar", "Horror"],
+  "manaCost": "{3}{U}{U}",
+  "power": 5,
+  "toughness": 3,
+  "abilities": []
+}
