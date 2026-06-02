@@ -1,0 +1,8 @@
+{
+  "name": "Brineborn Cutthroat",
+  "types": ["Creature"],
+  "subtypes": ["Merfolk", "Pirate"],
+  "manaCost": "{1}{U}",
+  "power": 2,
+  "toughness": 1
+}
