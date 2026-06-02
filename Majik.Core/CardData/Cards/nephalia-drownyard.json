@@ -1,0 +1,7 @@
+{
+  "name": "Nephalia Drownyard",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "C" }
+  ]
+}
