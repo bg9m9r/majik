@@ -1,0 +1,5 @@
+{
+  "name": "Simulacrum Synthesizer",
+  "types": ["Artifact"],
+  "manaCost": "{2}{U}"
+}
