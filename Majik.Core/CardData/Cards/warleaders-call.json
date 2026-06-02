@@ -1,0 +1,6 @@
+{
+  "name": "Warleader's Call",
+  "types": ["Enchantment"],
+  "manaCost": "{1}{R}{W}",
+  "abilities": []
+}
