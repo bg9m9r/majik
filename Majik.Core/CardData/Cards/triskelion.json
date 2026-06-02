@@ -1,0 +1,26 @@
+{
+  "name": "Triskelion",
+  "types": ["Creature", "Artifact"],
+  "subtypes": ["Construct"],
+  "manaCost": "{6}",
+  "power": 1,
+  "toughness": 1,
+  "abilities": [
+    {
+      "kind": "triggered",
+      "trigger": { "type": "etb_self" },
+      "effects": [
+        { "type": "put_counter", "counter": "+1/+1", "amount": 3, "target": "self" }
+      ]
+    },
+    {
+      "kind": "activated",
+      "costs": [
+        { "type": "remove_counter", "counter": "+1/+1", "amount": 1, "from": "self" }
+      ],
+      "effects": [
+        { "type": "deal_damage", "amount": 1, "target": "any" }
+      ]
+    }
+  ]
+}
