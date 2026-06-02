@@ -1,0 +1,9 @@
+{
+  "name": "Faerie Mastermind",
+  "types": ["Creature"],
+  "subtypes": ["Faerie", "Rogue"],
+  "manaCost": "{1}{U}",
+  "power": 2,
+  "toughness": 1,
+  "abilities": []
+}
