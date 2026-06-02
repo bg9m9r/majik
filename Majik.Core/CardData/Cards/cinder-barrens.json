@@ -1,0 +1,8 @@
+{
+  "name": "Cinder Barrens",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "B" },
+    { "kind": "mana", "produces": "R" }
+  ]
+}
