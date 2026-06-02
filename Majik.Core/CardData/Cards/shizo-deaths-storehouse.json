@@ -1,0 +1,8 @@
+{
+  "name": "Shizo, Death's Storehouse",
+  "types": ["Land"],
+  "supertypes": ["Legendary"],
+  "abilities": [
+    { "kind": "mana", "produces": "B" }
+  ]
+}
