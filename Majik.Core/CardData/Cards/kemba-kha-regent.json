@@ -1,0 +1,10 @@
+{
+  "name": "Kemba, Kha Regent",
+  "types": ["Creature"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Cat", "Cleric"],
+  "manaCost": "{1}{W}{W}",
+  "power": 2,
+  "toughness": 4,
+  "abilities": []
+}
