@@ -1,0 +1,9 @@
+{
+  "name": "Murmuring Mystic",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Wizard"],
+  "manaCost": "{3}{U}",
+  "power": 1,
+  "toughness": 5,
+  "abilities": []
+}
