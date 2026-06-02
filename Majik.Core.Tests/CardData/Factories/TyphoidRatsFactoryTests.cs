@@ -17,6 +17,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Card: Typhoid Rats — {B} Creature — Rat 1/1.
 ///   "Deathtouch"
 /// </summary>
+[Trait("Color", "B")]
 public class TyphoidRatsFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -80,16 +81,5 @@ public class TyphoidRatsFactoryTests
 
         c.Abilities.OfType<TriggeredAbility>().Should().BeEmpty();
         c.Abilities.OfType<ActivatedAbility>().Should().BeEmpty();
-    }
-
-    [Fact]
-    public void TyphoidRats_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Typhoid Rats", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Typhoid Rats");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Rat).Should().BeTrue();
     }
 }

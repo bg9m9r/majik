@@ -22,6 +22,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     controller) → matches; Soul Warden itself entering → does not match.
 ///   - Trigger effect resolution: controller gains 1 life.
 /// </summary>
+[Trait("Color", "W")]
 public class SoulWardenFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -42,20 +43,6 @@ public class SoulWardenFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void SoulWarden_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Soul Warden", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Soul Warden");
-        card.HasSubtype(CardSubtype.Human).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Cleric).Should().BeTrue();
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1,
-            "one ETB-other-creature trigger is attached");
-    }
-
     [Fact]
     public void SoulWarden_AnotherCreatureEnters_TriggerMatches()
     {

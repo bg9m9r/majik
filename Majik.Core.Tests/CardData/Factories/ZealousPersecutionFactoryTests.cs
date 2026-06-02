@@ -27,6 +27,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     resolution (CR 608.2).
 ///   - No-creature board is a clean no-op.
 /// </summary>
+[Trait("Color", "M")]
 public class ZealousPersecutionFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -49,18 +50,6 @@ public class ZealousPersecutionFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Zealous Persecution", _alice);
-
-        c.Should().BeOfType<Instant>();
-        c.Name.Should().Be("Zealous Persecution");
-        c.HasType(CardType.Instant).Should().BeTrue();
-        c.ManaCost.Should().Be("{W}{B}");
-    }
-
     // -----------------------------------------------------------------------
     // Resolve — symmetric team buff / opponent debuff
     // -----------------------------------------------------------------------

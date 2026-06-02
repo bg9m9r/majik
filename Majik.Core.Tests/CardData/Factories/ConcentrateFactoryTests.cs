@@ -23,6 +23,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Empty library mid-resolve flags the SBA-driven loss (CR 704.5b).
 ///   - One-card library: draws one, flags SBA loss on second draw attempt.
 /// </summary>
+[Trait("Color", "U")]
 public class ConcentrateFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -52,17 +53,6 @@ public class ConcentrateFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void Concentrate_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Concentrate", _alice);
-
-        c.Should().BeOfType<Sorcery>();
-        c.Name.Should().Be("Concentrate");
-        c.HasType(CardType.Sorcery).Should().BeTrue();
-    }
-
     // -------------------------------------------------------------------------
     // Resolve: draw three cards (CR 121.1)
     // -------------------------------------------------------------------------

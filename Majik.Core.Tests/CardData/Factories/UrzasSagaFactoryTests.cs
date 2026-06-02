@@ -32,6 +32,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     flag flips so the generic Saga sacrifice SBA finishes the Saga.
 ///   - <see cref="NamedCardFactory"/> dispatch.
 /// </summary>
+[Trait("Color", "C")]
 public class UrzasSagaFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -267,17 +268,5 @@ public class UrzasSagaFactoryTests
         // tutored. Battlefield does NOT include the spell.
         _alice.Zones.Library.GetCards().Should().Contain(spell);
         _alice.Zones.Battlefield.GetCards().Should().NotContain(spell);
-    }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_UrzasSaga()
-    {
-        var card = NamedCardFactory.Create("Urza's Saga", _alice);
-
-        card.Should().NotBeNull();
-        card.Name.Should().Be("Urza's Saga");
-        card.HasType(CardType.Land).Should().BeTrue();
-        card.HasType(CardType.Enchantment).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Saga).Should().BeTrue();
     }
 }

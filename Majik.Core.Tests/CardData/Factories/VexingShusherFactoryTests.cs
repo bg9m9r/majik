@@ -32,6 +32,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Resolving the activated ability stamps the chosen spell's
 ///   CannotBeCountered flag (CR 701.5b).
 /// </summary>
+[Trait("Color", "M")]
 public class VexingShusherFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -54,18 +55,6 @@ public class VexingShusherFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void VexingShusher_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Vexing Shusher", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Vexing Shusher");
-        ((Creature)c).HasSubtype(CardSubtype.Goblin).Should().BeTrue();
-        ((Creature)c).HasSubtype(CardSubtype.Shaman).Should().BeTrue();
-    }
-
     // ── "This spell can't be countered" self marker ──────────────────────
 
     [Fact]

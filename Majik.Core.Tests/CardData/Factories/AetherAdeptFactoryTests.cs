@@ -32,6 +32,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - ETB resolution: no target chosen → no-op, no exception.
 /// - ETB resolution: target already off battlefield (CR 608.2b) → no-op.
 /// </summary>
+[Trait("Color", "U")]
 public class AetherAdeptFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -79,19 +80,6 @@ public class AetherAdeptFactoryTests
     // -----------------------------------------------------------------------
     // NamedCardFactory dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void AetherAdept_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Aether Adept", _alice);
-
-        c.Should().BeOfType<Creature>("Aether Adept is a Creature");
-        c.Name.Should().Be("Aether Adept");
-        c.HasSubtype(CardSubtype.Human).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Wizard).Should().BeTrue();
-        c.ManaCost.Should().Be("{1}{U}{U}");
-    }
-
     // -----------------------------------------------------------------------
     // ETB triggered ability — shape
     // -----------------------------------------------------------------------

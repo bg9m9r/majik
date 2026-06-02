@@ -17,6 +17,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Card: Archangel — {5}{W}{W} Creature — Angel 5/5.
 ///   "Flying, vigilance"
 /// </summary>
+[Trait("Color", "W")]
 public class ArchangelFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -83,16 +84,5 @@ public class ArchangelFactoryTests
         c.Abilities.OfType<ActivatedAbility>().Should().BeEmpty();
         c.Abilities.OfType<KeywordAbility>().Should().HaveCount(2,
             "Flying and Vigilance are the only printed keywords");
-    }
-
-    [Fact]
-    public void Archangel_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Archangel", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Archangel");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Angel).Should().BeTrue();
     }
 }

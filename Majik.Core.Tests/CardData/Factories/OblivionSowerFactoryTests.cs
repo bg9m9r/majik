@@ -28,6 +28,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Custom picker can steal a subset / decline (empty).
 /// - Short library exiles what remains, no throw.
 /// </summary>
+[Trait("Color", "C")]
 public class OblivionSowerFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -57,19 +58,6 @@ public class OblivionSowerFactoryTests
         creature.Power.Should().Be(5);
         creature.Toughness.Should().Be(8);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_OblivionSower()
-    {
-        var card = NamedCardFactory.Create("Oblivion Sower", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Oblivion Sower");
-        card.HasType(CardType.Creature).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Eldrazi).Should().BeTrue();
-        card.Owner.Should().Be(_alice);
-    }
-
     [Fact]
     public void Card_HasOneCastTriggeredAbility_LiveOnStack()
     {

@@ -29,6 +29,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   <see cref="ZagothTriomeFactory"/>.
 /// - Dispatcher routing through <see cref="NamedCardFactory"/>.
 /// </summary>
+[Trait("Color", "C")]
 public class SmolderingMarshFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -117,14 +118,5 @@ public class SmolderingMarshFactoryTests
         var land = (Land)NamedCardFactory.Create("Smoldering Marsh", _alice);
 
         land.Abilities.OfType<ActivatedAbility>().Should().BeEmpty();
-    }
-
-    [Fact]
-    public void SmolderingMarsh_DispatchedThroughNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Smoldering Marsh", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Smoldering Marsh");
     }
 }

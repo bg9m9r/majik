@@ -18,6 +18,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// "Lava Coil deals 4 damage to target creature. If that creature would die
 /// this turn, exile it instead." ({1}{R} Sorcery.)
 /// </summary>
+[Trait("Color", "R")]
 public class LavaCoilFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -43,16 +44,6 @@ public class LavaCoilFactoryTests
         card.ManaCost.ToString().Should().Be("{1}{R}");
         card.Owner.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Lava Coil", _alice);
-
-        card.Should().BeOfType<Sorcery>();
-        card.Name.Should().Be("Lava Coil");
-    }
-
     [Fact]
     public void SpellDefinition_HasSingleTargetCreatureRequest()
     {

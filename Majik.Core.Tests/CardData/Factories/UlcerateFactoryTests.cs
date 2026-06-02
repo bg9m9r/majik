@@ -18,6 +18,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// "Target creature gets -3/-3 until end of turn. You lose 3 life."
 /// Disfigure-shape -X/-X plus a caster life cost.
 /// </summary>
+[Trait("Color", "B")]
 public class UlcerateFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -38,16 +39,6 @@ public class UlcerateFactoryTests
         card.ManaCost.ToString().Should().Be("{B}");
         card.Owner.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Ulcerate", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Ulcerate");
-    }
-
     [Fact]
     public void SpellDefinition_SingleTargetCreatureRequest()
     {

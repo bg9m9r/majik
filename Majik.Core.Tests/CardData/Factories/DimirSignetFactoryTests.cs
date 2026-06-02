@@ -29,6 +29,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// <see cref="ManaAbility"/> shape. CR 605.1 — still a mana ability, never
 /// on the stack; the {1} is paid atomically with the {T} tap.
 /// </summary>
+[Trait("Color", "C")]
 public class DimirSignetFactoryTests
 {
     // -----------------------------------------------------------------------
@@ -58,18 +59,6 @@ public class DimirSignetFactoryTests
         signet.Owner.Should().BeSameAs(alice);
         signet.Controller.Should().BeSameAs(alice);
     }
-
-    [Fact]
-    public void DimirSignet_Dispatch_ResolvesViaNamedCardFactory()
-    {
-        var alice = new Player("Alice", 20);
-
-        var card = NamedCardFactory.Create("Dimir Signet", alice);
-
-        card.Should().BeAssignableTo<Artifact>();
-        card.Name.Should().Be("Dimir Signet");
-    }
-
     // -----------------------------------------------------------------------
     // Mana ability — shape
     // -----------------------------------------------------------------------

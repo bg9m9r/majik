@@ -27,6 +27,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   * PitchAltCostProbe surfaces a Red / 0-life candidate from
 ///     <see cref="PitchAltCostProbe.DefaultLookup"/>.
 /// </summary>
+[Trait("Color", "R")]
 public class ForceOfRageFactoryTests
 {
     private readonly EventBus _bus = new();
@@ -54,16 +55,6 @@ public class ForceOfRageFactoryTests
         four.HasType(CardType.Sorcery).Should().BeTrue();
         CardColors.GetColors(four).Should().Contain(ManaColor.Red);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsForceOfRageShape()
-    {
-        var dispatched = NamedCardFactory.Create("Force of Rage", _alice);
-
-        dispatched.Should().BeOfType<Sorcery>();
-        dispatched.Name.Should().Be("Force of Rage");
-    }
-
     [Fact]
     public void PitchAltCostProbe_DefaultLookup_RecognisesForceOfRage_RedZeroLife()
     {

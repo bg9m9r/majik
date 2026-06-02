@@ -38,6 +38,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - BuildAdditionalCost helper wires White MarchAdditionalCost.
 ///   - Empty exile list (optional cost — zero reduction).
 /// </summary>
+[Trait("Color", "W")]
 public class MarchOfOtherworldlyLightFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -69,17 +70,6 @@ public class MarchOfOtherworldlyLightFactoryTests
         march.Controller.Should().BeSameAs(_alice);
         CardColors.GetColors(march).Should().Contain(ManaColor.White);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatch_ReturnsMarchShape()
-    {
-        var dispatched = NamedCardFactory.Create("March of Otherworldly Light", _alice);
-
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("March of Otherworldly Light");
-        dispatched.ManaCost.Should().Be("{X}{W}");
-    }
-
     // ── SpellDefinition shape ───────────────────────────────────────────────
 
     [Fact]

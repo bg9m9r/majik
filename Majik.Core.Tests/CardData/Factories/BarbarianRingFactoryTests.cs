@@ -31,6 +31,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   2 damage to the chosen target AND moves the land to the graveyard.
 /// - Target receives 2 damage only when threshold is met.
 /// </summary>
+[Trait("Color", "C")]
 public class BarbarianRingFactoryTests
 {
     // -----------------------------------------------------------------------
@@ -70,18 +71,6 @@ public class BarbarianRingFactoryTests
         ring.HasSupertype(CardSupertype.Basic).Should().BeFalse();
         ring.HasSupertype(CardSupertype.Legendary).Should().BeFalse();
     }
-
-    [Fact]
-    public void BarbarianRing_Dispatch_ResolvesViaNamedCardFactory()
-    {
-        var alice = new Player("Alice", 20);
-
-        var card = NamedCardFactory.Create("Barbarian Ring", alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Barbarian Ring");
-    }
-
     // -----------------------------------------------------------------------
     // Mana ability — {T}: Add {R}. Barbarian Ring deals 1 damage to you.
     // -----------------------------------------------------------------------

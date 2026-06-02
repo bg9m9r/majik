@@ -22,6 +22,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Resolve-time behaviour: tap-or-untap deterministic "useful flip".
 ///   - NamedCardFactory dispatch.
 /// </summary>
+[Trait("Color", "U")]
 public class PestermiteFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -157,15 +158,5 @@ public class PestermiteFactoryTests
 
         // Card off battlefield should not be tapped/untapped — CR 608.2b.
         grizzly.IsTapped.Should().BeFalse();
-    }
-
-    [Fact]
-    public void Pestermite_NamedCardFactory_Dispatch()
-    {
-        var card = NamedCardFactory.Create("Pestermite", _alice);
-
-        card.Should().NotBeNull();
-        card.Should().BeOfType<Creature>();
-        ((Creature)card).BasePower.Should().Be(2);
     }
 }

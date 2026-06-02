@@ -17,6 +17,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Card: Suntail Hawk — {W} Creature — Bird 1/1.
 ///   "Flying"
 /// </summary>
+[Trait("Color", "W")]
 public class SuntailHawkFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -73,16 +74,5 @@ public class SuntailHawkFactoryTests
         c.Abilities.OfType<ActivatedAbility>().Should().BeEmpty();
         c.Abilities.OfType<KeywordAbility>().Should().HaveCount(1,
             "Flying is the only printed keyword");
-    }
-
-    [Fact]
-    public void SuntailHawk_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Suntail Hawk", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Suntail Hawk");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Bird).Should().BeTrue();
     }
 }

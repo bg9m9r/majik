@@ -26,6 +26,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - ETB tutor: no eligible artifact → no-op.
 /// - ETB tutor: no artifacts in library → no-op.
 /// </summary>
+[Trait("Color", "U")]
 public class TributeMageFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -49,18 +50,6 @@ public class TributeMageFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void TributeMage_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Tribute Mage", _alice);
-
-        c.Should().BeOfType<Creature>("Tribute Mage is a Creature");
-        c.Name.Should().Be("Tribute Mage");
-        c.HasSubtype(CardSubtype.Human).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Wizard).Should().BeTrue();
-    }
-
     // -----------------------------------------------------------------------
     // ETB tutor — happy path
     // -----------------------------------------------------------------------

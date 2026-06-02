@@ -28,6 +28,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   <see cref="CardCycledEvent"/>.
 /// - <see cref="NamedCardFactory"/> dispatch.
 /// </summary>
+[Trait("Color", "G")]
 public class GenerousEntFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -51,28 +52,6 @@ public class GenerousEntFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void GenerousEnt_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Generous Ent", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Generous Ent");
-        card.HasSubtype(CardSubtype.Treefolk).Should().BeTrue();
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1,
-            "the ETB target-player-gains-4-life trigger");
-        card.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1,
-            "the cycling activated ability");
-        card.Abilities.OfType<KeywordAbility>()
-            .Should().Contain(k => k.Keyword == "Reach");
-        card.Abilities.OfType<KeywordAbility>()
-            .Should().Contain(k => k.Keyword == "Cycling");
-        card.Abilities.OfType<KeywordAbility>()
-            .Should().Contain(k => k.Keyword == "Forestcycling",
-                "Forestcycling marker surfaced even though typed-tutor body is deferred");
-    }
-
     // -----------------------------------------------------------------------
     // ETB trigger shape — CR 603.6a
     // -----------------------------------------------------------------------

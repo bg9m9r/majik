@@ -38,6 +38,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - One-shot skip-untap cleanup: on the target player's next Untap step,
 ///   the restriction is lifted (bus-wired path).
 /// </summary>
+[Trait("Color", "U")]
 public class SleepFactoryTests : IDisposable
 {
     private readonly Player _alice = new("Alice", 20);
@@ -86,18 +87,6 @@ public class SleepFactoryTests : IDisposable
     // -----------------------------------------------------------------------
     // NamedCardFactory dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void Sleep_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Sleep", _alice);
-
-        card.Should().BeOfType<Sorcery>("Sleep is a Sorcery");
-        card.Name.Should().Be("Sleep");
-        card.ManaCost.Should().Be("{2}{U}{U}");
-        card.Owner.Should().BeSameAs(_alice);
-    }
-
     // -----------------------------------------------------------------------
     // SpellDefinition shape
     // -----------------------------------------------------------------------

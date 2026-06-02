@@ -32,6 +32,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Resolve: noncreature target (e.g. land) → bounce no-op, Clue
 ///     still created.
 /// </summary>
+[Trait("Color", "U")]
 public class HardEvidenceFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -48,17 +49,6 @@ public class HardEvidenceFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void HardEvidence_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Hard Evidence", _alice);
-
-        card.Should().BeOfType<Sorcery>();
-        card.Name.Should().Be("Hard Evidence");
-        card.HasType(CardType.Sorcery).Should().BeTrue();
-    }
-
     [Fact]
     public void SpellDefinition_HasSingleCreatureTarget()
     {

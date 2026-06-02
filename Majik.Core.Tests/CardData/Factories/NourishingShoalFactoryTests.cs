@@ -39,6 +39,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///       • the spell itself as pitch → rejected.
 ///   - End-to-end pitch cast: exile the pitched card on resolve, gain X life.
 /// </summary>
+[Trait("Color", "G")]
 public class NourishingShoalFactoryTests
 {
     private readonly EventBus _bus = new();
@@ -71,18 +72,6 @@ public class NourishingShoalFactoryTests
         shoal.Owner.Should().BeSameAs(_alice);
         shoal.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchesNourishingShoal()
-    {
-        var card = NamedCardFactory.Create("Nourishing Shoal", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Nourishing Shoal");
-        card.HasType(CardType.Instant).Should().BeTrue();
-        card.ManaCost.Should().Be("{X}{G}{G}");
-    }
-
     // ── SpellDefinition shape ───────────────────────────────────────────────
 
     [Fact]

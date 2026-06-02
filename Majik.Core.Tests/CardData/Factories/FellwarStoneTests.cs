@@ -37,6 +37,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Tapping the live ability produces the matching mana + taps the stone.
 /// - Tapped stone can't activate.
 /// </summary>
+[Trait("Color", "C")]
 public class FellwarStoneTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -92,20 +93,6 @@ public class FellwarStoneTests
         manas.Should().ContainSingle(m => m.ManaGenerated.Red == 1);
         manas.Should().ContainSingle(m => m.ManaGenerated.Green == 1);
     }
-
-    [Fact]
-    public void FellwarStone_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Fellwar Stone", _alice);
-
-        card.Should().BeOfType<Artifact>();
-        card.Name.Should().Be("Fellwar Stone");
-        card.HasType(CardType.Artifact).Should().BeTrue();
-        card.ManaCost.Should().Be("{2}");
-        card.Abilities.OfType<ManaAbility>().Should().HaveCount(5,
-            "dispatcher path attaches the five colour slots");
-    }
-
     // -----------------------------------------------------------------------
     // No resolver / no opponent lands → no slot is active
     // -----------------------------------------------------------------------

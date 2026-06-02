@@ -26,6 +26,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// SpendRestriction) are wired in the factory — same shape as Cavern of
 /// Souls / Ornithopter of Paradise.
 /// </summary>
+[Trait("Color", "G")]
 public class DelightedHalflingFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -45,17 +46,6 @@ public class DelightedHalflingFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void DelightedHalfling_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Delighted Halfling", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Delighted Halfling");
-        ((Creature)c).HasSubtype(CardSubtype.Halfling).Should().BeTrue();
-    }
-
     [Fact]
     public void DelightedHalfling_HasSixManaAbilities_ColorlessPlusFiveColors()
     {

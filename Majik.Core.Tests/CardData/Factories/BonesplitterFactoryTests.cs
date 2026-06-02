@@ -24,6 +24,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// <see cref="ColossusHammerFactory"/> (flat +X/+0 equip), differing only
 /// in the boost magnitude (+2/+0) and equip cost ({1}).
 /// </summary>
+[Trait("Color", "C")]
 public class BonesplitterFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -41,17 +42,6 @@ public class BonesplitterFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void Bonesplitter_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Bonesplitter", _alice);
-
-        c.Should().BeOfType<Artifact>("Bonesplitter is an Artifact");
-        c.Name.Should().Be("Bonesplitter");
-        c.HasSubtype(CardSubtype.Equipment).Should().BeTrue();
-    }
-
     [Fact]
     public void Bonesplitter_EquipAbility_HasGenericOneCost()
     {

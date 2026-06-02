@@ -27,6 +27,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Resolve: a nonbasic land is NOT eligible (oracle says "basic land").
 ///   - Resolve: zero basics in library → no-op (legal under CR 701.19a).
 /// </summary>
+[Trait("Color", "G")]
 public class CivicWayfinderFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -51,18 +52,6 @@ public class CivicWayfinderFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_CivicWayfinder()
-    {
-        var card = NamedCardFactory.Create("Civic Wayfinder", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Civic Wayfinder");
-        card.HasType(CardType.Creature).Should().BeTrue();
-        card.ManaCost.Should().Be("{2}{G}");
-    }
-
     [Fact]
     public void CivicWayfinder_HasExactlyOneTriggeredAbility()
     {

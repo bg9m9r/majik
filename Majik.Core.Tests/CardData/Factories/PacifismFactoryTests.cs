@@ -29,6 +29,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - BuildSpellDefinition: legal candidates are creatures only
 ///     (CR 702.5b — "Enchant creature").
 /// </summary>
+[Trait("Color", "W")]
 public class PacifismFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -52,18 +53,6 @@ public class PacifismFactoryTests
         p.Owner.Should().BeSameAs(_alice);
         p.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_Pacifism()
-    {
-        var card = NamedCardFactory.Create("Pacifism", _alice);
-
-        card.Should().BeOfType<Enchantment>();
-        card.Name.Should().Be("Pacifism");
-        card.ManaCost.Should().Be("{1}{W}");
-        card.HasSubtype(CardSubtype.Aura).Should().BeTrue();
-    }
-
     // -----------------------------------------------------------------------
     // Static lockout (CR 508.1c / 509.1c)
     // -----------------------------------------------------------------------

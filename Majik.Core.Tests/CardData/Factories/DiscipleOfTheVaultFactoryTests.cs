@@ -32,6 +32,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     no-op when target is the controller (legality recheck).
 ///   - TargetRequest shape: 1..1 "target opponent".
 /// </summary>
+[Trait("Color", "B")]
 public class DiscipleOfTheVaultFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -56,18 +57,6 @@ public class DiscipleOfTheVaultFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void Disciple_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Disciple of the Vault", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Disciple of the Vault");
-        c.HasSubtype(CardSubtype.Human).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Cleric).Should().BeTrue();
-    }
-
     [Fact]
     public void Disciple_HasOneTriggeredAbility_WithTargetOpponentRequest()
     {

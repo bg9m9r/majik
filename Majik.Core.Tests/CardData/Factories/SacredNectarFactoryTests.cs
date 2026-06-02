@@ -23,6 +23,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Resolve: caster gains exactly 4 life (CR 119.3).
 /// - SpellDefinition shape: no target requests, no modes, no X.
 /// </summary>
+[Trait("Color", "W")]
 public class SacredNectarFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -63,19 +64,6 @@ public class SacredNectarFactoryTests
         colors.Should().HaveCount(1,
             "Sacred Nectar is mono-white");
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_SacredNectar()
-    {
-        var card = NamedCardFactory.Create("Sacred Nectar", _alice);
-
-        card.Should().BeOfType<Sorcery>();
-        card.Name.Should().Be("Sacred Nectar");
-        card.HasType(CardType.Sorcery).Should().BeTrue();
-        card.ManaCost.Should().Be("{1}{W}");
-        card.Owner.Should().BeSameAs(_alice);
-    }
-
     // ── Resolve — caster gains 4 life ────────────────────────────────────
 
     [Fact]

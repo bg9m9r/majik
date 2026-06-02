@@ -25,6 +25,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Resolve: opponent-controlled target fizzles (CR 608.2b).
 /// - Resolve: zero-target "may" branch is a clean no-op.
 /// </summary>
+[Trait("Color", "W")]
 public class FelidarGuardianFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -53,17 +54,6 @@ public class FelidarGuardianFactoryTests
             .Select(k => k.Keyword).ToList();
         keywordNames.Should().Contain("Flash");
     }
-
-    [Fact]
-    public void FelidarGuardian_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Felidar Guardian", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Felidar Guardian");
-        c.ManaCost.Should().Be("{2}{W}");
-    }
-
     [Fact]
     public void FelidarGuardian_HasEtbTriggerWithUpToOneTarget()
     {

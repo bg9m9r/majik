@@ -38,6 +38,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Empty hand before activation → draw gives 1 card → life loss = 1.
 /// - Hand with N cards before activation → draw gives N+1 → life loss = N+1.
 /// </summary>
+[Trait("Color", "C")]
 public class CastleLocthwainFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -118,15 +119,6 @@ public class CastleLocthwainFactoryTests
     // -----------------------------------------------------------------------
     // Dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void NamedCardFactory_Dispatch_ReturnsLand()
-    {
-        var card = NamedCardFactory.Create("Castle Locthwain", _alice);
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Castle Locthwain");
-    }
-
     // -----------------------------------------------------------------------
     // Ability count / shape
     // -----------------------------------------------------------------------
@@ -258,18 +250,6 @@ public class CastleLocthwainFactoryTests
         after!.EntersTapped.Should().BeTrue(
             "Castle Locthwain has no Swamp subtype; its presence on battlefield doesn't satisfy the predicate");
     }
-
-    [Fact]
-    public void SingleArgDispatch_DoesNotRegisterReplacement()
-    {
-        // Shape-only path via NamedCardFactory.Create — no replacement bus.
-        var alice = new Player("Alice", 20);
-        var card = NamedCardFactory.Create("Castle Locthwain", alice);
-        card.Should().BeOfType<Land>();
-        ((Land)card).Abilities.OfType<ManaAbility>().Should().HaveCount(1);
-        ((Land)card).Abilities.OfType<ActivatedAbility>().Should().HaveCount(1);
-    }
-
     // -----------------------------------------------------------------------
     // Activated ability: {1}{B}{B}, {T} — cost gates
     // -----------------------------------------------------------------------

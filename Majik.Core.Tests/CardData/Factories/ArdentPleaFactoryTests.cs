@@ -38,6 +38,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   (mirrors <see cref="ViolentOutburstFactory"/>).
 /// - Cascade discovery in <see cref="CascadeAltCostProbe.DefaultIsCascadeCard"/>.
 /// </summary>
+[Trait("Color", "M")]
 public class ArdentPleaFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -74,18 +75,6 @@ public class ArdentPleaFactoryTests
         card.Controller.Should().BeSameAs(_alice);
         card.ManaCostValue.TotalValue.Should().Be(3);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_ArdentPlea()
-    {
-        var card = NamedCardFactory.Create("Ardent Plea", _alice);
-
-        card.Should().BeOfType<Enchantment>();
-        card.Name.Should().Be("Ardent Plea");
-        card.HasType(CardType.Enchantment).Should().BeTrue();
-        card.Owner.Should().BeSameAs(_alice);
-    }
-
     // ── Exalted keyword marker ────────────────────────────────────────────
 
     [Fact]

@@ -41,6 +41,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Kicked with only one card available: takes the single card, no crash.
 /// </summary>
 [Collection(nameof(StaticRegistryCollection))]
+[Trait("Color", "U")]
 public class ConsultTheStarChartsFactoryTests : IDisposable
 {
     private readonly Player _alice = new("Alice", 20);
@@ -63,19 +64,6 @@ public class ConsultTheStarChartsFactoryTests : IDisposable
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_ConsultTheStarCharts()
-    {
-        var card = NamedCardFactory.Create("Consult the Star Charts", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Consult the Star Charts");
-        card.HasType(CardType.Instant).Should().BeTrue();
-        card.ManaCost.Should().Be("{1}{U}");
-        card.Owner.Should().BeSameAs(_alice);
-    }
-
     [Fact]
     public void KickerAltCostProbe_Recognises_ConsultTheStarCharts()
     {

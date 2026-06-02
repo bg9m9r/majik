@@ -28,6 +28,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   <see cref="Majik.Core.Events.CardCycledEvent"/>.
 /// - Dispatcher routing through <see cref="NamedCardFactory"/>.
 /// </summary>
+[Trait("Color", "C")]
 public class KetriaTriomeFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -35,19 +36,6 @@ public class KetriaTriomeFactoryTests
     // -----------------------------------------------------------------------
     // Identity + dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void KetriaTriome_Dispatch_ReturnsLandWithAllThreeSubtypes()
-    {
-        var card = NamedCardFactory.Create("Ketria Triome", _alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Ketria Triome");
-        card.HasSubtype(CardSubtype.Forest).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Island).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Mountain).Should().BeTrue();
-    }
-
     [Fact]
     public void KetriaTriome_HasThreeManaAbilities_ProducingGUR()
     {

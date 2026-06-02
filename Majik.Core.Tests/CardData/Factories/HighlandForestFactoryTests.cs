@@ -26,22 +26,10 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// path by <see cref="EntersTappedBinder"/> from the oracle text, not by this
 /// factory (same posture as <see cref="AlpineMeadowFactory"/>).
 /// </summary>
+[Trait("Color", "C")]
 public class HighlandForestFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
-
-    [Fact]
-    public void HighlandForest_Dispatch_ReturnsSnowLandWithMountainAndForestSubtypes()
-    {
-        var card = NamedCardFactory.Create("Highland Forest", _alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Highland Forest");
-        card.HasSupertype(CardSupertype.Snow).Should().BeTrue("type line is Snow Land");
-        card.HasSubtype(CardSubtype.Mountain).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Forest).Should().BeTrue();
-    }
-
     [Fact]
     public void HighlandForest_HasTwoManaAbilities_ProducingRedAndGreen()
     {

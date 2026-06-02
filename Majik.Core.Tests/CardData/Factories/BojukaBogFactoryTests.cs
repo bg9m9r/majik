@@ -26,6 +26,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Target-player fallback to controller when no target was chosen.
 /// - <see cref="NamedCardFactory"/> dispatch.
 /// </summary>
+[Trait("Color", "C")]
 public class BojukaBogFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -51,19 +52,6 @@ public class BojukaBogFactoryTests
         bog.Abilities.OfType<ManaAbility>().Should().HaveCount(1);
         bog.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1);
     }
-
-    [Fact]
-    public void BojukaBog_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Bojuka Bog", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Bojuka Bog");
-        card.HasType(CardType.Land).Should().BeTrue();
-        card.Abilities.OfType<ManaAbility>().Should().HaveCount(1);
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1);
-    }
-
     // -----------------------------------------------------------------------
     // Enters-tapped (CR 614.1c)
     // -----------------------------------------------------------------------

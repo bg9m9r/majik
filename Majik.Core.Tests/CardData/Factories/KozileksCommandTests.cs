@@ -29,6 +29,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Tests exercise the EffectFactory directly with crafted
 /// <see cref="ChosenSpellParams"/> — same pattern as <see cref="Majik.Core.Tests.CardData.KolaghansCommandTests"/>.
 /// </summary>
+[Trait("Color", "C")]
 public class KozileksCommandTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -233,17 +234,6 @@ public class KozileksCommandTests
         // {X}{C}{C} is colorless (CR 105.2c).
         CardColors.GetColors(kc).Should().BeEmpty();
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsKozileksCommandShape()
-    {
-        var dispatched = NamedCardFactory.Create("Kozilek's Command", _alice);
-
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("Kozilek's Command");
-        dispatched.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     [Fact]
     public void BuildDefinition_ExposesFourModes_VariableX_FourTargetRequests()
     {

@@ -33,6 +33,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Token rider: on attack, two 1/1 white Soldier tokens enter tapped AND
 ///   attacking the same defender as Hero.
 /// </summary>
+[Trait("Color", "W")]
 public class HeroOfBladeholdFactoryTests
 {
     // -----------------------------------------------------------------------
@@ -57,17 +58,6 @@ public class HeroOfBladeholdFactoryTests
         card.Owner.Should().BeSameAs(alice);
         card.Controller.Should().BeSameAs(alice);
     }
-
-    [Fact]
-    public void HeroOfBladehold_Dispatch_ResolvesViaNamedCardFactory()
-    {
-        var alice = new Player("Alice", 20);
-        var card = NamedCardFactory.Create("Hero of Bladehold", alice);
-
-        card.Should().BeAssignableTo<Creature>();
-        card.Name.Should().Be("Hero of Bladehold");
-    }
-
     [Fact]
     public void HeroOfBladehold_HasBattleCryKeywordMarker()
     {

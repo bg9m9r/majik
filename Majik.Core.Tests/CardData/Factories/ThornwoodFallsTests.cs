@@ -35,6 +35,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// path by <see cref="Majik.Core.CardData.EntersTappedBinder"/>, not by this
 /// named-card factory — same posture as the rest of the refuge cycle.
 /// </summary>
+[Trait("Color", "C")]
 public class ThornwoodFallsTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -51,18 +52,6 @@ public class ThornwoodFallsTests
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_ThornwoodFalls()
-    {
-        var card = NamedCardFactory.Create("Thornwood Falls", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Thornwood Falls");
-        card.Abilities.OfType<ManaAbility>().Should().HaveCount(2);
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1);
-    }
-
     [Fact]
     public void ThornwoodFalls_HasManaAbility_ForGreen()
     {

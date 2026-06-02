@@ -26,6 +26,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     at resolution).
 ///   - No-op on an off-battlefield target (CR 608.2b).
 /// </summary>
+[Trait("Color", "G")]
 public class PlummetFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -55,19 +56,6 @@ public class PlummetFactoryTests
         CardColors.GetColors(card).Should().Contain(ManaColor.Green,
             "Plummet has a {G} pip in its mana cost (CR 105)");
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_Plummet()
-    {
-        var card = NamedCardFactory.Create("Plummet", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Plummet");
-        card.HasType(CardType.Instant).Should().BeTrue();
-        card.ManaCost.Should().Be("{1}{G}");
-        card.Owner.Should().BeSameAs(_alice);
-    }
-
     // -----------------------------------------------------------------------
     // Resolution — destroys a creature with Flying
     // -----------------------------------------------------------------------

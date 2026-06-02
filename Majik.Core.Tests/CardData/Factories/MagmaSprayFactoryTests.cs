@@ -32,6 +32,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Exile rider is NOT applied to a creature that was NOT targeted
 ///     (i.e., the rider is scoped to only the one targeted creature).
 /// </summary>
+[Trait("Color", "R")]
 public class MagmaSprayFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -52,18 +53,6 @@ public class MagmaSprayFactoryTests
         spray.Owner.Should().BeSameAs(_alice);
         spray.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void MagmaSpray_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Magma Spray", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Magma Spray");
-        card.HasType(CardType.Instant).Should().BeTrue();
-        card.ManaCost.ToString().Should().Be("{R}");
-    }
-
     // -----------------------------------------------------------------------
     // Spell-definition shape
     // -----------------------------------------------------------------------

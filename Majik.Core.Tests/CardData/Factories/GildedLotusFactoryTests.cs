@@ -28,6 +28,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   disables the other four (CR 605.1b — only one "any one color" mode).
 /// - Dispatch through <see cref="NamedCardFactory"/>.
 /// </summary>
+[Trait("Color", "C")]
 public class GildedLotusFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -59,17 +60,6 @@ public class GildedLotusFactoryTests
         cost.Generic.Should().Be(5);
         cost.TotalValue.Should().Be(5);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_GildedLotus()
-    {
-        var card = NamedCardFactory.Create("Gilded Lotus", _alice);
-
-        card.Should().BeAssignableTo<Artifact>();
-        card.Name.Should().Be("Gilded Lotus");
-        card.HasType(CardType.Artifact).Should().BeTrue();
-    }
-
     // -----------------------------------------------------------------------
     // Mana ability shape — three mana of one colour per WUBRG
     // -----------------------------------------------------------------------

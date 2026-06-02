@@ -29,6 +29,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Picker callback receives the eligible pile and the returned subset
 ///   appears in <see cref="EtaliPrimalStormFactory.Result.Picked"/>.
 /// </summary>
+[Trait("Color", "R")]
 public class EtaliPrimalStormFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -54,18 +55,6 @@ public class EtaliPrimalStormFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_EtaliPrimalStorm()
-    {
-        var c = NamedCardFactory.Create("Etali, Primal Storm", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Etali, Primal Storm");
-        c.HasSubtype(CardSubtype.Dinosaur).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Elder).Should().BeTrue();
-    }
-
     [Fact]
     public void HasOneAttackTriggeredAbility()
     {

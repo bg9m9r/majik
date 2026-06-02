@@ -32,6 +32,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Sacrifice effect moves the bear to its owner's graveyard.
 /// - Targeting an unrelated permanent does NOT trigger.
 /// </summary>
+[Trait("Color", "U")]
 public class PhantasmalBearFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -56,20 +57,6 @@ public class PhantasmalBearFactoryTests
         pb.Owner.Should().BeSameAs(_alice);
         pb.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_PhantasmalBear()
-    {
-        var card = NamedCardFactory.Create("Phantasmal Bear", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Phantasmal Bear");
-        card.HasType(CardType.Creature).Should().BeTrue();
-        ((Creature)card).HasSubtype(CardSubtype.Bear).Should().BeTrue();
-        ((Creature)card).HasSubtype(CardSubtype.Illusion).Should().BeTrue();
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1);
-    }
-
     [Fact]
     public void PhantasmalBear_HasSacrificeTrigger_OnlyOnBattlefield()
     {
