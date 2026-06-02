@@ -1,0 +1,9 @@
+{
+  "name": "Felidar Savior",
+  "types": ["Creature"],
+  "subtypes": ["Cat", "Beast"],
+  "manaCost": "{3}{W}",
+  "power": 2,
+  "toughness": 3,
+  "abilities": []
+}
