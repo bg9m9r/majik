@@ -1,0 +1,8 @@
+{
+  "name": "Bottle Gnomes",
+  "types": ["Creature", "Artifact"],
+  "subtypes": ["Gnome"],
+  "manaCost": "{3}",
+  "power": 1,
+  "toughness": 3
+}
