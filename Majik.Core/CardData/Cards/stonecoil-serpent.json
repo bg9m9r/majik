@@ -1,0 +1,9 @@
+{
+  "name": "Stonecoil Serpent",
+  "types": ["Creature", "Artifact"],
+  "subtypes": ["Snake"],
+  "manaCost": "{X}",
+  "power": 0,
+  "toughness": 0,
+  "abilities": []
+}
