@@ -1,0 +1,5 @@
+{
+  "name": "Kaya's Guile",
+  "types": ["Instant"],
+  "manaCost": "{1}{W}{B}"
+}
