@@ -18,6 +18,7 @@ public sealed class ScriptedAgent : IPlayerAgent
     private readonly Queue<IReadOnlyList<object>> _targets = new();
     private readonly Queue<int> _xValues = new();
     private readonly Queue<int> _modes = new();
+    private readonly Queue<IReadOnlyList<int>> _modeSets = new();
     private readonly Queue<IReadOnlyList<ITriggeredAbility>> _triggerOrders = new();
     private readonly Queue<ManaPayment> _manaPayments = new();
     private readonly Queue<CombatPlan> _attackPlans = new();
@@ -41,6 +42,11 @@ public sealed class ScriptedAgent : IPlayerAgent
     public void QueueTargets(IReadOnlyList<object> targets) => _targets.Enqueue(targets);
     public void QueueX(int x) => _xValues.Enqueue(x);
     public void QueueMode(int m) => _modes.Enqueue(m);
+    /// <summary>Pre-queue the chosen mode SET for a "choose one or more"
+    /// modal spell (CR 700.2d). Consumed FIFO by
+    /// <see cref="ChooseModesAsync"/>. The order is preserved (the first
+    /// entry is the free mode; the rest pay escalate per CR 702.121).</summary>
+    public void QueueModes(params int[] modes) => _modeSets.Enqueue(modes.ToList());
     public void QueueTriggerOrder(IReadOnlyList<ITriggeredAbility> order) => _triggerOrders.Enqueue(order);
     public void QueueMana(ManaPayment p) => _manaPayments.Enqueue(p);
     public void QueueAttackers(CombatPlan p) => _attackPlans.Enqueue(p);
@@ -148,6 +154,15 @@ public sealed class ScriptedAgent : IPlayerAgent
         IReadOnlyList<BotIntent>? modeIntents = null,
         CancellationToken ct = default)
         => Task.FromResult(Pop(_modes, "mode"));
+
+    public Task<IReadOnlyList<int>> ChooseModesAsync(
+        GameContext ctx,
+        IReadOnlyList<string> modes,
+        int minModes,
+        int maxModes,
+        IReadOnlyList<BotIntent>? modeIntents = null,
+        CancellationToken ct = default)
+        => Task.FromResult(Pop(_modeSets, "modes"));
 
     public Task<IReadOnlyList<ITriggeredAbility>> OrderTriggersAsync(GameContext ctx, IReadOnlyList<ITriggeredAbility> mine, CancellationToken ct = default)
         => Task.FromResult(Pop(_triggerOrders, "trigger order"));
