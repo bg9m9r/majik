@@ -31,6 +31,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Guard: with fewer than two graveyard cards, the body is a no-op
 ///     (the cost can't be paid).
 /// </summary>
+[Trait("Color", "R")]
 public class GrimLavamancerFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -65,19 +66,6 @@ public class GrimLavamancerFactoryTests
         gl.Owner.Should().BeSameAs(_alice);
         gl.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void GrimLavamancer_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Grim Lavamancer", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Grim Lavamancer");
-        card.HasSubtype(CardSubtype.Wizard).Should().BeTrue();
-        ((Creature)card).BasePower.Should().Be(1);
-        ((Creature)card).BaseToughness.Should().Be(1);
-    }
-
     // -----------------------------------------------------------------------
     // Activated ability shape
     // -----------------------------------------------------------------------

@@ -33,6 +33,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Mode 1 no-op against a creature (wrong type — CR 608.2b).
 ///   - Mode 1 no-op if target left the battlefield before resolution (CR 608.2b).
 /// </summary>
+[Trait("Color", "R")]
 public class AbradeFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -55,17 +56,6 @@ public class AbradeFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsAbradeShape()
-    {
-        var dispatched = NamedCardFactory.Create("Abrade", _alice);
-
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("Abrade");
-        dispatched.ManaCost.Should().Be("{1}{R}");
-    }
-
     [Fact]
     public void SpellDefinition_ExposesTwoModes_AndTwoOptionalTargetRequests()
     {

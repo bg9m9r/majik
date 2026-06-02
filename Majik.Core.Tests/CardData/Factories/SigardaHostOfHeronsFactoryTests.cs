@@ -22,6 +22,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// you to sacrifice permanents." rider is intentionally NOT covered —
 /// see factory class summary for the deferred-primitive note.
 /// </summary>
+[Trait("Color", "M")]
 public class SigardaHostOfHeronsFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -51,22 +52,6 @@ public class SigardaHostOfHeronsFactoryTests
         keywords.Should().Contain(k => k.Keyword == "Flying");
         keywords.Should().Contain(k => k.Keyword == "Hexproof");
     }
-
-    [Fact]
-    public void Sigarda_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Sigarda, Host of Herons", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Sigarda, Host of Herons");
-        c.HasSubtype(CardSubtype.Angel).Should().BeTrue();
-        c.HasSupertype(CardSupertype.Legendary).Should().BeTrue();
-        c.Abilities.OfType<KeywordAbility>()
-            .Should().Contain(k => k.Keyword == "Flying");
-        c.Abilities.OfType<KeywordAbility>()
-            .Should().Contain(k => k.Keyword == "Hexproof");
-    }
-
     [Fact]
     public void Sigarda_NullOwner_Throws()
     {

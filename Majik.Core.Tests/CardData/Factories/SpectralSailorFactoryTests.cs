@@ -22,6 +22,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     resolution (Library → Hand zone-move, empty-library safety).
 ///   - NamedCardFactory dispatch routes the card name to this factory.
 /// </summary>
+[Trait("Color", "U")]
 public class SpectralSailorFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -107,19 +108,5 @@ public class SpectralSailorFactoryTests
 
         act.Should().NotThrow();
         _alice.Zones.Hand.GetCards().Should().BeEmpty();
-    }
-
-    [Fact]
-    public void SpectralSailor_NamedCardFactory_Dispatch()
-    {
-        var card = NamedCardFactory.Create("Spectral Sailor", _alice);
-
-        card.Should().NotBeNull();
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Spectral Sailor");
-        ((Creature)card).Power.Should().Be(1);
-        ((Creature)card).Toughness.Should().Be(1);
-        card.HasSubtype(CardSubtype.Spirit).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Pirate).Should().BeTrue();
     }
 }

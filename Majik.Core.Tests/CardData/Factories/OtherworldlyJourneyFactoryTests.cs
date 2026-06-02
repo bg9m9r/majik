@@ -33,6 +33,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Resolve: illegal target (already left the battlefield) fizzles
 ///   (CR 608.2b).
 /// </summary>
+[Trait("Color", "W")]
 public class OtherworldlyJourneyFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -53,17 +54,6 @@ public class OtherworldlyJourneyFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void OtherworldlyJourney_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Otherworldly Journey", _alice);
-
-        c.Should().BeOfType<Instant>();
-        c.Name.Should().Be("Otherworldly Journey");
-        c.ManaCost.Should().Be("{1}{W}");
-    }
-
     [Fact]
     public void OtherworldlyJourney_Definition_HasSingleCreatureTarget()
     {

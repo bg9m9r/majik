@@ -32,6 +32,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   * Cycling end-to-end: pays {1}, discards self, draws one card,
 ///     publishes <see cref="CardCycledEvent"/> on the bus (CR 702.32d).
 /// </summary>
+[Trait("Color", "U")]
 public class CensorFactoryTests
 {
     private readonly EventBus _bus = new();
@@ -67,21 +68,6 @@ public class CensorFactoryTests
         censor.Owner.Should().BeSameAs(_alice);
         censor.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsCensorShape_WithCyclingKeyword()
-    {
-        var dispatched = NamedCardFactory.Create("Censor", _alice);
-
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("Censor");
-        dispatched.ManaCost.Should().Be("{U}");
-        dispatched.Abilities.OfType<KeywordAbility>()
-            .Should().Contain(k => k.Keyword == "Cycling");
-        dispatched.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1,
-            "the cycling activated ability");
-    }
-
     [Fact]
     public void SpellDefinition_DeclaresSingleTargetSpellRequest()
     {

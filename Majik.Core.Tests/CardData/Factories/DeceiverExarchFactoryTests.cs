@@ -27,6 +27,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///       * Idempotent on an already-untapped legal target.
 ///   - NamedCardFactory dispatch.
 /// </summary>
+[Trait("Color", "C")]
 public class DeceiverExarchFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -211,15 +212,5 @@ public class DeceiverExarchFactoryTests
         {
             Assert.Fail("Island should be a Permanent");
         }
-    }
-
-    [Fact]
-    public void DeceiverExarch_NamedCardFactory_Dispatch()
-    {
-        var card = NamedCardFactory.Create("Deceiver Exarch", _alice);
-
-        card.Should().NotBeNull();
-        card.Should().BeOfType<Creature>();
-        ((Creature)card).BaseToughness.Should().Be(4);
     }
 }

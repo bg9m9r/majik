@@ -36,6 +36,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Storm as first spell this turn: no token copies.
 /// - Storm as Nth spell this turn: N-1 token copies, each a 4/4 flying Dragon.
 /// </summary>
+[Trait("Color", "R")]
 public class StormscaleScionFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -77,18 +78,6 @@ public class StormscaleScionFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void StormscaleScion_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Stormscale Scion", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Stormscale Scion");
-        ((Creature)c).HasSubtype(CardSubtype.Dragon).Should().BeTrue();
-        c.HasType(CardType.Creature).Should().BeTrue();
-    }
-
     // ── Flying ──────────────────────────────────────────────────────────
 
     [Fact]

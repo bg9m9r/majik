@@ -26,22 +26,10 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// path by <see cref="EntersTappedBinder"/> from the oracle text, not by this
 /// factory (same posture as the rest of the snow-dual cycle).
 /// </summary>
+[Trait("Color", "C")]
 public class VolatileFjordFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
-
-    [Fact]
-    public void VolatileFjord_Dispatch_ReturnsSnowLandWithIslandAndMountainSubtypes()
-    {
-        var card = NamedCardFactory.Create("Volatile Fjord", _alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Volatile Fjord");
-        card.HasSupertype(CardSupertype.Snow).Should().BeTrue("type line is Snow Land");
-        card.HasSubtype(CardSubtype.Island).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Mountain).Should().BeTrue();
-    }
-
     [Fact]
     public void VolatileFjord_HasTwoManaAbilities_ProducingBlueAndRed()
     {

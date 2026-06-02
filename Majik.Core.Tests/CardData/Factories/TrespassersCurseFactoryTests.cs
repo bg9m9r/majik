@@ -29,6 +29,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     non-creature ETBs, NOR when no player is enchanted.
 ///   - Resolution: enchanted player loses 1, controller gains 1.
 /// </summary>
+[Trait("Color", "B")]
 public class TrespassersCurseFactoryTests
 {
     private readonly Player _alice = new("Alice", 20); // curse controller

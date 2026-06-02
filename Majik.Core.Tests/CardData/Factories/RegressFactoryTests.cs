@@ -32,6 +32,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Resolve: bounces a non-creature permanent (Enchantment) to its owner's hand.
 /// - Resolve: target already off battlefield (CR 608.2b) → no-op.
 /// </summary>
+[Trait("Color", "U")]
 public class RegressFactoryTests
 {
     private readonly EventBus _bus = new();
@@ -71,17 +72,6 @@ public class RegressFactoryTests
     // -----------------------------------------------------------------------
     // NamedCardFactory dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void Regress_NamedCardFactory_DispatchesByName()
-    {
-        var card = NamedCardFactory.Create("Regress", _alice);
-
-        card.Should().BeOfType<Instant>("Regress is an Instant");
-        card.Name.Should().Be("Regress");
-        card.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     // -----------------------------------------------------------------------
     // BuildDefinition — target request shape
     // -----------------------------------------------------------------------

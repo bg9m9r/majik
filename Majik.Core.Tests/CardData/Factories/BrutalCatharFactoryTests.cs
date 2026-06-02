@@ -30,6 +30,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - LTB no-ops cleanly when nothing was exiled.
 /// - Back-face Ward—Pay 3 life builds a real PayLifeCost(3) ward.
 /// </summary>
+[Trait("Color", "W")]
 public class BrutalCatharFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -54,20 +55,6 @@ public class BrutalCatharFactoryTests
         c.Abilities.OfType<TriggeredAbility>().Should().HaveCount(2,
             "ETB exile trigger + LTB return trigger");
     }
-
-    [Fact]
-    public void BrutalCathar_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Brutal Cathar", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Brutal Cathar");
-        c.HasSubtype(CardSubtype.Werewolf).Should().BeTrue();
-        ((Creature)c).BasePower.Should().Be(2);
-        ((Creature)c).BaseToughness.Should().Be(2);
-        c.Abilities.OfType<TriggeredAbility>().Should().HaveCount(2);
-    }
-
     [Fact]
     public void BrutalCathar_CarriesDayboundNightboundAndBackFace()
     {

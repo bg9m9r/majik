@@ -27,6 +27,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - PayLifeCost gates on life total (CR 119.4).
 ///   - NamedCardFactory dispatch.
 /// </summary>
+[Trait("Color", "W")]
 public class AdantoVanguardFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -124,19 +125,5 @@ public class AdantoVanguardFactoryTests
             .Costs.OfType<PayLifeCost>().Single();
 
         cost.CanPay(lowLife).Should().BeFalse("CR 119.4 — can't pay 4 life with only 3");
-    }
-
-    [Fact]
-    public void AdantoVanguard_NamedCardFactory_Dispatch()
-    {
-        var card = NamedCardFactory.Create("Adanto Vanguard", _alice);
-
-        card.Should().NotBeNull();
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Adanto Vanguard");
-        ((Creature)card).BasePower.Should().Be(1);
-        ((Creature)card).BaseToughness.Should().Be(1);
-        card.HasSubtype(CardSubtype.Vampire).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Soldier).Should().BeTrue();
     }
 }

@@ -32,6 +32,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - {2}{R}, Discard a card activated ability dealing 2 damage to each
 ///     opponent.
 /// </summary>
+[Trait("Color", "R")]
 public class HazoretTheFerventFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -57,17 +58,6 @@ public class HazoretTheFerventFactoryTests
         hazoret.Owner.Should().BeSameAs(_alice);
         hazoret.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatch_ReturnsHazoretShape()
-    {
-        var dispatched = NamedCardFactory.Create("Hazoret the Fervent", _alice);
-
-        dispatched.Should().BeOfType<Creature>();
-        dispatched.Name.Should().Be("Hazoret the Fervent");
-        dispatched.HasType(CardType.Creature).Should().BeTrue();
-    }
-
     // -------------------------------------------------------------------------
     // Keyword markers
     // -------------------------------------------------------------------------

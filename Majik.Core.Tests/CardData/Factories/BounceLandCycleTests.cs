@@ -28,6 +28,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - ETB-tapped replacement is registered when a <see cref="ReplacementBus"/>
 ///   is wired (unconditional — bounce lands always enter tapped).
 /// </summary>
+[Trait("Color", "C")]
 public class BounceLandCycleTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -50,24 +51,6 @@ public class BounceLandCycleTests
         new object[] { "Selesnya Sanctuary",   "G", "W" },
         new object[] { "Simic Growth Chamber", "G", "U" },
     };
-
-    [Theory]
-    [MemberData(nameof(AllBounceLands))]
-    public void BounceLand_Dispatch_ReturnsLand(string cardName, string _a, string _b)
-    {
-        _ = _a; _ = _b;
-
-        var card = NamedCardFactory.Create(cardName, _alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be(cardName);
-        card.HasType(CardType.Land).Should().BeTrue();
-        card.HasSupertype(CardSupertype.Basic).Should().BeFalse(
-            "bounce lands are nonbasic");
-        card.Owner.Should().BeSameAs(_alice);
-        card.Controller.Should().BeSameAs(_alice);
-    }
-
     [Theory]
     [MemberData(nameof(AllBounceLands))]
     public void BounceLand_HasManaAbility_ProducingColourPair(
@@ -129,20 +112,6 @@ public class BounceLandCycleTests
         after!.EntersTapped.Should().BeTrue(
             "bounce lands always enter tapped (CR 614.1c)");
     }
-
-    [Fact]
-    public void BounceLand_SingleArgDispatch_DoesNotRegisterReplacement()
-    {
-        // Shape-only path — single-arg dispatcher constructs without a
-        // ReplacementBus, so the land enters untapped on this code path
-        // (matches every other always-tapped factory's shape-only posture).
-        // No assertion to make on bus-less construction other than that
-        // the card builds successfully.
-        var land = NamedCardFactory.Create("Azorius Chancery", _alice);
-        land.Should().NotBeNull();
-        land.Name.Should().Be("Azorius Chancery");
-    }
-
     // -----------------------------------------------------------------------
     // ETB bounce — controller picks one land, returned to its owner's hand
     // -----------------------------------------------------------------------

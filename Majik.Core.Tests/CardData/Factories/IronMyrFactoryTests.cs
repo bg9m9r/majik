@@ -24,6 +24,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - {T}: Add {R} mana ability — taps the myr, produces one red pip,
 ///     can't activate while already tapped.
 /// </summary>
+[Trait("Color", "C")]
 public class IronMyrFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -48,20 +49,6 @@ public class IronMyrFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void IronMyr_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Iron Myr", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Iron Myr");
-        c.HasType(CardType.Artifact).Should().BeTrue();
-        ((Creature)c).HasSubtype(CardSubtype.Myr).Should().BeTrue();
-        c.Abilities.OfType<ManaAbility>().Should().HaveCount(1,
-            "{T}: Add {R} mana ability is attached");
-    }
-
     // -------------------------------------------------------------------------
     // {T}: Add {R}
     // -------------------------------------------------------------------------

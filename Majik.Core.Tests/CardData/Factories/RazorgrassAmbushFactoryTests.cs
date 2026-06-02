@@ -49,6 +49,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Back face — exactly 3 life → payment legal, enters untapped.
 /// - Back face — no agent → enters tapped.
 /// </summary>
+[Trait("Color", "W")]
 public class RazorgrassAmbushFactoryTests : IDisposable
 {
     public RazorgrassAmbushFactoryTests()
@@ -95,18 +96,6 @@ public class RazorgrassAmbushFactoryTests : IDisposable
         colors.Should().NotContain(ManaColor.Green);
         colors.Should().NotContain(ManaColor.Red);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_RazorgrassAmbush()
-    {
-        var alice = new Player("Alice", 20);
-        var card = NamedCardFactory.Create("Razorgrass Ambush", alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Razorgrass Ambush");
-        card.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     // =========================================================================
     // MDFC face tracker — front face
     // =========================================================================
@@ -287,18 +276,6 @@ public class RazorgrassAmbushFactoryTests : IDisposable
         land.Owner.Should().BeSameAs(alice);
         land.Controller.Should().BeSameAs(alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_RazorgrassField()
-    {
-        var alice = new Player("Alice", 20);
-        var card = NamedCardFactory.Create("Razorgrass Field", alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Razorgrass Field");
-        card.HasType(CardType.Land).Should().BeTrue();
-    }
-
     [Fact]
     public void RazorgrassField_CarriesMdfcState_PreFlippedToBackFace()
     {

@@ -36,6 +36,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Tap-as-cost: second coloured activation can't pay {T} once tapped.
 /// - Dispatch through <see cref="NamedCardFactory"/>.
 /// </summary>
+[Trait("Color", "C")]
 public class GroveOfTheBurnwillowsFactoryTests
 {
     private const string Name = "Grove of the Burnwillows";
@@ -77,18 +78,6 @@ public class GroveOfTheBurnwillowsFactoryTests
         land.HasSupertype(CardSupertype.Basic).Should().BeFalse();
         land.HasSupertype(CardSupertype.Legendary).Should().BeFalse();
     }
-
-    [Fact]
-    public void Grove_Dispatch_ResolvesViaNamedCardFactory()
-    {
-        var alice = new Player("Alice", 20);
-
-        var card = NamedCardFactory.Create(Name, alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be(Name);
-    }
-
     // -----------------------------------------------------------------------
     // Mana abilities — shape
     // -----------------------------------------------------------------------

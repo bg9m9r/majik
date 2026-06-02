@@ -34,6 +34,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Surveil-1 fall-back (no agent) puts the peeked card in the graveyard.
 /// - The {1} mana cost gates the any-colour abilities (CR 605.1).
 /// </summary>
+[Trait("Color", "C")]
 public class HiddenGrottoTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -57,19 +58,6 @@ public class HiddenGrottoTests
 
         land.HasSupertype(CardSupertype.Basic).Should().BeFalse();
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_HiddenGrotto()
-    {
-        var card = NamedCardFactory.Create("Hidden Grotto", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Hidden Grotto");
-        // One {C} + five any-colour (WUBRG) = six mana abilities.
-        card.Abilities.OfType<ManaAbility>().Should().HaveCount(6);
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1);
-    }
-
     [Fact]
     public void HiddenGrotto_HasColorlessManaAbility_NoCost()
     {

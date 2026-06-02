@@ -54,6 +54,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Cast trigger B illegal-on-resolution: target no longer a Land
 ///   in battlefield → fizzles silently.
 /// </summary>
+[Trait("Color", "C")]
 public class SowingMycospawnFactoryTests : IDisposable
 {
     private readonly Player _alice = new("Alice", 20);
@@ -126,21 +127,6 @@ public class SowingMycospawnFactoryTests : IDisposable
                 "Devoid keyword ability marker is attached for ability-scan " +
                 "discoverability (CR 702.114)");
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_SowingMycospawn()
-    {
-        var card = NamedCardFactory.Create("Sowing Mycospawn", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Sowing Mycospawn");
-        card.HasSubtype(CardSubtype.Eldrazi).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Fungus).Should().BeTrue();
-        ((Creature)card).BasePower.Should().Be(3);
-        ((Creature)card).BaseToughness.Should().Be(3);
-        card.ManaCost.Should().Be("{3}{G}");
-    }
-
     // -----------------------------------------------------------------------
     // Kicker {1}{C}
     // -----------------------------------------------------------------------

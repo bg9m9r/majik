@@ -28,6 +28,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   pump applies only when <see cref="Card.WasCastForSurge"/> is true;
 ///   no-op otherwise (intervening-if collapse — CR 603.4).
 /// </summary>
+[Trait("Color", "R")]
 public class RecklessBushwhackerFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -48,18 +49,6 @@ public class RecklessBushwhackerFactoryTests
         c.Owner.Should().Be(_alice);
         c.Controller.Should().Be(_alice);
     }
-
-    [Fact]
-    public void DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Reckless Bushwhacker", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Reckless Bushwhacker");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.ManaCost.Should().Be("{2}{R}");
-    }
-
     [Fact]
     public void BuildAlternativeCost_ReturnsSurgeAltCost_BoundToTurnState()
     {

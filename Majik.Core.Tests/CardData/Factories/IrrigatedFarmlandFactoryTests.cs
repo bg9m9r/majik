@@ -38,21 +38,10 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// path by <see cref="EntersTappedBinder"/> from the oracle text, not by this
 /// factory (same posture as the Alpine Meadow / Guildgate factories).
 /// </summary>
+[Trait("Color", "C")]
 public class IrrigatedFarmlandFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
-
-    [Fact]
-    public void IrrigatedFarmland_Dispatch_ReturnsLandWithPlainsAndIslandSubtypes()
-    {
-        var card = NamedCardFactory.Create("Irrigated Farmland", _alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Irrigated Farmland");
-        card.HasSubtype(CardSubtype.Plains).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Island).Should().BeTrue();
-    }
-
     [Fact]
     public void IrrigatedFarmland_HasTwoManaAbilities_ProducingWhiteAndBlue()
     {

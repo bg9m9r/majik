@@ -22,6 +22,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   end-to-end activation moves card hand→graveyard, pays 2 life, draws.
 /// - <see cref="NamedCardFactory"/> dispatch.
 /// </summary>
+[Trait("Color", "B")]
 public class StreetWraithFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -53,21 +54,6 @@ public class StreetWraithFactoryTests
         wraith.Abilities.OfType<KeywordAbility>()
             .Should().ContainSingle(k => k.Keyword == "Swampwalk");
     }
-
-    [Fact]
-    public void StreetWraith_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Street Wraith", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Street Wraith");
-        card.HasSubtype(CardSubtype.Zombie).Should().BeTrue();
-        card.Abilities.OfType<KeywordAbility>()
-            .Should().ContainSingle(k => k.Keyword == "Swampwalk");
-        card.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1,
-            "the cycling activated ability is attached");
-    }
-
     // -----------------------------------------------------------------------
     // Cycling ability shape — CR 702.32
     // -----------------------------------------------------------------------

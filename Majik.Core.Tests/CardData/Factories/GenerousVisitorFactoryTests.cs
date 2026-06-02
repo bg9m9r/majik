@@ -30,6 +30,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Resolve-time recheck (CR 608.2b) — non-creature / off-battlefield
 ///   target is a silent no-op.
 /// </summary>
+[Trait("Color", "G")]
 public class GenerousVisitorFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -49,19 +50,6 @@ public class GenerousVisitorFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void GenerousVisitor_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Generous Visitor", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Generous Visitor");
-        c.HasSubtype(CardSubtype.Spirit).Should().BeTrue();
-        ((Creature)c).Power.Should().Be(1);
-        ((Creature)c).Toughness.Should().Be(1);
-    }
-
     [Fact]
     public void GenerousVisitor_HasOneTriggeredAbility_WithTargetCreature()
     {

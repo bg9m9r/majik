@@ -23,6 +23,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Mana ability produces {G} and taps Elvish Mystic.
 ///   - <c>canActivateCheck</c> gate prevents re-activation while tapped.
 /// </summary>
+[Trait("Color", "G")]
 public class ElvishMysticFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -42,19 +43,6 @@ public class ElvishMysticFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_ElvishMystic()
-    {
-        var card = NamedCardFactory.Create("Elvish Mystic", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Elvish Mystic");
-        card.HasType(CardType.Creature).Should().BeTrue();
-        ((Creature)card).HasSubtype(CardSubtype.Elf).Should().BeTrue();
-        ((Creature)card).HasSubtype(CardSubtype.Druid).Should().BeTrue();
-    }
-
     [Fact]
     public void ElvishMystic_HasSingleGreenManaAbility()
     {

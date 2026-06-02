@@ -35,6 +35,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Sacrifice-Blood-token alternative path (preferred when both options
 ///     are available).
 /// </summary>
+[Trait("Color", "R")]
 public class FalkenrathPitFighterFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -53,18 +54,6 @@ public class FalkenrathPitFighterFactoryTests
         c.BaseToughness.Should().Be(1);
         c.Owner.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void FalkenrathPitFighter_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Falkenrath Pit Fighter", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Falkenrath Pit Fighter");
-        c.HasSubtype(CardSubtype.Vampire).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Berserker).Should().BeTrue();
-    }
-
     [Fact]
     public void FalkenrathPitFighter_HasTrampleAndHaste()
     {

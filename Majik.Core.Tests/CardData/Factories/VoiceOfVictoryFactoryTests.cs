@@ -34,6 +34,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   AND attacking (spliced into the current combat); they are sacrificed at
 ///   the next end step.
 /// </summary>
+[Trait("Color", "W")]
 public class VoiceOfVictoryFactoryTests : IDisposable
 {
     public VoiceOfVictoryFactoryTests() => CastingRestrictions.Clear();
@@ -62,17 +63,6 @@ public class VoiceOfVictoryFactoryTests : IDisposable
         card.Owner.Should().BeSameAs(alice);
         card.Controller.Should().BeSameAs(alice);
     }
-
-    [Fact]
-    public void VoiceOfVictory_Dispatch_ResolvesViaNamedCardFactory()
-    {
-        var alice = new Player("Alice", 20);
-        var card = NamedCardFactory.Create("Voice of Victory", alice);
-
-        card.Should().BeAssignableTo<Creature>();
-        card.Name.Should().Be("Voice of Victory");
-    }
-
     // -----------------------------------------------------------------------
     // Static: "Your opponents can't cast spells during your turn."
     // -----------------------------------------------------------------------

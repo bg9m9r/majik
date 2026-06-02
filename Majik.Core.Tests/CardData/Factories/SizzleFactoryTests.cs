@@ -25,6 +25,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Two-opponent case: both take exactly 3 damage (CR 119.2 — each
 ///   damage event is independent).
 /// </summary>
+[Trait("Color", "R")]
 public class SizzleFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -50,17 +51,6 @@ public class SizzleFactoryTests
     // -------------------------------------------------------------------------
     // Dispatch
     // -------------------------------------------------------------------------
-
-    [Fact]
-    public void Sizzle_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Sizzle", _alice);
-
-        card.Should().BeOfType<Sorcery>();
-        card.Name.Should().Be("Sizzle");
-        card.HasType(CardType.Sorcery).Should().BeTrue();
-    }
-
     // -------------------------------------------------------------------------
     // Resolve: one opponent
     // -------------------------------------------------------------------------

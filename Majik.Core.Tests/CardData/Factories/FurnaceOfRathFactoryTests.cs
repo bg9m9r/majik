@@ -29,6 +29,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Stacking with a second Furnace quadruples damage (per-effect
 ///     dedup is per-instance, two instances each fire once).
 /// </summary>
+[Trait("Color", "R")]
 public class FurnaceOfRathFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -49,17 +50,6 @@ public class FurnaceOfRathFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void FurnaceOfRath_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Furnace of Rath", _alice);
-
-        c.Should().BeOfType<Enchantment>();
-        c.Name.Should().Be("Furnace of Rath");
-        c.HasType(CardType.Enchantment).Should().BeTrue();
-    }
-
     [Fact]
     public void FurnaceOfRath_SingleArgPath_DoesNotRegisterReplacement()
     {

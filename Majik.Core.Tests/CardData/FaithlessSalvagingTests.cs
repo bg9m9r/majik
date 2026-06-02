@@ -15,7 +15,7 @@ namespace Majik.Core.Tests.CardData;
 /// <summary>
 /// Unit tests for <see cref="FaithlessSalvagingFactory"/>.
 ///
-/// Card: Faithless Salvaging — Sorcery {1}{R} (Phyrexia: All Will Be One).
+/// Card: Faithless Salvaging — Instant {1}{R} (Phyrexia: All Will Be One).
 ///   "Discard a card, then draw a card.
 ///    Flashback—Discard a creature card."
 ///
@@ -44,7 +44,7 @@ public class FaithlessSalvagingTests
 
         c.Name.Should().Be("Faithless Salvaging");
         c.ManaCost.Should().Be("{1}{R}");
-        c.HasType(CardType.Sorcery).Should().BeTrue();
+        c.HasType(CardType.Instant).Should().BeTrue();
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
@@ -54,9 +54,9 @@ public class FaithlessSalvagingTests
     {
         var card = NamedCardFactory.Create("Faithless Salvaging", _alice);
 
-        card.Should().BeOfType<Sorcery>();
+        card.Should().BeOfType<Instant>();
         card.Name.Should().Be("Faithless Salvaging");
-        card.HasType(CardType.Sorcery).Should().BeTrue();
+        card.HasType(CardType.Instant).Should().BeTrue();
         card.ManaCost.Should().Be("{1}{R}");
         card.Owner.Should().BeSameAs(_alice);
     }

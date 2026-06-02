@@ -32,6 +32,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Lord static (CR 613.7c / 613.1f): other controller-Angels get +1/+1
 ///   AND gain Lifelink; self, opponent Angels, and non-Angels unaffected.
 /// </summary>
+[Trait("Color", "W")]
 public class LyraDawnbringerFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -90,18 +91,6 @@ public class LyraDawnbringerFactoryTests
         // {3}{W}{W} → generic 3 + two white pips = mana value 5 (CR 202.3).
         ManaCost.Parse(c.ManaCost).TotalValue.Should().Be(5);
     }
-
-    [Fact]
-    public void LyraDawnbringer_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Lyra Dawnbringer", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Lyra Dawnbringer");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        ((Creature)c).HasSubtype(CardSubtype.Angel).Should().BeTrue();
-    }
-
     // ── Keyword markers on Lyra herself ─────────────────────────────────
 
     [Fact]

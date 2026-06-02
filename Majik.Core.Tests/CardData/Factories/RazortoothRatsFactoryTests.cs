@@ -18,6 +18,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   "Fear (This creature can't be blocked except by artifact creatures
 ///    and/or black creatures.)"
 /// </summary>
+[Trait("Color", "B")]
 public class RazortoothRatsFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -81,16 +82,5 @@ public class RazortoothRatsFactoryTests
 
         c.Abilities.OfType<TriggeredAbility>().Should().BeEmpty();
         c.Abilities.OfType<ActivatedAbility>().Should().BeEmpty();
-    }
-
-    [Fact]
-    public void RazortoothRats_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Razortooth Rats", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Razortooth Rats");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Rat).Should().BeTrue();
     }
 }

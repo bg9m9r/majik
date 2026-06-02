@@ -12,12 +12,12 @@ namespace Majik.Core.CardData.Factories;
 /// Named-card factory for Faithless Salvaging (Phyrexia: All Will Be One,
 /// {1}{R}).
 ///
-/// Sorcery. Oracle text:
+/// Instant. Oracle text:
 ///   "Discard a card, then draw a card.
 ///    Flashback—Discard a creature card."
 ///
 /// ## Implemented (v1)
-/// - Sorcery shape, mana cost {1}{R}.
+/// - Instant shape, mana cost {1}{R}.
 /// - Resolve effect (via <see cref="BuildResolveEffect"/>) discards one
 ///   card from the caster's hand, then draws one card from the top of the
 ///   caster's library (CR 701.16 + CR 121.1). The "then" between discard
@@ -79,11 +79,11 @@ public static class FaithlessSalvagingFactory
     /// Card shape only — the resolve effect is built on demand via
     /// <see cref="BuildResolveEffect"/>.
     /// </summary>
-    public static Sorcery Create(Player owner)
+    public static Instant Create(Player owner)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
-        var card = new Sorcery(CardName, PrintedManaCost);
+        var card = new Instant(CardName, PrintedManaCost);
         card.SetOwner(owner);
         card.SetController(owner);
         return card;

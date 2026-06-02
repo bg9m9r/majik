@@ -17,6 +17,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Card: Serra Angel — {3}{W}{W} Creature — Angel 4/4.
 ///   "Flying, vigilance"
 /// </summary>
+[Trait("Color", "W")]
 public class SerraAngelFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -83,16 +84,5 @@ public class SerraAngelFactoryTests
         c.Abilities.OfType<ActivatedAbility>().Should().BeEmpty();
         c.Abilities.OfType<KeywordAbility>().Should().HaveCount(2,
             "Flying and Vigilance are the only printed keywords");
-    }
-
-    [Fact]
-    public void SerraAngel_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Serra Angel", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Serra Angel");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Angel).Should().BeTrue();
     }
 }

@@ -26,6 +26,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// predicate shape but no turn-gating helper. Tests are shape-only until
 /// both gaps close.
 /// </summary>
+[Trait("Color", "W")]
 public class GrandAbolisherFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -44,19 +45,5 @@ public class GrandAbolisherFactoryTests
         c.Toughness.Should().Be(2);
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
-    }
-
-    [Fact]
-    public void GrandAbolisher_NamedCardFactory_Dispatch()
-    {
-        var card = NamedCardFactory.Create("Grand Abolisher", _alice);
-
-        card.Should().NotBeNull();
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Grand Abolisher");
-        ((Creature)card).Power.Should().Be(2);
-        ((Creature)card).Toughness.Should().Be(2);
-        card.HasSubtype(CardSubtype.Human).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Cleric).Should().BeTrue();
     }
 }

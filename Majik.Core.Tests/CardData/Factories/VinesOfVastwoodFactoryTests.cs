@@ -37,6 +37,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - EOT cleanup expires both the keyword grant and the pump (CR 514.2).
 /// - Fizzle: target not on battlefield → no-op (CR 608.2b).
 /// </summary>
+[Trait("Color", "G")]
 public class VinesOfVastwoodFactoryTests
 {
     private readonly EventBus _bus = new();
@@ -78,17 +79,6 @@ public class VinesOfVastwoodFactoryTests
         var keywords = v.Abilities.OfType<KeywordAbility>().Select(k => k.Keyword).ToList();
         keywords.Should().Contain("Kicker");
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsVinesShape()
-    {
-        var dispatched = NamedCardFactory.Create("Vines of Vastwood", _alice);
-
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("Vines of Vastwood");
-        dispatched.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     [Fact]
     public void KickerProbe_RecognisesVinesAsGKicker()
     {

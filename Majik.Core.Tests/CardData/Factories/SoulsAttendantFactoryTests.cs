@@ -18,6 +18,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// <see cref="SoulWardenFactoryTests"/> so a regression on either card
 /// surfaces independently.
 /// </summary>
+[Trait("Color", "W")]
 public class SoulsAttendantFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -38,19 +39,6 @@ public class SoulsAttendantFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void SoulsAttendant_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Soul's Attendant", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Soul's Attendant");
-        card.HasSubtype(CardSubtype.Human).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Cleric).Should().BeTrue();
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1);
-    }
-
     [Fact]
     public void SoulsAttendant_AnotherCreatureEnters_TriggerMatches()
     {

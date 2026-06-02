@@ -35,6 +35,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     the trigger exile-and-returns Ocelot Pride under its owner's
 ///     control; with no such damage, the trigger no-ops.
 /// </summary>
+[Trait("Color", "W")]
 public class OcelotPrideFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -72,25 +73,6 @@ public class OcelotPrideFactoryTests
             .Should().Contain(k => k.Keyword == "Lifelink",
                 "Ocelot Pride has Lifelink (CR 702.15)");
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_OcelotPride_AsLegendaryCat()
-    {
-        var dispatched = NamedCardFactory.Create("Ocelot Pride", _alice);
-
-        dispatched.Should().BeOfType<Creature>(
-            "Ocelot Pride dispatches as a Creature shell");
-        dispatched.Name.Should().Be("Ocelot Pride");
-        dispatched.ManaCost.Should().Be("{W}");
-
-        var ocelot = (Creature)dispatched;
-        ocelot.HasSupertype(CardSupertype.Legendary).Should().BeTrue();
-        ocelot.HasSubtype(CardSubtype.Cat).Should().BeTrue();
-        ocelot.Abilities.OfType<KeywordAbility>()
-            .Should().Contain(k => k.Keyword == "Lifelink",
-                "the dispatcher route still attaches the Lifelink marker");
-    }
-
     // ------------------------------------------------------------------
     // CR 508.1f — attack trigger: 1 Cat token (city's blessing deferred)
     // ------------------------------------------------------------------

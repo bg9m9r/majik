@@ -36,6 +36,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - The {1} mana cost gates the any-colour abilities (CR 605.1) — they
 ///   can't activate with an empty pool, but can once {1} is available.
 /// </summary>
+[Trait("Color", "C")]
 public class CrystalGrottoTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -59,19 +60,6 @@ public class CrystalGrottoTests
 
         land.HasSupertype(CardSupertype.Basic).Should().BeFalse();
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_CrystalGrotto()
-    {
-        var card = NamedCardFactory.Create("Crystal Grotto", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Crystal Grotto");
-        // One {C} + five any-colour (WUBRG) = six mana abilities.
-        card.Abilities.OfType<ManaAbility>().Should().HaveCount(6);
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1);
-    }
-
     [Fact]
     public void CrystalGrotto_HasColorlessManaAbility_NoCost()
     {

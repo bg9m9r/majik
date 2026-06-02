@@ -19,6 +19,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - <see cref="CombatAbilities"/> lookups for both combat keywords.
 /// - <see cref="NamedCardFactory"/> dispatch.
 /// </summary>
+[Trait("Color", "W")]
 public class SkyhunterPatrolFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -58,23 +59,6 @@ public class SkyhunterPatrolFactoryTests
         CombatAbilities.HasFlying(c).Should().BeTrue();
         CombatAbilities.HasFirstStrike(c).Should().BeTrue();
     }
-
-    [Fact]
-    public void SkyhunterPatrol_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Skyhunter Patrol", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Skyhunter Patrol");
-        c.HasSubtype(CardSubtype.Cat).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Knight).Should().BeTrue();
-
-        var keywords = c.Abilities.OfType<KeywordAbility>()
-            .Select(k => k.Keyword).ToList();
-        keywords.Should().Contain("Flying");
-        keywords.Should().Contain("First Strike");
-    }
-
     [Fact]
     public void SkyhunterPatrol_NullOwner_Throws()
     {

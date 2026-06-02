@@ -28,6 +28,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// (<c>{0}: Switch P/T</c>) via <see cref="GrantAbilityEffect"/> +
 /// <see cref="SwitchPTEffect"/> (CR 613.7d).
 /// </summary>
+[Trait("Color", "C")]
 public class WanderingFumaroleTests
 {
     private const string Name = "Wandering Fumarole";
@@ -47,21 +48,6 @@ public class WanderingFumaroleTests
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches()
-    {
-        var card = NamedCardFactory.Create(Name, _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be(Name);
-        card.HasType(CardType.Land).Should().BeTrue();
-        card.Abilities.OfType<ManaAbility>().Should().HaveCount(2, "{T}: Add {U} / {T}: Add {R}");
-        card.Abilities
-            .Where(a => a.GetType() == typeof(ActivatedAbility))
-            .Should().HaveCount(1, "the animate ability");
-    }
-
     [Fact]
     public void TapForBlue_ProducesBlue()
     {

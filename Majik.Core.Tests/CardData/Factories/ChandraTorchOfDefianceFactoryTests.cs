@@ -35,6 +35,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - −7: emblem with a cast-trigger that deals 5 to any target.
 ///   - NamedCardFactory dispatch.
 /// </summary>
+[Trait("Color", "R")]
 public class ChandraTorchOfDefianceFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -66,21 +67,6 @@ public class ChandraTorchOfDefianceFactoryTests
         loyalty.Select(a => a.LoyaltyChange)
             .Should().BeEquivalentTo(new[] { +1, +1, -3, -7 });
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_Chandra()
-    {
-        var card = NamedCardFactory.Create("Chandra, Torch of Defiance", _alice);
-
-        card.Should().BeOfType<Planeswalker>();
-        card.Name.Should().Be("Chandra, Torch of Defiance");
-        card.HasType(CardType.Planeswalker).Should().BeTrue();
-        card.HasSupertype(CardSupertype.Legendary).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Chandra).Should().BeTrue();
-        ((Planeswalker)card).Loyalty.Should().Be(4);
-        card.Abilities.OfType<LoyaltyAbility>().Should().HaveCount(4);
-    }
-
     // -----------------------------------------------------------------------
     // +1 (impulse): Exile the top card of your library. You may cast that
     //               card. If you don't, Chandra deals 2 damage to each

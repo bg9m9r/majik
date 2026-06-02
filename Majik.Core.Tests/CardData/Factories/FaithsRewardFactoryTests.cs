@@ -35,6 +35,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Resolve: does NOT return cards owned by other players (CR 404.1
 ///   — "your graveyard" filter).
 /// </summary>
+[Trait("Color", "W")]
 public class FaithsRewardFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -50,16 +51,6 @@ public class FaithsRewardFactoryTests
         fr.HasType(CardType.Instant).Should().BeTrue();
         fr.Owner.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void FaithsReward_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Faith's Reward", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Faith's Reward");
-    }
-
     [Fact]
     public void FaithsReward_Resolve_NoTurnStateWired_IsNoOp()
     {

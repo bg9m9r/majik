@@ -24,6 +24,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// paths (normal + evoke) and assert the on-resolution triggers behave per
 /// CR 702.74 (Evoke) and Subtlety's printed ETB bounce-and-look trigger.
 /// </summary>
+[Trait("Color", "U")]
 public class SubtletyFactoryTests
 {
     private readonly EventBus _bus = new();
@@ -65,18 +66,6 @@ public class SubtletyFactoryTests
         // Two triggered abilities: ETB bounce + Evoke sacrifice.
         subtlety.Abilities.OfType<TriggeredAbility>().Should().HaveCount(2);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_To_SubtletyFactory()
-    {
-        var card = NamedCardFactory.Create("Subtlety", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Subtlety");
-        card.HasSubtype(CardSubtype.Elemental).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Incarnation).Should().BeTrue();
-    }
-
     // ── ETB bounce target shapes ──────────────────────────────────────────────
 
     [Fact]

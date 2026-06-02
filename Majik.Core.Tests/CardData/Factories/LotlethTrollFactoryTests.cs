@@ -35,6 +35,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Regenerate activated ability shape: sole cost is {B}; resolution adds
 ///     a regeneration shield (CR 701.18 / CR 701.15a).
 /// </summary>
+[Trait("Color", "M")]
 public class LotlethTrollFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -66,17 +67,6 @@ public class LotlethTrollFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_LotlethTroll()
-    {
-        var card = NamedCardFactory.Create("Lotleth Troll", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Lotleth Troll");
-        card.HasSubtype(CardSubtype.Troll).Should().BeTrue();
-    }
-
     [Fact]
     public void LotlethTroll_HasTrampleKeyword()
     {

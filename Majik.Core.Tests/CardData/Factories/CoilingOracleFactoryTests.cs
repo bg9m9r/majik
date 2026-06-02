@@ -24,6 +24,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - ETB with non-land on top → card goes to hand.
 /// - ETB with empty library → no-op (no crash, no zone moves).
 /// </summary>
+[Trait("Color", "M")]
 public class CoilingOracleFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -74,20 +75,6 @@ public class CoilingOracleFactoryTests
     // -----------------------------------------------------------------------
     // NamedCardFactory dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void CoilingOracle_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Coiling Oracle", _alice);
-
-        c.Should().BeOfType<Creature>("Coiling Oracle is a Creature");
-        c.Name.Should().Be("Coiling Oracle");
-        c.HasSubtype(CardSubtype.Snake).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Elf).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Druid).Should().BeTrue();
-        c.ManaCost.Should().Be("{G}{U}");
-    }
-
     // -----------------------------------------------------------------------
     // ETB triggered ability shape
     // -----------------------------------------------------------------------

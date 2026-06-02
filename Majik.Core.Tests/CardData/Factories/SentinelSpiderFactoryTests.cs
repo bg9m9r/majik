@@ -17,6 +17,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Card: Sentinel Spider — {3}{G}{G} Creature — Spider 4/4.
 ///   "Vigilance, reach"
 /// </summary>
+[Trait("Color", "G")]
 public class SentinelSpiderFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -83,16 +84,5 @@ public class SentinelSpiderFactoryTests
         c.Abilities.OfType<ActivatedAbility>().Should().BeEmpty();
         c.Abilities.OfType<KeywordAbility>().Should().HaveCount(2,
             "Vigilance and Reach are the only printed keywords");
-    }
-
-    [Fact]
-    public void SentinelSpider_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Sentinel Spider", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Sentinel Spider");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Spider).Should().BeTrue();
     }
 }

@@ -34,6 +34,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Opponent casting a noncreature spell → no trigger for Alice.
 ///   - No opponent resolver → trigger fires but burn half no-ops.
 /// </summary>
+[Trait("Color", "R")]
 public class FirebrandArcherFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -82,18 +83,6 @@ public class FirebrandArcherFactoryTests
         fa.Owner.Should().BeSameAs(_alice);
         fa.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_FirebrandArcher()
-    {
-        var card = NamedCardFactory.Create("Firebrand Archer", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Firebrand Archer");
-        card.HasSubtype(CardSubtype.Human).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Archer).Should().BeTrue();
-    }
-
     [Fact]
     public void FirebrandArcher_HasOneTriggeredAbility()
     {

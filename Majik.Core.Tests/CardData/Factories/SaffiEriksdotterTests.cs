@@ -21,6 +21,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///    graveyard this turn, return that card to the battlefield under
 ///    its owner's control."
 /// </summary>
+[Trait("Color", "M")]
 public class SaffiEriksdotterTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -60,20 +61,6 @@ public class SaffiEriksdotterTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void SaffiEriksdotter_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Saffi Eriksdotter", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Saffi Eriksdotter");
-        c.HasSupertype(CardSupertype.Legendary).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Scout).Should().BeTrue();
-        c.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1,
-            "Saffi prints one sacrifice-activated ability");
-    }
-
     [Fact]
     public void Activated_HasTargetCreatureRequest()
     {

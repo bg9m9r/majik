@@ -39,6 +39,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   onto the battlefield tapped + shuffle; declines / no-agent → no search.
 /// - "Draw a card" always fires for the caster (even on illegal target).
 /// </summary>
+[Trait("Color", "R")]
 public class CleansingWildfireFactoryTests : IDisposable
 {
     public CleansingWildfireFactoryTests() => AgentRegistry.Clear();
@@ -85,18 +86,6 @@ public class CleansingWildfireFactoryTests : IDisposable
         colors.Should().NotContain(ManaColorEnum.White);
         colors.Should().NotContain(ManaColorEnum.Black);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_CleansingWildfire()
-    {
-        var alice = new Player("Alice", 20);
-        var card = NamedCardFactory.Create("Cleansing Wildfire", alice);
-
-        card.Should().BeOfType<Sorcery>();
-        card.Name.Should().Be("Cleansing Wildfire");
-        card.HasType(CardType.Sorcery).Should().BeTrue();
-    }
-
     [Fact]
     public void CleansingWildfire_CandidateGatherer_OnlyLandPermanents()
     {

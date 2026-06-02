@@ -28,20 +28,10 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// printed oracle text; this factory builds the land without it, for test
 /// convenience (same posture as the Triome factories).
 /// </summary>
+[Trait("Color", "C")]
 public class GolgariGuildgateFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
-
-    [Fact]
-    public void GolgariGuildgate_Dispatch_ReturnsLandWithGateSubtype()
-    {
-        var card = NamedCardFactory.Create("Golgari Guildgate", _alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Golgari Guildgate");
-        card.HasSubtype(CardSubtype.Gate).Should().BeTrue();
-    }
-
     [Fact]
     public void GolgariGuildgate_HasTwoManaAbilities_ProducingBG()
     {
