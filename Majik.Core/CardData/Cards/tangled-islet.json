@@ -1,0 +1,9 @@
+{
+  "name": "Tangled Islet",
+  "types": ["Land"],
+  "subtypes": ["Forest", "Island"],
+  "abilities": [
+    { "kind": "mana", "produces": "G" },
+    { "kind": "mana", "produces": "U" }
+  ]
+}
