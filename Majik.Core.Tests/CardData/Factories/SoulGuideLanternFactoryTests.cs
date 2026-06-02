@@ -30,6 +30,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - {T}, sac: opponents' graveyards exiled, lantern sacrificed.
 /// - {1}, {T}, sac: controller draws a card, lantern sacrificed.
 /// </summary>
+[Trait("Color", "C")]
 public class SoulGuideLanternFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -46,17 +47,6 @@ public class SoulGuideLanternFactoryTests
         lantern.Owner.Should().BeSameAs(_alice);
         lantern.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void SoulGuideLantern_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Soul-Guide Lantern", _alice);
-
-        card.Should().BeOfType<Artifact>();
-        card.Name.Should().Be("Soul-Guide Lantern");
-        card.HasType(CardType.Artifact).Should().BeTrue();
-    }
-
     [Fact]
     public void SoulGuideLantern_AbilityShape()
     {

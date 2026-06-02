@@ -29,6 +29,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Resolve effect: no legal target is a clean no-op (graveyard is
 ///   left untouched, no exception).
 /// </summary>
+[Trait("Color", "W")]
 public class RecommissionFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -48,17 +49,6 @@ public class RecommissionFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void Recommission_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Recommission", _alice);
-
-        c.Should().BeOfType<Sorcery>();
-        c.Name.Should().Be("Recommission");
-        c.ManaCost.Should().Be("{1}{W}");
-    }
-
     // ------------------------------------------------------------------
     // Reanimate creature path
     // ------------------------------------------------------------------

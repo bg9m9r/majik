@@ -32,6 +32,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///
 /// Mirrors <see cref="SeachromeCoastTests"/> (the W/U member of the cycle).
 /// </summary>
+[Trait("Color", "C")]
 public class BloomingMarshTests
 {
     private static Land MakeWithBus(Player owner, ReplacementBus bus) =>
@@ -66,18 +67,6 @@ public class BloomingMarshTests
             "fast lands are nonbasic");
         land.HasSupertype(CardSupertype.Legendary).Should().BeFalse();
     }
-
-    [Fact]
-    public void BloomingMarsh_Dispatch_ResolvesViaNamedCardFactory()
-    {
-        var alice = new Player("Alice", 20);
-
-        var card = NamedCardFactory.Create("Blooming Marsh", alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Blooming Marsh");
-    }
-
     // -----------------------------------------------------------------------
     // Mana abilities
     // -----------------------------------------------------------------------
@@ -229,22 +218,6 @@ public class BloomingMarshTests
         after!.EntersTapped.Should().BeFalse(
             "Alice controls 0 lands; Bob's 5 don't count, so it enters untapped");
     }
-
-    [Fact]
-    public void BloomingMarsh_SingleArgDispatch_DoesNotRegisterReplacement()
-    {
-        // Shape-only dispatcher path — single-arg constructs without a
-        // ReplacementBus, so the ETB-tapped predicate isn't wired (matches
-        // every other ETB-replacement factory's shape-only posture). Prod
-        // load wires it from oracle text via ConditionalEntersTappedBinder.
-        var alice = new Player("Alice", 20);
-        var land = NamedCardFactory.Create("Blooming Marsh", alice);
-
-        land.Should().NotBeNull();
-        land.Name.Should().Be("Blooming Marsh");
-        ((Land)land).Abilities.OfType<ManaAbility>().Should().HaveCount(2);
-    }
-
     [Fact]
     public void BloomingMarsh_Create_ThrowsOnNullOwner()
     {

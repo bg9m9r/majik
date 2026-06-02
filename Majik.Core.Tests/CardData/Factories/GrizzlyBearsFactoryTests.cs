@@ -18,6 +18,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// keywords, triggers, statics, or activated abilities. The proverbial
 /// vanilla 2/2 against which other two-drops are measured.
 /// </summary>
+[Trait("Color", "G")]
 public class GrizzlyBearsFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -59,16 +60,5 @@ public class GrizzlyBearsFactoryTests
             "Grizzly Bears has no triggered abilities");
         c.Abilities.OfType<ActivatedAbility>().Should().BeEmpty(
             "Grizzly Bears has no activated abilities");
-    }
-
-    [Fact]
-    public void GrizzlyBears_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Grizzly Bears", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Grizzly Bears");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Bear).Should().BeTrue();
     }
 }

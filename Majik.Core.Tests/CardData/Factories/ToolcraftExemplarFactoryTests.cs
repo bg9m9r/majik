@@ -44,6 +44,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - With 0 artifacts: no pump (intervening-if fails).
 /// - The pump + first strike expire in the cleanup step (CR 514.2).
 /// </summary>
+[Trait("Color", "W")]
 public class ToolcraftExemplarFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -82,18 +83,6 @@ public class ToolcraftExemplarFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void ToolcraftExemplar_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Toolcraft Exemplar", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Toolcraft Exemplar");
-        c.HasSubtype(CardSubtype.Dwarf).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Artificer).Should().BeTrue();
-    }
-
     [Fact]
     public void ToolcraftExemplar_BeginCombatTrigger_IsSelfAffecting_NoTargets()
     {

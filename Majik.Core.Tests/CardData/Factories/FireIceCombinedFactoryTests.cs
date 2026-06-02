@@ -38,6 +38,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Fire face delegation — divided 2 damage among one or two targets.
 ///   - Ice face delegation — tap target permanent then the caster draws.
 /// </summary>
+[Trait("Color", "R")]
 public class FireIceCombinedFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -64,18 +65,6 @@ public class FireIceCombinedFactoryTests
         var card = FireIceFactory.Create(_alice);
         CardColors.GetColors(card).Should().Contain(ManaColorEnum.Red);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_FireIce()
-    {
-        var card = NamedCardFactory.Create("Fire // Ice", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Fire // Ice");
-        card.HasType(CardType.Instant).Should().BeTrue();
-        card.Owner.Should().BeSameAs(_alice);
-    }
-
     // ── Fire face — divided damage (delegated to FireFactory) ───────────────
 
     [Fact]

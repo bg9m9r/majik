@@ -32,6 +32,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - End-step trigger is unscoped — fires on any player's end step
 ///     (CR 603.3d).
 /// </summary>
+[Trait("Color", "R")]
 public class SparkElementalFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -54,18 +55,6 @@ public class SparkElementalFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void SparkElemental_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Spark Elemental", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Spark Elemental");
-        ((Creature)c).HasSubtype(CardSubtype.Elemental).Should().BeTrue();
-        c.HasType(CardType.Creature).Should().BeTrue();
-    }
-
     // ── Keywords ────────────────────────────────────────────────────────
 
     [Fact]

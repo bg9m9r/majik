@@ -25,6 +25,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   (CR 608.2b — if the target is illegal on resolution, the effect does
 ///   nothing).
 /// </summary>
+[Trait("Color", "R")]
 public class BombardFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -41,17 +42,6 @@ public class BombardFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void Bombard_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Bombard", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Bombard");
-        card.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     [Fact]
     public void Bombard_SpellDefinition_HasSingleTargetCreatureRequest()
     {

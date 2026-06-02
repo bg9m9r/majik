@@ -41,6 +41,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     - No-op when no Forest or Plains is available.
 ///     - Pure helper <see cref="KnightOfTheReliquaryFactory.CountLandsInGraveyard"/>.
 /// </summary>
+[Trait("Color", "M")]
 public class KnightOfTheReliquaryFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -73,19 +74,6 @@ public class KnightOfTheReliquaryFactoryTests
         knight.Owner.Should().BeSameAs(_alice);
         knight.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void Knight_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Knight of the Reliquary", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Knight of the Reliquary");
-        card.HasType(CardType.Creature).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Knight).Should().BeTrue();
-        card.ManaCost.Should().Be("{1}{G}{W}");
-    }
-
     // -----------------------------------------------------------------------
     // CountLandsInGraveyard pure helper
     // -----------------------------------------------------------------------

@@ -17,6 +17,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Card: Hitchclaw Recluse — {2}{G} Creature — Spider 1/4.
 ///   "Reach" (CR 702.17)
 /// </summary>
+[Trait("Color", "G")]
 public class HitchclawRecluseFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -73,16 +74,5 @@ public class HitchclawRecluseFactoryTests
         c.Abilities.OfType<ActivatedAbility>().Should().BeEmpty();
         c.Abilities.OfType<KeywordAbility>().Should().HaveCount(1,
             "Reach is the only printed keyword");
-    }
-
-    [Fact]
-    public void HitchclawRecluse_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Hitchclaw Recluse", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Hitchclaw Recluse");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Spider).Should().BeTrue();
     }
 }

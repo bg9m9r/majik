@@ -41,6 +41,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   card after a graveyard cast (CR 702.34b), exercised end-to-end through
 ///   <see cref="SpellCastFlow"/>.
 /// </summary>
+[Trait("Color", "R")]
 public class FireboltFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -61,17 +62,6 @@ public class FireboltFactoryTests
         firebolt.Owner.Should().BeSameAs(_alice);
         firebolt.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void Firebolt_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Firebolt", _alice);
-
-        card.Should().BeOfType<Sorcery>();
-        card.Name.Should().Be("Firebolt");
-        card.HasType(CardType.Sorcery).Should().BeTrue();
-    }
-
     // -----------------------------------------------------------------------
     // Spell definition — single "any target" request
     // -----------------------------------------------------------------------

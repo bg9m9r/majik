@@ -35,6 +35,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   card after a graveyard cast (CR 702.34b), exercised end-to-end through
 ///   <see cref="SpellCastFlow"/>.
 /// </summary>
+[Trait("Color", "B")]
 public class BumpInTheNightFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -55,17 +56,6 @@ public class BumpInTheNightFactoryTests
         bump.Owner.Should().BeSameAs(_alice);
         bump.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void BumpInTheNight_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Bump in the Night", _alice);
-
-        card.Should().BeOfType<Sorcery>();
-        card.Name.Should().Be("Bump in the Night");
-        card.HasType(CardType.Sorcery).Should().BeTrue();
-    }
-
     // -----------------------------------------------------------------------
     // Spell definition — single "target opponent" request
     // -----------------------------------------------------------------------

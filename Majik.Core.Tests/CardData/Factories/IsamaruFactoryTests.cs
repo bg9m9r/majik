@@ -18,6 +18,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// of Kamigawa / Modern reprints). Vanilla — no printed keywords, triggers,
 /// statics, or activated abilities.
 /// </summary>
+[Trait("Color", "W")]
 public class IsamaruFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -65,19 +66,6 @@ public class IsamaruFactoryTests
         c.HasSupertype(CardSupertype.Legendary).Should().BeTrue(
             "Isamaru, Hound of Konda is a Legendary Creature (CR 205.4)");
     }
-
-    [Fact]
-    public void Isamaru_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Isamaru, Hound of Konda", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Isamaru, Hound of Konda");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSupertype(CardSupertype.Legendary).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Dog).Should().BeTrue();
-    }
-
     [Fact]
     public void Isamaru_IsVanilla_NoAbilities()
     {

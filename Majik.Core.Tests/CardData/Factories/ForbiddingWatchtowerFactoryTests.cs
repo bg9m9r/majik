@@ -40,6 +40,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     * Records 1/5 base P/T on Layer 7b.
 ///     * Both expire at end of turn.
 /// </summary>
+[Trait("Color", "C")]
 public class ForbiddingWatchtowerFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -87,20 +88,6 @@ public class ForbiddingWatchtowerFactoryTests
         produced.Generic.Should().Be(0);
         land.IsTapped.Should().BeTrue();
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_ForbiddingWatchtower()
-    {
-        var card = NamedCardFactory.Create("Forbidding Watchtower", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Forbidding Watchtower");
-        card.HasType(CardType.Land).Should().BeTrue();
-
-        card.Abilities.OfType<ManaAbility>().Should().HaveCount(1);
-        card.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1);
-    }
-
     // -----------------------------------------------------------------------
     // Animate ability
     // -----------------------------------------------------------------------

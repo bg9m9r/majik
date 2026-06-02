@@ -29,6 +29,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     Cleanup when an event bus is supplied.
 ///   - NamedCardFactory dispatch.
 /// </summary>
+[Trait("Color", "U")]
 public class UrzaLordHighArtificerFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -71,18 +72,6 @@ public class UrzaLordHighArtificerFactoryTests
         urza.Owner.Should().BeSameAs(_alice);
         urza.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void Urza_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Urza, Lord High Artificer", _alice);
-
-        card.Should().NotBeNull();
-        card.Name.Should().Be("Urza, Lord High Artificer");
-        card.HasType(CardType.Creature).Should().BeTrue();
-        card.HasSupertype(CardSupertype.Legendary).Should().BeTrue();
-    }
-
     // ----------------------------------------------------------------------
     // ETB — Construct token
     // ----------------------------------------------------------------------

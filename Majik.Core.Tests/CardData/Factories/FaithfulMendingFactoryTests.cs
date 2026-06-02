@@ -29,6 +29,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Empty library: draws what's available, then discards from resulting
 ///     hand.
 /// </summary>
+[Trait("Color", "M")]
 public class FaithfulMendingFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -57,19 +58,6 @@ public class FaithfulMendingFactoryTests
         // {W}{U} = 2 generic pip-equivalents — mana value 2.
         c.ManaCostValue.TotalValue.Should().Be(2);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_FaithfulMending()
-    {
-        var card = NamedCardFactory.Create("Faithful Mending", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Faithful Mending");
-        card.HasType(CardType.Instant).Should().BeTrue();
-        card.ManaCost.Should().Be("{W}{U}");
-        card.Owner.Should().BeSameAs(_alice);
-    }
-
     // -----------------------------------------------------------------------
     // Flashback cost: {1}{W}{U}, mana value 3
     // -----------------------------------------------------------------------

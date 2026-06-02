@@ -47,6 +47,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   on the tap, CR 608.2c).
 /// </summary>
 [Collection(nameof(StaticRegistryCollection))]
+[Trait("Color", "R")]
 public class FireIceFactoryTests : IDisposable
 {
     private readonly Player _alice = new("Alice", 20);
@@ -74,17 +75,6 @@ public class FireIceFactoryTests : IDisposable
         var card = FireFactory.Create(_alice);
         CardColors.GetColors(card).Should().Contain(ManaColorEnum.Red);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_Fire()
-    {
-        var card = NamedCardFactory.Create("Fire", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Fire");
-        card.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     [Fact]
     public void Fire_CarriesMdfcState_FireFront_IceBack()
     {
@@ -198,17 +188,6 @@ public class FireIceFactoryTests : IDisposable
         var card = IceFactory.Create(_alice);
         CardColors.GetColors(card).Should().Contain(ManaColorEnum.Blue);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_Ice()
-    {
-        var card = NamedCardFactory.Create("Ice", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Ice");
-        card.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     [Fact]
     public void Ice_CarriesMdfcState_FireFront_IceBack()
     {

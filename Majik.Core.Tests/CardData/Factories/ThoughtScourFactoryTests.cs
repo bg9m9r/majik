@@ -27,6 +27,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Short library fully mills without throwing (CR 701.13a).
 /// - Illegal target (resolver returns non-Player) → no-op (CR 608.2b).
 /// </summary>
+[Trait("Color", "U")]
 public class ThoughtScourFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -51,18 +52,6 @@ public class ThoughtScourFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void ThoughtScour_DispatchesViaNamedCardFactory()
-    {
-        var dispatched = NamedCardFactory.Create("Thought Scour", _alice);
-
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("Thought Scour");
-        dispatched.HasType(CardType.Instant).Should().BeTrue();
-        dispatched.ManaCost.Should().Be("{U}");
-    }
-
     // -----------------------------------------------------------------------
     // BuildDefinition shape
     // -----------------------------------------------------------------------

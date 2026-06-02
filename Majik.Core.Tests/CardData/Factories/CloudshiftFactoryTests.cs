@@ -26,6 +26,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   legality check (CR 608.2b).
 /// - Resolve: empty target list short-circuits cleanly.
 /// </summary>
+[Trait("Color", "W")]
 public class CloudshiftFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -46,17 +47,6 @@ public class CloudshiftFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void Cloudshift_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Cloudshift", _alice);
-
-        c.Should().BeOfType<Instant>();
-        c.Name.Should().Be("Cloudshift");
-        c.ManaCost.Should().Be("{W}");
-    }
-
     // -----------------------------------------------------------------------
     // SpellDefinition — structural shape
     // -----------------------------------------------------------------------

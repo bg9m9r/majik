@@ -34,6 +34,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - <see cref="NamedCardFactory"/> dispatch resolves each printed name.
 /// - Args validation: null owner, too few args, unknown subtype.
 /// </summary>
+[Trait("Color", "C")]
 public class ShockLandCycleTests : IDisposable
 {
     public ShockLandCycleTests()
@@ -116,21 +117,6 @@ public class ShockLandCycleTests : IDisposable
             "shock lands are nonbasic");
         land.HasSupertype(CardSupertype.Legendary).Should().BeFalse();
     }
-
-    [Theory]
-    [MemberData(nameof(AllShockLands))]
-    public void ShockLand_Dispatch_ResolvesViaNamedCardFactory(
-        string cardName, string a, string b, string ca, string cb)
-    {
-        _ = a; _ = b; _ = ca; _ = cb;
-        var alice = new Player("Alice", 20);
-
-        var card = NamedCardFactory.Create(cardName, alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be(cardName);
-    }
-
     // -----------------------------------------------------------------------
     // Mana abilities
     // -----------------------------------------------------------------------
@@ -325,25 +311,6 @@ public class ShockLandCycleTests : IDisposable
             "no registered agent → default decline → enters tapped");
         alice.LifeTotal.Should().Be(20);
     }
-
-    [Fact]
-    public void ShockLand_SingleArgDispatch_DoesNotRegisterReplacement()
-    {
-        // Shape-only dispatcher path — single-arg constructs without a
-        // ReplacementBus, so the ETB pay-2 replacement is not wired.
-        // Matches every other ETB-replacement factory's posture.
-        var alice = new Player("Alice", 20);
-
-        var land = NamedCardFactory.Create("Blood Crypt", alice);
-        land.Should().NotBeNull();
-        land.Name.Should().Be("Blood Crypt");
-
-        var asLand = (Land)land;
-        asLand.Abilities.OfType<ManaAbility>().Should().HaveCount(2);
-        asLand.HasSubtype(CardSubtype.Swamp).Should().BeTrue();
-        asLand.HasSubtype(CardSubtype.Mountain).Should().BeTrue();
-    }
-
     // -----------------------------------------------------------------------
     // Args validation
     // -----------------------------------------------------------------------

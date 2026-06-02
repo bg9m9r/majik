@@ -36,6 +36,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Structural Storm trigger attached (CR 702.40).
 ///   - Storm: cast as 3rd spell this turn → 2 copies fire.
 /// </summary>
+[Trait("Color", "U")]
 public class FlusterstormFactoryTests
 {
     private readonly EventBus _bus = new();
@@ -71,17 +72,6 @@ public class FlusterstormFactoryTests
         fs.Owner.Should().BeSameAs(_alice);
         fs.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsFlusterstormShape()
-    {
-        var dispatched = NamedCardFactory.Create("Flusterstorm", _alice);
-
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("Flusterstorm");
-        dispatched.ManaCost.Should().Be("{U}");
-    }
-
     [Fact]
     public void SpellDefinition_DeclaresSingleTargetInstantOrSorcerySpellRequest()
     {

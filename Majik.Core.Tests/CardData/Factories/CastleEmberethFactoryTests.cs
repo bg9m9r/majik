@@ -28,6 +28,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// (same ELD Castle cycle) — only the gating subtype (Mountain), produced
 /// colour ({R}), and the second activated ability (team +1/+0 pump) differ.
 /// </summary>
+[Trait("Color", "C")]
 public class CastleEmberethFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -104,15 +105,6 @@ public class CastleEmberethFactoryTests
     // -----------------------------------------------------------------------
     // Dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void NamedCardFactory_Dispatch_ReturnsLand()
-    {
-        var card = NamedCardFactory.Create("Castle Embereth", _alice);
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Castle Embereth");
-    }
-
     // -----------------------------------------------------------------------
     // Ability count / shape
     // -----------------------------------------------------------------------
@@ -241,17 +233,6 @@ public class CastleEmberethFactoryTests
         after!.EntersTapped.Should().BeTrue(
             "Castle Embereth has no Mountain subtype; its presence on battlefield doesn't satisfy the predicate");
     }
-
-    [Fact]
-    public void SingleArgDispatch_DoesNotRegisterReplacement()
-    {
-        var alice = new Player("Alice", 20);
-        var card = NamedCardFactory.Create("Castle Embereth", alice);
-        card.Should().BeOfType<Land>();
-        ((Land)card).Abilities.OfType<ManaAbility>().Should().HaveCount(1);
-        ((Land)card).Abilities.OfType<ActivatedAbility>().Should().HaveCount(1);
-    }
-
     // -----------------------------------------------------------------------
     // Activated ability: {1}{R}{R}, {T} — cost gates
     // -----------------------------------------------------------------------

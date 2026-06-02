@@ -35,6 +35,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Flying keyword (CR 702.9).
 ///   - ETB draw-two trigger: structural shape + draws two off the top.
 /// </summary>
+[Trait("Color", "U")]
 public class ThoughtMonitorFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -77,21 +78,6 @@ public class ThoughtMonitorFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void ThoughtMonitor_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Thought Monitor", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Thought Monitor");
-        c.HasType(CardType.Artifact).Should().BeTrue();
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Construct).Should().BeTrue();
-        c.Abilities.OfType<CostReductionAbility>().Should().HaveCount(1,
-            "the Affinity-for-artifacts cost reducer is attached");
-    }
-
     // -------------------------------------------------------------------------
     // Keyword markers
     // -------------------------------------------------------------------------

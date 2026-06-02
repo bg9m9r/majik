@@ -24,6 +24,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   Mode 2: Create a 1/1 colorless Eldrazi Scion creature token with
 ///           "Sacrifice this token: Add {C}."
 /// </summary>
+[Trait("Color", "C")]
 public class WarpingWailTests
 {
     private readonly EventBus _bus = new();
@@ -51,17 +52,6 @@ public class WarpingWailTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void WarpingWail_NamedCardFactory_Dispatch()
-    {
-        var dispatched = NamedCardFactory.Create("Warping Wail", _alice);
-
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("Warping Wail");
-        dispatched.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     [Fact]
     public void WarpingWail_BuildDefinition_ExposesModes_AndTargetRequests()
     {

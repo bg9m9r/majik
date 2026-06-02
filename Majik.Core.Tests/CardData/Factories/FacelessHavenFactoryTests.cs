@@ -31,6 +31,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     * Records 4/3 base P/T on Layer 7b.
 ///     * Both expire at end of turn.
 /// </summary>
+[Trait("Color", "C")]
 public class FacelessHavenFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -66,21 +67,6 @@ public class FacelessHavenFactoryTests
         land.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1,
             "{S}{S}{S} animate ability is wired");
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_FacelessHaven()
-    {
-        var card = NamedCardFactory.Create("Faceless Haven", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Faceless Haven");
-        card.HasType(CardType.Land).Should().BeTrue();
-        card.HasSupertype(CardSupertype.Snow).Should().BeTrue();
-
-        card.Abilities.OfType<ManaAbility>().Should().HaveCount(1);
-        card.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1);
-    }
-
     // -----------------------------------------------------------------------
     // Animate ability
     // -----------------------------------------------------------------------

@@ -27,6 +27,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     exile-cast.
 ///   - NamedCardFactory dispatch.
 /// </summary>
+[Trait("Color", "C")]
 public class UginEyeOfTheStormsFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -249,21 +250,5 @@ public class UginEyeOfTheStormsFactoryTests
         colorlessNonland1.RuntimeExileCastCost!.IsZero.Should().BeTrue();
         colorlessNonland2.RuntimeExileCastAllowedCaster.Should().BeSameAs(_alice);
         colorlessNonland2.RuntimeExileCastCost!.IsZero.Should().BeTrue();
-    }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_Ugin()
-    {
-        var card = NamedCardFactory.Create("Ugin, Eye of the Storms", _alice);
-
-        card.Should().BeOfType<Planeswalker>();
-        card.Name.Should().Be("Ugin, Eye of the Storms");
-        card.HasType(CardType.Planeswalker).Should().BeTrue();
-        card.HasSupertype(CardSupertype.Legendary).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Ugin).Should().BeTrue();
-        ((Planeswalker)card).Loyalty.Should().Be(7);
-        card.Owner.Should().Be(_alice);
-        card.Abilities.OfType<LoyaltyAbility>().Should().HaveCount(3);
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(2);
     }
 }

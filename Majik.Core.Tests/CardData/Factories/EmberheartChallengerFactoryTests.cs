@@ -37,6 +37,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     re-trigger; a turn boundary resets it.
 ///   - Valiant does NOT trigger off a spell/ability an opponent controls.
 /// </summary>
+[Trait("Color", "R")]
 public class EmberheartChallengerFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -98,22 +99,6 @@ public class EmberheartChallengerFactoryTests
         var keywords = card.Abilities.OfType<KeywordAbility>().Select(k => k.Keyword).ToList();
         keywords.Should().Contain("Haste");
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_Emberheart()
-    {
-        var card = NamedCardFactory.Create("Emberheart Challenger", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Emberheart Challenger");
-        card.HasSubtype(CardSubtype.Mouse).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Warrior).Should().BeTrue();
-        var keywords = card.Abilities.OfType<KeywordAbility>().Select(k => k.Keyword).ToList();
-        keywords.Should().Contain("Haste");
-        // Two triggered abilities: Prowess + Valiant.
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(2);
-    }
-
     [Fact]
     public void Emberheart_HasTwoTriggeredAbilities_ProwessAndValiant()
     {

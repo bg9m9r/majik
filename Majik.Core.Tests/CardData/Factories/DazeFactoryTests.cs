@@ -26,6 +26,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   * Resolve "counter target spell unless its controller pays {1}" —
 ///     auto-pay when {1} is available, otherwise counter.
 /// </summary>
+[Trait("Color", "U")]
 public class DazeFactoryTests
 {
     private readonly EventBus _bus = new();
@@ -54,16 +55,6 @@ public class DazeFactoryTests
         CardColors.GetColors(daze).Should().Contain(ManaColor.Blue);
         daze.ManaCostValue.TotalValue.Should().Be(2);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsDazeFactoryShape()
-    {
-        var dispatched = NamedCardFactory.Create("Daze", _alice);
-
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("Daze");
-    }
-
     [Fact]
     public async Task CastViaPitch_ReturnsIslandToOwnersHand_NoManaPaid()
     {

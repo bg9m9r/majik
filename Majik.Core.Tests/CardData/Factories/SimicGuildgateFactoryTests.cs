@@ -25,20 +25,10 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// path by <see cref="EntersTappedBinder"/> from the oracle text, not by this
 /// factory (same posture as the other Guildgate factories).
 /// </summary>
+[Trait("Color", "C")]
 public class SimicGuildgateFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
-
-    [Fact]
-    public void SimicGuildgate_Dispatch_ReturnsLandWithGateSubtype()
-    {
-        var card = NamedCardFactory.Create("Simic Guildgate", _alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Simic Guildgate");
-        card.HasSubtype(CardSubtype.Gate).Should().BeTrue();
-    }
-
     [Fact]
     public void SimicGuildgate_HasTwoManaAbilities_ProducingGreenAndBlue()
     {

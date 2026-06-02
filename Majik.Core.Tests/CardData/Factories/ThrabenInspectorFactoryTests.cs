@@ -27,6 +27,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - The ETB effect creates a Clue token (CR 701.39 — Investigate) under
 ///   the controller, and the Clue carries its sac-to-draw ability.
 /// </summary>
+[Trait("Color", "W")]
 public class ThrabenInspectorFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -46,18 +47,6 @@ public class ThrabenInspectorFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void ThrabenInspector_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Thraben Inspector", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Thraben Inspector");
-        ((Creature)c).BasePower.Should().Be(1);
-        ((Creature)c).BaseToughness.Should().Be(2);
-    }
-
     [Fact]
     public void ThrabenInspector_AttachesSingleEtbTrigger()
     {

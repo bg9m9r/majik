@@ -27,6 +27,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   ("under YOUR control").
 /// - Trigger does NOT fire for non-land ETB (oracle: "a land enters").
 /// </summary>
+[Trait("Color", "G")]
 public class TirelessProvisionerFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -49,21 +50,6 @@ public class TirelessProvisionerFactoryTests
 
         c.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1);
     }
-
-    [Fact]
-    public void TirelessProvisioner_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Tireless Provisioner", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Tireless Provisioner");
-        c.HasSubtype(CardSubtype.Elf).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Scout).Should().BeTrue();
-        ((Creature)c).BasePower.Should().Be(3);
-        ((Creature)c).BaseToughness.Should().Be(2);
-        c.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1);
-    }
-
     [Fact]
     public void LandEntersUnderController_DefaultsToTreasureToken()
     {

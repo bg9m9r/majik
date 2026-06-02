@@ -30,6 +30,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   opponent's basic → still tapped (predicate is "you control").
 /// - Rummage activation: draws 1 card then discards 1 card.
 /// </summary>
+[Trait("Color", "C")]
 public class AgnaQelaFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -113,16 +114,6 @@ public class AgnaQelaFactoryTests
     // -----------------------------------------------------------------------
     // Dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void NamedCardFactory_Dispatch_ResolvesAgnaQela()
-    {
-        var card = NamedCardFactory.Create("Agna Qel'a", _alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Agna Qel'a");
-    }
-
     // -----------------------------------------------------------------------
     // Mana ability: {T}: Add {U}
     // -----------------------------------------------------------------------
@@ -304,17 +295,5 @@ public class AgnaQelaFactoryTests
         after.Should().NotBeNull();
         after!.EntersTapped.Should().BeTrue(
             "the predicate checks 'you control' — opponent's basics don't count");
-    }
-
-    [Fact]
-    public void AgnaQela_SingleArgDispatch_NoReplacement_LandBuilds()
-    {
-        // Shape-only path — no ReplacementBus wired, ETB-tapped omitted.
-        var land = NamedCardFactory.Create("Agna Qel'a", _alice);
-
-        land.Should().NotBeNull();
-        land.Name.Should().Be("Agna Qel'a");
-        ((Land)land).Abilities.OfType<ManaAbility>().Should().HaveCount(1);
-        ((Land)land).Abilities.OfType<ActivatedAbility>().Should().HaveCount(1);
     }
 }

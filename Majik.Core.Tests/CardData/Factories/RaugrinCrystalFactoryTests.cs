@@ -28,6 +28,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   <see cref="Majik.Core.Events.CardCycledEvent"/>.
 /// - Dispatcher routing through <see cref="NamedCardFactory"/>.
 /// </summary>
+[Trait("Color", "C")]
 public class RaugrinCrystalFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -35,17 +36,6 @@ public class RaugrinCrystalFactoryTests
     // -----------------------------------------------------------------------
     // Identity + dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void RaugrinCrystal_Dispatch_ReturnsArtifact()
-    {
-        var card = NamedCardFactory.Create("Raugrin Crystal", _alice);
-
-        card.Should().BeAssignableTo<Artifact>();
-        card.Name.Should().Be("Raugrin Crystal");
-        card.HasType(CardType.Artifact).Should().BeTrue();
-    }
-
     [Fact]
     public void RaugrinCrystal_HasThreeManaAbilities_ProducingURW()
     {

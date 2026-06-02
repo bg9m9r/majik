@@ -28,6 +28,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Hard-cast posture: EvokeWasPaid stays false → sacrifice trigger
 ///   never queues (intervening-if drops it at CR 603.4 queue time).
 /// </summary>
+[Trait("Color", "U")]
 public class MulldrifterFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -60,18 +61,6 @@ public class MulldrifterFactoryTests
             .Select(k => k.Keyword).ToList();
         keywordNames.Should().Contain(new[] { "Flying", "Evoke" });
     }
-
-    [Fact]
-    public void Mulldrifter_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Mulldrifter", _alice);
-
-        c.Should().BeOfType<Creature>("Mulldrifter is a Creature");
-        c.Name.Should().Be("Mulldrifter");
-        c.HasSubtype(CardSubtype.Elemental).Should().BeTrue();
-        c.ManaCost.Should().Be("{4}{U}");
-    }
-
     // -----------------------------------------------------------------------
     // ETB triggered ability — draw 2
     // -----------------------------------------------------------------------

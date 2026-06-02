@@ -100,11 +100,8 @@ public static class WhirlerVirtuosoFactory
             toughness: Toughness,
             subtypes: new[] { CardSubtype.Human, CardSubtype.Artificer });
 
-        // CR 301.1 / CR 302.1 — Artifact Creature: additively stamp the
-        // Artifact type so colour-identity / artifact-matters lookups see
-        // both types (same posture as Ornithopter / Vault Skirge).
-        card.AddCardType(CardType.Artifact);
-
+        // Whirler Virtuoso is a plain "Creature — Human Artificer" (NOT an
+        // Artifact Creature) — only the Thopter tokens it mints are artifacts.
         card.SetOwner(owner);
         card.SetController(owner);
 

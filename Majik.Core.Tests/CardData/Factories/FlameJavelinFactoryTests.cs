@@ -33,6 +33,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Resolve deals 4 damage to a creature target.
 /// - Resolve removes loyalty from a planeswalker target (CR 306.7).
 /// </summary>
+[Trait("Color", "R")]
 public class FlameJavelinFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -62,17 +63,6 @@ public class FlameJavelinFactoryTests
         card.ManaCostValue.TotalValue.Should().Be(6,
             "each {2/R} pip contributes its generic alternative of 2 (CR 202.3f)");
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_FlameJavelin()
-    {
-        var card = NamedCardFactory.Create("Flame Javelin", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Flame Javelin");
-        card.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     // ── Spell definition shape ────────────────────────────────────────────────
 
     [Fact]

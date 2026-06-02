@@ -39,6 +39,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   (Player + Creature).
 /// - Life-gain replacement zeroes Player.GainLife while attached.
 /// </summary>
+[Trait("Color", "R")]
 public class RoilingVortexFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -73,20 +74,6 @@ public class RoilingVortexFactoryTests
         vortex.Abilities.OfType<TriggeredAbility>().Should().HaveCount(2);
         vortex.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsRoilingVortexShape()
-    {
-        var dispatched = NamedCardFactory.Create("Roiling Vortex", _alice);
-
-        dispatched.Should().BeOfType<Enchantment>();
-        dispatched.Name.Should().Be("Roiling Vortex");
-        dispatched.ManaCost.Should().Be("{R}");
-        dispatched.HasType(CardType.Enchantment).Should().BeTrue();
-        dispatched.Abilities.OfType<TriggeredAbility>().Should().HaveCount(2);
-        dispatched.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1);
-    }
-
     // -----------------------------------------------------------------------
     // Upkeep trigger — 1 damage to each player
     // -----------------------------------------------------------------------

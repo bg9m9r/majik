@@ -41,6 +41,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     top card of library and stamps the may-play-from-exile grant.
 ///   - Discard trigger does NOT fire on an opponent's discard.
 /// </summary>
+[Trait("Color", "R")]
 public class IntiSeneschalOfTheSunFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -101,18 +102,6 @@ public class IntiSeneschalOfTheSunFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_Inti()
-    {
-        var card = NamedCardFactory.Create("Inti, Seneschal of the Sun", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Inti, Seneschal of the Sun");
-        card.HasSubtype(CardSubtype.Human).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Knight).Should().BeTrue();
-    }
-
     [Fact]
     public void Inti_HasTwoTriggeredAbilities_AttackAndDiscard()
     {

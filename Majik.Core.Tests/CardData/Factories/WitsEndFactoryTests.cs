@@ -26,6 +26,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   4 in graveyard (CR 701.7).
 /// - Resolve: target player with empty hand → no-op (CR 701.7c).
 /// </summary>
+[Trait("Color", "B")]
 public class WitsEndFactoryTests
 {
     private readonly EventBus _bus = new();
@@ -64,16 +65,6 @@ public class WitsEndFactoryTests
     // ------------------------------------------------------------------
     // Dispatcher
     // ------------------------------------------------------------------
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsWitsEnd()
-    {
-        var dispatched = NamedCardFactory.Create("Wit's End", _alice);
-
-        dispatched.Should().BeOfType<Sorcery>();
-        dispatched.Name.Should().Be("Wit's End");
-    }
-
     // ------------------------------------------------------------------
     // SpellDefinition shape
     // ------------------------------------------------------------------

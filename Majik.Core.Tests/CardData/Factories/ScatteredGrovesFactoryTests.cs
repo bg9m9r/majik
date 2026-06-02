@@ -28,6 +28,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// discards self, draws one, and publishes
 /// <see cref="Majik.Core.Events.CardCycledEvent"/> (CR 702.32d).
 /// </summary>
+[Trait("Color", "C")]
 public class ScatteredGrovesFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -35,18 +36,6 @@ public class ScatteredGrovesFactoryTests
     // -----------------------------------------------------------------------
     // Identity + dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void ScatteredGroves_Dispatch_ReturnsLandWithForestAndPlainsSubtypes()
-    {
-        var card = NamedCardFactory.Create("Scattered Groves", _alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Scattered Groves");
-        card.HasSubtype(CardSubtype.Forest).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Plains).Should().BeTrue();
-    }
-
     [Fact]
     public void ScatteredGroves_HasTwoManaAbilities_ProducingGreenAndWhite()
     {

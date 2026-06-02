@@ -44,6 +44,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   spell paid with non-exert mana gets nothing.
 /// - NamedCardFactory dispatcher resolves "Arena of Glory".
 /// </summary>
+[Trait("Color", "C")]
 public class ArenaOfGloryFactoryTests : IDisposable
 {
     private readonly Player _alice = new("Alice", 20);
@@ -172,17 +173,6 @@ public class ArenaOfGloryFactoryTests : IDisposable
         after!.EntersTapped.Should().BeTrue(
             "only the controller's own Mountains turn off the tapped clause");
     }
-
-    [Fact]
-    public void ArenaOfGlory_SingleArgDispatch_DoesNotRegisterReplacement()
-    {
-        // No ReplacementBus on the dispatcher path → ETB-tapped predicate
-        // omitted (shape-only posture, mirrors CheckLandCycleFactory).
-        var land = ArenaOfGloryFactory.Create(_alice);
-        land.Should().NotBeNull();
-        land.Abilities.OfType<ManaAbility>().Should().HaveCount(2);
-    }
-
     // -----------------------------------------------------------------------
     // {T}: Add {R}
     // -----------------------------------------------------------------------

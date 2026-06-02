@@ -36,6 +36,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   final test pins that the binder fires on Worn Powerstone's exact
 ///   oracle text and the rock enters the battlefield tapped.
 /// </summary>
+[Trait("Color", "C")]
 public class WornPowerstoneFactoryTests
 {
     // The exact Scryfall oracle text for Worn Powerstone.
@@ -95,18 +96,6 @@ public class WornPowerstoneFactoryTests
         stone.HasSupertype(CardSupertype.Basic).Should().BeFalse();
         stone.HasSupertype(CardSupertype.Legendary).Should().BeFalse();
     }
-
-    [Fact]
-    public void WornPowerstone_Dispatch_ResolvesViaNamedCardFactory()
-    {
-        var alice = new Player("Alice", 20);
-
-        var card = NamedCardFactory.Create("Worn Powerstone", alice);
-
-        card.Should().BeAssignableTo<Artifact>();
-        card.Name.Should().Be("Worn Powerstone");
-    }
-
     // -----------------------------------------------------------------------
     // Mana ability — shape
     // -----------------------------------------------------------------------

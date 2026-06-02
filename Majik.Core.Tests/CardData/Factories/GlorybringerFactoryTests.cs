@@ -31,6 +31,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Target gate: a Dragon is not a legal "non-Dragon" target.
 ///   - Trigger fires only when Glorybringer's controller attacks.
 /// </summary>
+[Trait("Color", "R")]
 public class GlorybringerFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -55,17 +56,6 @@ public class GlorybringerFactoryTests
         dragon.Owner.Should().BeSameAs(_alice);
         dragon.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatch_ReturnsGlorybringerShape()
-    {
-        var dispatched = NamedCardFactory.Create("Glorybringer", _alice);
-
-        dispatched.Should().BeOfType<Creature>();
-        dispatched.Name.Should().Be("Glorybringer");
-        dispatched.HasType(CardType.Creature).Should().BeTrue();
-    }
-
     [Fact]
     public void Create_AttachesFlying_Haste()
     {

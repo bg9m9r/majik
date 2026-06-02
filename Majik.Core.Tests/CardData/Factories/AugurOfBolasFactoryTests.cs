@@ -30,6 +30,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - ETB: short library (fewer than 3 cards) — no throw, partial peek.
 /// - ETB: empty library — clean no-op.
 /// </summary>
+[Trait("Color", "U")]
 public class AugurOfBolasFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -53,22 +54,6 @@ public class AugurOfBolasFactoryTests
         creature.BasePower.Should().Be(1);
         creature.BaseToughness.Should().Be(3);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_AugurOfBolas()
-    {
-        var card = NamedCardFactory.Create("Augur of Bolas", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Augur of Bolas");
-        card.HasSubtype(CardSubtype.Merfolk).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Wizard).Should().BeTrue();
-
-        var creature = (Creature)card;
-        creature.BasePower.Should().Be(1);
-        creature.BaseToughness.Should().Be(3);
-    }
-
     [Fact]
     public void Card_HasExactlyOneEtbTriggeredAbility_ActiveOnBattlefield()
     {

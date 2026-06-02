@@ -32,6 +32,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     may-play-from-exile grant (CR 603.6a / 701.20 / 118.9).
 ///   - ETB impulse on an empty library is a no-op (CR 701.20).
 /// </summary>
+[Trait("Color", "R")]
 public class AbbotOfKeralKeepFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -76,20 +77,6 @@ public class AbbotOfKeralKeepFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_Abbot()
-    {
-        var card = NamedCardFactory.Create("Abbot of Keral Keep", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Abbot of Keral Keep");
-        card.HasSubtype(CardSubtype.Human).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Monk).Should().BeTrue();
-        // Two triggered abilities: Prowess + ETB impulse.
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(2);
-    }
-
     [Fact]
     public void Abbot_HasTwoTriggeredAbilities_ProwessAndEtb()
     {

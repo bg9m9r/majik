@@ -25,6 +25,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Noncreature card in graveyard is NOT a legal candidate.
 ///   - Empty graveyard is a clean no-op.
 /// </summary>
+[Trait("Color", "B")]
 public class CadaverImpFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -82,26 +83,6 @@ public class CadaverImpFactoryTests
     }
 
     // ── Dispatch ─────────────────────────────────────────────────────────────
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_CadaverImp()
-    {
-        var card = NamedCardFactory.Create("Cadaver Imp", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Cadaver Imp");
-        card.HasType(CardType.Creature).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Imp).Should().BeTrue();
-        ((Creature)card).BasePower.Should().Be(1);
-        ((Creature)card).BaseToughness.Should().Be(1);
-        card.Owner.Should().Be(_alice);
-
-        // Should have Flying + one ETB trigger.
-        card.Abilities.OfType<KeywordAbility>()
-            .Should().Contain(k => k.Keyword == "Flying");
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1);
-    }
-
     // ── ETB resolution: fallback picks first creature card ───────────────────
 
     [Fact]

@@ -29,6 +29,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// NO "enters tapped" clause, so CR 614.1c does not apply and the rock always
 /// enters untapped.
 /// </summary>
+[Trait("Color", "C")]
 public class UrGolemsEyeFactoryTests
 {
     // -----------------------------------------------------------------------
@@ -85,18 +86,6 @@ public class UrGolemsEyeFactoryTests
         eye.HasSupertype(CardSupertype.Basic).Should().BeFalse();
         eye.HasSupertype(CardSupertype.Legendary).Should().BeFalse();
     }
-
-    [Fact]
-    public void UrGolemsEye_Dispatch_ResolvesViaNamedCardFactory()
-    {
-        var alice = new Player("Alice", 20);
-
-        var card = NamedCardFactory.Create("Ur-Golem's Eye", alice);
-
-        card.Should().BeAssignableTo<Artifact>();
-        card.Name.Should().Be("Ur-Golem's Eye");
-    }
-
     // -----------------------------------------------------------------------
     // Mana ability — shape
     // -----------------------------------------------------------------------

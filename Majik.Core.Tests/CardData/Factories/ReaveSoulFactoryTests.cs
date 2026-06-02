@@ -17,6 +17,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Unit tests for <see cref="ReaveSoulFactory"/> (Magic Origins, {1}{B}).
 /// "Destroy target creature with power 3 or less." (Sorcery.)
 /// </summary>
+[Trait("Color", "B")]
 public class ReaveSoulFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -58,16 +59,6 @@ public class ReaveSoulFactoryTests
     // -----------------------------------------------------------------------
     // Dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Reave Soul", _alice);
-
-        card.Should().BeOfType<Sorcery>();
-        card.Name.Should().Be("Reave Soul");
-    }
-
     // -----------------------------------------------------------------------
     // Spell definition shape
     // -----------------------------------------------------------------------

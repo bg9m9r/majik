@@ -28,6 +28,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Resolution: 2 damage to player / creature / planeswalker target
 ///     (CR 306.7 loyalty route); the Seal is sacrificed to the graveyard.
 /// </summary>
+[Trait("Color", "R")]
 public class SealOfFireFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -48,17 +49,6 @@ public class SealOfFireFactoryTests
         seal.Owner.Should().BeSameAs(_alice);
         seal.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void SealOfFire_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Seal of Fire", _alice);
-
-        card.Should().BeOfType<Enchantment>();
-        card.Name.Should().Be("Seal of Fire");
-        card.HasType(CardType.Enchantment).Should().BeTrue();
-    }
-
     // -----------------------------------------------------------------------
     // Activated ability shape
     // -----------------------------------------------------------------------

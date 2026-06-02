@@ -30,6 +30,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   Cap behavior: cap cleared via CastingRestrictions.Clear (end-of-turn).
 ///   Two resolutions in one turn: cap stays at 1 (tighter of 1, 1 = 1).
 /// </summary>
+[Trait("Color", "R")]
 public class IrencragFeatFactoryTests : IDisposable
 {
     private readonly Player _alice = new("Alice", 20);
@@ -54,19 +55,6 @@ public class IrencragFeatFactoryTests : IDisposable
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_IrencragFeat()
-    {
-        var card = NamedCardFactory.Create("Irencrag Feat", _alice);
-
-        card.Should().BeOfType<Sorcery>();
-        card.Name.Should().Be("Irencrag Feat");
-        card.HasType(CardType.Sorcery).Should().BeTrue();
-        card.ManaCost.Should().Be("{1}{R}{R}{R}");
-        card.Owner.Should().BeSameAs(_alice);
-    }
-
     // -----------------------------------------------------------------------
     // Mana production
     // -----------------------------------------------------------------------

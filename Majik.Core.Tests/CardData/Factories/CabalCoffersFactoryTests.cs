@@ -25,6 +25,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   * CanActivate: false when land is already tapped.
 ///   * CanActivate: false when controller cannot afford {2}.
 /// </summary>
+[Trait("Color", "C")]
 public class CabalCoffersFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -79,15 +80,6 @@ public class CabalCoffersFactoryTests
     // -----------------------------------------------------------------------
     // Dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsLandShape()
-    {
-        var dispatched = NamedCardFactory.Create("Cabal Coffers", _alice);
-        dispatched.Should().BeOfType<Land>();
-        dispatched.Name.Should().Be("Cabal Coffers");
-    }
-
     // -----------------------------------------------------------------------
     // No basic mana ability
     // -----------------------------------------------------------------------

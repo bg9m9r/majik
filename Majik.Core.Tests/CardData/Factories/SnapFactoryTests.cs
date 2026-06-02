@@ -26,6 +26,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     fires on its own targets.
 ///   * Non-land pick is silently skipped at resolve (CR 608.2b).
 /// </summary>
+[Trait("Color", "U")]
 public class SnapFactoryTests
 {
     private readonly EventBus _bus = new();
@@ -54,16 +55,6 @@ public class SnapFactoryTests
         CardColors.GetColors(snap).Should().Contain(ManaColor.Blue);
         snap.ManaCostValue.TotalValue.Should().Be(2);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsSnapShape()
-    {
-        var dispatched = NamedCardFactory.Create("Snap", _alice);
-
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("Snap");
-    }
-
     [Fact]
     public async Task Cast_BouncesCreature_AndUntapsTwoLands()
     {

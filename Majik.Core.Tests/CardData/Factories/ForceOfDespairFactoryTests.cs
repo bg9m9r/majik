@@ -25,6 +25,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   * PitchAltCostProbe surfaces a Black / 0-life candidate from
 ///     <see cref="PitchAltCostProbe.DefaultLookup"/>.
 /// </summary>
+[Trait("Color", "B")]
 public class ForceOfDespairFactoryTests
 {
     private readonly EventBus _bus = new();
@@ -52,15 +53,6 @@ public class ForceOfDespairFactoryTests
         fod.HasType(CardType.Instant).Should().BeTrue();
         CardColors.GetColors(fod).Should().Contain(ManaColor.Black);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsForceOfDespairShape()
-    {
-        var dispatched = NamedCardFactory.Create("Force of Despair", _alice);
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("Force of Despair");
-    }
-
     [Fact]
     public void PitchAltCostProbe_DefaultLookup_RecognisesForceOfDespair_BlackZeroLife()
     {

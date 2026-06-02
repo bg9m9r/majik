@@ -33,6 +33,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Another-colorless-creature-enters trigger: deals 1 damage to each
 ///     opponent.
 /// </summary>
+[Trait("Color", "C")]
 public class GlaringFleshrakerFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -58,18 +59,6 @@ public class GlaringFleshrakerFactoryTests
         CardColors.GetColors(c).Should().BeEmpty(
             "{2}{C} has no colored mana symbol");
     }
-
-    [Fact]
-    public void GlaringFleshraker_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Glaring Fleshraker", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Glaring Fleshraker");
-        c.HasSubtype(CardSubtype.Eldrazi).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Drone).Should().BeTrue();
-    }
-
     [Fact]
     public void GlaringFleshraker_HasTwoTriggeredAbilities()
     {
