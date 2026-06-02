@@ -1,0 +1,9 @@
+{
+  "name": "Void Winnower",
+  "types": ["Creature"],
+  "subtypes": ["Eldrazi"],
+  "manaCost": "{9}",
+  "power": 11,
+  "toughness": 9,
+  "abilities": []
+}
