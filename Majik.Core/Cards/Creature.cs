@@ -113,6 +113,31 @@ public class Creature : Permanent
     }
 
     /// <summary>
+    /// CR 613.1f / 613.8 — true iff this creature currently has
+    /// <paramref name="keyword"/> as an EFFECTIVE keyword (printed marker OR
+    /// granted by an active Layer-6 effect, minus any Layer-6 strip). When
+    /// <see cref="Permanent.ActiveEffects"/> is wired this reads the layer
+    /// system's post-Layer-6 keyword set
+    /// (<see cref="Majik.Core.Effects.ContinuousEffectsService.EffectiveKeywords"/>);
+    /// otherwise it falls back to printed
+    /// <see cref="Majik.Core.Abilities.KeywordAbility"/> markers. Casing is
+    /// irrelevant (the keyword set is ordinal-ignore-case). Keyword-gated
+    /// anthems ("Other creatures you control with flying get +1/+1") read
+    /// through this so a creature granted the keyword qualifies.
+    /// </summary>
+    public bool HasEffectiveKeyword(string keyword)
+    {
+        if (string.IsNullOrWhiteSpace(keyword)) return false;
+        if (ActiveEffects != null)
+        {
+            return ActiveEffects.EffectiveKeywords(this).Contains(keyword);
+        }
+        return Abilities
+            .OfType<Majik.Core.Abilities.KeywordAbility>()
+            .Any(k => string.Equals(k.Keyword, keyword, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
     /// Deal damage to the creature.
     /// </summary>
     public void TakeDamage(int amount)

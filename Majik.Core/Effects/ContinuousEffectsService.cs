@@ -804,6 +804,68 @@ public sealed class ContinuousEffectsService
     }
 
     /// <summary>
+    /// CR 613.1f / 613.8 — the EFFECTIVE keyword set of a creature after the
+    /// Layer-6 (ability-adding/removing) pass, computed WITHOUT running the
+    /// Layer-7 P/T pass. Used by keyword-gated anthems
+    /// (<see cref="LordStaticEffect"/> with a <c>matchingKeyword</c>):
+    /// "Other creatures you control with flying get +1/+1" reads each
+    /// candidate's POST-Layer-6 keywords (so a creature GRANTED flying counts)
+    /// to decide whether the Layer-7c boost applies.
+    ///
+    /// <para>This deliberately applies ONLY effects in layers up to and
+    /// including <see cref="Layer.Abilities"/> (6). Keyword-affecting effects
+    /// never live above Layer 6, so the result is identical to
+    /// <c>Compute(creature).Keywords</c> for keyword purposes — but excluding
+    /// the Layer-7c anthems is what makes this call RE-ENTRANCY-SAFE: a
+    /// keyword-gated anthem's <see cref="ContinuousEffect.AppliesTo(Creature)"/>
+    /// invokes this method, and were the full pipeline used it would recurse
+    /// back through that same anthem's <c>AppliesTo</c> for the same creature.
+    /// The CR 613.8 dependency (Layer-7c anthem depends on Layer-6 keyword
+    /// grants) is respected because Layer 6 is fully applied here before the
+    /// anthem in Layer 7c reads the result.</para>
+    ///
+    /// <para>Honours Layer-6 strips (Humility-class) and grant reconciliation
+    /// exactly as <see cref="Compute(Permanent)"/> does: it shares
+    /// <see cref="ComputeStrippedSet"/> + <see cref="SyncAbilityGrants"/> and
+    /// the same stripped-source suppression filter. NOT memoized (the layered
+    /// cache stores the full-pipeline result); the cost is a single bounded
+    /// pass over the active effects, called only by keyword-gated anthems.</para>
+    /// </summary>
+    public IReadOnlySet<string> EffectiveKeywords(Creature creature)
+    {
+        if (creature == null) throw new ArgumentNullException(nameof(creature));
+
+        var chars = SeedPrintedCharacteristics(creature);
+
+        if (_effects.Count == 0) return chars.Keywords;
+
+        var stripped = ComputeStrippedSet();
+        SyncAbilityGrants(stripped);
+
+        var applicable = _effects
+            .Where(e => (int)e.Layer <= (int)Layer.Abilities)
+            .Where(e => e.IsActive() && e.AppliesTo(creature))
+            .Where(e => e is LoseAllAbilitiesEffect
+                        || e.Source is not Creature src
+                        || !stripped.Contains(src))
+            .ToList();
+
+        var byLayer = applicable
+            .GroupBy(e => (int)e.Layer)
+            .OrderBy(g => g.Key);
+
+        foreach (var group in byLayer)
+        {
+            foreach (var effect in TopoSortByDependencies(group.ToList()))
+            {
+                effect.Apply(chars);
+            }
+        }
+
+        return chars.Keywords;
+    }
+
+    /// <summary>
     /// CR 613.2 — current controller of a permanent after applying any
     /// active Layer 2 control-change effects (latest-timestamp wins). Falls
     /// back to <see cref="Permanent.Controller"/> when no override is active.
