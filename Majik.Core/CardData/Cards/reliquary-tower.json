@@ -1,0 +1,7 @@
+{
+  "name": "Reliquary Tower",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "C" }
+  ]
+}
