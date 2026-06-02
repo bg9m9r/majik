@@ -1,0 +1,9 @@
+{
+  "name": "Thundermaw Hellkite",
+  "types": ["Creature"],
+  "subtypes": ["Dragon"],
+  "manaCost": "{3}{R}{R}",
+  "power": 5,
+  "toughness": 5,
+  "abilities": []
+}
