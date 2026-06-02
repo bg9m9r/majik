@@ -1,0 +1,5 @@
+{
+  "name": "Bile Blight",
+  "types": ["Instant"],
+  "manaCost": "{B}{B}"
+}
