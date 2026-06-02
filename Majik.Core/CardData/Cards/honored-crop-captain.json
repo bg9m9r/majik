@@ -1,0 +1,9 @@
+{
+  "name": "Honored Crop-Captain",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Warrior"],
+  "manaCost": "{R}{W}",
+  "power": 3,
+  "toughness": 2,
+  "abilities": []
+}
