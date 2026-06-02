@@ -1,0 +1,9 @@
+{
+  "name": "Sphinx of the Steel Wind",
+  "types": ["Creature", "Artifact"],
+  "subtypes": ["Sphinx"],
+  "manaCost": "{5}{W}{U}{B}",
+  "power": 6,
+  "toughness": 6,
+  "abilities": []
+}
