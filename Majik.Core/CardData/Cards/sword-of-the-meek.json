@@ -1,0 +1,6 @@
+{
+  "name": "Sword of the Meek",
+  "types": ["Artifact"],
+  "subtypes": ["Equipment"],
+  "manaCost": "{2}"
+}
