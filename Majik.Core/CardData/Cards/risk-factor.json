@@ -1,0 +1,7 @@
+{
+  "name": "Risk Factor",
+  "types": ["Instant"],
+  "manaCost": "{2}{R}",
+  "colors": ["R"],
+  "abilities": []
+}
