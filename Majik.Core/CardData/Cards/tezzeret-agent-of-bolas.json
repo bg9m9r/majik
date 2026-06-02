@@ -1,0 +1,9 @@
+{
+  "name": "Tezzeret, Agent of Bolas",
+  "types": ["Planeswalker"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Tezzeret"],
+  "manaCost": "{2}{U}{B}",
+  "loyalty": 3,
+  "abilities": []
+}

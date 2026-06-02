@@ -388,6 +388,10 @@ public enum CardSubtype
     /// (Murders at Karlov Manor / Modern Horizons line). CR 205.3m.</summary>
     Kaito,
 
+    /// <summary>Tezzeret planeswalker subtype — Tezzeret, Agent of Bolas
+    /// (Mirrodin Besieged) and the rest of the Tezzeret lineage. CR 205.3m.</summary>
+    Tezzeret,
+
     /// <summary>Samurai creature subtype — Kamigawa-block warriors plus the
     /// 2/2 white Samurai token created by The Wandering Emperor's −1.
     /// CR 205.3m.</summary>
