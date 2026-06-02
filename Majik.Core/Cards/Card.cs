@@ -1193,6 +1193,28 @@ public class Card : ICard
         }
     }
 
+    /// <summary>
+    /// CR 205.3 — add a printed subtype after construction. Used by named-card
+    /// factories that materialise a base shape from an embedded JSON
+    /// definition and then stamp additional printed subtypes (e.g. the
+    /// Changeling subtype set — Unsettled Mariner / Mutable Explorer). CR
+    /// 702.73a: Changeling is every creature type everywhere, so the
+    /// changeling subtype list is modelled as printed subtypes rather than a
+    /// continuous effect. Idempotent — adding the same subtype twice is a
+    /// no-op. Invalidates the layer-system cache so the next Compute re-seeds
+    /// the effective subtype set.
+    /// </summary>
+    internal void AddSubtype(CardSubtype subtype)
+    {
+        if (!_subtypes.Contains(subtype))
+        {
+            _subtypes.Add(subtype);
+            // CR 613.1d — the layer pipeline seeds chars.Subtypes from this
+            // list; a printed-subtype mutation must re-seed.
+            if (this is Permanent p) p.ActiveEffects?.BumpGeneration();
+        }
+    }
+
     public bool HasType(CardType type)
     {
         return _cardTypes.Contains(type);

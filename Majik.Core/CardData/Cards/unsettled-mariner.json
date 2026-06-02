@@ -1,0 +1,8 @@
+{
+  "name": "Unsettled Mariner",
+  "types": ["Creature"],
+  "subtypes": ["Shapeshifter"],
+  "manaCost": "{W}{U}",
+  "power": 2,
+  "toughness": 2
+}

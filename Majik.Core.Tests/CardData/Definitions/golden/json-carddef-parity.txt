@@ -28455,6 +28455,57 @@
     "Red"
   ]
 }
+==== unsettled-mariner ====
+{
+  "name": "Unsettled Mariner",
+  "manaCost": "{W}{U}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Shapeshifter"
+  ],
+  "power": 2,
+  "toughness": 2,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Blue",
+    "White"
+  ]
+}
 ==== ur-golems-eye ====
 {
   "name": "Ur-Golem\u0027s Eye",
