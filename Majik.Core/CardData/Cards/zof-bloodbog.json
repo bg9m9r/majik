@@ -1,0 +1,7 @@
+{
+  "name": "Zof Bloodbog",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "B" }
+  ]
+}
