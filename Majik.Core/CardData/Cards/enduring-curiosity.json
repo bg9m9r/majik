@@ -1,0 +1,9 @@
+{
+  "name": "Enduring Curiosity",
+  "types": ["Creature", "Enchantment"],
+  "subtypes": ["Cat", "Glimmer"],
+  "manaCost": "{2}{U}{U}",
+  "power": 4,
+  "toughness": 3,
+  "abilities": []
+}
