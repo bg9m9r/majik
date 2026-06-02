@@ -64,6 +64,12 @@ public static class TargetFilters
     {
         "creature_you_control" => ControlScope.YouControl,
         "creature_you_dont_control" or "creature_you_don't_control" => ControlScope.YouDontControl,
+        // CR 109.5 / 205.3m — a "Wizard you control" is a battlefield creature
+        // with the Wizard subtype under the resolving controller. Canonical
+        // case: Riptide Laboratory — "{1}{U}, {T}: Return target Wizard you
+        // control to its owner's hand." The base predicate gates on the Wizard
+        // subtype; the control rider is applied context-aware here.
+        "wizard_you_control" => ControlScope.YouControl,
         _ => ControlScope.Any,
     };
 
@@ -110,6 +116,12 @@ public static class TargetFilters
                 ($"target creature you control to {verb}", o => o is Creature c && OnBattlefield(c)),
             "creature_you_dont_control" or "creature_you_don't_control" =>
                 ($"target creature you don't control to {verb}", o => o is Creature c && OnBattlefield(c)),
+            // CR 205.3m — a "Wizard" is a creature with the Wizard subtype. The
+            // "you control" rider is applied context-aware in the candidate
+            // gatherer (ToTargetRequest). Canonical case: Riptide Laboratory.
+            "wizard_you_control" =>
+                ($"target Wizard you control to {verb}",
+                    o => o is Creature c && OnBattlefield(c) && c.HasSubtype(CardSubtype.Wizard)),
             "permanent" =>
                 ($"target permanent to {verb}", o => o is Permanent p && OnBattlefield(p)),
             "legendary_permanent" =>

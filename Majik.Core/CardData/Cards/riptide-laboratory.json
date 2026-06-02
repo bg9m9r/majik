@@ -1,0 +1,17 @@
+{
+  "name": "Riptide Laboratory",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "C" },
+    {
+      "kind": "activated",
+      "costs": [
+        { "type": "mana", "amount": "{1}{U}" },
+        { "type": "tap_self" }
+      ],
+      "effects": [
+        { "type": "return_to_hand", "targetFilter": "wizard_you_control" }
+      ]
+    }
+  ]
+}
