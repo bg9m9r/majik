@@ -258,4 +258,91 @@ public class GameFacadeTests
 
         act.Should().Throw<ArgumentException>();
     }
+
+    // ── Static-effect (lord / anthem) instance-swap wiring ─────────────
+    //
+    // CR 613.7c — a [CardName] factory that registers a continuous
+    // LordStaticEffect via its effects-aware Create overload must have that
+    // effect registered when the card is built through the PRODUCTION
+    // GameFacade routed path (instance-swap rebuild), not only when a test
+    // calls the effects-aware overload directly. Empyrean Eagle: "Other
+    // creatures you control with flying get +1/+1." Before the fix the
+    // routed path called the single-arg Create, dropping the anthem.
+
+    [Fact]
+    public void RoutedFactory_StaticAnthem_RegistersInProductionPath_EmpyreanEagle()
+    {
+        // Build Empyrean Eagle through the SAME path production uses: the
+        // GameFacade routed deck build (instance-swap rebuild). PopulateSideboard
+        // runs BuildDeckCard with the per-game routing policy.
+        var facade = GameFacade.Create("Alice", "Bob",
+            aliceDeck: Array.Empty<ICard>(), bobDeck: Array.Empty<ICard>(),
+            routeThroughNamedFactories: true);
+
+        facade.PopulateSideboard(facade.Alice,
+            new ICard[] { new Creature("Empyrean Eagle", "{1}{W}{U}", 2, 3) });
+
+        var eagle = facade.Alice.Sideboard.GetCards()
+            .OfType<Creature>()
+            .Single(c => c.Name == "Empyrean Eagle");
+
+        // Move the Eagle onto the battlefield so its LordStaticEffect is active.
+        eagle.SetZone(ZoneType.Battlefield);
+        facade.Alice.Zones.Battlefield.AddCard(eagle);
+
+        // A separate flyer the controller controls, wired to the SAME per-game
+        // continuous-effects service the routed build used.
+        var flyer = new Creature("Flyer", "1U", 1, 1)
+        {
+            Owner = facade.Alice,
+            Controller = facade.Alice,
+            ActiveEffects = facade.ContinuousEffects,
+        };
+        flyer.AddAbility(new Majik.Core.Abilities.KeywordAbility("Flying", flyer, facade.Alice));
+        flyer.SetZone(ZoneType.Battlefield);
+        facade.Alice.Zones.Battlefield.AddCard(flyer);
+
+        // CR 613.7c — "Other creatures you control with flying get +1/+1."
+        // The anthem must apply through the production path, not only via the
+        // factory's effects-aware overload called directly in a unit test.
+        flyer.Power.Should().Be(2,
+            "Empyrean Eagle's keyword-gated anthem must register in the routed production build");
+        flyer.Toughness.Should().Be(2);
+    }
+
+    [Fact]
+    public void RoutedFactory_TribalLord_RegistersInProductionPath_GoblinChieftain()
+    {
+        // Goblin Chieftain: "Other Goblin creatures you control have haste and
+        // get +1/+1." CR 613.7c (P/T) + CR 613.1f (granted keyword). Built via
+        // the routed production path (instance-swap rebuild).
+        var facade = GameFacade.Create("Alice", "Bob",
+            aliceDeck: Array.Empty<ICard>(), bobDeck: Array.Empty<ICard>(),
+            routeThroughNamedFactories: true);
+
+        facade.PopulateSideboard(facade.Alice,
+            new ICard[] { new Creature("Goblin Chieftain", "{1}{R}{R}", 2, 2) });
+
+        var chieftain = facade.Alice.Sideboard.GetCards()
+            .OfType<Creature>()
+            .Single(c => c.Name == "Goblin Chieftain");
+
+        chieftain.SetZone(ZoneType.Battlefield);
+        facade.Alice.Zones.Battlefield.AddCard(chieftain);
+
+        // Another Goblin the controller controls, wired to the same per-game CES.
+        var goblin = new Creature("Goblin Token", "R", 1, 1,
+            subtypes: new[] { Majik.Core.Cards.Types.CardSubtype.Goblin })
+        {
+            Owner = facade.Alice,
+            Controller = facade.Alice,
+            ActiveEffects = facade.ContinuousEffects,
+        };
+        goblin.SetZone(ZoneType.Battlefield);
+        facade.Alice.Zones.Battlefield.AddCard(goblin);
+
+        goblin.Power.Should().Be(2,
+            "Goblin Chieftain's tribal anthem must register in the routed production build");
+        goblin.Toughness.Should().Be(2);
+    }
 }

@@ -185,6 +185,7 @@ public sealed class NamedCardFactoryGenerator : IIncrementalGenerator
         var hasCreate = false;
         var hasNamedCreate = false;
         var hasArgsCreate = false;
+        var hasEffectsCreate = false;
         var hasDefine = false;
         foreach (var defineMember in cls.GetMembers("Define"))
         {
@@ -212,6 +213,21 @@ public sealed class NamedCardFactoryGenerator : IIncrementalGenerator
                 && arr.ElementType.SpecialType == SpecialType.System_String)
             {
                 hasArgsCreate = true;
+                continue;
+            }
+
+            // Effects-aware overload — Create(Player, ContinuousEffectsService).
+            // The lord / anthem / equipment / aura factories register their
+            // continuous LordStaticEffect / AttachedBoostEffect against this
+            // service. The production GameFacade routed build must call THIS
+            // overload (not the single-arg one) or the static effect is never
+            // registered (CR 613.7c). The second parameter may be the nullable
+            // `ContinuousEffectsService?` — match on the type name regardless of
+            // nullable annotation.
+            if (m.Parameters.Length == 2
+                && m.Parameters[1].Type.Name == "ContinuousEffectsService")
+            {
+                hasEffectsCreate = true;
                 continue;
             }
 
@@ -243,6 +259,7 @@ public sealed class NamedCardFactoryGenerator : IIncrementalGenerator
             hasCreate,
             hasNamedCreate,
             hasArgsCreate,
+            hasEffectsCreate,
             hasDefine,
             location);
     }
@@ -454,6 +471,40 @@ public sealed class NamedCardFactoryGenerator : IIncrementalGenerator
         sb.AppendLine("            _ => null,");
         sb.AppendLine("        };");
         sb.AppendLine("    }");
+        sb.AppendLine();
+
+        // ── Effects-aware dispatch ─────────────────────────────────────
+        // A second, narrower dispatcher used by the production GameFacade
+        // routed (instance-swap) build. It dispatches ONLY the factories that
+        // expose a Create(Player, ContinuousEffectsService) overload — the
+        // lord / anthem / equipment / aura cards whose continuous
+        // LordStaticEffect / AttachedBoostEffect must be registered against the
+        // live per-game service (CR 613.7c). For every other name it returns
+        // null so the caller falls back to the single-arg CreateGenerated path
+        // (which is behaviourally identical for those cards). This keeps the
+        // routed build calling the effects-aware overload exactly where it
+        // matters and nowhere else — no blast radius on non-static cards.
+        sb.AppendLine($"    /// <summary>");
+        sb.AppendLine($"    /// Effects-aware dispatch for factories exposing a");
+        sb.AppendLine($"    /// <c>Create(Player, ContinuousEffectsService)</c> overload. Returns");
+        sb.AppendLine($"    /// the constructed card with its continuous effect registered against");
+        sb.AppendLine($"    /// <paramref name=\"effects\"/>, or <c>null</c> when the name has no");
+        sb.AppendLine($"    /// effects-aware overload (caller falls back to the single-arg path).");
+        sb.AppendLine($"    /// </summary>");
+        sb.AppendLine($"    private static ICard? {DispatcherMethodName}WithEffects(string name, Player owner, global::Majik.Core.Effects.ContinuousEffectsService effects)");
+        sb.AppendLine("    {");
+        sb.AppendLine("        return name switch");
+        sb.AppendLine("        {");
+        foreach (var kvp in map)
+        {
+            if (!kvp.Value.Entry.HasEffectsCreateOverload) continue;
+            var literal = SymbolDisplay.FormatLiteral(kvp.Key, true);
+            var arm = kvp.Value;
+            sb.AppendLine($"            {literal} => {arm.Entry.FullyQualifiedName}.Create(owner, effects),");
+        }
+        sb.AppendLine("            _ => null,");
+        sb.AppendLine("        };");
+        sb.AppendLine("    }");
         sb.AppendLine("}");
 
         spc.AddSource("NamedCardFactory.Generated.g.cs", sb.ToString());
@@ -468,6 +519,7 @@ public sealed class NamedCardFactoryGenerator : IIncrementalGenerator
         bool HasCreateOverload,
         bool HasNamedCreateOverload,
         bool HasArgsCreateOverload,
+        bool HasEffectsCreateOverload,
         bool HasDefineMethod,
         Location? Location);
 
