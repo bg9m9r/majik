@@ -158,6 +158,26 @@ public class ActionValidator
                 new RuleViolation("601.3", "total cast restriction"));
         }
 
+        // CR 601.3 — even-mana-value cast block (Void Winnower: "Your
+        // opponents can't cast spells with even mana values. (Zero is even.)").
+        // Applies to EVERY spell type (creature and noncreature alike), unlike
+        // the noncreature-only Sanctum Prelate rail. Mana value is computed as
+        // printed MV + chosen X (CR 202.3b), and parity follows CR 202.3 —
+        // zero is even. Rejected when the player is registered AND the
+        // candidate spell's mana value is even.
+        if (action.Card is Card evenMvCard
+            && action.Player != null
+            && CastingRestrictions.CannotCastEvenManaValueSpell(action.Player))
+        {
+            var manaValue = evenMvCard.ManaCostValue.TotalValue + (evenMvCard.PendingCastX ?? 0);
+            if (manaValue % 2 == 0)
+            {
+                return ValidationResult.Invalid(
+                    $"{action.Player.Name} can't cast spells with even mana values (mana value {manaValue}) (Void Winnower)",
+                    new RuleViolation("601.3", "even-mana-value cast restriction"));
+            }
+        }
+
         // CR 601.3 — turn-scoped noncreature-spell restriction
         // (Ranger-Captain of Eos).
         if (action.Card != null

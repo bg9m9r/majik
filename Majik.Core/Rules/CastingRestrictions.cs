@@ -108,6 +108,18 @@ public static class CastingRestrictions
         // begins and removes them (via RemoveCannotCastAnySpell) when the turn
         // ends, so a registered entry already means the block is active.
         internal readonly List<(object Token, Player Player)> CannotCastAnySpellEntries = new();
+        // CR 601.3 — "<player> can't cast spells with even mana values"
+        // (Void Winnower: "Your opponents can't cast spells with even mana
+        // values. (Zero is even.)"). Same (token, player) shape as the
+        // sorcery-speed list so multiple sources stack without trampling. The
+        // even-parity check on the spell's mana value (CR 202.3 — zero is even)
+        // is ActionValidator's responsibility; a registered entry means the
+        // player is barred from casting ANY spell (creature or noncreature
+        // alike) whose mana value is even. Distinct from the noncreature-only,
+        // single-fixed-value NoncreatureManaValueBlocks rail (Sanctum Prelate)
+        // and from the total CannotCastAnySpellEntries rail (Grand Abolisher):
+        // this rail gates on even parity across every spell type.
+        internal readonly List<(object Token, Player Player)> EvenManaValueCastBlocks = new();
         // CR 701.5b — "The next spell you cast this turn can't be countered."
         // One-shot per-player flag: consumed (cleared) on the first spell the
         // registered player casts. Distinct from the all-turn uncounterable rail
@@ -766,6 +778,74 @@ public static class CastingRestrictions
         lock (store.Gate) store.MaxAdditionalSpells.Clear();
     }
 
+    /// <summary>
+    /// Register a "<paramref name="player"/> can't cast spells with even mana
+    /// values" restriction (CR 601.3 — Void Winnower: "Your opponents can't
+    /// cast spells with even mana values. (Zero is even.)"), keyed by
+    /// <paramref name="token"/>. Idempotent for the same (token, player) pair.
+    /// The even-parity test on the candidate spell's mana value (CR 202.3 —
+    /// zero is even) is performed by
+    /// <see cref="ActionValidator.ValidateCastSpell"/>; this rail only records
+    /// which players are subject to the restriction. The source registers each
+    /// opponent while it is on the battlefield and tears the entries down via
+    /// <see cref="RemoveEvenManaValueCastBlock"/> when it leaves.
+    /// </summary>
+    public static void AddEvenManaValueCastBlock(object token, Player player)
+    {
+        ArgumentNullException.ThrowIfNull(token);
+        ArgumentNullException.ThrowIfNull(player);
+        var store = Current;
+        lock (store.Gate)
+        {
+            foreach (var entry in store.EvenManaValueCastBlocks)
+            {
+                if (ReferenceEquals(entry.Token, token)
+                    && ReferenceEquals(entry.Player, player))
+                {
+                    return;
+                }
+            }
+            store.EvenManaValueCastBlocks.Add((token, player));
+        }
+    }
+
+    /// <summary>
+    /// Remove every even-mana-value cast block registered under
+    /// <paramref name="token"/> (across all players). Used when the source
+    /// permanent (Void Winnower) leaves the battlefield. Scoped by token, so
+    /// removing one source does not tear down blocks from other sources.
+    /// </summary>
+    public static void RemoveEvenManaValueCastBlock(object token)
+    {
+        ArgumentNullException.ThrowIfNull(token);
+        var store = Current;
+        lock (store.Gate)
+        {
+            store.EvenManaValueCastBlocks.RemoveAll(e => ReferenceEquals(e.Token, token));
+        }
+    }
+
+    /// <summary>
+    /// True if at least one registered restriction currently prevents
+    /// <paramref name="player"/> from casting spells with even mana values
+    /// (CR 601.3 — Void Winnower). The caller
+    /// (<see cref="ActionValidator.ValidateCastSpell"/>) is responsible for
+    /// computing the candidate spell's mana value and testing its parity.
+    /// </summary>
+    public static bool CannotCastEvenManaValueSpell(Player player)
+    {
+        if (player == null) return false;
+        var store = Current;
+        lock (store.Gate)
+        {
+            foreach (var entry in store.EvenManaValueCastBlocks)
+            {
+                if (ReferenceEquals(entry.Player, player)) return true;
+            }
+            return false;
+        }
+    }
+
     /// <summary>Reset the active store. Test-only.</summary>
     public static void Clear()
     {
@@ -781,6 +861,7 @@ public static class CastingRestrictions
             store.NoncreatureManaValueBlocks.Clear();
             store.GlobalCastZoneBlocks.Clear();
             store.CannotCastAnySpellEntries.Clear();
+            store.EvenManaValueCastBlocks.Clear();
             store.NextSpellUncounterable.Clear();
             store.MaxAdditionalSpells.Clear();
         }

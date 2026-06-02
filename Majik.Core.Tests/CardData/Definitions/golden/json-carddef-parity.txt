@@ -27782,6 +27782,54 @@
   "mdfc": null,
   "colors": []
 }
+==== void-winnower ====
+{
+  "name": "Void Winnower",
+  "manaCost": "{9}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Eldrazi"
+  ],
+  "power": 11,
+  "toughness": 9,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": []
+}
 ==== volatile-fjord ====
 {
   "name": "Volatile Fjord",
