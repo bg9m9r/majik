@@ -1,0 +1,10 @@
+{
+  "name": "Bristly Bill, Spine Sower",
+  "types": ["Creature"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Plant", "Druid"],
+  "manaCost": "{1}{G}",
+  "power": 2,
+  "toughness": 2,
+  "abilities": []
+}
