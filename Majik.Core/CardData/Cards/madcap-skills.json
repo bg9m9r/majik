@@ -1,0 +1,7 @@
+{
+  "name": "Madcap Skills",
+  "types": ["Enchantment"],
+  "subtypes": ["Aura"],
+  "manaCost": "{1}{R}",
+  "colors": ["R"]
+}
