@@ -481,4 +481,9 @@ public enum CardSubtype
     /// jackal lineage. CR 205.3m — flavour subtype with no inherent rules
     /// meaning.</summary>
     Jackal,
+
+    /// <summary>Satyr creature subtype — Satyr Wayfinder (Journey into Nyx)
+    /// and the broader Theros-block green/red Satyr lineage. CR 205.3m —
+    /// flavour subtype with no inherent rules meaning.</summary>
+    Satyr,
 }
