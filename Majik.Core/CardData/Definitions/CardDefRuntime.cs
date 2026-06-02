@@ -691,6 +691,7 @@ public static class CardDefRuntime
             DestroyTargetEffectDef destroy => BuildDestroyTargetEffect(destroy, card, targetRequestIndex),
             ReturnToHandEffectDef bounce => BuildReturnToHandEffect(bounce, card, targetRequestIndex),
             UntapTargetEffectDef untap => BuildUntapTargetEffect(untap, card, targetRequestIndex),
+            TapTargetEffectDef tap => BuildTapTargetEffect(tap, card, targetRequestIndex),
             PreventDamageTargetEffectDef prevent => BuildPreventDamageTargetEffect(prevent, card, replacements, targetRequestIndex),
             GainLifeSelfEffectDef gain => BuildGainLifeSelfEffect(gain, card, controller),
             MillThenPickFirstMatchingToHandEffectDef mp => BuildMillThenPickEffect(mp, card, controller),
@@ -825,6 +826,33 @@ public static class CardDefRuntime
                 if (live is Permanent permanent && permanent.Zone == ZoneType.Battlefield)
                 {
                     permanent.Untap();
+                }
+                return ValueTask.CompletedTask;
+            });
+    }
+
+    private static IEffect BuildTapTargetEffect(TapTargetEffectDef def, ICard card, int targetRequestIndex)
+    {
+        // CR 701.21a — real targeted tap, the mirror of BuildUntapTargetEffect.
+        // Reads the chosen permanent off ChosenTargets at the reserved index
+        // and taps it via Fx.Tap. Tapping an already-tapped permanent is a
+        // no-op (CR 701.21b — Permanent.Tap is idempotent). CR 608.2b — fizzle
+        // if it is no longer a battlefield permanent at resolution. The only
+        // new piece is the declarative wiring onto the pre-existing Fx.Tap
+        // primitive.
+        return new Effect(
+            $"{card.Name}: tap target {def.TargetFilter}",
+            ctx =>
+            {
+                var live = ChosenTargetAt(ctx, targetRequestIndex);
+                // CR 701.21b — tapping an already-tapped permanent is a no-op
+                // (Permanent.Tap throws on an already-tapped permanent, so the
+                // guard models the "taps with no effect" rule).
+                if (live is Permanent permanent
+                    && permanent.Zone == ZoneType.Battlefield
+                    && !permanent.IsTapped)
+                {
+                    Fx.Tap(permanent);
                 }
                 return ValueTask.CompletedTask;
             });

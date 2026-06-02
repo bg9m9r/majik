@@ -64,7 +64,7 @@ public class GoldmeadowHarrierFactoryTests
             c => c.CostType == AdditionalCostType.Tap);
 
         tap.TargetRequests.Should().ContainSingle()
-            .Which.Description.Should().Be("target creature");
+            .Which.Description.Should().Be("tap target creature");
     }
 
     [Fact]
@@ -84,9 +84,13 @@ public class GoldmeadowHarrierFactoryTests
         tap.SetChosenTargets(new[] { new object[] { grizzly } });
 
         grizzly.IsTapped.Should().BeFalse();
-        foreach (var effect in tap.Effects) effect.Execute();
+        // The declarative tap_target effect reads its chosen target off the
+        // resolving ability's ChosenTargets via the ResolutionContext, so it
+        // must be driven through Resolve() (the targeted-effect path) — raw
+        // effect.Execute() does not thread ChosenTargets.
+        tap.Resolve();
         grizzly.IsTapped.Should().BeTrue(
-            "Fx.Tap delegates to Permanent.Tap (CR 701.21)");
+            "Fx.Tap delegates to Permanent.Tap (CR 701.21a)");
     }
 
     [Fact]
@@ -102,7 +106,7 @@ public class GoldmeadowHarrierFactoryTests
         var tap = harrier.Abilities.OfType<ActivatedAbility>().Single();
         tap.SetChosenTargets(new[] { new object[] { grizzly } });
 
-        foreach (var effect in tap.Effects) effect.Execute();
+        tap.Resolve();
         grizzly.IsTapped.Should().BeFalse(
             "CR 608.2b — target no longer on battlefield: effect fails silently");
     }

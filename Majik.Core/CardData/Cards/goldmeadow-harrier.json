@@ -5,5 +5,16 @@
   "manaCost": "{W}",
   "power": 1,
   "toughness": 1,
-  "abilities": []
+  "abilities": [
+    {
+      "kind": "activated",
+      "costs": [
+        { "type": "mana", "amount": "W" },
+        { "type": "tap_self" }
+      ],
+      "effects": [
+        { "type": "tap_target", "targetFilter": "creature" }
+      ]
+    }
+  ]
 }
