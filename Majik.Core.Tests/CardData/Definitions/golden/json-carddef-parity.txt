@@ -6168,6 +6168,58 @@
   "mdfc": null,
   "colors": []
 }
+==== enduring-curiosity ====
+{
+  "name": "Enduring Curiosity",
+  "manaCost": "{2}{U}{U}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature",
+    "Enchantment"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Cat",
+    "Glimmer"
+  ],
+  "power": 4,
+  "toughness": 3,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Blue"
+  ]
+}
 ==== energy-refractor ====
 {
   "name": "Energy Refractor",

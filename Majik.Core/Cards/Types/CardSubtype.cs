@@ -507,4 +507,10 @@ public enum CardSubtype
     /// flavour subtype with no inherent rules meaning (the MKM "Collect
     /// evidence" payoffs reference it, but the subtype itself is inert).</summary>
     Detective,
+
+    /// <summary>Glimmer creature subtype — the Foundations "Enduring" cycle of
+    /// Enchantment Creatures (Enduring Curiosity "Cat Glimmer", Enduring
+    /// Vitality, Enduring Innocence, Enduring Tenacity, Enduring Courage).
+    /// CR 205.3m — flavour subtype with no inherent rules meaning.</summary>
+    Glimmer,
 }
