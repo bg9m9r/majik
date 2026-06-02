@@ -1,0 +1,9 @@
+{
+  "name": "Metalwork Colossus",
+  "types": ["Creature", "Artifact"],
+  "subtypes": ["Construct"],
+  "manaCost": "{11}",
+  "power": 10,
+  "toughness": 10,
+  "abilities": []
+}
