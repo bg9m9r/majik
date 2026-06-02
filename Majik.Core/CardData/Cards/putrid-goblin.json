@@ -1,0 +1,9 @@
+{
+  "name": "Putrid Goblin",
+  "types": ["Creature"],
+  "subtypes": ["Zombie", "Goblin"],
+  "manaCost": "{1}{B}",
+  "power": 2,
+  "toughness": 2,
+  "abilities": []
+}
