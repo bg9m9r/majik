@@ -1,0 +1,8 @@
+{
+  "name": "Flinthoof Boar",
+  "types": ["Creature"],
+  "subtypes": ["Boar"],
+  "manaCost": "{1}{G}",
+  "power": 2,
+  "toughness": 2
+}

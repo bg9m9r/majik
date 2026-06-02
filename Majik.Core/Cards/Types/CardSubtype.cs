@@ -237,6 +237,9 @@ public enum CardSubtype
     /// <summary>Ape creature subtype — Treetop Village (Urza's Legacy) animated
     /// form, Kird Ape (Arabian Nights / many reprints). CR 205.3m.</summary>
     Ape,
+    /// <summary>Boar creature subtype — Flinthoof Boar (Magic 2013 / Modern),
+    /// classic green/red beater lineage. CR 205.3m.</summary>
+    Boar,
     /// <summary>Serpent creature subtype — Striped Riverwinder (Hour of
     /// Devastation), Lorthos, the Tidemaker, Quest for Ula's Temple
     /// payoffs. CR 205.3m.</summary>
