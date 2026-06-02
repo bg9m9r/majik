@@ -1,0 +1,9 @@
+{
+  "name": "Overlord of the Boilerbilges",
+  "types": ["Creature", "Enchantment"],
+  "subtypes": ["Avatar", "Horror"],
+  "manaCost": "{4}{R}{R}",
+  "power": 5,
+  "toughness": 5,
+  "abilities": []
+}
