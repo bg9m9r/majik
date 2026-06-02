@@ -31,12 +31,15 @@ public class DelightedHalflingTests
     // -----------------------------------------------------------------------
 
     [Fact]
-    public void DelightedHalfling_HasFiveManaAbilities_OnePerColor()
+    public void DelightedHalfling_HasSixManaAbilities_ColorlessPlusOnePerColor()
     {
+        // Oracle: "{T}: Add {C}." (one ManaAbility, unrestricted) PLUS
+        // "{T}: Add one mana of any color." (five ManaAbilities, one per
+        // WUBRG, each carrying the legendary-only SpendRestriction).
         var hh = (Creature)NamedCardFactory.Create("Delighted Halfling", _alice);
         var mas = hh.Abilities.OfType<ManaAbility>().ToList();
 
-        mas.Should().HaveCount(5, "one ManaAbility per WUBRG colour");
+        mas.Should().HaveCount(6, "{T}: Add {C} plus one ManaAbility per WUBRG colour");
     }
 
     // -----------------------------------------------------------------------
@@ -53,15 +56,19 @@ public class DelightedHalflingTests
     }
 
     // -----------------------------------------------------------------------
-    // Supertype
+    // Supertype — Delighted Halfling is a plain (NON-legendary) creature.
+    // Its mana lets you cast OTHER legendary spells; the card itself carries
+    // no Legendary supertype (Scryfall type_line: "Creature — Halfling
+    // Citizen"). The prior assertion here was factually wrong.
     // -----------------------------------------------------------------------
 
     [Fact]
-    public void DelightedHalfling_IsLegendary()
+    public void DelightedHalfling_IsNotLegendary()
     {
         var hh = (Creature)NamedCardFactory.Create("Delighted Halfling", _alice);
 
-        hh.HasSupertype(CardSupertype.Legendary).Should().BeTrue("Delighted Halfling is a Legendary Creature");
+        hh.HasSupertype(CardSupertype.Legendary).Should().BeFalse(
+            "Delighted Halfling is a plain Creature — Halfling Citizen; it is not itself legendary");
     }
 
     // -----------------------------------------------------------------------
