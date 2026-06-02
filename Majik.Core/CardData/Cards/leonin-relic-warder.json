@@ -1,0 +1,9 @@
+{
+  "name": "Leonin Relic-Warder",
+  "types": ["Creature"],
+  "subtypes": ["Cat", "Cleric"],
+  "manaCost": "{W}{W}",
+  "power": 2,
+  "toughness": 2,
+  "abilities": []
+}
