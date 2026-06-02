@@ -1,0 +1,9 @@
+{
+  "name": "Ichorclaw Myr",
+  "types": ["Creature", "Artifact"],
+  "subtypes": ["Phyrexian", "Myr"],
+  "manaCost": "{2}",
+  "power": 1,
+  "toughness": 1,
+  "abilities": []
+}
