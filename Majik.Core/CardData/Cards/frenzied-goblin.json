@@ -1,0 +1,9 @@
+{
+  "name": "Frenzied Goblin",
+  "types": ["Creature"],
+  "subtypes": ["Goblin", "Berserker"],
+  "manaCost": "{R}",
+  "power": 1,
+  "toughness": 1,
+  "abilities": []
+}
