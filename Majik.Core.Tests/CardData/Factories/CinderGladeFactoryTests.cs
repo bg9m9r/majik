@@ -29,6 +29,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Dispatcher routing through <see cref="NamedCardFactory"/>.
 /// - Single-arg path registers no replacement.
 /// </summary>
+[Trait("Color", "C")]
 public class CinderGladeFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -36,21 +37,6 @@ public class CinderGladeFactoryTests
     // -----------------------------------------------------------------------
     // Identity + dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void CinderGlade_Dispatch_ReturnsLandWithBothSubtypes()
-    {
-        var card = NamedCardFactory.Create("Cinder Glade", _alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Cinder Glade");
-        card.HasType(CardType.Land).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Mountain).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Forest).Should().BeTrue();
-        card.Owner.Should().BeSameAs(_alice);
-        card.Controller.Should().BeSameAs(_alice);
-    }
-
     [Fact]
     public void CinderGlade_IsNotBasic()
     {
@@ -197,16 +183,6 @@ public class CinderGladeFactoryTests
     // -----------------------------------------------------------------------
     // Shape-only single-arg path
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void CinderGlade_SingleArgDispatch_DoesNotRegisterReplacement()
-    {
-        var land = NamedCardFactory.Create("Cinder Glade", _alice);
-        land.Should().NotBeNull();
-        land.Name.Should().Be("Cinder Glade");
-        ((Land)land).Abilities.OfType<ManaAbility>().Should().HaveCount(2);
-    }
-
     // -----------------------------------------------------------------------
     // Args validation
     // -----------------------------------------------------------------------

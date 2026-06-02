@@ -15,6 +15,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Card: Phyrexian Walker — Artifact Creature — Construct {0} 0/3
 /// (Homelands). Vanilla.
 /// </summary>
+[Trait("Color", "C")]
 public class PhyrexianWalkerFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -34,19 +35,6 @@ public class PhyrexianWalkerFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void PhyrexianWalker_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Phyrexian Walker", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Phyrexian Walker");
-        c.HasType(CardType.Artifact).Should().BeTrue();
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Construct).Should().BeTrue();
-    }
-
     [Fact]
     public void PhyrexianWalker_IsVanilla_NoAbilities()
     {

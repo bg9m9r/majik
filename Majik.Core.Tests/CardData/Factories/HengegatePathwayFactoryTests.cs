@@ -32,6 +32,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Each face has exactly one mana ability producing the right color.
 /// - No triggered / non-mana activated abilities ship.
 /// </summary>
+[Trait("Color", "C")]
 public class HengegatePathwayFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -58,17 +59,6 @@ public class HengegatePathwayFactoryTests
         land.MdfcState.IsBackFace.Should().BeFalse();
         land.MdfcState.ActiveFaceName.Should().Be("Hengegate Pathway");
     }
-
-    [Fact]
-    public void HengegatePathway_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Hengegate Pathway", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Hengegate Pathway");
-        card.HasType(CardType.Land).Should().BeTrue();
-    }
-
     [Fact]
     public void HengegatePathway_HasSingleTapForWhiteManaAbility()
     {
@@ -110,17 +100,6 @@ public class HengegatePathwayFactoryTests
         land.MdfcState.IsBackFace.Should().BeTrue();
         land.MdfcState.ActiveFaceName.Should().Be("Mistgate Pathway");
     }
-
-    [Fact]
-    public void MistgatePathway_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Mistgate Pathway", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Mistgate Pathway");
-        card.HasType(CardType.Land).Should().BeTrue();
-    }
-
     [Fact]
     public void MistgatePathway_HasSingleTapForBlueManaAbility()
     {

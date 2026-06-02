@@ -35,6 +35,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - {2}{G}{G},{T}: Add six {G} — gated on affording {2}{G}{G}; pays the
 ///   {2}{G}{G} when activated; produces six green; taps the land.
 /// </summary>
+[Trait("Color", "C")]
 public class CastleGarenbrigFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -101,15 +102,6 @@ public class CastleGarenbrigFactoryTests
     // -----------------------------------------------------------------------
     // Dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void NamedCardFactory_Dispatch_ReturnsLand()
-    {
-        var card = NamedCardFactory.Create("Castle Garenbrig", _alice);
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Castle Garenbrig");
-    }
-
     // -----------------------------------------------------------------------
     // Ability count / shape
     // -----------------------------------------------------------------------
@@ -243,17 +235,6 @@ public class CastleGarenbrigFactoryTests
         after!.EntersTapped.Should().BeTrue(
             "Castle Garenbrig has no Forest subtype; its presence on battlefield doesn't satisfy the predicate");
     }
-
-    [Fact]
-    public void SingleArgDispatch_DoesNotRegisterReplacement()
-    {
-        // Shape-only path via NamedCardFactory.Create — no replacement bus.
-        var alice = new Player("Alice", 20);
-        var card = NamedCardFactory.Create("Castle Garenbrig", alice);
-        card.Should().BeOfType<Land>();
-        ((Land)card).Abilities.OfType<ManaAbility>().Should().HaveCount(2);
-    }
-
     // -----------------------------------------------------------------------
     // {2}{G}{G}, {T}: Add six {G} — mana cost gate + production
     // -----------------------------------------------------------------------

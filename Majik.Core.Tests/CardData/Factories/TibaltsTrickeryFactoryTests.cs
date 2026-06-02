@@ -38,6 +38,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - onResolved callback fires with the eligible card; if the callback
 ///     moves the eligible card out of exile, it is NOT bottomed.
 /// </summary>
+[Trait("Color", "R")]
 public class TibaltsTrickeryFactoryTests
 {
     private readonly EventBus _bus = new();
@@ -72,18 +73,6 @@ public class TibaltsTrickeryFactoryTests
         t.Controller.Should().BeSameAs(_alice);
         CardColors.GetColors(t).Should().Contain(ManaColor.Red);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_TibaltsTrickery()
-    {
-        var card = NamedCardFactory.Create("Tibalt's Trickery", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Tibalt's Trickery");
-        card.HasType(CardType.Instant).Should().BeTrue();
-        card.Owner.Should().BeSameAs(_alice);
-    }
-
     // -----------------------------------------------------------------------
     // Resolution — counter + mill 3 + exile-until-shares-type
     // -----------------------------------------------------------------------

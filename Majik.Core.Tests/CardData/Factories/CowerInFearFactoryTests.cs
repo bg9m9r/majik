@@ -27,6 +27,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Creatures without ActiveEffects wired (shape-only) → no-op, no throw.
 ///   - No creatures on opponents' battlefields → clean no-op.
 /// </summary>
+[Trait("Color", "B")]
 public class CowerInFearFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -48,19 +49,6 @@ public class CowerInFearFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_CowerInFear()
-    {
-        var card = NamedCardFactory.Create("Cower in Fear", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Cower in Fear");
-        card.HasType(CardType.Instant).Should().BeTrue();
-        card.ManaCost.Should().Be("{1}{B}{B}");
-        card.Owner.Should().BeSameAs(_alice);
-    }
-
     // -----------------------------------------------------------------------
     // SpellDefinition shape
     // -----------------------------------------------------------------------

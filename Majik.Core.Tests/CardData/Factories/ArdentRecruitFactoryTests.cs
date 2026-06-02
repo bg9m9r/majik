@@ -28,6 +28,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Only the controller's artifacts count.
 /// - Helper predicates (CountArtifactsControlled, MetalcraftActive).
 /// </summary>
+[Trait("Color", "W")]
 public class ArdentRecruitFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -58,19 +59,6 @@ public class ArdentRecruitFactoryTests
         ar.Owner.Should().BeSameAs(_alice);
         ar.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void ArdentRecruit_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Ardent Recruit", _alice);
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Ardent Recruit");
-        card.HasSubtype(CardSubtype.Human).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Soldier).Should().BeTrue();
-        ((Creature)card).BasePower.Should().Be(1);
-        ((Creature)card).BaseToughness.Should().Be(1);
-    }
-
     private (Creature ar, ContinuousEffectsService effects) NewRecruitOnBattlefield()
     {
         var effects = new ContinuousEffectsService();

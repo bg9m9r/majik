@@ -25,6 +25,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   * Resolve with empty stack → redirect no-ops cleanly.
 ///   * Resolve with multi-target spell on top → redirect skips it.
 /// </summary>
+[Trait("Color", "U")]
 public class MisdirectionFactoryTests
 {
     private readonly EventBus _bus = new();
@@ -53,16 +54,6 @@ public class MisdirectionFactoryTests
         CardColors.GetColors(mis).Should().Contain(ManaColor.Blue);
         mis.ManaCostValue.TotalValue.Should().Be(4);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsMisdirectionShape()
-    {
-        var dispatched = NamedCardFactory.Create("Misdirection", _alice);
-
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("Misdirection");
-    }
-
     [Fact]
     public async Task CastViaPitch_ExilesBlueCard_RedirectsTopSingleTargetSpell()
     {

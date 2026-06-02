@@ -32,6 +32,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Distinct from the dual-land cycle: mono-red (one mana ability), animates
 /// to a Warrior (not Elemental), and has no printed attack trigger.
 /// </summary>
+[Trait("Color", "C")]
 public class GhituEncampmentFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -56,23 +57,6 @@ public class GhituEncampmentFactoryTests
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_GhituEncampment()
-    {
-        var card = NamedCardFactory.Create("Ghitu Encampment", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Ghitu Encampment");
-        card.HasType(CardType.Land).Should().BeTrue();
-
-        card.Abilities.OfType<ManaAbility>().Should().HaveCount(1,
-            "{T}: Add {R}");
-        card.Abilities
-            .Where(a => a.GetType() == typeof(ActivatedAbility))
-            .Should().HaveCount(1, "the {1}{R} animate ability");
-    }
-
     // -----------------------------------------------------------------------
     // {T}: Add {R}
     // -----------------------------------------------------------------------

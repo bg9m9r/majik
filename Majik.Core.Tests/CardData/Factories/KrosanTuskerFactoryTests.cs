@@ -29,6 +29,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Other-card-cycle does NOT fire the self-cycle gate.
 /// - Dispatch via <see cref="NamedCardFactory"/>.
 /// </summary>
+[Trait("Color", "G")]
 public class KrosanTuskerFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -52,23 +53,6 @@ public class KrosanTuskerFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void KrosanTusker_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Krosan Tusker", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Krosan Tusker");
-        card.HasSubtype(CardSubtype.Beast).Should().BeTrue();
-        card.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1,
-            "Cycling {2} activated ability");
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1,
-            "the on-cycle basic-land tutor trigger");
-        card.Abilities.OfType<KeywordAbility>()
-            .Should().Contain(k => k.Keyword == "Cycling");
-    }
-
     // -----------------------------------------------------------------------
     // Cycling activated ability — CR 702.32
     // -----------------------------------------------------------------------

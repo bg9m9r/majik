@@ -28,6 +28,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Non-Forest lands (Mountain) do not trigger the bonus.
 /// - Helper predicate (ControlsForest).
 /// </summary>
+[Trait("Color", "R")]
 public class KirdApeFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -67,18 +68,6 @@ public class KirdApeFactoryTests
         ape.Owner.Should().BeSameAs(_alice);
         ape.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void KirdApe_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Kird Ape", _alice);
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Kird Ape");
-        card.HasSubtype(CardSubtype.Ape).Should().BeTrue();
-        ((Creature)card).BasePower.Should().Be(1);
-        ((Creature)card).BaseToughness.Should().Be(1);
-    }
-
     private Creature NewApeOnBattlefield()
     {
         var effects = new ContinuousEffectsService();

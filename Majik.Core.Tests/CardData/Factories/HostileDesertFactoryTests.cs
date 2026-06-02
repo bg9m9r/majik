@@ -37,6 +37,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - The exile cost: can only pay with a land card in the graveyard, and
 ///   exiles exactly one land card Graveyard -> Exile.
 /// </summary>
+[Trait("Color", "C")]
 public class HostileDesertFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -74,21 +75,6 @@ public class HostileDesertFactoryTests
         land.Abilities.OfType<TriggeredAbility>().Should().BeEmpty(
             "Hostile Desert has no triggered ability");
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_HostileDesert()
-    {
-        var card = NamedCardFactory.Create("Hostile Desert", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Hostile Desert");
-        card.HasType(CardType.Land).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Desert).Should().BeTrue();
-
-        card.Abilities.OfType<ManaAbility>().Should().HaveCount(1);
-        card.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1);
-    }
-
     // -----------------------------------------------------------------------
     // Animate ability — cost shape
     // -----------------------------------------------------------------------

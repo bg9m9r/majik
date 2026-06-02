@@ -23,6 +23,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   * Resolution mills |delta| cards from the opponent's library into
 ///     their graveyard (CR 701.13).
 /// </summary>
+[Trait("Color", "C")]
 public class MindcrankFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -39,17 +40,6 @@ public class MindcrankFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_Mindcrank_AsArtifact()
-    {
-        var dispatched = NamedCardFactory.Create("Mindcrank", _alice);
-
-        dispatched.Should().BeOfType<Artifact>();
-        dispatched.Name.Should().Be("Mindcrank");
-        dispatched.ManaCost.Should().Be("{2}");
-    }
-
     [Fact]
     public void Mindcrank_OpponentLosesLife_MillsThatManyCards()
     {

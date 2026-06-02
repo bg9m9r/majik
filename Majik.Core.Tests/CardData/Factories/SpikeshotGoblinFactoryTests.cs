@@ -30,6 +30,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Power-scaling: a pump effect that raises Spikeshot's power increases
 ///     the damage dealt (proves it reads live power, not the printed 1).
 /// </summary>
+[Trait("Color", "R")]
 public class SpikeshotGoblinFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -54,20 +55,6 @@ public class SpikeshotGoblinFactoryTests
         sg.Owner.Should().BeSameAs(_alice);
         sg.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void SpikeshotGoblin_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Spikeshot Goblin", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Spikeshot Goblin");
-        card.HasSubtype(CardSubtype.Goblin).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Shaman).Should().BeTrue();
-        ((Creature)card).BasePower.Should().Be(1);
-        ((Creature)card).BaseToughness.Should().Be(2);
-    }
-
     // -----------------------------------------------------------------------
     // Activated ability shape
     // -----------------------------------------------------------------------

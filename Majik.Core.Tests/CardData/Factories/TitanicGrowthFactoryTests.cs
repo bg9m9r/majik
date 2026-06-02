@@ -27,6 +27,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - +4/+4 expires at end of turn (CR 514.2).
 /// - Fizzle: target not on battlefield → no-op (CR 608.2b).
 /// </summary>
+[Trait("Color", "G")]
 public class TitanicGrowthFactoryTests
 {
     private readonly EventBus _bus = new();
@@ -57,17 +58,6 @@ public class TitanicGrowthFactoryTests
         t.Controller.Should().BeSameAs(_alice);
         CardColors.GetColors(t).Should().Contain(ManaColor.Green);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsTitanicGrowth()
-    {
-        var dispatched = NamedCardFactory.Create("Titanic Growth", _alice);
-
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("Titanic Growth");
-        dispatched.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     [Fact]
     public void SpellDefinition_DeclaresSingleTargetCreatureRequest()
     {

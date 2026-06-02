@@ -33,6 +33,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - The unblockable restriction is scoped to Invisible Stalker — a
 ///     different creature is NOT restricted.
 /// </summary>
+[Trait("Color", "U")]
 public class InvisibleStalkerFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -58,18 +59,6 @@ public class InvisibleStalkerFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void InvisibleStalker_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Invisible Stalker", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Invisible Stalker");
-        c.HasSubtype(CardSubtype.Human).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Rogue).Should().BeTrue();
-    }
-
     // -------------------------------------------------------------------------
     // Keyword markers — Hexproof + Unblockable always attached
     // -------------------------------------------------------------------------

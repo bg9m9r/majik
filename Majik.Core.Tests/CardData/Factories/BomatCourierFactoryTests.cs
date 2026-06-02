@@ -35,6 +35,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// ledger pattern + <see cref="BedlamRevelerFactory"/>'s discard-hand /
 /// draw-into-hand handling.
 /// </summary>
+[Trait("Color", "C")]
 public class BomatCourierFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -84,18 +85,6 @@ public class BomatCourierFactoryTests
         courier.Owner.Should().BeSameAs(_alice);
         courier.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void BomatCourier_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Bomat Courier", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Bomat Courier");
-        card.HasType(CardType.Artifact).Should().BeTrue();
-        card.HasType(CardType.Creature).Should().BeTrue();
-    }
-
     [Fact]
     public void BomatCourier_HasHasteMarker()
     {

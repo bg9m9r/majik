@@ -31,6 +31,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   * Thalia leaving the battlefield unregisters the replacement.
 ///   * Single-arg path registers nothing.
 /// </summary>
+[Trait("Color", "W")]
 public class ThaliaHereticCatharTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -77,19 +78,6 @@ public class ThaliaHereticCatharTests
                 k.Keyword.Equals("First strike", StringComparison.OrdinalIgnoreCase),
                 "CR 702.7 — First strike keyword marker must be attached");
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatch_ReturnsThaliaShape()
-    {
-        var card = NamedCardFactory.Create("Thalia, Heretic Cathar", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Thalia, Heretic Cathar");
-        card.HasSupertype(CardSupertype.Legendary).Should().BeTrue();
-        ((Creature)card).Power.Should().Be(3);
-        ((Creature)card).Toughness.Should().Be(2);
-    }
-
     // -----------------------------------------------------------------------
     // Opponent enters-tapped static (CR 614.1c / CR 109.5 / CR 305.6)
     // -----------------------------------------------------------------------

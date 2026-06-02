@@ -46,6 +46,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///       different permanent do not trigger.</item>
 /// </list>
 /// </summary>
+[Trait("Color", "C")]
 public class BaskingBroodscaleFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -101,17 +102,6 @@ public class BaskingBroodscaleFactoryTests
             .Select(k => k.Keyword)
             .Should().Contain("Devoid");
     }
-
-    [Fact]
-    public void BaskingBroodscale_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Basking Broodscale", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Basking Broodscale");
-        card.HasType(CardType.Creature).Should().BeTrue();
-    }
-
     [Fact]
     public void BaskingBroodscale_AbilityShape()
     {

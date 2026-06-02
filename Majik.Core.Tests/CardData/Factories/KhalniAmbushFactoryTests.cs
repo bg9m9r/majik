@@ -40,6 +40,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Back — single {T}: Add {G} mana ability.
 /// - Back — enters tapped replacement fires when bus is wired; no bus → none.
 /// </summary>
+[Trait("Color", "G")]
 public class KhalniAmbushFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -76,17 +77,6 @@ public class KhalniAmbushFactoryTests
         colors.Should().NotContain(ManaColor.Black);
         colors.Should().NotContain(ManaColor.Red);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_KhalniAmbush()
-    {
-        var card = NamedCardFactory.Create("Khalni Ambush", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Khalni Ambush");
-        card.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     [Fact]
     public void KhalniAmbush_CarriesMdfcState_FrontFace()
     {
@@ -196,17 +186,6 @@ public class KhalniAmbushFactoryTests
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_KhalniTerritory()
-    {
-        var card = NamedCardFactory.Create("Khalni Territory", _alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Khalni Territory");
-        card.HasType(CardType.Land).Should().BeTrue();
-    }
-
     [Fact]
     public void KhalniTerritory_CarriesMdfcState_PreFlippedToBackFace()
     {

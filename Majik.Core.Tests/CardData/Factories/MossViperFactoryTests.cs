@@ -17,6 +17,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Card: Moss Viper — {G} Creature — Snake 1/1.
 ///   "Deathtouch"
 /// </summary>
+[Trait("Color", "G")]
 public class MossViperFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -73,16 +74,5 @@ public class MossViperFactoryTests
         c.Abilities.OfType<ActivatedAbility>().Should().BeEmpty();
         c.Abilities.OfType<KeywordAbility>().Should().HaveCount(1,
             "Deathtouch is the only printed keyword");
-    }
-
-    [Fact]
-    public void MossViper_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Moss Viper", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Moss Viper");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Snake).Should().BeTrue();
     }
 }

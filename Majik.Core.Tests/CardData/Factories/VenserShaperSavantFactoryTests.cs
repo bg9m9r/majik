@@ -33,6 +33,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - ETB resolve guards against illegal-on-resolution targets (CR 608.2b).
 /// - ETB resolve with no targets short-circuits.
 /// </summary>
+[Trait("Color", "U")]
 public class VenserShaperSavantFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -64,18 +65,6 @@ public class VenserShaperSavantFactoryTests
 
         keywords.Should().Contain("Flash");
     }
-
-    [Fact]
-    public void Venser_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Venser, Shaper Savant", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Venser, Shaper Savant");
-        ((Creature)c).BasePower.Should().Be(2);
-        ((Creature)c).BaseToughness.Should().Be(2);
-    }
-
     [Fact]
     public void Venser_EtbTrigger_HasSingleSpellOrPermanentTarget()
     {

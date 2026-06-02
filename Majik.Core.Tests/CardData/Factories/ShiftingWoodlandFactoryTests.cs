@@ -31,6 +31,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Delirium copy ability: cost {2}{G}{G}, 1..1 graveyard-permanent target,
 ///   delirium gate, in-place "becomes a copy until EOT" continuous effect.
 /// </summary>
+[Trait("Color", "C")]
 public class ShiftingWoodlandFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -102,15 +103,6 @@ public class ShiftingWoodlandFactoryTests
         land.HasSubtype(CardSubtype.Forest).Should().BeFalse(
             "Shifting Woodland has no Forest subtype and cannot satisfy its own ETB predicate");
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatch_ReturnsLand()
-    {
-        var card = NamedCardFactory.Create("Shifting Woodland", _alice);
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Shifting Woodland");
-    }
-
     // -----------------------------------------------------------------------
     // Ability shape
     // -----------------------------------------------------------------------

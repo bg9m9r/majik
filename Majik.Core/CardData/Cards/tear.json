@@ -1,0 +1,5 @@
+{
+  "name": "Tear",
+  "types": ["Instant"],
+  "manaCost": "{W}"
+}

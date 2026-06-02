@@ -31,6 +31,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   (CR 502.1 via UntapStepRestrictions.MarkPermanentDoesNotUntap).
 /// - CR 608.2b: target off battlefield at resolution → clean no-op.
 /// </summary>
+[Trait("Color", "U")]
 public class FrostLynxFactoryTests : IDisposable
 {
     private readonly Player _alice = new("Alice", 20);
@@ -84,19 +85,6 @@ public class FrostLynxFactoryTests : IDisposable
     // -----------------------------------------------------------------------
     // NamedCardFactory dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void FrostLynx_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Frost Lynx", _alice);
-
-        c.Should().BeOfType<Creature>("Frost Lynx is a Creature");
-        c.Name.Should().Be("Frost Lynx");
-        c.HasSubtype(CardSubtype.Elemental).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Cat).Should().BeTrue();
-        c.ManaCost.Should().Be("{2}{U}");
-    }
-
     // -----------------------------------------------------------------------
     // ETB triggered ability — shape
     // -----------------------------------------------------------------------

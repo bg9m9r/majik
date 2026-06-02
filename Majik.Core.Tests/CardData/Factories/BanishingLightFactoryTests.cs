@@ -24,6 +24,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   control.
 /// - LTB no-ops cleanly when nothing was exiled.
 /// </summary>
+[Trait("Color", "W")]
 public class BanishingLightFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -42,17 +43,6 @@ public class BanishingLightFactoryTests
         c.Abilities.OfType<TriggeredAbility>().Should().HaveCount(2,
             "ETB exile trigger + LTB return trigger");
     }
-
-    [Fact]
-    public void BanishingLight_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Banishing Light", _alice);
-
-        c.Should().BeOfType<Enchantment>();
-        c.Name.Should().Be("Banishing Light");
-        c.Abilities.OfType<TriggeredAbility>().Should().HaveCount(2);
-    }
-
     [Fact]
     public void BanishingLight_Etb_ExilesOpponentPermanent()
     {

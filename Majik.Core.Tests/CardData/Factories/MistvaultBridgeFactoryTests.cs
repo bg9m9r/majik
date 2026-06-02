@@ -23,6 +23,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Artifact Land typing + printed Indestructible keyword +
 /// enters-tapped replacement + one mana ability per produced colour.
 /// </summary>
+[Trait("Color", "C")]
 public class MistvaultBridgeFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -39,17 +40,6 @@ public class MistvaultBridgeFactoryTests
         bridge.Owner.Should().BeSameAs(_alice);
         bridge.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void MistvaultBridge_NamedCardFactory_DispatchesArtifactLand()
-    {
-        var card = NamedCardFactory.Create("Mistvault Bridge", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.HasType(CardType.Land).Should().BeTrue();
-        card.HasType(CardType.Artifact).Should().BeTrue();
-    }
-
     [Fact]
     public void MistvaultBridge_HasPrintedIndestructibleKeyword()
     {

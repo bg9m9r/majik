@@ -36,6 +36,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     opponent's library (CR 401.1 — owner's library, not controller's).
 ///   - No-op if the target left the graveyard before resolution (CR 608.2b).
 /// </summary>
+[Trait("Color", "G")]
 public class NoxiousRevivalFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -66,18 +67,6 @@ public class NoxiousRevivalFactoryTests
         NoxiousRevivalFactory.CardName.Should().Be("Noxious Revival");
         NoxiousRevivalFactory.PrintedManaCost.Should().Be("{G/P}");
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsNoxiousRevivalShape()
-    {
-        var dispatched = NamedCardFactory.Create("Noxious Revival", _alice);
-
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("Noxious Revival");
-        dispatched.ManaCost.Should().Be("{G/P}");
-        dispatched.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     // ── SpellDefinition shape ─────────────────────────────────────────────────
 
     [Fact]

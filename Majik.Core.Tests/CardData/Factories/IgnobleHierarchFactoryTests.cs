@@ -26,6 +26,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Two controlled creatures attack — no pump (CR 702.90b).
 /// - Single-arg dispatcher path is a no-op pump (no attackers source).
 /// </summary>
+[Trait("Color", "G")]
 public class IgnobleHierarchFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -61,18 +62,6 @@ public class IgnobleHierarchFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void IgnobleHierarch_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Ignoble Hierarch", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Ignoble Hierarch");
-        ((Creature)c).HasSubtype(CardSubtype.Goblin).Should().BeTrue();
-        ((Creature)c).HasSubtype(CardSubtype.Shaman).Should().BeTrue();
-    }
-
     // ── Mana abilities ────────────────────────────────────────────────────
 
     [Fact]

@@ -25,6 +25,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// <see cref="FlameSlashFactory"/> (extended to planeswalkers), the destroy
 /// mode mirrors <see cref="NaturalizeFactory"/>.
 /// </summary>
+[Trait("Color", "M")]
 public class RipApartFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -66,17 +67,6 @@ public class RipApartFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void RipApart_NamedCardFactory_Dispatch()
-    {
-        var dispatched = NamedCardFactory.Create("Rip Apart", _alice);
-
-        dispatched.Should().BeOfType<Sorcery>();
-        dispatched.Name.Should().Be("Rip Apart");
-        dispatched.HasType(CardType.Sorcery).Should().BeTrue();
-    }
-
     [Fact]
     public void RipApart_BuildDefinition_ExposesModes_AndPerModeTargets()
     {

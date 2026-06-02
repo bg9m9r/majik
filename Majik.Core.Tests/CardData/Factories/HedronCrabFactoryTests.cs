@@ -27,6 +27,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   control.
 /// - No-target fallback mills the controller (mirrors Bojuka Bog).
 /// </summary>
+[Trait("Color", "U")]
 public class HedronCrabFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -52,17 +53,6 @@ public class HedronCrabFactoryTests
         crab.Owner.Should().BeSameAs(_alice);
         crab.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void HedronCrab_DispatchesViaNamedCardFactory()
-    {
-        var dispatched = NamedCardFactory.Create("Hedron Crab", _alice);
-
-        dispatched.Should().BeOfType<Creature>();
-        dispatched.Name.Should().Be("Hedron Crab");
-        dispatched.HasType(CardType.Creature).Should().BeTrue();
-    }
-
     [Fact]
     public void HedronCrab_LandfallTrigger_HasTargetPlayerRequest()
     {

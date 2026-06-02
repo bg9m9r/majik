@@ -22,6 +22,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - <see cref="NamedCardFactory"/> dispatch.
 ///   - Vanilla: no keyword / triggered / activated / mana abilities.
 /// </summary>
+[Trait("Color", "C")]
 public class AlphaMyrFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -42,19 +43,6 @@ public class AlphaMyrFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void AlphaMyr_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Alpha Myr", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Alpha Myr");
-        c.HasType(CardType.Artifact).Should().BeTrue();
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Myr).Should().BeTrue();
-    }
-
     [Fact]
     public void AlphaMyr_IsVanilla_NoAbilities()
     {

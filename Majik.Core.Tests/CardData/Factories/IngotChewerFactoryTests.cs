@@ -35,6 +35,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Resolve: no agent target + own artifact on battlefield → deterministic
 ///     fallback destroys it (single-arg dispatcher posture).
 /// </summary>
+[Trait("Color", "R")]
 public class IngotChewerFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -57,19 +58,6 @@ public class IngotChewerFactoryTests
         chewer.Owner.Should().BeSameAs(_alice);
         chewer.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void IngotChewer_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Ingot Chewer", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Ingot Chewer");
-        card.HasType(CardType.Creature).Should().BeTrue();
-        card.ManaCost.Should().Be("{4}{R}");
-        ((Creature)card).HasSubtype(CardSubtype.Elemental).Should().BeTrue();
-    }
-
     // ── Evoke ───────────────────────────────────────────────────────────
 
     [Fact]

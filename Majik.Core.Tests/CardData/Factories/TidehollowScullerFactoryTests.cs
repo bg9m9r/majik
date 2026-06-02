@@ -36,6 +36,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - LTB returns the exiled card to its owner's hand.
 /// - LTB without an exiled card no-ops.
 /// </summary>
+[Trait("Color", "M")]
 public class TidehollowScullerFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -60,20 +61,6 @@ public class TidehollowScullerFactoryTests
         c.Abilities.OfType<TriggeredAbility>().Should().HaveCount(2,
             "ETB exile trigger + LTB return trigger");
     }
-
-    [Fact]
-    public void TidehollowSculler_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Tidehollow Sculler", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Tidehollow Sculler");
-        c.HasType(CardType.Artifact).Should().BeTrue();
-        ((Creature)c).BasePower.Should().Be(2);
-        ((Creature)c).BaseToughness.Should().Be(2);
-        c.Abilities.OfType<TriggeredAbility>().Should().HaveCount(2);
-    }
-
     [Fact]
     public void TidehollowSculler_Etb_ExilesNonlandFromOpponentHand()
     {

@@ -22,6 +22,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Bounce / exile bypass Undying (only Battlefield → Graveyard triggers).
 ///   - Dispatcher entry on NamedCardFactory returns a Young Wolf.
 /// </summary>
+[Trait("Color", "G")]
 public class YoungWolfFactoryTests
 {
     private readonly EventBus _bus = new();

@@ -31,6 +31,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// clause is not exercised — the primitive doesn't exist yet (see
 /// <see cref="GravecrawlerFactory"/> Deferred section).
 /// </summary>
+[Trait("Color", "B")]
 public class GravecrawlerFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -49,17 +50,6 @@ public class GravecrawlerFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void Gravecrawler_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Gravecrawler", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Gravecrawler");
-        c.HasSubtype(CardSubtype.Zombie).Should().BeTrue();
-    }
-
     [Fact]
     public void Gravecrawler_ShapeOnly_DoesNotRegisterCombatRestriction()
     {

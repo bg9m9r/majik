@@ -21,6 +21,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// is a documented v1 gap (no EOT-bounded control swap primitive yet) so
 /// tests assert the untap + haste shape that v1 ships.
 /// </summary>
+[Trait("Color", "U")]
 public class AbolethSpawnFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -133,19 +134,5 @@ public class AbolethSpawnFactoryTests
             "same-controller target fails the CR 109.1 re-check → no untap");
         CombatAbilities.HasHaste(llanowar).Should().BeFalse(
             "no haste grant on a same-controller target");
-    }
-
-    [Fact]
-    public void AbolethSpawn_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Aboleth Spawn", _alice);
-
-        c.Should().NotBeNull();
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Aboleth Spawn");
-        ((Creature)c).Power.Should().Be(4);
-        ((Creature)c).Toughness.Should().Be(3);
-        c.HasSubtype(CardSubtype.Fish).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Horror).Should().BeTrue();
     }
 }

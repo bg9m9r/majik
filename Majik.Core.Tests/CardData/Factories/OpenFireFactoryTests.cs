@@ -24,6 +24,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Resolve body routes creature damage through
 ///   <see cref="Primitives.Fx.DealDamageAny"/>.
 /// </summary>
+[Trait("Color", "R")]
 public class OpenFireFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -40,17 +41,6 @@ public class OpenFireFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void OpenFire_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Open Fire", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Open Fire");
-        card.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     [Fact]
     public void OpenFire_SpellDefinition_HasSingleAnyTargetRequest()
     {

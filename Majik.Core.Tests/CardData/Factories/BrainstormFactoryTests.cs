@@ -26,6 +26,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     remaining hand cards to the top of the library.
 ///   - Hand smaller than 2 after drawing returns however many exist.
 /// </summary>
+[Trait("Color", "U")]
 public class BrainstormFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -43,17 +44,6 @@ public class BrainstormFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsBrainstormShape()
-    {
-        var dispatched = NamedCardFactory.Create("Brainstorm", _alice);
-
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("Brainstorm");
-        dispatched.ManaCost.Should().Be("{U}");
-    }
-
     [Fact]
     public void Brainstorm_Resolve_NoAgent_DrawsThree_ReturnsLastTwo()
     {

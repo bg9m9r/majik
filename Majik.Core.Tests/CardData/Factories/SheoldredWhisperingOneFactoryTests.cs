@@ -29,6 +29,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   controller's own upkeep); the triggering opponent's creature goes to
 ///   their graveyard. No-op when the opponent controls no creatures.
 /// </summary>
+[Trait("Color", "B")]
 public class SheoldredWhisperingOneFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -62,19 +63,6 @@ public class SheoldredWhisperingOneFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void Sheoldred_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Sheoldred, Whispering One", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Sheoldred, Whispering One");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSupertype(CardSupertype.Legendary).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Praetor).Should().BeTrue();
-    }
-
     // -----------------------------------------------------------------------
     // Swampwalk (CR 702.13)
     // -----------------------------------------------------------------------

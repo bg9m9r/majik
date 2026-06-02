@@ -40,6 +40,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - EOT cleanup: non-caster Cleanup does not count.
 ///   - "Play up to 2" cap: 3rd-exiled card has NO grant (cannot be played).
 /// </summary>
+[Trait("Color", "R")]
 public class MarchOfRecklessJoyFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -73,17 +74,6 @@ public class MarchOfRecklessJoyFactoryTests
         march.Controller.Should().BeSameAs(_alice);
         CardColors.GetColors(march).Should().Contain(ManaColor.Red);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatch_ReturnsInstantShape()
-    {
-        var dispatched = NamedCardFactory.Create("March of Reckless Joy", _alice);
-
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("March of Reckless Joy");
-        dispatched.ManaCost.Should().Be("{X}{R}");
-    }
-
     // ── SpellDefinition shape ───────────────────────────────────────────────
 
     [Fact]

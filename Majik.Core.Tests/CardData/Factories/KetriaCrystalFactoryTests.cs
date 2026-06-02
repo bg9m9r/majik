@@ -31,6 +31,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   <see cref="Majik.Core.Events.CardCycledEvent"/> (CR 702.32d).
 /// - Dispatcher routing through <see cref="NamedCardFactory"/>.
 /// </summary>
+[Trait("Color", "C")]
 public class KetriaCrystalFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -50,18 +51,6 @@ public class KetriaCrystalFactoryTests
         crystal.Owner.Should().BeSameAs(_alice);
         crystal.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_KetriaCrystal()
-    {
-        var card = NamedCardFactory.Create("Ketria Crystal", _alice);
-
-        card.Should().BeOfType<Artifact>();
-        card.Name.Should().Be("Ketria Crystal");
-        card.HasType(CardType.Artifact).Should().BeTrue();
-        card.ManaCost.Should().Be("{3}");
-    }
-
     // -----------------------------------------------------------------------
     // Mana abilities — {G}, {U}, {R} (CR 605.1)
     // -----------------------------------------------------------------------

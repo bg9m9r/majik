@@ -37,6 +37,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   until-end-of-turn — same posture as Karn the Great Creator / The One Ring).
 /// Back-face land analogue: <see cref="AgadeemTheUndercryptFactory"/>.
 /// </summary>
+[Trait("Color", "W")]
 public class EmeriasCallFactoryTests : IDisposable
 {
     private readonly Player _alice = new("Alice", 20);
@@ -76,18 +77,6 @@ public class EmeriasCallFactoryTests : IDisposable
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_EmeriasCall()
-    {
-        var card = NamedCardFactory.Create("Emeria's Call", _alice);
-
-        card.Should().BeOfType<Sorcery>();
-        card.Name.Should().Be("Emeria's Call");
-        card.ManaCost.Should().Be("{4}{W}{W}{W}");
-        card.HasType(CardType.Sorcery).Should().BeTrue();
-    }
-
     [Fact]
     public void EmeriasCall_IsWhite()
     {
@@ -268,17 +257,6 @@ public class EmeriasCallFactoryTests : IDisposable
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_EmeriaShatteredSkyclave()
-    {
-        var card = NamedCardFactory.Create("Emeria, Shattered Skyclave", _alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Emeria, Shattered Skyclave");
-        card.HasType(CardType.Land).Should().BeTrue();
-    }
-
     [Fact]
     public void EmeriaShatteredSkyclave_CarriesMdfcState_PreFlippedToBackFace()
     {

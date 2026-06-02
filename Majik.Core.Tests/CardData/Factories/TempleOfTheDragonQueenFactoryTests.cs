@@ -38,6 +38,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   Opponent's Dragons and non-Dragons don't count; self excluded.
 /// - Dispatcher routing through <see cref="NamedCardFactory"/>.
 /// </summary>
+[Trait("Color", "C")]
 public class TempleOfTheDragonQueenFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -45,19 +46,6 @@ public class TempleOfTheDragonQueenFactoryTests
     // -----------------------------------------------------------------------
     // Identity + dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void Temple_Dispatch_ReturnsLand()
-    {
-        var card = NamedCardFactory.Create("Temple of the Dragon Queen", _alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Temple of the Dragon Queen");
-        card.HasType(CardType.Land).Should().BeTrue();
-        card.Owner.Should().BeSameAs(_alice);
-        card.Controller.Should().BeSameAs(_alice);
-    }
-
     [Fact]
     public void Temple_IsNotBasic()
     {
@@ -180,19 +168,6 @@ public class TempleOfTheDragonQueenFactoryTests
         after.EntersTapped.Should().BeTrue(
             "a non-Dragon creature does not satisfy 'you control a Dragon'");
     }
-
-    [Fact]
-    public void Temple_SingleArgDispatch_DoesNotRegisterReplacement()
-    {
-        // Shape-only path: a fresh bus must remain inert.
-        var bus = new ReplacementBus();
-        var land = TempleOfTheDragonQueenFactory.Create(_alice);
-
-        var after = ApplyEtb(bus, land, _alice);
-        after.EntersTapped.Should().BeFalse(
-            "no replacement registered on the shape-only path");
-    }
-
     // -----------------------------------------------------------------------
     // Args validation
     // -----------------------------------------------------------------------

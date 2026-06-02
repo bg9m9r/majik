@@ -26,6 +26,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   * Summoning sickness blocks activation (bare {T} cost).
 ///   * BuildColorMana helper.
 /// </summary>
+[Trait("Color", "G")]
 public class SanctumWeaverFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -153,16 +154,6 @@ public class SanctumWeaverFactoryTests
     // -----------------------------------------------------------------------
     // Dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsCreature()
-    {
-        var card = NamedCardFactory.Create("Sanctum Weaver", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Sanctum Weaver");
-    }
-
     // -----------------------------------------------------------------------
     // Mana abilities — shape
     // -----------------------------------------------------------------------

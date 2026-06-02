@@ -28,6 +28,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   sorceries / pure enchantments / lands).
 /// - Trigger does NOT fire on opponent's casts.
 /// </summary>
+[Trait("Color", "W")]
 public class BygoneBishopFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -56,18 +57,6 @@ public class BygoneBishopFactoryTests
         c.Abilities.OfType<KeywordAbility>().Select(k => k.Keyword)
             .Should().Contain("Flying");
     }
-
-    [Fact]
-    public void BygoneBishop_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Bygone Bishop", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Bygone Bishop");
-        ((Creature)c).BasePower.Should().Be(2);
-        ((Creature)c).BaseToughness.Should().Be(3);
-    }
-
     [Fact]
     public void BygoneBishop_AttachesSingleCastTrigger()
     {

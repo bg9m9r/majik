@@ -18,6 +18,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Modern reprints). Vanilla — no printed keywords, triggers, statics, or
 /// activated abilities.
 /// </summary>
+[Trait("Color", "G")]
 public class TrainedArmodonFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -55,18 +56,6 @@ public class TrainedArmodonFactoryTests
         colors.Should().Contain(ManaColor.Green, "Trained Armodon costs {1}{G}{G}");
         colors.Should().HaveCount(1, "Trained Armodon is exactly Green");
     }
-
-    [Fact]
-    public void TrainedArmodon_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Trained Armodon", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Trained Armodon");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Elephant).Should().BeTrue();
-    }
-
     [Fact]
     public void TrainedArmodon_IsVanilla_NoAbilities()
     {

@@ -11,7 +11,7 @@ using Xunit;
 namespace Majik.Core.Tests.CardData;
 
 /// <summary>
-/// Tests for Boil (Stronghold and many reprints, {2}{R}, Sorcery).
+/// Tests for Boil (Stronghold and many reprints, {2}{R}, Instant).
 ///
 /// Oracle: "Destroy all Islands."
 ///
@@ -33,13 +33,13 @@ public class BoilTests
     // -----------------------------------------------------------------------
 
     [Fact]
-    public void Boil_IsSorcery_At2R()
+    public void Boil_IsInstant_At2R()
     {
         var b = BoilFactory.Create(_alice);
 
         b.Name.Should().Be("Boil");
         b.ManaCost.Should().Be("{2}{R}");
-        b.HasType(CardType.Sorcery).Should().BeTrue();
+        b.HasType(CardType.Instant).Should().BeTrue();
         b.Owner.Should().BeSameAs(_alice);
         b.Controller.Should().BeSameAs(_alice);
     }
@@ -49,9 +49,9 @@ public class BoilTests
     {
         var card = NamedCardFactory.Create("Boil", _alice);
 
-        card.Should().BeOfType<Sorcery>();
+        card.Should().BeOfType<Instant>();
         card.Name.Should().Be("Boil");
-        card.HasType(CardType.Sorcery).Should().BeTrue();
+        card.HasType(CardType.Instant).Should().BeTrue();
         card.ManaCost.Should().Be("{2}{R}");
         card.Owner.Should().BeSameAs(_alice);
     }

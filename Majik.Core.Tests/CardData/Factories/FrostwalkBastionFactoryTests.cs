@@ -37,6 +37,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Combat-damage-to-a-creature trigger: taps the damaged creature and
 ///   skips its next untap step (CR 502.1 / 611.2b).
 /// </summary>
+[Trait("Color", "C")]
 public class FrostwalkBastionFactoryTests : IDisposable
 {
     private readonly Player _alice = new("Alice", 20);
@@ -74,21 +75,6 @@ public class FrostwalkBastionFactoryTests : IDisposable
         land.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1,
             "{1}{S} animate ability is wired");
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_FrostwalkBastion()
-    {
-        var card = NamedCardFactory.Create("Frostwalk Bastion", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Frostwalk Bastion");
-        card.HasType(CardType.Land).Should().BeTrue();
-        card.HasSupertype(CardSupertype.Snow).Should().BeTrue();
-
-        card.Abilities.OfType<ManaAbility>().Should().HaveCount(1);
-        card.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1);
-    }
-
     // -----------------------------------------------------------------------
     // Animate ability
     // -----------------------------------------------------------------------

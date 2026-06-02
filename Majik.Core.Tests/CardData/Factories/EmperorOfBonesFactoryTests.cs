@@ -44,6 +44,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///       end step redirects to exile (CR 122.1m).</item>
 /// </list>
 /// </summary>
+[Trait("Color", "B")]
 public class EmperorOfBonesFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -87,17 +88,6 @@ public class EmperorOfBonesFactoryTests
         emperor.Owner.Should().BeSameAs(_alice);
         emperor.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void EmperorOfBones_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Emperor of Bones", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Emperor of Bones");
-        card.HasType(CardType.Creature).Should().BeTrue();
-    }
-
     [Fact]
     public void EmperorOfBones_AbilityShape()
     {

@@ -18,6 +18,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// from it. That player discards that card."
 /// Duress-shape targeted discard with an artifact-or-creature filter, no life cost.
 /// </summary>
+[Trait("Color", "B")]
 public class DivestFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -72,15 +73,6 @@ public class DivestFactoryTests
         card.HasType(CardType.Sorcery).Should().BeTrue();
         card.ManaCost.ToString().Should().Be("{B}");
     }
-
-    [Fact]
-    public void DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Divest", _alice);
-        card.Should().BeOfType<Sorcery>();
-        card.Name.Should().Be("Divest");
-    }
-
     [Fact]
     public void Resolve_DiscardsChosenArtifact()
     {

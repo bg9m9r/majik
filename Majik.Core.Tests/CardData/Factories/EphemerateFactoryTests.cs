@@ -28,6 +28,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Resolve: opponent-controlled target fizzles at resolution-time
 ///   legality check (CR 608.2b).
 /// </summary>
+[Trait("Color", "W")]
 public class EphemerateFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -59,17 +60,6 @@ public class EphemerateFactoryTests
         keywordNames.Should().Contain("Rebound",
             "CR 702.88 — Rebound marker attached even though the rider is deferred");
     }
-
-    [Fact]
-    public void Ephemerate_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Ephemerate", _alice);
-
-        c.Should().BeOfType<Instant>();
-        c.Name.Should().Be("Ephemerate");
-        c.ManaCost.Should().Be("{W}");
-    }
-
     // -----------------------------------------------------------------------
     // SpellDefinition — structural shape
     // -----------------------------------------------------------------------

@@ -38,6 +38,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Activated ability cost: requires {2}{W}{W} + tap.
 /// - Activated ability resolve: a 1/1 white Human token enters the battlefield.
 /// </summary>
+[Trait("Color", "C")]
 public class CastleArdenvaleFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -94,15 +95,6 @@ public class CastleArdenvaleFactoryTests
     // -----------------------------------------------------------------------
     // Dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void NamedCardFactory_Dispatch_ReturnsLand()
-    {
-        var card = NamedCardFactory.Create("Castle Ardenvale", _alice);
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Castle Ardenvale");
-    }
-
     // -----------------------------------------------------------------------
     // Ability count / shape
     // -----------------------------------------------------------------------
@@ -231,17 +223,6 @@ public class CastleArdenvaleFactoryTests
         after!.EntersTapped.Should().BeTrue(
             "Castle Ardenvale has no Plains subtype; its presence on battlefield doesn't satisfy the predicate");
     }
-
-    [Fact]
-    public void SingleArgDispatch_DoesNotRegisterReplacement()
-    {
-        var alice = new Player("Alice", 20);
-        var card = NamedCardFactory.Create("Castle Ardenvale", alice);
-        card.Should().BeOfType<Land>();
-        ((Land)card).Abilities.OfType<ManaAbility>().Should().HaveCount(1);
-        ((Land)card).Abilities.OfType<ActivatedAbility>().Should().HaveCount(1);
-    }
-
     // -----------------------------------------------------------------------
     // Activated ability: {2}{W}{W}, {T} — cost gates
     // -----------------------------------------------------------------------

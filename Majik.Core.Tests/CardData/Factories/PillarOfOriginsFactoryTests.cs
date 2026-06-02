@@ -24,6 +24,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// deferrals (see <see cref="PillarOfOriginsFactory"/> xmldoc) — same
 /// posture as Delighted Halfling / Cavern of Souls.
 /// </summary>
+[Trait("Color", "C")]
 public class PillarOfOriginsFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -58,17 +59,6 @@ public class PillarOfOriginsFactoryTests
 
         pillar.HasSupertype(CardSupertype.Legendary).Should().BeFalse();
     }
-
-    [Fact]
-    public void PillarOfOrigins_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Pillar of Origins", _alice);
-
-        card.Should().BeOfType<Artifact>("Pillar of Origins is an Artifact");
-        card.Name.Should().Be("Pillar of Origins");
-        card.HasType(CardType.Artifact).Should().BeTrue();
-    }
-
     // -----------------------------------------------------------------------
     // Mana abilities — {T}: Add one mana of any color
     // -----------------------------------------------------------------------

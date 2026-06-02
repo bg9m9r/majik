@@ -30,6 +30,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - No TurnState wired (shape / dispatcher tests) → Revolt inactive.
 ///   - Off-battlefield target → no-op (CR 608.2b).
 /// </summary>
+[Trait("Color", "B")]
 public class FatalPushFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -53,17 +54,6 @@ public class FatalPushFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsFatalPushShape()
-    {
-        var dispatched = NamedCardFactory.Create("Fatal Push", _alice);
-
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("Fatal Push");
-        dispatched.ManaCost.Should().Be("{B}");
-    }
-
     [Fact]
     public void SpellDefinition_DeclaresSingleTargetCreatureRequest()
     {

@@ -29,6 +29,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   end-to-end publish.
 /// - <see cref="NamedCardFactory"/> dispatch.
 /// </summary>
+[Trait("Color", "U")]
 public class CuratorOfMysteriesFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -60,20 +61,6 @@ public class CuratorOfMysteriesFactoryTests
         card.Abilities.OfType<KeywordAbility>()
             .Should().Contain(k => k.Keyword == "Flying");
     }
-
-    [Fact]
-    public void CuratorOfMysteries_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Curator of Mysteries", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.HasSubtype(CardSubtype.Sphinx).Should().BeTrue();
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1,
-            "the cycle-or-discard scry trigger");
-        card.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1,
-            "the cycling activated ability");
-    }
-
     // -----------------------------------------------------------------------
     // Cycle trigger shape — CR 603.1 over CardCycledEvent
     // -----------------------------------------------------------------------

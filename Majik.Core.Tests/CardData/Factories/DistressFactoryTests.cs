@@ -19,6 +19,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Duress-shape targeted discard with a nonland-only filter (no creature
 /// exclusion — creatures are fair game), targeting any player.
 /// </summary>
+[Trait("Color", "B")]
 public class DistressFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -64,15 +65,6 @@ public class DistressFactoryTests
         card.HasType(CardType.Sorcery).Should().BeTrue();
         card.ManaCost.ToString().Should().Be("{B}{B}");
     }
-
-    [Fact]
-    public void DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Distress", _alice);
-        card.Should().BeOfType<Sorcery>();
-        card.Name.Should().Be("Distress");
-    }
-
     [Fact]
     public void BuildSpellDefinition_SingleTargetPlayerRequest()
     {

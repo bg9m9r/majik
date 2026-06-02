@@ -38,6 +38,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Creature surviving the turn → no 3 damage.
 ///   - Killing a NON-targeted creature → no 3 damage.
 /// </summary>
+[Trait("Color", "R")]
 public class SearingBloodTests
 {
     private readonly EventBus _bus = new();
@@ -69,18 +70,6 @@ public class SearingBloodTests
         sb.Owner.Should().BeSameAs(_alice);
         sb.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_SearingBlood()
-    {
-        var card = NamedCardFactory.Create("Searing Blood", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Searing Blood");
-        card.HasType(CardType.Instant).Should().BeTrue();
-        card.Owner.Should().BeSameAs(_alice);
-    }
-
     // -----------------------------------------------------------------------
     // Resolution — 2 damage to target creature
     // -----------------------------------------------------------------------

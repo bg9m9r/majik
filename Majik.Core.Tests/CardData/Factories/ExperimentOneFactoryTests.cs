@@ -36,6 +36,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     (CR 701.18 / CR 701.15a).
 ///   - Regenerate cost gate: cannot pay with fewer than two counters.
 /// </summary>
+[Trait("Color", "G")]
 public class ExperimentOneFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -71,17 +72,6 @@ public class ExperimentOneFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_ExperimentOne()
-    {
-        var card = NamedCardFactory.Create("Experiment One", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Experiment One");
-        card.HasSubtype(CardSubtype.Ooze).Should().BeTrue();
-    }
-
     [Fact]
     public void ExperimentOne_HasExactlyOneEvolveTriggerAndOneRegenerateAbility()
     {

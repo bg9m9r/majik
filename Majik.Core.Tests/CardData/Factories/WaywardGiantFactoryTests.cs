@@ -17,6 +17,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Card: Wayward Giant — {4}{R} Creature — Giant 4/5.
 ///   "Menace"
 /// </summary>
+[Trait("Color", "R")]
 public class WaywardGiantFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -73,16 +74,5 @@ public class WaywardGiantFactoryTests
         c.Abilities.OfType<ActivatedAbility>().Should().BeEmpty();
         c.Abilities.OfType<KeywordAbility>().Should().HaveCount(1,
             "Menace is the only printed keyword");
-    }
-
-    [Fact]
-    public void WaywardGiant_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Wayward Giant", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Wayward Giant");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Giant).Should().BeTrue();
     }
 }

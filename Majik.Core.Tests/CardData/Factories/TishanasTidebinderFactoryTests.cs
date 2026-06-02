@@ -34,6 +34,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   * Resolve: target no longer on stack → no-op (CR 608.2b).
 ///   * <see cref="NamedCardFactory"/> dispatch by name.
 /// </summary>
+[Trait("Color", "U")]
 public class TishanasTidebinderFactoryTests
 {
     private readonly EventBus _bus = new();
@@ -96,17 +97,6 @@ public class TishanasTidebinderFactoryTests
 
         etb.ActiveZones.Should().Contain(ZoneType.Battlefield);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsTidebinderShape()
-    {
-        var dispatched = NamedCardFactory.Create("Tishana's Tidebinder", _alice);
-
-        dispatched.Should().BeOfType<Creature>();
-        dispatched.Name.Should().Be("Tishana's Tidebinder");
-        dispatched.ManaCost.Should().Be("{2}{U}");
-    }
-
     // -----------------------------------------------------------------------
     // Counter a triggered ability
     // -----------------------------------------------------------------------

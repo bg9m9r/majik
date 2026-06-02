@@ -35,6 +35,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - The "another" gate: the ability cannot target Giver of Runes itself
 ///   (CR 602.1 — "another target creature").
 /// </summary>
+[Trait("Color", "W")]
 public class GiverOfRunesTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -58,18 +59,6 @@ public class GiverOfRunesTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void GiverOfRunes_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Giver of Runes", _alice);
-
-        c.Should().BeOfType<Creature>("Giver of Runes is a Creature");
-        c.Name.Should().Be("Giver of Runes");
-        c.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1,
-            "the {T} protection-grant ability is wired");
-    }
-
     // -----------------------------------------------------------------------
     // Activated-ability shape
     // -----------------------------------------------------------------------

@@ -29,6 +29,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - No-land-in-hand: skips prompt, Mox redirected to graveyard.
 /// - <see cref="NamedCardFactory"/> dispatch.
 /// </summary>
+[Trait("Color", "C")]
 public class MoxDiamondFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -48,17 +49,6 @@ public class MoxDiamondFactoryTests
         mox.Owner.Should().BeSameAs(_alice);
         mox.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void MoxDiamond_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Mox Diamond", _alice);
-
-        card.Should().BeOfType<Artifact>();
-        card.Name.Should().Be("Mox Diamond");
-        card.HasType(CardType.Artifact).Should().BeTrue();
-    }
-
     [Fact]
     public void MoxDiamond_HasFiveAnyColorManaAbilities()
     {

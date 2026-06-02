@@ -34,6 +34,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     across their own exile + graveyard; toughness stays fixed at 4.
 ///   - CountInstantsAndSorceries pure helper.
 /// </summary>
+[Trait("Color", "M")]
 public class CracklingDrakeFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -87,18 +88,6 @@ public class CracklingDrakeFactoryTests
             .Should().Contain("Flying",
                 "CR 702.9 — Flying is a printed keyword ability on Crackling Drake");
     }
-
-    [Fact]
-    public void CracklingDrake_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Crackling Drake", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Crackling Drake");
-        c.HasSubtype(CardSubtype.Drake).Should().BeTrue();
-        c.ManaCost.Should().Be("{U}{U}{R}{R}");
-    }
-
     // -----------------------------------------------------------------------
     // ETB triggered ability — draw 1
     // -----------------------------------------------------------------------

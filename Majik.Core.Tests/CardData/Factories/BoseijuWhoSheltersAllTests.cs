@@ -27,6 +27,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// countered" rider (per-slot mana provenance + cast-time flag) and the
 /// production-path enters-tapped replacement (owned by EntersTappedBinder).
 /// </summary>
+[Trait("Color", "C")]
 public class BoseijuWhoSheltersAllTests
 {
     private readonly Player _alice = new("Alice", 20);
