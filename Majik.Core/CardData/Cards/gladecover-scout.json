@@ -1,0 +1,9 @@
+{
+  "name": "Gladecover Scout",
+  "types": ["Creature"],
+  "subtypes": ["Elf", "Scout"],
+  "manaCost": "{G}",
+  "power": 1,
+  "toughness": 1,
+  "abilities": []
+}
