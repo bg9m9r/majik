@@ -716,14 +716,8 @@
       "list": []
     },
     "mana": {
-      "count": 5,
-      "list": [
-        "mana:B",
-        "mana:G",
-        "mana:R",
-        "mana:U",
-        "mana:W"
-      ]
+      "count": 0,
+      "list": []
     },
     "activated": {
       "count": 0,
