@@ -1,0 +1,5 @@
+{
+  "name": "Heartless Act",
+  "types": ["Instant"],
+  "manaCost": "{1}{B}"
+}
