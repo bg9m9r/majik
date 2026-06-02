@@ -2100,6 +2100,56 @@
   "mdfc": null,
   "colors": []
 }
+==== bonders-enclave ====
+{
+  "name": "Bonders\u0027 Enclave",
+  "manaCost": "",
+  "primaryType": "Land",
+  "cardTypes": [
+    "Land"
+  ],
+  "supertypes": [],
+  "subtypes": [],
+  "power": null,
+  "toughness": null,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 1,
+      "list": [
+        "mana:1"
+      ]
+    },
+    "activated": {
+      "count": 1,
+      "list": [
+        "act:AdditionalCost\u002BManaCostCost=\u003EEffect"
+      ]
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": []
+}
 ==== boom-bust ====
 {
   "name": "Boom // Bust",

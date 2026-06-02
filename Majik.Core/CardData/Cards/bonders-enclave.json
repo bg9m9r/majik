@@ -1,0 +1,17 @@
+{
+  "name": "Bonders' Enclave",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "C" },
+    {
+      "kind": "activated",
+      "costs": [
+        { "type": "mana", "amount": "{3}" },
+        { "type": "tap_self" }
+      ],
+      "effects": [
+        { "type": "draw_card", "amount": 1 }
+      ]
+    }
+  ]
+}
