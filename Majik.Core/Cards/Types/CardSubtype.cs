@@ -486,4 +486,10 @@ public enum CardSubtype
     /// and the broader Theros-block green/red Satyr lineage. CR 205.3m —
     /// flavour subtype with no inherent rules meaning.</summary>
     Satyr,
+
+    /// <summary>Otter creature subtype — Valley Floodcaller (Bloomburrow),
+    /// Mabel, Heir to Cragflame-adjacent Bloomburrow Otter lineage. CR
+    /// 205.3m — flavour subtype, but referenced by Bloomburrow
+    /// "Birds, Frogs, Otters, and Rats" tribal payoffs.</summary>
+    Otter,
 }
