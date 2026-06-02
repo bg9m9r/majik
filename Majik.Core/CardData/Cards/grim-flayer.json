@@ -1,0 +1,8 @@
+{
+  "name": "Grim Flayer",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Warrior"],
+  "manaCost": "{B}{G}",
+  "power": 2,
+  "toughness": 2
+}
