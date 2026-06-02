@@ -1,0 +1,8 @@
+{
+  "name": "Topiary Stomper",
+  "types": ["Creature"],
+  "subtypes": ["Plant", "Dinosaur"],
+  "manaCost": "{1}{G}{G}",
+  "power": 4,
+  "toughness": 4
+}
