@@ -1,0 +1,8 @@
+{
+  "name": "Resolute Reinforcements",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Soldier"],
+  "manaCost": "{1}{W}",
+  "power": 1,
+  "toughness": 1
+}
