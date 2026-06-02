@@ -1,0 +1,9 @@
+{
+  "name": "Wee Dragonauts",
+  "types": ["Creature"],
+  "subtypes": ["Faerie", "Wizard"],
+  "manaCost": "{1}{U}{R}",
+  "power": 1,
+  "toughness": 3,
+  "abilities": []
+}
