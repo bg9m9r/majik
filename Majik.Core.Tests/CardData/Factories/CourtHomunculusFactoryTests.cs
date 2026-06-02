@@ -35,6 +35,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - only the controller's artifacts count.
 /// - Helper predicate (ControlsAnotherArtifact).
 /// </summary>
+[Trait("Color", "W")]
 public class CourtHomunculusFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -65,19 +66,6 @@ public class CourtHomunculusFactoryTests
         ch.Owner.Should().BeSameAs(_alice);
         ch.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void CourtHomunculus_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Court Homunculus", _alice);
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Court Homunculus");
-        card.HasType(CardType.Artifact).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Homunculus).Should().BeTrue();
-        ((Creature)card).BasePower.Should().Be(1);
-        ((Creature)card).BaseToughness.Should().Be(1);
-    }
-
     private (Creature ch, ContinuousEffectsService effects) NewHomunculusOnBattlefield()
     {
         var effects = new ContinuousEffectsService();

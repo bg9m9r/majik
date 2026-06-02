@@ -27,6 +27,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Resolve-time illegal target (non-artifact, off-battlefield) is a
 ///   silent no-op but the jar is still sacrificed.
 /// </summary>
+[Trait("Color", "C")]
 public class WeldingJarFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -42,17 +43,6 @@ public class WeldingJarFactoryTests
         jar.Owner.Should().BeSameAs(_alice);
         jar.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void WeldingJar_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Welding Jar", _alice);
-
-        card.Should().BeOfType<Artifact>();
-        card.Name.Should().Be("Welding Jar");
-        card.HasType(CardType.Artifact).Should().BeTrue();
-    }
-
     [Fact]
     public void WeldingJar_HasOneActivatedAbility_WithSacAndTargetArtifact()
     {

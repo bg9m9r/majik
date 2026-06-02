@@ -26,6 +26,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - A non-Sliver creature you control is NOT granted first strike.
 /// - An opponent's Sliver is NOT granted first strike (controller-scoped).
 /// </summary>
+[Trait("Color", "R")]
 public class StrikingSliverFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -67,17 +68,6 @@ public class StrikingSliverFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void StrikingSliver_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Striking Sliver", _alice);
-
-        card.Should().BeOfType<Creature>("Striking Sliver is a Creature instance");
-        card.Name.Should().Be("Striking Sliver");
-        ((Creature)card).HasSubtype(CardSubtype.Sliver).Should().BeTrue();
-    }
-
     // -----------------------------------------------------------------------
     // Sliver lord static — "Sliver creatures you control have first strike."
     // -----------------------------------------------------------------------

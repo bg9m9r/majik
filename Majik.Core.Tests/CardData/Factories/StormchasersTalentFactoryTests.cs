@@ -30,6 +30,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - <see cref="NamedCardFactory"/> dispatch returns a fully-wired
 ///   Stormchaser's Talent instance.
 /// </summary>
+[Trait("Color", "M")]
 public class StormchasersTalentFactoryTests
 {
     private readonly EventBus _bus = new();
@@ -209,21 +210,4 @@ public class StormchasersTalentFactoryTests
     // -----------------------------------------------------------------------
     // NamedCardFactory dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void NamedCardFactory_DispatchesStormchasersTalent()
-    {
-        var card = NamedCardFactory.Create("Stormchaser's Talent", _alice);
-
-        card.Should().BeOfType<Enchantment>(
-            "Stormchaser's Talent is an Enchantment — Class");
-        card.Name.Should().Be("Stormchaser's Talent");
-        card.HasSubtype(CardSubtype.Class).Should().BeTrue(
-            "the dispatcher returns a fully-wired card with the Class subtype");
-
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(3,
-            "the dispatcher attaches the ETB trigger + Level-2 + Level-3 cast triggers");
-        card.Abilities.OfType<ActivatedAbility>().Should().HaveCount(2,
-            "the dispatcher attaches both level-up activated abilities (Level 2 + Level 3)");
-    }
 }

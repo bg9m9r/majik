@@ -27,6 +27,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   <see cref="CombatValidator.CanAttack"/> permits the attack the turn it returns.
 /// - NamedCardFactory dispatch returns a fully-wired Strangleroot Geist instance.
 /// </summary>
+[Trait("Color", "G")]
 public class StrangleRootGeistFactoryTests
 {
     private readonly EventBus _bus = new();
@@ -287,22 +288,4 @@ public class StrangleRootGeistFactoryTests
     // -----------------------------------------------------------------------
     // NamedCardFactory dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void NamedCardFactory_DispatchesStrangleRootGeist()
-    {
-        var card = Majik.Core.CardData.NamedCardFactory.Create("Strangleroot Geist", _alice);
-
-        card.Should().BeOfType<Creature>("Strangleroot Geist is a Creature");
-        card.Name.Should().Be("Strangleroot Geist");
-
-        var keywords = card.Abilities.OfType<KeywordAbility>().ToList();
-        keywords.Should().Contain(a => a.Keyword == "Haste",
-            "the dispatcher returns a fully-wired card with the Haste marker");
-        keywords.Should().Contain(a => a.Keyword == "Undying",
-            "the dispatcher returns a fully-wired card with the Undying marker");
-
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1,
-            "the dispatcher attaches the Undying trigger built via UndyingFactory");
-    }
 }

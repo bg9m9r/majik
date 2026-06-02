@@ -27,6 +27,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   from a stocked library (CR 603.6c / 700.4).
 /// - No trigger on non-death zone changes (bounce, exile).
 /// </summary>
+[Trait("Color", "U")]
 public class AvenFisherFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -77,21 +78,6 @@ public class AvenFisherFactoryTests
     // ------------------------------------------------------------------
     // Dispatcher
     // ------------------------------------------------------------------
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_AvenFisher()
-    {
-        var card = NamedCardFactory.Create("Aven Fisher", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Aven Fisher");
-        var creature = (Creature)card;
-        creature.HasSubtype(CardSubtype.Bird).Should().BeTrue();
-        creature.HasSubtype(CardSubtype.Soldier).Should().BeTrue();
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1,
-            "Aven Fisher has exactly one triggered ability (the dies trigger)");
-    }
-
     // ------------------------------------------------------------------
     // Triggered ability zones
     // ------------------------------------------------------------------

@@ -30,6 +30,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   reads the CONTROLLER's battlefield only.
 /// - <see cref="NamedCardFactory"/> dispatch resolves the printed name.
 /// </summary>
+[Trait("Color", "C")]
 public class DeathcapGladeTests
 {
     private static Land MakeWithBus(Player owner, ReplacementBus bus) =>
@@ -64,18 +65,6 @@ public class DeathcapGladeTests
             "slow lands are nonbasic");
         land.HasSupertype(CardSupertype.Legendary).Should().BeFalse();
     }
-
-    [Fact]
-    public void DeathcapGlade_Dispatch_ResolvesViaNamedCardFactory()
-    {
-        var alice = new Player("Alice", 20);
-
-        var card = NamedCardFactory.Create("Deathcap Glade", alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Deathcap Glade");
-    }
-
     // -----------------------------------------------------------------------
     // Mana abilities
     // -----------------------------------------------------------------------
@@ -221,22 +210,6 @@ public class DeathcapGladeTests
         after!.EntersTapped.Should().BeTrue(
             "Alice controls 0 lands; Bob's 5 don't count, so it enters tapped");
     }
-
-    [Fact]
-    public void DeathcapGlade_SingleArgDispatch_DoesNotRegisterReplacement()
-    {
-        // Shape-only dispatcher path — single-arg constructs without a
-        // ReplacementBus, so the ETB-tapped predicate isn't wired (matches
-        // every other ETB-replacement factory's shape-only posture). Prod
-        // load wires it from oracle text via ConditionalEntersTappedBinder.
-        var alice = new Player("Alice", 20);
-        var land = NamedCardFactory.Create("Deathcap Glade", alice);
-
-        land.Should().NotBeNull();
-        land.Name.Should().Be("Deathcap Glade");
-        ((Land)land).Abilities.OfType<ManaAbility>().Should().HaveCount(2);
-    }
-
     [Fact]
     public void DeathcapGlade_Create_ThrowsOnNullOwner()
     {

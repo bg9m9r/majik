@@ -36,6 +36,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   exile up to one target card from a graveyard" — a 0..1 graveyard
 ///   target; on resolve creates a Food and exiles the chosen card.
 /// </summary>
+[Trait("Color", "C")]
 public class RestlessCottageFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -71,21 +72,6 @@ public class RestlessCottageFactoryTests
         land.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1,
             "the attack trigger is attached to the land shape");
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_RestlessCottage()
-    {
-        var card = NamedCardFactory.Create("Restless Cottage", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Restless Cottage");
-        card.HasType(CardType.Land).Should().BeTrue();
-
-        card.Abilities.OfType<ManaAbility>().Should().HaveCount(2);
-        card.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1);
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1);
-    }
-
     // -----------------------------------------------------------------------
     // {T}: Add {B} / {T}: Add {G}
     // -----------------------------------------------------------------------

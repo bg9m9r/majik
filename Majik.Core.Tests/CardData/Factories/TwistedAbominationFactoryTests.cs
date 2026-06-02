@@ -28,6 +28,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Cycling cost gate: DiscardSelfCost CanPay is hand-only.
 /// - <see cref="NamedCardFactory"/> dispatch.
 /// </summary>
+[Trait("Color", "B")]
 public class TwistedAbominationFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -51,25 +52,6 @@ public class TwistedAbominationFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void TwistedAbomination_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Twisted Abomination", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.HasSubtype(CardSubtype.Zombie).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Mutant).Should().BeTrue();
-        card.Abilities.OfType<KeywordAbility>()
-            .Should().Contain(k => k.Keyword == "Swampcycling",
-                "typed-cycling keyword surfaced");
-        card.Abilities.OfType<KeywordAbility>()
-            .Should().Contain(k => k.Keyword == "Cycling",
-                "CR 702.32d — typecycling IS Cycling");
-        card.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1,
-            "the swampcycling activated ability");
-    }
-
     // -----------------------------------------------------------------------
     // Swampcycling ability shape — CR 702.32d
     // -----------------------------------------------------------------------

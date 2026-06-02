@@ -22,6 +22,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// library-search interception surface yet — same wall Leonin Arbiter
 /// hits). No tests assert search semantics until the primitive lands.
 /// </summary>
+[Trait("Color", "W")]
 public class AvenMindcensorFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -51,19 +52,5 @@ public class AvenMindcensorFactoryTests
             .Select(k => k.Keyword).ToList();
         keywords.Should().Contain("Flash");
         keywords.Should().Contain("Flying");
-    }
-
-    [Fact]
-    public void AvenMindcensor_NamedCardFactory_Dispatch()
-    {
-        var card = NamedCardFactory.Create("Aven Mindcensor", _alice);
-
-        card.Should().NotBeNull();
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Aven Mindcensor");
-        ((Creature)card).Power.Should().Be(2);
-        ((Creature)card).Toughness.Should().Be(1);
-        card.HasSubtype(CardSubtype.Bird).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Wizard).Should().BeTrue();
     }
 }

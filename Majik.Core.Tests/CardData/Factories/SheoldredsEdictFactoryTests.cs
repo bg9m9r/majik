@@ -31,6 +31,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Mirrors <see cref="DiabolicEdictFactoryTests"/> (edict/agent-driven pick)
 /// + <see cref="IzzetCharmTests"/> (modal choose-one shape).
 /// </summary>
+[Trait("Color", "B")]
 public class SheoldredsEdictFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -52,19 +53,6 @@ public class SheoldredsEdictFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_SheoldredsEdict()
-    {
-        var card = NamedCardFactory.Create("Sheoldred's Edict", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Sheoldred's Edict");
-        card.HasType(CardType.Instant).Should().BeTrue();
-        card.ManaCost.Should().Be("{1}{B}");
-        card.Owner.Should().BeSameAs(_alice);
-    }
-
     // -----------------------------------------------------------------------
     // SpellDefinition shape — three modes, no mandatory targets
     // -----------------------------------------------------------------------

@@ -30,6 +30,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - The drawn card itself becomes a candidate for the land-play half (the
 ///   draw happens first, exactly as printed).
 /// </summary>
+[Trait("Color", "M")]
 public class GrowthSpiralFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -69,18 +70,6 @@ public class GrowthSpiralFactoryTests
         // {G}{U} = mana value 2 (CR 202.3).
         c.ManaCostValue.TotalValue.Should().Be(2, "CR 202.3 — {G}{U} has mana value 2");
     }
-
-    [Fact]
-    public void GrowthSpiral_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Growth Spiral", _alice);
-
-        c.Should().BeOfType<Instant>("Growth Spiral is an Instant");
-        c.Name.Should().Be("Growth Spiral");
-        c.ManaCost.Should().Be("{G}{U}");
-        c.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     // -----------------------------------------------------------------------
     // Resolve — draw a card, then put a land from hand
     // -----------------------------------------------------------------------

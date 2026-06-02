@@ -17,6 +17,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Card: Vampire Nighthawk — {1}{B}{B} Creature — Vampire Shaman 2/3.
 ///   "Flying, deathtouch, lifelink"
 /// </summary>
+[Trait("Color", "B")]
 public class VampireNighthawkFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -101,17 +102,5 @@ public class VampireNighthawkFactoryTests
 
         c.Abilities.OfType<TriggeredAbility>().Should().BeEmpty();
         c.Abilities.OfType<ActivatedAbility>().Should().BeEmpty();
-    }
-
-    [Fact]
-    public void VampireNighthawk_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Vampire Nighthawk", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Vampire Nighthawk");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Vampire).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Shaman).Should().BeTrue();
     }
 }

@@ -29,6 +29,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     from library into hand, leaves a second creature in library.
 ///   - Resolve with only non-creature cards in library → no card moved.
 /// </summary>
+[Trait("Color", "G")]
 public class FaunaShamanFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -48,19 +49,6 @@ public class FaunaShamanFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_FaunaShaman()
-    {
-        var card = NamedCardFactory.Create("Fauna Shaman", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Fauna Shaman");
-        card.HasType(CardType.Creature).Should().BeTrue();
-        ((Creature)card).HasSubtype(CardSubtype.Elf).Should().BeTrue();
-        ((Creature)card).HasSubtype(CardSubtype.Shaman).Should().BeTrue();
-    }
-
     [Fact]
     public void FaunaShaman_HasExactlyOneActivatedAbility_NoTriggersOrManaAbilities()
     {

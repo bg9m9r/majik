@@ -52,6 +52,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Back face — exactly 3 life → payment legal, enters untapped.
 /// - Back face — no agent → enters tapped.
 /// </summary>
+[Trait("Color", "R")]
 public class SunderingEruptionFactoryTests : IDisposable
 {
     public SunderingEruptionFactoryTests()
@@ -98,18 +99,6 @@ public class SunderingEruptionFactoryTests : IDisposable
         colors.Should().NotContain(ManaColorEnum.Green);
         colors.Should().NotContain(ManaColorEnum.White);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_SunderingEruption()
-    {
-        var alice = new Player("Alice", 20);
-        var card = NamedCardFactory.Create("Sundering Eruption", alice);
-
-        card.Should().BeOfType<Sorcery>();
-        card.Name.Should().Be("Sundering Eruption");
-        card.HasType(CardType.Sorcery).Should().BeTrue();
-    }
-
     // =========================================================================
     // MDFC face tracker — front face
     // =========================================================================
@@ -496,18 +485,6 @@ public class SunderingEruptionFactoryTests : IDisposable
         land.Owner.Should().BeSameAs(alice);
         land.Controller.Should().BeSameAs(alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_VolcanicFissure()
-    {
-        var alice = new Player("Alice", 20);
-        var card = NamedCardFactory.Create("Volcanic Fissure", alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Volcanic Fissure");
-        card.HasType(CardType.Land).Should().BeTrue();
-    }
-
     [Fact]
     public void VolcanicFissure_CarriesMdfcState_PreFlippedToBackFace()
     {

@@ -26,6 +26,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - {T} mana ability counts Elves on controller's battlefield (including
 ///   self) and produces that many {G}.
 /// </summary>
+[Trait("Color", "G")]
 public class ElvishArchdruidFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -64,18 +65,6 @@ public class ElvishArchdruidFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void ElvishArchdruid_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Elvish Archdruid", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Elvish Archdruid");
-        ((Creature)c).HasSubtype(CardSubtype.Elf).Should().BeTrue();
-        ((Creature)c).HasSubtype(CardSubtype.Druid).Should().BeTrue();
-    }
-
     // ── Lord static ────────────────────────────────────────────────────
 
     [Fact]

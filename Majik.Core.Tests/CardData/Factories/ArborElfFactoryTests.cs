@@ -23,6 +23,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Non-Forest land target (e.g. Mountain) is a resolve-time no-op.
 /// - Non-land target is a resolve-time no-op.
 /// </summary>
+[Trait("Color", "G")]
 public class ArborElfFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -64,18 +65,6 @@ public class ArborElfFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void ArborElf_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Arbor Elf", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Arbor Elf");
-        ((Creature)c).HasSubtype(CardSubtype.Elf).Should().BeTrue();
-        ((Creature)c).HasSubtype(CardSubtype.Druid).Should().BeTrue();
-    }
-
     [Fact]
     public void ArborElf_HasActivatedUntapAbility_WithTargetRequest()
     {

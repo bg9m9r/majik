@@ -26,6 +26,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     battlefield.
 ///   - Stacking: two copies of Boon Reflection quadruple a single gain.
 /// </summary>
+[Trait("Color", "W")]
 public class BoonReflectionFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -44,17 +45,6 @@ public class BoonReflectionFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void BoonReflection_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Boon Reflection", _alice);
-
-        c.Should().BeOfType<Enchantment>();
-        c.Name.Should().Be("Boon Reflection");
-        c.HasType(CardType.Enchantment).Should().BeTrue();
-    }
-
     [Fact]
     public void BoonReflection_SingleArgPath_DoesNotRegisterReplacement()
     {

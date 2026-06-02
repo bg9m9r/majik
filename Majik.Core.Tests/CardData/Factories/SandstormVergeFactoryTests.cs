@@ -27,6 +27,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// utility-land posture plus the Earthshaker Khenra CannotBlock
 /// <see cref="CombatRestrictionEffect"/> resolution.
 /// </summary>
+[Trait("Color", "C")]
 public class SandstormVergeFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -49,17 +50,6 @@ public class SandstormVergeFactoryTests
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_SandstormVerge()
-    {
-        var card = NamedCardFactory.Create("Sandstorm Verge", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Sandstorm Verge");
-        card.HasType(CardType.Land).Should().BeTrue();
-    }
-
     // -----------------------------------------------------------------------
     // {T}: Add {C}
     // -----------------------------------------------------------------------

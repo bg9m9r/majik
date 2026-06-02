@@ -38,6 +38,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Null ActiveEffects → energy still spent but no throw.
 /// - Dispatcher integration via NamedCardFactory.
 /// </summary>
+[Trait("Color", "M")]
 public class VoltaicBrawlerFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);

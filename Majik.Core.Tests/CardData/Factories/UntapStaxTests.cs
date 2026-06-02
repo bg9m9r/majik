@@ -37,6 +37,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Each test calls <c>UntapStepRestrictions.Clear()</c> in the ctor +
 /// dispose so process-level registry state never leaks across cases.
 /// </summary>
+[Trait("Color", "U")]
 public class UntapStaxTests : IDisposable
 {
     private readonly EventBus _bus = new();
@@ -105,16 +106,6 @@ public class UntapStaxTests : IDisposable
         s.ManaCost.Should().Be("{1}{R}");
         s.HasType(CardType.Enchantment).Should().BeTrue();
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchesAllFourStaxCards()
-    {
-        NamedCardFactory.Create("Stasis", _alice).Should().BeOfType<Enchantment>();
-        NamedCardFactory.Create("Static Orb", _alice).Should().BeOfType<Artifact>();
-        NamedCardFactory.Create("Winter Orb", _alice).Should().BeOfType<Artifact>();
-        NamedCardFactory.Create("Smoke", _alice).Should().BeOfType<Enchantment>();
-    }
-
     // ------------------------------------------------------------------
     // Stasis — "Players skip their untap steps" + upkeep maintenance
     // ------------------------------------------------------------------

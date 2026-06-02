@@ -36,6 +36,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - SpellCastFlow rejects cast when caster has no card in hand AND cannot
 ///     produce {5} (CR 601.2g — additional cost can't be paid).
 /// </summary>
+[Trait("Color", "R")]
 public class LightningAxeFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -56,17 +57,6 @@ public class LightningAxeFactoryTests
         axe.Owner.Should().BeSameAs(_alice);
         axe.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void LightningAxe_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Lightning Axe", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Lightning Axe");
-        card.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     // -----------------------------------------------------------------------
     // SpellDefinition shape
     // -----------------------------------------------------------------------

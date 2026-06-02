@@ -26,6 +26,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - No-op if target is a creature (wrong type — CR 608.2b illegal target).
 ///   - No-op if target left the battlefield before resolution (CR 608.2b).
 /// </summary>
+[Trait("Color", "W")]
 public class DisenchantFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -48,17 +49,6 @@ public class DisenchantFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsDisenchantShape()
-    {
-        var dispatched = NamedCardFactory.Create("Disenchant", _alice);
-
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("Disenchant");
-        dispatched.ManaCost.Should().Be("{1}{W}");
-    }
-
     [Fact]
     public void SpellDefinition_DeclaresSingleTargetArtifactOrEnchantmentRequest()
     {

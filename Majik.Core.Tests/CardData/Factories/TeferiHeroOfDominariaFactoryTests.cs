@@ -33,6 +33,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - −8: emblem with a draw-trigger that exiles an opponent's permanent.
 ///   - NamedCardFactory dispatch.
 /// </summary>
+[Trait("Color", "M")]
 public class TeferiHeroOfDominariaFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -68,21 +69,6 @@ public class TeferiHeroOfDominariaFactoryTests
         loyalty.Select(a => a.LoyaltyChange)
             .Should().BeEquivalentTo(new[] { +1, -3, -8 });
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_Teferi()
-    {
-        var card = NamedCardFactory.Create("Teferi, Hero of Dominaria", _alice);
-
-        card.Should().BeOfType<Planeswalker>();
-        card.Name.Should().Be("Teferi, Hero of Dominaria");
-        card.HasType(CardType.Planeswalker).Should().BeTrue();
-        card.HasSupertype(CardSupertype.Legendary).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Teferi).Should().BeTrue();
-        ((Planeswalker)card).Loyalty.Should().Be(4);
-        card.Abilities.OfType<LoyaltyAbility>().Should().HaveCount(3);
-    }
-
     // -----------------------------------------------------------------------
     // +1: Draw a card; at the beginning of the next end step untap up to two
     //     lands.

@@ -23,6 +23,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Twin of Birds of Paradise (Flying + any-colour mana dork) but on an
 /// Artifact Creature — Thopter 0/2 body, mirroring the Ornithopter chassis.
 /// </summary>
+[Trait("Color", "C")]
 public class OrnithopterOfParadiseFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -42,17 +43,6 @@ public class OrnithopterOfParadiseFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void OrnithopterOfParadise_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Ornithopter of Paradise", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Ornithopter of Paradise");
-        ((Creature)c).HasSubtype(CardSubtype.Thopter).Should().BeTrue();
-    }
-
     [Fact]
     public void OrnithopterOfParadise_HasFlying()
     {

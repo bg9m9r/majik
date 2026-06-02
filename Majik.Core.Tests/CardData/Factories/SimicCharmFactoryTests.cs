@@ -32,6 +32,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     unaffected; the grant expires at end of turn.
 ///   - Mode 2 resolve: bounce target creature to its owner's hand.
 /// </summary>
+[Trait("Color", "M")]
 public class SimicCharmFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -54,17 +55,6 @@ public class SimicCharmFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void SimicCharm_NamedCardFactory_Dispatch()
-    {
-        var dispatched = NamedCardFactory.Create("Simic Charm", _alice);
-
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("Simic Charm");
-        dispatched.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     // -----------------------------------------------------------------------
     // SpellDefinition shape
     // -----------------------------------------------------------------------

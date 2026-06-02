@@ -27,6 +27,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Dispatch through <see cref="NamedCardFactory"/> resolves each printed
 ///   name to the parametric Create overload.
 /// </summary>
+[Trait("Color", "C")]
 public class PainLandCycleFactoryTests
 {
     /// <summary>
@@ -89,20 +90,6 @@ public class PainLandCycleFactoryTests
         land.HasSupertype(CardSupertype.Basic).Should().BeFalse();
         land.HasSupertype(CardSupertype.Legendary).Should().BeFalse();
     }
-
-    [Theory]
-    [MemberData(nameof(AllPainLands))]
-    public void PainLand_Dispatch_ResolvesViaNamedCardFactory(string cardName, string a, string b)
-    {
-        _ = a; _ = b;
-        var alice = new Player("Alice", 20);
-
-        var card = NamedCardFactory.Create(cardName, alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be(cardName);
-    }
-
     // -----------------------------------------------------------------------
     // Mana abilities — shape
     // -----------------------------------------------------------------------

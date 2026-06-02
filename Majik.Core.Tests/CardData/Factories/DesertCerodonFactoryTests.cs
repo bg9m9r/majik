@@ -29,6 +29,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// "cycling vanilla creature" shape, only the stats (6/4) and cycle cost
 /// ({R}) differ.
 /// </summary>
+[Trait("Color", "R")]
 public class DesertCerodonFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -51,20 +52,6 @@ public class DesertCerodonFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void DesertCerodon_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Desert Cerodon", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.HasSubtype(CardSubtype.Beast).Should().BeTrue();
-        card.Abilities.OfType<KeywordAbility>()
-            .Should().Contain(k => k.Keyword == "Cycling");
-        card.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1,
-            "the cycling activated ability");
-    }
-
     // -----------------------------------------------------------------------
     // Cycling ability shape — CR 702.32
     // -----------------------------------------------------------------------

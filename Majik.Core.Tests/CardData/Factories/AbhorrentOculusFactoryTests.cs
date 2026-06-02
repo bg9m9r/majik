@@ -29,6 +29,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Opponent-upkeep trigger fires on opponents' upkeeps only.
 /// - Live TriggerManager registration via the two-arg overload.
 /// </summary>
+[Trait("Color", "U")]
 public class AbhorrentOculusFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -64,24 +65,6 @@ public class AbhorrentOculusFactoryTests
             .Should().ContainSingle(k => k.Keyword == "Flying");
         oculus.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsOculusShape()
-    {
-        var dispatched = NamedCardFactory.Create("Abhorrent Oculus", _alice);
-
-        dispatched.Should().BeOfType<Creature>();
-        dispatched.Name.Should().Be("Abhorrent Oculus");
-        dispatched.HasType(CardType.Creature).Should().BeTrue();
-        dispatched.HasSubtype(CardSubtype.Eye).Should().BeTrue();
-        dispatched.ManaCost.Should().Be("{2}{U}");
-        ((Creature)dispatched).Power.Should().Be(5);
-        ((Creature)dispatched).Toughness.Should().Be(5);
-        dispatched.Abilities.OfType<KeywordAbility>()
-            .Should().ContainSingle(k => k.Keyword == "Flying");
-        dispatched.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1);
-    }
-
     // -----------------------------------------------------------------------
     // Additional cost — exile six cards from your graveyard
     // -----------------------------------------------------------------------

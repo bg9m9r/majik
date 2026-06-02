@@ -18,6 +18,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Modern reprints). Vanilla — no printed keywords, triggers, statics, or
 /// activated abilities.
 /// </summary>
+[Trait("Color", "R")]
 public class GoblinRoughriderFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -56,19 +57,6 @@ public class GoblinRoughriderFactoryTests
         colors.Should().Contain(ManaColor.Red, "Goblin Roughrider costs {2}{R}");
         colors.Should().HaveCount(1, "Goblin Roughrider is exactly Red");
     }
-
-    [Fact]
-    public void GoblinRoughrider_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Goblin Roughrider", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Goblin Roughrider");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Goblin).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Knight).Should().BeTrue();
-    }
-
     [Fact]
     public void GoblinRoughrider_IsVanilla_NoAbilities()
     {

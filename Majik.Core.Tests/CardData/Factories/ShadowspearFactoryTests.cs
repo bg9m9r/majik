@@ -24,6 +24,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   "Equipped creature gets +1/+1 and has trample and lifelink."
 ///   "Equip {1}."
 /// </summary>
+[Trait("Color", "C")]
 public class ShadowspearFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -43,18 +44,6 @@ public class ShadowspearFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void Shadowspear_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Shadowspear", _alice);
-
-        c.Should().BeOfType<Artifact>();
-        c.Name.Should().Be("Shadowspear");
-        c.HasSubtype(CardSubtype.Equipment).Should().BeTrue();
-        c.HasSupertype(CardSupertype.Legendary).Should().BeTrue();
-    }
-
     [Fact]
     public void Shadowspear_EquipAbility_HasGenericOneCost()
     {

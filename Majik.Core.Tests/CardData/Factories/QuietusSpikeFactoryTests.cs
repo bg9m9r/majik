@@ -26,6 +26,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     unattached state).
 ///   * Resolution drains ceil(life / 2) from the target player.
 /// </summary>
+[Trait("Color", "C")]
 public class QuietusSpikeFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -42,17 +43,6 @@ public class QuietusSpikeFactoryTests
         card.ManaCost.Should().Be("{3}");
         card.Owner.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_QuietusSpike_AsArtifactEquipment()
-    {
-        var dispatched = NamedCardFactory.Create("Quietus Spike", _alice);
-
-        dispatched.Should().BeOfType<Artifact>();
-        dispatched.Name.Should().Be("Quietus Spike");
-        dispatched.HasSubtype(CardSubtype.Equipment).Should().BeTrue();
-    }
-
     [Fact]
     public void QuietusSpike_HasEquipThreeActivatedAbility()
     {

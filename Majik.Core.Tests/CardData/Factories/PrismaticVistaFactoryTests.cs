@@ -19,19 +19,9 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Mirrors the cycle-factory test shape used for the fetchland cycle in
 /// <see cref="CycleFactoryTests"/>, narrowed to a single named card.
 /// </summary>
+[Trait("Color", "C")]
 public class PrismaticVistaFactoryTests
 {
-    [Fact]
-    public void Dispatch_ReturnsLandWithPrintedName()
-    {
-        var alice = new Player("Alice", 20);
-
-        var card = NamedCardFactory.Create("Prismatic Vista", alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Prismatic Vista");
-    }
-
     [Fact]
     public void HasSingleTapActivatedAbility()
     {

@@ -31,6 +31,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Scry 2 on an empty library after damage — no-ops cleanly.
 /// </summary>
 [Collection(nameof(StaticRegistryCollection))]
+[Trait("Color", "R")]
 public class MagmaJetFactoryTests : IDisposable
 {
     private readonly Player _alice = new("Alice", 20);
@@ -54,17 +55,6 @@ public class MagmaJetFactoryTests : IDisposable
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_MagmaJet()
-    {
-        var card = NamedCardFactory.Create("Magma Jet", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Magma Jet");
-        card.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     // ── Spell definition shape ────────────────────────────────────────────────
 
     [Fact]

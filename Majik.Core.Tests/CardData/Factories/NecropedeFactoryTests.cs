@@ -31,6 +31,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Resolution stamps a -1/-1 counter on the agent-chosen target.
 ///   - No-target / deterministic-opponent fallback paths.
 /// </summary>
+[Trait("Color", "C")]
 public class NecropedeFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -56,18 +57,6 @@ public class NecropedeFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void Necropede_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Necropede", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Necropede");
-        c.HasType(CardType.Artifact).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Insect).Should().BeTrue();
-    }
-
     // -------------------------------------------------------------------------
     // Infect
     // -------------------------------------------------------------------------

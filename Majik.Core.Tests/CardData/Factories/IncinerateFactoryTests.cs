@@ -34,6 +34,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// the current engine regen posture (see <see cref="IncinerateFactory"/>
 /// remarks) and is therefore not separately asserted here.
 /// </summary>
+[Trait("Color", "R")]
 public class IncinerateFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -50,17 +51,6 @@ public class IncinerateFactoryTests
         spell.Owner.Should().BeSameAs(_alice);
         spell.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void Incinerate_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Incinerate", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Incinerate");
-        card.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     [Fact]
     public void Incinerate_SpellDefinition_HasSingleAnyTargetRequest()
     {

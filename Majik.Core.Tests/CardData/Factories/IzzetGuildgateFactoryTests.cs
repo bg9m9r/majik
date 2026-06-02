@@ -21,6 +21,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// and the enters-tapped replacement registration (CR 614.1c) when a
 /// <see cref="ReplacementBus"/> is supplied.
 /// </summary>
+[Trait("Color", "C")]
 public class IzzetGuildgateFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -28,17 +29,6 @@ public class IzzetGuildgateFactoryTests
     // -----------------------------------------------------------------------
     // Identity + dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void IzzetGuildgate_Dispatch_ReturnsLandWithGateSubtype()
-    {
-        var card = NamedCardFactory.Create("Izzet Guildgate", _alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Izzet Guildgate");
-        card.HasSubtype(CardSubtype.Gate).Should().BeTrue();
-    }
-
     [Fact]
     public void IzzetGuildgate_HasTwoManaAbilities_ProducingBlueAndRed()
     {

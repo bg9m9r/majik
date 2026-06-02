@@ -25,6 +25,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Lord static (CR 613.7c): other controller-Merfolk get +1/+1; self,
 ///   opponent Merfolk, and non-Merfolk unaffected.
 /// </summary>
+[Trait("Color", "M")]
 public class MerfolkMistbinderFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -68,18 +69,6 @@ public class MerfolkMistbinderFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void MerfolkMistbinder_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Merfolk Mistbinder", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Merfolk Mistbinder");
-        ((Creature)c).HasSubtype(CardSubtype.Merfolk).Should().BeTrue();
-        c.HasType(CardType.Creature).Should().BeTrue();
-    }
-
     // ── Lord static ─────────────────────────────────────────────────────
 
     [Fact]

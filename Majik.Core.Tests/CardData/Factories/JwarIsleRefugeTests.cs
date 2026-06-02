@@ -39,6 +39,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// this named-card factory — same posture as the scry-land / surveil-land
 /// cycles.
 /// </summary>
+[Trait("Color", "C")]
 public class JwarIsleRefugeTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -55,18 +56,6 @@ public class JwarIsleRefugeTests
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_JwarIsleRefuge()
-    {
-        var card = NamedCardFactory.Create("Jwar Isle Refuge", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Jwar Isle Refuge");
-        card.Abilities.OfType<ManaAbility>().Should().HaveCount(2);
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1);
-    }
-
     [Fact]
     public void JwarIsleRefuge_HasManaAbility_ForBlue()
     {

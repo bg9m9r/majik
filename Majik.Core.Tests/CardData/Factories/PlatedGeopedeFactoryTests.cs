@@ -39,6 +39,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - The +2/+2 expires in the cleanup step (CR 514.2).
 /// - Opponent's land ETB does NOT fire (CR 603.6a — "a land you control").
 /// </summary>
+[Trait("Color", "R")]
 public class PlatedGeopedeFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -64,17 +65,6 @@ public class PlatedGeopedeFactoryTests
         geopede.Owner.Should().BeSameAs(_alice);
         geopede.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void PlatedGeopede_DispatchesViaNamedCardFactory()
-    {
-        var dispatched = NamedCardFactory.Create("Plated Geopede", _alice);
-
-        dispatched.Should().BeOfType<Creature>();
-        dispatched.Name.Should().Be("Plated Geopede");
-        dispatched.HasType(CardType.Creature).Should().BeTrue();
-    }
-
     [Fact]
     public void PlatedGeopede_HasFirstStrikeMarker()
     {

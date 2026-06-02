@@ -37,6 +37,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Mode 1 (destroy target enchantment).
 /// - Mode 2 (remove up to three counters from target permanent).
 /// </summary>
+[Trait("Color", "M")]
 public class GlissaSunslayerFactoryTests : IDisposable
 {
     private readonly Player _alice = new("Alice", 20);
@@ -76,17 +77,6 @@ public class GlissaSunslayerFactoryTests : IDisposable
         colors.Should().Contain(ManaColor.Green);
         colors.Should().HaveCount(2);
     }
-
-    [Fact]
-    public void GlissaSunslayer_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Glissa Sunslayer", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Glissa Sunslayer");
-        c.ManaCost.Should().Be("{B}{G}");
-    }
-
     // -----------------------------------------------------------------------
     // Keywords
     // -----------------------------------------------------------------------

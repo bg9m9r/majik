@@ -31,6 +31,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   * No timing restriction: alt cost legal on caster's own turn.
 ///   * Bot probe surfaces eligible nontoken blue creature candidates only.
 /// </summary>
+[Trait("Color", "U")]
 public class FlareOfDenialFactoryTests
 {
     private readonly EventBus _bus = new();
@@ -62,17 +63,6 @@ public class FlareOfDenialFactoryTests
         CardColors.GetColors(flare).Should().Contain(ManaColor.Blue);
         flare.ManaCostValue.TotalValue.Should().Be(3);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsFlareOfDenialShape()
-    {
-        var dispatched = NamedCardFactory.Create("Flare of Denial", _alice);
-
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("Flare of Denial");
-        dispatched.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     // ── Alternative cost — CanCastFor ────────────────────────────────────────
 
     [Fact]

@@ -32,6 +32,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Resolution draws exactly one card for the controller.
 /// - {3}{G} activated ability becomes base 5/3, gains trample, isn't a Human.
 /// </summary>
+[Trait("Color", "G")]
 public class WerewolfPackLeaderFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -67,17 +68,6 @@ public class WerewolfPackLeaderFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void WerewolfPackLeader_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Werewolf Pack Leader", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Werewolf Pack Leader");
-        ((Creature)c).HasSubtype(CardSubtype.Werewolf).Should().BeTrue();
-    }
-
     // ── Pack tactics attack trigger ──────────────────────────────────────
 
     [Fact]

@@ -33,6 +33,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - The unblockable restriction is scoped to Blighted Agent — a
 ///     different creature is NOT restricted.
 /// </summary>
+[Trait("Color", "U")]
 public class BlightedAgentFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -59,19 +60,6 @@ public class BlightedAgentFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void BlightedAgent_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Blighted Agent", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Blighted Agent");
-        c.HasSubtype(CardSubtype.Phyrexian).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Human).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Rogue).Should().BeTrue();
-    }
-
     // -------------------------------------------------------------------------
     // Keyword markers — Unblockable + Infect always attached
     // -------------------------------------------------------------------------

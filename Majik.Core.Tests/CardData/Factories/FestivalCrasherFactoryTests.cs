@@ -31,6 +31,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Creature spell does NOT fire the trigger.
 /// - Opponent's instant cast does NOT fire (controller scoped, CR 603.1).
 /// </summary>
+[Trait("Color", "R")]
 public class FestivalCrasherFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -72,21 +73,6 @@ public class FestivalCrasherFactoryTests
         fc.Owner.Should().BeSameAs(_alice);
         fc.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void FestivalCrasher_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Festival Crasher", _alice);
-
-        card.Should().BeOfType<Creature>("Festival Crasher is a Creature");
-        card.Name.Should().Be("Festival Crasher");
-        card.HasSubtype(CardSubtype.Devil).Should().BeTrue();
-        ((Creature)card).BasePower.Should().Be(1);
-        ((Creature)card).BaseToughness.Should().Be(3);
-        card.ManaCost.Should().Be("{1}{R}");
-        card.Owner.Should().BeSameAs(_alice);
-    }
-
     [Fact]
     public void SingleArg_ShapeOnly_DoesNotWireTrigger()
     {

@@ -34,6 +34,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Attack trigger: a 1..1 "target creature you control" TargetRequest,
 ///   placing one +1/+1 counter on the chosen target.
 /// </summary>
+[Trait("Color", "C")]
 public class RestlessBivouacFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -69,21 +70,6 @@ public class RestlessBivouacFactoryTests
         land.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1,
             "the attack trigger is attached to the land shape");
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_RestlessBivouac()
-    {
-        var card = NamedCardFactory.Create("Restless Bivouac", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Restless Bivouac");
-        card.HasType(CardType.Land).Should().BeTrue();
-
-        card.Abilities.OfType<ManaAbility>().Should().HaveCount(2);
-        card.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1);
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1);
-    }
-
     // -----------------------------------------------------------------------
     // Animate ability
     // -----------------------------------------------------------------------

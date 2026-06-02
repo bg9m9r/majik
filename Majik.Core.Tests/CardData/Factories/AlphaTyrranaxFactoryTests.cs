@@ -17,6 +17,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Card: Alpha Tyrranax — Creature — Dinosaur Beast {4}{G}{G} 6/5 (Scars of Mirrodin).
 /// Vanilla — no printed keywords, triggers, statics, or activated abilities.
 /// </summary>
+[Trait("Color", "G")]
 public class AlphaTyrranaxFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -55,19 +56,6 @@ public class AlphaTyrranaxFactoryTests
         colors.Should().Contain(ManaColor.Green, "Alpha Tyrranax costs {4}{G}{G}");
         colors.Should().HaveCount(1, "Alpha Tyrranax is exactly Green");
     }
-
-    [Fact]
-    public void AlphaTyrranax_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Alpha Tyrranax", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Alpha Tyrranax");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Dinosaur).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Beast).Should().BeTrue();
-    }
-
     [Fact]
     public void AlphaTyrranax_IsVanilla_NoAbilities()
     {

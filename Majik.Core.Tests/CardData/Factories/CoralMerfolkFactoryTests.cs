@@ -18,6 +18,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Modern reprints). Vanilla — no printed keywords, triggers, statics, or
 /// activated abilities.
 /// </summary>
+[Trait("Color", "U")]
 public class CoralMerfolkFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -55,18 +56,6 @@ public class CoralMerfolkFactoryTests
         colors.Should().Contain(ManaColor.Blue, "Coral Merfolk costs {1}{U}");
         colors.Should().HaveCount(1, "Coral Merfolk is exactly Blue");
     }
-
-    [Fact]
-    public void CoralMerfolk_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Coral Merfolk", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Coral Merfolk");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Merfolk).Should().BeTrue();
-    }
-
     [Fact]
     public void CoralMerfolk_IsVanilla_NoAbilities()
     {

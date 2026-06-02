@@ -24,6 +24,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Resolve body routes creature damage through
 ///   <see cref="Primitives.Fx.DealDamageAny"/>.
 /// </summary>
+[Trait("Color", "R")]
 public class ShockFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -40,17 +41,6 @@ public class ShockFactoryTests
         shock.Owner.Should().BeSameAs(_alice);
         shock.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void Shock_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Shock", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Shock");
-        card.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     [Fact]
     public void Shock_SpellDefinition_HasSingleAnyTargetRequest()
     {

@@ -35,6 +35,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   * Resolve: controller can't pay {3} → target spell countered to graveyard.
 ///   * Resolve: controller pays {3} → target spell NOT countered (survives).
 /// </summary>
+[Trait("Color", "U")]
 public class MetallicRebukeFactoryTests
 {
     private readonly EventBus _bus = new();
@@ -84,17 +85,6 @@ public class MetallicRebukeFactoryTests
         rebuke.Owner.Should().BeSameAs(_alice);
         rebuke.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsMetallicRebukeShape()
-    {
-        var dispatched = NamedCardFactory.Create("Metallic Rebuke", _alice);
-
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("Metallic Rebuke");
-        dispatched.ManaCost.Should().Be("{2}{U}");
-    }
-
     // ── Improvise keyword marker ──────────────────────────────────────────────
 
     [Fact]

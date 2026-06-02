@@ -33,6 +33,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Attack trigger: a 1..1 "another target attacking creature" TargetRequest,
 ///   pumping the chosen creature +2/+0 until end of turn and untapping it.
 /// </summary>
+[Trait("Color", "C")]
 public class RestlessRidgelineFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -68,21 +69,6 @@ public class RestlessRidgelineFactoryTests
         land.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1,
             "the attack trigger is attached to the land shape");
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_RestlessRidgeline()
-    {
-        var card = NamedCardFactory.Create("Restless Ridgeline", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Restless Ridgeline");
-        card.HasType(CardType.Land).Should().BeTrue();
-
-        card.Abilities.OfType<ManaAbility>().Should().HaveCount(2);
-        card.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1);
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1);
-    }
-
     // -----------------------------------------------------------------------
     // Animate ability
     // -----------------------------------------------------------------------

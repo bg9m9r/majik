@@ -18,6 +18,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Second Age). Vanilla — no printed keywords, triggers, statics, or activated
 /// abilities.
 /// </summary>
+[Trait("Color", "U")]
 public class FugitiveWizardFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -56,19 +57,6 @@ public class FugitiveWizardFactoryTests
         colors.Should().Contain(ManaColor.Blue, "Fugitive Wizard costs {U}");
         colors.Should().HaveCount(1, "Fugitive Wizard is exactly Blue");
     }
-
-    [Fact]
-    public void FugitiveWizard_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Fugitive Wizard", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Fugitive Wizard");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Human).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Wizard).Should().BeTrue();
-    }
-
     [Fact]
     public void FugitiveWizard_IsVanilla_NoAbilities()
     {

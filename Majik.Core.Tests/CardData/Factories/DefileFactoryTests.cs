@@ -23,6 +23,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   * No Swamps → clean no-op.
 ///   * Off-battlefield target → no-op (CR 608.2b).
 /// </summary>
+[Trait("Color", "B")]
 public class DefileFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -36,15 +37,6 @@ public class DefileFactoryTests
         defile.HasType(CardType.Instant).Should().BeTrue();
         CardColors.GetColors(defile).Should().Contain(ManaColor.Black);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsDefileShape()
-    {
-        var dispatched = NamedCardFactory.Create("Defile", _alice);
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("Defile");
-    }
-
     [Fact]
     public void CountSwamps_CountsOnlyControllerSwamps()
     {

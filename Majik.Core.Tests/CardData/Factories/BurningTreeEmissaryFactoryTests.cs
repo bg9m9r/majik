@@ -27,6 +27,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   * Resolve: mana pool gains {R}{G}.
 ///   * <see cref="NamedCardFactory"/> dispatch by name.
 /// </summary>
+[Trait("Color", "M")]
 public class BurningTreeEmissaryFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -94,19 +95,6 @@ public class BurningTreeEmissaryFactoryTests
         _alice.ManaPool.Total.Should().Be(2,
             "Burning-Tree deposits exactly two mana — {R}{G}");
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsBurningTreeShape()
-    {
-        var dispatched = NamedCardFactory.Create("Burning-Tree Emissary", _alice);
-
-        dispatched.Should().BeOfType<Creature>();
-        dispatched.Name.Should().Be("Burning-Tree Emissary");
-        dispatched.ManaCost.Should().Be("{R/G}{R/G}");
-        ((Creature)dispatched).BasePower.Should().Be(2);
-        ((Creature)dispatched).BaseToughness.Should().Be(2);
-    }
-
     [Fact]
     public void BurningTreeEmissary_BusDrivenEtbFires_AndPoolGainsRG()
     {

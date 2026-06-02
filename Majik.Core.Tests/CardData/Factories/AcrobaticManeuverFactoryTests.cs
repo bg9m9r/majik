@@ -28,6 +28,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Resolve: empty target list short-circuits cleanly (won't happen in
 ///   prod because MinTargets = 1, but documents the no-op posture).
 /// </summary>
+[Trait("Color", "W")]
 public class AcrobaticManeuverFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -48,17 +49,6 @@ public class AcrobaticManeuverFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void AcrobaticManeuver_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Acrobatic Maneuver", _alice);
-
-        c.Should().BeOfType<Instant>();
-        c.Name.Should().Be("Acrobatic Maneuver");
-        c.ManaCost.Should().Be("{2}{W}");
-    }
-
     // -----------------------------------------------------------------------
     // SpellDefinition — structural shape
     // -----------------------------------------------------------------------

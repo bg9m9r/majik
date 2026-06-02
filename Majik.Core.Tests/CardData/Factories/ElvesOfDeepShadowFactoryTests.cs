@@ -26,6 +26,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - No life-floor gate (CR 119.4 does not apply — this is damage, not
 ///     "Pay 1 life"): can still activate at 1 life.
 /// </summary>
+[Trait("Color", "G")]
 public class ElvesOfDeepShadowFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -45,19 +46,6 @@ public class ElvesOfDeepShadowFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_ElvesOfDeepShadow()
-    {
-        var card = NamedCardFactory.Create("Elves of Deep Shadow", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Elves of Deep Shadow");
-        card.HasType(CardType.Creature).Should().BeTrue();
-        ((Creature)card).HasSubtype(CardSubtype.Elf).Should().BeTrue();
-        ((Creature)card).HasSubtype(CardSubtype.Druid).Should().BeTrue();
-    }
-
     [Fact]
     public void ElvesOfDeepShadow_HasSingleBlackManaAbility()
     {

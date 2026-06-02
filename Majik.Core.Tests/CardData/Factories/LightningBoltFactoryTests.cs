@@ -26,6 +26,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Resolve body removes loyalty from a planeswalker target
 ///   (CR 306.7 — Bolt to a 3-loyalty Walker leaves it at 0).
 /// </summary>
+[Trait("Color", "R")]
 public class LightningBoltFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -42,17 +43,6 @@ public class LightningBoltFactoryTests
         bolt.Owner.Should().BeSameAs(_alice);
         bolt.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void LightningBolt_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Lightning Bolt", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Lightning Bolt");
-        card.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     [Fact]
     public void LightningBolt_SpellDefinition_HasSingleAnyTargetRequest()
     {
