@@ -9,7 +9,13 @@ on:
 
 jobs:
   build-test:
-    runs-on: ubuntu-latest
+    # Dual-pool: alternate each run between the self-hosted pool and GitHub-hosted
+    # by run-number parity, so combined concurrency (self-hosted runners + hosted)
+    # sustains a wider card-shipping POOL. Degrades gracefully — if one pool is
+    # throttled/down the other still takes its share.
+    # NB: GitHub Actions expressions have NO modulo operator, so parity is tested
+    # by the last digit via endsWith (even last digit -> self-hosted).
+    runs-on: ${{ (endsWith(github.run_number, '0') || endsWith(github.run_number, '2') || endsWith(github.run_number, '4') || endsWith(github.run_number, '6') || endsWith(github.run_number, '8')) && 'self-hosted' || 'ubuntu-latest' }}
     timeout-minutes: 12  # healthy run is ~3min; fail fast so a flaky hang frees the runner instead of hogging it
 
     steps:
