@@ -1,0 +1,9 @@
+{
+  "name": "Imperious Perfect",
+  "types": ["Creature"],
+  "subtypes": ["Elf", "Warrior"],
+  "manaCost": "{2}{G}",
+  "power": 2,
+  "toughness": 2,
+  "abilities": []
+}
