@@ -1,0 +1,8 @@
+{
+  "name": "Goldhound",
+  "types": ["Creature", "Artifact"],
+  "subtypes": ["Treasure", "Dog"],
+  "manaCost": "{R}",
+  "power": 1,
+  "toughness": 1
+}
