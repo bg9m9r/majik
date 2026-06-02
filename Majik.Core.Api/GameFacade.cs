@@ -701,7 +701,13 @@ public sealed class GameFacade : IDisposable
                     .Types.Contains(Majik.Core.Cards.Types.CardType.Land);
             if (!frontIsLand)
             {
-                var mdfcBuilt = Majik.Core.CardData.NamedCardFactory.Create(mdfcFrontName, owner);
+                // CR 613.7c — route through the effects-aware overload so a
+                // front-face factory that registers a continuous
+                // LordStaticEffect / AttachedBoostEffect (lord / anthem /
+                // equipment / aura) wires it against the live per-game service.
+                // Returns the single-arg result for fronts with no such
+                // overload — behaviourally identical for them.
+                var mdfcBuilt = Majik.Core.CardData.NamedCardFactory.Create(mdfcFrontName, owner, effects);
                 if (mdfcBuilt is Majik.Core.Cards.Creature mdfcCreature)
                 {
                     mdfcCreature.ActiveEffects = effects;
@@ -725,10 +731,22 @@ public sealed class GameFacade : IDisposable
         {
             // APPROACH B — instance swap. Build the card through its factory
             // (owner == controller, matching what GameFacade already assigns).
-            var built = Majik.Core.CardData.NamedCardFactory.Create(shell.Name, owner);
+            // CR 613.7c — route through the effects-aware overload so a factory
+            // that registers a continuous LordStaticEffect / AttachedBoostEffect
+            // (lord / anthem / equipment / aura) wires it against the live
+            // per-game ContinuousEffectsService. Without this the static effect
+            // was silently dropped in production: the factory's single-arg
+            // Create never touches the service, so the lord built nothing live
+            // (Empyrean Eagle / Leyline of the Guildpact / Dryad of the Ilysian
+            // Grove / every LordStaticEffect anthem). Names with no effects-aware
+            // overload fall back to the single-arg build — identical result.
+            var built = Majik.Core.CardData.NamedCardFactory.Create(shell.Name, owner, effects);
 
             // Hook the CES so creatures get layer-system P/T (mirrors
-            // BindCardAbilities). The factory does not wire this.
+            // BindCardAbilities). The effects-aware overload registers the
+            // lord's OWN static but does not set ActiveEffects on the built
+            // card itself, so it must still be wired for the card to READ its
+            // own (and others') layer P/T.
             if (built is Majik.Core.Cards.Creature creature)
             {
                 creature.ActiveEffects = effects;

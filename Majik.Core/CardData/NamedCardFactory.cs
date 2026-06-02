@@ -32,9 +32,50 @@ namespace Majik.Core.CardData;
 public static partial class NamedCardFactory
 {
     public static ICard Create(string name, Player owner)
+        => Create(name, owner, effects: null);
+
+    /// <summary>
+    /// Effects-aware dispatch. When <paramref name="effects"/> is supplied and
+    /// the named factory exposes a <c>Create(Player, ContinuousEffectsService)</c>
+    /// overload (lord / anthem / equipment / aura cards), the card is built
+    /// through that overload so its continuous <c>LordStaticEffect</c> /
+    /// <c>AttachedBoostEffect</c> is registered against the live per-game
+    /// <see cref="Majik.Core.Effects.ContinuousEffectsService"/> (CR 613.7c).
+    /// Cards without such an overload — and any call with a null
+    /// <paramref name="effects"/> — fall back to the single-arg dispatch, which
+    /// is behaviourally identical for them. This is the entry point the
+    /// production <c>GameFacade</c> routed (instance-swap) build uses so static
+    /// effects are no longer dropped in live matches.
+    /// </summary>
+    public static ICard Create(
+        string name,
+        Player owner,
+        Majik.Core.Effects.ContinuousEffectsService? effects)
     {
         if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException("Name required", nameof(name));
         if (owner == null) throw new ArgumentNullException(nameof(owner));
+
+        // 0) Effects-aware dispatch — only for factories that expose a
+        //    Create(Player, ContinuousEffectsService) overload. Returns null
+        //    when the name has no such overload, so the single-arg path below
+        //    takes over (identical result for non-static cards). Basic-land
+        //    mana is reattached here for symmetry with the single-arg path
+        //    (a manland factory's effects-aware overload could be dispatched
+        //    through this general entrypoint, even though GameFacade's routed
+        //    build skips lands).
+        if (effects != null)
+        {
+            ICard? withEffects = CreateGeneratedWithEffects(name, owner, effects);
+            if (withEffects != null)
+            {
+                withEffects.SetOwner(owner);
+                if (withEffects is Land && withEffects.HasSupertype(CardSupertype.Basic))
+                {
+                    AttachBasicLandMana(withEffects, owner);
+                }
+                return withEffects;
+            }
+        }
 
         // 1) Compile-time-generated dispatch table — populated from
         //    [CardName] attributes on each *Factory class. Returns null
