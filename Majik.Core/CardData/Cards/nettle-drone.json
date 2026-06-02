@@ -1,0 +1,9 @@
+{
+  "name": "Nettle Drone",
+  "types": ["Creature"],
+  "subtypes": ["Eldrazi", "Drone"],
+  "manaCost": "{2}{R}",
+  "power": 3,
+  "toughness": 1,
+  "abilities": []
+}
