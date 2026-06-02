@@ -1,0 +1,5 @@
+{
+  "name": "Esper Charm",
+  "types": ["Instant"],
+  "manaCost": "{W}{U}{B}"
+}
