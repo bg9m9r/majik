@@ -1,0 +1,9 @@
+{
+  "name": "Frontier Bivouac",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "G" },
+    { "kind": "mana", "produces": "U" },
+    { "kind": "mana", "produces": "R" }
+  ]
+}
