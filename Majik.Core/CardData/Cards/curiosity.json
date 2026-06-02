@@ -1,0 +1,7 @@
+{
+  "name": "Curiosity",
+  "types": ["Enchantment"],
+  "subtypes": ["Aura"],
+  "manaCost": "{U}",
+  "colors": ["U"]
+}
