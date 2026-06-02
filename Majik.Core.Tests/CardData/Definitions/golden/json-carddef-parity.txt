@@ -11582,6 +11582,56 @@
     "Black"
   ]
 }
+==== gray-merchant-of-asphodel ====
+{
+  "name": "Gray Merchant of Asphodel",
+  "manaCost": "{3}{B}{B}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Zombie"
+  ],
+  "power": 2,
+  "toughness": 4,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Black"
+  ]
+}
 ==== graypelt-refuge ====
 {
   "name": "Graypelt Refuge",

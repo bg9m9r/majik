@@ -1,0 +1,9 @@
+{
+  "name": "Gray Merchant of Asphodel",
+  "types": ["Creature"],
+  "subtypes": ["Zombie"],
+  "manaCost": "{3}{B}{B}",
+  "power": 2,
+  "toughness": 4,
+  "abilities": []
+}
