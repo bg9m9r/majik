@@ -1,0 +1,8 @@
+{
+  "name": "Fierce Empath",
+  "types": ["Creature"],
+  "subtypes": ["Elf"],
+  "manaCost": "{2}{G}",
+  "power": 1,
+  "toughness": 1
+}
