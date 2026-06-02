@@ -1,0 +1,5 @@
+{
+  "name": "Gather the Townsfolk",
+  "types": ["Sorcery"],
+  "manaCost": "{1}{W}"
+}
