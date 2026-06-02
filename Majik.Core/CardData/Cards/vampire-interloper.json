@@ -1,0 +1,9 @@
+{
+  "name": "Vampire Interloper",
+  "types": ["Creature"],
+  "subtypes": ["Vampire", "Scout"],
+  "manaCost": "{1}{B}",
+  "power": 2,
+  "toughness": 1,
+  "abilities": []
+}
