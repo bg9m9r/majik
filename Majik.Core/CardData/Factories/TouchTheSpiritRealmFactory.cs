@@ -1,15 +1,13 @@
 using Majik.Core.Abilities;
-using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
+using Majik.Core.Domain.DomainEvents;
 using Majik.Core.Events;
-using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
 using Majik.Core.Services;
 using Majik.Core.StateMachine;
-using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
@@ -18,203 +16,181 @@ namespace Majik.Core.CardData.Factories;
 /// Named-card factory for Touch the Spirit Realm (Kamigawa: Neon Dynasty,
 /// {2}{W}).
 ///
-/// Instant. Current Scryfall oracle:
-///   "Exile target artifact, creature, or enchantment.
-///    Channel — {2}{W}, Discard Touch the Spirit Realm: Exile target
-///    creature or enchantment you control. Return it to the battlefield
-///    under its owner's control at the beginning of the next end step."
+/// Enchantment. Oracle text (Scryfall, verified 2026-06-02):
+///   "When this enchantment enters, exile up to one target artifact or
+///    creature until this enchantment leaves the battlefield.
+///    Channel — {1}{W}, Discard this card: Exile target artifact or creature.
+///    Return it to the battlefield under its owner's control at the beginning
+///    of the next end step."
+///
+/// Two distinct removal modes:
+///   1. <b>Cast as the enchantment</b> — O-Ring: the ETB exiles up to one
+///      artifact/creature UNTIL THIS LEAVES the battlefield (returns when the
+///      enchantment dies/bounces). Same exile-on-ETB / return-on-LTB closure
+///      shape as <see cref="BanishingLightFactory"/>, but the target is
+///      optional ("up to one") and any controller's (not opponent-only), and
+///      the filter is artifact-OR-creature rather than nonland-permanent.
+///   2. <b>Channel from hand</b> — a TEMPORARY blink: discard the card to
+///      exile a target artifact/creature and return it at the next end step
+///      (CR 603.7 delayed trigger). NOT linked to the enchantment (the card
+///      is in the graveyard, never on the battlefield).
 ///
 /// ## Implemented (v1)
-/// - Instant shape, mana cost {2}{W}, owner / controller.
-/// - <b>Cast body</b> — <see cref="BuildSpellDefinition"/> returns a
-///   <see cref="SpellDefinition"/> with a single 1..1 "target artifact,
-///   creature, or enchantment" <see cref="TargetRequest"/> sourced from a
-///   live <c>CandidateGatherer</c> walking every player's battlefield
-///   (Artifact / Creature / Enchantment card-types; CR 305 — Lands are a
-///   card type, not a subtype, so the filter correctly rejects Dryad
-///   Arbor / Mishra's Factory). Removal intent in the bot ranker.
-///   Resolve: re-checks the target is still a battlefield permanent
-///   matching the type filter (CR 608.2b) and exiles it via owner-routed
-///   zone moves (CR 701.21 — mirrors PathToExile / AnguishedUnmaking /
-///   PrismaticEnding). Indestructible (CR 702.12) does NOT prevent exile.
-///
-/// - <b>Channel — {2}{W}, Discard Touch the Spirit Realm</b> (CR 702.74).
-///   Activated-from-hand ability attached to the card (same surface used
-///   by <see cref="ChannelLandCycleFactory"/>: <see cref="ManaCostCost"/>
-///   + <see cref="DiscardSelfCost"/> — the discard-self cost gates
-///   activation to <see cref="ZoneType.Hand"/> per CR 702.74a).
-///   <see cref="AttachChannelAbility"/> wires the activated ability with
-///   one 1..1 "target creature or enchantment you control" TargetRequest
-///   (controller-side gathering only — Protection intent). On resolve:
-///   (a) re-check the target is still a battlefield Creature /
-///       Enchantment controlled by the channel's controller (CR 608.2b);
-///   (b) exile it via owner-routed moves (CR 701.21);
-///   (c) when a <see cref="TriggerManager"/> is supplied, register a
-///       one-shot <see cref="DelayedTriggeredAbility"/> (CR 603.7) that
-///       fires on the first <see cref="StepStartedEvent"/> with
-///       <c>StepType == End</c> and timestamp strictly after this resolve
-///       (same activation-time fence as Mishra's Bauble / Wrenn's
-///       Resolve / Yorion's ETB-exile rider). When the trigger resolves,
-///       move the still-exiled card back to the battlefield under its
-///       owner's control (CR 614 — "under its owner's control" overrides
-///       the controller pronoun on the channel's resolve closure).
+/// - <b>Enchantment {2}{W}</b>. Owner / controller wired.
+/// - <b>ETB "exile up to one ... until this leaves"</b> (CR 603.6a / 701.21)
+///   + <b>LTB return</b> (CR 603.6c / 110.2) — per-instance closure captures
+///   the exiled card between the two triggered abilities (Banishing Light
+///   shape). "Up to one" → <c>MinTargets: 0</c>; an empty choice is a clean
+///   no-op.
+/// - <b>Channel — {1}{W}, Discard this card</b> (CR 702.74): activated-from-
+///   hand ability (<see cref="ManaCostCost"/> + <see cref="DiscardSelfCost"/>,
+///   the discard gating activation to <see cref="ZoneType.Hand"/> per
+///   CR 702.74a). On resolve exile the target then, when a
+///   <see cref="TriggerManager"/> is supplied, register a one-shot
+///   <see cref="DelayedTriggeredAbility"/> (CR 603.7) returning it to its
+///   OWNER's control at the next end step.
 ///
 /// ## Deferred (v1 gaps)
-/// - <b>Agent prompt — "target creature or enchantment YOU control"</b>:
-///   the Channel TargetRequest's <c>CandidateGatherer</c> filters to
-///   controller-side Creature / Enchantment permanents; the agent
-///   surface for the actual pick is the same shared queue as PathToExile
-///   / Anguished Unmaking — heuristic bot picks via Intent ranking, no
-///   explicit "pick one of yours" prompt needed at the v1 surface.
-///
-/// - <b>Tokens / non-card permanents</b>: tokens that get exiled cease
-///   to exist (CR 111.8). The delayed-return trigger defensively checks
-///   <c>Zone == Exile</c> at resolve so a token already removed by SBA
-///   is skipped — same posture as
-///   <see cref="YorionSkyNomadFactory.ResolveEtb"/>.
-///
-/// - <b>Replacement effects on return</b>: the delayed return uses
-///   <see cref="ZoneService.MoveCard"/> when supplied so ETB triggers /
-///   replacement effects on the returned card fire correctly; raw-zone
-///   fallback skips those events (matching Yorion's two-mode posture).
+/// - <b>Replacement effects on return</b>: raw-zone return fallback skips
+///   ETB/replacement events when no <see cref="ZoneService"/> is threaded in
+///   (Banishing Light / Yorion posture).
+/// - <b>Tokens</b>: an exiled token ceases to exist (CR 111.8); both return
+///   paths defensively check <c>Zone == Exile</c> before moving it back.
 /// </summary>
 [CardName("Touch the Spirit Realm")]
 public static class TouchTheSpiritRealmFactory
 {
     public const string CardName = "Touch the Spirit Realm";
     public const string PrintedManaCost = "{2}{W}";
-    public const string ChannelManaCost = "{2}{W}";
+    public const string ChannelManaCost = "{1}{W}";
 
-    /// <summary>CardDef DSL — card shape only. The cast resolve body
-    /// lives in <see cref="BuildSpellDefinition"/>; the Channel activated
-    /// ability is attached by <see cref="Create(Player, TriggerManager?, ZoneService?)"/>.</summary>
-    public static CardDef Define() => CardDef.Instant(CardName, PrintedManaCost);
-
-    /// <summary>
-    /// Single-arg dispatcher entry point. Builds the Instant shape and
-    /// attaches the Channel ability in shape-only mode (no
-    /// <see cref="TriggerManager"/>, no <see cref="ZoneService"/>) — the
-    /// Channel's exile body still runs, but the delayed end-step return
-    /// is skipped (matches Wrenn's Resolve / Yorion's shape-only fallback).
-    /// </summary>
-    public static Instant Create(Player owner) => Create(owner, triggers: null, zones: null);
+    /// <summary>Single-arg dispatcher entry — shape only (abilities attached
+    /// but not registered with a <see cref="TriggerManager"/>).</summary>
+    public static Enchantment Create(Player owner) => Create(owner, triggers: null, zones: null);
 
     /// <summary>
-    /// Build Touch the Spirit Realm with the Channel activated ability
-    /// fully wired. The cast body is built on demand via
-    /// <see cref="BuildSpellDefinition"/>.
+    /// Build Touch the Spirit Realm. When <paramref name="triggers"/> is
+    /// supplied, the ETB / LTB O-Ring pair and the Channel's delayed end-step
+    /// return are registered so the bus drives them.
     /// </summary>
-    public static Instant Create(Player owner, TriggerManager? triggers, ZoneService? zones)
+    public static Enchantment Create(Player owner, TriggerManager? triggers, ZoneService? zones)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
-        var card = (Instant)CardDefRuntime.Build(Define(), owner);
+        var card = new Enchantment(CardName, PrintedManaCost, supertypes: null, subtypes: null);
+        card.SetOwner(owner);
+        card.SetController(owner);
+
+        WireEtbExileUntilLeaves(card, owner, triggers);
         AttachChannelAbility(card, owner, triggers, zones);
         return card;
     }
 
     /// <summary>
-    /// Build the printed cast SpellDefinition — single 1..1 target
-    /// artifact / creature / enchantment, on-resolve exile via
-    /// owner-routed zone moves (CR 701.21).
+    /// ETB "exile up to one target artifact or creature until this leaves" +
+    /// the matching LTB return. Mirrors
+    /// <see cref="BanishingLightFactory.WireExileEnchantmentTriggers"/> but
+    /// with an optional ("up to one") target and an artifact-or-creature
+    /// filter with no controller restriction.
     /// </summary>
-    public static SpellDefinition BuildSpellDefinition(Func<object, object> targetResolver)
+    private static void WireEtbExileUntilLeaves(Enchantment card, Player owner, TriggerManager? triggers)
     {
-        ArgumentNullException.ThrowIfNull(targetResolver);
+        // Shared closure: ETB writes, LTB reads.
+        ICard? exiled = null;
+        Player? exiledOwner = null;
 
-        return new SpellDefinition(
-            Modes: Array.Empty<string>(),
-            HasVariableX: false,
-            TargetRequests: new[]
+        TriggeredAbility? etbTrigger = null;
+        var etbEffect = new Effect(
+            $"{CardName}: exile up to one target artifact or creature until this leaves (CR 701.21)",
+            () =>
+            {
+                if (etbTrigger == null) return;
+                var chosen = etbTrigger.ChosenTargets;
+                // "Up to one" — an empty choice is a legal no-op (CR 115.1b).
+                if (chosen.Count == 0 || chosen[0].Count == 0) return;
+                if (chosen[0][0] is not Permanent target) return;
+
+                // CR 608.2b — resolution-time legality re-check.
+                if (target.Zone != ZoneType.Battlefield) return;
+                if (!target.HasType(CardType.Artifact) && !target.HasType(CardType.Creature)) return;
+
+                // CR 701.21 — exile via the target's owner's zones.
+                var targetOwner = target.Owner;
+                if (targetOwner != null)
+                {
+                    targetOwner.Zones.Battlefield.RemoveCard(target);
+                    targetOwner.Zones.Exile.AddCard(target);
+                }
+                target.SetZone(ZoneType.Exile);
+
+                exiled = target;
+                exiledOwner = targetOwner;
+            });
+
+        etbTrigger = new TriggeredAbility(
+            source: card,
+            controller: owner,
+            condition: Triggers.OnEnterBattlefieldSelf(card),
+            effects: new IEffect[] { etbEffect },
+            interveningIf: null,
+            activeZones: new[] { ZoneType.Battlefield },
+            targetRequests: new[]
             {
                 new TargetRequest(
-                    Description: "target artifact, creature, or enchantment",
-                    MinTargets: 1,
+                    Description: "up to one target artifact or creature",
+                    MinTargets: 0,
                     MaxTargets: 1,
                     LegalCandidates: Array.Empty<object>(),
                     Intent: BotIntent.Removal,
-                    // Agent-prompt MVP — live gather any battlefield permanent
-                    // that's Artifact / Creature / Enchantment (CR 305 — Lands
-                    // are a card type, so a Dryad Arbor is rejected here even
-                    // though it's also a Creature... wait — Dryad Arbor IS a
-                    // Creature card type, so it WOULD be eligible. The printed
-                    // text reads "target artifact, creature, or enchantment"
-                    // and Dryad Arbor satisfies the creature half).
                     CandidateGatherer: ctx => ctx.AllPlayers
                         .SelectMany(p => p.Zones.Battlefield.GetCards())
-                        .Where(c => c.HasType(CardType.Artifact)
-                                    || c.HasType(CardType.Creature)
-                                    || c.HasType(CardType.Enchantment))
+                        .Where(c => c.HasType(CardType.Artifact) || c.HasType(CardType.Creature))
                         .Cast<object>()
                         .ToList()),
-            },
-            EffectFactory: chosen =>
-            {
-                var raw = chosen.Targets[0][0];
-                var resolved = targetResolver(raw);
-                return new IEffect[]
-                {
-                    new Effect(
-                        $"{CardName}: exile target artifact/creature/enchantment",
-                        () =>
-                        {
-                            // CR 608.2b — resolution-time legality re-check.
-                            if (resolved is not Permanent target) return;
-                            if (target.Zone != ZoneType.Battlefield) return;
-                            if (!target.HasType(CardType.Artifact)
-                                && !target.HasType(CardType.Creature)
-                                && !target.HasType(CardType.Enchantment))
-                            {
-                                return;
-                            }
-
-                            // CR 701.21 — Exile via owner-routed zone moves.
-                            // Indestructible (CR 702.12) does not prevent exile.
-                            var fromOwner = target.Owner;
-                            if (fromOwner != null)
-                            {
-                                fromOwner.Zones.Battlefield.RemoveCard(target);
-                                fromOwner.Zones.Exile.AddCard(target);
-                            }
-                            target.SetZone(ZoneType.Exile);
-                        }),
-                };
             });
+
+        card.AddAbility(etbTrigger);
+        triggers?.RegisterTriggeredAbility(etbTrigger);
+
+        // LTB — return the exiled card to its owner's control (CR 603.6c / 110.2).
+        var ltbEffect = new Effect(
+            $"{CardName}: return the exiled card to the battlefield under its owner's control",
+            () =>
+            {
+                if (exiled == null || exiledOwner == null) return;
+                if (exiled.Zone != ZoneType.Exile) return; // CR 400.7 / 111.8
+
+                exiledOwner.Zones.Exile.RemoveCard(exiled);
+                exiledOwner.Zones.Battlefield.AddCard(exiled);
+                exiled.SetZone(ZoneType.Battlefield);
+                if (exiled is Card returned) returned.ChangeController(exiledOwner);
+            });
+
+        var ltbTrigger = new TriggeredAbility(
+            source: card,
+            controller: owner,
+            condition: new EventTriggerCondition<CardMovedEvent>(
+                (e, _) => ReferenceEquals(e.Card, card) && e.FromZone == ZoneType.Battlefield),
+            effects: new IEffect[] { ltbEffect },
+            activeZones: new[] { ZoneType.Battlefield });
+
+        card.AddAbility(ltbTrigger);
+        triggers?.RegisterTriggeredAbility(ltbTrigger);
     }
 
     /// <summary>
-    /// Wire the Channel activated ability onto <paramref name="card"/>.
-    /// Same cost stack as <see cref="ChannelLandCycleFactory"/>:
-    /// <see cref="ManaCostCost"/>(<see cref="ChannelManaCost"/>) +
-    /// <see cref="DiscardSelfCost"/>. The discard-self cost is what gates
-    /// activation to the hand zone (CR 702.74a) — the engine surface
-    /// doesn't otherwise check the source zone for activated-ability
-    /// activations.
+    /// Channel — {1}{W}, Discard this card: exile target artifact or creature,
+    /// returning it to its owner's control at the beginning of the next end
+    /// step (CR 603.7 delayed trigger). Unlike the ETB this is a temporary
+    /// blink — the card itself is in the graveyard, not linked to the exile.
     /// </summary>
     private static void AttachChannelAbility(
-        Instant card, Player controller, TriggerManager? triggers, ZoneService? zones)
+        Enchantment card, Player controller, TriggerManager? triggers, ZoneService? zones)
     {
         ActivatedAbility? channel = null;
 
-        var targetRequests = new[]
-        {
-            new TargetRequest(
-                Description: "target creature or enchantment you control",
-                MinTargets: 1,
-                MaxTargets: 1,
-                LegalCandidates: Array.Empty<object>(),
-                Intent: BotIntent.Protection,
-                // Controller-scoped gather. CR 109.5 / CR 608.2b — "you
-                // control" reads off Permanent.Controller at choose-time.
-                CandidateGatherer: ctx => controller.Zones.Battlefield.GetCards()
-                    .Where(c => c.HasType(CardType.Creature) || c.HasType(CardType.Enchantment))
-                    .Where(c => ReferenceEquals(c.Controller, controller))
-                    .Cast<object>()
-                    .ToList()),
-        };
-
         var channelEffect = new Effect(
-            $"{CardName} (Channel): exile target creature/enchantment you control; return at next end step",
+            $"{CardName} (Channel): exile target artifact/creature; return at next end step",
             () =>
             {
                 var ability = channel!;
@@ -223,11 +199,9 @@ public static class TouchTheSpiritRealmFactory
 
                 // CR 608.2b — resolution-time legality re-check.
                 if (target.Zone != ZoneType.Battlefield) return;
-                if (!ReferenceEquals(target.Controller, controller)) return;
-                if (!target.HasType(CardType.Creature) && !target.HasType(CardType.Enchantment)) return;
+                if (!target.HasType(CardType.Artifact) && !target.HasType(CardType.Creature)) return;
 
-                // CR 701.21 — Exile. Prefer ZoneService when supplied so
-                // LTB events fire (Yorion's two-mode posture).
+                // CR 701.21 — exile. Prefer ZoneService so LTB events fire.
                 if (zones != null)
                 {
                     zones.MoveCard(target, ZoneType.Battlefield, ZoneType.Exile);
@@ -243,9 +217,7 @@ public static class TouchTheSpiritRealmFactory
                     target.SetZone(ZoneType.Exile);
                 }
 
-                // CR 603.7 — delayed end-step return rider. Only register
-                // when a TriggerManager is supplied (matches WrennsResolve
-                // / Yorion shape-only fallback).
+                // CR 603.7 — delayed end-step return (only with a live TriggerManager).
                 if (triggers == null) return;
 
                 var resolvedAt = Majik.Core.Game.LogicalClockScope.Current.NextTimestamp();
@@ -253,31 +225,14 @@ public static class TouchTheSpiritRealmFactory
                     $"{CardName} (Channel): return exiled card at next end step (CR 603.7)",
                     () =>
                     {
-                        // CR 111.8 — tokens that left the battlefield cease
-                        // to exist; defensively skip if the card has already
-                        // moved out of exile (SBA pickup, second move, etc.).
-                        if (target.Zone != ZoneType.Exile) return;
-
-                        // CR 614 — "under its owner's control" — return goes
-                        // to the card's OWNER, not to the channel's
-                        // controller (distinct from Yorion's "you control"
-                        // resolve, where the controller is also the owner
-                        // of the exiled permanents).
+                        if (target.Zone != ZoneType.Exile) return; // CR 111.8
                         var returnOwner = target.Owner ?? controller;
-
                         if (zones != null)
                         {
                             zones.MoveCard(target, ZoneType.Exile, ZoneType.Battlefield, returnOwner);
                         }
                         else
                         {
-                            // Raw-zone fallback — find which zone holds the
-                            // card today (it could have been routed through
-                            // someone else's exile pile via the channel's
-                            // controller exiling an opponent-owned token,
-                            // but the printed text targets controller-side
-                            // permanents only so it must be in returnOwner's
-                            // exile pile).
                             returnOwner.Zones.Exile.RemoveCard(target);
                             returnOwner.Zones.Battlefield.AddCard(target);
                             target.SetZone(ZoneType.Battlefield);
@@ -285,15 +240,12 @@ public static class TouchTheSpiritRealmFactory
                         }
                     });
 
-                var delayed = new DelayedTriggeredAbility(
+                triggers.RegisterDelayed(new DelayedTriggeredAbility(
                     source: card,
                     controller: controller,
                     condition: new EventTriggerCondition<StepStartedEvent>(
-                        (e, _) => e.StepType == PhaseStateType.End
-                                  && e.Timestamp > resolvedAt),
-                    effects: new IEffect[] { returnEffect });
-
-                triggers.RegisterDelayed(delayed);
+                        (e, _) => e.StepType == PhaseStateType.End && e.Timestamp > resolvedAt),
+                    effects: new IEffect[] { returnEffect }));
             });
 
         channel = new ActivatedAbility(
@@ -305,7 +257,20 @@ public static class TouchTheSpiritRealmFactory
                 new DiscardSelfCost(card),
             },
             effects: new IEffect[] { channelEffect },
-            targetRequests: targetRequests);
+            targetRequests: new[]
+            {
+                new TargetRequest(
+                    Description: "target artifact or creature",
+                    MinTargets: 1,
+                    MaxTargets: 1,
+                    LegalCandidates: Array.Empty<object>(),
+                    Intent: BotIntent.Removal,
+                    CandidateGatherer: ctx => ctx.AllPlayers
+                        .SelectMany(p => p.Zones.Battlefield.GetCards())
+                        .Where(c => c.HasType(CardType.Artifact) || c.HasType(CardType.Creature))
+                        .Cast<object>()
+                        .ToList()),
+            });
 
         card.AddAbility(channel);
     }
