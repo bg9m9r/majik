@@ -1,0 +1,9 @@
+{
+  "name": "Cryptic Serpent",
+  "types": ["Creature"],
+  "subtypes": ["Serpent"],
+  "manaCost": "{5}{U}{U}",
+  "power": 6,
+  "toughness": 5,
+  "abilities": []
+}
