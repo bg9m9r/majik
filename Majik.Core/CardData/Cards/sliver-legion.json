@@ -1,0 +1,10 @@
+{
+  "name": "Sliver Legion",
+  "types": ["Creature"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Sliver"],
+  "manaCost": "{W}{U}{B}{R}{G}",
+  "power": 7,
+  "toughness": 7,
+  "abilities": []
+}

@@ -21892,6 +21892,62 @@
   "mdfc": null,
   "colors": []
 }
+==== sliver-legion ====
+{
+  "name": "Sliver Legion",
+  "manaCost": "{W}{U}{B}{R}{G}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [
+    "Legendary"
+  ],
+  "subtypes": [
+    "Sliver"
+  ],
+  "power": 7,
+  "toughness": 7,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Black",
+    "Blue",
+    "Green",
+    "Red",
+    "White"
+  ]
+}
 ==== smoldering-marsh ====
 {
   "name": "Smoldering Marsh",
