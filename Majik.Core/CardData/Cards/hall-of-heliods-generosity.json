@@ -1,0 +1,8 @@
+{
+  "name": "Hall of Heliod's Generosity",
+  "types": ["Land"],
+  "supertypes": ["Legendary"],
+  "abilities": [
+    { "kind": "mana", "produces": "C" }
+  ]
+}
