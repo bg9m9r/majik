@@ -6703,6 +6703,57 @@
     "Blue"
   ]
 }
+==== dominator-drone ====
+{
+  "name": "Dominator Drone",
+  "manaCost": "{2}{B}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Drone",
+    "Eldrazi"
+  ],
+  "power": 3,
+  "toughness": 2,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Black"
+  ]
+}
 ==== dragons-claw ====
 {
   "name": "Dragon\u0027s Claw",
