@@ -1,0 +1,9 @@
+{
+  "name": "Restless Apparition",
+  "types": ["Creature"],
+  "subtypes": ["Spirit"],
+  "manaCost": "{W/B}{W/B}{W/B}",
+  "power": 2,
+  "toughness": 2,
+  "abilities": []
+}
