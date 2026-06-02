@@ -746,9 +746,59 @@ public static class CardDefRuntime
         {
             EnterBattlefieldSelfTriggerDef => Triggers.OnEnterBattlefieldSelf(card),
             CardLeavesYourGraveyardTriggerDef gy => BuildCardLeavesYourGraveyardTrigger(gy, card),
+            WheneverYouGainLifeTriggerDef => BuildWheneverYouGainLifeTrigger(card),
+            WheneverYouCastSpellTriggerDef cast => BuildWheneverYouCastSpellTrigger(cast, card),
+            AttacksSelfTriggerDef => Triggers.OnAttackSelf(card),
+            DiesSelfTriggerDef => Triggers.OnDies(card),
             _ => throw new NotSupportedException(
                 $"Trigger '{definition.GetType().Name}' is not yet supported by CardDefRuntime."),
         };
+
+    /// <summary>
+    /// CR 119.3 — "Whenever you gain life, …". Fires on a
+    /// <see cref="Majik.Core.Events.LifeChangedEvent"/> for the trigger's
+    /// controller where the life total strictly increased. The controller is
+    /// resolved live (<c>card.Controller</c>) at fire time so a control change
+    /// carries the trigger (CR 109.5); the same predicate as
+    /// <see cref="Triggers.OnLifeGainedByPlayer"/>.
+    /// </summary>
+    private static ITriggerCondition BuildWheneverYouGainLifeTrigger(ICard card) =>
+        new EventTriggerCondition<Majik.Core.Events.LifeChangedEvent>((e, _) =>
+        {
+            var controller = card.Controller;
+            return controller is not null
+                && ReferenceEquals(e.Player, controller)
+                && e.NewLife > e.PreviousLife;
+        });
+
+    /// <summary>
+    /// CR 601.2 / 603.1 — "Whenever you cast a [type] spell, …". Fires on a
+    /// <see cref="Majik.Core.Domain.DomainEvents.SpellCastEvent"/> whose
+    /// spell controller is the trigger's controller (CR 109.5). The optional
+    /// <see cref="WheneverYouCastSpellTriggerDef.NoncreatureOnly"/> (CR 112.1)
+    /// and <see cref="WheneverYouCastSpellTriggerDef.SpellTypes"/> (any-of,
+    /// logical OR) filters are AND-composed onto the controller scope.
+    /// Controller resolved live so a control change carries the trigger.
+    /// </summary>
+    private static ITriggerCondition BuildWheneverYouCastSpellTrigger(
+        WheneverYouCastSpellTriggerDef def, ICard card)
+    {
+        var noncreatureOnly = def.NoncreatureOnly;
+        var spellTypes = def.SpellTypes.Select(ParseType).ToArray();
+        return new EventTriggerCondition<Majik.Core.Domain.DomainEvents.SpellCastEvent>((e, _) =>
+        {
+            var controller = card.Controller;
+            if (controller is null || !ReferenceEquals(e.Spell.Controller, controller))
+            {
+                return false;
+            }
+            if (noncreatureOnly && e.Spell.Card.HasType(CardType.Creature))
+            {
+                return false;
+            }
+            return spellTypes.Length == 0 || spellTypes.Any(t => e.Spell.Card.HasType(t));
+        });
+    }
 
     private static ITriggerCondition BuildCardLeavesYourGraveyardTrigger(
         CardLeavesYourGraveyardTriggerDef def, ICard card)

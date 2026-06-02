@@ -5,5 +5,13 @@
   "manaCost": "{1}",
   "power": 1,
   "toughness": 1,
-  "abilities": []
+  "abilities": [
+    {
+      "kind": "triggered",
+      "trigger": { "type": "dies_self" },
+      "effects": [
+        { "type": "gain_life_self", "amount": 2 }
+      ]
+    }
+  ]
 }

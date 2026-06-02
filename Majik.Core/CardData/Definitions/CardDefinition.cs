@@ -263,6 +263,10 @@ public sealed class TriggeredAbilityDefinition : AbilityDefinition
         var effectSpecs = Effects
             .Select(e => new CardDefEffectSpec(e.ToTargetRequest(), e.ToResolveEffect()))
             .ToArray();
-        return new CardDefTriggeredAbility(triggerBuilder, effectSpecs);
+        // A leaves-the-battlefield trigger (e.g. dies_self) carries its own
+        // active-zone override so the built TriggeredAbility stays observable
+        // from the Graveyard (CR 603.6d / CR 700.4); all other shapes pass
+        // null = engine default (battlefield only).
+        return new CardDefTriggeredAbility(triggerBuilder, effectSpecs, Trigger.ActiveZones);
     }
 }
