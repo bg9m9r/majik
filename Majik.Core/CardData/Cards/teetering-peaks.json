@@ -1,0 +1,7 @@
+{
+  "name": "Teetering Peaks",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "R" }
+  ]
+}
