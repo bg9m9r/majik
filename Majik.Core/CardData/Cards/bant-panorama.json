@@ -1,0 +1,7 @@
+{
+  "name": "Bant Panorama",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "C" }
+  ]
+}
