@@ -18184,6 +18184,58 @@
     "White"
   ]
 }
+==== koth-of-the-hammer ====
+{
+  "name": "Koth of the Hammer",
+  "manaCost": "{2}{R}{R}",
+  "primaryType": "Planeswalker",
+  "cardTypes": [
+    "Planeswalker"
+  ],
+  "supertypes": [
+    "Legendary"
+  ],
+  "subtypes": [
+    "Koth"
+  ],
+  "power": null,
+  "toughness": null,
+  "loyalty": 3,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Red"
+  ]
+}
 ==== kozilek-butcher-of-truth ====
 {
   "name": "Kozilek, Butcher of Truth",

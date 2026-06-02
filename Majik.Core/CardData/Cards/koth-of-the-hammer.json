@@ -1,0 +1,9 @@
+{
+  "name": "Koth of the Hammer",
+  "types": ["Planeswalker"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Koth"],
+  "manaCost": "{2}{R}{R}",
+  "loyalty": 3,
+  "abilities": []
+}
