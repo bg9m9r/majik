@@ -35,7 +35,7 @@ public static class TargetFilters
     /// targets widely (the resolution-time guard still enforces the printed
     /// rule for the verbs that gate on type).
     /// </summary>
-    public static TargetRequest ToTargetRequest(string? filter, string verb)
+    public static TargetRequest ToTargetRequest(string? filter, string verb, BotIntent intent = BotIntent.None)
     {
         var normalized = (filter ?? "").Trim().ToLowerInvariant();
         var (description, predicate) = Resolve(normalized, verb);
@@ -44,7 +44,7 @@ public static class TargetFilters
             MinTargets: 1,
             MaxTargets: 1,
             LegalCandidates: Array.Empty<object>(),
-            Intent: BotIntent.None,
+            Intent: intent,
             CandidateGatherer: ctx => Gather(ctx, predicate));
     }
 
@@ -67,6 +67,9 @@ public static class TargetFilters
                 ($"target nonbasic land to {verb}",
                     o => o is Permanent p && OnBattlefield(p)
                          && p.HasType(CardType.Land) && !p.HasSupertype(CardSupertype.Basic)),
+            "nonland_permanent" =>
+                ($"target nonland permanent to {verb}",
+                    o => o is Permanent p && OnBattlefield(p) && !p.HasType(CardType.Land)),
             "artifact_enchantment_nonbasic_land" =>
                 ($"target artifact, enchantment, or nonbasic land to {verb}",
                     IsArtifactEnchantmentOrNonbasicLand),

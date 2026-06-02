@@ -28,6 +28,7 @@ namespace Majik.Core.CardData.Definitions;
 [JsonDerivedType(typeof(SurveilSelfEffectDef), "surveil_self")]
 [JsonDerivedType(typeof(ScrySelfEffectDef), "scry_self")]
 [JsonDerivedType(typeof(DestroyTargetEffectDef), "destroy_target")]
+[JsonDerivedType(typeof(ReturnToHandEffectDef), "return_to_hand")]
 [JsonDerivedType(typeof(UntapTargetEffectDef), "untap_target")]
 [JsonDerivedType(typeof(PreventDamageTargetEffectDef), "prevent_damage_target")]
 [JsonDerivedType(typeof(GainLifeSelfEffectDef), "gain_life_self")]
@@ -55,7 +56,8 @@ public abstract class EffectDefinition
     /// <see cref="PreventDamageTargetEffectDef"/>)
     /// emit a matching <see cref="ToTargetRequest"/> so the ability declares
     /// the target and the shared <see cref="Majik.Core.Targeting.TargetCollection"/>
-    /// pipeline collects it.
+    /// pipeline collects it (<see cref="ReturnToHandEffectDef"/> joins the same
+    /// targeted family — a declarative bounce onto <c>Fx.BounceToHand</c>).
     /// </para>
     /// </summary>
     public Func<Majik.Core.Cards.ICard, Majik.Core.Players.Player, Majik.Core.Effects.ReplacementBus?, int, Majik.Core.Abilities.IEffect> ToResolveEffect() =>
@@ -176,6 +178,36 @@ public sealed class DestroyTargetEffectDef : EffectDefinition
     /// <inheritdoc />
     public override Majik.Core.Players.Agents.TargetRequest? ToTargetRequest() =>
         TargetFilters.ToTargetRequest(TargetFilter, "destroy");
+}
+
+/// <summary>
+/// "Return target [filter] to its owner's hand" — real targeted bounce
+/// effect (CR 701.20). At resolution the effect reads the chosen permanent
+/// off <see cref="Majik.Core.Abilities.ResolutionContext.ChosenTargets"/> and
+/// returns it to its owner's hand via
+/// <see cref="Majik.Core.Primitives.Fx.BounceToHand(Majik.Core.Cards.ICard, Majik.Core.Services.ZoneService?)"/>.
+/// CR 608.2b — an illegal target at resolution (the permanent has moved off
+/// the battlefield since the ability was put on the stack) fizzles cleanly.
+/// Mirrors the existing <see cref="DestroyTargetEffectDef"/> /
+/// <see cref="UntapTargetEffectDef"/> targeted-effect shape exactly — the
+/// only new piece is the declarative schema wiring onto the pre-existing
+/// <c>Fx.BounceToHand</c> primitive. Canonical case: Karakas —
+/// <c>"{T}: Return target legendary creature to its owner's hand."</c>
+///
+/// <see cref="TargetFilter"/> is the filter string the runtime translates
+/// into a <see cref="Majik.Core.Players.Agents.TargetRequest"/> (e.g.
+/// <c>"legendary_creature"</c>, <c>"creature"</c>, <c>"nonland_permanent"</c>,
+/// <c>"permanent"</c>).
+/// </summary>
+public sealed class ReturnToHandEffectDef : EffectDefinition
+{
+    public string TargetFilter { get; set; } = "permanent";
+
+    /// <inheritdoc />
+    public override Majik.Core.Players.Agents.TargetRequest? ToTargetRequest() =>
+        TargetFilters.ToTargetRequest(
+            TargetFilter, "return to its owner's hand",
+            Majik.Core.Cards.BotIntent.Bounce);
 }
 
 /// <summary>

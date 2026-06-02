@@ -1,0 +1,17 @@
+{
+  "name": "Karakas",
+  "types": ["Land"],
+  "supertypes": ["Legendary"],
+  "abilities": [
+    { "kind": "mana", "produces": "W" },
+    {
+      "kind": "activated",
+      "costs": [
+        { "type": "tap_self" }
+      ],
+      "effects": [
+        { "type": "return_to_hand", "targetFilter": "legendary_creature" }
+      ]
+    }
+  ]
+}

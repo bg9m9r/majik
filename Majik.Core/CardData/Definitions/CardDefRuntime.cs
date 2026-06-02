@@ -689,6 +689,7 @@ public static class CardDefRuntime
             SurveilSelfEffectDef surveil => BuildSurveilSelfEffect(surveil, card, controller),
             ScrySelfEffectDef scry => BuildScrySelfEffect(scry, card, controller),
             DestroyTargetEffectDef destroy => BuildDestroyTargetEffect(destroy, card, targetRequestIndex),
+            ReturnToHandEffectDef bounce => BuildReturnToHandEffect(bounce, card, targetRequestIndex),
             UntapTargetEffectDef untap => BuildUntapTargetEffect(untap, card, targetRequestIndex),
             PreventDamageTargetEffectDef prevent => BuildPreventDamageTargetEffect(prevent, card, replacements, targetRequestIndex),
             GainLifeSelfEffectDef gain => BuildGainLifeSelfEffect(gain, card, controller),
@@ -785,6 +786,27 @@ public static class CardDefRuntime
                 if (live is Permanent permanent && permanent.Zone == ZoneType.Battlefield)
                 {
                     Fx.MoveToGraveyard(permanent, ZoneMoveReason.Destroy);
+                }
+                return ValueTask.CompletedTask;
+            });
+    }
+
+    private static IEffect BuildReturnToHandEffect(ReturnToHandEffectDef def, ICard card, int targetRequestIndex)
+    {
+        // CR 701.20 — real targeted bounce. Reads the chosen permanent off
+        // ChosenTargets at the reserved index and returns it to its owner's
+        // hand via Fx.BounceToHand. CR 608.2b — fizzle (no-op) if the target
+        // is no longer a battlefield permanent at resolution. Exact parallel
+        // of BuildDestroyTargetEffect / BuildUntapTargetEffect — the only new
+        // piece is the declarative wiring onto the pre-existing Fx primitive.
+        return new Effect(
+            $"{card.Name}: return target {def.TargetFilter} to its owner's hand",
+            ctx =>
+            {
+                var live = ChosenTargetAt(ctx, targetRequestIndex);
+                if (live is Permanent permanent && permanent.Zone == ZoneType.Battlefield)
+                {
+                    Fx.BounceToHand(permanent);
                 }
                 return ValueTask.CompletedTask;
             });

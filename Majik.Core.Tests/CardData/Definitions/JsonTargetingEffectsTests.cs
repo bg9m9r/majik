@@ -266,6 +266,71 @@ public class JsonTargetingEffectsTests
     }
 
     // ------------------------------------------------------------------
+    // Karakas — return_to_hand (bounce target legendary creature).
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void Karakas_BounceAbility_DeclaresLegendaryCreatureTargetRequest()
+    {
+        var karakas = (Land)NamedCardFactory.Create("Karakas", _alice);
+        var bounce = karakas.Abilities.OfType<ActivatedAbility>().Single();
+
+        bounce.TargetRequests.Should().HaveCount(1);
+        bounce.TargetRequests[0].MinTargets.Should().Be(1);
+        bounce.TargetRequests[0].MaxTargets.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Karakas_ReturnsChosenLegendaryCreature_ToOwnersHand()
+    {
+        var karakas = (Land)NamedCardFactory.Create("Karakas", _alice);
+        var bounce = karakas.Abilities.OfType<ActivatedAbility>().Single();
+
+        // Bob owns a legendary creature; only the chosen one is bounced.
+        var legend = OnBattlefield(
+            new Creature("Emrakul", "{15}", 15, 15, new[] { CardSupertype.Legendary }), _bob);
+        var bystander = OnBattlefield(
+            new Creature("Other Legend", "{2}{G}", 2, 2, new[] { CardSupertype.Legendary }), _bob);
+
+        await ActivateAndResolve(bounce, legend);
+
+        legend.Zone.Should().Be(ZoneType.Hand, "the chosen legendary creature returns to its owner's hand (CR 701.20)");
+        _bob.Zones.Hand.GetCards().Should().Contain(legend);
+        _bob.Zones.Battlefield.GetCards().Should().NotContain(legend);
+        bystander.Zone.Should().Be(ZoneType.Battlefield, "only the chosen target is bounced");
+    }
+
+    [Fact]
+    public async Task Karakas_NoTarget_FizzlesCleanly()
+    {
+        var karakas = (Land)NamedCardFactory.Create("Karakas", _alice);
+        var bounce = karakas.Abilities.OfType<ActivatedAbility>().Single();
+
+        var legend = OnBattlefield(
+            new Creature("Emrakul", "{15}", 15, 15, new[] { CardSupertype.Legendary }), _bob);
+
+        await ActivateAndResolve(bounce, chosen: null);
+
+        legend.Zone.Should().Be(ZoneType.Battlefield, "nothing is bounced when no target was chosen (CR 608.2b)");
+    }
+
+    [Fact]
+    public void LegendaryCreatureFilter_OnlyOffersLegendaryCreatures()
+    {
+        var legend = OnBattlefield(
+            new Creature("Legendary Bear", "{1}{G}", 2, 2, new[] { CardSupertype.Legendary }), _bob);
+        var plain = OnBattlefield(new Creature("Plain Bear", "{1}{G}", 2, 2), _bob);
+        var ctx = NewContext(new Majik.Core.Stack.Stack(_bus));
+
+        var request = Majik.Core.CardData.Definitions.TargetFilters
+            .ToTargetRequest("legendary_creature", "return to its owner's hand");
+        var candidates = request.ResolveCandidates(ctx);
+
+        candidates.Should().Contain(legend);
+        candidates.Should().NotContain(plain, "non-legendary creatures are not legal targets for the legendary-creature bounce");
+    }
+
+    // ------------------------------------------------------------------
     // TargetFilters — the TargetFilter string → CandidateGatherer translation
     // that drives which objects the agent is offered (CR 608.2b legality).
     // ------------------------------------------------------------------
