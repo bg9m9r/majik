@@ -1,0 +1,5 @@
+{
+  "name": "Render Silent",
+  "types": ["Instant"],
+  "manaCost": "{W}{U}{U}"
+}
