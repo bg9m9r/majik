@@ -1,0 +1,7 @@
+{
+  "name": "Tarrian's Soulcleaver",
+  "types": ["Artifact"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Equipment"],
+  "manaCost": "{1}"
+}
