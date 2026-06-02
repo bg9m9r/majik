@@ -1,0 +1,5 @@
+{
+  "name": "Get Out",
+  "types": ["Instant"],
+  "manaCost": "{U}{U}"
+}
