@@ -10484,6 +10484,54 @@
     "Red"
   ]
 }
+==== krosan-grip ====
+{
+  "name": "Krosan Grip",
+  "manaCost": "{2}{G}",
+  "primaryType": "Instant",
+  "cardTypes": [
+    "Instant"
+  ],
+  "supertypes": [],
+  "subtypes": [],
+  "power": null,
+  "toughness": null,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Green"
+  ]
+}
 ==== kroxa-titan-of-deaths-hunger ====
 {
   "name": "Kroxa, Titan of Death\u0027s Hunger",
