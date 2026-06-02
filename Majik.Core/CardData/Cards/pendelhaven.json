@@ -1,0 +1,8 @@
+{
+  "name": "Pendelhaven",
+  "types": ["Land"],
+  "supertypes": ["Legendary"],
+  "abilities": [
+    { "kind": "mana", "produces": "G" }
+  ]
+}
