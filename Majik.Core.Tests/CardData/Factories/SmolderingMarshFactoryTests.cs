@@ -4,119 +4,222 @@ using Majik.Core.CardData;
 using Majik.Core.CardData.Factories;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Effects;
 using Majik.Core.Players;
+using Majik.Core.ValueObjects;
+using Majik.Core.Zones;
 using Xunit;
 
 namespace Majik.Core.Tests.CardData.Factories;
 
 /// <summary>
-/// Unit tests for <see cref="SmolderingMarshFactory"/> — the Battle for
-/// Zendikar B/R "battle land" (a.k.a. "tango land"). Oracle text
-/// (Scryfall, verified):
+/// Unit tests for <see cref="SmolderingMarshFactory"/> — Smoldering Marsh, a
+/// Battle for Zendikar "battle land" / "tango land" (Swamp Mountain dual).
+/// Oracle text:
 ///   "({T}: Add {B} or {R}.)
 ///    This land enters tapped unless you control two or more basic lands."
-/// Type line: "Land — Swamp Mountain".
 ///
 /// Covers:
-/// - Identity (Land + the two printed land subtypes Swamp / Mountain,
-///   nonbasic, non-Legendary).
-/// - Two mana abilities producing {B} and {R} (CR 605.1 — mana abilities
-///   don't use the stack).
-/// - No triggered / non-mana activated abilities ship here: the conditional
-///   "enters tapped unless you control two or more basic lands" (CR 614.1c)
-///   is a replacement effect handled by the binder layer on the production
-///   load path, same posture as <see cref="BloomingMarshFactory"/> and
-///   <see cref="ZagothTriomeFactory"/>.
+/// - Identity (Land + both printed subtypes Swamp/Mountain, non-Basic).
+/// - Two mana abilities producing {B} and {R} respectively (CR 605.1).
+/// - No activated / triggered abilities beyond mana.
+/// - ETB-tapped predicate via <see cref="ConditionalEntersTappedReplacement"/>
+///   (CR 614.1c): 0 basics -> tapped; 1 basic -> tapped; 2 basics -> untapped;
+///   nonbasic lands don't count; opponent's basics don't count; self excluded.
 /// - Dispatcher routing through <see cref="NamedCardFactory"/>.
+/// - Single-arg path registers no replacement.
 /// </summary>
 [Trait("Color", "C")]
 public class SmolderingMarshFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
 
+    // -----------------------------------------------------------------------
+    // Identity + dispatch
+    // -----------------------------------------------------------------------
     [Fact]
-    public void SmolderingMarsh_IsLand()
+    public void SmolderingMarsh_IsNotBasic()
     {
-        var land = (Land)NamedCardFactory.Create("Smoldering Marsh", _alice);
-
-        land.HasType(CardType.Land).Should().BeTrue();
+        var land = SmolderingMarshFactory.Create(_alice);
+        land.HasSupertype(CardSupertype.Basic).Should().BeFalse(
+            "battle lands are nonbasic");
     }
 
     [Fact]
-    public void SmolderingMarsh_NameIsCorrect()
+    public void SmolderingMarsh_HasBothPrintedSubtypes()
     {
-        var land = (Land)NamedCardFactory.Create("Smoldering Marsh", _alice);
-
-        land.Name.Should().Be("Smoldering Marsh");
-    }
-
-    [Fact]
-    public void SmolderingMarsh_OwnerAndControllerAreSet()
-    {
-        var land = (Land)NamedCardFactory.Create("Smoldering Marsh", _alice);
-
-        land.Owner.Should().BeSameAs(_alice);
-        land.Controller.Should().BeSameAs(_alice);
-    }
-
-    [Fact]
-    public void SmolderingMarsh_HasSwampAndMountainSubtypes()
-    {
-        var land = (Land)NamedCardFactory.Create("Smoldering Marsh", _alice);
-
+        var land = SmolderingMarshFactory.Create(_alice);
         land.HasSubtype(CardSubtype.Swamp).Should().BeTrue();
         land.HasSubtype(CardSubtype.Mountain).Should().BeTrue();
     }
 
     [Fact]
-    public void SmolderingMarsh_IsNotBasic_NotLegendary()
+    public void SmolderingMarsh_HasTwoManaAbilities_ProducingBR()
     {
         var land = (Land)NamedCardFactory.Create("Smoldering Marsh", _alice);
+        var mana = land.Abilities.OfType<ManaAbility>().ToList();
 
-        land.HasSupertype(CardSupertype.Basic).Should().BeFalse("battle lands are nonbasic");
-        land.HasSupertype(CardSupertype.Legendary).Should().BeFalse();
+        mana.Should().HaveCount(2, "Smoldering Marsh taps for {B} or {R}");
+        mana.Should().Contain(m => m.ManaGenerated.Black == 1);
+        mana.Should().Contain(m => m.ManaGenerated.Red == 1);
     }
 
     [Fact]
-    public void SmolderingMarsh_HasTwoManaAbilities()
+    public void SmolderingMarsh_HasNoActivatedOrTriggeredAbilities()
     {
-        var land = (Land)NamedCardFactory.Create("Smoldering Marsh", _alice);
+        var land = SmolderingMarshFactory.Create(_alice);
 
-        land.Abilities.OfType<ManaAbility>().Should().HaveCount(2);
-    }
-
-    [Fact]
-    public void SmolderingMarsh_HasBlackManaAbility()
-    {
-        var land = (Land)NamedCardFactory.Create("Smoldering Marsh", _alice);
-
-        land.Abilities.OfType<ManaAbility>()
-            .Should().ContainSingle(m => m.ManaGenerated.Black == 1 && m.ManaGenerated.Red == 0);
-    }
-
-    [Fact]
-    public void SmolderingMarsh_HasRedManaAbility()
-    {
-        var land = (Land)NamedCardFactory.Create("Smoldering Marsh", _alice);
-
-        land.Abilities.OfType<ManaAbility>()
-            .Should().ContainSingle(m => m.ManaGenerated.Red == 1 && m.ManaGenerated.Black == 0);
-    }
-
-    [Fact]
-    public void SmolderingMarsh_HasNoTriggeredAbilities()
-    {
-        var land = (Land)NamedCardFactory.Create("Smoldering Marsh", _alice);
-
+        land.Abilities.OfType<ActivatedAbility>().Should().BeEmpty(
+            "battle lands have no non-mana activated abilities");
         land.Abilities.OfType<TriggeredAbility>().Should().BeEmpty(
-            "ETB-tapped-unless-two-or-more-basic-lands is a replacement effect, not a trigger");
+            "battle lands have no triggered abilities");
+    }
+
+    // -----------------------------------------------------------------------
+    // ETB-tapped predicate (CR 614.1c) — "two or more basic lands"
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void SmolderingMarsh_EntersTapped_WhenControllerHasNoBasics()
+    {
+        var bus = new ReplacementBus();
+        var land = SmolderingMarshFactory.Create(_alice, replacements: bus);
+
+        var after = ApplyEtb(bus, land, _alice);
+
+        after.EntersTapped.Should().BeTrue(
+            "enters tapped when controller has zero basic lands");
     }
 
     [Fact]
-    public void SmolderingMarsh_HasNoActivatedAbilities()
+    public void SmolderingMarsh_EntersTapped_WhenControllerHasExactlyOneBasic()
     {
-        var land = (Land)NamedCardFactory.Create("Smoldering Marsh", _alice);
+        var bus = new ReplacementBus();
+        SeedBasic("Swamp", _alice);
+        var land = SmolderingMarshFactory.Create(_alice, replacements: bus);
 
-        land.Abilities.OfType<ActivatedAbility>().Should().BeEmpty();
+        var after = ApplyEtb(bus, land, _alice);
+
+        after.EntersTapped.Should().BeTrue(
+            "one basic land is not 'two or more'");
+    }
+
+    [Fact]
+    public void SmolderingMarsh_EntersUntapped_WhenControllerHasTwoBasics()
+    {
+        var bus = new ReplacementBus();
+        SeedBasic("Swamp", _alice);
+        SeedBasic("Mountain", _alice);
+        var land = SmolderingMarshFactory.Create(_alice, replacements: bus);
+
+        var after = ApplyEtb(bus, land, _alice);
+
+        after.EntersTapped.Should().BeFalse(
+            "two basic lands satisfies 'two or more basic lands'");
+    }
+
+    [Fact]
+    public void SmolderingMarsh_EntersUntapped_WhenControllerHasMoreThanTwoBasics()
+    {
+        var bus = new ReplacementBus();
+        SeedBasic("Swamp", _alice);
+        SeedBasic("Mountain", _alice);
+        SeedBasic("Plains", _alice);
+        var land = SmolderingMarshFactory.Create(_alice, replacements: bus);
+
+        var after = ApplyEtb(bus, land, _alice);
+
+        after.EntersTapped.Should().BeFalse(
+            "three basics is 'two or more'");
+    }
+
+    [Fact]
+    public void SmolderingMarsh_NonbasicLands_DoNotCount()
+    {
+        // Two nonbasic lands (other Smoldering Marshes) are NOT basic lands, so
+        // the predicate is unmet -> enters tapped. CR 205.4a: only the Basic
+        // supertype makes a land "basic".
+        var bus = new ReplacementBus();
+        var other1 = SmolderingMarshFactory.Create(_alice);
+        var other2 = SmolderingMarshFactory.Create(_alice);
+        _alice.Zones.Battlefield.AddCard(other1);
+        other1.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(other2);
+        other2.SetZone(ZoneType.Battlefield);
+
+        var land = SmolderingMarshFactory.Create(_alice, replacements: bus);
+        var after = ApplyEtb(bus, land, _alice);
+
+        after.EntersTapped.Should().BeTrue(
+            "nonbasic lands do not count toward 'two or more basic lands'");
+    }
+
+    [Fact]
+    public void SmolderingMarsh_EntersTapped_WhenOnlyOpponentHasBasics()
+    {
+        // "you control" — opponent's basics don't satisfy the predicate.
+        var bus = new ReplacementBus();
+        var bob = new Player("Bob", 20);
+        SeedBasic("Swamp", bob);
+        SeedBasic("Mountain", bob);
+
+        var land = SmolderingMarshFactory.Create(_alice, replacements: bus);
+        var after = ApplyEtb(bus, land, _alice);
+
+        after.EntersTapped.Should().BeTrue(
+            "only the controller's basic lands count");
+    }
+
+    [Fact]
+    public void SmolderingMarsh_PredicateExcludesSelf()
+    {
+        // Even on the battlefield Smoldering Marsh isn't a basic land, so it
+        // can't satisfy its own predicate; with one other basic the count is
+        // still 1 -> tapped.
+        var bus = new ReplacementBus();
+        SeedBasic("Swamp", _alice);
+        var land = SmolderingMarshFactory.Create(_alice, replacements: bus);
+        _alice.Zones.Battlefield.AddCard(land);
+        land.SetZone(ZoneType.Battlefield);
+
+        var after = ApplyEtb(bus, land, _alice);
+
+        after.EntersTapped.Should().BeTrue(
+            "the land itself isn't basic and is excluded from the count");
+    }
+
+    // -----------------------------------------------------------------------
+    // Args validation
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void SmolderingMarsh_Create_ThrowsOnNullOwner()
+    {
+        var act = () => SmolderingMarshFactory.Create(null!);
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    // -----------------------------------------------------------------------
+    // Helpers
+    // -----------------------------------------------------------------------
+
+    private static void SeedBasic(string name, Player owner)
+    {
+        var basic = (Land)NamedCardFactory.Create(name, owner);
+        owner.Zones.Battlefield.AddCard(basic);
+        basic.SetZone(ZoneType.Battlefield);
+    }
+
+    private static ZoneMoveIntent ApplyEtb(ReplacementBus bus, Land land, Player controller)
+    {
+        var intent = new ZoneMoveIntent(
+            Card: land,
+            FromZone: ZoneType.Hand,
+            ToZone: ZoneType.Battlefield,
+            Controller: controller);
+
+        var after = bus.Apply(intent);
+        after.Should().NotBeNull();
+        return after!;
     }
 }
