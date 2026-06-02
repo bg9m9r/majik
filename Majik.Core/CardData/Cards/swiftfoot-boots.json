@@ -1,0 +1,6 @@
+{
+  "name": "Swiftfoot Boots",
+  "types": ["Artifact"],
+  "subtypes": ["Equipment"],
+  "manaCost": "{2}"
+}
