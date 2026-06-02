@@ -1,0 +1,9 @@
+{
+  "name": "Flameblade Adept",
+  "types": ["Creature"],
+  "subtypes": ["Jackal", "Warrior"],
+  "manaCost": "{R}",
+  "power": 1,
+  "toughness": 2,
+  "abilities": []
+}

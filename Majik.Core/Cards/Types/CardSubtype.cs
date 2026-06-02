@@ -472,4 +472,10 @@ public enum CardSubtype
     /// LTR Peasant lineage. CR 205.3m — flavour subtype with no inherent
     /// rules meaning.</summary>
     Peasant,
+
+    /// <summary>Jackal creature subtype — Flameblade Adept (Amonkhet, the
+    /// "Jackal Warrior" cycling payoff), Anointer Priest-adjacent Amonkhet
+    /// jackal lineage. CR 205.3m — flavour subtype with no inherent rules
+    /// meaning.</summary>
+    Jackal,
 }
