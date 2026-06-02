@@ -1,0 +1,8 @@
+{
+  "name": "Survivors' Encampment",
+  "types": ["Land"],
+  "subtypes": ["Desert"],
+  "abilities": [
+    { "kind": "mana", "produces": "C" }
+  ]
+}
