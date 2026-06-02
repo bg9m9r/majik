@@ -140,6 +140,22 @@ public static class Triggers
             && ReferenceEquals(e.Card.Controller, controller));
     }
 
+    /// <summary>
+    /// CR 603.3 / CR 603.6e — "Whenever an artifact you control enters, …"
+    /// The modern reminder-free wording "enters" means a permanent entering
+    /// the battlefield (CR 603.6e). Fires on CardMovedEvent → Battlefield
+    /// where the entering card has the Artifact type and its controller is
+    /// <paramref name="controller"/>. Models the Ovalchase Daredevil /
+    /// Inventors' Fair-style artifact-enters family.
+    /// </summary>
+    public static ITriggerCondition OnArtifactYouControlEnters(Player controller)
+    {
+        return new EventTriggerCondition<CardMovedEvent>((e, _) =>
+            e.ToZone == ZoneType.Battlefield
+            && e.Card.HasType(CardType.Artifact)
+            && ReferenceEquals(e.Card.Controller, controller));
+    }
+
     /// <summary>CR 500 — "At the beginning of your upkeep / end step / draw
     /// step, …" trigger. Fires on StepStartedEvent matching the requested
     /// phase, restricted to <paramref name="controller"/>'s own turns.</summary>

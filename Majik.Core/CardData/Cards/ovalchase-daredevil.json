@@ -1,0 +1,9 @@
+{
+  "name": "Ovalchase Daredevil",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Pilot"],
+  "manaCost": "{3}{B}",
+  "power": 4,
+  "toughness": 2,
+  "abilities": []
+}
