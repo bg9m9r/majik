@@ -47,12 +47,12 @@ public class ForceOfRageFactoryTests
     }
 
     [Fact]
-    public void Create_HasSorceryShape_Red()
+    public void Create_HasInstantShape_Red()
     {
         var four = ForceOfRageFactory.Create(_alice);
 
         four.Name.Should().Be("Force of Rage");
-        four.HasType(CardType.Sorcery).Should().BeTrue();
+        four.HasType(CardType.Instant).Should().BeTrue();
         CardColors.GetColors(four).Should().Contain(ManaColor.Red);
     }
     [Fact]
@@ -155,10 +155,10 @@ public class ForceOfRageFactoryTests
         var pitchCost = new PitchAlternativeCost(ManaColor.Red, redFuel, lifeCost: 0);
         var agent = new ScriptedAgent();
         agent.QueueMana(ManaPayment.Empty);
-        // NOTE: Force of Rage is a sorcery, but its pitch alt-cost is what
-        // gates it — pitching on opponent's turn (CR 118.9 + Force-cycle
-        // not-your-turn restriction) cuts through the sorcery-speed gate
-        // (CR 117.1) the same way Force of Despair does.
+        // Force of Rage is an Instant, so it's castable on the opponent's
+        // turn at instant speed (CR 117.1); the free pitch alt-cost (CR 118.9)
+        // is itself only available when it's NOT your turn (the Force-cycle
+        // not-your-turn restriction), same as Force of Despair.
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, _bob, 2, PhaseStateType.PreCombatMain, _stack);
 
         await _flow.CastAsync(
