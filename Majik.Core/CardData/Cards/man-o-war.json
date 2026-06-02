@@ -1,0 +1,17 @@
+{
+  "name": "Man-o'-War",
+  "manaCost": "{2}{U}",
+  "types": ["Creature"],
+  "subtypes": ["Jellyfish"],
+  "power": 2,
+  "toughness": 2,
+  "abilities": [
+    {
+      "kind": "triggered",
+      "trigger": { "type": "etb_self" },
+      "effects": [
+        { "type": "return_to_hand", "targetFilter": "creature" }
+      ]
+    }
+  ]
+}

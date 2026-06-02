@@ -540,4 +540,9 @@ public enum CardSubtype
     /// Pegasus Charger, Cloudfin Raptor-adjacent winged-horse lineage.
     /// CR 205.3m — flavour subtype with no inherent rules meaning.</summary>
     Pegasus,
+
+    /// <summary>Jellyfish creature subtype — Man-o'-War (Visions / many
+    /// reprints), Lu Su, Wu Advisor-adjacent blue tempo lineage. CR 205.3m —
+    /// flavour subtype with no inherent rules meaning.</summary>
+    Jellyfish,
 }
