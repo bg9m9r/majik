@@ -183,6 +183,59 @@ public interface IPlayerAgent
         CancellationToken ct = default);
 
     /// <summary>
+    /// CR 701.40c — explore put-back decision. After a non-land card is
+    /// revealed off the top of the library and a +1/+1 counter is placed on
+    /// the exploring permanent, its controller chooses to leave the revealed
+    /// <paramref name="revealedCard"/> on top of their library or put it into
+    /// their graveyard. Returns <see langword="true"/> to keep the card on top
+    /// of the library, <see langword="false"/> to put it into the graveyard.
+    /// <para>
+    /// Only invoked when a NON-land card was revealed and the library was
+    /// non-empty (CR 701.40b — a revealed land goes straight to hand and the
+    /// controller makes no choice; CR 701.40d — an empty library reveals
+    /// nothing and there is no card to keep or bin).
+    /// </para>
+    /// <para>
+    /// Default implementation routes through the declarative
+    /// <see cref="ChooseAsync"/> sink as a Yes/No prompt ("keep the revealed
+    /// card on top of your library?"), classified <see cref="BotIntent.None"/>
+    /// so the default heuristic answers "yes" — keep the card on top. This is
+    /// the library-preserving default (mirrors Scry's all-on-top /
+    /// Surveil's keep-on-top postures), so factories written before a smart
+    /// agent ships don't silently mill the revealed card. Smart bots / remote
+    /// agents override <see cref="ChooseAsync"/> (or this method) to decide
+    /// per card value.
+    /// </para>
+    /// <para>
+    /// <paramref name="ctx"/> may be <see langword="null"/> in v1 effect
+    /// closures (same sync-over-async wart as
+    /// <see cref="ChooseScryDecisionAsync"/>).
+    /// </para>
+    /// </summary>
+    async Task<bool> ChooseExploreKeepOnTopAsync(
+        GameContext? ctx,
+        ICard exploringCreature,
+        ICard revealedCard,
+        CancellationToken ct = default)
+    {
+        // PLAN 01 (Slice C) shim — declarative YesNo "keep on top?". A
+        // non-empty result ("yes") keeps the card on top; an empty result
+        // ("no") sends it to the graveyard. Default ChooseAsync applies the
+        // intent heuristic; BotIntent.None falls through to the legacy
+        // "auto-accept may" posture => keep on top (library-preserving).
+        var label = revealedCard?.Name is { Length: > 0 } name
+            ? $"Keep {name} on top of your library?"
+            : "Keep the revealed card on top of your library?";
+        var req = new ChoiceRequest(
+            ChoiceKind.YesNo, label, Min: 0, Max: 1,
+            Candidates: Array.Empty<object>(),
+            Intent: BotIntent.None,
+            Optional: true);
+        var chosen = await ChooseAsync(ctx!, req, ct).ConfigureAwait(false);
+        return chosen.Count > 0;
+    }
+
+    /// <summary>
     /// CR 701.19a — library search. The engine pre-filters
     /// <paramref name="candidates"/> down to the cards that satisfy the
     /// search predicate (kind, color, mana value, etc.); the agent picks

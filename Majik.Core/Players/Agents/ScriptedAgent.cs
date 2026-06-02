@@ -25,6 +25,7 @@ public sealed class ScriptedAgent : IPlayerAgent
     private readonly Queue<Func<IReadOnlyList<ICard>, IReadOnlyList<ICard>>> _bottomChoices = new();
     private readonly Queue<ScryAction.ScryDecision> _scryDecisions = new();
     private readonly Queue<SurveilAction.SurveilDecision> _surveilDecisions = new();
+    private readonly Queue<bool> _exploreKeepOnTop = new();
     private readonly Queue<Func<IReadOnlyList<Player>, Player?>> _giftRecipients = new();
     private readonly Queue<bool> _yesNoAnswers = new();
     private readonly Queue<Func<IReadOnlyList<ICard>, ICard?>> _fromHandChoices = new();
@@ -65,6 +66,10 @@ public sealed class ScriptedAgent : IPlayerAgent
             : Array.Empty<object>());
     /// <summary>Pre-queue a Surveil decision; falls back to all-graveyard when queue is empty.</summary>
     public void QueueSurveilDecision(SurveilAction.SurveilDecision d) => _surveilDecisions.Enqueue(d);
+    /// <summary>Pre-queue the next explore put-back decision (CR 701.40c): <c>true</c> keeps the
+    /// revealed non-land card on top of the library, <c>false</c> puts it into the graveyard.
+    /// Falls back to keep-on-top (the library-preserving default) when the queue is empty.</summary>
+    public void QueueExploreKeepOnTop(bool keepOnTop) => _exploreKeepOnTop.Enqueue(keepOnTop);
     /// <summary>Pre-queue a Bloomburrow Gift recipient picker (CR 701.59); receives the live opponent
     /// pool and returns the chosen recipient or <c>null</c> to decline. Falls back to decline when
     /// the queue is empty (matches the legacy <see cref="IPlayerAgent"/> default).</summary>
@@ -176,6 +181,17 @@ public sealed class ScriptedAgent : IPlayerAgent
         return Task.FromResult(new SurveilAction.SurveilDecision(
             ToGraveyard: peeked.ToList(),
             TopOrder: Array.Empty<ICard>()));
+    }
+
+    public Task<bool> ChooseExploreKeepOnTopAsync(
+        GameContext? ctx, ICard exploringCreature, ICard revealedCard, CancellationToken ct = default)
+    {
+        if (_exploreKeepOnTop.Count > 0)
+            return Task.FromResult(_exploreKeepOnTop.Dequeue());
+        // Default: keep the revealed card on top of the library (the
+        // library-preserving default — matches the IPlayerAgent shim and the
+        // scry/surveil "minimal disruption" postures).
+        return Task.FromResult(true);
     }
 
     public Task<ICard?> ChooseLibraryPickAsync(

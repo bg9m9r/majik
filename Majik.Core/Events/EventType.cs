@@ -95,4 +95,11 @@ public enum EventType
     // rewrites the intent BEFORE commit, so it runs first and the
     // amount on this event already reflects its bump.
     CounterAdded,
+
+    // CR 701.40 — a permanent (creature) explored (revealed the top card
+    // of its controller's library; land → hand, otherwise +1/+1 counter +
+    // back-or-graveyard for the revealed card). The hook "Whenever a
+    // creature you control explores" triggers (Wildgrowth Walker) subscribe
+    // to this. Published after the explore action fully resolves.
+    Explored,
 }

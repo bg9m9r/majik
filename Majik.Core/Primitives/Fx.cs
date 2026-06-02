@@ -3,9 +3,11 @@ using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.CardData;
 using Majik.Core.Counters;
+using Majik.Core.Effects;
 using Majik.Core.Events;
 using Majik.Core.Keywords;
 using Majik.Core.Players;
+using Majik.Core.Players.Agents;
 using Majik.Core.Services;
 using Majik.Core.Tokens;
 using Majik.Core.ValueObjects;
@@ -362,6 +364,30 @@ public static class Fx
         var bus = eventBus ?? EventBusRegistry.Get(player);
         bus?.Publish(new SurveilEvent(player, n, peeked));
     }
+
+    /// <summary>
+    /// CR 701.40 — <paramref name="creature"/> explores under
+    /// <paramref name="controller"/>'s control: reveal the top card of the
+    /// controller's library; a land goes to hand, otherwise a +1/+1 counter
+    /// is placed on the exploring permanent and the revealed card is kept on
+    /// top or put into the graveyard (controller's choice, via the registered
+    /// agent). Publishes a <see cref="CreatureExploredEvent"/> after resolving
+    /// so "Whenever a creature you control explores" triggers fire. Thin
+    /// re-export of <see cref="ExploreAction.ExploreAsync"/> — agent /
+    /// replacement bus / event bus / zone service all default to their
+    /// registries when not supplied.
+    /// </summary>
+    public static ValueTask Explore(
+        ICard creature,
+        Player controller,
+        Majik.Core.Game.GameContext? game = null,
+        IPlayerAgent? agent = null,
+        ReplacementBus? replacements = null,
+        IEventBus? eventBus = null,
+        ZoneService? zones = null,
+        CancellationToken ct = default)
+        => ExploreAction.ExploreAsync(
+            creature, controller, agent, game, replacements, eventBus, zones, ct);
 
     // ------------------------------------------------------------------
     // Zone moves (CR 400.7 / 701.20) — aliases for the helpers that
