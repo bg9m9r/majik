@@ -1,0 +1,8 @@
+{
+  "name": "Shefet Dunes",
+  "types": ["Land"],
+  "subtypes": ["Desert"],
+  "abilities": [
+    { "kind": "mana", "produces": "C" }
+  ]
+}
