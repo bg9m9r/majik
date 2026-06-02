@@ -28411,6 +28411,61 @@
     "Green"
   ]
 }
+==== the-mycosynth-gardens ====
+{
+  "name": "The Mycosynth Gardens",
+  "manaCost": "",
+  "primaryType": "Land",
+  "cardTypes": [
+    "Land"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Sphere"
+  ],
+  "power": null,
+  "toughness": null,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 6,
+      "list": [
+        "mana:1",
+        "mana:B",
+        "mana:G",
+        "mana:R",
+        "mana:U",
+        "mana:W"
+      ]
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": []
+}
 ==== the-stone-brain ====
 {
   "name": "The Stone Brain",
