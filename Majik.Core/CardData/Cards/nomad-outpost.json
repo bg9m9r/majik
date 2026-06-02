@@ -1,0 +1,9 @@
+{
+  "name": "Nomad Outpost",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "R" },
+    { "kind": "mana", "produces": "W" },
+    { "kind": "mana", "produces": "B" }
+  ]
+}
