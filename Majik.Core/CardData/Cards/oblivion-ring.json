@@ -1,5 +1,19 @@
 {
   "name": "Oblivion Ring",
   "types": ["Enchantment"],
-  "manaCost": "{2}{W}"
+  "manaCost": "{2}{W}",
+  "abilities": [
+    {
+      "kind": "triggered",
+      "trigger": { "type": "etb_self" },
+      "effects": [
+        {
+          "type": "exile_until_leaves",
+          "targetFilter": "nonland_permanent",
+          "opponentControlsOnly": false,
+          "excludeSelf": true
+        }
+      ]
+    }
+  ]
 }

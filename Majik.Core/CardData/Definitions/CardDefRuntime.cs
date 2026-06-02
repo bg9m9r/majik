@@ -1024,6 +1024,7 @@ public static class CardDefRuntime
             ScrySelfEffectDef scry => BuildScrySelfEffect(scry, card, controller),
             DestroyTargetEffectDef destroy => BuildDestroyTargetEffect(destroy, card, targetRequestIndex),
             ExileTargetEffectDef exile => BuildExileTargetEffect(exile, card, targetRequestIndex),
+            ExileUntilLeavesEffectDef exileUntil => BuildExileUntilLeavesEffect(exileUntil, card, controller, targetRequestIndex),
             ReturnToHandEffectDef bounce => BuildReturnToHandEffect(bounce, card, targetRequestIndex),
             UntapTargetEffectDef untap => BuildUntapTargetEffect(untap, card, targetRequestIndex),
             TapTargetEffectDef tap => BuildTapTargetEffect(tap, card, targetRequestIndex),
@@ -1198,6 +1199,157 @@ public static class CardDefRuntime
                 {
                     Fx.MoveToExile(target);
                 }
+                return ValueTask.CompletedTask;
+            });
+    }
+
+    /// <summary>
+    /// CR 607 (linked abilities) / CR 603.6e ("until" duration) / CR 610.3
+    /// (return) — the declarative Banishing Light / Oblivion Ring / Glass
+    /// Casket / Portable Hole / Leonin Relic-Warder mechanism.
+    ///
+    /// <para>
+    /// This runs at card-build time (it is an effect-builder, invoked while the
+    /// owning <c>etb_self</c> ability is materialized for the live
+    /// <paramref name="card"/>). It does two things:
+    /// </para>
+    /// <list type="number">
+    ///   <item>Creates a per-instance closure (<c>exiled</c> + <c>exiledOwner</c>)
+    ///   shared between the two linked abilities.</item>
+    ///   <item>Builds the linked leaves-the-battlefield (LTB) triggered ability
+    ///   and attaches it to the SAME card via <c>card.AddAbility</c>, so when
+    ///   the card enters the battlefield <see cref="TriggerManager.BindCard"/>
+    ///   auto-registers BOTH abilities (matching the hand-rolled
+    ///   <see cref="Majik.Core.CardData.Factories.BanishingLightFactory"/>
+    ///   posture exactly).</item>
+    /// </list>
+    /// <para>
+    /// It returns the ETB effect: at resolution it reads the chosen target off
+    /// <see cref="Majik.Core.Abilities.ResolutionContext.ChosenTargets"/>,
+    /// re-checks the composed legality (CR 608.2b — still on the battlefield,
+    /// still matches the base filter, an opponent controls it /
+    /// <c>excludeSelf</c> / mana value cap), exiles it (CR 701.21), and records
+    /// it + its owner in the shared closure. The LTB effect, when the source
+    /// leaves the battlefield, returns the SAME remembered object to its
+    /// <b>owner's</b> battlefield under its owner's control (CR 110.2). If the
+    /// source already left (closure already returned, ref cleared) or the
+    /// exiled object has since left exile (CR 603.6e — the linked "until" return
+    /// finds nothing), the LTB no-ops cleanly.
+    /// </para>
+    /// </summary>
+    private static IEffect BuildExileUntilLeavesEffect(
+        ExileUntilLeavesEffectDef def, ICard card, Player controller, int targetRequestIndex)
+    {
+        // ----------------------------------------------------------------
+        // Shared per-instance closure: ETB writes, LTB reads. One Banishing
+        // Light only ever exiles one card per ETB resolution (the printed
+        // "target" is singular); a fresh ICard identity on re-entry (CR 400.7)
+        // starts its own closure.
+        // ----------------------------------------------------------------
+        ICard? exiled = null;
+        Player? exiledOwner = null;
+
+        var filter = def.TargetFilter;
+        var opponentOnly = def.OpponentControlsOnly;
+        var excludeSelf = def.ExcludeSelf;
+        var maxMv = def.MaxManaValue;
+
+        // CR 608.2b — the composed resolution-time legality re-check. Mirrors
+        // the hand-rolled factories (BanishingLight / GlassCasket / PortableHole
+        // / OblivionRing): base filter (via TargetFilters.Matches) + "an opponent
+        // controls" (CR 109.5) + "another" (exclude self) + mana-value cap
+        // (CR 202.3). The source controller is read live so a control change
+        // carries the ability (CR 109.5).
+        bool IsLegalTarget(Permanent target)
+        {
+            if (target.Zone != ZoneType.Battlefield) return false;
+            if (!TargetFilters.Matches(filter, target)) return false;
+            if (excludeSelf && ReferenceEquals(target, card)) return false;
+            if (opponentOnly)
+            {
+                var sourceController = card.Controller ?? controller;
+                if (ReferenceEquals(target.Controller, sourceController)) return false;
+            }
+            if (maxMv is int cap && target is Card mvCard
+                && mvCard.ManaCostValue.TotalValue > cap)
+            {
+                return false;
+            }
+            return true;
+        }
+
+        // ----------------------------------------------------------------
+        // LTB triggered ability — CR 603.6e / CR 610.3. Fires whenever the
+        // source moves OUT of the battlefield (any destination — covers dies +
+        // bounce + flicker, matching "leaves the battlefield" wording, same
+        // posture as the hand-rolled siblings). Attached now so BindCard
+        // auto-registers it when the source enters the battlefield.
+        // ----------------------------------------------------------------
+        var ltbCondition = new EventTriggerCondition<Majik.Core.Events.CardMovedEvent>(
+            (e, _) => ReferenceEquals(e.Card, card)
+                      && e.FromZone == ZoneType.Battlefield);
+
+        var ltbEffect = new Effect(
+            $"{card.Name}: return the exiled card to the battlefield under its owner's control (CR 610.3)",
+            () =>
+            {
+                if (exiled == null || exiledOwner == null) return;
+                // CR 603.6e / CR 400.7 — if the exiled card has since left exile
+                // (extraction, processed by Eldrazi, etc.), the linked return
+                // finds nothing. The ref is cleared after a successful return so
+                // a second LTB (a re-entered, then re-left source shares no
+                // closure; this guards a double-fire of the SAME instance).
+                if (exiled.Zone != ZoneType.Exile)
+                {
+                    exiled = null;
+                    exiledOwner = null;
+                    return;
+                }
+
+                exiledOwner.Zones.Exile.RemoveCard(exiled);
+                exiledOwner.Zones.Battlefield.AddCard(exiled);
+                exiled.SetZone(ZoneType.Battlefield);
+                // CR 110.2 — "under its owner's control" maps Controller := Owner
+                // on the way back.
+                if (exiled is Card returned) returned.ChangeController(exiledOwner);
+
+                // CR 603.6e — the "until" return happens once; clear so a
+                // subsequent LTB of the same instance no-ops.
+                exiled = null;
+                exiledOwner = null;
+            });
+
+        var ltbTrigger = new TriggeredAbility(
+            source: card,
+            controller: controller,
+            condition: ltbCondition,
+            effects: new IEffect[] { ltbEffect },
+            // CR 603.6d — LTB triggers see the permanent as it last existed on
+            // the battlefield (same "looks back" posture as the hand-rolled
+            // siblings).
+            activeZones: new[] { ZoneType.Battlefield });
+
+        card.AddAbility(ltbTrigger);
+
+        // ----------------------------------------------------------------
+        // ETB effect — CR 603.6a / CR 701.21. Exile the chosen target and
+        // record it + its owner for the linked LTB return.
+        // ----------------------------------------------------------------
+        return new Effect(
+            def.BuildEffectDescription(card.Name),
+            ctx =>
+            {
+                var live = ChosenTargetAt(ctx, targetRequestIndex);
+                if (live is not Permanent target || !IsLegalTarget(target))
+                {
+                    return ValueTask.CompletedTask;
+                }
+
+                var targetOwner = target.Owner;
+                Fx.MoveToExile(target);
+
+                exiled = target;
+                exiledOwner = targetOwner;
                 return ValueTask.CompletedTask;
             });
     }

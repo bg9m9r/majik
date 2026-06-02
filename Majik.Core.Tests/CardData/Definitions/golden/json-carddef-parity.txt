@@ -19974,8 +19974,10 @@
       "list": []
     },
     "triggered": {
-      "count": 0,
-      "list": []
+      "count": 2,
+      "list": [
+        "trig:CardMovedEvent=\u003EEffect"
+      ]
     },
     "static": {
       "count": 0,

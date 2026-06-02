@@ -29,6 +29,7 @@ namespace Majik.Core.CardData.Definitions;
 [JsonDerivedType(typeof(ScrySelfEffectDef), "scry_self")]
 [JsonDerivedType(typeof(DestroyTargetEffectDef), "destroy_target")]
 [JsonDerivedType(typeof(ExileTargetEffectDef), "exile_target")]
+[JsonDerivedType(typeof(ExileUntilLeavesEffectDef), "exile_until_leaves")]
 [JsonDerivedType(typeof(ReturnToHandEffectDef), "return_to_hand")]
 [JsonDerivedType(typeof(UntapTargetEffectDef), "untap_target")]
 [JsonDerivedType(typeof(TapTargetEffectDef), "tap_target")]
@@ -260,6 +261,97 @@ public sealed class ExileTargetEffectDef : EffectDefinition
     public override Majik.Core.Players.Agents.TargetRequest? ToTargetRequest() =>
         TargetFilters.ToTargetRequest(
             TargetFilter, "exile", Majik.Core.Cards.BotIntent.Removal);
+}
+
+/// <summary>
+/// "When [this] enters, exile target [filter] until [this] leaves the
+/// battlefield." — the Banishing Light / Oblivion Ring / Glass Casket /
+/// Portable Hole / Leonin Relic-Warder family of two LINKED abilities
+/// (CR 607 linked abilities; CR 603.6e "until" duration; CR 610.3 return).
+///
+/// <para>
+/// This verb sits on an <c>etb_self</c> trigger and is the ONE declarative
+/// shape for the whole "exile until this leaves" removal cluster. Unlike the
+/// plain <see cref="ExileTargetEffectDef"/> (a one-shot exile), this verb
+/// composes the full linked pair: at card-build time it attaches the linked
+/// leaves-the-battlefield (LTB) triggered ability to the SAME card, sharing a
+/// per-instance closure with the ETB effect that captures the exiled object +
+/// its owner. When the source leaves the battlefield, the LTB returns the SAME
+/// remembered object to its <b>owner's</b> battlefield (CR 110.2 — under its
+/// owner's control), or no-ops if the source already left (the closure only
+/// fires once) or the exiled object has since left exile (CR 603.6e — the
+/// linked "until" return finds nothing). See
+/// <see cref="Majik.Core.CardData.Definitions.CardDefRuntime.BuildExileUntilLeavesEffect"/>.
+/// </para>
+///
+/// <para>
+/// The verb composes the printed restrictions of the cluster onto the base
+/// <see cref="TargetFilter"/> (a battlefield permanent / creature filter):
+/// <list type="bullet">
+///   <item><see cref="OpponentControlsOnly"/> (default <c>true</c>) — "an
+///   opponent controls" (CR 109.5). Banishing Light / Glass Casket / Portable
+///   Hole carry it; Oblivion Ring ("another target nonland permanent") does
+///   not, so it flips this off and relies on <see cref="ExcludeSelf"/>.</item>
+///   <item><see cref="ExcludeSelf"/> (default <c>false</c>) — "another" (CR
+///   109.5 — exclude the source permanent itself). Oblivion Ring sets it.</item>
+///   <item><see cref="MaxManaValue"/> (default <c>null</c> = no cap) — "with
+///   mana value N or less" (CR 202.3). Glass Casket = 3, Portable Hole = 2,
+///   Leonin Relic-Warder leaves it null (any artifact/enchantment).</item>
+/// </list>
+/// Both the candidate gatherer (so the agent is only ever offered legal picks)
+/// and the resolution-time legality re-check (CR 608.2b) apply the full
+/// composed predicate against the live source controller.
+/// </para>
+///
+/// <para>
+/// <see cref="TargetFilter"/> is the base battlefield filter string the runtime
+/// translates (e.g. <c>"nonland_permanent"</c>, <c>"creature"</c>,
+/// <c>"artifact_or_enchantment"</c>, <c>"permanent"</c>).
+/// </para>
+/// </summary>
+public sealed class ExileUntilLeavesEffectDef : EffectDefinition
+{
+    /// <summary>Base battlefield target filter (e.g. <c>"nonland_permanent"</c>,
+    /// <c>"creature"</c>, <c>"artifact_or_enchantment"</c>).</summary>
+    public string TargetFilter { get; set; } = "nonland_permanent";
+
+    /// <summary>"an opponent controls" (CR 109.5). Default <c>true</c>.</summary>
+    public bool OpponentControlsOnly { get; set; } = true;
+
+    /// <summary>"another" — exclude the source permanent itself (CR 109.5).
+    /// Default <c>false</c>.</summary>
+    public bool ExcludeSelf { get; set; }
+
+    /// <summary>"with mana value N or less" (CR 202.3). Null = no cap.</summary>
+    public int? MaxManaValue { get; set; }
+
+    /// <inheritdoc />
+    public override Majik.Core.Players.Agents.TargetRequest? ToTargetRequest() =>
+        // The candidate gatherer is built in the runtime (it needs the live
+        // source card's controller to apply the "an opponent controls" /
+        // "another" riders against the resolving GameContext), so the request
+        // declared here is a placeholder the runtime replaces. We still emit a
+        // 1..1 request so the owning ability reserves a target slot.
+        new Majik.Core.Players.Agents.TargetRequest(
+            Description: BuildDescription(),
+            MinTargets: 1,
+            MaxTargets: 1,
+            LegalCandidates: System.Array.Empty<object>(),
+            Intent: Majik.Core.Cards.BotIntent.Removal);
+
+    private string BuildDescription()
+    {
+        var who = OpponentControlsOnly ? " an opponent controls" : "";
+        var another = ExcludeSelf ? "another " : "";
+        var mv = MaxManaValue is int n ? $" with mana value {n} or less" : "";
+        return $"exile {another}target {TargetFilter}{who}{mv} until this leaves the battlefield";
+    }
+
+    /// <summary>Stable effect description used by the runtime ETB effect
+    /// (prefixed with the source name) — kept here so the wording stays in one
+    /// place alongside the <see cref="TargetRequest"/> description.</summary>
+    internal string BuildEffectDescription(string cardName) =>
+        $"{cardName}: {BuildDescription()} (CR 701.21)";
 }
 
 /// <summary>
