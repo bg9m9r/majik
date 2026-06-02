@@ -151,6 +151,16 @@ public class Spell : ISpell
     public bool WasKicked { get; set; }
 
     /// <summary>
+    /// CR 702.32 — number of times Multikicker (or Kicker) was paid as this
+    /// spell was cast. Mirrors <see cref="Majik.Core.Cards.Card.TimesKicked"/>
+    /// on the resolving stack object so a resolution that scales on the kick
+    /// count (Everflowing Chalice — "a charge counter for each time it was
+    /// kicked", CR 702.32c) can read it off the spell handle. Plain Kicker
+    /// tops out at 1; defaults to 0 (not kicked).
+    /// </summary>
+    public int TimesKicked { get; set; }
+
+    /// <summary>
     /// CR 701.59 — the opponent who was promised this spell's gift
     /// (Bloomburrow "Gift" mechanic, e.g. Into the Flood Maw).
     /// Stamped by <see cref="Majik.Core.Game.SpellCastFlow"/> when the

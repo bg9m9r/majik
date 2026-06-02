@@ -200,7 +200,12 @@ public sealed class SpellCastFlow
 
         // CR 702.34b / 702.33b / 702.115 / 701.59 — append per-feature cleanup
         // effects (alt-cost OnResolved, Kicker/Surge/Gift sentinel-clear).
-        bool hasKickerPayment = mergedAdditional.OfType<KickerAdditionalCost>().Any();
+        // CR 702.33 / 702.32 — a kicked OR multikicked spell needs the same
+        // sentinel-clear cleanup + "was kicked" mirror. Multikicker is just a
+        // kicker that may be paid any number of times (CR 702.32a); a
+        // multikicker paid zero times leaves the spell un-kicked.
+        bool hasKickerPayment = mergedAdditional.OfType<KickerAdditionalCost>().Any()
+            || mergedAdditional.OfType<MultikickerAdditionalCost>().Any(m => m.Times > 0);
         var finalEffects = AppendCleanupEffects(
             effects, card, caster, alternativeCost, hasKickerPayment, giftRecipient,
             mergedAdditional);
@@ -660,10 +665,23 @@ public sealed class SpellCastFlow
             }
         }
 
-        // CR 702.33b — kicked posture mirror.
+        // CR 702.33b / 702.32c — kicked posture mirror onto the resolving
+        // spell. The kick count was already stamped on the underlying card by
+        // the (Multi)Kicker cost's Pay; surface it on the spell handle too so a
+        // scaling resolution (Everflowing Chalice) can read either reference.
         if (hasKickerPayment)
         {
             spell.WasKicked = true;
+            if (card is Card concreteForKickCount && concreteForKickCount.TimesKicked > 0)
+            {
+                spell.TimesKicked = concreteForKickCount.TimesKicked;
+            }
+            else
+            {
+                // Plain Kicker (KickerAdditionalCost) stamps only the boolean;
+                // a single kick = 1 (CR 702.33 — kicked at most once).
+                spell.TimesKicked = 1;
+            }
         }
 
         // CR 702.115 — Surge posture mirror onto the underlying card so
