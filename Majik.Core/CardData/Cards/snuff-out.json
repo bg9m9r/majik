@@ -1,0 +1,5 @@
+{
+  "name": "Snuff Out",
+  "types": ["Instant"],
+  "manaCost": "{3}{B}"
+}
