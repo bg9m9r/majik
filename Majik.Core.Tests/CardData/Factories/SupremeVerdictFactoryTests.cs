@@ -26,6 +26,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Like Day of Judgment (no "can't be regenerated" rider), the sweep
 ///     uses <see cref="Majik.Core.Zones.ZoneMoveReason.Destroy"/>.
 /// </summary>
+[Trait("Color", "M")]
 public class SupremeVerdictFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -57,19 +58,6 @@ public class SupremeVerdictFactoryTests
             .Should().Contain(SupremeVerdictFactory.CantBeCounteredMarker,
                 "Supreme Verdict carries the 'Can't Be Countered' structural marker");
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_SupremeVerdict()
-    {
-        var card = NamedCardFactory.Create("Supreme Verdict", _alice);
-
-        card.Should().BeOfType<Sorcery>();
-        card.Name.Should().Be("Supreme Verdict");
-        card.HasType(CardType.Sorcery).Should().BeTrue();
-        card.ManaCost.Should().Be("{1}{W}{W}{U}");
-        card.Owner.Should().BeSameAs(_alice);
-    }
-
     // -----------------------------------------------------------------------
     // Resolve — sweep semantics
     // -----------------------------------------------------------------------

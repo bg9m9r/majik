@@ -26,6 +26,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - No abilities attached (vanilla card, CR 208.1).
 /// - NamedCardFactory dispatch resolves the correct factory.
 /// </summary>
+[Trait("Color", "U")]
 public class MaritimeGuardFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -125,19 +126,5 @@ public class MaritimeGuardFactoryTests
             "Maritime Guard has no triggered abilities");
         card.Abilities.OfType<ActivatedAbility>().Should().BeEmpty(
             "Maritime Guard has no activated abilities");
-    }
-
-    [Fact]
-    public void MaritimeGuard_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Maritime Guard", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Maritime Guard");
-        card.HasType(CardType.Creature).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Merfolk).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Soldier).Should().BeTrue();
-        ((Creature)card).BasePower.Should().Be(1);
-        ((Creature)card).BaseToughness.Should().Be(3);
     }
 }

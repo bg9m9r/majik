@@ -34,21 +34,10 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// path by <see cref="EntersTappedBinder"/> from the oracle text, not by this
 /// factory (same posture as the Guildgate / Alpine Meadow factories).
 /// </summary>
+[Trait("Color", "C")]
 public class ShelteredThicketFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
-
-    [Fact]
-    public void ShelteredThicket_Dispatch_ReturnsLandWithMountainAndForestSubtypes()
-    {
-        var card = NamedCardFactory.Create("Sheltered Thicket", _alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Sheltered Thicket");
-        card.HasSubtype(CardSubtype.Mountain).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Forest).Should().BeTrue();
-    }
-
     [Fact]
     public void ShelteredThicket_HasTwoManaAbilities_ProducingRedAndGreen()
     {

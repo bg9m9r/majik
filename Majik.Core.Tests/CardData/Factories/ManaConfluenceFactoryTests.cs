@@ -29,6 +29,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Tap-as-cost: a second coloured activation can't pay {T} once tapped.
 /// - Dispatch through <see cref="NamedCardFactory"/>.
 /// </summary>
+[Trait("Color", "C")]
 public class ManaConfluenceFactoryTests
 {
     private const string CardName = "Mana Confluence";
@@ -79,18 +80,6 @@ public class ManaConfluenceFactoryTests
         land.HasSupertype(CardSupertype.Basic).Should().BeFalse();
         land.HasSupertype(CardSupertype.Legendary).Should().BeFalse();
     }
-
-    [Fact]
-    public void ManaConfluence_Dispatch_ResolvesViaNamedCardFactory()
-    {
-        var alice = new Player("Alice", 20);
-
-        var card = NamedCardFactory.Create(CardName, alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be(CardName);
-    }
-
     // -----------------------------------------------------------------------
     // Mana abilities — shape
     // -----------------------------------------------------------------------

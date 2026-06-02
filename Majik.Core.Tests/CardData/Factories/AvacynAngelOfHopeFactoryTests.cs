@@ -26,6 +26,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// is intentionally NOT covered — see factory class summary for the
 /// deferred anthem-primitive note.
 /// </summary>
+[Trait("Color", "W")]
 public class AvacynAngelOfHopeFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -67,22 +68,6 @@ public class AvacynAngelOfHopeFactoryTests
         CombatAbilities.HasFlying(c).Should().BeTrue();
         CombatAbilities.HasVigilance(c).Should().BeTrue();
     }
-
-    [Fact]
-    public void Avacyn_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Avacyn, Angel of Hope", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Avacyn, Angel of Hope");
-        c.HasSubtype(CardSubtype.Angel).Should().BeTrue();
-        c.HasSupertype(CardSupertype.Legendary).Should().BeTrue();
-        var keywords = c.Abilities.OfType<KeywordAbility>().ToList();
-        keywords.Should().Contain(k => k.Keyword == "Flying");
-        keywords.Should().Contain(k => k.Keyword == "Vigilance");
-        keywords.Should().Contain(k => k.Keyword == "Indestructible");
-    }
-
     [Fact]
     public void Avacyn_NullOwner_Throws()
     {

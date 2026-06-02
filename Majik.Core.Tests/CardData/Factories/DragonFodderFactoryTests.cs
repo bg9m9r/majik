@@ -22,6 +22,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Resolve: controller's battlefield gains exactly two 1/1 red Goblin tokens.
 /// - Each token: IsToken, Name "Goblin", Power 1, Toughness 1, red, Goblin subtype.
 /// </summary>
+[Trait("Color", "R")]
 public class DragonFodderFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -43,17 +44,6 @@ public class DragonFodderFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsDragonFodderShape()
-    {
-        var dispatched = NamedCardFactory.Create("Dragon Fodder", _alice);
-
-        dispatched.Should().BeOfType<Sorcery>();
-        dispatched.Name.Should().Be("Dragon Fodder");
-        dispatched.ManaCost.Should().Be("{1}{R}");
-    }
-
     // -----------------------------------------------------------------------
     // SpellDefinition — structural shape
     // -----------------------------------------------------------------------

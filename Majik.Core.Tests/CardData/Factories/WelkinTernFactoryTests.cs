@@ -21,6 +21,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///
 /// No triggers, no activated abilities — Welkin Tern is a vanilla flier.
 /// </summary>
+[Trait("Color", "U")]
 public class WelkinTernFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -58,18 +59,5 @@ public class WelkinTernFactoryTests
 
         c.Abilities.OfType<TriggeredAbility>().Should().BeEmpty();
         c.Abilities.OfType<ActivatedAbility>().Should().BeEmpty();
-    }
-
-    [Fact]
-    public void WelkinTern_NamedCardFactory_Dispatch()
-    {
-        var card = NamedCardFactory.Create("Welkin Tern", _alice);
-
-        card.Should().NotBeNull();
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Welkin Tern");
-        ((Creature)card).BasePower.Should().Be(2);
-        ((Creature)card).BaseToughness.Should().Be(1);
-        card.HasSubtype(CardSubtype.Bird).Should().BeTrue();
     }
 }

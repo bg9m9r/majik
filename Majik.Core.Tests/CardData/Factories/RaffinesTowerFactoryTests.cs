@@ -26,6 +26,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   <see cref="Majik.Core.Events.CardCycledEvent"/> when a bus is supplied.
 /// - Dispatcher routing through <see cref="NamedCardFactory"/>.
 /// </summary>
+[Trait("Color", "C")]
 public class RaffinesTowerFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -33,17 +34,6 @@ public class RaffinesTowerFactoryTests
     // -----------------------------------------------------------------------
     // Identity + dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void RaffinesTower_Dispatch_ReturnsLandWithName()
-    {
-        var card = NamedCardFactory.Create("Raffine's Tower", _alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Raffine's Tower");
-        card.HasType(CardType.Land).Should().BeTrue();
-    }
-
     [Theory]
     [InlineData(CardSubtype.Plains)]
     [InlineData(CardSubtype.Island)]

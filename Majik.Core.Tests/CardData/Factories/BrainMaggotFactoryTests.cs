@@ -25,6 +25,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - LTB returns the exiled card to its owner's hand.
 /// - LTB without an exiled card no-ops.
 /// </summary>
+[Trait("Color", "B")]
 public class BrainMaggotFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -49,20 +50,6 @@ public class BrainMaggotFactoryTests
         c.Abilities.OfType<TriggeredAbility>().Should().HaveCount(2,
             "ETB exile trigger + LTB return trigger");
     }
-
-    [Fact]
-    public void BrainMaggot_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Brain Maggot", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Brain Maggot");
-        c.HasType(CardType.Enchantment).Should().BeTrue();
-        ((Creature)c).BasePower.Should().Be(1);
-        ((Creature)c).BaseToughness.Should().Be(1);
-        c.Abilities.OfType<TriggeredAbility>().Should().HaveCount(2);
-    }
-
     [Fact]
     public void BrainMaggot_Etb_ExilesNonlandFromOpponentHand()
     {

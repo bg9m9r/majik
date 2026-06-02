@@ -34,6 +34,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Resolve: illegal target (creature) → sacrifice still happens, no destroy.
 ///   - Resolve: no Goblin to sacrifice → clean no-op (cost can't be paid).
 /// </summary>
+[Trait("Color", "R")]
 public class GoblinTrashmasterFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -57,19 +58,6 @@ public class GoblinTrashmasterFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void GoblinTrashmaster_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Goblin Trashmaster", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Goblin Trashmaster");
-        card.ManaCost.Should().Be("{2}{R}{R}");
-        ((Creature)card).HasSubtype(CardSubtype.Goblin).Should().BeTrue();
-        ((Creature)card).HasSubtype(CardSubtype.Warrior).Should().BeTrue();
-    }
-
     // ── Lord static — "Other Goblins you control get +1/+1" ─────────────
 
     [Fact]

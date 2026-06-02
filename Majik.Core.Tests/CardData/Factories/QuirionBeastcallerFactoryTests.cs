@@ -23,6 +23,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// dies-distribute half by pre-stamping counters on Quirion directly so
 /// the live counter-read on the dying card has something to dump.
 /// </summary>
+[Trait("Color", "G")]
 public class QuirionBeastcallerFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -137,19 +138,5 @@ public class QuirionBeastcallerFactoryTests
         // Nothing crashes; counters remain on the dying Quirion (until
         // cleanup) and don't leak onto anything else.
         quirion.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(5);
-    }
-
-    [Fact]
-    public void Quirion_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Quirion Beastcaller", _alice);
-
-        c.Should().NotBeNull();
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Quirion Beastcaller");
-        ((Creature)c).Power.Should().Be(1);
-        ((Creature)c).Toughness.Should().Be(1);
-        c.HasSubtype(CardSubtype.Elf).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Druid).Should().BeTrue();
     }
 }

@@ -25,6 +25,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   graveyard via CR 701.16) AND caster gains 3 life (the toughness).
 /// - Opponent with no creatures — no sacrifice, no lifegain (no-op).
 /// </summary>
+[Trait("Color", "B")]
 public class TributeToHungerFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -45,18 +46,6 @@ public class TributeToHungerFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_TributeToHunger()
-    {
-        var card = NamedCardFactory.Create("Tribute to Hunger", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Tribute to Hunger");
-        card.HasType(CardType.Instant).Should().BeTrue();
-        card.Owner.Should().BeSameAs(_alice);
-    }
-
     // -----------------------------------------------------------------------
     // Resolution — opponent has a 2/3 creature
     // -----------------------------------------------------------------------

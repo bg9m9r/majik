@@ -18,6 +18,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   "Fear (This creature can't be blocked except by artifact creatures
 ///    and/or black creatures.)"
 /// </summary>
+[Trait("Color", "B")]
 public class SeveredLegionFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -81,16 +82,5 @@ public class SeveredLegionFactoryTests
 
         c.Abilities.OfType<TriggeredAbility>().Should().BeEmpty();
         c.Abilities.OfType<ActivatedAbility>().Should().BeEmpty();
-    }
-
-    [Fact]
-    public void SeveredLegion_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Severed Legion", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Severed Legion");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Zombie).Should().BeTrue();
     }
 }

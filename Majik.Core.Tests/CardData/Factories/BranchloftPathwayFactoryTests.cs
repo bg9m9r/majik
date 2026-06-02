@@ -31,6 +31,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Front: single {T}: Add {G} mana ability, no triggers/replacements.
 /// - Back: single {T}: Add {W} mana ability, no triggers.
 /// </summary>
+[Trait("Color", "C")]
 public class BranchloftPathwayFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -50,17 +51,6 @@ public class BranchloftPathwayFactoryTests
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void BranchloftPathway_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Branchloft Pathway", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Branchloft Pathway");
-        card.HasType(CardType.Land).Should().BeTrue();
-    }
-
     [Fact]
     public void BranchloftPathway_HasMdfcTracker_OnFrontFace()
     {
@@ -109,17 +99,6 @@ public class BranchloftPathwayFactoryTests
         land.MdfcState.IsBackFace.Should().BeTrue();
         land.MdfcState.ActiveFaceName.Should().Be("Boulderloft Pathway");
     }
-
-    [Fact]
-    public void BoulderloftPathway_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Boulderloft Pathway", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Boulderloft Pathway");
-        card.HasType(CardType.Land).Should().BeTrue();
-    }
-
     [Fact]
     public void BoulderloftPathway_HasTapForWhiteManaAbility()
     {

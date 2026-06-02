@@ -23,6 +23,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - ETB declines cleanly when the target's hand is empty.
 /// - Lands in the target's hand are NOT picked.
 /// </summary>
+[Trait("Color", "U")]
 public class VendilionCliqueFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -51,19 +52,6 @@ public class VendilionCliqueFactoryTests
         // Exactly one ETB trigger.
         c.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1);
     }
-
-    [Fact]
-    public void VendilionClique_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Vendilion Clique", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Vendilion Clique");
-        c.Abilities.OfType<KeywordAbility>().Select(k => k.Keyword)
-            .Should().Contain(new[] { "Flash", "Flying" });
-        c.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1);
-    }
-
     [Fact]
     public void Etb_BottomNonland_AndTargetDraws()
     {

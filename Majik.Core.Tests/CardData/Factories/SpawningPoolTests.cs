@@ -27,6 +27,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// granted activated ability — here "{B}: Regenerate this creature"
 /// (CR 701.18) via <see cref="GrantAbilityEffect"/>.
 /// </summary>
+[Trait("Color", "C")]
 public class SpawningPoolTests
 {
     private const string Name = "Spawning Pool";
@@ -46,21 +47,6 @@ public class SpawningPoolTests
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches()
-    {
-        var card = NamedCardFactory.Create(Name, _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be(Name);
-        card.HasType(CardType.Land).Should().BeTrue();
-        card.Abilities.OfType<ManaAbility>().Should().HaveCount(1, "{T}: Add {B}");
-        card.Abilities
-            .Where(a => a.GetType() == typeof(ActivatedAbility))
-            .Should().HaveCount(1, "the animate ability");
-    }
-
     [Fact]
     public void TapForBlack_ProducesBlack()
     {

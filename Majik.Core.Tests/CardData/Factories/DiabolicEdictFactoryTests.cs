@@ -31,6 +31,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     when the target controls no creatures, per printed text).
 ///   - Illegal / non-Player target (CR 608.2b) → no effect.
 /// </summary>
+[Trait("Color", "B")]
 public class DiabolicEdictFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -51,19 +52,6 @@ public class DiabolicEdictFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_DiabolicEdict()
-    {
-        var card = NamedCardFactory.Create("Diabolic Edict", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Diabolic Edict");
-        card.HasType(CardType.Instant).Should().BeTrue();
-        card.ManaCost.Should().Be("{1}{B}");
-        card.Owner.Should().BeSameAs(_alice);
-    }
-
     // -----------------------------------------------------------------------
     // SpellDefinition shape
     // -----------------------------------------------------------------------

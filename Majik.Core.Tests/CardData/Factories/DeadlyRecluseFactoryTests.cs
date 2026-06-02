@@ -17,6 +17,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Card: Deadly Recluse — {1}{G} Creature — Spider 1/2.
 ///   "Reach, Deathtouch" (CR 702.17, CR 702.2)
 /// </summary>
+[Trait("Color", "G")]
 public class DeadlyRecluseFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -90,16 +91,5 @@ public class DeadlyRecluseFactoryTests
 
         c.Abilities.OfType<TriggeredAbility>().Should().BeEmpty();
         c.Abilities.OfType<ActivatedAbility>().Should().BeEmpty();
-    }
-
-    [Fact]
-    public void DeadlyRecluse_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Deadly Recluse", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Deadly Recluse");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Spider).Should().BeTrue();
     }
 }

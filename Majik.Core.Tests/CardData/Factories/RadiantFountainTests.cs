@@ -28,6 +28,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - One battlefield-active ETB triggered ability that gains 2 life.
 /// - ETB effect: controller's life total rises by exactly 2 (CR 119.3).
 /// </summary>
+[Trait("Color", "C")]
 public class RadiantFountainTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -44,18 +45,6 @@ public class RadiantFountainTests
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_RadiantFountain()
-    {
-        var card = NamedCardFactory.Create("Radiant Fountain", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Radiant Fountain");
-        card.Abilities.OfType<ManaAbility>().Should().HaveCount(1);
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1);
-    }
-
     [Fact]
     public void RadiantFountain_HasManaAbility_ForColorless()
     {

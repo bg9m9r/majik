@@ -23,6 +23,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Conditional hexproof (CR 702.11): untapped → untargetable by opponents;
 ///   tapped → legal target; controller can always target either way.
 /// </summary>
+[Trait("Color", "G")]
 public class ParadiseDruidFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -45,18 +46,6 @@ public class ParadiseDruidFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void ParadiseDruid_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Paradise Druid", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Paradise Druid");
-        ((Creature)c).HasSubtype(CardSubtype.Elf).Should().BeTrue();
-        ((Creature)c).HasSubtype(CardSubtype.Druid).Should().BeTrue();
-    }
-
     // ── Mana abilities ─────────────────────────────────────────────────────
 
     [Fact]

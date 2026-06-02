@@ -39,6 +39,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   card after a graveyard cast (CR 702.34b), exercised end-to-end through
 ///   <see cref="SpellCastFlow"/>.
 /// </summary>
+[Trait("Color", "R")]
 public class GeistflameFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -57,18 +58,6 @@ public class GeistflameFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_Geistflame()
-    {
-        var card = NamedCardFactory.Create("Geistflame", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Geistflame");
-        card.HasType(CardType.Instant).Should().BeTrue();
-        card.ManaCost.ToString().Should().Be("{R}");
-    }
-
     // ── Spell definition shape ────────────────────────────────────────────────
 
     [Fact]

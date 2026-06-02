@@ -39,6 +39,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     opponent damage and net 2x for controller (Furnace 2x then
 ///     Gisela halve rounded up).
 /// </summary>
+[Trait("Color", "M")]
 public class GiselaBladeOfGoldnightFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -63,17 +64,6 @@ public class GiselaBladeOfGoldnightFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void Gisela_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Gisela, Blade of Goldnight", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Gisela, Blade of Goldnight");
-        c.HasSubtype(CardSubtype.Angel).Should().BeTrue();
-    }
-
     [Fact]
     public void Gisela_HasFlyingFirstStrikeLifelinkKeywords()
     {

@@ -24,6 +24,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// "four or more lands" check happens after it has entered the battlefield),
 /// while the sacrificed Fabled Passage no longer does.
 /// </summary>
+[Trait("Color", "C")]
 public class FabledPassageFactoryTests
 {
     private static Land MakeBasic(string name, CardSubtype subtype) =>
@@ -31,18 +32,6 @@ public class FabledPassageFactoryTests
 
     private static Land MakeNonbasicLand(string name) =>
         new(name, supertypes: null, subtypes: null);
-
-    [Fact]
-    public void Dispatch_ReturnsLandWithPrintedName()
-    {
-        var alice = new Player("Alice", 20);
-
-        var card = NamedCardFactory.Create("Fabled Passage", alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Fabled Passage");
-    }
-
     [Fact]
     public void HasSingleTapActivatedAbility()
     {

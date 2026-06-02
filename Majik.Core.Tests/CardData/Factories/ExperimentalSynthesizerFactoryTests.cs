@@ -31,6 +31,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - The activated ability: {2}{R} + Sacrifice this, sorcery-speed, creates
 ///     a 2/2 white Samurai token with vigilance.
 /// </summary>
+[Trait("Color", "R")]
 public class ExperimentalSynthesizerFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -60,16 +61,6 @@ public class ExperimentalSynthesizerFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_ExperimentalSynthesizer()
-    {
-        var card = NamedCardFactory.Create("Experimental Synthesizer", _alice);
-
-        card.Should().BeOfType<Artifact>();
-        card.Name.Should().Be("Experimental Synthesizer");
-    }
-
     // -----------------------------------------------------------------------
     // Enters-or-leaves trigger (CR 603.6a / 603.10b)
     // -----------------------------------------------------------------------

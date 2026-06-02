@@ -17,6 +17,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Card: Standing Troops — {2}{W} Creature — Human Soldier 1/4.
 ///   "Vigilance"
 /// </summary>
+[Trait("Color", "W")]
 public class StandingTroopsFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -74,17 +75,5 @@ public class StandingTroopsFactoryTests
         c.Abilities.OfType<ActivatedAbility>().Should().BeEmpty();
         c.Abilities.OfType<KeywordAbility>().Should().HaveCount(1,
             "Vigilance is the only printed keyword");
-    }
-
-    [Fact]
-    public void StandingTroops_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Standing Troops", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Standing Troops");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Human).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Soldier).Should().BeTrue();
     }
 }

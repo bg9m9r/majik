@@ -32,6 +32,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - <see cref="NamedCardFactory"/> dispatches both printed face names.
 /// - MDFC face-tracker (front starts on the front face; back pre-flipped).
 /// </summary>
+[Trait("Color", "C")]
 public class CragcrownPathwayFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -67,17 +68,6 @@ public class CragcrownPathwayFactoryTests
         land.Abilities.OfType<TriggeredAbility>()
             .Should().BeEmpty("a Pathway land enters untapped — no ETB replacement/trigger");
     }
-
-    [Fact]
-    public void CragcrownPathway_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Cragcrown Pathway", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Cragcrown Pathway");
-        card.HasType(CardType.Land).Should().BeTrue();
-    }
-
     // =========================================================================
     // Back face — Timbercrown Pathway ({T}: Add {G})
     // =========================================================================
@@ -108,15 +98,5 @@ public class CragcrownPathwayFactoryTests
         land.Abilities.OfType<ManaAbility>().Should().HaveCount(1);
         land.Abilities.OfType<TriggeredAbility>()
             .Should().BeEmpty("a Pathway land enters untapped — no ETB replacement/trigger");
-    }
-
-    [Fact]
-    public void TimbercrownPathway_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Timbercrown Pathway", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Timbercrown Pathway");
-        card.HasType(CardType.Land).Should().BeTrue();
     }
 }

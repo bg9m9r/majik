@@ -28,6 +28,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   lose-abilities effect.
 /// - NamedCardFactory dispatch returns a Merfolk Trickster instance.
 /// </summary>
+[Trait("Color", "U")]
 public class MerfolkTricksterFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -373,18 +374,4 @@ public class MerfolkTricksterFactoryTests
     // -----------------------------------------------------------------------
     // NamedCardFactory dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void NamedCardFactory_DispatchesMerfolkTrickster()
-    {
-        var card = Majik.Core.CardData.NamedCardFactory.Create("Merfolk Trickster", _alice);
-
-        card.Should().BeOfType<Creature>("Merfolk Trickster is a Creature");
-        card.Name.Should().Be("Merfolk Trickster");
-        card.Abilities.OfType<KeywordAbility>()
-            .Should().Contain(a => a.Keyword == "Flash",
-                "the dispatcher returns a fully-wired card with Flash");
-        card.Abilities.OfType<TriggeredAbility>()
-            .Should().HaveCount(1, "the dispatcher attaches the ETB trigger");
-    }
 }

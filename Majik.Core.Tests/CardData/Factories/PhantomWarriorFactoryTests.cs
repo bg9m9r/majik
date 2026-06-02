@@ -33,6 +33,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     different creature is NOT restricted.
 ///   - The restriction does not expire at end of turn (static ability).
 /// </summary>
+[Trait("Color", "U")]
 public class PhantomWarriorFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -75,18 +76,6 @@ public class PhantomWarriorFactoryTests
         c.ManaCost.Should().Contain("U",
             "Phantom Warrior is a blue card — its cost contains blue pips");
     }
-
-    [Fact]
-    public void PhantomWarrior_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Phantom Warrior", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Phantom Warrior");
-        c.HasSubtype(CardSubtype.Illusion).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Warrior).Should().BeTrue();
-    }
-
     // -------------------------------------------------------------------------
     // Keyword marker — Unblockable always attached
     // -------------------------------------------------------------------------

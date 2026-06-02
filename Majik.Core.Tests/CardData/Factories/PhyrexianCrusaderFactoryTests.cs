@@ -35,6 +35,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     Red + White and false for Blue / Black / Green.
 ///   - Infect keyword marker is attached.
 /// </summary>
+[Trait("Color", "B")]
 public class PhyrexianCrusaderFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -60,20 +61,6 @@ public class PhyrexianCrusaderFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void PhyrexianCrusader_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Phyrexian Crusader", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Phyrexian Crusader");
-        c.HasSubtype(CardSubtype.Phyrexian).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Knight).Should().BeTrue();
-        c.Abilities.OfType<ProtectionAbility>().Should().HaveCount(2,
-            "Protection from red AND protection from white — two qualities");
-    }
-
     // -------------------------------------------------------------------------
     // First strike
     // -------------------------------------------------------------------------

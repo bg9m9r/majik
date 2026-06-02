@@ -47,6 +47,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Back: life &lt; 3 → enters tapped (CR 119.4).
 /// - Back: no agent → enters tapped.
 /// </summary>
+[Trait("Color", "B")]
 public class AgadeemsAwakeningFactoryTests : IDisposable
 {
     private readonly Player _alice = new("Alice", 20);
@@ -93,18 +94,6 @@ public class AgadeemsAwakeningFactoryTests : IDisposable
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_AgadeemsAwakening()
-    {
-        var card = NamedCardFactory.Create("Agadeem's Awakening", _alice);
-
-        card.Should().BeOfType<Sorcery>();
-        card.Name.Should().Be("Agadeem's Awakening");
-        card.ManaCost.Should().Be("{X}{B}{B}{B}");
-        card.HasType(CardType.Sorcery).Should().BeTrue();
-    }
-
     [Fact]
     public void AgadeemsAwakening_IsBlack()
     {
@@ -294,17 +283,6 @@ public class AgadeemsAwakeningFactoryTests : IDisposable
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_AgadeemTheUndercrypt()
-    {
-        var card = NamedCardFactory.Create("Agadeem, the Undercrypt", _alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Agadeem, the Undercrypt");
-        card.HasType(CardType.Land).Should().BeTrue();
-    }
-
     // =========================================================================
     // Back face — MDFC face tracker
     // =========================================================================

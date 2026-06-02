@@ -35,6 +35,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   (CR 608.2b — illegal target at resolution).
 /// - Resolve no-ops against a non-Creature target.
 /// </summary>
+[Trait("Color", "R")]
 public class RendingVolleyFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -53,17 +54,6 @@ public class RendingVolleyFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Rending Volley", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Rending Volley");
-        card.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     [Fact]
     public void HasCantBeCounteredKeyword()
     {

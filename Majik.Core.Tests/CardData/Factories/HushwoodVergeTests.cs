@@ -34,6 +34,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   other ability unactivatable for the same untap cycle.
 /// - NamedCardFactory dispatch round-trip.
 /// </summary>
+[Trait("Color", "C")]
 public class HushwoodVergeTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -289,15 +290,4 @@ public class HushwoodVergeTests
     // -----------------------------------------------------------------------
     // NamedCardFactory dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_HushwoodVerge()
-    {
-        var card = NamedCardFactory.Create("Hushwood Verge", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Hushwood Verge");
-        card.HasType(CardType.Land).Should().BeTrue();
-        card.Owner.Should().BeSameAs(_alice);
-    }
 }

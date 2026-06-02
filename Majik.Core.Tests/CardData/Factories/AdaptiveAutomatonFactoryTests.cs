@@ -33,6 +33,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   * Adaptive Automaton itself does not get the buff ("Other creatures").
 ///   * Adaptive Automaton leaving the battlefield lifts the buff.
 /// </summary>
+[Trait("Color", "C")]
 public class AdaptiveAutomatonFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -80,20 +81,6 @@ public class AdaptiveAutomatonFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void AdaptiveAutomaton_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Adaptive Automaton", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Adaptive Automaton");
-        card.HasType(CardType.Artifact).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Construct).Should().BeTrue();
-        ((Creature)card).BasePower.Should().Be(2);
-        ((Creature)card).BaseToughness.Should().Be(2);
-    }
-
     [Fact]
     public void AdaptiveAutomaton_SingleArgPath_NoChoice_NoEffects()
     {

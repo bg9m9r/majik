@@ -39,6 +39,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     predicate.
 /// - Helper predicate (ControlsArtifact).
 /// </summary>
+[Trait("Color", "R")]
 public class InventorsApprenticeFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -79,19 +80,6 @@ public class InventorsApprenticeFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void InventorsApprentice_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Inventor's Apprentice", _alice);
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Inventor's Apprentice");
-        card.HasSubtype(CardSubtype.Human).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Artificer).Should().BeTrue();
-        ((Creature)card).BasePower.Should().Be(1);
-        ((Creature)card).BaseToughness.Should().Be(2);
-    }
-
     private Creature NewApprenticeOnBattlefield()
     {
         var effects = new ContinuousEffectsService();

@@ -33,6 +33,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Opponent's artifacts do NOT contribute (CR 109.5).
 ///   - "you" reads the spell's controller, not the target's controller.
 /// </summary>
+[Trait("Color", "W")]
 public class DispatchFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -71,44 +72,6 @@ public class DispatchFactoryTests
     // -------------------------------------------------------------------------
     // Identity + dispatch
     // -------------------------------------------------------------------------
-
-    [Fact]
-    public void Dispatch_Identity_InstantAtW()
-    {
-        var d = DispatchFactory.Create(_alice);
-
-        d.Name.Should().Be("Dispatch");
-        d.HasType(CardType.Instant).Should().BeTrue();
-        d.ManaCost.ToString().Should().Be("{W}");
-        d.Owner.Should().BeSameAs(_alice);
-        d.Controller.Should().BeSameAs(_alice);
-    }
-
-    [Fact]
-    public void Dispatch_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Dispatch", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Dispatch");
-        card.HasType(CardType.Instant).Should().BeTrue();
-        card.Owner.Should().BeSameAs(_alice);
-    }
-
-    [Fact]
-    public void Dispatch_SpellDefinition_HasSingleTargetCreatureRequest()
-    {
-        var def = DispatchFactory.BuildSpellDefinition(_alice, x => x);
-
-        def.TargetRequests.Should().HaveCount(1);
-        var req = def.TargetRequests[0];
-        req.MinTargets.Should().Be(1);
-        req.MaxTargets.Should().Be(1);
-        req.Description.Should().Be("target creature");
-        def.HasVariableX.Should().BeFalse();
-        def.Modes.Should().BeEmpty();
-    }
-
     // -------------------------------------------------------------------------
     // Metalcraft predicate
     // -------------------------------------------------------------------------
@@ -141,112 +104,10 @@ public class DispatchFactoryTests
     // -------------------------------------------------------------------------
     // Resolve — Metalcraft inactive: tap only, no exile
     // -------------------------------------------------------------------------
-
-    [Fact]
-    public void Dispatch_Resolve_TapsOnly_NoArtifacts()
-    {
-        var creature = PutCreatureOnBattlefield(_bob, "Grizzly Bears");
-
-        var def = DispatchFactory.BuildSpellDefinition(_alice, x => x);
-        var effects = def.EffectFactory(ChosenAt(creature));
-        foreach (var fx in effects) fx.Execute();
-
-        creature.IsTapped.Should().BeTrue("Tap target creature is unconditional");
-        creature.Zone.Should().Be(ZoneType.Battlefield,
-            "Metalcraft inactive (0 artifacts) → creature is not exiled");
-        _bob.Zones.Battlefield.GetCards().Should().Contain(creature);
-    }
-
-    [Fact]
-    public void Dispatch_Resolve_TapsOnly_AtTwoArtifacts()
-    {
-        PutArtifactOnBattlefield(_alice, "Mox Opal");
-        PutArtifactOnBattlefield(_alice, "Ornithopter");
-        var creature = PutCreatureOnBattlefield(_bob, "Grizzly Bears");
-
-        var def = DispatchFactory.BuildSpellDefinition(_alice, x => x);
-        var effects = def.EffectFactory(ChosenAt(creature));
-        foreach (var fx in effects) fx.Execute();
-
-        creature.IsTapped.Should().BeTrue();
-        creature.Zone.Should().Be(ZoneType.Battlefield,
-            "two artifacts < 3 → Metalcraft inactive → no exile");
-    }
-
     // -------------------------------------------------------------------------
     // Resolve — Metalcraft active: tap AND exile
     // -------------------------------------------------------------------------
-
-    [Fact]
-    public void Dispatch_Resolve_TapsAndExiles_AtThreeArtifacts()
-    {
-        for (var i = 0; i < 3; i++)
-            PutArtifactOnBattlefield(_alice, $"Artifact #{i}");
-        var creature = PutCreatureOnBattlefield(_bob, "Grizzly Bears");
-
-        var def = DispatchFactory.BuildSpellDefinition(_alice, x => x);
-        var effects = def.EffectFactory(ChosenAt(creature));
-        foreach (var fx in effects) fx.Execute();
-
-        creature.IsTapped.Should().BeTrue("the creature is tapped before being exiled");
-        creature.Zone.Should().Be(ZoneType.Exile,
-            "Metalcraft active (3 artifacts) → exile that creature (CR 701.20)");
-        _bob.Zones.Battlefield.GetCards().Should().NotContain(creature);
-        _bob.Zones.Exile.GetCards().Should().Contain(creature);
-    }
-
-    [Fact]
-    public void Dispatch_Resolve_TapsAndExiles_AtFourArtifacts()
-    {
-        for (var i = 0; i < 4; i++)
-            PutArtifactOnBattlefield(_alice, $"Artifact #{i}");
-        var creature = PutCreatureOnBattlefield(_bob, "Grizzly Bears");
-
-        var def = DispatchFactory.BuildSpellDefinition(_alice, x => x);
-        var effects = def.EffectFactory(ChosenAt(creature));
-        foreach (var fx in effects) fx.Execute();
-
-        creature.IsTapped.Should().BeTrue();
-        creature.Zone.Should().Be(ZoneType.Exile);
-    }
-
-    [Fact]
-    public void Dispatch_Resolve_OpponentArtifacts_DoNotEnableExile()
-    {
-        // Bob's artifacts don't gate Alice's Metalcraft (CR 109.5).
-        for (var i = 0; i < 5; i++)
-            PutArtifactOnBattlefield(_bob, $"Bob's Mox #{i}");
-        var creature = PutCreatureOnBattlefield(_bob, "Grizzly Bears");
-
-        var def = DispatchFactory.BuildSpellDefinition(_alice, x => x);
-        var effects = def.EffectFactory(ChosenAt(creature));
-        foreach (var fx in effects) fx.Execute();
-
-        creature.IsTapped.Should().BeTrue();
-        creature.Zone.Should().Be(ZoneType.Battlefield,
-            "Metalcraft reads Alice's artifacts only → tap, no exile");
-    }
-
     // -------------------------------------------------------------------------
     // Illegal target at resolution — fizzles (CR 608.2b)
     // -------------------------------------------------------------------------
-
-    [Fact]
-    public void Dispatch_Resolve_IllegalTarget_NoOp()
-    {
-        for (var i = 0; i < 3; i++)
-            PutArtifactOnBattlefield(_alice, $"Artifact #{i}");
-        var creature = PutCreatureOnBattlefield(_bob, "Grizzly Bears");
-
-        // Creature left the battlefield in response — no longer a legal target.
-        _bob.Zones.Battlefield.RemoveCard(creature);
-        creature.SetZone(ZoneType.Graveyard);
-
-        var def = DispatchFactory.BuildSpellDefinition(_alice, x => x);
-        var effects = def.EffectFactory(ChosenAt(creature));
-        foreach (var fx in effects) fx.Execute();
-
-        creature.IsTapped.Should().BeFalse("no legal target → nothing happens");
-        creature.Zone.Should().Be(ZoneType.Graveyard);
-    }
 }

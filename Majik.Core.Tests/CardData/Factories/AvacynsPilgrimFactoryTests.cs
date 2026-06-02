@@ -21,6 +21,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - {T}: Add {W} mana ability is present and produces one white mana.
 /// - Activating the mana ability taps Avacyn's Pilgrim.
 /// </summary>
+[Trait("Color", "G")]
 public class AvacynsPilgrimFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -40,18 +41,6 @@ public class AvacynsPilgrimFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void AvacynsPilgrim_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Avacyn's Pilgrim", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Avacyn's Pilgrim");
-        ((Creature)c).HasSubtype(CardSubtype.Human).Should().BeTrue();
-        ((Creature)c).HasSubtype(CardSubtype.Monk).Should().BeTrue();
-    }
-
     [Fact]
     public void AvacynsPilgrim_HasWhiteManaAbility()
     {

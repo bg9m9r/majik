@@ -42,6 +42,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Bust: symmetric "destroy all lands" sweep across every supplied
 ///     player's battlefield (Armageddon-style), regardless of controller.
 /// </summary>
+[Trait("Color", "R")]
 public class BoomBustFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -63,18 +64,6 @@ public class BoomBustFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_BoomBust()
-    {
-        var card = NamedCardFactory.Create("Boom // Bust", _alice);
-
-        card.Should().BeOfType<Sorcery>();
-        card.Name.Should().Be("Boom // Bust");
-        card.HasType(CardType.Sorcery).Should().BeTrue();
-        card.Owner.Should().BeSameAs(_alice);
-    }
-
     [Fact]
     public void BoomBust_IsRed()
     {

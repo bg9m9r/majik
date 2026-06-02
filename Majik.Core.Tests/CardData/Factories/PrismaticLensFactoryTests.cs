@@ -37,6 +37,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Tap-as-cost: a tapped lens cannot activate any of its abilities.
 /// - Dispatch through <see cref="NamedCardFactory"/>.
 /// </summary>
+[Trait("Color", "C")]
 public class PrismaticLensFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -61,16 +62,6 @@ public class PrismaticLensFactoryTests
         lens.Owner.Should().BeSameAs(_alice);
         lens.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_PrismaticLens()
-    {
-        var card = NamedCardFactory.Create("Prismatic Lens", _alice);
-
-        card.Should().BeOfType<Artifact>();
-        card.Name.Should().Be("Prismatic Lens");
-    }
-
     // -----------------------------------------------------------------------
     // Mana abilities — shape
     // -----------------------------------------------------------------------

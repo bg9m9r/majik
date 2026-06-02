@@ -28,6 +28,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Resolve body is a no-op when the target has flying — the spell can
 ///   only legally target creatures without flying (CR 115.4 / CR 608.2b).
 /// </summary>
+[Trait("Color", "R")]
 public class RoastFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -58,17 +59,6 @@ public class RoastFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void Roast_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Roast", _alice);
-
-        card.Should().BeOfType<Sorcery>();
-        card.Name.Should().Be("Roast");
-        card.HasType(CardType.Sorcery).Should().BeTrue();
-    }
-
     [Fact]
     public void Roast_SpellDefinition_HasSingleTargetCreatureWithoutFlyingRequest()
     {

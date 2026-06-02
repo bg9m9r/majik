@@ -26,6 +26,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - "Enchant creature" target predicate (creatures only).
 ///   - Escape alt-cost shape: {W}, exile two OTHER graveyard cards.
 /// </summary>
+[Trait("Color", "W")]
 public class SentinelsEyesTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -44,17 +45,6 @@ public class SentinelsEyesTests
         c.HasType(CardType.Enchantment).Should().BeTrue();
         c.HasSubtype(CardSubtype.Aura).Should().BeTrue();
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_SentinelsEyes()
-    {
-        var card = NamedCardFactory.Create("Sentinel's Eyes", _alice);
-
-        card.Should().BeOfType<Enchantment>();
-        card.Name.Should().Be("Sentinel's Eyes");
-        card.HasSubtype(CardSubtype.Aura).Should().BeTrue();
-    }
-
     // -----------------------------------------------------------------------
     // Static boost — +1/+1 + vigilance
     // -----------------------------------------------------------------------

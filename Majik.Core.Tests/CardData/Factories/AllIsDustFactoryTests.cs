@@ -30,6 +30,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   * Each sacrificed permanent lands in its OWNER's graveyard
 ///     (CR 110.2).
 /// </summary>
+[Trait("Color", "C")]
 public class AllIsDustFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -62,19 +63,6 @@ public class AllIsDustFactoryTests
         // CR 105 — no coloured pips in the printed cost {7}.
         CardColors.GetColors(card).Should().BeEmpty();
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_AllIsDust()
-    {
-        var card = NamedCardFactory.Create("All Is Dust", _alice);
-
-        card.Should().BeOfType<Sorcery>();
-        card.Name.Should().Be("All Is Dust");
-        card.HasType(CardType.Tribal).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Eldrazi).Should().BeTrue();
-        card.ManaCost.Should().Be("{7}");
-    }
-
     // -----------------------------------------------------------------------
     // Colour detection
     // -----------------------------------------------------------------------

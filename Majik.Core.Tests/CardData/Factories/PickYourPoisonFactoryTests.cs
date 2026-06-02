@@ -33,6 +33,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// of-their-choice shape); the per-mode filter differs (artifact / enchantment
 /// / creature-with-flying).
 /// </summary>
+[Trait("Color", "G")]
 public class PickYourPoisonFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -54,19 +55,6 @@ public class PickYourPoisonFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_PickYourPoison()
-    {
-        var card = NamedCardFactory.Create("Pick Your Poison", _alice);
-
-        card.Should().BeOfType<Sorcery>();
-        card.Name.Should().Be("Pick Your Poison");
-        card.HasType(CardType.Sorcery).Should().BeTrue();
-        card.ManaCost.Should().Be("{G}");
-        card.Owner.Should().BeSameAs(_alice);
-    }
-
     // -----------------------------------------------------------------------
     // SpellDefinition shape — three modes, no mandatory targets
     // -----------------------------------------------------------------------

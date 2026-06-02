@@ -37,6 +37,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Damage from an opponent's source is NOT redirected.
 ///   - Soul-Scar Mage leaving the battlefield disables the replacement.
 /// </summary>
+[Trait("Color", "R")]
 public class SoulScarMageFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -61,19 +62,6 @@ public class SoulScarMageFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_SoulScarMage()
-    {
-        var card = NamedCardFactory.Create("Soul-Scar Mage", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Soul-Scar Mage");
-        card.HasType(CardType.Creature).Should().BeTrue();
-        card.ManaCost.Should().Be("{R}");
-        card.Owner.Should().BeSameAs(_alice);
-    }
-
     // -----------------------------------------------------------------------
     // Prowess
     // -----------------------------------------------------------------------

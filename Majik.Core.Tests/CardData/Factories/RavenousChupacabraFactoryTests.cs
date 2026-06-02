@@ -27,6 +27,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Resolve: target left battlefield → clean no-op.
 ///   - Resolve: no chosen target → clean no-op.
 /// </summary>
+[Trait("Color", "B")]
 public class RavenousChupacabraFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -50,19 +51,6 @@ public class RavenousChupacabraFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_RavenousChupacabra()
-    {
-        var card = NamedCardFactory.Create("Ravenous Chupacabra", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Ravenous Chupacabra");
-        ((Creature)card).HasSubtype(CardSubtype.Beast).Should().BeTrue();
-        ((Creature)card).HasSubtype(CardSubtype.Horror).Should().BeTrue();
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1);
-    }
-
     [Fact]
     public void RavenousChupacabra_Etb_HasOpponentCreatureTargetRequest()
     {

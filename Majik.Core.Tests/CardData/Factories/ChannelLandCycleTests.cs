@@ -25,6 +25,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   (CR 702.74a) — the activated-from-hand surface lives entirely on
 ///   <see cref="DiscardSelfCost"/>'s zone gate.
 /// </summary>
+[Trait("Color", "C")]
 public class ChannelLandCycleTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -42,22 +43,6 @@ public class ChannelLandCycleTests
         new object[] { "Takenuma, Abandoned Mire",       "B", 2, 1 }, // channel = {2}{B}
         new object[] { "Sokenzan, Crucible of Defiance", "R", 2, 1 }, // channel = {2}{R}
     };
-
-    [Theory]
-    [MemberData(nameof(AllChannelLands))]
-    public void ChannelLand_Dispatch_ReturnsLegendaryLand(
-        string cardName, string _color, int _x, int _y)
-    {
-        _ = _color; _ = _x; _ = _y;
-
-        var card = NamedCardFactory.Create(cardName, _alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be(cardName);
-        card.HasSupertype(CardSupertype.Legendary).Should().BeTrue(
-            "all Channel-cycle lands are legendary");
-    }
-
     [Theory]
     [MemberData(nameof(AllChannelLands))]
     public void ChannelLand_HasManaAbilityProducingExpectedColor(

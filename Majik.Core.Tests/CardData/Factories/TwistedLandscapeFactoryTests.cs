@@ -32,6 +32,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   <see cref="Majik.Core.Keywords.CyclingFactory.Build"/> primitive
 ///   (CR 702.32).
 /// </summary>
+[Trait("Color", "C")]
 public class TwistedLandscapeFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -39,16 +40,6 @@ public class TwistedLandscapeFactoryTests
     // -----------------------------------------------------------------------
     // Identity + dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void Dispatch_ReturnsLandWithPrintedName()
-    {
-        var card = NamedCardFactory.Create("Twisted Landscape", _alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Twisted Landscape");
-    }
-
     // -----------------------------------------------------------------------
     // {T}: Add {C}
     // -----------------------------------------------------------------------

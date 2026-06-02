@@ -33,6 +33,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - LTB releases the restriction for every affected player.
 /// </summary>
 [Collection(nameof(StaticRegistryCollection))]
+[Trait("Color", "W")]
 public class SpiritOfTheLabyrinthTests
 {
     private readonly Player _alice = new("Alice", 20);

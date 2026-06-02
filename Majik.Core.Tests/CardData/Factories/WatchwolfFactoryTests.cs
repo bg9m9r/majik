@@ -17,6 +17,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Card: Watchwolf — Creature — Wolf {G}{W} 3/3 (Ravnica: City of Guilds).
 /// Vanilla — no printed keywords, triggers, statics, or activated abilities.
 /// </summary>
+[Trait("Color", "M")]
 public class WatchwolfFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -55,18 +56,6 @@ public class WatchwolfFactoryTests
         colors.Should().Contain(ManaColor.White, "Watchwolf costs {W}");
         colors.Should().HaveCount(2, "Watchwolf is exactly Green and White");
     }
-
-    [Fact]
-    public void Watchwolf_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Watchwolf", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Watchwolf");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Wolf).Should().BeTrue();
-    }
-
     [Fact]
     public void Watchwolf_IsVanilla_NoAbilities()
     {

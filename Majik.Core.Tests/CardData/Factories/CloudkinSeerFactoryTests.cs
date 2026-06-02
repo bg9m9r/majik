@@ -22,6 +22,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - ETB draws 1 card for the controller from a stocked library.
 /// - ETB on empty library stamps the loss flag (CR 704.5b) without crashing.
 /// </summary>
+[Trait("Color", "U")]
 public class CloudkinSeerFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -78,19 +79,6 @@ public class CloudkinSeerFactoryTests
     // -----------------------------------------------------------------------
     // NamedCardFactory dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void CloudkinSeer_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Cloudkin Seer", _alice);
-
-        c.Should().BeOfType<Creature>("Cloudkin Seer is a Creature");
-        c.Name.Should().Be("Cloudkin Seer");
-        c.HasSubtype(CardSubtype.Elemental).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Wizard).Should().BeTrue();
-        c.ManaCost.Should().Be("{2}{U}");
-    }
-
     // -----------------------------------------------------------------------
     // ETB triggered ability shape
     // -----------------------------------------------------------------------

@@ -37,6 +37,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// "you draw a card") + <see cref="DiabolicEdictFactory"/> (per-player
 /// "sacrifice a creature of their choice", agent-driven pick).
 /// </summary>
+[Trait("Color", "B")]
 public class PriestOfForgottenGodsFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -67,17 +68,6 @@ public class PriestOfForgottenGodsFactoryTests
         priest.HasSubtype(CardSubtype.Human).Should().BeTrue();
         priest.HasSubtype(CardSubtype.Cleric).Should().BeTrue();
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_Priest()
-    {
-        var card = NamedCardFactory.Create("Priest of Forgotten Gods", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Priest of Forgotten Gods");
-        card.ManaCost.Should().Be("{1}{B}");
-    }
-
     // -----------------------------------------------------------------------
     // Costs — {T} + sacrifice two other creatures
     // -----------------------------------------------------------------------

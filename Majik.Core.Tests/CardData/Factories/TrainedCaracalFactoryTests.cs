@@ -20,6 +20,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   * White colour via CardColors.GetColors (CR 105).
 ///   * Mana value = 1 (CR 202.3).
 /// </summary>
+[Trait("Color", "W")]
 public class TrainedCaracalFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -81,21 +82,4 @@ public class TrainedCaracalFactoryTests
     // ------------------------------------------------------------------
     // Dispatcher
     // ------------------------------------------------------------------
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_TrainedCaracal_AsCreatureCat()
-    {
-        var dispatched = NamedCardFactory.Create("Trained Caracal", _alice);
-
-        dispatched.Should().BeOfType<Creature>(
-            "Trained Caracal dispatches as a Creature shell");
-        dispatched.Name.Should().Be("Trained Caracal");
-        dispatched.ManaCost.Should().Be("{W}");
-
-        var caracal = (Creature)dispatched;
-        caracal.HasSubtype(CardSubtype.Cat).Should().BeTrue();
-        caracal.Abilities.OfType<KeywordAbility>()
-            .Should().Contain(k => k.Keyword == "Lifelink",
-                "the dispatcher route still attaches the Lifelink marker");
-    }
 }

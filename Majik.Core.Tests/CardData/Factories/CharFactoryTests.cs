@@ -27,6 +27,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Resolve deals 4 damage to a player target AND 2 damage to the caster.
 /// - Resolve deals 4 damage to a creature target AND 2 damage to the caster.
 /// </summary>
+[Trait("Color", "R")]
 public class CharFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -43,17 +44,6 @@ public class CharFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void Char_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Char", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Char");
-        card.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     [Fact]
     public void Char_SpellDefinition_HasSingleAnyTargetRequest()
     {

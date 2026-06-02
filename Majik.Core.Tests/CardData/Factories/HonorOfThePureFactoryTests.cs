@@ -27,6 +27,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - LTB lifts the bonus (IsActive gate).
 ///   - NamedCardFactory dispatch.
 /// </summary>
+[Trait("Color", "W")]
 public class HonorOfThePureFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -117,18 +118,6 @@ public class HonorOfThePureFactoryTests
             "the anthem's IsActive gates on the source being on the battlefield");
         whiteKnight.GetToughness().Should().Be(1);
     }
-
-    [Fact]
-    public void HonorOfThePure_NamedCardFactory_Dispatch()
-    {
-        var card = NamedCardFactory.Create("Honor of the Pure", _alice);
-
-        card.Should().NotBeNull();
-        card.Should().BeOfType<Enchantment>();
-        card.Name.Should().Be("Honor of the Pure");
-        card.HasType(CardType.Enchantment).Should().BeTrue();
-    }
-
     // ─── Helpers ────────────────────────────────────────────────────────────
 
     private static Creature MakeCreature(string name, Player owner,

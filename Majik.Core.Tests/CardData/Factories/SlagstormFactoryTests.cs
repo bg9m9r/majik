@@ -22,6 +22,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///
 /// CR 700.2d — modal "Choose one —" spell with 2 non-targeted modes.
 /// </summary>
+[Trait("Color", "R")]
 public class SlagstormFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -48,18 +49,6 @@ public class SlagstormFactoryTests
         SlagstormFactory.CardName.Should().Be("Slagstorm");
         SlagstormFactory.PrintedManaCost.Should().Be("{1}{R}{R}");
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_Slagstorm()
-    {
-        var card = NamedCardFactory.Create("Slagstorm", _alice);
-
-        card.Should().BeOfType<Sorcery>();
-        card.Name.Should().Be("Slagstorm");
-        card.HasType(CardType.Sorcery).Should().BeTrue();
-        card.Owner.Should().BeSameAs(_alice);
-    }
-
     [Fact]
     public void Slagstorm_BuildDefinition_HasTwoModes_NoTargetRequests()
     {

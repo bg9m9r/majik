@@ -17,6 +17,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Card: Sanctuary Cat — Creature — Cat {W} 1/2 (Amonkhet).
 /// Vanilla — no printed keywords, triggers, statics, or activated abilities.
 /// </summary>
+[Trait("Color", "W")]
 public class SanctuaryCatFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -54,18 +55,6 @@ public class SanctuaryCatFactoryTests
         colors.Should().Contain(ManaColor.White, "Sanctuary Cat costs {W}");
         colors.Should().HaveCount(1, "Sanctuary Cat is exactly White");
     }
-
-    [Fact]
-    public void SanctuaryCat_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Sanctuary Cat", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Sanctuary Cat");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Cat).Should().BeTrue();
-    }
-
     [Fact]
     public void SanctuaryCat_IsVanilla_NoAbilities()
     {

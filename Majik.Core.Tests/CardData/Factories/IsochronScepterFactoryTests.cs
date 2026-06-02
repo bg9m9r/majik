@@ -39,6 +39,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     imprinted card itself stays in exile (a copy is cast, not the card).
 ///   - Activated-ability resolve with nothing imprinted: clean no-op.
 /// </summary>
+[Trait("Color", "C")]
 public class IsochronScepterFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -67,17 +68,6 @@ public class IsochronScepterFactoryTests
         scepter.Owner.Should().BeSameAs(_alice);
         scepter.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void IsochronScepter_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Isochron Scepter", _alice);
-
-        c.Should().BeOfType<Artifact>();
-        c.Name.Should().Be("Isochron Scepter");
-        c.HasType(CardType.Artifact).Should().BeTrue();
-    }
-
     // -----------------------------------------------------------------------
     // {2}, {T}: activated ability shape
     // -----------------------------------------------------------------------

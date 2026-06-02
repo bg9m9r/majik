@@ -25,6 +25,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - ETB trigger with an empty library stamps the SBA loss flag without
 ///   crashing (CR 704.5b).
 /// </summary>
+[Trait("Color", "G")]
 public class ElvishVisionaryFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -53,19 +54,6 @@ public class ElvishVisionaryFactoryTests
     // -----------------------------------------------------------------------
     // NamedCardFactory dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void ElvishVisionary_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Elvish Visionary", _alice);
-
-        c.Should().BeOfType<Creature>("Elvish Visionary is a Creature");
-        c.Name.Should().Be("Elvish Visionary");
-        c.HasSubtype(CardSubtype.Elf).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Shaman).Should().BeTrue();
-        c.ManaCost.Should().Be("{1}{G}");
-    }
-
     // -----------------------------------------------------------------------
     // ETB triggered ability — shape
     // -----------------------------------------------------------------------

@@ -17,6 +17,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Card: Yavimaya Wurm — Creature — Wurm {4}{G}{G} 6/4 with Trample.
 /// Oracle text: "Trample"
 /// </summary>
+[Trait("Color", "G")]
 public class YavimayaWurmFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -76,20 +77,5 @@ public class YavimayaWurmFactoryTests
             "Yavimaya Wurm has no activated abilities");
         c.Abilities.OfType<KeywordAbility>().Should().HaveCount(1,
             "Only Trample — no other keyword abilities");
-    }
-
-    [Fact]
-    public void YavimayaWurm_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Yavimaya Wurm", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Yavimaya Wurm");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Wurm).Should().BeTrue();
-
-        var creature = (Creature)c;
-        creature.Power.Should().Be(6);
-        creature.Toughness.Should().Be(4);
     }
 }

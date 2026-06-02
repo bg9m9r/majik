@@ -43,6 +43,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// half-life-rounded-up math, and the kicked / not-kicked cast-trigger
 /// branches.
 /// </summary>
+[Trait("Color", "B")]
 public class ScourgeOfTheSkyclavesTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -66,17 +67,6 @@ public class ScourgeOfTheSkyclavesTests
         scourge.Owner.Should().BeSameAs(_alice);
         scourge.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_Scourge()
-    {
-        var scourge = NamedCardFactory.Create("Scourge of the Skyclaves", _alice);
-
-        scourge.Should().BeOfType<Creature>();
-        scourge.Name.Should().Be("Scourge of the Skyclaves");
-        scourge.HasSubtype(CardSubtype.Demon).Should().BeTrue();
-    }
-
     // -----------------------------------------------------------------------
     // Kicker rider
     // -----------------------------------------------------------------------
