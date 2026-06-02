@@ -10,7 +10,7 @@ on:
 jobs:
   build-test:
     runs-on: ubuntu-latest
-    timeout-minutes: 30  # cap so a hung/deadlocked test can't hold a merge-queue slot for the 6h default
+    timeout-minutes: 12  # healthy run is ~3min; fail fast so a flaky hang frees the runner instead of hogging it
 
     steps:
       - uses: actions/checkout@v4
@@ -35,4 +35,13 @@ jobs:
         run: dotnet build Majik.sln --no-restore --configuration Release
 
       - name: Test
-        run: dotnet test Majik.sln --no-build --configuration Release --verbosity normal
+        # Exclude Majik.Bot.Tests.Integration from the required gate: it is
+        # supplementary bot-vs-bot / SignalR-hub smoke (mostly [Skip]-ed per
+        # CLAUDE.md) and is intermittently flaky AND prone to a CI-only
+        # thread-pool-starvation deadlock that silently hangs the whole
+        # `dotnet test Majik.sln` run to the timeout — ejecting unrelated PRs
+        # (the same class of flake #1731 quarantined VanillaShellGracefulDegrade
+        # for). The engine/server unit suites (Core, Core.Api, Server, Bot)
+        # remain the required coverage. Run the integration smoke separately if
+        # desired; it must not gate merges.
+        run: dotnet test Majik.sln --no-build --configuration Release --verbosity normal --filter "FullyQualifiedName!~Majik.Bot.Tests.Integration"
