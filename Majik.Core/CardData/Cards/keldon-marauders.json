@@ -1,0 +1,9 @@
+{
+  "name": "Keldon Marauders",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Warrior"],
+  "manaCost": "{1}{R}",
+  "power": 3,
+  "toughness": 1,
+  "abilities": []
+}
