@@ -200,6 +200,59 @@
   "mdfc": null,
   "colors": []
 }
+==== adeline-resplendent-cathar ====
+{
+  "name": "Adeline, Resplendent Cathar",
+  "manaCost": "{1}{W}{W}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [
+    "Legendary"
+  ],
+  "subtypes": [
+    "Human",
+    "Knight"
+  ],
+  "power": 0,
+  "toughness": 4,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "White"
+  ]
+}
 ==== agadeem-the-undercrypt ====
 {
   "name": "Agadeem, the Undercrypt",
@@ -4472,6 +4525,52 @@
   "mdfc": null,
   "colors": []
 }
+==== dragons-claw ====
+{
+  "name": "Dragon\u0027s Claw",
+  "manaCost": "{2}",
+  "primaryType": "Artifact",
+  "cardTypes": [
+    "Artifact"
+  ],
+  "supertypes": [],
+  "subtypes": [],
+  "power": null,
+  "toughness": null,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": []
+}
 ==== dreadbore ====
 {
   "name": "Dreadbore",
@@ -8007,6 +8106,54 @@
     "Red"
   ]
 }
+==== heartless-act ====
+{
+  "name": "Heartless Act",
+  "manaCost": "{1}{B}",
+  "primaryType": "Instant",
+  "cardTypes": [
+    "Instant"
+  ],
+  "supertypes": [],
+  "subtypes": [],
+  "power": null,
+  "toughness": null,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Black"
+  ]
+}
 ==== hedge-maze ====
 {
   "name": "Hedge Maze",
@@ -8016,7 +8163,10 @@
     "Land"
   ],
   "supertypes": [],
-  "subtypes": [],
+  "subtypes": [
+    "Forest",
+    "Island"
+  ],
   "power": null,
   "toughness": null,
   "loyalty": null,
@@ -21624,6 +21774,54 @@
   "mdfc": null,
   "colors": [
     "Green"
+  ]
+}
+==== warlords-fury ====
+{
+  "name": "Warlord\u0027s Fury",
+  "manaCost": "{R}",
+  "primaryType": "Sorcery",
+  "cardTypes": [
+    "Sorcery"
+  ],
+  "supertypes": [],
+  "subtypes": [],
+  "power": null,
+  "toughness": null,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Red"
   ]
 }
 ==== wastes ====
