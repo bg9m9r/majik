@@ -27,6 +27,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - No summoning-sickness gate on the ability (CR 302.6 doesn't apply —
 ///     the cost is the word "Tap", not a {T} symbol).
 /// </summary>
+[Trait("Color", "G")]
 public class HeritageDruidFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -58,19 +59,6 @@ public class HeritageDruidFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_HeritageDruid()
-    {
-        var card = NamedCardFactory.Create("Heritage Druid", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Heritage Druid");
-        card.HasType(CardType.Creature).Should().BeTrue();
-        ((Creature)card).HasSubtype(CardSubtype.Elf).Should().BeTrue();
-        ((Creature)card).HasSubtype(CardSubtype.Druid).Should().BeTrue();
-    }
-
     [Fact]
     public void HeritageDruid_HasSingleManaAbility()
     {

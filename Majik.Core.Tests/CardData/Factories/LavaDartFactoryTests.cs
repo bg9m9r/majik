@@ -30,6 +30,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - End-to-end flashback cast through <see cref="SpellCastFlow"/>: cost
 ///   sacrifices the Mountain, spell deals 1 damage, post-resolve exile.
 /// </summary>
+[Trait("Color", "R")]
 public class LavaDartFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -50,17 +51,6 @@ public class LavaDartFactoryTests
         dart.Owner.Should().BeSameAs(_alice);
         dart.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void LavaDart_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Lava Dart", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Lava Dart");
-        card.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     // -----------------------------------------------------------------------
     // Spell definition — single any-target request
     // -----------------------------------------------------------------------

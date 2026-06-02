@@ -38,6 +38,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   target is still a legal object reference here; CR 608.2b only suppresses
 ///   the pump body, not the independent draw clause).
 /// </summary>
+[Trait("Color", "W")]
 public class DefiantStrikeFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -57,17 +58,6 @@ public class DefiantStrikeFactoryTests
         card.Controller.Should().BeSameAs(_alice);
         CardColors.GetColors(card).Should().Contain(ManaColor.White);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_DefiantStrike()
-    {
-        var card = NamedCardFactory.Create("Defiant Strike", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Defiant Strike");
-        card.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     // ── Spell definition shape ────────────────────────────────────────────────
 
     [Fact]

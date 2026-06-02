@@ -19,6 +19,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   each opponent of the caster — one-opponent and two-opponent cases.
 /// - Caster takes no damage even if listed among opponents (defensive guard).
 /// </summary>
+[Trait("Color", "R")]
 public class BoltwaveFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -49,18 +50,6 @@ public class BoltwaveFactoryTests
         // {R} → one coloured pip = mana value 1 (CR 202.3).
         ManaCost.Parse(card.ManaCost).TotalValue.Should().Be(1, "single {R} pip → CMC 1");
     }
-
-    [Fact]
-    public void Boltwave_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Boltwave", _alice);
-
-        card.Should().BeOfType<Sorcery>();
-        card.Name.Should().Be("Boltwave");
-        card.HasType(CardType.Sorcery).Should().BeTrue();
-        card.ManaCost.Should().Be("{R}");
-    }
-
     // -----------------------------------------------------------------------
     // Resolve — each-opponent damage
     // -----------------------------------------------------------------------

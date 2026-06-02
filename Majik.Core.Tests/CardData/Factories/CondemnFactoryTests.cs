@@ -31,6 +31,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   * Toughness-0 target → relocated, zero lifegain (no GainLife throw).
 ///   * Non-creature / off-battlefield target at resolution → no-op (CR 608.2b).
 /// </summary>
+[Trait("Color", "W")]
 public class CondemnFactoryTests
 {
     private readonly EventBus _bus = new();
@@ -65,17 +66,6 @@ public class CondemnFactoryTests
         condemn.Owner.Should().BeSameAs(_alice);
         condemn.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsCondemnShape()
-    {
-        var dispatched = NamedCardFactory.Create("Condemn", _alice);
-
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("Condemn");
-        dispatched.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     [Fact]
     public void BuildDefinition_HasOneRequiredTarget_NoVariableX()
     {

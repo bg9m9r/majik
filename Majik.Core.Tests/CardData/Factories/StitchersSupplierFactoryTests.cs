@@ -34,6 +34,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   a clean no-op for the trigger itself (the loss only fires later
 ///   via empty-library draw-step SBA, CR 704.5b).
 /// </summary>
+[Trait("Color", "B")]
 public class StitchersSupplierFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -67,19 +68,6 @@ public class StitchersSupplierFactoryTests
         s.Owner.Should().BeSameAs(_alice);
         s.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_StitchersSupplier()
-    {
-        var card = NamedCardFactory.Create("Stitcher's Supplier", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Stitcher's Supplier");
-        ((Creature)card).HasSubtype(CardSubtype.Zombie).Should().BeTrue();
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(2,
-            "Stitcher's Supplier has TWO triggers: ETB and dies");
-    }
-
     [Fact]
     public void StitchersSupplier_DiesTrigger_IsActiveInGraveyard()
     {

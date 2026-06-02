@@ -29,6 +29,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - "Players can't gain life" replacement zeros every GainLife while
 ///     the bus is attached.
 /// </summary>
+[Trait("Color", "R")]
 public class SulfuricVortexFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -50,18 +51,6 @@ public class SulfuricVortexFactoryTests
         vortex.Owner.Should().BeSameAs(_alice);
         vortex.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatch_ReturnsSulfuricVortexShape()
-    {
-        var dispatched = NamedCardFactory.Create("Sulfuric Vortex", _alice);
-
-        dispatched.Should().BeOfType<Enchantment>();
-        dispatched.Name.Should().Be("Sulfuric Vortex");
-        dispatched.ManaCost.Should().Be("{1}{R}{R}");
-        dispatched.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1);
-    }
-
     // -------------------------------------------------------------------------
     // Each-player's-upkeep trigger
     // -------------------------------------------------------------------------

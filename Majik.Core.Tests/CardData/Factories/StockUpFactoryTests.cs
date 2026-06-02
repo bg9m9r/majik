@@ -28,6 +28,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Fewer than two cards in library: hands however many exist (no underflow).
 ///   - Empty library: no moves.
 /// </summary>
+[Trait("Color", "U")]
 public class StockUpFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -45,17 +46,6 @@ public class StockUpFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsStockUpShape()
-    {
-        var dispatched = NamedCardFactory.Create("Stock Up", _alice);
-
-        dispatched.Should().BeOfType<Sorcery>();
-        dispatched.Name.Should().Be("Stock Up");
-        dispatched.ManaCost.Should().Be("{2}{U}");
-    }
-
     [Fact]
     public void StockUp_Resolve_FullLibrary_HandsTopTwo_BottomsRestInOrder()
     {

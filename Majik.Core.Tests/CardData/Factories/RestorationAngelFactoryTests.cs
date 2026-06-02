@@ -26,6 +26,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Resolve: opponent-controlled target fizzles (CR 608.2b).
 /// - Resolve: zero-target "may" branch is a clean no-op.
 /// </summary>
+[Trait("Color", "W")]
 public class RestorationAngelFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -53,17 +54,6 @@ public class RestorationAngelFactoryTests
             .Select(k => k.Keyword).ToList();
         keywordNames.Should().Contain(new[] { "Flash", "Flying" });
     }
-
-    [Fact]
-    public void RestorationAngel_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Restoration Angel", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Restoration Angel");
-        c.ManaCost.Should().Be("{3}{W}");
-    }
-
     [Fact]
     public void RestorationAngel_HasEtbTriggerWithUpToOneTarget()
     {

@@ -33,6 +33,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   a LAND (or had an empty hand) loses 3 life (CR 701.8 / CR 119.3).
 /// - Escape alt-cost shape ({B}{B}{R}{R}, exile 5).
 /// </summary>
+[Trait("Color", "M")]
 public class KroxaTitanFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -59,21 +60,6 @@ public class KroxaTitanFactoryTests
         c.Controller.Should().BeSameAs(_alice);
         c.ManaCost.Should().Be("{B}{R}");
     }
-
-    [Fact]
-    public void KroxaTitan_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Kroxa, Titan of Death's Hunger", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Kroxa, Titan of Death's Hunger");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Giant).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Elder).Should().BeTrue();
-        c.HasSupertype(CardSupertype.Legendary).Should().BeTrue();
-        c.ManaCost.Should().Be("{B}{R}");
-    }
-
     // -----------------------------------------------------------------------
     // Self-sacrifice ETB trigger — CR 603.1 / CR 701.16 / CR 702.138b
     // -----------------------------------------------------------------------

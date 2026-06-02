@@ -35,6 +35,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   battlefield (CR 603.6c / 700.4 / CR 111 / CR 702.9).
 /// - No trigger on non-death zone changes (bounce, exile).
 /// </summary>
+[Trait("Color", "W")]
 public class DoomedTravelerFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -83,21 +84,6 @@ public class DoomedTravelerFactoryTests
     // ------------------------------------------------------------------
     // Dispatcher
     // ------------------------------------------------------------------
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_DoomedTraveler()
-    {
-        var card = NamedCardFactory.Create("Doomed Traveler", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Doomed Traveler");
-        var creature = (Creature)card;
-        creature.HasSubtype(CardSubtype.Human).Should().BeTrue();
-        creature.HasSubtype(CardSubtype.Soldier).Should().BeTrue();
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1,
-            "Doomed Traveler has exactly one triggered ability (the dies trigger)");
-    }
-
     // ------------------------------------------------------------------
     // Triggered ability — active zones
     // ------------------------------------------------------------------

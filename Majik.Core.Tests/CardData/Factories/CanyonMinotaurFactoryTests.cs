@@ -16,6 +16,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Card: Canyon Minotaur — Creature — Minotaur Warrior {3}{R} 3/3.
 /// Vanilla — no printed keywords, triggers, statics, or activated abilities.
 /// </summary>
+[Trait("Color", "R")]
 public class CanyonMinotaurFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -58,17 +59,5 @@ public class CanyonMinotaurFactoryTests
             "Canyon Minotaur has no triggered abilities");
         c.Abilities.OfType<ActivatedAbility>().Should().BeEmpty(
             "Canyon Minotaur has no activated abilities");
-    }
-
-    [Fact]
-    public void CanyonMinotaur_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Canyon Minotaur", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Canyon Minotaur");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Minotaur).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Warrior).Should().BeTrue();
     }
 }

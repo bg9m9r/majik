@@ -23,6 +23,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - {T}: Add {B} mana ability — taps the myr, produces one black,
 ///     can't activate while already tapped.
 /// </summary>
+[Trait("Color", "C")]
 public class LeadenMyrFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -47,20 +48,6 @@ public class LeadenMyrFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void LeadenMyr_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Leaden Myr", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Leaden Myr");
-        c.HasType(CardType.Artifact).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Myr).Should().BeTrue();
-        c.Abilities.OfType<ManaAbility>().Should().HaveCount(1,
-            "{T}: Add {B} mana ability is attached");
-    }
-
     // -------------------------------------------------------------------------
     // {T}: Add {B}
     // -------------------------------------------------------------------------

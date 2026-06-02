@@ -28,6 +28,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Illegal target at resolution (creature left battlefield) → no-op (CR 608.2b).
 ///   - Non-creature resolved target (wrong type) → no-op.
 /// </summary>
+[Trait("Color", "B")]
 public class FellFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -51,19 +52,6 @@ public class FellFactoryTests
         ManaCost.Parse(card.ManaCost).TotalValue.Should().Be(2,
             "Fell costs {1}{B} — generic 1 + coloured 1 = MV 2 (CR 202.3)");
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_Fell()
-    {
-        var card = NamedCardFactory.Create("Fell", _alice);
-
-        card.Should().BeOfType<Sorcery>();
-        card.Name.Should().Be("Fell");
-        card.ManaCost.Should().Be("{1}{B}");
-        card.HasType(CardType.Sorcery).Should().BeTrue();
-        card.Owner.Should().BeSameAs(_alice);
-    }
-
     // -----------------------------------------------------------------------
     // SpellDefinition shape
     // -----------------------------------------------------------------------

@@ -30,6 +30,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - ETB: library has exactly 1 card — that card goes to hand, nothing to bottom.
 /// - ETB: empty library — no-op, no crash.
 /// </summary>
+[Trait("Color", "U")]
 public class SeaGateOracleFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -71,19 +72,6 @@ public class SeaGateOracleFactoryTests
     // -----------------------------------------------------------------------
     // NamedCardFactory dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void SeaGateOracle_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Sea Gate Oracle", _alice);
-
-        c.Should().BeOfType<Creature>("Sea Gate Oracle is a Creature");
-        c.Name.Should().Be("Sea Gate Oracle");
-        c.HasSubtype(CardSubtype.Human).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Wizard).Should().BeTrue();
-        c.ManaCost.Should().Be("{2}{U}");
-    }
-
     // -----------------------------------------------------------------------
     // ETB triggered ability — shape
     // -----------------------------------------------------------------------

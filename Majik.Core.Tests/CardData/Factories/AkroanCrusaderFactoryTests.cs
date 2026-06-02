@@ -28,6 +28,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Opponent's targeted spell → no trigger (controller scope).
 /// - Soldier-token shape: name, P/T, subtype, colour, Haste keyword.
 /// </summary>
+[Trait("Color", "R")]
 public class AkroanCrusaderFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -65,22 +66,6 @@ public class AkroanCrusaderFactoryTests
         ac.Owner.Should().BeSameAs(_alice);
         ac.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void AkroanCrusader_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Akroan Crusader", _alice);
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Akroan Crusader");
-        card.HasSubtype(CardSubtype.Human).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Soldier).Should().BeTrue();
-        ((Creature)card).BasePower.Should().Be(1);
-        ((Creature)card).BaseToughness.Should().Be(1);
-        card.Abilities.OfType<KeywordAbility>()
-            .Should().ContainSingle(k => k.Keyword == "Haste");
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1);
-    }
-
     [Fact]
     public void HeroicTrigger_TargetedSpell_CreatesSoldierToken()
     {

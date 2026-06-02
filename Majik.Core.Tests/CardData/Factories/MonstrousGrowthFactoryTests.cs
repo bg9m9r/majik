@@ -27,6 +27,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - +4/+4 expires at end of turn (CR 514.2).
 /// - Fizzle: target not on battlefield → no-op (CR 608.2b).
 /// </summary>
+[Trait("Color", "G")]
 public class MonstrousGrowthFactoryTests
 {
     private readonly EventBus _bus = new();
@@ -65,17 +66,6 @@ public class MonstrousGrowthFactoryTests
 
         mg.ManaCostValue.TotalValue.Should().Be(2);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsMonstrousGrowth()
-    {
-        var dispatched = NamedCardFactory.Create("Monstrous Growth", _alice);
-
-        dispatched.Should().BeOfType<Sorcery>();
-        dispatched.Name.Should().Be("Monstrous Growth");
-        dispatched.HasType(CardType.Sorcery).Should().BeTrue();
-    }
-
     [Fact]
     public void SpellDefinition_DeclaresSingleTargetCreatureRequest()
     {

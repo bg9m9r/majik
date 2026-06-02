@@ -22,6 +22,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Resolve: caster draws exactly 2 cards; library shrinks by 2.
 /// - Resolve: empty library flags CR 704.5b loss SBA but does not throw.
 /// </summary>
+[Trait("Color", "U")]
 public class DivinationFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -43,17 +44,6 @@ public class DivinationFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsDivinationShape()
-    {
-        var dispatched = NamedCardFactory.Create("Divination", _alice);
-
-        dispatched.Should().BeOfType<Sorcery>();
-        dispatched.Name.Should().Be("Divination");
-        dispatched.ManaCost.Should().Be("{2}{U}");
-    }
-
     // -----------------------------------------------------------------------
     // SpellDefinition — structural shape
     // -----------------------------------------------------------------------

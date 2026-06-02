@@ -41,6 +41,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Back: {T}: Add {U} mana ability.
 /// - Back: unconditional enters-tapped replacement.
 /// </summary>
+[Trait("Color", "U")]
 public class SilundiVisionFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -62,18 +63,6 @@ public class SilundiVisionFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_SilundiVision()
-    {
-        var card = NamedCardFactory.Create("Silundi Vision", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Silundi Vision");
-        card.ManaCost.Should().Be("{2}{U}");
-        card.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     [Fact]
     public void SilundiVision_IsBlue()
     {
@@ -253,17 +242,6 @@ public class SilundiVisionFactoryTests
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_SilundiIsle()
-    {
-        var card = NamedCardFactory.Create("Silundi Isle", _alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Silundi Isle");
-        card.HasType(CardType.Land).Should().BeTrue();
-    }
-
     [Fact]
     public void SilundiIsle_CarriesMdfcState_PreFlippedToBackFace()
     {

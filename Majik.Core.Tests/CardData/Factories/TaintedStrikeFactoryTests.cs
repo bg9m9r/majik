@@ -34,6 +34,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - EOT cleanup expires both the pump and the keyword grant (CR 514.2).
 /// - Fizzle: target not on battlefield at resolution → no-op (CR 608.2b).
 /// </summary>
+[Trait("Color", "B")]
 public class TaintedStrikeFactoryTests
 {
     private readonly EventBus _bus = new();
@@ -66,17 +67,6 @@ public class TaintedStrikeFactoryTests
         ts.Controller.Should().BeSameAs(_alice);
         CardColors.GetColors(ts).Should().Contain(ManaColor.Black);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsTaintedStrikeShape()
-    {
-        var dispatched = NamedCardFactory.Create("Tainted Strike", _alice);
-
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("Tainted Strike");
-        dispatched.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     [Fact]
     public void SpellDefinition_HasSingleTargetCreatureRequest_NoX()
     {

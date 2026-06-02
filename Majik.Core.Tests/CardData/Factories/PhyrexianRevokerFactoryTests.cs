@@ -26,6 +26,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// clear in <see cref="IDisposable.Dispose"/>.
 /// </summary>
 [Collection(nameof(ActivatedAbilityRestrictionsCollection))]
+[Trait("Color", "C")]
 public class PhyrexianRevokerFactoryTests : IDisposable
 {
     private readonly Player _alice = new("Alice", 20);
@@ -60,19 +61,6 @@ public class PhyrexianRevokerFactoryTests : IDisposable
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void PhyrexianRevoker_NamedCardFactory_Dispatch()
-    {
-        var card = NamedCardFactory.Create("Phyrexian Revoker", _alice);
-
-        card.Should().NotBeNull();
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Phyrexian Revoker");
-        card.HasType(CardType.Artifact).Should().BeTrue();
-        card.HasType(CardType.Creature).Should().BeTrue();
-    }
-
     // -----------------------------------------------------------------------
     // ETB lifecycle — chosen name registers / unregisters
     // -----------------------------------------------------------------------

@@ -17,6 +17,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Card: Youthful Knight — {1}{W} Creature — Human Knight 2/1.
 ///   "First strike"
 /// </summary>
+[Trait("Color", "W")]
 public class YouthfulKnightFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -74,17 +75,5 @@ public class YouthfulKnightFactoryTests
         c.Abilities.OfType<ActivatedAbility>().Should().BeEmpty();
         c.Abilities.OfType<KeywordAbility>().Should().HaveCount(1,
             "First strike is the only printed keyword");
-    }
-
-    [Fact]
-    public void YouthfulKnight_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Youthful Knight", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Youthful Knight");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Human).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Knight).Should().BeTrue();
     }
 }

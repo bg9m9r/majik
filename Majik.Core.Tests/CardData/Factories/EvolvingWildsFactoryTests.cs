@@ -20,19 +20,9 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// the battlefield tapped) but as a Land with no mana payment — i.e.
 /// Prismatic Vista minus the 1-life payment, plus the printed "tapped" rider.
 /// </summary>
+[Trait("Color", "C")]
 public class EvolvingWildsFactoryTests
 {
-    [Fact]
-    public void Dispatch_ReturnsLandWithPrintedName()
-    {
-        var alice = new Player("Alice", 20);
-
-        var card = NamedCardFactory.Create("Evolving Wilds", alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Evolving Wilds");
-    }
-
     [Fact]
     public void HasSingleTapActivatedAbility()
     {

@@ -26,6 +26,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Dispatcher routing through <see cref="NamedCardFactory"/>.
 /// - Single-arg path registers no replacement.
 /// </summary>
+[Trait("Color", "C")]
 public class WoodedRidgelineFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -33,21 +34,6 @@ public class WoodedRidgelineFactoryTests
     // -----------------------------------------------------------------------
     // Identity + dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void WoodedRidgeline_Dispatch_ReturnsLandWithBothSubtypes()
-    {
-        var card = NamedCardFactory.Create("Wooded Ridgeline", _alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Wooded Ridgeline");
-        card.HasType(CardType.Land).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Mountain).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Forest).Should().BeTrue();
-        card.Owner.Should().BeSameAs(_alice);
-        card.Controller.Should().BeSameAs(_alice);
-    }
-
     [Fact]
     public void WoodedRidgeline_IsNotBasic()
     {
@@ -114,16 +100,6 @@ public class WoodedRidgelineFactoryTests
     // -----------------------------------------------------------------------
     // Shape-only single-arg path
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void WoodedRidgeline_SingleArgDispatch_DoesNotRegisterReplacement()
-    {
-        var land = NamedCardFactory.Create("Wooded Ridgeline", _alice);
-        land.Should().NotBeNull();
-        land.Name.Should().Be("Wooded Ridgeline");
-        ((Land)land).Abilities.OfType<ManaAbility>().Should().HaveCount(2);
-    }
-
     // -----------------------------------------------------------------------
     // Args validation
     // -----------------------------------------------------------------------

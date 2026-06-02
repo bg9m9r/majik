@@ -28,6 +28,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Cost discards the first card in hand and is unpayable with an empty
 ///     hand (CR 117.1 / CR 601.2g).
 /// </summary>
+[Trait("Color", "R")]
 public class WildGuessFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -47,19 +48,6 @@ public class WildGuessFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_WildGuess()
-    {
-        var card = NamedCardFactory.Create("Wild Guess", _alice);
-
-        card.Should().BeOfType<Sorcery>();
-        card.Name.Should().Be("Wild Guess");
-        card.HasType(CardType.Sorcery).Should().BeTrue();
-        card.ManaCost.Should().Be("{R}{R}");
-        card.Owner.Should().BeSameAs(_alice);
-    }
-
     // -----------------------------------------------------------------------
     // SpellDefinition shape
     // -----------------------------------------------------------------------

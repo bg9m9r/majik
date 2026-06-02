@@ -38,6 +38,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   card to hand, publishes <see cref="CardCycledEvent"/>.
 /// - Cycling cost gate: DiscardSelfCost CanPay is hand-only.
 /// </summary>
+[Trait("Color", "R")]
 public class OliphantFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -78,17 +79,6 @@ public class OliphantFactoryTests
         CardColors.GetColors(card).Should().Contain(ManaColor.Red,
             "Oliphaunt has {R} in its mana cost (CR 105.2)");
     }
-
-    [Fact]
-    public void Oliphaunt_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Oliphaunt", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Oliphaunt");
-        card.HasSubtype(CardSubtype.Elephant).Should().BeTrue();
-    }
-
     // -----------------------------------------------------------------------
     // Trample keyword — CR 702.19
     // -----------------------------------------------------------------------

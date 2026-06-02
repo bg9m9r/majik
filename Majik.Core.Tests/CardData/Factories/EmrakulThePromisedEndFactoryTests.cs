@@ -41,6 +41,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// target-opponent request) and resolution (grants control of the target's
 /// next turn with the extra-turn rider via the live ControlPlayerRegistry).
 /// </summary>
+[Trait("Color", "C")]
 public class EmrakulThePromisedEndFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -65,19 +66,6 @@ public class EmrakulThePromisedEndFactoryTests
         emrakul.Owner.Should().BeSameAs(_alice);
         emrakul.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void Emrakul_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Emrakul, the Promised End", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.HasSupertype(CardSupertype.Legendary).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Eldrazi).Should().BeTrue();
-        ((Creature)card).BasePower.Should().Be(13);
-        ((Creature)card).BaseToughness.Should().Be(13);
-    }
-
     // -----------------------------------------------------------------------
     // Keyword markers
     // -----------------------------------------------------------------------

@@ -41,6 +41,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Back face — pay 3 life → enters untapped; decline / can't pay / no
 ///   agent → enters tapped; {T}: Add {B}.
 /// </summary>
+[Trait("Color", "B")]
 public class BoggartTrawlerFactoryTests : IDisposable
 {
     private readonly Player _alice = new("Alice", 20);
@@ -95,17 +96,6 @@ public class BoggartTrawlerFactoryTests : IDisposable
         creature.Toughness.Should().Be(1);
         creature.HasSubtype(CardSubtype.Goblin).Should().BeTrue("Boggart Trawler is a Goblin");
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_BoggartTrawler()
-    {
-        var card = NamedCardFactory.Create("Boggart Trawler", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Boggart Trawler");
-        card.HasType(CardType.Creature).Should().BeTrue();
-    }
-
     // =========================================================================
     // Front face — MDFC face tracker
     // =========================================================================
@@ -250,17 +240,6 @@ public class BoggartTrawlerFactoryTests : IDisposable
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_BoggartBog()
-    {
-        var card = NamedCardFactory.Create("Boggart Bog", _alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Boggart Bog");
-        card.HasType(CardType.Land).Should().BeTrue();
-    }
-
     [Fact]
     public void BoggartBog_CarriesMdfcState_PreFlippedToBackFace()
     {

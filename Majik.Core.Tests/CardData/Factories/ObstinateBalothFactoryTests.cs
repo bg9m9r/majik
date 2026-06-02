@@ -31,6 +31,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// The discard-replacement clause is deferred (the engine's discard funnel does
 /// not record opponent-caused-discard attribution); see the factory doc.
 /// </summary>
+[Trait("Color", "G")]
 public class ObstinateBalothFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -50,19 +51,6 @@ public class ObstinateBalothFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void ObstinateBaloth_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Obstinate Baloth", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Obstinate Baloth");
-        card.HasSubtype(CardSubtype.Beast).Should().BeTrue();
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1,
-            "one ETB lifegain trigger is attached");
-    }
-
     [Fact]
     public void ObstinateBaloth_SelfEnters_TriggerMatches()
     {

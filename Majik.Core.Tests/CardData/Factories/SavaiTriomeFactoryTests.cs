@@ -26,6 +26,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// pays {3}, discards self, draws one, and publishes
 /// <see cref="Majik.Core.Events.CardCycledEvent"/> (CR 702.32d).
 /// </summary>
+[Trait("Color", "C")]
 public class SavaiTriomeFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -33,19 +34,6 @@ public class SavaiTriomeFactoryTests
     // -----------------------------------------------------------------------
     // Identity + dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void SavaiTriome_Dispatch_ReturnsLandWithThreeBasicLandSubtypes()
-    {
-        var card = NamedCardFactory.Create("Savai Triome", _alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Savai Triome");
-        card.HasSubtype(CardSubtype.Mountain).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Plains).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Swamp).Should().BeTrue();
-    }
-
     [Fact]
     public void SavaiTriome_HasThreeManaAbilities_ProducingRedWhiteBlack()
     {

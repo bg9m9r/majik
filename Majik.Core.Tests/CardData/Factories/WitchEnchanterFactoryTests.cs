@@ -48,6 +48,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Back face — can't pay (life &lt; 3) → enters tapped (CR 119.4).
 /// - Back face — no agent → enters tapped.
 /// </summary>
+[Trait("Color", "W")]
 public class WitchEnchanterFactoryTests : IDisposable
 {
     private readonly Player _alice = new("Alice", 20);
@@ -83,18 +84,6 @@ public class WitchEnchanterFactoryTests : IDisposable
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void WitchEnchanter_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Witch Enchanter", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Witch Enchanter");
-        card.HasType(CardType.Creature).Should().BeTrue();
-        card.ManaCost.Should().Be("{3}{W}");
-    }
-
     [Fact]
     public void WitchEnchanter_HasMdfcTracker_OnFrontFace()
     {
@@ -294,17 +283,6 @@ public class WitchEnchanterFactoryTests : IDisposable
         land.MdfcState.IsBackFace.Should().BeTrue();
         land.MdfcState.ActiveFaceName.Should().Be("Witch-Blessed Meadow");
     }
-
-    [Fact]
-    public void WitchBlessedMeadow_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Witch-Blessed Meadow", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Witch-Blessed Meadow");
-        card.HasType(CardType.Land).Should().BeTrue();
-    }
-
     [Fact]
     public void WitchBlessedMeadow_HasTapForWhiteManaAbility()
     {

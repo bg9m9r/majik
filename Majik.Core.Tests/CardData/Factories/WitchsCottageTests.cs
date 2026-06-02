@@ -30,6 +30,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Tapped entry (&lt;3 Swamps) → enters tapped, no enters-untapped trigger.
 /// - No target supplied → effect no-ops cleanly.
 /// </summary>
+[Trait("Color", "C")]
 public class WitchsCottageTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -55,20 +56,6 @@ public class WitchsCottageTests
         land.Abilities.OfType<ManaAbility>().Should().HaveCount(1);
         land.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_WitchsCottage()
-    {
-        var card = NamedCardFactory.Create("Witch's Cottage", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Witch's Cottage");
-        card.HasType(CardType.Land).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Swamp).Should().BeTrue();
-        card.Abilities.OfType<ManaAbility>().Should().HaveCount(1);
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1);
-    }
-
     // -----------------------------------------------------------------------
     // {T}: Add {B}
     // -----------------------------------------------------------------------

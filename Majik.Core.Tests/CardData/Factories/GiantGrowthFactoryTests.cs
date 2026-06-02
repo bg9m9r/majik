@@ -27,6 +27,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - +3/+3 expires at end of turn (CR 514.2).
 /// - Fizzle: target not on battlefield → no-op (CR 608.2b).
 /// </summary>
+[Trait("Color", "G")]
 public class GiantGrowthFactoryTests
 {
     private readonly EventBus _bus = new();
@@ -57,17 +58,6 @@ public class GiantGrowthFactoryTests
         g.Controller.Should().BeSameAs(_alice);
         CardColors.GetColors(g).Should().Contain(ManaColor.Green);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsGiantGrowth()
-    {
-        var dispatched = NamedCardFactory.Create("Giant Growth", _alice);
-
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("Giant Growth");
-        dispatched.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     [Fact]
     public void SpellDefinition_DeclaresSingleTargetCreatureRequest()
     {

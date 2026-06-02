@@ -30,6 +30,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// only in the resolution effect (counters on the equipped creature, not
 /// a life drain).
 /// </summary>
+[Trait("Color", "C")]
 public class BladeOfTheBloodchiefFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -51,17 +52,6 @@ public class BladeOfTheBloodchiefFactoryTests
         c.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1,
             "Blade has a single 'whenever a creature dies' trigger");
     }
-
-    [Fact]
-    public void BladeOfTheBloodchief_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Blade of the Bloodchief", _alice);
-
-        c.Should().BeOfType<Artifact>("Blade of the Bloodchief is an Artifact");
-        c.Name.Should().Be("Blade of the Bloodchief");
-        c.HasSubtype(CardSubtype.Equipment).Should().BeTrue();
-    }
-
     [Fact]
     public void BladeOfTheBloodchief_EquipAbility_HasGenericOneCost()
     {

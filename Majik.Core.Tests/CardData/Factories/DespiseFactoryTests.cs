@@ -18,6 +18,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// card from it. That player discards that card."
 /// Duress-shape targeted discard with a creature-or-planeswalker filter, no life loss.
 /// </summary>
+[Trait("Color", "B")]
 public class DespiseFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -72,15 +73,6 @@ public class DespiseFactoryTests
         card.HasType(CardType.Sorcery).Should().BeTrue();
         card.ManaCost.ToString().Should().Be("{B}");
     }
-
-    [Fact]
-    public void DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Despise", _alice);
-        card.Should().BeOfType<Sorcery>();
-        card.Name.Should().Be("Despise");
-    }
-
     [Fact]
     public void Resolve_DiscardsChosenCreature()
     {

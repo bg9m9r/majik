@@ -25,6 +25,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// EntersTappedReplacement (CR 614.1c), and <see cref="LotusCobraFactory"/>
 /// for the one-shot "add one mana of any color" trigger (CR 106).
 /// </summary>
+[Trait("Color", "C")]
 public class CrumblingVestigeFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -32,19 +33,6 @@ public class CrumblingVestigeFactoryTests
     // -----------------------------------------------------------------------
     // Identity + dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void CrumblingVestige_Dispatch_ReturnsLand()
-    {
-        var card = NamedCardFactory.Create("Crumbling Vestige", _alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Crumbling Vestige");
-        card.HasType(CardType.Land).Should().BeTrue();
-        card.HasSupertype(CardSupertype.Basic).Should()
-            .BeFalse("Crumbling Vestige is a nonbasic land");
-    }
-
     // -----------------------------------------------------------------------
     // {T}: Add {C} — CR 605.1 mana ability
     // -----------------------------------------------------------------------

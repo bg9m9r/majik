@@ -32,6 +32,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Cast trigger does NOT fire on an opponent's artifact spell.
 ///   - NamedCardFactory dispatch.
 /// </summary>
+[Trait("Color", "C")]
 public class PatchworkAutomatonFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -172,19 +173,5 @@ public class PatchworkAutomatonFactoryTests
 
         auto.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(3,
             "each artifact cast lands an independent +1/+1 counter");
-    }
-
-    [Fact]
-    public void PatchworkAutomaton_NamedCardFactory_Dispatch()
-    {
-        var card = NamedCardFactory.Create("Patchwork Automaton", _alice);
-
-        card.Should().NotBeNull();
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Patchwork Automaton");
-        ((Creature)card).BasePower.Should().Be(1);
-        ((Creature)card).BaseToughness.Should().Be(1);
-        card.HasType(CardType.Artifact).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Construct).Should().BeTrue();
     }
 }

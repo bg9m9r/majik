@@ -26,6 +26,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - <see cref="NamedCardFactory"/> dispatch resolves "Wall of Mist" to the
 ///   correct shape.
 /// </summary>
+[Trait("Color", "U")]
 public class WallOfMistFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);

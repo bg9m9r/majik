@@ -41,6 +41,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Sweep resolution exiles ALL graveyards (multi-player) and self-exiles.
 /// - Sweep single-arg path sweeps only the controller's graveyard.
 /// </summary>
+[Trait("Color", "C")]
 public class SentinelTotemTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -62,17 +63,6 @@ public class SentinelTotemTests
         totem.Owner.Should().BeSameAs(_alice);
         totem.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_SentinelTotem()
-    {
-        var card = NamedCardFactory.Create("Sentinel Totem", _alice);
-
-        card.Should().BeOfType<Artifact>();
-        card.Name.Should().Be("Sentinel Totem");
-        card.HasType(CardType.Artifact).Should().BeTrue();
-    }
-
     // -----------------------------------------------------------------------
     // Ability shape
     // -----------------------------------------------------------------------

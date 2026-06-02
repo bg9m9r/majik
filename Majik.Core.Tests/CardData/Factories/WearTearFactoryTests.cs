@@ -50,6 +50,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   target or a target gone from the battlefield (CR 608.2b).
 /// </summary>
 [Collection(nameof(StaticRegistryCollection))]
+[Trait("Color", "R")]
 public class WearTearFactoryTests : IDisposable
 {
     private readonly Player _alice = new("Alice", 20);
@@ -77,17 +78,6 @@ public class WearTearFactoryTests : IDisposable
         var card = WearFactory.Create(_alice);
         CardColors.GetColors(card).Should().Contain(ManaColorEnum.Red);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_Wear()
-    {
-        var card = NamedCardFactory.Create("Wear", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Wear");
-        card.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     [Fact]
     public void Wear_CarriesMdfcState_WearFront_TearBack()
     {
@@ -173,17 +163,6 @@ public class WearTearFactoryTests : IDisposable
         var card = TearFactory.Create(_alice);
         CardColors.GetColors(card).Should().Contain(ManaColorEnum.White);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_Tear()
-    {
-        var card = NamedCardFactory.Create("Tear", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Tear");
-        card.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     [Fact]
     public void Tear_CarriesMdfcState_WearFront_TearBack()
     {

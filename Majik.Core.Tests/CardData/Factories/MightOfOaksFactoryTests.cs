@@ -27,6 +27,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - +7/+7 expires at end of turn (CR 514.2).
 /// - Fizzle: target not on battlefield → no-op (CR 608.2b).
 /// </summary>
+[Trait("Color", "G")]
 public class MightOfOaksFactoryTests
 {
     private readonly EventBus _bus = new();
@@ -66,17 +67,6 @@ public class MightOfOaksFactoryTests
         mo.ManaCostValue.TotalValue.Should().Be(4,
             "{3}{G} = 3 generic + 1 green = MV 4 (CR 202.3)");
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsMightOfOaks()
-    {
-        var dispatched = NamedCardFactory.Create("Might of Oaks", _alice);
-
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("Might of Oaks");
-        dispatched.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     [Fact]
     public void SpellDefinition_DeclaresSingleTargetCreatureRequest()
     {

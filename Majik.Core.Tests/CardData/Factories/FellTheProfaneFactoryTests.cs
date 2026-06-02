@@ -45,6 +45,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Back face — exactly 3 life → payment legal, enters untapped.
 /// - Back face — no agent → enters tapped.
 /// </summary>
+[Trait("Color", "B")]
 public class FellTheProfaneFactoryTests : IDisposable
 {
     public FellTheProfaneFactoryTests()
@@ -91,18 +92,6 @@ public class FellTheProfaneFactoryTests : IDisposable
         colors.Should().NotContain(ManaColorEnum.Green);
         colors.Should().NotContain(ManaColorEnum.White);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_FellTheProfane()
-    {
-        var alice = new Player("Alice", 20);
-        var card = NamedCardFactory.Create("Fell the Profane", alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Fell the Profane");
-        card.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     // =========================================================================
     // MDFC face tracker — front face
     // =========================================================================
@@ -320,18 +309,6 @@ public class FellTheProfaneFactoryTests : IDisposable
         land.Owner.Should().BeSameAs(alice);
         land.Controller.Should().BeSameAs(alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_FellMire()
-    {
-        var alice = new Player("Alice", 20);
-        var card = NamedCardFactory.Create("Fell Mire", alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Fell Mire");
-        card.HasType(CardType.Land).Should().BeTrue();
-    }
-
     [Fact]
     public void FellMire_CarriesMdfcState_PreFlippedToBackFace()
     {

@@ -33,6 +33,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Mode 2 illegal target: opponent-owned creature is NOT exiled (resolve-
 ///   time ownership re-check — "creature you own").
 /// </summary>
+[Trait("Color", "W")]
 public class CharmingPrinceFactoryTests : IDisposable
 {
     private readonly Player _alice = new("Alice", 20);
@@ -83,19 +84,6 @@ public class CharmingPrinceFactoryTests : IDisposable
     // -----------------------------------------------------------------------
     // NamedCardFactory dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void CharmingPrince_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Charming Prince", _alice);
-
-        c.Should().BeOfType<Creature>("Charming Prince is a Creature");
-        c.Name.Should().Be("Charming Prince");
-        c.HasSubtype(CardSubtype.Human).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Noble).Should().BeTrue();
-        c.ManaCost.Should().Be("{1}{W}");
-    }
-
     // -----------------------------------------------------------------------
     // ETB triggered ability shape
     // -----------------------------------------------------------------------

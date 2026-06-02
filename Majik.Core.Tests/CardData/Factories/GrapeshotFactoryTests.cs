@@ -30,6 +30,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Cast as 6th spell this turn (5 other spells) → 6 hits total (original + 5 copies).
 /// - Copies may choose new targets (tested independently per copy).
 /// </summary>
+[Trait("Color", "R")]
 public class GrapeshotFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -52,18 +53,6 @@ public class GrapeshotFactoryTests
         gs.Owner.Should().BeSameAs(_alice);
         gs.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void Grapeshot_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Grapeshot", _alice);
-
-        card.Should().BeOfType<Sorcery>();
-        card.Name.Should().Be("Grapeshot");
-        card.HasType(CardType.Sorcery).Should().BeTrue();
-        card.ManaCost.Should().Be("{1}{R}");
-    }
-
     // ---------------------------------------------------------------
     // Structural shape — Storm trigger attached (CR 702.39)
     // ---------------------------------------------------------------

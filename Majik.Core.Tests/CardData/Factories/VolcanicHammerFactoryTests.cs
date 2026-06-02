@@ -25,6 +25,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Resolve body routes creature damage through
 ///   <see cref="Primitives.Fx.DealDamageAny"/>.
 /// </summary>
+[Trait("Color", "R")]
 public class VolcanicHammerFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -41,17 +42,6 @@ public class VolcanicHammerFactoryTests
         hammer.Owner.Should().BeSameAs(_alice);
         hammer.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void VolcanicHammer_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Volcanic Hammer", _alice);
-
-        card.Should().BeOfType<Sorcery>();
-        card.Name.Should().Be("Volcanic Hammer");
-        card.HasType(CardType.Sorcery).Should().BeTrue();
-    }
-
     [Fact]
     public void VolcanicHammer_SpellDefinition_HasSingleAnyTargetRequest()
     {

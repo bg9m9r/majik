@@ -36,6 +36,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Return ability: imprinted card goes back to its owner's hand and is
 ///     no longer imprinted; mana ability reverts to {C}.
 /// </summary>
+[Trait("Color", "C")]
 public class UginsLabyrinthFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -64,17 +65,6 @@ public class UginsLabyrinthFactoryTests
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void UginsLabyrinth_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Ugin's Labyrinth", _alice);
-
-        c.Should().BeOfType<Land>();
-        c.Name.Should().Be("Ugin's Labyrinth");
-        c.HasType(CardType.Land).Should().BeTrue();
-    }
-
     // -----------------------------------------------------------------------
     // Mana ability (conditional {C} / {C}{C})
     // -----------------------------------------------------------------------

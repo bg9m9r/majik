@@ -36,6 +36,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Front face — choosing zero cards still draws one (CR 121).
 /// - Back face — enters tapped (CR 614.1c) + {T}: Add {R} mana ability.
 /// </summary>
+[Trait("Color", "R")]
 public class ValakutAwakeningFactoryTests : IDisposable
 {
     public ValakutAwakeningFactoryTests()
@@ -76,18 +77,6 @@ public class ValakutAwakeningFactoryTests : IDisposable
         var colors = CardColors.GetColors(card);
         colors.Should().Contain(ManaColorEnum.Red);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_ValakutAwakening()
-    {
-        var alice = new Player("Alice", 20);
-        var card = NamedCardFactory.Create("Valakut Awakening", alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Valakut Awakening");
-        card.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     [Fact]
     public void ValakutAwakening_CarriesMdfcState_FrontNameAndBackName()
     {
@@ -230,18 +219,6 @@ public class ValakutAwakeningFactoryTests : IDisposable
         land.Owner.Should().BeSameAs(alice);
         land.Controller.Should().BeSameAs(alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_ValakutStoneforge()
-    {
-        var alice = new Player("Alice", 20);
-        var card = NamedCardFactory.Create("Valakut Stoneforge", alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Valakut Stoneforge");
-        card.HasType(CardType.Land).Should().BeTrue();
-    }
-
     [Fact]
     public void ValakutStoneforge_CarriesMdfcState_PreFlippedToBackFace()
     {

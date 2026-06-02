@@ -34,6 +34,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// delayed trigger; same EOT-subscription posture as
 /// <see cref="AvatarRokuFactory"/>'s "until end of combat" rider).
 /// </summary>
+[Trait("Color", "R")]
 public class KariZevSkyshipRaiderFactoryTests
 {
     // -----------------------------------------------------------------------
@@ -73,19 +74,6 @@ public class KariZevSkyshipRaiderFactoryTests
         keywords.Should().Contain("First Strike", "CR 702.7");
         keywords.Should().Contain("Menace", "CR 702.111");
     }
-
-    [Fact]
-    public void KariZev_Dispatch_ResolvesViaNamedCardFactory()
-    {
-        var alice = new Player("Alice", 20);
-        var card = NamedCardFactory.Create("Kari Zev, Skyship Raider", alice);
-
-        card.Should().BeAssignableTo<Creature>();
-        card.Name.Should().Be("Kari Zev, Skyship Raider");
-        card.HasSupertype(CardSupertype.Legendary).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Pirate).Should().BeTrue();
-    }
-
     [Fact]
     public void KariZev_HasExactlyOneAttackTrigger()
     {

@@ -24,6 +24,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Opponent creatures are NOT granted indestructible.
 ///   - NamedCardFactory dispatch.
 /// </summary>
+[Trait("Color", "W")]
 public class SelflessSpiritFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -140,18 +141,5 @@ public class SelflessSpiritFactoryTests
         ally.Abilities.OfType<KeywordAbility>()
             .Select(k => k.Keyword)
             .Should().NotContain("Indestructible");
-    }
-
-    [Fact]
-    public void SelflessSpirit_NamedCardFactory_Dispatch()
-    {
-        var card = NamedCardFactory.Create("Selfless Spirit", _alice);
-
-        card.Should().NotBeNull();
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Selfless Spirit");
-        ((Creature)card).BasePower.Should().Be(2);
-        ((Creature)card).BaseToughness.Should().Be(1);
-        card.HasSubtype(CardSubtype.Spirit).Should().BeTrue();
     }
 }

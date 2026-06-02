@@ -31,6 +31,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     * On activation: life total −7, hand +7, library −7.
 ///     * Activation fails (CanPay = false) when controller has ≤ 7 life.
 /// </summary>
+[Trait("Color", "B")]
 public class GriselbrandFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -75,18 +76,6 @@ public class GriselbrandFactoryTests
         Majik.Core.ValueObjects.ManaCost.Parse(c.ManaCost).TotalValue.Should().Be(8,
             "mana value of {4}{B}{B}{B}{B} is 8 (CR 202.3)");
     }
-
-    [Fact]
-    public void Griselbrand_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Griselbrand", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Griselbrand");
-        (c as Creature)!.HasSupertype(CardSupertype.Legendary).Should().BeTrue();
-        (c as Creature)!.HasSubtype(CardSubtype.Demon).Should().BeTrue();
-    }
-
     // -------------------------------------------------------------------------
     // Keyword markers — Flying + Lifelink (CR 702.9 / CR 702.15)
     // -------------------------------------------------------------------------

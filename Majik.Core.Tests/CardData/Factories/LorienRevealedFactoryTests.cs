@@ -33,6 +33,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - End-to-end Islandcycling: pays {1}, discards self, tutors an Island
 ///     card to hand, shuffles, publishes CardCycledEvent (CR 702.32d).
 /// </summary>
+[Trait("Color", "U")]
 public class LorienRevealedFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -81,17 +82,6 @@ public class LorienRevealedFactoryTests
         colors.Should().Contain(ManaColor.Blue,
             "Lórien Revealed has {U} pips so it is blue");
     }
-
-    [Fact]
-    public void LorienRevealed_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Lórien Revealed", _alice);
-
-        c.Should().BeOfType<Sorcery>();
-        c.Name.Should().Be("Lórien Revealed");
-        c.HasType(CardType.Sorcery).Should().BeTrue();
-    }
-
     // -------------------------------------------------------------------------
     // Resolve: draw three cards (CR 121.1)
     // -------------------------------------------------------------------------

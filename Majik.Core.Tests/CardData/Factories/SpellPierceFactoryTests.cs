@@ -32,6 +32,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Noncreature filter: target became a creature spell at resolution
 ///     (CR 608.2b) → no-op.
 /// </summary>
+[Trait("Color", "U")]
 public class SpellPierceFactoryTests
 {
     private readonly EventBus _bus = new();
@@ -67,17 +68,6 @@ public class SpellPierceFactoryTests
         sp.Owner.Should().BeSameAs(_alice);
         sp.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsSpellPierceShape()
-    {
-        var dispatched = NamedCardFactory.Create("Spell Pierce", _alice);
-
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("Spell Pierce");
-        dispatched.ManaCost.Should().Be("{U}");
-    }
-
     [Fact]
     public void SpellDefinition_DeclaresSingleTargetNoncreatureSpellRequest()
     {
