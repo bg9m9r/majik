@@ -12288,6 +12288,57 @@
     "White"
   ]
 }
+==== nameless-inversion ====
+{
+  "name": "Nameless Inversion",
+  "manaCost": "{1}{B}",
+  "primaryType": "Instant",
+  "cardTypes": [
+    "Instant",
+    "Tribal"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Shapeshifter"
+  ],
+  "power": null,
+  "toughness": null,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Black"
+  ]
+}
 ==== natures-claim ====
 {
   "name": "Nature\u0027s Claim",
