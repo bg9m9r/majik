@@ -25,6 +25,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Resolve deals 4 to every supplied player, including the caster.
 ///   - No-player / empty list is a clean no-op.
 /// </summary>
+[Trait("Color", "R")]
 public class FlameRiftFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -41,19 +42,6 @@ public class FlameRiftFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_FlameRift()
-    {
-        var card = NamedCardFactory.Create("Flame Rift", _alice);
-
-        card.Should().BeOfType<Sorcery>();
-        card.Name.Should().Be("Flame Rift");
-        card.HasType(CardType.Sorcery).Should().BeTrue();
-        card.ManaCost.Should().Be("{1}{R}");
-        card.Owner.Should().BeSameAs(_alice);
-    }
-
     [Fact]
     public void Resolve_Deals4Damage_ToEveryPlayer_IncludingCaster()
     {

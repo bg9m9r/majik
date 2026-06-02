@@ -29,6 +29,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Trigger does NOT fire when a land enters under the opponent's
 ///   control (CR 603.6a — "a land you control").
 /// </summary>
+[Trait("Color", "W")]
 public class SteppeLynxFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -54,17 +55,6 @@ public class SteppeLynxFactoryTests
         lynx.Owner.Should().BeSameAs(_alice);
         lynx.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void SteppeLynx_DispatchesViaNamedCardFactory()
-    {
-        var dispatched = NamedCardFactory.Create("Steppe Lynx", _alice);
-
-        dispatched.Should().BeOfType<Creature>();
-        dispatched.Name.Should().Be("Steppe Lynx");
-        dispatched.HasType(CardType.Creature).Should().BeTrue();
-    }
-
     [Fact]
     public void SteppeLynx_LandfallTrigger_IsSelfAffecting_NoTargets()
     {

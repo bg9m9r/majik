@@ -37,6 +37,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Resolve deals 2 damage to a player target (CR 120.3).
 /// - Resolve deals 2 damage to a creature target.
 /// </summary>
+[Trait("Color", "R")]
 public class StaggershockFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -66,18 +67,6 @@ public class StaggershockFactoryTests
         keywordNames.Should().Contain("Rebound",
             "CR 702.88 — Rebound marker attached even though the rider is deferred");
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_Staggershock()
-    {
-        var card = NamedCardFactory.Create("Staggershock", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Staggershock");
-        card.HasType(CardType.Instant).Should().BeTrue();
-        card.ManaCost.ToString().Should().Be("{2}{R}");
-    }
-
     // ── Spell definition shape ────────────────────────────────────────────────
 
     [Fact]

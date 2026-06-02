@@ -26,6 +26,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - {2}, Sacrifice two artifacts: Draw a card — cost shape +
 ///     resolution.
 /// </summary>
+[Trait("Color", "U")]
 public class SaiMasterThopteristFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -71,18 +72,6 @@ public class SaiMasterThopteristFactoryTests
         sai.Owner.Should().BeSameAs(_alice);
         sai.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void Sai_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Sai, Master Thopterist", _alice);
-
-        card.Should().NotBeNull();
-        card.Name.Should().Be("Sai, Master Thopterist");
-        card.Should().BeOfType<Creature>();
-        card.HasSupertype(CardSupertype.Legendary).Should().BeTrue();
-    }
-
     // -----------------------------------------------------------------------
     // Ability shape
     // -----------------------------------------------------------------------

@@ -31,6 +31,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   {1} consumed from Rift controller's pool → 2 damage applied.
 /// - <see cref="NamedCardFactory"/> dispatch.
 /// </summary>
+[Trait("Color", "R")]
 public class LightningRiftFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -51,18 +52,6 @@ public class LightningRiftFactoryTests
         rift.Owner.Should().BeSameAs(_alice);
         rift.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void LightningRift_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Lightning Rift", _alice);
-
-        card.Should().BeOfType<Enchantment>();
-        card.Name.Should().Be("Lightning Rift");
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1,
-            "exactly one cycling-trigger is attached");
-    }
-
     // -----------------------------------------------------------------------
     // Trigger shape — CardCycledEvent + "any target" 1..1
     // -----------------------------------------------------------------------

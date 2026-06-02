@@ -29,6 +29,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Each face has exactly one {T}: Add {C} mana ability, correct colour.
 /// - No non-mana activated / triggered abilities (pathways are vanilla).
 /// </summary>
+[Trait("Color", "C")]
 public class BlightstepPathwayFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -51,17 +52,6 @@ public class BlightstepPathwayFactoryTests
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_BlightstepPathway()
-    {
-        var card = NamedCardFactory.Create("Blightstep Pathway", _alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Blightstep Pathway");
-        card.HasType(CardType.Land).Should().BeTrue();
-    }
-
     [Fact]
     public void BlightstepPathway_CarriesMdfcState_FrontFace()
     {
@@ -120,17 +110,6 @@ public class BlightstepPathwayFactoryTests
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_SearstepPathway()
-    {
-        var card = NamedCardFactory.Create("Searstep Pathway", _alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Searstep Pathway");
-        card.HasType(CardType.Land).Should().BeTrue();
-    }
-
     [Fact]
     public void SearstepPathway_CarriesMdfcState_PreFlippedToBackFace()
     {

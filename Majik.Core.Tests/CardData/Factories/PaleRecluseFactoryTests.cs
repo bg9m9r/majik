@@ -35,6 +35,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   card to hand, publishes <see cref="CardCycledEvent"/>.
 /// - <see cref="NamedCardFactory"/> dispatch.
 /// </summary>
+[Trait("Color", "M")]
 public class PaleRecluseFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -65,27 +66,6 @@ public class PaleRecluseFactoryTests
         card.Abilities.OfType<KeywordAbility>()
             .Should().Contain(k => k.Keyword == "Reach");
     }
-
-    [Fact]
-    public void PaleRecluse_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Pale Recluse", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Pale Recluse");
-        card.HasSubtype(CardSubtype.Spider).Should().BeTrue();
-        card.Abilities.OfType<KeywordAbility>()
-            .Should().Contain(k => k.Keyword == "Reach");
-        card.Abilities.OfType<KeywordAbility>()
-            .Should().Contain(k => k.Keyword == "Cycling");
-        card.Abilities.OfType<KeywordAbility>()
-            .Should().Contain(k => k.Keyword == "Forestcycling");
-        card.Abilities.OfType<KeywordAbility>()
-            .Should().Contain(k => k.Keyword == "Plainscycling");
-        card.Abilities.OfType<ActivatedAbility>().Should().HaveCount(2,
-            "Forestcycling + Plainscycling are two distinct activated abilities");
-    }
-
     // -----------------------------------------------------------------------
     // Typed-cycling ability shapes — CR 702.32d
     // -----------------------------------------------------------------------

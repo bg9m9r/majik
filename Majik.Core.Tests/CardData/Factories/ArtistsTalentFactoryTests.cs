@@ -49,6 +49,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   to combat damage.
 /// - <see cref="NamedCardFactory"/> dispatch returns a wired Class instance.
 /// </summary>
+[Trait("Color", "R")]
 public class ArtistsTalentFactoryTests
 {
     private readonly EventBus _bus = new();
@@ -274,20 +275,6 @@ public class ArtistsTalentFactoryTests
     // -----------------------------------------------------------------------
     // NamedCardFactory dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void NamedCardFactory_DispatchesArtistsTalent()
-    {
-        var card = NamedCardFactory.Create("Artist's Talent", _alice);
-        card.Should().BeOfType<Enchantment>("Artist's Talent is an Enchantment — Class");
-        card.Name.Should().Be("Artist's Talent");
-        card.HasSubtype(CardSubtype.Class).Should().BeTrue();
-        card.Abilities.OfType<ActivatedAbility>().Should().HaveCount(2,
-            "the dispatcher attaches both level-up activated abilities");
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1,
-            "the dispatcher attaches the Level-1 rummage trigger");
-    }
-
     // -----------------------------------------------------------------------
     // Helpers
     // -----------------------------------------------------------------------

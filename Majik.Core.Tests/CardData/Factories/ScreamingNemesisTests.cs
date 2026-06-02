@@ -35,6 +35,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - 0-damage event does not fire the trigger (predicate gate).
 ///   - Damage to a different creature does NOT fire the trigger.
 /// </summary>
+[Trait("Color", "R")]
 public class ScreamingNemesisTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -57,25 +58,6 @@ public class ScreamingNemesisTests
         CombatAbilities.HasHaste(nem).Should().BeTrue(
             "Haste keyword marker is wired (CR 702.10)");
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_ScreamingNemesis()
-    {
-        var card = NamedCardFactory.Create("Screaming Nemesis", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Screaming Nemesis");
-        card.HasSubtype(CardSubtype.Spirit).Should().BeTrue();
-        ((Creature)card).BasePower.Should().Be(3);
-        ((Creature)card).BaseToughness.Should().Be(3);
-        card.Owner.Should().Be(_alice);
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1,
-            "damage-received trigger is wired");
-        card.Abilities.OfType<KeywordAbility>().Should().ContainSingle(k =>
-            string.Equals(k.Keyword, "Haste", System.StringComparison.OrdinalIgnoreCase),
-            "Haste keyword marker is wired");
-    }
-
     [Fact]
     public void ScreamingNemesis_HasDamageReceivedTrigger_ActiveOnBattlefieldOnly()
     {

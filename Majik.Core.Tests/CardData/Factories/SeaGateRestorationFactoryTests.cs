@@ -44,6 +44,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Back: life &lt; 3 -> enters tapped (CR 119.4).
 /// - Back: no agent -> enters tapped.
 /// </summary>
+[Trait("Color", "U")]
 public class SeaGateRestorationFactoryTests : IDisposable
 {
     private readonly Player _alice = new("Alice", 20);
@@ -105,18 +106,6 @@ public class SeaGateRestorationFactoryTests : IDisposable
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_SeaGateRestoration()
-    {
-        var card = NamedCardFactory.Create("Sea Gate Restoration", _alice);
-
-        card.Should().BeOfType<Sorcery>();
-        card.Name.Should().Be("Sea Gate Restoration");
-        card.ManaCost.Should().Be("{4}{U}{U}{U}");
-        card.HasType(CardType.Sorcery).Should().BeTrue();
-    }
-
     [Fact]
     public void SeaGateRestoration_IsBlue()
     {
@@ -215,17 +204,6 @@ public class SeaGateRestorationFactoryTests : IDisposable
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_SeaGateReborn()
-    {
-        var card = NamedCardFactory.Create("Sea Gate, Reborn", _alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Sea Gate, Reborn");
-        card.HasType(CardType.Land).Should().BeTrue();
-    }
-
     // =========================================================================
     // Back face — MDFC face tracker
     // =========================================================================

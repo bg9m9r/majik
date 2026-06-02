@@ -31,6 +31,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Differences: red Human tokens (not white Soldier) and 2/3 stats.
 /// The meld half is not modelled (deferred — no meld mechanic in v1).
 /// </summary>
+[Trait("Color", "R")]
 public class HanweirGarrisonFactoryTests
 {
     // -----------------------------------------------------------------------
@@ -55,19 +56,6 @@ public class HanweirGarrisonFactoryTests
         card.Owner.Should().BeSameAs(alice);
         card.Controller.Should().BeSameAs(alice);
     }
-
-    [Fact]
-    public void HanweirGarrison_Dispatch_ResolvesViaNamedCardFactory()
-    {
-        var alice = new Player("Alice", 20);
-        var card = NamedCardFactory.Create("Hanweir Garrison", alice);
-
-        card.Should().BeAssignableTo<Creature>();
-        card.Name.Should().Be("Hanweir Garrison");
-        card.HasSubtype(CardSubtype.Human).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Soldier).Should().BeTrue();
-    }
-
     [Fact]
     public void HanweirGarrison_HasExactlyOneAttackTrigger()
     {

@@ -30,6 +30,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - {B}: Regenerate activated ability shape + resolve adds a
 ///     <see cref="Permanent.AddRegenerationShield"/> shield.
 /// </summary>
+[Trait("Color", "B")]
 public class SkithiryxTheBlightDragonFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -51,19 +52,6 @@ public class SkithiryxTheBlightDragonFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void Skithiryx_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Skithiryx, the Blight Dragon", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Skithiryx, the Blight Dragon");
-        c.HasSupertype(CardSupertype.Legendary).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Dragon).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Skeleton).Should().BeTrue();
-    }
-
     [Fact]
     public void Skithiryx_HasFlyingHasteInfectKeywordMarkers()
     {

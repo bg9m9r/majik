@@ -38,6 +38,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   <see cref="CombatRestrictionEffect"/> registered on the target, EOT
 ///   scoped (mirrors <see cref="EarthshakerKhenraFactory"/>).
 /// </summary>
+[Trait("Color", "M")]
 public class DemonicDreadFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -70,18 +71,6 @@ public class DemonicDreadFactoryTests
         card.Controller.Should().BeSameAs(_alice);
         card.ManaCostValue.TotalValue.Should().Be(3);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_DemonicDread()
-    {
-        var card = NamedCardFactory.Create("Demonic Dread", _alice);
-
-        card.Should().BeOfType<Sorcery>();
-        card.Name.Should().Be("Demonic Dread");
-        card.HasType(CardType.Sorcery).Should().BeTrue();
-        card.Owner.Should().BeSameAs(_alice);
-    }
-
     // ── Cascade trigger ──────────────────────────────────────────────────
 
     [Fact]

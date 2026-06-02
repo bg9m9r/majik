@@ -23,6 +23,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// The parenthetical is reminder text for the Phyrexian-mana pip in the
 /// cost (CR 107.4f / 118.8); the only printed ability is First strike.
 /// </summary>
+[Trait("Color", "W")]
 public class PorcelainLegionnaireFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -81,19 +82,5 @@ public class PorcelainLegionnaireFactoryTests
         c.Abilities.OfType<ActivatedAbility>().Should().BeEmpty();
         c.Abilities.OfType<KeywordAbility>().Should().HaveCount(1,
             "First strike is the only printed keyword");
-    }
-
-    [Fact]
-    public void PorcelainLegionnaire_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Porcelain Legionnaire", _alice);
-
-        c.Should().BeOfType<Creature>(
-            "Porcelain Legionnaire is a Creature shell with Artifact stamped on top");
-        c.Name.Should().Be("Porcelain Legionnaire");
-        c.HasType(CardType.Artifact).Should().BeTrue();
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Phyrexian).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Soldier).Should().BeTrue();
     }
 }

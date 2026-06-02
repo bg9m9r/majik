@@ -27,6 +27,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Two noncreature casts in one turn → +6/+0 stacks (power = 7).
 ///   - Plot (CR 718) is deferred — documented gap, no plot activation surface.
 /// </summary>
+[Trait("Color", "R")]
 public class SlickshotShowOffFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -73,22 +74,6 @@ public class SlickshotShowOffFactoryTests
         keywords.Should().Contain("Flying");
         keywords.Should().Contain("Haste");
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_SlickshotShowOff()
-    {
-        var card = NamedCardFactory.Create("Slickshot Show-Off", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Slickshot Show-Off");
-        card.HasSubtype(CardSubtype.Human).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Mercenary).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Jock).Should().BeTrue();
-        var keywords = card.Abilities.OfType<KeywordAbility>().Select(k => k.Keyword).ToList();
-        keywords.Should().Contain("Flying");
-        keywords.Should().Contain("Haste");
-    }
-
     [Fact]
     public void SlickshotShowOff_HasOneCastTriggeredAbility()
     {

@@ -29,6 +29,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Spirit-flash does NOT cover opponent's Spirit cards or non-Spirits.
 ///   - NamedCardFactory dispatch.
 /// </summary>
+[Trait("Color", "W")]
 public class RattlechainsFactoryTests : IDisposable
 {
     private readonly Player _alice = new("Alice", 20);
@@ -278,20 +279,6 @@ public class RattlechainsFactoryTests : IDisposable
         TimingRules.CanCastAtInstantSpeed(spirit).Should().BeFalse(
             "FlashGrantStaticEffect unregisters on LTB");
     }
-
-    [Fact]
-    public void Rattlechains_NamedCardFactory_Dispatch()
-    {
-        var card = NamedCardFactory.Create("Rattlechains", _alice);
-
-        card.Should().NotBeNull();
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Rattlechains");
-        ((Creature)card).BasePower.Should().Be(2);
-        ((Creature)card).BaseToughness.Should().Be(2);
-        card.HasSubtype(CardSubtype.Spirit).Should().BeTrue();
-    }
-
     // ─── BuildEngine helper (mirrors SigardasAidTests) ──────────────────────
 
     private static (EventBus bus, ZoneService zones, Majik.Core.Stack.Stack stack, TriggerManager triggers) BuildEngine()

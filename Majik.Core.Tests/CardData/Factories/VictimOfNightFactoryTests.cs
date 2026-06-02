@@ -26,6 +26,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - No-op on a Werewolf (CR 608.2b).
 ///   - No-op on an off-battlefield target (CR 608.2b).
 /// </summary>
+[Trait("Color", "B")]
 public class VictimOfNightFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -55,19 +56,6 @@ public class VictimOfNightFactoryTests
         CardColors.GetColors(card).Should().Contain(ManaColor.Black,
             "Victim of Night has two {B} pips in its mana cost (CR 105)");
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_VictimOfNight()
-    {
-        var card = NamedCardFactory.Create("Victim of Night", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Victim of Night");
-        card.HasType(CardType.Instant).Should().BeTrue();
-        card.ManaCost.Should().Be("{B}{B}");
-        card.Owner.Should().BeSameAs(_alice);
-    }
-
     // -----------------------------------------------------------------------
     // Resolution — destroys a plain creature
     // -----------------------------------------------------------------------

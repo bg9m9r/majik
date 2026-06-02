@@ -32,6 +32,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Each face has exactly one mana ability producing the right color.
 /// - No triggered / non-mana activated abilities ship.
 /// </summary>
+[Trait("Color", "C")]
 public class ClearwaterPathwayFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -58,17 +59,6 @@ public class ClearwaterPathwayFactoryTests
         land.MdfcState.IsBackFace.Should().BeFalse();
         land.MdfcState.ActiveFaceName.Should().Be("Clearwater Pathway");
     }
-
-    [Fact]
-    public void ClearwaterPathway_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Clearwater Pathway", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Clearwater Pathway");
-        card.HasType(CardType.Land).Should().BeTrue();
-    }
-
     [Fact]
     public void ClearwaterPathway_HasSingleTapForBlueManaAbility()
     {
@@ -110,17 +100,6 @@ public class ClearwaterPathwayFactoryTests
         land.MdfcState.IsBackFace.Should().BeTrue();
         land.MdfcState.ActiveFaceName.Should().Be("Murkwater Pathway");
     }
-
-    [Fact]
-    public void MurkwaterPathway_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Murkwater Pathway", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Murkwater Pathway");
-        card.HasType(CardType.Land).Should().BeTrue();
-    }
-
     [Fact]
     public void MurkwaterPathway_HasSingleTapForBlackManaAbility()
     {

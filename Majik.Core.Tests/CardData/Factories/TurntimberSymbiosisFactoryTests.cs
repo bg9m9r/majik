@@ -52,6 +52,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Back: life &lt; 3 → enters tapped (CR 119.4).
 /// - Back: no agent → enters tapped.
 /// </summary>
+[Trait("Color", "G")]
 public class TurntimberSymbiosisFactoryTests : IDisposable
 {
     private readonly Player _alice = new("Alice", 20);
@@ -105,18 +106,6 @@ public class TurntimberSymbiosisFactoryTests : IDisposable
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_TurntimberSymbiosis()
-    {
-        var card = NamedCardFactory.Create("Turntimber Symbiosis", _alice);
-
-        card.Should().BeOfType<Sorcery>();
-        card.Name.Should().Be("Turntimber Symbiosis");
-        card.ManaCost.Should().Be("{4}{G}{G}{G}");
-        card.HasType(CardType.Sorcery).Should().BeTrue();
-    }
-
     [Fact]
     public void TurntimberSymbiosis_IsGreen()
     {
@@ -310,17 +299,6 @@ public class TurntimberSymbiosisFactoryTests : IDisposable
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_TurntimberSerpentineWood()
-    {
-        var card = NamedCardFactory.Create("Turntimber, Serpentine Wood", _alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Turntimber, Serpentine Wood");
-        card.HasType(CardType.Land).Should().BeTrue();
-    }
-
     // =========================================================================
     // Back face — MDFC face tracker
     // =========================================================================

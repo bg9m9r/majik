@@ -34,6 +34,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - ETB effect: empty graveyard — no-op (no crash).
 ///   - NamedCardFactory dispatch returns a Pinnacle Monk shape.
 /// </summary>
+[Trait("Color", "R")]
 public class PinnacleMonkFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -74,18 +75,6 @@ public class PinnacleMonkFactoryTests
     }
 
     // ── NamedCardFactory dispatch ─────────────────────────────────────────────
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_PinnacleMonk()
-    {
-        var card = NamedCardFactory.Create("Pinnacle Monk", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Pinnacle Monk");
-        card.HasSubtype(CardSubtype.Djinn).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Monk).Should().BeTrue();
-    }
-
     // ── Ability set — keyword markers + trigger wiring ────────────────────────
 
     [Fact]

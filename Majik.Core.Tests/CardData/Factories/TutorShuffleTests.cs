@@ -30,6 +30,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     <see cref="BotIntent.LibraryReorder"/> prompt; declines otherwise.
 /// </summary>
 [Collection(nameof(StaticRegistryCollection))]
+[Trait("Color", "C")]
 public class TutorShuffleTests : IDisposable
 {
     // Per-test Player so the static registries are keyed against an

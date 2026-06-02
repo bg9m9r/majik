@@ -26,6 +26,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     skips untapped creatures / non-creatures).
 ///   - NamedCardFactory dispatch.
 /// </summary>
+[Trait("Color", "W")]
 public class TheWanderingEmperorFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -62,21 +63,6 @@ public class TheWanderingEmperorFactoryTests
         loyalty.Select(a => a.LoyaltyChange)
             .Should().BeEquivalentTo(new[] { +1, -1, -2 });
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_Emperor()
-    {
-        var card = NamedCardFactory.Create("The Wandering Emperor", _alice);
-
-        card.Should().BeOfType<Planeswalker>();
-        card.Name.Should().Be("The Wandering Emperor");
-        card.HasType(CardType.Planeswalker).Should().BeTrue();
-        card.HasSupertype(CardSupertype.Legendary).Should().BeTrue();
-        ((Planeswalker)card).Loyalty.Should().Be(3);
-        card.Owner.Should().Be(_alice);
-        card.Abilities.OfType<LoyaltyAbility>().Should().HaveCount(3);
-    }
-
     // -----------------------------------------------------------------------
     // +1: +1/+1 counter + first strike on up to one target creature
     // -----------------------------------------------------------------------

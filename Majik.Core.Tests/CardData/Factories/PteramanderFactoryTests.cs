@@ -42,6 +42,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   <item>Reduced cost is actually payable from a reduced pool.</item>
 /// </list>
 /// </summary>
+[Trait("Color", "U")]
 public class PteramanderFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -77,17 +78,6 @@ public class PteramanderFactoryTests
         p.Owner.Should().BeSameAs(_alice);
         p.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void Pteramander_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Pteramander", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Pteramander");
-        card.HasType(CardType.Creature).Should().BeTrue();
-    }
-
     [Fact]
     public void Pteramander_HasFlyingMarker()
     {

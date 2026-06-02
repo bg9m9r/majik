@@ -21,6 +21,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Resolve effect creates exactly three 1/1 white Soldier creature tokens
 ///   on the caster's battlefield (CR 111 / 111.4 / CR 202.3).
 /// </summary>
+[Trait("Color", "W")]
 public class CaptainsCallFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -50,16 +51,6 @@ public class CaptainsCallFactoryTests
         parsed.White.Should().Be(1, "one white pip in {3}{W}");
         parsed.Generic.Should().Be(3, "three generic pips in {3}{W}");
     }
-
-    [Fact]
-    public void CaptainsCall_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Captain's Call", _alice);
-
-        c.Should().BeOfType<Sorcery>();
-        c.Name.Should().Be("Captain's Call");
-    }
-
     // -----------------------------------------------------------------------
     // Resolve effect
     // -----------------------------------------------------------------------

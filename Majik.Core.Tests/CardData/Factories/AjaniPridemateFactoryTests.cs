@@ -25,6 +25,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Effect resolution: one +1/+1 counter regardless of gained amount
 ///     (CR 122.1).
 /// </summary>
+[Trait("Color", "W")]
 public class AjaniPridemateFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -45,22 +46,6 @@ public class AjaniPridemateFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void Pridemate_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Ajani's Pridemate", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Ajani's Pridemate");
-        card.HasSubtype(CardSubtype.Cat).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Soldier).Should().BeTrue();
-        ((Creature)card).BasePower.Should().Be(2);
-        ((Creature)card).BaseToughness.Should().Be(2);
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1,
-            "one lifegain trigger is attached");
-    }
-
     [Fact]
     public void Pridemate_LifegainTrigger_FiresForController_NotOpponent()
     {

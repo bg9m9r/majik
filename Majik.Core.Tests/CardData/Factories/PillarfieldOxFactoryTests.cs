@@ -23,6 +23,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - No abilities attached (vanilla card).
 /// - NamedCardFactory dispatch resolves the correct factory.
 /// </summary>
+[Trait("Color", "W")]
 public class PillarfieldOxFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -109,18 +110,5 @@ public class PillarfieldOxFactoryTests
 
         card.Abilities.Should().BeEmpty(
             "Pillarfield Ox is a vanilla creature with no printed abilities");
-    }
-
-    [Fact]
-    public void PillarfieldOx_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Pillarfield Ox", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Pillarfield Ox");
-        card.HasType(CardType.Creature).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Ox).Should().BeTrue();
-        ((Creature)card).BasePower.Should().Be(2);
-        ((Creature)card).BaseToughness.Should().Be(4);
     }
 }

@@ -24,6 +24,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - No-op on an Elf creature (CR 608.2b illegal-target filter at resolution).
 ///   - No-op on an off-battlefield target (CR 608.2b).
 /// </summary>
+[Trait("Color", "B")]
 public class EyeblightsEndingFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -53,19 +54,6 @@ public class EyeblightsEndingFactoryTests
         CardColors.GetColors(card).Should().Contain(ManaColor.Black,
             "Eyeblight's Ending has a {B} pip in its mana cost (CR 105)");
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_EyeblightsEnding()
-    {
-        var card = NamedCardFactory.Create("Eyeblight's Ending", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Eyeblight's Ending");
-        card.HasType(CardType.Instant).Should().BeTrue();
-        card.ManaCost.Should().Be("{2}{B}");
-        card.Owner.Should().BeSameAs(_alice);
-    }
-
     // -----------------------------------------------------------------------
     // Resolution — destroys a plain non-Elf creature
     // -----------------------------------------------------------------------

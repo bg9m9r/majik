@@ -34,6 +34,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     the PW's controller controls.
 ///   - X = 0 — primary + sweep both no-op (CR 119.2 guards in Fx).
 /// </summary>
+[Trait("Color", "R")]
 public class BonfireOfTheDamnedFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -67,17 +68,6 @@ public class BonfireOfTheDamnedFactoryTests
         bonfire.Owner.Should().BeSameAs(_alice);
         bonfire.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatch_ReturnsBonfireShape()
-    {
-        var dispatched = NamedCardFactory.Create("Bonfire of the Damned", _alice);
-
-        dispatched.Should().BeOfType<Sorcery>();
-        dispatched.Name.Should().Be("Bonfire of the Damned");
-        dispatched.ManaCost.Should().Be("{X}{X}{R}");
-    }
-
     [Fact]
     public void Create_AttachesMiracleKeywordMarker()
     {

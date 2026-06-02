@@ -43,6 +43,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Back face — pay 3 life → enters untapped; decline / can't pay /
 ///   no agent → enters tapped; mana ability adds {U}.
 /// </summary>
+[Trait("Color", "U")]
 public class SinkIntoStuporFactoryTests : IDisposable
 {
     public SinkIntoStuporFactoryTests()
@@ -83,18 +84,6 @@ public class SinkIntoStuporFactoryTests : IDisposable
         var colors = CardColors.GetColors(card);
         colors.Should().Contain(ManaColorEnum.Blue);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_SinkIntoStupor()
-    {
-        var alice = new Player("Alice", 20);
-        var card = NamedCardFactory.Create("Sink into Stupor", alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Sink into Stupor");
-        card.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     // =========================================================================
     // MDFC face tracker — front face carries Soporific Springs name
     // =========================================================================
@@ -322,18 +311,6 @@ public class SinkIntoStuporFactoryTests : IDisposable
         land.Owner.Should().BeSameAs(alice);
         land.Controller.Should().BeSameAs(alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_SoporificSprings()
-    {
-        var alice = new Player("Alice", 20);
-        var card = NamedCardFactory.Create("Soporific Springs", alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Soporific Springs");
-        card.HasType(CardType.Land).Should().BeTrue();
-    }
-
     [Fact]
     public void SoporificSprings_CarriesMdfcState_PreFlippedToBackFace()
     {

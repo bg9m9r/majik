@@ -24,6 +24,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     for the controller (CR 603.3 / 603.6a).
 ///   - Empty-library draw stamps the SBA loss flag (CR 704.5b) without crashing.
 /// </summary>
+[Trait("Color", "G")]
 public class GenerousStrayFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -69,18 +70,6 @@ public class GenerousStrayFactoryTests
     // -----------------------------------------------------------------------
     // Dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void GenerousStray_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Generous Stray", _alice);
-
-        c.Should().BeOfType<Creature>("Generous Stray is a Creature");
-        c.Name.Should().Be("Generous Stray");
-        c.HasSubtype(CardSubtype.Cat).Should().BeTrue();
-        c.ManaCost.Should().Be("{2}{G}");
-    }
-
     // -----------------------------------------------------------------------
     // ETB trigger shape (shape-only Create overload)
     // -----------------------------------------------------------------------

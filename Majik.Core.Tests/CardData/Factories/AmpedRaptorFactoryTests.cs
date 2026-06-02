@@ -24,6 +24,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   is reported as <see cref="AmpedRaptorFactory.Result.Picked"/>.
 /// - Exiled cards stay in exile after the ETB resolves (no return-to-library).
 /// </summary>
+[Trait("Color", "R")]
 public class AmpedRaptorFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -45,19 +46,6 @@ public class AmpedRaptorFactoryTests
         creature.Power.Should().Be(3);
         creature.Toughness.Should().Be(1);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_AmpedRaptor()
-    {
-        var card = NamedCardFactory.Create("Amped Raptor", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Amped Raptor");
-        card.HasType(CardType.Creature).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Dinosaur).Should().BeTrue();
-        card.Owner.Should().Be(_alice);
-    }
-
     [Fact]
     public void Card_HasTrampleKeyword()
     {

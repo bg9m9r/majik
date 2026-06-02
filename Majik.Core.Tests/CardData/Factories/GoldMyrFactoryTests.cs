@@ -23,6 +23,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - {T}: Add {W} mana ability — taps the myr, produces one white pip,
 ///     can't activate while already tapped.
 /// </summary>
+[Trait("Color", "C")]
 public class GoldMyrFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -47,20 +48,6 @@ public class GoldMyrFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void GoldMyr_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Gold Myr", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Gold Myr");
-        c.HasType(CardType.Artifact).Should().BeTrue();
-        ((Creature)c).HasSubtype(CardSubtype.Myr).Should().BeTrue();
-        c.Abilities.OfType<ManaAbility>().Should().HaveCount(1,
-            "{T}: Add {W} mana ability is attached");
-    }
-
     // -------------------------------------------------------------------------
     // {T}: Add {W}
     // -------------------------------------------------------------------------

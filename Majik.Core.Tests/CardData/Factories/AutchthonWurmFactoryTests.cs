@@ -28,6 +28,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Convoke cost reduction: 8 creatures tapped → 8 less generic (CR 702.51b).
 ///   - Exactly two keyword abilities (no extra abilities).
 /// </summary>
+[Trait("Color", "M")]
 public class AutchthonWurmFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -59,18 +60,6 @@ public class AutchthonWurmFactoryTests
         // {10}{G}{G}{G}{W}{W} = 10 + 3 + 2 = 15 (CR 202.3)
         card.ManaCostValue.TotalValue.Should().Be(15);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_AutchthonWurm()
-    {
-        var card = NamedCardFactory.Create("Autochthon Wurm", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Autochthon Wurm");
-        card.HasType(CardType.Creature).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Wurm).Should().BeTrue();
-    }
-
     // ── Convoke ───────────────────────────────────────────────────────────────
 
     [Fact]

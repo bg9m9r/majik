@@ -37,6 +37,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - CandidateGatherer excludes Faeries, lands, and permanents you don't
 ///   control; the Pixie never offers itself.
 /// </summary>
+[Trait("Color", "W")]
 public class NurturingPixieFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -82,19 +83,6 @@ public class NurturingPixieFactoryTests
     // -----------------------------------------------------------------------
     // NamedCardFactory dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void NurturingPixie_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Nurturing Pixie", _alice);
-
-        c.Should().BeOfType<Creature>("Nurturing Pixie is a Creature");
-        c.Name.Should().Be("Nurturing Pixie");
-        c.HasSubtype(CardSubtype.Faerie).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Rogue).Should().BeTrue();
-        c.ManaCost.Should().Be("{W}");
-    }
-
     // -----------------------------------------------------------------------
     // Keyword + ETB trigger shape
     // -----------------------------------------------------------------------

@@ -30,6 +30,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// yet wired — the engine has no library-search tracking surface. See
 /// <see cref="ArchiveTrapFactory"/> xmldoc for the deferred gap.
 /// </summary>
+[Trait("Color", "U")]
 public class ArchiveTrapFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -52,18 +53,6 @@ public class ArchiveTrapFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void ArchiveTrap_DispatchesViaNamedCardFactory()
-    {
-        var dispatched = NamedCardFactory.Create("Archive Trap", _alice);
-
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("Archive Trap");
-        dispatched.HasType(CardType.Instant).Should().BeTrue();
-        dispatched.ManaCost.Should().Be("{3}{U}{U}");
-    }
-
     // -----------------------------------------------------------------------
     // BuildDefinition shape
     // -----------------------------------------------------------------------

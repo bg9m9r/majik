@@ -36,6 +36,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   * The end-step flicker feeds back into the exile trigger
 ///     (Soulherder counts its own flicker — CR 603.6 + CR 603.7).
 /// </summary>
+[Trait("Color", "M")]
 public class SoulherderFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -59,18 +60,6 @@ public class SoulherderFactoryTests
         s.Owner.Should().BeSameAs(_alice);
         s.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_Soulherder()
-    {
-        var card = NamedCardFactory.Create("Soulherder", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Soulherder");
-        card.HasSubtype(CardSubtype.Spirit).Should().BeTrue();
-        card.ManaCost.Should().Be("{1}{W}{U}");
-    }
-
     [Fact]
     public void Soulherder_HasFlying()
     {

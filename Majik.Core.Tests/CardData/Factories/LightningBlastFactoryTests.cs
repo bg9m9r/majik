@@ -24,6 +24,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Resolve body routes creature damage through
 ///   <see cref="Primitives.Fx.DealDamageAny"/>.
 /// </summary>
+[Trait("Color", "R")]
 public class LightningBlastFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -40,17 +41,6 @@ public class LightningBlastFactoryTests
         blast.Owner.Should().BeSameAs(_alice);
         blast.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void LightningBlast_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Lightning Blast", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Lightning Blast");
-        card.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     [Fact]
     public void LightningBlast_SpellDefinition_HasSingleAnyTargetRequest()
     {

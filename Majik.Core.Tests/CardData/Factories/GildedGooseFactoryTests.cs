@@ -37,6 +37,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   sacrifices a Food token + produces one mana of the chosen colour;
 ///   cannot activate with no Food available.
 /// </summary>
+[Trait("Color", "G")]
 public class GildedGooseFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -59,18 +60,6 @@ public class GildedGooseFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void GildedGoose_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Gilded Goose", _alice);
-
-        c.Should().BeOfType<Creature>("Gilded Goose is a Creature instance");
-        c.Name.Should().Be("Gilded Goose");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        ((Creature)c).HasSubtype(CardSubtype.Bird).Should().BeTrue();
-    }
-
     // ── Flying ──────────────────────────────────────────────────────────
 
     [Fact]

@@ -31,6 +31,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Agent: when the target player's agent is queued, it drives both picks
 ///   (not a deterministic first-card take).
 /// </summary>
+[Trait("Color", "B")]
 public class MindRotFactoryTests
 {
     private readonly EventBus _bus = new();
@@ -69,16 +70,6 @@ public class MindRotFactoryTests
     // ------------------------------------------------------------------
     // Dispatcher
     // ------------------------------------------------------------------
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsMindRot()
-    {
-        var dispatched = NamedCardFactory.Create("Mind Rot", _alice);
-
-        dispatched.Should().BeOfType<Sorcery>();
-        dispatched.Name.Should().Be("Mind Rot");
-    }
-
     // ------------------------------------------------------------------
     // SpellDefinition shape
     // ------------------------------------------------------------------

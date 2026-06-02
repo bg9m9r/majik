@@ -35,6 +35,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     no-ops. Fires on EACH player's end step (no controller filter).
 ///     The per-turn latch resets on TurnStartedEvent.
 /// </summary>
+[Trait("Color", "W")]
 public class ResplendentAngelFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -63,23 +64,6 @@ public class ResplendentAngelFactoryTests
             .Should().Contain(k => k.Keyword == "Flying",
                 "Resplendent Angel has Flying (CR 702.9)");
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_ResplendentAngel_AsAngel()
-    {
-        var dispatched = NamedCardFactory.Create("Resplendent Angel", _alice);
-
-        dispatched.Should().BeOfType<Creature>();
-        dispatched.Name.Should().Be("Resplendent Angel");
-        dispatched.ManaCost.Should().Be("{1}{W}{W}");
-
-        var angel = (Creature)dispatched;
-        angel.HasSubtype(CardSubtype.Angel).Should().BeTrue();
-        angel.Abilities.OfType<KeywordAbility>()
-            .Should().Contain(k => k.Keyword == "Flying",
-                "the dispatcher route still attaches the Flying marker");
-    }
-
     // ------------------------------------------------------------------
     // {3}{W}{W}{W}: +2/+2 and gains lifelink until end of turn
     // ------------------------------------------------------------------

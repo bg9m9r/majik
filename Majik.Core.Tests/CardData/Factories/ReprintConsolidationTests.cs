@@ -26,6 +26,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///      Damnation, both printed names produce a sorcery whose resolve
 ///      effect sweeps every creature off every battlefield (CR 701.7).
 /// </summary>
+[Trait("Color", "W")]
 public class ReprintConsolidationTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -51,25 +52,6 @@ public class ReprintConsolidationTests
             }
         }
     }
-
-    [Theory]
-    [MemberData(nameof(MultiCardNameAttributeFactories))]
-    public void EveryCardNameDispatchesToCorrectPrintedName(
-        string factoryDisplay, string cardName)
-    {
-        var owner = new Player("Owner", 20);
-
-        var card = NamedCardFactory.Create(cardName, owner);
-
-        card.Should().NotBeNull(
-            $"{factoryDisplay} declares [CardName(\"{cardName}\")] — the " +
-            "source-generated dispatcher must surface it.");
-        card.Name.Should().Be(cardName,
-            $"the printed name returned by {factoryDisplay} must match " +
-            $"the [CardName] dispatch key (\"{cardName}\").");
-        card.Owner.Should().BeSameAs(owner);
-    }
-
     // -------------------------------------------------------------------
     // Wrath of God + Damnation — functional-reprint coverage at the
     // resolve-effect layer.

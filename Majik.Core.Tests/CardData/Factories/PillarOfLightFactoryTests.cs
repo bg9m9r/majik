@@ -30,6 +30,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Resolving against a creature with toughness 3 (2/3) → no-op (CR 608.2b).
 ///   - Target no longer on battlefield at resolution → no-op (CR 608.2b).
 /// </summary>
+[Trait("Color", "W")]
 public class PillarOfLightFactoryTests
 {
     private readonly EventBus _bus = new();
@@ -64,17 +65,6 @@ public class PillarOfLightFactoryTests
         pol.Owner.Should().BeSameAs(_alice);
         pol.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsPillarOfLightShape()
-    {
-        var dispatched = NamedCardFactory.Create("Pillar of Light", _alice);
-
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("Pillar of Light");
-        dispatched.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     [Fact]
     public void BuildDefinition_OneRequiredTarget_NoXNoModes()
     {

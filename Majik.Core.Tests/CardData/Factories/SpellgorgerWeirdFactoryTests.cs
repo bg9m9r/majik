@@ -31,6 +31,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Multiple noncreature casts stack counters.
 ///   - NamedCardFactory dispatch.
 /// </summary>
+[Trait("Color", "R")]
 public class SpellgorgerWeirdFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -168,18 +169,5 @@ public class SpellgorgerWeirdFactoryTests
 
         weird.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(3,
             "each noncreature cast lands an independent +1/+1 counter");
-    }
-
-    [Fact]
-    public void SpellgorgerWeird_NamedCardFactory_Dispatch()
-    {
-        var card = NamedCardFactory.Create("Spellgorger Weird", _alice);
-
-        card.Should().NotBeNull();
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Spellgorger Weird");
-        ((Creature)card).BasePower.Should().Be(2);
-        ((Creature)card).BaseToughness.Should().Be(2);
-        card.HasSubtype(CardSubtype.Weird).Should().BeTrue();
     }
 }

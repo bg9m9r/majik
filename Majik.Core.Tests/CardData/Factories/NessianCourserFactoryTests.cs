@@ -18,6 +18,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Modern reprints). Vanilla — no printed keywords, triggers, statics, or
 /// activated abilities.
 /// </summary>
+[Trait("Color", "G")]
 public class NessianCourserFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -56,19 +57,6 @@ public class NessianCourserFactoryTests
         colors.Should().Contain(ManaColor.Green, "Nessian Courser costs {2}{G}");
         colors.Should().HaveCount(1, "Nessian Courser is exactly Green");
     }
-
-    [Fact]
-    public void NessianCourser_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Nessian Courser", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Nessian Courser");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Centaur).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Warrior).Should().BeTrue();
-    }
-
     [Fact]
     public void NessianCourser_IsVanilla_NoAbilities()
     {

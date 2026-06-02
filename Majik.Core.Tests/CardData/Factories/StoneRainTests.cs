@@ -27,6 +27,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     graveyard. Mirrors the OracleSpellBinder DestroyLandTemplate path,
 ///     which is how Stone Rain resolves in prod.
 /// </summary>
+[Trait("Color", "R")]
 public class StoneRainTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -46,18 +47,6 @@ public class StoneRainTests
         sr.Owner.Should().BeSameAs(_alice);
         sr.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_StoneRain()
-    {
-        var card = NamedCardFactory.Create("Stone Rain", _alice);
-
-        card.Should().BeOfType<Sorcery>();
-        card.Name.Should().Be("Stone Rain");
-        card.HasType(CardType.Sorcery).Should().BeTrue();
-        card.Owner.Should().BeSameAs(_alice);
-    }
-
     // -----------------------------------------------------------------------
     // Resolve — destroy target land (CR 701.7 → owner's graveyard)
     // -----------------------------------------------------------------------

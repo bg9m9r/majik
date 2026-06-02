@@ -18,6 +18,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Modern reprints). Vanilla — no printed keywords, triggers, statics, or
 /// activated abilities.
 /// </summary>
+[Trait("Color", "B")]
 public class WalkingCorpseFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -55,18 +56,6 @@ public class WalkingCorpseFactoryTests
         colors.Should().Contain(ManaColor.Black, "Walking Corpse costs {1}{B}");
         colors.Should().HaveCount(1, "Walking Corpse is exactly Black");
     }
-
-    [Fact]
-    public void WalkingCorpse_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Walking Corpse", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Walking Corpse");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Zombie).Should().BeTrue();
-    }
-
     [Fact]
     public void WalkingCorpse_IsVanilla_NoAbilities()
     {

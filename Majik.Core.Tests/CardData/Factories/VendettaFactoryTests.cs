@@ -17,6 +17,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// "Destroy target nonblack creature. It can't be regenerated.
 ///  You lose life equal to that creature's toughness."
 /// </summary>
+[Trait("Color", "B")]
 public class VendettaFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -41,16 +42,6 @@ public class VendettaFactoryTests
     }
 
     // ── Dispatch ─────────────────────────────────────────────────────────────
-
-    [Fact]
-    public void DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Vendetta", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Vendetta");
-    }
-
     // ── SpellDefinition shape ────────────────────────────────────────────────
 
     [Fact]

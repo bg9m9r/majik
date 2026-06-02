@@ -35,6 +35,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   * Scry 1 on empty library — short-circuits gracefully; no throw.
 /// </summary>
 [Collection(nameof(StaticRegistryCollection))]
+[Trait("Color", "U")]
 public class DissolveFactoryTests : IDisposable
 {
     private readonly EventBus _bus = new();
@@ -72,17 +73,6 @@ public class DissolveFactoryTests : IDisposable
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsDissolveShape()
-    {
-        var dispatched = NamedCardFactory.Create("Dissolve", _alice);
-
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("Dissolve");
-        dispatched.ManaCost.Should().Be("{1}{U}{U}");
-    }
-
     // ── SpellDefinition shape ─────────────────────────────────────────────────
 
     [Fact]

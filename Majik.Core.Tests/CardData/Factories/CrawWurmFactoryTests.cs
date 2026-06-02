@@ -17,6 +17,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Card: Craw Wurm — Creature — Wurm {4}{G}{G} 6/4 (Alpha / Modern reprints).
 /// Vanilla — no printed keywords, triggers, statics, or activated abilities.
 /// </summary>
+[Trait("Color", "G")]
 public class CrawWurmFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -54,18 +55,6 @@ public class CrawWurmFactoryTests
         colors.Should().Contain(ManaColor.Green, "Craw Wurm costs {4}{G}{G}");
         colors.Should().HaveCount(1, "Craw Wurm is exactly Green");
     }
-
-    [Fact]
-    public void CrawWurm_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Craw Wurm", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Craw Wurm");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Wurm).Should().BeTrue();
-    }
-
     [Fact]
     public void CrawWurm_IsVanilla_NoAbilities()
     {

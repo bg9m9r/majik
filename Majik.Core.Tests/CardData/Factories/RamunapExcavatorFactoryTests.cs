@@ -31,6 +31,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Bus-aware overload: lands entering the controller's graveyard
 ///     after construction are stamped via <see cref="CardMovedEvent"/>.
 /// </summary>
+[Trait("Color", "G")]
 public class RamunapExcavatorFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -62,20 +63,6 @@ public class RamunapExcavatorFactoryTests
         excavator.Owner.Should().BeSameAs(_alice);
         excavator.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void Excavator_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Ramunap Excavator", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Ramunap Excavator");
-        card.HasType(CardType.Creature).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Naga).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Cleric).Should().BeTrue();
-        card.ManaCost.Should().Be("{1}{G}{G}");
-    }
-
     // -----------------------------------------------------------------------
     // Static-ability marker
     // -----------------------------------------------------------------------

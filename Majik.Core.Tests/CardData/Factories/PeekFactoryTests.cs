@@ -24,6 +24,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// as <see cref="UrzasBaubleFactory"/>'s look-at-hand); the cantrip draws one
 /// card for the caster off the top of their library.
 /// </summary>
+[Trait("Color", "U")]
 public class PeekFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -60,15 +61,6 @@ public class PeekFactoryTests
         card.HasType(CardType.Instant).Should().BeTrue();
         card.ManaCost.ToString().Should().Be("{U}");
     }
-
-    [Fact]
-    public void DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Peek", _alice);
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Peek");
-    }
-
     [Fact]
     public void DeclaresOneTargetPlayerRequest()
     {

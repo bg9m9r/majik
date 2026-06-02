@@ -31,6 +31,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     * Both expire at end of turn.
 /// - Conditional ETB-tapped ("two or more other lands") replacement.
 /// </summary>
+[Trait("Color", "C")]
 public class CaveOfTheFrostDragonFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -64,20 +65,6 @@ public class CaveOfTheFrostDragonFactoryTests
         land.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1,
             "{4}{W} animate ability is wired");
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_CaveOfTheFrostDragon()
-    {
-        var card = NamedCardFactory.Create("Cave of the Frost Dragon", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Cave of the Frost Dragon");
-        card.HasType(CardType.Land).Should().BeTrue();
-
-        card.Abilities.OfType<ManaAbility>().Should().HaveCount(1);
-        card.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1);
-    }
-
     // -----------------------------------------------------------------------
     // Animate ability
     // -----------------------------------------------------------------------

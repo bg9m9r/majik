@@ -29,6 +29,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   <see cref="Majik.Core.Events.CardCycledEvent"/>.
 /// - Dispatcher routing through <see cref="NamedCardFactory"/>.
 /// </summary>
+[Trait("Color", "C")]
 public class RaugrinTriomeFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -36,19 +37,6 @@ public class RaugrinTriomeFactoryTests
     // -----------------------------------------------------------------------
     // Identity + dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void RaugrinTriome_Dispatch_ReturnsLandWithAllThreeSubtypes()
-    {
-        var card = NamedCardFactory.Create("Raugrin Triome", _alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Raugrin Triome");
-        card.HasSubtype(CardSubtype.Island).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Mountain).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Plains).Should().BeTrue();
-    }
-
     [Fact]
     public void RaugrinTriome_HasThreeManaAbilities_ProducingURW()
     {

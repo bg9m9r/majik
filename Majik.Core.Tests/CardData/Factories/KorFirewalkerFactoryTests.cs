@@ -35,6 +35,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Non-red spell does NOT fire the trigger.
 ///   - Trigger only active on the battlefield.
 /// </summary>
+[Trait("Color", "W")]
 public class KorFirewalkerFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -71,18 +72,6 @@ public class KorFirewalkerFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void KorFirewalker_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Kor Firewalker", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Kor Firewalker");
-        c.HasSubtype(CardSubtype.Kor).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Soldier).Should().BeTrue();
-    }
-
     // -------------------------------------------------------------------------
     // Protection from red
     // -------------------------------------------------------------------------

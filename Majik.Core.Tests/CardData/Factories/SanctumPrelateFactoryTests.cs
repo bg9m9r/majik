@@ -28,6 +28,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   (CR 603.6 / zone change), and the empty-choice (shape) path imposes no
 ///   restriction.
 /// </summary>
+[Trait("Color", "W")]
 public class SanctumPrelateFactoryTests : IDisposable
 {
     private readonly Player _alice = new("Alice", 20);

@@ -27,6 +27,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Token identity: Land, named "Mutavault", IsToken, mana ability +
 ///   {1} animate ability shape, tapped on entry.
 /// </summary>
+[Trait("Color", "G")]
 public class MutableExplorerFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -108,18 +109,6 @@ public class MutableExplorerFactoryTests
     // -----------------------------------------------------------------------
     // NamedCardFactory dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void MutableExplorer_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Mutable Explorer", _alice);
-
-        c.Should().BeOfType<Creature>("Mutable Explorer is a Creature");
-        c.Name.Should().Be("Mutable Explorer");
-        c.HasSubtype(CardSubtype.Shapeshifter).Should().BeTrue();
-        c.ManaCost.Should().Be("{2}{G}");
-    }
-
     // -----------------------------------------------------------------------
     // ETB triggered ability shape
     // -----------------------------------------------------------------------

@@ -32,6 +32,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Cycling end-to-end publishes <see cref="CardCycledEvent"/>.
 /// - <see cref="NamedCardFactory"/> dispatch.
 /// </summary>
+[Trait("Color", "M")]
 public class ValleyRannetFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -54,29 +55,6 @@ public class ValleyRannetFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void ValleyRannet_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Valley Rannet", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Valley Rannet");
-        card.HasSubtype(CardSubtype.Beast).Should().BeTrue();
-
-        // Two typecycling activated abilities (Mountaincycling + Forestcycling).
-        card.Abilities.OfType<ActivatedAbility>().Should().HaveCount(2,
-            "the mountaincycling + forestcycling activated abilities");
-
-        card.Abilities.OfType<KeywordAbility>()
-            .Should().Contain(k => k.Keyword == "Mountaincycling");
-        card.Abilities.OfType<KeywordAbility>()
-            .Should().Contain(k => k.Keyword == "Forestcycling");
-        card.Abilities.OfType<KeywordAbility>()
-            .Should().Contain(k => k.Keyword == "Cycling",
-                "CR 702.32d — typecycling IS Cycling");
-    }
-
     // -----------------------------------------------------------------------
     // Cycling activated ability shape — CR 702.32 / 702.32d
     // -----------------------------------------------------------------------

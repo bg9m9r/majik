@@ -26,6 +26,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Resolution no-ops when target is the controller (CR 608.2b).
 ///   - Resolution no-ops when target is already-lost player.
 /// </summary>
+[Trait("Color", "B")]
 public class SanguineBondFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);

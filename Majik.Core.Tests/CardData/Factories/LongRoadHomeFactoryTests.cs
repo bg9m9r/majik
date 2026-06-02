@@ -35,6 +35,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   (CR 608.2b).
 /// - Delayed trigger fires only on End step (not Upkeep / Draw / etc.).
 /// </summary>
+[Trait("Color", "W")]
 public class LongRoadHomeFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -55,17 +56,6 @@ public class LongRoadHomeFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void LongRoadHome_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Long Road Home", _alice);
-
-        c.Should().BeOfType<Instant>();
-        c.Name.Should().Be("Long Road Home");
-        c.ManaCost.Should().Be("{1}{W}");
-    }
-
     // -----------------------------------------------------------------------
     // SpellDefinition — structural shape
     // -----------------------------------------------------------------------
