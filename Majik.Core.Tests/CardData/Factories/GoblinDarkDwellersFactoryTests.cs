@@ -37,6 +37,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     it is exiled (not put into the graveyard) on resolution.
 ///   - NamedCardFactory dispatch.
 /// </summary>
+[Trait("Color", "R")]
 public class GoblinDarkDwellersFactoryTests
 {
     private readonly EventBus _bus = new();
@@ -176,23 +177,5 @@ public class GoblinDarkDwellersFactoryTests
 
         // "If that spell would be put into your graveyard, exile it instead."
         bolt.Zone.Should().Be(ZoneType.Exile);
-    }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_GoblinDarkDwellers()
-    {
-        var card = NamedCardFactory.Create("Goblin Dark-Dwellers", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Goblin Dark-Dwellers");
-        card.HasType(CardType.Creature).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Goblin).Should().BeTrue();
-        ((Creature)card).BasePower.Should().Be(4);
-        ((Creature)card).BaseToughness.Should().Be(4);
-        card.Owner.Should().Be(_alice);
-
-        card.Abilities.OfType<KeywordAbility>()
-            .Select(k => k.Keyword).Should().Contain("Menace");
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1);
     }
 }

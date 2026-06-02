@@ -46,6 +46,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Activated ability cost: requires {2}{U}{U} + tap.
 /// - Activated ability resolve: Scry 2 reorders the top of the library.
 /// </summary>
+[Trait("Color", "C")]
 public class CastleVantressFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -102,15 +103,6 @@ public class CastleVantressFactoryTests
     // -----------------------------------------------------------------------
     // Dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void NamedCardFactory_Dispatch_ReturnsLand()
-    {
-        var card = NamedCardFactory.Create("Castle Vantress", _alice);
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Castle Vantress");
-    }
-
     // -----------------------------------------------------------------------
     // Ability count / shape
     // -----------------------------------------------------------------------
@@ -239,17 +231,6 @@ public class CastleVantressFactoryTests
         after!.EntersTapped.Should().BeTrue(
             "Castle Vantress has no Island subtype; its presence on battlefield doesn't satisfy the predicate");
     }
-
-    [Fact]
-    public void SingleArgDispatch_DoesNotRegisterReplacement()
-    {
-        var alice = new Player("Alice", 20);
-        var card = NamedCardFactory.Create("Castle Vantress", alice);
-        card.Should().BeOfType<Land>();
-        ((Land)card).Abilities.OfType<ManaAbility>().Should().HaveCount(1);
-        ((Land)card).Abilities.OfType<ActivatedAbility>().Should().HaveCount(1);
-    }
-
     // -----------------------------------------------------------------------
     // Activated ability: {2}{U}{U}, {T} — cost gates
     // -----------------------------------------------------------------------

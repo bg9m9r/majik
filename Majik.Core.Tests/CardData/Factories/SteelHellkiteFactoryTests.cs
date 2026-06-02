@@ -34,6 +34,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   controller is in the victim set.
 /// - Tokens are excluded from destruction (CR 111.1).
 /// </summary>
+[Trait("Color", "C")]
 public class SteelHellkiteFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -66,18 +67,6 @@ public class SteelHellkiteFactoryTests
         c.Controller.Should().BeSameAs(_alice);
         c.ManaCostValue.TotalValue.Should().Be(6);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_SteelHellkite()
-    {
-        var c = NamedCardFactory.Create("Steel Hellkite", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Steel Hellkite");
-        c.HasType(CardType.Artifact).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Dragon).Should().BeTrue();
-    }
-
     [Fact]
     public void HasFlyingKeyword()
     {

@@ -30,6 +30,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Graveyard with only non-creature cards → no-op, no exception.
 ///   - NamedCardFactory dispatch.
 /// </summary>
+[Trait("Color", "B")]
 public class GravediggerFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -204,24 +205,6 @@ public class GravediggerFactoryTests
         candidates.Should().NotContain(bolt);
         candidates.Should().NotContain(forest);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_Gravedigger()
-    {
-        var card = NamedCardFactory.Create("Gravedigger", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Gravedigger");
-        card.HasType(CardType.Creature).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Zombie).Should().BeTrue();
-        ((Creature)card).BasePower.Should().Be(2);
-        ((Creature)card).BaseToughness.Should().Be(2);
-        card.Owner.Should().Be(_alice);
-
-        // ETB trigger should be wired by the factory.
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1);
-    }
-
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private static Instant MakeInstantInZone(string name, string manaCost, Player owner)

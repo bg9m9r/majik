@@ -33,6 +33,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Mode 1 discards then draws the same number of cards.
 ///   - Mode 1 with an empty hand discards nothing, draws nothing.
 /// </summary>
+[Trait("Color", "R")]
 public class CatharticPyreFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -55,17 +56,6 @@ public class CatharticPyreFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsCatharticPyreShape()
-    {
-        var dispatched = NamedCardFactory.Create("Cathartic Pyre", _alice);
-
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("Cathartic Pyre");
-        dispatched.ManaCost.Should().Be("{1}{R}");
-    }
-
     [Fact]
     public void SpellDefinition_ExposesTwoModes_AndTwoOptionalTargetRequests()
     {

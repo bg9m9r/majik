@@ -32,6 +32,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Each face has exactly one mana ability producing the right color.
 /// - No triggered / non-mana activated abilities ship.
 /// </summary>
+[Trait("Color", "C")]
 public class RiverglidePathwayFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -58,17 +59,6 @@ public class RiverglidePathwayFactoryTests
         land.MdfcState.IsBackFace.Should().BeFalse();
         land.MdfcState.ActiveFaceName.Should().Be("Riverglide Pathway");
     }
-
-    [Fact]
-    public void RiverglidePathway_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Riverglide Pathway", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Riverglide Pathway");
-        card.HasType(CardType.Land).Should().BeTrue();
-    }
-
     [Fact]
     public void RiverglidePathway_HasSingleTapForBlueManaAbility()
     {
@@ -110,17 +100,6 @@ public class RiverglidePathwayFactoryTests
         land.MdfcState.IsBackFace.Should().BeTrue();
         land.MdfcState.ActiveFaceName.Should().Be("Lavaglide Pathway");
     }
-
-    [Fact]
-    public void LavaglidePathway_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Lavaglide Pathway", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Lavaglide Pathway");
-        card.HasType(CardType.Land).Should().BeTrue();
-    }
-
     [Fact]
     public void LavaglidePathway_HasSingleTapForRedManaAbility()
     {

@@ -24,6 +24,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     NOT opponent gain, NOT zero delta.
 ///   - Resolution: controller gains N (= loss delta).
 /// </summary>
+[Trait("Color", "B")]
 public class ExquisiteBloodFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);

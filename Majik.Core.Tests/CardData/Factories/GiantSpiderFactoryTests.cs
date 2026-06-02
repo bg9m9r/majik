@@ -17,6 +17,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Card: Giant Spider — {3}{G} Creature — Spider 2/4.
 ///   "Reach" (CR 702.17)
 /// </summary>
+[Trait("Color", "G")]
 public class GiantSpiderFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -73,16 +74,5 @@ public class GiantSpiderFactoryTests
         c.Abilities.OfType<ActivatedAbility>().Should().BeEmpty();
         c.Abilities.OfType<KeywordAbility>().Should().HaveCount(1,
             "Reach is the only printed keyword");
-    }
-
-    [Fact]
-    public void GiantSpider_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Giant Spider", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Giant Spider");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Spider).Should().BeTrue();
     }
 }

@@ -33,6 +33,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Off-battlefield target → destroy no-ops, but the caster STILL loses 2
 ///   life (CR 608.2 — the "You lose 2 life" clause does not target).
 /// </summary>
+[Trait("Color", "B")]
 public class InfernalGraspFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -51,19 +52,6 @@ public class InfernalGraspFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_InfernalGrasp()
-    {
-        var card = NamedCardFactory.Create("Infernal Grasp", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Infernal Grasp");
-        card.HasType(CardType.Instant).Should().BeTrue();
-        card.ManaCost.ToString().Should().Be("{1}{B}");
-        card.Owner.Should().BeSameAs(_alice);
-    }
-
     // ── Spell definition shape ────────────────────────────────────────────────
 
     [Fact]

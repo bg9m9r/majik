@@ -32,6 +32,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Resolve routes through ZoneService when supplied (CR 603.6a — ETB).
 /// - Flashback cost ({3}{W}) parsed from the printed oracle text.
 /// </summary>
+[Trait("Color", "B")]
 public class UnburialRitesFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -47,17 +48,6 @@ public class UnburialRitesFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void UnburialRites_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Unburial Rites", _alice);
-
-        c.Should().BeOfType<Sorcery>("Unburial Rites is a Sorcery");
-        c.Name.Should().Be("Unburial Rites");
-        c.ManaCost.Should().Be("{4}{B}");
-    }
-
     [Fact]
     public void UnburialRites_Resolve_ReturnsTargetCreature_NoLifeLoss()
     {

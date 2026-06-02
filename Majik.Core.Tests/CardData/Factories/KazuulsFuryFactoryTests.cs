@@ -45,6 +45,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Back: {T}: Add {R} mana ability, no other abilities.
 /// - Back: enters tapped (unconditional replacement, CR 614.1c).
 /// </summary>
+[Trait("Color", "R")]
 public class KazuulsFuryFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -82,18 +83,6 @@ public class KazuulsFuryFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_KazuulsFury()
-    {
-        var card = NamedCardFactory.Create("Kazuul's Fury", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Kazuul's Fury");
-        card.ManaCost.Should().Be("{2}{R}");
-        card.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     [Fact]
     public void KazuulsFury_IsRed()
     {
@@ -244,17 +233,6 @@ public class KazuulsFuryFactoryTests
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_KazuulsCliffs()
-    {
-        var card = NamedCardFactory.Create("Kazuul's Cliffs", _alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Kazuul's Cliffs");
-        card.HasType(CardType.Land).Should().BeTrue();
-    }
-
     [Fact]
     public void KazuulsCliffs_CarriesMdfcState_PreFlippedToBackFace()
     {

@@ -21,6 +21,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - <see cref="NamedCardFactory"/> dispatch resolves "Wall of Wood" to the
 ///   correct shape.
 /// </summary>
+[Trait("Color", "G")]
 public class WallOfWoodFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);

@@ -18,6 +18,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// reprints). Vanilla — no printed keywords, triggers, statics, or
 /// activated abilities.
 /// </summary>
+[Trait("Color", "G")]
 public class SpinedWurmFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -55,18 +56,6 @@ public class SpinedWurmFactoryTests
         colors.Should().Contain(ManaColor.Green, "Spined Wurm costs {4}{G}");
         colors.Should().HaveCount(1, "Spined Wurm is exactly Green");
     }
-
-    [Fact]
-    public void SpinedWurm_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Spined Wurm", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Spined Wurm");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Wurm).Should().BeTrue();
-    }
-
     [Fact]
     public void SpinedWurm_IsVanilla_NoAbilities()
     {

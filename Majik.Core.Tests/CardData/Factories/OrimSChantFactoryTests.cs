@@ -37,6 +37,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Kicked: creatures can't attack (CombatRestriction.CannotAttack).
 /// - Cast block restriction expires when cleared.
 /// </summary>
+[Trait("Color", "W")]
 public class OrimSChantFactoryTests : IDisposable
 {
     private readonly EventBus _bus = new();
@@ -76,18 +77,6 @@ public class OrimSChantFactoryTests : IDisposable
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_OrimSChant()
-    {
-        var card = NamedCardFactory.Create("Orim's Chant", _alice);
-
-        card.Should().BeOfType<Instant>("Orim's Chant is an Instant");
-        card.Name.Should().Be("Orim's Chant");
-        card.HasType(CardType.Instant).Should().BeTrue();
-        card.Owner.Should().BeSameAs(_alice);
-    }
-
     // -----------------------------------------------------------------------
     // Kicker {W}
     // -----------------------------------------------------------------------

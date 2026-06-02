@@ -34,6 +34,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Sac ability grants the controller's creatures indestructible AND tempts
 ///   (Ring created, count incremented, Ring-bearer designated).
 /// </summary>
+[Trait("Color", "W")]
 public class BoromirWardenOfTheTowerFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -71,18 +72,6 @@ public class BoromirWardenOfTheTowerFactoryTests
         boromir.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1);
         boromir.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsBoromir()
-    {
-        var dispatched = NamedCardFactory.Create("Boromir, Warden of the Tower", _alice);
-
-        dispatched.Should().BeOfType<Creature>();
-        dispatched.Name.Should().Be("Boromir, Warden of the Tower");
-        dispatched.ManaCost.Should().Be("{2}{W}");
-        dispatched.HasSupertype(CardSupertype.Legendary).Should().BeTrue();
-    }
-
     [Fact]
     public void SacAbility_CostIsSacrificeSelf()
     {

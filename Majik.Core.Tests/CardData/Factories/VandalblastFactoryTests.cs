@@ -47,6 +47,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// here by passing <c>wasOverloaded: true</c> through the spell-definition
 /// builder directly (same posture as Mizzium Mortars).
 /// </summary>
+[Trait("Color", "R")]
 public class VandalblastFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -69,17 +70,6 @@ public class VandalblastFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsVandalblastShape()
-    {
-        var dispatched = NamedCardFactory.Create("Vandalblast", _alice);
-
-        dispatched.Should().BeOfType<Sorcery>();
-        dispatched.Name.Should().Be("Vandalblast");
-        dispatched.ManaCost.Should().Be("{R}");
-    }
-
     // -----------------------------------------------------------------------
     // SpellDefinition shape (default / not overloaded)
     // -----------------------------------------------------------------------

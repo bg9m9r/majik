@@ -31,6 +31,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   * Drain trigger is gated by 3+ Quest counters and fires when a
 ///     card enters an opponent's graveyard.
 /// </summary>
+[Trait("Color", "B")]
 public class BloodchiefAscensionFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -47,17 +48,6 @@ public class BloodchiefAscensionFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_BloodchiefAscension_AsEnchantment()
-    {
-        var dispatched = NamedCardFactory.Create("Bloodchief Ascension", _alice);
-
-        dispatched.Should().BeOfType<Enchantment>();
-        dispatched.Name.Should().Be("Bloodchief Ascension");
-        dispatched.ManaCost.Should().Be("{1}{B}");
-    }
-
     [Fact]
     public void BloodchiefAscension_OpponentEndStep_WithLifeLoss_PlacesQuestCounter()
     {

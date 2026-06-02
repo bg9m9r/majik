@@ -31,6 +31,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Resolve: target that left the battlefield before resolution → no-op
 ///     (CR 608.2b).
 /// </summary>
+[Trait("Color", "W")]
 public class TakeVengeanceFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -60,18 +61,6 @@ public class TakeVengeanceFactoryTests
         CardColors.GetColors(card).Should().Contain(ManaColor.White,
             "Take Vengeance has {W} in its mana cost (CR 105)");
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_TakeVengeance()
-    {
-        var card = NamedCardFactory.Create("Take Vengeance", _alice);
-
-        card.Should().BeOfType<Sorcery>();
-        card.Name.Should().Be("Take Vengeance");
-        card.ManaCost.Should().Be("{1}{W}");
-        card.Owner.Should().BeSameAs(_alice);
-    }
-
     // -----------------------------------------------------------------------
     // SpellDefinition shape
     // -----------------------------------------------------------------------

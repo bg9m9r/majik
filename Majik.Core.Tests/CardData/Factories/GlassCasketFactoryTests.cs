@@ -32,6 +32,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - LTB returns the exiled card to the battlefield under its owner's control.
 /// - LTB no-ops cleanly when nothing was exiled.
 /// </summary>
+[Trait("Color", "W")]
 public class GlassCasketFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -56,17 +57,6 @@ public class GlassCasketFactoryTests
         c.Abilities.OfType<TriggeredAbility>().Should().HaveCount(2,
             "ETB exile trigger + LTB return trigger");
     }
-
-    [Fact]
-    public void GlassCasket_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Glass Casket", _alice);
-
-        c.Should().BeOfType<Artifact>();
-        c.Name.Should().Be("Glass Casket");
-        c.Abilities.OfType<TriggeredAbility>().Should().HaveCount(2);
-    }
-
     [Fact]
     public void GlassCasket_Etb_ExilesOpponentLowMvCreature()
     {

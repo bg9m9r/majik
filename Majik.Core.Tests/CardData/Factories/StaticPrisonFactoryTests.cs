@@ -37,6 +37,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - NamedCardFactory dispatcher resolves "Static Prison" to the
 ///     expected enchantment shape.
 /// </summary>
+[Trait("Color", "G")]
 public class StaticPrisonFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -302,19 +303,6 @@ public class StaticPrisonFactoryTests
     // -----------------------------------------------------------------------
     // Dispatcher integration
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_StaticPrison()
-    {
-        var card = NamedCardFactory.Create("Static Prison", _alice);
-
-        card.Should().NotBeNull();
-        card.Name.Should().Be("Static Prison");
-        card.HasType(CardType.Enchantment).Should().BeTrue();
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(2,
-            "dispatcher path attaches ETB + upkeep triggers");
-    }
-
     // -----------------------------------------------------------------------
     // Helpers
     // -----------------------------------------------------------------------

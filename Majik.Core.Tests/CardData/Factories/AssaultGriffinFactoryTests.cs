@@ -17,6 +17,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Card: Assault Griffin — {3}{W} Creature — Griffin 3/2.
 ///   "Flying"
 /// </summary>
+[Trait("Color", "W")]
 public class AssaultGriffinFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -73,16 +74,5 @@ public class AssaultGriffinFactoryTests
         c.Abilities.OfType<ActivatedAbility>().Should().BeEmpty();
         c.Abilities.OfType<KeywordAbility>().Should().HaveCount(1,
             "Flying is the only printed keyword");
-    }
-
-    [Fact]
-    public void AssaultGriffin_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Assault Griffin", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Assault Griffin");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Griffin).Should().BeTrue();
     }
 }

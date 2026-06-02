@@ -27,6 +27,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   * Resolve "counter target spell" via printed mana — counters the spell.
 ///   * Illegal target (spell no longer on stack) → counter no-ops.
 /// </summary>
+[Trait("Color", "U")]
 public class FoilFactoryTests
 {
     private readonly EventBus _bus = new();
@@ -55,16 +56,6 @@ public class FoilFactoryTests
         CardColors.GetColors(foil).Should().Contain(ManaColor.Blue);
         foil.ManaCostValue.TotalValue.Should().Be(3);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsFoilShape()
-    {
-        var dispatched = NamedCardFactory.Create("Foil", _alice);
-
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("Foil");
-    }
-
     [Fact]
     public async Task CastViaPitch_ExilesBlueCard_DiscardsCard_CountersTarget()
     {

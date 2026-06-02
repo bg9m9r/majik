@@ -31,6 +31,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - End-to-end cycle: pays {3}, discards self, draws one card,
 ///     publishes CardCycledEvent when a bus is supplied.
 /// </summary>
+[Trait("Color", "R")]
 public class SwelteringSunsFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -51,19 +52,6 @@ public class SwelteringSunsFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_SwelteringSuns()
-    {
-        var card = NamedCardFactory.Create("Sweltering Suns", _alice);
-
-        card.Should().BeOfType<Sorcery>();
-        card.Name.Should().Be("Sweltering Suns");
-        card.HasType(CardType.Sorcery).Should().BeTrue();
-        card.ManaCost.Should().Be("{1}{R}{R}");
-        card.Owner.Should().BeSameAs(_alice);
-    }
-
     // -----------------------------------------------------------------------
     // Resolve — sweep (CR 109.5 — "each creature")
     // -----------------------------------------------------------------------

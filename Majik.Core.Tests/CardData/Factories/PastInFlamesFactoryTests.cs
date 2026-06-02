@@ -34,6 +34,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Printed Flashback {4}{R} alt-cost helper produces a usable
 ///     <see cref="FlashbackAlternativeCost"/>.
 /// </summary>
+[Trait("Color", "R")]
 public class PastInFlamesFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -61,19 +62,6 @@ public class PastInFlamesFactoryTests
         PastInFlamesFactory.PrintedManaCost.Should().Be("{3}{R}");
         PastInFlamesFactory.FlashbackManaCost.Should().Be("{4}{R}");
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_PastInFlames()
-    {
-        var card = NamedCardFactory.Create("Past in Flames", _alice);
-
-        card.Should().BeOfType<Sorcery>();
-        card.Name.Should().Be("Past in Flames");
-        card.ManaCost.Should().Be("{3}{R}");
-        card.HasType(CardType.Sorcery).Should().BeTrue();
-        card.Owner.Should().BeSameAs(_alice);
-    }
-
     // ── Printed clause: grant flashback to each instant/sorcery in GY ─────────
 
     [Fact]

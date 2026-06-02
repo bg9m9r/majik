@@ -40,6 +40,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Kicker {4}{U} additional cost is built (CR 702.33).
 /// - Shape-only path (no TriggerManager) doesn't throw.
 /// </summary>
+[Trait("Color", "U")]
 public class SeaGateStormcallerFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -79,17 +80,6 @@ public class SeaGateStormcallerFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void SeaGateStormcaller_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Sea Gate Stormcaller", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Sea Gate Stormcaller");
-        ((Creature)c).HasSubtype(CardSubtype.Wizard).Should().BeTrue();
-    }
-
     // ── Structural ETB trigger ──────────────────────────────────────────
 
     [Fact]

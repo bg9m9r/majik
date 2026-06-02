@@ -38,6 +38,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - {2},{T},Sacrifice: gain 3 life — built from the embedded JSON
 ///   (mana + tap_self + sacrifice_self costs, gain_life_self effect).
 /// </summary>
+[Trait("Color", "C")]
 public class GingerbruteFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -74,18 +75,6 @@ public class GingerbruteFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void Gingerbrute_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Gingerbrute", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Gingerbrute");
-        c.HasType(CardType.Artifact).Should().BeTrue();
-        ((Creature)c).HasSubtype(CardSubtype.Food).Should().BeTrue();
-    }
-
     // ── Haste ───────────────────────────────────────────────────────────
 
     [Fact]

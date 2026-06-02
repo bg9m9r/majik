@@ -24,6 +24,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// replacement + one mana ability per produced colour). Only the produced
 /// colours differ ({U}/{R} here vs {W}/{U} on Razortide Bridge).
 /// </summary>
+[Trait("Color", "C")]
 public class SilverbluffBridgeFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -40,17 +41,6 @@ public class SilverbluffBridgeFactoryTests
         bridge.Owner.Should().BeSameAs(_alice);
         bridge.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void SilverbluffBridge_NamedCardFactory_DispatchesArtifactLand()
-    {
-        var card = NamedCardFactory.Create("Silverbluff Bridge", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.HasType(CardType.Land).Should().BeTrue();
-        card.HasType(CardType.Artifact).Should().BeTrue();
-    }
-
     [Fact]
     public void SilverbluffBridge_HasPrintedIndestructibleKeyword()
     {

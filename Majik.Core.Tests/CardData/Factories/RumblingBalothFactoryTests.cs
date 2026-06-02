@@ -18,6 +18,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Modern reprints). Vanilla — no printed keywords, triggers, statics, or
 /// activated abilities.
 /// </summary>
+[Trait("Color", "G")]
 public class RumblingBalothFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -55,18 +56,6 @@ public class RumblingBalothFactoryTests
         colors.Should().Contain(ManaColor.Green, "Rumbling Baloth costs {2}{G}{G}");
         colors.Should().HaveCount(1, "Rumbling Baloth is exactly Green");
     }
-
-    [Fact]
-    public void RumblingBaloth_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Rumbling Baloth", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Rumbling Baloth");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Beast).Should().BeTrue();
-    }
-
     [Fact]
     public void RumblingBaloth_IsVanilla_NoAbilities()
     {

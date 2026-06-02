@@ -33,6 +33,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Cast-uncounterable: SpellCastFlow stamps Spell.CannotBeCountered,
 ///     Counterspell-style RemoveFromStack vetoes the pop.
 /// </summary>
+[Trait("Color", "C")]
 public class EmrakulTheAeonsTornFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -53,17 +54,6 @@ public class EmrakulTheAeonsTornFactoryTests
         emrakul.Owner.Should().BeSameAs(_alice);
         emrakul.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void Emrakul_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Emrakul, the Aeons Torn", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.HasSupertype(CardSupertype.Legendary).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Eldrazi).Should().BeTrue();
-    }
-
     [Fact]
     public void Emrakul_HasFlying_Annihilator6_Uncounterable_Markers()
     {

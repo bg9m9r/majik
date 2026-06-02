@@ -1,0 +1,5 @@
+{
+  "name": "Hurkyl's Recall",
+  "types": ["Instant"],
+  "manaCost": "{1}{U}"
+}

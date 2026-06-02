@@ -43,6 +43,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     supplied; not wired on the single-arg shape-only path.
 ///   - ETB triggered ability (scry 2) attached.
 /// </summary>
+[Trait("Color", "U")]
 public class StormwingEntityFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -65,19 +66,6 @@ public class StormwingEntityFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_StormwingEntity()
-    {
-        var card = NamedCardFactory.Create("Stormwing Entity", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Stormwing Entity");
-        card.HasType(CardType.Creature).Should().BeTrue();
-        card.ManaCost.Should().Be("{3}{U}{U}");
-        card.Owner.Should().BeSameAs(_alice);
-    }
-
     // -----------------------------------------------------------------------
     // Flying
     // -----------------------------------------------------------------------

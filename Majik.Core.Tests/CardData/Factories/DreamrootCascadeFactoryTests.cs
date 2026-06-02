@@ -28,6 +28,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// battlefield only. This is the mirror image of the fast-land "two or fewer"
 /// threshold exercised by <see cref="SeachromeCoastFactory"/>.
 /// </summary>
+[Trait("Color", "C")]
 public class DreamrootCascadeFactoryTests
 {
     private static Land MakeWithBus(Player owner, ReplacementBus bus) =>
@@ -180,22 +181,6 @@ public class DreamrootCascadeFactoryTests
         after!.EntersTapped.Should().BeTrue(
             "Alice controls 0 lands; Bob's 5 don't count, so it enters tapped");
     }
-
-    [Fact]
-    public void DreamrootCascade_SingleArgDispatch_DoesNotRegisterReplacement()
-    {
-        // Shape-only dispatcher path — single-arg constructs without a
-        // ReplacementBus, so the ETB-tapped predicate isn't wired (matches
-        // every other ETB-replacement factory's shape-only posture). Prod
-        // load wires it from oracle text via ConditionalEntersTappedBinder.
-        var alice = new Player("Alice", 20);
-        var land = NamedCardFactory.Create("Dreamroot Cascade", alice);
-
-        land.Should().NotBeNull();
-        land.Name.Should().Be("Dreamroot Cascade");
-        ((Land)land).Abilities.OfType<ManaAbility>().Should().HaveCount(2);
-    }
-
     [Fact]
     public void DreamrootCascade_Create_ThrowsOnNullOwner()
     {

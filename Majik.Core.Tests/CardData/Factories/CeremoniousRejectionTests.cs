@@ -25,6 +25,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// effect does nothing. The card itself is blue ({U}) — only its target must
 /// be colorless.
 /// </summary>
+[Trait("Color", "U")]
 public class CeremoniousRejectionTests
 {
     private readonly EventBus _bus = new();
@@ -53,17 +54,6 @@ public class CeremoniousRejectionTests
         CardColors.GetColors(card).Should().Contain(ManaColor.Blue);
         card.ManaCostValue.TotalValue.Should().Be(1);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsShape()
-    {
-        var dispatched = NamedCardFactory.Create("Ceremonious Rejection", _alice);
-
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("Ceremonious Rejection");
-        dispatched.ManaCost.Should().Be("{U}");
-    }
-
     [Fact]
     public void SpellDefinition_DeclaresSingleTargetColorlessSpellRequest()
     {

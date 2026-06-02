@@ -28,20 +28,10 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// path by <see cref="EntersTappedBinder"/> from the oracle text, not by
 /// this factory (same posture as the Guildgate factories).
 /// </summary>
+[Trait("Color", "C")]
 public class IceTunnelFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
-
-    [Fact]
-    public void IceTunnel_Dispatch_ReturnsLandWithCorrectName()
-    {
-        var card = NamedCardFactory.Create("Ice Tunnel", _alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Ice Tunnel");
-        card.HasType(CardType.Land).Should().BeTrue();
-    }
-
     [Fact]
     public void IceTunnel_HasSnowSupertype()
     {

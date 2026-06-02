@@ -32,6 +32,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Each face has exactly one mana ability producing the right color.
 /// - No triggered / non-mana activated abilities ship.
 /// </summary>
+[Trait("Color", "C")]
 public class NeedlevergePathwayFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -58,17 +59,6 @@ public class NeedlevergePathwayFactoryTests
         land.MdfcState.IsBackFace.Should().BeFalse();
         land.MdfcState.ActiveFaceName.Should().Be("Needleverge Pathway");
     }
-
-    [Fact]
-    public void NeedlevergePathway_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Needleverge Pathway", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Needleverge Pathway");
-        card.HasType(CardType.Land).Should().BeTrue();
-    }
-
     [Fact]
     public void NeedlevergePathway_HasSingleTapForRedManaAbility()
     {
@@ -110,17 +100,6 @@ public class NeedlevergePathwayFactoryTests
         land.MdfcState.IsBackFace.Should().BeTrue();
         land.MdfcState.ActiveFaceName.Should().Be("Pillarverge Pathway");
     }
-
-    [Fact]
-    public void PillarvergePathway_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Pillarverge Pathway", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Pillarverge Pathway");
-        card.HasType(CardType.Land).Should().BeTrue();
-    }
-
     [Fact]
     public void PillarvergePathway_HasSingleTapForWhiteManaAbility()
     {

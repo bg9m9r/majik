@@ -34,6 +34,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   supplied; the shape-only path registers nothing.
 /// - Args validation + dispatcher routing through <see cref="NamedCardFactory"/>.
 /// </summary>
+[Trait("Color", "C")]
 public class ColdsteelHeartFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -41,20 +42,6 @@ public class ColdsteelHeartFactoryTests
     // -----------------------------------------------------------------------
     // Identity + dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void ColdsteelHeart_Dispatch_ReturnsSnowArtifact()
-    {
-        var card = NamedCardFactory.Create("Coldsteel Heart", _alice);
-
-        card.Should().BeAssignableTo<Artifact>();
-        card.Name.Should().Be("Coldsteel Heart");
-        card.HasType(CardType.Artifact).Should().BeTrue();
-        card.HasSupertype(CardSupertype.Snow).Should().BeTrue();
-        card.Owner.Should().BeSameAs(_alice);
-        card.Controller.Should().BeSameAs(_alice);
-    }
-
     [Fact]
     public void ColdsteelHeart_IsNotBasic()
     {

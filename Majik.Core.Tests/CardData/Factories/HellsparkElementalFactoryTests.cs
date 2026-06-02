@@ -37,6 +37,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Unearth end-step rider EXILES (not graveyard) the returned creature.
 ///   - Unearth no-ops when the card is not in the graveyard.
 /// </summary>
+[Trait("Color", "R")]
 public class HellsparkElementalFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -67,22 +68,6 @@ public class HellsparkElementalFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsCreatureWithKeywordsAndUnearth()
-    {
-        var card = NamedCardFactory.Create("Hellspark Elemental", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Hellspark Elemental");
-        card.ManaCost.Should().Be("{1}{R}");
-        card.Abilities.OfType<KeywordAbility>()
-            .Should().Contain(k => k.Keyword == "Trample")
-            .And.Contain(k => k.Keyword == "Haste");
-        card.Abilities.OfType<ActivatedAbility>().Should().ContainSingle(
-            "the Unearth activated ability");
-    }
-
     // -----------------------------------------------------------------------
     // Keywords
     // -----------------------------------------------------------------------

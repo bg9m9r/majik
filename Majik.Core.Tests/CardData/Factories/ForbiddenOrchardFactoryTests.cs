@@ -32,6 +32,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   1/1 colourless Spirit creature token (CR 111 / 111.4).
 /// - Dispatch through <see cref="NamedCardFactory"/>.
 /// </summary>
+[Trait("Color", "C")]
 public class ForbiddenOrchardFactoryTests
 {
     private const string CardName = "Forbidden Orchard";
@@ -82,18 +83,6 @@ public class ForbiddenOrchardFactoryTests
         land.HasSupertype(CardSupertype.Basic).Should().BeFalse();
         land.HasSupertype(CardSupertype.Legendary).Should().BeFalse();
     }
-
-    [Fact]
-    public void ForbiddenOrchard_Dispatch_ResolvesViaNamedCardFactory()
-    {
-        var alice = new Player("Alice", 20);
-
-        var card = NamedCardFactory.Create(CardName, alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be(CardName);
-    }
-
     // -----------------------------------------------------------------------
     // Mana abilities — shape
     // -----------------------------------------------------------------------

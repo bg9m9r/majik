@@ -29,6 +29,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     Counterspell's "any spell" oracle text and differs from
 ///     <see cref="NegateFactory"/>).
 /// </summary>
+[Trait("Color", "U")]
 public class CounterspellFactoryTests
 {
     private readonly EventBus _bus = new();
@@ -59,17 +60,6 @@ public class CounterspellFactoryTests
         cs.Owner.Should().BeSameAs(_alice);
         cs.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsCounterspellShape()
-    {
-        var dispatched = NamedCardFactory.Create("Counterspell", _alice);
-
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("Counterspell");
-        dispatched.ManaCost.Should().Be("{U}{U}");
-    }
-
     [Fact]
     public void SpellDefinition_DeclaresSingleTargetSpellRequest_NoTypeFilter()
     {

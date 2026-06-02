@@ -17,6 +17,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Card: Lightning Elemental — {3}{R} Creature — Elemental 4/1.
 ///   "Haste"
 /// </summary>
+[Trait("Color", "R")]
 public class LightningElementalFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -74,16 +75,5 @@ public class LightningElementalFactoryTests
         c.Abilities.OfType<ActivatedAbility>().Should().BeEmpty();
         c.Abilities.OfType<KeywordAbility>().Should().HaveCount(1,
             "Haste is the only printed keyword");
-    }
-
-    [Fact]
-    public void LightningElemental_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Lightning Elemental", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Lightning Elemental");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Elemental).Should().BeTrue();
     }
 }

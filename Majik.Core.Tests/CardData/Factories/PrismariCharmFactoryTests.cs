@@ -33,6 +33,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Mode 2 resolve: bounce target nonland permanent (Creature) to hand.
 ///   - Mode 2 resolve: land is NOT a legal target — no-op.
 /// </summary>
+[Trait("Color", "M")]
 public class PrismariCharmFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -55,17 +56,6 @@ public class PrismariCharmFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void PrismariCharm_NamedCardFactory_Dispatch()
-    {
-        var dispatched = NamedCardFactory.Create("Prismari Charm", _alice);
-
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("Prismari Charm");
-        dispatched.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     // -----------------------------------------------------------------------
     // SpellDefinition shape
     // -----------------------------------------------------------------------

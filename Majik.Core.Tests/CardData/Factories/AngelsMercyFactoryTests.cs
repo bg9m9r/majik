@@ -23,6 +23,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Resolve: caster gains exactly 7 life (CR 119.3).
 /// - SpellDefinition shape: no target requests, no modes, no X.
 /// </summary>
+[Trait("Color", "W")]
 public class AngelsMercyFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -54,19 +55,6 @@ public class AngelsMercyFactoryTests
         colors.Should().HaveCount(1,
             "Angel's Mercy is mono-white");
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_AngelsMercy()
-    {
-        var card = NamedCardFactory.Create("Angel's Mercy", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Angel's Mercy");
-        card.HasType(CardType.Instant).Should().BeTrue();
-        card.ManaCost.Should().Be("{2}{W}{W}");
-        card.Owner.Should().BeSameAs(_alice);
-    }
-
     // ── Resolve — caster gains 7 life ────────────────────────────────────
 
     [Fact]

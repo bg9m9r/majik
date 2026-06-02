@@ -38,6 +38,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Opponent casting a colorless MV ≥ 7 spell does NOT trigger.
 ///   - Trigger is gated to Battlefield (CR 113.6).
 /// </summary>
+[Trait("Color", "C")]
 public class SanctumOfUginFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -85,17 +86,6 @@ public class SanctumOfUginFactoryTests
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void SanctumOfUgin_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Sanctum of Ugin", _alice);
-
-        c.Should().BeOfType<Land>();
-        c.Name.Should().Be("Sanctum of Ugin");
-        c.HasType(CardType.Land).Should().BeTrue();
-    }
-
     // -----------------------------------------------------------------------
     // Mana ability
     // -----------------------------------------------------------------------

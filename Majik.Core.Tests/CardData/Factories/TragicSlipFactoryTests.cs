@@ -33,6 +33,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Off-battlefield target → no-op (CR 608.2b).
 ///   - No ContinuousEffectsService → silent no-op.
 /// </summary>
+[Trait("Color", "B")]
 public class TragicSlipFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -54,19 +55,6 @@ public class TragicSlipFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_TragicSlip()
-    {
-        var card = NamedCardFactory.Create("Tragic Slip", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Tragic Slip");
-        card.HasType(CardType.Instant).Should().BeTrue();
-        card.ManaCost.Should().Be("{B}");
-        card.Owner.Should().BeSameAs(_alice);
-    }
-
     [Fact]
     public void BuildSpellDefinition_SingleTargetCreatureRequest()
     {

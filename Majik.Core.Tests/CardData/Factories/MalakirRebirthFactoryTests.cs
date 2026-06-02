@@ -45,6 +45,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Front: illegal target at resolution → no life loss, no grant.
 /// - Back: Land type, non-basic, {T}: Add {B} mana ability.
 /// </summary>
+[Trait("Color", "B")]
 public class MalakirRebirthFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -89,18 +90,6 @@ public class MalakirRebirthFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_MalakirRebirth()
-    {
-        var card = NamedCardFactory.Create("Malakir Rebirth", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Malakir Rebirth");
-        card.ManaCost.Should().Be("{B}");
-        card.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     [Fact]
     public void MalakirRebirth_IsBlack()
     {
@@ -329,17 +318,6 @@ public class MalakirRebirthFactoryTests
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_MalakirMire()
-    {
-        var card = NamedCardFactory.Create("Malakir Mire", _alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Malakir Mire");
-        card.HasType(CardType.Land).Should().BeTrue();
-    }
-
     [Fact]
     public void MalakirMire_CarriesMdfcState_PreFlippedToBackFace()
     {

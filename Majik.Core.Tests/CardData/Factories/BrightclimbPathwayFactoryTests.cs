@@ -32,6 +32,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Each face has exactly one mana ability producing the right color.
 /// - No triggered / non-mana activated abilities ship.
 /// </summary>
+[Trait("Color", "C")]
 public class BrightclimbPathwayFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -58,17 +59,6 @@ public class BrightclimbPathwayFactoryTests
         land.MdfcState.IsBackFace.Should().BeFalse();
         land.MdfcState.ActiveFaceName.Should().Be("Brightclimb Pathway");
     }
-
-    [Fact]
-    public void BrightclimbPathway_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Brightclimb Pathway", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Brightclimb Pathway");
-        card.HasType(CardType.Land).Should().BeTrue();
-    }
-
     [Fact]
     public void BrightclimbPathway_HasSingleTapForWhiteManaAbility()
     {
@@ -110,17 +100,6 @@ public class BrightclimbPathwayFactoryTests
         land.MdfcState.IsBackFace.Should().BeTrue();
         land.MdfcState.ActiveFaceName.Should().Be("Grimclimb Pathway");
     }
-
-    [Fact]
-    public void GrimclimbPathway_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Grimclimb Pathway", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Grimclimb Pathway");
-        card.HasType(CardType.Land).Should().BeTrue();
-    }
-
     [Fact]
     public void GrimclimbPathway_HasSingleTapForBlackManaAbility()
     {

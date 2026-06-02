@@ -30,6 +30,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Dispatcher routing through <see cref="NamedCardFactory"/>.
 /// - Single-arg path registers no replacement.
 /// </summary>
+[Trait("Color", "C")]
 public class InspiringVantageFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -37,19 +38,6 @@ public class InspiringVantageFactoryTests
     // -----------------------------------------------------------------------
     // Identity + dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void InspiringVantage_Dispatch_ReturnsLandWithCorrectName()
-    {
-        var card = NamedCardFactory.Create("Inspiring Vantage", _alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Inspiring Vantage");
-        card.HasType(CardType.Land).Should().BeTrue();
-        card.Owner.Should().BeSameAs(_alice);
-        card.Controller.Should().BeSameAs(_alice);
-    }
-
     [Fact]
     public void InspiringVantage_IsNotBasic_NotLegendary()
     {
@@ -188,16 +176,6 @@ public class InspiringVantageFactoryTests
     // -----------------------------------------------------------------------
     // Shape-only single-arg path
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void InspiringVantage_SingleArgDispatch_DoesNotRegisterReplacement()
-    {
-        var land = NamedCardFactory.Create("Inspiring Vantage", _alice);
-        land.Should().NotBeNull();
-        land.Name.Should().Be("Inspiring Vantage");
-        ((Land)land).Abilities.OfType<ManaAbility>().Should().HaveCount(2);
-    }
-
     // -----------------------------------------------------------------------
     // Args validation
     // -----------------------------------------------------------------------

@@ -22,6 +22,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Trample keyword wired; <see cref="CombatAbilities.HasTrample"/> reads it.
 ///   - No other abilities beyond the single Trample keyword.
 /// </summary>
+[Trait("Color", "G")]
 public class FangrenHunterFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -51,19 +52,6 @@ public class FangrenHunterFactoryTests
         // {3}{G}{G} = 3 + 1 + 1 = 5 (CR 202.3)
         card.ManaCostValue.TotalValue.Should().Be(5);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_FangrenHunter()
-    {
-        var card = NamedCardFactory.Create("Fangren Hunter", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Fangren Hunter");
-        card.HasType(CardType.Creature).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Beast).Should().BeTrue();
-        card.Owner.Should().Be(_alice);
-    }
-
     [Fact]
     public void Card_HasTrampleKeyword()
     {

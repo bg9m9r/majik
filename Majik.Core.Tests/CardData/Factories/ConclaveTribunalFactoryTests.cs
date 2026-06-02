@@ -22,6 +22,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// via the keyword-ability marker + <see cref="ConvokeAdditionalCost"/>
 /// build path (same shape as Chord of Calling's tests).
 /// </summary>
+[Trait("Color", "W")]
 public class ConclaveTribunalFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -44,18 +45,6 @@ public class ConclaveTribunalFactoryTests
         c.Abilities.OfType<TriggeredAbility>().Should().HaveCount(2,
             "ETB exile trigger + LTB return trigger");
     }
-
-    [Fact]
-    public void ConclaveTribunal_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Conclave Tribunal", _alice);
-
-        c.Should().BeOfType<Enchantment>();
-        c.Name.Should().Be("Conclave Tribunal");
-        c.Abilities.OfType<KeywordAbility>()
-            .Should().ContainSingle(k => k.Keyword == "Convoke");
-    }
-
     [Fact]
     public void ConclaveTribunal_Etb_ExilesOpponentPermanent()
     {

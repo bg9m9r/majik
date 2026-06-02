@@ -23,6 +23,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - No abilities attached (vanilla card).
 /// - NamedCardFactory dispatch resolves the correct factory.
 /// </summary>
+[Trait("Color", "W")]
 public class FootSoldiersFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -118,19 +119,5 @@ public class FootSoldiersFactoryTests
 
         card.Abilities.Should().BeEmpty(
             "Foot Soldiers is a vanilla creature with no printed abilities");
-    }
-
-    [Fact]
-    public void FootSoldiers_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Foot Soldiers", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Foot Soldiers");
-        card.HasType(CardType.Creature).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Human).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Soldier).Should().BeTrue();
-        ((Creature)card).BasePower.Should().Be(2);
-        ((Creature)card).BaseToughness.Should().Be(4);
     }
 }

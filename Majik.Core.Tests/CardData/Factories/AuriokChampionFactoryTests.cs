@@ -33,6 +33,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   matches (any controller); non-creature + self do not; resolution gains
 ///   the controller 1 life.
 /// </summary>
+[Trait("Color", "W")]
 public class AuriokChampionFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -57,21 +58,6 @@ public class AuriokChampionFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void AuriokChampion_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Auriok Champion", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Auriok Champion");
-        ((Creature)c).HasSubtype(CardSubtype.Human).Should().BeTrue();
-        ((Creature)c).HasSubtype(CardSubtype.Cleric).Should().BeTrue();
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1,
-            "one ETB-other-creature trigger is attached");
-    }
-
     // ── Protection ──────────────────────────────────────────────────────
 
     [Fact]

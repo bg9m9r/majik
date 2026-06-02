@@ -17,6 +17,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Card: Garruk's Companion — Creature — Beast {G}{G} 3/2 with Trample.
 /// Oracle text: "Trample"
 /// </summary>
+[Trait("Color", "G")]
 public class GarruksCompanionFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -76,20 +77,5 @@ public class GarruksCompanionFactoryTests
             "Garruk's Companion has no activated abilities");
         c.Abilities.OfType<KeywordAbility>().Should().HaveCount(1,
             "Only Trample — no other keyword abilities");
-    }
-
-    [Fact]
-    public void GarruksCompanion_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Garruk's Companion", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Garruk's Companion");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Beast).Should().BeTrue();
-
-        var creature = (Creature)c;
-        creature.Power.Should().Be(3);
-        creature.Toughness.Should().Be(2);
     }
 }

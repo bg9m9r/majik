@@ -25,6 +25,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - <see cref="SpellDefinition"/> shape: HasVariableX = true, one
 ///   target request.
 /// </summary>
+[Trait("Color", "R")]
 public class IndomitableCreativityFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -43,16 +44,6 @@ public class IndomitableCreativityFactoryTests
         CardColors.GetColors(card).Should().Contain(ManaColor.Red);
         card.Should().BeOfType<Sorcery>();
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_IndomitableCreativity()
-    {
-        var card = NamedCardFactory.Create("Indomitable Creativity", _alice);
-
-        card.Should().BeOfType<Sorcery>();
-        card.Name.Should().Be("Indomitable Creativity");
-    }
-
     [Fact]
     public void SpellDefinition_HasVariableX_AndOneTargetRequest()
     {

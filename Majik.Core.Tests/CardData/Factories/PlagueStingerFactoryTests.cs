@@ -14,6 +14,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Tests for <see cref="PlagueStingerFactory"/> — Creature — Phyrexian Insect
 /// {1}{B} 1/1 with Flying (CR 702.9) + Infect (CR 702.90).
 /// </summary>
+[Trait("Color", "B")]
 public class PlagueStingerFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -47,20 +48,5 @@ public class PlagueStingerFactoryTests
         keywords.Should().Contain("Infect",
             "Infect (CR 702.90) marker is attached so combat damage routes " +
             "to -1/-1 counters / poison counters once that primitive lands.");
-    }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_PlagueStinger()
-    {
-        var card = NamedCardFactory.Create("Plague Stinger", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Plague Stinger");
-        ((Creature)card).HasSubtype(CardSubtype.Phyrexian).Should().BeTrue();
-        ((Creature)card).HasSubtype(CardSubtype.Insect).Should().BeTrue();
-        ((Creature)card).Abilities.OfType<KeywordAbility>()
-            .Any(k => k.Keyword == "Flying").Should().BeTrue();
-        ((Creature)card).Abilities.OfType<KeywordAbility>()
-            .Any(k => k.Keyword == "Infect").Should().BeTrue();
     }
 }

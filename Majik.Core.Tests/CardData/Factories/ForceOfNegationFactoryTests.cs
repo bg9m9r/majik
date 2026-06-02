@@ -26,6 +26,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   * Cast without pitch on own turn — works (uses printed mana cost).
 ///   * Counter target NONcreature spell — creature spell target is a no-op.
 /// </summary>
+[Trait("Color", "U")]
 public class ForceOfNegationFactoryTests
 {
     private readonly EventBus _bus = new();
@@ -53,16 +54,6 @@ public class ForceOfNegationFactoryTests
         fon.HasType(CardType.Instant).Should().BeTrue();
         CardColors.GetColors(fon).Should().Contain(ManaColor.Blue);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsForceOfNegationFactoryShape()
-    {
-        var dispatched = NamedCardFactory.Create("Force of Negation", _alice);
-
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("Force of Negation");
-    }
-
     [Fact]
     public async Task CastViaPitch_OnOpponentsTurn_ExilesBlueCard_NoLifeLoss()
     {

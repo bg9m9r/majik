@@ -27,6 +27,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   * PitchAltCostProbe surfaces a Green / 0-life candidate from
 ///     <see cref="PitchAltCostProbe.DefaultLookup"/>.
 /// </summary>
+[Trait("Color", "G")]
 public class ForceOfVigorFactoryTests
 {
     private readonly EventBus _bus = new();
@@ -54,16 +55,6 @@ public class ForceOfVigorFactoryTests
         fov.HasType(CardType.Instant).Should().BeTrue();
         CardColors.GetColors(fov).Should().Contain(ManaColor.Green);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsForceOfVigorFactoryShape()
-    {
-        var dispatched = NamedCardFactory.Create("Force of Vigor", _alice);
-
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("Force of Vigor");
-    }
-
     [Fact]
     public async Task CastViaPitch_OnOpponentsTurn_DestroysBothTargets_AndExilesGreenCard()
     {

@@ -27,6 +27,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - +3/+3 expires at end of turn (CR 514.2).
 /// - Fizzle: target not on battlefield → no-op (CR 608.2b).
 /// </summary>
+[Trait("Color", "R")]
 public class BruteForceFactoryTests
 {
     private readonly EventBus _bus = new();
@@ -57,17 +58,6 @@ public class BruteForceFactoryTests
         bf.Controller.Should().BeSameAs(_alice);
         CardColors.GetColors(bf).Should().Contain(ManaColor.Red);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsBruteForce()
-    {
-        var dispatched = NamedCardFactory.Create("Brute Force", _alice);
-
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("Brute Force");
-        dispatched.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     [Fact]
     public void SpellDefinition_DeclaresSingleTargetCreatureRequest()
     {

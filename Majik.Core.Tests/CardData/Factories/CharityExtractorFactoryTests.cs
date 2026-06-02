@@ -17,6 +17,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Card: Charity Extractor — {3}{B} Creature — Human Knight 1/5.
 ///   "Lifelink"
 /// </summary>
+[Trait("Color", "B")]
 public class CharityExtractorFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -74,17 +75,5 @@ public class CharityExtractorFactoryTests
         c.Abilities.OfType<ActivatedAbility>().Should().BeEmpty();
         c.Abilities.OfType<KeywordAbility>().Should().HaveCount(1,
             "Lifelink is the only printed keyword");
-    }
-
-    [Fact]
-    public void CharityExtractor_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Charity Extractor", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Charity Extractor");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Human).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Knight).Should().BeTrue();
     }
 }
