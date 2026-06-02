@@ -1,0 +1,9 @@
+{
+  "name": "Glasspool Mimic",
+  "types": ["Creature"],
+  "subtypes": ["Shapeshifter", "Rogue"],
+  "manaCost": "{2}{U}",
+  "power": 0,
+  "toughness": 0,
+  "abilities": []
+}
