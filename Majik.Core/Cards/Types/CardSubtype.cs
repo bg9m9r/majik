@@ -151,6 +151,10 @@ public enum CardSubtype
     /// <summary>Druid creature subtype — Noble Hierarch, Fyndhorn Elder,
     /// Devoted Druid. CR 205.3m.</summary>
     Druid,
+    /// <summary>Ally creature subtype — Sylvan Advocate, Kalastria Healer,
+    /// the Battle for Zendikar Ally tribe. CR 205.3m — flavour subtype with
+    /// no inherent rules meaning (Ally-matters cards reference it by name).</summary>
+    Ally,
     /// <summary>Ouphe creature subtype — Kitchen Finks (Shadowmoor / Modern
     /// Horizons 2), Witchstalker. CR 205.3m.</summary>
     Ouphe,
