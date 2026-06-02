@@ -1,0 +1,5 @@
+{
+  "name": "Deflecting Palm",
+  "types": ["Instant"],
+  "manaCost": "{R}{W}"
+}
