@@ -26,6 +26,17 @@ public sealed record CounterType(string Name)
     public static readonly CounterType Poison = new("Poison");
 
     /// <summary>
+    /// CR 107.14 / CR 122 — Experience counters. A player-scoped counter
+    /// (counters on PLAYERS, not permanents) accumulated by cards that read
+    /// "you get an experience counter" (Commander 2015 / 2018: Mizzix of the
+    /// Izmagnus, Daxos the Returned, Saskia the Unyielding, …). The payoff
+    /// scales off the player's experience-counter count. Stored on
+    /// <see cref="Majik.Core.Players.Player"/> alongside Poison and Energy,
+    /// never on a permanent.
+    /// </summary>
+    public static readonly CounterType Experience = new("Experience");
+
+    /// <summary>
     /// CR 122.1 — Time counters. Used by Suspend (CR 702.62), Vanishing
     /// (CR 702.63), Fading (CR 702.32), and similar timed-exile / fade
     /// mechanics. Each tick removes one counter; reaching zero triggers

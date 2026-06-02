@@ -66,16 +66,18 @@ namespace Majik.Core.CardData.Factories;
 /// - <see cref="Create(Player, ReplacementBus?)"/> — both replacements
 ///   are registered when the bus is supplied.
 ///
+/// ## Implemented (v1, cont.)
+/// 3. <see cref="SolemnityPlayerCounterAddReplacement"/> on
+///    <see cref="PlayerCounterAddIntent"/> — the "Players can't get
+///    counters" clause. Now that player-counter placement routes through
+///    <see cref="Services.PlayerCountersService.Add"/> (the path
+///    <see cref="Player.AddPoisonCounters"/> / <c>GainEnergy</c> /
+///    <see cref="Player.AddCounters"/> take when a bus is attached), every
+///    poison / energy / experience / generic placement on any player is
+///    rewritten to <c>Amount = 0</c> while Solemnity is on the battlefield.
+///    Global + symmetric.
+///
 /// ## Deferred (v1 gaps)
-/// - <b>Players-can't-get-counters</b>: poison / energy / experience
-///   counter placement on <see cref="Player"/> happens via
-///   <see cref="Player.AddPoisonCounters"/> / <c>GainEnergy</c> /
-///   similar direct mutators — none of those route through the
-///   <see cref="ReplacementBus"/> today. Solemnity's permanent-side
-///   coverage is complete; the player-side clause is silently a no-op
-///   until player-counter placement gets a <c>PlayerCounterAddIntent</c>
-///   primitive. Tracked as a follow-up (same shape as the
-///   <see cref="CounterAddIntent"/> retrofit Hardened Scales depends on).
 /// - <b>Direct-add factory call sites</b>: factories that call
 ///   <c>permanent.Counters.Add(...)</c> directly (Champion of the Parish
 ///   ETB-trigger, Arcbound Ravager modular self-bump, Walking Ballista
@@ -126,6 +128,11 @@ public static class SolemnityFactory
         {
             replacements.Register<CounterAddIntent>(new SolemnityCounterAddReplacement(card));
             replacements.Register<ZoneMoveIntent>(new SolemnityEntersWithCountersReplacement(card));
+            // "Players can't get counters" — the player-side clause, now that
+            // PlayerCounterAddIntent exists (CR 614). Global + symmetric:
+            // every player's poison / energy / experience / generic placement
+            // is zeroed while Solemnity is on the battlefield.
+            replacements.Register<PlayerCounterAddIntent>(new SolemnityPlayerCounterAddReplacement(card));
         }
 
         return card;
@@ -215,4 +222,39 @@ public sealed class SolemnityEntersWithCountersReplacement : IReplacementEffect<
 
     public ZoneMoveIntent? Replace(ZoneMoveIntent intent, IReadOnlyList<object> history) =>
         intent with { PlusOneCountersOnEnter = 0 };
+}
+
+/// <summary>
+/// CR 614 replacement: "Players can't get counters." While Solemnity is on
+/// the battlefield, every <see cref="PlayerCounterAddIntent"/> (poison —
+/// CR 704.5c; energy — CR 107.16; experience — CR 107.14; or generic) routed
+/// through <see cref="Services.PlayerCountersService.Add"/> is rewritten to
+/// <c>Amount = 0</c>. Global + symmetric (board-wide), the player-scoped twin
+/// of <see cref="SolemnityCounterAddReplacement"/>. Self-gates on Solemnity's
+/// zone (CR 614.6) so it auto-revokes when Solemnity leaves.
+/// </summary>
+public sealed class SolemnityPlayerCounterAddReplacement : IReplacementEffect<PlayerCounterAddIntent>
+{
+    private readonly Enchantment _source;
+
+    public SolemnityPlayerCounterAddReplacement(Enchantment source)
+    {
+        _source = source ?? throw new ArgumentNullException(nameof(source));
+    }
+
+    public bool OneShot => false;
+    public object? Tag => this;
+
+    /// <summary>The Solemnity instance this replacement is keyed to.</summary>
+    public Enchantment Source => _source;
+
+    public bool Applies(PlayerCounterAddIntent intent, IReadOnlyList<object> history)
+    {
+        if (_source.Zone != ZoneType.Battlefield) return false;
+        if (intent.Amount <= 0) return false;
+        return true;
+    }
+
+    public PlayerCounterAddIntent? Replace(PlayerCounterAddIntent intent, IReadOnlyList<object> history) =>
+        intent with { Amount = 0 };
 }
