@@ -1,0 +1,8 @@
+{
+  "name": "Marauding Blight-Priest",
+  "types": ["Creature"],
+  "subtypes": ["Vampire", "Cleric"],
+  "manaCost": "{2}{B}",
+  "power": 3,
+  "toughness": 2
+}
