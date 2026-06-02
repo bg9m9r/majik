@@ -1,0 +1,9 @@
+{
+  "name": "Auriok Champion",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Cleric"],
+  "manaCost": "{W}",
+  "power": 1,
+  "toughness": 1,
+  "abilities": []
+}

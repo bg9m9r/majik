@@ -1,0 +1,8 @@
+{
+  "name": "Inventor's Apprentice",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Artificer"],
+  "manaCost": "{R}",
+  "power": 1,
+  "toughness": 2
+}
