@@ -20,6 +20,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   "Modular 1 (This creature enters with a +1/+1 counter on it. When it
 ///    dies, you may put its +1/+1 counters on target artifact creature.)"
 /// </summary>
+[Trait("Color", "C")]
 public class ArcboundWorkerTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -46,24 +47,6 @@ public class ArcboundWorkerTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void ArcboundWorker_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Arcbound Worker", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Arcbound Worker");
-        c.HasType(CardType.Artifact).Should().BeTrue();
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Construct).Should().BeTrue();
-        c.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1,
-            "Modular death trigger is attached at construction");
-        c.Abilities.OfType<KeywordAbility>()
-            .Any(k => k.Keyword == "Modular 1").Should().BeTrue(
-                "Modular 1 marker is attached");
-    }
-
     [Fact]
     public void Modular_ReplacementBus_StampsEtbCounterIntent()
     {

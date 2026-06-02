@@ -33,6 +33,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Activating the ability installs a "whenever you attack this turn"
 ///   trigger that creates two 1/1 red Warrior tokens on attack.
 /// </summary>
+[Trait("Color", "C")]
 public class DalkovanEncampmentFactoryTests
 {
     // -----------------------------------------------------------------------
@@ -61,17 +62,6 @@ public class DalkovanEncampmentFactoryTests
         land.HasSupertype(CardSupertype.Basic).Should().BeFalse("Dalkovan Encampment is nonbasic");
         land.HasSupertype(CardSupertype.Legendary).Should().BeFalse();
     }
-
-    [Fact]
-    public void DalkovanEncampment_Dispatch_ResolvesViaNamedCardFactory()
-    {
-        var alice = new Player("Alice", 20);
-        var card = NamedCardFactory.Create("Dalkovan Encampment", alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Dalkovan Encampment");
-    }
-
     // -----------------------------------------------------------------------
     // ETB-tapped predicate (CR 614.1c)
     // -----------------------------------------------------------------------

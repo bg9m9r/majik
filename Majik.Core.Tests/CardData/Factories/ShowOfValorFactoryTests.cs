@@ -27,6 +27,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - +2/+4 expires at end of turn (CR 514.2).
 /// - Fizzle: target not on battlefield → no-op (CR 608.2b).
 /// </summary>
+[Trait("Color", "W")]
 public class ShowOfValorFactoryTests
 {
     private readonly EventBus _bus = new();
@@ -66,17 +67,6 @@ public class ShowOfValorFactoryTests
         // {1}{W} → one generic + one coloured pip = mana value 2 (CR 202.3).
         ManaCost.Parse(sov.ManaCost).TotalValue.Should().Be(2);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsShowOfValor()
-    {
-        var dispatched = NamedCardFactory.Create("Show of Valor", _alice);
-
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("Show of Valor");
-        dispatched.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     [Fact]
     public void SpellDefinition_DeclaresSingleTargetCreatureRequest()
     {

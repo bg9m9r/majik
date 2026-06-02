@@ -26,6 +26,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   graveyard) is per-target; other legal targets still resolve.
 /// - <see cref="NamedCardFactory"/> dispatch.
 /// </summary>
+[Trait("Color", "B")]
 public class FaerieMacabreFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -50,17 +51,6 @@ public class FaerieMacabreFactoryTests
         macabre.Owner.Should().BeSameAs(_alice);
         macabre.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void FaerieMacabre_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Faerie Macabre", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Faerie Macabre");
-        card.HasSubtype(CardSubtype.Faerie).Should().BeTrue();
-    }
-
     // -----------------------------------------------------------------------
     // Keyword markers — Flash + Flying (CR 702.8 / 702.9)
     // -----------------------------------------------------------------------

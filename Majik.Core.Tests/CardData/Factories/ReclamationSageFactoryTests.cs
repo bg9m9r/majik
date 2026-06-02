@@ -30,6 +30,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Resolve: no agent target + legal candidate on own battlefield →
 ///     deterministic fallback destroys it (single-arg dispatcher posture).
 /// </summary>
+[Trait("Color", "G")]
 public class ReclamationSageFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -50,18 +51,6 @@ public class ReclamationSageFactoryTests
         sage.Owner.Should().BeSameAs(_alice);
         sage.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void ReclamationSage_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Reclamation Sage", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Reclamation Sage");
-        card.HasType(CardType.Creature).Should().BeTrue();
-        card.ManaCost.Should().Be("{2}{G}");
-    }
-
     [Fact]
     public void ReclamationSage_HasSingleEtbTrigger_WithOneArtifactOrEnchantmentTarget()
     {

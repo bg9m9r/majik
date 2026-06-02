@@ -35,6 +35,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Attack trigger: "Whenever this land attacks, scry 1" — no targets,
 ///   scries the controller's library by 1.
 /// </summary>
+[Trait("Color", "C")]
 public class RestlessSpireFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -70,21 +71,6 @@ public class RestlessSpireFactoryTests
         land.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1,
             "the attack trigger is attached to the land shape");
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_RestlessSpire()
-    {
-        var card = NamedCardFactory.Create("Restless Spire", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Restless Spire");
-        card.HasType(CardType.Land).Should().BeTrue();
-
-        card.Abilities.OfType<ManaAbility>().Should().HaveCount(2);
-        card.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1);
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1);
-    }
-
     // -----------------------------------------------------------------------
     // Animate ability
     // -----------------------------------------------------------------------

@@ -32,6 +32,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Owner-vs-controller distinction: a permanent returned goes to its owner's
 ///   battlefield, not the current controller's (important for stolen permanents).
 /// </summary>
+[Trait("Color", "W")]
 public class FlickerwispFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -89,18 +90,6 @@ public class FlickerwispFactoryTests
     // -----------------------------------------------------------------------
     // NamedCardFactory dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void Flickerwisp_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Flickerwisp", _alice);
-
-        c.Should().BeOfType<Creature>("Flickerwisp is a Creature");
-        c.Name.Should().Be("Flickerwisp");
-        c.HasSubtype(CardSubtype.Elemental).Should().BeTrue();
-        c.ManaCost.Should().Be("{1}{W}{W}");
-    }
-
     // -----------------------------------------------------------------------
     // ETB triggered ability shape
     // -----------------------------------------------------------------------

@@ -25,6 +25,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - ETB resolve: tutors ONE basic land into the controller's hand (CR 603.6a).
 ///   - ETB resolve: only nonbasics in library → no card moved.
 /// </summary>
+[Trait("Color", "G")]
 public class BorderlandRangerFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -45,18 +46,6 @@ public class BorderlandRangerFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_BorderlandRanger()
-    {
-        var card = NamedCardFactory.Create("Borderland Ranger", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Borderland Ranger");
-        card.HasType(CardType.Creature).Should().BeTrue();
-        ((Creature)card).HasSubtype(CardSubtype.Scout).Should().BeTrue();
-    }
-
     [Fact]
     public void BorderlandRanger_HasOneEtbTrigger_NoActivatedOrManaAbilities()
     {

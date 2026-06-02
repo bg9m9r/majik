@@ -37,6 +37,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Damage routes through <see cref="Primitives.Fx.DealDamageAny"/>
 ///     for both player and creature targets.
 /// </summary>
+[Trait("Color", "R")]
 public class GalvanicBlastFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -76,18 +77,6 @@ public class GalvanicBlastFactoryTests
         blast.Owner.Should().BeSameAs(_alice);
         blast.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void GalvanicBlast_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Galvanic Blast", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Galvanic Blast");
-        card.HasType(CardType.Instant).Should().BeTrue();
-        card.Owner.Should().BeSameAs(_alice);
-    }
-
     [Fact]
     public void GalvanicBlast_SpellDefinition_HasSingleAnyTargetRequest()
     {

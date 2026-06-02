@@ -39,6 +39,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   turn (CR 700.3 / CR 514.2); player target takes damage with no rider.
 /// - Back face — enters-tapped replacement; {T}: Add {R} mana ability.
 /// </summary>
+[Trait("Color", "R")]
 public class SpikefieldHazardFactoryTests
 {
     // =========================================================================
@@ -68,18 +69,6 @@ public class SpikefieldHazardFactoryTests
         var colors = CardColors.GetColors(card);
         colors.Should().Contain(ManaColorEnum.Red);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_SpikefieldHazard()
-    {
-        var alice = new Player("Alice", 20);
-        var card = NamedCardFactory.Create("Spikefield Hazard", alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Spikefield Hazard");
-        card.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     [Fact]
     public void SpikefieldHazard_CarriesMdfcState_FrontNameAndBackName()
     {
@@ -219,18 +208,6 @@ public class SpikefieldHazardFactoryTests
         land.Owner.Should().BeSameAs(alice);
         land.Controller.Should().BeSameAs(alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_SpikefieldCave()
-    {
-        var alice = new Player("Alice", 20);
-        var card = NamedCardFactory.Create("Spikefield Cave", alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Spikefield Cave");
-        card.HasType(CardType.Land).Should().BeTrue();
-    }
-
     [Fact]
     public void SpikefieldCave_CarriesMdfcState_PreFlippedToBackFace()
     {

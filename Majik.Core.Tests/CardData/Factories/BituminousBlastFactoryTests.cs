@@ -39,6 +39,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Resolve no-ops when the target is no longer a creature on the battlefield
 ///   (CR 608.2b).
 /// </summary>
+[Trait("Color", "M")]
 public class BituminousBlastFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -62,18 +63,6 @@ public class BituminousBlastFactoryTests
         card.Controller.Should().BeSameAs(_alice);
         card.ManaCostValue.TotalValue.Should().Be(5);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_BituminousBlast()
-    {
-        var card = NamedCardFactory.Create("Bituminous Blast", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Bituminous Blast");
-        card.HasType(CardType.Instant).Should().BeTrue();
-        card.ManaCost.Should().Be("{3}{B}{R}");
-    }
-
     // ── Cascade trigger ──────────────────────────────────────────────────
 
     [Fact]

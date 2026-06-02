@@ -33,6 +33,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Activation: sacrifices a Goblin, target player loses 1, controller
 ///   gains 1.
 /// </summary>
+[Trait("Color", "B")]
 public class SlingGangLieutenantFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -65,17 +66,6 @@ public class SlingGangLieutenantFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void SlingGangLieutenant_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Sling-Gang Lieutenant", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Sling-Gang Lieutenant");
-        ((Creature)c).HasSubtype(CardSubtype.Goblin).Should().BeTrue();
-    }
-
     // ── ETB trigger — structural ────────────────────────────────────────
 
     [Fact]

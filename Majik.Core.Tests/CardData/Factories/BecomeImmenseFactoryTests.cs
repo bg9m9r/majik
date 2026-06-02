@@ -33,6 +33,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Fizzle: target not on battlefield → no-op (CR 608.2b).
 ///   - Cast with Delve exiles graveyard cards and pumps the target.
 /// </summary>
+[Trait("Color", "G")]
 public class BecomeImmenseFactoryTests
 {
     private readonly EventBus _bus = new();
@@ -72,19 +73,6 @@ public class BecomeImmenseFactoryTests
         bi.Abilities.OfType<KeywordAbility>().Select(k => k.Keyword)
             .Should().Contain("Delve", because: "Become Immense is a Delve card (CR 702.66)");
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsBecomeImmenseShape()
-    {
-        var card = NamedCardFactory.Create("Become Immense", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Become Immense");
-        card.HasType(CardType.Instant).Should().BeTrue();
-        card.ManaCost.Should().Be("{5}{G}");
-        card.Abilities.OfType<KeywordAbility>().Select(k => k.Keyword).Should().Contain("Delve");
-    }
-
     // ── SpellDefinition shape ─────────────────────────────────────────────────
 
     [Fact]

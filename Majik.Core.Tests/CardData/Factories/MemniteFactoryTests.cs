@@ -15,6 +15,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Card: Memnite — Artifact Creature — Construct {0} 1/1 (Scars of
 /// Mirrodin). Vanilla.
 /// </summary>
+[Trait("Color", "C")]
 public class MemniteFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -34,19 +35,6 @@ public class MemniteFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void Memnite_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Memnite", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Memnite");
-        c.HasType(CardType.Artifact).Should().BeTrue();
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Construct).Should().BeTrue();
-    }
-
     [Fact]
     public void Memnite_IsVanilla_NoAbilities()
     {

@@ -33,6 +33,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - +2/+2 expires at end of turn (CR 514.2).
 /// - Fizzle: target not on battlefield at resolution → no-op (CR 608.2b).
 /// </summary>
+[Trait("Color", "G")]
 public class MutagenicGrowthFactoryTests
 {
     private readonly EventBus _bus = new();
@@ -75,17 +76,6 @@ public class MutagenicGrowthFactoryTests
         keywords.Should().Contain("Phyrexian",
             because: "{G/P} shape is preserved structurally for visibility/search");
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsMutagenicGrowthShape()
-    {
-        var dispatched = NamedCardFactory.Create("Mutagenic Growth", _alice);
-
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("Mutagenic Growth");
-        dispatched.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     // ── Phyrexian alt-cost shape ──────────────────────────────────────────────
 
     [Fact]

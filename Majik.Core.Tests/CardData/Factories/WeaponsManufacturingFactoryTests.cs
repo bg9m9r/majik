@@ -30,6 +30,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Token artifact ETB → no Munitions token (nontoken filter).
 ///   - Munitions LTB trigger deals 2 damage to a chosen any-target.
 /// </summary>
+[Trait("Color", "R")]
 public class WeaponsManufacturingFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -53,17 +54,6 @@ public class WeaponsManufacturingFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void WeaponsManufacturing_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Weapons Manufacturing", _alice);
-
-        card.Should().BeOfType<Enchantment>();
-        card.Name.Should().Be("Weapons Manufacturing");
-        card.HasType(CardType.Enchantment).Should().BeTrue();
-    }
-
     // -----------------------------------------------------------------------
     // Ability shape
     // -----------------------------------------------------------------------

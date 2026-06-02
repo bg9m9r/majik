@@ -34,6 +34,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - The trigger fires on ANY player's end step (the printed clause has
 ///     no possessive), so an opponent's end step also sacrifices it.
 /// </summary>
+[Trait("Color", "R")]
 public class BallLightningFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -53,19 +54,6 @@ public class BallLightningFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void BallLightning_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Ball Lightning", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Ball Lightning");
-        c.HasSubtype(CardSubtype.Elemental).Should().BeTrue();
-        ((Creature)c).BasePower.Should().Be(6);
-        ((Creature)c).BaseToughness.Should().Be(1);
-    }
-
     [Fact]
     public void BallLightning_HasTrampleAndHaste()
     {

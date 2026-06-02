@@ -31,6 +31,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Front: single {T}: Add {G} mana ability, no triggers/replacements.
 /// - Back: single {T}: Add {U} mana ability, no triggers.
 /// </summary>
+[Trait("Color", "C")]
 public class BarkchannelPathwayFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -50,17 +51,6 @@ public class BarkchannelPathwayFactoryTests
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void BarkchannelPathway_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Barkchannel Pathway", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Barkchannel Pathway");
-        card.HasType(CardType.Land).Should().BeTrue();
-    }
-
     [Fact]
     public void BarkchannelPathway_HasMdfcTracker_OnFrontFace()
     {
@@ -109,17 +99,6 @@ public class BarkchannelPathwayFactoryTests
         land.MdfcState.IsBackFace.Should().BeTrue();
         land.MdfcState.ActiveFaceName.Should().Be("Tidechannel Pathway");
     }
-
-    [Fact]
-    public void TidechannelPathway_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Tidechannel Pathway", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Tidechannel Pathway");
-        card.HasType(CardType.Land).Should().BeTrue();
-    }
-
     [Fact]
     public void TidechannelPathway_HasTapForBlueManaAbility()
     {

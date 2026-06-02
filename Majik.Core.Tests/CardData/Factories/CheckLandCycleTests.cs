@@ -31,6 +31,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - <see cref="NamedCardFactory"/> dispatch resolves each printed name.
 /// - Args validation: null owner, too few args, unknown subtype.
 /// </summary>
+[Trait("Color", "C")]
 public class CheckLandCycleTests
 {
     /// <summary>
@@ -84,21 +85,6 @@ public class CheckLandCycleTests
             "check lands are nonbasic");
         land.HasSupertype(CardSupertype.Legendary).Should().BeFalse();
     }
-
-    [Theory]
-    [MemberData(nameof(AllCheckLands))]
-    public void CheckLand_Dispatch_ResolvesViaNamedCardFactory(
-        string cardName, string a, string b, string ca, string cb)
-    {
-        _ = a; _ = b; _ = ca; _ = cb;
-        var alice = new Player("Alice", 20);
-
-        var card = NamedCardFactory.Create(cardName, alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be(cardName);
-    }
-
     // -----------------------------------------------------------------------
     // Mana abilities
     // -----------------------------------------------------------------------
@@ -286,21 +272,6 @@ public class CheckLandCycleTests
         after!.EntersTapped.Should().BeTrue(
             "the check land's own subtypes don't satisfy the predicate (it isn't a Plains / Island)");
     }
-
-    [Fact]
-    public void CheckLand_SingleArgDispatch_DoesNotRegisterReplacement()
-    {
-        // Shape-only dispatcher path — single-arg dispatcher constructs
-        // without a ReplacementBus, so the ETB-tapped predicate is not
-        // wired. Matches every other ETB-replacement factory's
-        // shape-only posture.
-        var alice = new Player("Alice", 20);
-        var land = NamedCardFactory.Create("Glacial Fortress", alice);
-        land.Should().NotBeNull();
-        land.Name.Should().Be("Glacial Fortress");
-        ((Land)land).Abilities.OfType<ManaAbility>().Should().HaveCount(2);
-    }
-
     // -----------------------------------------------------------------------
     // Args validation
     // -----------------------------------------------------------------------

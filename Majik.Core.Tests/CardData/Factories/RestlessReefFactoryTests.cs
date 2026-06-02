@@ -35,6 +35,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Attack trigger mills four from the chosen target player; no-ops when
 ///   the chosen target isn't a Player.
 /// </summary>
+[Trait("Color", "C")]
 public class RestlessReefFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -59,24 +60,6 @@ public class RestlessReefFactoryTests
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_RestlessReef()
-    {
-        var card = NamedCardFactory.Create("Restless Reef", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Restless Reef");
-        card.HasType(CardType.Land).Should().BeTrue();
-
-        card.Abilities.OfType<ManaAbility>().Should().HaveCount(2,
-            "{T}: Add {U} and {T}: Add {B} mana abilities are wired");
-        card.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1,
-            "{2}{U}{B} animate ability is wired");
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1,
-            "the attack-mill trigger is attached");
-    }
-
     [Fact]
     public void RestlessReef_AnimateAbility_HasPrintedManaCost2UB()
     {

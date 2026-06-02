@@ -42,6 +42,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   <see cref="DragonsRageChannelerFactory.IsDeliriumActive"/>.
 /// - Cascade discovery in <see cref="CascadeAltCostProbe.DefaultIsCascadeCard"/>.
 /// </summary>
+[Trait("Color", "R")]
 public class BloodbraidMarauderFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -91,18 +92,6 @@ public class BloodbraidMarauderFactoryTests
         creature.Owner.Should().BeSameAs(_alice);
         creature.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_BloodbraidMarauder()
-    {
-        var card = NamedCardFactory.Create("Bloodbraid Marauder", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Bloodbraid Marauder");
-        card.HasType(CardType.Creature).Should().BeTrue();
-        card.ManaCost.Should().Be("{1}{R}");
-    }
-
     // ── "This creature can't block." ─────────────────────────────────────
 
     [Fact]

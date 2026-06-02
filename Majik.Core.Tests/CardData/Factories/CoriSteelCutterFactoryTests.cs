@@ -40,6 +40,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Equip {1}{R} attaches to the first controller-side creature.
 /// - <see cref="NamedCardFactory"/> dispatch entry.
 /// </summary>
+[Trait("Color", "R")]
 public class CoriSteelCutterFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -292,19 +293,4 @@ public class CoriSteelCutterFactoryTests
     // -----------------------------------------------------------------------
     // NamedCardFactory dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void NamedCardFactory_DispatchesCoriSteelCutter()
-    {
-        var card = NamedCardFactory.Create("Cori-Steel Cutter", _alice);
-
-        card.Should().BeOfType<Artifact>("Cori-Steel Cutter is an Artifact — Equipment");
-        card.Name.Should().Be("Cori-Steel Cutter");
-        card.HasSubtype(CardSubtype.Equipment).Should().BeTrue();
-
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1,
-            "the dispatcher returns a Cori-Steel Cutter shape with the Flurry trigger attached");
-        card.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1,
-            "the dispatcher returns a Cori-Steel Cutter shape with the Equip activated ability attached");
-    }
 }

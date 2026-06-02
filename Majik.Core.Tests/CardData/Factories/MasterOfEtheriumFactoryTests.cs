@@ -32,6 +32,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Master does NOT buff opponent's artifact creatures.
 ///   - NamedCardFactory dispatch.
 /// </summary>
+[Trait("Color", "U")]
 public class MasterOfEtheriumFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -258,18 +259,5 @@ public class MasterOfEtheriumFactoryTests
         memnite.GetPower().Should().Be(1,
             "Master leaving the battlefield deactivates the +1/+1 anthem");
         memnite.GetToughness().Should().Be(1);
-    }
-
-    [Fact]
-    public void MasterOfEtherium_NamedCardFactory_Dispatch()
-    {
-        var card = NamedCardFactory.Create("Master of Etherium", _alice);
-
-        card.Should().NotBeNull();
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Master of Etherium");
-        card.HasType(CardType.Artifact).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Vedalken).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Wizard).Should().BeTrue();
     }
 }

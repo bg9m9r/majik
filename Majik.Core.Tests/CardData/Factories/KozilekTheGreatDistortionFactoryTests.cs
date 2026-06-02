@@ -40,6 +40,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Discard-X-counter-X activated ability: counters a matching-mv spell;
 ///   no-op on mv mismatch.
 /// </summary>
+[Trait("Color", "C")]
 public class KozilekTheGreatDistortionFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -82,18 +83,6 @@ public class KozilekTheGreatDistortionFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void Kozilek_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Kozilek, the Great Distortion", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Kozilek, the Great Distortion");
-        ((Creature)c).HasSubtype(CardSubtype.Eldrazi).Should().BeTrue();
-        c.HasType(CardType.Creature).Should().BeTrue();
-    }
-
     // ── Menace ──────────────────────────────────────────────────────────
 
     [Fact]

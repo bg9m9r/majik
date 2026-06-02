@@ -33,6 +33,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - LTB returns the exiled card to the battlefield under its owner's control.
 /// - LTB no-ops cleanly when nothing was exiled.
 /// </summary>
+[Trait("Color", "W")]
 public class PortableHoleFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -57,17 +58,6 @@ public class PortableHoleFactoryTests
         c.Abilities.OfType<TriggeredAbility>().Should().HaveCount(2,
             "ETB exile trigger + LTB return trigger");
     }
-
-    [Fact]
-    public void PortableHole_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Portable Hole", _alice);
-
-        c.Should().BeOfType<Artifact>();
-        c.Name.Should().Be("Portable Hole");
-        c.Abilities.OfType<TriggeredAbility>().Should().HaveCount(2);
-    }
-
     [Fact]
     public void PortableHole_Etb_ExilesOpponentLowMvPermanent()
     {

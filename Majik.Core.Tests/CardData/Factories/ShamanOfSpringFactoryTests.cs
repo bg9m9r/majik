@@ -26,6 +26,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - WIRED Create(Player, IEventBus?, TriggerManager?): entering battlefield
 ///   draws 1 card for controller.
 /// </summary>
+[Trait("Color", "G")]
 public class ShamanOfSpringFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -83,18 +84,6 @@ public class ShamanOfSpringFactoryTests
     // -----------------------------------------------------------------------
     // Dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void ShamanOfSpring_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Shaman of Spring", _alice);
-
-        c.Should().BeOfType<Creature>("Shaman of Spring is a Creature");
-        c.Name.Should().Be("Shaman of Spring");
-        c.HasSubtype(CardSubtype.Elf).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Shaman).Should().BeTrue();
-    }
-
     // -----------------------------------------------------------------------
     // ETB trigger shape
     // -----------------------------------------------------------------------

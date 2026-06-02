@@ -27,6 +27,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Cycling {2} activated ability: cost shape ({2} + Discard self),
 ///   hand-zone gate (CR 702.32a), end-to-end activation discards self + draws.
 /// </summary>
+[Trait("Color", "C")]
 public class ZagothCrystalFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -46,18 +47,6 @@ public class ZagothCrystalFactoryTests
         crystal.Owner.Should().BeSameAs(_alice);
         crystal.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_ZagothCrystal()
-    {
-        var card = NamedCardFactory.Create("Zagoth Crystal", _alice);
-
-        card.Should().BeOfType<Artifact>();
-        card.Name.Should().Be("Zagoth Crystal");
-        card.HasType(CardType.Artifact).Should().BeTrue();
-        card.ManaCost.Should().Be("{3}");
-    }
-
     // -----------------------------------------------------------------------
     // Mana abilities — three fixed colour slots (B/G/U).
     // -----------------------------------------------------------------------

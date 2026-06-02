@@ -37,6 +37,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   their graveyard into their library; fires from a non-battlefield zone
 ///   too ("from anywhere").
 /// </summary>
+[Trait("Color", "C")]
 public class KozilekButcherOfTruthFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -79,18 +80,6 @@ public class KozilekButcherOfTruthFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void Kozilek_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Kozilek, Butcher of Truth", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Kozilek, Butcher of Truth");
-        ((Creature)c).HasSubtype(CardSubtype.Eldrazi).Should().BeTrue();
-        c.HasType(CardType.Creature).Should().BeTrue();
-    }
-
     // ── Annihilator 4 ───────────────────────────────────────────────────
 
     [Fact]

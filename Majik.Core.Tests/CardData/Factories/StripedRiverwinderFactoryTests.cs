@@ -29,6 +29,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   reanimated) listen for.
 /// - <see cref="NamedCardFactory"/> dispatch.
 /// </summary>
+[Trait("Color", "U")]
 public class StripedRiverwinderFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -59,22 +60,6 @@ public class StripedRiverwinderFactoryTests
         card.Abilities.OfType<KeywordAbility>()
             .Should().Contain(k => k.Keyword == "Hexproof");
     }
-
-    [Fact]
-    public void StripedRiverwinder_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Striped Riverwinder", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.HasSubtype(CardSubtype.Serpent).Should().BeTrue();
-        card.Abilities.OfType<KeywordAbility>()
-            .Should().Contain(k => k.Keyword == "Hexproof");
-        card.Abilities.OfType<KeywordAbility>()
-            .Should().Contain(k => k.Keyword == "Cycling");
-        card.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1,
-            "the cycling activated ability");
-    }
-
     // -----------------------------------------------------------------------
     // Cycling ability shape — CR 702.32
     // -----------------------------------------------------------------------

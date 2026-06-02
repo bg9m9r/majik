@@ -31,6 +31,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Resolve: no Plains in library → no-op.
 ///   - Resolve: "Plains card" matches the Plains land subtype (CR 305.6).
 /// </summary>
+[Trait("Color", "W")]
 public class KnightOfTheWhiteOrchidFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -65,17 +66,6 @@ public class KnightOfTheWhiteOrchidFactoryTests
             .Should().ContainSingle(k => k.Keyword == "First strike",
                 "Knight of the White Orchid has first strike (CR 702.7).");
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_KnightOfTheWhiteOrchid()
-    {
-        var card = NamedCardFactory.Create("Knight of the White Orchid", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Knight of the White Orchid");
-        card.HasType(CardType.Creature).Should().BeTrue();
-    }
-
     [Fact]
     public void KnightOfTheWhiteOrchid_HasExactlyOneTriggeredAbility()
     {

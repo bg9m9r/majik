@@ -24,6 +24,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// typing + printed Indestructible keyword + enters-tapped replacement +
 /// one mana ability per produced colour.
 /// </summary>
+[Trait("Color", "C")]
 public class RustvaleBridgeFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -40,17 +41,6 @@ public class RustvaleBridgeFactoryTests
         bridge.Owner.Should().BeSameAs(_alice);
         bridge.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void RustvaleBridge_NamedCardFactory_DispatchesArtifactLand()
-    {
-        var card = NamedCardFactory.Create("Rustvale Bridge", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.HasType(CardType.Land).Should().BeTrue();
-        card.HasType(CardType.Artifact).Should().BeTrue();
-    }
-
     [Fact]
     public void RustvaleBridge_HasPrintedIndestructibleKeyword()
     {

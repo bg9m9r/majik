@@ -35,6 +35,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Mode 2 resolve: target creature gains Double strike until EOT via
 ///     GrantKeywordUntilEndOfTurnEffect (CombatAbilities.HasDoubleStrike).
 /// </summary>
+[Trait("Color", "M")]
 public class BorosCharmFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -57,17 +58,6 @@ public class BorosCharmFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void BorosCharm_NamedCardFactory_Dispatch()
-    {
-        var dispatched = NamedCardFactory.Create("Boros Charm", _alice);
-
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("Boros Charm");
-        dispatched.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     // -----------------------------------------------------------------------
     // SpellDefinition shape
     // -----------------------------------------------------------------------

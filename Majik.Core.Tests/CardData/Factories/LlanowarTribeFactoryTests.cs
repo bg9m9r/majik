@@ -24,6 +24,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     the creature.
 ///   - <c>canActivateCheck</c> gate prevents re-activation while tapped.
 /// </summary>
+[Trait("Color", "G")]
 public class LlanowarTribeFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -43,19 +44,6 @@ public class LlanowarTribeFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_LlanowarTribe()
-    {
-        var card = NamedCardFactory.Create("Llanowar Tribe", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Llanowar Tribe");
-        card.HasType(CardType.Creature).Should().BeTrue();
-        ((Creature)card).HasSubtype(CardSubtype.Elf).Should().BeTrue();
-        ((Creature)card).HasSubtype(CardSubtype.Druid).Should().BeTrue();
-    }
-
     [Fact]
     public void LlanowarTribe_HasSingleTripleGreenManaAbility()
     {

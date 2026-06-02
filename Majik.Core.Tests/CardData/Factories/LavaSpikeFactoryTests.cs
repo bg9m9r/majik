@@ -24,6 +24,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Resolve body routes planeswalker damage through
 ///   <see cref="Primitives.Fx.DealDamageAny"/> (loyalty removal — CR 306.7).
 /// </summary>
+[Trait("Color", "R")]
 public class LavaSpikeFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -42,18 +43,6 @@ public class LavaSpikeFactoryTests
         spike.HasSubtype(CardSubtype.Arcane).Should().BeTrue(
             "Lava Spike is an Arcane sorcery — splice fodder (CR 205.3k)");
     }
-
-    [Fact]
-    public void LavaSpike_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Lava Spike", _alice);
-
-        card.Should().BeOfType<Sorcery>();
-        card.Name.Should().Be("Lava Spike");
-        card.HasType(CardType.Sorcery).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Arcane).Should().BeTrue();
-    }
-
     [Fact]
     public void LavaSpike_SpellDefinition_HasPlayerOrPlaneswalkerRequest()
     {

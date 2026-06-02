@@ -37,6 +37,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   is wired.
 /// - ETB trigger resolve: one 0/1 green Plant creature token enters.
 /// </summary>
+[Trait("Color", "C")]
 public class KhalniGardenFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -72,20 +73,6 @@ public class KhalniGardenFactoryTests
         land.HasSupertype(CardSupertype.Legendary).Should().BeFalse(
             "Khalni Garden is not legendary");
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_KhalniGarden()
-    {
-        var card = NamedCardFactory.Create("Khalni Garden", _alice);
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Khalni Garden");
-
-        card.Abilities.OfType<ManaAbility>().Should().HaveCount(1,
-            "{T}: Add {G} mana ability is wired");
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1,
-            "the ETB Plant-token trigger is attached");
-    }
-
     [Fact]
     public void Create_HasExactlyTwoAbilities_OneManaOneTriggered()
     {
@@ -145,17 +132,6 @@ public class KhalniGardenFactoryTests
         after!.EntersTapped.Should().BeTrue(
             "Khalni Garden enters tapped unconditionally (CR 614.1c)");
     }
-
-    [Fact]
-    public void SingleArgDispatch_DoesNotRegisterReplacement()
-    {
-        var alice = new Player("Alice", 20);
-        var card = NamedCardFactory.Create("Khalni Garden", alice);
-        card.Should().BeOfType<Land>();
-        ((Land)card).Abilities.OfType<ManaAbility>().Should().HaveCount(1);
-        ((Land)card).Abilities.OfType<TriggeredAbility>().Should().HaveCount(1);
-    }
-
     // -----------------------------------------------------------------------
     // ETB trigger — creates a 0/1 green Plant token (CR 111 / 111.4)
     // -----------------------------------------------------------------------

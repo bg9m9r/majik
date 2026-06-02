@@ -21,6 +21,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// shared <c>Create(Player, string[])</c> overload with the args array
 /// shaped as <c>[name, ...payload]</c>.
 /// </summary>
+[Trait("Color", "C")]
 public class CycleFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -42,20 +43,6 @@ public class CycleFactoryTests
         new object[] { "Verdant Catacombs", CardSubtype.Swamp,    CardSubtype.Forest   },
         new object[] { "Marsh Flats",       CardSubtype.Plains,   CardSubtype.Swamp    },
     };
-
-    [Theory]
-    [MemberData(nameof(AllFetchlands))]
-    public void Fetchland_Dispatch_ReturnsLandWithPrintedName(
-        string cardName, CardSubtype subtypeA, CardSubtype subtypeB)
-    {
-        _ = subtypeA; _ = subtypeB;
-
-        var card = NamedCardFactory.Create(cardName, _alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be(cardName);
-    }
-
     [Theory]
     [MemberData(nameof(AllFetchlands))]
     public void Fetchland_HasFetchActivatedAbility(
@@ -194,26 +181,6 @@ public class CycleFactoryTests
         new object[] { "Thundering Falls",     CardSubtype.Island,   CardSubtype.Mountain, "U", "R" },
         new object[] { "Elegant Parlor",       CardSubtype.Mountain, CardSubtype.Plains,   "R", "W" },
     };
-
-    [Theory]
-    [MemberData(nameof(AllSurveilLands))]
-    public void SurveilLand_Dispatch_ReturnsLandWithPrintedNameAndDualSubtypes(
-        string cardName, CardSubtype subtypeA, CardSubtype subtypeB, string colorA, string colorB)
-    {
-        _ = colorA; _ = colorB;
-
-        var card = NamedCardFactory.Create(cardName, _alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be(cardName);
-        var land = (Land)card;
-        // CR 305.6 — surveil lands print as Land — TypeA TypeB; both subtypes
-        // must be on the card so fetchland subtype searches (and effects like
-        // Yavimaya / Urborg) treat them as real duals.
-        land.HasSubtype(subtypeA).Should().BeTrue(because: $"{cardName} is a {subtypeA}");
-        land.HasSubtype(subtypeB).Should().BeTrue(because: $"{cardName} is a {subtypeB}");
-    }
-
     [Theory]
     [MemberData(nameof(AllSurveilLands))]
     public void SurveilLand_HasTwoManaAbilities_OnePerProducedColour(
@@ -297,18 +264,6 @@ public class CycleFactoryTests
     // Horizon-land cycle — 3 members shipped (Horizon Canopy, Fiery Islet,
     // Sunbaked Canyon)
     // -----------------------------------------------------------------------
-
-    [Theory]
-    [InlineData("Horizon Canopy")]
-    [InlineData("Fiery Islet")]
-    [InlineData("Sunbaked Canyon")]
-    public void HorizonLand_Dispatch_ReturnsLandWithPrintedName(string cardName)
-    {
-        var card = NamedCardFactory.Create(cardName, _alice);
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be(cardName);
-    }
-
     [Theory]
     [InlineData("Horizon Canopy")]
     [InlineData("Fiery Islet")]

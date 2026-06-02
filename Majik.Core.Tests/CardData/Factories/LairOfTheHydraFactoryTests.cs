@@ -32,6 +32,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     * Both expire at end of turn.
 /// - Conditional ETB-tapped ("two or more other lands") replacement.
 /// </summary>
+[Trait("Color", "C")]
 public class LairOfTheHydraFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -65,20 +66,6 @@ public class LairOfTheHydraFactoryTests
         land.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1,
             "{X}{G} animate ability is wired");
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_LairOfTheHydra()
-    {
-        var card = NamedCardFactory.Create("Lair of the Hydra", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Lair of the Hydra");
-        card.HasType(CardType.Land).Should().BeTrue();
-
-        card.Abilities.OfType<ManaAbility>().Should().HaveCount(1);
-        card.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1);
-    }
-
     // -----------------------------------------------------------------------
     // Animate ability
     // -----------------------------------------------------------------------

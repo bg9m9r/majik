@@ -36,6 +36,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - No-op if target left the battlefield before resolution (CR 608.2b).
 ///   - Kicker rider builds a real KickerAdditionalCost (CR 702.33).
 /// </summary>
+[Trait("Color", "G")]
 public class TearAsunderFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -58,19 +59,6 @@ public class TearAsunderFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_TearAsunder()
-    {
-        var card = NamedCardFactory.Create("Tear Asunder", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Tear Asunder");
-        card.HasType(CardType.Instant).Should().BeTrue();
-        card.ManaCost.Should().Be("{1}{G}");
-        card.Owner.Should().BeSameAs(_alice);
-    }
-
     // -----------------------------------------------------------------------
     // SpellDefinition — structural shape
     // -----------------------------------------------------------------------

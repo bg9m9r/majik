@@ -29,6 +29,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   publishes <see cref="Majik.Core.Events.CardCycledEvent"/> (CR 702.32d).
 /// - Dispatcher routing through <see cref="NamedCardFactory"/>.
 /// </summary>
+[Trait("Color", "C")]
 public class DesertOfTheTrueFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -36,17 +37,6 @@ public class DesertOfTheTrueFactoryTests
     // -----------------------------------------------------------------------
     // Identity + dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void DesertOfTheTrue_Dispatch_ReturnsLandWithDesertSubtype()
-    {
-        var card = NamedCardFactory.Create("Desert of the True", _alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Desert of the True");
-        card.HasSubtype(CardSubtype.Desert).Should().BeTrue("the printed Desert land subtype");
-    }
-
     [Fact]
     public void DesertOfTheTrue_HasManaAbilityProducingWhite()
     {

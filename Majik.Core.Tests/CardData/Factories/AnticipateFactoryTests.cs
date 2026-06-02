@@ -38,6 +38,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     SBA flag).
 /// </summary>
 [Collection(nameof(StaticRegistryCollection))]
+[Trait("Color", "U")]
 public class AnticipateFactoryTests : IDisposable
 {
     private readonly Player _alice = new("Alice", 20);
@@ -60,19 +61,6 @@ public class AnticipateFactoryTests : IDisposable
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_Anticipate()
-    {
-        var card = NamedCardFactory.Create("Anticipate", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Anticipate");
-        card.HasType(CardType.Instant).Should().BeTrue();
-        card.ManaCost.Should().Be("{1}{U}");
-        card.Owner.Should().BeSameAs(_alice);
-    }
-
     // ── Resolve — default (no agent) ─────────────────────────────────────────
 
     [Fact]

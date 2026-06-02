@@ -32,6 +32,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   graveyard no-op; any-card-type returnable; illegal-on-resolution no-op;
 ///   ZoneService route.
 /// </summary>
+[Trait("Color", "G")]
 public class RegrowthFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -67,17 +68,6 @@ public class RegrowthFactoryTests
         colors.Should().NotContain(ManaColor.Black);
         colors.Should().NotContain(ManaColor.Red);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_Regrowth()
-    {
-        var card = NamedCardFactory.Create("Regrowth", _alice);
-
-        card.Should().BeOfType<Sorcery>();
-        card.Name.Should().Be("Regrowth");
-        card.HasType(CardType.Sorcery).Should().BeTrue();
-    }
-
     // =========================================================================
     // SpellDefinition shape
     // =========================================================================

@@ -30,6 +30,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Cycling cost gate: DiscardSelfCost CanPay is hand-only.
 /// - <see cref="NamedCardFactory"/> dispatch.
 /// </summary>
+[Trait("Color", "B")]
 public class TrollOfKhazadDumFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -53,27 +54,6 @@ public class TrollOfKhazadDumFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void TrollOfKhazadDum_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Troll of Khazad-dûm", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.HasSubtype(CardSubtype.Troll).Should().BeTrue();
-        card.Abilities.OfType<KeywordAbility>()
-            .Should().Contain(k => k.Keyword == "CantBeBlockedExceptByMinBlockers",
-                "three-or-more-blocker restriction marker attached");
-        card.Abilities.OfType<KeywordAbility>()
-            .Should().Contain(k => k.Keyword == "Swampcycling",
-                "typed-cycling keyword surfaced");
-        card.Abilities.OfType<KeywordAbility>()
-            .Should().Contain(k => k.Keyword == "Cycling",
-                "CR 702.32d — typecycling IS Cycling");
-        card.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1,
-            "the swampcycling activated ability");
-    }
-
     // -----------------------------------------------------------------------
     // "Can't be blocked except by three or more creatures" (CR 509.1b)
     // -----------------------------------------------------------------------

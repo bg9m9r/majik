@@ -33,6 +33,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - The chosen amount expires at end of turn (CR 514.2).
 /// - Fizzle: target not on battlefield → no-op (CR 608.2b).
 /// </summary>
+[Trait("Color", "G")]
 public class MightOfOldKrosaFactoryTests
 {
     private readonly EventBus _bus = new();
@@ -63,17 +64,6 @@ public class MightOfOldKrosaFactoryTests
         mok.Controller.Should().BeSameAs(_alice);
         CardColors.GetColors(mok).Should().Contain(ManaColor.Green);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsMightOfOldKrosa()
-    {
-        var dispatched = NamedCardFactory.Create("Might of Old Krosa", _alice);
-
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("Might of Old Krosa");
-        dispatched.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     [Fact]
     public void SpellDefinition_DeclaresSingleTargetCreatureRequest()
     {

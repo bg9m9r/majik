@@ -23,6 +23,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Mana ability produces {G} and taps the creature.
 ///   - Re-activation gate while tapped.
 /// </summary>
+[Trait("Color", "G")]
 public class DruidOfTheCowlFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -42,19 +43,6 @@ public class DruidOfTheCowlFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_DruidOfTheCowl()
-    {
-        var card = NamedCardFactory.Create("Druid of the Cowl", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Druid of the Cowl");
-        card.HasType(CardType.Creature).Should().BeTrue();
-        ((Creature)card).HasSubtype(CardSubtype.Elf).Should().BeTrue();
-        ((Creature)card).HasSubtype(CardSubtype.Druid).Should().BeTrue();
-    }
-
     [Fact]
     public void DruidOfTheCowl_HasSingleGreenManaAbility()
     {

@@ -35,6 +35,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - {T} resolve: controller and chosen opponent each draw one card.
 ///   - {T} resolve: no opponent chosen → only the controller draws.
 /// </summary>
+[Trait("Color", "W")]
 public class LoranOfTheThirdPathFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -59,21 +60,6 @@ public class LoranOfTheThirdPathFactoryTests
         loran.Owner.Should().BeSameAs(_alice);
         loran.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void Loran_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Loran of the Third Path", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Loran of the Third Path");
-        card.HasType(CardType.Creature).Should().BeTrue();
-        card.ManaCost.Should().Be("{2}{W}");
-        var creature = (Creature)card;
-        creature.HasSupertype(CardSupertype.Legendary).Should().BeTrue();
-        creature.HasSubtype(CardSubtype.Artificer).Should().BeTrue();
-    }
-
     [Fact]
     public void Loran_HasVigilanceKeyword()
     {

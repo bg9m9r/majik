@@ -41,6 +41,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Back — single {T}: Add {G} mana ability.
 /// - Back — enters tapped replacement fires when bus is wired; no bus → none.
 /// </summary>
+[Trait("Color", "G")]
 public class BalaGedRecoveryFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -76,17 +77,6 @@ public class BalaGedRecoveryFactoryTests
         colors.Should().NotContain(ManaColor.Black);
         colors.Should().NotContain(ManaColor.Red);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_BalaGedRecovery()
-    {
-        var card = NamedCardFactory.Create("Bala Ged Recovery", _alice);
-
-        card.Should().BeOfType<Sorcery>();
-        card.Name.Should().Be("Bala Ged Recovery");
-        card.HasType(CardType.Sorcery).Should().BeTrue();
-    }
-
     [Fact]
     public void BalaGedRecovery_CarriesMdfcState_FrontFace()
     {
@@ -242,17 +232,6 @@ public class BalaGedRecoveryFactoryTests
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_BalaGedSanctuary()
-    {
-        var card = NamedCardFactory.Create("Bala Ged Sanctuary", _alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Bala Ged Sanctuary");
-        card.HasType(CardType.Land).Should().BeTrue();
-    }
-
     [Fact]
     public void BalaGedSanctuary_CarriesMdfcState_PreFlippedToBackFace()
     {

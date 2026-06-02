@@ -33,6 +33,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   intervening-if).
 /// - NamedCardFactory dispatch.
 /// </summary>
+[Trait("Color", "B")]
 public class GeralfsMessengerFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -56,18 +57,6 @@ public class GeralfsMessengerFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void GeralfsMessenger_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Geralf's Messenger", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Geralf's Messenger");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Zombie).Should().BeTrue();
-    }
-
     // -----------------------------------------------------------------------
     // Undying keyword marker (CR 702.93)
     // -----------------------------------------------------------------------

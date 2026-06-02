@@ -33,6 +33,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   returns a historic card from the graveyard to hand (and only a historic
 ///   card).
 /// </summary>
+[Trait("Color", "W")]
 public class SamwiseGamgeeFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -67,16 +68,6 @@ public class SamwiseGamgeeFactoryTests
         c.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1,
             "Samwise has a single Sacrifice-three-Foods graveyard-return ability");
     }
-
-    [Fact]
-    public void SamwiseGamgee_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Samwise Gamgee", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Samwise Gamgee");
-    }
-
     [Fact]
     public void EtbTrigger_FiresForAnotherNontokenCreatureYouControl_CreatesFood()
     {

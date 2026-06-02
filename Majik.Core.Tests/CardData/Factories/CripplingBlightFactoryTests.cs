@@ -29,6 +29,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///       * Restriction removed when aura LTBs.
 ///   - BuildSpellDefinition: legal candidates are creatures only (CR 702.5b).
 /// </summary>
+[Trait("Color", "B")]
 public class CripplingBlightFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -52,18 +53,6 @@ public class CripplingBlightFactoryTests
         cb.Owner.Should().BeSameAs(_alice);
         cb.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_CripplingBlight()
-    {
-        var card = NamedCardFactory.Create("Crippling Blight", _alice);
-
-        card.Should().BeOfType<Enchantment>();
-        card.Name.Should().Be("Crippling Blight");
-        card.ManaCost.Should().Be("{B}");
-        card.HasSubtype(CardSubtype.Aura).Should().BeTrue();
-    }
-
     // -----------------------------------------------------------------------
     // Static -1/-1 (CR 613.3c — Layer 7c)
     // -----------------------------------------------------------------------

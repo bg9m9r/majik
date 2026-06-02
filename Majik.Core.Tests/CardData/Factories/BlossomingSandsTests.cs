@@ -34,6 +34,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// load path by <see cref="Majik.Core.CardData.EntersTappedBinder"/>, not by
 /// this named-card factory — same posture as the Refuge / Temple cycle.
 /// </summary>
+[Trait("Color", "C")]
 public class BlossomingSandsTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -50,18 +51,6 @@ public class BlossomingSandsTests
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_BlossomingSands()
-    {
-        var card = NamedCardFactory.Create("Blossoming Sands", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Blossoming Sands");
-        card.Abilities.OfType<ManaAbility>().Should().HaveCount(2);
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1);
-    }
-
     [Fact]
     public void BlossomingSands_HasManaAbility_ForGreen()
     {

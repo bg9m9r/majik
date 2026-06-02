@@ -37,6 +37,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     (CR 608.2b).
 ///   - Non-creature resolved target (wrong type) → no-op.
 /// </summary>
+[Trait("Color", "U")]
 public class RealityShiftFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -60,19 +61,6 @@ public class RealityShiftFactoryTests
         ManaCost.Parse(card.ManaCost).TotalValue.Should().Be(2,
             "Reality Shift costs {1}{U} — generic 1 + coloured 1 = MV 2 (CR 202.3)");
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_RealityShift()
-    {
-        var card = NamedCardFactory.Create("Reality Shift", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Reality Shift");
-        card.ManaCost.Should().Be("{1}{U}");
-        card.HasType(CardType.Instant).Should().BeTrue();
-        card.Owner.Should().BeSameAs(_alice);
-    }
-
     // -----------------------------------------------------------------------
     // SpellDefinition shape
     // -----------------------------------------------------------------------

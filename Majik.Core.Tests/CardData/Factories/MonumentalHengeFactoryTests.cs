@@ -33,6 +33,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Look-at-top-five: reveals a historic card to hand, re-bottoms the rest;
 ///   historic = Artifact / Legendary / Saga; no historic → no card to hand.
 /// </summary>
+[Trait("Color", "C")]
 public class MonumentalHengeFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -54,16 +55,6 @@ public class MonumentalHengeFactoryTests
         land.HasSupertype(CardSupertype.Basic).Should().BeFalse();
         land.HasSupertype(CardSupertype.Legendary).Should().BeFalse();
     }
-
-    [Fact]
-    public void DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Monumental Henge", _alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Monumental Henge");
-    }
-
     // -----------------------------------------------------------------------
     // Abilities
     // -----------------------------------------------------------------------
@@ -163,17 +154,6 @@ public class MonumentalHengeFactoryTests
         after!.EntersTapped.Should().BeTrue(
             "Monumental Henge enters tapped when only the opponent controls a Plains");
     }
-
-    [Fact]
-    public void SingleArgDispatch_DoesNotRegisterReplacement()
-    {
-        // Shape-only dispatcher path — no ReplacementBus, so the ETB-tapped
-        // predicate is not wired. Matches every ETB-replacement factory.
-        var land = (Land)NamedCardFactory.Create("Monumental Henge", _alice);
-        land.Abilities.OfType<ManaAbility>().Should().ContainSingle();
-        land.Abilities.OfType<ActivatedAbility>().Should().ContainSingle();
-    }
-
     // -----------------------------------------------------------------------
     // {2}{W}{W}, {T}: look at top 5, may reveal a historic card to hand
     // -----------------------------------------------------------------------

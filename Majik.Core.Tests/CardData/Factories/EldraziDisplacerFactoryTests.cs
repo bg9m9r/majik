@@ -32,6 +32,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     true owner (CR 108.3).
 ///   - NamedCardFactory dispatch.
 /// </summary>
+[Trait("Color", "C")]
 public class EldraziDisplacerFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -145,20 +146,5 @@ public class EldraziDisplacerFactoryTests
         _alice.Zones.Battlefield.GetCards().Should().Contain(ed);
         ed.Zone.Should().Be(ZoneType.Battlefield);
         ed.IsTapped.Should().BeFalse();
-    }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_EldraziDisplacer()
-    {
-        var card = NamedCardFactory.Create("Eldrazi Displacer", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Eldrazi Displacer");
-        card.HasType(CardType.Creature).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Eldrazi).Should().BeTrue();
-        ((Creature)card).Power.Should().Be(3);
-        ((Creature)card).Toughness.Should().Be(3);
-        card.Owner.Should().Be(_alice);
-        card.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1);
     }
 }

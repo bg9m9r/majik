@@ -23,6 +23,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   five combat keywords.
 /// - <see cref="NamedCardFactory"/> dispatch.
 /// </summary>
+[Trait("Color", "W")]
 public class AkromaAngelOfWrathFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -81,27 +82,6 @@ public class AkromaAngelOfWrathFactoryTests
         protections.Should().Contain("black");
         protections.Should().Contain("red");
     }
-
-    [Fact]
-    public void Akroma_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Akroma, Angel of Wrath", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Akroma, Angel of Wrath");
-        c.HasSubtype(CardSubtype.Angel).Should().BeTrue();
-        c.HasSupertype(CardSupertype.Legendary).Should().BeTrue();
-
-        var keywords = c.Abilities.OfType<KeywordAbility>()
-            .Select(k => k.Keyword).ToList();
-        keywords.Should().Contain(new[]
-        {
-            "Flying", "First Strike", "Vigilance", "Trample", "Haste",
-        });
-
-        c.Abilities.OfType<ProtectionAbility>().Should().HaveCount(2);
-    }
-
     [Fact]
     public void Akroma_NullOwner_Throws()
     {

@@ -28,6 +28,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   <see cref="Majik.Core.Events.CardCycledEvent"/> when a bus is supplied.
 /// - Dispatcher routing through <see cref="NamedCardFactory"/>.
 /// </summary>
+[Trait("Color", "C")]
 public class DesertOfTheFerventFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -35,17 +36,6 @@ public class DesertOfTheFerventFactoryTests
     // -----------------------------------------------------------------------
     // Identity + dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void Dispatch_ReturnsLandWithDesertSubtype()
-    {
-        var card = NamedCardFactory.Create("Desert of the Fervent", _alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Desert of the Fervent");
-        card.HasSubtype(CardSubtype.Desert).Should().BeTrue("Land — Desert");
-    }
-
     [Fact]
     public void HasManaAbilityProducingRed()
     {

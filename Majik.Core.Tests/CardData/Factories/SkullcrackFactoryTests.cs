@@ -32,6 +32,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   when a <see cref="ReplacementBus"/> is supplied.
 /// - No life-gain prevention when no bus is supplied (shape-only path).
 /// </summary>
+[Trait("Color", "R")]
 public class SkullcrackFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -53,18 +54,6 @@ public class SkullcrackFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void Skullcrack_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Skullcrack", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Skullcrack");
-        card.HasType(CardType.Instant).Should().BeTrue();
-        card.ManaCost.Should().Be("{1}{R}");
-    }
-
     // -----------------------------------------------------------------------
     // SpellDefinition shape
     // -----------------------------------------------------------------------

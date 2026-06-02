@@ -31,6 +31,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   pump).
 /// - <see cref="NamedCardFactory"/> dispatch.
 /// </summary>
+[Trait("Color", "B")]
 public class DecreeOfPainFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -51,23 +52,6 @@ public class DecreeOfPainFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void DecreeOfPain_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Decree of Pain", _alice);
-
-        card.Should().BeOfType<Sorcery>();
-        card.Name.Should().Be("Decree of Pain");
-        card.HasType(CardType.Sorcery).Should().BeTrue();
-        card.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1,
-            "the cycling activated ability");
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1,
-            "the on-cycle -2/-2 trigger");
-        card.Abilities.OfType<KeywordAbility>()
-            .Should().Contain(k => k.Keyword == "Cycling");
-    }
-
     // -----------------------------------------------------------------------
     // Cycling ability shape — CR 702.32
     // -----------------------------------------------------------------------

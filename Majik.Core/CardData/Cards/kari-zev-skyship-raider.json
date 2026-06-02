@@ -1,0 +1,10 @@
+{
+  "name": "Kari Zev, Skyship Raider",
+  "types": ["Creature"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Human", "Pirate"],
+  "manaCost": "{1}{R}",
+  "power": 1,
+  "toughness": 3,
+  "abilities": []
+}

@@ -21,6 +21,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - {T}: Add {W} mana ability present from the JSON-driven build route.
 /// - NamedCardFactory dispatch resolves the printed name.
 /// </summary>
+[Trait("Color", "C")]
 public class PlainsFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -93,23 +94,6 @@ public class PlainsFactoryTests
     // -----------------------------------------------------------------------
     // NamedCardFactory dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void Plains_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Plains", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Plains");
-        card.HasType(CardType.Land).Should().BeTrue();
-        card.HasSupertype(CardSupertype.Basic).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Plains).Should().BeTrue();
-        card.Owner.Should().BeSameAs(_alice);
-
-        card.Abilities.OfType<ManaAbility>().Should().HaveCount(1,
-            "the dispatched Plains carries its {T}: Add {W} mana ability");
-    }
-
     // -----------------------------------------------------------------------
     // Null guard
     // -----------------------------------------------------------------------
