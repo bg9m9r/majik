@@ -1,0 +1,8 @@
+{
+  "name": "Figure of Destiny",
+  "types": ["Creature"],
+  "subtypes": ["Kithkin"],
+  "manaCost": "{R/W}",
+  "power": 1,
+  "toughness": 1
+}
