@@ -1,0 +1,9 @@
+{
+  "name": "Sunlit Marsh",
+  "types": ["Land"],
+  "subtypes": ["Plains", "Swamp"],
+  "abilities": [
+    { "kind": "mana", "produces": "W" },
+    { "kind": "mana", "produces": "B" }
+  ]
+}
