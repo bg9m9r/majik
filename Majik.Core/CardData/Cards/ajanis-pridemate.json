@@ -1,0 +1,17 @@
+{
+  "name": "Ajani's Pridemate",
+  "types": ["Creature"],
+  "subtypes": ["Cat", "Soldier"],
+  "manaCost": "{1}{W}",
+  "power": 2,
+  "toughness": 2,
+  "abilities": [
+    {
+      "kind": "triggered",
+      "trigger": { "type": "whenever_you_gain_life" },
+      "effects": [
+        { "type": "put_counter", "counter": "+1/+1", "amount": 1, "target": "self" }
+      ]
+    }
+  ]
+}

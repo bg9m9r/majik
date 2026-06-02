@@ -1,0 +1,17 @@
+{
+  "name": "Spellgorger Weird",
+  "types": ["Creature"],
+  "subtypes": ["Weird"],
+  "manaCost": "{2}{R}",
+  "power": 2,
+  "toughness": 2,
+  "abilities": [
+    {
+      "kind": "triggered",
+      "trigger": { "type": "whenever_you_cast_spell", "noncreatureOnly": true },
+      "effects": [
+        { "type": "put_counter", "counter": "+1/+1", "amount": 1, "target": "self" }
+      ]
+    }
+  ]
+}

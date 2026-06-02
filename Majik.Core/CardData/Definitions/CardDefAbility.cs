@@ -118,12 +118,23 @@ public sealed class CardDefTriggeredAbility : CardDefAbility
     internal Func<ICard, ITriggerCondition> TriggerBuilder { get; }
     internal IReadOnlyList<CardDefEffectSpec> EffectSpecs { get; }
 
+    /// <summary>
+    /// The zones in which the built <see cref="TriggeredAbility"/> stays active
+    /// (<see cref="TriggeredAbility.ActiveZones"/>). <c>null</c> means "use the
+    /// engine default" (battlefield only). A leaves-the-battlefield trigger
+    /// (e.g. <c>dies_self</c>) supplies the Graveyard here so it remains
+    /// observable after the zone stamp (CR 603.6d / CR 700.4).
+    /// </summary>
+    internal IReadOnlyList<Majik.Core.Zones.ZoneType>? ActiveZones { get; }
+
     internal CardDefTriggeredAbility(
         Func<ICard, ITriggerCondition> triggerBuilder,
-        IReadOnlyList<CardDefEffectSpec> effectSpecs)
+        IReadOnlyList<CardDefEffectSpec> effectSpecs,
+        IReadOnlyList<Majik.Core.Zones.ZoneType>? activeZones = null)
     {
         TriggerBuilder = triggerBuilder;
         EffectSpecs = effectSpecs;
+        ActiveZones = activeZones;
     }
 
     internal override IAbility Build(ICard card, Player controller, ReplacementBus? replacements)
@@ -135,7 +146,8 @@ public sealed class CardDefTriggeredAbility : CardDefAbility
             controller: controller,
             condition: condition,
             effects: effects,
-            targetRequests: requests);
+            targetRequests: requests,
+            activeZones: ActiveZones);
     }
 }
 

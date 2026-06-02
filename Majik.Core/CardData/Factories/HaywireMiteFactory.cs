@@ -25,17 +25,20 @@ namespace Majik.Core.CardData.Factories;
 /// <see cref="CardDefinitionLoader.FromEmbeddedResource"/> +
 /// <see cref="CardDefinitionFactory.Build"/> (same posture as
 /// <see cref="GlaringFleshrakerFactory"/> / <see cref="AdaptiveAutomatonFactory"/>).
-/// The dies trigger and the sacrifice-exile activated ability are layered
-/// on here — the JSON <c>AbilityDefinition</c> schema does not yet express
-/// dies triggers or sacrifice-self + targeted-exile activations.
+/// The dies trigger is now declarative (carried by the JSON definition via the
+/// <c>dies_self</c> trigger variant + <c>gain_life_self</c> effect); the
+/// sacrifice-exile activated ability is still layered on here — the JSON
+/// schema does not yet express sacrifice-self + targeted-exile activations.
 ///
 /// ## Implemented (v1)
 ///
 /// - <b>Dies trigger (CR 603.6c / 700.4)</b> — "When this creature dies, you
-///   gain 2 life." Fires on a Battlefield → Graveyard move
-///   (<see cref="Triggers.OnDies"/>). On resolve the controller gains 2 life
-///   via <see cref="Fx.GainLife"/> (CR 119.3). Active zones include
-///   Graveyard because <see cref="ZoneService"/> stamps
+///   gain 2 life." Now declarative: the JSON <c>dies_self</c> trigger variant
+///   (<see cref="DiesSelfTriggerDef"/>) builds a <see cref="TriggeredAbility"/>
+///   over the Battlefield → Graveyard move (<see cref="Triggers.OnDies"/>),
+///   and the <c>gain_life_self</c> effect gains the controller 2 life on
+///   resolution (CR 119.3). The trigger variant declares active zones
+///   {Battlefield, Graveyard} because <see cref="ZoneService"/> stamps
 ///   <c>card.Zone = Graveyard</c> before publishing the move event — the
 ///   trigger must still be observable then (same posture as Doomed Traveler
 ///   / Aven Fisher / Wurmcoil Engine).
@@ -73,9 +76,9 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="Fx.MoveToExile"/> (mirrors the other exile factories), so
 ///   leave-the-battlefield triggers via
 ///   <see cref="Majik.Core.Events.CardMovedEvent"/> are not emitted by this
-///   path. The single-arg dispatcher path likewise does not register the dies
-///   trigger with a <see cref="TriggerManager"/> (correct shape for
-///   factory-shape / dispatch tests; production callers use the full
+///   path. The single-arg dispatcher path likewise does not register the
+///   declarative dies trigger with a <see cref="TriggerManager"/> (correct
+///   shape for factory-shape / dispatch tests; production callers use the full
 ///   overload).
 /// </summary>
 [CardName("Haywire Mite")]
@@ -103,37 +106,29 @@ public static class HaywireMiteFactory
     {
         ArgumentNullException.ThrowIfNull(owner);
 
-        // Base shape from the embedded JSON definition (name, Artifact +
-        // Creature, Insect subtype, {1}, 1/1). The JSON carries no abilities
-        // — the dies trigger + sacrifice-exile ability are layered on below.
+        // Base shape + declarative dies trigger from the embedded JSON
+        // definition (name, Artifact + Creature, Insect subtype, {1}, 1/1 +
+        // the dies_self → gain_life_self ability). The sacrifice-exile
+        // activated ability is layered on below — its self-sacrifice + targeted
+        // exile is not yet expressible declaratively.
         var definition = CardDefinitionLoader.FromEmbeddedResource(Slug);
         var card = (Creature)CardDefinitionFactory.Build(definition, owner);
 
         // ----------------------------------------------------------------
-        // Dies trigger (CR 603.6c / 700.4):
-        //   "When this creature dies, you gain 2 life."
-        // "Dies" = Battlefield → Graveyard (CR 700.4). Active zones include
-        // Graveyard so the trigger is still observable after ZoneService
-        // stamps card.Zone = Graveyard before publishing the move event.
+        // Dies trigger (CR 603.6c / 700.4): "When this creature dies, you
+        // gain 2 life." Now declarative — the JSON dies_self trigger variant
+        // builds a TriggeredAbility over the Battlefield → Graveyard move with
+        // active zones {Battlefield, Graveyard} (so it stays observable after
+        // ZoneService stamps card.Zone = Graveyard). Register it with the
+        // supplied TriggerManager so the move auto-queues it (CR 603.3).
         // ----------------------------------------------------------------
-        var diesEffect = new Effect(
-            $"{CardName} dies: you gain {LifeGain} life",
-            () =>
+        if (triggers != null)
+        {
+            foreach (var trigger in card.Abilities.OfType<TriggeredAbility>())
             {
-                // CR 119.3 — "you" is the controller of the dies trigger.
-                var controller = card.Controller ?? owner;
-                Fx.GainLife(controller, LifeGain);
-            });
-
-        var diesTrigger = new TriggeredAbility(
-            source: card,
-            controller: owner,
-            condition: Triggers.OnDies(card),
-            effects: new IEffect[] { diesEffect },
-            activeZones: new[] { ZoneType.Battlefield, ZoneType.Graveyard });
-
-        card.AddAbility(diesTrigger);
-        triggers?.RegisterTriggeredAbility(diesTrigger);
+                triggers.RegisterTriggeredAbility(trigger);
+            }
+        }
 
         // ----------------------------------------------------------------
         // {G}, Sacrifice this creature: Exile target noncreature artifact or
