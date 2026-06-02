@@ -1,0 +1,8 @@
+{
+  "name": "Inferno Titan",
+  "types": ["Creature"],
+  "subtypes": ["Giant"],
+  "manaCost": "{4}{R}{R}",
+  "power": 6,
+  "toughness": 6
+}
