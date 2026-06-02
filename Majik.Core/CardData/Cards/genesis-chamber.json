@@ -1,0 +1,6 @@
+{
+  "name": "Genesis Chamber",
+  "types": ["Artifact"],
+  "manaCost": "{2}",
+  "abilities": []
+}
