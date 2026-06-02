@@ -1,0 +1,6 @@
+{
+  "name": "Lightning Greaves",
+  "types": ["Artifact"],
+  "subtypes": ["Equipment"],
+  "manaCost": "{2}"
+}
