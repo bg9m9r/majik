@@ -27,10 +27,15 @@ namespace Majik.Core.Costs;
 ///   when no other artifact is available (Arcbound Ravager is an
 ///   artifact). Callers that want a "sacrifice another artifact" shape
 ///   should pass an <paramref name="excludeSource"/> reference.
+/// - <b>Nontoken rider</b>: pass <c>requireNontoken: true</c> to restrict
+///   the picker to nontoken artifacts (CR 111.8 — Thopter Foundry's
+///   "Sacrifice a nontoken artifact"). The token check reads
+///   <see cref="Permanent.IsToken"/>.
 /// </summary>
 public sealed class SacrificeAnArtifactCost : ICost
 {
     private readonly Permanent? _excludeSource;
+    private readonly bool _requireNontoken;
 
     /// <summary>
     /// Optionally set by the agent to indicate which artifact to
@@ -49,16 +54,29 @@ public sealed class SacrificeAnArtifactCost : ICost
     /// "sacrifice an artifact other than ~"). Default null — the source
     /// is eligible (Arcbound Ravager — "Sacrifice an artifact" picks
     /// itself when no other artifact is available).
+    /// When <paramref name="requireNontoken"/> is true, token artifacts
+    /// are excluded from the picker (CR 111.8 — Thopter Foundry's
+    /// "Sacrifice a nontoken artifact"); default false.
     /// </summary>
-    public SacrificeAnArtifactCost(Permanent? excludeSource = null)
+    public SacrificeAnArtifactCost(Permanent? excludeSource = null, bool requireNontoken = false)
     {
         _excludeSource = excludeSource;
+        _requireNontoken = requireNontoken;
     }
 
     public string Description =>
-        _excludeSource == null
-            ? "sacrifice an artifact"
-            : $"sacrifice an artifact other than {_excludeSource.Name}";
+        _requireNontoken
+            ? (_excludeSource == null
+                ? "sacrifice a nontoken artifact"
+                : $"sacrifice a nontoken artifact other than {_excludeSource.Name}")
+            : (_excludeSource == null
+                ? "sacrifice an artifact"
+                : $"sacrifice an artifact other than {_excludeSource.Name}");
+
+    private bool IsEligible(Permanent p) =>
+        p.HasType(CardType.Artifact)
+        && (_excludeSource == null || !ReferenceEquals(p, _excludeSource))
+        && (!_requireNontoken || !p.IsToken);
 
     /// <inheritdoc/>
     public bool CanPay(Player player)
@@ -66,8 +84,7 @@ public sealed class SacrificeAnArtifactCost : ICost
         if (player == null) return false;
         return player.Zones.Battlefield.GetCards()
             .OfType<Permanent>()
-            .Any(p => p.HasType(CardType.Artifact)
-                   && (_excludeSource == null || !ReferenceEquals(p, _excludeSource)));
+            .Any(IsEligible);
     }
 
     /// <inheritdoc/>
@@ -77,8 +94,7 @@ public sealed class SacrificeAnArtifactCost : ICost
 
         var pick = Target ?? player.Zones.Battlefield.GetCards()
             .OfType<Permanent>()
-            .FirstOrDefault(p => p.HasType(CardType.Artifact)
-                              && (_excludeSource == null || !ReferenceEquals(p, _excludeSource)));
+            .FirstOrDefault(IsEligible);
 
         if (pick == null)
             throw new InvalidOperationException(
