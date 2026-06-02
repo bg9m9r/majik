@@ -400,6 +400,10 @@ public enum CardSubtype
     /// (Mirrodin Besieged) and the rest of the Tezzeret lineage. CR 205.3m.</summary>
     Tezzeret,
 
+    /// <summary>Vivien planeswalker subtype — Vivien Reid (Core Set 2019)
+    /// and the rest of the Vivien lineage. CR 205.3m.</summary>
+    Vivien,
+
     /// <summary>Samurai creature subtype — Kamigawa-block warriors plus the
     /// 2/2 white Samurai token created by The Wandering Emperor's −1.
     /// CR 205.3m.</summary>
