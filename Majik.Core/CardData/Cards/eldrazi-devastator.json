@@ -1,0 +1,9 @@
+{
+  "name": "Eldrazi Devastator",
+  "types": ["Creature"],
+  "subtypes": ["Eldrazi"],
+  "manaCost": "{8}",
+  "power": 8,
+  "toughness": 9,
+  "abilities": []
+}
