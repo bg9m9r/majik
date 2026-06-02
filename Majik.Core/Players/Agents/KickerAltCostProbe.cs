@@ -104,6 +104,7 @@ public sealed class KickerAltCostProbe : IAlternativeCostProbe
             "Consult the Star Charts" => ManaCost.Parse("{1}{U}"),
             "Sea Gate Stormcaller" => ManaCost.Parse("{4}{U}"),
             "Scourge of the Skyclaves" => ManaCost.Parse("{4}{B}"),
+            "Tourach, Dread Cantor" => ManaCost.Parse("{B}{B}"),
             _ => null,
         };
     }

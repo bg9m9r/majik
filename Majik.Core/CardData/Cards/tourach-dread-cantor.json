@@ -1,0 +1,10 @@
+{
+  "name": "Tourach, Dread Cantor",
+  "supertypes": ["Legendary"],
+  "types": ["Creature"],
+  "subtypes": ["Human", "Cleric"],
+  "manaCost": "{1}{B}",
+  "power": 2,
+  "toughness": 1,
+  "abilities": []
+}
