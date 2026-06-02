@@ -391,6 +391,9 @@ public enum CardSubtype
     Grist,
     Jace,
     Liliana,
+    /// <summary>Sorin planeswalker subtype — Sorin, Imperious Bloodlord;
+    /// Sorin, Lord of Innistrad. CR 205.3m.</summary>
+    Sorin,
     Nahiri,
     Narset,
     Garruk,
