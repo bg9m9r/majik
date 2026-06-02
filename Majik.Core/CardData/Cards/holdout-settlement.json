@@ -1,0 +1,7 @@
+{
+  "name": "Holdout Settlement",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "C" }
+  ]
+}
