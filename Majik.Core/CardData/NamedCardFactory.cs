@@ -57,6 +57,14 @@ public static partial class NamedCardFactory
             "Wastes"   => Land(name, CardSubtype.Wastes),
 
             // A few common vanilla creatures the test suite relies on.
+            // Grizzly Bears / Runeclaw Bear / Hill Giant ALSO have real
+            // [CardName] factories (GrizzlyBearsFactory etc.), but they are
+            // kept here AND in ImplementedCardNames.InlineFallbackNames on
+            // purpose: that keeps HasRealFactory() returning false for them,
+            // so GameFacade does NOT do its "instance swap" rebuild for these
+            // shells (which would replace a directly-constructed test
+            // Creature with a JSON-built one mid-cast). Same posture as the
+            // merged HillGiantFactory PR — see that factory's doc comment.
             "Grizzly Bears"   => new Creature(name, "1G", 2, 2),
             "Runeclaw Bear"   => new Creature(name, "1G", 2, 2),
             "Hill Giant"      => new Creature(name, "3R", 3, 3),
