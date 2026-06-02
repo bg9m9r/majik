@@ -1,0 +1,5 @@
+{
+  "name": "Repeal",
+  "types": ["Instant"],
+  "manaCost": "{X}{U}"
+}
