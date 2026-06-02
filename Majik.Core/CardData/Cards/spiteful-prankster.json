@@ -1,0 +1,8 @@
+{
+  "name": "Spiteful Prankster",
+  "types": ["Creature"],
+  "subtypes": ["Devil"],
+  "manaCost": "{2}{R}",
+  "power": 3,
+  "toughness": 2
+}
