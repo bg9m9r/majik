@@ -1,0 +1,7 @@
+{
+  "name": "Rancor",
+  "types": ["Enchantment"],
+  "subtypes": ["Aura"],
+  "manaCost": "{G}",
+  "colors": ["G"]
+}
