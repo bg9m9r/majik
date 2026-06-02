@@ -1,0 +1,8 @@
+{
+  "name": "Academy Ruins",
+  "types": ["Land"],
+  "supertypes": ["Legendary"],
+  "abilities": [
+    { "kind": "mana", "produces": "C" }
+  ]
+}
