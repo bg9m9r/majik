@@ -206,6 +206,31 @@ public class ActionValidator
                     $"Noncreature spells with mana value {manaValue} can't be cast (Sanctum Prelate)",
                     new RuleViolation("601.3", "noncreature mana-value cast restriction"));
             }
+
+            // CR 601.3 — noncreature-spell "mana value N or greater" block
+            // (Gaddock Teeg: "Noncreature spells with mana value 4 or greater
+            // can't be cast."). Same noncreature gating + MV (printed MV +
+            // chosen X, CR 202.3b) computation as the exact-value Sanctum
+            // Prelate rail above; the registry rail tests the >= threshold.
+            if (CastingRestrictions.IsNoncreatureManaValueAtLeastBlocked(manaValue))
+            {
+                return ValidationResult.Invalid(
+                    $"Noncreature spells with mana value {manaValue} can't be cast (Gaddock Teeg / mana-value-or-greater block)",
+                    new RuleViolation("601.3", "noncreature mana-value-or-greater cast restriction"));
+            }
+
+            // CR 601.3 — noncreature-spell "{X} in their mana costs" block
+            // (Gaddock Teeg: "Noncreature spells with {X} in their mana costs
+            // can't be cast."). Tests the printed cost for the {X} symbol
+            // (CR 107.3 — Card.ManaCostValue.HasX), independent of the chosen X
+            // value, and only for noncreature spells.
+            if (mvCard.ManaCostValue.HasX
+                && CastingRestrictions.IsNoncreatureXCostBlocked())
+            {
+                return ValidationResult.Invalid(
+                    $"Noncreature spells with {{X}} in their mana costs can't be cast (Gaddock Teeg)",
+                    new RuleViolation("601.3", "noncreature X-cost cast restriction"));
+            }
         }
 
         // CR 601.3 — turn-scoped additional-spell cap (Irencrag Feat:

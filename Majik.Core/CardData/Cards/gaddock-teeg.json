@@ -1,0 +1,10 @@
+{
+  "name": "Gaddock Teeg",
+  "supertypes": ["Legendary"],
+  "types": ["Creature"],
+  "subtypes": ["Kithkin", "Advisor"],
+  "manaCost": "{G}{W}",
+  "power": 2,
+  "toughness": 2,
+  "abilities": []
+}

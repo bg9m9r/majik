@@ -120,6 +120,24 @@ public static class CastingRestrictions
         // and from the total CannotCastAnySpellEntries rail (Grand Abolisher):
         // this rail gates on even parity across every spell type.
         internal readonly List<(object Token, Player Player)> EvenManaValueCastBlocks = new();
+        // CR 601.3 — "noncreature spells with mana value N or greater can't be
+        // cast" rail (Gaddock Teeg: "Noncreature spells with mana value 4 or
+        // greater can't be cast."). Stored as (token, threshold) entries; a
+        // noncreature spell is blocked while its mana value is >= at least one
+        // registered threshold. Global / symmetric — applies to every player's
+        // noncreature spells (gating to noncreature is ActionValidator's
+        // responsibility). Distinct from the exact-single-value
+        // NoncreatureManaValueBlocks rail (Sanctum Prelate): this rail blocks an
+        // open-ended "N or greater" band rather than one fixed value.
+        internal readonly List<(object Token, int Threshold)> NoncreatureManaValueAtLeastBlocks = new();
+        // CR 601.3 — "noncreature spells with {X} in their mana costs can't be
+        // cast" rail (Gaddock Teeg: "Noncreature spells with {X} in their mana
+        // costs can't be cast."). Stored as a flat list of source tokens; a
+        // noncreature spell whose printed mana cost contains the {X} symbol
+        // (CR 107.3) is blocked while at least one entry is registered. Global /
+        // symmetric; gating to noncreature spells and the {X}-in-cost test are
+        // ActionValidator's responsibility.
+        internal readonly List<object> NoncreatureXCostBlocks = new();
         // CR 701.5b — "The next spell you cast this turn can't be countered."
         // One-shot per-player flag: consumed (cleared) on the first spell the
         // registered player casts. Distinct from the all-turn uncounterable rail
@@ -846,6 +864,126 @@ public static class CastingRestrictions
         }
     }
 
+    /// <summary>
+    /// Register a "noncreature spells with mana value
+    /// <paramref name="threshold"/> or greater can't be cast" restriction
+    /// (CR 601.3 — Gaddock Teeg: "Noncreature spells with mana value 4 or
+    /// greater can't be cast."), keyed by <paramref name="token"/>. Idempotent
+    /// for the same (token, threshold) pair. Global / symmetric: applies to
+    /// every player's noncreature spells (gating to noncreature is
+    /// <see cref="ActionValidator"/>'s responsibility — it only consults
+    /// <see cref="IsNoncreatureManaValueAtLeastBlocked"/> for non-creature
+    /// cards). Removed when the source permanent leaves the battlefield via
+    /// <see cref="RemoveNoncreatureManaValueAtLeastBlock"/>.
+    /// </summary>
+    public static void AddNoncreatureManaValueAtLeastBlock(object token, int threshold)
+    {
+        ArgumentNullException.ThrowIfNull(token);
+        if (threshold < 0) return;
+        var store = Current;
+        lock (store.Gate)
+        {
+            foreach (var entry in store.NoncreatureManaValueAtLeastBlocks)
+            {
+                if (ReferenceEquals(entry.Token, token) && entry.Threshold == threshold)
+                {
+                    return;
+                }
+            }
+            store.NoncreatureManaValueAtLeastBlocks.Add((token, threshold));
+        }
+    }
+
+    /// <summary>
+    /// Remove every noncreature-mana-value-at-least block registered under
+    /// <paramref name="token"/>. Used when the source permanent (Gaddock Teeg)
+    /// leaves the battlefield. Scoped by token, so removing one source does not
+    /// tear down blocks contributed by other sources.
+    /// </summary>
+    public static void RemoveNoncreatureManaValueAtLeastBlock(object token)
+    {
+        ArgumentNullException.ThrowIfNull(token);
+        var store = Current;
+        lock (store.Gate)
+        {
+            store.NoncreatureManaValueAtLeastBlocks.RemoveAll(e => ReferenceEquals(e.Token, token));
+        }
+    }
+
+    /// <summary>
+    /// True if at least one registered block currently prevents casting a
+    /// noncreature spell with mana value <paramref name="manaValue"/> by virtue
+    /// of an "N or greater" threshold (CR 601.3 — Gaddock Teeg). The caller
+    /// (<see cref="ActionValidator"/>) is responsible for gating this check to
+    /// noncreature spells.
+    /// </summary>
+    public static bool IsNoncreatureManaValueAtLeastBlocked(int manaValue)
+    {
+        var store = Current;
+        lock (store.Gate)
+        {
+            foreach (var entry in store.NoncreatureManaValueAtLeastBlocks)
+            {
+                if (manaValue >= entry.Threshold) return true;
+            }
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Register a "noncreature spells with {X} in their mana costs can't be
+    /// cast" restriction (CR 601.3 — Gaddock Teeg: "Noncreature spells with
+    /// {X} in their mana costs can't be cast."), keyed by
+    /// <paramref name="token"/>. Idempotent for the same token. Global /
+    /// symmetric: applies to every player's noncreature spells (gating to
+    /// noncreature spells and the {X}-in-cost test are
+    /// <see cref="ActionValidator"/>'s responsibility). Removed when the source
+    /// permanent leaves the battlefield via
+    /// <see cref="RemoveNoncreatureXCostBlock"/>.
+    /// </summary>
+    public static void AddNoncreatureXCostBlock(object token)
+    {
+        ArgumentNullException.ThrowIfNull(token);
+        var store = Current;
+        lock (store.Gate)
+        {
+            foreach (var entry in store.NoncreatureXCostBlocks)
+            {
+                if (ReferenceEquals(entry, token)) return;
+            }
+            store.NoncreatureXCostBlocks.Add(token);
+        }
+    }
+
+    /// <summary>
+    /// Remove the noncreature-{X}-cost block registered under
+    /// <paramref name="token"/>. Used when the source permanent (Gaddock Teeg)
+    /// leaves the battlefield. Scoped by token, so removing one source does not
+    /// tear down blocks contributed by other sources.
+    /// </summary>
+    public static void RemoveNoncreatureXCostBlock(object token)
+    {
+        ArgumentNullException.ThrowIfNull(token);
+        var store = Current;
+        lock (store.Gate)
+        {
+            store.NoncreatureXCostBlocks.RemoveAll(e => ReferenceEquals(e, token));
+        }
+    }
+
+    /// <summary>
+    /// True if at least one registered block currently prevents casting any
+    /// noncreature spell that has {X} in its mana cost (CR 601.3 — Gaddock
+    /// Teeg). The caller (<see cref="ActionValidator"/>) is responsible for
+    /// gating this check to noncreature spells and for testing whether the
+    /// candidate spell's cost contains {X}.
+    /// </summary>
+    public static bool IsNoncreatureXCostBlocked()
+    {
+        var store = Current;
+        lock (store.Gate) return store.NoncreatureXCostBlocks.Count > 0;
+    }
+
     /// <summary>Reset the active store. Test-only.</summary>
     public static void Clear()
     {
@@ -862,6 +1000,8 @@ public static class CastingRestrictions
             store.GlobalCastZoneBlocks.Clear();
             store.CannotCastAnySpellEntries.Clear();
             store.EvenManaValueCastBlocks.Clear();
+            store.NoncreatureManaValueAtLeastBlocks.Clear();
+            store.NoncreatureXCostBlocks.Clear();
             store.NextSpellUncounterable.Clear();
             store.MaxAdditionalSpells.Clear();
         }
