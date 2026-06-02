@@ -1,0 +1,9 @@
+{
+  "name": "Kazandu Mammoth",
+  "types": ["Creature"],
+  "subtypes": ["Elephant"],
+  "manaCost": "{1}{G}{G}",
+  "power": 3,
+  "toughness": 3,
+  "abilities": []
+}
