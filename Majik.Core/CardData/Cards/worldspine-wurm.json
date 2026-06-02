@@ -1,0 +1,9 @@
+{
+  "name": "Worldspine Wurm",
+  "types": ["Creature"],
+  "subtypes": ["Wurm"],
+  "manaCost": "{8}{G}{G}{G}",
+  "power": 15,
+  "toughness": 15,
+  "abilities": []
+}
