@@ -1,0 +1,7 @@
+{
+  "name": "Sticky Fingers",
+  "types": ["Enchantment"],
+  "subtypes": ["Aura"],
+  "manaCost": "{R}",
+  "colors": ["R"]
+}
