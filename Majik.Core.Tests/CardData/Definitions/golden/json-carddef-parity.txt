@@ -10060,6 +10060,57 @@
     "Red"
   ]
 }
+==== hired-claw ====
+{
+  "name": "Hired Claw",
+  "manaCost": "{R}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Lizard",
+    "Mercenary"
+  ],
+  "power": 1,
+  "toughness": 1,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Red"
+  ]
+}
 ==== honor-of-the-pure ====
 {
   "name": "Honor of the Pure",
