@@ -1,0 +1,9 @@
+{
+  "name": "Lovestruck Beast",
+  "types": ["Creature"],
+  "subtypes": ["Beast", "Noble"],
+  "manaCost": "{2}{G}",
+  "power": 5,
+  "toughness": 5,
+  "abilities": []
+}
