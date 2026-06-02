@@ -1,0 +1,5 @@
+{
+  "name": "Jeskai Charm",
+  "types": ["Instant"],
+  "manaCost": "{U}{R}{W}"
+}
