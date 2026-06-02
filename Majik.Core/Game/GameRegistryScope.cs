@@ -15,6 +15,7 @@ namespace Majik.Core.Game;
 /// <see cref="CastingRestrictions"/>, <see cref="UntapStepRestrictions"/>,
 /// <see cref="FlashGrantRegistry"/>, <see cref="IndestructibleGrantRegistry"/>,
 /// <see cref="SkipDrawRegistry"/>, <see cref="PlayerStaticAbilities"/>,
+/// <see cref="LibraryTopPlayPermissions"/>,
 /// <see cref="ActivatedAbilityRestrictions"/> and
 /// <see cref="ControlPlayerRegistryProvider"/> — for the duration of a game's
 /// run.
@@ -60,6 +61,7 @@ public static class GameRegistryScope
             IndestructibleGrantRegistry.PushScope(),
             SkipDrawRegistry.PushScope(),
             PlayerStaticAbilities.PushScope(),
+            LibraryTopPlayPermissions.PushScope(),
             ActivatedAbilityRestrictions.PushScope(),
             ControlPlayerRegistryProvider.PushScope(),
         };

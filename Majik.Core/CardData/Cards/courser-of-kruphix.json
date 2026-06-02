@@ -1,0 +1,9 @@
+{
+  "name": "Courser of Kruphix",
+  "types": ["Creature", "Enchantment"],
+  "subtypes": ["Centaur"],
+  "manaCost": "{1}{G}{G}",
+  "power": 2,
+  "toughness": 4,
+  "abilities": []
+}

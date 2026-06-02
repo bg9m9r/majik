@@ -157,6 +157,21 @@ public sealed class HeuristicBotAgent : IPlayerAgent
         var land = ctx.Self.Zones.Hand.GetCards()
             .FirstOrDefault(c => c.HasType(CardType.Land)
                 && !_failedThisTurn.Contains(c.InstanceId));
+
+        // CR 601.3e / CR 305.6 — Courser of Kruphix / Augur of Autumn / Oracle
+        // of Mul Daya grant "you may play lands from the top of your library".
+        // When no hand land is available, fall back to the top library card if
+        // an active grant makes it a legal land play. Played from the library;
+        // still consumes the CR 305.2 land drop via the loop's LandDropTracker.
+        if (land == null)
+        {
+            var topLand = Rules.LibraryTopPlayPermissions.PlayableLandFromTop(ctx.Self);
+            if (topLand != null && !_failedThisTurn.Contains(topLand.InstanceId))
+            {
+                land = topLand;
+            }
+        }
+
         if (land == null) return null;
         _lastProposed = land.InstanceId;
         return new PriorityAction.PlayLand(land);
