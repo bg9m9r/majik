@@ -26296,6 +26296,56 @@
   "mdfc": null,
   "colors": []
 }
+==== sunbond ====
+{
+  "name": "Sunbond",
+  "manaCost": "{3}{W}",
+  "primaryType": "Enchantment",
+  "cardTypes": [
+    "Enchantment"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Aura"
+  ],
+  "power": null,
+  "toughness": null,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "White"
+  ]
+}
 ==== sundown-pass ====
 {
   "name": "Sundown Pass",

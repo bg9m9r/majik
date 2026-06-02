@@ -1,0 +1,7 @@
+{
+  "name": "Sunbond",
+  "types": ["Enchantment"],
+  "subtypes": ["Aura"],
+  "manaCost": "{3}{W}",
+  "colors": ["W"]
+}
