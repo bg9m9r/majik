@@ -21770,7 +21770,10 @@
     "Land"
   ],
   "supertypes": [],
-  "subtypes": [],
+  "subtypes": [
+    "Island",
+    "Swamp"
+  ],
   "power": null,
   "toughness": null,
   "loyalty": null,
