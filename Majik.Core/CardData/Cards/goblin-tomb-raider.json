@@ -1,0 +1,8 @@
+{
+  "name": "Goblin Tomb Raider",
+  "types": ["Creature"],
+  "subtypes": ["Goblin", "Pirate"],
+  "manaCost": "{R}",
+  "power": 1,
+  "toughness": 2
+}
