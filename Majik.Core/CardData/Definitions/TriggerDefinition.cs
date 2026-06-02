@@ -21,6 +21,7 @@ namespace Majik.Core.CardData.Definitions;
 [JsonDerivedType(typeof(AtBeginningOfYourEndStepTriggerDef), "at_beginning_of_your_end_step")]
 [JsonDerivedType(typeof(WheneverAnotherCreatureEntersTriggerDef), "whenever_another_creature_enters")]
 [JsonDerivedType(typeof(DealsCombatDamageToPlayerSelfTriggerDef), "whenever_this_deals_combat_damage_to_a_player")]
+[JsonDerivedType(typeof(WheneverACreatureYouControlExploresTriggerDef), "whenever_a_creature_you_control_explores")]
 public abstract class TriggerDefinition
 {
     /// <summary>
@@ -199,3 +200,18 @@ public sealed class WheneverAnotherCreatureEntersTriggerDef : TriggerDefinition
 /// source is always the card the ability lives on.
 /// </summary>
 public sealed class DealsCombatDamageToPlayerSelfTriggerDef : TriggerDefinition { }
+
+/// <summary>
+/// "Whenever a creature you control explores, …" (CR 701.40e). Fires on a
+/// <see cref="Majik.Core.Events.CreatureExploredEvent"/> whose
+/// <see cref="Majik.Core.Events.CreatureExploredEvent.Controller"/> is the
+/// trigger's controller (CR 109.5 — "a creature you control"; the controller is
+/// resolved live so a control change carries the trigger). The exploring
+/// permanent itself counts ("a creature you control" includes the source if it
+/// explores). Maps to an
+/// <see cref="Majik.Core.Abilities.EventTriggerCondition{TEvent}"/> with the
+/// live-controller predicate — the SAME condition the hand-rolled Wildgrowth
+/// Walker factory uses ("Whenever a creature you control explores, put a +1/+1
+/// counter on this creature and you gain 3 life"). No extra fields.
+/// </summary>
+public sealed class WheneverACreatureYouControlExploresTriggerDef : TriggerDefinition { }

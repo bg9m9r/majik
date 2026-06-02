@@ -1,0 +1,5 @@
+{
+  "name": "Get Lost",
+  "types": ["Instant"],
+  "manaCost": "{1}{W}"
+}

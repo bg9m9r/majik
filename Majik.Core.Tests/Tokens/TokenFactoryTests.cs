@@ -188,4 +188,102 @@ public class TokenFactoryTests
         alice.Zones.Battlefield.GetCards().Should().NotContain(blood);
         alice.Zones.Graveyard.GetCards().Should().Contain(blood);
     }
+
+    // ── Map token (CR 111.10 / CR 701.40 — The Lost Caverns of Ixalan) ───────
+
+    [Fact]
+    public void CreateMap_PutsColorlessArtifactTokenOnBattlefield_WithMapSubtype()
+    {
+        var map = TokenFactory.CreateMap(_alice, _zones);
+
+        map.Should().NotBeNull();
+        map.IsToken.Should().BeTrue();
+        map.HasType(CardType.Artifact).Should().BeTrue();
+        map.Subtypes.Should().Contain(CardSubtype.Map);
+        map.Zone.Should().Be(ZoneType.Battlefield);
+        Majik.Core.Cards.CardColors.GetColors(map).Should().BeEmpty(
+            "CR 111.10 — Map tokens are colourless artifacts");
+    }
+
+    [Fact]
+    public void CreateMap_HasSorcerySpeedExploreAbility_ManaTapSac_OneTarget()
+    {
+        var map = TokenFactory.CreateMap(_alice);
+
+        var ability = map.Abilities.OfType<ActivatedAbility>().Single();
+        ability.Costs.Should().HaveCount(3, "{1} mana + tap + sacrifice");
+        ability.IsSorcerySpeed.Should().BeTrue(
+            "'Activate only as a sorcery' (CR 117.1a / 307.5)");
+        ability.TargetRequests.Should().ContainSingle();
+        ability.TargetRequests[0].MinTargets.Should().Be(1);
+        ability.TargetRequests[0].MaxTargets.Should().Be(1);
+        ability.TargetRequests[0].Description.Should().Contain("creature you control");
+    }
+
+    [Fact]
+    public void CreateMap_ExploreAbility_TargetExplores_AndMapIsSacrificed()
+    {
+        var agent = new Majik.Core.Players.Agents.ScriptedAgent();
+        agent.QueueExploreKeepOnTop(true);
+        Majik.Core.Players.Agents.AgentRegistry.Set(_alice, agent);
+        Majik.Core.Services.ZoneServiceRegistry.Set(_alice, _zones);
+        Majik.Core.Events.EventBusRegistry.Set(_alice, _bus);
+        try
+        {
+            // Non-land on top → +1/+1 counter on the explorer (CR 701.40c).
+            var spell = new Creature("Big", "{G}", 3, 3);
+            _alice.Zones.Library.AddCard(spell);
+            spell.SetZone(ZoneType.Library);
+
+            var target = new Creature("Scout", "{G}", 1, 1) { Owner = _alice, Controller = _alice };
+            _zones.MoveCardTo(target, ZoneType.Battlefield, _alice);
+
+            var map = TokenFactory.CreateMap(_alice, _zones);
+            var ability = map.Abilities.OfType<ActivatedAbility>().Single();
+            ability.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { target } });
+
+            ability.Resolve();
+
+            target.Counters.Count(Majik.Core.Counters.CounterType.PlusOnePlusOne).Should()
+                .Be(1, "CR 701.40c — the +1/+1 counter lands on the exploring target");
+            map.Zone.Should().Be(ZoneType.Graveyard, "Sacrifice this token");
+            _alice.Zones.Battlefield.GetCards().Should().NotContain(map);
+        }
+        finally
+        {
+            Majik.Core.Players.Agents.AgentRegistry.Clear();
+            Majik.Core.Services.ZoneServiceRegistry.Clear();
+            Majik.Core.Events.EventBusRegistry.Clear();
+        }
+    }
+
+    [Fact]
+    public void CreateMap_ExploreAbility_LandOnTop_GoesToHand_AndMapSacrificed()
+    {
+        Majik.Core.Services.ZoneServiceRegistry.Set(_alice, _zones);
+        try
+        {
+            var land = new Land("Forest") { Owner = _alice };
+            _alice.Zones.Library.AddCard(land);
+            land.SetZone(ZoneType.Library);
+
+            var target = new Creature("Scout", "{G}", 1, 1) { Owner = _alice, Controller = _alice };
+            _zones.MoveCardTo(target, ZoneType.Battlefield, _alice);
+
+            var map = TokenFactory.CreateMap(_alice, _zones);
+            var ability = map.Abilities.OfType<ActivatedAbility>().Single();
+            ability.SetChosenTargets(new IReadOnlyList<object>[] { new object[] { target } });
+
+            ability.Resolve();
+
+            _alice.Zones.Hand.GetCards().Should().Contain(land,
+                "CR 701.40b — a revealed land goes to the controller's hand");
+            target.Counters.Count(Majik.Core.Counters.CounterType.PlusOnePlusOne).Should().Be(0);
+            map.Zone.Should().Be(ZoneType.Graveyard);
+        }
+        finally
+        {
+            Majik.Core.Services.ZoneServiceRegistry.Clear();
+        }
+    }
 }

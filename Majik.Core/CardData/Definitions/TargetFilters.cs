@@ -160,6 +160,15 @@ public static class TargetFilters
             "enchantment" =>
                 ($"target enchantment to {verb}",
                     o => o is Permanent p && OnBattlefield(p) && p.HasType(CardType.Enchantment)),
+            // CR 109.5 — Get Lost's "creature, enchantment, or planeswalker"
+            // (any one of the three types). Both the candidate gatherer and the
+            // CR 608.2b resolution re-check apply the OR predicate.
+            "creature_enchantment_or_planeswalker" =>
+                ($"target creature, enchantment, or planeswalker to {verb}",
+                    o => o is Permanent p && OnBattlefield(p)
+                         && (p.HasType(CardType.Creature)
+                             || p.HasType(CardType.Enchantment)
+                             || p.HasType(CardType.Planeswalker))),
             // Conditional battlefield filters — the description is verbatim so
             // converted factories keep their printed-text TargetRequest wording.
             // The predicate also gates resolution (CR 608.2b) via Matches, so a

@@ -298,6 +298,37 @@ public static class TokenFactory
         return token;
     }
 
+    /// <summary>Map (CR 111.10 / The Lost Caverns of Ixalan): colourless
+    /// artifact token with "{1}, {T}, Sacrifice this token: Target creature you
+    /// control explores. Activate only as a sorcery." (CR 701.40). Produced by
+    /// Get Lost (two Maps), Sentinel of the Nameless City, Spyglass Siren,
+    /// Cenote Scout's neighbours, Amalia Benavides Aguirre, etc. Bound as a
+    /// single sorcery-speed activated ability ({1} mana + {T} tap +
+    /// sacrifice-self) targeting a creature the activating player controls; on
+    /// resolution that creature explores via the shared
+    /// <see cref="Majik.Core.Keywords.ExploreAction.ExploreAsync"/> primitive
+    /// (PR #2237) — the same body the ETB-explore family runs.</summary>
+    public static Artifact CreateMap(Player controller, ZoneService? zones = null)
+    {
+        if (controller == null) throw new ArgumentNullException(nameof(controller));
+        var token = new Artifact("Map", "",
+            subtypes: new[] { CardSubtype.Map })
+        {
+            Owner = controller,
+            Controller = controller,
+            IsToken = true,
+        };
+        // CR 111.10 — Map tokens are colourless artifacts.
+        token.SetTokenColors(Array.Empty<ManaColor>());
+
+        // {1}, {T}, Sacrifice this token: Target creature you control explores.
+        // Activate only as a sorcery.
+        token.AddAbility(BuildMapExploreAbility(token, controller));
+
+        PutOnBattlefield(token, controller, zones);
+        return token;
+    }
+
     /// <summary>Powerstone (CR 111.10 / The Brothers' War): colourless
     /// artifact token with "{T}: Add {C}. This mana can't be spent to cast
     /// a nonartifact spell." (Reckoner Bankbuster, Thran Spider, Loran's
@@ -474,6 +505,87 @@ public static class TokenFactory
             }),
         };
         return new ActivatedAbility(source, controller, costs: costs, effects: effects);
+    }
+
+    /// <summary>
+    /// "{1}, {T}, Sacrifice this token: Target creature you control explores.
+    /// Activate only as a sorcery." — Map ability (CR 111.10 / CR 701.40).
+    /// Three costs in declaration order (mana {1}, tap, sacrifice); the
+    /// sacrifice payment is performed inside the effect closure (the generic
+    /// <see cref="AdditionalCost.Sacrifice"/> payment is a no-op stub — same
+    /// posture as Clue / Food / Blood). The effect reads the chosen creature off
+    /// the ability's <see cref="ActivatedAbility.ChosenTargets"/> and explores it
+    /// under its controller via the shared
+    /// <see cref="Majik.Core.Keywords.ExploreAction.ExploreAsync"/> primitive
+    /// (PR #2237); the keep-on-top / graveyard choice (CR 701.40c) consults the
+    /// resolving context's agent (falling back to the registry, then
+    /// keep-on-top) and a <see cref="Majik.Core.Events.CreatureExploredEvent"/>
+    /// is published so explore payoffs fire (CR 701.40e). CR 608.2b — an illegal
+    /// target at resolution fizzles the explore (but the token is still
+    /// sacrificed — the cost was already paid). <c>sorcerySpeed: true</c> carries
+    /// the CR 117.1a / 307.5 "Activate only as a sorcery" timing rider.
+    /// </summary>
+    private static ActivatedAbility BuildMapExploreAbility(Artifact source, Player controller)
+    {
+        var costs = new ICost[]
+        {
+            new ManaCostCost(ValueObjects.ManaCost.Parse("1")),
+            AdditionalCost.Tap(source),
+            AdditionalCost.Sacrifice(source),
+        };
+
+        ActivatedAbility? ability = null;
+        var effect = new Effect(
+            "Map: sacrifice self + target creature you control explores",
+            async ctx =>
+            {
+                // Sacrifice payment — AdditionalCost.Sacrifice is a no-op stub
+                // (Clue / Food / Blood precedent), so route the
+                // battlefield → graveyard move here. CR 701.16 — idempotent
+                // re-entry guard.
+                if (source.Zone == ZoneType.Battlefield)
+                {
+                    controller.Zones.Battlefield.RemoveCard(source);
+                    controller.Zones.Graveyard.AddCard(source);
+                    source.SetZone(ZoneType.Graveyard);
+                }
+
+                // CR 608.2b — read the chosen target; an illegal / absent target
+                // fizzles the explore (the token is already sacrificed).
+                if (ability == null) return;
+                if (ability.ChosenTargets.Count == 0) return;
+                if (ability.ChosenTargets[0].Count == 0) return;
+                if (ability.ChosenTargets[0][0] is not Creature target) return;
+                if (target.Zone != ZoneType.Battlefield) return;
+
+                // CR 701.40a — explore under the exploring permanent's own
+                // controller. The agent / event bus / zone service all default
+                // to their registries (or the resolving context's agent).
+                var explorerController = target.Controller ?? controller;
+                await Majik.Core.Keywords.ExploreAction.ExploreAsync(
+                    creature: target,
+                    controller: explorerController,
+                    agent: ctx.Agent ?? Majik.Core.Players.Agents.AgentRegistry.Get(explorerController),
+                    game: ctx.Game,
+                    replacements: null,
+                    eventBus: null,
+                    zones: ZoneServiceRegistry.Get(explorerController),
+                    ct: ctx.Ct).ConfigureAwait(false);
+            });
+
+        ability = new ActivatedAbility(
+            source: source,
+            controller: controller,
+            costs: costs,
+            effects: new IEffect[] { effect },
+            targetRequests: new[]
+            {
+                Majik.Core.CardData.Definitions.TargetFilters.ToTargetRequest(
+                    "creature_you_control", "explore", BotIntent.Buff),
+            },
+            sorcerySpeed: true);
+
+        return ability;
     }
 
     /// <summary>Move the top card of <paramref name="player"/>'s library to

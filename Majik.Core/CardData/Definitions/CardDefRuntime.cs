@@ -867,9 +867,26 @@ public static class CardDefRuntime
                 BuildAnotherCreatureEntersTrigger(anotherEnters, card),
             DealsCombatDamageToPlayerSelfTriggerDef =>
                 BuildDealsCombatDamageToPlayerSelfTrigger(card),
+            WheneverACreatureYouControlExploresTriggerDef =>
+                BuildWheneverACreatureYouControlExploresTrigger(card),
             _ => throw new NotSupportedException(
                 $"Trigger '{definition.GetType().Name}' is not yet supported by CardDefRuntime."),
         };
+
+    /// <summary>
+    /// CR 701.40e / CR 603.1 — "Whenever a creature you control explores, …".
+    /// Fires on a <see cref="Majik.Core.Events.CreatureExploredEvent"/> whose
+    /// <see cref="Majik.Core.Events.CreatureExploredEvent.Controller"/> is the
+    /// trigger's controller (CR 109.5 — "a creature you control"; resolved live
+    /// so a control change carries the trigger). The same predicate the
+    /// hand-rolled Wildgrowth Walker factory uses.
+    /// </summary>
+    private static ITriggerCondition BuildWheneverACreatureYouControlExploresTrigger(ICard card) =>
+        new EventTriggerCondition<Majik.Core.Events.CreatureExploredEvent>((e, _) =>
+        {
+            var controller = card.Controller;
+            return controller is not null && ReferenceEquals(e.Controller, controller);
+        });
 
     /// <summary>
     /// CR 500.1 / CR 603.1 — "At the beginning of your [step], …". Fires on a
@@ -1066,6 +1083,7 @@ public static class CardDefRuntime
             PreventDamageTargetEffectDef prevent => BuildPreventDamageTargetEffect(prevent, card, replacements, targetRequestIndex),
             GainControlEffectDef control => BuildGainControlEffect(control, card, controller, targetRequestIndex, continuous),
             FightEffectDef fight => BuildFightEffect(fight, card, targetRequestIndex),
+            ExploreTargetEffectDef explore => BuildExploreTargetEffect(explore, card, targetRequestIndex),
             GainLifeSelfEffectDef gain => BuildGainLifeSelfEffect(gain, card, controller),
             LoseLifeSelfEffectDef loseSelf => BuildLoseLifeSelfEffect(loseSelf, card, controller),
             LoseLifeTargetEffectDef lose => BuildLoseLifeTargetEffect(lose, card, targetRequestIndex),
@@ -1236,6 +1254,51 @@ public static class CardDefRuntime
                     Fx.MoveToExile(target);
                 }
                 return ValueTask.CompletedTask;
+            });
+    }
+
+    private static IEffect BuildExploreTargetEffect(
+        ExploreTargetEffectDef def, ICard card, int targetRequestIndex)
+    {
+        // CR 701.40 — the targeted explore verb. Reads the chosen creature off
+        // ChosenTargets at the reserved index and explores it under ITS
+        // controller (CR 701.40a — the exploring permanent's controller reveals
+        // the top card; the +1/+1 counter, if any, lands on the exploring
+        // creature). The keep-on-top / graveyard choice (CR 701.40c) consults the
+        // resolving context's agent (falling back to the registry, then
+        // keep-on-top); a CreatureExploredEvent is published afterwards so
+        // "Whenever a creature you control explores" payoffs fire (CR 701.40e).
+        // CR 608.2b — an illegal target at resolution (the chosen creature has
+        // left the battlefield) fizzles cleanly: no explore. The shared
+        // ExploreAction primitive (PR #2237) is the SAME body the ETB-explore
+        // factories (Seekers' Squire / Merfolk Branchwalker) run.
+        var filter = def.TargetFilter;
+        return new Effect(
+            $"{card.Name}: target {filter} explores",
+            async ctx =>
+            {
+                var live = ChosenTargetAt(ctx, targetRequestIndex);
+                if (live is not Creature target
+                    || target.Zone != ZoneType.Battlefield
+                    || !TargetFilters.Matches(filter, target))
+                {
+                    return;
+                }
+
+                // CR 701.40a — explore under the exploring permanent's own
+                // controller (a control change since announcement carries here).
+                var controller = target.Controller;
+                if (controller is null) return;
+
+                await Majik.Core.Keywords.ExploreAction.ExploreAsync(
+                    creature: target,
+                    controller: controller,
+                    agent: ctx.Agent ?? AgentRegistry.Get(controller),
+                    game: ctx.Game,
+                    replacements: null,
+                    eventBus: null,
+                    zones: ZoneServiceRegistry.Get(controller),
+                    ct: ctx.Ct).ConfigureAwait(false);
             });
     }
 
