@@ -1,0 +1,8 @@
+{
+  "name": "Desert of the Mindful",
+  "types": ["Land"],
+  "subtypes": ["Desert"],
+  "abilities": [
+    { "kind": "mana", "produces": "U" }
+  ]
+}
