@@ -1,0 +1,7 @@
+{
+  "name": "Mortuary Mire",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "B" }
+  ]
+}
