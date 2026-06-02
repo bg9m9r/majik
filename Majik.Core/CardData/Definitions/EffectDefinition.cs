@@ -30,6 +30,7 @@ namespace Majik.Core.CardData.Definitions;
 [JsonDerivedType(typeof(DestroyTargetEffectDef), "destroy_target")]
 [JsonDerivedType(typeof(ReturnToHandEffectDef), "return_to_hand")]
 [JsonDerivedType(typeof(UntapTargetEffectDef), "untap_target")]
+[JsonDerivedType(typeof(TapTargetEffectDef), "tap_target")]
 [JsonDerivedType(typeof(PreventDamageTargetEffectDef), "prevent_damage_target")]
 [JsonDerivedType(typeof(GainLifeSelfEffectDef), "gain_life_self")]
 [JsonDerivedType(typeof(MillThenPickFirstMatchingToHandEffectDef), "mill_then_pick_first_matching_to_hand")]
@@ -230,6 +231,34 @@ public sealed class UntapTargetEffectDef : EffectDefinition
     /// <inheritdoc />
     public override Majik.Core.Players.Agents.TargetRequest? ToTargetRequest() =>
         TargetFilters.ToTargetRequest(TargetFilter, "untap");
+}
+
+/// <summary>
+/// "Tap target [filter]" — real targeted effect (CR 701.21a). The mirror of
+/// <see cref="UntapTargetEffectDef"/>: at resolution the effect reads the
+/// chosen permanent off
+/// <see cref="Majik.Core.Abilities.ResolutionContext.ChosenTargets"/> and taps
+/// it via <see cref="Majik.Core.Primitives.Fx.Tap(Majik.Core.Cards.Permanent)"/>.
+/// Tapping an already-tapped permanent is a no-op (CR 701.21b — "taps" with no
+/// effect; <see cref="Majik.Core.Cards.Permanent.Tap"/> is idempotent). CR
+/// 608.2b — an illegal target at resolution (the permanent has left the
+/// battlefield since the ability went on the stack) fizzles cleanly. Mirrors
+/// the existing targeted-effect family exactly — the only new piece is the
+/// declarative schema wiring onto the pre-existing <c>Fx.Tap</c> primitive.
+/// Canonical case: Goldmeadow Harrier — <c>"{W}, {T}: Tap target creature."</c>
+///
+/// <see cref="TargetFilter"/> is the filter string the runtime translates
+/// into a <see cref="Majik.Core.Players.Agents.TargetRequest"/> (e.g.
+/// <c>"creature"</c>, <c>"permanent"</c>).
+/// </summary>
+public sealed class TapTargetEffectDef : EffectDefinition
+{
+    public string TargetFilter { get; set; } = "creature";
+
+    /// <inheritdoc />
+    public override Majik.Core.Players.Agents.TargetRequest? ToTargetRequest() =>
+        TargetFilters.ToTargetRequest(
+            TargetFilter, "tap", Majik.Core.Cards.BotIntent.Removal);
 }
 
 /// <summary>

@@ -331,6 +331,81 @@ public class JsonTargetingEffectsTests
     }
 
     // ------------------------------------------------------------------
+    // Goldmeadow Harrier — tap_target (tap target creature).
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void GoldmeadowHarrier_TapAbility_DeclaresCreatureTargetRequest()
+    {
+        var harrier = (Creature)NamedCardFactory.Create("Goldmeadow Harrier", _alice);
+        var tap = harrier.Abilities.OfType<ActivatedAbility>().Single();
+
+        tap.TargetRequests.Should().HaveCount(1);
+        tap.TargetRequests[0].MinTargets.Should().Be(1);
+        tap.TargetRequests[0].MaxTargets.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task GoldmeadowHarrier_TapsChosenCreature_NotABystander()
+    {
+        var harrier = (Creature)NamedCardFactory.Create("Goldmeadow Harrier", _alice);
+        var tap = harrier.Abilities.OfType<ActivatedAbility>().Single();
+
+        var victim = OnBattlefield(new Creature("Victim", "{G}", 2, 2), _bob);
+        var bystander = OnBattlefield(new Creature("Bystander", "{G}", 2, 2), _bob);
+
+        await ActivateAndResolve(tap, victim);
+
+        victim.IsTapped.Should().BeTrue("the chosen creature is tapped (CR 701.21a)");
+        bystander.IsTapped.Should().BeFalse("only the chosen target is tapped, not a no-op spray");
+    }
+
+    [Fact]
+    public async Task GoldmeadowHarrier_AlreadyTappedTarget_IsANoOp()
+    {
+        var harrier = (Creature)NamedCardFactory.Create("Goldmeadow Harrier", _alice);
+        var tap = harrier.Abilities.OfType<ActivatedAbility>().Single();
+
+        var victim = OnBattlefield(new Creature("Victim", "{G}", 2, 2), _bob);
+        victim.Tap();
+
+        // CR 701.21b — "taps" with no effect; Permanent.Tap is idempotent.
+        await ActivateAndResolve(tap, victim);
+
+        victim.IsTapped.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task GoldmeadowHarrier_NoTarget_FizzlesCleanly()
+    {
+        var harrier = (Creature)NamedCardFactory.Create("Goldmeadow Harrier", _alice);
+        var tap = harrier.Abilities.OfType<ActivatedAbility>().Single();
+
+        var bystander = OnBattlefield(new Creature("Bystander", "{G}", 2, 2), _bob);
+
+        // CR 608.2b — no legal target supplied → the tap fizzles.
+        await ActivateAndResolve(tap, chosen: null);
+
+        bystander.IsTapped.Should().BeFalse();
+    }
+
+    [Fact]
+    public void CreatureFilter_OnlyOffersCreatures()
+    {
+        var creature = OnBattlefield(new Creature("Bear", "{1}{G}", 2, 2), _bob);
+        var artifact = OnBattlefield(new Artifact("Rock", "{2}"), _bob);
+        var ctx = NewContext(new Majik.Core.Stack.Stack(_bus));
+
+        var request = Majik.Core.CardData.Definitions.TargetFilters
+            .ToTargetRequest("creature", "tap");
+        var candidates = request.ResolveCandidates(ctx);
+
+        candidates.Should().Contain(creature);
+        candidates.Should().NotContain(artifact, "a tap-target-creature filter offers no artifacts");
+        candidates.Should().NotContain((object)_alice, "a creature filter offers no players");
+    }
+
+    // ------------------------------------------------------------------
     // TargetFilters — the TargetFilter string → CandidateGatherer translation
     // that drives which objects the agent is offered (CR 608.2b legality).
     // ------------------------------------------------------------------
