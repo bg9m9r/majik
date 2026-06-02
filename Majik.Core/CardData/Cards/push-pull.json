@@ -1,0 +1,6 @@
+{
+  "name": "Push // Pull",
+  "types": ["Sorcery"],
+  "manaCost": "{1}{W/B}",
+  "colors": ["W", "B", "R"]
+}
