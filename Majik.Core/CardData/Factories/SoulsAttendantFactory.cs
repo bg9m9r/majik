@@ -1,10 +1,7 @@
 using Majik.Core.Abilities;
+using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
-using Majik.Core.Cards.Types;
-using Majik.Core.Effects;
-using Majik.Core.Events;
 using Majik.Core.Players;
-using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
 
@@ -15,11 +12,16 @@ namespace Majik.Core.CardData.Factories;
 /// same Scryfall oracle:
 ///   "Whenever another creature enters, you gain 1 life."
 ///
-/// Implementation mirrors <see cref="SoulWardenFactory"/> exactly — kept as a
-/// separate factory (rather than aliased) so the
-/// <c>[CardName]</c> dispatcher table holds the printed-name identity
-/// independently and the Modern Soul Sisters archetype can field both
-/// (max 8 effective Soul Wardens per CR 113 deck rules).
+/// ## Pure-JSON factory (declarative trigger + effect)
+/// Materialised from <c>souls-attendant.json</c> via the same declarative
+/// <c>whenever_another_creature_enters</c> trigger + <c>gain_life_self</c>
+/// effect as <see cref="SoulWardenFactory"/> — kept as a separate factory
+/// (rather than aliased) so the <c>[CardName]</c> dispatcher table holds the
+/// printed-name identity independently and the Modern Soul Sisters archetype
+/// can field both.
+///
+/// Adding this <c>[CardName]</c> factory flips <c>IsImplemented</c> on
+/// automatically via <see cref="ImplementedCardNames"/> — no seed regen.
 /// </summary>
 [CardName("Soul's Attendant")]
 public static class SoulsAttendantFactory
@@ -29,6 +31,12 @@ public static class SoulsAttendantFactory
     public const int Power = 1;
     public const int Toughness = 1;
     public const int LifeGainAmount = 1;
+
+    /// <summary>JSON slug for the embedded card definition.</summary>
+    public const string Slug = "souls-attendant";
+
+    private static readonly CardDefinition Definition =
+        CardDefinitionLoader.FromEmbeddedResource(Slug);
 
     /// <summary>
     /// Construct Soul's Attendant with no live <see cref="TriggerManager"/>
@@ -45,41 +53,21 @@ public static class SoulsAttendantFactory
     {
         ArgumentNullException.ThrowIfNull(owner);
 
-        var card = new Creature(
-            name: CardName,
-            manaCost: PrintedManaCost,
-            power: Power,
-            toughness: Toughness,
-            subtypes: new[] { CardSubtype.Human, CardSubtype.Cleric });
+        var built = CardDefinitionFactory.Build(Definition, owner);
+        if (built is not Creature card)
+        {
+            throw new InvalidOperationException(
+                $"Expected '{CardName}' to materialise as a Creature but got "
+                + $"'{built.GetType().Name}'.");
+        }
 
-        card.SetOwner(owner);
-        card.SetController(owner);
-
-        // ----------------------------------------------------------------
-        // ETB-other-creature trigger — CR 603.6a / CR 119.3.
-        // Identical predicate + effect shape as Soul Warden — see
-        // SoulWardenFactory for the canonical commentary.
-        // ----------------------------------------------------------------
-        var lifegainEffect = new Effect(
-            $"{CardName}: controller gains {LifeGainAmount} life",
-            () =>
+        if (triggers != null)
+        {
+            foreach (var trigger in card.Abilities.OfType<TriggeredAbility>())
             {
-                var controller = card.Controller ?? owner;
-                controller.GainLife(LifeGainAmount);
-            });
-
-        var etbOtherCreatureTrigger = new TriggeredAbility(
-            source: card,
-            controller: owner,
-            condition: new EventTriggerCondition<CardMovedEvent>((e, _) =>
-                e.ToZone == ZoneType.Battlefield
-                && e.Card.HasType(CardType.Creature)
-                && !ReferenceEquals(e.Card, card)),
-            effects: new IEffect[] { lifegainEffect },
-            activeZones: new[] { ZoneType.Battlefield });
-
-        card.AddAbility(etbOtherCreatureTrigger);
-        triggers?.RegisterTriggeredAbility(etbOtherCreatureTrigger);
+                triggers.RegisterTriggeredAbility(trigger);
+            }
+        }
 
         return card;
     }

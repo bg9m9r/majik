@@ -17,6 +17,10 @@ namespace Majik.Core.CardData.Definitions;
 [JsonDerivedType(typeof(WheneverYouCastSpellTriggerDef), "whenever_you_cast_spell")]
 [JsonDerivedType(typeof(AttacksSelfTriggerDef), "attacks_self")]
 [JsonDerivedType(typeof(DiesSelfTriggerDef), "dies_self")]
+[JsonDerivedType(typeof(AtBeginningOfYourUpkeepTriggerDef), "at_beginning_of_your_upkeep")]
+[JsonDerivedType(typeof(AtBeginningOfYourEndStepTriggerDef), "at_beginning_of_your_end_step")]
+[JsonDerivedType(typeof(WheneverAnotherCreatureEntersTriggerDef), "whenever_another_creature_enters")]
+[JsonDerivedType(typeof(DealsCombatDamageToPlayerSelfTriggerDef), "whenever_this_deals_combat_damage_to_a_player")]
 public abstract class TriggerDefinition
 {
     /// <summary>
@@ -131,3 +135,67 @@ public sealed class DiesSelfTriggerDef : TriggerDefinition
     /// <inheritdoc />
     public override IReadOnlyList<ZoneType>? ActiveZones => BattlefieldAndGraveyard;
 }
+
+/// <summary>
+/// "At the beginning of your upkeep, …" (CR 500.1 / CR 603.1) — a phase /
+/// step trigger over <see cref="Majik.Core.Events.StepStartedEvent"/>
+/// restricted to the trigger controller's own <c>Upkeep</c> step. Maps to
+/// <see cref="Majik.Core.Abilities.Triggers.OnStepBegin"/> with
+/// <see cref="Majik.Core.StateMachine.PhaseStateType.Upkeep"/>. Controller is
+/// resolved live (<c>card.Controller</c>) at fire time so a control change
+/// carries the trigger (CR 109.5 — same posture as the other declarative
+/// variants). No extra fields. Models the Phyrexian Arena / Dark Confidant /
+/// Howling Mine "your-upkeep" family.
+/// </summary>
+public sealed class AtBeginningOfYourUpkeepTriggerDef : TriggerDefinition { }
+
+/// <summary>
+/// "At the beginning of your end step, …" (CR 513.1 / CR 603.1) — a phase /
+/// step trigger over <see cref="Majik.Core.Events.StepStartedEvent"/>
+/// restricted to the trigger controller's own <c>End</c> step. Maps to
+/// <see cref="Majik.Core.Abilities.Triggers.OnStepBegin"/> with
+/// <see cref="Majik.Core.StateMachine.PhaseStateType.End"/>. Controller is
+/// resolved live (CR 109.5). No extra fields. Models the Wedding Announcement /
+/// Bonecrusher Giant-token / end-step-payoff family.
+/// </summary>
+public sealed class AtBeginningOfYourEndStepTriggerDef : TriggerDefinition { }
+
+/// <summary>
+/// "Whenever another creature enters, …" (CR 603.6e) — fires on a creature
+/// OTHER than this permanent entering the battlefield, over
+/// <see cref="Majik.Core.Events.CardMovedEvent"/>. The "another creature"
+/// self-exclusion is what distinguishes it from the ETB-self variant.
+///
+/// <para>
+/// Optional <see cref="YouControlOnly"/> scope (CR 109.5):
+/// <list type="bullet">
+///   <item><c>false</c> (default) — ANY creature entering under any player's
+///   control fires it. Models the Soul Warden / Essence Warden / Soul's
+///   Attendant / Auriok Champion "whenever another creature enters, you gain 1
+///   life" family.</item>
+///   <item><c>true</c> — only a creature entering under the trigger
+///   controller (resolved live so a control change carries the trigger). Models
+///   the Cathars' Crusade / Impact-Tremors "creature you control enters"
+///   family.</item>
+/// </list>
+/// </para>
+/// </summary>
+public sealed class WheneverAnotherCreatureEntersTriggerDef : TriggerDefinition
+{
+    /// <summary>Restrict to creatures entering under the trigger controller
+    /// (CR 109.5). Default <c>false</c> = any creature entering.</summary>
+    public bool YouControlOnly { get; set; }
+}
+
+/// <summary>
+/// "Whenever this creature deals combat damage to a player, …" (CR 510.2 /
+/// CR 603.1) — a per-source combat-damage trigger over
+/// <see cref="Majik.Core.Domain.DomainEvents.CombatDamageDealtEvent"/> whose
+/// <see cref="Majik.Core.Domain.DomainEvents.CombatDamageDealtEvent.Source"/>
+/// is this card and whose target is a player (non-null
+/// <see cref="Majik.Core.Events.DamageDealtEvent.TargetPlayer"/>). Models the
+/// Ophidian / Hypnotic Specter / "combat-damage-to-a-player" payoff family
+/// (the same event Ragavan's hand-rolled trigger reads). No extra fields; the
+/// source is always the card the ability lives on.
+/// </summary>
+public sealed class DealsCombatDamageToPlayerSelfTriggerDef : TriggerDefinition { }

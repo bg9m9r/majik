@@ -1,0 +1,17 @@
+{
+  "name": "Dragon's Rage Channeler",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Shaman"],
+  "manaCost": "{R}",
+  "power": 1,
+  "toughness": 1,
+  "abilities": [
+    {
+      "kind": "triggered",
+      "trigger": { "type": "whenever_you_cast_spell", "noncreatureOnly": true },
+      "effects": [
+        { "type": "surveil_self", "amount": 1 }
+      ]
+    }
+  ]
+}

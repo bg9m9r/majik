@@ -34,6 +34,7 @@ namespace Majik.Core.CardData.Definitions;
 [JsonDerivedType(typeof(TapTargetEffectDef), "tap_target")]
 [JsonDerivedType(typeof(PreventDamageTargetEffectDef), "prevent_damage_target")]
 [JsonDerivedType(typeof(GainLifeSelfEffectDef), "gain_life_self")]
+[JsonDerivedType(typeof(LoseLifeSelfEffectDef), "lose_life_self")]
 [JsonDerivedType(typeof(LoseLifeTargetEffectDef), "lose_life_target")]
 [JsonDerivedType(typeof(MillThenPickFirstMatchingToHandEffectDef), "mill_then_pick_first_matching_to_hand")]
 [JsonDerivedType(typeof(ConniveSelfEffectDef), "connive_self")]
@@ -352,6 +353,21 @@ public sealed class PreventDamageTargetEffectDef : EffectDefinition
 
 /// <summary>"Controller gains N life." Default <see cref="Amount"/> = 1.</summary>
 public sealed class GainLifeSelfEffectDef : EffectDefinition
+{
+    public int Amount { get; set; } = 1;
+}
+
+/// <summary>
+/// "You lose N life" (CR 119.3) — the untargeted, controller-scoped life-loss
+/// verb. The mirror of <see cref="GainLifeSelfEffectDef"/> onto the
+/// pre-existing <see cref="Majik.Core.Primitives.Fx.LoseLife"/> primitive. The
+/// loss lands on the ability's controller directly (no target slot), so unlike
+/// <see cref="LoseLifeTargetEffectDef"/> it needs neither a target nor the
+/// shared-slot rider machinery. Models the symmetric / self-cost half of the
+/// "you draw a card and you lose N life" upkeep family (Phyrexian Arena, Dark
+/// Tutelage) and the Howling-Mine-style payoff. Default <see cref="Amount"/> = 1.
+/// </summary>
+public sealed class LoseLifeSelfEffectDef : EffectDefinition
 {
     public int Amount { get; set; } = 1;
 }

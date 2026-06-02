@@ -384,4 +384,350 @@ public class JsonTriggerConditionsTests
 
         triggers.PendingCount.Should().Be(0, "returning to hand is not dying (CR 700.4)");
     }
+
+    // ------------------------------------------------------------------
+    // at_beginning_of_your_upkeep — CR 500.1 / 603.1, over StepStartedEvent.
+    // ------------------------------------------------------------------
+
+    private const string UpkeepDrawLoseLifeJson = """
+    {
+      "name": "Test Phyrexian Arena",
+      "types": ["Enchantment"],
+      "manaCost": "1BB",
+      "abilities": [
+        {
+          "kind": "triggered",
+          "trigger": { "type": "at_beginning_of_your_upkeep" },
+          "effects": [
+            { "type": "draw_card", "amount": 1 },
+            { "type": "lose_life_self", "amount": 1 }
+          ]
+        }
+      ]
+    }
+    """;
+
+    [Fact]
+    public void AtBeginningOfYourUpkeep_FiresForController_DrawsAndLosesLife()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        var (_, _) = BuildAndRegister(UpkeepDrawLoseLifeJson, triggers);
+
+        // Seed a card to draw so the draw clause has something to move.
+        var top = new Instant("Lightning Bolt", "R") { Owner = _alice };
+        _alice.Zones.Library.AddCard(top);
+        top.SetZone(ZoneType.Library);
+
+        bus.Publish(new StepStartedEvent(
+            Majik.Core.StateMachine.PhaseStateType.Upkeep, _alice));
+
+        triggers.PendingCount.Should().Be(1,
+            "the controller's own upkeep fires the trigger (CR 500.1 / 603.1)");
+        triggers.PutPendingTriggersOnStack(_alice);
+        ResolveAll(stack);
+
+        _alice.Zones.Hand.GetCards().Should().Contain(top, "the draw clause drew the top card (CR 120)");
+        _alice.LifeTotal.Should().Be(19, "the lose_life_self clause cost 1 life (CR 119.3)");
+    }
+
+    [Fact]
+    public void AtBeginningOfYourUpkeep_DoesNotFireForOpponentUpkeep()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        BuildAndRegister(UpkeepDrawLoseLifeJson, triggers);
+
+        bus.Publish(new StepStartedEvent(
+            Majik.Core.StateMachine.PhaseStateType.Upkeep, _bob));
+
+        triggers.PendingCount.Should().Be(0, "'at the beginning of YOUR upkeep' is controller-scoped (CR 109.5)");
+    }
+
+    [Fact]
+    public void AtBeginningOfYourUpkeep_DoesNotFireForOtherStep()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        BuildAndRegister(UpkeepDrawLoseLifeJson, triggers);
+
+        bus.Publish(new StepStartedEvent(
+            Majik.Core.StateMachine.PhaseStateType.End, _alice));
+
+        triggers.PendingCount.Should().Be(0, "the End step is not the Upkeep step");
+    }
+
+    // ------------------------------------------------------------------
+    // at_beginning_of_your_end_step — CR 513.1 / 603.1, over StepStartedEvent.
+    // ------------------------------------------------------------------
+
+    private const string EndStepCounterJson = """
+    {
+      "name": "Test Wedding Announcement",
+      "types": ["Creature"],
+      "manaCost": "1W",
+      "power": 1,
+      "toughness": 1,
+      "abilities": [
+        {
+          "kind": "triggered",
+          "trigger": { "type": "at_beginning_of_your_end_step" },
+          "effects": [ { "type": "put_counter", "counter": "+1/+1", "amount": 1, "target": "self" } ]
+        }
+      ]
+    }
+    """;
+
+    [Fact]
+    public void AtBeginningOfYourEndStep_FiresForController_AddsCounter()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        var (_, card) = BuildAndRegister(EndStepCounterJson, triggers);
+
+        bus.Publish(new StepStartedEvent(
+            Majik.Core.StateMachine.PhaseStateType.End, _alice));
+
+        triggers.PendingCount.Should().Be(1,
+            "the controller's own end step fires the trigger (CR 513.1 / 603.1)");
+        triggers.PutPendingTriggersOnStack(_alice);
+        ResolveAll(stack);
+
+        card.Counters.Count(CounterType.PlusOnePlusOne).Should().Be(1);
+    }
+
+    [Fact]
+    public void AtBeginningOfYourEndStep_DoesNotFireForUpkeep()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        BuildAndRegister(EndStepCounterJson, triggers);
+
+        bus.Publish(new StepStartedEvent(
+            Majik.Core.StateMachine.PhaseStateType.Upkeep, _alice));
+
+        triggers.PendingCount.Should().Be(0, "the Upkeep step is not the End step");
+    }
+
+    // ------------------------------------------------------------------
+    // whenever_another_creature_enters — CR 603.6e, over CardMovedEvent
+    // (self-excluded). Default any-controller; optional youControlOnly scope.
+    // ------------------------------------------------------------------
+
+    // Soul Warden shape: ANY creature entering (both players') fires it.
+    private const string AnotherCreatureEntersJson = """
+    {
+      "name": "Test Soul Warden",
+      "types": ["Creature"],
+      "manaCost": "W",
+      "power": 1,
+      "toughness": 1,
+      "abilities": [
+        {
+          "kind": "triggered",
+          "trigger": { "type": "whenever_another_creature_enters" },
+          "effects": [ { "type": "gain_life_self", "amount": 1 } ]
+        }
+      ]
+    }
+    """;
+
+    [Fact]
+    public void AnotherCreatureEnters_Fires_OnOtherCreature_GainsLife()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        BuildAndRegister(AnotherCreatureEntersJson, triggers);
+
+        var other = new Creature("Bear", "1G", 2, 2) { Owner = _alice };
+        other.SetController(_alice);
+        _alice.Zones.Battlefield.AddCard(other);
+        other.SetZone(ZoneType.Battlefield);
+        bus.Publish(new CardMovedEvent(other, ZoneType.Hand, ZoneType.Battlefield));
+
+        triggers.PendingCount.Should().Be(1,
+            "another creature entering fires the trigger (CR 603.6e)");
+        triggers.PutPendingTriggersOnStack(_alice);
+        ResolveAll(stack);
+
+        _alice.LifeTotal.Should().Be(21);
+    }
+
+    [Fact]
+    public void AnotherCreatureEnters_DoesNotFire_ForSelf()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        var (_, card) = BuildAndRegister(AnotherCreatureEntersJson, triggers);
+
+        // The permanent's OWN entry must not fire its "another creature" trigger.
+        bus.Publish(new CardMovedEvent(card, ZoneType.Hand, ZoneType.Battlefield));
+
+        triggers.PendingCount.Should().Be(0, "'ANOTHER creature' excludes the source itself (CR 603.6e)");
+    }
+
+    [Fact]
+    public void AnotherCreatureEnters_Default_Fires_ForOpponentCreature()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        BuildAndRegister(AnotherCreatureEntersJson, triggers);
+
+        var enemy = new Creature("Enemy Bear", "1G", 2, 2) { Owner = _bob };
+        enemy.SetController(_bob);
+        _bob.Zones.Battlefield.AddCard(enemy);
+        enemy.SetZone(ZoneType.Battlefield);
+        bus.Publish(new CardMovedEvent(enemy, ZoneType.Hand, ZoneType.Battlefield));
+
+        triggers.PendingCount.Should().Be(1,
+            "the default (un-scoped) 'another creature enters' fires for ANY creature (Soul Warden)");
+    }
+
+    [Fact]
+    public void AnotherCreatureEnters_DoesNotFire_ForNoncreature()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        BuildAndRegister(AnotherCreatureEntersJson, triggers);
+
+        var land = new Land("Forest") { Owner = _alice };
+        land.SetController(_alice);
+        bus.Publish(new CardMovedEvent(land, ZoneType.Hand, ZoneType.Battlefield));
+
+        triggers.PendingCount.Should().Be(0, "a land entering is not 'another creature'");
+    }
+
+    // youControlOnly scope: only creatures the controller controls fire it.
+    private const string AnotherCreatureYouControlEntersJson = """
+    {
+      "name": "Test Cathars Crusade",
+      "types": ["Enchantment"],
+      "manaCost": "3WW",
+      "abilities": [
+        {
+          "kind": "triggered",
+          "trigger": { "type": "whenever_another_creature_enters", "youControlOnly": true },
+          "effects": [ { "type": "gain_life_self", "amount": 1 } ]
+        }
+      ]
+    }
+    """;
+
+    [Fact]
+    public void AnotherCreatureEnters_YouControlOnly_DoesNotFire_ForOpponentCreature()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        BuildAndRegister(AnotherCreatureYouControlEntersJson, triggers);
+
+        var enemy = new Creature("Enemy Bear", "1G", 2, 2) { Owner = _bob };
+        enemy.SetController(_bob);
+        _bob.Zones.Battlefield.AddCard(enemy);
+        enemy.SetZone(ZoneType.Battlefield);
+        bus.Publish(new CardMovedEvent(enemy, ZoneType.Hand, ZoneType.Battlefield));
+
+        triggers.PendingCount.Should().Be(0,
+            "youControlOnly scope excludes opponents' creatures (CR 109.5)");
+    }
+
+    [Fact]
+    public void AnotherCreatureEnters_YouControlOnly_Fires_ForOwnCreature()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        BuildAndRegister(AnotherCreatureYouControlEntersJson, triggers);
+
+        var own = new Creature("Bear", "1G", 2, 2) { Owner = _alice };
+        own.SetController(_alice);
+        _alice.Zones.Battlefield.AddCard(own);
+        own.SetZone(ZoneType.Battlefield);
+        bus.Publish(new CardMovedEvent(own, ZoneType.Hand, ZoneType.Battlefield));
+
+        triggers.PendingCount.Should().Be(1, "youControlOnly scope fires for the controller's own creature");
+    }
+
+    // ------------------------------------------------------------------
+    // whenever_this_deals_combat_damage_to_a_player — CR 510.2 / 603.1, over
+    // CombatDamageDealtEvent (self source, player target).
+    // ------------------------------------------------------------------
+
+    private const string CombatDamageDrawJson = """
+    {
+      "name": "Test Ophidian",
+      "types": ["Creature"],
+      "manaCost": "2U",
+      "power": 1,
+      "toughness": 3,
+      "abilities": [
+        {
+          "kind": "triggered",
+          "trigger": { "type": "whenever_this_deals_combat_damage_to_a_player" },
+          "effects": [ { "type": "draw_card", "amount": 1 } ]
+        }
+      ]
+    }
+    """;
+
+    [Fact]
+    public void DealsCombatDamageToPlayer_Fires_DrawsCard()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        var (_, card) = BuildAndRegister(CombatDamageDrawJson, triggers);
+
+        var top = new Instant("Counterspell", "UU") { Owner = _alice };
+        _alice.Zones.Library.AddCard(top);
+        top.SetZone(ZoneType.Library);
+
+        bus.Publish(new CombatDamageDealtEvent((Creature)card, _bob, 1));
+
+        triggers.PendingCount.Should().Be(1,
+            "this creature dealing combat damage to a player fires the trigger (CR 510.2)");
+        triggers.PutPendingTriggersOnStack(_alice);
+        ResolveAll(stack);
+
+        _alice.Zones.Hand.GetCards().Should().Contain(top, "the trigger drew a card (CR 120)");
+    }
+
+    [Fact]
+    public void DealsCombatDamageToPlayer_DoesNotFire_OnDamageToCreature()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        var (_, card) = BuildAndRegister(CombatDamageDrawJson, triggers);
+
+        // Combat damage to a CREATURE (a blocker), not a player.
+        var blocker = new Creature("Wall", "1W", 0, 4) { Owner = _bob };
+        bus.Publish(new CombatDamageDealtEvent((Creature)card, blocker, 1));
+
+        triggers.PendingCount.Should().Be(0, "'to a PLAYER' excludes combat damage to a creature");
+    }
+
+    [Fact]
+    public void DealsCombatDamageToPlayer_DoesNotFire_ForAnotherSource()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        BuildAndRegister(CombatDamageDrawJson, triggers);
+
+        // A DIFFERENT creature dealing combat damage to a player.
+        var other = new Creature("Other Attacker", "1R", 2, 2) { Owner = _alice };
+        bus.Publish(new CombatDamageDealtEvent(other, _bob, 2));
+
+        triggers.PendingCount.Should().Be(0, "'whenever THIS creature deals combat damage' is self-scoped");
+    }
 }

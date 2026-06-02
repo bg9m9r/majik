@@ -1,4 +1,5 @@
 using Majik.Core.Abilities;
+using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Domain.DomainEvents;
@@ -66,6 +67,13 @@ public static class DragonsRageChannelerFactory
     public const string Cost = "{R}";
     public const int DeliriumThreshold = 4;
 
+    /// <summary>JSON slug for the embedded card definition (base shape +
+    /// declarative noncreature-cast surveil trigger).</summary>
+    public const string Slug = "dragons-rage-channeler";
+
+    private static readonly Majik.Core.CardData.Definitions.CardDefinition Definition =
+        Majik.Core.CardData.Definitions.CardDefinitionLoader.FromEmbeddedResource(Slug);
+
     /// <summary>
     /// Construct Dragon's Rage Channeler with no live wiring. The
     /// surveil trigger is attached to the card for shape observability;
@@ -86,60 +94,35 @@ public static class DragonsRageChannelerFactory
     {
         ArgumentNullException.ThrowIfNull(owner);
 
-        var card = new Creature(
-            name: CardName,
-            manaCost: Cost,
-            power: 1,
-            toughness: 1,
-            subtypes: new[] { CardSubtype.Human, CardSubtype.Shaman });
+        var built = CardDefinitionFactory.Build(Definition, owner);
+        if (built is not Creature card)
+        {
+            throw new InvalidOperationException(
+                $"Expected '{CardName}' to materialise as a Creature but got "
+                + $"'{built.GetType().Name}'.");
+        }
 
         card.SetOwner(owner);
         card.SetController(owner);
 
         // ----------------------------------------------------------------
-        // Trigger 1 — "Whenever you cast a noncreature spell, surveil 1."
-        // CR 603.1 + CR 701.42. Predicate: spell controller is DRC's
-        // controller AND the spell's card is not a Creature. (Other types
-        // like Artifact/Sorcery/Instant — and any future Battle-spell —
-        // still qualify; "noncreature" only excludes the Creature type.)
+        // Trigger — "Whenever you cast a noncreature spell, surveil 1."
+        // CR 603.1 + CR 701.42. Now declarative: the JSON definition
+        // (dragons-rage-channeler.json) carries a whenever_you_cast_spell
+        // trigger with noncreatureOnly = true (spell controller is DRC's
+        // controller AND the spell's card is not a Creature) wired to the
+        // existing surveil_self effect (surveil 1 — agent-driven with the
+        // all-to-graveyard fallback, byte-identical to the prior
+        // hand-rolled effect). Register the JSON-built trigger(s) with the
+        // supplied TriggerManager so the bus surfaces them as pending.
         // ----------------------------------------------------------------
-        var surveilCondition = new EventTriggerCondition<SpellCastEvent>((e, _) =>
-            ReferenceEquals(e.Spell.Controller, owner)
-            && !e.Spell.Card.HasType(CardType.Creature));
-
-        var surveilEffect = new Effect(
-            "Dragon's Rage Channeler — surveil 1 (whenever you cast a noncreature spell)",
-            async ctx =>
+        if (triggers != null)
+        {
+            foreach (var trigger in card.Abilities.OfType<TriggeredAbility>())
             {
-                var peeked = Majik.Core.Keywords.SurveilAction.Peek(owner, 1);
-                if (peeked.Count == 0) return;
-
-                var agent = ctx.Agent ?? AgentRegistry.Get(owner);
-                Majik.Core.Keywords.SurveilAction.SurveilDecision decision;
-                if (agent != null)
-                {
-                    decision = (await agent.ChooseSurveilDecisionAsync( ctx.Game, peeked).ConfigureAwait(false));
-                }
-                else
-                {
-                    // Default: all peeked cards go to graveyard (matches
-                    // Ledger Shredder / Library Surveyor / Underground
-                    // Mortuary v1 behavior when no agent is registered).
-                    decision = new Majik.Core.Keywords.SurveilAction.SurveilDecision(
-                        ToGraveyard: peeked.ToList(),
-                        TopOrder: Array.Empty<ICard>());
-                }
-                Majik.Core.Keywords.SurveilAction.Apply(owner, 1, decision);
-            });
-
-        var surveilTrigger = new TriggeredAbility(
-            source: card,
-            controller: owner,
-            condition: surveilCondition,
-            effects: new IEffect[] { surveilEffect });
-
-        card.AddAbility(surveilTrigger);
-        triggers?.RegisterTriggeredAbility(surveilTrigger);
+                triggers.RegisterTriggeredAbility(trigger);
+            }
+        }
 
         // ----------------------------------------------------------------
         // Delirium static — "DRC gets +2/+2 and has flying as long as

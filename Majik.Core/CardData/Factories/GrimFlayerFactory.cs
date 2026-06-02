@@ -119,45 +119,22 @@ public static class GrimFlayerFactory
 
         // ----------------------------------------------------------------
         // Trigger — "Whenever this creature deals combat damage to a
-        // player, surveil 3." CR 603.1 + CR 701.42. Predicate: damage
-        // source is Grim Flayer AND the damage was dealt to a player
-        // (TargetPlayer non-null). Same shape as Ragavan, Nimble Pilferer.
+        // player, surveil 3." CR 603.1 + CR 701.42. Now declarative: the
+        // JSON definition (grim-flayer.json) carries a
+        // whenever_this_deals_combat_damage_to_a_player trigger (same
+        // source + non-null-TargetPlayer predicate Ragavan uses) wired to
+        // the existing surveil_self effect (surveil 3 — agent-driven with
+        // the all-to-graveyard fallback, byte-identical to the prior
+        // hand-rolled effect). Register the JSON-built trigger(s) with the
+        // supplied TriggerManager so the bus surfaces them as pending.
         // ----------------------------------------------------------------
-        var surveilEffect = new Effect(
-            "Grim Flayer — surveil 3 (whenever this creature deals combat damage to a player)",
-            async ctx =>
+        if (triggers != null)
+        {
+            foreach (var trigger in card.Abilities.OfType<TriggeredAbility>())
             {
-                var peeked = Majik.Core.Keywords.SurveilAction.Peek(owner, SurveilCount);
-                if (peeked.Count == 0) return;
-
-                var agent = ctx.Agent ?? AgentRegistry.Get(owner);
-                Majik.Core.Keywords.SurveilAction.SurveilDecision decision;
-                if (agent != null)
-                {
-                    decision = await agent.ChooseSurveilDecisionAsync(ctx.Game, peeked).ConfigureAwait(false);
-                }
-                else
-                {
-                    // Default: all peeked cards go to graveyard (matches
-                    // Dragon's Rage Channeler / Ledger Shredder behavior
-                    // when no agent is registered).
-                    decision = new Majik.Core.Keywords.SurveilAction.SurveilDecision(
-                        ToGraveyard: peeked.ToList(),
-                        TopOrder: Array.Empty<ICard>());
-                }
-                Majik.Core.Keywords.SurveilAction.Apply(owner, SurveilCount, decision);
-            });
-
-        var surveilTrigger = new TriggeredAbility(
-            source: card,
-            controller: owner,
-            condition: new EventTriggerCondition<CombatDamageDealtEvent>((e, _) =>
-                ReferenceEquals(e.Source, card) && e.TargetPlayer != null),
-            effects: new IEffect[] { surveilEffect },
-            activeZones: new[] { ZoneType.Battlefield });
-
-        card.AddAbility(surveilTrigger);
-        triggers?.RegisterTriggeredAbility(surveilTrigger);
+                triggers.RegisterTriggeredAbility(trigger);
+            }
+        }
 
         // ----------------------------------------------------------------
         // Delirium static — "Grim Flayer gets +2/+2 as long as there are
