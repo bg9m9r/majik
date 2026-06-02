@@ -775,10 +775,44 @@ public class Card : ICard
     /// <summary>Clear the kicker sentinel. Called by
     /// <see cref="Majik.Core.Game.SpellCastFlow"/> via a cleanup
     /// effect appended after the spell's printed body so the flag
-    /// doesn't leak past resolution (CR 400.7).</summary>
+    /// doesn't leak past resolution (CR 400.7). Also resets the
+    /// <see cref="TimesKicked"/> multikicker count.</summary>
     public void ClearWasKicked()
     {
         WasKicked = false;
+        TimesKicked = 0;
+    }
+
+    /// <summary>
+    /// CR 702.32 — number of times Multikicker (or Kicker) was paid as
+    /// this spell was cast. Plain Kicker (CR 702.33) tops out at 1;
+    /// Multikicker ("a kicker ability that may be paid any number of
+    /// times", CR 702.32a) records the full multiplicity so a resolution
+    /// / ETB rider can scale on it (Everflowing Chalice — "enters with a
+    /// charge counter on it for each time it was kicked", CR 702.32c).
+    ///
+    /// <para>Stamped by <see cref="Majik.Core.Costs.MultikickerAdditionalCost.Pay"/>.
+    /// <see cref="Majik.Core.Costs.KickerAdditionalCost.Pay"/> leaves it at
+    /// the implicit <c>1</c> via <see cref="SetWasKicked"/> only stamping
+    /// the boolean; multikicker callers stamp the count via
+    /// <see cref="SetTimesKicked"/>. Mirrors the <see cref="WasKicked"/>
+    /// sentinel: cleared to <c>0</c> alongside it by
+    /// <see cref="ClearWasKicked"/> after resolution so a later re-cast /
+    /// blink / token copy doesn't inherit the prior kick count (CR 400.7).
+    /// Defaults to <c>0</c> (not kicked).</para>
+    /// </summary>
+    public int TimesKicked { get; private set; }
+
+    /// <summary>Stamp the multikicker count. Called by
+    /// <see cref="Majik.Core.Costs.MultikickerAdditionalCost.Pay"/> after
+    /// the kicker mana has been paid <paramref name="times"/> times. A
+    /// non-zero value also implies <see cref="WasKicked"/> (CR 702.32a —
+    /// the spell "was kicked" if Multikicker was paid at least once).</summary>
+    public void SetTimesKicked(int times)
+    {
+        if (times < 0) throw new ArgumentOutOfRangeException(nameof(times));
+        TimesKicked = times;
+        WasKicked = times > 0;
     }
 
     /// <summary>
