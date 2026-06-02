@@ -1,0 +1,10 @@
+{
+  "name": "Kaheera, the Orphanguard",
+  "types": ["Creature"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Cat", "Beast"],
+  "manaCost": "{1}{G/W}{G/W}",
+  "power": 3,
+  "toughness": 2,
+  "abilities": []
+}

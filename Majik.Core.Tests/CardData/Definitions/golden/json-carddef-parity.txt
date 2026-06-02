@@ -13237,6 +13237,60 @@
     "White"
   ]
 }
+==== kaheera-the-orphanguard ====
+{
+  "name": "Kaheera, the Orphanguard",
+  "manaCost": "{1}{G/W}{G/W}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [
+    "Legendary"
+  ],
+  "subtypes": [
+    "Beast",
+    "Cat"
+  ],
+  "power": 3,
+  "toughness": 2,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Green",
+    "White"
+  ]
+}
 ==== kaito-bane-of-nightmares ====
 {
   "name": "Kaito, Bane of Nightmares",
