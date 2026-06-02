@@ -1,0 +1,5 @@
+{
+  "name": "Sorcerous Spyglass",
+  "types": ["Artifact"],
+  "manaCost": "{2}"
+}
