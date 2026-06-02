@@ -1,0 +1,7 @@
+{
+  "name": "Kabira Plateau",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "W" }
+  ]
+}
