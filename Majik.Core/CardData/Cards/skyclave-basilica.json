@@ -1,0 +1,7 @@
+{
+  "name": "Skyclave Basilica",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "W" }
+  ]
+}
