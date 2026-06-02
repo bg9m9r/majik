@@ -1,0 +1,9 @@
+{
+  "name": "Slippery Bogle",
+  "types": ["Creature"],
+  "subtypes": ["Beast"],
+  "manaCost": "{G/U}",
+  "power": 1,
+  "toughness": 1,
+  "abilities": []
+}
