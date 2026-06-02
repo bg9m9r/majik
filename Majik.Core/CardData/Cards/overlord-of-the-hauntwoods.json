@@ -1,0 +1,9 @@
+{
+  "name": "Overlord of the Hauntwoods",
+  "types": ["Creature", "Enchantment"],
+  "subtypes": ["Avatar", "Horror"],
+  "manaCost": "{3}{G}{G}",
+  "power": 6,
+  "toughness": 5,
+  "abilities": []
+}
