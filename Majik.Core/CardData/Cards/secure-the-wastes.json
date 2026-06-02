@@ -1,0 +1,6 @@
+{
+  "name": "Secure the Wastes",
+  "types": ["Instant"],
+  "manaCost": "{X}{W}",
+  "abilities": []
+}
