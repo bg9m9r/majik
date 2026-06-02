@@ -1,10 +1,8 @@
 using Majik.Core.Abilities;
+using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
-using Majik.Core.Cards.Types;
 using Majik.Core.Effects;
-using Majik.Core.Events;
 using Majik.Core.Players;
-using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
 
@@ -14,25 +12,28 @@ namespace Majik.Core.CardData.Factories;
 /// Creature — Human Cleric 1/1. Oracle text (current Scryfall):
 ///   "Whenever another creature enters, you gain 1 life."
 ///
-/// ## Implemented (v1)
-/// - 1/1 Creature — Human Cleric at {W}. Owner / controller wired.
-/// - <b>ETB-other-creature trigger (CR 603.6a / CR 119.3)</b>: any creature
-///   other than Soul Warden entering the battlefield (under any controller)
-///   triggers; on resolution Soul Warden's controller gains 1 life.
-///   Predicate gates on:
-///     1. <see cref="CardMovedEvent.ToZone"/> == Battlefield.
-///     2. The entering card is a <see cref="CardType.Creature"/>.
-///     3. The entering card is NOT Soul Warden itself ("another" — CR 603.1).
-///   Controller is not constrained — Soul Warden triggers on opponent's
-///   creatures entering too (this is the printed Soul Sisters interaction).
-///   The trigger is active only while Soul Warden is on the battlefield.
+/// ## Pure-JSON factory (declarative trigger + effect)
+/// Soul Warden is now fully declarative — the ETB-other-creature trigger is
+/// expressed by the <c>whenever_another_creature_enters</c>
+/// (<see cref="WheneverAnotherCreatureEntersTriggerDef"/>) trigger variant
+/// (default any-controller scope — the printed Soul Sisters care about ANY
+/// creature entering, not just yours) and the payoff by the existing
+/// <c>gain_life_self</c> effect, both materialised by <see cref="CardDefRuntime"/>
+/// from <c>soul-warden.json</c> via
+/// <see cref="CardDefinitionLoader.FromEmbeddedResource"/> +
+/// <see cref="CardDefinitionFactory.Build(CardDefinition, Player, ReplacementBus?)"/>.
+/// This replaces the prior hand-rolled <see cref="EventTriggerCondition{TEvent}"/>
+/// over <see cref="Majik.Core.Events.CardMovedEvent"/> wiring — proving the
+/// declarative "another creature enters" shape carries the same behaviour.
 ///
-/// ## Lifecycle
-/// The single-arg <see cref="Create(Player)"/> path attaches the trigger for
-/// shape tests without <see cref="TriggerManager"/> registration. Use the
-/// (owner, triggers) overload for bus-driven, fully-wired behavior — the
-/// trigger fires on every qualifying <see cref="CardMovedEvent"/> the bus
-/// publishes (CR 603.2 — once-per-event posture).
+/// - <b>ETB-other-creature trigger (CR 603.6e / CR 119.3)</b>: any creature
+///   other than Soul Warden entering the battlefield (under any controller)
+///   triggers; on resolution Soul Warden's controller gains 1 life. The
+///   trigger is active only while Soul Warden is on the battlefield (the engine
+///   default).
+///
+/// Adding this <c>[CardName]</c> factory flips <c>IsImplemented</c> on
+/// automatically via <see cref="ImplementedCardNames"/> — no seed regen.
 /// </summary>
 [CardName("Soul Warden")]
 public static class SoulWardenFactory
@@ -43,69 +44,45 @@ public static class SoulWardenFactory
     public const int Toughness = 1;
     public const int LifeGainAmount = 1;
 
+    /// <summary>JSON slug for the embedded card definition.</summary>
+    public const string Slug = "soul-warden";
+
+    private static readonly CardDefinition Definition =
+        CardDefinitionLoader.FromEmbeddedResource(Slug);
+
     /// <summary>
     /// Construct Soul Warden with no live <see cref="TriggerManager"/> wiring.
-    /// The ETB-other-creature trigger is attached to the card shape for
-    /// structural / dispatch tests; bus-driven firing requires the
-    /// (owner, triggers) overload.
+    /// The ETB-other-creature trigger is materialised onto the card shape from
+    /// the JSON definition for structural / dispatch tests; bus-driven firing
+    /// requires the (owner, triggers) overload.
     /// </summary>
     public static Creature Create(Player owner) => Create(owner, triggers: null);
 
     /// <summary>
     /// Construct Soul Warden, registering the lifegain trigger with
     /// <paramref name="triggers"/> when supplied so a qualifying
-    /// <see cref="CardMovedEvent"/> automatically queues the ability.
+    /// <see cref="Majik.Core.Events.CardMovedEvent"/> automatically queues the
+    /// ability.
     /// </summary>
     public static Creature Create(Player owner, TriggerManager? triggers)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
-        var card = new Creature(
-            name: CardName,
-            manaCost: PrintedManaCost,
-            power: Power,
-            toughness: Toughness,
-            subtypes: new[] { CardSubtype.Human, CardSubtype.Cleric });
+        var built = CardDefinitionFactory.Build(Definition, owner);
+        if (built is not Creature card)
+        {
+            throw new InvalidOperationException(
+                $"Expected '{CardName}' to materialise as a Creature but got "
+                + $"'{built.GetType().Name}'.");
+        }
 
-        card.SetOwner(owner);
-        card.SetController(owner);
-
-        // ----------------------------------------------------------------
-        // ETB-other-creature trigger — CR 603.6a / CR 119.3.
-        //   "Whenever another creature enters, you gain 1 life."
-        //
-        // Condition: CardMovedEvent → Battlefield where:
-        //   - The card is a Creature (any controller — printed Soul
-        //     Warden cares about ANY creature, not just yours).
-        //   - The card is NOT Soul Warden itself ("another", CR 603.1).
-        //
-        // Effect: Soul Warden's controller gains 1 life (CR 118.3).
-        // Controller is resolved live (card.Controller ?? owner) so that
-        // control-change effects (Mind Control / Threaten) route gains
-        // to the new controller — same posture as Guide of Souls'
-        // energy effect.
-        // Active only while Soul Warden is on the Battlefield.
-        // ----------------------------------------------------------------
-        var lifegainEffect = new Effect(
-            $"{CardName}: controller gains {LifeGainAmount} life",
-            () =>
+        if (triggers != null)
+        {
+            foreach (var trigger in card.Abilities.OfType<TriggeredAbility>())
             {
-                var controller = card.Controller ?? owner;
-                controller.GainLife(LifeGainAmount);
-            });
-
-        var etbOtherCreatureTrigger = new TriggeredAbility(
-            source: card,
-            controller: owner,
-            condition: new EventTriggerCondition<CardMovedEvent>((e, _) =>
-                e.ToZone == ZoneType.Battlefield
-                && e.Card.HasType(CardType.Creature)
-                && !ReferenceEquals(e.Card, card)),
-            effects: new IEffect[] { lifegainEffect },
-            activeZones: new[] { ZoneType.Battlefield });
-
-        card.AddAbility(etbOtherCreatureTrigger);
-        triggers?.RegisterTriggeredAbility(etbOtherCreatureTrigger);
+                triggers.RegisterTriggeredAbility(trigger);
+            }
+        }
 
         return card;
     }

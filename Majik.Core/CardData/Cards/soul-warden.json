@@ -1,0 +1,17 @@
+{
+  "name": "Soul Warden",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Cleric"],
+  "manaCost": "{W}",
+  "power": 1,
+  "toughness": 1,
+  "abilities": [
+    {
+      "kind": "triggered",
+      "trigger": { "type": "whenever_another_creature_enters" },
+      "effects": [
+        { "type": "gain_life_self", "amount": 1 }
+      ]
+    }
+  ]
+}

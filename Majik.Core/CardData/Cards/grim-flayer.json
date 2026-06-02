@@ -4,5 +4,14 @@
   "subtypes": ["Human", "Warrior"],
   "manaCost": "{B}{G}",
   "power": 2,
-  "toughness": 2
+  "toughness": 2,
+  "abilities": [
+    {
+      "kind": "triggered",
+      "trigger": { "type": "whenever_this_deals_combat_damage_to_a_player" },
+      "effects": [
+        { "type": "surveil_self", "amount": 3 }
+      ]
+    }
+  ]
 }

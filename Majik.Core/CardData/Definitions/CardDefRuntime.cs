@@ -823,9 +823,78 @@ public static class CardDefRuntime
             WheneverYouCastSpellTriggerDef cast => BuildWheneverYouCastSpellTrigger(cast, card),
             AttacksSelfTriggerDef => Triggers.OnAttackSelf(card),
             DiesSelfTriggerDef => Triggers.OnDies(card),
+            AtBeginningOfYourUpkeepTriggerDef =>
+                BuildStepBeginTrigger(card, Majik.Core.StateMachine.PhaseStateType.Upkeep),
+            AtBeginningOfYourEndStepTriggerDef =>
+                BuildStepBeginTrigger(card, Majik.Core.StateMachine.PhaseStateType.End),
+            WheneverAnotherCreatureEntersTriggerDef anotherEnters =>
+                BuildAnotherCreatureEntersTrigger(anotherEnters, card),
+            DealsCombatDamageToPlayerSelfTriggerDef =>
+                BuildDealsCombatDamageToPlayerSelfTrigger(card),
             _ => throw new NotSupportedException(
                 $"Trigger '{definition.GetType().Name}' is not yet supported by CardDefRuntime."),
         };
+
+    /// <summary>
+    /// CR 500.1 / CR 603.1 — "At the beginning of your [step], …". Fires on a
+    /// <see cref="Majik.Core.Events.StepStartedEvent"/> for the requested step
+    /// whose active player is the trigger's controller. The controller is
+    /// resolved live (<c>card.Controller</c>) at fire time so a control change
+    /// carries the trigger (CR 109.5) — the same live-controller predicate as
+    /// <see cref="BuildWheneverYouGainLifeTrigger"/>; equivalent to
+    /// <see cref="Triggers.OnStepBegin"/> with the controller bound late.
+    /// </summary>
+    private static ITriggerCondition BuildStepBeginTrigger(
+        ICard card, Majik.Core.StateMachine.PhaseStateType step) =>
+        new EventTriggerCondition<Majik.Core.Events.StepStartedEvent>((e, _) =>
+        {
+            var controller = card.Controller;
+            return controller is not null
+                && e.StepType == step
+                && ReferenceEquals(e.Player, controller);
+        });
+
+    /// <summary>
+    /// CR 603.6e — "Whenever another creature [you control] enters, …". Fires on
+    /// a <see cref="Majik.Core.Events.CardMovedEvent"/> → Battlefield where the
+    /// entering card is a creature OTHER than this permanent. When
+    /// <see cref="WheneverAnotherCreatureEntersTriggerDef.YouControlOnly"/> is
+    /// set, the entering creature must also be controlled by the trigger's
+    /// controller (resolved live, CR 109.5) — equivalent to
+    /// <see cref="Triggers.OnAnotherCreatureYouControlEnters"/> with the
+    /// controller bound late. Otherwise any creature entering fires it
+    /// (<see cref="Triggers.OnAnyCreatureEntersBattlefield"/> plus the self
+    /// exclusion).
+    /// </summary>
+    private static ITriggerCondition BuildAnotherCreatureEntersTrigger(
+        WheneverAnotherCreatureEntersTriggerDef def, ICard card)
+    {
+        var youControlOnly = def.YouControlOnly;
+        return new EventTriggerCondition<Majik.Core.Events.CardMovedEvent>((e, _) =>
+        {
+            if (e.ToZone != ZoneType.Battlefield) return false;
+            if (!e.Card.HasType(CardType.Creature)) return false;
+            if (ReferenceEquals(e.Card, card)) return false;
+            if (!youControlOnly) return true;
+            var controller = card.Controller;
+            return controller is not null
+                && ReferenceEquals(e.Card.Controller, controller);
+        });
+    }
+
+    /// <summary>
+    /// CR 510.2 / CR 603.1 — "Whenever this creature deals combat damage to a
+    /// player, …". Fires on a
+    /// <see cref="Majik.Core.Domain.DomainEvents.CombatDamageDealtEvent"/> whose
+    /// <see cref="Majik.Core.Domain.DomainEvents.CombatDamageDealtEvent.Source"/>
+    /// is this card and whose target is a player (non-null
+    /// <see cref="Majik.Core.Events.DamageDealtEvent.TargetPlayer"/>) — the same
+    /// predicate Ragavan's hand-rolled trigger uses. The source is always the
+    /// card the ability lives on (self-scoped), so no controller read is needed.
+    /// </summary>
+    private static ITriggerCondition BuildDealsCombatDamageToPlayerSelfTrigger(ICard card) =>
+        new EventTriggerCondition<Majik.Core.Domain.DomainEvents.CombatDamageDealtEvent>((e, _) =>
+            ReferenceEquals(e.Source, card) && e.TargetPlayer != null);
 
     /// <summary>
     /// CR 119.3 — "Whenever you gain life, …". Fires on a
@@ -959,6 +1028,7 @@ public static class CardDefRuntime
             TapTargetEffectDef tap => BuildTapTargetEffect(tap, card, targetRequestIndex),
             PreventDamageTargetEffectDef prevent => BuildPreventDamageTargetEffect(prevent, card, replacements, targetRequestIndex),
             GainLifeSelfEffectDef gain => BuildGainLifeSelfEffect(gain, card, controller),
+            LoseLifeSelfEffectDef loseSelf => BuildLoseLifeSelfEffect(loseSelf, card, controller),
             LoseLifeTargetEffectDef lose => BuildLoseLifeTargetEffect(lose, card, targetRequestIndex),
             MillThenPickFirstMatchingToHandEffectDef mp => BuildMillThenPickEffect(mp, card, controller),
             ConniveSelfEffectDef connive => BuildConniveSelfEffect(connive, card),
@@ -1014,6 +1084,17 @@ public static class CardDefRuntime
         return new Effect(
             $"{card.Name}: gain {amount} life",
             () => controller.GainLife(amount));
+    }
+
+    private static IEffect BuildLoseLifeSelfEffect(LoseLifeSelfEffectDef def, ICard card, Player controller)
+    {
+        // CR 119.3 — untargeted "you lose N life". Routes through the shared
+        // Fx.LoseLife primitive (Player.LoseLife) against the ability's
+        // controller. The mirror of BuildGainLifeSelfEffect.
+        var amount = def.Amount;
+        return new Effect(
+            $"{card.Name}: lose {amount} life",
+            () => Fx.LoseLife(controller, amount));
     }
 
     private static IEffect BuildLoseLifeTargetEffect(LoseLifeTargetEffectDef def, ICard card, int targetRequestIndex)
