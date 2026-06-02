@@ -880,6 +880,7 @@ public static class CardDefRuntime
             SurveilSelfEffectDef surveil => BuildSurveilSelfEffect(surveil, card, controller),
             ScrySelfEffectDef scry => BuildScrySelfEffect(scry, card, controller),
             DestroyTargetEffectDef destroy => BuildDestroyTargetEffect(destroy, card, targetRequestIndex),
+            ExileTargetEffectDef exile => BuildExileTargetEffect(exile, card, targetRequestIndex),
             ReturnToHandEffectDef bounce => BuildReturnToHandEffect(bounce, card, targetRequestIndex),
             UntapTargetEffectDef untap => BuildUntapTargetEffect(untap, card, targetRequestIndex),
             TapTargetEffectDef tap => BuildTapTargetEffect(tap, card, targetRequestIndex),
@@ -978,6 +979,32 @@ public static class CardDefRuntime
                 if (live is Permanent permanent && permanent.Zone == ZoneType.Battlefield)
                 {
                     Fx.MoveToGraveyard(permanent, ZoneMoveReason.Destroy);
+                }
+                return ValueTask.CompletedTask;
+            });
+    }
+
+    private static IEffect BuildExileTargetEffect(ExileTargetEffectDef def, ICard card, int targetRequestIndex)
+    {
+        // CR 701.21 — real targeted exile. The mirror of BuildDestroyTargetEffect
+        // onto the exile primitive (Fx.MoveToExile). Reads the chosen target off
+        // ChosenTargets at the reserved index; CR 608.2b — re-check the SAME
+        // filter predicate at resolution (via TargetFilters.Matches) so a
+        // conditional filter (nonbasic_land / colour / mana-value) and the
+        // graveyard filters (card_in_graveyard / creature_card_in_graveyard)
+        // fizzle cleanly when the target no longer matches. Exile bypasses
+        // Indestructible (CR 702.12) and regeneration (CR 701.15) — the card
+        // moves regardless. Fx.MoveToExile handles every source zone the filters
+        // produce (battlefield permanents AND graveyard cards).
+        var filter = def.TargetFilter;
+        return new Effect(
+            $"{card.Name}: exile target {filter}",
+            ctx =>
+            {
+                var live = ChosenTargetAt(ctx, targetRequestIndex);
+                if (live is ICard target && TargetFilters.Matches(filter, target))
+                {
+                    Fx.MoveToExile(target);
                 }
                 return ValueTask.CompletedTask;
             });

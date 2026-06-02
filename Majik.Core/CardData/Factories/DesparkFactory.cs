@@ -85,6 +85,15 @@ public static class DesparkFactory
     /// <param name="targetResolver">Maps the agent-supplied raw target token
     /// to the live engine object. Pass <c>o =&gt; o</c> for tests that hand
     /// permanents directly.</param>
+    /// <remarks>
+    /// Declarative conversion (the exile-verb slice): delegates to the shared
+    /// <see cref="CardDefRuntime.BuildSpellDefinitionFromEffects"/> with a single
+    /// <see cref="ExileTargetEffectDef"/> over the <c>permanent_mana_value_ge_4</c>
+    /// filter. That filter's predicate IS the CR 608.2b legality (battlefield +
+    /// mana value &gt;= 4 per CR 202.3), re-checked at resolution by the verb —
+    /// byte-equivalent to the former hand-rolled mana-value gate, routed through
+    /// the same shared exile primitive (<see cref="Majik.Core.Primitives.Fx.MoveToExile(ICard)"/>).
+    /// </remarks>
     public static SpellDefinition BuildDefinition(
         Player caster,
         Func<object, object> targetResolver)
@@ -92,60 +101,11 @@ public static class DesparkFactory
         ArgumentNullException.ThrowIfNull(caster);
         ArgumentNullException.ThrowIfNull(targetResolver);
 
-        return new SpellDefinition(
-            Modes: Array.Empty<string>(),
-            HasVariableX: false,
-            TargetRequests: new[]
+        return CardDefRuntime.BuildSpellDefinitionFromEffects(
+            CardName,
+            new EffectDefinition[]
             {
-                new TargetRequest(
-                    Description: "target permanent with mana value 4 or greater",
-                    MinTargets: 1,
-                    MaxTargets: 1,
-                    LegalCandidates: Array.Empty<object>(),
-                    Intent: BotIntent.Removal,
-                    // Agent-prompt MVP: live gather every permanent with mana
-                    // value >= 4 on any battlefield (CR 202.3). Removal intent
-                    // in the bot's ranker pushes opponent permanents up.
-                    CandidateGatherer: ctx => ctx.AllPlayers
-                        .SelectMany(p => p.Zones.Battlefield.GetCards())
-                        .Where(c => c is Card card
-                            && card.ManaCostValue.TotalValue >= MinTargetManaValue)
-                        .Cast<object>()
-                        .ToList()),
-            },
-            EffectFactory: p =>
-            {
-                var raw = p.Targets[0][0];
-                var resolved = targetResolver(raw);
-                return new IEffect[]
-                {
-                    new Effect(
-                        $"{CardName}: exile target permanent with mana value 4 or greater (CR 701.21)",
-                        () =>
-                        {
-                            // CR 608.2b — resolution-time legality re-check.
-                            // Exile only fires when the target is still a
-                            // permanent on the battlefield with mana value >= 4.
-                            if (resolved is Permanent target
-                                && target.Zone == ZoneType.Battlefield
-                                && target.ManaCostValue.TotalValue >= MinTargetManaValue)
-                            {
-                                // CR 701.21 — Exile. Routed through the owning
-                                // player's zones so owner-of-zone bookkeeping
-                                // stays consistent across multi-player games
-                                // (mirrors AnguishedUnmaking / SkyclaveApparition).
-                                // Indestructible (CR 702.12) does not prevent
-                                // exile.
-                                var fromOwner = target.Owner;
-                                if (fromOwner != null)
-                                {
-                                    fromOwner.Zones.Battlefield.RemoveCard(target);
-                                    fromOwner.Zones.Exile.AddCard(target);
-                                }
-                                target.SetZone(ZoneType.Exile);
-                            }
-                        }),
-                };
+                new ExileTargetEffectDef { TargetFilter = "permanent_mana_value_ge_4" },
             });
     }
 }

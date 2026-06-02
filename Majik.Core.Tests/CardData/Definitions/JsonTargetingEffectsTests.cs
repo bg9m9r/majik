@@ -456,4 +456,148 @@ public class JsonTargetingEffectsTests
         candidates.Should().Contain(legend);
         candidates.Should().NotContain(plain, "non-legendary permanents are not legal untap targets");
     }
+
+    // ------------------------------------------------------------------
+    // exile_target — targeted exile of a permanent (ability path).
+    // CR 701.21 — Exile. Mirrors destroy_target onto the exile primitive.
+    // ------------------------------------------------------------------
+
+    /// <summary>Build a 1-effect activated ability whose single effect is the
+    /// given <see cref="Majik.Core.CardData.Definitions.EffectDefinition"/>,
+    /// wired through the declarative ability path (the same path the JSON
+    /// ToCardDefAbility pairs ToTargetRequest + ToResolveEffect).</summary>
+    private ActivatedAbility BuildExileAbility(
+        Majik.Core.CardData.Definitions.EffectDefinition effect, ICard source)
+    {
+        var request = effect.ToTargetRequest();
+        var built = effect.ToResolveEffect()(source, _alice, null, request is null ? -1 : 0);
+        return new ActivatedAbility(
+            source: source,
+            controller: _alice,
+            costs: System.Array.Empty<Majik.Core.Costs.ICost>(),
+            effects: new[] { built },
+            targetRequests: request is null
+                ? System.Array.Empty<Majik.Core.Players.Agents.TargetRequest>()
+                : new[] { request });
+    }
+
+    [Fact]
+    public async Task ExileTarget_ExilesChosenPermanent_NotABystander()
+    {
+        var source = OnBattlefield(new Artifact("Exiler", "{2}"), _alice);
+        var ability = BuildExileAbility(
+            new Majik.Core.CardData.Definitions.ExileTargetEffectDef { TargetFilter = "permanent" },
+            source);
+
+        var victim = OnBattlefield(new Creature("Victim", "{G}", 2, 2), _bob);
+        var bystander = OnBattlefield(new Creature("Bystander", "{G}", 2, 2), _bob);
+
+        await ActivateAndResolve(ability, victim);
+
+        victim.Zone.Should().Be(ZoneType.Exile, "the chosen permanent is exiled (CR 701.21)");
+        _bob.Zones.Exile.GetCards().Should().Contain(victim);
+        bystander.Zone.Should().Be(ZoneType.Battlefield, "only the chosen target is exiled");
+    }
+
+    [Fact]
+    public async Task ExileTarget_NonbasicLandFilter_RejectsBasicLandAtResolution()
+    {
+        var source = OnBattlefield(new Artifact("Exiler", "{2}"), _alice);
+        var ability = BuildExileAbility(
+            new Majik.Core.CardData.Definitions.ExileTargetEffectDef { TargetFilter = "nonbasic_land" },
+            source);
+
+        // A basic land is NOT a legal nonbasic-land target — CR 608.2b re-check
+        // at resolution fizzles even when the agent hands it directly.
+        var basic = OnBattlefield(new Land("Forest", new[] { CardSupertype.Basic }, null), _bob);
+
+        await ActivateAndResolve(ability, basic);
+
+        basic.Zone.Should().Be(ZoneType.Battlefield,
+            "a basic land is not a legal nonbasic-land exile target (CR 608.2b)");
+    }
+
+    [Fact]
+    public async Task ExileTarget_NoTargetChosen_FizzlesCleanly()
+    {
+        var source = OnBattlefield(new Artifact("Exiler", "{2}"), _alice);
+        var ability = BuildExileAbility(
+            new Majik.Core.CardData.Definitions.ExileTargetEffectDef { TargetFilter = "permanent" },
+            source);
+
+        var bystander = OnBattlefield(new Creature("Bystander", "{G}", 2, 2), _bob);
+
+        await ActivateAndResolve(ability, chosen: null);
+
+        bystander.Zone.Should().Be(ZoneType.Battlefield, "nothing is exiled when no target was chosen (CR 608.2b)");
+    }
+
+    // ------------------------------------------------------------------
+    // exile_target — exile target card from a graveyard (Part 2).
+    // CR 701.21 — Soul Guide Lantern / Scavenging Ooze / Boggart Trawler
+    // piece "exile target card from a graveyard".
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public async Task ExileTarget_ExilesChosenCardFromGraveyard()
+    {
+        var source = OnBattlefield(new Artifact("Lantern", "{1}"), _alice);
+        var ability = BuildExileAbility(
+            new Majik.Core.CardData.Definitions.ExileTargetEffectDef { TargetFilter = "card_in_graveyard" },
+            source);
+
+        var inGrave = new Creature("Dead Bear", "{1}{G}", 2, 2);
+        inGrave.SetOwner(_bob);
+        inGrave.SetController(_bob);
+        inGrave.SetZone(ZoneType.Graveyard);
+        _bob.Zones.Graveyard.AddCard(inGrave);
+
+        await ActivateAndResolve(ability, inGrave);
+
+        inGrave.Zone.Should().Be(ZoneType.Exile, "the chosen graveyard card is exiled (CR 701.21)");
+        _bob.Zones.Exile.GetCards().Should().Contain(inGrave);
+        _bob.Zones.Graveyard.GetCards().Should().NotContain(inGrave);
+    }
+
+    [Fact]
+    public void GraveyardCardFilter_OnlyOffersCardsInGraveyards()
+    {
+        var inGrave = new Creature("Dead Bear", "{1}{G}", 2, 2);
+        inGrave.SetOwner(_bob);
+        inGrave.SetZone(ZoneType.Graveyard);
+        _bob.Zones.Graveyard.AddCard(inGrave);
+        var onField = OnBattlefield(new Creature("Live Bear", "{1}{G}", 2, 2), _bob);
+        var ctx = NewContext(new Majik.Core.Stack.Stack(_bus));
+
+        var request = Majik.Core.CardData.Definitions.TargetFilters
+            .ToTargetRequest("card_in_graveyard", "exile");
+        var candidates = request.ResolveCandidates(ctx);
+
+        candidates.Should().Contain(inGrave);
+        candidates.Should().NotContain(onField, "battlefield cards are not in a graveyard");
+        candidates.Should().NotContain((object)_alice, "a graveyard-card filter offers no players");
+    }
+
+    [Fact]
+    public void CreatureCardInGraveyardFilter_OnlyOffersCreatureCards()
+    {
+        var deadBear = new Creature("Dead Bear", "{1}{G}", 2, 2);
+        deadBear.SetOwner(_bob);
+        deadBear.SetZone(ZoneType.Graveyard);
+        _bob.Zones.Graveyard.AddCard(deadBear);
+
+        var deadBolt = new Instant("Spent Bolt", "{R}");
+        deadBolt.SetOwner(_bob);
+        deadBolt.SetZone(ZoneType.Graveyard);
+        _bob.Zones.Graveyard.AddCard(deadBolt);
+
+        var ctx = NewContext(new Majik.Core.Stack.Stack(_bus));
+
+        var request = Majik.Core.CardData.Definitions.TargetFilters
+            .ToTargetRequest("creature_card_in_graveyard", "exile");
+        var candidates = request.ResolveCandidates(ctx);
+
+        candidates.Should().Contain(deadBear);
+        candidates.Should().NotContain(deadBolt, "a creature-card-in-graveyard filter offers no instants");
+    }
 }

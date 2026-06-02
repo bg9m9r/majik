@@ -28,6 +28,7 @@ namespace Majik.Core.CardData.Definitions;
 [JsonDerivedType(typeof(SurveilSelfEffectDef), "surveil_self")]
 [JsonDerivedType(typeof(ScrySelfEffectDef), "scry_self")]
 [JsonDerivedType(typeof(DestroyTargetEffectDef), "destroy_target")]
+[JsonDerivedType(typeof(ExileTargetEffectDef), "exile_target")]
 [JsonDerivedType(typeof(ReturnToHandEffectDef), "return_to_hand")]
 [JsonDerivedType(typeof(UntapTargetEffectDef), "untap_target")]
 [JsonDerivedType(typeof(TapTargetEffectDef), "tap_target")]
@@ -179,6 +180,44 @@ public sealed class DestroyTargetEffectDef : EffectDefinition
     /// <inheritdoc />
     public override Majik.Core.Players.Agents.TargetRequest? ToTargetRequest() =>
         TargetFilters.ToTargetRequest(TargetFilter, "destroy");
+}
+
+/// <summary>
+/// "Exile target [filter]" — real targeted exile effect (CR 701.21). The
+/// mirror of <see cref="DestroyTargetEffectDef"/> onto the exile primitive
+/// (<see cref="Majik.Core.Primitives.Fx.MoveToExile(Majik.Core.Cards.ICard)"/>).
+/// At resolution the effect reads the chosen target off
+/// <see cref="Majik.Core.Abilities.ResolutionContext.ChosenTargets"/> and exiles
+/// it. Unlike destroy, exile bypasses Indestructible (CR 702.12) and
+/// regeneration (CR 701.15) — the card moves regardless.
+///
+/// <para>
+/// CR 608.2b — at resolution the effect re-checks the SAME
+/// <see cref="TargetFilter"/> predicate the candidate gatherer used (not just
+/// battlefield presence), so a conditional filter (e.g. <c>nonbasic_land</c>,
+/// <c>black_or_red_permanent</c>) fizzles cleanly when the target no longer
+/// matches — even if the agent hands an off-filter object directly. The
+/// graveyard filters (<c>card_in_graveyard</c> /
+/// <c>creature_card_in_graveyard</c>) reuse the same machinery, so "exile
+/// target card from a graveyard" (Soul Guide Lantern / Scavenging Ooze's
+/// piece / Boggart Trawler-style) resolves through the SAME verb — the only
+/// zone difference is the predicate (graveyard vs battlefield), handled by
+/// <see cref="TargetFilters"/>.
+/// </para>
+///
+/// <see cref="TargetFilter"/> is the filter string the runtime translates into
+/// a <see cref="Majik.Core.Players.Agents.TargetRequest"/> (e.g.
+/// <c>"permanent"</c>, <c>"creature"</c>, <c>"nonbasic_land"</c>,
+/// <c>"card_in_graveyard"</c>, <c>"creature_card_in_graveyard"</c>).
+/// </summary>
+public sealed class ExileTargetEffectDef : EffectDefinition
+{
+    public string TargetFilter { get; set; } = "permanent";
+
+    /// <inheritdoc />
+    public override Majik.Core.Players.Agents.TargetRequest? ToTargetRequest() =>
+        TargetFilters.ToTargetRequest(
+            TargetFilter, "exile", Majik.Core.Cards.BotIntent.Removal);
 }
 
 /// <summary>
