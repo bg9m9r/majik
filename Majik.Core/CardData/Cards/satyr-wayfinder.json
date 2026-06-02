@@ -1,0 +1,9 @@
+{
+  "name": "Satyr Wayfinder",
+  "types": ["Creature"],
+  "subtypes": ["Satyr"],
+  "manaCost": "{1}{G}",
+  "power": 1,
+  "toughness": 1,
+  "abilities": []
+}
