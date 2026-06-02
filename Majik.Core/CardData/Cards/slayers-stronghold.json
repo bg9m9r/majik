@@ -1,0 +1,7 @@
+{
+  "name": "Slayers' Stronghold",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "C" }
+  ]
+}
