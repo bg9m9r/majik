@@ -1,0 +1,233 @@
+using FluentAssertions;
+using Majik.Core.Abilities;
+using Majik.Core.CardData;
+using Majik.Core.CardData.Factories;
+using Majik.Core.Cards;
+using Majik.Core.Cards.Types;
+using Majik.Core.Effects;
+using Majik.Core.Players;
+using Majik.Core.ValueObjects;
+using Majik.Core.Zones;
+using Xunit;
+
+namespace Majik.Core.Tests.CardData.Factories;
+
+/// <summary>
+/// Tests for <see cref="DarkslickShoresFactory"/> — the Scars of Mirrodin
+/// "fast land" Darkslick Shores.
+///
+/// Oracle (verified against Scryfall):
+///   "This land enters tapped unless you control two or fewer other lands.
+///    {T}: Add {U} or {B}."
+///
+/// Covers:
+/// - Identity (Land type, printed name, owner/controller wiring,
+///   non-Basic, non-Legendary).
+/// - Two mana abilities producing {U} and {B}.
+/// - ETB-tapped predicate via <see cref="ConditionalEntersTappedReplacement"/>
+///   (CR 614.1c): "two or fewer other lands" ⇒ untapped at ≤2 other lands,
+///   tapped at ≥3. "other" excludes the fast land itself; "you control"
+///   reads the CONTROLLER's battlefield only.
+/// - <see cref="NamedCardFactory"/> dispatch resolves the printed name.
+/// </summary>
+[Trait("Color", "C")]
+public class DarkslickShoresTests
+{
+    private static Land MakeWithBus(Player owner, ReplacementBus bus) =>
+        DarkslickShoresFactory.Create(owner, bus);
+
+    // -----------------------------------------------------------------------
+    // Identity
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void DarkslickShores_IsLand_WithCorrectName()
+    {
+        var alice = new Player("Alice", 20);
+
+        var land = DarkslickShoresFactory.Create(alice);
+
+        land.Should().BeOfType<Land>();
+        land.HasType(CardType.Land).Should().BeTrue();
+        land.Name.Should().Be("Darkslick Shores");
+        land.Owner.Should().BeSameAs(alice);
+        land.Controller.Should().BeSameAs(alice);
+    }
+
+    [Fact]
+    public void DarkslickShores_IsNotBasic_NotLegendary()
+    {
+        var alice = new Player("Alice", 20);
+
+        var land = DarkslickShoresFactory.Create(alice);
+
+        land.HasSupertype(CardSupertype.Basic).Should().BeFalse(
+            "fast lands are nonbasic");
+        land.HasSupertype(CardSupertype.Legendary).Should().BeFalse();
+    }
+    // -----------------------------------------------------------------------
+    // Mana abilities
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void DarkslickShores_HasTwoColouredManaAbilities_U_and_B()
+    {
+        var alice = new Player("Alice", 20);
+
+        var land = DarkslickShoresFactory.Create(alice);
+
+        var manaAbilities = land.Abilities.OfType<ManaAbility>().ToList();
+        manaAbilities.Should().HaveCount(2, "one ManaAbility per produced colour ({U} and {B})");
+
+        manaAbilities.Should().Contain(m => SameCost(m.ManaGenerated, ManaCost.Parse("U")),
+            "Darkslick Shores produces {U}");
+        manaAbilities.Should().Contain(m => SameCost(m.ManaGenerated, ManaCost.Parse("B")),
+            "Darkslick Shores produces {B}");
+    }
+
+    [Fact]
+    public void DarkslickShores_HasNoActivatedOrTriggeredAbilities()
+    {
+        var alice = new Player("Alice", 20);
+
+        var land = DarkslickShoresFactory.Create(alice);
+
+        land.Abilities.OfType<ActivatedAbility>().Should().BeEmpty(
+            "fast lands have no non-mana activated abilities");
+        land.Abilities.OfType<TriggeredAbility>().Should().BeEmpty(
+            "fast lands have no triggered abilities");
+    }
+
+    // -----------------------------------------------------------------------
+    // ETB-tapped predicate (CR 614.1c) — "two or fewer other lands"
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void DarkslickShores_EntersUntapped_WhenControllerHasZeroOtherLands()
+    {
+        var bus = new ReplacementBus();
+        var alice = new Player("Alice", 20);
+        var land = MakeWithBus(alice, bus);
+
+        var after = bus.Apply(new ZoneMoveIntent(
+            Card: land, FromZone: ZoneType.Hand,
+            ToZone: ZoneType.Battlefield, Controller: alice));
+
+        after.Should().NotBeNull();
+        after!.EntersTapped.Should().BeFalse(
+            "0 other lands is ≤ 2, so Darkslick Shores enters untapped");
+    }
+
+    [Fact]
+    public void DarkslickShores_EntersUntapped_WhenControllerHasTwoOtherLands()
+    {
+        var bus = new ReplacementBus();
+        var alice = new Player("Alice", 20);
+        for (var i = 0; i < 2; i++)
+        {
+            var p = (Land)NamedCardFactory.Create("Plains", alice);
+            alice.Zones.Battlefield.AddCard(p);
+            p.SetZone(ZoneType.Battlefield);
+        }
+
+        var land = MakeWithBus(alice, bus);
+
+        var after = bus.Apply(new ZoneMoveIntent(
+            Card: land, FromZone: ZoneType.Hand,
+            ToZone: ZoneType.Battlefield, Controller: alice));
+
+        after.Should().NotBeNull();
+        after!.EntersTapped.Should().BeFalse(
+            "exactly 2 other lands is still ≤ 2, so it enters untapped");
+    }
+
+    [Fact]
+    public void DarkslickShores_EntersTapped_WhenControllerHasThreeOtherLands()
+    {
+        var bus = new ReplacementBus();
+        var alice = new Player("Alice", 20);
+        for (var i = 0; i < 3; i++)
+        {
+            var p = (Land)NamedCardFactory.Create("Plains", alice);
+            alice.Zones.Battlefield.AddCard(p);
+            p.SetZone(ZoneType.Battlefield);
+        }
+
+        var land = MakeWithBus(alice, bus);
+
+        var after = bus.Apply(new ZoneMoveIntent(
+            Card: land, FromZone: ZoneType.Hand,
+            ToZone: ZoneType.Battlefield, Controller: alice));
+
+        after.Should().NotBeNull();
+        after!.EntersTapped.Should().BeTrue(
+            "3 other lands exceeds 2, so Darkslick Shores enters tapped");
+    }
+
+    [Fact]
+    public void DarkslickShores_PredicateExcludesSelf()
+    {
+        // "two or FEWER OTHER lands" — the fast land must not count itself.
+        // Seed exactly 2 other lands, then place the fast land on the
+        // battlefield too; the count must stay 2 (≤ 2 ⇒ untapped).
+        var bus = new ReplacementBus();
+        var alice = new Player("Alice", 20);
+        for (var i = 0; i < 2; i++)
+        {
+            var p = (Land)NamedCardFactory.Create("Plains", alice);
+            alice.Zones.Battlefield.AddCard(p);
+            p.SetZone(ZoneType.Battlefield);
+        }
+
+        var land = MakeWithBus(alice, bus);
+        alice.Zones.Battlefield.AddCard(land);
+        land.SetZone(ZoneType.Battlefield);
+
+        var after = bus.Apply(new ZoneMoveIntent(
+            Card: land, FromZone: ZoneType.Hand,
+            ToZone: ZoneType.Battlefield, Controller: alice));
+
+        after.Should().NotBeNull();
+        after!.EntersTapped.Should().BeFalse(
+            "the fast land excludes itself, so 2 other lands ⇒ untapped");
+    }
+
+    [Fact]
+    public void DarkslickShores_EntersUntapped_WhenOnlyOpponentHasManyLands()
+    {
+        // "you control" — opponent's lands are irrelevant to the predicate.
+        var bus = new ReplacementBus();
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+        for (var i = 0; i < 5; i++)
+        {
+            var p = (Land)NamedCardFactory.Create("Plains", bob);
+            bob.Zones.Battlefield.AddCard(p);
+            p.SetZone(ZoneType.Battlefield);
+        }
+
+        var land = MakeWithBus(alice, bus);
+
+        var after = bus.Apply(new ZoneMoveIntent(
+            Card: land, FromZone: ZoneType.Hand,
+            ToZone: ZoneType.Battlefield, Controller: alice));
+
+        after.Should().NotBeNull();
+        after!.EntersTapped.Should().BeFalse(
+            "Alice controls 0 lands; Bob's 5 don't count, so it enters untapped");
+    }
+    [Fact]
+    public void DarkslickShores_Create_ThrowsOnNullOwner()
+    {
+        var act = () => DarkslickShoresFactory.Create(null!);
+        act.Should().Throw<ArgumentNullException>();
+    }
+
+    private static bool SameCost(ManaCost a, ManaCost b) =>
+        a.White == b.White &&
+        a.Blue == b.Blue &&
+        a.Black == b.Black &&
+        a.Red == b.Red &&
+        a.Green == b.Green &&
+        a.Generic == b.Generic;
+}

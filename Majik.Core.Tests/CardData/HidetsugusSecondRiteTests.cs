@@ -17,7 +17,7 @@ namespace Majik.Core.Tests.CardData;
 
 /// <summary>
 /// Tests for Hidetsugu's Second Rite (Champions of Kamigawa / Kamigawa:
-/// Neon Dynasty, {2}{R}, Sorcery).
+/// Neon Dynasty, {2}{R}, Instant).
 ///
 /// Oracle: "If target opponent's life total is exactly 10, Hidetsugu's
 /// Second Rite deals 10 damage to them."
@@ -53,13 +53,13 @@ public class HidetsugusSecondRiteTests
     // -----------------------------------------------------------------------
 
     [Fact]
-    public void HidetsugusSecondRite_IsSorcery_AtCost2R()
+    public void HidetsugusSecondRite_IsInstant_AtCost2R()
     {
         var rite = HidetsugusSecondRiteFactory.Create(_alice);
 
         rite.Name.Should().Be("Hidetsugu's Second Rite");
         rite.ManaCost.Should().Be("{2}{R}");
-        rite.HasType(CardType.Sorcery).Should().BeTrue();
+        rite.HasType(CardType.Instant).Should().BeTrue();
         rite.Owner.Should().BeSameAs(_alice);
         rite.Controller.Should().BeSameAs(_alice);
     }
@@ -69,9 +69,9 @@ public class HidetsugusSecondRiteTests
     {
         var card = NamedCardFactory.Create("Hidetsugu's Second Rite", _alice);
 
-        card.Should().BeOfType<Sorcery>();
+        card.Should().BeOfType<Instant>();
         card.Name.Should().Be("Hidetsugu's Second Rite");
-        card.HasType(CardType.Sorcery).Should().BeTrue();
+        card.HasType(CardType.Instant).Should().BeTrue();
         card.ManaCost.Should().Be("{2}{R}");
         card.Owner.Should().BeSameAs(_alice);
     }

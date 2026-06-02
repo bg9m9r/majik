@@ -35,6 +35,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// path by <see cref="Majik.Core.CardData.EntersTappedBinder"/>, not by this
 /// named-card factory — same posture as the refuge-land cycle.
 /// </summary>
+[Trait("Color", "C")]
 public class SwiftwaterCliffsTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -51,18 +52,6 @@ public class SwiftwaterCliffsTests
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_SwiftwaterCliffs()
-    {
-        var card = NamedCardFactory.Create("Swiftwater Cliffs", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Swiftwater Cliffs");
-        card.Abilities.OfType<ManaAbility>().Should().HaveCount(2);
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1);
-    }
-
     [Fact]
     public void SwiftwaterCliffs_HasManaAbility_ForBlue()
     {

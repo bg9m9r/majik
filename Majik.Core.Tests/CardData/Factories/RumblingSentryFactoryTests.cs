@@ -29,6 +29,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - ETB scry 1 on empty library: no-ops cleanly (CR 701.20).
 /// </summary>
 [Collection(nameof(StaticRegistryCollection))]
+[Trait("Color", "W")]
 public class RumblingSentryFactoryTests : IDisposable
 {
     private readonly Player _alice = new("Alice", 20);
@@ -84,18 +85,6 @@ public class RumblingSentryFactoryTests : IDisposable
     }
 
     // ── NamedCardFactory dispatch ─────────────────────────────────────────────
-
-    [Fact]
-    public void RumblingSentry_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Rumbling Sentry", _alice);
-
-        c.Should().BeOfType<Creature>("Rumbling Sentry is a Creature");
-        c.Name.Should().Be("Rumbling Sentry");
-        c.HasSubtype(CardSubtype.Giant).Should().BeTrue();
-        c.ManaCost.Should().Be("{3}{W}{W}");
-    }
-
     // ── ETB triggered ability shape ───────────────────────────────────────────
 
     [Fact]

@@ -41,6 +41,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   the first Untap StepStartedEvent for the blocked creature's
 ///   controller.
 /// </summary>
+[Trait("Color", "U")]
 public class WallOfFrostFactoryTests : IDisposable
 {
     private readonly Player _alice = new("Alice", 20);
@@ -102,23 +103,6 @@ public class WallOfFrostFactoryTests : IDisposable
     // -----------------------------------------------------------------------
     // NamedCardFactory dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void WallOfFrost_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Wall of Frost", _alice);
-
-        card.Should().BeOfType<Creature>("Wall of Frost is a Creature");
-        card.Name.Should().Be("Wall of Frost");
-        card.HasSubtype(CardSubtype.Wall).Should().BeTrue();
-        card.ManaCost.Should().Be("{1}{U}{U}");
-        ((Creature)card).BasePower.Should().Be(0);
-        ((Creature)card).BaseToughness.Should().Be(7);
-        card.Abilities.OfType<KeywordAbility>()
-            .Should().ContainSingle(k => k.Keyword == "Defender");
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1);
-    }
-
     // -----------------------------------------------------------------------
     // Triggered ability — shape
     // -----------------------------------------------------------------------

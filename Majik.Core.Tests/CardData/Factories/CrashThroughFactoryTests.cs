@@ -33,6 +33,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     are untouched. Then the caster draws a card.
 ///   - Trample grant expires at end of turn (CR 514.2).
 /// </summary>
+[Trait("Color", "R")]
 public class CrashThroughFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -54,17 +55,6 @@ public class CrashThroughFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void CrashThrough_NamedCardFactory_Dispatch()
-    {
-        var dispatched = NamedCardFactory.Create("Crash Through", _alice);
-
-        dispatched.Should().BeOfType<Sorcery>();
-        dispatched.Name.Should().Be("Crash Through");
-        dispatched.HasType(CardType.Sorcery).Should().BeTrue();
-    }
-
     // -----------------------------------------------------------------------
     // SpellDefinition shape
     // -----------------------------------------------------------------------

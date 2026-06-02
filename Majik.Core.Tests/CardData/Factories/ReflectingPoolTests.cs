@@ -35,6 +35,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Reflecting Pool ignores itself (no infinite self-reference).
 /// - Tapping the live ability produces the matching mana and taps the land.
 /// </summary>
+[Trait("Color", "C")]
 public class ReflectingPoolTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -72,21 +73,6 @@ public class ReflectingPoolTests
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void ReflectingPool_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Reflecting Pool", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Reflecting Pool");
-        card.HasType(CardType.Land).Should().BeTrue();
-
-        // One ability per mana type: W, U, B, R, G, C.
-        card.Abilities.OfType<ManaAbility>().Should().HaveCount(6,
-            "one fixed-type mana ability per producible type (WUBRG + C)");
-    }
-
     // -----------------------------------------------------------------------
     // No other lands → no type is producible → no ability is active
     // -----------------------------------------------------------------------

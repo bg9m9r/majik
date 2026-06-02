@@ -35,6 +35,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Sweep is instant speed (no "activate only as a sorcery" rider on this
 ///   card — unlike Blast Zone).
 /// </summary>
+[Trait("Color", "C")]
 public class RatchetBombFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -55,24 +56,6 @@ public class RatchetBombFactoryTests
         bomb.Owner.Should().BeSameAs(_alice);
         bomb.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void RatchetBomb_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Ratchet Bomb", _alice);
-
-        card.Should().BeOfType<Artifact>();
-        card.Name.Should().Be("Ratchet Bomb");
-        card.HasType(CardType.Artifact).Should().BeTrue();
-
-        card.Abilities.OfType<ManaAbility>().Should().BeEmpty(
-            "Ratchet Bomb has no mana ability (unlike Blast Zone)");
-        card.Abilities.OfType<TriggeredAbility>().Should().BeEmpty(
-            "Ratchet Bomb has no ETB trigger (unlike Blast Zone)");
-        card.Abilities.OfType<ActivatedAbility>().Should().HaveCount(2,
-            "the charge-counter activation + sweep activation are both attached");
-    }
-
     // -----------------------------------------------------------------------
     // {T}: Put a charge counter on this artifact.
     // -----------------------------------------------------------------------

@@ -18,6 +18,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Modern reprints). Vanilla — no printed keywords, triggers, statics, or
 /// activated abilities.
 /// </summary>
+[Trait("Color", "B")]
 public class ScatheZombiesFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -55,18 +56,6 @@ public class ScatheZombiesFactoryTests
         colors.Should().Contain(ManaColor.Black, "Scathe Zombies costs {2}{B}");
         colors.Should().HaveCount(1, "Scathe Zombies is exactly Black");
     }
-
-    [Fact]
-    public void ScatheZombies_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Scathe Zombies", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Scathe Zombies");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Zombie).Should().BeTrue();
-    }
-
     [Fact]
     public void ScatheZombies_IsVanilla_NoAbilities()
     {

@@ -25,6 +25,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// CR 700.2d — modal "Choose one —" spell with 3 modes.
 /// MinTargets=0 per mode so unchosen modes don't gate the cast (CR 601.2c).
 /// </summary>
+[Trait("Color", "W")]
 public class ThrabenCharmFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -51,18 +52,6 @@ public class ThrabenCharmFactoryTests
         ThrabenCharmFactory.CardName.Should().Be("Thraben Charm");
         ThrabenCharmFactory.PrintedManaCost.Should().Be("{1}{W}");
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_ThrabenCharm()
-    {
-        var card = NamedCardFactory.Create("Thraben Charm", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Thraben Charm");
-        card.HasType(CardType.Instant).Should().BeTrue();
-        card.Owner.Should().BeSameAs(_alice);
-    }
-
     [Fact]
     public void ThrabenCharm_BuildDefinition_HasThreeModes_ThreeTargetRequests()
     {

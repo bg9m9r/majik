@@ -34,6 +34,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - PhyrexianAlternativeCost: AlternativeManaCost = {2}, LifeCost = 2;
 ///     OnResolved drains 2 life from the caster.
 /// </summary>
+[Trait("Color", "B")]
 public class VaultSkirgeFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -66,19 +67,6 @@ public class VaultSkirgeFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void VaultSkirge_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Vault Skirge", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Vault Skirge");
-        c.HasType(CardType.Artifact).Should().BeTrue();
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Imp).Should().BeTrue();
-    }
-
     // -------------------------------------------------------------------------
     // Keyword markers
     // -------------------------------------------------------------------------

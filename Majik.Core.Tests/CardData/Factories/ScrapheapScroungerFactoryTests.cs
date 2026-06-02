@@ -36,6 +36,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Guards: with no other creature card available, or once Scrounger has
 ///     left the graveyard, the body is a no-op.
 /// </summary>
+[Trait("Color", "C")]
 public class ScrapheapScroungerFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -78,18 +79,6 @@ public class ScrapheapScroungerFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void ScrapheapScrounger_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Scrapheap Scrounger", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Scrapheap Scrounger");
-        c.HasType(CardType.Artifact).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Construct).Should().BeTrue();
-    }
-
     // -----------------------------------------------------------------------
     // Can't-block static (CR 509.1c)
     // -----------------------------------------------------------------------

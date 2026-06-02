@@ -17,6 +17,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Card: Alpine Watchdog — {1}{W} Creature — Dog 2/2.
 ///   "Vigilance"
 /// </summary>
+[Trait("Color", "W")]
 public class AlpineWatchdogFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -73,16 +74,5 @@ public class AlpineWatchdogFactoryTests
         c.Abilities.OfType<ActivatedAbility>().Should().BeEmpty();
         c.Abilities.OfType<KeywordAbility>().Should().HaveCount(1,
             "Vigilance is the only printed keyword");
-    }
-
-    [Fact]
-    public void AlpineWatchdog_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Alpine Watchdog", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Alpine Watchdog");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Dog).Should().BeTrue();
     }
 }

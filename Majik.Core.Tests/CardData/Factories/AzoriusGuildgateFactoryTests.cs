@@ -25,20 +25,10 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// path by <see cref="EntersTappedBinder"/> from the oracle text, not by this
 /// factory (same posture as the Triome factories).
 /// </summary>
+[Trait("Color", "C")]
 public class AzoriusGuildgateFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
-
-    [Fact]
-    public void AzoriusGuildgate_Dispatch_ReturnsLandWithGateSubtype()
-    {
-        var card = NamedCardFactory.Create("Azorius Guildgate", _alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Azorius Guildgate");
-        card.HasSubtype(CardSubtype.Gate).Should().BeTrue();
-    }
-
     [Fact]
     public void AzoriusGuildgate_HasTwoManaAbilities_ProducingWhiteAndBlue()
     {

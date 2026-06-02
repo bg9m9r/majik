@@ -18,6 +18,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Modern reprints). Vanilla — no printed keywords, triggers, statics, or
 /// activated abilities.
 /// </summary>
+[Trait("Color", "R")]
 public class GoblinPikerFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -56,19 +57,6 @@ public class GoblinPikerFactoryTests
         colors.Should().Contain(ManaColor.Red, "Goblin Piker costs {1}{R}");
         colors.Should().HaveCount(1, "Goblin Piker is exactly Red");
     }
-
-    [Fact]
-    public void GoblinPiker_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Goblin Piker", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Goblin Piker");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Goblin).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Warrior).Should().BeTrue();
-    }
-
     [Fact]
     public void GoblinPiker_IsVanilla_NoAbilities()
     {

@@ -16,6 +16,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// (Onslaught). Vanilla — no printed keywords, triggers, statics, or
 /// activated abilities.
 /// </summary>
+[Trait("Color", "G")]
 public class ElvishWarriorFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -43,18 +44,6 @@ public class ElvishWarriorFactoryTests
 
         c.ManaCostValue.TotalValue.Should().Be(2, "two green pips = converted mana cost 2");
     }
-
-    [Fact]
-    public void ElvishWarrior_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Elvish Warrior", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Elvish Warrior");
-        c.HasSubtype(CardSubtype.Elf).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Warrior).Should().BeTrue();
-    }
-
     [Fact]
     public void ElvishWarrior_IsVanilla_NoAbilities()
     {

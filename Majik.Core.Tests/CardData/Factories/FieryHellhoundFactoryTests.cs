@@ -28,6 +28,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Repeatable: activating twice registers two +1/+0 EOT effects.
 /// - NamedCardFactory dispatcher resolves "Fiery Hellhound" to expected shape.
 /// </summary>
+[Trait("Color", "R")]
 public class FieryHellhoundFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);

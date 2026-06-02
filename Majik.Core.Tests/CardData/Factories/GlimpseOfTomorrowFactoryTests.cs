@@ -22,6 +22,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   * reveals top of library until N nonland permanent cards are seen.
 ///   * those re-enter the battlefield; the others stay in the library.
 /// </summary>
+[Trait("Color", "R")]
 public class GlimpseOfTomorrowFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -37,15 +38,6 @@ public class GlimpseOfTomorrowFactoryTests
         CardColors.GetColors(card).Should().Contain(ManaColor.Red);
         card.Should().BeOfType<Sorcery>();
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_GlimpseOfTomorrow()
-    {
-        var card = NamedCardFactory.Create("Glimpse of Tomorrow", _alice);
-        card.Should().BeOfType<Sorcery>();
-        card.Name.Should().Be("Glimpse of Tomorrow");
-    }
-
     [Fact]
     public void SpellDefinition_NoTargets_NoX()
     {

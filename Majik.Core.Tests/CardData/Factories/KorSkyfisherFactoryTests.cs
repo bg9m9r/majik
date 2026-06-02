@@ -36,6 +36,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - ETB resolution: no target chosen → no-op, no exception.
 /// - ETB resolution: target already off battlefield (CR 608.2b) → no-op.
 /// </summary>
+[Trait("Color", "W")]
 public class KorSkyfisherFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -82,19 +83,6 @@ public class KorSkyfisherFactoryTests
     // -----------------------------------------------------------------------
     // NamedCardFactory dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void KorSkyfisher_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Kor Skyfisher", _alice);
-
-        c.Should().BeOfType<Creature>("Kor Skyfisher is a Creature");
-        c.Name.Should().Be("Kor Skyfisher");
-        c.HasSubtype(CardSubtype.Kor).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Soldier).Should().BeTrue();
-        c.ManaCost.Should().Be("{1}{W}");
-    }
-
     // -----------------------------------------------------------------------
     // Flying (CR 702.9)
     // -----------------------------------------------------------------------

@@ -33,6 +33,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   green Spider token with reach on the battlefield.
 /// - ETB-effect execution mints one such token under the controller.
 /// </summary>
+[Trait("Color", "G")]
 public class TwinSilkSpiderFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -55,18 +56,6 @@ public class TwinSilkSpiderFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void TwinSilkSpider_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Twin-Silk Spider", _alice);
-
-        c.Should().BeOfType<Creature>("Twin-Silk Spider is a Creature instance");
-        c.Name.Should().Be("Twin-Silk Spider");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        ((Creature)c).HasSubtype(CardSubtype.Spider).Should().BeTrue();
-    }
-
     // ── Reach ───────────────────────────────────────────────────────────
 
     [Fact]

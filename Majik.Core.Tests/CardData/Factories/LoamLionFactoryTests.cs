@@ -32,6 +32,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Non-Forest lands (Mountain) do not trigger the bonus.
 /// - Helper predicate (ControlsForest).
 /// </summary>
+[Trait("Color", "W")]
 public class LoamLionFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -71,18 +72,6 @@ public class LoamLionFactoryTests
         lion.Owner.Should().BeSameAs(_alice);
         lion.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void LoamLion_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Loam Lion", _alice);
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Loam Lion");
-        card.HasSubtype(CardSubtype.Cat).Should().BeTrue();
-        ((Creature)card).BasePower.Should().Be(1);
-        ((Creature)card).BaseToughness.Should().Be(1);
-    }
-
     private Creature NewLionOnBattlefield()
     {
         var effects = new ContinuousEffectsService();

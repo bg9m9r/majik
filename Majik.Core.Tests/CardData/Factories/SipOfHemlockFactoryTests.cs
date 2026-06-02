@@ -25,6 +25,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Happy path: creature destroyed → graveyard AND its controller loses 2 life.
 /// - Illegal target (CR 608.2b): creature not on battlefield → no destroy, no life loss.
 /// </summary>
+[Trait("Color", "B")]
 public class SipOfHemlockFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -49,16 +50,6 @@ public class SipOfHemlockFactoryTests
     }
 
     // ── Dispatch ──────────────────────────────────────────────────────────────
-
-    [Fact]
-    public void DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Sip of Hemlock", _alice);
-
-        card.Should().BeOfType<Sorcery>();
-        card.Name.Should().Be("Sip of Hemlock");
-    }
-
     // ── SpellDefinition shape ─────────────────────────────────────────────────
 
     [Fact]

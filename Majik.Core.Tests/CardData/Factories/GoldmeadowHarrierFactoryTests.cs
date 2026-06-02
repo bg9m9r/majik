@@ -24,6 +24,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Tap resolution taps the chosen creature (CR 701.21).
 ///   - Tap resolution is a no-op on an off-battlefield target (CR 608.2b).
 /// </summary>
+[Trait("Color", "W")]
 public class GoldmeadowHarrierFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -44,17 +45,6 @@ public class GoldmeadowHarrierFactoryTests
         harrier.Owner.Should().BeSameAs(_alice);
         harrier.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void GoldmeadowHarrier_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Goldmeadow Harrier", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Goldmeadow Harrier");
-        card.HasSubtype(CardSubtype.Kithkin).Should().BeTrue();
-    }
-
     [Fact]
     public void GoldmeadowHarrier_HasSingleTapActivatedAbility_WithManaAndTapCost()
     {

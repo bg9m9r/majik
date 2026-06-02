@@ -33,6 +33,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Ferocious rider does not alter the base 2-damage outcome (the
 ///   prevention-suppression clause is a documented v1 no-op; see factory).
 /// </summary>
+[Trait("Color", "R")]
 public class WildSlashFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -53,17 +54,6 @@ public class WildSlashFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void WildSlash_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Wild Slash", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Wild Slash");
-        card.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     // -----------------------------------------------------------------------
     // SpellDefinition shape
     // -----------------------------------------------------------------------

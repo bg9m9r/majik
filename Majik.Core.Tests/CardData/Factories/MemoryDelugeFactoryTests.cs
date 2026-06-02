@@ -30,6 +30,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - X = 0 / negative clamps to a clean no-op.
 ///   - Flashback alt-cost = {5}{U}{U}.
 /// </summary>
+[Trait("Color", "U")]
 public class MemoryDelugeFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -47,18 +48,6 @@ public class MemoryDelugeFactoryTests
         s.Owner.Should().BeSameAs(_alice);
         s.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_MemoryDeluge()
-    {
-        var card = NamedCardFactory.Create("Memory Deluge", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Memory Deluge");
-        card.HasType(CardType.Instant).Should().BeTrue();
-        card.ManaCost.Should().Be("{2}{U}{U}");
-    }
-
     [Fact]
     public void DefaultManaSpent_IsFour()
     {

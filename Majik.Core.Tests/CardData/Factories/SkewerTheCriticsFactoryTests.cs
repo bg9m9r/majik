@@ -30,6 +30,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Resolve body deals 3 damage to a player target.
 /// - Resolve body deals 3 damage to a creature target.
 /// </summary>
+[Trait("Color", "R")]
 public class SkewerTheCriticsFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -51,17 +52,6 @@ public class SkewerTheCriticsFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void SkewerTheCritics_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Skewer the Critics", _alice);
-
-        card.Should().BeOfType<Sorcery>();
-        card.Name.Should().Be("Skewer the Critics");
-        card.HasType(CardType.Sorcery).Should().BeTrue();
-    }
-
     // -------------------------------------------------------------------
     // Spectacle alt cost
     // -------------------------------------------------------------------

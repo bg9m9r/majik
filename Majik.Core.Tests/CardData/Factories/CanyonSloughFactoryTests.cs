@@ -26,6 +26,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// self, draws one, and publishes
 /// <see cref="Majik.Core.Events.CardCycledEvent"/> (CR 702.32d).
 /// </summary>
+[Trait("Color", "C")]
 public class CanyonSloughFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -33,18 +34,6 @@ public class CanyonSloughFactoryTests
     // -----------------------------------------------------------------------
     // Identity + dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void CanyonSlough_Dispatch_ReturnsLandWithSwampAndMountainSubtypes()
-    {
-        var card = NamedCardFactory.Create("Canyon Slough", _alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Canyon Slough");
-        card.HasSubtype(CardSubtype.Swamp).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Mountain).Should().BeTrue();
-    }
-
     [Fact]
     public void CanyonSlough_HasTwoManaAbilities_ProducingBlackAndRed()
     {

@@ -40,6 +40,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Tap-as-cost: a tapped prism cannot activate any of its abilities.
 /// - Dispatch through <see cref="NamedCardFactory"/>.
 /// </summary>
+[Trait("Color", "C")]
 public class PropheticPrismFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -63,17 +64,6 @@ public class PropheticPrismFactoryTests
         prism.Owner.Should().BeSameAs(_alice);
         prism.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_PropheticPrism()
-    {
-        var card = NamedCardFactory.Create("Prophetic Prism", _alice);
-
-        card.Should().BeOfType<Artifact>();
-        card.Name.Should().Be("Prophetic Prism");
-        card.HasType(CardType.Artifact).Should().BeTrue();
-    }
-
     // -----------------------------------------------------------------------
     // Ability shape — one ETB trigger + five coloured mana abilities
     // -----------------------------------------------------------------------

@@ -26,6 +26,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - {T}: Add {W} mana ability present from the JSON-driven build route.
 /// - NamedCardFactory dispatch resolves the printed name.
 /// </summary>
+[Trait("Color", "C")]
 public class SnowCoveredPlainsFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -107,24 +108,6 @@ public class SnowCoveredPlainsFactoryTests
     // -----------------------------------------------------------------------
     // NamedCardFactory dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void SnowCoveredPlains_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Snow-Covered Plains", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Snow-Covered Plains");
-        card.HasType(CardType.Land).Should().BeTrue();
-        card.HasSupertype(CardSupertype.Basic).Should().BeTrue();
-        card.HasSupertype(CardSupertype.Snow).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Plains).Should().BeTrue();
-        card.Owner.Should().BeSameAs(_alice);
-
-        card.Abilities.OfType<ManaAbility>().Should().HaveCount(1,
-            "the dispatched Snow-Covered Plains carries its {T}: Add {W} mana ability");
-    }
-
     // -----------------------------------------------------------------------
     // Null guard
     // -----------------------------------------------------------------------

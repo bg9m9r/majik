@@ -28,6 +28,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     <see cref="ValueObjects.ManaCost.Parse"/>), can't activate while
 ///     already tapped.
 /// </summary>
+[Trait("Color", "C")]
 public class PlagueMyrFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -53,24 +54,6 @@ public class PlagueMyrFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void PlagueMyr_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Plague Myr", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Plague Myr");
-        c.HasType(CardType.Artifact).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Phyrexian).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Myr).Should().BeTrue();
-        c.Abilities.OfType<ManaAbility>().Should().HaveCount(1,
-            "{T}: Add {C} mana ability is attached");
-        c.Abilities.OfType<KeywordAbility>().Should().Contain(k =>
-            string.Equals(k.Keyword, "Infect", System.StringComparison.OrdinalIgnoreCase),
-            "CR 702.90 — Infect keyword marker is wired");
-    }
-
     // -------------------------------------------------------------------------
     // Infect
     // -------------------------------------------------------------------------

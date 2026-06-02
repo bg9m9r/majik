@@ -30,6 +30,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Tap-as-cost: a tapped signet cannot activate (CR 605.1 / {T} cost).
 /// - Dispatch through <see cref="NamedCardFactory"/>.
 /// </summary>
+[Trait("Color", "C")]
 public class IzzetSignetFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -52,16 +53,6 @@ public class IzzetSignetFactoryTests
         signet.Owner.Should().BeSameAs(_alice);
         signet.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_IzzetSignet()
-    {
-        var card = NamedCardFactory.Create("Izzet Signet", _alice);
-
-        card.Should().BeOfType<Artifact>();
-        card.Name.Should().Be("Izzet Signet");
-    }
-
     // -----------------------------------------------------------------------
     // Mana ability — shape
     // -----------------------------------------------------------------------

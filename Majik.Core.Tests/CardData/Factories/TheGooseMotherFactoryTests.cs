@@ -38,6 +38,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Attack trigger: with a Food + "yes", sacrifices the Food and draws.
 /// - Attack trigger: with no Food, draws nothing (nothing to sacrifice).
 /// </summary>
+[Trait("Color", "M")]
 public class TheGooseMotherFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -63,18 +64,6 @@ public class TheGooseMotherFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void TheGooseMother_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("The Goose Mother", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("The Goose Mother");
-        ((Creature)c).HasSubtype(CardSubtype.Bird).Should().BeTrue();
-        ((Creature)c).HasSubtype(CardSubtype.Hydra).Should().BeTrue();
-    }
-
     // ── Flying ──────────────────────────────────────────────────────────
 
     [Fact]

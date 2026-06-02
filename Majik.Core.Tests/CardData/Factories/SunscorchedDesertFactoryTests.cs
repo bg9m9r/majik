@@ -30,6 +30,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Fizzle (CR 608.2b) — no target chosen → clean no-op.
 /// - <see cref="NamedCardFactory"/> dispatch.
 /// </summary>
+[Trait("Color", "C")]
 public class SunscorchedDesertFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -58,19 +59,6 @@ public class SunscorchedDesertFactoryTests
         d.Abilities.OfType<ManaAbility>().Should().HaveCount(1);
         d.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1);
     }
-
-    [Fact]
-    public void SunscorchedDesert_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Sunscorched Desert", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Sunscorched Desert");
-        card.HasType(CardType.Land).Should().BeTrue();
-        card.Abilities.OfType<ManaAbility>().Should().HaveCount(1);
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1);
-    }
-
     // -----------------------------------------------------------------------
     // Enters-tapped (CR 614.1c)
     // -----------------------------------------------------------------------

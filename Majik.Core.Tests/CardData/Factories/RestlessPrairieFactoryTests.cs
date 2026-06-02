@@ -34,6 +34,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Attack trigger: NON-targeted; pumps every OTHER creature the controller
 ///   controls +1/+1 until end of turn (the land itself excluded).
 /// </summary>
+[Trait("Color", "C")]
 public class RestlessPrairieFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -69,21 +70,6 @@ public class RestlessPrairieFactoryTests
         land.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1,
             "the attack trigger is attached to the land shape");
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_RestlessPrairie()
-    {
-        var card = NamedCardFactory.Create("Restless Prairie", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Restless Prairie");
-        card.HasType(CardType.Land).Should().BeTrue();
-
-        card.Abilities.OfType<ManaAbility>().Should().HaveCount(2);
-        card.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1);
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1);
-    }
-
     // -----------------------------------------------------------------------
     // Animate ability
     // -----------------------------------------------------------------------

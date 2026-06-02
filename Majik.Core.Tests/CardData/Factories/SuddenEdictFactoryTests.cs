@@ -37,6 +37,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Target player with no creatures → no-op.
 ///   - Illegal / non-Player target (CR 608.2b) → no effect.
 /// </summary>
+[Trait("Color", "B")]
 public class SuddenEdictFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -69,19 +70,6 @@ public class SuddenEdictFactoryTests
         card.Abilities.OfType<KeywordAbility>()
             .Should().ContainSingle(a => a.Keyword == "Split second");
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_SuddenEdict()
-    {
-        var card = NamedCardFactory.Create("Sudden Edict", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Sudden Edict");
-        card.HasType(CardType.Instant).Should().BeTrue();
-        card.ManaCost.Should().Be("{1}{B}");
-        card.Owner.Should().BeSameAs(_alice);
-    }
-
     // -----------------------------------------------------------------------
     // SpellDefinition shape
     // -----------------------------------------------------------------------

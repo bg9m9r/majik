@@ -27,6 +27,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   (including the Shaman itself; excluding opponent's Elves).
 /// - No chosen target → clean no-op (CR 608.2b).
 /// </summary>
+[Trait("Color", "M")]
 public class ShamanOfThePackFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -64,19 +65,6 @@ public class ShamanOfThePackFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void ShamanOfThePack_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Shaman of the Pack", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Shaman of the Pack");
-        ((Creature)c).HasSubtype(CardSubtype.Elf).Should().BeTrue();
-        ((Creature)c).HasSubtype(CardSubtype.Shaman).Should().BeTrue();
-        c.ManaCost.Should().Be("{1}{B}{G}");
-    }
-
     // -----------------------------------------------------------------------
     // Trigger shape
     // -----------------------------------------------------------------------

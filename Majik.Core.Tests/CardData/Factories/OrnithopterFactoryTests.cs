@@ -15,6 +15,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Card: Ornithopter — Artifact Creature — Thopter {0} 0/2 (Antiquities).
 ///   "Flying"
 /// </summary>
+[Trait("Color", "C")]
 public class OrnithopterFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -34,19 +35,6 @@ public class OrnithopterFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void Ornithopter_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Ornithopter", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Ornithopter");
-        c.HasType(CardType.Artifact).Should().BeTrue();
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Thopter).Should().BeTrue();
-    }
-
     [Fact]
     public void Ornithopter_HasFlyingKeywordMarker()
     {

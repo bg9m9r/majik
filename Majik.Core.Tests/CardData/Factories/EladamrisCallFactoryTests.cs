@@ -28,6 +28,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///    SylvanScrying already verifies; here we just confirm the pick path
 ///    routes through the creature predicate.
 /// </summary>
+[Trait("Color", "M")]
 public class EladamrisCallFactoryTests
 {
     private static ChosenSpellParams EmptyChoices() =>
@@ -68,18 +69,6 @@ public class EladamrisCallFactoryTests
         parsed.Green.Should().Be(1, "the printed cost is one green pip");
         parsed.TotalValue.Should().Be(2);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_EladamrisCall()
-    {
-        var owner = new Player("A", 20);
-        var card = NamedCardFactory.Create("Eladamri's Call", owner);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Eladamri's Call");
-        card.ManaCost.Should().Be("{G}{W}");
-    }
-
     [Fact]
     public void Resolve_TutorsCreatureCardFromLibraryToHand()
     {

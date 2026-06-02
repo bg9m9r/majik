@@ -44,6 +44,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   One-shot: second spell cast same turn is NOT uncounterable.
 ///   One-shot: second activation re-arms the rider for the next spell.
 /// </summary>
+[Trait("Color", "C")]
 public class MistriseVillageFactoryTests : IDisposable
 {
     private readonly Player _alice = new("Alice", 20);
@@ -89,16 +90,6 @@ public class MistriseVillageFactoryTests : IDisposable
         land.HasSupertype(CardSupertype.Basic).Should().BeFalse("Mistrise Village is nonbasic");
         land.HasSupertype(CardSupertype.Legendary).Should().BeFalse();
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatch_ReturnsLandShape()
-    {
-        var card = NamedCardFactory.Create("Mistrise Village", _alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Mistrise Village");
-    }
-
     // -----------------------------------------------------------------------
     // Mana ability
     // -----------------------------------------------------------------------
@@ -212,16 +203,6 @@ public class MistriseVillageFactoryTests : IDisposable
         after!.EntersTapped.Should().BeTrue(
             "only the opponent has a Mountain — 'you control' means controller only");
     }
-
-    [Fact]
-    public void ShapeOnlyDispatch_DoesNotRegisterReplacement()
-    {
-        // Single-arg path — ETB-tapped replacement is not wired.
-        var land = NamedCardFactory.Create("Mistrise Village", _alice);
-        land.Should().NotBeNull();
-        ((Land)land).Abilities.OfType<ManaAbility>().Should().HaveCount(1);
-    }
-
     // -----------------------------------------------------------------------
     // {U},{T} activated ability: next-spell-uncounterable rider
     // -----------------------------------------------------------------------

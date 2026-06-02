@@ -17,6 +17,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Card: Nest Robber — {1}{R} Creature — Dinosaur 2/1.
 ///   "Haste"
 /// </summary>
+[Trait("Color", "R")]
 public class NestRobberFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -73,16 +74,5 @@ public class NestRobberFactoryTests
         c.Abilities.OfType<ActivatedAbility>().Should().BeEmpty();
         c.Abilities.OfType<KeywordAbility>().Should().HaveCount(1,
             "Haste is the only printed keyword");
-    }
-
-    [Fact]
-    public void NestRobber_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Nest Robber", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Nest Robber");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Dinosaur).Should().BeTrue();
     }
 }

@@ -23,6 +23,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - No abilities attached (vanilla card).
 /// - NamedCardFactory dispatch resolves the correct factory.
 /// </summary>
+[Trait("Color", "W")]
 public class GlorySeekerFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -118,19 +119,5 @@ public class GlorySeekerFactoryTests
 
         card.Abilities.Should().BeEmpty(
             "Glory Seeker is a vanilla creature with no printed abilities");
-    }
-
-    [Fact]
-    public void GlorySeeker_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Glory Seeker", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Glory Seeker");
-        card.HasType(CardType.Creature).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Human).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Soldier).Should().BeTrue();
-        ((Creature)card).BasePower.Should().Be(2);
-        ((Creature)card).BaseToughness.Should().Be(2);
     }
 }

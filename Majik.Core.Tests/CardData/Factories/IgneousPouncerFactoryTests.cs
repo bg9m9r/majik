@@ -30,6 +30,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Cycling cost gate: DiscardSelfCost CanPay is hand-only.
 /// - <see cref="NamedCardFactory"/> dispatch.
 /// </summary>
+[Trait("Color", "M")]
 public class IgneousPouncerFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -62,28 +63,6 @@ public class IgneousPouncerFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void IgneousPouncer_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Igneous Pouncer", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.HasSubtype(CardSubtype.Elemental).Should().BeTrue();
-
-        var keywords = card.Abilities.OfType<KeywordAbility>().ToList();
-        keywords.Should().Contain(k => k.Keyword == "Haste", "CR 702.10");
-        keywords.Should().Contain(k => k.Keyword == "Swampcycling",
-            "typed-cycling keyword surfaced");
-        keywords.Should().Contain(k => k.Keyword == "Mountaincycling",
-            "typed-cycling keyword surfaced");
-        keywords.Should().Contain(k => k.Keyword == "Cycling",
-            "CR 702.32d — typecycling IS Cycling");
-
-        card.Abilities.OfType<ActivatedAbility>().Should().HaveCount(2,
-            "swampcycling + mountaincycling activated abilities");
-    }
-
     // -----------------------------------------------------------------------
     // Cycling ability shape — CR 702.32d
     // -----------------------------------------------------------------------

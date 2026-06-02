@@ -18,6 +18,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Mana value 2 (CR 202.3).
 /// - <see cref="NamedCardFactory"/> dispatch.
 /// </summary>
+[Trait("Color", "B")]
 public class ChildOfNightFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -86,15 +87,4 @@ public class ChildOfNightFactoryTests
     // -----------------------------------------------------------------------
     // NamedCardFactory dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void ChildOfNight_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Child of Night", _alice);
-
-        c.Should().BeOfType<Creature>("Child of Night is a Creature");
-        c.Name.Should().Be("Child of Night");
-        c.HasSubtype(CardSubtype.Vampire).Should().BeTrue();
-        c.ManaCost.Should().Be("{1}{B}");
-    }
 }

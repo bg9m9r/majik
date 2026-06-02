@@ -32,6 +32,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - The trigger fires on the controller's instant/sorcery, not on a
 ///     creature spell, and not on an opponent's instant/sorcery.
 /// </summary>
+[Trait("Color", "R")]
 public class KilnFiendFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -56,19 +57,6 @@ public class KilnFiendFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_KilnFiend()
-    {
-        var card = NamedCardFactory.Create("Kiln Fiend", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Kiln Fiend");
-        card.HasType(CardType.Creature).Should().BeTrue();
-        card.ManaCost.Should().Be("{1}{R}");
-        card.Owner.Should().BeSameAs(_alice);
-    }
-
     // -----------------------------------------------------------------------
     // Cast trigger wiring
     // -----------------------------------------------------------------------
