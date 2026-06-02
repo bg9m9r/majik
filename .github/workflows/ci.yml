@@ -35,13 +35,19 @@ jobs:
         run: dotnet build Majik.sln --no-restore --configuration Release
 
       - name: Test
-        # Exclude Majik.Bot.Tests.Integration from the required gate: it is
-        # supplementary bot-vs-bot / SignalR-hub smoke (mostly [Skip]-ed per
-        # CLAUDE.md) and is intermittently flaky AND prone to a CI-only
-        # thread-pool-starvation deadlock that silently hangs the whole
-        # `dotnet test Majik.sln` run to the timeout — ejecting unrelated PRs
-        # (the same class of flake #1731 quarantined VanillaShellGracefulDegrade
-        # for). The engine/server unit suites (Core, Core.Api, Server, Bot)
-        # remain the required coverage. Run the integration smoke separately if
-        # desired; it must not gate merges.
-        run: dotnet test Majik.sln --no-build --configuration Release --verbosity normal --filter "FullyQualifiedName!~Majik.Bot.Tests.Integration"
+        # Run each test assembly SEQUENTIALLY rather than `dotnet test Majik.sln`
+        # (which runs all projects in PARALLEL). On CI's low core count the
+        # parallel run intermittently deadlocked — silently hanging to the
+        # timeout and ejecting unrelated PRs — a classic sync-over-async
+        # thread-pool starvation that never reproduces on a 16-core dev box.
+        # Each assembly alone is <35s, so sequential costs ~1-2 min wall-clock
+        # but is deterministic. Majik.Bot.Tests.Integration is omitted from the
+        # required gate: supplementary bot-vs-bot / SignalR smoke (mostly
+        # [Skip]-ed per CLAUDE.md) + the same flake class #1731 quarantined.
+        run: |
+          set -e
+          for proj in Majik.Core.Tests Majik.Core.Api.Tests Majik.Server.Tests Majik.Bot.Tests; do
+            echo "::group::test $proj"
+            dotnet test "$proj/$proj.csproj" --no-build --configuration Release --verbosity normal
+            echo "::endgroup::"
+          done
