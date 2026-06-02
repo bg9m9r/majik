@@ -1,0 +1,6 @@
+{
+  "name": "Paradise Mantle",
+  "types": ["Artifact"],
+  "subtypes": ["Equipment"],
+  "manaCost": "{0}"
+}
