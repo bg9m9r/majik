@@ -1,0 +1,10 @@
+{
+  "name": "Klothys, God of Destiny",
+  "types": ["Creature", "Enchantment"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["God"],
+  "manaCost": "{1}{R}{G}",
+  "power": 4,
+  "toughness": 5,
+  "abilities": []
+}
