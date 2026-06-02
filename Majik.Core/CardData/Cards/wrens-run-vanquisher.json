@@ -1,0 +1,9 @@
+{
+  "name": "Wren's Run Vanquisher",
+  "types": ["Creature"],
+  "subtypes": ["Elf", "Warrior"],
+  "manaCost": "{1}{G}",
+  "power": 3,
+  "toughness": 3,
+  "abilities": []
+}
