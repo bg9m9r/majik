@@ -317,4 +317,94 @@ public class JsonSpellEffectsTests
         _bob.LifeTotal.Should().Be(18, "the targeted player loses 2 life (CR 119.3)");
         _alice.LifeTotal.Should().Be(20);
     }
+
+    // ── gain_control (Threaten / Act of Treason, until end of turn) ────────────
+
+    [Fact]
+    public async Task GainControl_StealsChosenCreature_UntapsAndGrantsHaste()
+    {
+        var continuous = new Majik.Core.Effects.ContinuousEffectsService(_bus);
+        var def = CardDefRuntime.BuildSpellDefinitionFromEffects(
+            "Act of Treason",
+            new EffectDefinition[]
+            {
+                new GainControlEffectDef { TargetFilter = "creature", Duration = "end_of_turn" },
+            },
+            replacements: null,
+            continuous: continuous);
+
+        // Bob's tapped, summoning-sick creature.
+        var bear = OnBattlefield(new Creature("Grizzly Bears", "{1}{G}", 2, 2), _bob);
+        bear.ActiveEffects = continuous;
+        bear.Tap();
+
+        var card = CastInstant("Act of Treason", "{2}{R}");
+        await CastAndResolve(card, def, bear);
+
+        bear.Controller.Should().BeSameAs(_alice, "the caster gains control of the chosen creature (CR 613.2)");
+        bear.IsTapped.Should().BeFalse("Threaten untaps the gained creature (CR 701.21)");
+        Majik.Core.Combat.CombatAbilities.HasHaste(bear).Should()
+            .BeTrue("the gained creature gains haste until end of turn (CR 302.6)");
+    }
+
+    [Fact]
+    public async Task GainControl_RevertsToOwner_AtEndOfTurnCleanup()
+    {
+        var continuous = new Majik.Core.Effects.ContinuousEffectsService(_bus);
+        var def = CardDefRuntime.BuildSpellDefinitionFromEffects(
+            "Act of Treason",
+            new EffectDefinition[] { new GainControlEffectDef { TargetFilter = "creature" } },
+            replacements: null,
+            continuous: continuous);
+
+        var bear = OnBattlefield(new Creature("Grizzly Bears", "{1}{G}", 2, 2), _bob);
+        bear.ActiveEffects = continuous;
+
+        var card = CastInstant("Act of Treason", "{2}{R}");
+        await CastAndResolve(card, def, bear);
+        bear.Controller.Should().BeSameAs(_alice);
+
+        // CR 514.2 — cleanup step ends the until-end-of-turn control change.
+        continuous.ExpireEndOfTurn();
+
+        bear.Controller.Should().BeSameAs(_bob, "control reverts to the owner at cleanup (CR 514.2)");
+        Majik.Core.Combat.CombatAbilities.HasHaste(bear).Should()
+            .BeFalse("the until-EOT haste grant ends at cleanup too");
+    }
+
+    [Fact]
+    public async Task GainControl_IllegalTarget_FizzlesCleanly()
+    {
+        var continuous = new Majik.Core.Effects.ContinuousEffectsService(_bus);
+        var def = CardDefRuntime.BuildSpellDefinitionFromEffects(
+            "Act of Treason",
+            new EffectDefinition[] { new GainControlEffectDef { TargetFilter = "creature" } },
+            replacements: null,
+            continuous: continuous);
+
+        // Already in the graveyard — illegal at resolution (CR 608.2b).
+        var bear = new Creature("Grizzly Bears", "{1}{G}", 2, 2);
+        bear.SetOwner(_bob);
+        bear.SetController(_bob);
+        bear.ActiveEffects = continuous;
+        bear.SetZone(ZoneType.Graveyard);
+        _bob.Zones.Graveyard.AddCard(bear);
+
+        var card = CastInstant("Act of Treason", "{2}{R}");
+        await CastAndResolve(card, def, bear);
+
+        bear.Controller.Should().BeSameAs(_bob, "illegal target at resolution → no control change (CR 608.2b)");
+    }
+
+    [Fact]
+    public void GainControl_DeclaresSingleTargetRequest()
+    {
+        var def = CardDefRuntime.BuildSpellDefinitionFromEffects(
+            "Act of Treason",
+            new EffectDefinition[] { new GainControlEffectDef { TargetFilter = "creature" } });
+
+        def.TargetRequests.Should().HaveCount(1);
+        def.TargetRequests[0].MinTargets.Should().Be(1);
+        def.TargetRequests[0].MaxTargets.Should().Be(1);
+    }
 }

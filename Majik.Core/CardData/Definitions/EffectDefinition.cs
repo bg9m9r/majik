@@ -39,6 +39,7 @@ namespace Majik.Core.CardData.Definitions;
 [JsonDerivedType(typeof(MillThenPickFirstMatchingToHandEffectDef), "mill_then_pick_first_matching_to_hand")]
 [JsonDerivedType(typeof(ConniveSelfEffectDef), "connive_self")]
 [JsonDerivedType(typeof(AmassSelfEffectDef), "amass_self")]
+[JsonDerivedType(typeof(GainControlEffectDef), "gain_control")]
 public abstract class EffectDefinition
 {
     /// <summary>
@@ -67,6 +68,26 @@ public abstract class EffectDefinition
     public Func<Majik.Core.Cards.ICard, Majik.Core.Players.Player, Majik.Core.Effects.ReplacementBus?, int, Majik.Core.Abilities.IEffect> ToResolveEffect() =>
         (card, controller, replacements, targetRequestIndex) =>
             CardDefRuntime.BuildJsonEffect(this, card, controller, replacements, targetRequestIndex);
+
+    /// <summary>
+    /// Continuous-effects-aware overload of <see cref="ToResolveEffect()"/>.
+    /// Identical to the base closure, but additionally captures the live
+    /// <see cref="Majik.Core.Effects.ContinuousEffectsService"/> so verbs that
+    /// register a CR 613 continuous effect (currently
+    /// <see cref="GainControlEffectDef"/> — the Threaten / Act of Treason
+    /// "gain control until end of turn" family, which registers a
+    /// <see cref="Majik.Core.Effects.TemporaryControlChangeEffect"/> + an
+    /// until-EOT haste grant) can reach it at resolution. Threaded through the
+    /// SPELL path (<see cref="CardDefRuntime.BuildSpellDefinitionFromEffects"/>)
+    /// exactly as the <see cref="Majik.Core.Effects.ReplacementBus"/> already is;
+    /// untargeted/non-control verbs ignore the extra capture, so the produced
+    /// effect is byte-identical to the base path for them.
+    /// </summary>
+    public Func<Majik.Core.Cards.ICard, Majik.Core.Players.Player, Majik.Core.Effects.ReplacementBus?, int, Majik.Core.Abilities.IEffect> ToResolveEffect(
+        Majik.Core.Effects.ContinuousEffectsService? continuous) =>
+        (card, controller, replacements, targetRequestIndex) =>
+            CardDefRuntime.BuildJsonEffect(
+                this, card, controller, replacements, targetRequestIndex, continuous);
 
     /// <summary>
     /// PLAN 01 (Slice F) — the targeting declaration this effect needs, or
@@ -349,6 +370,64 @@ public sealed class PreventDamageTargetEffectDef : EffectDefinition
     /// <inheritdoc />
     public override Majik.Core.Players.Agents.TargetRequest? ToTargetRequest() =>
         TargetFilters.ToTargetRequest(TargetFilter, $"prevent {Amount} damage to");
+}
+
+/// <summary>
+/// "Gain control of target creature [until end of turn]" — the Threaten /
+/// Act of Treason / Claim the Firstborn family (CR 613.2). Real targeted
+/// control-change verb onto the
+/// <see cref="Majik.Core.Effects.TemporaryControlChangeEffect"/> primitive: at
+/// resolution the effect reads the chosen creature off
+/// <see cref="Majik.Core.Abilities.ResolutionContext.ChosenTargets"/> and, for
+/// <see cref="Duration"/> = <c>"end_of_turn"</c> (the only v1 mode), registers a
+/// temporary control swap on the live
+/// <see cref="Majik.Core.Effects.ContinuousEffectsService"/> — the controlling
+/// player keeps the creature until the cleanup step (CR 514.2), after which
+/// control reverts to the owner/prior controller automatically.
+///
+/// <para>The verb composes the FULL Threaten rider in one effect (CR 805
+/// standard wording — "Gain control of target creature until end of turn.
+/// Untap it. It gains haste until end of turn."):
+/// <list type="bullet">
+///   <item><see cref="Untap"/> (default <c>true</c>) — untaps the gained
+///   creature so it can attack.</item>
+///   <item><see cref="GainsHaste"/> (default <c>true</c>) — registers a
+///   <see cref="Majik.Core.Effects.GrantKeywordUntilEndOfTurnEffect"/> with
+///   keyword "Haste" so the creature, which has summoning sickness for its new
+///   controller (CR 302.6), can attack the turn it is stolen.</item>
+/// </list>
+/// Cards that only steal without the haste/untap rider (rare) can flip the
+/// flags off in JSON.</para>
+///
+/// <para>CR 608.2b — an illegal target at resolution (the creature has left the
+/// battlefield since the spell went on the stack) fizzles cleanly: no swap,
+/// untap, or haste. Without a live continuous-effects service (pure-shape test
+/// path) the control swap is a no-op, mirroring the legacy
+/// <see cref="Majik.Core.CardData.Factories.ArchmagesCharmFactory"/> posture.</para>
+/// </summary>
+public sealed class GainControlEffectDef : EffectDefinition
+{
+    /// <summary>Target filter (default <c>"creature"</c>).</summary>
+    public string TargetFilter { get; set; } = "creature";
+
+    /// <summary>Duration of the control change. v1 supports only
+    /// <c>"end_of_turn"</c> (the Threaten family); any other value is treated
+    /// as <c>"end_of_turn"</c> for now (permanent Mind-Control-style control
+    /// is served by the bespoke <c>ControlSpellFactory</c> path).</summary>
+    public string Duration { get; set; } = "end_of_turn";
+
+    /// <summary>Untap the gained creature (Threaten rider). Default <c>true</c>.</summary>
+    public bool Untap { get; set; } = true;
+
+    /// <summary>Grant the gained creature haste until end of turn (Threaten
+    /// rider, CR 302.6 — a creature whose control changed this turn is sick).
+    /// Default <c>true</c>.</summary>
+    public bool GainsHaste { get; set; } = true;
+
+    /// <inheritdoc />
+    public override Majik.Core.Players.Agents.TargetRequest? ToTargetRequest() =>
+        TargetFilters.ToTargetRequest(
+            TargetFilter, "gain control of", Majik.Core.Cards.BotIntent.Removal);
 }
 
 /// <summary>"Controller gains N life." Default <see cref="Amount"/> = 1.</summary>

@@ -1,0 +1,7 @@
+{
+  "name": "Song-Mad Ruins",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "R" }
+  ]
+}

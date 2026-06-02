@@ -65,6 +65,25 @@ public abstract class ContinuousEffect
     /// does, or the set of objects it applies to. Default: no dependency.
     /// </summary>
     public virtual bool DependsOn(ContinuousEffect other) => false;
+
+    /// <summary>
+    /// Lifecycle hook fired by <see cref="ContinuousEffectsService"/> when this
+    /// effect is dropped from the registry — during end-of-turn cleanup
+    /// (<see cref="ContinuousEffectsService.ExpireEndOfTurn"/>, CR 514.2),
+    /// inactive-effect pruning (<see cref="ContinuousEffectsService.Prune"/>),
+    /// or explicit <see cref="ContinuousEffectsService.Unregister"/>.
+    ///
+    /// <para>Most effects are pure mutators of the computed working set and
+    /// need no teardown (default: no-op). Effects that mutate <i>actual</i>
+    /// game state on registration — e.g.
+    /// <see cref="TemporaryControlChangeEffect"/>, which swaps the target's
+    /// real <see cref="Permanent.Controller"/> — override this to restore that
+    /// state when their duration ends. The service drops the effect from
+    /// <c>_effects</c> in the same pass, so the hook fires at most once per
+    /// removal; making the override idempotent is still recommended (mirrors
+    /// <see cref="GrantAbilityEffect.Revoke"/>).</para>
+    /// </summary>
+    public virtual void OnExpired() { }
 }
 
 /// <summary>

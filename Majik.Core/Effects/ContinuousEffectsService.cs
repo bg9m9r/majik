@@ -139,7 +139,9 @@ public sealed class ContinuousEffectsService
     public void Unregister(ContinuousEffect effect)
     {
         if (effect is GrantAbilityEffect grant) grant.Revoke();
-        _effects.Remove(effect);
+        // CR 613 — fire the teardown hook (e.g. restore a temporarily swapped
+        // controller) only if the effect was actually registered here.
+        if (_effects.Remove(effect)) effect.OnExpired();
         BumpGeneration();
     }
 
@@ -153,7 +155,16 @@ public sealed class ContinuousEffectsService
         {
             if (!grant.IsActive()) grant.Revoke();
         }
-        _effects.RemoveAll(e => !e.IsActive());
+        // CR 613 — an effect that mutated real game state on registration must
+        // restore it when it is dropped for going inactive (e.g. a temporary
+        // control swap whose target left the battlefield). Fire OnExpired on
+        // each inactive effect as it is removed.
+        _effects.RemoveAll(e =>
+        {
+            if (e.IsActive()) return false;
+            e.OnExpired();
+            return true;
+        });
         // Effects may have changed AND permanents may have left play; clear
         // opportunistically to bound cache growth, and bump so any survivor's
         // recompute reflects the dropped effects.
@@ -638,7 +649,15 @@ public sealed class ContinuousEffectsService
         {
             if (grant.ExpiresAtEndOfTurn) grant.Revoke();
         }
-        _effects.RemoveAll(e => e.ExpiresAtEndOfTurn);
+        // CR 514.2 — "until end of turn" effects end in the cleanup step. Fire
+        // each expiring effect's OnExpired teardown (e.g. restore a temporarily
+        // swapped controller — Threaten / Act of Treason) as it is dropped.
+        _effects.RemoveAll(e =>
+        {
+            if (!e.ExpiresAtEndOfTurn) return false;
+            e.OnExpired();
+            return true;
+        });
         // Effects dropped → clear opportunistically (bounds growth) and bump.
         _cache.Clear();
         _ptCache.Clear();

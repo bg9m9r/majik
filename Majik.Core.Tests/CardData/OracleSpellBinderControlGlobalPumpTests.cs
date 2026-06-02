@@ -35,6 +35,49 @@ public class OracleSpellBinderControlGlobalPumpTests
     }
 
     [Fact]
+    public async Task GainControlUntilEndOfTurn_StealsUntapsHastes_ThenRevertsAtCleanup()
+    {
+        // Threaten / Act of Treason — "Gain control of target creature until end
+        // of turn. Untap it. It gains haste until end of turn." The binder must
+        // route this to the TEMPORARY control path (real controller swap that
+        // reverts at cleanup), NOT the permanent Mind-Control effect.
+        var svc = new ContinuousEffectsService();
+        var bear = new Majik.Core.Cards.Creature("Bear", "1G", 2, 2)
+        { Owner = _bob, Controller = _bob, Zone = ZoneType.Battlefield, ActiveEffects = svc };
+        _bob.Zones.Battlefield.AddCard(bear);
+        bear.Tap();
+
+        var def = OracleSpellBinder.Bind(
+            new CardEntity
+            {
+                Name = "Act of Treason", ManaCost = "{2}{R}",
+                OracleText = "Gain control of target creature until end of turn. " +
+                             "Untap that creature. It gains haste until end of turn.",
+            },
+            _alice, raw => raw, svc, null);
+        def.Should().NotBeNull();
+        def!.TargetRequests.Should().HaveCount(1, "target creature");
+
+        // The cast flow supplies AllPlayers with the caster first (CR 601.2) —
+        // the declarative gain_control verb reads its new controller from there.
+        var chosen = new ChosenSpellParams(null, null,
+            new[] { new object[] { bear } }, ManaPayment.Empty,
+            AllPlayers: new[] { _alice, _bob });
+        foreach (var e in def.EffectFactory(chosen))
+        {
+            await e.ExecuteAsync(Majik.Core.Abilities.ResolutionContext.Legacy);
+        }
+
+        bear.Controller.Should().BeSameAs(_alice, "temporary steal swaps the real controller (CR 613.2)");
+        bear.IsTapped.Should().BeFalse("Untap that creature (CR 701.21)");
+        Majik.Core.Combat.CombatAbilities.HasHaste(bear).Should()
+            .BeTrue("it gains haste until end of turn (CR 302.6)");
+
+        svc.ExpireEndOfTurn();
+        bear.Controller.Should().BeSameAs(_bob, "control reverts to the owner at cleanup (CR 514.2)");
+    }
+
+    [Fact]
     public void CreaturesYouControlGetPlusN_PumpsAllControlledCreatures()
     {
         var svc = new ContinuousEffectsService();
