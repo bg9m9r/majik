@@ -22663,6 +22663,58 @@
     "Green"
   ]
 }
+==== witching-well ====
+{
+  "name": "Witching Well",
+  "manaCost": "{U}",
+  "primaryType": "Artifact",
+  "cardTypes": [
+    "Artifact"
+  ],
+  "supertypes": [],
+  "subtypes": [],
+  "power": null,
+  "toughness": null,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 1,
+      "list": [
+        "act:AdditionalCost\u002BManaCostCost=\u003EEffect"
+      ]
+    },
+    "triggered": {
+      "count": 1,
+      "list": [
+        "trig:CardMovedEvent=\u003EEffect"
+      ]
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Blue"
+  ]
+}
 ==== witchs-cottage ====
 {
   "name": "Witch\u0027s Cottage",
