@@ -1,0 +1,8 @@
+{
+  "name": "Frostboil Snarl",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "U" },
+    { "kind": "mana", "produces": "R" }
+  ]
+}
