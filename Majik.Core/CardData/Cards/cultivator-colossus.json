@@ -1,0 +1,8 @@
+{
+  "name": "Cultivator Colossus",
+  "types": ["Creature"],
+  "subtypes": ["Plant", "Beast"],
+  "manaCost": "{4}{G}{G}{G}",
+  "power": 0,
+  "toughness": 0
+}
