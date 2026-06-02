@@ -1,0 +1,8 @@
+{
+  "name": "Warden of the Inner Sky",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Soldier"],
+  "manaCost": "{W}",
+  "power": 1,
+  "toughness": 2
+}
