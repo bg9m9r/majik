@@ -1,0 +1,9 @@
+{
+  "name": "Glint-Sleeve Siphoner",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Rogue"],
+  "manaCost": "{1}{B}",
+  "power": 2,
+  "toughness": 1,
+  "abilities": []
+}
