@@ -1,0 +1,5 @@
+{
+  "name": "Grisly Salvage",
+  "types": ["Instant"],
+  "manaCost": "{B}{G}"
+}
