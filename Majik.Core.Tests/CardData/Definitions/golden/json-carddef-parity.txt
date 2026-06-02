@@ -11492,6 +11492,58 @@
     "White"
   ]
 }
+==== honored-crop-captain ====
+{
+  "name": "Honored Crop-Captain",
+  "manaCost": "{R}{W}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Human",
+    "Warrior"
+  ],
+  "power": 3,
+  "toughness": 2,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Red",
+    "White"
+  ]
+}
 ==== horror-of-the-broken-lands ====
 {
   "name": "Horror of the Broken Lands",
