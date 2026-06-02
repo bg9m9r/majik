@@ -1,0 +1,9 @@
+{
+  "name": "Dominator Drone",
+  "types": ["Creature"],
+  "subtypes": ["Eldrazi", "Drone"],
+  "manaCost": "{2}{B}",
+  "power": 3,
+  "toughness": 2,
+  "abilities": []
+}
