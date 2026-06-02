@@ -32,6 +32,12 @@ namespace Majik.Core.Effects;
 /// opponents control get -1/-0.") where no creature type restriction
 /// exists. CR 613.7c — scope is still governed by opponentsOnly /
 /// allPlayers / includeSelf flags.</para>
+///
+/// <para>Set <c>tokensOnly: true</c> to additionally gate on the creature
+/// being a token (CR 111). Combined with <c>matchingSubtype: null</c> this
+/// is the "Creature tokens you control get +1/+1 (and have KEYWORD)" shape
+/// used by Intangible Virtue. The token gate is ANDed with the subtype /
+/// controller filters; it is orthogonal to them.</para>
 /// </summary>
 public sealed class LordStaticEffect : ContinuousEffect
 {
@@ -43,6 +49,7 @@ public sealed class LordStaticEffect : ContinuousEffect
     private readonly bool _includeSelf;
     private readonly bool _opponentsOnly;
     private readonly bool _allPlayers;
+    private readonly bool _tokensOnly;
 
     /// <summary>
     /// Construct with a specific creature-type filter.
@@ -55,9 +62,10 @@ public sealed class LordStaticEffect : ContinuousEffect
         IReadOnlyList<string>? grantedKeywords = null,
         bool includeSelf = false,
         bool opponentsOnly = false,
-        bool allPlayers = false)
+        bool allPlayers = false,
+        bool tokensOnly = false)
         : this(source, (CardSubtype?)matchingSubtype, power, toughness,
-               grantedKeywords, includeSelf, opponentsOnly, allPlayers)
+               grantedKeywords, includeSelf, opponentsOnly, allPlayers, tokensOnly)
     {
     }
 
@@ -74,7 +82,8 @@ public sealed class LordStaticEffect : ContinuousEffect
         IReadOnlyList<string>? grantedKeywords = null,
         bool includeSelf = false,
         bool opponentsOnly = false,
-        bool allPlayers = false)
+        bool allPlayers = false,
+        bool tokensOnly = false)
     {
         _source = source ?? throw new ArgumentNullException(nameof(source));
         _subtype = matchingSubtype;
@@ -84,6 +93,7 @@ public sealed class LordStaticEffect : ContinuousEffect
         _includeSelf = includeSelf;
         _opponentsOnly = opponentsOnly;
         _allPlayers = allPlayers;
+        _tokensOnly = tokensOnly;
     }
 
     public override Layer Layer => Layer.PT_Modify;
@@ -97,6 +107,10 @@ public sealed class LordStaticEffect : ContinuousEffect
     public override bool AppliesTo(Creature creature)
     {
         if (creature.Zone != Majik.Core.Zones.ZoneType.Battlefield) return false;
+        // CR 111 — optional token gate ("Creature tokens you control ...").
+        // ANDed with every controller / subtype branch below; orthogonal to
+        // them. Default false preserves the all-creatures behaviour.
+        if (_tokensOnly && !creature.IsToken) return false;
         if (_allPlayers)
         {
             // No controller filter — effect applies to ALL creatures of the
