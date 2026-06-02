@@ -1,0 +1,8 @@
+{
+  "name": "Asylum Visitor",
+  "types": ["Creature"],
+  "subtypes": ["Vampire", "Wizard"],
+  "manaCost": "{1}{B}",
+  "power": 3,
+  "toughness": 1
+}
