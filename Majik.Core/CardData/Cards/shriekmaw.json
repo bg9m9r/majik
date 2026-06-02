@@ -1,0 +1,9 @@
+{
+  "name": "Shriekmaw",
+  "types": ["Creature"],
+  "subtypes": ["Elemental"],
+  "manaCost": "{5}{B}",
+  "power": 3,
+  "toughness": 2,
+  "abilities": []
+}
