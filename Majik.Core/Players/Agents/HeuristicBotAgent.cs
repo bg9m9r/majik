@@ -148,6 +148,12 @@ public sealed class HeuristicBotAgent : IPlayerAgent
     /// can be detected on the next call.</summary>
     private PriorityAction.PlayLand? PickLandDrop(GameContext ctx)
     {
+        // CR 305.2 — once the land drop is spent (or otherwise unavailable),
+        // don't propose ANY land. Without this the bot cycled through every
+        // remaining land in hand each turn, each rejected by the loop — a
+        // flood of "rejected PlayLand" lines over a long game. LandPlayAvailable
+        // is the engine's live LandDropTracker truth (handles extra-drop caps).
+        if (!ctx.LandPlayAvailable) return null;
         var land = ctx.Self.Zones.Hand.GetCards()
             .FirstOrDefault(c => c.HasType(CardType.Land)
                 && !_failedThisTurn.Contains(c.InstanceId));

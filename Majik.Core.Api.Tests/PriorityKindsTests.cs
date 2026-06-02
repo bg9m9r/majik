@@ -43,6 +43,40 @@ public class PriorityKindsTests
         new(_alice, new[] { _alice, _bob }, _alice, turnNumber: 1, phase, _stack);
 
     [Fact]
+    public void LandInHand_SorceryWindow_DropAvailable_OffersPlayLand()
+    {
+        var land = new Land("Forest");
+        land.SetOwner(_alice); land.SetController(_alice);
+        _alice.Zones.Hand.AddCard(land); land.SetZone(ZoneType.Hand);
+
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, activePlayer: _alice,
+            turnNumber: 1, PhaseStateType.PreCombatMain, _stack, landPlayAvailable: true);
+
+        PriorityKinds.Build(ctx).Should().Contain(typeof(PlayLandCommand));
+    }
+
+    [Fact]
+    public void LandInHand_SorceryWindow_DropSpent_DoesNotOfferPlayLand()
+    {
+        // Regression: PriorityKinds used to over-include PlayLandCommand on the
+        // mere presence of a land in hand, ignoring the per-turn drop cap. The
+        // auto-pass gate + the random fuzz harness trust ExpectedKinds, so they
+        // proposed an illegal land every priority window once the drop was
+        // spent — the loop rejected each one, flooding stderr ("rejected
+        // PlayLand ... already played 1 land this turn") and (pre-fix) spinning.
+        // Gating on ctx.LandPlayAvailable (the live LandDropTracker truth) stops
+        // the over-include at the source.
+        var land = new Land("Forest");
+        land.SetOwner(_alice); land.SetController(_alice);
+        _alice.Zones.Hand.AddCard(land); land.SetZone(ZoneType.Hand);
+
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, activePlayer: _alice,
+            turnNumber: 1, PhaseStateType.PreCombatMain, _stack, landPlayAvailable: false);
+
+        PriorityKinds.Build(ctx).Should().NotContain(typeof(PlayLandCommand));
+    }
+
+    [Fact]
     public void EmptyBoard_EmptyHand_OpponentTurn_KindsIsPassOnly()
     {
         var ctx = new GameContext(_alice, new[] { _alice, _bob }, activePlayer: _bob,
