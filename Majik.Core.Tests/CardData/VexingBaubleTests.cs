@@ -5,6 +5,8 @@ using Majik.Core.CardData.Factories;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
+using Majik.Core.Domain.DomainEvents;
+using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Zones;
 using Xunit;
@@ -20,10 +22,13 @@ namespace Majik.Core.Tests.CardData;
 /// - Activated ability shape: ManaCostCost({1}) + Tap + Sacrifice
 /// - Draw effect: moves top library card to hand
 /// - Draw effect: no-op on empty library
+/// - Free-spell counter trigger: counters any player's 0-mana cast
+///   (including the controller's own); ignores mana-paid casts.
 /// </summary>
 public class VexingBaubleTests
 {
     private readonly Player _alice = new("Alice", 20);
+    private readonly Player _bob = new("Bob", 20);
 
     // -----------------------------------------------------------------------
     // Card identity
@@ -194,5 +199,97 @@ public class VexingBaubleTests
         var act = () => ability.Resolve();
 
         act.Should().NotThrow();
+    }
+
+    // -----------------------------------------------------------------------
+    // Free-spell counter trigger
+    //   "Whenever a player casts a spell, if no mana was spent to cast it,
+    //    counter that spell." (CR 603.1 / CR 118)
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void VexingBauble_HasExactlyOneTriggeredAbility()
+    {
+        var bauble = (Artifact)NamedCardFactory.Create("Vexing Bauble", _alice);
+
+        bauble.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1,
+            "the free-spell counter trigger");
+    }
+
+    private (EventBus bus, Majik.Core.Stack.Stack stack, TriggerManager triggers, Artifact bauble)
+        WireBaubleOnBattlefield()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        var bauble = VexingBaubleFactory.Create(_alice, triggers, stack);
+        bauble.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(bauble);
+        return (bus, stack, triggers, bauble);
+    }
+
+    [Fact]
+    public void FreeSpellCounter_CountersOpponentFreeCast()
+    {
+        var (bus, stack, triggers, _) = WireBaubleOnBattlefield();
+
+        // Bob (opponent) casts a 0-mana spell.
+        var memnite = new Card("Memnite", "{0}");
+        memnite.SetOwner(_bob);
+        memnite.SetZone(ZoneType.Stack);
+        var freeSpell = new Majik.Core.Spells.Spell(memnite, _bob) { WasFreeCast = true };
+        stack.Push(freeSpell);
+
+        bus.Publish(new SpellCastEvent(freeSpell));
+        triggers.PendingCount.Should().Be(1, "a player cast a free spell — counter trigger fires");
+
+        triggers.PutPendingTriggersOnStack(_alice);
+        var trigger = stack.Pop()!;
+        trigger.Resolve();
+
+        stack.GetAll().Should().NotContain(freeSpell, "the free spell was countered (CR 701.5)");
+        memnite.Zone.Should().Be(ZoneType.Graveyard);
+    }
+
+    [Fact]
+    public void FreeSpellCounter_CountersControllersOwnFreeCast()
+    {
+        var (bus, stack, triggers, _) = WireBaubleOnBattlefield();
+
+        // Alice (the Bauble's controller) casts her OWN free spell. Unlike
+        // Boromir ("an opponent"), Vexing Bauble watches "a player" — it
+        // counters its controller's free casts too (CR 102).
+        var ornithopter = new Card("Ornithopter", "{0}");
+        ornithopter.SetOwner(_alice);
+        ornithopter.SetZone(ZoneType.Stack);
+        var ownFree = new Majik.Core.Spells.Spell(ornithopter, _alice) { WasFreeCast = true };
+        stack.Push(ownFree);
+
+        bus.Publish(new SpellCastEvent(ownFree));
+        triggers.PendingCount.Should().Be(1,
+            "'whenever a player casts' includes the controller — own free cast is countered too");
+
+        triggers.PutPendingTriggersOnStack(_alice);
+        var trigger = stack.Pop()!;
+        trigger.Resolve();
+
+        stack.GetAll().Should().NotContain(ownFree, "the controller's own free spell is countered");
+        ornithopter.Zone.Should().Be(ZoneType.Graveyard);
+    }
+
+    [Fact]
+    public void FreeSpellCounter_IgnoresManaPaidCast()
+    {
+        var (bus, stack, triggers, _) = WireBaubleOnBattlefield();
+
+        var bolt = new Card("Lightning Bolt", "{R}");
+        bolt.SetOwner(_bob);
+        var paidSpell = new Majik.Core.Spells.Spell(bolt, _bob); // WasFreeCast defaults false
+        stack.Push(paidSpell);
+
+        bus.Publish(new SpellCastEvent(paidSpell));
+
+        triggers.PendingCount.Should().Be(0, "mana was paid — Vexing Bauble does not counter");
+        stack.GetAll().Should().Contain(paidSpell);
     }
 }
