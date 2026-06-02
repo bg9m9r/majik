@@ -1,0 +1,5 @@
+{
+  "name": "Tale's End",
+  "types": ["Instant"],
+  "manaCost": "{1}{U}"
+}
