@@ -1,0 +1,7 @@
+{
+  "name": "Gavony Township",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "C" }
+  ]
+}
