@@ -1,0 +1,7 @@
+{
+  "name": "Akoum Teeth",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "R" }
+  ]
+}
