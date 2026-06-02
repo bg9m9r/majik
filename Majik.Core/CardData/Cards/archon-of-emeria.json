@@ -1,0 +1,9 @@
+{
+  "name": "Archon of Emeria",
+  "types": ["Creature"],
+  "subtypes": ["Archon"],
+  "manaCost": "{2}{W}",
+  "power": 2,
+  "toughness": 3,
+  "abilities": []
+}
