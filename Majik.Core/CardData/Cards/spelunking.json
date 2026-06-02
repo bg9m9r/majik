@@ -1,0 +1,5 @@
+{
+  "name": "Spelunking",
+  "types": ["Enchantment"],
+  "manaCost": "{2}{G}"
+}
