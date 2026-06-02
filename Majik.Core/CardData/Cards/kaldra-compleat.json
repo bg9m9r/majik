@@ -1,0 +1,7 @@
+{
+  "name": "Kaldra Compleat",
+  "types": ["Artifact"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Equipment"],
+  "manaCost": "{7}"
+}
