@@ -12921,6 +12921,58 @@
     "Black"
   ]
 }
+==== knight-of-autumn ====
+{
+  "name": "Knight of Autumn",
+  "manaCost": "{1}{G}{W}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Dryad",
+    "Knight"
+  ],
+  "power": 2,
+  "toughness": 1,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Green",
+    "White"
+  ]
+}
 ==== knight-of-the-white-orchid ====
 {
   "name": "Knight of the White Orchid",
