@@ -338,6 +338,9 @@ public enum CardSubtype
     /// Engine, Triskelion. Almost always paired with the Artifact type.
     /// CR 205.3g + CR 205.3m.</summary>
     Golem,
+    /// <summary>Gnome creature/artifact subtype — Bottle Gnomes, Clockwork
+    /// Gnomes. Usually paired with the Artifact type. CR 205.3g + CR 205.3m.</summary>
+    Gnome,
     Blood,
     Powerstone,
     /// <summary>Myr creature/artifact subtype — Myr Enforcer, Myr Retriever,
