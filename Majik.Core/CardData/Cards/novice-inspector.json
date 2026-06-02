@@ -1,0 +1,9 @@
+{
+  "name": "Novice Inspector",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Detective"],
+  "manaCost": "{W}",
+  "power": 1,
+  "toughness": 2,
+  "abilities": []
+}

@@ -501,4 +501,10 @@ public enum CardSubtype
     /// 205.3m — flavour subtype, but referenced by Bloomburrow
     /// "Birds, Frogs, Otters, and Rats" tribal payoffs.</summary>
     Otter,
+
+    /// <summary>Detective creature subtype — Novice Inspector (Murders at
+    /// Karlov Manor) and the broader MKM Detective lineage. CR 205.3m —
+    /// flavour subtype with no inherent rules meaning (the MKM "Collect
+    /// evidence" payoffs reference it, but the subtype itself is inert).</summary>
+    Detective,
 }
