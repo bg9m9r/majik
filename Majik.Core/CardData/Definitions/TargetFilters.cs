@@ -71,6 +71,8 @@ public static class TargetFilters
         {
             "any" or "any_target" or "creature_or_player" =>
                 ($"{verb} to any target", IsAnyTarget),
+            "player" =>
+                ($"target player to {verb}", o => o is Player),
             "creature" =>
                 ($"{verb} target creature", o => o is Creature c && OnBattlefield(c)),
             "permanent" =>
@@ -94,6 +96,10 @@ public static class TargetFilters
             "artifact" =>
                 ($"target artifact to {verb}",
                     o => o is Permanent p && OnBattlefield(p) && p.HasType(CardType.Artifact)),
+            "artifact_or_enchantment" =>
+                ($"target artifact or enchantment to {verb}",
+                    o => o is Permanent p && OnBattlefield(p)
+                         && (p.HasType(CardType.Artifact) || p.HasType(CardType.Enchantment))),
             "enchantment" =>
                 ($"target enchantment to {verb}",
                     o => o is Permanent p && OnBattlefield(p) && p.HasType(CardType.Enchantment)),

@@ -34,6 +34,7 @@ namespace Majik.Core.CardData.Definitions;
 [JsonDerivedType(typeof(TapTargetEffectDef), "tap_target")]
 [JsonDerivedType(typeof(PreventDamageTargetEffectDef), "prevent_damage_target")]
 [JsonDerivedType(typeof(GainLifeSelfEffectDef), "gain_life_self")]
+[JsonDerivedType(typeof(LoseLifeTargetEffectDef), "lose_life_target")]
 [JsonDerivedType(typeof(MillThenPickFirstMatchingToHandEffectDef), "mill_then_pick_first_matching_to_hand")]
 [JsonDerivedType(typeof(ConniveSelfEffectDef), "connive_self")]
 [JsonDerivedType(typeof(AmassSelfEffectDef), "amass_self")]
@@ -79,6 +80,25 @@ public abstract class EffectDefinition
     /// same path a hand-written factory uses. Default: untargeted.
     /// </summary>
     public virtual Majik.Core.Players.Agents.TargetRequest? ToTargetRequest() => null;
+
+    /// <summary>
+    /// A <b>rider</b> verb that reuses the immediately-preceding targeted
+    /// effect's chosen target instead of declaring a fresh target slot
+    /// (default: <c>false</c>). The canonical case is Vapor Snag's
+    /// "Return target creature to its owner's hand. Its controller loses 1
+    /// life." — the second clause's "its controller" refers to the SAME
+    /// creature the bounce targeted, so the spell has exactly one target.
+    ///
+    /// <para>
+    /// When <c>true</c>, the effect contributes no <see cref="TargetRequest"/>
+    /// (so <see cref="ToTargetRequest"/> must return <c>null</c>) and the
+    /// spell / ability bridge wires its resolution-time
+    /// <c>targetRequestIndex</c> to the slot the most-recent targeted effect
+    /// reserved. CR 608.2b — if that shared target is illegal at resolution,
+    /// both the host effect and the rider fizzle together.
+    /// </para>
+    /// </summary>
+    public virtual bool SharesPreviousTargetSlot => false;
 }
 
 /// <summary>Add N counters of the given type to a target permanent.
@@ -334,6 +354,51 @@ public sealed class PreventDamageTargetEffectDef : EffectDefinition
 public sealed class GainLifeSelfEffectDef : EffectDefinition
 {
     public int Amount { get; set; } = 1;
+}
+
+/// <summary>
+/// "[Target / its controller] loses N life" — the targeted life-drain rider
+/// onto the pre-existing <see cref="Majik.Core.Primitives.Fx.LoseLife"/>
+/// primitive (CR 119.3). Two <see cref="Subject"/> modes:
+///
+/// <list type="bullet">
+///   <item><c>"controller"</c> (default) — the effect is a <b>rider</b> that
+///   shares the immediately-preceding targeted effect's chosen target
+///   (<see cref="SharesPreviousTargetSlot"/> = <c>true</c>) and drains
+///   <b>that target's controller</b>. The canonical case is Vapor Snag's
+///   "Return target creature to its owner's hand. Its controller loses 1
+///   life." — one printed target, two clauses. CR 608.2b: if the shared
+///   target is illegal at resolution the rider fizzles with the host.</item>
+///   <item><c>"target"</c> — the effect declares its OWN target (via
+///   <see cref="TargetFilter"/>, e.g. <c>"player"</c> / <c>"creature"</c>)
+///   and drains the chosen object's controller (a player targets itself).
+///   "Target player loses N life."</item>
+/// </list>
+/// </summary>
+public sealed class LoseLifeTargetEffectDef : EffectDefinition
+{
+    public int Amount { get; set; } = 1;
+
+    /// <summary><c>"controller"</c> (rider, default) or <c>"target"</c>
+    /// (declares its own target slot). See the type summary.</summary>
+    public string Subject { get; set; } = "controller";
+
+    /// <summary>The filter string for the OWN target slot when
+    /// <see cref="Subject"/> is <c>"target"</c> (e.g. <c>"player"</c>,
+    /// <c>"creature"</c>). Ignored in <c>"controller"</c> rider mode.</summary>
+    public string TargetFilter { get; set; } = "player";
+
+    private bool IsRider =>
+        string.Equals(Subject, "controller", StringComparison.OrdinalIgnoreCase);
+
+    /// <inheritdoc />
+    public override bool SharesPreviousTargetSlot => IsRider;
+
+    /// <inheritdoc />
+    public override Majik.Core.Players.Agents.TargetRequest? ToTargetRequest() =>
+        IsRider
+            ? null
+            : TargetFilters.ToTargetRequest(TargetFilter, $"lose {Amount} life");
 }
 
 /// <summary>

@@ -238,4 +238,83 @@ public class JsonSpellEffectsTests
         def.TargetRequests[0].MinTargets.Should().Be(1);
         def.TargetRequests[0].MaxTargets.Should().Be(1);
     }
+
+    // ── lose_life_target (rider that shares the preceding target slot) ─────────
+
+    [Fact]
+    public async Task LoseLifeTarget_RiderSharesPreviousSlot_VaporSnagBouncesAndDrainsController()
+    {
+        // Vapor Snag: "Return target creature to its owner's hand. Its
+        // controller loses 1 life." The lose-life rider does NOT declare its
+        // own target — it shares the bounce's slot and drains the chosen
+        // creature's controller (CR 119.3).
+        var def = CardDefRuntime.BuildSpellDefinitionFromEffects(
+            "Vapor Snag",
+            new EffectDefinition[]
+            {
+                new ReturnToHandEffectDef { TargetFilter = "creature" },
+                new LoseLifeTargetEffectDef { Amount = 1, Subject = "controller" },
+            });
+
+        // Exactly ONE target request — the rider shares the bounce's slot.
+        def.TargetRequests.Should().HaveCount(1);
+
+        var bear = OnBattlefield(new Creature("Grizzly Bears", "{1}{G}", 2, 2), _bob);
+
+        var card = CastInstant("Vapor Snag", "{U}");
+        await CastAndResolve(card, def, bear);
+
+        bear.Zone.Should().Be(ZoneType.Hand, "the chosen creature returns to its owner's hand");
+        _bob.Zones.Hand.GetCards().Should().Contain(bear);
+        _bob.LifeTotal.Should().Be(19, "its controller loses 1 life (CR 119.3)");
+        _alice.LifeTotal.Should().Be(20, "the caster is unaffected");
+    }
+
+    [Fact]
+    public async Task LoseLifeTarget_IllegalTarget_NeitherBounceNorLifeLoss()
+    {
+        var def = CardDefRuntime.BuildSpellDefinitionFromEffects(
+            "Vapor Snag",
+            new EffectDefinition[]
+            {
+                new ReturnToHandEffectDef { TargetFilter = "creature" },
+                new LoseLifeTargetEffectDef { Amount = 1, Subject = "controller" },
+            });
+
+        // Already in the graveyard — illegal at resolution (CR 608.2b). The
+        // rider keys off "its controller", undefined off the battlefield, so
+        // neither clause happens.
+        var bear = new Creature("Grizzly Bears", "{1}{G}", 2, 2);
+        bear.SetOwner(_bob);
+        bear.SetController(_bob);
+        bear.SetZone(ZoneType.Graveyard);
+        _bob.Zones.Graveyard.AddCard(bear);
+
+        var card = CastInstant("Vapor Snag", "{U}");
+        await CastAndResolve(card, def, bear);
+
+        bear.Zone.Should().Be(ZoneType.Graveyard, "illegal target → no bounce (CR 608.2b)");
+        _bob.LifeTotal.Should().Be(20, "no life loss when the target fizzles");
+    }
+
+    [Fact]
+    public async Task LoseLifeTarget_SubjectTarget_DrainsTargetedPlayerDirectly()
+    {
+        // "Target player loses 2 life" — the lose-life verb standalone with
+        // subject "target": it declares its OWN player target slot.
+        var def = CardDefRuntime.BuildSpellDefinitionFromEffects(
+            "Mind Rot Lite",
+            new EffectDefinition[]
+            {
+                new LoseLifeTargetEffectDef { Amount = 2, Subject = "target", TargetFilter = "player" },
+            });
+
+        def.TargetRequests.Should().HaveCount(1);
+
+        var card = CastInstant("Mind Rot Lite", "{B}");
+        await CastAndResolve(card, def, _bob);
+
+        _bob.LifeTotal.Should().Be(18, "the targeted player loses 2 life (CR 119.3)");
+        _alice.LifeTotal.Should().Be(20);
+    }
 }
