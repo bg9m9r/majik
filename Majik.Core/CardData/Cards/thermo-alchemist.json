@@ -1,0 +1,9 @@
+{
+  "name": "Thermo-Alchemist",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Shaman"],
+  "manaCost": "{1}{R}",
+  "power": 0,
+  "toughness": 3,
+  "abilities": []
+}
