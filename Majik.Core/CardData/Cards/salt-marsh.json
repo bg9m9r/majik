@@ -1,0 +1,8 @@
+{
+  "name": "Salt Marsh",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "U" },
+    { "kind": "mana", "produces": "B" }
+  ]
+}
