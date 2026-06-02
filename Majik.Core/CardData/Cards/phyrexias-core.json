@@ -1,0 +1,7 @@
+{
+  "name": "Phyrexia's Core",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "C" }
+  ]
+}
