@@ -2,7 +2,10 @@ using Majik.Core.Abilities;
 using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Effects;
+using Majik.Core.Events;
 using Majik.Core.Players;
+using Majik.Core.Rules;
 using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
@@ -23,41 +26,33 @@ namespace Majik.Core.CardData.Factories;
 /// <see cref="CardDefinitionFactory"/>. The three oracle riders are attached in
 /// code below as description-only <see cref="StaticAbility"/> entries.
 ///
-/// ## Implemented (v1 — simplified)
-/// Augur's three riders all operate off the top card of the controller's
-/// library via continuous "permission to play/cast from a zone other than
-/// hand" effects. The engine has no live "may play lands from library" or "may
-/// cast creature spells from library" primitive — confirmed via grep over
-/// Majik.Core/Rules + Majik.Core/Services + Majik.Core/Effects; the only other
-/// reference to "play from top of library" in the codebase is
-/// <see cref="ConspicuousSnoopFactory"/>, which ships the same documented-gap
-/// posture. There is likewise no Coven keyword/mechanic in the engine.
-///
-/// Rather than half-build that cast-from-zone permission infrastructure, v1
-/// ships the card shape with three <see cref="StaticAbility"/> riders carrying
-/// their printed descriptions (so audits, dispatcher tests, and bot decision
-/// surfaces see Augur as a top-of-library-value creature) plus pure-read
-/// controller-side helpers:
+/// ## Implemented
+/// - <b>Play lands from the top of your library</b> (CR 601.3e / CR 305.6): the
+///   bus-aware <see cref="Create(Player, IEventBus)"/> overload attaches a
+///   <see cref="LibraryTopPlayStaticEffect"/> that registers a
+///   <see cref="TopPlayFilter.Lands"/> + reveal-top grant into
+///   <see cref="LibraryTopPlayPermissions"/> while Augur is on the battlefield
+///   (revoked on leave, CR 603.6e). Same surface as Courser of Kruphix — when
+///   the controller's top library card is a land they may play it as their land
+///   for the turn (still consuming the CR 305.2 land drop).
+/// - <b>Card shape</b> with three <see cref="StaticAbility"/> riders carrying
+///   their printed descriptions (audit / dispatch / bot surfaces) plus
+///   controller-side helpers:
 ///   - <see cref="LookAtTopOfLibrary"/> — the "look at the top card any time"
-///     peek (CR 401.4 lets a player look at the top card whenever an effect
-///     grants it). Returns the top card or null when the library is empty.
+///     peek (CR 401.4). Returns the top card or null when the library is empty.
 ///   - <see cref="HasCoven"/> — the Coven condition (control three or more
-///     creatures with different powers). Used to gate the "cast creature spells
-///     from the top" rider once cast-from-zone permission exists.
-///
-/// This mirrors <see cref="ConspicuousSnoopFactory"/> ("play with the top card
-/// revealed" + "may cast top if Goblin") exactly: card shape + description
-/// riders + controller-side peek, with the continuous cast-from-zone wiring
-/// deferred.
+///     creatures with different powers). Gates the "cast creature spells from
+///     the top" rider once cast-from-zone permission exists.
 ///
 /// ## Deferred (v1 gaps — documented)
-/// - <b>Play lands from the top of your library</b>: needs a "may play lands
-///   from library" permission primitive (none exists — same gap that blocks
-///   Courser of Kruphix, Oracle of Mul Daya, Conspicuous Snoop).
-/// - <b>Cast creature spells from the top (Coven-gated)</b>: needs a
-///   continuous "permission to cast from a zone other than hand" primitive plus
-///   a live Coven static-condition evaluator. Same cast-from-zone gap blocks
-///   Bolas's Citadel, Vivien (Champion of the Wilds), Conspicuous Snoop.
+/// - <b>Cast creature spells from the top (Coven-gated)</b>: lands are PLAYED
+///   (the land-play path already moves a land from any zone), but casting a
+///   nonland spell from the library needs a continuous "permission to cast from
+///   a zone other than hand" primitive that the spell-cast flow consults. That
+///   cast-from-top wiring is not yet built (same gap as Bolas's Citadel, Vivien
+///   (Champion of the Wilds), Conspicuous Snoop), so the creature clause is
+///   description-only for now. The <see cref="TopPlayFilter.Creatures"/> filter
+///   exists in the registry ready for that surface to consult.
 /// - <b>Coven as a live conditional grant</b>: <see cref="HasCoven"/> evaluates
 ///   the condition on demand, but it is not wired as a continuous static
 ///   ability that toggles the cast-from-top permission as the board changes.
@@ -80,13 +75,25 @@ public static class AugurOfAutumnFactory
         CardDefinitionLoader.FromEmbeddedResource("augur-of-autumn");
 
     /// <summary>
+    /// Construct Augur of Autumn with no live bus wiring. The three oracle
+    /// riders are attached as description-only <see cref="StaticAbility"/>
+    /// entries (CR 604.1); the live "play lands from the top" grant is NOT
+    /// registered (use the <see cref="Create(Player, IEventBus)"/> overload).
+    /// Suitable for shape / dispatch tests.
+    /// </summary>
+    public static Creature Create(Player owner) => Create(owner, eventBus: null);
+
+    /// <summary>
     /// Construct Augur of Autumn. Identity comes from the embedded JSON
     /// definition; the three oracle riders are attached as description-only
-    /// <see cref="StaticAbility"/> entries (CR 604.1 — static abilities function
-    /// while the permanent is on the battlefield). See class doc for the v1
-    /// scope vs. deferred items.
+    /// <see cref="StaticAbility"/> entries (CR 604.1). When
+    /// <paramref name="eventBus"/> is supplied, a
+    /// <see cref="LibraryTopPlayStaticEffect"/> registers the
+    /// "may play lands from the top, revealed" grant (CR 601.3e / CR 305.6 /
+    /// CR 715.4) while Augur is on the battlefield. See class doc for the
+    /// deferred Coven cast-from-top clause.
     /// </summary>
-    public static Creature Create(Player owner)
+    public static Creature Create(Player owner, IEventBus? eventBus)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -95,8 +102,7 @@ public static class AugurOfAutumnFactory
         card.SetController(owner);
 
         // CR 604.1 — static abilities. Three riders, each carrying its printed
-        // description for audit / bot-surface visibility. No live
-        // continuous-effect wiring yet (see class doc).
+        // description for audit / bot-surface visibility.
         card.AddAbility(new StaticAbility(
             source: card,
             controller: owner,
@@ -111,6 +117,20 @@ public static class AugurOfAutumnFactory
             source: card,
             controller: owner,
             description: CovenCastFromTopDescription));
+
+        // CR 601.3e / CR 305.6 / CR 715.4 — live "may play lands from the top,
+        // revealed" grant, battlefield-gated. The Coven creature clause stays
+        // description-only pending cast-from-top wiring (see class doc).
+        if (eventBus != null)
+        {
+            var lifecycle = new LibraryTopPlayStaticEffect(
+                source: card,
+                controller: owner,
+                filter: TopPlayFilter.Lands,
+                eventBus: eventBus,
+                revealsTop: true);
+            lifecycle.Attach();
+        }
 
         return card;
     }
