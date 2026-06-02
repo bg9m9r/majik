@@ -34,16 +34,19 @@ public static class KeywordBinder
         // a creature is dealt as -1/-1 counters instead of marked damage
         // (CR 702.90b). Wither only changes the form of damage to CREATURES;
         // damage to players / planeswalkers stays normal.
-        //
-        // NOTE: Infect is deliberately NOT bound here. Infect's creature-damage
-        // form is identical to wither, but Infect ALSO converts player damage
-        // to poison counters (CR 702.90c) — a path not yet wired into the
-        // combat / Fx player-damage sites. Binding "Infect" generically here
-        // would load infect creatures with correct creature damage but WRONG
-        // (normal life-loss) player damage. Deferred to a dedicated infect
-        // pass that registers InfectDamageReplacement globally / threads poison
-        // into the player-damage path. See v1-deferrals.
         "Wither",
+        // Infect (CR 702.90c). Infect's creature-damage form is identical to
+        // wither (-1/-1 counters, shared via
+        // CombatAbilities.DealsCreatureDamageAsMinusCounters), AND it converts
+        // damage to PLAYERS into poison counters instead of life loss
+        // (CombatAbilities.DealsPlayerDamageAsPoison, read at every
+        // player-damage application site: CombatFlow.DealDamageToPlayer plus
+        // the source-aware Fx.DealDamageAny / OracleSpellBinder.DealDamage
+        // noncombat paths). The 10-poison loss is the CR 704.5c state-based
+        // action. Binding the marker generically loads every infect creature
+        // (Glistener Elf, Phyrexian Crusader, Plague Stinger, Blighted Agent,
+        // …) with correct creature AND player damage.
+        "Infect",
         // Death-triggered keywords
         "Undying",
         // Cast-noncreature-spell triggered keyword (CR 702.108). Requires a

@@ -268,9 +268,23 @@ public sealed class CombatFlow
         intent = _replacements?.Apply(intent) ?? intent;
         if (intent == null || intent.Amount <= 0) return;
 
-        // CR 120.3 — record damage (Bloodthirst etc.) before applying life loss.
+        // CR 120.3 — record damage (Bloodthirst etc.) before applying it.
         target.RecordDamageDealt(intent.Amount);
-        target.LoseLife(intent.Amount);
+
+        // CR 702.90c — a source with infect deals its damage to a PLAYER as
+        // that many poison counters instead of life loss. The 10-poison loss
+        // is a state-based action (CR 704.5c) picked up on the next SBA pass.
+        // Lifelink (below) still gains life equal to the damage dealt, because
+        // damage was still dealt — only its life-loss FORM is replaced
+        // (CR 702.15g / 119.3).
+        if (CombatAbilities.DealsPlayerDamageAsPoison(source))
+        {
+            target.AddPoisonCounters(intent.Amount);
+        }
+        else
+        {
+            target.LoseLife(intent.Amount);
+        }
         if (CombatAbilities.HasLifelink(source) && source.Controller != null)
         {
             source.Controller.GainLife(intent.Amount);

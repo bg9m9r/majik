@@ -87,6 +87,24 @@ public static class Fx
     }
 
     /// <summary>
+    /// CR 119 + CR 306.7 — source-aware overload of
+    /// <see cref="DealDamageAny(object,int)"/>. When <paramref name="source"/>
+    /// is a creature with infect (CR 702.90c), damage to a CREATURE is dealt as
+    /// -1/-1 counters and damage to a PLAYER as poison counters instead of life
+    /// loss. Planeswalker damage is unchanged (CR 702.90 does not redirect it).
+    /// A null source behaves exactly like the parameterless overload.
+    /// </summary>
+    public static void DealDamageAny(object target, int amount, Creature? source)
+    {
+        if (amount <= 0) return;
+        switch (target)
+        {
+            case Planeswalker pw: pw.RemoveLoyalty(amount); break;
+            default: OracleSpellBinder.DealDamage(target, amount, source); break;
+        }
+    }
+
+    /// <summary>
     /// CR 701.12 — Fight. <paramref name="a"/> and <paramref name="b"/> each
     /// deal damage equal to their (current) power to the other SIMULTANEOUSLY
     /// (CR 701.12a). This is damage, but NOT combat damage — first strike,

@@ -316,17 +316,46 @@ public static class OracleSpellBinder
     }
 
     internal static void DealDamage(object target, int n)
+        => DealDamage(target, n, source: null);
+
+    /// <summary>
+    /// CR 119 — deal <paramref name="n"/> damage to <paramref name="target"/>
+    /// from <paramref name="source"/>. When <paramref name="source"/> is a
+    /// creature with infect (CR 702.90c), damage to a CREATURE is dealt as
+    /// -1/-1 counters and damage to a PLAYER as poison counters instead of
+    /// life loss. A null source behaves like ordinary damage.
+    /// </summary>
+    internal static void DealDamage(object target, int n, Creature? source)
     {
         switch (target)
         {
             case Player p:
-                // CR 120.3 — record damage (Bloodthirst etc.) then apply it
-                // as life loss (CR 119.3 — damage to a player causes that
-                // much life loss).
+                // CR 120.3 — record damage (Bloodthirst etc.) before applying.
                 p.RecordDamageDealt(n);
-                p.LoseLife(n);
+                // CR 702.90c — an infect source deals damage to a player as
+                // poison counters instead of life loss (CR 119.3). The 10-
+                // poison loss is the CR 704.5c state-based action.
+                if (Combat.CombatAbilities.DealsPlayerDamageAsPoison(source))
+                {
+                    p.AddPoisonCounters(n);
+                }
+                else
+                {
+                    p.LoseLife(n);
+                }
                 break;
-            case Creature c: c.TakeDamage(n); break;
+            case Creature c:
+                // CR 702.90b/c — wither / infect deals creature damage as
+                // -1/-1 counters instead of marked damage.
+                if (Combat.CombatAbilities.DealsCreatureDamageAsMinusCounters(source))
+                {
+                    c.Counters.Add(Counters.CounterType.MinusOneMinusOne, n);
+                }
+                else
+                {
+                    c.TakeDamage(n);
+                }
+                break;
         }
     }
 
