@@ -1,0 +1,9 @@
+{
+  "name": "Vile Aggregate",
+  "types": ["Creature"],
+  "subtypes": ["Eldrazi", "Drone"],
+  "manaCost": "{2}{R}",
+  "power": 0,
+  "toughness": 5,
+  "abilities": []
+}
