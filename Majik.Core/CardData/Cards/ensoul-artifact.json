@@ -1,0 +1,6 @@
+{
+  "name": "Ensoul Artifact",
+  "types": ["Enchantment"],
+  "subtypes": ["Aura"],
+  "manaCost": "{1}{U}"
+}
