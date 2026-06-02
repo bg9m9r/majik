@@ -1,0 +1,8 @@
+{
+  "name": "Voice of the Blessed",
+  "types": ["Creature"],
+  "subtypes": ["Spirit", "Cleric"],
+  "manaCost": "{W}{W}",
+  "power": 2,
+  "toughness": 2
+}
