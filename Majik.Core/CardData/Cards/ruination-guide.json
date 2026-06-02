@@ -1,0 +1,9 @@
+{
+  "name": "Ruination Guide",
+  "types": ["Creature"],
+  "subtypes": ["Eldrazi", "Drone"],
+  "manaCost": "{2}{U}",
+  "power": 3,
+  "toughness": 2,
+  "abilities": []
+}
