@@ -1,0 +1,8 @@
+{
+  "name": "Murmuring Bosk",
+  "types": ["Land"],
+  "subtypes": ["Forest"],
+  "abilities": [
+    { "kind": "mana", "produces": "G" }
+  ]
+}
