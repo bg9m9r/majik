@@ -1,0 +1,6 @@
+{
+  "name": "Sigil of Distinction",
+  "types": ["Artifact"],
+  "subtypes": ["Equipment"],
+  "manaCost": "{X}"
+}
