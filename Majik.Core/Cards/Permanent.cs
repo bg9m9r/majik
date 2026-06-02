@@ -353,6 +353,23 @@ public class Permanent : Card
     /// <see cref="ResetTurnState"/>.</summary>
     public bool LoyaltyAbilityActivatedThisTurn { get; internal set; }
 
+    /// <summary>
+    /// CR 305.2 / 720 — the number of <em>additional</em> land plays this
+    /// permanent grants its controller each turn while it is on the
+    /// battlefield ("you may play N additional land(s) on each of your
+    /// turns"). 0 for the vast majority of permanents; +1 for Exploration /
+    /// Dryad of the Ilysian Grove, +2 for Azusa, Lost but Seeking.
+    ///
+    /// This is a controller-scoped, battlefield-gated static (CR 603.6e —
+    /// functions only while the source is on the battlefield). It is summed
+    /// live by <see cref="Majik.Core.Game.LandDropTracker"/> over the
+    /// permanents the active player controls, so it naturally appears when
+    /// the permanent enters and disappears when it leaves (no per-turn
+    /// re-application needed — the tracker recomputes on every land-play
+    /// validation). Multiple sources stack additively (two Azusas = +4).
+    /// </summary>
+    public int AdditionalLandPlaysGranted { get; set; }
+
     // -----------------------------------------------------------------------
     // CR 701.15 — Regeneration shields
     //
