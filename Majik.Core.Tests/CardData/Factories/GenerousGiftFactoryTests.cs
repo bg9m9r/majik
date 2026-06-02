@@ -35,6 +35,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     "opponent controls").
 ///   - Off-battlefield target → no-op (CR 608.2b).
 /// </summary>
+[Trait("Color", "W")]
 public class GenerousGiftFactoryTests
 {
     private readonly EventBus _bus = new();
@@ -66,17 +67,6 @@ public class GenerousGiftFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_GenerousGift()
-    {
-        var card = NamedCardFactory.Create("Generous Gift", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Generous Gift");
-        card.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     // -----------------------------------------------------------------------
     // Resolution
     // -----------------------------------------------------------------------

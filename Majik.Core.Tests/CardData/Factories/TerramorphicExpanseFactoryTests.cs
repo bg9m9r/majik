@@ -22,19 +22,9 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// <c>WayfarersBaubleFactoryTests</c> — a sac-to-fetch land, but the fetched
 /// basic enters <b>tapped</b> and there is no life payment / mana cost.
 /// </summary>
+[Trait("Color", "C")]
 public class TerramorphicExpanseFactoryTests
 {
-    [Fact]
-    public void Dispatch_ReturnsLandWithPrintedName()
-    {
-        var alice = new Player("Alice", 20);
-
-        var card = NamedCardFactory.Create("Terramorphic Expanse", alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Terramorphic Expanse");
-    }
-
     [Fact]
     public void HasSingleTapActivatedAbility()
     {

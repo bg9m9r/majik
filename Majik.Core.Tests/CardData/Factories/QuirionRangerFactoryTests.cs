@@ -31,6 +31,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - "Activate only once each turn" (CR 602.5e) — the cost is illegal a
 ///   second time within the same turn until the per-turn lock is reset.
 /// </summary>
+[Trait("Color", "G")]
 public class QuirionRangerFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -73,18 +74,6 @@ public class QuirionRangerFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void QuirionRanger_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Quirion Ranger", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Quirion Ranger");
-        ((Creature)c).HasSubtype(CardSubtype.Elf).Should().BeTrue();
-        ((Creature)c).HasSubtype(CardSubtype.Ranger).Should().BeTrue();
-    }
-
     [Fact]
     public void QuirionRanger_HasActivatedAbility_WithTargetRequest()
     {

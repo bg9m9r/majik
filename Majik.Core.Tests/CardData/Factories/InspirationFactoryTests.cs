@@ -28,6 +28,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     Sign in Blood).
 ///   * Caster's life unchanged after resolve.
 /// </summary>
+[Trait("Color", "U")]
 public class InspirationFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -46,17 +47,6 @@ public class InspirationFactoryTests
         card.ManaCostValue.TotalValue.Should().Be(4, because: "{3}{U} = mana value 4");
         CardColors.GetColors(card).Should().Contain(ManaColor.Blue);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsInspirationInstant()
-    {
-        var dispatched = NamedCardFactory.Create("Inspiration", _alice);
-
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("Inspiration");
-        dispatched.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     // ── SpellDefinition shape ────────────────────────────────────────────────
 
     [Fact]

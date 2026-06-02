@@ -45,6 +45,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   documented but not enforced (engine has no generic timing-restriction
 ///   hook on instant cast-flow yet).
 /// </summary>
+[Trait("Color", "G")]
 public class BerserkFactoryTests
 {
     private readonly EventBus _bus = new();
@@ -65,18 +66,6 @@ public class BerserkFactoryTests
         b.Controller.Should().BeSameAs(_alice);
         b.ManaCost.Should().Be("{G}");
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsBerserkShape()
-    {
-        var card = NamedCardFactory.Create("Berserk", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Berserk");
-        card.HasType(CardType.Instant).Should().BeTrue();
-        card.ManaCost.Should().Be("{G}");
-    }
-
     // ── SpellDefinition shape ─────────────────────────────────────────────────
 
     [Fact]

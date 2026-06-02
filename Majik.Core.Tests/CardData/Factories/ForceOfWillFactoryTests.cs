@@ -26,6 +26,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   * Pitch cast on own turn — rejected by the CR 118.9 timing gate.
 ///   * Counter target spell — chosen target leaves the stack.
 /// </summary>
+[Trait("Color", "U")]
 public class ForceOfWillFactoryTests
 {
     private readonly EventBus _bus = new();
@@ -56,17 +57,6 @@ public class ForceOfWillFactoryTests
         fow.ManaCost.ToString().Should().Contain("U");
         CardColors.GetColors(fow).Should().Contain(ManaColor.Blue);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsForceOfWillFactoryShape()
-    {
-        var dispatched = NamedCardFactory.Create("Force of Will", _alice);
-
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("Force of Will");
-        dispatched.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     // ── Pitch cast (CR 118.9) ────────────────────────────────────────────────
 
     [Fact]

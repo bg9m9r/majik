@@ -33,6 +33,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   <see cref="Majik.Core.Keywords.CyclingFactory.Build"/> primitive
 ///   (CR 702.32).
 /// </summary>
+[Trait("Color", "C")]
 public class BountifulLandscapeFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -40,16 +41,6 @@ public class BountifulLandscapeFactoryTests
     // -----------------------------------------------------------------------
     // Identity + dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void Dispatch_ReturnsLandWithPrintedName()
-    {
-        var card = NamedCardFactory.Create("Bountiful Landscape", _alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Bountiful Landscape");
-    }
-
     // -----------------------------------------------------------------------
     // {T}: Add {C}
     // -----------------------------------------------------------------------

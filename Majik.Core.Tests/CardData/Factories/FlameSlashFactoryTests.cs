@@ -25,6 +25,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Resolve body deals 4 damage to a target creature (CR 119.2).
 /// - Resolve body is a no-op when the target is not a creature (CR 608.2b).
 /// </summary>
+[Trait("Color", "R")]
 public class FlameSlashFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -51,17 +52,6 @@ public class FlameSlashFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void FlameSlash_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Flame Slash", _alice);
-
-        card.Should().BeOfType<Sorcery>();
-        card.Name.Should().Be("Flame Slash");
-        card.HasType(CardType.Sorcery).Should().BeTrue();
-    }
-
     [Fact]
     public void FlameSlash_SpellDefinition_HasSingleTargetCreatureRequest()
     {

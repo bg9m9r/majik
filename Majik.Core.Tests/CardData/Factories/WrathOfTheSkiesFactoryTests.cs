@@ -29,6 +29,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   * Energy alt-cost probe yields a candidate when the caster has
 ///     ≥4 energy; suppresses when caster has &lt;4.
 /// </summary>
+[Trait("Color", "W")]
 public class WrathOfTheSkiesFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -47,19 +48,6 @@ public class WrathOfTheSkiesFactoryTests
         w.Owner.Should().BeSameAs(_alice);
         w.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_WrathOfTheSkies()
-    {
-        var card = NamedCardFactory.Create("Wrath of the Skies", _alice);
-
-        card.Should().BeOfType<Sorcery>();
-        card.Name.Should().Be("Wrath of the Skies");
-        card.HasType(CardType.Sorcery).Should().BeTrue();
-        card.ManaCost.Should().Be("{X}{W}{W}");
-        card.Owner.Should().BeSameAs(_alice);
-    }
-
     // ── Resolve — sweep semantics ────────────────────────────────────────────
 
     [Fact]

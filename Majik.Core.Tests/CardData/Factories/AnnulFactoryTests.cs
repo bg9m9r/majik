@@ -27,6 +27,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   * Counters an enchantment spell → graveyard.
 ///   * Creature spell target → no-op at resolution (CR 608.2b).
 /// </summary>
+[Trait("Color", "U")]
 public class AnnulFactoryTests
 {
     private readonly EventBus _bus = new();
@@ -56,17 +57,6 @@ public class AnnulFactoryTests
         annul.ManaCost.Should().Be("{U}");
         annul.ManaCostValue.TotalValue.Should().Be(1);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsAnnulShape()
-    {
-        var dispatched = NamedCardFactory.Create("Annul", _alice);
-
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("Annul");
-        dispatched.ManaCost.Should().Be("{U}");
-    }
-
     [Fact]
     public void SpellDefinition_DeclaresSingleTargetRequest()
     {

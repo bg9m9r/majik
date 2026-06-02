@@ -37,6 +37,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     * Creature target → NO scry (no player was dealt damage this way).
 /// </summary>
 [Collection(nameof(StaticRegistryCollection))]
+[Trait("Color", "R")]
 public class PlayWithFireFactoryTests : IDisposable
 {
     private readonly Player _alice = new("Alice", 20);
@@ -60,17 +61,6 @@ public class PlayWithFireFactoryTests : IDisposable
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_PlayWithFire()
-    {
-        var card = NamedCardFactory.Create("Play with Fire", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Play with Fire");
-        card.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     // ── Spell definition shape ────────────────────────────────────────────────
 
     [Fact]

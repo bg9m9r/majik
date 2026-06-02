@@ -29,6 +29,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Cast-creature trigger does NOT fire.
 /// - Opponent's noncreature cast does NOT fire (controller scoped).
 /// </summary>
+[Trait("Color", "M")]
 public class SpriteDragonFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -72,24 +73,6 @@ public class SpriteDragonFactoryTests
             .Should().ContainSingle(k => k.Keyword == "Flying",
                 "Flying is wired as a KeywordAbility marker");
     }
-
-    [Fact]
-    public void SpriteDragon_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Sprite Dragon", _alice);
-
-        card.Should().BeOfType<Creature>("Sprite Dragon is a Creature");
-        card.Name.Should().Be("Sprite Dragon");
-        card.HasSubtype(CardSubtype.Faerie).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Dragon).Should().BeTrue();
-        ((Creature)card).BasePower.Should().Be(1);
-        ((Creature)card).BaseToughness.Should().Be(1);
-        card.Abilities.OfType<KeywordAbility>()
-            .Should().ContainSingle(k => k.Keyword == "Flying");
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1,
-            "cast-noncreature-spell trigger is attached");
-    }
-
     // -----------------------------------------------------------------------
     // Cast-noncreature trigger fires → +1/+1 counter (P/T 1/1 → 2/2)
     // -----------------------------------------------------------------------

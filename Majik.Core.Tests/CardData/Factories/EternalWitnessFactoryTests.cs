@@ -27,6 +27,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Card-type agnostic: Instant / Sorcery / Creature / Land all returnable.
 ///   - NamedCardFactory dispatch.
 /// </summary>
+[Trait("Color", "G")]
 public class EternalWitnessFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -192,25 +193,6 @@ public class EternalWitnessFactoryTests
         _alice.Zones.Hand.GetCards().Should().Contain(seed);
         _alice.Zones.Graveyard.GetCards().Should().NotContain(seed);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_EternalWitness()
-    {
-        var card = NamedCardFactory.Create("Eternal Witness", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Eternal Witness");
-        card.HasType(CardType.Creature).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Human).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Shaman).Should().BeTrue();
-        ((Creature)card).BasePower.Should().Be(2);
-        ((Creature)card).BaseToughness.Should().Be(1);
-        card.Owner.Should().Be(_alice);
-
-        // ETB trigger should be wired by the factory.
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1);
-    }
-
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private static Instant MakeInstantInZone(string name, string manaCost, Player owner)

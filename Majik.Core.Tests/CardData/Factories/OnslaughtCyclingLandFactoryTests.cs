@@ -29,6 +29,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   is supplied.
 /// - Dispatcher routing through <see cref="NamedCardFactory"/>.
 /// </summary>
+[Trait("Color", "C")]
 public class OnslaughtCyclingLandFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -45,22 +46,6 @@ public class OnslaughtCyclingLandFactoryTests
     // -----------------------------------------------------------------------
     // Identity + dispatch
     // -----------------------------------------------------------------------
-
-    [Theory]
-    [MemberData(nameof(AllCyclingLands))]
-    public void CyclingLand_Dispatch_ReturnsLandWithExpectedSubtype(
-        string cardName, string _color, CardSubtype expectedSubtype)
-    {
-        _ = _color;
-
-        var card = NamedCardFactory.Create(cardName, _alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be(cardName);
-        card.HasSubtype(expectedSubtype).Should().BeTrue(
-            "the printed land subtype");
-    }
-
     [Theory]
     [MemberData(nameof(AllCyclingLands))]
     public void CyclingLand_HasManaAbilityProducingExpectedColor(

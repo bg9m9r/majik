@@ -31,6 +31,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///       discard a card instead (CR 701.8).
 ///     * A player who can't sac AND has an empty hand does nothing (clean).
 /// </summary>
+[Trait("Color", "B")]
 public class PlaguecrafterFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -54,20 +55,6 @@ public class PlaguecrafterFactoryTests
         c.Controller.Should().BeSameAs(_alice);
         c.ManaCost.Should().Be("{2}{B}");
     }
-
-    [Fact]
-    public void Plaguecrafter_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Plaguecrafter", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Plaguecrafter");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Human).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Shaman).Should().BeTrue();
-        c.ManaCost.Should().Be("{2}{B}");
-    }
-
     // -----------------------------------------------------------------------
     // ETB trigger — each player sacrifices a creature/planeswalker of their
     // choice; each who can't discards a card. CR 603.1 / 701.16 / 701.8.

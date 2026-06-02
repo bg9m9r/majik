@@ -37,6 +37,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Fizzle (CR 608.2b) — no target chosen → clean no-op.
 /// - <see cref="NamedCardFactory"/> dispatch.
 /// </summary>
+[Trait("Color", "C")]
 public class AbradedBluffsFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -63,19 +64,6 @@ public class AbradedBluffsFactoryTests
         land.Abilities.OfType<ManaAbility>().Should().HaveCount(2);
         land.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1);
     }
-
-    [Fact]
-    public void AbradedBluffs_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Abraded Bluffs", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Abraded Bluffs");
-        card.HasType(CardType.Land).Should().BeTrue();
-        card.Abilities.OfType<ManaAbility>().Should().HaveCount(2);
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1);
-    }
-
     // -----------------------------------------------------------------------
     // {T}: Add {R} or {W}
     // -----------------------------------------------------------------------

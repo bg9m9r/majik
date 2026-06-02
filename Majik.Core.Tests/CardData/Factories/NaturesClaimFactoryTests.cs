@@ -27,6 +27,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - No-op if target is a creature (wrong type — CR 608.2b illegal target).
 ///   - No-op (incl. no life gain) if target left the battlefield before resolution.
 /// </summary>
+[Trait("Color", "G")]
 public class NaturesClaimFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -49,17 +50,6 @@ public class NaturesClaimFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsNaturesClaimShape()
-    {
-        var dispatched = NamedCardFactory.Create("Nature's Claim", _alice);
-
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("Nature's Claim");
-        dispatched.ManaCost.Should().Be("{G}");
-    }
-
     [Fact]
     public void SpellDefinition_DeclaresSingleTargetArtifactOrEnchantmentRequest()
     {

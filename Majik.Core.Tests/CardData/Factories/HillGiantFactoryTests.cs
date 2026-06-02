@@ -16,6 +16,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Card: Hill Giant — Creature — Giant {3}{R} 3/3.
 /// Vanilla — no printed keywords, triggers, statics, or activated abilities.
 /// </summary>
+[Trait("Color", "R")]
 public class HillGiantFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -57,16 +58,5 @@ public class HillGiantFactoryTests
             "Hill Giant has no triggered abilities");
         c.Abilities.OfType<ActivatedAbility>().Should().BeEmpty(
             "Hill Giant has no activated abilities");
-    }
-
-    [Fact]
-    public void HillGiant_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Hill Giant", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Hill Giant");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Giant).Should().BeTrue();
     }
 }

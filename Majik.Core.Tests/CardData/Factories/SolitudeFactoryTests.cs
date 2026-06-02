@@ -23,6 +23,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// paths (normal + evoke) and assert the on-resolution triggers behave per
 /// CR 702.74 (Evoke) and Solitude's printed ETB exile trigger.
 /// </summary>
+[Trait("Color", "C")]
 public class SolitudeFactoryTests
 {
     private readonly EventBus _bus = new();

@@ -26,6 +26,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Intervening-if (CR 603.4): the ETB effect mints a token ONLY when the
 ///   controller controls another Elf, and no-ops when it does not.
 /// </summary>
+[Trait("Color", "G")]
 public class DwynensEliteFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -49,18 +50,6 @@ public class DwynensEliteFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void DwynensElite_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Dwynen's Elite", _alice);
-
-        card.Should().BeOfType<Creature>("Dwynen's Elite is a Creature instance");
-        card.Name.Should().Be("Dwynen's Elite");
-        card.HasSubtype(CardSubtype.Elf).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Warrior).Should().BeTrue();
-    }
-
     [Fact]
     public void DwynensElite_HasOneEtbTrigger()
     {

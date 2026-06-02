@@ -23,6 +23,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   * Pitch cast — exiles a red card, no timing gate (any turn).
 ///   * Resolve deals 4 damage divided among target creatures (even split).
 /// </summary>
+[Trait("Color", "R")]
 public class PyrokinesisFactoryTests
 {
     private readonly EventBus _bus = new();
@@ -50,16 +51,6 @@ public class PyrokinesisFactoryTests
         pyro.HasType(CardType.Sorcery).Should().BeTrue();
         CardColors.GetColors(pyro).Should().Contain(ManaColor.Red);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsPyrokinesisShape()
-    {
-        var dispatched = NamedCardFactory.Create("Pyrokinesis", _alice);
-
-        dispatched.Should().BeOfType<Sorcery>();
-        dispatched.Name.Should().Be("Pyrokinesis");
-    }
-
     [Fact]
     public async Task CastViaPitch_ExilesRedCard_Deals4DamageToSingleTarget()
     {

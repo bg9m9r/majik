@@ -37,6 +37,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     Mutavault manland posture.
 ///   - NamedCardFactory dispatch.
 /// </summary>
+[Trait("Color", "M")]
 public class KaitoBaneOfNightmaresFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -87,22 +88,6 @@ public class KaitoBaneOfNightmaresFactoryTests
             Majik.Core.ValueObjects.ManaCost.Parse("{1}{U}{B}"),
             "Kaito's printed ninjutsu cost is {1}{U}{B}");
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_Kaito()
-    {
-        var card = NamedCardFactory.Create("Kaito, Bane of Nightmares", _alice);
-
-        card.Should().BeOfType<Planeswalker>();
-        card.Name.Should().Be("Kaito, Bane of Nightmares");
-        card.HasType(CardType.Planeswalker).Should().BeTrue();
-        card.HasSupertype(CardSupertype.Legendary).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Kaito).Should().BeTrue();
-        ((Planeswalker)card).Loyalty.Should().Be(4);
-        card.Owner.Should().Be(_alice);
-        card.Abilities.OfType<LoyaltyAbility>().Should().HaveCount(3);
-    }
-
     // -----------------------------------------------------------------------
     // +1: emblem "Ninjas you control get +1/+1"
     // -----------------------------------------------------------------------

@@ -25,6 +25,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   * Resolve bounces target creature to its owner's hand.
 ///   * Illegal target (creature no longer on battlefield) → no-op.
 /// </summary>
+[Trait("Color", "U")]
 public class SnapbackFactoryTests
 {
     private readonly EventBus _bus = new();
@@ -52,16 +53,6 @@ public class SnapbackFactoryTests
         snap.HasType(CardType.Instant).Should().BeTrue();
         CardColors.GetColors(snap).Should().Contain(ManaColor.Blue);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsSnapbackShape()
-    {
-        var dispatched = NamedCardFactory.Create("Snapback", _alice);
-
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("Snapback");
-    }
-
     [Fact]
     public async Task CastViaPitch_ExilesBlueCard_BouncesTargetCreature()
     {

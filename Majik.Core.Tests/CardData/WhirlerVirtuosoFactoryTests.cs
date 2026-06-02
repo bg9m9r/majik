@@ -19,7 +19,7 @@ namespace Majik.Core.Tests.CardData;
 ///    creature token with flying."
 ///
 /// Covers:
-/// - Identity ({2}{U}{R}, 2/3, Human Artificer, additively Artifact).
+/// - Identity ({2}{U}{R}, 2/3, Human Artificer — a plain Creature, NOT an artifact).
 /// - <see cref="NamedCardFactory"/> dispatch.
 /// - ETB trigger grants the controller {E}{E}{E} on resolution.
 /// - {E}{E} activated ability shape (PayEnergyCost(2), no targets).
@@ -43,7 +43,8 @@ public class WhirlerVirtuosoFactoryTests
         card.Name.Should().Be("Whirler Virtuoso");
         card.ManaCost.ToString().Should().Be("{2}{U}{R}");
         card.HasType(CardType.Creature).Should().BeTrue();
-        card.HasType(CardType.Artifact).Should().BeTrue();
+        card.HasType(CardType.Artifact).Should().BeFalse(
+            "Whirler Virtuoso is a plain Creature — Human Artificer, not an Artifact Creature");
         card.HasSubtype(CardSubtype.Human).Should().BeTrue();
         card.HasSubtype(CardSubtype.Artificer).Should().BeTrue();
         card.BasePower.Should().Be(2);
@@ -60,7 +61,7 @@ public class WhirlerVirtuosoFactoryTests
         card.Should().NotBeNull();
         card!.Name.Should().Be("Whirler Virtuoso");
         card.HasType(CardType.Creature).Should().BeTrue();
-        card.HasType(CardType.Artifact).Should().BeTrue();
+        card.HasType(CardType.Artifact).Should().BeFalse();
     }
 
     // -----------------------------------------------------------------------

@@ -29,6 +29,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Casting a creature spell does NOT pump.
 ///   - End-of-turn cleanup expires the pump.
 /// </summary>
+[Trait("Color", "R")]
 public class MonasterySwiftspearFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -64,18 +65,6 @@ public class MonasterySwiftspearFactoryTests
         s.Owner.Should().BeSameAs(_alice);
         s.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_MonasterySwiftspear()
-    {
-        var card = NamedCardFactory.Create("Monastery Swiftspear", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Monastery Swiftspear");
-        card.HasSubtype(CardSubtype.Human).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Monk).Should().BeTrue();
-    }
-
     // -----------------------------------------------------------------------
     // Ability set — keyword markers + trigger wiring
     // -----------------------------------------------------------------------

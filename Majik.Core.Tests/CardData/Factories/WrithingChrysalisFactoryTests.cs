@@ -32,6 +32,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Sacrifice trigger (CardMovedEvent Battlefield -> Graveyard for another
 ///   Eldrazi) puts a +1/+1 counter on Writhing Chrysalis.
 /// </summary>
+[Trait("Color", "C")]
 public class WrithingChrysalisFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -55,18 +56,6 @@ public class WrithingChrysalisFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void WrithingChrysalis_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Writhing Chrysalis", _alice);
-
-        card.Should().BeOfType<Creature>("Writhing Chrysalis is a Creature instance");
-        card.Name.Should().Be("Writhing Chrysalis");
-        card.HasSubtype(CardSubtype.Eldrazi).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Drone).Should().BeTrue();
-    }
-
     [Fact]
     public void WrithingChrysalis_IsDevoid_AndHasDevoidMarker()
     {

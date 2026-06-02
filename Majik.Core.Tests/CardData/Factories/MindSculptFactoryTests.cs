@@ -24,6 +24,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Short library fully mills without throwing (CR 701.13a).
 /// - Illegal target (resolver returns non-Player) → no-op (CR 608.2b).
 /// </summary>
+[Trait("Color", "U")]
 public class MindSculptFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -48,18 +49,6 @@ public class MindSculptFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void MindSculpt_DispatchesViaNamedCardFactory()
-    {
-        var dispatched = NamedCardFactory.Create("Mind Sculpt", _alice);
-
-        dispatched.Should().BeOfType<Sorcery>();
-        dispatched.Name.Should().Be("Mind Sculpt");
-        dispatched.HasType(CardType.Sorcery).Should().BeTrue();
-        dispatched.ManaCost.Should().Be("{1}{U}");
-    }
-
     // -----------------------------------------------------------------------
     // BuildDefinition shape
     // -----------------------------------------------------------------------

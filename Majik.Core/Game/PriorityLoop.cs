@@ -398,8 +398,18 @@ public sealed class PriorityLoop
         return true;
     }
 
-    private GameContext MakeContext(Player self, Player activePlayer) =>
-        new(self, _players, activePlayer, _turnNumberAccessor(), _phaseAccessor(), _stack);
+    private GameContext MakeContext(Player self, Player activePlayer)
+    {
+        var phase = _phaseAccessor();
+        // CR 305.2 — surface whether `self` can actually play a land right now,
+        // computed from the same LandDropTracker that ApplyActionAsync enforces.
+        // Consumers (PriorityKinds, auto-pass gate, bot agents) gate land
+        // proposals on this so they don't repeatedly offer a land the loop will
+        // only reject (the old over-include flooded logs / spun the round).
+        var landPlayAvailable = phase is { } ph
+            && _landDropTracker.CanPlayLand(self, activePlayer, ph, _stack.IsEmpty, out _);
+        return new(self, _players, activePlayer, _turnNumberAccessor(), phase, _stack, landPlayAvailable);
+    }
 
     // PLAN 01 — resolve the agent for a stack object's controller when
     // resolving its effects. Prefer the engine-supplied seat agents (this

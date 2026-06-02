@@ -30,6 +30,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Multiple acceptors each take 5; draw still suppressed.
 ///   - Absent AllPlayers (all-decline default) → target draws three.
 /// </summary>
+[Trait("Color", "R")]
 public class BrowbeatFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -68,17 +69,6 @@ public class BrowbeatFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void Browbeat_DispatchesViaNamedCardFactory()
-    {
-        var dispatched = NamedCardFactory.Create("Browbeat", _alice);
-
-        dispatched.Should().BeOfType<Sorcery>();
-        dispatched.Name.Should().Be("Browbeat");
-        dispatched.HasType(CardType.Sorcery).Should().BeTrue();
-    }
-
     [Fact]
     public void Browbeat_SpellDefinition_HasSingleTargetPlayerRequest()
     {

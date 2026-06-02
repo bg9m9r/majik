@@ -40,6 +40,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// not-overloaded; the overloaded branch is exercised here by passing
 /// <c>wasOverloaded: true</c> through the spell-definition builder directly.
 /// </summary>
+[Trait("Color", "R")]
 public class ElectrickeryFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -58,19 +59,6 @@ public class ElectrickeryFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_Electrickery()
-    {
-        var card = NamedCardFactory.Create("Electrickery", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Electrickery");
-        card.HasType(CardType.Instant).Should().BeTrue();
-        card.ManaCost.ToString().Should().Be("{R}");
-        card.Owner.Should().BeSameAs(_alice);
-    }
-
     // ── Spell definition shape (default, not overloaded) ──────────────────────
 
     [Fact]

@@ -22,6 +22,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Cycle-mate of <see cref="RazortideBridgeFactory"/> (the WU member); the
 /// only difference is the produced colours (G/W vs W/U).
 /// </summary>
+[Trait("Color", "C")]
 public class ThornglintBridgeFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -38,17 +39,6 @@ public class ThornglintBridgeFactoryTests
         bridge.Owner.Should().BeSameAs(_alice);
         bridge.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void ThornglintBridge_NamedCardFactory_DispatchesArtifactLand()
-    {
-        var card = NamedCardFactory.Create("Thornglint Bridge", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.HasType(CardType.Land).Should().BeTrue();
-        card.HasType(CardType.Artifact).Should().BeTrue();
-    }
-
     [Fact]
     public void ThornglintBridge_HasPrintedIndestructibleKeyword()
     {

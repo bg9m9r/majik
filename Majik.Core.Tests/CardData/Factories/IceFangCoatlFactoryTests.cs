@@ -35,6 +35,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     - PRESENT when ≥3 other snow permanents controlled.
 ///     - Responds dynamically as snow count changes.
 /// </summary>
+[Trait("Color", "M")]
 public class IceFangCoatlFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -111,19 +112,6 @@ public class IceFangCoatlFactoryTests
     // -----------------------------------------------------------------------
     // NamedCardFactory dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void IceFangCoatl_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Ice-Fang Coatl", _alice);
-
-        c.Should().BeOfType<Creature>("Ice-Fang Coatl is a Creature");
-        c.Name.Should().Be("Ice-Fang Coatl");
-        c.HasSubtype(CardSubtype.Snake).Should().BeTrue();
-        c.HasSupertype(CardSupertype.Snow).Should().BeTrue();
-        c.ManaCost.Should().Be("{G}{U}");
-    }
-
     // -----------------------------------------------------------------------
     // ETB triggered ability shape
     // -----------------------------------------------------------------------

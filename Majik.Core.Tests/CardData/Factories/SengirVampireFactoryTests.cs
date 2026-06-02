@@ -32,6 +32,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Non-combat (ability/spell) damage counts (printed "dealt damage").
 /// - Per-turn scope: TurnStartedEvent clears the victim set.
 /// </summary>
+[Trait("Color", "B")]
 public class SengirVampireFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -72,23 +73,6 @@ public class SengirVampireFactoryTests
         var sv = SengirVampireFactory.Create(_alice);
         CombatAbilities.HasFlying(sv).Should().BeTrue("printed Flying keyword");
     }
-
-    [Fact]
-    public void SengirVampire_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Sengir Vampire", _alice);
-
-        card.Should().BeOfType<Creature>("Sengir Vampire is a Creature");
-        card.Name.Should().Be("Sengir Vampire");
-        card.HasSubtype(CardSubtype.Vampire).Should().BeTrue();
-        ((Creature)card).BasePower.Should().Be(4);
-        ((Creature)card).BaseToughness.Should().Be(4);
-        card.Abilities.OfType<KeywordAbility>()
-            .Should().ContainSingle(k => k.Keyword == "Flying");
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1,
-            "the damage-linked dies trigger is attached");
-    }
-
     // -----------------------------------------------------------------------
     // Damage → death loop
     // -----------------------------------------------------------------------

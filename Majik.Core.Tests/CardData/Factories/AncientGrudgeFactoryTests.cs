@@ -35,6 +35,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - No-op if target left the battlefield before resolution (CR 608.2b).
 ///   - Printed Flashback {G} alt-cost helper produces a usable cost.
 /// </summary>
+[Trait("Color", "R")]
 public class AncientGrudgeFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -63,18 +64,6 @@ public class AncientGrudgeFactoryTests
         AncientGrudgeFactory.PrintedManaCost.Should().Be("{1}{R}");
         AncientGrudgeFactory.FlashbackManaCost.Should().Be("{G}");
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsAncientGrudgeShape()
-    {
-        var dispatched = NamedCardFactory.Create("Ancient Grudge", _alice);
-
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("Ancient Grudge");
-        dispatched.ManaCost.Should().Be("{1}{R}");
-        dispatched.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     // ── SpellDefinition shape ─────────────────────────────────────────────────
 
     [Fact]

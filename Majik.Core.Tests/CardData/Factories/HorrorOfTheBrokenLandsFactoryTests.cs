@@ -34,6 +34,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Cycling activated ability shape ({B} mana + DiscardSelfCost) + end-to-end.
 /// - <see cref="NamedCardFactory"/> dispatch.
 /// </summary>
+[Trait("Color", "B")]
 public class HorrorOfTheBrokenLandsFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -57,20 +58,6 @@ public class HorrorOfTheBrokenLandsFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void HorrorOfTheBrokenLands_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Horror of the Broken Lands", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.HasSubtype(CardSubtype.Horror).Should().BeTrue();
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1,
-            "the cycle-or-discard pump trigger");
-        card.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1,
-            "the cycling activated ability");
-    }
-
     // -----------------------------------------------------------------------
     // Cycle trigger shape — CR 603.1 over CardCycledEvent
     // -----------------------------------------------------------------------

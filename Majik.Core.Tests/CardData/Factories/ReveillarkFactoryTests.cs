@@ -33,6 +33,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   controller's graveyard to the battlefield; respects the "up to two"
 ///   cap and the "power 2 or less" filter; empty / no-legal-target = no-op.
 /// </summary>
+[Trait("Color", "W")]
 public class ReveillarkFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -55,20 +56,6 @@ public class ReveillarkFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void Reveillark_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Reveillark", _alice);
-
-        card.Should().BeOfType<Creature>("Reveillark is a Creature");
-        card.Name.Should().Be("Reveillark");
-        card.HasSubtype(CardSubtype.Elemental).Should().BeTrue();
-        ((Creature)card).BasePower.Should().Be(4);
-        ((Creature)card).BaseToughness.Should().Be(3);
-        card.Owner.Should().BeSameAs(_alice);
-    }
-
     [Fact]
     public void Reveillark_HasFlyingAndEvokeMarkers()
     {

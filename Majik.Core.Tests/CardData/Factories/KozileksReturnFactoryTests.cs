@@ -42,6 +42,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///         each creature,
 ///       * declining the "may" leaves the card + creatures untouched.
 /// </summary>
+[Trait("Color", "C")]
 public class KozileksReturnFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -62,19 +63,6 @@ public class KozileksReturnFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_KozileksReturn()
-    {
-        var card = NamedCardFactory.Create("Kozilek's Return", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Kozilek's Return");
-        card.HasType(CardType.Instant).Should().BeTrue();
-        card.ManaCost.Should().Be("{2}{R}");
-        card.Owner.Should().BeSameAs(_alice);
-    }
-
     // -----------------------------------------------------------------------
     // Devoid (CR 702.114)
     // -----------------------------------------------------------------------

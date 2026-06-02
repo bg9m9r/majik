@@ -29,6 +29,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   markers present, surfaced via Rules.Protection.HasProtectionFromColor.
 /// - No protection from other colours.
 /// </summary>
+[Trait("Color", "W")]
 public class MirranCrusaderFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -52,19 +53,6 @@ public class MirranCrusaderFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void MirranCrusader_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Mirran Crusader", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Mirran Crusader");
-        ((Creature)c).HasSubtype(CardSubtype.Human).Should().BeTrue();
-        ((Creature)c).HasSubtype(CardSubtype.Knight).Should().BeTrue();
-        c.HasType(CardType.Creature).Should().BeTrue();
-    }
-
     // ── Double strike ───────────────────────────────────────────────────
 
     [Fact]

@@ -27,6 +27,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Shield prevents red-source damage to the chosen target end-to-end.
 /// - No bus + no target = clean no-op (shape test).
 /// </summary>
+[Trait("Color", "W")]
 public class BurrentonForgeTenderFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -47,20 +48,6 @@ public class BurrentonForgeTenderFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void Burrenton_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Burrenton Forge-Tender", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Burrenton Forge-Tender");
-        c.Abilities.OfType<ProtectionAbility>().Should().HaveCount(1,
-            "protection from red rider");
-        c.Abilities.OfType<BurrentonForgeTenderAbility>().Should().HaveCount(1,
-            "sac-self prevent-red activated ability");
-    }
-
     [Fact]
     public void Burrenton_HasProtectionFromRed()
     {

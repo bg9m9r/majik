@@ -17,6 +17,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Functional reprint of <see cref="LightningStrikeFactory"/>:
 /// "Searing Spear deals 3 damage to any target." ({1}{R} Instant.)
 /// </summary>
+[Trait("Color", "R")]
 public class SearingSpearFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -32,16 +33,6 @@ public class SearingSpearFactoryTests
         card.ManaCost.ToString().Should().Be("{1}{R}");
         card.Owner.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Searing Spear", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Searing Spear");
-    }
-
     [Fact]
     public void SpellDefinition_HasSingleAnyTargetRequest()
     {

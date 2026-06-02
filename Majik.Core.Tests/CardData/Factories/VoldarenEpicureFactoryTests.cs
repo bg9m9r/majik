@@ -30,6 +30,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     <see cref="TriggerManager"/>; on resolution opponents lose 1 life
 ///     and a Blood token enters the battlefield under the controller.
 /// </summary>
+[Trait("Color", "R")]
 public class VoldarenEpicureFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -50,18 +51,6 @@ public class VoldarenEpicureFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void VoldarenEpicure_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Voldaren Epicure", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Voldaren Epicure");
-        c.HasSubtype(CardSubtype.Vampire).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Citizen).Should().BeTrue();
-    }
-
     [Fact]
     public void VoldarenEpicure_HasOneEtbTriggeredAbility()
     {

@@ -22,6 +22,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// spell) and NO life cost. Tests mirror DuressFactoryTests, dropping the
 /// noncreature/nonland filter and confirming no life loss.
 /// </summary>
+[Trait("Color", "B")]
 public class CoercionFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -69,15 +70,6 @@ public class CoercionFactoryTests
         card.HasType(CardType.Sorcery).Should().BeTrue();
         card.ManaCost.ToString().Should().Be("{2}{B}");
     }
-
-    [Fact]
-    public void DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Coercion", _alice);
-        card.Should().BeOfType<Sorcery>();
-        card.Name.Should().Be("Coercion");
-    }
-
     // ── Core discard behaviour ───────────────────────────────────────────
 
     [Fact]

@@ -18,14 +18,14 @@ namespace Majik.Core.CardData.Factories;
 /// <summary>
 /// Named-card factory for Force of Rage (Modern Horizons, {2}{R}{R}).
 ///
-/// Sorcery. Oracle text:
+/// Instant. Oracle text:
 ///   "If it's not your turn, you may exile a red card from your hand rather
 ///    than pay this spell's mana cost.
 ///    Create three 3/1 red Elemental creature tokens with trample and haste.
 ///    Sacrifice them at the beginning of the next end step."
 ///
 /// ## Implemented (v1)
-/// - Sorcery card shape ({2}{R}{R}, Red) — built via the fluent
+/// - Instant card shape ({2}{R}{R}, Red) — built via the fluent
 ///   <see cref="CardDef"/> DSL.
 /// - Pitch alternative cost (<see cref="Majik.Core.Costs.PitchAlternativeCost"/>,
 ///   <c>RequiredColor = Red</c>, <c>LifeCost = 0</c>) — same primitive +
@@ -71,10 +71,10 @@ public static class ForceOfRageFactory
     public const int TokenToughness = 1;
     public const string TokenName = "Elemental";
 
-    public static CardDef Define() => CardDef.Sorcery(CardName, PrintedManaCost);
+    public static CardDef Define() => CardDef.Instant(CardName, PrintedManaCost);
 
-    public static Sorcery Create(Player owner) =>
-        (Sorcery)CardDefRuntime.Build(Define(), owner);
+    public static Instant Create(Player owner) =>
+        (Instant)CardDefRuntime.Build(Define(), owner);
 
     /// <summary>
     /// Build the resolve-time <see cref="SpellDefinition"/>. Creates three

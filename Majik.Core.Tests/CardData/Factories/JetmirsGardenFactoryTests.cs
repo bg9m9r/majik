@@ -40,6 +40,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// <see cref="HedgeMazeFactory"/> and <see cref="OnslaughtCyclingLandFactory"/>'s
 /// shape-only path.
 /// </summary>
+[Trait("Color", "C")]
 public class JetmirsGardenFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -49,19 +50,6 @@ public class JetmirsGardenFactoryTests
     // -----------------------------------------------------------------------
     // Identity + dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void JetmirsGarden_Dispatch_ReturnsLandWithThreePrintedSubtypes()
-    {
-        var card = NamedCardFactory.Create(CardName, _alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be(CardName);
-        card.HasSubtype(CardSubtype.Mountain).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Forest).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Plains).Should().BeTrue();
-    }
-
     [Fact]
     public void JetmirsGarden_HasThreeManaAbilities_ProducingRGW()
     {

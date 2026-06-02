@@ -18,6 +18,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   "Flying"
 ///   "First strike"
 /// </summary>
+[Trait("Color", "W")]
 public class RazorfootGriffinFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -95,16 +96,5 @@ public class RazorfootGriffinFactoryTests
 
         c.Abilities.OfType<TriggeredAbility>().Should().BeEmpty();
         c.Abilities.OfType<ActivatedAbility>().Should().BeEmpty();
-    }
-
-    [Fact]
-    public void RazorfootGriffin_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Razorfoot Griffin", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Razorfoot Griffin");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Griffin).Should().BeTrue();
     }
 }

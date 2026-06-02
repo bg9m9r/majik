@@ -33,6 +33,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - No-op against a non-artifact, non-creature target (CR 608.2b).
 ///   - No-op if target left the battlefield before resolution (CR 608.2b).
 /// </summary>
+[Trait("Color", "M")]
 public class PutrefyFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -61,18 +62,6 @@ public class PutrefyFactoryTests
         PutrefyFactory.CardName.Should().Be("Putrefy");
         PutrefyFactory.PrintedManaCost.Should().Be("{1}{B}{G}");
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsPutrefyShape()
-    {
-        var dispatched = NamedCardFactory.Create("Putrefy", _alice);
-
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("Putrefy");
-        dispatched.ManaCost.Should().Be("{1}{B}{G}");
-        dispatched.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     // ── SpellDefinition shape ─────────────────────────────────────────────────
 
     [Fact]

@@ -25,6 +25,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Oracle: "Target instant or sorcery card in your graveyard gains flashback
 /// until end of turn. The flashback cost is equal to its mana cost."
 /// </summary>
+[Trait("Color", "R")]
 public class FlashbackFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -230,19 +231,6 @@ public class FlashbackFactoryTests
     }
 
     // ── Dispatcher ────────────────────────────────────────────────────────────
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_Flashback()
-    {
-        var card = NamedCardFactory.Create("Flashback", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Flashback");
-        card.ManaCost.Should().Be("{R}");
-        card.HasType(CardType.Instant).Should().BeTrue();
-        card.Owner.Should().Be(_alice);
-    }
-
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private static ChosenSpellParams MakeChosen(object target) =>

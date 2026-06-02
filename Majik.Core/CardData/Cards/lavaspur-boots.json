@@ -1,0 +1,6 @@
+{
+  "name": "Lavaspur Boots",
+  "types": ["Artifact"],
+  "subtypes": ["Equipment"],
+  "manaCost": "{1}"
+}

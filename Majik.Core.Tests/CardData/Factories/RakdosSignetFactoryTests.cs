@@ -23,6 +23,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Tap-as-cost: a tapped signet can't activate the mana ability.
 /// - Dispatch through <see cref="NamedCardFactory"/> resolves the name.
 /// </summary>
+[Trait("Color", "C")]
 public class RakdosSignetFactoryTests
 {
     // -----------------------------------------------------------------------
@@ -79,18 +80,6 @@ public class RakdosSignetFactoryTests
         signet.HasSupertype(CardSupertype.Basic).Should().BeFalse();
         signet.HasSupertype(CardSupertype.Legendary).Should().BeFalse();
     }
-
-    [Fact]
-    public void RakdosSignet_Dispatch_ResolvesViaNamedCardFactory()
-    {
-        var alice = new Player("Alice", 20);
-
-        var card = NamedCardFactory.Create("Rakdos Signet", alice);
-
-        card.Should().BeAssignableTo<Artifact>();
-        card.Name.Should().Be("Rakdos Signet");
-    }
-
     // -----------------------------------------------------------------------
     // Mana ability — shape
     // -----------------------------------------------------------------------

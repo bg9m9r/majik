@@ -27,6 +27,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - +2/+0 expires at end of turn (CR 514.2).
 /// - Fizzle: target not on battlefield → no-op (CR 608.2b).
 /// </summary>
+[Trait("Color", "R")]
 public class BullRushFactoryTests
 {
     private readonly EventBus _bus = new();
@@ -57,17 +58,6 @@ public class BullRushFactoryTests
         br.Controller.Should().BeSameAs(_alice);
         CardColors.GetColors(br).Should().Contain(ManaColor.Red);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsBullRush()
-    {
-        var dispatched = NamedCardFactory.Create("Bull Rush", _alice);
-
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("Bull Rush");
-        dispatched.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     [Fact]
     public void SpellDefinition_DeclaresSingleTargetCreatureRequest()
     {

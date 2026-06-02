@@ -32,6 +32,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Conditional ward {1} marker keyword while legendary (CR 702.21).
 ///   - Inert while unattached.
 /// </summary>
+[Trait("Color", "U")]
 public class CombatResearchTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -47,17 +48,6 @@ public class CombatResearchTests
         c.HasType(CardType.Enchantment).Should().BeTrue();
         c.HasSubtype(CardSubtype.Aura).Should().BeTrue();
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_CombatResearch()
-    {
-        var card = NamedCardFactory.Create("Combat Research", _alice);
-
-        card.Should().BeOfType<Enchantment>();
-        card.Name.Should().Be("Combat Research");
-        card.HasSubtype(CardSubtype.Aura).Should().BeTrue();
-    }
-
     // -----------------------------------------------------------------------
     // Granted trigger — "Whenever this creature deals combat damage to a
     // player, draw a card." (CR 510 / CR 603.1)

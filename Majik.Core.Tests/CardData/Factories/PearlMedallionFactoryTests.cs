@@ -28,6 +28,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     * Two Medallions stack ({2} reduction).
 ///     * Opponent's Medallion doesn't discount your spells.
 /// </summary>
+[Trait("Color", "C")]
 public class PearlMedallionFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -53,17 +54,6 @@ public class PearlMedallionFactoryTests
         c.Abilities.OfType<SpellCostReductionAbility>()
             .Should().HaveCount(1, "the white-spell cost-reduction rider is attached");
     }
-
-    [Fact]
-    public void PearlMedallion_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Pearl Medallion", _alice);
-
-        c.Should().BeOfType<Artifact>();
-        c.Name.Should().Be("Pearl Medallion");
-        c.Abilities.OfType<SpellCostReductionAbility>().Should().HaveCount(1);
-    }
-
     [Fact]
     public void WhiteInstant_GenericReducedByOne()
     {

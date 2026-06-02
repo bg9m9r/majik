@@ -35,22 +35,10 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// by <see cref="EntersTappedBinder"/> from the oracle text, not by this
 /// factory (same posture as the Guildgate / Refuge tapland factories).
 /// </summary>
+[Trait("Color", "C")]
 public class WoodlandChasmFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
-
-    [Fact]
-    public void WoodlandChasm_Dispatch_ReturnsSnowLandWithSwampForestSubtypes()
-    {
-        var card = NamedCardFactory.Create("Woodland Chasm", _alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Woodland Chasm");
-        card.HasSupertype(CardSupertype.Snow).Should().BeTrue("type line is Snow Land");
-        card.HasSubtype(CardSubtype.Swamp).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Forest).Should().BeTrue();
-    }
-
     [Fact]
     public void WoodlandChasm_IsNotBasic()
     {

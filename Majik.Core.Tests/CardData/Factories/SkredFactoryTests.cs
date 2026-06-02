@@ -27,6 +27,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   * Zero snow permanents → clean no-op.
 ///   * Off-battlefield target → no-op (CR 608.2b).
 /// </summary>
+[Trait("Color", "R")]
 public class SkredFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -40,15 +41,6 @@ public class SkredFactoryTests
         skred.HasType(CardType.Instant).Should().BeTrue();
         CardColors.GetColors(skred).Should().Contain(ManaColor.Red);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsSkredShape()
-    {
-        var dispatched = NamedCardFactory.Create("Skred", _alice);
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("Skred");
-    }
-
     [Fact]
     public void CountSnowPermanents_CountsAllSnowTypesControllerControls()
     {

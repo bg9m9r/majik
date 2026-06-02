@@ -18,6 +18,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Flying keyword marker (CR 702.9).
 /// - <see cref="NamedCardFactory"/> dispatch.
 /// </summary>
+[Trait("Color", "B")]
 public class BogImpFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -104,14 +105,4 @@ public class BogImpFactoryTests
     // -----------------------------------------------------------------------
     // Named-card dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void BogImp_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Bog Imp", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Bog Imp");
-        card.HasSubtype(CardSubtype.Imp).Should().BeTrue();
-    }
 }

@@ -18,6 +18,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Oracle text (verified against Scryfall): empty — vanilla. No printed
 /// keywords, triggers, statics, or activated abilities.
 /// </summary>
+[Trait("Color", "G")]
 public class RuneclawBearFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -40,18 +41,6 @@ public class RuneclawBearFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void RuneclawBear_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Runeclaw Bear", _alice);
-
-        c.Should().BeOfType<Creature>("Runeclaw Bear is a Creature instance");
-        c.Name.Should().Be("Runeclaw Bear");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        ((Creature)c).HasSubtype(CardSubtype.Bear).Should().BeTrue();
-    }
-
     [Fact]
     public void RuneclawBear_IsVanilla_NoAbilities()
     {

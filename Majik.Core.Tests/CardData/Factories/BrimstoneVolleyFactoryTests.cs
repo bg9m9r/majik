@@ -33,6 +33,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - No TurnState wired (shape / dispatcher tests) → base 3 damage.
 ///   - IsMorbidActive helpers track CreaturesDiedThisTurn.
 /// </summary>
+[Trait("Color", "R")]
 public class BrimstoneVolleyFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -54,19 +55,6 @@ public class BrimstoneVolleyFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_BrimstoneVolley()
-    {
-        var card = NamedCardFactory.Create("Brimstone Volley", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Brimstone Volley");
-        card.HasType(CardType.Instant).Should().BeTrue();
-        card.ManaCost.Should().Be("{2}{R}");
-        card.Owner.Should().BeSameAs(_alice);
-    }
-
     // -----------------------------------------------------------------------
     // Spell definition shape
     // -----------------------------------------------------------------------

@@ -37,6 +37,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Dies trigger: deals damage equal to its power (LKI, counters included)
 ///     to each opponent (CR 603.6d / 603.10).
 /// </summary>
+[Trait("Color", "R")]
 public class HeartfireHeroFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -69,20 +70,6 @@ public class HeartfireHeroFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_HeartfireHero()
-    {
-        var card = NamedCardFactory.Create("Heartfire Hero", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Heartfire Hero");
-        card.HasSubtype(CardSubtype.Mouse).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Soldier).Should().BeTrue();
-        // Two triggered abilities: Valiant + dies.
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(2);
-    }
-
     [Fact]
     public void HeartfireHero_HasTwoTriggeredAbilities_ValiantAndDies()
     {

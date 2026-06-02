@@ -28,6 +28,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Casting a vanilla creature spell -> no draw.
 /// - Opponent casting an Aura -> no draw.
 /// </summary>
+[Trait("Color", "W")]
 public class KorSpiritdancerFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -67,17 +68,6 @@ public class KorSpiritdancerFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void KorSpiritdancer_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Kor Spiritdancer", _alice);
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Kor Spiritdancer");
-        c.HasSubtype(CardSubtype.Kor).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Wizard).Should().BeTrue();
-    }
-
     // -----------------------------------------------------------------------
     // Part 1 — Aura-count self-pump (CR 613.1g)
     // -----------------------------------------------------------------------

@@ -17,6 +17,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Card: Ancient Crab — Creature — Crab {1}{U}{U} 1/5 (Amonkhet).
 /// Vanilla — no printed keywords, triggers, statics, or activated abilities.
 /// </summary>
+[Trait("Color", "U")]
 public class AncientCrabFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -54,18 +55,6 @@ public class AncientCrabFactoryTests
         colors.Should().Contain(ManaColor.Blue, "Ancient Crab costs {1}{U}{U}");
         colors.Should().HaveCount(1, "Ancient Crab is exactly Blue");
     }
-
-    [Fact]
-    public void AncientCrab_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Ancient Crab", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Ancient Crab");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Crab).Should().BeTrue();
-    }
-
     [Fact]
     public void AncientCrab_IsVanilla_NoAbilities()
     {

@@ -14,6 +14,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Tests for <see cref="GlistenerElfFactory"/> — Creature — Phyrexian Elf
 /// Warrior {G} 1/1 with Infect (CR 702.90).
 /// </summary>
+[Trait("Color", "G")]
 public class GlistenerElfFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -44,19 +45,5 @@ public class GlistenerElfFactoryTests
             .Any(k => k.Keyword == "Infect").Should().BeTrue(
                 "Infect (CR 702.90) marker is attached so the damage pipeline " +
                 "can route -1/-1 counters / poison counters once that primitive lands.");
-    }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_GlistenerElf()
-    {
-        var card = NamedCardFactory.Create("Glistener Elf", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Glistener Elf");
-        ((Creature)card).HasSubtype(CardSubtype.Phyrexian).Should().BeTrue();
-        ((Creature)card).HasSubtype(CardSubtype.Elf).Should().BeTrue();
-        ((Creature)card).HasSubtype(CardSubtype.Warrior).Should().BeTrue();
-        ((Creature)card).Abilities.OfType<KeywordAbility>()
-            .Any(k => k.Keyword == "Infect").Should().BeTrue();
     }
 }

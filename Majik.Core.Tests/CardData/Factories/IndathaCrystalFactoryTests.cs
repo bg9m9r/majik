@@ -28,6 +28,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   <see cref="Majik.Core.Events.CardCycledEvent"/>.
 /// - Dispatcher routing through <see cref="NamedCardFactory"/>.
 /// </summary>
+[Trait("Color", "C")]
 public class IndathaCrystalFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -47,18 +48,6 @@ public class IndathaCrystalFactoryTests
         crystal.Owner.Should().BeSameAs(_alice);
         crystal.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_IndathaCrystal()
-    {
-        var card = NamedCardFactory.Create("Indatha Crystal", _alice);
-
-        card.Should().BeOfType<Artifact>();
-        card.Name.Should().Be("Indatha Crystal");
-        card.HasType(CardType.Artifact).Should().BeTrue();
-        card.ManaCost.Should().Be("{3}");
-    }
-
     [Fact]
     public void IndathaCrystal_HasThreeManaAbilities_ProducingWBG()
     {

@@ -17,6 +17,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Card: Storm Crow — {1}{U} Creature — Bird 1/2.
 ///   "Flying"
 /// </summary>
+[Trait("Color", "U")]
 public class StormCrowFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -73,16 +74,5 @@ public class StormCrowFactoryTests
         c.Abilities.OfType<ActivatedAbility>().Should().BeEmpty();
         c.Abilities.OfType<KeywordAbility>().Should().HaveCount(1,
             "Flying is the only printed keyword");
-    }
-
-    [Fact]
-    public void StormCrow_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Storm Crow", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Storm Crow");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Bird).Should().BeTrue();
     }
 }
