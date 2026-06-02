@@ -1,0 +1,8 @@
+{
+  "name": "Foreboding Ruins",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "B" },
+    { "kind": "mana", "produces": "R" }
+  ]
+}
