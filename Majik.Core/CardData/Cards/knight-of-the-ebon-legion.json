@@ -1,0 +1,9 @@
+{
+  "name": "Knight of the Ebon Legion",
+  "types": ["Creature"],
+  "subtypes": ["Vampire", "Knight"],
+  "manaCost": "{B}",
+  "power": 1,
+  "toughness": 2,
+  "abilities": []
+}
