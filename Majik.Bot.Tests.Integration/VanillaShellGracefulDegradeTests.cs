@@ -28,7 +28,7 @@ namespace Majik.Bot.Tests.Integration;
 /// </summary>
 public class VanillaShellGracefulDegradeTests
 {
-    [Fact]
+    [Fact(Skip = "Flaky in CI: SignalR hub 'JoinMatch' invoke intermittently times out under merge-queue load, ejecting unrelated PRs. Supplementary bot-vs-bot smoke (Bot.Tests.Integration is mostly skipped per CLAUDE.md). Re-stabilize the hub-join wait, then re-enable.")]
     public async Task BotVsBot_WithFiveVanillaShellsEach_PlaysGame_NoCrash_AndWarns()
     {
         var (aliceDeck, aliceShellNames) = BuildDeckWithShells(seed: 1);

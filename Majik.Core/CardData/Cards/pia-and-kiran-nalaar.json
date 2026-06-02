@@ -1,0 +1,10 @@
+{
+  "name": "Pia and Kiran Nalaar",
+  "types": ["Creature"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Human", "Artificer"],
+  "manaCost": "{2}{R}{R}",
+  "power": 2,
+  "toughness": 2,
+  "abilities": []
+}
