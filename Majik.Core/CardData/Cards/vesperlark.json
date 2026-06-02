@@ -1,0 +1,9 @@
+{
+  "name": "Vesperlark",
+  "types": ["Creature"],
+  "subtypes": ["Elemental"],
+  "manaCost": "{2}{W}",
+  "power": 2,
+  "toughness": 1,
+  "abilities": []
+}
