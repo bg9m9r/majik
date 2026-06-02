@@ -535,4 +535,9 @@ public enum CardSubtype
     /// and the broader one-eyed-giant Cyclops lineage. CR 205.3m — flavour
     /// subtype with no inherent rules meaning.</summary>
     Cyclops,
+
+    /// <summary>Pegasus creature subtype — Vryn Wingmare (Magic Origins),
+    /// Pegasus Charger, Cloudfin Raptor-adjacent winged-horse lineage.
+    /// CR 205.3m — flavour subtype with no inherent rules meaning.</summary>
+    Pegasus,
 }

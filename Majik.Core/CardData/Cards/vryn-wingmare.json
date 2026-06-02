@@ -1,0 +1,9 @@
+{
+  "name": "Vryn Wingmare",
+  "types": ["Creature"],
+  "subtypes": ["Pegasus"],
+  "manaCost": "{2}{W}",
+  "power": 2,
+  "toughness": 1,
+  "abilities": []
+}
