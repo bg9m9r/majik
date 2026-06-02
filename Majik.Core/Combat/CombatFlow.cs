@@ -152,8 +152,9 @@ public sealed class CombatFlow
         var deathtouch = CombatAbilities.HasDeathtouch(attacker);
         var trample = CombatAbilities.HasTrample(attacker);
 
-        foreach (var b in blocks)
+        for (var idx = 0; idx < blocks.Count; idx++)
         {
+            var b = blocks[idx];
             if (remaining <= 0) break;
             if (b.Blocker.Zone != ZoneType.Battlefield) continue;
 
@@ -163,11 +164,32 @@ public sealed class CombatFlow
 
             if (remaining < lethal)
             {
-                // CR 510.1c — must assign lethal before moving on. Couldn't,
-                // so leftover (and any subsequent blockers) goes unassigned.
+                // CR 510.1c — the attacking player must assign at least lethal
+                // damage to a blocker before assigning damage to the NEXT one,
+                // but is never forced to "waste" the remainder on a later
+                // blocker. The auto-assigner keeps the "rest is lost" semantics
+                // once it has already assigned lethal to a PRIOR blocker (the
+                // attacker is allowed to stop). But a creature whose power is
+                // less than its lone blocker's toughness still deals all its
+                // damage to that blocker (a 3-power attacker vs a lone 4/4
+                // deals 3 — marked, or as -1/-1 counters under wither). Detect
+                // that case: nothing has been assigned yet (remaining ==
+                // attacker.Power) and there is no later battlefield blocker.
+                var nothingAssignedYet = remaining == attacker.Power;
+                var hasLaterBlocker = false;
+                for (var j = idx + 1; j < blocks.Count; j++)
+                {
+                    if (blocks[j].Blocker.Zone == ZoneType.Battlefield) { hasLaterBlocker = true; break; }
+                }
+
                 if (trample)
                 {
                     DealDamageToPlayer(attacker, defender, remaining);
+                    remaining = 0;
+                }
+                else if (nothingAssignedYet && !hasLaterBlocker)
+                {
+                    DealDamageToCreature(attacker, b.Blocker, remaining);
                     remaining = 0;
                 }
                 break;
@@ -195,7 +217,20 @@ public sealed class CombatFlow
         intent = _replacements?.Apply(intent) ?? intent;
         if (intent == null || intent.Amount <= 0) return;
 
-        target.TakeDamage(intent.Amount);
+        // CR 702.90b — a source with wither (or infect) deals its damage to a
+        // CREATURE in the form of that many -1/-1 counters instead of marked
+        // damage. Mirrors the deathtouch branch below: wither changes the FORM
+        // of the damage, not the timing — first-strike ordering, lifelink, and
+        // the combat-damage event are unchanged. Lethal-via-counters is left to
+        // the Layer 7c P/T mod + CR 704.5g state-based action.
+        if (CombatAbilities.DealsCreatureDamageAsMinusCounters(source))
+        {
+            target.Counters.Add(Majik.Core.Counters.CounterType.MinusOneMinusOne, intent.Amount);
+        }
+        else
+        {
+            target.TakeDamage(intent.Amount);
+        }
         if (CombatAbilities.HasDeathtouch(source))
         {
             target.MarkedForDestructionByDeathtouch = true;
