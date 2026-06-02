@@ -1,0 +1,9 @@
+{
+  "name": "Kozilek's Predator",
+  "types": ["Creature"],
+  "subtypes": ["Eldrazi", "Drone"],
+  "manaCost": "{3}{G}",
+  "power": 3,
+  "toughness": 3,
+  "abilities": []
+}
