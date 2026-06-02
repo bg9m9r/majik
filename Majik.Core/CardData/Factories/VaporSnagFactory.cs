@@ -1,10 +1,8 @@
-using Majik.Core.Abilities;
+using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
 using Majik.Core.Game;
 using Majik.Core.Players;
-using Majik.Core.Players.Agents;
 using Majik.Core.Services;
-using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
 
@@ -15,24 +13,22 @@ namespace Majik.Core.CardData.Factories;
 ///   "Return target creature to its owner's hand.
 ///    Its controller loses 1 life."
 ///
-/// ## Implemented (v1)
-/// - Instant {U}, owner/controller wired.
-/// - <see cref="BuildDefinition"/> wires the resolve effect:
-///   1. Reads target from ChosenSpellParams (1..1 "target creature").
-///   2. Validates the target is still a Creature on the Battlefield at
-///      resolution (CR 608.2b — illegal target → both effects do nothing;
-///      the life-loss rider keys off "its controller", which is only
-///      defined when the target is still on the battlefield).
-///   3. Captures the controller before moving the card, then routes the
-///      bounce through <see cref="ZoneService.MoveCard"/> when a ZoneService
-///      is supplied, or falls back to raw zone manipulation.
-///   4. Charges the captured controller 1 life via
-///      <see cref="Player.LoseLife"/>.
+/// ## Declarative spell schema (return_to_hand + lose_life_target rider)
+/// <see cref="BuildDefinition"/> no longer hand-rolls a bespoke bounce +
+/// life-loss closure: it declares a <see cref="ReturnToHandEffectDef"/> over the
+/// <c>creature</c> target filter followed by a <see cref="LoseLifeTargetEffectDef"/>
+/// rider (<c>Subject = "controller"</c>) that SHARES the bounce's chosen target
+/// and drains its controller (CR 119.3) — the same ability-side verbs the engine
+/// uses elsewhere, here threaded through
+/// <see cref="CardDefRuntime.BuildSpellDefinitionFromEffects"/>.
 ///
-/// CR 608.2b applies to both clauses: if the target has left the battlefield
-/// by resolution, neither the bounce NOR the life loss happens (the oracle
-/// text's "its controller" refers to the creature's controller at resolution,
-/// which is indeterminate if it is no longer on the battlefield).
+/// CR 608.2g — "its controller" uses last-known information: the rider snapshots
+/// the creature's controller before the bounce moves it. CR 608.2b — an illegal
+/// target at resolution (the creature already left the battlefield) fizzles BOTH
+/// clauses: no bounce AND no life loss. The target request + the bounce / drain
+/// resolution come straight from the shared <see cref="TargetFilters"/> /
+/// <see cref="Majik.Core.Primitives.Fx.BounceToHand"/> /
+/// <see cref="Majik.Core.Primitives.Fx.LoseLife"/> primitives.
 /// </summary>
 [CardName("Vapor Snag")]
 public static class VaporSnagFactory
@@ -43,8 +39,7 @@ public static class VaporSnagFactory
     /// <summary>
     /// Construct Vapor Snag as an Instant card with owner/controller wired.
     /// The resolve SpellDefinition is built on demand via
-    /// <see cref="BuildDefinition"/> at the SpellCastFlow resolver wire-up
-    /// site (mirrors Force of Negation / Spell Snare).
+    /// <see cref="BuildDefinition"/> at the SpellCastFlow resolver wire-up site.
     /// </summary>
     public static Instant Create(Player owner)
     {
@@ -57,77 +52,18 @@ public static class VaporSnagFactory
 
     /// <summary>
     /// Build the "return target creature to its owner's hand; its controller
-    /// loses 1 life" SpellDefinition.
-    ///
-    /// CR 608.2b: if the chosen target is no longer a creature on the
-    /// battlefield at resolution, both effects do nothing.
+    /// loses 1 life" SpellDefinition declaratively.
     /// </summary>
-    /// <param name="zoneService">Optional ZoneService for replacement-bus-aware
-    /// zone moves. When null, raw zone manipulation is used (shape tests /
-    /// dispatcher path).</param>
-    public static SpellDefinition BuildDefinition(
-        ZoneService? zoneService = null) =>
-        new(
-            Modes: Array.Empty<string>(),
-            HasVariableX: false,
-            TargetRequests: new[]
+    /// <param name="zoneService">Accepted for call-site compatibility with the
+    /// other spell factories; the declarative bounce verb resolves through
+    /// <see cref="Majik.Core.Primitives.Fx.BounceToHand(ICard, ZoneService?)"/>
+    /// using raw zone moves.</param>
+    public static SpellDefinition BuildDefinition(ZoneService? zoneService = null) =>
+        CardDefRuntime.BuildSpellDefinitionFromEffects(
+            CardName,
+            new EffectDefinition[]
             {
-                new TargetRequest(
-                    "target creature",
-                    MinTargets: 1,
-                    MaxTargets: 1,
-                    LegalCandidates: Array.Empty<object>(),
-                    Intent: BotIntent.Bounce,
-                    // Agent-prompt MVP: live gather all creatures; Bounce
-                    // intent in the bot's ranker picks opponent's most-
-                    // expensive creature (CMC-as-spend proxy).
-                    CandidateGatherer: ctx => ctx.AllPlayers
-                        .SelectMany(p => p.Zones.Battlefield.GetCards())
-                        .OfType<Creature>()
-                        .Cast<object>()
-                        .ToList()),
-            },
-            EffectFactory: p =>
-            {
-                var raw = p.Targets[0][0];
-                return new IEffect[]
-                {
-                    new Effect(
-                        "Vapor Snag — return target creature to its owner's hand; its controller loses 1 life",
-                        () => Resolve(raw, zoneService)),
-                };
+                new ReturnToHandEffectDef { TargetFilter = "creature" },
+                new LoseLifeTargetEffectDef { Amount = 1, Subject = "controller" },
             });
-
-    private static void Resolve(object raw, ZoneService? zoneService)
-    {
-        // CR 608.2b — target must still be a creature on the battlefield.
-        if (raw is not Creature target) return;
-        if (target.Zone != ZoneType.Battlefield) return;
-
-        var targetOwner = target.Owner;
-        if (targetOwner == null) return;
-
-        // Capture controller before the zone move, since SetController may
-        // update after returning to hand.
-        var controller = target.Controller ?? targetOwner;
-
-        // CR 701.10 — return to owner's hand.
-        if (zoneService != null)
-        {
-            zoneService.MoveCard(target, ZoneType.Battlefield, ZoneType.Hand);
-        }
-        else
-        {
-            var fromController = controller;
-            fromController.Zones.Battlefield.RemoveCard(target);
-            targetOwner.Zones.Hand.AddCard(target);
-            target.SetZone(ZoneType.Hand);
-            target.SetController(targetOwner);
-        }
-
-        // CR 119.3 — "Its controller loses 1 life." The controller is the
-        // player who controlled the creature immediately before it left the
-        // battlefield (captured above, before the zone move).
-        controller.LoseLife(1);
-    }
 }

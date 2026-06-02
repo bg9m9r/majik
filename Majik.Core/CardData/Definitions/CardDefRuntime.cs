@@ -321,6 +321,47 @@ public static class CardDefRuntime
     private static Player? _fallbackController;
 
     /// <summary>
+    /// Build a shared-slot rider effect (CR 608.2g — last-known information).
+    /// The host effect at the shared slot runs first in printed order and may
+    /// move the target off the battlefield, so the rider snapshots its victim
+    /// NOW (resolution start, targets locked, host not yet run) rather than
+    /// reading post-host state. An illegal target (not a battlefield permanent /
+    /// player) snapshots no victim, so the rider fizzles cleanly with its host.
+    /// v1 supports the <see cref="LoseLifeTargetEffectDef"/> rider.
+    /// </summary>
+    private static IEffect BuildSharedSlotRider(
+        EffectDefinition effect, ChosenSpellParams chosen, int slot)
+    {
+        var picks = slot < chosen.Targets.Count
+            ? chosen.Targets[slot]
+            : (IReadOnlyList<object>)Array.Empty<object>();
+        var pick = picks.Count > 0 ? picks[0] : null;
+
+        return effect switch
+        {
+            LoseLifeTargetEffectDef lose => BuildLoseLifeRiderSnapshot(lose, pick),
+            _ => throw new NotSupportedException(
+                $"Shared-slot rider '{effect.GetType().Name}' is not yet supported by CardDefRuntime."),
+        };
+    }
+
+    private static IEffect BuildLoseLifeRiderSnapshot(LoseLifeTargetEffectDef def, object? pick)
+    {
+        // CR 608.2g — capture last-known controller before the host effect runs.
+        var victim = pick switch
+        {
+            Player player => player,
+            Permanent permanent when permanent.Zone == ZoneType.Battlefield
+                => permanent.Controller,
+            _ => null,
+        };
+        var amount = def.Amount;
+        return new Effect(
+            $"its controller loses {amount} life",
+            () => { if (victim != null) Fx.LoseLife(victim, amount); });
+    }
+
+    /// <summary>
     /// Declarative SPELL-effect bridge — compile an ability-side
     /// <see cref="EffectDefinition"/> list into a full
     /// <see cref="SpellDefinition"/> so an instant / sorcery reuses the SAME
@@ -373,13 +414,27 @@ public static class CardDefRuntime
         // at resolution, or -1 for an untargeted effect.
         var targetRequests = new List<TargetRequest>();
         var slotForEffect = new int[effects.Count];
+        // The slot index of the most-recently declared targeted effect, so a
+        // rider verb (SharesPreviousTargetSlot — e.g. Vapor Snag's "its
+        // controller loses 1 life") reuses it instead of declaring a new
+        // target. -1 until the first targeted effect appears.
+        var lastTargetedSlot = -1;
         for (var i = 0; i < effects.Count; i++)
         {
-            var request = effects[i].ToTargetRequest();
+            var effect = effects[i];
+            var request = effect.ToTargetRequest();
             if (request is not null)
             {
                 slotForEffect[i] = targetRequests.Count;
+                lastTargetedSlot = targetRequests.Count;
                 targetRequests.Add(request);
+            }
+            else if (effect.SharesPreviousTargetSlot)
+            {
+                // Rider — reuse the preceding targeted effect's slot (no new
+                // TargetRequest). Falls back to untargeted if it is the first
+                // effect (no slot to share).
+                slotForEffect[i] = lastTargetedSlot;
             }
             else
             {
@@ -404,6 +459,24 @@ public static class CardDefRuntime
                 for (var i = 0; i < effects.Count; i++)
                 {
                     var slot = slotForEffect[i];
+
+                    // Shared-slot rider (Vapor Snag's "its controller loses N
+                    // life"): the host effect (the bounce) runs first in printed
+                    // order and moves the target off the battlefield, so a
+                    // resolution-time controller read would see the post-bounce
+                    // state. CR 608.2g — "its controller" uses LAST-KNOWN
+                    // information from immediately before the target left. We
+                    // snapshot it NOW, at resolution start (targets locked, host
+                    // not yet run), exactly like the bespoke factory captured the
+                    // controller before its zone move. An illegal target (never a
+                    // battlefield permanent) snapshots no victim → the rider
+                    // fizzles with its host.
+                    if (slot >= 0 && effects[i].SharesPreviousTargetSlot)
+                    {
+                        built[i] = BuildSharedSlotRider(effects[i], chosen, slot);
+                        continue;
+                    }
+
                     // The shared ability builder reads its target from
                     // ChosenTargets[targetRequestIndex]; we always present the
                     // pick at index 0 of a single-slot context (the adapter
@@ -886,6 +959,7 @@ public static class CardDefRuntime
             TapTargetEffectDef tap => BuildTapTargetEffect(tap, card, targetRequestIndex),
             PreventDamageTargetEffectDef prevent => BuildPreventDamageTargetEffect(prevent, card, replacements, targetRequestIndex),
             GainLifeSelfEffectDef gain => BuildGainLifeSelfEffect(gain, card, controller),
+            LoseLifeTargetEffectDef lose => BuildLoseLifeTargetEffect(lose, card, targetRequestIndex),
             MillThenPickFirstMatchingToHandEffectDef mp => BuildMillThenPickEffect(mp, card, controller),
             ConniveSelfEffectDef connive => BuildConniveSelfEffect(connive, card),
             AmassSelfEffectDef amass => BuildAmassSelfEffect(amass, card, controller),
@@ -942,6 +1016,36 @@ public static class CardDefRuntime
             () => controller.GainLife(amount));
     }
 
+    private static IEffect BuildLoseLifeTargetEffect(LoseLifeTargetEffectDef def, ICard card, int targetRequestIndex)
+    {
+        // CR 119.3 — the targeted life-drain rider. Reads the chosen target off
+        // ChosenTargets at the reserved index (its own slot when subject is
+        // "target", or the SHARED slot of the preceding targeted effect when
+        // subject is "controller"). The life loss lands on:
+        //   - the chosen Player directly (a player's "controller" is itself), or
+        //   - the chosen Permanent's controller ("its controller loses N life").
+        // CR 608.2b — when the shared/own target is illegal at resolution (a
+        // bounced permanent has left the battlefield), "its controller" is
+        // undefined, so the rider fizzles cleanly with its host. Routes through
+        // the shared Fx.LoseLife primitive.
+        var amount = def.Amount;
+        return new Effect(
+            $"{card.Name}: target loses {amount} life",
+            ctx =>
+            {
+                var live = ChosenTargetAt(ctx, targetRequestIndex);
+                var victim = live switch
+                {
+                    Player player => player,
+                    Permanent permanent when permanent.Zone == ZoneType.Battlefield
+                        => permanent.Controller,
+                    _ => null,
+                };
+                if (victim != null) Fx.LoseLife(victim, amount);
+                return ValueTask.CompletedTask;
+            });
+    }
+
     private static IEffect BuildMillThenPickEffect(
         MillThenPickFirstMatchingToHandEffectDef def, ICard card, Player controller)
     {
@@ -967,16 +1071,21 @@ public static class CardDefRuntime
     {
         // PLAN 01 (Slice F) — real targeted destroy. The chosen permanent is
         // read off the resolving ability's ChosenTargets via the index the
-        // ability reserved for this effect; CR 608.2b — re-check legality at
-        // resolution (target must still be a battlefield permanent) and fizzle
-        // otherwise. Fx.MoveToGraveyard(…, Destroy) honours Indestructible
-        // (CR 702.12) / regeneration (CR 701.15).
+        // ability reserved for this effect; CR 608.2b — re-check the SAME filter
+        // predicate at resolution (via TargetFilters.Matches), so a type-gated
+        // "destroy target artifact / enchantment / …" instant fizzles cleanly
+        // when the chosen object no longer matches its printed type (the mirror
+        // of BuildExileTargetEffect's re-check). Fx.MoveToGraveyard(…, Destroy)
+        // honours Indestructible (CR 702.12) / regeneration (CR 701.15).
+        var filter = def.TargetFilter;
         return new Effect(
-            $"{card.Name}: destroy target {def.TargetFilter}",
+            $"{card.Name}: destroy target {filter}",
             ctx =>
             {
                 var live = ChosenTargetAt(ctx, targetRequestIndex);
-                if (live is Permanent permanent && permanent.Zone == ZoneType.Battlefield)
+                if (live is Permanent permanent
+                    && permanent.Zone == ZoneType.Battlefield
+                    && TargetFilters.Matches(filter, permanent))
                 {
                     Fx.MoveToGraveyard(permanent, ZoneMoveReason.Destroy);
                 }
@@ -1018,12 +1127,20 @@ public static class CardDefRuntime
         // is no longer a battlefield permanent at resolution. Exact parallel
         // of BuildDestroyTargetEffect / BuildUntapTargetEffect — the only new
         // piece is the declarative wiring onto the pre-existing Fx primitive.
+        var filter = def.TargetFilter;
         return new Effect(
-            $"{card.Name}: return target {def.TargetFilter} to its owner's hand",
+            $"{card.Name}: return target {filter} to its owner's hand",
             ctx =>
             {
+                // CR 608.2b — re-check the SAME filter predicate at resolution
+                // (via TargetFilters.Matches) so a type-gated bounce
+                // ("nonland permanent" / "creature" / …) fizzles cleanly when
+                // the chosen object no longer matches — the mirror of the
+                // destroy/exile re-check.
                 var live = ChosenTargetAt(ctx, targetRequestIndex);
-                if (live is Permanent permanent && permanent.Zone == ZoneType.Battlefield)
+                if (live is Permanent permanent
+                    && permanent.Zone == ZoneType.Battlefield
+                    && TargetFilters.Matches(filter, permanent))
                 {
                     Fx.BounceToHand(permanent);
                 }
