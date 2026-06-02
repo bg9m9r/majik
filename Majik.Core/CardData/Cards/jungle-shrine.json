@@ -1,0 +1,9 @@
+{
+  "name": "Jungle Shrine",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "R" },
+    { "kind": "mana", "produces": "G" },
+    { "kind": "mana", "produces": "W" }
+  ]
+}
