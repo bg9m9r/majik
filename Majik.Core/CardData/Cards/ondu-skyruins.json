@@ -1,0 +1,7 @@
+{
+  "name": "Ondu Skyruins",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "W" }
+  ]
+}
