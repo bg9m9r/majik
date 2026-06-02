@@ -14700,6 +14700,55 @@
     "Green"
   ]
 }
+==== render-silent ====
+{
+  "name": "Render Silent",
+  "manaCost": "{W}{U}{U}",
+  "primaryType": "Instant",
+  "cardTypes": [
+    "Instant"
+  ],
+  "supertypes": [],
+  "subtypes": [],
+  "power": null,
+  "toughness": null,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Blue",
+    "White"
+  ]
+}
 ==== rending-volley ====
 {
   "name": "Rending Volley",
