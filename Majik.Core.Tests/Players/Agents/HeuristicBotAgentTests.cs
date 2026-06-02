@@ -42,6 +42,25 @@ public class HeuristicBotAgentTests
     }
 
     [Fact]
+    public async Task Priority_LandDropSpent_Passes_EvenWithLandsInHand()
+    {
+        // Regression: the bot used to cycle through every land in hand each
+        // turn even after its drop was spent, proposing each one to the loop,
+        // which rejected each — flooding "rejected PlayLand" lines over a long
+        // game (and timing out the fuzz harness). With LandPlayAvailable=false
+        // (the engine's live land-drop truth) it offers no land at all.
+        var l1 = NamedCardFactory.Create("Mountain", _alice);
+        var l2 = NamedCardFactory.Create("Forest", _alice);
+        foreach (var l in new[] { l1, l2 }) { l.SetZone(ZoneType.Hand); _alice.Zones.Hand.AddCard(l); }
+
+        var bot = new HeuristicBotAgent();
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice,
+            1, PhaseStateType.PreCombatMain, new Majik.Core.Stack.Stack(), landPlayAvailable: false);
+
+        (await bot.ChoosePriorityActionAsync(ctx)).Should().Be(PriorityAction.Pass);
+    }
+
+    [Fact]
     public async Task Priority_OpponentTurn_Passes_EvenWithLand()
     {
         var land = NamedCardFactory.Create("Mountain", _alice);
