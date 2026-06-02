@@ -1,0 +1,6 @@
+{
+  "name": "Maul of the Skyclaves",
+  "types": ["Artifact"],
+  "subtypes": ["Equipment"],
+  "manaCost": "{2}{W}"
+}
