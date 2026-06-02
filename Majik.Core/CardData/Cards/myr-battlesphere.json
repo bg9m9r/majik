@@ -1,0 +1,8 @@
+{
+  "name": "Myr Battlesphere",
+  "types": ["Creature", "Artifact"],
+  "subtypes": ["Myr", "Construct"],
+  "manaCost": "{7}",
+  "power": 4,
+  "toughness": 7
+}
