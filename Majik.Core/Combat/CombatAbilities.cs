@@ -51,6 +51,16 @@ public static class CombatAbilities
         source != null && (HasWither(source) || HasInfect(source));
 
     /// <summary>
+    /// CR 702.90c — true when <paramref name="source"/> deals damage to
+    /// PLAYERS as poison counters instead of life loss, i.e. it has infect
+    /// (wither does NOT — wither only changes the form of damage to
+    /// creatures). Centralized so combat and noncombat player-damage paths
+    /// agree on the poison-counter form.
+    /// </summary>
+    public static bool DealsPlayerDamageAsPoison(Creature? source) =>
+        source != null && HasInfect(source);
+
+    /// <summary>
     /// CR 509.1b — returns the minimum number of blockers required to
     /// legally block this creature (from a
     /// <see cref="KeywordAbility"/> with keyword
