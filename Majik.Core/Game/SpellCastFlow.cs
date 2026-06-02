@@ -163,15 +163,39 @@ public sealed class SpellCastFlow
         // because Gift spells upgrade their target predicate when promised).
         var giftRecipient = await PromptForGiftRecipientAsync(card, caster, ctx, agent, ct);
 
-        // CR 700.2 — choose modes (modal spells).
-        int? mode = await PromptForModeAsync(definition, ctx, agent, ct);
+        // CR 700.2 — choose modes (modal spells). Single-mode ("Choose one")
+        // spells return a scalar; multi-mode ("Choose one or more" / "Choose
+        // two") spells return the chosen set (CR 700.2d). The scalar is kept
+        // in sync with the first chosen mode so legacy single-mode
+        // EffectFactory closures still read ChosenSpellParams.ModeIndex.
+        var modeChoice = await PromptForModesAsync(definition, ctx, agent, ct);
+        int? mode = modeChoice.Count > 0 ? modeChoice[0] : (int?)null;
+        IReadOnlyList<int>? modeIndexes =
+            definition.IsMultiMode && modeChoice.Count > 0 ? modeChoice : null;
+
+        // CR 702.121 — Escalate. Pay the escalate additional cost once for
+        // each mode chosen BEYOND the first (CR 702.121a), as part of casting
+        // (CR 601.2f). Each payment is a fresh cost instance; an unpayable
+        // extra mode makes the whole cast illegal (CR 601.2g — no partial
+        // payment). The paid instances are appended to the merged additional
+        // costs so downstream effect closures / cleanup see them.
+        if (definition.Escalate is { } escalate && modeChoice.Count > 1)
+        {
+            PayEscalateCosts(escalate, card, caster, modeChoice.Count - 1, mergedAdditional);
+        }
 
         // CR 601.2e + CR 202.3b — choose X and stamp the value on the card so
         // permanents whose ETB references X can read it.
         int? xValue = await PromptForXAsync(definition, card, ctx, agent, ct);
 
-        // CR 601.2c — collect targets in declaration order.
-        var collectedTargets = await CollectTargetsAsync(definition, card, ctx, agent, ct);
+        // CR 601.2c — collect targets in declaration order. For a multi-mode
+        // ("choose one or more") spell whose target requests are index-aligned
+        // with its modes, only the CHOSEN modes' target slots are prompted —
+        // CR 601.2c only chooses targets for modes that were chosen. Unchosen
+        // modes keep an empty slot so EffectFactory's per-mode index lookups
+        // stay aligned.
+        var collectedTargets = await CollectTargetsAsync(
+            definition, card, ctx, agent, modeChoice, ct);
 
         // CR 601.2f — compute the post-reduction total cost (printed cost OR
         // alt cost; + X; − cost reductions; − Delve, Improvise, Convoke
@@ -185,7 +209,7 @@ public sealed class SpellCastFlow
 
         var chosen = new ChosenSpellParams(
             mode, xValue, collectedTargets, mana, ctx.AllPlayers,
-            ModeIndexes: null,
+            ModeIndexes: modeIndexes,
             AdditionalCostPayments: mergedAdditional.Count > 0 ? mergedAdditional : null);
         var effects = definition.EffectFactory(chosen);
 
@@ -392,12 +416,73 @@ public sealed class SpellCastFlow
         return giftRecipient;
     }
 
-    /// <summary>CR 700.2 — modal-spell mode prompt.</summary>
-    private static async Task<int?> PromptForModeAsync(
+    /// <summary>CR 700.2 / CR 700.2d — modal-spell mode prompt. Returns the
+    /// chosen mode index set (one entry for "Choose one", N entries for
+    /// "Choose one or more" / "Choose two"). Empty when the spell is not
+    /// modal. Single-mode spells route through the scalar
+    /// <see cref="IPlayerAgent.ChooseModeAsync"/> so existing agents /
+    /// scripts keep their behaviour; multi-mode spells route through
+    /// <see cref="IPlayerAgent.ChooseModesAsync"/>.</summary>
+    private static async Task<IReadOnlyList<int>> PromptForModesAsync(
         SpellDefinition definition, GameContext ctx, IPlayerAgent agent, CancellationToken ct)
     {
-        if (definition.Modes.Count == 0) return null;
-        return await agent.ChooseModeAsync(ctx, definition.Modes, definition.ModeIntents, ct);
+        if (definition.Modes.Count == 0) return Array.Empty<int>();
+
+        if (!definition.IsMultiMode)
+        {
+            var single = await agent.ChooseModeAsync(
+                ctx, definition.Modes, definition.ModeIntents, ct);
+            return new[] { single };
+        }
+
+        return await agent.ChooseModesAsync(
+            ctx, definition.Modes, definition.MinModes, definition.MaxModes,
+            definition.ModeIntents, ct);
+    }
+
+    /// <summary>CR 702.121 / CR 601.2f / CR 601.2g — pay the escalate
+    /// additional cost <paramref name="extraModes"/> times (one per mode
+    /// chosen beyond the first). Each payment is a fresh cost instance from
+    /// <see cref="EscalateSpec.BuildPerModeCost"/>; all are affordability-
+    /// checked before any is committed so a shortfall can't leave a
+    /// half-paid escalate (e.g. one card discarded then the cast aborts).
+    /// Paid instances are appended to <paramref name="mergedAdditional"/> so
+    /// downstream effect / cleanup machinery can read them. Throws
+    /// <see cref="InvalidOperationException"/> when the total escalate cost
+    /// can't be paid — making the cast illegal.</summary>
+    private static void PayEscalateCosts(
+        EscalateSpec escalate,
+        ICard card,
+        Player caster,
+        int extraModes,
+        List<IAdditionalCost> mergedAdditional)
+    {
+        if (extraModes <= 0) return;
+
+        // CR 601.2g — confirm the WHOLE escalate bill is affordable BEFORE
+        // paying any single instance, so a shortfall can't leave a half-paid
+        // escalate (one card discarded then the cast aborts). The aggregate
+        // probe counts the depletable resource (hand size for discard, life
+        // for pay-life); when no probe is supplied this is permissive and the
+        // per-payment guard below still catches a mid-sequence shortfall.
+        if (!escalate.CanPayExtraModes(caster, extraModes))
+        {
+            throw new InvalidOperationException(
+                $"Cannot pay Escalate cost ({escalate.Description}) for {card.Name}: " +
+                $"insufficient resources for {extraModes} extra-mode payment(s).");
+        }
+
+        for (var i = 0; i < extraModes; i++)
+        {
+            var cost = escalate.BuildPerModeCost(card);
+            if (!cost.CanPay(caster) || !cost.Pay(caster))
+            {
+                throw new InvalidOperationException(
+                    $"Cannot pay Escalate cost ({escalate.Description}) for {card.Name}: " +
+                    $"insufficient resources for {extraModes} extra-mode payment(s).");
+            }
+            mergedAdditional.Add(cost);
+        }
     }
 
     /// <summary>CR 601.2e + CR 202.3b — choose X and stamp it on the card so
@@ -417,10 +502,48 @@ public sealed class SpellCastFlow
 
     /// <summary>CR 601.2c — collect targets in declaration order, lazy-
     /// gathering candidate pools against the live ctx. Throws when the agent
-    /// can't pick enough legal targets (cast is illegal).</summary>
+    /// can't pick enough legal targets (cast is illegal).
+    /// <para>
+    /// CR 700.2d — for a multi-mode spell whose target requests are
+    /// index-aligned with its modes (one request per printed mode), only the
+    /// CHOSEN modes are prompted for targets; unchosen modes keep an empty
+    /// slot so per-mode index lookups in the EffectFactory stay aligned. When
+    /// the request/mode counts don't line up (e.g. Cryptic Command, whose two
+    /// requests cover only the first two of four modes) the whole request list
+    /// is collected, preserving the legacy behaviour.
+    /// </para></summary>
     private static async Task<List<IReadOnlyList<object>>> CollectTargetsAsync(
-        SpellDefinition definition, ICard card, GameContext ctx, IPlayerAgent agent, CancellationToken ct)
+        SpellDefinition definition, ICard card, GameContext ctx, IPlayerAgent agent,
+        IReadOnlyList<int> chosenModes, CancellationToken ct)
     {
+        // CR 700.2d — mode-aware target collection for index-aligned multi-mode
+        // spells. Prompt only the chosen modes' slots; fill the rest empty.
+        if (definition.IsMultiMode
+            && definition.TargetRequests.Count == definition.Modes.Count
+            && chosenModes.Count > 0)
+        {
+            var chosenSet = new HashSet<int>(chosenModes);
+            var perMode = new List<IReadOnlyList<object>>(definition.TargetRequests.Count);
+            for (var i = 0; i < definition.TargetRequests.Count; i++)
+            {
+                if (!chosenSet.Contains(i))
+                {
+                    perMode.Add(Array.Empty<object>());
+                    continue;
+                }
+                var oneSlot = await Targeting.TargetCollection.CollectAsync(
+                    new[] { definition.TargetRequests[i] },
+                    card, ctx, agent, throwOnInsufficient: true, ct);
+                perMode.Add(oneSlot.Count > 0 ? oneSlot[0] : Array.Empty<object>());
+            }
+
+            if (card is Card concreteMulti && perMode.Count > 0)
+            {
+                concreteMulti.SetPendingCastTargets(perMode);
+            }
+            return perMode;
+        }
+
         // PLAN 01 (Slice E) — one shared targeting pipeline. CR 601.2c: an
         // agent that can't supply enough legal targets makes the cast illegal,
         // so the spell path enforces min cardinality.

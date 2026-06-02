@@ -29,8 +29,22 @@ public sealed record SpellDefinition(
     IReadOnlyList<TargetRequest> TargetRequests,
     Func<ChosenSpellParams, IReadOnlyList<IEffect>> EffectFactory,
     IReadOnlyList<BotIntent>? ModeIntents = null,
-    IReadOnlyList<IAdditionalCost>? AdditionalCosts = null)
+    IReadOnlyList<IAdditionalCost>? AdditionalCosts = null,
+    int MinModes = 1,
+    int MaxModes = 1,
+    EscalateSpec? Escalate = null)
 {
+    /// <summary>
+    /// CR 700.2d / CR 700.2e — true when the caster may pick MORE than one
+    /// mode ("Choose one or more", "Choose two", "Choose two or three").
+    /// Single-mode ("Choose one") spells leave <see cref="MinModes"/> /
+    /// <see cref="MaxModes"/> at their (1, 1) default and route through the
+    /// legacy scalar <c>ChooseModeAsync</c> path; multi-mode spells route
+    /// through <c>ChooseModesAsync</c> and populate
+    /// <see cref="ChosenSpellParams.ModeIndexes"/>.
+    /// </summary>
+    public bool IsMultiMode => Modes.Count > 0 && MaxModes > 1;
+
     /// <summary>
     /// Non-null view of <see cref="ModeIntents"/> — empty when no per-mode
     /// intents have been computed. Consumers should prefer this accessor
@@ -80,4 +94,48 @@ public sealed record ChosenSpellParams(
     /// </summary>
     public IReadOnlyList<IAdditionalCost> AdditionalCostPaymentsOrEmpty =>
         AdditionalCostPayments ?? Array.Empty<IAdditionalCost>();
+}
+
+/// <summary>
+/// CR 702.121 — Escalate. The additional cost a modal ("choose one or more")
+/// spell must pay for EACH mode chosen beyond the first (CR 702.121a). The
+/// caster pays this cost (modesChosen − 1) times as the spell is cast
+/// (CR 601.2f — as an additional cost), so choosing two modes costs the
+/// escalate cost once, three modes costs it twice, and so on.
+///
+/// <para>
+/// <see cref="BuildPerModeCost"/> is invoked by <see cref="SpellCastFlow"/>
+/// once per extra mode to produce a fresh <see cref="IAdditionalCost"/>
+/// instance (e.g. a new <c>DiscardACardAdditionalCost</c> for Collective
+/// Brutality's "Escalate—Discard a card"). Each instance is pre-checked for
+/// affordability and paid in order; if any extra mode's cost can't be paid
+/// the cast is illegal (CR 601.2g — no partial payment of additional costs),
+/// surfaced as the same <see cref="InvalidOperationException"/> the rest of
+/// the additional-cost machinery throws.
+/// </para>
+///
+/// <para>
+/// Modelling escalate as a per-extra-mode cost FACTORY (rather than a single
+/// cost paid N times) keeps each payment independent — the discard picker can
+/// nominate a different card per extra mode, and the paid references are
+/// surfaced individually on <see cref="ChosenSpellParams.AdditionalCostPayments"/>.
+/// </para>
+/// </summary>
+public sealed record EscalateSpec(
+    string Description,
+    Func<ICard, IAdditionalCost> BuildPerModeCost,
+    Func<Player, int, bool>? CanPayExtra = null)
+{
+    /// <summary>
+    /// CR 601.2g — aggregate affordability for paying the escalate cost
+    /// <paramref name="extraModes"/> times up front (before any payment
+    /// mutates state). Defaults to "true" when no probe is supplied — the
+    /// per-payment loop in <see cref="SpellCastFlow"/> then catches a
+    /// mid-sequence shortfall. Cards whose escalate cost depletes a countable
+    /// resource (discard-a-card → hand size; pay N life → life total) supply a
+    /// real probe so a "chose 3 modes with 2 cards in hand" cast is rejected
+    /// atomically rather than discarding one card and then aborting.
+    /// </summary>
+    public bool CanPayExtraModes(Player caster, int extraModes) =>
+        extraModes <= 0 || (CanPayExtra?.Invoke(caster, extraModes) ?? true);
 }

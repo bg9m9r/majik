@@ -127,6 +127,76 @@ public interface IPlayerAgent
         CancellationToken ct = default);
 
     /// <summary>
+    /// CR 700.2d / CR 702.121 — pick the set of modes for a "choose one or
+    /// more" (or "choose two", "choose two or three") modal spell. Returns
+    /// the chosen mode indices, in the order the caster wants them announced
+    /// (resolution always reorders to printed order per CR 608.2c — the
+    /// EffectFactory enforces that — so order here only affects which extra
+    /// modes pay escalate). The result must:
+    /// <list type="bullet">
+    /// <item>contain between <paramref name="minModes"/> and
+    /// <paramref name="maxModes"/> entries (CR 700.2e),</item>
+    /// <item>contain no duplicate indices (CR 700.2d — each mode at most
+    /// once, absent a "you may choose the same mode more than once" rider),</item>
+    /// <item>contain only indices in <c>[0, modes.Count)</c>.</item>
+    /// </list>
+    /// <paramref name="modeIntents"/> is parallel to <paramref name="modes"/>
+    /// when populated (same contract as <see cref="ChooseModeAsync"/>).
+    /// <para>
+    /// Default implementation routes through the declarative
+    /// <see cref="ChooseAsync"/> sink as a <see cref="ChoiceKind.PickN"/> over
+    /// boxed mode indices, then sanitizes the result (dedupe, clamp to range,
+    /// enforce <paramref name="minModes"/>..<paramref name="maxModes"/>). When
+    /// the agent supplies nothing usable it falls back to the first
+    /// <paramref name="minModes"/> modes — the deterministic pre-agent posture
+    /// matching every other prompt's first-candidate default.
+    /// </para>
+    /// </summary>
+    async Task<IReadOnlyList<int>> ChooseModesAsync(
+        GameContext ctx,
+        IReadOnlyList<string> modes,
+        int minModes,
+        int maxModes,
+        IReadOnlyList<BotIntent>? modeIntents = null,
+        CancellationToken ct = default)
+    {
+        var indices = Enumerable.Range(0, modes.Count).Cast<object>().ToList();
+        var req = new ChoiceRequest(
+            ChoiceKind.PickN,
+            "Choose modes",
+            Min: Math.Max(1, minModes),
+            Max: Math.Min(maxModes, modes.Count),
+            Candidates: indices,
+            Intent: BotIntent.None,
+            Optional: false);
+        var chosen = await ChooseAsync(ctx, req, ct).ConfigureAwait(false);
+
+        // Sanitize: keep only valid, distinct indices in encounter order.
+        var seen = new HashSet<int>();
+        var clean = new List<int>();
+        foreach (var o in chosen)
+        {
+            if (o is not int idx) continue;
+            if (idx < 0 || idx >= modes.Count) continue;
+            if (!seen.Add(idx)) continue;
+            clean.Add(idx);
+            if (clean.Count >= maxModes) break;
+        }
+
+        // CR 700.2e — enforce the minimum. Backfill from the first unused
+        // modes so a misbehaving / first-candidate agent still produces a
+        // legal pick.
+        if (clean.Count < minModes)
+        {
+            for (var i = 0; i < modes.Count && clean.Count < minModes; i++)
+            {
+                if (seen.Add(i)) clean.Add(i);
+            }
+        }
+        return clean;
+    }
+
+    /// <summary>
     /// Sub-order the player's own triggers when multiple fired at once
     /// (Rule 603.3b — APNAP, then controller chooses within their group).
     /// </summary>
