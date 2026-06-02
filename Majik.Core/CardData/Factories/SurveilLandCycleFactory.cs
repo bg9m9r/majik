@@ -65,6 +65,11 @@ namespace Majik.Core.CardData.Factories;
 [CardName("Shadowy Backstreet",   "Plains",   "Swamp",    "W", "B")]
 [CardName("Thundering Falls",     "Island",   "Mountain", "U", "R")]
 [CardName("Elegant Parlor",       "Mountain", "Plains",   "R", "W")]
+// Commercial District — MKM R/G surveil land. Type line "Land — Mountain Forest",
+// {T}: Add {R} or {G}, enters tapped, ETB surveil 1 (CR 701.42). Identical cycle
+// shape; the ETB-tapped replacement comes from EntersTappedBinder on the
+// production load path (CR 614.1c), same as the rest of the cycle.
+[CardName("Commercial District",  "Mountain", "Forest",   "R", "G")]
 public static class SurveilLandCycleFactory
 {
     /// <summary>
