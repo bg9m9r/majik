@@ -1,0 +1,9 @@
+{
+  "name": "Borborygmos Enraged",
+  "types": ["Creature"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Cyclops"],
+  "manaCost": "{4}{R}{R}{G}{G}",
+  "power": 7,
+  "toughness": 6
+}

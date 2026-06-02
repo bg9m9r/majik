@@ -530,4 +530,9 @@ public enum CardSubtype
     /// meaning (the Crew keyword references creatures generally, not the
     /// Pilot subtype itself).</summary>
     Pilot,
+
+    /// <summary>Cyclops creature subtype — Borborygmos Enraged (Gatecrash)
+    /// and the broader one-eyed-giant Cyclops lineage. CR 205.3m — flavour
+    /// subtype with no inherent rules meaning.</summary>
+    Cyclops,
 }
