@@ -1,0 +1,7 @@
+{
+  "name": "Thespian's Stage",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "C" }
+  ]
+}
