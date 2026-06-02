@@ -137,7 +137,20 @@ public static class Fx
     private static void DealFightDamage(Creature source, Creature target, int amount)
     {
         if (amount <= 0) return;
-        target.TakeDamage(amount);
+
+        // CR 702.90b — wither / infect deals damage to a CREATURE as that many
+        // -1/-1 counters instead of marked damage. This applies to ALL damage
+        // to creatures, including noncombat fight damage (a wither creature's
+        // fight). The Layer 7c P/T mod + CR 704.5g SBA handle lethal-via-0-
+        // toughness; deathtouch still independently marks the target.
+        if (Combat.CombatAbilities.DealsCreatureDamageAsMinusCounters(source))
+        {
+            target.Counters.Add(CounterType.MinusOneMinusOne, amount);
+        }
+        else
+        {
+            target.TakeDamage(amount);
+        }
         if (Combat.CombatAbilities.HasDeathtouch(source))
         {
             target.MarkedForDestructionByDeathtouch = true;

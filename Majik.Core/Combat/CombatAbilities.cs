@@ -24,6 +24,33 @@ public static class CombatAbilities
     public static bool HasDefender(Creature c) => Has(c, "Defender");
 
     /// <summary>
+    /// CR 702.90a — Wither. A source with wither deals damage to creatures
+    /// in the form of -1/-1 counters (CR 702.90b). Read at every
+    /// creature-damage application site so the -1/-1-counter form is applied
+    /// consistently across combat and noncombat (fight / ability) damage.
+    /// </summary>
+    public static bool HasWither(Creature c) => Has(c, "Wither");
+
+    /// <summary>
+    /// CR 702.90c — Infect. A source with infect deals damage to creatures
+    /// in the form of -1/-1 counters (identical creature-damage form as
+    /// wither) and to players in the form of poison counters. Only the
+    /// creature-damage form is consumed by
+    /// <see cref="DealsCreatureDamageAsMinusCounters"/>; the player → poison
+    /// form is handled separately (see <see cref="InfectDamageReplacement"/>).
+    /// </summary>
+    public static bool HasInfect(Creature c) => Has(c, "Infect");
+
+    /// <summary>
+    /// CR 702.90b / 702.90c — true when <paramref name="source"/> deals
+    /// damage to CREATURES as -1/-1 counters instead of marked damage, i.e.
+    /// it has wither or infect. Centralized so combat and noncombat
+    /// (fight / ability) creature-damage paths agree on the counter form.
+    /// </summary>
+    public static bool DealsCreatureDamageAsMinusCounters(Creature? source) =>
+        source != null && (HasWither(source) || HasInfect(source));
+
+    /// <summary>
     /// CR 509.1b — returns the minimum number of blockers required to
     /// legally block this creature (from a
     /// <see cref="KeywordAbility"/> with keyword

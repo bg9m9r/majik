@@ -28,6 +28,22 @@ public static class KeywordBinder
         "First strike", "Double strike",
         "Deathtouch", "Lifelink", "Reach", "Menace",
         "Defender", "Indestructible", "Flash",
+        // Wither (CR 702.90a). The marker is read at every creature-damage
+        // application site (CombatFlow / Fx.Fight) via
+        // CombatAbilities.DealsCreatureDamageAsMinusCounters — wither damage to
+        // a creature is dealt as -1/-1 counters instead of marked damage
+        // (CR 702.90b). Wither only changes the form of damage to CREATURES;
+        // damage to players / planeswalkers stays normal.
+        //
+        // NOTE: Infect is deliberately NOT bound here. Infect's creature-damage
+        // form is identical to wither, but Infect ALSO converts player damage
+        // to poison counters (CR 702.90c) — a path not yet wired into the
+        // combat / Fx player-damage sites. Binding "Infect" generically here
+        // would load infect creatures with correct creature damage but WRONG
+        // (normal life-loss) player damage. Deferred to a dedicated infect
+        // pass that registers InfectDamageReplacement globally / threads poison
+        // into the player-damage path. See v1-deferrals.
+        "Wither",
         // Death-triggered keywords
         "Undying",
         // Cast-noncreature-spell triggered keyword (CR 702.108). Requires a
