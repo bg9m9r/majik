@@ -1,0 +1,9 @@
+{
+  "name": "Desolation Twin",
+  "types": ["Creature"],
+  "subtypes": ["Eldrazi"],
+  "manaCost": "{10}",
+  "power": 10,
+  "toughness": 10,
+  "abilities": []
+}
