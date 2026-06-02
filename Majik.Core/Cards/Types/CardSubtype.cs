@@ -33,6 +33,9 @@ public enum CardSubtype
     Bird,
     Cat,
     Dog,
+    /// <summary>Fox creature subtype — Filigree Familiar (Kaladesh),
+    /// Pious Evangel adjacent printings. CR 205.3m.</summary>
+    Fox,
     Elemental,
     Bear,
     Insect,
