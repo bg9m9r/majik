@@ -1,0 +1,5 @@
+{
+  "name": "Engulf the Shore",
+  "types": ["Instant"],
+  "manaCost": "{3}{U}"
+}
