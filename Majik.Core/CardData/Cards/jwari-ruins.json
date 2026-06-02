@@ -1,0 +1,7 @@
+{
+  "name": "Jwari Ruins",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "U" }
+  ]
+}
