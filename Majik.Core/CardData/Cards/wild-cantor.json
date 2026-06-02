@@ -1,0 +1,8 @@
+{
+  "name": "Wild Cantor",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Druid"],
+  "manaCost": "{R/G}",
+  "power": 1,
+  "toughness": 1
+}
