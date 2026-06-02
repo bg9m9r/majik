@@ -1,0 +1,5 @@
+{
+  "name": "Counterbalance",
+  "types": ["Enchantment"],
+  "manaCost": "{U}{U}"
+}
