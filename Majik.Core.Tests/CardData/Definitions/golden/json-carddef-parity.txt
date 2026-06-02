@@ -30344,6 +30344,58 @@
   "mdfc": null,
   "colors": []
 }
+==== vivien-reid ====
+{
+  "name": "Vivien Reid",
+  "manaCost": "{3}{G}{G}",
+  "primaryType": "Planeswalker",
+  "cardTypes": [
+    "Planeswalker"
+  ],
+  "supertypes": [
+    "Legendary"
+  ],
+  "subtypes": [
+    "Vivien"
+  ],
+  "power": null,
+  "toughness": null,
+  "loyalty": 5,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Green"
+  ]
+}
 ==== voice-of-the-blessed ====
 {
   "name": "Voice of the Blessed",

@@ -1,0 +1,9 @@
+{
+  "name": "Vivien Reid",
+  "types": ["Planeswalker"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Vivien"],
+  "manaCost": "{3}{G}{G}",
+  "loyalty": 5,
+  "abilities": []
+}
