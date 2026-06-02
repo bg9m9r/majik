@@ -1,0 +1,10 @@
+{
+  "name": "Grumgully, the Generous",
+  "types": ["Creature"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Goblin", "Shaman"],
+  "manaCost": "{1}{R}{G}",
+  "power": 3,
+  "toughness": 3,
+  "abilities": []
+}
