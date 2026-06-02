@@ -9427,6 +9427,60 @@
   "mdfc": null,
   "colors": []
 }
+==== gaddock-teeg ====
+{
+  "name": "Gaddock Teeg",
+  "manaCost": "{G}{W}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [
+    "Legendary"
+  ],
+  "subtypes": [
+    "Advisor",
+    "Kithkin"
+  ],
+  "power": 2,
+  "toughness": 2,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Green",
+    "White"
+  ]
+}
 ==== game-trail ====
 {
   "name": "Game Trail",
