@@ -1,0 +1,8 @@
+{
+  "name": "Valley Floodcaller",
+  "types": ["Creature"],
+  "subtypes": ["Otter", "Wizard"],
+  "manaCost": "{2}{U}",
+  "power": 2,
+  "toughness": 2
+}
