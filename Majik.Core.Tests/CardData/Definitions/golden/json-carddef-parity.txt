@@ -36332,6 +36332,54 @@
     "Green"
   ]
 }
+==== vastwood-fortification-vastwood-thicket ====
+{
+  "name": "Vastwood Fortification // Vastwood Thicket",
+  "manaCost": "{G}",
+  "primaryType": "Instant",
+  "cardTypes": [
+    "Instant"
+  ],
+  "supertypes": [],
+  "subtypes": [],
+  "power": null,
+  "toughness": null,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Green"
+  ]
+}
 ==== venser-shaper-savant ====
 {
   "name": "Venser, Shaper Savant",
