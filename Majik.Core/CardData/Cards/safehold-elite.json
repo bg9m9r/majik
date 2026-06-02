@@ -1,0 +1,9 @@
+{
+  "name": "Safehold Elite",
+  "types": ["Creature"],
+  "subtypes": ["Elf", "Scout"],
+  "manaCost": "{1}{G/W}",
+  "power": 2,
+  "toughness": 2,
+  "abilities": []
+}
