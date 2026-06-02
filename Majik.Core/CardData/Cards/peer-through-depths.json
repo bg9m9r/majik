@@ -1,0 +1,6 @@
+{
+  "name": "Peer Through Depths",
+  "types": ["Instant"],
+  "subtypes": ["Arcane"],
+  "manaCost": "{1}{U}"
+}
