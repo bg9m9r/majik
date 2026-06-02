@@ -1,0 +1,5 @@
+{
+  "name": "Atarka's Command",
+  "types": ["Instant"],
+  "manaCost": "{R}{G}"
+}
