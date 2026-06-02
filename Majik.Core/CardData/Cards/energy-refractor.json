@@ -1,0 +1,14 @@
+{
+  "name": "Energy Refractor",
+  "types": ["Artifact"],
+  "manaCost": "{2}",
+  "abilities": [
+    {
+      "kind": "triggered",
+      "trigger": { "type": "etb_self" },
+      "effects": [
+        { "type": "draw_card", "amount": 1 }
+      ]
+    }
+  ]
+}
