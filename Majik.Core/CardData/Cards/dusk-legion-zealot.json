@@ -1,0 +1,18 @@
+{
+  "name": "Dusk Legion Zealot",
+  "types": ["Creature"],
+  "subtypes": ["Vampire", "Soldier"],
+  "manaCost": "{1}{B}",
+  "power": 1,
+  "toughness": 1,
+  "abilities": [
+    {
+      "kind": "triggered",
+      "trigger": { "type": "etb_self" },
+      "effects": [
+        { "type": "draw_card", "amount": 1 },
+        { "type": "lose_life_self", "amount": 1 }
+      ]
+    }
+  ]
+}
