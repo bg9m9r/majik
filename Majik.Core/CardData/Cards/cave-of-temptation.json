@@ -1,0 +1,7 @@
+{
+  "name": "Cave of Temptation",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "C" }
+  ]
+}
