@@ -1,0 +1,5 @@
+{
+  "name": "Jwari Disruption",
+  "types": ["Instant"],
+  "manaCost": "{1}{U}"
+}
