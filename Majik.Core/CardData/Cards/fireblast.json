@@ -1,0 +1,5 @@
+{
+  "name": "Fireblast",
+  "types": ["Instant"],
+  "manaCost": "{4}{R}{R}"
+}
