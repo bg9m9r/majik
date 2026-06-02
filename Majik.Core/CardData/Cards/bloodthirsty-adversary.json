@@ -1,0 +1,9 @@
+{
+  "name": "Bloodthirsty Adversary",
+  "types": ["Creature"],
+  "subtypes": ["Vampire"],
+  "manaCost": "{1}{R}",
+  "power": 2,
+  "toughness": 2,
+  "abilities": []
+}
