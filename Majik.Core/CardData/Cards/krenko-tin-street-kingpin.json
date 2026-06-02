@@ -1,0 +1,10 @@
+{
+  "name": "Krenko, Tin Street Kingpin",
+  "types": ["Creature"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Goblin"],
+  "manaCost": "{2}{R}",
+  "power": 1,
+  "toughness": 2,
+  "abilities": []
+}
