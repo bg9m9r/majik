@@ -1,0 +1,24 @@
+{
+  "name": "Witching Well",
+  "types": ["Artifact"],
+  "manaCost": "{U}",
+  "abilities": [
+    {
+      "kind": "triggered",
+      "trigger": { "type": "etb_self" },
+      "effects": [
+        { "type": "scry_self", "amount": 2 }
+      ]
+    },
+    {
+      "kind": "activated",
+      "costs": [
+        { "type": "mana", "amount": "{3}{U}" },
+        { "type": "sacrifice_self" }
+      ],
+      "effects": [
+        { "type": "draw_card", "amount": 2 }
+      ]
+    }
+  ]
+}
