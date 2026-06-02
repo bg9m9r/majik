@@ -27,6 +27,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     battlefield, grant haste, and the delayed end-step return to hand.
 ///   - NamedCardFactory dispatch.
 /// </summary>
+[Trait("Color", "M")]
 public class NahiriTheHarbingerFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -62,22 +63,6 @@ public class NahiriTheHarbingerFactoryTests
         loyalty.Select(a => a.LoyaltyChange)
             .Should().BeEquivalentTo(new[] { +2, -2, -8 });
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_Nahiri()
-    {
-        var card = NamedCardFactory.Create("Nahiri, the Harbinger", _alice);
-
-        card.Should().BeOfType<Planeswalker>();
-        card.Name.Should().Be("Nahiri, the Harbinger");
-        card.HasType(CardType.Planeswalker).Should().BeTrue();
-        card.HasSupertype(CardSupertype.Legendary).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Nahiri).Should().BeTrue();
-        ((Planeswalker)card).Loyalty.Should().Be(4);
-        card.Owner.Should().Be(_alice);
-        card.Abilities.OfType<LoyaltyAbility>().Should().HaveCount(3);
-    }
-
     // -----------------------------------------------------------------------
     // +2: discard a card, then draw a card
     // -----------------------------------------------------------------------

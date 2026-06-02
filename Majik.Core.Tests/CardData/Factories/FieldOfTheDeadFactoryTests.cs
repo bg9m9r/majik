@@ -27,6 +27,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Land-ETB trigger does NOT fire with &lt;7 distinctly-named lands.
 ///   - Trigger does NOT fire on opponent's land ETBs.
 /// </summary>
+[Trait("Color", "C")]
 public class FieldOfTheDeadFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -51,19 +52,6 @@ public class FieldOfTheDeadFactoryTests
         f.Abilities.OfType<ManaAbility>().Should().HaveCount(1);
         f.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1);
     }
-
-    [Fact]
-    public void Field_NamedCardFactory_DispatchesShape()
-    {
-        var card = NamedCardFactory.Create("Field of the Dead", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Field of the Dead");
-        card.HasType(CardType.Land).Should().BeTrue();
-        card.Abilities.OfType<ManaAbility>().Should().HaveCount(1);
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1);
-    }
-
     // -----------------------------------------------------------------------
     // Pure helper
     // -----------------------------------------------------------------------

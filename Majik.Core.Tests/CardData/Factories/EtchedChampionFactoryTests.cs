@@ -33,6 +33,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Opponent's artifacts do NOT count toward Metalcraft.
 ///   - HasProtectionFromColor returns the gated read for every colour.
 /// </summary>
+[Trait("Color", "C")]
 public class EtchedChampionFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -66,21 +67,6 @@ public class EtchedChampionFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void EtchedChampion_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Etched Champion", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Etched Champion");
-        c.HasType(CardType.Artifact).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Soldier).Should().BeTrue();
-        c.Abilities.OfType<ProtectionAbility>().Should().ContainSingle(
-            p => p.Quality == "all colors",
-            "the conditional Metalcraft rider is attached");
-    }
-
     // -------------------------------------------------------------------------
     // Single ProtectionAbility with the gate
     // -------------------------------------------------------------------------

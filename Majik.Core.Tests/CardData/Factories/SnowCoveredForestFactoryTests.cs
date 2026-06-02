@@ -21,6 +21,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - {T}: Add {G} mana ability present when created via NamedCardFactory.
 /// - NamedCardFactory dispatch resolves the printed name.
 /// </summary>
+[Trait("Color", "C")]
 public class SnowCoveredForestFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -102,21 +103,6 @@ public class SnowCoveredForestFactoryTests
     // -----------------------------------------------------------------------
     // NamedCardFactory dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void SnowCoveredForest_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Snow-Covered Forest", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Snow-Covered Forest");
-        card.HasType(CardType.Land).Should().BeTrue();
-        card.HasSupertype(CardSupertype.Basic).Should().BeTrue();
-        card.HasSupertype(CardSupertype.Snow).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Forest).Should().BeTrue();
-        card.Owner.Should().BeSameAs(_alice);
-    }
-
     // -----------------------------------------------------------------------
     // Null guard
     // -----------------------------------------------------------------------

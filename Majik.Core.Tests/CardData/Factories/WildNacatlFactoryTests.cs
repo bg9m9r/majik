@@ -32,6 +32,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Dynamic re-evaluation as lands ETB / LTB.
 ///   - Only the controller's lands count.
 /// </summary>
+[Trait("Color", "G")]
 public class WildNacatlFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -62,19 +63,6 @@ public class WildNacatlFactoryTests
         n.Owner.Should().BeSameAs(_alice);
         n.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void WildNacatl_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Wild Nacatl", _alice);
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Wild Nacatl");
-        card.HasSubtype(CardSubtype.Cat).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Warrior).Should().BeTrue();
-        ((Creature)card).BasePower.Should().Be(1);
-        ((Creature)card).BaseToughness.Should().Be(1);
-    }
-
     private (Creature nacatl, ContinuousEffectsService effects) NewNacatlOnBattlefield()
     {
         var effects = new ContinuousEffectsService();

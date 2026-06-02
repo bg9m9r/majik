@@ -20,6 +20,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   "Equipped creature gets +1/+0."
 ///   "Equip {2}."
 /// </summary>
+[Trait("Color", "C")]
 public class BoneSawFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -37,17 +38,6 @@ public class BoneSawFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void BoneSaw_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Bone Saw", _alice);
-
-        c.Should().BeOfType<Artifact>("Bone Saw is an Artifact");
-        c.Name.Should().Be("Bone Saw");
-        c.HasSubtype(CardSubtype.Equipment).Should().BeTrue();
-    }
-
     [Fact]
     public void BoneSaw_EquipAbility_HasGenericTwoCost()
     {

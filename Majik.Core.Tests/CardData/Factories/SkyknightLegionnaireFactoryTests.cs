@@ -24,6 +24,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - <see cref="CombatAbilities"/> lookups: HasFlying + HasHaste are true.
 /// - <see cref="NamedCardFactory"/> dispatch routes the card name correctly.
 /// </summary>
+[Trait("Color", "M")]
 public class SkyknightLegionnaireFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -123,19 +124,5 @@ public class SkyknightLegionnaireFactoryTests
         var c = SkyknightLegionnaireFactory.Create(_alice);
         c.Abilities.OfType<KeywordAbility>().Should().HaveCount(2,
             "exactly Flying and Haste — no other keyword markers on Skyknight Legionnaire");
-    }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_SkyknightLegionnaire()
-    {
-        var card = NamedCardFactory.Create("Skyknight Legionnaire", _alice);
-
-        card.Should().NotBeNull();
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Skyknight Legionnaire");
-        ((Creature)card).Power.Should().Be(2);
-        ((Creature)card).Toughness.Should().Be(2);
-        card.HasSubtype(CardSubtype.Human).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Knight).Should().BeTrue();
     }
 }

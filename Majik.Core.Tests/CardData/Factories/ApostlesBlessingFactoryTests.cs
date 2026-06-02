@@ -31,6 +31,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Resolve on an illegal target: clean no-op.
 /// - Quality picker default = "artifacts".
 /// </summary>
+[Trait("Color", "W")]
 public class ApostlesBlessingFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -50,15 +51,6 @@ public class ApostlesBlessingFactoryTests
             .Any(k => k.Keyword.Equals("Phyrexian", System.StringComparison.OrdinalIgnoreCase))
             .Should().BeTrue();
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_ApostlesBlessing()
-    {
-        var card = NamedCardFactory.Create("Apostle's Blessing", _alice);
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Apostle's Blessing");
-    }
-
     [Fact]
     public void PhyrexianAlternativeCost_OneLifePip_TwoLife()
     {

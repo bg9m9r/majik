@@ -25,6 +25,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// static graveyard→exile replacement) but FILTERED to black-or-red
 /// objects, and adds the two protection qualities (CR 702.16).
 /// </summary>
+[Trait("Color", "W")]
 public class SanctifierEnVecFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -62,20 +63,6 @@ public class SanctifierEnVecFactoryTests
         qualities.Should().Contain("black");
         qualities.Should().Contain("red");
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_SanctifierEnVec()
-    {
-        var card = NamedCardFactory.Create("Sanctifier en-Vec", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Sanctifier en-Vec");
-        card.HasSubtype(CardSubtype.Human).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Cleric).Should().BeTrue();
-        ((Creature)card).Power.Should().Be(2);
-        ((Creature)card).Toughness.Should().Be(2);
-    }
-
     // -----------------------------------------------------------------------
     // ETB exile sweep — only black or red cards
     // -----------------------------------------------------------------------

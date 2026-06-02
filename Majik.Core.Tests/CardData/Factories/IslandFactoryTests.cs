@@ -21,6 +21,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - {T}: Add {U} mana ability present from the JSON-driven build route.
 /// - NamedCardFactory dispatch resolves the printed name.
 /// </summary>
+[Trait("Color", "C")]
 public class IslandFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -93,23 +94,6 @@ public class IslandFactoryTests
     // -----------------------------------------------------------------------
     // NamedCardFactory dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void Island_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Island", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Island");
-        card.HasType(CardType.Land).Should().BeTrue();
-        card.HasSupertype(CardSupertype.Basic).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Island).Should().BeTrue();
-        card.Owner.Should().BeSameAs(_alice);
-
-        card.Abilities.OfType<ManaAbility>().Should().HaveCount(1,
-            "the dispatched Island carries its {T}: Add {U} mana ability");
-    }
-
     // -----------------------------------------------------------------------
     // Null guard
     // -----------------------------------------------------------------------

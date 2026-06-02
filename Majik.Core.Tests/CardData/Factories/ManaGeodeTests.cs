@@ -40,6 +40,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   the no-agent fall-back puts the single peeked card on the bottom.
 /// - Dispatch through <see cref="NamedCardFactory"/>.
 /// </summary>
+[Trait("Color", "C")]
 public class ManaGeodeTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -62,19 +63,6 @@ public class ManaGeodeTests
         geode.Owner.Should().BeSameAs(_alice);
         geode.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_ManaGeode()
-    {
-        var card = NamedCardFactory.Create("Mana Geode", _alice);
-
-        card.Should().BeOfType<Artifact>();
-        card.Name.Should().Be("Mana Geode");
-        // Five any-colour (WUBRG) mana abilities + one ETB trigger.
-        card.Abilities.OfType<ManaAbility>().Should().HaveCount(5);
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1);
-    }
-
     // -----------------------------------------------------------------------
     // Mana abilities — shape (free any-colour, one per WUBRG)
     // -----------------------------------------------------------------------

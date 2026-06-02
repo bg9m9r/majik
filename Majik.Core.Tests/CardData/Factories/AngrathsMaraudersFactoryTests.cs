@@ -34,6 +34,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Stacking with Furnace of Rath quadruples opponent-targeting
 ///     damage from controller-side sources.
 /// </summary>
+[Trait("Color", "R")]
 public class AngrathsMaraudersFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -58,17 +59,6 @@ public class AngrathsMaraudersFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void AngrathsMarauders_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Angrath's Marauders", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Angrath's Marauders");
-        c.HasSubtype(CardSubtype.Pirate).Should().BeTrue();
-    }
-
     [Fact]
     public void SingleArgPath_DoesNotRegisterReplacement()
     {

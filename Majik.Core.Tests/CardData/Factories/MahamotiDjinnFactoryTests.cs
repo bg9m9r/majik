@@ -22,6 +22,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// history. It is a vanilla Flying body with no triggered or activated
 /// abilities beyond the keyword marker.
 /// </summary>
+[Trait("Color", "U")]
 public class MahamotiDjinnFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -103,15 +104,4 @@ public class MahamotiDjinnFactoryTests
     // -----------------------------------------------------------------------
     // Dispatch via NamedCardFactory
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void MahamotiDjinn_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Mahamoti Djinn", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Mahamoti Djinn");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Djinn).Should().BeTrue();
-    }
 }

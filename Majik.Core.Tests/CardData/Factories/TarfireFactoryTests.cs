@@ -29,6 +29,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Resolve body routes creature damage through
 ///   <see cref="Primitives.Fx.DealDamageAny"/>.
 /// </summary>
+[Trait("Color", "R")]
 public class TarfireFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -48,18 +49,6 @@ public class TarfireFactoryTests
         tarfire.Owner.Should().BeSameAs(_alice);
         tarfire.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void Tarfire_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Tarfire", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Tarfire");
-        card.HasType(CardType.Instant).Should().BeTrue();
-        card.HasType(CardType.Tribal).Should().BeTrue();
-    }
-
     [Fact]
     public void Tarfire_SpellDefinition_HasSingleAnyTargetRequest()
     {

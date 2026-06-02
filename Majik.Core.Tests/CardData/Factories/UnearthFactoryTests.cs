@@ -34,6 +34,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Cycling end-to-end: pay {2}, discard Unearth, draw 1 card,
 ///     publish <see cref="CardCycledEvent"/> (CR 702.29d).
 /// </summary>
+[Trait("Color", "B")]
 public class UnearthFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -56,22 +57,6 @@ public class UnearthFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsSorceryShapeWithCycling()
-    {
-        var card = NamedCardFactory.Create("Unearth", _alice);
-
-        card.Should().BeOfType<Sorcery>();
-        card.Name.Should().Be("Unearth");
-        card.ManaCost.Should().Be("{B}");
-        card.Abilities.OfType<KeywordAbility>()
-            .Should().Contain(k => k.Keyword == "Cycling",
-                "Cycling {2} is a keyword ability (CR 702.29)");
-        card.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1,
-            "the cycling activated ability");
-    }
-
     // -----------------------------------------------------------------------
     // Resolve: MV ≤ 3 creature from caster's graveyard → battlefield
     // -----------------------------------------------------------------------

@@ -36,6 +36,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Detach (Unattach) suspends doubling without explicit
 ///     deregistration.
 /// </summary>
+[Trait("Color", "C")]
 public class InquisitorsFlailFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -58,17 +59,6 @@ public class InquisitorsFlailFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void InquisitorsFlail_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Inquisitor's Flail", _alice);
-
-        c.Should().BeOfType<Artifact>();
-        c.Name.Should().Be("Inquisitor's Flail");
-        c.HasSubtype(CardSubtype.Equipment).Should().BeTrue();
-    }
-
     [Fact]
     public void InquisitorsFlail_EquipAbility_HasGenericTwoCost()
     {

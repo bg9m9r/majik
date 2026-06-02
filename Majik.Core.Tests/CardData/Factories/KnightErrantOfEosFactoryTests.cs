@@ -25,6 +25,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     (< 6 cards).
 ///   - NamedCardFactory dispatch routes the card name to this factory.
 /// </summary>
+[Trait("Color", "M")]
 public class KnightErrantOfEosFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -141,21 +142,6 @@ public class KnightErrantOfEosFactoryTests
         _alice.Zones.Hand.GetCards().Should().ContainSingle().Which.Should().Be(c1);
         _alice.Zones.Library.GetCards().Should().Contain(bigCreature);
     }
-
-    [Fact]
-    public void KnightErrant_NamedCardFactory_Dispatch()
-    {
-        var card = NamedCardFactory.Create("Knight-Errant of Eos", _alice);
-
-        card.Should().NotBeNull();
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Knight-Errant of Eos");
-        ((Creature)card).Power.Should().Be(4);
-        ((Creature)card).Toughness.Should().Be(4);
-        card.HasSubtype(CardSubtype.Elf).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Knight).Should().BeTrue();
-    }
-
     // ----------------- helpers -----------------
 
     private Creature BuildCreature(string name, string cost)

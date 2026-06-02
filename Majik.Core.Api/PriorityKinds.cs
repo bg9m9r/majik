@@ -48,11 +48,12 @@ public static class PriorityKinds
             && ctx.Stack.IsEmpty;
 
         // CR 305.2 — lands are sorcery-speed-only, your-turn-only, and
-        // stack-must-be-empty. The per-turn cap isn't checked here —
-        // overinclude when the window is right and there's a land in
-        // hand; the engine's LandDropTracker rejects an over-cap
-        // submission cleanly.
-        if (sorceryWindow && hand.Any(c => c.HasType(CardType.Land)))
+        // stack-must-be-empty. ctx.LandPlayAvailable folds in the per-turn
+        // drop cap (computed from the live LandDropTracker by the priority
+        // loop), so we no longer over-include PlayLand once the drop is spent.
+        // Over-including used to make the auto-pass gate + the fuzz harness
+        // propose a land the loop only rejects — flooding logs every round.
+        if (sorceryWindow && ctx.LandPlayAvailable && hand.Any(c => c.HasType(CardType.Land)))
         {
             kinds.Add(typeof(PlayLandCommand));
         }

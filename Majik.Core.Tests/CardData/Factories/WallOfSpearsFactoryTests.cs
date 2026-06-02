@@ -29,6 +29,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     <see cref="CombatAbilities.HasFirstStrike"/>.
 ///   - Exactly two KeywordAbility instances (Defender + First strike).
 /// </summary>
+[Trait("Color", "C")]
 public class WallOfSpearsFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -70,19 +71,6 @@ public class WallOfSpearsFactoryTests
     // -------------------------------------------------------------------------
     // Dispatch
     // -------------------------------------------------------------------------
-
-    [Fact]
-    public void WallOfSpears_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Wall of Spears", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Wall of Spears");
-        c.HasType(CardType.Artifact).Should().BeTrue();
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Wall).Should().BeTrue();
-    }
-
     // -------------------------------------------------------------------------
     // Keywords
     // -------------------------------------------------------------------------

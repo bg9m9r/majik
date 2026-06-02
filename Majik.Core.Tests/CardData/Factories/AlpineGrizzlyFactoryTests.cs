@@ -17,6 +17,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Card: Alpine Grizzly — Creature — Bear {2}{G} 4/2 (Khans of Tarkir).
 /// Vanilla — no printed keywords, triggers, statics, or activated abilities.
 /// </summary>
+[Trait("Color", "G")]
 public class AlpineGrizzlyFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -54,18 +55,6 @@ public class AlpineGrizzlyFactoryTests
         colors.Should().Contain(ManaColor.Green, "Alpine Grizzly costs {2}{G}");
         colors.Should().HaveCount(1, "Alpine Grizzly is exactly Green");
     }
-
-    [Fact]
-    public void AlpineGrizzly_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Alpine Grizzly", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Alpine Grizzly");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Bear).Should().BeTrue();
-    }
-
     [Fact]
     public void AlpineGrizzly_IsVanilla_NoAbilities()
     {

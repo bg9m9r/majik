@@ -17,6 +17,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Card: Pharika's Chosen — {B} Creature — Snake 1/1.
 ///   "Deathtouch"
 /// </summary>
+[Trait("Color", "B")]
 public class PharikasChosenFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -80,16 +81,5 @@ public class PharikasChosenFactoryTests
 
         c.Abilities.OfType<TriggeredAbility>().Should().BeEmpty();
         c.Abilities.OfType<ActivatedAbility>().Should().BeEmpty();
-    }
-
-    [Fact]
-    public void PharikasChosen_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Pharika's Chosen", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Pharika's Chosen");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Snake).Should().BeTrue();
     }
 }

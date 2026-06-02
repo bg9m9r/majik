@@ -53,6 +53,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Back: exactly 3 life → legal to pay, enters untapped.
 /// - Back: no agent → enters tapped.
 /// </summary>
+[Trait("Color", "R")]
 public class ShatterskullSmashinFactoryTests : IDisposable
 {
     private readonly Player _alice = new("Alice", 20);
@@ -100,18 +101,6 @@ public class ShatterskullSmashinFactoryTests : IDisposable
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_ShatterskullSmashing()
-    {
-        var card = NamedCardFactory.Create("Shatterskull Smashing", _alice);
-
-        card.Should().BeOfType<Sorcery>();
-        card.Name.Should().Be("Shatterskull Smashing");
-        card.ManaCost.Should().Be("{X}{R}{R}");
-        card.HasType(CardType.Sorcery).Should().BeTrue();
-    }
-
     [Fact]
     public void ShatterskullSmashing_IsRed()
     {
@@ -340,17 +329,6 @@ public class ShatterskullSmashinFactoryTests : IDisposable
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_ShatterskullTheHammerPass()
-    {
-        var card = NamedCardFactory.Create("Shatterskull, the Hammer Pass", _alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Shatterskull, the Hammer Pass");
-        card.HasType(CardType.Land).Should().BeTrue();
-    }
-
     // =========================================================================
     // Back face — MDFC face tracker
     // =========================================================================

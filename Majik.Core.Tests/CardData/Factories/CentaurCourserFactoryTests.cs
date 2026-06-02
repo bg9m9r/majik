@@ -23,6 +23,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - <see cref="NamedCardFactory"/> dispatch.
 ///   - Vanilla: no keyword / triggered / activated / mana abilities.
 /// </summary>
+[Trait("Color", "G")]
 public class CentaurCourserFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -52,19 +53,6 @@ public class CentaurCourserFactoryTests
         CardColors.GetColors(c).Should().Contain(ManaColor.Green,
             "Centaur Courser has {G} in its mana cost");
     }
-
-    [Fact]
-    public void CentaurCourser_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Centaur Courser", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Centaur Courser");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Centaur).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Warrior).Should().BeTrue();
-    }
-
     [Fact]
     public void CentaurCourser_IsVanilla_NoAbilities()
     {

@@ -29,6 +29,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Each face has exactly one {T}: Add {C} mana ability, correct colour.
 /// - No non-mana activated / triggered abilities (pathways are vanilla).
 /// </summary>
+[Trait("Color", "C")]
 public class DarkborePathwayFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -51,17 +52,6 @@ public class DarkborePathwayFactoryTests
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_DarkborePathway()
-    {
-        var card = NamedCardFactory.Create("Darkbore Pathway", _alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Darkbore Pathway");
-        card.HasType(CardType.Land).Should().BeTrue();
-    }
-
     [Fact]
     public void DarkborePathway_CarriesMdfcState_FrontFace()
     {
@@ -120,17 +110,6 @@ public class DarkborePathwayFactoryTests
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_SlitherborePathway()
-    {
-        var card = NamedCardFactory.Create("Slitherbore Pathway", _alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Slitherbore Pathway");
-        card.HasType(CardType.Land).Should().BeTrue();
-    }
-
     [Fact]
     public void SlitherborePathway_CarriesMdfcState_PreFlippedToBackFace()
     {

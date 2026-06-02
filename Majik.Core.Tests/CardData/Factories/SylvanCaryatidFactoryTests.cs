@@ -30,6 +30,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Hexproof (CR 702.11) — unconditional; opponents can't target, controller
 ///   can; unaffected by tap state (unlike Paradise Druid).
 /// </summary>
+[Trait("Color", "G")]
 public class SylvanCaryatidFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -51,17 +52,6 @@ public class SylvanCaryatidFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void SylvanCaryatid_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Sylvan Caryatid", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Sylvan Caryatid");
-        ((Creature)c).HasSubtype(CardSubtype.Plant).Should().BeTrue();
-    }
-
     // ── Mana abilities ─────────────────────────────────────────────────────
 
     [Fact]

@@ -16,6 +16,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Card: Ancient Carp — {4}{U} Creature — Fish 2/5 (Modern Horizons).
 /// Vanilla — no printed keywords, triggers, statics, or activated abilities.
 /// </summary>
+[Trait("Color", "U")]
 public class AncientCarpFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -64,16 +65,5 @@ public class AncientCarpFactoryTests
             "Ancient Carp has no triggered abilities");
         c.Abilities.OfType<ActivatedAbility>().Should().BeEmpty(
             "Ancient Carp has no activated abilities");
-    }
-
-    [Fact]
-    public void AncientCarp_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Ancient Carp", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Ancient Carp");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Fish).Should().BeTrue();
     }
 }

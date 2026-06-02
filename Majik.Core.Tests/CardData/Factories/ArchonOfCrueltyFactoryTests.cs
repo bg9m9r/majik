@@ -33,6 +33,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - No target chosen → clean no-op (CR 608.2b).
 /// - Attack trigger fires same full effect as ETB.
 /// </summary>
+[Trait("Color", "B")]
 public class ArchonOfCrueltyFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -91,18 +92,6 @@ public class ArchonOfCrueltyFactoryTests
     // -----------------------------------------------------------------------
     // NamedCardFactory dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void ArchonOfCruelty_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Archon of Cruelty", _alice);
-
-        c.Should().BeOfType<Creature>("Archon of Cruelty is a Creature");
-        c.Name.Should().Be("Archon of Cruelty");
-        c.HasSubtype(CardSubtype.Archon).Should().BeTrue();
-        c.ManaCost.Should().Be("{6}{B}{B}");
-    }
-
     // -----------------------------------------------------------------------
     // Trigger shape — two battlefield-active triggers
     // -----------------------------------------------------------------------

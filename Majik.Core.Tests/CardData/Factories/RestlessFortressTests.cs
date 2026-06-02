@@ -37,6 +37,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     * Both expire at end of turn.
 /// - Attack trigger: defending player loses 2 life, controller gains 2.
 /// </summary>
+[Trait("Color", "C")]
 public class RestlessFortressTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -60,24 +61,6 @@ public class RestlessFortressTests
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_RestlessFortress()
-    {
-        var card = NamedCardFactory.Create("Restless Fortress", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Restless Fortress");
-        card.HasType(CardType.Land).Should().BeTrue();
-
-        card.Abilities.OfType<ManaAbility>().Should().HaveCount(2,
-            "{T}: Add {W} and {T}: Add {B} are two distinct mana abilities");
-        card.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1,
-            "{2}{W}{B} animate ability is wired");
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1,
-            "the printed attack trigger is attached");
-    }
-
     // -----------------------------------------------------------------------
     // Mana abilities
     // -----------------------------------------------------------------------

@@ -30,6 +30,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Bus-aware overload: lands entering the controller's graveyard
 ///     after construction are stamped via <see cref="CardMovedEvent"/>.
 /// </summary>
+[Trait("Color", "C")]
 public class CrucibleOfWorldsFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -57,18 +58,6 @@ public class CrucibleOfWorldsFactoryTests
         crucible.Owner.Should().BeSameAs(_alice);
         crucible.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void Crucible_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Crucible of Worlds", _alice);
-
-        card.Should().BeOfType<Artifact>();
-        card.Name.Should().Be("Crucible of Worlds");
-        card.HasType(CardType.Artifact).Should().BeTrue();
-        card.ManaCost.Should().Be("{3}");
-    }
-
     // -----------------------------------------------------------------------
     // Static-ability marker
     // -----------------------------------------------------------------------

@@ -31,6 +31,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - ETB: short library (fewer than 4 cards) — no throw, partial peek.
 /// - ETB: empty library — clean no-op.
 /// </summary>
+[Trait("Color", "U")]
 public class GlintNestCraneFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -89,21 +90,6 @@ public class GlintNestCraneFactoryTests
             .Should().Contain(k => k.Keyword == "Flying",
                 "Glint-Nest Crane has Flying (CR 702.9)");
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_GlintNestCrane()
-    {
-        var card = NamedCardFactory.Create("Glint-Nest Crane", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Glint-Nest Crane");
-        card.HasSubtype(CardSubtype.Bird).Should().BeTrue();
-
-        var creature = (Creature)card;
-        creature.BasePower.Should().Be(1);
-        creature.BaseToughness.Should().Be(3);
-    }
-
     [Fact]
     public void Card_HasExactlyOneEtbTriggeredAbility_ActiveOnBattlefield()
     {

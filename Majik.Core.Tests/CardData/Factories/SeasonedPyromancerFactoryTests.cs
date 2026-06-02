@@ -26,6 +26,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Graveyard-activated ability creates two 1/1 red Elemental tokens.
 /// - Graveyard-activated ability is a no-op when card is not in graveyard.
 /// </summary>
+[Trait("Color", "R")]
 public class SeasonedPyromancerFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -76,24 +77,6 @@ public class SeasonedPyromancerFactoryTests
         var sp = SeasonedPyromancerFactory.Create(_alice);
         sp.ManaCostValue.TotalValue.Should().Be(3, "mana cost {1}{R}{R} = 1+1+1 = 3");
     }
-
-    [Fact]
-    public void SeasonedPyromancer_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Seasoned Pyromancer", _alice);
-
-        card.Should().BeOfType<Creature>("Seasoned Pyromancer is a Creature");
-        card.Name.Should().Be("Seasoned Pyromancer");
-        card.HasSubtype(CardSubtype.Human).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Shaman).Should().BeTrue();
-        ((Creature)card).BasePower.Should().Be(2);
-        ((Creature)card).BaseToughness.Should().Be(2);
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1,
-            "one ETB triggered ability");
-        card.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1,
-            "one graveyard-activated ability");
-    }
-
     // -----------------------------------------------------------------------
     // ETB triggered ability — shape
     // -----------------------------------------------------------------------

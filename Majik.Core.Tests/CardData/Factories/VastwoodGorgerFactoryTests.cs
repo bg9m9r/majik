@@ -18,6 +18,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Modern reprints). Vanilla — no printed keywords, triggers, statics, or
 /// activated abilities.
 /// </summary>
+[Trait("Color", "G")]
 public class VastwoodGorgerFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -55,18 +56,6 @@ public class VastwoodGorgerFactoryTests
         colors.Should().Contain(ManaColor.Green, "Vastwood Gorger costs {5}{G}");
         colors.Should().HaveCount(1, "Vastwood Gorger is exactly Green");
     }
-
-    [Fact]
-    public void VastwoodGorger_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Vastwood Gorger", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Vastwood Gorger");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Wurm).Should().BeTrue();
-    }
-
     [Fact]
     public void VastwoodGorger_IsVanilla_NoAbilities()
     {

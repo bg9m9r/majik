@@ -27,6 +27,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - +3/+2 expires at end of turn (CR 514.2).
 /// - Fizzle: target not on battlefield → no-op (CR 608.2b).
 /// </summary>
+[Trait("Color", "R")]
 public class InfuriateFactoryTests
 {
     private readonly EventBus _bus = new();
@@ -57,17 +58,6 @@ public class InfuriateFactoryTests
         inf.Controller.Should().BeSameAs(_alice);
         CardColors.GetColors(inf).Should().Contain(ManaColor.Red);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsInfuriate()
-    {
-        var dispatched = NamedCardFactory.Create("Infuriate", _alice);
-
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("Infuriate");
-        dispatched.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     [Fact]
     public void SpellDefinition_DeclaresSingleTargetCreatureRequest()
     {

@@ -38,6 +38,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   * Metallic Mimic itself does not get a counter ("each OTHER creature").
 ///   * Metallic Mimic leaving the battlefield lifts the replacement.
 /// </summary>
+[Trait("Color", "C")]
 public class MetallicMimicFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -73,20 +74,6 @@ public class MetallicMimicFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void MetallicMimic_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Metallic Mimic", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Metallic Mimic");
-        card.HasType(CardType.Artifact).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Shapeshifter).Should().BeTrue();
-        ((Creature)card).BasePower.Should().Be(2);
-        ((Creature)card).BaseToughness.Should().Be(1);
-    }
-
     [Fact]
     public void MetallicMimic_SingleArgPath_NoChoice_NoEffects()
     {

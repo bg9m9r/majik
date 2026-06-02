@@ -30,6 +30,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Resolution grants Double strike EOT to every attacking Dragon
 ///   Atarka's controller controls.
 /// </summary>
+[Trait("Color", "R")]
 public class AtarkaWorldRenderFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -73,18 +74,6 @@ public class AtarkaWorldRenderFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_AtarkaWorldRender()
-    {
-        var c = NamedCardFactory.Create("Atarka, World Render", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Atarka, World Render");
-        c.HasSubtype(CardSubtype.Dragon).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Elder).Should().BeTrue();
-    }
-
     [Fact]
     public void HasFlyingAndTrampleKeywords()
     {

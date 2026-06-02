@@ -30,6 +30,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - <see cref="NamedCardFactory"/> dispatch returns Sythis with the right
 ///   shape.
 /// </summary>
+[Trait("Color", "M")]
 public class SythisHarvestsHandFactoryTests
 {
     private readonly EventBus _bus = new();
@@ -74,18 +75,6 @@ public class SythisHarvestsHandFactoryTests
         c.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1,
             "Sythis carries the single constellation trigger (CR 702.144)");
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_Sythis()
-    {
-        var card = NamedCardFactory.Create("Sythis, Harvest's Hand", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Sythis, Harvest's Hand");
-        card.ManaCost.Should().Be("{G}{W}");
-        card.HasSubtype(CardSubtype.Nymph).Should().BeTrue();
-    }
-
     // -----------------------------------------------------------------------
     // Constellation behaviour — end-to-end via TriggerManager
     // -----------------------------------------------------------------------

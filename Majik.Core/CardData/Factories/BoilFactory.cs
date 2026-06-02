@@ -8,7 +8,7 @@ namespace Majik.Core.CardData.Factories;
 /// <summary>
 /// Named-card factory for Boil (Stronghold and many reprints, {2}{R}).
 ///
-/// Sorcery. Oracle text:
+/// Instant. Oracle text:
 ///   "Destroy all Islands."
 ///
 /// ## Implementation
@@ -51,11 +51,11 @@ public static class BoilFactory
     /// <paramref name="owner"/>. Card shape only — wire the resolve
     /// effect via <see cref="BuildResolveEffect"/>.
     /// </summary>
-    public static Sorcery Create(Player owner)
+    public static Instant Create(Player owner)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
-        var card = new Sorcery(CardName, PrintedManaCost);
+        var card = new Instant(CardName, PrintedManaCost);
         card.SetOwner(owner);
         card.SetController(owner);
         return card;

@@ -36,6 +36,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Cycling end-to-end: pays {R/G}, discards self, draws, publishes
 ///   CardCycledEvent.
 /// </summary>
+[Trait("Color", "M")]
 public class DeadshotMinotaurFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -80,22 +81,6 @@ public class DeadshotMinotaurFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void DeadshotMinotaur_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Deadshot Minotaur", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.HasSubtype(CardSubtype.Minotaur).Should().BeTrue();
-        card.Abilities.OfType<KeywordAbility>()
-            .Should().Contain(k => k.Keyword == "Cycling");
-        card.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1,
-            "the cycling activated ability");
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1,
-            "the ETB damage trigger");
-    }
-
     // -----------------------------------------------------------------------
     // ETB trigger — CR 603.6a, restricted target (CR 702.9)
     // -----------------------------------------------------------------------

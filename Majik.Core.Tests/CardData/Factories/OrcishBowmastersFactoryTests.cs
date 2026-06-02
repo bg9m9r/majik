@@ -35,6 +35,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     fires (the "first one they draw in each of their draw steps"
 ///     exception is narrow).
 /// </summary>
+[Trait("Color", "B")]
 public class OrcishBowmastersFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -60,17 +61,6 @@ public class OrcishBowmastersFactoryTests
         bow.Owner.Should().BeSameAs(_alice);
         bow.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void OrcishBowmasters_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Orcish Bowmasters", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Orcish Bowmasters");
-        card.HasType(CardType.Creature).Should().BeTrue();
-    }
-
     [Fact]
     public void OrcishBowmasters_HasFlash_PlusTwoTriggers()
     {

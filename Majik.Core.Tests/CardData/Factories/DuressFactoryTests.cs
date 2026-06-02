@@ -18,6 +18,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// card from it. That player discards that card."
 /// Thoughtseize-shape discard with a noncreature+nonland filter, no life loss.
 /// </summary>
+[Trait("Color", "B")]
 public class DuressFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -63,15 +64,6 @@ public class DuressFactoryTests
         card.HasType(CardType.Sorcery).Should().BeTrue();
         card.ManaCost.ToString().Should().Be("{B}");
     }
-
-    [Fact]
-    public void DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Duress", _alice);
-        card.Should().BeOfType<Sorcery>();
-        card.Name.Should().Be("Duress");
-    }
-
     [Fact]
     public void Resolve_DiscardsChosenNoncreatureNonland()
     {

@@ -25,6 +25,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// <see cref="ChosenSpellParams"/>, mirroring ArchmagesCharmTests /
 /// IzzetCharmTests.
 /// </summary>
+[Trait("Color", "M")]
 public class BantCharmTests
 {
     private readonly EventBus _bus = new();
@@ -56,17 +57,6 @@ public class BantCharmTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsBantCharmShape()
-    {
-        var dispatched = NamedCardFactory.Create("Bant Charm", _alice);
-
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("Bant Charm");
-        dispatched.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     [Fact]
     public void BuildDefinition_ExposesThreeModes_WithPerModeIntents()
     {

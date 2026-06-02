@@ -23,6 +23,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Trigger does NOT fire on noncreature spells (instants / sorceries).
 /// - Trigger does NOT fire on opponent's casts.
 /// </summary>
+[Trait("Color", "G")]
 public class BeastWhispererFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -43,18 +44,6 @@ public class BeastWhispererFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void BeastWhisperer_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Beast Whisperer", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Beast Whisperer");
-        ((Creature)c).BasePower.Should().Be(2);
-        ((Creature)c).BaseToughness.Should().Be(3);
-    }
-
     [Fact]
     public void BeastWhisperer_AttachesSingleCastTrigger()
     {

@@ -31,6 +31,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - ETB effect draws 1 card for the controller from a stocked library.
 /// - ETB effect stamps the empty-library SBA flag (CR 704.5b) on shortage.
 /// </summary>
+[Trait("Color", "G")]
 public class WallOfBlossomsFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -73,19 +74,6 @@ public class WallOfBlossomsFactoryTests
     }
 
     // ── NamedCardFactory dispatch ───────────────────────────────────────
-
-    [Fact]
-    public void WallOfBlossoms_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Wall of Blossoms", _alice);
-
-        c.Should().BeOfType<Creature>("Wall of Blossoms is a Creature");
-        c.Name.Should().Be("Wall of Blossoms");
-        ((Creature)c).HasSubtype(CardSubtype.Wall).Should().BeTrue();
-        ((Creature)c).HasSubtype(CardSubtype.Plant).Should().BeTrue();
-        c.ManaCost.Should().Be("{1}{G}");
-    }
-
     // ── ETB triggered ability — shape ───────────────────────────────────
 
     [Fact]

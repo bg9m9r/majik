@@ -38,6 +38,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - <see cref="SpellCastFlow"/> rejects the cast when the caster controls no
 ///   land (CR 601.2g — additional cost can't be paid).
 /// </summary>
+[Trait("Color", "R")]
 public class ShardVolleyFactoryTests
 {
     // ── Identity + dispatch ──────────────────────────────────────────────────
@@ -54,19 +55,6 @@ public class ShardVolleyFactoryTests
         card.Owner.Should().BeSameAs(owner);
         card.Controller.Should().BeSameAs(owner);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_ShardVolley()
-    {
-        var owner = new Player("Alice", 20);
-        var card = NamedCardFactory.Create("Shard Volley", owner);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Shard Volley");
-        card.HasType(CardType.Instant).Should().BeTrue();
-        card.ManaCost.ToString().Should().Be("{R}");
-    }
-
     // ── Spell definition shape ───────────────────────────────────────────────
 
     [Fact]

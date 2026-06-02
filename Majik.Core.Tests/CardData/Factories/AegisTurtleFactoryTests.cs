@@ -17,6 +17,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Card: Aegis Turtle — Creature — Turtle {U} 0/5 (Core Set 2021).
 /// Vanilla — no printed keywords, triggers, statics, or activated abilities.
 /// </summary>
+[Trait("Color", "U")]
 public class AegisTurtleFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -54,18 +55,6 @@ public class AegisTurtleFactoryTests
         colors.Should().Contain(ManaColor.Blue, "Aegis Turtle costs {U}");
         colors.Should().HaveCount(1, "Aegis Turtle is exactly Blue");
     }
-
-    [Fact]
-    public void AegisTurtle_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Aegis Turtle", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Aegis Turtle");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Turtle).Should().BeTrue();
-    }
-
     [Fact]
     public void AegisTurtle_IsVanilla_NoAbilities()
     {

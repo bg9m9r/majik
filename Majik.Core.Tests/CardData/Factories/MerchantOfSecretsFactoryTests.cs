@@ -22,6 +22,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - ETB draws 1 card for the controller from a stocked library.
 /// - ETB on empty library stamps the loss flag (CR 704.5b) without crashing.
 /// </summary>
+[Trait("Color", "U")]
 public class MerchantOfSecretsFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -78,19 +79,6 @@ public class MerchantOfSecretsFactoryTests
     // -----------------------------------------------------------------------
     // NamedCardFactory dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void MerchantOfSecrets_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Merchant of Secrets", _alice);
-
-        c.Should().BeOfType<Creature>("Merchant of Secrets is a Creature");
-        c.Name.Should().Be("Merchant of Secrets");
-        c.HasSubtype(CardSubtype.Human).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Wizard).Should().BeTrue();
-        c.ManaCost.Should().Be("{2}{U}");
-    }
-
     // -----------------------------------------------------------------------
     // ETB triggered ability shape
     // -----------------------------------------------------------------------

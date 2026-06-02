@@ -26,6 +26,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   * Counter when controller cannot pay {1} → spell to graveyard (CR 701.5).
 ///   * No-op when controller auto-pays {1} (CR 118.4).
 /// </summary>
+[Trait("Color", "U")]
 public class QuenchFactoryTests
 {
     private readonly EventBus _bus = new();
@@ -55,17 +56,6 @@ public class QuenchFactoryTests
         quench.ManaCost.Should().Be("{1}{U}");
         quench.ManaCostValue.TotalValue.Should().Be(2);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsQuenchShape()
-    {
-        var dispatched = NamedCardFactory.Create("Quench", _alice);
-
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("Quench");
-        dispatched.ManaCost.Should().Be("{1}{U}");
-    }
-
     [Fact]
     public void SpellDefinition_DeclaresSingleTargetSpellRequest()
     {

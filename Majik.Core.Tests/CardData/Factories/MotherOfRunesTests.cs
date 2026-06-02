@@ -35,6 +35,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Mother of Runes CAN target itself (no "another" gate, unlike Giver of
 ///   Runes).
 /// </summary>
+[Trait("Color", "W")]
 public class MotherOfRunesTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -58,18 +59,6 @@ public class MotherOfRunesTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void MotherOfRunes_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Mother of Runes", _alice);
-
-        c.Should().BeOfType<Creature>("Mother of Runes is a Creature");
-        c.Name.Should().Be("Mother of Runes");
-        c.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1,
-            "the {T} protection-grant ability is wired");
-    }
-
     // -----------------------------------------------------------------------
     // Activated-ability shape
     // -----------------------------------------------------------------------

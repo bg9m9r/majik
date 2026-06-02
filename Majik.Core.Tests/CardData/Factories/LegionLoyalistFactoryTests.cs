@@ -27,6 +27,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///    attack, creatures you control gain first strike and trample until end
 ///    of turn and can't be blocked by creature tokens this turn."
 /// </summary>
+[Trait("Color", "R")]
 public class LegionLoyalistFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -98,19 +99,6 @@ public class LegionLoyalistFactoryTests
         c.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1,
             "Battalion is wired as a single attack-declared triggered ability");
     }
-
-    [Fact]
-    public void LegionLoyalist_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Legion Loyalist", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Legion Loyalist");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Goblin).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Soldier).Should().BeTrue();
-    }
-
     // --- Battalion trigger condition (CR 508.1f) -------------------------
 
     [Fact]

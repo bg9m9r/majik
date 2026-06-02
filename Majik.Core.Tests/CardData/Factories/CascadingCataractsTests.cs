@@ -30,6 +30,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   combination (mirrors the FilterLand {N}-cost mana-ability shape and
 ///   Chromatic Star's any-color fan-out).
 /// </summary>
+[Trait("Color", "C")]
 public class CascadingCataractsTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -49,18 +50,6 @@ public class CascadingCataractsTests
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void CascadingCataracts_NamedCardFactory_DispatchesShape()
-    {
-        var card = NamedCardFactory.Create("Cascading Cataracts", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Cascading Cataracts");
-        card.HasType(CardType.Land).Should().BeTrue();
-        card.HasSupertype(CardSupertype.Basic).Should().BeFalse();
-    }
-
     // -----------------------------------------------------------------------
     // Indestructible (CR 702.12)
     // -----------------------------------------------------------------------

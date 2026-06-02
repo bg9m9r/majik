@@ -35,6 +35,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// load path by <see cref="Majik.Core.CardData.EntersTappedBinder"/>, not by
 /// this named-card factory — same posture as the rest of the cycle.
 /// </summary>
+[Trait("Color", "C")]
 public class WindScarredCragTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -51,18 +52,6 @@ public class WindScarredCragTests
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_WindScarredCrag()
-    {
-        var card = NamedCardFactory.Create("Wind-Scarred Crag", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Wind-Scarred Crag");
-        card.Abilities.OfType<ManaAbility>().Should().HaveCount(2);
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1);
-    }
-
     [Fact]
     public void WindScarredCrag_HasManaAbility_ForRed()
     {

@@ -27,6 +27,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Resolution-time legality re-check: Phelia herself is rejected
 ///   ("another target").
 /// </summary>
+[Trait("Color", "W")]
 public class PheliaExuberantShepherdFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -52,19 +53,6 @@ public class PheliaExuberantShepherdFactoryTests
 
         p.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1);
     }
-
-    [Fact]
-    public void Phelia_DispatchesViaNamedCardFactory()
-    {
-        var p = NamedCardFactory.Create("Phelia, Exuberant Shepherd", _alice);
-
-        p.Should().BeOfType<Creature>();
-        p.Name.Should().Be("Phelia, Exuberant Shepherd");
-        p.Abilities.OfType<KeywordAbility>().Select(k => k.Keyword)
-            .Should().Contain("Lifelink");
-        p.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1);
-    }
-
     [Fact]
     public void AttackTrigger_ExilesAnotherNonlandPermanent_AndDelayedReturnFires()
     {

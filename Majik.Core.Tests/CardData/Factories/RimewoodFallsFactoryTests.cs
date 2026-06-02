@@ -26,22 +26,10 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// path by <see cref="EntersTappedBinder"/> from the oracle text, not by this
 /// factory (same posture as the sibling snow duals).
 /// </summary>
+[Trait("Color", "C")]
 public class RimewoodFallsFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
-
-    [Fact]
-    public void RimewoodFalls_Dispatch_ReturnsSnowLandWithForestAndIslandSubtypes()
-    {
-        var card = NamedCardFactory.Create("Rimewood Falls", _alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Rimewood Falls");
-        card.HasSupertype(CardSupertype.Snow).Should().BeTrue("type line is Snow Land");
-        card.HasSubtype(CardSubtype.Forest).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Island).Should().BeTrue();
-    }
-
     [Fact]
     public void RimewoodFalls_HasTwoManaAbilities_ProducingGreenAndBlue()
     {

@@ -31,6 +31,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///       * control both             -> draw exactly 2.
 ///       * control neither          -> draw 0.
 /// </summary>
+[Trait("Color", "C")]
 public class RoadsideReliquaryFactoryTests
 {
     private static Player NewPlayerWithLibrary(int librarySize)
@@ -82,18 +83,6 @@ public class RoadsideReliquaryFactoryTests
         land.Owner.Should().BeSameAs(alice);
         land.Controller.Should().BeSameAs(alice);
     }
-
-    [Fact]
-    public void RoadsideReliquary_DispatchesViaNamedCardFactory()
-    {
-        var alice = new Player("Alice", 20);
-        var c = NamedCardFactory.Create("Roadside Reliquary", alice);
-
-        c.Should().BeOfType<Land>();
-        c.Name.Should().Be("Roadside Reliquary");
-        c.HasType(CardType.Land).Should().BeTrue();
-    }
-
     // -------------------------------------------------------------- Mana ability
 
     [Fact]

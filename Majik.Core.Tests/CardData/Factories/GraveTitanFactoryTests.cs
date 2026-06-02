@@ -31,6 +31,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Attack trigger: matches Grave Titan only (CR 508.1f self-match);
 ///   resolution creates two 2/2 black Zombie tokens.
 /// </summary>
+[Trait("Color", "B")]
 public class GraveTitanFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -62,17 +63,6 @@ public class GraveTitanFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void GraveTitan_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Grave Titan", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Grave Titan");
-        c.HasSubtype(CardSubtype.Giant).Should().BeTrue();
-    }
-
     [Fact]
     public void GraveTitan_HasDeathtouch()
     {

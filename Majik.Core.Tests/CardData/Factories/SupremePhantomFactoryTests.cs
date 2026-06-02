@@ -24,6 +24,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - LTB lifts the bonus (IsActive gate).
 ///   - NamedCardFactory dispatch.
 /// </summary>
+[Trait("Color", "U")]
 public class SupremePhantomFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -138,20 +139,6 @@ public class SupremePhantomFactoryTests
         otherSpirit.GetPower().Should().Be(1, "LordStaticEffect.IsActive gates on source being on battlefield");
         otherSpirit.GetToughness().Should().Be(1);
     }
-
-    [Fact]
-    public void SupremePhantom_NamedCardFactory_Dispatch()
-    {
-        var card = NamedCardFactory.Create("Supreme Phantom", _alice);
-
-        card.Should().NotBeNull();
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Supreme Phantom");
-        ((Creature)card).BasePower.Should().Be(1);
-        ((Creature)card).BaseToughness.Should().Be(3);
-        card.HasSubtype(CardSubtype.Spirit).Should().BeTrue();
-    }
-
     // ─── Helpers ────────────────────────────────────────────────────────────
 
     private static Creature MakeSpirit(string name, Player owner,

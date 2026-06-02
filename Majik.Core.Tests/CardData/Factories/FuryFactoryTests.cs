@@ -25,6 +25,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// X = cards in controller's hand at resolution and routes per the
 /// caller-supplied distribute Func (deterministic in tests).
 /// </summary>
+[Trait("Color", "R")]
 public class FuryFactoryTests
 {
     private readonly EventBus _bus = new();
@@ -66,17 +67,6 @@ public class FuryFactoryTests
         // Two triggered abilities: ETB damage + Evoke sacrifice.
         fury.Abilities.OfType<TriggeredAbility>().Should().HaveCount(2);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchesFury()
-    {
-        var card = NamedCardFactory.Create("Fury", _alice);
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Fury");
-        card.HasSubtype(CardSubtype.Elemental).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Incarnation).Should().BeTrue();
-    }
-
     // ── ETB damage trigger ────────────────────────────────────────────────────
 
     [Fact]

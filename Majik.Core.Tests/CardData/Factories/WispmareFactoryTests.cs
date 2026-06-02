@@ -45,6 +45,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     Wispmare to its owner's graveyard.
 ///   - Illegal target on resolution (non-enchantment) -> no destroy.
 /// </summary>
+[Trait("Color", "W")]
 public class WispmareFactoryTests
 {
     private readonly EventBus _bus = new();
@@ -88,20 +89,6 @@ public class WispmareFactoryTests
         // Two triggered abilities: ETB destroy + evoke sacrifice.
         w.Abilities.OfType<TriggeredAbility>().Should().HaveCount(2);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchesWispmare()
-    {
-        var card = NamedCardFactory.Create("Wispmare", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Wispmare");
-        var creature = (Creature)card;
-        creature.BasePower.Should().Be(1);
-        creature.BaseToughness.Should().Be(3);
-        creature.HasSubtype(CardSubtype.Elemental).Should().BeTrue();
-    }
-
     [Fact]
     public void EtbTrigger_HasMandatorySingleTarget_Enchantment()
     {

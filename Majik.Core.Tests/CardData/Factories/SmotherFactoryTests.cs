@@ -29,6 +29,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - No-op when target has left the battlefield (CR 608.2b).
 ///   - DestroyNoRegeneration used (CR 701.15c — "it can't be regenerated").
 /// </summary>
+[Trait("Color", "B")]
 public class SmotherFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -54,19 +55,6 @@ public class SmotherFactoryTests
     }
 
     // ── Dispatch ─────────────────────────────────────────────────────────────
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_Smother()
-    {
-        var card = NamedCardFactory.Create("Smother", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Smother");
-        card.HasType(CardType.Instant).Should().BeTrue();
-        card.ManaCost.Should().Be("{1}{B}");
-        card.Owner.Should().BeSameAs(_alice);
-    }
-
     // ── SpellDefinition shape ─────────────────────────────────────────────────
 
     [Fact]

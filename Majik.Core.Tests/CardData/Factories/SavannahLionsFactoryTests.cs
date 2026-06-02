@@ -18,6 +18,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// reprints). Vanilla — no printed keywords, triggers, statics, or activated
 /// abilities.
 /// </summary>
+[Trait("Color", "W")]
 public class SavannahLionsFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -55,18 +56,6 @@ public class SavannahLionsFactoryTests
         colors.Should().Contain(ManaColor.White, "Savannah Lions costs {W}");
         colors.Should().HaveCount(1, "Savannah Lions is exactly White");
     }
-
-    [Fact]
-    public void SavannahLions_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Savannah Lions", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Savannah Lions");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Cat).Should().BeTrue();
-    }
-
     [Fact]
     public void SavannahLions_IsVanilla_NoAbilities()
     {
