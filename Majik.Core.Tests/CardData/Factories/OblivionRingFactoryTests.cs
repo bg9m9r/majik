@@ -88,7 +88,7 @@ public class OblivionRingFactoryTests
         {
             new object[] { bobsCreature },
         });
-        foreach (var e in etb.Effects) e.Execute();
+        etb.Resolve();
 
         bobsCreature.Zone.Should().Be(ZoneType.Exile,
             "ETB exiles the targeted nonland permanent (CR 701.21)");
@@ -117,7 +117,7 @@ public class OblivionRingFactoryTests
         {
             new object[] { aliceCreature },
         });
-        foreach (var e in etb.Effects) e.Execute();
+        etb.Resolve();
 
         aliceCreature.Zone.Should().Be(ZoneType.Exile,
             "Oblivion Ring may exile any nonland permanent, including controller's own");
@@ -142,7 +142,7 @@ public class OblivionRingFactoryTests
         {
             new object[] { bobsLand },
         });
-        foreach (var e in etb.Effects) e.Execute();
+        etb.Resolve();
 
         bobsLand.Zone.Should().Be(ZoneType.Battlefield,
             "lands are skipped by the printed 'nonland' filter (CR 608.2b)");
@@ -164,7 +164,7 @@ public class OblivionRingFactoryTests
         {
             new object[] { ring },
         });
-        foreach (var e in etb.Effects) e.Execute();
+        etb.Resolve();
 
         ring.Zone.Should().Be(ZoneType.Battlefield,
             "'another' excludes Oblivion Ring itself (CR 109.5)");
@@ -189,12 +189,12 @@ public class OblivionRingFactoryTests
         {
             new object[] { bobsCreature },
         });
-        foreach (var e in etb.Effects) e.Execute();
+        etb.Resolve();
         bobsCreature.Zone.Should().Be(ZoneType.Exile);
 
         var ltb = ring.Abilities.OfType<TriggeredAbility>()
             .Single(t => t.TargetRequests.Count == 0);
-        foreach (var e in ltb.Effects) e.Execute();
+        ltb.Resolve();
 
         bobsCreature.Zone.Should().Be(ZoneType.Battlefield,
             "LTB returns the exiled card to the battlefield");
@@ -213,7 +213,7 @@ public class OblivionRingFactoryTests
 
         var ltb = ring.Abilities.OfType<TriggeredAbility>()
             .Single(t => t.TargetRequests.Count == 0);
-        foreach (var e in ltb.Effects) e.Execute();
+        ltb.Resolve();
 
         _bob.Zones.Battlefield.GetCards().Should().BeEmpty();
     }
