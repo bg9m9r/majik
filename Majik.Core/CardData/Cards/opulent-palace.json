@@ -1,0 +1,9 @@
+{
+  "name": "Opulent Palace",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "B" },
+    { "kind": "mana", "produces": "G" },
+    { "kind": "mana", "produces": "U" }
+  ]
+}
