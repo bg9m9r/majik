@@ -1,0 +1,7 @@
+{
+  "name": "Unclaimed Territory",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "C" }
+  ]
+}
