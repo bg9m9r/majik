@@ -1,0 +1,9 @@
+{
+  "name": "Narnam Renegade",
+  "types": ["Creature"],
+  "subtypes": ["Elf", "Warrior"],
+  "manaCost": "{G}",
+  "power": 1,
+  "toughness": 2,
+  "colors": ["G"]
+}
