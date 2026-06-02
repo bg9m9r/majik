@@ -1,0 +1,8 @@
+{
+  "name": "Ambush Viper",
+  "types": ["Creature"],
+  "subtypes": ["Snake"],
+  "manaCost": "{1}{G}",
+  "power": 2,
+  "toughness": 1
+}
