@@ -240,7 +240,8 @@ public sealed class ActivatedAbilityDefinition : AbilityDefinition
         // PLAN 01 (Slice F) — pair each effect's resolve-builder with the
         // TargetRequest it targets through (null for untargeted effects).
         var effectSpecs = Effects
-            .Select(e => new CardDefEffectSpec(e.ToTargetRequest(), e.ToResolveEffect()))
+            .Select(e => new CardDefEffectSpec(
+                e.ToTargetRequest(), e.ToResolveEffect(), e.ToExtraTargetRequest()))
             .ToArray();
         return new CardDefActivatedAbility(costBuilders, effectSpecs, SorcerySpeed);
     }
@@ -261,7 +262,8 @@ public sealed class TriggeredAbilityDefinition : AbilityDefinition
     {
         var triggerBuilder = Trigger.ToTrigger();
         var effectSpecs = Effects
-            .Select(e => new CardDefEffectSpec(e.ToTargetRequest(), e.ToResolveEffect()))
+            .Select(e => new CardDefEffectSpec(
+                e.ToTargetRequest(), e.ToResolveEffect(), e.ToExtraTargetRequest()))
             .ToArray();
         // A leaves-the-battlefield trigger (e.g. dies_self) carries its own
         // active-zone override so the built TriggeredAbility stays observable

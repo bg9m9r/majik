@@ -415,6 +415,10 @@ public static class CardDefRuntime
         // at resolution, or -1 for an untargeted effect.
         var targetRequests = new List<TargetRequest>();
         var slotForEffect = new int[effects.Count];
+        // CR 701.12 fight (source: "target") — whether each effect declared a
+        // SECOND contiguous slot (the "other" creature) right after its
+        // primary. The adapter below then re-presents both picks.
+        var hasExtraSlot = new bool[effects.Count];
         // The slot index of the most-recently declared targeted effect, so a
         // rider verb (SharesPreviousTargetSlot — e.g. Vapor Snag's "its
         // controller loses 1 life") reuses it instead of declaring a new
@@ -429,6 +433,12 @@ public static class CardDefRuntime
                 slotForEffect[i] = targetRequests.Count;
                 lastTargetedSlot = targetRequests.Count;
                 targetRequests.Add(request);
+                var extra = effect.ToExtraTargetRequest();
+                if (extra is not null)
+                {
+                    hasExtraSlot[i] = true;
+                    targetRequests.Add(extra);
+                }
             }
             else if (effect.SharesPreviousTargetSlot)
             {
@@ -500,6 +510,21 @@ public static class CardDefRuntime
                     var picks = slot < chosen.Targets.Count
                         ? chosen.Targets[slot]
                         : (IReadOnlyList<object>)Array.Empty<object>();
+
+                    if (hasExtraSlot[i])
+                    {
+                        // CR 701.12 fight — a two-slot verb reads its primary
+                        // pick at index 0 and its extra pick at index 1. Present
+                        // both contiguous spell slots so the shared builder
+                        // (invoked with index 0) sees [fighter, other].
+                        var extraSlot = slot + 1;
+                        var extraPicks = extraSlot < chosen.Targets.Count
+                            ? chosen.Targets[extraSlot]
+                            : (IReadOnlyList<object>)Array.Empty<object>();
+                        built[i] = new SpellTargetedEffect(inner, picks, extraPicks);
+                        continue;
+                    }
+
                     built[i] = new SpellTargetedEffect(inner, picks);
                 }
                 return built;
@@ -518,18 +543,28 @@ public static class CardDefRuntime
     {
         private readonly IEffect _inner;
         private readonly IReadOnlyList<object> _picks;
+        // CR 701.12 fight (source: "target") — the second contiguous slot's
+        // picks (the "other" creature), or null for the common single-slot
+        // case. When present the inner builder reads slot 0 (primary) + slot 1.
+        private readonly IReadOnlyList<object>? _extraPicks;
 
-        internal SpellTargetedEffect(IEffect inner, IReadOnlyList<object> picks)
+        internal SpellTargetedEffect(
+            IEffect inner,
+            IReadOnlyList<object> picks,
+            IReadOnlyList<object>? extraPicks = null)
         {
             _inner = inner;
             _picks = picks;
+            _extraPicks = extraPicks;
         }
 
         public string Description => _inner.Description;
 
         public ValueTask ExecuteAsync(ResolutionContext ctx)
         {
-            var chosen = new IReadOnlyList<object>[] { _picks };
+            var chosen = _extraPicks is null
+                ? new[] { _picks }
+                : new[] { _picks, _extraPicks };
             var scoped = ctx with { ChosenTargets = chosen };
             return _inner.ExecuteAsync(scoped);
         }
@@ -1030,6 +1065,7 @@ public static class CardDefRuntime
             TapTargetEffectDef tap => BuildTapTargetEffect(tap, card, targetRequestIndex),
             PreventDamageTargetEffectDef prevent => BuildPreventDamageTargetEffect(prevent, card, replacements, targetRequestIndex),
             GainControlEffectDef control => BuildGainControlEffect(control, card, controller, targetRequestIndex, continuous),
+            FightEffectDef fight => BuildFightEffect(fight, card, targetRequestIndex),
             GainLifeSelfEffectDef gain => BuildGainLifeSelfEffect(gain, card, controller),
             LoseLifeSelfEffectDef loseSelf => BuildLoseLifeSelfEffect(loseSelf, card, controller),
             LoseLifeTargetEffectDef lose => BuildLoseLifeTargetEffect(lose, card, targetRequestIndex),
@@ -1622,6 +1658,74 @@ public static class CardDefRuntime
                 return ValueTask.CompletedTask;
             });
     }
+
+    private static IEffect BuildFightEffect(FightEffectDef def, ICard card, int targetRequestIndex)
+    {
+        // CR 701.12 — Fight. Two creatures each deal damage equal to their
+        // power to the other simultaneously, routed through the shared
+        // Fx.Fight primitive (which honours deathtouch CR 702.2b + lifelink
+        // CR 702.15a; the lethal-damage SBA runs afterward — CR 704).
+        //
+        // source "self": the FIGHTER is this card; the single chosen target
+        //   (at targetRequestIndex) is the OTHER creature.
+        // source "target": the FIGHTER is the chosen creature at
+        //   targetRequestIndex; the OTHER creature is the NEXT slot
+        //   (targetRequestIndex + 1) declared via ToExtraTargetRequest.
+        //
+        // CR 608.2b / 701.12c — a fight needs BOTH creatures present on the
+        // battlefield at resolution; if either is gone/illegal the whole fight
+        // fizzles (no damage either way).
+        var isTargetSource =
+            string.Equals(def.Source, "target", StringComparison.OrdinalIgnoreCase);
+        var otherFilter = def.TargetFilter;
+        var fighterFilter = def.ControllerTargetFilter ?? def.TargetFilter;
+
+        return new Effect(
+            $"{card.Name}: fight ({def.Source})",
+            ctx =>
+            {
+                Creature? fighter;
+                Creature? other;
+
+                if (isTargetSource)
+                {
+                    fighter = AsLegalFightCreature(
+                        ChosenTargetAt(ctx, targetRequestIndex), fighterFilter);
+                    other = AsLegalFightCreature(
+                        ChosenTargetAt(ctx, targetRequestIndex + 1), otherFilter);
+                }
+                else
+                {
+                    // self-source: the fighter is this card; it must still be a
+                    // creature on the battlefield (CR 701.12c).
+                    fighter = card is Creature self
+                              && self.Zone == ZoneType.Battlefield
+                        ? self
+                        : null;
+                    other = AsLegalFightCreature(
+                        ChosenTargetAt(ctx, targetRequestIndex), otherFilter);
+                }
+
+                if (fighter != null && other != null)
+                {
+                    Fx.Fight(fighter, other);
+                }
+                return ValueTask.CompletedTask;
+            });
+    }
+
+    /// <summary>
+    /// CR 608.2b / 701.12c — coerce a chosen target into a live fight-legal
+    /// creature: it must be a <see cref="Creature"/> on the battlefield that
+    /// still matches the printed <paramref name="filter"/>. Returns
+    /// <c>null</c> otherwise so the fight fizzles.
+    /// </summary>
+    private static Creature? AsLegalFightCreature(object? chosen, string filter) =>
+        chosen is Creature c
+        && c.Zone == ZoneType.Battlefield
+        && TargetFilters.Matches(filter, c)
+            ? c
+            : null;
 
     private static CounterType ParseCounterType(string raw) => raw switch
     {

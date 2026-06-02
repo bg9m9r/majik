@@ -41,6 +41,7 @@ namespace Majik.Core.CardData.Definitions;
 [JsonDerivedType(typeof(ConniveSelfEffectDef), "connive_self")]
 [JsonDerivedType(typeof(AmassSelfEffectDef), "amass_self")]
 [JsonDerivedType(typeof(GainControlEffectDef), "gain_control")]
+[JsonDerivedType(typeof(FightEffectDef), "fight")]
 public abstract class EffectDefinition
 {
     /// <summary>
@@ -122,6 +123,27 @@ public abstract class EffectDefinition
     /// </para>
     /// </summary>
     public virtual bool SharesPreviousTargetSlot => false;
+
+    /// <summary>
+    /// A SECOND target slot this effect declares, immediately following its
+    /// primary <see cref="ToTargetRequest"/>, or <c>null</c> for the common
+    /// single-target / untargeted case (the default). The only verb that needs
+    /// two own target slots is <see cref="FightEffectDef"/> in its
+    /// <c>source: "target"</c> mode — "target creature you control fights
+    /// target creature you don't control" (CR 701.12) — where the FIGHTER and
+    /// the OTHER creature are two distinct targets the spell announces.
+    ///
+    /// <para>
+    /// When non-null, <see cref="ToTargetRequest"/> MUST also be non-null (the
+    /// extra slot is the second of an ordered pair), and at resolution the
+    /// effect reads its primary pick at <c>targetRequestIndex</c> and its extra
+    /// pick at <c>targetRequestIndex + 1</c>. Both the ability materializer
+    /// (<see cref="CardDefAbilityEffects.Materialize"/>) and the spell bridge
+    /// (<see cref="CardDefRuntime.BuildSpellDefinitionFromEffects"/>) append the
+    /// extra request right after the primary so the two slots are contiguous.
+    /// </para>
+    /// </summary>
+    public virtual Majik.Core.Players.Agents.TargetRequest? ToExtraTargetRequest() => null;
 }
 
 /// <summary>Add N counters of the given type to a target permanent.
@@ -520,6 +542,83 @@ public sealed class GainControlEffectDef : EffectDefinition
     public override Majik.Core.Players.Agents.TargetRequest? ToTargetRequest() =>
         TargetFilters.ToTargetRequest(
             TargetFilter, "gain control of", Majik.Core.Cards.BotIntent.Removal);
+}
+
+/// <summary>
+/// "Fight" (CR 701.12) — two creatures each deal damage equal to their power
+/// to the other SIMULTANEOUSLY (CR 701.12a). Real targeted verb onto the
+/// shared <see cref="Majik.Core.Primitives.Fx.Fight"/> primitive: at
+/// resolution the effect reads the chosen creature(s) off
+/// <see cref="Majik.Core.Abilities.ResolutionContext.ChosenTargets"/> and runs
+/// the bilateral power exchange. Fight is damage but NOT combat damage (no
+/// first/double strike, no combat triggers, no trample); deathtouch (CR
+/// 702.2b) and lifelink (CR 702.15a) still apply, and the resulting
+/// lethal-damage / deathtouch state-based action runs afterward (CR 704).
+///
+/// <para>Two <see cref="Source"/> modes:</para>
+/// <list type="bullet">
+///   <item><c>"self"</c> (default) — "[this creature] fights target creature."
+///   The FIGHTER is the ability/spell's own source creature; the verb declares
+///   ONE target (the OTHER creature) via <see cref="ToTargetRequest"/>. Pounce /
+///   Prey Upon-on-a-creature / Setessan Tactics-style abilities.</item>
+///   <item><c>"target"</c> — "Target creature you control fights target
+///   creature you don't control" (Prey Upon, Khalni Ambush, Pit Fight). The
+///   verb declares TWO ordered targets: the FIGHTER ("a creature you control",
+///   <see cref="ToTargetRequest"/>) and the OTHER creature
+///   (<see cref="ToExtraTargetRequest"/>). At resolution the fighter is read at
+///   the primary slot and the other creature at the next slot.</item>
+/// </list>
+///
+/// <para>
+/// CR 608.2b — if either fighter is gone / no longer a legal creature on the
+/// battlefield at resolution, the whole fight fizzles (no damage either way) —
+/// a fight needs BOTH creatures present (CR 701.12c). The candidate gatherers /
+/// resolution re-check use the <see cref="TargetFilters"/> predicate.
+/// </para>
+///
+/// <para><see cref="TargetFilter"/> filters the OTHER creature in
+/// <c>"self"</c> mode, and BOTH targets in <c>"target"</c> mode
+/// (<see cref="ControllerTargetFilter"/> overrides the fighter's filter when
+/// the printed "you control" / "you don't control" split matters; defaults to
+/// <c>"creature"</c>).</para>
+/// </summary>
+public sealed class FightEffectDef : EffectDefinition
+{
+    /// <summary><c>"self"</c> (the source creature fights, default) or
+    /// <c>"target"</c> (the fighter is a chosen creature).</summary>
+    public string Source { get; set; } = "self";
+
+    /// <summary>Filter for the OTHER (fought) creature — and, in
+    /// <c>"target"</c> mode, the default filter for the fighter too (unless
+    /// <see cref="ControllerTargetFilter"/> overrides it). Default
+    /// <c>"creature"</c>.</summary>
+    public string TargetFilter { get; set; } = "creature";
+
+    /// <summary>In <c>"target"</c> mode, the filter for the FIGHTER ("a
+    /// creature you control"). Null = reuse <see cref="TargetFilter"/>.</summary>
+    public string? ControllerTargetFilter { get; set; }
+
+    private bool IsTargetSource =>
+        string.Equals(Source, "target", StringComparison.OrdinalIgnoreCase);
+
+    /// <inheritdoc />
+    public override Majik.Core.Players.Agents.TargetRequest? ToTargetRequest() =>
+        IsTargetSource
+            // Primary slot is the FIGHTER ("creature you control"); the OTHER
+            // creature is the extra slot below.
+            ? TargetFilters.ToTargetRequest(
+                ControllerTargetFilter ?? TargetFilter, "fight with",
+                Majik.Core.Cards.BotIntent.Removal)
+            // self-source: the single declared target is the OTHER creature.
+            : TargetFilters.ToTargetRequest(
+                TargetFilter, "fight", Majik.Core.Cards.BotIntent.Removal);
+
+    /// <inheritdoc />
+    public override Majik.Core.Players.Agents.TargetRequest? ToExtraTargetRequest() =>
+        IsTargetSource
+            ? TargetFilters.ToTargetRequest(
+                TargetFilter, "fight", Majik.Core.Cards.BotIntent.Removal)
+            : null;
 }
 
 /// <summary>"Controller gains N life." Default <see cref="Amount"/> = 1.</summary>

@@ -40,13 +40,39 @@ public static class TargetFilters
     {
         var normalized = (filter ?? "").Trim().ToLowerInvariant();
         var (description, predicate) = Resolve(normalized, verb);
+        // CR 109.5 — control-scoped creature filters ("you control" / "you
+        // don't control", e.g. Prey Upon / Pounce fight targets) gate on the
+        // resolving controller (ctx.Self), which the context-free predicate
+        // cannot see. The gatherer applies the control rider on top of the
+        // base creature predicate so the agent is only offered legal picks.
+        // The resolution-time re-check (Matches) treats these as plain
+        // "creature" — control is locked at announcement (CR 601.2c) and not
+        // re-checked unless the printed effect says so.
+        var controlScope = ControlScopeOf(normalized);
         return new TargetRequest(
             Description: description,
             MinTargets: 1,
             MaxTargets: 1,
             LegalCandidates: Array.Empty<object>(),
             Intent: intent,
-            CandidateGatherer: ctx => Gather(ctx, predicate));
+            CandidateGatherer: ctx => Gather(ctx, o => predicate(o) && MatchesControl(controlScope, o, ctx)));
+    }
+
+    private enum ControlScope { Any, YouControl, YouDontControl }
+
+    private static ControlScope ControlScopeOf(string filter) => filter switch
+    {
+        "creature_you_control" => ControlScope.YouControl,
+        "creature_you_dont_control" or "creature_you_don't_control" => ControlScope.YouDontControl,
+        _ => ControlScope.Any,
+    };
+
+    private static bool MatchesControl(ControlScope scope, object o, GameContext ctx)
+    {
+        if (scope == ControlScope.Any) return true;
+        if (o is not Permanent p) return false;
+        var youControl = ReferenceEquals(p.Controller, ctx.Self);
+        return scope == ControlScope.YouControl ? youControl : !youControl;
     }
 
     /// <summary>
@@ -75,6 +101,15 @@ public static class TargetFilters
                 ($"target player to {verb}", o => o is Player),
             "creature" =>
                 ($"{verb} target creature", o => o is Creature c && OnBattlefield(c)),
+            // CR 109.5 — control-scoped creature filters. The base predicate is
+            // a battlefield creature; the "you control" / "you don't control"
+            // rider is applied context-aware in the candidate gatherer
+            // (ToTargetRequest), since Matches/Resolve have no resolving-player
+            // context. Used by the fight family (Prey Upon, Pounce).
+            "creature_you_control" =>
+                ($"target creature you control to {verb}", o => o is Creature c && OnBattlefield(c)),
+            "creature_you_dont_control" or "creature_you_don't_control" =>
+                ($"target creature you don't control to {verb}", o => o is Creature c && OnBattlefield(c)),
             "permanent" =>
                 ($"target permanent to {verb}", o => o is Permanent p && OnBattlefield(p)),
             "legendary_permanent" =>
@@ -99,6 +134,16 @@ public static class TargetFilters
             "artifact_or_enchantment" =>
                 ($"target artifact or enchantment to {verb}",
                     o => o is Permanent p && OnBattlefield(p)
+                         && (p.HasType(CardType.Artifact) || p.HasType(CardType.Enchantment))),
+            // CR 109.5 — Haywire Mite's "noncreature artifact or noncreature
+            // enchantment": an artifact OR enchantment that is NOT also a
+            // creature (an artifact creature / enchantment creature is
+            // excluded). Both the gatherer and the CR 608.2b resolution
+            // re-check apply the !Creature gate.
+            "noncreature_artifact_or_enchantment" =>
+                ($"target noncreature artifact or noncreature enchantment to {verb}",
+                    o => o is Permanent p && OnBattlefield(p)
+                         && !p.HasType(CardType.Creature)
                          && (p.HasType(CardType.Artifact) || p.HasType(CardType.Enchantment))),
             "enchantment" =>
                 ($"target enchantment to {verb}",

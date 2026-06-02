@@ -13136,8 +13136,10 @@
       "list": []
     },
     "activated": {
-      "count": 0,
-      "list": []
+      "count": 1,
+      "list": [
+        "act:AdditionalCost\u002BManaCostCost=\u003EEffect"
+      ]
     },
     "triggered": {
       "count": 1,

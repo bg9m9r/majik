@@ -21,7 +21,8 @@ namespace Majik.Core.CardData.Definitions;
 /// </summary>
 internal sealed record CardDefEffectSpec(
     TargetRequest? Request,
-    Func<ICard, Player, ReplacementBus?, int, IEffect> Build);
+    Func<ICard, Player, ReplacementBus?, int, IEffect> Build,
+    TargetRequest? ExtraRequest = null);
 
 /// <summary>
 /// Canonical, runtime-agnostic representation of a card ability carried on
@@ -178,6 +179,14 @@ internal static class CardDefAbilityEffects
             {
                 index = requests.Count;
                 requests.Add(spec.Request);
+                // CR 701.12 fight (source: "target") — the verb declares a
+                // SECOND contiguous target slot (the "other" creature) right
+                // after its primary (the fighter). It reads its two picks at
+                // index and index+1 at resolution.
+                if (spec.ExtraRequest is not null)
+                {
+                    requests.Add(spec.ExtraRequest);
+                }
             }
             effects[i] = spec.Build(card, controller, replacements, index);
         }

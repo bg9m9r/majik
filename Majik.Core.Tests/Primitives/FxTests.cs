@@ -59,6 +59,111 @@ public class FxTests
         pw.Loyalty.Should().Be(1);
     }
 
+    // ------------------------------------------------------------------
+    // Fight (CR 701.12)
+    // ------------------------------------------------------------------
+
+    private static Creature FightCreature(
+        string name, int power, int toughness, Player owner, string? keyword = null)
+    {
+        var c = new Creature(name, "{G}", power, toughness);
+        c.SetOwner(owner);
+        c.SetController(owner);
+        owner.Zones.Battlefield.AddCard(c);
+        c.SetZone(ZoneType.Battlefield);
+        if (keyword != null) c.AddAbility(new KeywordAbility(keyword, c, owner));
+        return c;
+    }
+
+    [Fact]
+    public void Fight_BothCreatures_TakeEachOthersPowerSimultaneously()
+    {
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+        var a = FightCreature("A", 3, 4, alice);
+        var b = FightCreature("B", 2, 5, bob);
+
+        Fx.Fight(a, b);
+
+        // CR 701.12a — each deals power damage to the other simultaneously.
+        a.Damage.Should().Be(2, "B has power 2");
+        b.Damage.Should().Be(3, "A has power 3");
+    }
+
+    [Fact]
+    public void Fight_SimultaneousExchange_UsesPreFightPower()
+    {
+        // CR 701.12a — both fighters die, yet each still dealt its full power
+        // because the powers are snapshotted before any damage applies.
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+        var a = FightCreature("A", 2, 2, alice);
+        var b = FightCreature("B", 2, 2, bob);
+
+        Fx.Fight(a, b);
+
+        a.Damage.Should().Be(2);
+        b.Damage.Should().Be(2);
+        a.IsDead().Should().BeTrue();
+        b.IsDead().Should().BeTrue();
+    }
+
+    [Fact]
+    public void Fight_Deathtouch_MarksOtherForDestruction()
+    {
+        // CR 702.2b — 1 damage from a deathtouch source marks for destruction
+        // even though it is not combat damage.
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+        var snake = FightCreature("Snake", 1, 1, alice, "Deathtouch");
+        var giant = FightCreature("Giant", 0, 8, bob); // 0 power: deals no damage back
+
+        Fx.Fight(snake, giant);
+
+        giant.MarkedForDestructionByDeathtouch.Should().BeTrue(
+            "deathtouch applies to fight damage (CR 702.2b)");
+        giant.Damage.Should().Be(1);
+        snake.Damage.Should().Be(0, "the giant has 0 power and deals no damage");
+    }
+
+    [Fact]
+    public void Fight_Lifelink_GainsControllerLife()
+    {
+        // CR 702.15a — lifelink applies to any damage the source deals.
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+        var vamp = FightCreature("Vampire", 3, 3, alice, "Lifelink");
+        var bear = FightCreature("Bear", 2, 2, bob);
+
+        Fx.Fight(vamp, bear);
+
+        alice.LifeTotal.Should().Be(23, "lifelink gains 3 from the 3 fight damage");
+    }
+
+    [Fact]
+    public void Fight_ZeroPower_DealsNoDamage()
+    {
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+        var wall = FightCreature("Wall", 0, 4, alice);
+        var bear = FightCreature("Bear", 2, 2, bob);
+
+        Fx.Fight(wall, bear);
+
+        bear.Damage.Should().Be(0, "a 0-power creature deals no damage");
+        wall.Damage.Should().Be(2);
+    }
+
+    [Fact]
+    public void Fight_NullFighter_IsNoOp()
+    {
+        var alice = new Player("Alice", 20);
+        var a = FightCreature("A", 2, 2, alice);
+        Fx.Fight(a, null);
+        Fx.Fight(null, a);
+        a.Damage.Should().Be(0);
+    }
+
     [Fact]
     public void DealDamageAny_ToPlayer_LosesLife()
     {

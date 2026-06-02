@@ -211,6 +211,64 @@ public class JsonTargetingEffectsTests
     }
 
     // ------------------------------------------------------------------
+    // fight (CR 701.12) — source: "self".
+    // ------------------------------------------------------------------
+
+    /// <summary>Build a "this creature fights target creature" activated
+    /// ability on <paramref name="source"/> from the declarative
+    /// <see cref="Majik.Core.CardData.Definitions.FightEffectDef"/> verb.</summary>
+    private static ActivatedAbility SelfFightAbility(Creature source, Player controller)
+    {
+        var def = new Majik.Core.CardData.Definitions.FightEffectDef { Source = "self" };
+        var request = def.ToTargetRequest()!;
+        var effect = def.ToResolveEffect()(source, controller, null, 0);
+        return new ActivatedAbility(
+            source: source,
+            controller: controller,
+            effects: new[] { effect },
+            targetRequests: new[] { request });
+    }
+
+    [Fact]
+    public async Task SelfFight_SourceAndTarget_TakeEachOthersPower()
+    {
+        var mine = OnBattlefield(new Creature("Mine", "{G}", 4, 5), _alice);
+        var theirs = OnBattlefield(new Creature("Theirs", "{G}", 2, 3), _bob);
+
+        var fight = SelfFightAbility(mine, _alice);
+        fight.TargetRequests.Should().HaveCount(1, "self-source declares one target (the other creature)");
+
+        await ActivateAndResolve(fight, theirs);
+
+        mine.Damage.Should().Be(2, "Theirs has power 2");
+        theirs.Damage.Should().Be(4, "Mine has power 4");
+    }
+
+    [Fact]
+    public async Task SelfFight_DeathtouchSource_MarksTarget()
+    {
+        var snake = OnBattlefield(new Creature("Snake", "{G}", 1, 1), _alice);
+        snake.AddAbility(new KeywordAbility("Deathtouch", snake, _alice));
+        var giant = OnBattlefield(new Creature("Giant", "{G}", 0, 8), _bob);
+
+        await ActivateAndResolve(SelfFightAbility(snake, _alice), giant);
+
+        giant.MarkedForDestructionByDeathtouch.Should().BeTrue(
+            "deathtouch applies to fight damage (CR 702.2b)");
+    }
+
+    [Fact]
+    public async Task SelfFight_NoTarget_FizzlesCleanly()
+    {
+        var mine = OnBattlefield(new Creature("Mine", "{G}", 4, 5), _alice);
+
+        // CR 608.2b / 701.12c — no other creature → the fight does nothing.
+        await ActivateAndResolve(SelfFightAbility(mine, _alice), chosen: null);
+
+        mine.Damage.Should().Be(0);
+    }
+
+    // ------------------------------------------------------------------
     // Minamo / Voltaic Key — untap_target.
     // ------------------------------------------------------------------
 
