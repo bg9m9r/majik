@@ -1,0 +1,8 @@
+{
+  "name": "Septic Rats",
+  "types": ["Creature"],
+  "subtypes": ["Phyrexian", "Rat"],
+  "manaCost": "{1}{B}{B}",
+  "power": 2,
+  "toughness": 2
+}
