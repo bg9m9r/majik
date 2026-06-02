@@ -1,0 +1,9 @@
+{
+  "name": "Knight of Autumn",
+  "types": ["Creature"],
+  "subtypes": ["Dryad", "Knight"],
+  "manaCost": "{1}{G}{W}",
+  "power": 2,
+  "toughness": 1,
+  "abilities": []
+}
