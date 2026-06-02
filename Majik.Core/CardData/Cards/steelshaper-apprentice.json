@@ -1,0 +1,9 @@
+{
+  "name": "Steelshaper Apprentice",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Soldier"],
+  "manaCost": "{2}{W}{W}",
+  "power": 1,
+  "toughness": 3,
+  "abilities": []
+}
