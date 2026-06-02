@@ -19287,6 +19287,58 @@
   "mdfc": null,
   "colors": []
 }
+==== lightning-skelemental ====
+{
+  "name": "Lightning Skelemental",
+  "manaCost": "{B}{R}{R}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Elemental",
+    "Skeleton"
+  ],
+  "power": 6,
+  "toughness": 1,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Black",
+    "Red"
+  ]
+}
 ==== lilianas-triumph ====
 {
   "name": "Liliana\u0027s Triumph",
