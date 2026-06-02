@@ -1,0 +1,9 @@
+{
+  "name": "Fallen Shinobi",
+  "types": ["Creature"],
+  "subtypes": ["Zombie", "Ninja"],
+  "manaCost": "{3}{U}{B}",
+  "power": 5,
+  "toughness": 4,
+  "abilities": []
+}
