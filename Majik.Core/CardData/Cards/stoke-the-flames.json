@@ -1,0 +1,5 @@
+{
+  "name": "Stoke the Flames",
+  "types": ["Instant"],
+  "manaCost": "{2}{R}{R}"
+}
