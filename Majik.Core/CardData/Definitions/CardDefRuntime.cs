@@ -397,7 +397,8 @@ public static class CardDefRuntime
     public static SpellDefinition BuildSpellDefinitionFromEffects(
         string cardName,
         IReadOnlyList<EffectDefinition> effects,
-        ReplacementBus? replacements = null)
+        ReplacementBus? replacements = null,
+        ContinuousEffectsService? continuous = null)
     {
         ArgumentNullException.ThrowIfNull(cardName);
         ArgumentNullException.ThrowIfNull(effects);
@@ -481,7 +482,7 @@ public static class CardDefRuntime
                     // ChosenTargets[targetRequestIndex]; we always present the
                     // pick at index 0 of a single-slot context (the adapter
                     // below), so the builder is invoked with index 0.
-                    var inner = effects[i].ToResolveEffect()(
+                    var inner = effects[i].ToResolveEffect(continuous)(
                         nameCard, controller, replacements,
                         slot >= 0 ? 0 : -1);
 
@@ -1013,7 +1014,7 @@ public static class CardDefRuntime
 
     internal static IEffect BuildJsonEffect(
         EffectDefinition definition, ICard card, Player controller, ReplacementBus? replacements,
-        int targetRequestIndex = -1) =>
+        int targetRequestIndex = -1, ContinuousEffectsService? continuous = null) =>
         definition switch
         {
             PutCounterEffectDef put => BuildPutCounterEffect(put, card, replacements),
@@ -1027,6 +1028,7 @@ public static class CardDefRuntime
             UntapTargetEffectDef untap => BuildUntapTargetEffect(untap, card, targetRequestIndex),
             TapTargetEffectDef tap => BuildTapTargetEffect(tap, card, targetRequestIndex),
             PreventDamageTargetEffectDef prevent => BuildPreventDamageTargetEffect(prevent, card, replacements, targetRequestIndex),
+            GainControlEffectDef control => BuildGainControlEffect(control, card, controller, targetRequestIndex, continuous),
             GainLifeSelfEffectDef gain => BuildGainLifeSelfEffect(gain, card, controller),
             LoseLifeSelfEffectDef loseSelf => BuildLoseLifeSelfEffect(loseSelf, card, controller),
             LoseLifeTargetEffectDef lose => BuildLoseLifeTargetEffect(lose, card, targetRequestIndex),
@@ -1243,6 +1245,56 @@ public static class CardDefRuntime
                 {
                     permanent.Untap();
                 }
+                return ValueTask.CompletedTask;
+            });
+    }
+
+    private static IEffect BuildGainControlEffect(
+        GainControlEffectDef def, ICard card, Player controller, int targetRequestIndex,
+        ContinuousEffectsService? continuous)
+    {
+        // CR 613.2 / CR 514.2 — the Threaten / Act of Treason family. Reads the
+        // chosen creature off ChosenTargets at the reserved index and, until end
+        // of turn, swaps its real controller to the spell's controller via a
+        // TemporaryControlChangeEffect on the live continuous-effects service
+        // (control reverts at cleanup). Composes the standard Threaten rider:
+        // untap the creature (so it can attack) and grant it haste until end of
+        // turn (CR 302.6 — a creature whose control changed this turn is sick).
+        // CR 608.2b — an illegal target at resolution fizzles entirely. Without
+        // a live service (pure-shape test path) the control swap no-ops, like
+        // ArchmagesCharmFactory's single-arg posture.
+        var untap = def.Untap;
+        var gainsHaste = def.GainsHaste;
+        return new Effect(
+            $"{card.Name}: gain control of target {def.TargetFilter} until end of turn",
+            ctx =>
+            {
+                if (continuous == null) return ValueTask.CompletedTask;
+                if (ChosenTargetAt(ctx, targetRequestIndex) is not Creature creature
+                    || creature.Zone != ZoneType.Battlefield)
+                {
+                    return ValueTask.CompletedTask;
+                }
+
+                // CR 613.2 — only swap if we don't already control it.
+                if (!ReferenceEquals(creature.Controller, controller))
+                {
+                    continuous.Register(new TemporaryControlChangeEffect(creature, controller));
+                }
+
+                // CR 701.21 — "Untap it."
+                if (untap && creature.IsTapped)
+                {
+                    creature.Untap();
+                }
+
+                // "It gains haste until end of turn." (Layer 6 keyword grant,
+                // CR 514.2 expiry — reuses the shared until-EOT haste grant.)
+                if (gainsHaste)
+                {
+                    continuous.Register(new GrantKeywordUntilEndOfTurnEffect(creature, "Haste"));
+                }
+
                 return ValueTask.CompletedTask;
             });
     }
