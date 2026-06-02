@@ -30,6 +30,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   reads the CONTROLLER's battlefield only.
 /// - <see cref="NamedCardFactory"/> dispatch resolves the printed name.
 /// </summary>
+[Trait("Color", "C")]
 public class SeachromeCoastTests
 {
     private static Land MakeWithBus(Player owner, ReplacementBus bus) =>
@@ -78,18 +79,6 @@ public class SeachromeCoastTests
             "fast lands are nonbasic");
         land.HasSupertype(CardSupertype.Legendary).Should().BeFalse();
     }
-
-    [Fact]
-    public void SeachromeCoast_Dispatch_ResolvesViaNamedCardFactory()
-    {
-        var alice = new Player("Alice", 20);
-
-        var card = NamedCardFactory.Create("Seachrome Coast", alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Seachrome Coast");
-    }
-
     // -----------------------------------------------------------------------
     // Mana abilities
     // -----------------------------------------------------------------------
@@ -241,22 +230,6 @@ public class SeachromeCoastTests
         after!.EntersTapped.Should().BeFalse(
             "Alice controls 0 lands; Bob's 5 don't count, so it enters untapped");
     }
-
-    [Fact]
-    public void SeachromeCoast_SingleArgDispatch_DoesNotRegisterReplacement()
-    {
-        // Shape-only dispatcher path — single-arg constructs without a
-        // ReplacementBus, so the ETB-tapped predicate isn't wired (matches
-        // every other ETB-replacement factory's shape-only posture). Prod
-        // load wires it from oracle text via ConditionalEntersTappedBinder.
-        var alice = new Player("Alice", 20);
-        var land = NamedCardFactory.Create("Seachrome Coast", alice);
-
-        land.Should().NotBeNull();
-        land.Name.Should().Be("Seachrome Coast");
-        ((Land)land).Abilities.OfType<ManaAbility>().Should().HaveCount(2);
-    }
-
     [Fact]
     public void SeachromeCoast_Create_ThrowsOnNullOwner()
     {

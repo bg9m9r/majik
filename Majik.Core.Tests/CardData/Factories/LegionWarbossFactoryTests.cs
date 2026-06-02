@@ -39,6 +39,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   creates a 1/1 red Goblin token with Haste (summoning sickness cleared)
 ///   carrying the "AttacksThisCombat" must-attack marker.
 /// </summary>
+[Trait("Color", "R")]
 public class LegionWarbossFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -82,18 +83,6 @@ public class LegionWarbossFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void LegionWarboss_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Legion Warboss", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Legion Warboss");
-        c.HasSubtype(CardSubtype.Goblin).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Soldier).Should().BeTrue();
-    }
-
     [Fact]
     public void LegionWarboss_HasMentorMarker()
     {

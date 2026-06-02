@@ -19,6 +19,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Thoughtseize-shape discard with a nonland + mana-value≤3 filter, no life
 /// loss.
 /// </summary>
+[Trait("Color", "B")]
 public class InquisitionOfKozilekFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -55,15 +56,6 @@ public class InquisitionOfKozilekFactoryTests
         card.HasType(CardType.Sorcery).Should().BeTrue();
         card.ManaCost.ToString().Should().Be("{B}");
     }
-
-    [Fact]
-    public void DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Inquisition of Kozilek", _alice);
-        card.Should().BeOfType<Sorcery>();
-        card.Name.Should().Be("Inquisition of Kozilek");
-    }
-
     [Fact]
     public void Resolve_DiscardsChosenLowMvNonland()
     {

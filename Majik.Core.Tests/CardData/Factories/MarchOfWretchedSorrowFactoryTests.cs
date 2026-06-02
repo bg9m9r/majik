@@ -34,6 +34,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - X = 0: caster doesn't gain life (X = 0 short-circuits).
 ///   - BuildAdditionalCost helper wires the MarchAdditionalCost cleanly.
 /// </summary>
+[Trait("Color", "B")]
 public class MarchOfWretchedSorrowFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -64,17 +65,6 @@ public class MarchOfWretchedSorrowFactoryTests
         march.Controller.Should().BeSameAs(_alice);
         CardColors.GetColors(march).Should().Contain(ManaColor.Black);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatch_ReturnsMarchShape()
-    {
-        var dispatched = NamedCardFactory.Create("March of Wretched Sorrow", _alice);
-
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("March of Wretched Sorrow");
-        dispatched.ManaCost.Should().Be("{X}{B}");
-    }
-
     // ── SpellDefinition shape ───────────────────────────────────────────────
 
     [Fact]

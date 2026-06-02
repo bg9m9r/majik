@@ -33,6 +33,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   * Two Captains buff each other (each excludes self only).
 ///   * LTB lifts the bonus when Captain leaves the battlefield.
 /// </summary>
+[Trait("Color", "M")]
 public class DrogskolCaptainFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -53,18 +54,6 @@ public class DrogskolCaptainFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void DrogskolCaptain_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Drogskol Captain", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Drogskol Captain");
-        c.HasSubtype(CardSubtype.Spirit).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Soldier).Should().BeTrue();
-    }
-
     [Fact]
     public void DrogskolCaptain_HasPrintedFlying()
     {

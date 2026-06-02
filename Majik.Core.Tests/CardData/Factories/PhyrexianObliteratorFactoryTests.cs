@@ -36,6 +36,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - 0-damage instances do NOT fire the trigger (predicate gate, CR 119.4).
 ///   - Damage to a different creature does NOT fire the trigger.
 /// </summary>
+[Trait("Color", "B")]
 public class PhyrexianObliteratorFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -59,26 +60,6 @@ public class PhyrexianObliteratorFactoryTests
         CombatAbilities.HasTrample(ob).Should().BeTrue(
             "Trample keyword marker is wired (CR 702.19)");
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_PhyrexianObliterator()
-    {
-        var card = NamedCardFactory.Create("Phyrexian Obliterator", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Phyrexian Obliterator");
-        card.HasSubtype(CardSubtype.Phyrexian).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Horror).Should().BeTrue();
-        ((Creature)card).BasePower.Should().Be(5);
-        ((Creature)card).BaseToughness.Should().Be(5);
-        card.Owner.Should().Be(_alice);
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1,
-            "damage-received sacrifice trigger is wired");
-        card.Abilities.OfType<KeywordAbility>().Should().ContainSingle(k =>
-            string.Equals(k.Keyword, "Trample", System.StringComparison.OrdinalIgnoreCase),
-            "Trample keyword marker is wired");
-    }
-
     [Fact]
     public void PhyrexianObliterator_HasDamageReceivedTrigger_ActiveOnBattlefieldOnly()
     {

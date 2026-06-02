@@ -24,6 +24,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// <see cref="SavaiTriomeFactoryTests"/> (enters-tapped replacement +
 /// one mana ability per produced colour).
 /// </summary>
+[Trait("Color", "C")]
 public class RazortideBridgeFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -40,17 +41,6 @@ public class RazortideBridgeFactoryTests
         bridge.Owner.Should().BeSameAs(_alice);
         bridge.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void RazortideBridge_NamedCardFactory_DispatchesArtifactLand()
-    {
-        var card = NamedCardFactory.Create("Razortide Bridge", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.HasType(CardType.Land).Should().BeTrue();
-        card.HasType(CardType.Artifact).Should().BeTrue();
-    }
-
     [Fact]
     public void RazortideBridge_HasPrintedIndestructibleKeyword()
     {

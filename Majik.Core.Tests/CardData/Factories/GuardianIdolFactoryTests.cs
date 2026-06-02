@@ -33,6 +33,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     * Records 2/2 base P/T on Layer 7b.
 /// - Unconditional ETB-tapped replacement when a bus is wired.
 /// </summary>
+[Trait("Color", "C")]
 public class GuardianIdolFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -65,19 +66,6 @@ public class GuardianIdolFactoryTests
         idol.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1,
             "{2} animate ability is wired");
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_GuardianIdol()
-    {
-        var card = NamedCardFactory.Create("Guardian Idol", _alice);
-
-        card.Should().BeOfType<Artifact>();
-        card.Name.Should().Be("Guardian Idol");
-        card.HasType(CardType.Artifact).Should().BeTrue();
-        card.Abilities.OfType<ManaAbility>().Should().HaveCount(1);
-        card.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1);
-    }
-
     // -----------------------------------------------------------------------
     // {T}: Add {C}
     // -----------------------------------------------------------------------

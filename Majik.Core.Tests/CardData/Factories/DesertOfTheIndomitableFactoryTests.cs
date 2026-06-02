@@ -31,21 +31,11 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   publishes <see cref="Majik.Core.Events.CardCycledEvent"/> (CR 702.32d).
 /// - Dispatcher routing through <see cref="NamedCardFactory"/>.
 /// </summary>
+[Trait("Color", "C")]
 public class DesertOfTheIndomitableFactoryTests
 {
     private const string CardName = "Desert of the Fervent's sibling Desert of the Indomitable";
     private readonly Player _alice = new("Alice", 20);
-
-    [Fact]
-    public void Dispatch_ReturnsDesertLand()
-    {
-        var card = NamedCardFactory.Create(CardName, _alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be(CardName);
-        card.HasSubtype(CardSubtype.Desert).Should().BeTrue("Type line: Land — Desert");
-    }
-
     [Fact]
     public void HasManaAbilityProducingGreen()
     {

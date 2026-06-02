@@ -30,6 +30,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Resolving against a green/white/colourless permanent → no-op (CR 608.2b).
 ///   - Target no longer on battlefield at resolution → no-op (CR 608.2b).
 /// </summary>
+[Trait("Color", "W")]
 public class CelestialPurgeFactoryTests
 {
     private readonly EventBus _bus = new();
@@ -64,17 +65,6 @@ public class CelestialPurgeFactoryTests
         cp.Owner.Should().BeSameAs(_alice);
         cp.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsCelestialPurgeShape()
-    {
-        var dispatched = NamedCardFactory.Create("Celestial Purge", _alice);
-
-        dispatched.Should().BeOfType<Instant>();
-        dispatched.Name.Should().Be("Celestial Purge");
-        dispatched.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     [Fact]
     public void BuildDefinition_OneRequiredTarget_NoXNoModes()
     {

@@ -1,0 +1,8 @@
+{
+  "name": "Obstinate Baloth",
+  "types": ["Creature"],
+  "subtypes": ["Beast"],
+  "manaCost": "{2}{G}{G}",
+  "power": 4,
+  "toughness": 4
+}

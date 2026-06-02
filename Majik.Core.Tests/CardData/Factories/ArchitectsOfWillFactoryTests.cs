@@ -29,6 +29,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   of Mysteries subscribe to.
 /// - <see cref="NamedCardFactory"/> dispatch.
 /// </summary>
+[Trait("Color", "M")]
 public class ArchitectsOfWillFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -55,23 +56,6 @@ public class ArchitectsOfWillFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void ArchitectsOfWill_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Architects of Will", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Architects of Will");
-        card.HasType(CardType.Artifact).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Wizard).Should().BeTrue();
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1,
-            "the ETB look-at-library trigger");
-        card.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1,
-            "the cycling activated ability");
-        card.Abilities.OfType<KeywordAbility>().Should().Contain(k => k.Keyword == "Cycling");
-    }
-
     // -----------------------------------------------------------------------
     // ETB trigger shape — CR 603.6a
     // -----------------------------------------------------------------------

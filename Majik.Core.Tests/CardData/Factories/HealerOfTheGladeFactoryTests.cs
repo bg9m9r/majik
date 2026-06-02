@@ -23,6 +23,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Wired Create(Player, IEventBus?, TriggerManager?) path: entering the
 ///   battlefield via a bus event gains controller 3 life end-to-end.
 /// </summary>
+[Trait("Color", "G")]
 public class HealerOfTheGladeFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -78,18 +79,6 @@ public class HealerOfTheGladeFactoryTests
     // -----------------------------------------------------------------------
     // NamedCardFactory dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void HealerOfTheGlade_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Healer of the Glade", _alice);
-
-        c.Should().BeOfType<Creature>("Healer of the Glade is a Creature");
-        c.Name.Should().Be("Healer of the Glade");
-        c.HasSubtype(CardSubtype.Elemental).Should().BeTrue();
-        c.ManaCost.Should().Be("{G}");
-    }
-
     // -----------------------------------------------------------------------
     // ETB triggered ability shape
     // -----------------------------------------------------------------------

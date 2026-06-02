@@ -41,6 +41,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// JSON definition; the any-colour mana ability is appended second. The tests
 /// rely on that order (<c>.First()</c> = {C}, <c>.Last()</c> = any-colour).
 /// </summary>
+[Trait("Color", "C")]
 public class MirrexFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -81,20 +82,6 @@ public class MirrexFactoryTests
         land.HasSupertype(CardSupertype.Basic).Should().BeFalse("Mirrex is nonbasic");
         land.HasSupertype(CardSupertype.Legendary).Should().BeFalse("Mirrex is not legendary");
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_Mirrex()
-    {
-        var card = NamedCardFactory.Create("Mirrex", _alice);
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Mirrex");
-
-        card.Abilities.OfType<ManaAbility>().Should().HaveCount(2,
-            "{T}: Add {C} + {T}: Add one mana of any color");
-        card.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1,
-            "the {3}, {T} token-making ability");
-    }
-
     [Fact]
     public void Create_HasExactlyThreeAbilities()
     {

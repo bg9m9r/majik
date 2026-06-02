@@ -11,7 +11,7 @@ namespace Majik.Core.CardData.Factories;
 /// Named-card factory for Hidetsugu's Second Rite (Champions of Kamigawa
 /// / NEO reprint, {2}{R}).
 ///
-/// Sorcery. Oracle text:
+/// Instant. Oracle text:
 ///   "If target opponent's life total is exactly 10, Hidetsugu's Second
 ///    Rite deals 10 damage to them."
 ///
@@ -48,10 +48,10 @@ public static class HidetsugusSecondRiteFactory
 
     /// <summary>CardDef DSL — card shape only. Conditional damage body
     /// lives in <see cref="BuildSpellDefinition"/>.</summary>
-    public static CardDef Define() => CardDef.Sorcery(CardName, PrintedManaCost);
+    public static CardDef Define() => CardDef.Instant(CardName, PrintedManaCost);
 
-    public static Sorcery Create(Player owner) =>
-        (Sorcery)CardDefRuntime.Build(Define(), owner);
+    public static Instant Create(Player owner) =>
+        (Instant)CardDefRuntime.Build(Define(), owner);
 
     /// <summary>
     /// Build the <see cref="SpellDefinition"/> Hidetsugu's Second Rite

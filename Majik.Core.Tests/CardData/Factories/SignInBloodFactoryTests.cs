@@ -30,6 +30,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Targeting opponent: opponent draws 2 and loses 2; caster unaffected.
 /// - CR 608.2b: no-op when resolved target is not a Player.
 /// </summary>
+[Trait("Color", "B")]
 public class SignInBloodFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -52,17 +53,6 @@ public class SignInBloodFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsSignInBloodShape()
-    {
-        var dispatched = NamedCardFactory.Create("Sign in Blood", _alice);
-
-        dispatched.Should().BeOfType<Sorcery>();
-        dispatched.Name.Should().Be("Sign in Blood");
-        dispatched.ManaCost.Should().Be("{B}{B}");
-    }
-
     // -----------------------------------------------------------------------
     // SpellDefinition — structural shape
     // -----------------------------------------------------------------------

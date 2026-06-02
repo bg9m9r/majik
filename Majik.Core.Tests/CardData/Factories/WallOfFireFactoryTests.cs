@@ -32,6 +32,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - NamedCardFactory dispatcher resolves "Wall of Fire" to the expected
 ///   Wall shape with Defender + one ActivatedAbility.
 /// </summary>
+[Trait("Color", "R")]
 public class WallOfFireFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);

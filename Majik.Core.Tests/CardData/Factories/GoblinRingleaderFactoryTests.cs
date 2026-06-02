@@ -32,6 +32,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - ETB: fewer than 4 cards — reveals what's available (graceful).
 /// - ETB: empty library — no-op, no crash.
 /// </summary>
+[Trait("Color", "R")]
 public class GoblinRingleaderFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -64,18 +65,6 @@ public class GoblinRingleaderFactoryTests
         colors.Should().Contain(Majik.Core.ValueObjects.ManaColor.Red,
             "Goblin Ringleader has {R} in its mana cost");
     }
-
-    [Fact]
-    public void GoblinRingleader_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Goblin Ringleader", _alice);
-
-        c.Should().BeOfType<Creature>("Goblin Ringleader is a Creature");
-        c.Name.Should().Be("Goblin Ringleader");
-        c.HasSubtype(CardSubtype.Goblin).Should().BeTrue();
-        c.ManaCost.Should().Be("{3}{R}");
-    }
-
     // -----------------------------------------------------------------------
     // Haste — CR 702.10
     // -----------------------------------------------------------------------

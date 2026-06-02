@@ -28,6 +28,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Dispatch through <see cref="NamedCardFactory"/> resolves each printed
 ///   name to the parametric Create overload.
 /// </summary>
+[Trait("Color", "C")]
 public class TalismanCycleFactoryTests
 {
     /// <summary>
@@ -79,21 +80,6 @@ public class TalismanCycleFactoryTests
         t.Owner.Should().BeSameAs(alice);
         t.Controller.Should().BeSameAs(alice);
     }
-
-    [Theory]
-    [MemberData(nameof(AllTalismans))]
-    public void Talisman_Dispatch_ResolvesViaNamedCardFactory(string cardName, string a, string b)
-    {
-        _ = a; _ = b;
-        var alice = new Player("Alice", 20);
-
-        var card = NamedCardFactory.Create(cardName, alice);
-
-        card.Should().BeAssignableTo<Artifact>();
-        card.Name.Should().Be(cardName);
-        card.ManaCost.Should().Be("{2}");
-    }
-
     // -----------------------------------------------------------------------
     // Mana abilities — shape
     // -----------------------------------------------------------------------

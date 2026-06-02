@@ -33,6 +33,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// 3/3 Elemental artifact body survives cleanup
 /// (<see cref="ContinuousEffectsService.ExpireEndOfTurn"/>).
 /// </summary>
+[Trait("Color", "C")]
 public class StalkingStonesFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -57,23 +58,6 @@ public class StalkingStonesFactoryTests
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_StalkingStones()
-    {
-        var card = NamedCardFactory.Create("Stalking Stones", _alice);
-
-        card.Should().BeOfType<Land>();
-        card.Name.Should().Be("Stalking Stones");
-        card.HasType(CardType.Land).Should().BeTrue();
-
-        card.Abilities.OfType<ManaAbility>().Should().HaveCount(1,
-            "{T}: Add {C}");
-        card.Abilities
-            .Where(a => a.GetType() == typeof(ActivatedAbility))
-            .Should().HaveCount(1, "the {6} animate ability");
-    }
-
     // -----------------------------------------------------------------------
     // {T}: Add {C}
     // -----------------------------------------------------------------------

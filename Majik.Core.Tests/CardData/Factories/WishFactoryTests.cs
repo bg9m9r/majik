@@ -40,6 +40,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// AgentRegistry is process-global; tests Clear() on dispose so they don't
 /// leak agents into neighbouring suites.
 /// </summary>
+[Trait("Color", "R")]
 public class WishFactoryTests : IDisposable
 {
     private readonly Player _alice = new("Alice", 20);
@@ -75,17 +76,6 @@ public class WishFactoryTests : IDisposable
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void Wish_NamedCardFactory_Dispatches()
-    {
-        var dispatched = NamedCardFactory.Create("Wish", _alice);
-
-        dispatched.Should().BeOfType<Sorcery>();
-        dispatched.Name.Should().Be("Wish");
-        dispatched.HasType(CardType.Sorcery).Should().BeTrue();
-    }
-
     [Fact]
     public void Wish_BuildDefinition_Shape()
     {

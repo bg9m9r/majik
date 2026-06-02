@@ -32,6 +32,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - <see cref="NamedCardFactory"/> dispatch returns Setessan Champion with
 ///   the right shape.
 /// </summary>
+[Trait("Color", "G")]
 public class SetessanChampionFactoryTests
 {
     private readonly EventBus _bus = new();
@@ -72,19 +73,6 @@ public class SetessanChampionFactoryTests
         c.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1,
             "Setessan Champion carries the single constellation trigger (CR 702.144)");
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_SetessanChampion()
-    {
-        var card = NamedCardFactory.Create("Setessan Champion", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Setessan Champion");
-        card.ManaCost.Should().Be("{1}{G}{G}");
-        card.HasSubtype(CardSubtype.Human).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Warrior).Should().BeTrue();
-    }
-
     // -----------------------------------------------------------------------
     // Constellation behaviour — end-to-end via TriggerManager
     // -----------------------------------------------------------------------

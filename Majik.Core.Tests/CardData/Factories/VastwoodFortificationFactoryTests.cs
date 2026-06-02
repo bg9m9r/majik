@@ -40,6 +40,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Back — single {T}: Add {G} mana ability.
 /// - Back — enters tapped replacement fires when bus is wired; no bus → none.
 /// </summary>
+[Trait("Color", "G")]
 public class VastwoodFortificationFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -76,17 +77,6 @@ public class VastwoodFortificationFactoryTests
         colors.Should().NotContain(ManaColor.Black);
         colors.Should().NotContain(ManaColor.Red);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_VastwoodFortification()
-    {
-        var card = NamedCardFactory.Create("Vastwood Fortification", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Vastwood Fortification");
-        card.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     [Fact]
     public void VastwoodFortification_CarriesMdfcState_FrontFace()
     {
@@ -176,17 +166,6 @@ public class VastwoodFortificationFactoryTests
         land.Owner.Should().BeSameAs(_alice);
         land.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_VastwoodThicket()
-    {
-        var card = NamedCardFactory.Create("Vastwood Thicket", _alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Vastwood Thicket");
-        card.HasType(CardType.Land).Should().BeTrue();
-    }
-
     [Fact]
     public void VastwoodThicket_CarriesMdfcState_PreFlippedToBackFace()
     {

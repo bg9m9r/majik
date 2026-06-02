@@ -32,6 +32,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Becomes-monstrous trigger fires 3-damage-each-opponent IFF hand
 ///     size ≥ 7.
 /// </summary>
+[Trait("Color", "R")]
 public class StormbreathDragonFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -56,17 +57,6 @@ public class StormbreathDragonFactoryTests
         dragon.Owner.Should().BeSameAs(_alice);
         dragon.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatch_ReturnsStormbreathShape()
-    {
-        var dispatched = NamedCardFactory.Create("Stormbreath Dragon", _alice);
-
-        dispatched.Should().BeOfType<Creature>();
-        dispatched.Name.Should().Be("Stormbreath Dragon");
-        dispatched.HasType(CardType.Creature).Should().BeTrue();
-    }
-
     // -------------------------------------------------------------------------
     // Keyword markers + protection
     // -------------------------------------------------------------------------

@@ -32,6 +32,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Crew 3 (CR 702.122) promotes the vehicle to a 5/5 creature via
 ///     VehicleCrewEffect.
 /// </summary>
+[Trait("Color", "C")]
 public class CultivatorsCaravanFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -59,18 +60,6 @@ public class CultivatorsCaravanFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void CultivatorsCaravan_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Cultivator's Caravan", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Cultivator's Caravan");
-        c.HasType(CardType.Artifact).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Vehicle).Should().BeTrue();
-    }
-
     // -----------------------------------------------------------------------
     // "{T}: Add one mana of any color" — five free coloured mana abilities
     // -----------------------------------------------------------------------

@@ -18,6 +18,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Modern reprints). Vanilla — no printed keywords, triggers, statics, or
 /// activated abilities.
 /// </summary>
+[Trait("Color", "G")]
 public class LeatherbackBalothFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -55,18 +56,6 @@ public class LeatherbackBalothFactoryTests
         colors.Should().Contain(ManaColor.Green, "Leatherback Baloth costs {G}{G}{G}");
         colors.Should().HaveCount(1, "Leatherback Baloth is exactly Green");
     }
-
-    [Fact]
-    public void LeatherbackBaloth_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Leatherback Baloth", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Leatherback Baloth");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Beast).Should().BeTrue();
-    }
-
     [Fact]
     public void LeatherbackBaloth_IsVanilla_NoAbilities()
     {

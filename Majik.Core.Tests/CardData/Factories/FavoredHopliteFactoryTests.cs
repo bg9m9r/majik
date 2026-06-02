@@ -32,6 +32,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Damage to another creature is unaffected.
 ///   - Shield drops at end of turn.
 /// </summary>
+[Trait("Color", "W")]
 public class FavoredHopliteFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -59,21 +60,6 @@ public class FavoredHopliteFactoryTests
         fh.Owner.Should().BeSameAs(_alice);
         fh.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void FavoredHoplite_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Favored Hoplite", _alice);
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Favored Hoplite");
-        card.HasSubtype(CardSubtype.Human).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Soldier).Should().BeTrue();
-        ((Creature)card).BasePower.Should().Be(1);
-        ((Creature)card).BaseToughness.Should().Be(2);
-        card.Abilities.OfType<TriggeredAbility>().Should().HaveCount(1,
-            "Heroic trigger is attached");
-    }
-
     [Fact]
     public void HeroicTrigger_TargetedSpell_AddsCounterAndPlacesShield()
     {

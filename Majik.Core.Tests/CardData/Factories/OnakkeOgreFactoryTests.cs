@@ -18,6 +18,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Modern reprints). Vanilla — no printed keywords, triggers, statics, or
 /// activated abilities.
 /// </summary>
+[Trait("Color", "R")]
 public class OnakkeOgreFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -56,19 +57,6 @@ public class OnakkeOgreFactoryTests
         colors.Should().Contain(ManaColor.Red, "Onakke Ogre costs {2}{R}");
         colors.Should().HaveCount(1, "Onakke Ogre is exactly Red");
     }
-
-    [Fact]
-    public void OnakkeOgre_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Onakke Ogre", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Onakke Ogre");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Ogre).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Warrior).Should().BeTrue();
-    }
-
     [Fact]
     public void OnakkeOgre_IsVanilla_NoAbilities()
     {

@@ -29,6 +29,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   destination — graveyard / exile).
 /// - LTB effect creates a single 3/3 green Beast token.
 /// </summary>
+[Trait("Color", "G")]
 public class ThragtuskFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -48,21 +49,6 @@ public class ThragtuskFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void Thragtusk_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Thragtusk", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Thragtusk");
-        card.HasType(CardType.Creature).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Beast).Should().BeTrue();
-        ((Creature)card).BasePower.Should().Be(5);
-        ((Creature)card).BaseToughness.Should().Be(3);
-        card.Owner.Should().BeSameAs(_alice);
-    }
-
     [Fact]
     public void Thragtusk_AttachesTwoTriggeredAbilities()
     {

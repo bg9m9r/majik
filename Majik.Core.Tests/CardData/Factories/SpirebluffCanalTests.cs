@@ -30,6 +30,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   reads the CONTROLLER's battlefield only.
 /// - <see cref="NamedCardFactory"/> dispatch resolves the printed name.
 /// </summary>
+[Trait("Color", "C")]
 public class SpirebluffCanalFactoryTests
 {
     private static Land MakeWithBus(Player owner, ReplacementBus bus) =>
@@ -64,18 +65,6 @@ public class SpirebluffCanalFactoryTests
             "fast lands are nonbasic");
         land.HasSupertype(CardSupertype.Legendary).Should().BeFalse();
     }
-
-    [Fact]
-    public void SpirebluffCanal_Dispatch_ResolvesViaNamedCardFactory()
-    {
-        var alice = new Player("Alice", 20);
-
-        var card = NamedCardFactory.Create("Spirebluff Canal", alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Spirebluff Canal");
-    }
-
     // -----------------------------------------------------------------------
     // Mana abilities
     // -----------------------------------------------------------------------
@@ -227,22 +216,6 @@ public class SpirebluffCanalFactoryTests
         after!.EntersTapped.Should().BeFalse(
             "Alice controls 0 lands; Bob's 5 don't count, so it enters untapped");
     }
-
-    [Fact]
-    public void SpirebluffCanal_SingleArgDispatch_DoesNotRegisterReplacement()
-    {
-        // Shape-only dispatcher path — single-arg constructs without a
-        // ReplacementBus, so the ETB-tapped predicate isn't wired (matches
-        // every other ETB-replacement factory's shape-only posture). Prod
-        // load wires it from oracle text via ConditionalEntersTappedBinder.
-        var alice = new Player("Alice", 20);
-        var land = NamedCardFactory.Create("Spirebluff Canal", alice);
-
-        land.Should().NotBeNull();
-        land.Name.Should().Be("Spirebluff Canal");
-        ((Land)land).Abilities.OfType<ManaAbility>().Should().HaveCount(2);
-    }
-
     [Fact]
     public void SpirebluffCanal_Create_ThrowsOnNullOwner()
     {

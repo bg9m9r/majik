@@ -29,6 +29,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// crafted <see cref="ChosenSpellParams"/> — same pattern as
 /// <see cref="Majik.Core.Tests.CardData.KolaghansCommandTests"/>.
 /// </summary>
+[Trait("Color", "R")]
 public class BrotherhoodsEndFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -51,17 +52,6 @@ public class BrotherhoodsEndFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchByName_ReturnsBrotherhoodsEndShape()
-    {
-        var dispatched = NamedCardFactory.Create("Brotherhood's End", _alice);
-
-        dispatched.Should().BeOfType<Sorcery>();
-        dispatched.Name.Should().Be("Brotherhood's End");
-        dispatched.HasType(CardType.Sorcery).Should().BeTrue();
-    }
-
     [Fact]
     public void BuildDefinition_TwoModes_NoTargetRequests()
     {

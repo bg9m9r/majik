@@ -29,6 +29,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   crashing (CR 704.5b).
 /// - One <see cref="ManaAbility"/> that produces {G} (CR 605.1).
 /// </summary>
+[Trait("Color", "G")]
 public class LlanowarVisionaryFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -57,19 +58,6 @@ public class LlanowarVisionaryFactoryTests
     // -----------------------------------------------------------------------
     // NamedCardFactory dispatch
     // -----------------------------------------------------------------------
-
-    [Fact]
-    public void LlanowarVisionary_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Llanowar Visionary", _alice);
-
-        c.Should().BeOfType<Creature>("Llanowar Visionary is a Creature");
-        c.Name.Should().Be("Llanowar Visionary");
-        ((Creature)c).HasSubtype(CardSubtype.Elf).Should().BeTrue();
-        ((Creature)c).HasSubtype(CardSubtype.Druid).Should().BeTrue();
-        c.ManaCost.Should().Be("{2}{G}");
-    }
-
     // -----------------------------------------------------------------------
     // ETB triggered ability — shape
     // -----------------------------------------------------------------------

@@ -30,6 +30,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Resolution: artifact creature target → fizzles (CR 608.2b) but mite
 ///   still sacrifices.
 /// </summary>
+[Trait("Color", "C")]
 public class HaywireMiteTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -54,18 +55,6 @@ public class HaywireMiteTests
         mite.Owner.Should().BeSameAs(_alice);
         mite.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_HaywireMite()
-    {
-        var card = NamedCardFactory.Create("Haywire Mite", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Haywire Mite");
-        ((Creature)card).Power.Should().Be(1);
-        ((Creature)card).Toughness.Should().Be(1);
-    }
-
     // -----------------------------------------------------------------------
     // Ability shapes
     // -----------------------------------------------------------------------

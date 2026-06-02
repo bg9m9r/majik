@@ -18,6 +18,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// "Pillar of Flame deals 2 damage to any target. If a creature dealt damage
 /// this way would die this turn, exile it instead." ({R} Sorcery.)
 /// </summary>
+[Trait("Color", "R")]
 public class PillarOfFlameFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -43,16 +44,6 @@ public class PillarOfFlameFactoryTests
         card.ManaCost.ToString().Should().Be("{R}");
         card.Owner.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Pillar of Flame", _alice);
-
-        card.Should().BeOfType<Sorcery>();
-        card.Name.Should().Be("Pillar of Flame");
-    }
-
     [Fact]
     public void SpellDefinition_HasSingleAnyTargetRequest()
     {

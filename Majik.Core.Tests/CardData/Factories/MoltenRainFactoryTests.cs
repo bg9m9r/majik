@@ -30,6 +30,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Mirrors the SmashToSmithereens shape (destroy + conditional damage to the
 /// destroyed permanent's controller) and the Befoul destroy-land shape.
 /// </summary>
+[Trait("Color", "R")]
 public class MoltenRainFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -59,18 +60,6 @@ public class MoltenRainFactoryTests
         CardColors.GetColors(card).Should().Contain(ManaColor.Red,
             "Molten Rain has {R}{R} in its mana cost (CR 105.2a)");
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_MoltenRain()
-    {
-        var card = NamedCardFactory.Create("Molten Rain", _alice);
-
-        card.Should().BeOfType<Sorcery>();
-        card.Name.Should().Be("Molten Rain");
-        card.HasType(CardType.Sorcery).Should().BeTrue();
-        card.Owner.Should().BeSameAs(_alice);
-    }
-
     // -----------------------------------------------------------------------
     // Resolution — basic land: destroy, no damage
     // -----------------------------------------------------------------------

@@ -39,6 +39,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// when one is registered for the caster (which <see cref="Majik.Core.Game.GameDriver"/>
 /// does at construction time).
 /// </summary>
+[Trait("Color", "C")]
 public class PrimevalTitanZoneServiceTests : IDisposable
 {
     private readonly Player _alice = new("Alice", 20);

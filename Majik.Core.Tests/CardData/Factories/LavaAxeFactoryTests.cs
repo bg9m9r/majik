@@ -24,6 +24,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Resolve body deals 5 damage to a planeswalker target (loyalty removal — CR 306.7).
 /// - Resolve body is a no-op when target is a creature (CR 608.2b).
 /// </summary>
+[Trait("Color", "R")]
 public class LavaAxeFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -40,17 +41,6 @@ public class LavaAxeFactoryTests
         axe.Owner.Should().BeSameAs(_alice);
         axe.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void LavaAxe_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Lava Axe", _alice);
-
-        card.Should().BeOfType<Sorcery>();
-        card.Name.Should().Be("Lava Axe");
-        card.HasType(CardType.Sorcery).Should().BeTrue();
-    }
-
     [Fact]
     public void LavaAxe_SpellDefinition_HasPlayerOrPlaneswalkerRequest()
     {

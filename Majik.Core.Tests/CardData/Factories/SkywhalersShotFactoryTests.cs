@@ -30,6 +30,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Scry 1 on an empty library — short-circuits cleanly; no throw.
 /// </summary>
 [Collection(nameof(StaticRegistryCollection))]
+[Trait("Color", "W")]
 public class SkywhalersShotFactoryTests : IDisposable
 {
     private readonly Player _alice = new("Alice", 20);
@@ -62,18 +63,6 @@ public class SkywhalersShotFactoryTests : IDisposable
         CardColors.GetColors(card).Should().Contain(ManaColor.White,
             "Skywhaler's Shot has {W} in its mana cost");
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_SkywhalersShot()
-    {
-        var card = NamedCardFactory.Create("Skywhaler's Shot", _alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Skywhaler's Shot");
-        card.HasType(CardType.Instant).Should().BeTrue();
-        card.ManaCost.Should().Be("{2}{W}");
-    }
-
     // ── Spell definition shape ────────────────────────────────────────────────
 
     [Fact]

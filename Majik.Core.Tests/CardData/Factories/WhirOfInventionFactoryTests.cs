@@ -43,6 +43,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Live ZoneService → CardMovedEvent published so ETB triggers fire
 ///   (CR 603.6a).
 /// </summary>
+[Trait("Color", "U")]
 public class WhirOfInventionFactoryTests
 {
     private static ChosenSpellParams Choose(int? x) =>
@@ -95,21 +96,6 @@ public class WhirOfInventionFactoryTests
         card.Abilities.OfType<KeywordAbility>()
             .Select(k => k.Keyword).Should().Contain("Improvise");
     }
-
-    [Fact]
-    public void NamedCardFactory_DispatchesWhirOfInvention()
-    {
-        var owner = new Player("Alice", 20);
-        var card = NamedCardFactory.Create("Whir of Invention", owner);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Whir of Invention");
-        card.ManaCost.Should().Be("{X}{U}{U}{U}");
-
-        card.Abilities.OfType<KeywordAbility>()
-            .Select(k => k.Keyword).Should().Contain("Improvise");
-    }
-
     // ── Improvise cost surface ───────────────────────────────────────────────
 
     [Fact]

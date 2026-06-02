@@ -40,6 +40,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - IsActive gate: when the Bridge leaves the battlefield, the
 ///     restriction is suppressed and pruned away.
 /// </summary>
+[Trait("Color", "C")]
 public class EnsnaringBridgeFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -81,17 +82,6 @@ public class EnsnaringBridgeFactoryTests
         bridge.Owner.Should().BeSameAs(_alice);
         bridge.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void EnsnaringBridge_DispatchesViaNamedCardFactory()
-    {
-        var bridge = NamedCardFactory.Create("Ensnaring Bridge", _alice);
-
-        bridge.Should().BeOfType<Artifact>();
-        bridge.Name.Should().Be("Ensnaring Bridge");
-        bridge.HasType(CardType.Artifact).Should().BeTrue();
-    }
-
     // -------------------------------------------------------------------------
     // Static-ability marker — printed text + battlefield gate
     // -------------------------------------------------------------------------

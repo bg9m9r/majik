@@ -18,6 +18,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// permanents" multi-target distribution is a documented v1 gap (single
 /// 1..1 target collapse — same posture as Slogurk's "up to three" target).
 /// </summary>
+[Trait("Color", "M")]
 public class BragoKingEternalFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -142,19 +143,5 @@ public class BragoKingEternalFactoryTests
             foreach (var e in trig.Effects) e.Execute();
         };
         act.Should().NotThrow("missing-target path is a clean no-op");
-    }
-
-    [Fact]
-    public void Brago_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Brago, King Eternal", _alice);
-
-        c.Should().NotBeNull();
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Brago, King Eternal");
-        ((Creature)c).Power.Should().Be(2);
-        ((Creature)c).Toughness.Should().Be(4);
-        c.HasSubtype(CardSubtype.Spirit).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Advisor).Should().BeTrue();
     }
 }

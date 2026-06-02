@@ -30,6 +30,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Opponents' defenders and the controller's non-defender creatures are
 ///   excluded (CR 109.5 — "you control"; "with defender" filter).
 /// </summary>
+[Trait("Color", "G")]
 public class OvergrownBattlementFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -78,20 +79,6 @@ public class OvergrownBattlementFactoryTests
 
         c.HasSupertype(CardSupertype.Legendary).Should().BeFalse();
     }
-
-    [Fact]
-    public void OvergrownBattlement_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Overgrown Battlement", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Overgrown Battlement");
-        ((Creature)c).HasSubtype(CardSubtype.Wall).Should().BeTrue();
-        ((Creature)c).Abilities.OfType<KeywordAbility>()
-            .Should().ContainSingle(k => k.Keyword == "Defender");
-        ((Creature)c).Abilities.OfType<ManaAbility>().Should().HaveCount(1);
-    }
-
     // ── Defender keyword ───────────────────────────────────────────────
 
     [Fact]

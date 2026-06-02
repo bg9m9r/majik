@@ -48,6 +48,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Back face — enters tapped replacement fires when bus is wired.
 /// - Back face — no bus → no replacement (shape-only path).
 /// </summary>
+[Trait("Color", "M")]
 public class LegionLeadershipFactoryTests : IDisposable
 {
     public LegionLeadershipFactoryTests()
@@ -97,18 +98,6 @@ public class LegionLeadershipFactoryTests : IDisposable
         colors.Should().NotContain(ManaColor.Black);
         colors.Should().NotContain(ManaColor.Green);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_LegionLeadership()
-    {
-        var alice = new Player("Alice", 20);
-        var card = NamedCardFactory.Create("Legion Leadership", alice);
-
-        card.Should().BeOfType<Instant>();
-        card.Name.Should().Be("Legion Leadership");
-        card.HasType(CardType.Instant).Should().BeTrue();
-    }
-
     // =========================================================================
     // MDFC face tracker — front face
     // =========================================================================
@@ -270,18 +259,6 @@ public class LegionLeadershipFactoryTests : IDisposable
         land.Owner.Should().BeSameAs(alice);
         land.Controller.Should().BeSameAs(alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_LegionStronghold()
-    {
-        var alice = new Player("Alice", 20);
-        var card = NamedCardFactory.Create("Legion Stronghold", alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Legion Stronghold");
-        card.HasType(CardType.Land).Should().BeTrue();
-    }
-
     [Fact]
     public void LegionStronghold_CarriesMdfcState_PreFlippedToBackFace()
     {

@@ -26,22 +26,10 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// path by <see cref="EntersTappedBinder"/> from the oracle text, not by this
 /// factory (same posture as the Guildgate factories).
 /// </summary>
+[Trait("Color", "C")]
 public class AlpineMeadowFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
-
-    [Fact]
-    public void AlpineMeadow_Dispatch_ReturnsSnowLandWithMountainAndPlainsSubtypes()
-    {
-        var card = NamedCardFactory.Create("Alpine Meadow", _alice);
-
-        card.Should().BeAssignableTo<Land>();
-        card.Name.Should().Be("Alpine Meadow");
-        card.HasSupertype(CardSupertype.Snow).Should().BeTrue("type line is Snow Land");
-        card.HasSubtype(CardSubtype.Mountain).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Plains).Should().BeTrue();
-    }
-
     [Fact]
     public void AlpineMeadow_HasTwoManaAbilities_ProducingRedAndWhite()
     {

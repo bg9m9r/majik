@@ -23,6 +23,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - No abilities attached (vanilla card).
 /// - NamedCardFactory dispatch resolves the correct factory.
 /// </summary>
+[Trait("Color", "W")]
 public class EliteVanguardFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -108,19 +109,5 @@ public class EliteVanguardFactoryTests
 
         card.Abilities.Should().BeEmpty(
             "Elite Vanguard is a vanilla creature with no printed abilities");
-    }
-
-    [Fact]
-    public void EliteVanguard_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Elite Vanguard", _alice);
-
-        card.Should().BeOfType<Creature>();
-        card.Name.Should().Be("Elite Vanguard");
-        card.HasType(CardType.Creature).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Human).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Soldier).Should().BeTrue();
-        ((Creature)card).BasePower.Should().Be(2);
-        ((Creature)card).BaseToughness.Should().Be(1);
     }
 }

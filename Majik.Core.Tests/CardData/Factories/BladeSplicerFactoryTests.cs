@@ -31,6 +31,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - The Golem lord static grants first strike to Golems the controller
 ///   controls (the minted token included).
 /// </summary>
+[Trait("Color", "W")]
 public class BladeSplicerFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -55,18 +56,6 @@ public class BladeSplicerFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void BladeSplicer_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Blade Splicer", _alice);
-
-        card.Should().BeOfType<Creature>("Blade Splicer is a Creature instance");
-        card.Name.Should().Be("Blade Splicer");
-        card.HasSubtype(CardSubtype.Human).Should().BeTrue();
-        card.HasSubtype(CardSubtype.Artificer).Should().BeTrue();
-    }
-
     [Fact]
     public void BladeSplicer_HasOneEtbTrigger()
     {

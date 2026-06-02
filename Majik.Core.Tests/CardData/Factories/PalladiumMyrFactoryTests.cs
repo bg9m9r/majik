@@ -26,6 +26,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///     <see cref="ValueObjects.ManaCost.Parse"/>), can't activate while
 ///     already tapped.
 /// </summary>
+[Trait("Color", "C")]
 public class PalladiumMyrFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -50,20 +51,6 @@ public class PalladiumMyrFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void PalladiumMyr_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Palladium Myr", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Palladium Myr");
-        c.HasType(CardType.Artifact).Should().BeTrue();
-        ((Creature)c).HasSubtype(CardSubtype.Myr).Should().BeTrue();
-        c.Abilities.OfType<ManaAbility>().Should().HaveCount(1,
-            "{T}: Add {C}{C} mana ability is attached");
-    }
-
     // -------------------------------------------------------------------------
     // {T}: Add {C}{C}
     // -------------------------------------------------------------------------

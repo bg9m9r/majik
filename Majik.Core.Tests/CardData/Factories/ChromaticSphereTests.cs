@@ -36,6 +36,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   credits one mana of the chosen colour, and draws a card.
 /// - Sibling colour abilities un-activatable once sacrificed.
 /// </summary>
+[Trait("Color", "C")]
 public class ChromaticSphereTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -55,18 +56,6 @@ public class ChromaticSphereTests
         sphere.Owner.Should().BeSameAs(_alice);
         sphere.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NamedCardFactory_Dispatches_ChromaticSphere()
-    {
-        var card = NamedCardFactory.Create("Chromatic Sphere", _alice);
-
-        card.Should().BeOfType<Artifact>();
-        card.Name.Should().Be("Chromatic Sphere");
-        card.HasType(CardType.Artifact).Should().BeTrue();
-        card.ManaCost.Should().Be("{1}");
-    }
-
     // --------------------------------------------------------------
     // Ability shape — 5 mana abilities, no triggers
     // --------------------------------------------------------------

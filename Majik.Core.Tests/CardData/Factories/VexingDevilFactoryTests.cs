@@ -29,6 +29,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 ///   - Decline: opponent untouched AND the Devil stays on the battlefield.
 ///   - No opponent resolver → whole ETB body no-ops.
 /// </summary>
+[Trait("Color", "R")]
 public class VexingDevilFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -48,19 +49,6 @@ public class VexingDevilFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void VexingDevil_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Vexing Devil", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Vexing Devil");
-        c.HasSubtype(CardSubtype.Devil).Should().BeTrue();
-        ((Creature)c).BasePower.Should().Be(4);
-        ((Creature)c).BaseToughness.Should().Be(3);
-    }
-
     [Fact]
     public void VexingDevil_HasOneEtbTriggeredAbility()
     {

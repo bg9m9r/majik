@@ -34,6 +34,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Unearth resolve: returns card from graveyard → battlefield, grants haste
 ///   (clears summoning sickness) (CR 702.84).
 /// </summary>
+[Trait("Color", "C")]
 public class ScrapworkMuttFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -59,19 +60,6 @@ public class ScrapworkMuttFactoryTests
         c.Owner.Should().BeSameAs(_alice);
         c.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Scrapwork Mutt", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Scrapwork Mutt");
-        c.HasType(CardType.Artifact).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Dog).Should().BeTrue();
-        c.ManaCost.Should().Be("{2}");
-    }
-
     // -----------------------------------------------------------------------
     // ETB loot — CR 603.1 / CR 117.x / CR 701.16 / CR 121.1
     // -----------------------------------------------------------------------

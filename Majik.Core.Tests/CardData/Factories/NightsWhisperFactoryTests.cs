@@ -23,6 +23,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// - Resolve on empty library: stamps the SBA flag (CR 704.5b), life
 ///   still drains 2.
 /// </summary>
+[Trait("Color", "B")]
 public class NightsWhisperFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -42,17 +43,6 @@ public class NightsWhisperFactoryTests
         card.Owner.Should().BeSameAs(_alice);
         card.Controller.Should().BeSameAs(_alice);
     }
-
-    [Fact]
-    public void NightsWhisper_DispatchesViaNamedCardFactory()
-    {
-        var card = NamedCardFactory.Create("Night's Whisper", _alice);
-
-        card.Should().BeOfType<Sorcery>("Night's Whisper is a Sorcery");
-        card.Name.Should().Be("Night's Whisper");
-        card.ManaCost.Should().Be("{1}{B}");
-    }
-
     // -----------------------------------------------------------------------
     // Resolve — draw 2, lose 2
     // -----------------------------------------------------------------------

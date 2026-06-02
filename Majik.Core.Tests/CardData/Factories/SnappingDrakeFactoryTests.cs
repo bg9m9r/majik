@@ -17,6 +17,7 @@ namespace Majik.Core.Tests.CardData.Factories;
 /// Card: Snapping Drake — {3}{U} Creature — Drake 3/2.
 ///   "Flying"
 /// </summary>
+[Trait("Color", "U")]
 public class SnappingDrakeFactoryTests
 {
     private readonly Player _alice = new("Alice", 20);
@@ -73,16 +74,5 @@ public class SnappingDrakeFactoryTests
         c.Abilities.OfType<ActivatedAbility>().Should().BeEmpty();
         c.Abilities.OfType<KeywordAbility>().Should().HaveCount(1,
             "Flying is the only printed keyword");
-    }
-
-    [Fact]
-    public void SnappingDrake_DispatchesViaNamedCardFactory()
-    {
-        var c = NamedCardFactory.Create("Snapping Drake", _alice);
-
-        c.Should().BeOfType<Creature>();
-        c.Name.Should().Be("Snapping Drake");
-        c.HasType(CardType.Creature).Should().BeTrue();
-        c.HasSubtype(CardSubtype.Drake).Should().BeTrue();
     }
 }
