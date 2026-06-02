@@ -1,0 +1,8 @@
+{
+  "name": "Painted Bluffs",
+  "types": ["Land"],
+  "subtypes": ["Desert"],
+  "abilities": [
+    { "kind": "mana", "produces": "C" }
+  ]
+}
