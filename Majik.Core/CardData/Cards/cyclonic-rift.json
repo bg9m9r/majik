@@ -1,0 +1,5 @@
+{
+  "name": "Cyclonic Rift",
+  "types": ["Instant"],
+  "manaCost": "{1}{U}"
+}
