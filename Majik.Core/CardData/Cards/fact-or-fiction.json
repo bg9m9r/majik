@@ -1,0 +1,5 @@
+{
+  "name": "Fact or Fiction",
+  "types": ["Instant"],
+  "manaCost": "{3}{U}"
+}
