@@ -1,0 +1,9 @@
+{
+  "name": "Hired Claw",
+  "types": ["Creature"],
+  "subtypes": ["Lizard", "Mercenary"],
+  "manaCost": "{R}",
+  "power": 1,
+  "toughness": 1,
+  "abilities": []
+}
