@@ -1,0 +1,8 @@
+{
+  "name": "Geier Reach Sanitarium",
+  "types": ["Land"],
+  "supertypes": ["Legendary"],
+  "abilities": [
+    { "kind": "mana", "produces": "C" }
+  ]
+}
