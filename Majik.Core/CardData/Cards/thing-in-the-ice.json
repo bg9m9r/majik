@@ -1,0 +1,9 @@
+{
+  "name": "Thing in the Ice",
+  "types": ["Creature"],
+  "subtypes": ["Horror"],
+  "manaCost": "{1}{U}",
+  "power": 0,
+  "toughness": 4,
+  "abilities": []
+}
