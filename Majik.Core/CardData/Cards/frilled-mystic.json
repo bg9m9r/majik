@@ -1,0 +1,9 @@
+{
+  "name": "Frilled Mystic",
+  "types": ["Creature"],
+  "subtypes": ["Elf", "Lizard", "Wizard"],
+  "manaCost": "{G}{G}{U}{U}",
+  "power": 3,
+  "toughness": 2,
+  "abilities": []
+}
