@@ -13,6 +13,15 @@ namespace Majik.Core.Effects;
 /// by the source's controller (excluding the source itself) receives the
 /// bonus.
 ///
+/// <para>Pass <c>matchingKeyword</c> (the <c>(Permanent, string, ...)</c>
+/// constructor) for the KEYWORD-GATED anthem shape — "Other creatures you
+/// control with [keyword] get +N/+N" (CR 613.4). The membership filter then
+/// gates on the candidate's EFFECTIVE keyword (post-Layer-6, so a creature
+/// GRANTED the keyword counts — CR 613.8) via
+/// <see cref="Creature.HasEffectiveKeyword"/>. Closes Empyrean Eagle and the
+/// flying / landwalk / etc. keyword-anthem cluster. When both a subtype and a
+/// keyword are supplied (canonical constructor) they are ANDed.</para>
+///
 /// <para>Set <c>opponentsOnly: true</c> to flip the controller filter so
 /// the effect applies to matching creatures controlled by anyone OTHER
 /// than the source's controller — used by Plague Engineer ("Creatures of
@@ -43,6 +52,7 @@ public sealed class LordStaticEffect : ContinuousEffect
 {
     private readonly Permanent _source;
     private readonly CardSubtype? _subtype;
+    private readonly string? _matchingKeyword;
     private readonly int _power;
     private readonly int _toughness;
     private readonly IReadOnlyList<string> _grantedKeywords;
@@ -64,19 +74,53 @@ public sealed class LordStaticEffect : ContinuousEffect
         bool opponentsOnly = false,
         bool allPlayers = false,
         bool tokensOnly = false)
-        : this(source, (CardSubtype?)matchingSubtype, power, toughness,
+        : this(source, (CardSubtype?)matchingSubtype, matchingKeyword: null, power, toughness,
                grantedKeywords, includeSelf, opponentsOnly, allPlayers, tokensOnly)
     {
     }
 
     /// <summary>
-    /// Construct with an optional creature-type filter. Pass
-    /// <paramref name="matchingSubtype"/> as <c>null</c> to apply the
-    /// effect to ALL creatures in the relevant scope (no subtype gate).
+    /// Construct the KEYWORD-GATED anthem variant — "Other creatures you
+    /// control with [keyword] get +N/+N" (CR 613.4 / 613.7c). The affected
+    /// set is filtered by the candidate creature's EFFECTIVE keyword
+    /// (post-Layer-6, so a granted keyword counts — CR 613.8), via
+    /// <see cref="Creature.HasEffectiveKeyword"/>. Closes Empyrean Eagle and
+    /// the keyword-anthem cluster (flying / landwalk / etc. lords gated by a
+    /// keyword rather than a creature subtype). No subtype gate is applied
+    /// (<paramref name="matchingKeyword"/> is the only membership filter
+    /// beyond controller scope and the "other" clause); pass the
+    /// canonical constructor directly to AND a subtype with a keyword.
+    /// </summary>
+    public LordStaticEffect(
+        Permanent source,
+        string matchingKeyword,
+        int power = 1,
+        int toughness = 1,
+        IReadOnlyList<string>? grantedKeywords = null,
+        bool includeSelf = false,
+        bool opponentsOnly = false,
+        bool allPlayers = false,
+        bool tokensOnly = false)
+        : this(source, matchingSubtype: null,
+               matchingKeyword: string.IsNullOrWhiteSpace(matchingKeyword)
+                   ? throw new ArgumentException("Keyword required", nameof(matchingKeyword))
+                   : matchingKeyword,
+               power, toughness, grantedKeywords, includeSelf, opponentsOnly, allPlayers, tokensOnly)
+    {
+    }
+
+    /// <summary>
+    /// Canonical constructor. Pass <paramref name="matchingSubtype"/> as
+    /// <c>null</c> to skip the subtype gate, and/or
+    /// <paramref name="matchingKeyword"/> as <c>null</c> to skip the
+    /// effective-keyword gate. When both are set they are ANDed; when both
+    /// are null the effect applies to ALL creatures in the relevant
+    /// controller scope.
     /// </summary>
     public LordStaticEffect(
         Permanent source,
         CardSubtype? matchingSubtype,
+        string? matchingKeyword = null,
         int power = 1,
         int toughness = 1,
         IReadOnlyList<string>? grantedKeywords = null,
@@ -87,6 +131,7 @@ public sealed class LordStaticEffect : ContinuousEffect
     {
         _source = source ?? throw new ArgumentNullException(nameof(source));
         _subtype = matchingSubtype;
+        _matchingKeyword = matchingKeyword;
         _power = power;
         _toughness = toughness;
         _grantedKeywords = grantedKeywords ?? Array.Empty<string>();
@@ -120,7 +165,7 @@ public sealed class LordStaticEffect : ContinuousEffect
             // Merfolk" (allPlayers: true, includeSelf: false) so it must
             // exclude itself from its own buff.
             if (!_includeSelf && ReferenceEquals(creature, _source)) return false;
-            return _subtype == null || creature.HasSubtype(_subtype.Value);
+            return MatchesMembership(creature);
         }
         var sameController = ReferenceEquals(creature.Controller, _source.Controller);
         if (_opponentsOnly)
@@ -134,8 +179,22 @@ public sealed class LordStaticEffect : ContinuousEffect
             if (!sameController) return false;
             if (!_includeSelf && ReferenceEquals(creature, _source)) return false;
         }
-        // _subtype == null → no type restriction; all creatures in scope match.
-        return _subtype == null || creature.HasSubtype(_subtype.Value);
+        return MatchesMembership(creature);
+    }
+
+    /// <summary>
+    /// AND of the optional subtype gate and the optional effective-keyword
+    /// gate. <c>_subtype == null</c> → no type restriction; <c>_matchingKeyword
+    /// == null</c> → no keyword restriction. CR 613.8 — the keyword gate reads
+    /// the candidate's POST-Layer-6 keyword set
+    /// (<see cref="Creature.HasEffectiveKeyword"/>), so a creature GRANTED the
+    /// keyword (e.g. flying) qualifies for this Layer-7c boost.
+    /// </summary>
+    private bool MatchesMembership(Creature creature)
+    {
+        if (_subtype != null && !creature.HasSubtype(_subtype.Value)) return false;
+        if (_matchingKeyword != null && !creature.HasEffectiveKeyword(_matchingKeyword)) return false;
+        return true;
     }
 
     public override void Apply(CreatureCharacteristics chars)
