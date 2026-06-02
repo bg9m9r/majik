@@ -1,0 +1,9 @@
+{
+  "name": "Brazen Borrower",
+  "types": ["Creature"],
+  "subtypes": ["Faerie", "Rogue"],
+  "manaCost": "{1}{U}{U}",
+  "power": 3,
+  "toughness": 1,
+  "abilities": []
+}
