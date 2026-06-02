@@ -1,0 +1,9 @@
+{
+  "name": "Savage Lands",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "B" },
+    { "kind": "mana", "produces": "R" },
+    { "kind": "mana", "produces": "G" }
+  ]
+}
