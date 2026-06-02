@@ -1,0 +1,8 @@
+{
+  "name": "Endless Sands",
+  "types": ["Land"],
+  "subtypes": ["Desert"],
+  "abilities": [
+    { "kind": "mana", "produces": "C" }
+  ]
+}
