@@ -1,0 +1,6 @@
+{
+  "name": "Thopter Foundry",
+  "types": ["Artifact"],
+  "manaCost": "{W/B}{U}",
+  "abilities": []
+}

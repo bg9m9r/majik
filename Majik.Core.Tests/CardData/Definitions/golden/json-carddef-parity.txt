@@ -22159,6 +22159,56 @@
     "Blue"
   ]
 }
+==== thopter-foundry ====
+{
+  "name": "Thopter Foundry",
+  "manaCost": "{W/B}{U}",
+  "primaryType": "Artifact",
+  "cardTypes": [
+    "Artifact"
+  ],
+  "supertypes": [],
+  "subtypes": [],
+  "power": null,
+  "toughness": null,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Black",
+    "Blue",
+    "White"
+  ]
+}
 ==== thornwood-falls ====
 {
   "name": "Thornwood Falls",
