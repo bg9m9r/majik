@@ -1,0 +1,9 @@
+{
+  "name": "Toolcraft Exemplar",
+  "types": ["Creature"],
+  "subtypes": ["Dwarf", "Artificer"],
+  "manaCost": "{W}",
+  "power": 1,
+  "toughness": 1,
+  "abilities": []
+}

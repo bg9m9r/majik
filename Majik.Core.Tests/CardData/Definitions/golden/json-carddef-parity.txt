@@ -701,6 +701,57 @@
     "White"
   ]
 }
+==== auriok-champion ====
+{
+  "name": "Auriok Champion",
+  "manaCost": "{W}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Cleric",
+    "Human"
+  ],
+  "power": 1,
+  "toughness": 1,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "White"
+  ]
+}
 ==== azorius-guildgate ====
 {
   "name": "Azorius Guildgate",
@@ -2047,6 +2098,54 @@
   "mdfc": null,
   "colors": []
 }
+==== boseiju-who-shelters-all ====
+{
+  "name": "Boseiju, Who Shelters All",
+  "manaCost": "",
+  "primaryType": "Land",
+  "cardTypes": [
+    "Land"
+  ],
+  "supertypes": [
+    "Legendary"
+  ],
+  "subtypes": [],
+  "power": null,
+  "toughness": null,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": []
+}
 ==== botanical-sanctum ====
 {
   "name": "Botanical Sanctum",
@@ -2239,6 +2338,54 @@
   },
   "mdfc": null,
   "colors": []
+}
+==== brotherhoods-end ====
+{
+  "name": "Brotherhood\u0027s End",
+  "manaCost": "{1}{R}{R}",
+  "primaryType": "Sorcery",
+  "cardTypes": [
+    "Sorcery"
+  ],
+  "supertypes": [],
+  "subtypes": [],
+  "power": null,
+  "toughness": null,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Red"
+  ]
 }
 ==== browbeat ====
 {
@@ -3875,6 +4022,55 @@
     "White"
   ]
 }
+==== deflecting-palm ====
+{
+  "name": "Deflecting Palm",
+  "manaCost": "{R}{W}",
+  "primaryType": "Instant",
+  "cardTypes": [
+    "Instant"
+  ],
+  "supertypes": [],
+  "subtypes": [],
+  "power": null,
+  "toughness": null,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Red",
+    "White"
+  ]
+}
 ==== delighted-halfling ====
 {
   "name": "Delighted Halfling",
@@ -3883,9 +4079,7 @@
   "cardTypes": [
     "Creature"
   ],
-  "supertypes": [
-    "Legendary"
-  ],
+  "supertypes": [],
   "subtypes": [
     "Citizen",
     "Halfling"
@@ -3899,13 +4093,9 @@
       "list": []
     },
     "mana": {
-      "count": 5,
+      "count": 1,
       "list": [
-        "mana:B",
-        "mana:G",
-        "mana:R",
-        "mana:U",
-        "mana:W"
+        "mana:1"
       ]
     },
     "activated": {
@@ -6712,6 +6902,56 @@
     "Green"
   ]
 }
+==== glorybringer ====
+{
+  "name": "Glorybringer",
+  "manaCost": "{3}{R}{R}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Dragon"
+  ],
+  "power": 4,
+  "toughness": 4,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Red"
+  ]
+}
 ==== goblin-dark-dwellers ====
 {
   "name": "Goblin Dark-Dwellers",
@@ -8688,6 +8928,57 @@
     "Knight"
   ],
   "power": 2,
+  "toughness": 2,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Red"
+  ]
+}
+==== inventors-apprentice ====
+{
+  "name": "Inventor\u0027s Apprentice",
+  "manaCost": "{R}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Artificer",
+    "Human"
+  ],
+  "power": 1,
   "toughness": 2,
   "loyalty": null,
   "abilities": {
@@ -11294,6 +11585,57 @@
   "mdfc": null,
   "colors": []
 }
+==== mother-of-runes ====
+{
+  "name": "Mother of Runes",
+  "manaCost": "{W}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Cleric",
+    "Human"
+  ],
+  "power": 1,
+  "toughness": 1,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "White"
+  ]
+}
 ==== mountain ====
 {
   "name": "Mountain",
@@ -12304,6 +12646,59 @@
   "mdfc": null,
   "colors": [
     "Green"
+  ]
+}
+==== pia-and-kiran-nalaar ====
+{
+  "name": "Pia and Kiran Nalaar",
+  "manaCost": "{2}{R}{R}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [
+    "Legendary"
+  ],
+  "subtypes": [
+    "Artificer",
+    "Human"
+  ],
+  "power": 2,
+  "toughness": 2,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Red"
   ]
 }
 ==== pilgrims-eye ====
@@ -19637,6 +20032,57 @@
   "mdfc": null,
   "colors": []
 }
+==== toolcraft-exemplar ====
+{
+  "name": "Toolcraft Exemplar",
+  "manaCost": "{W}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Artificer",
+    "Dwarf"
+  ],
+  "power": 1,
+  "toughness": 1,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "White"
+  ]
+}
 ==== tranquil-cove ====
 {
   "name": "Tranquil Cove",
@@ -20732,6 +21178,54 @@
   "mdfc": null,
   "colors": []
 }
+==== vraskas-contempt ====
+{
+  "name": "Vraska\u0027s Contempt",
+  "manaCost": "{2}{B}{B}",
+  "primaryType": "Instant",
+  "cardTypes": [
+    "Instant"
+  ],
+  "supertypes": [],
+  "subtypes": [],
+  "power": null,
+  "toughness": null,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Black"
+  ]
+}
 ==== walking-ballista ====
 {
   "name": "Walking Ballista",
@@ -21434,6 +21928,58 @@
   "colors": [
     "Green"
   ]
+}
+==== wooded-ridgeline ====
+{
+  "name": "Wooded Ridgeline",
+  "manaCost": "",
+  "primaryType": "Land",
+  "cardTypes": [
+    "Land"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Forest",
+    "Mountain"
+  ],
+  "power": null,
+  "toughness": null,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 2,
+      "list": [
+        "mana:G",
+        "mana:R"
+      ]
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": []
 }
 ==== woodland-chasm ====
 {
