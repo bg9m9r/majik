@@ -1,0 +1,8 @@
+{
+  "name": "Akoum Hellhound",
+  "types": ["Creature"],
+  "subtypes": ["Elemental", "Dog"],
+  "manaCost": "{R}",
+  "power": 0,
+  "toughness": 1
+}
