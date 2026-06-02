@@ -1,0 +1,9 @@
+{
+  "name": "Foundry Inspector",
+  "types": ["Creature", "Artifact"],
+  "subtypes": ["Construct"],
+  "manaCost": "{3}",
+  "power": 3,
+  "toughness": 2,
+  "abilities": []
+}
