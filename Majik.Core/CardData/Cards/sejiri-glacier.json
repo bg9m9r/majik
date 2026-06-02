@@ -1,0 +1,7 @@
+{
+  "name": "Sejiri Glacier",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "W" }
+  ]
+}
