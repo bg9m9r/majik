@@ -75,6 +75,7 @@ public class EventPayloadCoverageTests
         "LibraryShuffledEvent",
         "ManaAbilityActivatedEvent",
         "OpeningHandCheckEvent",
+        "PlayerCounterAddedEvent",
         "PriorityPassedEvent",
         "PriorityReceivedEvent",
         "StackClearedEvent",

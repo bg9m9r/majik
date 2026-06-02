@@ -39,6 +39,21 @@ public sealed class CounterCollection
         OnMutated?.Invoke();
     }
 
+    /// <summary>
+    /// CR 122 — remove EVERY counter of every type from this permanent at
+    /// once ("remove all counters from target creature" — Suncleanser's
+    /// creature mode, Vampire Hexmage, Oko's food-ification, etc.). Returns
+    /// the total number of counters removed across all types.
+    /// </summary>
+    public int Clear()
+    {
+        if (_counts.Count == 0) return 0;
+        var total = _counts.Values.Sum();
+        _counts.Clear();
+        OnMutated?.Invoke();
+        return total;
+    }
+
     public IReadOnlyDictionary<CounterType, int> All => _counts;
 
     public bool HasAny => _counts.Values.Any(n => n > 0);

@@ -254,6 +254,44 @@ public class SolemnityTests
             "Solemnity off battlefield → ETB-counter rider survives");
     }
 
+    // -------- Players can't get counters (CR 614 player-side clause) ------
+
+    [Fact]
+    public void Solemnity_PreventsPlayerEnergyAndPoison()
+    {
+        var bus = new ReplacementBus();
+        _alice.AttachReplacementBus(bus);
+        var solemnity = SolemnityFactory.Create(_alice, bus);
+        PlaceOnBattlefield(solemnity, _alice);
+
+        _alice.GainEnergy(3);
+        _alice.AddPoisonCounters(2);
+        _alice.AddCounters(CounterType.Experience, 1);
+
+        _alice.EnergyCounters.Should().Be(0, "players can't get counters while Solemnity is in play");
+        _alice.PoisonCounters.Should().Be(0);
+        _alice.GetCounters(CounterType.Experience).Should().Be(0);
+    }
+
+    [Fact]
+    public void Solemnity_PlayerCounterPrevention_RevokesWhenItLeaves()
+    {
+        var bus = new ReplacementBus();
+        _alice.AttachReplacementBus(bus);
+        var solemnity = SolemnityFactory.Create(_alice, bus);
+        PlaceOnBattlefield(solemnity, _alice);
+
+        _alice.GainEnergy(2);
+        _alice.EnergyCounters.Should().Be(0);
+
+        _alice.Zones.Battlefield.RemoveCard(solemnity);
+        _alice.Zones.Graveyard.AddCard(solemnity);
+        solemnity.SetZone(ZoneType.Graveyard);
+
+        _alice.GainEnergy(4);
+        _alice.EnergyCounters.Should().Be(4, "Solemnity gone → players can get counters again (CR 614.6)");
+    }
+
     // -------- Shape-only factory does not register -----------------------
 
     [Fact]

@@ -133,24 +133,152 @@ public class Player
     public bool HasHexproof =>
         Majik.Core.Rules.PlayerStaticAbilities.HasHexproof(this);
 
+    // ── CR 122 — counters on PLAYERS (poison / energy / experience / …) ──────
+    //
+    // Counters that sit on the PLAYER, not on any permanent. Poison
+    // (CR 704.5c) and Energy (CR 107.16) keep their dedicated int fields
+    // for back-compat with every existing caller / test (and energy's
+    // spend semantics); every OTHER player-counter type (Experience —
+    // CR 107.14, plus any card-specific generic player counter) lives in
+    // <see cref="_otherCounters"/>. All three are unified behind
+    // <see cref="GetCounters"/> / <see cref="RemoveAllCounters"/> so
+    // "remove all counters from that player" (Suncleanser / Leeches /
+    // Vampire Hexmage-style player wipes) and "players can't get counters"
+    // (Solemnity / Suncleanser) operate type-agnostically.
+
+    private readonly Dictionary<Counters.CounterType, int> _otherCounters = new();
+
     /// <summary>CR 704.5c — poison counters; 10+ → lose.</summary>
     public int PoisonCounters { get; internal set; }
 
-    /// <summary>Add poison counters (CR 122 / 704.5c).</summary>
-    public void AddPoisonCounters(int amount)
-    {
-        if (amount < 0) throw new ArgumentOutOfRangeException(nameof(amount));
-        PoisonCounters += amount;
-    }
-
-    /// <summary>CR 106.13 — Energy is a player-scoped resource. Gained
+    /// <summary>CR 107.16 — Energy is a player-scoped resource. Gained
     /// via "you get {E}" effects, spent via "Pay {E}{E}: …" costs.</summary>
     public int EnergyCounters { get; private set; }
 
+    /// <summary>
+    /// CR 122 — read the current count of any player-scoped counter type
+    /// (Poison, Energy, Experience, or any generic player counter). Returns
+    /// 0 for a type this player has none of. The single read surface used by
+    /// "remove all counters" and "for each &lt;type&gt; counter you have"
+    /// payoffs.
+    /// </summary>
+    public int GetCounters(Counters.CounterType type)
+    {
+        ArgumentNullException.ThrowIfNull(type);
+        if (type == Counters.CounterType.Poison) return PoisonCounters;
+        if (type == Counters.CounterType.Energy) return EnergyCounters;
+        return _otherCounters.TryGetValue(type, out var n) ? n : 0;
+    }
+
+    /// <summary>
+    /// CR 122 — every player-counter type this player currently has a
+    /// non-zero count of, with its count. Snapshot — safe to enumerate
+    /// while mutating. Drives <see cref="RemoveAllCounters"/> and counter
+    /// inspection.
+    /// </summary>
+    public IReadOnlyDictionary<Counters.CounterType, int> AllCounters
+    {
+        get
+        {
+            var all = new Dictionary<Counters.CounterType, int>(_otherCounters);
+            if (PoisonCounters > 0) all[Counters.CounterType.Poison] = PoisonCounters;
+            if (EnergyCounters > 0) all[Counters.CounterType.Energy] = EnergyCounters;
+            return all;
+        }
+    }
+
+    /// <summary>
+    /// CR 122 — place <paramref name="amount"/> counters of
+    /// <paramref name="type"/> on this player, routing through the attached
+    /// <see cref="ReplacementBus"/> (when present) so "players can't get
+    /// counters" effects (Solemnity / Suncleanser, CR 614) can rewrite or
+    /// cancel the placement before it commits. Publishes a
+    /// <see cref="PlayerCounterAddedEvent"/> on the attached event bus when
+    /// a non-zero placement lands (CR 603.6). Returns the amount actually
+    /// committed (may be 0 when prevented). A non-positive
+    /// <paramref name="amount"/> is a no-op (returns 0).
+    /// </summary>
+    public int AddCounters(Counters.CounterType type, int amount)
+    {
+        ArgumentNullException.ThrowIfNull(type);
+        return Majik.Core.Services.PlayerCountersService.Add(
+            this, type, amount, Replacements, _citysBlessingBus);
+    }
+
+    /// <summary>Add poison counters (CR 122 / 704.5c). Routes through the
+    /// attached <see cref="ReplacementBus"/> when present so "can't get
+    /// counters" locks (Solemnity / Suncleanser) prevent the placement.</summary>
+    public void AddPoisonCounters(int amount)
+    {
+        if (amount < 0) throw new ArgumentOutOfRangeException(nameof(amount));
+        if (amount == 0) return;
+        AddCounters(Counters.CounterType.Poison, amount);
+    }
+
+    /// <summary>
+    /// CR 107.16 — gain energy. Routes through the attached
+    /// <see cref="ReplacementBus"/> when present so "can't get counters"
+    /// locks (Solemnity / Suncleanser) prevent the gain. A non-positive
+    /// amount is a no-op (preserves the prior silent-ignore contract).
+    /// </summary>
     public void GainEnergy(int amount)
     {
         if (amount <= 0) return;
-        EnergyCounters += amount;
+        AddCounters(Counters.CounterType.Energy, amount);
+    }
+
+    /// <summary>
+    /// CR 122 — low-level counter commit used by
+    /// <see cref="Services.PlayerCountersService"/> AFTER replacements have
+    /// run. Writes the post-replacement count to the right backing store
+    /// (poison / energy field, or the generic dictionary). Not routed
+    /// through the bus — callers that want replacement honoured must go
+    /// through <see cref="AddCounters"/> / the service. Internal so only the
+    /// service commits here.
+    /// </summary>
+    internal void CommitCounters(Counters.CounterType type, int amount)
+    {
+        if (amount <= 0) return;
+        if (type == Counters.CounterType.Poison) { PoisonCounters += amount; return; }
+        if (type == Counters.CounterType.Energy) { EnergyCounters += amount; return; }
+        _otherCounters[type] = GetCounters(type) + amount;
+    }
+
+    /// <summary>
+    /// CR 122.6 — remove up to <paramref name="amount"/> counters of
+    /// <paramref name="type"/> from this player (clamped at 0 — you can't
+    /// remove counters that aren't there). Returns the number actually
+    /// removed.
+    /// </summary>
+    public int RemoveCounters(Counters.CounterType type, int amount)
+    {
+        ArgumentNullException.ThrowIfNull(type);
+        if (amount <= 0) return 0;
+        var cur = GetCounters(type);
+        var removed = Math.Min(cur, amount);
+        if (removed == 0) return 0;
+        var next = cur - removed;
+        if (type == Counters.CounterType.Poison) PoisonCounters = next;
+        else if (type == Counters.CounterType.Energy) EnergyCounters = next;
+        else if (next == 0) _otherCounters.Remove(type);
+        else _otherCounters[type] = next;
+        return removed;
+    }
+
+    /// <summary>
+    /// CR 122 — "remove all counters from that player" (Suncleanser's
+    /// player mode; also Leeches, Solemnity-adjacent wipes). Clears every
+    /// player-scoped counter type — poison, energy, experience, and any
+    /// generic — in one shot. Returns the total number of counters removed.
+    /// </summary>
+    public int RemoveAllCounters()
+    {
+        var total = PoisonCounters + EnergyCounters;
+        foreach (var n in _otherCounters.Values) total += n;
+        PoisonCounters = 0;
+        EnergyCounters = 0;
+        _otherCounters.Clear();
+        return total;
     }
 
     /// <summary>Spend N energy if available. Atomic — returns false if

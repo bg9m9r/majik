@@ -102,4 +102,11 @@ public enum EventType
     // creature you control explores" triggers (Wildgrowth Walker) subscribe
     // to this. Published after the explore action fully resolves.
     Explored,
+
+    // CR 122 / CR 614 — one or more counters have been placed on a PLAYER
+    // (poison — CR 704.5c; energy — CR 107.16; experience — CR 107.14; or
+    // a generic player counter), after all replacement effects have been
+    // applied. The player-scoped twin of <c>CounterAdded</c>. Published by
+    // <c>PlayerCountersService.Add</c> when a non-zero placement landed.
+    PlayerCounterAdded,
 }
