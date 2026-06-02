@@ -1,0 +1,7 @@
+{
+  "name": "Spirit Mantle",
+  "types": ["Enchantment"],
+  "subtypes": ["Aura"],
+  "manaCost": "{1}{W}",
+  "colors": ["W"]
+}
