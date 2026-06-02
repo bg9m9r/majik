@@ -139,6 +139,9 @@ public sealed class ContinuousEffectsService
     public void Unregister(ContinuousEffect effect)
     {
         if (effect is GrantAbilityEffect grant) grant.Revoke();
+        // CR 613.6e — a group ability-grant must release every bearer when
+        // its source leaves / the effect is torn down.
+        if (effect is GrantAbilityToGroupStaticEffect groupGrant) groupGrant.RevokeAll();
         // CR 613 — fire the teardown hook (e.g. restore a temporarily swapped
         // controller) only if the effect was actually registered here.
         if (_effects.Remove(effect)) effect.OnExpired();
@@ -154,6 +157,11 @@ public sealed class ContinuousEffectsService
         foreach (var grant in _effects.OfType<GrantAbilityEffect>())
         {
             if (!grant.IsActive()) grant.Revoke();
+        }
+        // CR 613.6e — same for group ability-grants going inactive.
+        foreach (var groupGrant in _effects.OfType<GrantAbilityToGroupStaticEffect>())
+        {
+            if (!groupGrant.IsActive()) groupGrant.RevokeAll();
         }
         // CR 613 — an effect that mutated real game state on registration must
         // restore it when it is dropped for going inactive (e.g. a temporary
@@ -700,6 +708,15 @@ public sealed class ContinuousEffectsService
             {
                 grant.Revoke();
             }
+        }
+
+        // CR 613.1f / 611.2c — reconcile every group ability-grant against the
+        // live membership set (Chromatic Lantern: "lands you control have
+        // …"). Members entering / leaving the battlefield are picked up here on
+        // each Compute pass.
+        foreach (var groupGrant in _effects.OfType<GrantAbilityToGroupStaticEffect>())
+        {
+            groupGrant.Sync();
         }
     }
 
