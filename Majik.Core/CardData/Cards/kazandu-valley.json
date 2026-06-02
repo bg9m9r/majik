@@ -1,0 +1,7 @@
+{
+  "name": "Kazandu Valley",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "G" }
+  ]
+}
