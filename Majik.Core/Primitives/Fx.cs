@@ -84,6 +84,68 @@ public static class Fx
         }
     }
 
+    /// <summary>
+    /// CR 701.12 — Fight. <paramref name="a"/> and <paramref name="b"/> each
+    /// deal damage equal to their (current) power to the other SIMULTANEOUSLY
+    /// (CR 701.12a). This is damage, but NOT combat damage — first strike,
+    /// double strike, combat triggers, and trample do not apply — yet
+    /// deathtouch (CR 702.2 — any lethal-marking source) and lifelink (CR
+    /// 702.15 — any damage a source deals gains its controller that much life)
+    /// DO apply, because those key off the damage event, not combat.
+    ///
+    /// <para>
+    /// Both powers are read BEFORE any damage is applied so a creature that
+    /// dies (or shrinks) from the exchange still deals its full pre-fight
+    /// power (CR 701.12a — "simultaneously"). Zero/negative power deals no
+    /// damage (a creature only deals damage if its power is greater than 0).
+    /// Deathtouch from a fighter that deals ≥1 damage marks the other for
+    /// destruction (CR 702.2b); the lethal-damage / deathtouch state-based
+    /// action that follows is the CALLER's responsibility (mirrors how combat
+    /// marks then SBAs run — CR 704).
+    /// </para>
+    ///
+    /// <para>
+    /// No-op for a null fighter. Damage routes through
+    /// <see cref="Creature.TakeDamage"/> directly (no replacement-bus hop) —
+    /// the fight verbs that call this do not yet thread a bus, matching the
+    /// existing fight templates.
+    /// </para>
+    /// </summary>
+    public static void Fight(Creature? a, Creature? b)
+    {
+        if (a is null || b is null) return;
+
+        // CR 701.12a — snapshot both powers before any damage applies so the
+        // exchange is genuinely simultaneous.
+        var aPower = a.Power;
+        var bPower = b.Power;
+
+        DealFightDamage(a, b, aPower);
+        DealFightDamage(b, a, bPower);
+    }
+
+    /// <summary>
+    /// One direction of a <see cref="Fight"/>: <paramref name="source"/> deals
+    /// <paramref name="amount"/> damage to <paramref name="target"/>, honoring
+    /// deathtouch (CR 702.2b — mark for destruction) and lifelink (CR 702.15a —
+    /// the source's controller gains that much life). Mirrors
+    /// <c>CombatFlow.DealDamageToCreature</c>'s keyword handling without the
+    /// combat-only riders (first/double strike, trample, combat-damage event).
+    /// </summary>
+    private static void DealFightDamage(Creature source, Creature target, int amount)
+    {
+        if (amount <= 0) return;
+        target.TakeDamage(amount);
+        if (Combat.CombatAbilities.HasDeathtouch(source))
+        {
+            target.MarkedForDestructionByDeathtouch = true;
+        }
+        if (Combat.CombatAbilities.HasLifelink(source) && source.Controller != null)
+        {
+            source.Controller.GainLife(amount);
+        }
+    }
+
     // ------------------------------------------------------------------
     // Life (CR 119.3 / 119.4) — passthroughs to Player.
     // ------------------------------------------------------------------

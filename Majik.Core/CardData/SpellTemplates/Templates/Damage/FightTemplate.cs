@@ -55,15 +55,13 @@ public sealed class FightTemplate : ISpellTemplate
                 var b = resolver(p.Targets[1][0]);
                 return new IEffect[] { new Effect("fight", () =>
                 {
-                    if (a is not Creature ca || b is not Creature cb) return;
-                    // CR 701.13a — each deals damage equal to its CURRENT
-                    // power to the other simultaneously. Read both powers
-                    // before any damage applies so a -X/-X to one doesn't
-                    // change the other's incoming damage.
-                    var aPower = ca.Power;
-                    var bPower = cb.Power;
-                    if (aPower > 0) cb.TakeDamage(aPower);
-                    if (bPower > 0) ca.TakeDamage(bPower);
+                    // CR 701.12 — both creatures deal damage equal to their
+                    // (pre-fight) power to the other simultaneously, routed
+                    // through the shared Fx.Fight primitive so deathtouch
+                    // (CR 702.2b) and lifelink (CR 702.15a) apply. Fx.Fight
+                    // no-ops if either target is not a creature (CR 701.12c —
+                    // a fight needs both creatures present).
+                    Majik.Core.Primitives.Fx.Fight(a as Creature, b as Creature);
                 }) };
             });
     }

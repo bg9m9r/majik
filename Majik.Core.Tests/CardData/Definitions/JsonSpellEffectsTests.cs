@@ -135,6 +135,109 @@ public class JsonSpellEffectsTests
         def.TargetRequests[0].MaxTargets.Should().Be(1);
     }
 
+    // ── fight (CR 701.12) ────────────────────────────────────────────────────
+
+    private static SpellDefinition PreyUponDef() =>
+        CardDefRuntime.BuildSpellDefinitionFromEffects(
+            "Prey Upon",
+            new EffectDefinition[]
+            {
+                new FightEffectDef
+                {
+                    Source = "target",
+                    ControllerTargetFilter = "creature_you_control",
+                    TargetFilter = "creature_you_dont_control",
+                },
+            });
+
+    private Creature WithKeyword(Creature c, string keyword)
+    {
+        c.AddAbility(new Majik.Core.Abilities.KeywordAbility(keyword, c, c.Controller));
+        return c;
+    }
+
+    private async Task CastFightAndResolve(
+        Instant card, SpellDefinition def, object fighter, object other)
+    {
+        var agent = new ScriptedAgent();
+        // Two ordered target slots: fighter ("you control") then other.
+        agent.QueueTargets(new[] { fighter });
+        agent.QueueTargets(new[] { other });
+        agent.QueueMana(ManaPayment.Empty);
+
+        await _flow.CastAsync(_alice, card, def, agent, NewContext(), alternativeCost: null);
+        _resolver.ResolveTop(_stack);
+    }
+
+    [Fact]
+    public void PreyUpon_DeclaresTwoTargetRequests()
+    {
+        // source: "target" declares the fighter + the other creature.
+        PreyUponDef().TargetRequests.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task PreyUpon_BothCreatures_TakeEachOthersPower()
+    {
+        var mine = OnBattlefield(new Creature("Mine", "{G}", 3, 4), _alice);
+        var theirs = OnBattlefield(new Creature("Theirs", "{G}", 2, 5), _bob);
+
+        var card = CastInstant("Prey Upon", "{G}");
+        await CastFightAndResolve(card, PreyUponDef(), mine, theirs);
+
+        // CR 701.12a — simultaneous bilateral power damage.
+        mine.Damage.Should().Be(2, "Theirs has power 2");
+        theirs.Damage.Should().Be(3, "Mine has power 3");
+    }
+
+    [Fact]
+    public async Task PreyUpon_Deathtouch_MarksTheOtherForDestruction()
+    {
+        // CR 702.2b — deathtouch applies to fight damage (it is damage, not
+        // combat damage).
+        var snake = WithKeyword(OnBattlefield(new Creature("Snake", "{G}", 1, 1), _alice), "Deathtouch");
+        var giant = OnBattlefield(new Creature("Giant", "{G}", 0, 8), _bob);
+
+        var card = CastInstant("Prey Upon", "{G}");
+        await CastFightAndResolve(card, PreyUponDef(), snake, giant);
+
+        giant.MarkedForDestructionByDeathtouch.Should().BeTrue();
+        snake.Damage.Should().Be(0, "the giant has 0 power and deals no damage back");
+    }
+
+    [Fact]
+    public async Task PreyUpon_Lifelink_GainsControllerLife()
+    {
+        // CR 702.15a — lifelink applies to fight damage.
+        var vamp = WithKeyword(OnBattlefield(new Creature("Vampire", "{G}", 3, 3), _alice), "Lifelink");
+        var bear = OnBattlefield(new Creature("Bear", "{G}", 2, 2), _bob);
+
+        var card = CastInstant("Prey Upon", "{G}");
+        await CastFightAndResolve(card, PreyUponDef(), vamp, bear);
+
+        _alice.LifeTotal.Should().Be(23, "lifelink gains 3 from the 3 fight damage");
+    }
+
+    [Fact]
+    public async Task PreyUpon_IllegalOtherTarget_WholeFightFizzles()
+    {
+        // CR 608.2b / 701.12c — if the OTHER creature is gone at resolution,
+        // the fight fizzles entirely: the fighter takes no damage either.
+        var mine = OnBattlefield(new Creature("Mine", "{G}", 3, 4), _alice);
+
+        var theirs = new Creature("Theirs", "{G}", 5, 5);
+        theirs.SetOwner(_bob);
+        theirs.SetController(_bob);
+        theirs.SetZone(ZoneType.Graveyard);
+        _bob.Zones.Graveyard.AddCard(theirs);
+
+        var card = CastInstant("Prey Upon", "{G}");
+        await CastFightAndResolve(card, PreyUponDef(), mine, theirs);
+
+        mine.Damage.Should().Be(0, "a fight needs both creatures — the other is gone");
+        theirs.Damage.Should().Be(0);
+    }
+
     // ── deal_damage (burn) ───────────────────────────────────────────────────
 
     [Fact]

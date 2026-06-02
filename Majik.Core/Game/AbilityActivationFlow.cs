@@ -69,6 +69,17 @@ public sealed class AbilityActivationFlow
             activator.PayMana(cost);
         }
 
+        // NOTE: this MVP flow pays ONLY the explicit mana `cost`; it does NOT
+        // settle the ability's non-mana ICosts (sacrifice / tap / remove-
+        // counter). The PRODUCTION activation path (TurnDriver →
+        // AbilityActivator.ActivateAbility → CostPayment.PayCosts) pays every
+        // ICost the ability carries, including the declarative `sacrifice_self`
+        // additional cost (CR 602.5 / 118.8) — see HaywireMiteTests. Adding
+        // CostPayment here would also re-pay counter-remove / tap costs the
+        // existing JsonTargetingEffectsTests intentionally drive without setup,
+        // so the non-mana-cost settlement is left to the production path on
+        // purpose; this flow stays a targets-only MVP harness.
+
         _stack.Push(ability);
         _bus.Publish(new AbilityActivatedEvent(ability));
         return ability;

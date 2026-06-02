@@ -12,6 +12,16 @@
       "effects": [
         { "type": "gain_life_self", "amount": 2 }
       ]
+    },
+    {
+      "kind": "activated",
+      "costs": [
+        { "type": "mana", "amount": "G" },
+        { "type": "sacrifice_self" }
+      ],
+      "effects": [
+        { "type": "exile_target", "targetFilter": "noncreature_artifact_or_enchantment" }
+      ]
     }
   ]
 }
