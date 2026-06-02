@@ -1,0 +1,9 @@
+{
+  "name": "Wirewood Symbiote",
+  "types": ["Creature"],
+  "subtypes": ["Insect"],
+  "manaCost": "{G}",
+  "power": 1,
+  "toughness": 1,
+  "abilities": []
+}
