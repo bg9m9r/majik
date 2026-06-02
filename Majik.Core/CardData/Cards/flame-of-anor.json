@@ -1,0 +1,5 @@
+{
+  "name": "Flame of Anor",
+  "types": ["Instant"],
+  "manaCost": "{1}{U}{R}"
+}
