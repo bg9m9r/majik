@@ -164,6 +164,9 @@ public enum CardSubtype
     /// <summary>Vampire creature subtype — Bloodghast (Zendikar), Vampire Nighthawk,
     /// Olivia Voldaren. CR 205.3m.</summary>
     Vampire,
+    /// <summary>Aetherborn creature subtype — Gifted Aetherborn (Aether Revolt),
+    /// Gonti, Lord of Luxury, Yahenni, Undying Partisan. CR 205.3m.</summary>
+    Aetherborn,
     /// <summary>Plant creature subtype — Wall of Roots (Mirrodin / many
     /// reprints), Sakura-Tribe Elder's adjacent flora cycle, Dryad cousins.
     /// CR 205.3m.</summary>
