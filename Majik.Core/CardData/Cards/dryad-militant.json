@@ -1,0 +1,8 @@
+{
+  "name": "Dryad Militant",
+  "types": ["Creature"],
+  "subtypes": ["Dryad", "Soldier"],
+  "manaCost": "{G/W}",
+  "power": 2,
+  "toughness": 1
+}
