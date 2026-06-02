@@ -520,4 +520,11 @@ public enum CardSubtype
     /// Vitality, Enduring Innocence, Enduring Tenacity, Enduring Courage).
     /// CR 205.3m — flavour subtype with no inherent rules meaning.</summary>
     Glimmer,
+
+    /// <summary>Pilot creature subtype — Ovalchase Daredevil ("Human Pilot",
+    /// Kaladesh) and the broader Kaladesh/Aether Revolt Pilot lineage that
+    /// crews Vehicles. CR 205.3m — flavour subtype with no inherent rules
+    /// meaning (the Crew keyword references creatures generally, not the
+    /// Pilot subtype itself).</summary>
+    Pilot,
 }
