@@ -1,0 +1,8 @@
+{
+  "name": "Acidic Slime",
+  "types": ["Creature"],
+  "subtypes": ["Ooze"],
+  "manaCost": "{3}{G}{G}",
+  "power": 2,
+  "toughness": 2
+}
