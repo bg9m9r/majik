@@ -1,0 +1,9 @@
+{
+  "name": "Nest Invader",
+  "types": ["Creature"],
+  "subtypes": ["Eldrazi", "Drone"],
+  "manaCost": "{1}{G}",
+  "power": 2,
+  "toughness": 2,
+  "abilities": []
+}
