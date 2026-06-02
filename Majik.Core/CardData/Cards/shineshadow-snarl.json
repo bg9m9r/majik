@@ -1,0 +1,8 @@
+{
+  "name": "Shineshadow Snarl",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "W" },
+    { "kind": "mana", "produces": "B" }
+  ]
+}
