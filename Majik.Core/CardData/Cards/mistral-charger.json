@@ -1,0 +1,8 @@
+{
+  "name": "Mistral Charger",
+  "types": ["Creature"],
+  "subtypes": ["Pegasus"],
+  "manaCost": "{1}{W}",
+  "power": 2,
+  "toughness": 1
+}
