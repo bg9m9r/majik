@@ -1,0 +1,9 @@
+{
+  "name": "Augur of Autumn",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Druid"],
+  "manaCost": "{1}{G}{G}",
+  "power": 2,
+  "toughness": 3,
+  "abilities": []
+}
