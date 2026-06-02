@@ -1,0 +1,9 @@
+{
+  "name": "Tidebinder Mage",
+  "types": ["Creature"],
+  "subtypes": ["Merfolk", "Wizard"],
+  "manaCost": "{U}{U}",
+  "power": 2,
+  "toughness": 2,
+  "abilities": []
+}
