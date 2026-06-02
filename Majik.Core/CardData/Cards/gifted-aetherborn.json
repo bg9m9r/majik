@@ -1,0 +1,8 @@
+{
+  "name": "Gifted Aetherborn",
+  "types": ["Creature"],
+  "subtypes": ["Aetherborn", "Vampire"],
+  "manaCost": "{B}{B}",
+  "power": 2,
+  "toughness": 3
+}
