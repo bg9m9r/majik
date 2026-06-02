@@ -31157,6 +31157,58 @@
   "mdfc": null,
   "colors": []
 }
+==== sorin-imperious-bloodlord ====
+{
+  "name": "Sorin, Imperious Bloodlord",
+  "manaCost": "{2}{B}",
+  "primaryType": "Planeswalker",
+  "cardTypes": [
+    "Planeswalker"
+  ],
+  "supertypes": [
+    "Legendary"
+  ],
+  "subtypes": [
+    "Sorin"
+  ],
+  "power": null,
+  "toughness": null,
+  "loyalty": 4,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "Black"
+  ]
+}
 ==== soul-warden ====
 {
   "name": "Soul Warden",

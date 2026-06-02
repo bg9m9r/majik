@@ -1,0 +1,9 @@
+{
+  "name": "Sorin, Imperious Bloodlord",
+  "types": ["Planeswalker"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Sorin"],
+  "manaCost": "{2}{B}",
+  "loyalty": 4,
+  "abilities": []
+}
