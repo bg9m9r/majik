@@ -410,6 +410,10 @@ public enum CardSubtype
     /// and the rest of the Vivien lineage. CR 205.3m.</summary>
     Vivien,
 
+    /// <summary>Koth planeswalker subtype — Koth of the Hammer (Scars of
+    /// Mirrodin). CR 205.3m.</summary>
+    Koth,
+
     /// <summary>Samurai creature subtype — Kamigawa-block warriors plus the
     /// 2/2 white Samurai token created by The Wandering Emperor's −1.
     /// CR 205.3m.</summary>
