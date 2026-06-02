@@ -126,6 +126,9 @@ public enum CardSubtype
     /// <summary>Horror creature subtype — Spellskite (New Phyrexia),
     /// Phyrexian Obliterator. CR 205.3m.</summary>
     Horror,
+    /// <summary>Kraken creature subtype — Awoken Horror (the transformed back
+    /// face of Thing in the Ice). CR 205.3m.</summary>
+    Kraken,
     /// <summary>Phoenix creature subtype — Arclight Phoenix, Rekindling
     /// Phoenix, Skarrgan Pit-Skulk-adjacent. CR 205.3m.</summary>
     Phoenix,
