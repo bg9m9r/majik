@@ -1,0 +1,6 @@
+{
+  "name": "Cloud Key",
+  "types": ["Artifact"],
+  "manaCost": "{2}",
+  "abilities": []
+}
