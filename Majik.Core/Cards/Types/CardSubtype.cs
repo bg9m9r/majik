@@ -297,6 +297,11 @@ public enum CardSubtype
     /// <summary>Sphere land subtype — Mirrex (Phyrexia: All Will Be One).
     /// CR 205.3i. The only land in the Sphere cycle.</summary>
     Sphere,
+    /// <summary>Cave land subtype — the Cave cycle from Lost Caverns of Ixalan
+    /// (Hidden Cataract, Sunken Citadel, etc.) that Spelunking's "if you put a
+    /// Cave onto the battlefield this way, you gain 4 life" rider keys off.
+    /// CR 205.3i.</summary>
+    Cave,
 
     // Enchantment subtypes (examples)
     Aura,
