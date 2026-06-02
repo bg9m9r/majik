@@ -1,0 +1,9 @@
+{
+  "name": "Vampire Hexmage",
+  "types": ["Creature"],
+  "subtypes": ["Vampire", "Shaman"],
+  "manaCost": "{B}{B}",
+  "power": 2,
+  "toughness": 1,
+  "abilities": []
+}
