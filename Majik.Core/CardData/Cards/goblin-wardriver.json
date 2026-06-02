@@ -1,0 +1,9 @@
+{
+  "name": "Goblin Wardriver",
+  "types": ["Creature"],
+  "subtypes": ["Goblin", "Warrior"],
+  "manaCost": "{R}{R}",
+  "power": 2,
+  "toughness": 2,
+  "abilities": []
+}
