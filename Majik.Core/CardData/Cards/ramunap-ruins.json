@@ -1,0 +1,8 @@
+{
+  "name": "Ramunap Ruins",
+  "types": ["Land"],
+  "subtypes": ["Desert"],
+  "abilities": [
+    { "kind": "mana", "produces": "C" }
+  ]
+}
