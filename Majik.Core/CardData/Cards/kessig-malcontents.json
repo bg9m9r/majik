@@ -1,0 +1,9 @@
+{
+  "name": "Kessig Malcontents",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Warrior"],
+  "manaCost": "{2}{R}",
+  "power": 3,
+  "toughness": 1,
+  "abilities": []
+}
