@@ -1,0 +1,9 @@
+{
+  "name": "Floodpits Drowner",
+  "types": ["Creature"],
+  "subtypes": ["Merfolk"],
+  "manaCost": "{1}{U}",
+  "power": 2,
+  "toughness": 1,
+  "abilities": []
+}
