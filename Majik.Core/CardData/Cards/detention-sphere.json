@@ -1,0 +1,5 @@
+{
+  "name": "Detention Sphere",
+  "types": ["Enchantment"],
+  "manaCost": "{1}{W}{U}"
+}
