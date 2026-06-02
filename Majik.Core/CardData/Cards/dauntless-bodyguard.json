@@ -1,0 +1,9 @@
+{
+  "name": "Dauntless Bodyguard",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Knight"],
+  "manaCost": "{W}",
+  "power": 2,
+  "toughness": 1,
+  "abilities": []
+}
