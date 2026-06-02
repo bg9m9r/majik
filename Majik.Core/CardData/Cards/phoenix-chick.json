@@ -1,0 +1,9 @@
+{
+  "name": "Phoenix Chick",
+  "types": ["Creature"],
+  "subtypes": ["Phoenix"],
+  "manaCost": "{R}",
+  "power": 1,
+  "toughness": 1,
+  "abilities": []
+}
