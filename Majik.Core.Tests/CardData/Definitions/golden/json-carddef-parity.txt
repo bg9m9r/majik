@@ -18084,6 +18084,58 @@
     "Green"
   ]
 }
+==== overlord-of-the-mistmoors ====
+{
+  "name": "Overlord of the Mistmoors",
+  "manaCost": "{5}{W}{W}",
+  "primaryType": "Creature",
+  "cardTypes": [
+    "Creature",
+    "Enchantment"
+  ],
+  "supertypes": [],
+  "subtypes": [
+    "Avatar",
+    "Horror"
+  ],
+  "power": 6,
+  "toughness": 6,
+  "loyalty": null,
+  "abilities": {
+    "keyword": {
+      "count": 0,
+      "list": []
+    },
+    "mana": {
+      "count": 0,
+      "list": []
+    },
+    "activated": {
+      "count": 0,
+      "list": []
+    },
+    "triggered": {
+      "count": 0,
+      "list": []
+    },
+    "static": {
+      "count": 0,
+      "list": []
+    },
+    "other": {
+      "count": 0,
+      "list": []
+    }
+  },
+  "replacements": {
+    "count": 0,
+    "list": []
+  },
+  "mdfc": null,
+  "colors": [
+    "White"
+  ]
+}
 ==== palladium-myr ====
 {
   "name": "Palladium Myr",
