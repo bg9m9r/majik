@@ -1,0 +1,8 @@
+{
+  "name": "Nykthos, Shrine to Nyx",
+  "types": ["Land"],
+  "supertypes": ["Legendary"],
+  "abilities": [
+    { "kind": "mana", "produces": "C" }
+  ]
+}
