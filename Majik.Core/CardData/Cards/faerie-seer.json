@@ -1,0 +1,8 @@
+{
+  "name": "Faerie Seer",
+  "types": ["Creature"],
+  "subtypes": ["Faerie", "Wizard"],
+  "manaCost": "{U}",
+  "power": 1,
+  "toughness": 1
+}
