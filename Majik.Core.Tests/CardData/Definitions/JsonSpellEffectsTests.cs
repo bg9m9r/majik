@@ -185,4 +185,57 @@ public class JsonSpellEffectsTests
         victim.Zone.Should().Be(ZoneType.Graveyard, "the chosen artifact is destroyed");
         bystander.Zone.Should().Be(ZoneType.Battlefield, "only the chosen target is destroyed");
     }
+
+    // ── exile_target (spell path) ────────────────────────────────────────────
+
+    [Fact]
+    public async Task ExileTarget_ExilesChosenCreature_NotABystander()
+    {
+        var def = CardDefRuntime.BuildSpellDefinitionFromEffects(
+            "Excommunicate",
+            new EffectDefinition[] { new ExileTargetEffectDef { TargetFilter = "creature" } });
+
+        var victim = OnBattlefield(new Creature("Doomed Bear", "{1}{G}", 2, 2), _bob);
+        var bystander = OnBattlefield(new Creature("Safe Bear", "{1}{G}", 2, 2), _bob);
+
+        var card = CastInstant("Excommunicate", "{2}{W}");
+        await CastAndResolve(card, def, victim);
+
+        victim.Zone.Should().Be(ZoneType.Exile, "the chosen creature is exiled (CR 701.21)");
+        _bob.Zones.Exile.GetCards().Should().Contain(victim);
+        bystander.Zone.Should().Be(ZoneType.Battlefield, "only the chosen target is exiled");
+    }
+
+    [Fact]
+    public async Task ExileTarget_IllegalTarget_FizzlesCleanly()
+    {
+        var def = CardDefRuntime.BuildSpellDefinitionFromEffects(
+            "Excommunicate",
+            new EffectDefinition[] { new ExileTargetEffectDef { TargetFilter = "creature" } });
+
+        // Already in the graveyard — illegal at resolution (CR 608.2b).
+        var bear = new Creature("Doomed Bear", "{1}{G}", 2, 2);
+        bear.SetOwner(_bob);
+        bear.SetController(_bob);
+        bear.SetZone(ZoneType.Graveyard);
+        _bob.Zones.Graveyard.AddCard(bear);
+
+        var card = CastInstant("Excommunicate", "{2}{W}");
+        await CastAndResolve(card, def, bear);
+
+        bear.Zone.Should().Be(ZoneType.Graveyard, "illegal target at resolution → no-op (CR 608.2b)");
+        _bob.Zones.Exile.GetCards().Should().NotContain(bear);
+    }
+
+    [Fact]
+    public void ExileTarget_DeclaresSingleTargetRequest()
+    {
+        var def = CardDefRuntime.BuildSpellDefinitionFromEffects(
+            "Excommunicate",
+            new EffectDefinition[] { new ExileTargetEffectDef { TargetFilter = "creature" } });
+
+        def.TargetRequests.Should().HaveCount(1);
+        def.TargetRequests[0].MinTargets.Should().Be(1);
+        def.TargetRequests[0].MaxTargets.Should().Be(1);
+    }
 }

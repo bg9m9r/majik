@@ -47,57 +47,28 @@ public static class PillarOfLightFactory
 
     /// <summary>
     /// Build the "exile target creature with toughness 4 or greater" SpellDefinition.
+    ///
+    /// Declarative conversion (the exile-verb slice): delegates to the shared
+    /// <see cref="CardDefRuntime.BuildSpellDefinitionFromEffects"/> with a single
+    /// <see cref="ExileTargetEffectDef"/> over the <c>creature_toughness_ge_4</c>
+    /// filter. That filter's predicate IS the CR 608.2b legality (battlefield
+    /// creature + toughness &gt;= 4), re-checked at resolution by the verb —
+    /// byte-equivalent to the former hand-rolled toughness gate on the same
+    /// shared exile primitive.
     /// </summary>
-    /// <param name="targetResolver">Maps the agent-supplied raw target token
-    /// to the live engine object. Pass <c>o =&gt; o</c> for tests that
-    /// hand creatures directly.</param>
+    /// <param name="targetResolver">Retained for signature compatibility; the
+    /// declarative spell path receives live targets from the cast flow's
+    /// <see cref="ChosenSpellParams"/>, so the resolver is a no-op identity
+    /// here (pass <c>o =&gt; o</c>).</param>
     public static SpellDefinition BuildDefinition(
-        Func<object, object> targetResolver) =>
-        new(
-            Modes: Array.Empty<string>(),
-            HasVariableX: false,
-            TargetRequests: new[]
+        Func<object, object> targetResolver)
+    {
+        ArgumentNullException.ThrowIfNull(targetResolver);
+        return CardDefRuntime.BuildSpellDefinitionFromEffects(
+            CardName,
+            new EffectDefinition[]
             {
-                new TargetRequest(
-                    Description: "target creature with toughness 4 or greater",
-                    MinTargets: 1,
-                    MaxTargets: 1,
-                    LegalCandidates: Array.Empty<object>(),
-                    Intent: BotIntent.Removal,
-                    // Gather battlefield creatures with toughness ≥ 4 at targeting time.
-                    CandidateGatherer: ctx => ctx.AllPlayers
-                        .SelectMany(p => p.Zones.Battlefield.GetCards())
-                        .OfType<Creature>()
-                        .Where(c => c.Toughness >= 4)
-                        .Cast<object>()
-                        .ToList()),
-            },
-            EffectFactory: p =>
-            {
-                var raw = p.Targets[0][0];
-                var resolved = targetResolver(raw);
-                return new IEffect[]
-                {
-                    new Effect(
-                        "Pillar of Light — exile target creature with toughness 4 or greater",
-                        () =>
-                        {
-                            if (resolved is not Creature target) return;
-                            // CR 608.2b — illegal target at resolution → no-op.
-                            if (target.Zone != ZoneType.Battlefield) return;
-
-                            // Toughness check at resolution time (CR 608.2b).
-                            if (target.Toughness < 4) return;
-
-                            // Exile (CR 701.21).
-                            var owner = target.Owner;
-                            if (owner != null)
-                            {
-                                owner.Zones.Battlefield.RemoveCard(target);
-                                owner.Zones.Exile.AddCard(target);
-                            }
-                            target.SetZone(ZoneType.Exile);
-                        }),
-                };
+                new ExileTargetEffectDef { TargetFilter = "creature_toughness_ge_4" },
             });
+    }
 }

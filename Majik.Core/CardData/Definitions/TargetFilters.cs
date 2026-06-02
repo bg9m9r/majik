@@ -3,6 +3,7 @@ using Majik.Core.Cards.Types;
 using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
+using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Definitions;
@@ -48,6 +49,23 @@ public static class TargetFilters
             CandidateGatherer: ctx => Gather(ctx, predicate));
     }
 
+    /// <summary>
+    /// CR 608.2b — does <paramref name="target"/> still satisfy the
+    /// <paramref name="filter"/> at resolution time? This is the SAME predicate
+    /// the candidate gatherer used to offer legal picks, so a targeted effect
+    /// (e.g. <see cref="ExileTargetEffectDef"/>) re-checks the full legality
+    /// (type + zone + property), not merely battlefield presence — a target
+    /// that has changed colour / type / zone since the ability went on the
+    /// stack fizzles cleanly. Returns <c>false</c> for a <c>null</c> pick.
+    /// </summary>
+    public static bool Matches(string? filter, object? target)
+    {
+        if (target is null) return false;
+        var normalized = (filter ?? "").Trim().ToLowerInvariant();
+        var (_, predicate) = Resolve(normalized, "exile");
+        return predicate(target);
+    }
+
     private static (string Description, Func<object, bool> Predicate) Resolve(string filter, string verb) =>
         filter switch
         {
@@ -79,6 +97,32 @@ public static class TargetFilters
             "enchantment" =>
                 ($"target enchantment to {verb}",
                     o => o is Permanent p && OnBattlefield(p) && p.HasType(CardType.Enchantment)),
+            // Conditional battlefield filters — the description is verbatim so
+            // converted factories keep their printed-text TargetRequest wording.
+            // The predicate also gates resolution (CR 608.2b) via Matches, so a
+            // target that no longer satisfies the condition fizzles cleanly.
+            "black_or_red_permanent" =>
+                ("target black or red permanent",
+                    o => o is Permanent p && OnBattlefield(p)
+                         && (CardColors.GetColors(p).Contains(ManaColor.Black)
+                             || CardColors.GetColors(p).Contains(ManaColor.Red))),
+            "permanent_mana_value_ge_4" =>
+                ("target permanent with mana value 4 or greater",
+                    o => o is Permanent p && OnBattlefield(p)
+                         && p is Card mv && mv.ManaCostValue.TotalValue >= 4),
+            "creature_toughness_ge_4" =>
+                ("target creature with toughness 4 or greater",
+                    o => o is Creature c && OnBattlefield(c) && c.Toughness >= 4),
+            // Graveyard-zone targets (CR 406 / 701.21 — "exile target card from
+            // a graveyard"). The predicate gates on Graveyard zone, so the same
+            // verb that exiles a battlefield permanent also exiles a graveyard
+            // card; the gatherer scans graveyards via Gather's graveyard pass.
+            "card_in_graveyard" or "card_in_target_graveyard" =>
+                ($"target card in a graveyard to {verb}",
+                    o => o is ICard c && InGraveyard(c)),
+            "creature_card_in_graveyard" =>
+                ($"target creature card in a graveyard to {verb}",
+                    o => o is ICard c && InGraveyard(c) && c.HasType(CardType.Creature)),
             // Unknown filter — fall back to any target (broadest legal pool).
             _ => ($"{verb} target ({filter})", IsAnyTarget),
         };
@@ -106,10 +150,16 @@ public static class TargetFilters
 
     private static bool OnBattlefield(ICard card) => card.Zone == ZoneType.Battlefield;
 
+    private static bool InGraveyard(ICard card) => card.Zone == ZoneType.Graveyard;
+
     /// <summary>
     /// Enumerate the live legal candidates from the resolving context:
-    /// every player plus every battlefield permanent across all players,
-    /// filtered by <paramref name="predicate"/>.
+    /// every player plus every battlefield permanent AND every graveyard card
+    /// across all players, filtered by <paramref name="predicate"/>. The
+    /// graveyard pass lets graveyard-zone filters (<c>card_in_graveyard</c> /
+    /// <c>creature_card_in_graveyard</c>) be offered the right pool while the
+    /// predicate's own zone gate keeps battlefield filters from picking up
+    /// graveyard cards and vice-versa.
     /// </summary>
     private static IReadOnlyList<object> Gather(GameContext ctx, Func<object, bool> predicate)
     {
@@ -119,10 +169,21 @@ public static class TargetFilters
             if (predicate(player)) result.Add(player);
 
             var battlefield = player.Zones?.Battlefield;
-            if (battlefield == null) continue;
-            foreach (var card in battlefield.GetCards())
+            if (battlefield != null)
             {
-                if (predicate(card)) result.Add(card);
+                foreach (var card in battlefield.GetCards())
+                {
+                    if (predicate(card)) result.Add(card);
+                }
+            }
+
+            var graveyard = player.Zones?.Graveyard;
+            if (graveyard != null)
+            {
+                foreach (var card in graveyard.GetCards())
+                {
+                    if (predicate(card)) result.Add(card);
+                }
             }
         }
         return result;
