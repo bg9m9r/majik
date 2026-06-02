@@ -1,0 +1,6 @@
+{
+  "name": "Battle Screech",
+  "types": ["Sorcery"],
+  "manaCost": "{2}{W}{W}",
+  "abilities": []
+}
