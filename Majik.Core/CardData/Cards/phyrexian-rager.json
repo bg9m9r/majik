@@ -1,0 +1,18 @@
+{
+  "name": "Phyrexian Rager",
+  "types": ["Creature"],
+  "subtypes": ["Phyrexian", "Horror"],
+  "manaCost": "{2}{B}",
+  "power": 2,
+  "toughness": 2,
+  "abilities": [
+    {
+      "kind": "triggered",
+      "trigger": { "type": "etb_self" },
+      "effects": [
+        { "type": "draw_card", "amount": 1 },
+        { "type": "lose_life_self", "amount": 1 }
+      ]
+    }
+  ]
+}
