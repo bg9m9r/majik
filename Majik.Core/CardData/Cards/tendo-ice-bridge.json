@@ -1,0 +1,7 @@
+{
+  "name": "Tendo Ice Bridge",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "C" }
+  ]
+}
