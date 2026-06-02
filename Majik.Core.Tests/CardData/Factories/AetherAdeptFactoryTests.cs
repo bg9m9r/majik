@@ -137,7 +137,11 @@ public class AetherAdeptFactoryTests
         {
             new object[] { target },
         });
-        foreach (var effect in etb.Effects) effect.Execute();
+        // The JSON return_to_hand effect reads its chosen target off the
+        // ResolutionContext that Resolve() builds from the ability's
+        // ChosenTargets — so drive resolution at the ability level (not a raw
+        // effect.Execute(), which carries the empty Legacy context).
+        etb.Resolve();
 
         target.Zone.Should().Be(ZoneType.Hand,
             "Aether Adept ETB bounces the chosen creature to its owner's hand");
@@ -170,7 +174,7 @@ public class AetherAdeptFactoryTests
         {
             new object[] { allyCreature },
         });
-        foreach (var effect in etb.Effects) effect.Execute();
+        etb.Resolve();
 
         allyCreature.Zone.Should().Be(ZoneType.Hand,
             "Aether Adept targets ANY creature — self-bounce is legal (no opponent restriction)");
@@ -192,7 +196,7 @@ public class AetherAdeptFactoryTests
         var etb = adept.Abilities.OfType<TriggeredAbility>().Single();
         // ChosenTargets left empty — no target declared.
 
-        var act = () => { foreach (var effect in etb.Effects) effect.Execute(); };
+        var act = () => etb.Resolve();
 
         act.Should().NotThrow("ETB with no chosen target is a no-op");
         bob.Zones.Hand.GetCards().Should().BeEmpty(
@@ -220,7 +224,7 @@ public class AetherAdeptFactoryTests
             new object[] { target },
         });
 
-        var act = () => { foreach (var effect in etb.Effects) effect.Execute(); };
+        var act = () => etb.Resolve();
 
         act.Should().NotThrow(
             "CR 608.2b: illegal target at resolution is a no-op, not an exception");

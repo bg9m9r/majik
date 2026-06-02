@@ -124,10 +124,13 @@ public class KarakasTests
     }
 
     [Fact]
-    public void Karakas_Bounce_NonLegendaryCreature_IsNoOp()
+    public void Karakas_Bounce_NonLegendaryCreature_IsNotALegalTarget()
     {
-        // Bob's non-legendary creature is fed to Karakas — illegal target,
-        // resolution-time guard makes the bounce a no-op (CR 608.2b).
+        // CR 608.2b — Karakas's bounce targets only a "legendary creature".
+        // The JSON return_to_hand effect declares a legendary_creature target
+        // filter whose CandidateGatherer enumerates the legal picks; a plain
+        // (non-legendary) creature is never offered to the activating player's
+        // agent, so it can never become the chosen target.
         var bears = new Creature(
             name: "Grizzly Bears",
             manaCost: "{1}{G}",
@@ -138,20 +141,29 @@ public class KarakasTests
         _bob.Zones.Battlefield.AddCard(bears);
         bears.SetZone(ZoneType.Battlefield);
 
+        var legend = new Creature(
+            name: "Thalia, Guardian of Thraben",
+            manaCost: "{1}{W}",
+            power: 2,
+            toughness: 1,
+            supertypes: new[] { CardSupertype.Legendary });
+        legend.SetOwner(_bob);
+        legend.SetController(_bob);
+        _bob.Zones.Battlefield.AddCard(legend);
+        legend.SetZone(ZoneType.Battlefield);
+
         var land = KarakasFactory.Create(_alice);
         var activated = land.Abilities.OfType<ActivatedAbility>().Single();
+        var request = activated.TargetRequests.Should().ContainSingle().Subject;
 
-        activated.SetChosenTargets(new IReadOnlyList<object>[]
-        {
-            new object[] { bears },
-        });
+        var ctx = new Majik.Core.Game.GameContext(
+            _alice, new[] { _alice, _bob }, _alice, 1,
+            Majik.Core.StateMachine.PhaseStateType.PreCombatMain,
+            new Majik.Core.Stack.Stack(new Majik.Core.Events.EventBus()));
+        var candidates = request.ResolveCandidates(ctx);
 
-        activated.Resolve();
-
-        // Bears stays put.
-        _bob.Zones.Battlefield.GetCards().Should().Contain(bears);
-        _bob.Zones.Hand.GetCards().Should().NotContain(bears);
-        bears.Zone.Should().Be(ZoneType.Battlefield);
+        candidates.Should().Contain(legend, "a legendary creature is a legal Karakas target");
+        candidates.Should().NotContain(bears, "a non-legendary creature is not a legal Karakas target (CR 608.2b)");
     }
 
     [Fact]

@@ -1,0 +1,17 @@
+{
+  "name": "Aether Adept",
+  "manaCost": "{1}{U}{U}",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Wizard"],
+  "power": 2,
+  "toughness": 2,
+  "abilities": [
+    {
+      "kind": "triggered",
+      "trigger": { "type": "etb_self" },
+      "effects": [
+        { "type": "return_to_hand", "targetFilter": "creature" }
+      ]
+    }
+  ]
+}
