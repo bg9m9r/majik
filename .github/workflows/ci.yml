@@ -13,10 +13,10 @@ jobs:
     timeout-minutes: 12  # healthy run is ~3min; fail fast so a flaky hang frees the runner instead of hogging it
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         # On self-hosted runners setup-dotnet defaults to /usr/share/dotnet,
         # which the unprivileged runner user can't write. Install into the
         # runner tool cache (a shared Docker volume): writable, and persisted
