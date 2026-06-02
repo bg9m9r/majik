@@ -1,0 +1,9 @@
+{
+  "name": "Bloodsoaked Champion",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Warrior"],
+  "manaCost": "{B}",
+  "power": 2,
+  "toughness": 1,
+  "abilities": []
+}
