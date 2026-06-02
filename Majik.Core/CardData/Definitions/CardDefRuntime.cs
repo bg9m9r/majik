@@ -321,6 +321,147 @@ public static class CardDefRuntime
     private static Player? _fallbackController;
 
     /// <summary>
+    /// Declarative SPELL-effect bridge — compile an ability-side
+    /// <see cref="EffectDefinition"/> list into a full
+    /// <see cref="SpellDefinition"/> so an instant / sorcery reuses the SAME
+    /// targeted verbs (<c>return_to_hand</c> / <c>deal_damage</c> /
+    /// <c>destroy_target</c> / …) that activated + triggered abilities already
+    /// use — no bespoke C# resolve closure. This is the spell analogue of the
+    /// ability path: <see cref="ActivatedAbilityDefinition.ToCardDefAbility"/>
+    /// pairs each effect's <see cref="EffectDefinition.ToTargetRequest"/> with
+    /// its <see cref="EffectDefinition.ToResolveEffect"/> builder, and
+    /// <see cref="CardDefAbilityEffects.Materialize"/> threads the chosen target
+    /// off <see cref="ResolutionContext.ChosenTargets"/>. Here the spell's cast
+    /// flow collects the targets into <see cref="ChosenSpellParams.Targets"/>
+    /// instead; this method re-presents the per-effect pick to the SAME shared
+    /// effect builder via a thin <see cref="SpellTargetedEffect"/> adapter, so
+    /// the resolve logic (and its CR 608.2b illegal-target fizzle) is
+    /// byte-identical to the ability path.
+    ///
+    /// <para>
+    /// Each targeted effect (<see cref="EffectDefinition.ToTargetRequest"/> non-
+    /// null) contributes one <see cref="TargetRequest"/> in printed order; the
+    /// slot it reads at resolution is its index in that list. Untargeted effects
+    /// (Draw / GainLife / Scry / …) resolve against the caster directly. Mirrors
+    /// the bespoke spell factories (Unsummon / Vapor Snag) the path replaces.
+    /// </para>
+    /// </summary>
+    /// <param name="cardName">The spell's name — woven into effect
+    /// descriptions only (the resolve behaviour never reads the card).</param>
+    /// <param name="effects">The ability-side effect verbs to resolve in
+    /// printed-text order (CR 608.2c).</param>
+    /// <param name="replacements">Optional replacement bus for effects that
+    /// register CR 614/615 replacements (prevention shields, counters). Null
+    /// for the targeted-removal / burn / bounce verbs in scope.</param>
+    public static SpellDefinition BuildSpellDefinitionFromEffects(
+        string cardName,
+        IReadOnlyList<EffectDefinition> effects,
+        ReplacementBus? replacements = null)
+    {
+        ArgumentNullException.ThrowIfNull(cardName);
+        ArgumentNullException.ThrowIfNull(effects);
+
+        // A lightweight stand-in card carrying just the name. The shared effect
+        // builders read it only for their Description string — never for resolve
+        // behaviour — so a bare Instant is sufficient and keeps this method free
+        // of a live cast card (BuildDefinition is called before the cast card
+        // exists, exactly like the bespoke spell factories).
+        var nameCard = new Instant(cardName, "");
+
+        // One TargetRequest per targeted effect, in printed order. slotForEffect
+        // is parallel to `effects`: the spell-target slot a targeted effect reads
+        // at resolution, or -1 for an untargeted effect.
+        var targetRequests = new List<TargetRequest>();
+        var slotForEffect = new int[effects.Count];
+        for (var i = 0; i < effects.Count; i++)
+        {
+            var request = effects[i].ToTargetRequest();
+            if (request is not null)
+            {
+                slotForEffect[i] = targetRequests.Count;
+                targetRequests.Add(request);
+            }
+            else
+            {
+                slotForEffect[i] = -1;
+            }
+        }
+
+        return new SpellDefinition(
+            Modes: Array.Empty<string>(),
+            HasVariableX: false,
+            TargetRequests: targetRequests,
+            EffectFactory: chosen =>
+            {
+                // Controller scope for untargeted effects: the cast flow's
+                // AllPlayers[0] is the caster (CR 601.2 — the spell's controller),
+                // else a throwaway player so untargeted builders' null guards
+                // engage in pure-shape tests instead of NRE-ing.
+                var controller = (chosen.AllPlayers is { Count: > 0 } all ? all[0] : null)
+                    ?? (_fallbackController ??= new Player("(unspecified)", 0));
+
+                var built = new IEffect[effects.Count];
+                for (var i = 0; i < effects.Count; i++)
+                {
+                    var slot = slotForEffect[i];
+                    // The shared ability builder reads its target from
+                    // ChosenTargets[targetRequestIndex]; we always present the
+                    // pick at index 0 of a single-slot context (the adapter
+                    // below), so the builder is invoked with index 0.
+                    var inner = effects[i].ToResolveEffect()(
+                        nameCard, controller, replacements,
+                        slot >= 0 ? 0 : -1);
+
+                    if (slot < 0)
+                    {
+                        // Untargeted effect — resolve unchanged.
+                        built[i] = inner;
+                        continue;
+                    }
+
+                    // CR 601.2c — the spell's chosen target for THIS slot. Wrap
+                    // the shared effect so at resolution it sees the pick at
+                    // ChosenTargets[0], reusing the ability path's CR 608.2b
+                    // legality re-check verbatim.
+                    var picks = slot < chosen.Targets.Count
+                        ? chosen.Targets[slot]
+                        : (IReadOnlyList<object>)Array.Empty<object>();
+                    built[i] = new SpellTargetedEffect(inner, picks);
+                }
+                return built;
+            });
+    }
+
+    /// <summary>
+    /// Adapter that re-presents a spell's per-slot chosen target to a shared
+    /// ability <see cref="IEffect"/> at resolution. The wrapped effect reads its
+    /// target off <see cref="ResolutionContext.ChosenTargets"/> index 0; this
+    /// adapter rebuilds the context with the spell's picks in that slot before
+    /// delegating, so the ability effect's resolve + CR 608.2b illegal-target
+    /// fizzle run byte-identically on the spell path.
+    /// </summary>
+    private sealed class SpellTargetedEffect : IEffect
+    {
+        private readonly IEffect _inner;
+        private readonly IReadOnlyList<object> _picks;
+
+        internal SpellTargetedEffect(IEffect inner, IReadOnlyList<object> picks)
+        {
+            _inner = inner;
+            _picks = picks;
+        }
+
+        public string Description => _inner.Description;
+
+        public ValueTask ExecuteAsync(ResolutionContext ctx)
+        {
+            var chosen = new IReadOnlyList<object>[] { _picks };
+            var scoped = ctx with { ChosenTargets = chosen };
+            return _inner.ExecuteAsync(scoped);
+        }
+    }
+
+    /// <summary>
     /// Map a DSL <see cref="TargetKind"/> onto a live
     /// <see cref="TargetRequest"/> (1..1, with the matching candidate gatherer
     /// + bot intent). Mirrors the hand-written request shapes the bespoke

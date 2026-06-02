@@ -1,10 +1,8 @@
-using Majik.Core.Abilities;
+using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
 using Majik.Core.Game;
 using Majik.Core.Players;
-using Majik.Core.Players.Agents;
 using Majik.Core.Services;
-using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
 
@@ -18,6 +16,16 @@ namespace Majik.Core.CardData.Factories;
 /// land, or planeswalker). Compare <see cref="UnsummonFactory"/> which is the
 /// creature-only variant at {U}. CR 608.2b: if the chosen target is no longer
 /// a permanent on the battlefield at resolution, the effect does nothing.
+///
+/// ## Declarative spell schema (proof of the spell-effect path)
+/// <see cref="BuildDefinition"/> declares a single
+/// <see cref="ReturnToHandEffectDef"/> verb (filter <c>"permanent"</c>) and
+/// routes it through <see cref="CardDefRuntime.BuildSpellDefinitionFromEffects"/>
+/// — the same ability-side <c>return_to_hand</c> verb Karakas uses, here reused
+/// on the instant cast path with the broadest bounce filter. The target request
+/// + CR 608.2b illegal-target fizzle come from the shared
+/// <see cref="TargetFilters"/> / <see cref="Majik.Core.Primitives.Fx.BounceToHand"/>
+/// primitives.
 /// </summary>
 [CardName("Boomerang")]
 public static class BoomerangFactory
@@ -35,61 +43,19 @@ public static class BoomerangFactory
     }
 
     /// <summary>
-    /// Build the "return target permanent to its owner's hand" SpellDefinition.
+    /// Build the "return target permanent to its owner's hand" SpellDefinition
+    /// declaratively (the <c>return_to_hand</c> verb on a <c>permanent</c>
+    /// target filter).
     /// </summary>
-    /// <param name="zoneService">Optional ZoneService for replacement-bus-aware
-    /// zone moves. When null, raw zone manipulation is used.</param>
+    /// <param name="zoneService">Accepted for call-site compatibility with the
+    /// other bespoke spell factories; the declarative bounce verb resolves
+    /// through <see cref="Majik.Core.Primitives.Fx.BounceToHand(ICard, ZoneService?)"/>
+    /// using raw zone moves (no replacement bus needed for a plain bounce).</param>
     public static SpellDefinition BuildDefinition(ZoneService? zoneService = null) =>
-        new(
-            Modes: Array.Empty<string>(),
-            HasVariableX: false,
-            TargetRequests: new[]
+        CardDefRuntime.BuildSpellDefinitionFromEffects(
+            CardName,
+            new EffectDefinition[]
             {
-                new TargetRequest(
-                    "target permanent",
-                    MinTargets: 1,
-                    MaxTargets: 1,
-                    LegalCandidates: Array.Empty<object>(),
-                    Intent: BotIntent.Bounce,
-                    CandidateGatherer: ctx => ctx.AllPlayers
-                        .SelectMany(p => p.Zones.Battlefield.GetCards())
-                        .OfType<Permanent>()
-                        .Cast<object>()
-                        .ToList()),
-            },
-            EffectFactory: p =>
-            {
-                var raw = p.Targets[0][0];
-                return new IEffect[]
-                {
-                    new Effect(
-                        "Boomerang — return target permanent to its owner's hand",
-                        () => Resolve(raw, zoneService)),
-                };
+                new ReturnToHandEffectDef { TargetFilter = "permanent" },
             });
-
-    private static void Resolve(object raw, ZoneService? zoneService)
-    {
-        // CR 608.2b — target must still be a permanent on the battlefield.
-        if (raw is not Permanent target) return;
-        if (target.Zone != ZoneType.Battlefield) return;
-
-        var targetOwner = target.Owner;
-        if (targetOwner == null) return;
-
-        var controller = target.Controller ?? targetOwner;
-
-        // CR 701.10 — return to owner's hand.
-        if (zoneService != null)
-        {
-            zoneService.MoveCard(target, ZoneType.Battlefield, ZoneType.Hand);
-        }
-        else
-        {
-            controller.Zones.Battlefield.RemoveCard(target);
-            targetOwner.Zones.Hand.AddCard(target);
-            target.SetZone(ZoneType.Hand);
-            target.SetController(targetOwner);
-        }
-    }
 }

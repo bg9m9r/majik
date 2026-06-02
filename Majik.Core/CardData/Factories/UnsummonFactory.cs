@@ -1,10 +1,8 @@
-using Majik.Core.Abilities;
+using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
 using Majik.Core.Game;
 using Majik.Core.Players;
-using Majik.Core.Players.Agents;
 using Majik.Core.Services;
-using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
 
@@ -18,6 +16,15 @@ namespace Majik.Core.CardData.Factories;
 /// controller loses 1 life" rider. CR 608.2b: if the chosen target is no
 /// longer a creature on the battlefield at resolution, the effect does
 /// nothing.
+///
+/// ## Declarative spell schema (proof of the spell-effect path)
+/// <see cref="BuildDefinition"/> no longer hand-rolls a bespoke bounce
+/// closure: it declares a single <see cref="ReturnToHandEffectDef"/> verb and
+/// hands it to <see cref="CardDefRuntime.BuildSpellDefinitionFromEffects"/> —
+/// the same ability-side <c>return_to_hand</c> verb Karakas uses, now reused on
+/// the instant/sorcery cast path. The target request + CR 608.2b illegal-target
+/// fizzle come straight from the shared <see cref="TargetFilters"/> /
+/// <see cref="Majik.Core.Primitives.Fx.BounceToHand"/> primitives.
 /// </summary>
 [CardName("Unsummon")]
 public static class UnsummonFactory
@@ -35,61 +42,19 @@ public static class UnsummonFactory
     }
 
     /// <summary>
-    /// Build the "return target creature to its owner's hand" SpellDefinition.
+    /// Build the "return target creature to its owner's hand" SpellDefinition
+    /// declaratively (the <c>return_to_hand</c> verb on a <c>creature</c>
+    /// target filter).
     /// </summary>
-    /// <param name="zoneService">Optional ZoneService for replacement-bus-aware
-    /// zone moves. When null, raw zone manipulation is used.</param>
+    /// <param name="zoneService">Accepted for call-site compatibility with the
+    /// other bespoke spell factories; the declarative bounce verb resolves
+    /// through <see cref="Majik.Core.Primitives.Fx.BounceToHand(ICard, ZoneService?)"/>
+    /// using raw zone moves (no replacement bus needed for a plain bounce).</param>
     public static SpellDefinition BuildDefinition(ZoneService? zoneService = null) =>
-        new(
-            Modes: Array.Empty<string>(),
-            HasVariableX: false,
-            TargetRequests: new[]
+        CardDefRuntime.BuildSpellDefinitionFromEffects(
+            CardName,
+            new EffectDefinition[]
             {
-                new TargetRequest(
-                    "target creature",
-                    MinTargets: 1,
-                    MaxTargets: 1,
-                    LegalCandidates: Array.Empty<object>(),
-                    Intent: BotIntent.Bounce,
-                    CandidateGatherer: ctx => ctx.AllPlayers
-                        .SelectMany(p => p.Zones.Battlefield.GetCards())
-                        .OfType<Creature>()
-                        .Cast<object>()
-                        .ToList()),
-            },
-            EffectFactory: p =>
-            {
-                var raw = p.Targets[0][0];
-                return new IEffect[]
-                {
-                    new Effect(
-                        "Unsummon — return target creature to its owner's hand",
-                        () => Resolve(raw, zoneService)),
-                };
+                new ReturnToHandEffectDef { TargetFilter = "creature" },
             });
-
-    private static void Resolve(object raw, ZoneService? zoneService)
-    {
-        // CR 608.2b — target must still be a creature on the battlefield.
-        if (raw is not Creature target) return;
-        if (target.Zone != ZoneType.Battlefield) return;
-
-        var targetOwner = target.Owner;
-        if (targetOwner == null) return;
-
-        var controller = target.Controller ?? targetOwner;
-
-        // CR 701.10 — return to owner's hand.
-        if (zoneService != null)
-        {
-            zoneService.MoveCard(target, ZoneType.Battlefield, ZoneType.Hand);
-        }
-        else
-        {
-            controller.Zones.Battlefield.RemoveCard(target);
-            targetOwner.Zones.Hand.AddCard(target);
-            target.SetZone(ZoneType.Hand);
-            target.SetController(targetOwner);
-        }
-    }
 }
