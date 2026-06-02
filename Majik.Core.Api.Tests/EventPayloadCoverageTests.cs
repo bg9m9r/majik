@@ -67,6 +67,7 @@ public class EventPayloadCoverageTests
         "CombatStartedEvent",
         "CostsPaidEvent",
         "CreatureAttacksEvent",
+        "CreatureExploredEvent",
         "DayNightChangedEvent",
         "ExtraTurnAddedEvent",
         "GainedCitysBlessingEvent",
