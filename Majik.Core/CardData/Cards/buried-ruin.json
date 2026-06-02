@@ -1,0 +1,7 @@
+{
+  "name": "Buried Ruin",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "C" }
+  ]
+}
