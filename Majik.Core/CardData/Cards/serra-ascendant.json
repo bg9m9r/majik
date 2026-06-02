@@ -1,0 +1,8 @@
+{
+  "name": "Serra Ascendant",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Monk"],
+  "manaCost": "{W}",
+  "power": 1,
+  "toughness": 1
+}
