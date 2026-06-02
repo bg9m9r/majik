@@ -1,0 +1,9 @@
+{
+  "name": "Shacklegeist",
+  "types": ["Creature"],
+  "subtypes": ["Spirit"],
+  "manaCost": "{1}{U}",
+  "power": 2,
+  "toughness": 2,
+  "abilities": []
+}
