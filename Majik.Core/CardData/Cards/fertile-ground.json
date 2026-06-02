@@ -1,0 +1,7 @@
+{
+  "name": "Fertile Ground",
+  "types": ["Enchantment"],
+  "subtypes": ["Aura"],
+  "manaCost": "{1}{G}",
+  "colors": ["G"]
+}
