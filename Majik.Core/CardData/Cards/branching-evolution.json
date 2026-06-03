@@ -1,0 +1,6 @@
+{
+  "name": "Branching Evolution",
+  "types": ["Enchantment"],
+  "manaCost": "{2}{G}",
+  "colors": ["G"]
+}
