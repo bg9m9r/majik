@@ -1,0 +1,9 @@
+{
+  "name": "Mage's Attendant",
+  "types": ["Creature"],
+  "subtypes": ["Cat", "Rogue"],
+  "manaCost": "{2}{W}",
+  "power": 3,
+  "toughness": 2,
+  "abilities": []
+}
