@@ -31,6 +31,57 @@ public class Combat
     public IReadOnlyList<Attacker> Attackers => _attackers.AsReadOnly();
 
     /// <summary>
+    /// CR 506.2 / 508.4 — the distinct set of <b>defenders</b> being attacked in
+    /// this combat, derived purely from the per-attacker band fields
+    /// (<see cref="Attacker.TargetPlayer"/> / <see cref="Attacker.TargetPlaneswalker"/>).
+    /// A player attacked directly contributes themselves; a planeswalker being
+    /// attacked contributes its <see cref="Player"/> controller (CR 508.4 — the
+    /// defending player of an attacked planeswalker is the player who controls
+    /// it). The combat's nominal <see cref="DefendingPlayer"/> /
+    /// <see cref="TargetPlaneswalker"/> is included too, so a combat with no
+    /// attackers yet still reports the defender it was declared against.
+    /// Order-preserving, reference-deduped.
+    ///
+    /// This is the per-opponent enumeration seam that "for each opponent ...
+    /// attacking that player or a planeswalker they control"
+    /// (<c>Adeline, Resplendent Cathar</c>) keys its band count on — no new
+    /// combat subsystem, just an enumeration over the existing
+    /// <c>Attacker.Target*</c> fields the model already carries. In the engine's
+    /// 2-player model this is a single defender; the projection generalises to
+    /// the multiplayer per-opponent bands without changing the storage model.
+    /// </summary>
+    public IReadOnlyList<Player> AttackedDefenders
+    {
+        get
+        {
+            var defenders = new List<Player>();
+
+            void Add(Player? p)
+            {
+                if (p == null) return;
+                if (defenders.Any(d => ReferenceEquals(d, p))) return;
+                defenders.Add(p);
+            }
+
+            // The combat's nominal defender (the player it was declared against,
+            // or the controller of the attacked planeswalker).
+            Add(DefendingPlayer);
+            Add(TargetPlaneswalker?.Controller);
+
+            // Each attacker's own band — a token spliced in attacking a
+            // planeswalker the defending player controls resolves to that same
+            // controller (deduped above).
+            foreach (var attacker in _attackers)
+            {
+                Add(attacker.TargetPlayer);
+                Add(attacker.TargetPlaneswalker?.Controller);
+            }
+
+            return defenders.AsReadOnly();
+        }
+    }
+
+    /// <summary>
     /// The current state of combat.
     /// </summary>
     public CombatState State { get; private set; }
@@ -104,6 +155,13 @@ public class Combat
     /// (CR 508.4 — a creature put onto the battlefield attacking is attacking
     /// the player or planeswalker the effect that created it specifies, which
     /// for Mobilize is the same defender its creator is attacking).
+    ///
+    /// CR 508.4 also permits an effect to put the token onto the battlefield
+    /// attacking <b>a different permitted defender belonging to the same
+    /// defending player</b> — e.g. Adeline's token attacking "that player OR a
+    /// planeswalker they control". A token whose <see cref="Attacker.TargetPlaneswalker"/>
+    /// is controlled by this combat's <see cref="DefendingPlayer"/> is therefore
+    /// accepted even though the combat's own band targets the player directly.
     /// </summary>
     public void AddAttackerInProgress(Attacker attacker)
     {
@@ -118,7 +176,7 @@ public class Combat
                 "Cannot add an attacker to a combat that has ended");
         }
 
-        if (attacker.TargetPlayer != DefendingPlayer && attacker.TargetPlaneswalker != TargetPlaneswalker)
+        if (!IsPermittedInProgressTarget(attacker))
         {
             throw new ArgumentException("Attacker target does not match combat target", nameof(attacker));
         }
@@ -129,6 +187,40 @@ public class Combat
         }
 
         _attackers.Add(attacker);
+    }
+
+    /// <summary>
+    /// CR 508.4 — whether <paramref name="attacker"/> may be spliced into this
+    /// in-progress combat. Legal targets are the combat's own defender (the
+    /// <see cref="DefendingPlayer"/> or <see cref="TargetPlaneswalker"/>) OR a
+    /// planeswalker controlled by this combat's defending player (a band against
+    /// "a planeswalker they control"). The defending player is the controller of
+    /// the combat's attacked planeswalker when the combat targets a walker.
+    /// </summary>
+    private bool IsPermittedInProgressTarget(Attacker attacker)
+    {
+        // Matches the combat's exact band (player or the same planeswalker).
+        if (ReferenceEquals(attacker.TargetPlayer, DefendingPlayer)) return true;
+        if (ReferenceEquals(attacker.TargetPlaneswalker, TargetPlaneswalker) &&
+            TargetPlaneswalker != null) return true;
+
+        // A planeswalker controlled by the same defending player is permitted
+        // (Adeline — "that player OR a planeswalker they control").
+        var defender = DefendingPlayer ?? TargetPlaneswalker?.Controller;
+        if (attacker.TargetPlaneswalker != null && defender != null &&
+            ReferenceEquals(attacker.TargetPlaneswalker.Controller, defender))
+        {
+            return true;
+        }
+
+        // A direct-player band against the same defending player.
+        if (attacker.TargetPlayer != null && defender != null &&
+            ReferenceEquals(attacker.TargetPlayer, defender))
+        {
+            return true;
+        }
+
+        return false;
     }
 
     /// <summary>

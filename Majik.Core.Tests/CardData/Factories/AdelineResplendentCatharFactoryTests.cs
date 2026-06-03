@@ -214,6 +214,61 @@ public class AdelineResplendentCatharFactoryTests
     }
 
     [Fact]
+    public void AttackTrigger_PlaneswalkerChoice_TokenAttacksOpponentsPlaneswalker()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        var combat = new CombatManager(bus);
+        var effects = new ContinuousEffectsService();
+
+        Func<IEnumerable<ICard>> mine = () => _alice.Zones.Battlefield.GetCards();
+
+        // A planeswalker Bob (the opponent) controls — Adeline's token may
+        // attack "a planeswalker they control" (CR 508.4).
+        var jace = new Planeswalker("Jace", "2UU", 4) { Owner = _bob, Controller = _bob };
+        jace.SetZone(ZoneType.Battlefield);
+        _bob.Zones.Battlefield.AddCard(jace);
+
+        var card = AdelineResplendentCatharFactory.Create(
+            _alice, effects, bus, mine,
+            opponentResolver: () => new[] { _bob },
+            triggers: triggers,
+            combat: combat,
+            planeswalkerChoiceForOpponent: _ => jace);
+        card.ActiveEffects = effects;
+        _alice.Zones.Battlefield.AddCard(card);
+        card.SetZone(ZoneType.Battlefield);
+        card.ClearSummoningSickness();
+
+        // Combat is declared against the player Bob; the token bands against
+        // Bob's planeswalker instead.
+        combat.StartCombat(_alice);
+        combat.DeclareAttackers(_alice, new[]
+        {
+            new AttackerDeclaration(card, targetPlayer: _bob),
+        });
+
+        var attack = card.Abilities.OfType<TriggeredAbility>().Single();
+        foreach (var e in attack.Effects) e.Execute();
+
+        var token = _alice.Zones.Battlefield.GetCards()
+            .OfType<Creature>()
+            .Single(c => c.IsToken && c.HasSubtype(CardSubtype.Human));
+
+        var entry = combat.CurrentCombat!.Attackers
+            .Single(a => ReferenceEquals(a.Creature, token));
+        entry.TargetPlaneswalker.Should().BeSameAs(jace,
+            "the token attacks the planeswalker the opponent controls (CR 508.4)");
+        entry.TargetPlayer.Should().BeNull("a token attacking a planeswalker has no player band");
+
+        // The distinct attacked-defender set still resolves to the single
+        // opponent Bob (planeswalker's controller deduped against the player).
+        combat.CurrentCombat.AttackedDefenders.Should().ContainSingle()
+            .Which.Should().BeSameAs(_bob);
+    }
+
+    [Fact]
     public void AttackTrigger_OpponentAttacks_DoesNotFire()
     {
         var bus = new EventBus();

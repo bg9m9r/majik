@@ -150,6 +150,66 @@ public class CombatTests
         combat.IsEnded.Should().BeTrue();
     }
 
+    // -----------------------------------------------------------------------
+    // CR 506.2 — the distinct set of defenders being attacked. Enumerated over
+    // the per-attacker band fields (Attacker.TargetPlayer / TargetPlaneswalker),
+    // a planeswalker being attacked contributes its CONTROLLER as a defender
+    // (CR 508.4 — a defending player is the controller of the planeswalker an
+    // attacker is attacking). This is the per-opponent enumeration seam Adeline
+    // ("for each opponent ... attacking that player or a planeswalker they
+    // control") keys her band count on.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void AttackedDefenders_PlayerAndPlaneswalker_DedupesByController()
+    {
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+        // Combat's single defender is Bob; a token can also attack a
+        // planeswalker Bob controls (same defending player).
+        var jace = new Planeswalker("Jace", "2UU", 4) { Owner = bob, Controller = bob };
+
+        var combat = new Majik.Core.Combat.Combat(alice, bob);
+        combat.AddAttacker(new Attacker(new Creature("Bear", "1G", 2, 2), bob));
+        combat.AddAttackerInProgress(new Attacker(
+            new Creature("Token", "", 1, 1), targetPlaneswalker: jace));
+
+        // Both the direct-player attacker and the planeswalker attacker resolve
+        // to Bob as the defender → distinct set is exactly { Bob }.
+        combat.AttackedDefenders.Should().ContainSingle().Which.Should().BeSameAs(bob);
+    }
+
+    [Fact]
+    public void AttackedDefenders_PlaneswalkerOnlyCombat_YieldsItsController()
+    {
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+        var jace = new Planeswalker("Jace", "2UU", 4) { Owner = bob, Controller = bob };
+
+        var combat = new Majik.Core.Combat.Combat(alice, null, jace);
+        combat.AddAttacker(new Attacker(new Creature("Bear", "1G", 2, 2), targetPlaneswalker: jace));
+
+        combat.AttackedDefenders.Should().ContainSingle().Which.Should().BeSameAs(bob);
+    }
+
+    [Fact]
+    public void AddAttackerInProgress_PlaneswalkerControlledByDefendingPlayer_IsAccepted()
+    {
+        var alice = new Player("Alice", 20);
+        var bob = new Player("Bob", 20);
+        var jace = new Planeswalker("Jace", "2UU", 4) { Owner = bob, Controller = bob };
+
+        // Combat targets the player Bob; CR 508.4 lets an effect put a token
+        // onto the battlefield attacking a planeswalker the SAME defending
+        // player controls (Adeline — "that player OR a planeswalker they
+        // control").
+        var combat = new Majik.Core.Combat.Combat(alice, bob);
+        var token = new Attacker(new Creature("Token", "", 1, 1), targetPlaneswalker: jace);
+
+        combat.Invoking(c => c.AddAttackerInProgress(token)).Should().NotThrow();
+        combat.Attackers.Should().Contain(token);
+    }
+
     [Fact]
     public void GetAllBlockers_ReturnsAllBlockers()
     {
