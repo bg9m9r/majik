@@ -72,11 +72,10 @@ The official Magic: The Gathering Comprehensive Rules (2025-11-14) are the sourc
 
 ## Architecture
 
-### State machines (hierarchical, three levels)
+### Game state machine + turn/phase/step flow
 
-- `GameStateMachine` — `Initializing | Mulligan | Playing | GameOver` (`Majik.Core/StateMachine/`).
-- `TurnStateMachine` — `Beginning | PreCombatMain | Combat | PostCombatMain | Ending`.
-- `PhaseStateMachine` — steps within phases (`Untap`, `Upkeep`, `Draw`, main, combat steps, `End`, `Cleanup`).
+- `GameStateMachine` — `Initializing | Mulligan | Playing | GameOver` (`Majik.Core/StateMachine/`). The only live state machine.
+- Turn-level (phase) and step-level flow is **not** a state machine — it's driven directly by `TurnDriver` (emits the typed `TurnStateChangedEvent` per CR-505 phase + `StepStartedEvent` per step) and `PhaseManager` (emits `PhaseStartedEvent`). The vocabulary lives in two enums: `TurnStateType` (turn-level = MTG phases) and `PhaseStateType` (step-level = MTG steps).
 
 Phases are pluggable (`Majik.Core/Game/Phases/`). The sequence supports MTG's extra-turn / extra-phase / extra-step insertion (Rule 500.7–9). Flow is coordinated by `PhaseSequence` + `TurnManager` + `PhaseManager` + `PriorityManager`.
 
