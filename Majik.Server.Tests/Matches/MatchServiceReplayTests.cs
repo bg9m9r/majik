@@ -98,7 +98,7 @@ public sealed class MatchServiceReplayTests : IClassFixture<TestMongoFixture>
             "Priority", "Pass", 0.1,
             Array.Empty<BotDecisionAlternative>(),
             new Dictionary<string, string>()));
-        buf.RecordEvent(matchId, FakeEvent("PhaseChangedEvent"));
+        buf.RecordEvent(matchId, FakeEvent("GameStateChangedEvent"));
 
         var result = await svc.GetReplayAsync("stub-alice", matchId, CancellationToken.None);
 

@@ -95,8 +95,9 @@ public sealed record PhaseEndedPayload(
     string Phase,
     Guid PlayerId);
 
-/// <summary>Phase-label transition (free-form from/to strings).</summary>
-public sealed record PhaseChangedPayload(
+/// <summary>Top-level game-lifecycle transition (Initializing / Mulligan /
+/// Playing / GameOver). Distinct from the phase/step channel.</summary>
+public sealed record GameStateChangedPayload(
     string? From,
     string To);
 
@@ -200,7 +201,7 @@ public sealed record EventPayloadCatalog(
     LifeChangedPayload LifeChanged,
     PhaseStartedPayload PhaseStarted,
     PhaseEndedPayload PhaseEnded,
-    PhaseChangedPayload PhaseChanged,
+    GameStateChangedPayload GameStateChanged,
     TurnStateChangedPayload TurnStateChanged,
     StepStartedPayload StepStarted,
     StepEndedPayload StepEnded,

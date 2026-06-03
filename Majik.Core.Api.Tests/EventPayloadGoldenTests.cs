@@ -96,14 +96,15 @@ public class EventPayloadGoldenTests
     }
 
     [Fact]
-    public void PhaseChangedPayload_Golden()
+    public void GameStateChangedPayload_Golden()
     {
-        var payload = EventPayloadBuilder.Build(
-            new PhaseChangedEvent("Draw", "PreCombatMain"));
+        var payload = EventPayloadBuilder.Build(new GameStateChangedEvent(
+            Majik.Core.StateMachine.GameStateType.Initializing,
+            Majik.Core.StateMachine.GameStateType.Playing));
 
         Keys(payload).Should().BeEquivalentTo(new[] { "from", "to" });
-        payload.GetProperty("from").GetString().Should().Be("Draw");
-        payload.GetProperty("to").GetString().Should().Be("PreCombatMain");
+        payload.GetProperty("from").GetString().Should().Be("Initializing");
+        payload.GetProperty("to").GetString().Should().Be("Playing");
     }
 
     [Fact]

@@ -100,9 +100,9 @@ public static class EventPayloadBuilder
         PhaseEndedEvent x => Serialize(new PhaseEndedPayload(
             Phase: PhaseLabelResolver.Resolve(x.PhaseType, turnState),
             PlayerId: x.Player.Id)),
-        PhaseChangedEvent x => Serialize(new PhaseChangedPayload(
-            From: x.PreviousPhase,
-            To: x.CurrentPhase)),
+        GameStateChangedEvent x => Serialize(new GameStateChangedPayload(
+            From: x.PreviousState?.ToString(),
+            To: x.CurrentState.ToString())),
         TurnStateChangedEvent x => Serialize(new TurnStateChangedPayload(
             From: x.PreviousState?.ToString(),
             To: x.CurrentState.ToString())),
