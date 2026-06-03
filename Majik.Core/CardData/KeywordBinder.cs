@@ -60,6 +60,14 @@ public static class KeywordBinder
         // incarnation card factories) — Scryfall does not encode the evoke
         // cost in a way KeywordBinder can parse generically.
         "Evoke",
+        // Alternative-cost keyword (CR 702.152). The KeywordAbility marker is
+        // attached so downstream code (UI, action validator, bot probes) can
+        // introspect "this creature has blitz". The blitz alt-cost path itself
+        // is wired bespoke per-card (see BlitzAlternativeCost + BlitzFactory and
+        // the Tenacious Underdog factory) — Scryfall does not encode the blitz
+        // cost (or the per-card graveyard-cast permission) in a way
+        // KeywordBinder can parse generically.
+        "Blitz",
     };
 
     public static void Bind(ICard card, CardEntity entity, Player controller,
