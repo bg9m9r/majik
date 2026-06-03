@@ -74,11 +74,17 @@ namespace Majik.Core.CardData.Factories;
 ///   reference so deaths AFTER construction but BEFORE activation count —
 ///   same captured-TurnState pattern as <see cref="StormscaleScionFactory"/>).
 ///
-/// ## Deferred (v1 gaps)
-/// - <b>Agent-driven connive discard pick</b>: <see cref="ConniveAction"/>'s
-///   v1 deterministic discard policy (last card in hand) is used; the
-///   agent-prompt discard pick is deferred engine-wide (same queue as
-///   Faithless Looting / Cathartic Reunion's discard pick).
+/// ## Connive discard pick (CR 701.50a)
+/// - <b>Agent-driven</b>: <see cref="ConniveAction"/> now routes the discard
+///   choice through the controller's
+///   <see cref="Majik.Core.Players.Agents.IPlayerAgent.ChooseFromHandAsync"/>
+///   sink (resolved via <see cref="Majik.Core.Players.Agents.AgentRegistry"/>,
+///   tagged <see cref="BotIntent.Discard"/>) — the same declarative discard
+///   surface Fable of the Mirror-Breaker's rummage / Faithless Looting use.
+///   Connive X (CR 701.50b) draws X then discards X as a batch (the controller
+///   sees every drawn card before discarding), placing a +1/+1 counter per
+///   nonland discarded. With no agent registered the deterministic fallback
+///   (last card in hand) preserves the legacy direct-call behaviour.
 /// </summary>
 [CardName("Spymaster's Vault")]
 public static class SpymastersVaultFactory
