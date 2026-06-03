@@ -564,6 +564,48 @@ public static class Fx
     public static void Sacrifice(ICard permanent)
         => OracleSpellBinder.MoveToGraveyard(permanent, ZoneMoveReason.Sacrifice);
 
+    /// <summary>
+    /// CR 701.16 — sacrifice <paramref name="permanent"/> AND publish a
+    /// dedicated <see cref="PermanentSacrificedEvent"/> on
+    /// <paramref name="eventBus"/> so "whenever a/an [opponent] sacrifices
+    /// …" aristocrat triggers (It That Betrays, Mayhem Devil, Writhing
+    /// Chrysalis) fire with the correct sacrifice-only firing semantics —
+    /// distinct from a destroy / SBA death, which the bare
+    /// <see cref="Sacrifice(ICard)"/> overload (publishing nothing) can't
+    /// be told apart from.
+    ///
+    /// <para>
+    /// The sacrificing player (<paramref name="sacrificingPlayer"/>) is the
+    /// permanent's controller at sacrifice time (CR 701.16a). Token-ness is
+    /// snapshotted BEFORE the move (the permanent may be cleaned up as an
+    /// SBA the instant it hits the graveyard, CR 111.7), and the event is
+    /// published AFTER the zone move so a payoff that pulls the sacrificed
+    /// card back (It That Betrays) reads it from the graveyard. Like the
+    /// bare overload the move routes through
+    /// <see cref="OracleSpellBinder.MoveToGraveyard(ICard, ZoneMoveReason)"/>
+    /// with <see cref="ZoneMoveReason.Sacrifice"/> (bypasses Indestructible
+    /// / regeneration — sacrifice is not a "destroy" effect).
+    /// </para>
+    /// </summary>
+    public static void Sacrifice(ICard permanent, Player sacrificingPlayer, IEventBus eventBus)
+    {
+        if (permanent is null) throw new ArgumentNullException(nameof(permanent));
+        if (sacrificingPlayer is null) throw new ArgumentNullException(nameof(sacrificingPlayer));
+        if (eventBus is null) throw new ArgumentNullException(nameof(eventBus));
+
+        // CR 111.7 — a token snapshotted before the move; once it reaches
+        // the graveyard it ceases to exist as a state-based action, so the
+        // flag (and any "nontoken" filtering downstream) must be read while
+        // the permanent is still the live object on the battlefield.
+        var wasToken = permanent is Permanent p && p.IsToken;
+
+        OracleSpellBinder.MoveToGraveyard(permanent, ZoneMoveReason.Sacrifice);
+
+        // CR 701.16 — publish AFTER the zone move so the sacrificed card is
+        // already in the graveyard for a steal-on-sacrifice payoff.
+        eventBus.Publish(new PermanentSacrificedEvent(permanent, sacrificingPlayer, wasToken));
+    }
+
     // ------------------------------------------------------------------
     // Stack (CR 701.5) — counter target spell/ability.
     // ------------------------------------------------------------------

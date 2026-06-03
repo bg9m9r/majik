@@ -40,11 +40,11 @@ namespace Majik.Core.CardData.Factories;
 ///   the deferred "Sacrifice this token: Add {C}." mana ability).
 /// - <b>Sacrifice trigger (CR 603.1)</b> — "Whenever you sacrifice another
 ///   Eldrazi, put a +1/+1 counter on this creature." A
-///   <see cref="TriggeredAbility"/> over a <see cref="CardMovedEvent"/>
-///   filtered to (another Eldrazi, Battlefield -> Graveyard); resolution
-///   places one +1/+1 counter (CR 122) on Writhing Chrysalis via
-///   <see cref="Fx.PlaceCounter"/>. Same sacrifice-detection posture as
-///   <see cref="MayhemDevilFactory"/>.
+///   <see cref="TriggeredAbility"/> over the dedicated
+///   <see cref="PermanentSacrificedEvent"/> filtered to (controller is the
+///   sacrificing player, another Eldrazi); resolution places one +1/+1
+///   counter (CR 122) on Writhing Chrysalis via <see cref="Fx.PlaceCounter"/>.
+///   Same sacrifice-detection posture as <see cref="MayhemDevilFactory"/>.
 ///
 /// ## Wiring overloads
 /// - <see cref="Create(Player)"/> — shape only; triggers attached but not
@@ -60,14 +60,6 @@ namespace Majik.Core.CardData.Factories;
 ///   as Eldrazi Skyspawner's Scion / Treasure / Food). The Spawn produces
 ///   {C} without enforcing the sacrifice — see
 ///   <see cref="TokenFactory.CreateEldraziSpawn"/>.
-/// - <b>Sacrifice-only firing semantics</b>: the engine doesn't yet
-///   distinguish "sacrificed" from "destroyed" / "died from SBA" at the
-///   <see cref="CardMovedEvent"/> level (it carries only zones, no
-///   <see cref="ZoneMoveReason"/>). The v1 condition fires on ANY Eldrazi
-///   moving Battlefield -> Graveyard — the same over/under-fire footprint
-///   documented on <see cref="MayhemDevilFactory"/>. A dedicated
-///   <c>PermanentSacrificedEvent</c> would close it with no change to this
-///   factory beyond swapping the condition type.
 /// </summary>
 [CardName("Writhing Chrysalis")]
 public static class WrithingChrysalisFactory
@@ -163,17 +155,19 @@ public static class WrithingChrysalisFactory
         // Sacrifice trigger — CR 603.1.
         //   "Whenever you sacrifice another Eldrazi, put a +1/+1 counter on
         //    this creature."
-        // v1 condition: another Eldrazi moving Battlefield -> Graveyard
-        // (see class xmldoc gap note re: sacrifice-vs-death detection, same
-        // footprint as Mayhem Devil). "another" excludes Writhing Chrysalis
+        // Fires on the dedicated PermanentSacrificedEvent (CR 701.16) —
+        // exact sacrifice detection, scoped to the controller ("you", CR
+        // 109.5) and another Eldrazi. "another" excludes Writhing Chrysalis
         // itself (CR 603.2 — the source does not count as "another").
         // ----------------------------------------------------------------
-        var sacCondition = new EventTriggerCondition<CardMovedEvent>((e, _) =>
+        var sacCondition = new EventTriggerCondition<PermanentSacrificedEvent>((e, _) =>
         {
-            if (e.FromZone != ZoneType.Battlefield) return false;
-            if (e.ToZone != ZoneType.Graveyard) return false;
-            if (ReferenceEquals(e.Card, card)) return false; // "another"
-            return e.Card.HasSubtype(CardSubtype.Eldrazi);
+            // "you sacrifice" — CR 109.5: the controller is the sacrificing
+            // player. Re-read the live controller so a control change is
+            // honoured (the source's controller at trigger time).
+            if (!ReferenceEquals(e.SacrificingPlayer, card.Controller ?? owner)) return false;
+            if (ReferenceEquals(e.SacrificedCard, card)) return false; // "another"
+            return e.SacrificedCard.HasSubtype(CardSubtype.Eldrazi);
         });
 
         var counterEffect = new Effect(

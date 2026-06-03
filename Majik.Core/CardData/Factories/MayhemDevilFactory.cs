@@ -19,41 +19,26 @@ namespace Majik.Core.CardData.Factories;
 /// ## Implemented (v1)
 /// - 3/3 Creature — Devil {1}{B}{R}; owner / controller wired.
 /// - <b>Sacrifice-detection trigger (CR 603.1 + CR 701.16)</b>: a
-///   <see cref="TriggeredAbility"/> fires on a permanent moving
-///   Battlefield → Graveyard. The trigger carries a <see cref="TargetRequest"/>
+///   <see cref="TriggeredAbility"/> fires on the dedicated
+///   <see cref="PermanentSacrificedEvent"/> (published by the bus-aware
+///   <see cref="Fx.Sacrifice(Cards.ICard, Players.Player, Events.IEventBus)"/>
+///   overload). The trigger carries a <see cref="TargetRequest"/>
 ///   for a single any-target damage target; on resolution the source
 ///   deals 1 damage to the chosen target via <see cref="Fx.DealDamageAny"/>
 ///   (CR 306.7 — Planeswalker targets convert to loyalty removal).
 /// - <b>Self-sourced damage</b>: damage source is the Devil itself per
 ///   "Mayhem Devil deals 1 damage to any target."
 ///
+/// ## Sacrifice-detection (CR 701.16) — closed
+/// The dedicated <see cref="PermanentSacrificedEvent"/> replaced the v1
+/// degraded <see cref="CardMovedEvent"/> Battlefield → Graveyard condition,
+/// which couldn't distinguish a sacrifice from a destroy / SBA death
+/// (over-fire) and which <see cref="Fx.Sacrifice(Cards.ICard)"/> never
+/// published at all (under-fire). "Whenever a player sacrifices a
+/// permanent" is now exact — no <see cref="PermanentSacrificedEvent.SacrificingPlayer"/>
+/// filter, since the printed text fires off ANY player's sacrifice.
+///
 /// ## Deferred (v1 gaps)
-/// - <b>Sacrifice-only firing semantics</b>: the engine does not yet
-///   distinguish "sacrificed" from "destroyed" / "died from SBA" /
-///   "milled from the battlefield" / "exiled" at the
-///   <see cref="CardMovedEvent"/> level — <see cref="CardMovedEvent"/>
-///   carries only zones, not a <see cref="ZoneMoveReason"/>. The v1
-///   condition fires on ANY Battlefield → Graveyard move involving a
-///   permanent. This produces two real-world deviations:
-///   <list type="bullet">
-///     <item>OVER-fire: Mayhem Devil triggers on permanents being
-///       destroyed or dying from SBA-driven death, which it should not
-///       per the printed text.</item>
-///     <item>UNDER-fire: <see cref="Fx.Sacrifice"/> currently routes
-///       through <see cref="Majik.Core.CardData.OracleSpellBinder.MoveToGraveyard"/>
-///       which mutates zones directly WITHOUT publishing a
-///       <see cref="CardMovedEvent"/>. Sacrifice payments inside
-///       activated-ability cost closures (Fanatical Firebrand,
-///       Insolent Neonate, Goblin Bombardment) hit this path and the
-///       trigger is silently missed.</item>
-///   </list>
-///   The clean fix is a dedicated <c>PermanentSacrificedEvent</c>
-///   published by <see cref="Fx.Sacrifice"/> + every additional-cost
-///   sacrifice closure; the trigger condition would then move to
-///   <c>EventTriggerCondition&lt;PermanentSacrificedEvent&gt;</c> with
-///   no behavioural change to this factory beyond swapping the
-///   condition type. Same shape as the planned card-cast-event
-///   refactor.
 /// - <b>Target prompting</b>: activated-ability flow doesn't prompt for
 ///   targets via the v1 dispatcher — callers set
 ///   <see cref="TriggeredAbility.ChosenTargets"/> before the trigger
@@ -110,26 +95,15 @@ public static class MayhemDevilFactory
         // Sacrifice-detection trigger — CR 603.1 + CR 701.16.
         //   "Whenever a player sacrifices a permanent, Mayhem Devil deals
         //    1 damage to any target."
-        // v1 condition: any permanent moving Battlefield → Graveyard
-        // (see class xmldoc gap note for the over/under-fire footprint).
-        // The card must still be a permanent at LKI to filter out raw
-        // spell resolutions (Instant / Sorcery hitting the graveyard via
-        // a different zone path).
+        // Fires on the dedicated PermanentSacrificedEvent — published by
+        // the bus-aware Fx.Sacrifice overload only on a real sacrifice
+        // (Annihilator / edict / sac-cost), so this no longer over-fires
+        // on destroys / SBA deaths nor under-fires on a sacrifice that
+        // mutates zones directly (the v1 CardMovedEvent footprint). "a
+        // player" is any player, so no SacrificingPlayer filter (CR 603.1).
         // ----------------------------------------------------------------
         TriggeredAbility? sacTrigger = null;
-        var sacCondition = new EventTriggerCondition<CardMovedEvent>((e, _) =>
-        {
-            if (e.FromZone != ZoneType.Battlefield) return false;
-            if (e.ToZone != ZoneType.Graveyard) return false;
-            // Only permanent types — battlefield-zone restriction (CR 110.1)
-            // already covers this in production but the explicit filter
-            // is cheap insurance against synthetic test moves.
-            return e.Card.HasType(CardType.Creature)
-                || e.Card.HasType(CardType.Artifact)
-                || e.Card.HasType(CardType.Enchantment)
-                || e.Card.HasType(CardType.Land)
-                || e.Card.HasType(CardType.Planeswalker);
-        });
+        var sacCondition = new EventTriggerCondition<PermanentSacrificedEvent>((e, _) => true);
 
         var pingEffect = new Effect(
             $"{CardName}: deal 1 damage to any target",
