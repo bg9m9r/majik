@@ -44,10 +44,19 @@ namespace Majik.Core.CardData.Factories;
 ///   back descriptor + the "whenever you discard a card, exile it; you may
 ///   play it" discard-exile trigger.
 ///
+/// ## Boast-twice static (CR 702.135c)
+/// - Birgi's "Creatures you control can boast twice during each of your turns
+///   rather than once" is modelled by stamping the
+///   <see cref="Majik.Core.Keywords.BoastAbility.BoastTwiceMarker"/> keyword on
+///   the front face. Every Boast ability built through
+///   <see cref="Majik.Core.Keywords.BoastAbility.Build"/> with
+///   <see cref="Majik.Core.Keywords.BoastAbility.ControllerCapResolver"/> reads
+///   the controller's battlefield for this marker and raises its per-turn cap
+///   from 1 to 2 while a Birgi is controlled.
+///
 /// ## Deferred (v1 gaps, documented for v1-deferrals #19)
-/// - Birgi's "this mana doesn't empty" rider (mana-no-empty) and any
-///   boast-twice static interaction are not modelled — the trigger adds {R}
-///   to the pool only.
+/// - Birgi's "this mana doesn't empty" rider (mana-no-empty) is not modelled —
+///   the trigger adds {R} to the pool only.
 /// - Harnfel's activated "{2}{R}, {T}, Discard a card: exile top two, you may
 ///   play those cards" + the play-permission expiry are stubbed at the trigger
 ///   level (the exile-on-discard rider) — the activated mill+play-window is a
@@ -103,6 +112,14 @@ public static class BirgiGodOfStorytellingFactory
             activeZones: new[] { ZoneType.Battlefield });
         birgi.AddAbility(castTrigger);
         triggers?.RegisterTriggeredAbility(castTrigger);
+
+        // CR 702.135c — "Creatures you control can boast twice during each of
+        // your turns rather than once." Stamp the Boast-twice marker keyword;
+        // BoastAbility.ControllerCapResolver scans the controller's battlefield
+        // for this marker and raises the per-turn Boast cap from 1 to 2 while a
+        // Birgi is in play.
+        birgi.AddAbility(new KeywordAbility(
+            Majik.Core.Keywords.BoastAbility.BoastTwiceMarker, birgi, owner));
 
         // CR 712.3 — attach the MDFC face tracker WITH a castable PERMANENT
         // back-face descriptor (Harnfel — Legendary Artifact). MdfcCastFlow
