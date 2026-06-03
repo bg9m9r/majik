@@ -235,6 +235,22 @@ public static class Triggers
     }
 
     /// <summary>
+    /// CR 119.3 / CR 109.5 — "Whenever an opponent gains life, …" trigger. The
+    /// opponent-scoped mirror of <see cref="OnLifeGainedByPlayer"/>: fires on
+    /// <see cref="LifeChangedEvent"/> where the player whose life increased is
+    /// NOT <paramref name="controller"/> (every other player in the game is an
+    /// opponent — CR 102.2) AND the life total strictly increased
+    /// (NewLife &gt; PreviousLife — life *gain*, not life loss). Models the
+    /// Kavu Predator / "whenever an opponent gains life" punish family.
+    /// </summary>
+    public static ITriggerCondition OnLifeGainedByOpponent(Player controller)
+    {
+        if (controller == null) throw new ArgumentNullException(nameof(controller));
+        return new EventTriggerCondition<LifeChangedEvent>((e, _) =>
+            !ReferenceEquals(e.Player, controller) && e.NewLife > e.PreviousLife);
+    }
+
+    /// <summary>
     /// CR 701.42 — "Whenever you surveil, …" trigger. Fires on
     /// <see cref="SurveilEvent"/> where <paramref name="player"/>
     /// matches the surveiling player. Used by Ledger Shredder's

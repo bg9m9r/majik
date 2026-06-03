@@ -937,6 +937,10 @@ public static class CardDefRuntime
                 BuildAnotherCreatureEntersTrigger(anotherEnters, card),
             WheneverAnotherCreatureDiesTriggerDef anotherDies =>
                 BuildAnotherCreatureDiesTrigger(anotherDies, card),
+            WheneverAnotherPermanentDiesTriggerDef anotherPermDies =>
+                BuildAnotherPermanentDiesTrigger(anotherPermDies, card),
+            WheneverAnOpponentGainsLifeTriggerDef =>
+                BuildWheneverAnOpponentGainsLifeTrigger(card),
             DealsCombatDamageToPlayerSelfTriggerDef =>
                 BuildDealsCombatDamageToPlayerSelfTrigger(card),
             WheneverACreatureYouControlExploresTriggerDef =>
@@ -1067,6 +1071,56 @@ public static class CardDefRuntime
                 && ReferenceEquals(e.Card.Controller, controller);
         });
     }
+
+    /// <summary>
+    /// CR 603.6e / CR 700.4 — "Whenever another permanent [you control] dies,
+    /// …". The permanent-type-agnostic generalisation of
+    /// <see cref="BuildAnotherCreatureDiesTrigger"/>: fires on a
+    /// <see cref="Majik.Core.Events.CardMovedEvent"/> Battlefield → Graveyard of
+    /// a PERMANENT (any type) OTHER than this permanent, with the optional
+    /// youControlOnly (CR 109.5, resolved live) / nontokenOnly (CR 111.7) /
+    /// subtype (CR 205.3) filters AND-composed. The only difference from the
+    /// creature variant is the dropped <c>HasType(Creature)</c> gate — any
+    /// permanent type dying counts.
+    /// </summary>
+    private static ITriggerCondition BuildAnotherPermanentDiesTrigger(
+        WheneverAnotherPermanentDiesTriggerDef def, ICard card)
+    {
+        var youControlOnly = def.YouControlOnly;
+        var nontokenOnly = def.NontokenOnly;
+        var subtype = ParseOptionalSubtype(def.Subtype);
+        return new EventTriggerCondition<Majik.Core.Events.CardMovedEvent>((e, _) =>
+        {
+            if (e.FromZone != ZoneType.Battlefield) return false;
+            if (e.ToZone != ZoneType.Graveyard) return false;
+            if (ReferenceEquals(e.Card, card)) return false;
+            if (nontokenOnly && e.Card is Permanent { IsToken: true }) return false;
+            if (subtype is not null && !e.Card.HasSubtype(subtype.Value)) return false;
+            if (!youControlOnly) return true;
+            var controller = card.Controller;
+            return controller is not null
+                && ReferenceEquals(e.Card.Controller, controller);
+        });
+    }
+
+    /// <summary>
+    /// CR 119.3 / CR 109.5 — "Whenever an opponent gains life, …". The
+    /// opponent-scoped mirror of <see cref="BuildWheneverYouGainLifeTrigger"/>:
+    /// fires on a <see cref="Majik.Core.Events.LifeChangedEvent"/> for a player
+    /// OTHER than the trigger's controller (every other player is an opponent,
+    /// CR 102.2) where the life total strictly increased. The controller is
+    /// resolved live (<c>card.Controller</c>) so a control change carries the
+    /// trigger (CR 109.5); the same predicate as
+    /// <see cref="Triggers.OnLifeGainedByOpponent"/>.
+    /// </summary>
+    private static ITriggerCondition BuildWheneverAnOpponentGainsLifeTrigger(ICard card) =>
+        new EventTriggerCondition<Majik.Core.Events.LifeChangedEvent>((e, _) =>
+        {
+            var controller = card.Controller;
+            return controller is not null
+                && !ReferenceEquals(e.Player, controller)
+                && e.NewLife > e.PreviousLife;
+        });
 
     /// <summary>
     /// CR 510.2 / CR 603.1 — "Whenever this creature deals combat damage to a
