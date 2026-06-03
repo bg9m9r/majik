@@ -1,0 +1,8 @@
+{
+  "name": "Cathar Commando",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Soldier"],
+  "manaCost": "{1}{W}",
+  "power": 3,
+  "toughness": 1
+}
