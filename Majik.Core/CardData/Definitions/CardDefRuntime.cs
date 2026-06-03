@@ -876,6 +876,7 @@ public static class CardDefRuntime
             CardLeavesYourGraveyardTriggerDef gy => BuildCardLeavesYourGraveyardTrigger(gy, card),
             WheneverYouGainLifeTriggerDef => BuildWheneverYouGainLifeTrigger(card),
             WheneverYouCastSpellTriggerDef cast => BuildWheneverYouCastSpellTrigger(cast, card),
+            CastSelfTriggerDef => Triggers.OnCastSelf(card),
             AttacksSelfTriggerDef => Triggers.OnAttackSelf(card),
             DiesSelfTriggerDef => Triggers.OnDies(card),
             AtBeginningOfYourUpkeepTriggerDef =>

@@ -15,6 +15,7 @@ namespace Majik.Core.CardData.Definitions;
 [JsonDerivedType(typeof(CardLeavesYourGraveyardTriggerDef), "card_leaves_your_graveyard")]
 [JsonDerivedType(typeof(WheneverYouGainLifeTriggerDef), "whenever_you_gain_life")]
 [JsonDerivedType(typeof(WheneverYouCastSpellTriggerDef), "whenever_you_cast_spell")]
+[JsonDerivedType(typeof(CastSelfTriggerDef), "cast_self")]
 [JsonDerivedType(typeof(AttacksSelfTriggerDef), "attacks_self")]
 [JsonDerivedType(typeof(DiesSelfTriggerDef), "dies_self")]
 [JsonDerivedType(typeof(AtBeginningOfYourUpkeepTriggerDef), "at_beginning_of_your_upkeep")]
@@ -107,6 +108,38 @@ public sealed class WheneverYouCastSpellTriggerDef : TriggerDefinition
     /// <summary>Restrict to spells whose card has ANY of these card types
     /// (logical OR). Empty = no type restriction.</summary>
     public List<string> SpellTypes { get; set; } = new();
+}
+
+/// <summary>
+/// "When you cast this spell, …" (CR 601.2i / 603.3) — a self-cast trigger
+/// that fires as this very card is put on the stack as a spell. Fires on a
+/// <see cref="Majik.Core.Domain.DomainEvents.SpellCastEvent"/> whose
+/// <see cref="Majik.Core.Spells.ISpell.Card"/> IS this card (reference match),
+/// the cast-trigger family (Eldrazi cast-riders, Annihilator-Eldrazi
+/// "draw four", Demigod of Revenge). This is the self-scoped sibling of
+/// <see cref="WheneverYouCastSpellTriggerDef"/> (which fires on OTHER spells you
+/// cast): no controller read is needed because the source-card match already
+/// implies "you cast" — a spell is on the stack only under its controller's
+/// cast (CR 601.2). No extra fields; the source is always the card the ability
+/// lives on.
+///
+/// <para>
+/// Because a "when you cast this spell" ability is functional while the card is
+/// on the stack (CR 603.3e — it triggers from the stack as the spell is cast),
+/// the trigger overrides <see cref="TriggerDefinition.ActiveZones"/> to include
+/// the Stack so <see cref="Majik.Core.Abilities.TriggerManager"/> still observes
+/// it after <see cref="Majik.Core.Zones.ZoneService"/> stamps the card onto the
+/// stack as part of casting (same posture as <c>dies_self</c> reaching into the
+/// Graveyard).
+/// </para>
+/// </summary>
+public sealed class CastSelfTriggerDef : TriggerDefinition
+{
+    private static readonly IReadOnlyList<ZoneType> BattlefieldAndStack =
+        new[] { ZoneType.Battlefield, ZoneType.Stack };
+
+    /// <inheritdoc />
+    public override IReadOnlyList<ZoneType>? ActiveZones => BattlefieldAndStack;
 }
 
 /// <summary>

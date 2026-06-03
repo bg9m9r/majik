@@ -105,6 +105,22 @@ public static class Triggers
     }
 
     /// <summary>
+    /// CR 601.2i / 603.3 — "When you cast this spell, …" self-cast trigger.
+    /// Fires on the <see cref="SpellCastEvent"/> whose spell IS
+    /// <paramref name="source"/> (reference match). The source-card match
+    /// already implies "you cast" — the card is on the stack as a spell only
+    /// under its controller's cast (CR 601.2) — so no controller read is
+    /// needed. Self-scoped sibling of <see cref="OnSpellCast"/> /
+    /// <see cref="OnNonCreatureSpellCastByController"/> (which match OTHER
+    /// spells).
+    /// </summary>
+    public static ITriggerCondition OnCastSelf(Majik.Core.Cards.ICard source)
+    {
+        return new EventTriggerCondition<SpellCastEvent>(
+            (e, _) => ReferenceEquals(e.Spell.Card, source));
+    }
+
+    /// <summary>
     /// CR 702.50 — Prowess. "Whenever you cast a noncreature spell, this
     /// gets +1/+1 until end of turn." Fires on SpellCastEvent where the
     /// spell's controller is <paramref name="controller"/> AND the spell
