@@ -1,4 +1,5 @@
 using Majik.Core.Cards;
+using Majik.Core.Costs;
 using Majik.Core.Domain.DomainEvents;
 using Majik.Core.Events;
 using Majik.Core.Game;
@@ -32,13 +33,16 @@ public sealed class CombatFlow
     private readonly IEventBus _bus;
     private readonly StateBasedActions _sba;
     private readonly Majik.Core.Effects.ReplacementBus? _replacements;
+    private readonly AttackRestrictionRegistry? _attackRestrictions;
 
     public CombatFlow(IEventBus bus, StateBasedActions sba,
-        Majik.Core.Effects.ReplacementBus? replacements = null)
+        Majik.Core.Effects.ReplacementBus? replacements = null,
+        AttackRestrictionRegistry? attackRestrictions = null)
     {
         _bus = bus ?? throw new ArgumentNullException(nameof(bus));
         _sba = sba ?? throw new ArgumentNullException(nameof(sba));
         _replacements = replacements;
+        _attackRestrictions = attackRestrictions;
     }
 
     public async Task RunCombatAsync(
@@ -52,6 +56,13 @@ public sealed class CombatFlow
         CancellationToken ct = default)
     {
         var attackPlan = await attackerAgent.DeclareAttackersAsync(ctx, attackers, ct);
+
+        // CR 508.1g — "can't attack [defender] unless its controller pays
+        // {cost}" (Ghostly Prison / Propaganda / Sphere of Safety). The cost
+        // is part of declaring the attacker; a creature whose tax goes unpaid
+        // was never legally declared, so it is removed from the attack before
+        // it taps or fires its "attacks" trigger.
+        attackPlan = await ChargeAttackTaxesAsync(attacker, attackerAgent, attackPlan, ctx, ct);
 
         foreach (var decl in attackPlan.Attackers)
         {
@@ -94,6 +105,114 @@ public sealed class CombatFlow
             AssignAndDealDamage(attackPlan, blockersByAttacker, defender, DamageStep.SingleStep);
             CleanupAfterDamage(attacker, defender);
         }
+    }
+
+    /// <summary>
+    /// CR 508.1g — charge each declared attacker's "unless its controller
+    /// pays {cost}" tax (Ghostly Prison / Propaganda / Sphere of Safety),
+    /// returning a pruned <see cref="CombatPlan"/> with the unpaid attackers
+    /// removed. An attacker whose declared target is protected by an active
+    /// <see cref="PayPerAttackerRestriction"/> must have its per-attacker cost
+    /// paid (the controller both CAN pay and CHOOSES to, mirroring
+    /// <see cref="Majik.Core.Keywords.WardEffect.Resolve"/>); a creature with
+    /// no active tax on its target is untouched.
+    ///
+    /// The cost is a real mana payment (<see cref="ManaCostCost"/>) charged
+    /// against the attacking player's pool via <see cref="ICost.Pay"/>, so the
+    /// {2}/{X} comes out of floated mana exactly as a manual declare-attackers
+    /// payment would. A creature whose controller can't or won't pay is
+    /// "un-declared" (CR 508.1g — the declaration was illegal): it is dropped
+    /// from the plan so it never taps, never fires its "attacks" trigger, and
+    /// deals no damage. Multiple paywalls on the same defender stack additively
+    /// (two Ghostly Prisons → {4} per attacker).
+    /// </summary>
+    private async Task<CombatPlan> ChargeAttackTaxesAsync(
+        Player attackingPlayer,
+        IPlayerAgent attackerAgent,
+        CombatPlan plan,
+        GameContext ctx,
+        CancellationToken ct)
+    {
+        // Prefer the explicitly-injected registry (tests); otherwise consult
+        // the per-game ambient registry that Ghostly-Prison-class enchantments
+        // register their paywalls onto (production via GameRegistryScope).
+        var registry = _attackRestrictions ?? AttackRestrictionRegistryProvider.Current;
+        if (plan.Attackers.Count == 0)
+        {
+            return plan;
+        }
+
+        // Reset every paywall's paid-marks before this combat's declaration so a
+        // creature paid-for last combat must pay again this combat (the tax is
+        // per declare-attackers — CR 508.1g — not a permanent unlock).
+        foreach (var r in registry.Active.OfType<PayPerAttackerRestriction>())
+        {
+            r.ClearForTurn();
+        }
+
+        var kept = new List<Majik.Core.Players.Agents.AttackerDeclaration>(plan.Attackers.Count);
+        var anyDropped = false;
+
+        foreach (var decl in plan.Attackers)
+        {
+            // Only attackers whose declared defender is protected by a paywall
+            // owe a tax; everything else attacks for free.
+            if (registry.MayAttack(decl.Attacker, decl.DefendingPlayerOrPlaneswalker))
+            {
+                kept.Add(decl);
+                continue;
+            }
+
+            // Sum the per-attacker cost across every paywall protecting this
+            // defender (attack taxes are all generic mana, so total the values
+            // and rebuild a single generic cost — CR 508.1g checked per
+            // restriction).
+            var owed = registry.Active
+                .OfType<PayPerAttackerRestriction>()
+                .Where(r => r.Protects(decl.DefendingPlayerOrPlaneswalker))
+                .ToList();
+
+            if (owed.Count == 0)
+            {
+                // A non-payment restriction blocks this attacker outright.
+                anyDropped = true;
+                continue;
+            }
+
+            var totalGeneric = owed.Sum(r => r.CostPerAttacker.TotalValue);
+            var cost = new ManaCostCost(
+                Majik.Core.ValueObjects.ManaCost.Zero.AddGenericCost(totalGeneric));
+
+            // CR 508.1g — the controller pays only if they both CAN and CHOOSE
+            // to. Ask the agent (declarative Yes/No) before charging; a
+            // decline or an unaffordable cost un-declares the attacker.
+            var paid = false;
+            if (cost.CanPay(attackingPlayer))
+            {
+                var question = totalGeneric > 0
+                    ? $"Pay {{{totalGeneric}}} for {decl.Attacker.Name} to attack?"
+                    : $"Declare {decl.Attacker.Name} as an attacker?";
+                var wantsToPay = await attackerAgent.ChooseYesNoAsync(
+                    ctx, question, decl.Attacker.Name, ct).ConfigureAwait(false);
+                if (wantsToPay && cost.CanPay(attackingPlayer))
+                {
+                    cost.Pay(attackingPlayer);
+                    paid = true;
+                }
+            }
+
+            if (paid)
+            {
+                foreach (var r in owed) r.MarkPaid(decl.Attacker);
+                kept.Add(decl);
+            }
+            else
+            {
+                anyDropped = true;
+            }
+        }
+
+        return anyDropped ? new CombatPlan(kept) : plan;
     }
 
     private enum DamageStep { SingleStep, FirstStrike, Regular }
