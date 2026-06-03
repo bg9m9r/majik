@@ -315,7 +315,6 @@ public sealed class GameFacade : IDisposable
 
         _bus.SubscribeAll(BridgeEvent);
         _bus.Subscribe<TurnStartedEvent>(e => { _currentTurn = e.TurnNumber; _currentActivePlayer = e.Player; });
-        _bus.Subscribe<PhaseStartedEvent>(e => { _currentPhase = e.PhaseType; });
         _bus.Subscribe<StepStartedEvent>(e => { _currentPhase = e.StepType; });
         _bus.Subscribe<PhaseStateChangedEvent>(e => { _currentTurnState = e.CurrentState; });
     }

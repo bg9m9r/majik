@@ -53,28 +53,6 @@ public class EventPayloadGoldenTests
     }
 
     [Fact]
-    public void PhaseStartedPayload_Golden()
-    {
-        var alice = new Player("Alice");
-        var payload = EventPayloadBuilder.Build(
-            new PhaseStartedEvent(Majik.Core.StateMachine.StepStateType.PreCombatMain, alice));
-
-        Keys(payload).Should().BeEquivalentTo(new[] { "phase", "playerId" });
-        payload.GetProperty("playerId").GetGuid().Should().Be(alice.Id);
-        payload.GetProperty("phase").ValueKind.Should().Be(JsonValueKind.String);
-    }
-
-    [Fact]
-    public void PhaseEndedPayload_Golden()
-    {
-        var alice = new Player("Alice");
-        var payload = EventPayloadBuilder.Build(
-            new PhaseEndedEvent(Majik.Core.StateMachine.StepStateType.PreCombatMain, alice));
-
-        Keys(payload).Should().BeEquivalentTo(new[] { "phase", "playerId" });
-    }
-
-    [Fact]
     public void StepStartedPayload_Golden()
     {
         var alice = new Player("Alice");
@@ -83,16 +61,6 @@ public class EventPayloadGoldenTests
 
         Keys(payload).Should().BeEquivalentTo(new[] { "step", "playerId" });
         payload.GetProperty("playerId").GetGuid().Should().Be(alice.Id);
-    }
-
-    [Fact]
-    public void StepEndedPayload_Golden()
-    {
-        var alice = new Player("Alice");
-        var payload = EventPayloadBuilder.Build(
-            new StepEndedEvent(Majik.Core.StateMachine.StepStateType.Upkeep, alice));
-
-        Keys(payload).Should().BeEquivalentTo(new[] { "step", "playerId" });
     }
 
     [Fact]

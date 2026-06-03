@@ -611,14 +611,14 @@ public sealed class MatchFacadeBridge
         return true;
     }
 
-    /// <summary>Extract the disambiguated phase/step label from a
-    /// PhaseStartedEvent / StepStartedEvent payload, or null when the event
-    /// carries no phase/step field. Used by the live desync observer to spot
-    /// a raw CR 505 "Main" reaching the wire.</summary>
+    /// <summary>Extract the disambiguated phase/step label from any event
+    /// payload that carries one (StepStartedEvent's <c>step</c>,
+    /// ExtraPhaseAddedEvent's <c>phase</c>), or null otherwise. Used by the
+    /// live desync observer to spot a raw CR 505 "Main" reaching the wire.</summary>
     private static string? WirePhaseLabel(EventDto evt)
     {
         if (evt.Payload.ValueKind != JsonValueKind.Object) return null;
-        // PhaseStarted/Ended carry "phase"; StepStarted/Ended carry "step".
+        // Some payloads carry "phase", step payloads carry "step".
         if (evt.Payload.TryGetProperty("phase", out var phase) && phase.ValueKind == JsonValueKind.String)
             return phase.GetString();
         if (evt.Payload.TryGetProperty("step", out var step) && step.ValueKind == JsonValueKind.String)

@@ -80,8 +80,6 @@ public class PhaseManager
 
         _currentPhaseIndex = 0;
         _currentPhase = _currentSequence[0];
-        
-        _eventBus?.Publish(new PhaseStartedEvent(_currentPhase.Value, _activePlayer));
     }
 
     /// <summary>
@@ -99,14 +97,9 @@ public class PhaseManager
             throw new InvalidGameStateException("Cannot transition phase: no current phase");
         }
 
-        // End current phase
-        var endingPhase = _currentPhase.Value;
-        _eventBus?.Publish(new PhaseEndedEvent(endingPhase, _activePlayer));
-
         if (_sequenceMutator.TryDequeue(out var extraPhase))
         {
             _currentPhase = extraPhase;
-            _eventBus?.Publish(new PhaseStartedEvent(extraPhase, _activePlayer));
             _eventBus?.Publish(new ExtraPhaseAddedEvent(extraPhase));
             return;
         }
@@ -122,7 +115,6 @@ public class PhaseManager
         }
 
         _currentPhase = _currentSequence[_currentPhaseIndex];
-        _eventBus?.Publish(new PhaseStartedEvent(_currentPhase.Value, _activePlayer));
     }
 
     /// <summary>

@@ -9,7 +9,7 @@ namespace Majik.Core.Events;
 /// <para>
 /// This is the game-lifecycle channel, deliberately distinct from the
 /// phase / step channel (<see cref="PhaseStateChangedEvent"/>,
-/// <see cref="PhaseStartedEvent"/>, <see cref="StepStartedEvent"/>). It
+/// <see cref="StepStartedEvent"/>). It
 /// replaced the old multiplexed <c>PhaseChangedEvent</c> emit so
 /// lifecycle names ("Mulligan", "Playing") never leak into the UI's phase
 /// label.

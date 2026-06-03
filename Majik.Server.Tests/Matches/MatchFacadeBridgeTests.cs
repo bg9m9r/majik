@@ -918,7 +918,7 @@ public class MatchFacadeBridgeTests
     [Fact]
     public void ForwardEvent_RawMainOnWire_TripsDesyncObserver()
     {
-        // Live path: a PhaseStartedEvent carrying the raw "Main" label
+        // Live path: a StepStartedEvent carrying the raw "Main" label
         // reaching ForwardEvent must trip the prod observer (counter bump)
         // WITHOUT throwing — even though ForwardEvent runs in a path where a
         // throw would be swallowed.
@@ -929,7 +929,7 @@ public class MatchFacadeBridgeTests
         bridge.Attach(matchId, "creator-sub", "opponent-sub", facade);
         var routing = DefaultRouting(facade.Alice.Id, facade.Bob.Id);
 
-        var rawMain = FakeEvent("PhaseStartedEvent", """{"phase":"Main"}""");
+        var rawMain = FakeEvent("StepStartedEvent", """{"step":"Main"}""");
         var act = () => bridge.ForwardEvent(matchId, new EventEnvelope(rawMain, PerPlayer: null), routing);
 
         act.Should().NotThrow();
@@ -949,7 +949,7 @@ public class MatchFacadeBridgeTests
         bridge.Attach(matchId, "creator-sub", "opponent-sub", facade);
         var routing = DefaultRouting(facade.Alice.Id, facade.Bob.Id);
 
-        var goodPhase = FakeEvent("PhaseStartedEvent", """{"phase":"PreCombatMain"}""");
+        var goodPhase = FakeEvent("StepStartedEvent", """{"step":"PreCombatMain"}""");
         bridge.ForwardEvent(matchId, new EventEnvelope(goodPhase, PerPlayer: null), routing);
 
         bridge.DesyncWarningCount.Should().Be(0,
