@@ -46,6 +46,7 @@ public static class OracleSpellBinder
         new ISpellTemplate[]
         {
             _modal,
+            new SpellTemplates.Templates.Counter.CounterAndGainLifeTemplate(),
             new SpellTemplates.Templates.Counter.CounterUnlessPayTemplate(),
             new SpellTemplates.Templates.Counter.CounterNoncreatureTemplate(),
             new SpellTemplates.Templates.Counter.CounterCreatureTemplate(),

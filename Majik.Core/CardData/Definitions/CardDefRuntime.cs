@@ -1254,6 +1254,7 @@ public static class CardDefRuntime
             MillThenPickFirstMatchingToHandEffectDef mp => BuildMillThenPickEffect(mp, card, controller),
             ConniveSelfEffectDef connive => BuildConniveSelfEffect(connive, card),
             AmassSelfEffectDef amass => BuildAmassSelfEffect(amass, card, controller),
+            CounterTargetSpellEffectDef counter => BuildCounterTargetSpellEffect(counter, card, targetRequestIndex),
             _ => throw new NotSupportedException(
                 $"Effect '{definition.GetType().Name}' is not yet supported by CardDefRuntime."),
         };
@@ -1427,6 +1428,37 @@ public static class CardDefRuntime
                 if (live is ICard target && TargetFilters.Matches(filter, target))
                 {
                     Fx.MoveToExile(target);
+                }
+                return ValueTask.CompletedTask;
+            });
+    }
+
+    private static IEffect BuildCounterTargetSpellEffect(
+        CounterTargetSpellEffectDef def, ICard card, int targetRequestIndex)
+    {
+        // CR 701.5 — counter target [type] spell. The chosen ISpell is read off
+        // the resolving spell's ChosenTargets at the reserved index; the live
+        // stack is reached off ctx.Game.Stack (the resolver threads the live
+        // GameContext into the resolution context). CR 608.2b — re-check the
+        // SAME type rider (via TargetFilters.SpellMatches) so a target that left
+        // the stack or no longer matches the printed noncreature/creature gate
+        // fizzles cleanly. Fx.Counter honours CR 701.5b — an uncounterable spell
+        // survives the attempt (RemoveFromStack's veto skips the graveyard tail).
+        var noncreature = def.Noncreature;
+        var creature = def.Creature;
+        var qualifier = noncreature ? "noncreature " : creature ? "creature " : "";
+        return new Effect(
+            $"{card.Name}: counter target {qualifier}spell",
+            ctx =>
+            {
+                var stack = ctx.Game?.Stack;
+                if (stack is null) return ValueTask.CompletedTask;
+
+                var live = ChosenTargetAt(ctx, targetRequestIndex);
+                if (live is ISpell spell
+                    && TargetFilters.SpellMatches(noncreature, creature, spell))
+                {
+                    Fx.Counter(stack, spell);
                 }
                 return ValueTask.CompletedTask;
             });
