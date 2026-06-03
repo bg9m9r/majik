@@ -977,6 +977,49 @@ public class Card : ICard
     }
 
     /// <summary>
+    /// CR 702.169 — "Offspring {cost}" runtime sentinel. Stamped <c>true</c> by
+    /// <see cref="Majik.Core.Costs.OffspringAdditionalCost.Pay"/> when the caster
+    /// pays the optional additional Offspring cost as a creature spell is cast
+    /// (CR 702.169a — "You may pay an additional {cost} as you cast this
+    /// spell."). Read by the resolving permanent's <em>enters-the-battlefield</em>
+    /// trigger to decide whether to create the 1/1 token copy (CR 702.169b — "If
+    /// you do, when this creature enters, create a 1/1 token copy of it.").
+    ///
+    /// <para>Unlike the Kicker / Bargain sentinels (read by the spell's printed
+    /// resolution body, then cleared by <see cref="Majik.Core.Game.SpellCastFlow"/>'s
+    /// resolution cleanup), the Offspring flag is read AFTER the creature has
+    /// already entered the battlefield — its ETB trigger fires off the stack
+    /// once the creature spell has fully resolved (CR 603.6b). So the flag is
+    /// NOT cleared by the SpellCastFlow resolution cleanup; instead the
+    /// Offspring ETB trigger clears it itself via <see cref="ClearWasOffspringPaid"/>
+    /// once it has fired, exactly as Everflowing Chalice's ETB consumes
+    /// <see cref="TimesKicked"/>. This guarantees the flag survives spell
+    /// resolution → battlefield entry → ETB read (CR 400.7 — and the clear
+    /// prevents a later blink / re-cast from inheriting the prior posture).</para>
+    ///
+    /// <para>Defaults to <c>false</c> so hand-built test cards without an
+    /// explicit stamp are treated as casts where Offspring was declined.</para>
+    /// </summary>
+    public bool WasOffspringPaid { get; private set; }
+
+    /// <summary>Stamp the Offspring sentinel. Called by
+    /// <see cref="Majik.Core.Costs.OffspringAdditionalCost.Pay"/> after the
+    /// optional additional cost is paid (CR 702.169a).</summary>
+    public void SetWasOffspringPaid(bool value)
+    {
+        WasOffspringPaid = value;
+    }
+
+    /// <summary>Clear the Offspring sentinel (CR 400.7). Called by the
+    /// Offspring ETB trigger itself after it has created (or declined to
+    /// create) the token copy, so a later blink / re-cast of this card does
+    /// not re-read the prior cast's payment.</summary>
+    public void ClearWasOffspringPaid()
+    {
+        WasOffspringPaid = false;
+    }
+
+    /// <summary>
     /// CR 702.115 — "Surge" runtime sentinel. Stamped <c>true</c> by
     /// <see cref="Majik.Core.Costs.SurgeAlternativeCost"/> at cast time
     /// (during <see cref="Majik.Core.Game.SpellCastFlow"/>'s alt-cost

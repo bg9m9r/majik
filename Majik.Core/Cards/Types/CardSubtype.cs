@@ -201,6 +201,9 @@ public enum CardSubtype
     /// <summary>Mouse creature subtype — Emberheart Challenger (Bloomburrow),
     /// and the rest of the Bloomburrow Mouse "Valiant" lineage. CR 205.3m.</summary>
     Mouse,
+    /// <summary>Rabbit creature subtype — Pawpatch Recruit (Bloomburrow) and the
+    /// rest of the Bloomburrow Rabbit lineage. CR 205.3m.</summary>
+    Rabbit,
     /// <summary>Faerie creature subtype — Sprite Dragon (Ikoria), Spellstutter Sprite,
     /// Bitterblossom tokens. CR 205.3m.</summary>
     Faerie,
