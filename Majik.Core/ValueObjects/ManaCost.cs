@@ -37,6 +37,23 @@ public class ManaCost : IEquatable<ManaCost>
     public int Green { get; }
 
     /// <summary>
+    /// CR 107.4c — colorless ({C}) pips. Tracked as a TAGGED SUBSET of
+    /// <see cref="Generic"/>: a {C} pip still counts toward <see cref="Generic"/>
+    /// and <see cref="TotalValue"/> (preserving the long-standing "{C} buckets
+    /// as generic" invariant for mana-value / inspection), but this column says
+    /// how many of those generic units are specifically the colorless TYPE.
+    ///
+    /// <para>The distinction matters at payment: as a COST a {C} pip can be paid
+    /// <em>only</em> with colorless mana (CR 106.1b — colorless is a mana type,
+    /// not a color; CR 601.2g), never colored or non-colorless generic mana, and
+    /// a "spend as any color" permission doesn't help (it widens color, not
+    /// type). Conversely colorless mana freely pays a generic {N} pip
+    /// (CR 106.1c). As a produced-mana descriptor this marks the unit colorless
+    /// (Eye of Ugin, Wastes, Karn's Bastion).</para>
+    /// </summary>
+    public int Colorless { get; }
+
+    /// <summary>
     /// Whether this mana cost contains X (variable cost).
     /// </summary>
     public bool HasX { get; }
@@ -60,6 +77,7 @@ public class ManaCost : IEquatable<ManaCost>
     /// For {2/W} hybrids, uses the generic alternative (higher value).
     /// </summary>
     public int TotalValue =>
+        // Colorless is a subset of Generic — NOT added again (would double-count).
         Generic + White + Blue + Black + Red + Green
         + HybridPips.Sum(h => h.GenericAlternative > 0 ? h.GenericAlternative : 1)
         + PhyrexianPips.Count;
@@ -69,7 +87,8 @@ public class ManaCost : IEquatable<ManaCost>
     /// </summary>
     public bool IsZero => TotalValue == 0 && !HasX;
 
-    private ManaCost(int generic, int white, int blue, int black, int red, int green, bool hasX)
+    private ManaCost(int generic, int white, int blue, int black, int red, int green, bool hasX,
+        int colorless = 0)
     {
         Generic = generic;
         White = white;
@@ -77,12 +96,13 @@ public class ManaCost : IEquatable<ManaCost>
         Black = black;
         Red = red;
         Green = green;
+        Colorless = colorless;
         HasX = hasX;
     }
 
     private ManaCost(int generic, int white, int blue, int black, int red, int green, bool hasX,
-        IReadOnlyList<HybridPip> hybrid, IReadOnlyList<ManaColor> phyrexian)
-        : this(generic, white, blue, black, red, green, hasX)
+        IReadOnlyList<HybridPip> hybrid, IReadOnlyList<ManaColor> phyrexian, int colorless = 0)
+        : this(generic, white, blue, black, red, green, hasX, colorless)
     {
         HybridPips = hybrid;
         PhyrexianPips = phyrexian;
@@ -99,7 +119,7 @@ public class ManaCost : IEquatable<ManaCost>
             return Zero;
         }
 
-        int generic = 0, white = 0, blue = 0, black = 0, red = 0, green = 0;
+        int generic = 0, white = 0, blue = 0, black = 0, red = 0, green = 0, colorless = 0;
         bool hasX = false;
         var hybrid = new List<HybridPip>();
         var phyrexian = new List<ManaColor>();
@@ -164,10 +184,11 @@ public class ManaCost : IEquatable<ManaCost>
                 case 'B': black++; break;
                 case 'R': red++; break;
                 case 'G': green++; break;
-                // {C} = colourless mana (CR 107.4c). No dedicated bucket today;
-                // treat as +1 generic — pays generic costs and behaves
-                // identically for permanents like Urza's Saga ('{T}: Add {C}.').
-                case 'C': generic++; break;
+                // {C} = colourless mana (CR 107.4c). Counts toward Generic (the
+                // long-standing "{C} buckets as generic" mana-value invariant)
+                // AND is tagged colorless so a {C} COST pip demands colorless
+                // mana (CR 106.1b) while colorless mana still pays generic pips.
+                case 'C': generic++; colorless++; break;
                 // {S} = snow mana (CR 107.4g). Snow is restricted source —
                 // some costs (Skred, Marit Lage's Slumber) require {S}-
                 // specific payment. MVP treats as +1 generic so snow lands
@@ -176,7 +197,7 @@ public class ManaCost : IEquatable<ManaCost>
             }
         }
 
-        return new ManaCost(generic, white, blue, black, red, green, hasX, hybrid, phyrexian);
+        return new ManaCost(generic, white, blue, black, red, green, hasX, hybrid, phyrexian, colorless);
     }
 
     private static ManaColor ParseColor(char c) => c switch
@@ -207,15 +228,20 @@ public class ManaCost : IEquatable<ManaCost>
     public ManaCost AddGenericCost(int amount)
     {
         if (amount < 0) throw new ArgumentOutOfRangeException(nameof(amount));
-        return new ManaCost(Generic + amount, White, Blue, Black, Red, Green, HasX);
+        return new ManaCost(Generic + amount, White, Blue, Black, Red, Green, HasX,
+            HybridPips, PhyrexianPips, Colorless);
     }
 
     /// <summary>Construct a new ManaCost with a different generic component
-    /// (other components preserved). Used by cost-reduction effects.</summary>
+    /// (other components preserved). Used by cost-reduction effects. Generic
+    /// reduction never eats {C} colorless pips (they remain part of Generic as a
+    /// subset, CR 106.1b / 117.7e), so newGeneric is clamped to at least the
+    /// colorless count to preserve the Colorless ≤ Generic invariant.</summary>
     public ManaCost WithGeneric(int newGeneric)
     {
-        if (newGeneric < 0) newGeneric = 0;
-        return new ManaCost(newGeneric, White, Blue, Black, Red, Green, HasX);
+        if (newGeneric < Colorless) newGeneric = Colorless;
+        return new ManaCost(newGeneric, White, Blue, Black, Red, Green, HasX,
+            HybridPips, PhyrexianPips, Colorless);
     }
 
     /// <summary>
@@ -241,10 +267,14 @@ public class ManaCost : IEquatable<ManaCost>
             return this;
         }
 
+        // CR 107.4c — colorless ({C}) pips are NOT folded: "spend mana as
+        // though it were any color" widens which COLOR satisfies a colored pip;
+        // it never lets generic / colored mana pay a colorless pip (colorless
+        // is a mana type, not a color). The {C} demand survives the fold.
         return new ManaCost(
             Generic + coloredPips,
             white: 0, blue: 0, black: 0, red: 0, green: 0,
-            HasX, HybridPips, PhyrexianPips);
+            HasX, HybridPips, PhyrexianPips, Colorless);
     }
 
     /// <summary>
@@ -259,11 +289,15 @@ public class ManaCost : IEquatable<ManaCost>
             parts.Add("X");
         }
 
-        if (Generic > 0)
+        // Colorless is a subset of Generic; the non-colorless remainder prints
+        // as the generic number, the colorless portion as "C" pips (CR 107.4c).
+        var genericOnly = Generic - Colorless;
+        if (genericOnly > 0)
         {
-            parts.Add(Generic.ToString());
+            parts.Add(genericOnly.ToString());
         }
 
+        parts.AddRange(Enumerable.Repeat("C", Colorless));
         parts.AddRange(Enumerable.Repeat("W", White));
         parts.AddRange(Enumerable.Repeat("U", Blue));
         parts.AddRange(Enumerable.Repeat("B", Black));
@@ -284,6 +318,7 @@ public class ManaCost : IEquatable<ManaCost>
                Black == other.Black &&
                Red == other.Red &&
                Green == other.Green &&
+               Colorless == other.Colorless &&
                HasX == other.HasX;
     }
 
@@ -294,7 +329,7 @@ public class ManaCost : IEquatable<ManaCost>
 
     public override int GetHashCode()
     {
-        return HashCode.Combine(Generic, White, Blue, Black, Red, Green, HasX);
+        return HashCode.Combine(Generic, White, Blue, Black, Red, Green, Colorless, HasX);
     }
 
     public static bool operator ==(ManaCost? left, ManaCost? right)

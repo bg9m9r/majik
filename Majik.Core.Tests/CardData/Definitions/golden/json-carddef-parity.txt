@@ -222,7 +222,7 @@
     "mana": {
       "count": 1,
       "list": [
-        "mana:1"
+        "mana:C"
       ]
     },
     "activated": {
@@ -2371,7 +2371,7 @@
     "mana": {
       "count": 1,
       "list": [
-        "mana:1"
+        "mana:C"
       ]
     },
     "activated": {
@@ -3811,7 +3811,7 @@
     "mana": {
       "count": 1,
       "list": [
-        "mana:1"
+        "mana:C"
       ]
     },
     "activated": {
@@ -4903,7 +4903,7 @@
     "mana": {
       "count": 1,
       "list": [
-        "mana:1"
+        "mana:C"
       ]
     },
     "activated": {
@@ -5047,7 +5047,7 @@
     "mana": {
       "count": 1,
       "list": [
-        "mana:1"
+        "mana:C"
       ]
     },
     "activated": {
@@ -5546,7 +5546,7 @@
     "mana": {
       "count": 1,
       "list": [
-        "mana:1"
+        "mana:C"
       ]
     },
     "activated": {
@@ -7470,8 +7470,8 @@
     "mana": {
       "count": 6,
       "list": [
-        "mana:1",
         "mana:B",
+        "mana:C",
         "mana:G",
         "mana:R",
         "mana:U",
@@ -8368,7 +8368,7 @@
     "mana": {
       "count": 1,
       "list": [
-        "mana:1"
+        "mana:C"
       ]
     },
     "activated": {
@@ -8517,7 +8517,7 @@
     "mana": {
       "count": 1,
       "list": [
-        "mana:1"
+        "mana:C"
       ]
     },
     "activated": {
@@ -9212,7 +9212,7 @@
     "mana": {
       "count": 1,
       "list": [
-        "mana:1"
+        "mana:C"
       ]
     },
     "activated": {
@@ -9358,7 +9358,7 @@
     "mana": {
       "count": 1,
       "list": [
-        "mana:3"
+        "mana:CCC"
       ]
     },
     "activated": {
@@ -10418,7 +10418,7 @@
     "mana": {
       "count": 1,
       "list": [
-        "mana:1"
+        "mana:C"
       ]
     },
     "activated": {
@@ -10714,7 +10714,7 @@
     "mana": {
       "count": 1,
       "list": [
-        "mana:1"
+        "mana:C"
       ]
     },
     "activated": {
@@ -11208,7 +11208,7 @@
     "mana": {
       "count": 1,
       "list": [
-        "mana:1"
+        "mana:C"
       ]
     },
     "activated": {
@@ -13184,7 +13184,7 @@
     "mana": {
       "count": 1,
       "list": [
-        "mana:1"
+        "mana:C"
       ]
     },
     "activated": {
@@ -13432,7 +13432,7 @@
     "mana": {
       "count": 1,
       "list": [
-        "mana:1"
+        "mana:C"
       ]
     },
     "activated": {
@@ -13482,7 +13482,7 @@
     "mana": {
       "count": 1,
       "list": [
-        "mana:1"
+        "mana:C"
       ]
     },
     "activated": {
@@ -15290,7 +15290,7 @@
     "mana": {
       "count": 1,
       "list": [
-        "mana:1"
+        "mana:C"
       ]
     },
     "activated": {
@@ -15691,7 +15691,7 @@
     "mana": {
       "count": 1,
       "list": [
-        "mana:1"
+        "mana:C"
       ]
     },
     "activated": {
@@ -15839,7 +15839,7 @@
     "mana": {
       "count": 1,
       "list": [
-        "mana:1"
+        "mana:C"
       ]
     },
     "activated": {
@@ -16041,7 +16041,7 @@
     "mana": {
       "count": 1,
       "list": [
-        "mana:1"
+        "mana:C"
       ]
     },
     "activated": {
@@ -16190,7 +16190,7 @@
     "mana": {
       "count": 1,
       "list": [
-        "mana:1"
+        "mana:C"
       ]
     },
     "activated": {
@@ -16745,8 +16745,8 @@
     "mana": {
       "count": 6,
       "list": [
-        "mana:1",
         "mana:B",
+        "mana:C",
         "mana:G",
         "mana:R",
         "mana:U",
@@ -17004,7 +17004,7 @@
     "mana": {
       "count": 1,
       "list": [
-        "mana:1"
+        "mana:C"
       ]
     },
     "activated": {
@@ -17204,7 +17204,7 @@
     "mana": {
       "count": 1,
       "list": [
-        "mana:1"
+        "mana:C"
       ]
     },
     "activated": {
@@ -17503,7 +17503,7 @@
     "mana": {
       "count": 1,
       "list": [
-        "mana:1"
+        "mana:C"
       ]
     },
     "activated": {
@@ -18508,7 +18508,7 @@
     "mana": {
       "count": 1,
       "list": [
-        "mana:1"
+        "mana:C"
       ]
     },
     "activated": {
@@ -19666,7 +19666,7 @@
     "mana": {
       "count": 1,
       "list": [
-        "mana:1"
+        "mana:C"
       ]
     },
     "activated": {
@@ -21476,7 +21476,7 @@
     "mana": {
       "count": 1,
       "list": [
-        "mana:1"
+        "mana:C"
       ]
     },
     "activated": {
@@ -22989,7 +22989,7 @@
     "mana": {
       "count": 1,
       "list": [
-        "mana:1"
+        "mana:C"
       ]
     },
     "activated": {
@@ -24023,7 +24023,7 @@
     "mana": {
       "count": 1,
       "list": [
-        "mana:1"
+        "mana:C"
       ]
     },
     "activated": {
@@ -24267,7 +24267,7 @@
     "mana": {
       "count": 1,
       "list": [
-        "mana:1"
+        "mana:C"
       ]
     },
     "activated": {
@@ -24718,7 +24718,7 @@
     "mana": {
       "count": 1,
       "list": [
-        "mana:1"
+        "mana:C"
       ]
     },
     "activated": {
@@ -25872,7 +25872,7 @@
     "mana": {
       "count": 1,
       "list": [
-        "mana:1"
+        "mana:C"
       ]
     },
     "activated": {
@@ -25923,7 +25923,7 @@
     "mana": {
       "count": 1,
       "list": [
-        "mana:2"
+        "mana:CC"
       ]
     },
     "activated": {
@@ -26530,7 +26530,7 @@
     "mana": {
       "count": 1,
       "list": [
-        "mana:1"
+        "mana:C"
       ]
     },
     "activated": {
@@ -27322,8 +27322,8 @@
     "mana": {
       "count": 6,
       "list": [
-        "mana:1",
         "mana:B",
+        "mana:C",
         "mana:G",
         "mana:R",
         "mana:U",
@@ -27876,7 +27876,7 @@
     "mana": {
       "count": 1,
       "list": [
-        "mana:1"
+        "mana:C"
       ]
     },
     "activated": {
@@ -28129,7 +28129,7 @@
     "mana": {
       "count": 1,
       "list": [
-        "mana:1"
+        "mana:C"
       ]
     },
     "activated": {
@@ -28765,7 +28765,7 @@
     "mana": {
       "count": 1,
       "list": [
-        "mana:1"
+        "mana:C"
       ]
     },
     "activated": {
@@ -29701,7 +29701,7 @@
     "mana": {
       "count": 1,
       "list": [
-        "mana:1"
+        "mana:C"
       ]
     },
     "activated": {
@@ -29847,7 +29847,7 @@
     "mana": {
       "count": 1,
       "list": [
-        "mana:1"
+        "mana:C"
       ]
     },
     "activated": {
@@ -30044,7 +30044,7 @@
     "mana": {
       "count": 1,
       "list": [
-        "mana:1"
+        "mana:C"
       ]
     },
     "activated": {
@@ -30649,7 +30649,7 @@
     "mana": {
       "count": 1,
       "list": [
-        "mana:1"
+        "mana:C"
       ]
     },
     "activated": {
@@ -30847,7 +30847,7 @@
     "mana": {
       "count": 1,
       "list": [
-        "mana:1"
+        "mana:C"
       ]
     },
     "activated": {
@@ -31630,7 +31630,7 @@
     "mana": {
       "count": 1,
       "list": [
-        "mana:1"
+        "mana:C"
       ]
     },
     "activated": {
@@ -32525,7 +32525,7 @@
     "mana": {
       "count": 1,
       "list": [
-        "mana:1"
+        "mana:C"
       ]
     },
     "activated": {
@@ -33613,7 +33613,7 @@
     "mana": {
       "count": 1,
       "list": [
-        "mana:1"
+        "mana:C"
       ]
     },
     "activated": {
@@ -34118,7 +34118,7 @@
     "mana": {
       "count": 1,
       "list": [
-        "mana:1"
+        "mana:C"
       ]
     },
     "activated": {
@@ -35563,7 +35563,7 @@
     "mana": {
       "count": 1,
       "list": [
-        "mana:1"
+        "mana:C"
       ]
     },
     "activated": {
@@ -36497,7 +36497,7 @@
     "mana": {
       "count": 1,
       "list": [
-        "mana:1"
+        "mana:C"
       ]
     },
     "activated": {
@@ -36701,7 +36701,7 @@
     "mana": {
       "count": 1,
       "list": [
-        "mana:1"
+        "mana:C"
       ]
     },
     "activated": {
@@ -38209,7 +38209,7 @@
     "mana": {
       "count": 1,
       "list": [
-        "mana:1"
+        "mana:C"
       ]
     },
     "activated": {
@@ -38617,8 +38617,8 @@
     "mana": {
       "count": 6,
       "list": [
-        "mana:1",
         "mana:B",
+        "mana:C",
         "mana:G",
         "mana:R",
         "mana:U",
@@ -38963,7 +38963,7 @@
     "mana": {
       "count": 1,
       "list": [
-        "mana:1"
+        "mana:C"
       ]
     },
     "activated": {
@@ -40547,7 +40547,7 @@
     "mana": {
       "count": 1,
       "list": [
-        "mana:1"
+        "mana:C"
       ]
     },
     "activated": {
@@ -40796,7 +40796,7 @@
     "mana": {
       "count": 1,
       "list": [
-        "mana:2"
+        "mana:CC"
       ]
     },
     "activated": {
@@ -42782,7 +42782,7 @@
     "mana": {
       "count": 1,
       "list": [
-        "mana:1"
+        "mana:C"
       ]
     },
     "activated": {
@@ -44080,7 +44080,7 @@
     "mana": {
       "count": 1,
       "list": [
-        "mana:2"
+        "mana:CC"
       ]
     },
     "activated": {

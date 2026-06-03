@@ -633,7 +633,7 @@ public class Player
             // colorless unit produced WITH a rider records a slot.
             if (restriction != null || doesNotEmpty)
             {
-                AddProvenanceSlots(source, ValueObjects.ManaColor.Colorless, mana.Generic, onSpent, restriction, doesNotEmpty);
+                AddProvenanceSlots(source, ValueObjects.ManaColor.Colorless, mana.Colorless, onSpent, restriction, doesNotEmpty);
             }
         }
     }
@@ -767,7 +767,7 @@ public class Player
     /// </summary>
     public void WithholdColoredMana(int white, int blue, int black, int red, int green, int colorless = 0)
     {
-        _manaPool = _manaPool.RemoveColored(white, blue, black, red, green, generic: colorless);
+        _manaPool = _manaPool.RemoveColored(white, blue, black, red, green, colorless: colorless);
     }
 
     /// <summary>
@@ -779,7 +779,7 @@ public class Player
     /// </summary>
     public void RestoreColoredMana(int white, int blue, int black, int red, int green, int colorless = 0)
     {
-        _manaPool = _manaPool.AddColored(white, blue, black, red, green, generic: colorless);
+        _manaPool = _manaPool.AddColored(white, blue, black, red, green, colorless: colorless);
     }
 
     /// <summary>
@@ -819,7 +819,7 @@ public class Player
         _manaProvenance.Clear();
         _manaProvenance.AddRange(survivors);
 
-        int w = 0, u = 0, b = 0, r = 0, g = 0, generic = 0;
+        int w = 0, u = 0, b = 0, r = 0, g = 0, colorless = 0;
         foreach (var slot in survivors)
         {
             switch (slot.Color)
@@ -829,12 +829,11 @@ public class Player
                 case ValueObjects.ManaColor.Black: b++; break;
                 case ValueObjects.ManaColor.Red: r++; break;
                 case ValueObjects.ManaColor.Green: g++; break;
-                default: generic++; break; // Colorless → Generic bucket
+                default: colorless++; break; // Colorless → Colorless bucket (CR 107.4c)
             }
         }
         _manaPool = ValueObjects.ManaPool.Empty
-            .AddColored(white: w, blue: u, black: b, red: r, green: g)
-            .AddGeneric(generic);
+            .AddColored(white: w, blue: u, black: b, red: r, green: g, colorless: colorless);
     }
 
     public override string ToString()

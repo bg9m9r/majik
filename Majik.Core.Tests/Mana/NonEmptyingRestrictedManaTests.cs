@@ -32,12 +32,13 @@ public class NonEmptyingRestrictedManaTests
         var source = new object();
 
         alice.AddManaToPool(
-            ManaCost.Parse("3"), // 3 generic == 3 colorless units here
+            ManaCost.Parse("CCC"), // {C}{C}{C} — three colorless units
             provenanceSource: source,
             restriction: ArtifactSpellsOnly,
             doesNotEmpty: true);
 
-        alice.ManaPool.Generic.Should().Be(3, "colorless mana is stored in the Generic bucket");
+        alice.ManaPool.Generic.Should().Be(3, "colorless mana counts toward the Generic bucket");
+        alice.ManaPool.Colorless.Should().Be(3, "and is tagged as the colorless type");
         alice.ManaProvenance.Should().HaveCount(3);
         alice.ManaProvenance.Should().OnlyContain(s =>
             s.Color == ManaColor.Colorless
@@ -53,7 +54,7 @@ public class NonEmptyingRestrictedManaTests
         // flagged units (and their provenance slots) floating.
         var alice = new Player("Alice", 20);
         alice.AddManaToPool(
-            ManaCost.Parse("2"),
+            ManaCost.Parse("CC"),
             provenanceSource: new object(),
             restriction: ArtifactSpellsOnly,
             doesNotEmpty: true);
@@ -61,6 +62,7 @@ public class NonEmptyingRestrictedManaTests
         alice.EmptyManaPool(endOfTurn: false);
 
         alice.ManaPool.Generic.Should().Be(2, "doesn't-empty mana survives a step boundary");
+        alice.ManaPool.Colorless.Should().Be(2, "the colorless tag survives too");
         alice.ManaProvenance.Should().HaveCount(2);
     }
 
@@ -71,7 +73,7 @@ public class NonEmptyingRestrictedManaTests
         // mana floats alongside it.
         var alice = new Player("Alice", 20);
         alice.AddManaToPool(
-            ManaCost.Parse("1"),
+            ManaCost.Parse("C"),
             provenanceSource: new object(),
             restriction: ArtifactSpellsOnly,
             doesNotEmpty: true);
@@ -81,6 +83,7 @@ public class NonEmptyingRestrictedManaTests
 
         alice.ManaPool.Red.Should().Be(0, "plain red empties at a step boundary");
         alice.ManaPool.Generic.Should().Be(1, "protected colorless survives");
+        alice.ManaPool.Colorless.Should().Be(1);
         alice.ManaProvenance.Should().HaveCount(1);
     }
 

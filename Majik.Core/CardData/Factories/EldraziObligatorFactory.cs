@@ -43,10 +43,10 @@ namespace Majik.Core.CardData.Factories;
 ///   clause. The target is chosen as the trigger goes on the stack (CR 603.3d),
 ///   independent of the later payment.
 ///
-///   {C} (CR 107.4c) folds into a generic pip in v1's pool model
-///   (<see cref="Majik.Core.ValueObjects.ManaCost.Parse"/>), so {1}{C} is
-///   charged as two generic mana — the dedicated-colorless spend restriction is
-///   the same v1 simplification snow ({S}) and other {C}-cost cards carry.
+///   {C} (CR 107.4c) is now a real payable colorless pip: {1}{C} demands one
+///   generic plus one COLORLESS mana, and the colorless pip can be paid only
+///   from a colorless source (<see cref="Majik.Core.ValueObjects.ManaPool.Colorless"/>,
+///   CR 106.1b) — a plain {2} no longer covers it.
 ///
 /// ## Card identity comes from JSON
 ///

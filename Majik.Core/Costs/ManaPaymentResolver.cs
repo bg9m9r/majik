@@ -385,7 +385,7 @@ public sealed class ManaPaymentResolver
         {
             var spendable = simulated.RemoveColored(
                 white: blockedW, blue: blockedU, black: blockedB,
-                red: blockedR, green: blockedG, generic: blockedC);
+                red: blockedR, green: blockedG, colorless: blockedC);
             var (_, canPaySpendable) = spendable.Pay(matchCost);
             if (!canPaySpendable)
             {
@@ -494,15 +494,15 @@ public sealed class ManaPaymentResolver
         if (deltaR > 0) payer.ConsumeProvenanceSlotsOnSpend(ValueObjects.ManaColor.Red,   deltaR, spentOn);
         if (deltaG > 0) payer.ConsumeProvenanceSlotsOnSpend(ValueObjects.ManaColor.Green, deltaG, spentOn);
 
-        // CR 106.1b — colorless ({C}) provenance slots (Karn, Legacy Reforged)
-        // live in the Generic pool bucket. The generic delta is the number of
-        // generic-bucket units the payment consumed; pop that many Colorless
-        // slots FIFO that the spend satisfies, firing their reactions. Untagged
-        // generic spends pop nothing (no Colorless slots present). The withheld
-        // restricted colorless (blockedC) was held back across PayMana, so a
-        // nonartifact spell never consumes Karn's {C} here.
-        var availableGeneric = poolBefore.Generic + produced.Sum(p => p.Generic);
-        var deltaC = availableGeneric - poolAfter.Generic;
+        // CR 107.4c — colorless ({C}) mana now lives in its own pool bucket and
+        // its provenance slots (Karn, Legacy Reforged) track it. The colorless
+        // delta is the number of colorless-bucket units the payment consumed;
+        // pop that many Colorless slots FIFO that the spend satisfies, firing
+        // their reactions. Untagged colorless spends pop nothing (no slots). The
+        // withheld restricted colorless (blockedC) was held back across PayMana,
+        // so a nonartifact spell never consumes Karn's {C} here.
+        var availableColorless = poolBefore.Colorless + produced.Sum(p => p.Colorless);
+        var deltaC = availableColorless - poolAfter.Colorless;
         if (deltaC > 0) payer.ConsumeProvenanceSlotsOnSpend(ValueObjects.ManaColor.Colorless, deltaC, spentOn);
 
         return true;
@@ -557,6 +557,8 @@ public sealed class ManaPaymentResolver
                 ValueObjects.ManaColor.Black => produced.Black,
                 ValueObjects.ManaColor.Red => produced.Red,
                 ValueObjects.ManaColor.Green => produced.Green,
+                // CR 107.4c — colorless {C} mana now lives in its own bucket.
+                ValueObjects.ManaColor.Colorless => produced.Colorless,
                 _ => 0,
             };
         }

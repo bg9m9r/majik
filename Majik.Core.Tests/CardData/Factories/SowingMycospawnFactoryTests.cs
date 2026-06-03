@@ -149,10 +149,10 @@ public class SowingMycospawnFactoryTests : IDisposable
         var card = SowingMycospawnFactory.Create(_alice);
         var kicker = SowingMycospawnFactory.BuildAdditionalCost(card);
 
-        // Seed Alice with {1}{C} worth of mana. KickerCost is {1}{C},
-        // which the engine totals as 2 generic mana (no colorless-mana
-        // primitive — colorless is paid out of generic in v1).
-        _alice.AddManaToPool(ManaCost.Parse("{2}"));
+        // Seed Alice with {1}{C}: the kicker is {1}{C}, and the {C} pip now
+        // demands a real colorless mana (CR 107.4c) — a plain {2} would no
+        // longer satisfy it.
+        _alice.AddManaToPool(ManaCost.Parse("{1}{C}"));
 
         kicker.Pay(_alice).Should().BeTrue();
         card.WasKicked.Should().BeTrue(

@@ -184,6 +184,55 @@ public class JsonOptionalReflexiveGainControlTests
     }
 
     [Fact]
+    public async Task OptionalPay_TwoGenericNoColorless_CannotPayTheColorlessPip()
+    {
+        // colorless-pip pay-down: the {C} in {1}{C} now demands a colorless
+        // mana source (CR 107.4c). Two PLAIN generic mana cover the {1} but not
+        // the {C}, so the optional payment fails and the steal is skipped — even
+        // though the agent said yes and the total mana value is "enough".
+        var continuous = new ContinuousEffectsService(_bus);
+        var ability = BuildObligator(continuous);
+
+        var bear = OnBattlefield(new Creature("Grizzly Bears", "{1}{G}", 2, 2), _bob);
+        bear.ActiveEffects = continuous;
+        bear.Tap();
+
+        // Float two RED mana (a colored source) — covers {1} but the {C} pip
+        // cannot be paid from colored/generic mana.
+        _alice.AddManaToPool(ManaCost.Parse("RR"));
+
+        await ResolveWith(ability, bear, YesNo(true));
+
+        bear.Controller.Should().BeSameAs(_bob,
+            "the {C} pip requires colorless mana; red can't pay it (CR 107.4c)");
+        bear.IsTapped.Should().BeTrue("the steal/untap rider is gated behind the unpaid {C}");
+        _alice.ManaPool.Total.Should().Be(2, "no mana is spent when the {C} pip is unpayable");
+    }
+
+    [Fact]
+    public async Task OptionalPay_ColorlessSource_PaysTheColorlessPip()
+    {
+        // The complement: a real colorless source ({1} + {C}) DOES pay {1}{C}.
+        var continuous = new ContinuousEffectsService(_bus);
+        var ability = BuildObligator(continuous);
+
+        var bear = OnBattlefield(new Creature("Grizzly Bears", "{1}{G}", 2, 2), _bob);
+        bear.ActiveEffects = continuous;
+        bear.Tap();
+
+        // One generic + one colorless — exactly {1}{C}.
+        _alice.AddManaToPool(ManaCost.Parse("1"));
+        _alice.AddManaToPool(ManaCost.Parse("C"));
+
+        await ResolveWith(ability, bear, YesNo(true));
+
+        _alice.ManaPool.Total.Should().Be(0, "{1}{C} is paid with one generic + one colorless");
+        bear.Controller.Should().BeSameAs(_alice,
+            "a colorless source satisfies the {C} pip and the steal resolves (CR 613.2)");
+        bear.IsTapped.Should().BeFalse("untap that creature (CR 701.21)");
+    }
+
+    [Fact]
     public async Task EldraziObligator_Factory_BuildsCastTriggerOptionalSteal()
     {
         var continuous = new ContinuousEffectsService(_bus);
