@@ -1,4 +1,5 @@
 using Majik.Core.Abilities;
+using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
@@ -49,6 +50,10 @@ public static class ConclaveTribunalFactory
 {
     public const string CardName = "Conclave Tribunal";
     public const string PrintedManaCost = "{4}{W}";
+    public const string Slug = "conclave-tribunal";
+
+    private static readonly CardDefinition Definition =
+        CardDefinitionLoader.FromEmbeddedResource(Slug);
 
     /// <summary>
     /// Construct Conclave Tribunal with no runtime services. Convoke
@@ -71,11 +76,13 @@ public static class ConclaveTribunalFactory
     {
         ArgumentNullException.ThrowIfNull(owner);
 
-        var card = new Enchantment(
-            CardName,
-            PrintedManaCost,
-            supertypes: null,
-            subtypes: null);
+        var built = CardDefinitionFactory.Build(Definition, owner);
+        if (built is not Enchantment card)
+        {
+            throw new InvalidOperationException(
+                $"Expected '{CardName}' to materialise as an Enchantment but got "
+                + $"'{built.GetType().Name}'.");
+        }
         card.SetOwner(owner);
         card.SetController(owner);
 
@@ -85,8 +92,18 @@ public static class ConclaveTribunalFactory
         // Chord of Calling.
         card.AddAbility(new KeywordAbility("Convoke", card, owner));
 
-        // ETB exile + LTB return — identical shape to Banishing Light.
-        BanishingLightFactory.WireExileEnchantmentTriggers(card, owner, triggers);
+        // ETB exile + LTB return — now sourced from the declarative
+        // exile_until_leaves verb (conclave-tribunal.json), identical shape to
+        // Banishing Light. The verb attached both linked abilities at build
+        // time; register them with a live TriggerManager (same posture as
+        // OblivionRingFactory).
+        if (triggers != null)
+        {
+            foreach (var ability in card.Abilities.OfType<ITriggeredAbility>())
+            {
+                triggers.RegisterTriggeredAbility(ability);
+            }
+        }
 
         return card;
     }

@@ -1,4 +1,5 @@
 using Majik.Core.Abilities;
+using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
@@ -65,6 +66,10 @@ public static class CastOutFactory
     public const string CardName = "Cast Out";
     public const string PrintedManaCost = "{3}{W}";
     public const string CyclingManaCost = "{W}";
+    public const string Slug = "cast-out";
+
+    private static readonly CardDefinition Definition =
+        CardDefinitionLoader.FromEmbeddedResource(Slug);
 
     /// <summary>
     /// Construct Cast Out with no runtime services. The ETB / LTB exile
@@ -92,21 +97,31 @@ public static class CastOutFactory
     {
         ArgumentNullException.ThrowIfNull(owner);
 
-        var card = new Enchantment(
-            CardName,
-            PrintedManaCost,
-            supertypes: null,
-            subtypes: null);
+        var built = CardDefinitionFactory.Build(Definition, owner);
+        if (built is not Enchantment card)
+        {
+            throw new InvalidOperationException(
+                $"Expected '{CardName}' to materialise as an Enchantment but got "
+                + $"'{built.GetType().Name}'.");
+        }
         card.SetOwner(owner);
         card.SetController(owner);
 
         // CR 702.8 — Flash. Allows casting at instant speed.
         card.AddAbility(new KeywordAbility("Flash", card, owner));
 
-        // CR 701.21 — exile target nonland permanent an opponent controls
-        // until this leaves. Identical backbone to Banishing Light, so it
-        // is routed through the shared wiring primitive.
-        BanishingLightFactory.WireExileEnchantmentTriggers(card, owner, triggers);
+        // CR 701.21 — exile target nonland permanent an opponent controls until
+        // this leaves. Now sourced from the declarative exile_until_leaves verb
+        // (cast-out.json), identical backbone to Banishing Light. The verb
+        // attached both linked abilities at build time; register them with a
+        // live TriggerManager (same posture as OblivionRingFactory).
+        if (triggers != null)
+        {
+            foreach (var ability in card.Abilities.OfType<ITriggeredAbility>())
+            {
+                triggers.RegisterTriggeredAbility(ability);
+            }
+        }
 
         // CR 702.32 — Cycling {W}. Routed through the shared primitive;
         // the DiscardSelfCost hand-zone gate (CR 702.32a) + CardCycledEvent

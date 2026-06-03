@@ -3,5 +3,18 @@
   "types": ["Enchantment"],
   "subtypes": ["Aura"],
   "manaCost": "{1}{W}",
-  "colors": ["W"]
+  "colors": ["W"],
+  "abilities": [
+    {
+      "kind": "triggered",
+      "trigger": { "type": "etb_self" },
+      "effects": [
+        {
+          "type": "exile_until_leaves",
+          "targetFilter": "nonland_permanent",
+          "opponentControlsOnly": true
+        }
+      ]
+    }
+  ]
 }

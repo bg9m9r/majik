@@ -99,10 +99,10 @@ public static class JourneyToNowhereFactory
 
     /// <summary>
     /// Wiring for the "exile target creature until this leaves" ETB / LTB
-    /// pair. Shares the per-source closure shape with
-    /// <see cref="BanishingLightFactory.WireExileEnchantmentTriggers"/>
-    /// but with a creature-only target and no "an opponent controls"
-    /// gate.
+    /// pair. Shares the per-source closure shape with the declarative
+    /// <see cref="Majik.Core.CardData.Definitions.ExileUntilLeavesEffectDef"/>
+    /// verb (the closed Banishing Light backbone) but with a creature-only
+    /// target and no "an opponent controls" gate.
     /// </summary>
     private static void WireExileCreatureTriggers(
         Enchantment card,

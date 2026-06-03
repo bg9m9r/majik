@@ -144,13 +144,22 @@ public static class ShelteredByGhostsFactory
         var card = (Enchantment)CardDefinitionFactory.Build(Definition, owner);
 
         // ----------------------------------------------------------------
-        // ETB exile + LTB return — reuse Banishing Light's shared closure
-        // (CR 701.21 / 603.6c). Identical "exile target nonland permanent an
-        // opponent controls until this leaves" semantics — captures one
-        // exiled card per ETB and returns it on LTB under its owner's
-        // control (CR 110.2). Attaches the two TriggeredAbility instances.
+        // ETB exile + LTB return — now sourced from the declarative
+        // exile_until_leaves verb (sheltered-by-ghosts.json), the same closed
+        // verb the whole Banishing Light family rides (CR 701.21 / 603.6c).
+        // Identical "exile target nonland permanent an opponent controls until
+        // this leaves" semantics — captures one exiled card per ETB and returns
+        // it on LTB under its owner's control (CR 110.2). The verb attached the
+        // two TriggeredAbility instances at build time; register them with a
+        // live TriggerManager (same posture as OblivionRingFactory).
         // ----------------------------------------------------------------
-        BanishingLightFactory.WireExileEnchantmentTriggers(card, owner, triggers);
+        if (triggers != null)
+        {
+            foreach (var ability in card.Abilities.OfType<ITriggeredAbility>())
+            {
+                triggers.RegisterTriggeredAbility(ability);
+            }
+        }
 
         if (continuousEffects != null)
         {

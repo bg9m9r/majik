@@ -69,7 +69,7 @@ public class DetentionSphereFactoryTests
         {
             new object[] { bobGoblin1 },
         });
-        foreach (var e in etb.Effects) e.Execute();
+        etb.Resolve();
 
         bobGoblin1.Zone.Should().Be(ZoneType.Exile, "the chosen target is exiled");
         bobGoblin2.Zone.Should().Be(ZoneType.Exile, "same-name permanent is exiled");
@@ -98,7 +98,7 @@ public class DetentionSphereFactoryTests
         {
             new object[] { bobsLand },
         });
-        foreach (var e in etb.Effects) e.Execute();
+        etb.Resolve();
 
         bobsLand.Zone.Should().Be(ZoneType.Battlefield,
             "lands are skipped by the printed 'nonland' filter (CR 608.2b)");
@@ -120,14 +120,14 @@ public class DetentionSphereFactoryTests
         {
             new object[] { bobGoblin },
         });
-        foreach (var e in etb.Effects) e.Execute();
+        etb.Resolve();
         bobGoblin.Zone.Should().Be(ZoneType.Exile);
         aliceGoblin.Zone.Should().Be(ZoneType.Exile);
 
         // LTB — Detention Sphere leaves the battlefield.
         var ltb = sphere.Abilities.OfType<TriggeredAbility>()
             .Single(t => t.TargetRequests.Count == 0);
-        foreach (var e in ltb.Effects) e.Execute();
+        ltb.Resolve();
 
         bobGoblin.Zone.Should().Be(ZoneType.Battlefield,
             "LTB returns every exiled card to the battlefield");
@@ -150,11 +150,40 @@ public class DetentionSphereFactoryTests
 
         var ltb = sphere.Abilities.OfType<TriggeredAbility>()
             .Single(t => t.TargetRequests.Count == 0);
-        foreach (var e in ltb.Effects) e.Execute();
+        ltb.Resolve();
 
         _bob.Zones.Battlefield.GetCards().Should().BeEmpty();
         _alice.Zones.Battlefield.GetCards().Should().ContainSingle()
             .Which.Name.Should().Be("Detention Sphere");
+    }
+
+    [Fact]
+    public void DetentionSphere_Etb_DoesNotSweepAnotherDetentionSphere()
+    {
+        // "target nonland permanent NOT NAMED Detention Sphere" — CR 109.5. A
+        // second Detention Sphere on the battlefield is excluded by NAME, so it
+        // is never seeded into the same-name sweep even if the slot is filled
+        // with it; the legality re-check rejects it cleanly.
+        var sphere = DetentionSphereFactory.Create(_alice);
+        sphere.SetZone(ZoneType.Battlefield);
+        _alice.Zones.Battlefield.AddCard(sphere);
+
+        var otherSphere = DetentionSphereFactory.Create(_bob);
+        otherSphere.SetZone(ZoneType.Battlefield);
+        _bob.Zones.Battlefield.AddCard(otherSphere);
+
+        var etb = sphere.Abilities.OfType<TriggeredAbility>()
+            .Single(t => t.TargetRequests.Count == 1);
+        etb.SetChosenTargets(new IReadOnlyList<object>[]
+        {
+            new object[] { otherSphere },
+        });
+        etb.Resolve();
+
+        otherSphere.Zone.Should().Be(ZoneType.Battlefield,
+            "'not named Detention Sphere' excludes another Detention Sphere (CR 109.5)");
+        sphere.Zone.Should().Be(ZoneType.Battlefield,
+            "the resolving sphere is never swept by its own ability");
     }
 
     private static Creature MakeCreature(string name, Player controller)

@@ -390,6 +390,25 @@ public sealed class ExileUntilLeavesEffectDef : EffectDefinition
     /// <summary>"with mana value N or less" (CR 202.3). Null = no cap.</summary>
     public int? MaxManaValue { get; set; }
 
+    /// <summary>
+    /// Detention Sphere variant — "and all other permanents with the same name
+    /// as that permanent" (CR 201.2). When <c>true</c>, the ETB exiles the
+    /// chosen target PLUS every other battlefield permanent sharing its name
+    /// (controller-agnostic), and the linked LTB returns the whole captured
+    /// group, each card under its own owner's control. Default <c>false</c>
+    /// (single-permanent Banishing Light / Oblivion Ring shape).
+    /// </summary>
+    public bool SameNameGroup { get; set; }
+
+    /// <summary>
+    /// "you may exile …" — CR 603.5. When <c>true</c>, declining (no legal
+    /// target chosen) resolves to a clean no-op so the linked LTB later returns
+    /// nothing. Detention Sphere sets it; the mandatory siblings leave it
+    /// <c>false</c>. The optionality is enforced at the targeting layer (the
+    /// chosen slot may be empty); this flag is descriptive for the wording.
+    /// </summary>
+    public bool Optional { get; set; }
+
     /// <inheritdoc />
     public override Majik.Core.Players.Agents.TargetRequest? ToTargetRequest() =>
         // The candidate gatherer is built in the runtime (it needs the live
@@ -406,10 +425,19 @@ public sealed class ExileUntilLeavesEffectDef : EffectDefinition
 
     private string BuildDescription()
     {
+        var may = Optional ? "you may " : "";
         var who = OpponentControlsOnly ? " an opponent controls" : "";
         var another = ExcludeSelf ? "another " : "";
         var mv = MaxManaValue is int n ? $" with mana value {n} or less" : "";
-        return $"exile {another}target {TargetFilter}{who}{mv} until this leaves the battlefield";
+        if (SameNameGroup)
+        {
+            // CR 201.2 — same-name sweep (Detention Sphere). The "until this
+            // leaves" duration is carried by the linked LTB return, so the
+            // printed wording uses the explicit return clause instead.
+            return $"{may}exile {another}target {TargetFilter}{who}{mv} "
+                + "and all other permanents with the same name as that permanent";
+        }
+        return $"{may}exile {another}target {TargetFilter}{who}{mv} until this leaves the battlefield";
     }
 
     /// <summary>Stable effect description used by the runtime ETB effect

@@ -165,9 +165,10 @@ public static class BrutalCatharFactory
     /// <summary>
     /// Shared wiring for the "exile target creature an opponent controls until
     /// this creature leaves the battlefield" ETB / LTB pair (CR 603.6a /
-    /// 701.21 / 603.6c). Mirrors
-    /// <see cref="BanishingLightFactory.WireExileEnchantmentTriggers"/> with a
-    /// creature-only target filter. v1 fires on the ENTERS half only — the
+    /// 701.21 / 603.6c). Mirrors the declarative
+    /// <see cref="Majik.Core.CardData.Definitions.ExileUntilLeavesEffectDef"/>
+    /// verb (the closed Banishing Light backbone) with a creature-only target
+    /// filter. v1 fires on the ENTERS half only — the
     /// "or transforms into Brutal Cathar" re-trigger is deferred (no transform
     /// trigger in the engine).
     /// </summary>
