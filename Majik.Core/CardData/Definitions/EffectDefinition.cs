@@ -606,10 +606,23 @@ public sealed class GainControlEffectDef : EffectDefinition
     /// <summary>Target filter (default <c>"creature"</c>).</summary>
     public string TargetFilter { get; set; } = "creature";
 
-    /// <summary>Duration of the control change. v1 supports only
-    /// <c>"end_of_turn"</c> (the Threaten family); any other value is treated
-    /// as <c>"end_of_turn"</c> for now (permanent Mind-Control-style control
-    /// is served by the bespoke <c>ControlSpellFactory</c> path).</summary>
+    /// <summary>Duration of the control change. Two modes (CR 611.2b):
+    /// <list type="bullet">
+    ///   <item><c>"end_of_turn"</c> (default) — the Threaten / Act of Treason /
+    ///   Zealous Conscripts / Eldrazi Obligator family. Control reverts at the
+    ///   cleanup step (CR 514.2).</item>
+    ///   <item><c>"while_source_on_battlefield"</c> — the persistent-steal family
+    ///   ("gain control of target creature <i>for as long as this remains on the
+    ///   battlefield</i>" — Sower of Temptation). Control lasts past end of turn
+    ///   and reverts when the ability's SOURCE card leaves the battlefield; the
+    ///   <see cref="Majik.Core.Effects.TemporaryControlChangeEffect"/> carries an
+    ///   <c>until</c> predicate keyed on the source's zone, the service prunes it
+    ///   on the source's departure, and its <c>OnExpired</c> restores the prior
+    ///   controller.</item>
+    /// </list>
+    /// Any unrecognized value falls back to <c>"end_of_turn"</c>. Fully permanent
+    /// Mind-Control-style Aura control is served by the bespoke
+    /// <c>ControlSpellFactory</c> path.</summary>
     public string Duration { get; set; } = "end_of_turn";
 
     /// <summary>Untap the gained creature (Threaten rider). Default <c>true</c>.</summary>

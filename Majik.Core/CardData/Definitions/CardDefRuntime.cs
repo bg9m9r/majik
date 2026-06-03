@@ -1913,6 +1913,18 @@ public static class CardDefRuntime
         // single-arg posture.
         var untap = def.Untap;
         var gainsHaste = def.GainsHaste;
+        // CR 611.2b — duration. "end_of_turn" (default) = the Threaten family,
+        // reverting at the cleanup step. "while_source_on_battlefield" = the
+        // persistent-steal family (Sower of Temptation — "gain control of target
+        // creature for as long as this creature remains on the battlefield"): the
+        // control change lasts past end of turn and reverts when THIS card (the
+        // ability's source) leaves the battlefield. Built by handing the
+        // TemporaryControlChangeEffect an `until` predicate keyed on the source's
+        // zone; the effect then doesn't expire at cleanup and the service prunes
+        // it (firing the revert) the moment the source departs (CR 611.2b).
+        var whileSourceOnBattlefield = string.Equals(
+            def.Duration, "while_source_on_battlefield", StringComparison.OrdinalIgnoreCase);
+        var sourceCard = card;
         // CR 601.2b / 603.4 — the optional reflexive "you may pay {cost}. If you
         // do, …" rider (Eldrazi Obligator). Parsed once at build time; null when
         // the control change is mandatory (Threaten / Zealous Conscripts).
@@ -1921,7 +1933,10 @@ public static class CardDefRuntime
             : Majik.Core.ValueObjects.ManaCost.Parse(def.OptionalManaCost);
         var cardName = card.Name;
         return new Effect(
-            $"{card.Name}: gain control of target {def.TargetFilter} until end of turn"
+            $"{card.Name}: gain control of target {def.TargetFilter}"
+                + (whileSourceOnBattlefield
+                    ? " for as long as this remains on the battlefield"
+                    : " until end of turn")
                 + (optionalCost != null ? $" (may pay {def.OptionalManaCost})" : ""),
             async ctx =>
             {
@@ -1956,7 +1971,16 @@ public static class CardDefRuntime
                 // CR 613.2 — only swap if we don't already control it.
                 if (!ReferenceEquals(permanent.Controller, controller))
                 {
-                    continuous.Register(new TemporaryControlChangeEffect(permanent, controller));
+                    // CR 611.2b — a "for as long as this remains on the
+                    // battlefield" steal carries an `until` predicate keyed on
+                    // the source card's zone; the EOT (Threaten) steal carries
+                    // none. The captured `sourceCard` is the ability's own
+                    // permanent — when it leaves play the service prunes this
+                    // effect and OnExpired restores the prior controller.
+                    Func<bool>? until = whileSourceOnBattlefield
+                        ? () => sourceCard.Zone == ZoneType.Battlefield
+                        : null;
+                    continuous.Register(new TemporaryControlChangeEffect(permanent, controller, until));
                 }
 
                 // CR 701.21 — "Untap that permanent."

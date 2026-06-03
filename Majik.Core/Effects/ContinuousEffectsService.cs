@@ -2,6 +2,7 @@ using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Events;
 using Majik.Core.Players;
+using Majik.Core.Zones;
 
 namespace Majik.Core.Effects;
 
@@ -103,13 +104,33 @@ public sealed class ContinuousEffectsService
     /// </summary>
     public IEventBus? EventBus => _eventBus;
 
-    private void OnBusEvent(GameEvent _)
+    private void OnBusEvent(GameEvent e)
     {
         // Any game event can shift an external CDA input (graveyard contents,
         // life totals, control, counts of artifacts/etc.). Bump unconditionally
         // — a spurious bump only costs a recompute, never correctness.
         BumpGeneration();
+
+        // CR 611.2b — a "for as long as <condition>" continuous effect ends the
+        // moment its condition lapses. The most common lapse is the source
+        // leaving the battlefield ("for as long as you control this" / "for as
+        // long as this remains on the battlefield" — Sower of Temptation). That
+        // departure rides a CardMovedEvent off the battlefield; pruning here
+        // drops any now-inactive effect and fires its OnExpired teardown (e.g. a
+        // TemporaryControlChangeEffect restoring the prior controller) as soon as
+        // the game next processes events — the SBA-style condition check the
+        // persistent-steal duration needs, without a separate sweep boundary.
+        if (e is CardMovedEvent { FromZone: ZoneType.Battlefield } && !_pruning)
+        {
+            // Re-entrancy guard: OnExpired teardown inside Prune can ripple
+            // further events; a single pass per departure is sufficient.
+            _pruning = true;
+            try { Prune(); }
+            finally { _pruning = false; }
+        }
     }
+
+    private bool _pruning;
 
     /// <summary>
     /// Invalidate the whole memoization cache by advancing the global
