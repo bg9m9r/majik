@@ -7,6 +7,7 @@ using Majik.Core.Events;
 using Majik.Core.Keywords;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
+using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
@@ -37,9 +38,16 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="CardMovedEvent"/>, so the trigger fires in a real match
 ///   without explicit registration.
 ///
-/// ## Deferred (v1 gap)
-/// - <b>"Whenever you tap a creature for mana, add {G}"</b>: tap-for-mana
-///   watcher missing (separate deferral surface — not Earthbend).
+/// - <b>"Whenever you tap a creature for mana, add an additional {G}"</b>
+///   (CR 605.1b — a triggered mana ability that triggers on mana being
+///   produced and itself produces mana): a <see cref="TriggeredAbility"/>
+///   subscribing to <see cref="ManaAbilityActivatedEvent"/> (published by
+///   <see cref="Majik.Core.Services.ManaAbilityActivator"/> after the
+///   activator's pool is topped up — the same surface Utopia Sprawl /
+///   Mirari's Wake consume). The condition matches when the activator is
+///   THIS card's controller ("you", CR 109.5) AND the tapped source is a
+///   <see cref="Creature"/>. The effect adds an additional {G} to that
+///   controller's mana pool via <see cref="Player.AddManaToPool"/>.
 /// </summary>
 [CardName("Badgermole Cub")]
 public static class BadgermoleCubFactory
@@ -58,7 +66,18 @@ public static class BadgermoleCubFactory
     /// <see cref="ContinuousEffectsService"/> is resolved from the card's
     /// <see cref="Permanent.ActiveEffects"/> when the animate effects register.
     /// </summary>
-    public static Creature Create(Player owner)
+    public static Creature Create(Player owner) => Create(owner, triggers: null);
+
+    /// <summary>
+    /// Build a fully-wired Badgermole Cub. The Earthbend-1 ETB trigger and the
+    /// "whenever you tap a creature for mana, add an additional {G}" triggered
+    /// mana ability are both attached to the card's
+    /// <see cref="Card.Abilities"/> collection; when <paramref name="triggers"/>
+    /// is supplied the tap-for-mana trigger is also registered with the
+    /// <see cref="TriggerManager"/> so it surfaces as pending end-to-end (the
+    /// ETB trigger auto-binds on its <see cref="CardMovedEvent"/>).
+    /// </summary>
+    public static Creature Create(Player owner, TriggerManager? triggers)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -119,6 +138,48 @@ public static class BadgermoleCubFactory
             });
 
         card.AddAbility(etbTrigger);
+
+        // --------------------------------------------------------------------
+        // "Whenever you tap a creature for mana, add an additional {G}."
+        // CR 605.1b — a triggered mana ability (triggers on mana being
+        // produced; itself produces mana). It subscribes to the
+        // ManaAbilityActivatedEvent published by ManaAbilityActivator after the
+        // activator's pool is topped up (same surface Utopia Sprawl consumes).
+        // CR 109.5 / 603.2 — "you" is THIS card's controller; the trigger only
+        // fires when the controller is the player who tapped a creature.
+        // --------------------------------------------------------------------
+        var bonusGreen = ManaCost.Parse("G");
+        Player? pendingController = null;
+
+        var tapCondition = new EventTriggerCondition<ManaAbilityActivatedEvent>((e, _) =>
+        {
+            // "you tap" — the activator must be the cub's current controller.
+            var you = card.Controller ?? owner;
+            if (!ReferenceEquals(e.Player, you)) return false;
+            // "a creature for mana" — the tapped source must be a creature.
+            if (e.Source is not Creature) return false;
+            pendingController = e.Player;
+            return true;
+        });
+
+        var addGreenEffect = new Effect(
+            "Badgermole Cub — add an additional {G}",
+            () =>
+            {
+                var controller = pendingController;
+                pendingController = null;
+                controller?.AddManaToPool(bonusGreen);
+            });
+
+        var tapTrigger = new TriggeredAbility(
+            source: card,
+            controller: owner,
+            condition: tapCondition,
+            effects: new IEffect[] { addGreenEffect },
+            activeZones: new[] { ZoneType.Battlefield });
+
+        card.AddAbility(tapTrigger);
+        triggers?.RegisterTriggeredAbility(tapTrigger);
 
         return card;
     }
