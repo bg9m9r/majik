@@ -1,4 +1,5 @@
 using Majik.Core.Cards;
+using Majik.Core.Costs;
 using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Rules;
@@ -35,6 +36,7 @@ public sealed class LibraryTopPlayStaticEffect
     private readonly IEventBus? _eventBus;
     private readonly Func<bool>? _activeCondition;
     private readonly Func<ICard, bool>? _extraPredicate;
+    private readonly Func<IAlternativeCost>? _topCastAltCostFactory;
     private readonly Action<CardMovedEvent> _handler;
     private readonly object _token = new();
     private bool _attached;
@@ -62,6 +64,11 @@ public sealed class LibraryTopPlayStaticEffect
     /// <param name="extraPredicate">Optional per-card restriction passed through
     /// to the registry grant — e.g. Conspicuous Snoop's "Goblin card" gate on
     /// its creature-cast grant. Null means "no per-card restriction".</param>
+    /// <param name="topCastAltCostFactory">Optional CR 118.9 alternative-cost
+    /// factory passed through to the registry grant — when set, a spell cast
+    /// under this grant must be cast using the produced alternative cost instead
+    /// of its printed mana cost (Bolas's Citadel: "pay life equal to its mana
+    /// value rather than pay its mana cost"). Null = cast with the printed cost.</param>
     public LibraryTopPlayStaticEffect(
         Permanent source,
         Player controller,
@@ -69,7 +76,8 @@ public sealed class LibraryTopPlayStaticEffect
         IEventBus? eventBus,
         bool revealsTop = true,
         Func<bool>? activeCondition = null,
-        Func<ICard, bool>? extraPredicate = null)
+        Func<ICard, bool>? extraPredicate = null,
+        Func<IAlternativeCost>? topCastAltCostFactory = null)
     {
         _source = source ?? throw new ArgumentNullException(nameof(source));
         _controller = controller ?? throw new ArgumentNullException(nameof(controller));
@@ -78,6 +86,7 @@ public sealed class LibraryTopPlayStaticEffect
         _eventBus = eventBus;
         _activeCondition = activeCondition;
         _extraPredicate = extraPredicate;
+        _topCastAltCostFactory = topCastAltCostFactory;
         _handler = OnEvent;
     }
 
@@ -123,7 +132,8 @@ public sealed class LibraryTopPlayStaticEffect
         {
             if (_registered) return;
             LibraryTopPlayPermissions.AddGrant(
-                _token, _controller, _filter, _revealsTop, _extraPredicate);
+                _token, _controller, _filter, _revealsTop, _extraPredicate,
+                _topCastAltCostFactory);
             _registered = true;
         }
         else
