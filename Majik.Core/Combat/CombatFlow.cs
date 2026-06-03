@@ -84,6 +84,16 @@ public sealed class CombatFlow
         var blockPlan = await defenderAgent.DeclareBlockersAsync(
             ctx, attackPlan.Attackers.Select(a => a.Attacker).ToList(), blockers, ct);
 
+        // CR 509.1h — per-blocker "blocks" event so "Whenever ~ blocks a
+        // creature, …" triggers (Brimaz, King of Oreskos) can fire on
+        // declaration. One event per blocker→attacker pairing, naming the
+        // blocked attacker so the trigger can act on that specific creature.
+        foreach (var b in blockPlan.Blockers)
+        {
+            _bus.Publish(new Majik.Core.Domain.DomainEvents.CreatureBlocksEvent(
+                b.Blocker, b.Attacker));
+        }
+
         var blockersByAttacker = blockPlan.Blockers
             .GroupBy(b => b.Attacker)
             .ToDictionary(g => g.Key, g => g.ToList());

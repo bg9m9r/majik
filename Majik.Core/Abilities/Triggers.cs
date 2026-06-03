@@ -168,6 +168,19 @@ public static class Triggers
     }
 
     /// <summary>
+    /// CR 509.1h — "Whenever ~ blocks a creature, …" per-blocker trigger. Fires
+    /// on <see cref="Majik.Core.Domain.DomainEvents.CreatureBlocksEvent"/> whose
+    /// <c>Blocker</c> IS <paramref name="source"/> (reference match). The
+    /// blocked attacker travels on the event so the trigger's effect can act on
+    /// that specific creature (Brimaz — "create a token blocking that creature").
+    /// </summary>
+    public static ITriggerCondition OnBlockSelf(Majik.Core.Cards.ICard source)
+    {
+        return new EventTriggerCondition<Majik.Core.Domain.DomainEvents.CreatureBlocksEvent>(
+            (e, _) => ReferenceEquals(e.Blocker, source));
+    }
+
+    /// <summary>
     /// CR 614 / Zendikar — Landfall. "Whenever a land enters the battlefield
     /// under your control, …" Fires on CardMovedEvent → Battlefield where
     /// the card is a Land and its controller is <paramref name="controller"/>.

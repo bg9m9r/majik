@@ -39,7 +39,17 @@ public sealed class TurnDriver
     private readonly Majik.Core.Effects.ContinuousEffectsService? _continuousEffects;
     private readonly Majik.Core.Effects.ReplacementBus? _replacements;
     private readonly LandDropTracker _landDropTracker;
-    private readonly AdditionalCombatQueue _additionalCombats = new();
+    // CR 506.4 — the additional-combat-phase queue. Resolved LAZILY from the
+    // per-game provider (NOT captured in a field) so a card's trigger (Fear of
+    // Missing Out, Aggravated Assault) that reaches
+    // AdditionalCombatRegistryProvider.Current at resolution time enqueues onto
+    // the SAME per-game instance the turn loop drains. The TurnDriver is
+    // constructed BEFORE GameRegistryScope.PushForGame installs the per-game
+    // store, so a field capture would grab the stale process-wide fallback;
+    // reading the AsyncLocal-backed Current per access always yields this
+    // game's queue once the scope is active (and is stable within the run).
+    private AdditionalCombatQueue _additionalCombats
+        => AdditionalCombatRegistryProvider.Current;
     private PhaseStateType _currentPhase;
     private int _currentTurnNumber;
 
@@ -902,6 +912,12 @@ public sealed class TurnDriver
             // never be offered as attackers.
             .Where(c => !c.IsTapped
                 && (!c.HasSummoningSickness || Majik.Core.Combat.CombatAbilities.HasHaste(c)))
+            // CR 702.3b — a defender creature can't be declared as an attacker
+            // unless an effect lets it attack this turn "as though it didn't
+            // have defender" (CR 508.1a relaxation — Nivix Cyclops). Without
+            // this filter a Wall would be offered as an attacker.
+            .Where(c => !Majik.Core.Combat.CombatAbilities.HasDefender(c)
+                || c.CanAttackAsThoughItDidntHaveDefenderThisTurn)
             .ToList();
         var eligibleBlockers = defender.Zones.Battlefield.GetCards()
             .OfType<Creature>()
@@ -961,7 +977,13 @@ public sealed class TurnDriver
         //    once.
         foreach (var permanent in _players.SelectMany(p => p.Zones.Battlefield.GetCards().OfType<Permanent>()))
         {
-            if (permanent is Creature creature) creature.ClearDamage();
+            if (permanent is Creature creature)
+            {
+                creature.ClearDamage();
+                // CR 514.2 — "attack as though it didn't have defender this
+                // turn" grants (Nivix Cyclops) expire at cleanup.
+                creature.CanAttackAsThoughItDidntHaveDefenderThisTurn = false;
+            }
             // CR 514.2 — the per-turn "was dealt damage this turn" flag
             // (Needle Drop etc., CR 120.3) clears alongside marked damage.
             permanent.ClearWasDealtDamageThisTurn();

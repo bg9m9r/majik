@@ -196,6 +196,67 @@ public class CombatManager
     }
 
     /// <summary>
+    /// CR 509.1 (token-creation analogue) — splice a creature into the current
+    /// combat as a token that is already <b>blocking a specific attacker</b>,
+    /// without it being "declared" as a blocker. This is the block-side sibling
+    /// of <see cref="AddTappedAndAttackingToken"/>: the primitive behind effects
+    /// that "create a token that's blocking that creature" (Brimaz, King of
+    /// Oreskos's block trigger — CR 509.4 / 509.1h, a creature put onto the
+    /// battlefield blocking is "blocking" but was never "declared as a blocker",
+    /// so "whenever a creature blocks" abilities do NOT trigger off it).
+    ///
+    /// The blocking <paramref name="token"/> is attached to the
+    /// <see cref="Attacker"/> wrapping <paramref name="blockedAttacker"/> in the
+    /// current combat, so it participates in the combat-damage step exactly as a
+    /// declared blocker would (deals/takes damage with that attacker). It does
+    /// NOT tap (CR 509.1 — blocking does not tap) and does not bypass any block
+    /// LEGALITY checks because it was put into combat by an effect, not declared
+    /// (CR 509.4).
+    ///
+    /// Returns the created <see cref="Blocker"/>, or <c>null</c> when there is no
+    /// combat in progress or <paramref name="blockedAttacker"/> is not an
+    /// attacker in it (nothing to block — the caller should fall back to a plain
+    /// battlefield token).
+    /// </summary>
+    public Blocker? AddBlockingToken(Creature token, Creature blockedAttacker)
+    {
+        if (token == null)
+        {
+            throw new ArgumentNullException(nameof(token));
+        }
+
+        if (blockedAttacker == null)
+        {
+            throw new ArgumentNullException(nameof(blockedAttacker));
+        }
+
+        if (_currentCombat == null || _currentCombat.IsEnded)
+        {
+            return null;
+        }
+
+        // Find the attacker entry the token is to block. A token can only be
+        // created blocking a creature that is actually attacking this combat
+        // (CR 509.1 — you block an attacking creature).
+        var attacker = _currentCombat.Attackers
+            .FirstOrDefault(a => ReferenceEquals(a.Creature, blockedAttacker));
+        if (attacker == null)
+        {
+            return null;
+        }
+
+        var blocker = new Blocker(
+            token,
+            attacker,
+            CombatAbilities.HasFirstStrike(token),
+            CombatAbilities.HasDoubleStrike(token),
+            CombatAbilities.HasDeathtouch(token));
+
+        attacker.AddBlocker(blocker);
+        return blocker;
+    }
+
+    /// <summary>
     /// Declare blockers (Rule 509: Declare Blockers step).
     /// </summary>
     public void DeclareBlockers(Player defendingPlayer, IEnumerable<BlockerDeclaration> declarations)

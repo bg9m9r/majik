@@ -52,6 +52,16 @@ public class CombatValidator
             return false;
         }
 
+        // CR 702.3b — a creature with defender can't attack, UNLESS an effect
+        // lets it attack this turn "as though it didn't have defender"
+        // (CR 508.1a relaxation — Nivix Cyclops). The grant is a per-turn
+        // permission flag, not a keyword removal.
+        if (CombatAbilities.HasDefender(creature)
+            && !creature.CanAttackAsThoughItDidntHaveDefenderThisTurn)
+        {
+            return false;
+        }
+
         // Per-turn CannotAttack restriction (CR 508.1c) — installed by
         // spells like Orim's Chant / "<X> creatures can't attack this turn".
         if (_effects?.HasRestriction(creature, CombatRestriction.CannotAttack) == true)
