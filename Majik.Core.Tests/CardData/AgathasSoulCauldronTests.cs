@@ -230,6 +230,64 @@ public class AgathasSoulCauldronTests
             "only creature cards are imprinted; non-creature cards are not");
     }
 
+    // -----------------------------------------------------------------------
+    // CR 609.4b — mana-colour-substitution permission
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void AgathasSoulCauldron_ContributesAnyColorForCreatureAbilities()
+    {
+        var alice = new Player("Alice", 20);
+        var cauldron = AgathasSoulCauldronFactory.Create(alice);
+        cauldron.SetZone(ZoneType.Battlefield);
+        alice.Zones.Battlefield.AddCard(cauldron);
+
+        cauldron.Abilities.OfType<ManaColorSubstitutionPermission>()
+            .Should().ContainSingle(p => p.Purpose == ManaSpendPurpose.ActivateCreatureAbilities,
+                "Agatha's Soul Cauldron lets you spend mana as though any color to activate creature abilities");
+
+        ManaColorSubstitutionPermission
+            .PlayerMaySpendAnyColorFor(alice, ManaSpendPurpose.ActivateCreatureAbilities)
+            .Should().BeTrue("the Cauldron is on Alice's battlefield");
+    }
+
+    [Fact]
+    public void AgathasSoulCauldron_LetsCreatureAbilityBePaidWithOffColorMana()
+    {
+        var alice = new Player("Alice", 20);
+        var cauldron = AgathasSoulCauldronFactory.Create(alice);
+        cauldron.SetZone(ZoneType.Battlefield);
+        alice.Zones.Battlefield.AddCard(cauldron);
+
+        // A creature ability that costs {G}. Alice floats only red mana.
+        alice.AddManaToPool(Majik.Core.ValueObjects.ManaCost.Parse("R"));
+        var creatureAbilityCost = new ManaColorSubstitutableManaCost(
+            Majik.Core.ValueObjects.ManaCost.Parse("G"),
+            alice,
+            ManaSpendPurpose.ActivateCreatureAbilities);
+
+        creatureAbilityCost.CanPay(alice).Should().BeTrue(
+            "the Cauldron lets red mana pay a green pip on a creature ability (CR 609.4b)");
+
+        creatureAbilityCost.Pay(alice);
+        alice.ManaPool.Total.Should().Be(0, "the red mana was spent on the {G} pip");
+    }
+
+    [Fact]
+    public void AgathasSoulCauldron_PermissionGoneWhenCauldronLeavesBattlefield()
+    {
+        var alice = new Player("Alice", 20);
+        var cauldron = AgathasSoulCauldronFactory.Create(alice);
+
+        // Cauldron in hand, not on the battlefield.
+        cauldron.SetZone(ZoneType.Hand);
+        alice.Zones.Hand.AddCard(cauldron);
+
+        ManaColorSubstitutionPermission
+            .PlayerMaySpendAnyColorFor(alice, ManaSpendPurpose.ActivateCreatureAbilities)
+            .Should().BeFalse("a static ability only applies from the battlefield (CR 604.1)");
+    }
+
     [Fact]
     public void AgathasSoulCauldron_ExilingMultipleCreatures_ImprintsAll()
     {
