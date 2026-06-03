@@ -84,25 +84,14 @@ public sealed record LifeChangedPayload(
     int Previous,
     int Current);
 
-/// <summary>CR 500 — entry into a phase. <see cref="Phase"/> is the
-/// resolved phase label.</summary>
-public sealed record PhaseStartedPayload(
-    string Phase,
-    Guid PlayerId);
-
-/// <summary>CR 500 — exit from a phase.</summary>
-public sealed record PhaseEndedPayload(
-    string Phase,
-    Guid PlayerId);
-
 /// <summary>Top-level game-lifecycle transition (Initializing / Mulligan /
 /// Playing / GameOver). Distinct from the phase/step channel.</summary>
 public sealed record GameStateChangedPayload(
     string? From,
     string To);
 
-/// <summary>Turn-state-machine transition (Beginning / PreCombatMain /
-/// Combat / PostCombatMain / Ending).</summary>
+/// <summary>CR 500/505 — phase-level transition (TurnBeginning /
+/// PreCombatMain / Combat / PostCombatMain / TurnEnding).</summary>
 public sealed record PhaseStateChangedPayload(
     string? From,
     string To);
@@ -110,11 +99,6 @@ public sealed record PhaseStateChangedPayload(
 /// <summary>CR 500 — entry into a step. <see cref="Step"/> is the
 /// resolved step label.</summary>
 public sealed record StepStartedPayload(
-    string Step,
-    Guid PlayerId);
-
-/// <summary>CR 500 — exit from a step.</summary>
-public sealed record StepEndedPayload(
     string Step,
     Guid PlayerId);
 
@@ -199,12 +183,9 @@ public sealed record EventPayloadCatalog(
     CardDrawnPayload CardDrawn,
     CardRevealedPayload CardRevealed,
     LifeChangedPayload LifeChanged,
-    PhaseStartedPayload PhaseStarted,
-    PhaseEndedPayload PhaseEnded,
     GameStateChangedPayload GameStateChanged,
     PhaseStateChangedPayload PhaseStateChanged,
     StepStartedPayload StepStarted,
-    StepEndedPayload StepEnded,
     TurnStartedPayload TurnStarted,
     TurnEndedPayload TurnEnded,
     ExtraPhaseAddedPayload ExtraPhaseAdded,

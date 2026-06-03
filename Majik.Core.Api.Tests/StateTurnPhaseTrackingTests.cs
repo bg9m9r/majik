@@ -36,12 +36,12 @@ public class StateTurnPhaseTrackingTests
     }
 
     [Fact]
-    public void GetState_Phase_PicksUpPhaseStartedEvent()
+    public void GetState_Phase_PicksUpStepStartedEvent()
     {
         var facade = GameFacade.Create("Alice", "Bob", Array.Empty<ICard>(), Array.Empty<ICard>());
         var alice = new Player("Alice");
 
-        facade.EventBus_Publish(new PhaseStartedEvent(StepStateType.DeclareAttackers, alice));
+        facade.EventBus_Publish(new StepStartedEvent(StepStateType.DeclareAttackers, alice));
 
         facade.GetState().Phase.Should().Be(StepStateType.DeclareAttackers.ToString());
     }

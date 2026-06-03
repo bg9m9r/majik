@@ -75,7 +75,7 @@ The official Magic: The Gathering Comprehensive Rules (2025-11-14) are the sourc
 ### Game state machine + turn/phase/step flow
 
 - `GameStateMachine` — `Initializing | Mulligan | Playing | GameOver` (`Majik.Core/StateMachine/`). The only live state machine.
-- Turn-level (phase) and step-level flow is **not** a state machine — it's driven directly by `TurnDriver` (emits the typed `PhaseStateChangedEvent` per CR-505 phase + `StepStartedEvent` per step) and `PhaseManager` (emits `PhaseStartedEvent`). The vocabulary lives in two enums that now match the Comprehensive Rules: `PhaseStateType` (= MTG phases: TurnBeginning/PreCombatMain/Combat/PostCombatMain/TurnEnding) and `StepStateType` (= MTG steps: Untap/Upkeep/Draw/…/Cleanup).
+- Turn-level (phase) and step-level flow is **not** a state machine — in the live engine (`GameFacade` → `GameDriver` → `TurnDriver`) it's driven directly by `TurnDriver`, which emits the typed `PhaseStateChangedEvent` per CR-505 phase + `StepStartedEvent` per step. The vocabulary lives in two enums that now match the Comprehensive Rules: `PhaseStateType` (= MTG phases: TurnBeginning/PreCombatMain/Combat/PostCombatMain/TurnEnding) and `StepStateType` (= MTG steps: Untap/Upkeep/Draw/…/Cleanup). (The `Domain.Aggregates.Game` + `PhaseManager` aggregate is a separate, test-only path and does not run in production matches.)
 
 Phases are pluggable (`Majik.Core/Game/Phases/`). The sequence supports MTG's extra-turn / extra-phase / extra-step insertion (Rule 500.7–9). Flow is coordinated by `PhaseSequence` + `TurnManager` + `PhaseManager` + `PriorityManager`.
 
@@ -85,7 +85,7 @@ Phases are pluggable (`Majik.Core/Game/Phases/`). The sequence supports MTG's ex
 
 ### Event bus
 
-`IEventBus` / `EventBus` in `Majik.Core/Events/`. Public `GameEvent` subclasses (`CardDrawnEvent`, `GameStateChangedEvent`, `LifeChangedEvent`, `TurnStartedEvent`, `StepStartedEvent`). The game-lifecycle channel (`GameStateChangedEvent`: Initializing/Mulligan/Playing/GameOver) is kept separate from the phase/step channel (`PhaseStateChangedEvent` / `PhaseStartedEvent` / `StepStartedEvent`). Domain-internal events under `Majik.Core/Domain/DomainEvents/` (`SpellCastEvent`, `PriorityPassedEvent`, `StackObjectResolvedEvent`). Engine is UI-agnostic — clients subscribe.
+`IEventBus` / `EventBus` in `Majik.Core/Events/`. Public `GameEvent` subclasses (`CardDrawnEvent`, `GameStateChangedEvent`, `LifeChangedEvent`, `TurnStartedEvent`, `StepStartedEvent`). The game-lifecycle channel (`GameStateChangedEvent`: Initializing/Mulligan/Playing/GameOver) is kept separate from the phase/step channel (`PhaseStateChangedEvent` / `StepStartedEvent`). Domain-internal events under `Majik.Core/Domain/DomainEvents/` (`SpellCastEvent`, `PriorityPassedEvent`, `StackObjectResolvedEvent`). Engine is UI-agnostic — clients subscribe.
 
 **DEBUG fail-fast:** `GameFacade` wires `EventBus.OnHandlerError` to a rethrowing sink in DEBUG builds (`GameFacadeErrorSinkInitializer`). Event-handler bodies must not throw on normal execution paths — a throw in DEBUG crashes the process immediately so the bug surfaces during development / tests. Release builds leave the sink null (silent swallow) to preserve live-game isolation. If you add a handler that can throw under ordinary conditions you will see an unhandled-exception crash in tests before it reaches production.
 

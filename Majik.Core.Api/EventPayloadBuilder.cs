@@ -94,12 +94,6 @@ public static class EventPayloadBuilder
             PlayerId: x.Player.Id,
             Previous: x.PreviousLife,
             Current: x.NewLife)),
-        PhaseStartedEvent x => Serialize(new PhaseStartedPayload(
-            Phase: PhaseLabelResolver.Resolve(x.PhaseType, turnState),
-            PlayerId: x.Player.Id)),
-        PhaseEndedEvent x => Serialize(new PhaseEndedPayload(
-            Phase: PhaseLabelResolver.Resolve(x.PhaseType, turnState),
-            PlayerId: x.Player.Id)),
         GameStateChangedEvent x => Serialize(new GameStateChangedPayload(
             From: x.PreviousState?.ToString(),
             To: x.CurrentState.ToString())),
@@ -107,9 +101,6 @@ public static class EventPayloadBuilder
             From: x.PreviousState?.ToString(),
             To: x.CurrentState.ToString())),
         StepStartedEvent x => Serialize(new StepStartedPayload(
-            Step: PhaseLabelResolver.Resolve(x.StepType, turnState),
-            PlayerId: x.Player.Id)),
-        StepEndedEvent x => Serialize(new StepEndedPayload(
             Step: PhaseLabelResolver.Resolve(x.StepType, turnState),
             PlayerId: x.Player.Id)),
         TurnStartedEvent x => Serialize(new TurnStartedPayload(

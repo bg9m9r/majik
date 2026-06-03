@@ -268,13 +268,9 @@ public class LayerAgreementInvariantTests : IClassFixture<TestMongoFixture>
         {
             if (@event != "event") continue;
             if (payload is not EventDto dto) continue;
-            if (dto.Type == "StepStartedEvent" || dto.Type == "StepEndedEvent")
+            if (dto.Type == "StepStartedEvent")
             {
                 if (TryReadString(dto.Payload, "step", out var step)) labels.Add(step);
-            }
-            else if (dto.Type == "PhaseStartedEvent" || dto.Type == "PhaseEndedEvent")
-            {
-                if (TryReadString(dto.Payload, "phase", out var phase)) labels.Add(phase);
             }
         }
         return labels;
