@@ -223,6 +223,28 @@ public class CollectiveBrutalityTests
     }
 
     [Fact]
+    public async Task ChosenTargetedMode_NoLegalTarget_CastIllegal_Rewinds()
+    {
+        // CR 601.2c — a CHOSEN targeted mode that the agent can't supply a
+        // legal target for makes the WHOLE cast illegal (the cast rewinds),
+        // rather than no-opping on resolution. Alice chooses mode 1 (target
+        // creature −2/−2) but there is no creature on the battlefield, so the
+        // agent returns an empty target slot. The cast must throw.
+        var cb = NewBrutality();
+
+        var agent = new ScriptedAgent();
+        agent.QueueModes(CollectiveBrutalityFactory.ModeMinusTwoMinusTwo);
+        agent.QueueTargets(System.Array.Empty<object>()); // no legal creature
+        agent.QueueMana(ManaPayment.Empty);
+
+        Func<Task> act = async () => await _flow.CastAsync(_alice, cb, Def(agent), agent, Ctx());
+
+        await act.Should().ThrowAsync<System.InvalidOperationException>()
+            .WithMessage("*target creature*",
+                because: "a chosen targeted mode with no legal target is illegal (CR 601.2c)");
+    }
+
+    [Fact]
     public void EffectFactory_DuplicateModeIndices_DeDuplicated()
     {
         // CR 700.2d — the same mode can't be chosen more than once.
