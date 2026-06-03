@@ -16,7 +16,13 @@ public static class BlockLegality
     /// </summary>
     public static bool CanAttack(Creature creature, out string reason)
     {
-        if (CombatAbilities.HasDefender(creature))
+        // CR 702.3b — defender forbids attacking, UNLESS an effect lets this
+        // creature attack "as though it didn't have defender" this turn
+        // (CR 508.1a relaxation — Nivix Cyclops). The flag is a per-turn
+        // permission grant; the creature still has the defender keyword, it is
+        // merely permitted to be declared as an attacker.
+        if (CombatAbilities.HasDefender(creature)
+            && !creature.CanAttackAsThoughItDidntHaveDefenderThisTurn)
         {
             reason = "creature has defender";
             return false;

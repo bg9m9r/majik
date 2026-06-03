@@ -217,4 +217,18 @@ public class Creature : Permanent
     /// card to the battlefield and fires the ETB <see cref="CardMovedEvent"/>).
     /// </summary>
     public bool EvokeWasPaid { get; set; }
+
+    /// <summary>
+    /// CR 508.1a relaxation — set by effects that let a creature "attack this
+    /// turn as though it didn't have defender" (Nivix Cyclops, Axebane
+    /// Stag/Assault Formation family). When true, the Defender keyword's
+    /// can't-attack rule (CR 702.3b) is ignored for THIS creature for the rest
+    /// of the turn; every OTHER attack-legality check (tapped, summoning
+    /// sickness, "can't attack" restrictions) still applies normally. This is a
+    /// per-turn permission grant, not a keyword removal — the creature still
+    /// HAS defender (e.g. for "can't block" effects keyed on defender), it is
+    /// merely permitted to be declared as an attacker. Cleared at cleanup
+    /// (CR 514.2) alongside other "until end of turn" effects.
+    /// </summary>
+    public bool CanAttackAsThoughItDidntHaveDefenderThisTurn { get; set; }
 }

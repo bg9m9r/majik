@@ -127,6 +127,34 @@ public class CombatValidatorTests
     }
 
     [Fact]
+    public void CanAttack_Defender_ReturnsFalse()
+    {
+        // CR 702.3b — a creature with defender can't attack.
+        var player = new Player("Alice", 20);
+        var wall = new Creature("Wall", "1G", 0, 4) { Owner = player, Controller = player };
+        wall.SetZone(ZoneType.Battlefield);
+        wall.HasSummoningSickness = false;
+        wall.AddAbility(new Majik.Core.Abilities.KeywordAbility("Defender", wall, player));
+
+        _validator.CanAttack(wall, player).Should().BeFalse();
+    }
+
+    [Fact]
+    public void CanAttack_Defender_WithAttackAsThoughNoDefenderGrant_ReturnsTrue()
+    {
+        // CR 508.1a relaxation (Nivix Cyclops) — the per-turn grant permits a
+        // defender creature to attack.
+        var player = new Player("Alice", 20);
+        var wall = new Creature("Wall", "1G", 0, 4) { Owner = player, Controller = player };
+        wall.SetZone(ZoneType.Battlefield);
+        wall.HasSummoningSickness = false;
+        wall.AddAbility(new Majik.Core.Abilities.KeywordAbility("Defender", wall, player));
+        wall.CanAttackAsThoughItDidntHaveDefenderThisTurn = true;
+
+        _validator.CanAttack(wall, player).Should().BeTrue();
+    }
+
+    [Fact]
     public void CanBlock_ValidBlock_ReturnsTrue()
     {
         // Arrange

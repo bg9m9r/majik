@@ -291,4 +291,68 @@ public class CombatManagerTests
         blockerCreature.IsDead().Should().BeTrue(); // 1 toughness, 2 damage
         _eventBusMock.Verify(x => x.Publish(It.IsAny<StateBasedActionExecutedEvent>()), Times.AtLeastOnce);
     }
+
+    // -----------------------------------------------------------------------
+    // AddBlockingToken (CR 509.1 — create a token blocking a specific attacker)
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void AddBlockingToken_SplicesTokenAsBlockerOfChosenAttacker()
+    {
+        var activePlayer = new Player("Alice", 20);
+        var defendingPlayer = new Player("Bob", 20);
+        var attackerCreature = new Creature("Ogre", "2R", 3, 3) { Controller = activePlayer };
+        attackerCreature.SetZone(ZoneType.Battlefield);
+        attackerCreature.HasSummoningSickness = false;
+        _combatManager.StartCombat(activePlayer);
+        _combatManager.DeclareAttackers(activePlayer, new[]
+        {
+            new AttackerDeclaration(attackerCreature, defendingPlayer)
+        });
+
+        var token = new Creature("Cat Soldier", "", 1, 1)
+        { Owner = defendingPlayer, Controller = defendingPlayer, IsToken = true };
+        token.SetZone(ZoneType.Battlefield);
+
+        var blocker = _combatManager.AddBlockingToken(token, attackerCreature);
+
+        blocker.Should().NotBeNull("a token can be created blocking the attacker");
+        var attacker = _combatManager.CurrentCombat!.Attackers
+            .Single(a => ReferenceEquals(a.Creature, attackerCreature));
+        attacker.Blockers.Select(b => b.Creature).Should().Contain(token,
+            "the token is now blocking the chosen attacker");
+        token.IsTapped.Should().BeFalse("blocking does not tap (CR 509.1)");
+    }
+
+    [Fact]
+    public void AddBlockingToken_NoCombat_ReturnsNull()
+    {
+        var defendingPlayer = new Player("Bob", 20);
+        var attacker = new Creature("Ogre", "2R", 3, 3) { Controller = new Player("Alice", 20) };
+        var token = new Creature("Cat Soldier", "", 1, 1) { Controller = defendingPlayer };
+
+        // No StartCombat / DeclareAttackers — nothing to splice into.
+        _combatManager.AddBlockingToken(token, attacker).Should().BeNull();
+    }
+
+    [Fact]
+    public void AddBlockingToken_AttackerNotInCombat_ReturnsNull()
+    {
+        var activePlayer = new Player("Alice", 20);
+        var defendingPlayer = new Player("Bob", 20);
+        var realAttacker = new Creature("Ogre", "2R", 3, 3) { Controller = activePlayer };
+        realAttacker.SetZone(ZoneType.Battlefield);
+        realAttacker.HasSummoningSickness = false;
+        _combatManager.StartCombat(activePlayer);
+        _combatManager.DeclareAttackers(activePlayer, new[]
+        {
+            new AttackerDeclaration(realAttacker, defendingPlayer)
+        });
+
+        // A creature that is NOT attacking can't be blocked.
+        var notAttacking = new Creature("Bear", "1G", 2, 2) { Controller = activePlayer };
+        var token = new Creature("Cat Soldier", "", 1, 1) { Controller = defendingPlayer };
+
+        _combatManager.AddBlockingToken(token, notAttacking).Should().BeNull();
+    }
 }

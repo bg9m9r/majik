@@ -50,6 +50,33 @@ public class BlockLegalityTests
     }
 
     [Fact]
+    public void Defender_WithAttackAsThoughNoDefenderGrant_CanAttack()
+    {
+        // CR 508.1a relaxation — Nivix Cyclops: a defender creature granted
+        // "attack as though it didn't have defender this turn" may be declared.
+        var wall = Make("Wall", "Defender", _alice);
+        wall.HasSummoningSickness = false;
+        wall.CanAttackAsThoughItDidntHaveDefenderThisTurn = true;
+
+        BlockLegality.CanAttack(wall, out _).Should().BeTrue(
+            "the per-turn grant relaxes the defender can't-attack rule (CR 702.3b)");
+    }
+
+    [Fact]
+    public void Defender_WithGrant_StillBlockedByTapped()
+    {
+        // The grant relaxes ONLY the defender rule — every other check still
+        // applies (CR 508.1a). A tapped granted-defender still can't attack.
+        var wall = Make("Wall", "Defender", _alice);
+        wall.HasSummoningSickness = false;
+        wall.CanAttackAsThoughItDidntHaveDefenderThisTurn = true;
+        wall.Tap();
+
+        BlockLegality.CanAttack(wall, out var reason).Should().BeFalse();
+        reason.Should().Contain("tapped");
+    }
+
+    [Fact]
     public void NonDefender_CanAttack()
     {
         var bear = Make("Bear", null, _alice);
