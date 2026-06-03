@@ -65,11 +65,38 @@ public static class ChromaticLanternFactory
     /// leaves the battlefield via <see cref="CardMovedEvent"/> on
     /// <paramref name="eventBus"/>. When <paramref name="effects"/> is null the
     /// lifecycle wiring is silently skipped.
+    ///
+    /// <para>This overload defaults the candidate set to the lantern
+    /// controller's OWN battlefield zone (legacy #2322 behaviour). That set
+    /// MISSES a land the controller controls but an opponent owns (a stolen
+    /// land lives in the OWNER's battlefield collection — CR 110.2 / 700.6). To
+    /// enumerate the group by EFFECTIVE controller across both battlefields,
+    /// use <see cref="Create(Player, ContinuousEffectsService?, IEventBus?, System.Func{System.Collections.Generic.IEnumerable{Player}?})"/>.</para>
     /// </summary>
     public static Artifact Create(
         Player owner,
         ContinuousEffectsService? effects,
         IEventBus? eventBus)
+        => Create(owner, effects, eventBus, allPlayersProvider: null);
+
+    /// <summary>
+    /// Fully-wired Chromatic Lantern whose "Lands you control" group grant
+    /// enumerates the WHOLE battlefield (every player's battlefield zone via
+    /// <paramref name="allPlayersProvider"/>) and filters by EFFECTIVE
+    /// controller. This is the controlled-but-not-owned-correct path: a land
+    /// the lantern's controller controls but an opponent OWNS (stolen via
+    /// Threaten / Mindslaver / Persuasion) lives in the opponent's battlefield
+    /// collection yet has <see cref="Permanent.Controller"/> pointing at the
+    /// lantern's controller, so the whole-board gatherer +
+    /// <c>ReferenceEquals(p.Controller, lantern.Controller)</c> scope picks it
+    /// up (CR 611.2c / 109.5). When <paramref name="allPlayersProvider"/> is
+    /// null the candidate set falls back to the controller's own battlefield.
+    /// </summary>
+    public static Artifact Create(
+        Player owner,
+        ContinuousEffectsService? effects,
+        IEventBus? eventBus,
+        System.Func<System.Collections.Generic.IEnumerable<Player>?>? allPlayersProvider)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -79,14 +106,22 @@ public static class ChromaticLanternFactory
         {
             // CR 613.1f — "Lands you control have '{T}: Add one mana of any
             // color.'" Grant five single-colour mana abilities to every Land
-            // the lantern's controller controls; live membership.
+            // the lantern's controller controls; live membership. The candidate
+            // set is the whole battlefield (all players) when a players
+            // provider is supplied, so a stolen land you control but an opponent
+            // owns is enumerated and filtered in by the effective-controller
+            // scope (CR 110.2 / 700.6).
+            var membership = allPlayersProvider != null
+                ? BattlefieldGroupGatherer.WholeBattlefield(allPlayersProvider)
+                : (System.Func<System.Collections.Generic.IEnumerable<Permanent>>)(() => ControllerBattlefield(lantern));
+
             var lifecycle = new GrantAbilityToGroupLifecycle(
                 lantern,
                 effects,
                 eventBus,
                 scope: p => p is Land && ReferenceEquals(p.Controller, lantern.Controller),
                 abilityFactory: member => BuildAnyColorMana(member, lantern),
-                membershipProvider: () => ControllerBattlefield(lantern));
+                membershipProvider: membership);
             lifecycle.Attach();
         }
 
