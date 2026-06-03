@@ -271,6 +271,14 @@ public sealed class GameFacade : IDisposable
         _alice = alice;
         _bob = bob;
 
+        // CR 110.2 / 700.6 / 611.2c — give the per-match continuous-effects
+        // service the live player roster so a controller-scoped group
+        // ability-grant routed through the effects-aware factory overload
+        // (Chromatic Lantern, Kataki) enumerates BOTH battlefields and filters
+        // by effective controller — picking up a stolen permanent you control
+        // but an opponent owns (which lives in the owner's battlefield zone).
+        ContinuousEffects.PlayersProvider = () => new[] { _alice, _bob };
+
         // Route per-match EventBus handler exceptions to the process-wide
         // sink so a throwing trigger / SBA / wire-bridge handler can't vanish
         // and freeze the match with no diagnostic. Fail loud: log (server) or

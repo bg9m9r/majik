@@ -77,13 +77,34 @@ public static class KatakiWarsWageFactory
 
     /// <summary>
     /// Effects-aware overload matched by the source generator's production
-    /// instance-swap route. Wires the Layer-6 grant against the live service
-    /// with a controller-battlefield membership provider; the symmetric
-    /// whole-board membership + live <see cref="TriggerManager"/> require the
-    /// 5-arg overload (see the type's Deferred note).
+    /// instance-swap route. Wires the Layer-6 grant against the live service.
+    ///
+    /// <para>CR 110.2 / 700.6 / 611.2c — Kataki's grant is SYMMETRIC ("All
+    /// artifacts have …"), so its candidate set must span BOTH battlefields,
+    /// not just the controller's own zone. When the live game graph has wired a
+    /// <see cref="ContinuousEffectsService.PlayersProvider"/> (GameFacade /
+    /// Game), this overload uses the whole-battlefield gatherer so an OPPONENT's
+    /// artifacts — and a stolen artifact you control but an opponent owns, which
+    /// lives in the owner's battlefield zone — are taxed too. The live event bus
+    /// is taken from <see cref="ContinuousEffectsService.EventBus"/> so the
+    /// lifecycle tracks artifacts entering / leaving / changing control. Falls
+    /// back to the controller's own battlefield only when no roster is wired
+    /// (pure card-shape tests).</para>
+    ///
+    /// <para>The live <see cref="TriggerManager"/> still requires the 5-arg
+    /// overload (no per-game trigger-manager registry exists to recover it from
+    /// the service) — see the type's Deferred note. Enumeration is whole-board
+    /// here regardless.</para>
     /// </summary>
     public static Creature Create(Player owner, ContinuousEffectsService? effects)
-        => Create(owner, effects, eventBus: null, triggers: null, membershipProvider: null);
+        => Create(
+            owner,
+            effects,
+            eventBus: effects?.EventBus,
+            triggers: null,
+            membershipProvider: effects?.PlayersProvider is { } roster
+                ? BattlefieldGroupGatherer.WholeBattlefield(roster)
+                : null);
 
     /// <summary>
     /// Fully-wired Kataki. When <paramref name="effects"/> is supplied a

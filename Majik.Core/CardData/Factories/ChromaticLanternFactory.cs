@@ -59,6 +59,25 @@ public static class ChromaticLanternFactory
         => Create(owner, effects: null, eventBus: null);
 
     /// <summary>
+    /// Production effects-aware overload matched by the source generator's
+    /// instance-swap dispatch (<c>NamedCardFactory.CreateGeneratedWithEffects</c>
+    /// requires this exact <c>Create(Player, ContinuousEffectsService)</c>
+    /// signature). Wires the Layer-6 "Lands you control" group grant against the
+    /// live service, taking the event bus from
+    /// <see cref="ContinuousEffectsService.EventBus"/> so the lifecycle tracks
+    /// lands entering / leaving / changing control, and deriving the
+    /// whole-battlefield candidate gatherer from
+    /// <see cref="ContinuousEffectsService.PlayersProvider"/> so a stolen land
+    /// you control but an opponent owns (living in the owner's battlefield zone)
+    /// is enumerated in a real match (CR 110.2 / 700.6 / 611.2c). Without this
+    /// overload the routed build fell back to the single-arg
+    /// <see cref="Create(Player)"/> and the lantern's group grant was dropped in
+    /// production entirely.
+    /// </summary>
+    public static Artifact Create(Player owner, ContinuousEffectsService? effects)
+        => Create(owner, effects, eventBus: effects?.EventBus, allPlayersProvider: null);
+
+    /// <summary>
     /// Creates a fully-wired Chromatic Lantern. When <paramref name="effects"/>
     /// is supplied, a <see cref="GrantAbilityToGroupLifecycle"/> is attached so
     /// the Layer-6 group grant registers / unregisters as the lantern enters /
@@ -111,8 +130,15 @@ public static class ChromaticLanternFactory
             // provider is supplied, so a stolen land you control but an opponent
             // owns is enumerated and filtered in by the effective-controller
             // scope (CR 110.2 / 700.6).
-            var membership = allPlayersProvider != null
-                ? BattlefieldGroupGatherer.WholeBattlefield(allPlayersProvider)
+            // CR 110.2 / 700.6 / 611.2c — prefer an explicit players provider;
+            // otherwise fall back to the one the live game graph wired onto the
+            // effects service (production path — GameFacade / Game). Only when
+            // NEITHER is available (pure card-shape tests) do we walk just the
+            // controller's own battlefield zone, which misses a stolen land you
+            // control but an opponent owns.
+            var players = allPlayersProvider ?? effects.PlayersProvider;
+            var membership = players != null
+                ? BattlefieldGroupGatherer.WholeBattlefield(players)
                 : (System.Func<System.Collections.Generic.IEnumerable<Permanent>>)(() => ControllerBattlefield(lantern));
 
             var lifecycle = new GrantAbilityToGroupLifecycle(
