@@ -522,6 +522,26 @@ public sealed class ExileWithReturnEffectDef : EffectDefinition
     /// </summary>
     public string ReturnAt { get; set; } = "next_end_step";
 
+    /// <summary>
+    /// Optional rider: a counter minted on each returned permanent as it
+    /// re-enters (CR 122.1). <c>null</c> / empty (default) = a plain flicker
+    /// (Eerie Interlude). Supported values:
+    /// <list type="bullet">
+    ///   <item><c>"plus_one_plus_one"</c> — one +1/+1 counter on each returned
+    ///   permanent (the "for many" generalization of Otherworldly Journey's
+    ///   single-target rider; CR 122.1c).</item>
+    ///   <item><c>"plus_one_plus_one_or_loyalty"</c> — a type-aware rider
+    ///   (Semester's End): a +1/+1 counter if the returned permanent is a
+    ///   creature, OR a loyalty counter if it is a planeswalker (CR 122.1b/c).
+    ///   A permanent that is both gets the +1/+1 counter (creature branch
+    ///   first).</item>
+    /// </list>
+    /// The placement is routed through the live <see cref="ReplacementBus"/>
+    /// when one is supplied (Hardened Scales / Doubling Season / Vorinclex may
+    /// rewrite the count).
+    /// </summary>
+    public string? CounterOnReturn { get; set; }
+
     /// <inheritdoc />
     public override Majik.Core.Players.Agents.TargetRequest? ToTargetRequest()
     {

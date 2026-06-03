@@ -2086,6 +2086,14 @@ public static class CardDefRuntime
                             }
                             // CR 614 — "under its owner's control".
                             if (returnedCard is Card returned) returned.ChangeController(returnedOwner);
+
+                            // CR 122.1 — optional counter-on-return rider
+                            // (Otherworldly Journey / Semester's End). Mint
+                            // AFTER the re-entry move so the permanent is on the
+                            // battlefield (CR 122.3); route through the
+                            // ReplacementBus so Hardened Scales / Doubling
+                            // Season can rewrite the count.
+                            ApplyCounterOnReturn(def.CounterOnReturn, returnedCard, replacements);
                         }
                     });
 
@@ -2099,6 +2107,46 @@ public static class CardDefRuntime
                 triggers.RegisterDelayed(delayed);
                 return ValueTask.CompletedTask;
             });
+    }
+
+    /// <summary>
+    /// CR 122.1 — apply the optional counter-on-return rider for the
+    /// <see cref="ExileWithReturnEffectDef"/> verb to a single returned card.
+    /// <c>"plus_one_plus_one"</c> mints one +1/+1 counter (CR 122.1c — the
+    /// Otherworldly Journey rider, generalized "for many").
+    /// <c>"plus_one_plus_one_or_loyalty"</c> is type-aware (Semester's End): a
+    /// +1/+1 counter on a creature, OR a loyalty counter on a planeswalker
+    /// (CR 122.1b). Placement is routed through <paramref name="replacements"/>
+    /// when supplied. No-op for a null/empty rider or a non-permanent card.
+    /// </summary>
+    private static void ApplyCounterOnReturn(
+        string? rider, ICard returnedCard, ReplacementBus? replacements)
+    {
+        if (string.IsNullOrWhiteSpace(rider)) return;
+        if (returnedCard is not Permanent perm) return;
+        if (perm.Zone != ZoneType.Battlefield) return;
+
+        switch (rider.Trim().ToLowerInvariant())
+        {
+            case "plus_one_plus_one":
+                CountersService.Add(perm, CounterType.PlusOnePlusOne, 1, replacements);
+                break;
+
+            case "plus_one_plus_one_or_loyalty":
+                // CR 122.1c — creature → +1/+1; CR 122.1b — planeswalker →
+                // loyalty. A permanent that is BOTH (rare) takes the creature
+                // branch (the only such cards are creature-planeswalkers, where
+                // the +1/+1 is the load-bearing buff).
+                if (perm.HasType(CardType.Creature))
+                {
+                    CountersService.Add(perm, CounterType.PlusOnePlusOne, 1, replacements);
+                }
+                else if (perm.HasType(CardType.Planeswalker))
+                {
+                    CountersService.Add(perm, CounterType.Loyalty, 1, replacements);
+                }
+                break;
+        }
     }
 
     /// <summary>
