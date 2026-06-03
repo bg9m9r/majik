@@ -244,6 +244,23 @@ public class ActionValidator
                 new RuleViolation("601.3", "additional-spell cap exhausted"));
         }
 
+        // CR 605/616 / 601.3 — Ethersworn Canonist nonartifact restriction:
+        // "Each player who has cast a nonartifact spell this turn can't cast
+        // additional nonartifact spells." Gated to NONARTIFACT candidate spells
+        // here (an artifact spell is always castable, even after a nonartifact
+        // spell). The rail itself combines the battlefield-gated symmetric
+        // active flag with the per-player "has already cast a nonartifact spell
+        // this turn" counter.
+        if (action.Card != null
+            && action.Player != null
+            && !action.Card.HasType(Cards.Types.CardType.Artifact)
+            && CastingRestrictions.IsRestrictedByCanonistNonartifact(action.Player))
+        {
+            return ValidationResult.Invalid(
+                $"{action.Player.Name} can't cast additional nonartifact spells this turn (Ethersworn Canonist)",
+                new RuleViolation("601.3", "Canonist nonartifact-spell restriction"));
+        }
+
         return null;
     }
 
