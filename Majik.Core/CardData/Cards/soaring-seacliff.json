@@ -1,0 +1,14 @@
+{
+  "name": "Soaring Seacliff",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "U" },
+    {
+      "kind": "triggered",
+      "trigger": { "type": "etb_self" },
+      "effects": [
+        { "type": "grant_keyword_until_eot_target", "keyword": "Flying", "targetFilter": "creature" }
+      ]
+    }
+  ]
+}

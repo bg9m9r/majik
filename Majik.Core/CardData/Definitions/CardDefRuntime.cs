@@ -1084,6 +1084,9 @@ public static class CardDefRuntime
             GainControlEffectDef control => BuildGainControlEffect(control, card, controller, targetRequestIndex, continuous),
             FightEffectDef fight => BuildFightEffect(fight, card, targetRequestIndex),
             ExploreTargetEffectDef explore => BuildExploreTargetEffect(explore, card, targetRequestIndex),
+            PumpTargetEffectDef pump => BuildPumpTargetEffect(pump, card, targetRequestIndex),
+            GrantKeywordUntilEotTargetEffectDef grant => BuildGrantKeywordUntilEotTargetEffect(grant, card, targetRequestIndex),
+            BecomesArtifactTargetEffectDef artifact => BuildBecomesArtifactTargetEffect(artifact, card, targetRequestIndex),
             GainLifeSelfEffectDef gain => BuildGainLifeSelfEffect(gain, card, controller),
             LoseLifeSelfEffectDef loseSelf => BuildLoseLifeSelfEffect(loseSelf, card, controller),
             LoseLifeTargetEffectDef lose => BuildLoseLifeTargetEffect(lose, card, targetRequestIndex),
@@ -1299,6 +1302,98 @@ public static class CardDefRuntime
                     eventBus: null,
                     zones: ZoneServiceRegistry.Get(controller),
                     ct: ctx.Ct).ConfigureAwait(false);
+            });
+    }
+
+    private static IEffect BuildPumpTargetEffect(
+        PumpTargetEffectDef def, ICard card, int targetRequestIndex)
+    {
+        // CR 611 / CR 514.2 — the targeted +X/+X (signed: also −X/−X) verb.
+        // Reads the chosen creature off ChosenTargets at the reserved index and
+        // registers a Layer-7c PumpUntilEndOfTurnEffect on the creature's OWN
+        // ActiveEffects, so it auto-expires at the cleanup step — the same
+        // posture the fluent PumpUntilEndOfTurn MaterializeStep uses. CR 608.2b
+        // — an illegal target at resolution (left the battlefield) fizzles
+        // cleanly: no modifier. ActiveEffects null (pure-shape test path) →
+        // silent no-op (mirrors GainControlEffectDef / DismemberFactory).
+        var filter = def.TargetFilter;
+        var p = def.Power;
+        var t = def.Toughness;
+        return new Effect(
+            $"{card.Name}: target {filter} gets {(p < 0 ? "" : "+")}{p}/{(t < 0 ? "" : "+")}{t} until EOT",
+            ctx =>
+            {
+                var live = ChosenTargetAt(ctx, targetRequestIndex);
+                if (live is Creature creature
+                    && creature.Zone == ZoneType.Battlefield
+                    && TargetFilters.Matches(filter, creature)
+                    && creature.ActiveEffects != null)
+                {
+                    creature.ActiveEffects.Register(
+                        new PumpUntilEndOfTurnEffect(creature, p, t));
+                }
+                return ValueTask.CompletedTask;
+            });
+    }
+
+    private static IEffect BuildGrantKeywordUntilEotTargetEffect(
+        GrantKeywordUntilEotTargetEffectDef def, ICard card, int targetRequestIndex)
+    {
+        // CR 613.1c / CR 514.2 — the targeted "gains [keyword] until end of
+        // turn" verb. Reads the chosen creature off ChosenTargets at the
+        // reserved index and registers a Layer-6 GrantKeywordUntilEndOfTurnEffect
+        // on the creature's OWN ActiveEffects (auto-expires at cleanup). The
+        // SAME until-EOT grant the GainControlEffectDef haste rider and the
+        // Temur Battle Rage / Berserk pump family use. CR 608.2b — an illegal
+        // target at resolution fizzles cleanly. ActiveEffects null (pure-shape
+        // test path) → silent no-op.
+        var filter = def.TargetFilter;
+        var keyword = def.Keyword;
+        return new Effect(
+            $"{card.Name}: target {filter} gains {keyword} until EOT",
+            ctx =>
+            {
+                var live = ChosenTargetAt(ctx, targetRequestIndex);
+                if (live is Creature creature
+                    && creature.Zone == ZoneType.Battlefield
+                    && TargetFilters.Matches(filter, creature)
+                    && creature.ActiveEffects != null)
+                {
+                    creature.ActiveEffects.Register(
+                        new GrantKeywordUntilEndOfTurnEffect(creature, keyword));
+                }
+                return ValueTask.CompletedTask;
+            });
+    }
+
+    private static IEffect BuildBecomesArtifactTargetEffect(
+        BecomesArtifactTargetEffectDef def, ICard card, int targetRequestIndex)
+    {
+        // CR 613.1d / CR 514.2 — the Liquimetal Coating / Liquimetal Torque
+        // "target [permanent] becomes an artifact in addition to its other types
+        // until end of turn" verb. Reads the chosen permanent off ChosenTargets
+        // at the reserved index and registers the EOT-expiring Layer-4
+        // LiquimetalCoatingAddArtifactEffect (the ADD union keeps the printed
+        // types present) on the permanent's OWN ActiveEffects, so it expires at
+        // cleanup. CR 608.2b — an illegal target at resolution (left the
+        // battlefield, or no longer matches the filter) fizzles cleanly.
+        // ActiveEffects null (pure-shape test path) → silent no-op, mirroring the
+        // hand-rolled LiquimetalCoatingFactory.
+        var filter = def.TargetFilter;
+        return new Effect(
+            $"{card.Name}: target {filter} becomes an artifact until EOT",
+            ctx =>
+            {
+                var live = ChosenTargetAt(ctx, targetRequestIndex);
+                if (live is Permanent permanent
+                    && permanent.Zone == ZoneType.Battlefield
+                    && TargetFilters.Matches(filter, permanent)
+                    && permanent.ActiveEffects != null)
+                {
+                    permanent.ActiveEffects.Register(
+                        new LiquimetalCoatingAddArtifactEffect(permanent));
+                }
+                return ValueTask.CompletedTask;
             });
     }
 
