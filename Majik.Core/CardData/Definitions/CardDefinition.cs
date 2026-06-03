@@ -264,6 +264,28 @@ public sealed class TriggeredAbilityDefinition : AbilityDefinition
     public TriggerDefinition Trigger { get; set; } = new EnterBattlefieldSelfTriggerDef();
     public List<EffectDefinition> Effects { get; set; } = new();
 
+    /// <summary>
+    /// GENERALIZED optional/reflexive "you may pay {cost}. If you do, …" mana
+    /// rider on the WHOLE triggered ability (CR 601.2b / CR 603.4). <c>null</c>
+    /// (the default) = the effect list runs unconditionally. When set to a
+    /// mana-cost string (e.g. <c>"{1}{C}"</c>), at resolution the ability first
+    /// prompts the controller's agent yes/no; on "yes" it pays the cost via
+    /// <see cref="Majik.Core.Players.Player.PayMana"/> and ONLY if the payment
+    /// succeeds runs <see cref="Effects"/> in order. A decline OR an unpayable
+    /// cost skips the entire "if you do" effect block (CR 601.2b — an optional
+    /// cost that can't be paid isn't paid). Target choice still happens as the
+    /// trigger goes on the stack (CR 603.3d), independent of the later payment,
+    /// so a wrapped targeted effect still declares its <c>TargetRequest</c>.
+    ///
+    /// <para>Canonical case: Eldrazi Obligator — "When you cast this spell, you
+    /// may pay {1}{C}. If you do, gain control of target creature …". The {C}
+    /// colorless pip (CR 107.4c) folds into a generic pip in v1's pool model
+    /// (see <see cref="Majik.Core.ValueObjects.ManaCost.Parse"/>). Strictly more
+    /// general than the verb-baked <see cref="GainControlEffectDef.OptionalManaCost"/>:
+    /// it gates ANY effect list, not just gain_control.</para>
+    /// </summary>
+    public string? OptionalManaCost { get; set; }
+
     /// <inheritdoc />
     public override CardDefAbility ToCardDefAbility()
     {
@@ -281,10 +303,17 @@ public sealed class TriggeredAbilityDefinition : AbilityDefinition
                 e.ToExtraTargetRequest(),
                 e.SharesPreviousTargetSlot))
             .ToArray();
+        // CR 601.2b / 603.4 — the generalized optional reflexive "you may pay
+        // {cost}. If you do, …" rider wrapping the WHOLE effect list. Parsed
+        // once at map time; null when the ability is unconditional.
+        var optionalCost = string.IsNullOrWhiteSpace(OptionalManaCost)
+            ? (Majik.Core.ValueObjects.ManaCost?)null
+            : Majik.Core.ValueObjects.ManaCost.Parse(OptionalManaCost);
         // A leaves-the-battlefield trigger (e.g. dies_self) carries its own
         // active-zone override so the built TriggeredAbility stays observable
         // from the Graveyard (CR 603.6d / CR 700.4); all other shapes pass
         // null = engine default (battlefield only).
-        return new CardDefTriggeredAbility(triggerBuilder, effectSpecs, Trigger.ActiveZones);
+        return new CardDefTriggeredAbility(
+            triggerBuilder, effectSpecs, Trigger.ActiveZones, optionalCost);
     }
 }

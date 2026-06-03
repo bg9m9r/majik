@@ -9,14 +9,14 @@
     {
       "kind": "triggered",
       "trigger": { "type": "cast_self" },
+      "optionalManaCost": "{1}{C}",
       "effects": [
         {
           "type": "gain_control",
           "targetFilter": "creature",
           "duration": "end_of_turn",
           "untap": true,
-          "gainsHaste": true,
-          "optionalManaCost": "{1}{C}"
+          "gainsHaste": true
         }
       ]
     }
