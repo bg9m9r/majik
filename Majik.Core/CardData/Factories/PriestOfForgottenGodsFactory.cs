@@ -2,8 +2,10 @@ using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Costs;
+using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
+using Majik.Core.Primitives;
 using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
 
@@ -96,10 +98,15 @@ public static class PriestOfForgottenGodsFactory
     /// player's "sacrifice a creature of their choice" pick. When null the pick
     /// falls back deterministically to the first creature in battlefield
     /// order (mirrors <see cref="DiabolicEdictFactory"/>).</param>
+    /// <param name="eventBus">Optional event bus. When supplied, each affected
+    /// player's forced "sacrifice a creature of their choice" publishes a
+    /// <see cref="PermanentSacrificedEvent"/> (CR 701.16a) so aristocrat
+    /// payoffs fire on the Priest activation path.</param>
     public static Creature Create(
         Player owner,
         Func<IReadOnlyList<Player>>? opponentsResolver,
-        IPlayerAgent? sacrificeAgent)
+        IPlayerAgent? sacrificeAgent,
+        IEventBus? eventBus = null)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -186,7 +193,11 @@ public static class PriestOfForgottenGodsFactory
                                 pick = creatures[0];
                             }
 
-                            OracleSpellBinder.MoveToGraveyard(pick, ZoneMoveReason.Sacrifice);
+                            // CR 701.16 — sacrifice. With a bus, publish a
+                            // PermanentSacrificedEvent crediting the affected
+                            // player (CR 701.16a) for aristocrat payoffs.
+                            if (eventBus != null) Fx.Sacrifice(pick, p, eventBus);
+                            else Fx.Sacrifice(pick);
                         }
                     }),
 

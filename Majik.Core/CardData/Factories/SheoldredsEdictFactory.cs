@@ -1,9 +1,11 @@
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Events;
 using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
+using Majik.Core.Primitives;
 using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
@@ -114,10 +116,16 @@ public static class SheoldredsEdictFactory
     /// player's "of their choice" pick. When null, the pick falls back
     /// deterministically to the first matching permanent in battlefield
     /// order (matches <see cref="DiabolicEdictFactory"/>).</param>
+    /// <param name="eventBus">Optional event bus. When supplied, each affected
+    /// opponent's forced sacrifice publishes a
+    /// <see cref="PermanentSacrificedEvent"/> (CR 701.16a) crediting that
+    /// opponent, so "whenever an opponent sacrifices …" aristocrat payoffs
+    /// fire on the Sheoldred's Edict path.</param>
     public static SpellDefinition BuildDefinition(
         Player caster,
         IReadOnlyList<Player> allPlayers,
-        IPlayerAgent? agent)
+        IPlayerAgent? agent,
+        IEventBus? eventBus = null)
     {
         ArgumentNullException.ThrowIfNull(caster);
         ArgumentNullException.ThrowIfNull(allPlayers);
@@ -149,7 +157,7 @@ public static class SheoldredsEdictFactory
                     if (!seen.Add(raw)) continue;      // CR 700.2d — each mode at most once
                     if (seen.Count > PickCount) break; // CR 700.2d — pick count cap
 
-                    effectsOut.Add(BuildModeEffect(raw, caster, allPlayers, agent, p));
+                    effectsOut.Add(BuildModeEffect(raw, caster, allPlayers, agent, p, eventBus));
                 }
                 return effectsOut;
             });
@@ -160,7 +168,8 @@ public static class SheoldredsEdictFactory
         Player caster,
         IReadOnlyList<Player> allPlayers,
         IPlayerAgent? agent,
-        ChosenSpellParams p)
+        ChosenSpellParams p,
+        IEventBus? eventBus)
     {
         var (label, filter) = mode switch
         {
@@ -227,7 +236,16 @@ public static class SheoldredsEdictFactory
 
                 // CR 701.16 — sacrifice: move permanent from battlefield to
                 // its owner's graveyard. Bypasses Indestructible / regen.
-                OracleSpellBinder.MoveToGraveyard(pick, ZoneMoveReason.Sacrifice);
+                // With a bus, publish a PermanentSacrificedEvent crediting the
+                // affected opponent (CR 701.16a) so aristocrat payoffs fire.
+                if (eventBus != null)
+                {
+                    Fx.Sacrifice(pick, pl, eventBus);
+                }
+                else
+                {
+                    Fx.Sacrifice(pick);
+                }
             }
         });
     }

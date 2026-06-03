@@ -1,8 +1,11 @@
+using System.Collections.Generic;
+using System.Linq;
 using FluentAssertions;
 using Majik.Core.CardData;
 using Majik.Core.CardData.Factories;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Events;
 using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
@@ -221,6 +224,58 @@ public class SheoldredsEdictFactoryTests
 
         bear.Zone.Should().Be(ZoneType.Battlefield);
         _bob.Zones.Graveyard.GetCards().Should().BeEmpty();
+    }
+
+    // -----------------------------------------------------------------------
+    // Bus-aware sacrifice — pays down thread-bus-into-edict-sacrifice-closures
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void Mode0_WithEventBus_PublishesPermanentSacrificedEvent_PerAffectedOpponent()
+    {
+        var bobBear   = SeedCreature(_bob, "Runeclaw Bear", isToken: false);
+        var carolBear = SeedCreature(_carol, "Grizzly Bears", isToken: false);
+
+        var bus = new EventBus();
+        var sacrificed = new List<PermanentSacrificedEvent>();
+        bus.Subscribe<PermanentSacrificedEvent>(ev => sacrificed.Add(ev));
+
+        var def = SheoldredsEdictFactory.BuildDefinition(
+            _alice, AllPlayers(), agent: null, eventBus: bus);
+
+        Run(def, SheoldredsEdictFactory.ModeNontokenCreature);
+
+        // Each affected opponent (Bob, Carol) sacrificed a nontoken creature →
+        // two events, each crediting the controlling opponent (CR 701.16a).
+        // The caster (Alice) is excluded from "each opponent".
+        sacrificed.Should().HaveCount(2);
+        sacrificed.Should().Contain(ev =>
+            ev.SacrificedCard == bobBear && ev.SacrificingPlayer == _bob && !ev.WasToken);
+        sacrificed.Should().Contain(ev =>
+            ev.SacrificedCard == carolBear && ev.SacrificingPlayer == _carol && !ev.WasToken);
+    }
+
+    [Fact]
+    public void Mode1_WithEventBus_TokenSacrifice_FlagsWasToken()
+    {
+        var bobToken = SeedCreature(_bob, "Zombie Token", isToken: true);
+
+        var bus = new EventBus();
+        var sacrificed = new List<PermanentSacrificedEvent>();
+        bus.Subscribe<PermanentSacrificedEvent>(ev => sacrificed.Add(ev));
+
+        var def = SheoldredsEdictFactory.BuildDefinition(
+            _alice, AllPlayers(), agent: null, eventBus: bus);
+
+        Run(def, SheoldredsEdictFactory.ModeCreatureToken);
+
+        // CR 111.7 — token-ness snapshotted before the move; the event carries
+        // WasToken=true so a nontoken-only payoff (It That Betrays) skips it.
+        sacrificed.Should().ContainSingle()
+            .Which.Should().Match<PermanentSacrificedEvent>(ev =>
+                ev.SacrificedCard == bobToken
+                && ev.SacrificingPlayer == _bob
+                && ev.WasToken);
     }
 
     // -----------------------------------------------------------------------

@@ -2,9 +2,11 @@ using Majik.Core.Abilities;
 using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Events;
 using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
+using Majik.Core.Primitives;
 using Majik.Core.Services;
 using Majik.Core.Tokens;
 using Majik.Core.ValueObjects;
@@ -145,7 +147,8 @@ public static class KayasGuileFactory
         IReadOnlyList<Player> allPlayers,
         IPlayerAgent? agent,
         ZoneService? zoneService = null,
-        bool entwined = false)
+        bool entwined = false,
+        IEventBus? eventBus = null)
     {
         ArgumentNullException.ThrowIfNull(caster);
         ArgumentNullException.ThrowIfNull(allPlayers);
@@ -184,7 +187,7 @@ public static class KayasGuileFactory
                     switch (raw)
                     {
                         case ModeEachOpponentSacrifices:
-                            effects.Add(BuildEachOpponentSacrificesEffect(caster, allPlayers, agent, p));
+                            effects.Add(BuildEachOpponentSacrificesEffect(caster, allPlayers, agent, p, eventBus));
                             break;
                         case ModeExileGraveyards:
                             effects.Add(BuildExileGraveyardsEffect(caster, allPlayers, p));
@@ -213,7 +216,8 @@ public static class KayasGuileFactory
         Player caster,
         IReadOnlyList<Player> allPlayers,
         IPlayerAgent? agent,
-        ChosenSpellParams p) =>
+        ChosenSpellParams p,
+        IEventBus? eventBus) =>
         new Effect($"{CardName}: each opponent sacrifices a creature of their choice", () =>
         {
             var players = p.AllPlayers is { Count: > 0 } fresh ? fresh : allPlayers;
@@ -255,8 +259,11 @@ public static class KayasGuileFactory
                 }
 
                 // CR 701.16 — sacrifice: battlefield → owner's graveyard,
-                // bypassing Indestructible / regeneration.
-                OracleSpellBinder.MoveToGraveyard(pick, ZoneMoveReason.Sacrifice);
+                // bypassing Indestructible / regeneration. With a bus, publish
+                // a PermanentSacrificedEvent crediting the affected opponent
+                // (CR 701.16a) for aristocrat payoffs.
+                if (eventBus != null) Fx.Sacrifice(pick, pl, eventBus);
+                else Fx.Sacrifice(pick);
             }
         });
 

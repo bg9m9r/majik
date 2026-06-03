@@ -1,5 +1,6 @@
 using Majik.Core.Cards;
 using Majik.Core.Domain.Exceptions;
+using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Services;
 using Majik.Core.Zones;
@@ -14,15 +15,17 @@ public class AdditionalCost : ICost
 {
     private readonly AdditionalCostType _costType;
     private readonly object? _costParameter;
+    private readonly IEventBus? _eventBus;
 
     public string Description { get; }
     public AdditionalCostType CostType => _costType;
 
-    private AdditionalCost(AdditionalCostType costType, string description, object? costParameter = null)
+    private AdditionalCost(AdditionalCostType costType, string description, object? costParameter = null, IEventBus? eventBus = null)
     {
         _costType = costType;
         Description = description;
         _costParameter = costParameter;
+        _eventBus = eventBus;
     }
 
     /// <summary>
@@ -41,14 +44,21 @@ public class AdditionalCost : ICost
     /// <summary>
     /// Create a sacrifice cost (sacrifice a permanent).
     /// </summary>
-    public static AdditionalCost Sacrifice(Cards.Permanent permanent)
+    /// <param name="permanent">The permanent sacrificed as the cost.</param>
+    /// <param name="eventBus">Optional event bus. When supplied, paying the
+    /// cost publishes a <see cref="PermanentSacrificedEvent"/> (CR 701.16a)
+    /// crediting the cost-payer (the permanent's controller) as the
+    /// sacrificing player, so "whenever an opponent sacrifices …" aristocrat
+    /// payoffs fire on sac-cost activation paths. Null preserves the legacy
+    /// publish-nothing posture.</param>
+    public static AdditionalCost Sacrifice(Cards.Permanent permanent, IEventBus? eventBus = null)
     {
         if (permanent == null)
         {
             throw new ArgumentNullException(nameof(permanent));
         }
 
-        return new AdditionalCost(AdditionalCostType.Sacrifice, $"Sacrifice {permanent.Name}", permanent);
+        return new AdditionalCost(AdditionalCostType.Sacrifice, $"Sacrifice {permanent.Name}", permanent, eventBus);
     }
 
     /// <summary>
@@ -127,6 +137,12 @@ public class AdditionalCost : ICost
                     var holder = sac.Controller ?? ownerOfSac;
                     if (sac.Zone != ZoneType.Battlefield) break;
 
+                    // CR 111.7 — snapshot token-ness BEFORE the move; a token
+                    // ceases to exist as an SBA the instant it reaches the
+                    // graveyard, so the flag must be read while it is still the
+                    // live battlefield object.
+                    var wasToken = sac.IsToken;
+
                     var zones = ZoneServiceRegistry.Get(holder);
                     if (zones != null)
                     {
@@ -138,6 +154,12 @@ public class AdditionalCost : ICost
                         ownerOfSac.Zones.Graveyard.AddCard(sac);
                         sac.SetZone(ZoneType.Graveyard);
                     }
+
+                    // CR 701.16a — the cost-payer (the permanent's controller)
+                    // is the sacrificing player. Publish AFTER the move so a
+                    // payoff that reads the sacrificed card finds it in the
+                    // graveyard (mirrors Fx.Sacrifice's bus-aware overload).
+                    _eventBus?.Publish(new PermanentSacrificedEvent(sac, player, wasToken));
                 }
                 break;
 
