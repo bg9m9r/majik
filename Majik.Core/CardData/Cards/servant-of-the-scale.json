@@ -1,0 +1,9 @@
+{
+  "name": "Servant of the Scale",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Soldier"],
+  "manaCost": "{G}",
+  "power": 0,
+  "toughness": 0,
+  "colors": ["G"]
+}
