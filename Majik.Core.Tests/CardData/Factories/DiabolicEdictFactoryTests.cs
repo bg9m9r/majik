@@ -1,8 +1,10 @@
+using System.Collections.Generic;
 using FluentAssertions;
 using Majik.Core.CardData;
 using Majik.Core.CardData.Factories;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Events;
 using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
@@ -187,6 +189,54 @@ public class DiabolicEdictFactoryTests
         act.Should().NotThrow("fizzled spell does nothing — no exception");
 
         _bob.Zones.Graveyard.GetCards().Should().BeEmpty();
+    }
+
+    // -----------------------------------------------------------------------
+    // Bus-aware sacrifice — pays down thread-bus-into-edict-sacrifice-closures
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void Resolve_WithEventBus_PublishesPermanentSacrificedEvent_CreditingTargetPlayer()
+    {
+        var bear = SeedBattlefieldCreature(_bob, "Runeclaw Bear");
+
+        var bus = new EventBus();
+        var sacrificed = new List<PermanentSacrificedEvent>();
+        bus.Subscribe<PermanentSacrificedEvent>(ev => sacrificed.Add(ev));
+
+        var def = DiabolicEdictFactory.BuildSpellDefinition(
+            resolver: o => o!,
+            agent: null,
+            eventBus: bus);
+
+        var effects = def.EffectFactory(MakeChosen(_bob));
+        foreach (var e in effects) e.Execute();
+
+        bear.Zone.Should().Be(ZoneType.Graveyard);
+        // CR 701.16a — the target player (the permanent's controller) is the
+        // sacrificing player; aristocrat payoffs observe this event.
+        sacrificed.Should().ContainSingle()
+            .Which.Should().Match<PermanentSacrificedEvent>(ev =>
+                ev.SacrificedCard == bear
+                && ev.SacrificingPlayer == _bob
+                && !ev.WasToken);
+    }
+
+    [Fact]
+    public void Resolve_NoEventBus_PublishesNothing_LegacyPosture()
+    {
+        var bear = SeedBattlefieldCreature(_bob, "Runeclaw Bear");
+
+        var def = DiabolicEdictFactory.BuildSpellDefinition(
+            resolver: o => o!,
+            agent: null);
+
+        var effects = def.EffectFactory(MakeChosen(_bob));
+        foreach (var e in effects) e.Execute();
+
+        // Still a real sacrifice with the bare overload — no bus, nothing to
+        // publish; the creature still hits the graveyard.
+        bear.Zone.Should().Be(ZoneType.Graveyard);
     }
 
     // -----------------------------------------------------------------------

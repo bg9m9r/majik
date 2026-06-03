@@ -3,9 +3,11 @@ using Majik.Core.Abilities;
 using Majik.Core.CardData.SpellTemplates;
 using Majik.Core.Cards;
 using Majik.Core.Effects;
+using Majik.Core.Events;
 using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
+using Majik.Core.Primitives;
 
 namespace Majik.Core.CardData.SpellTemplates.Templates.Misc;
 
@@ -234,6 +236,7 @@ public sealed class TargetPlayerSacrificesCreatureTemplate : ISpellTemplate
     public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx)
     {
         var resolver = ctx.Resolver;
+        var eventBus = ctx.EventBus;
         return new SpellDefinition(
             Modes: Array.Empty<string>(),
             HasVariableX: false,
@@ -247,9 +250,15 @@ public sealed class TargetPlayerSacrificesCreatureTemplate : ISpellTemplate
                     var pick = tp.Zones.Battlefield.GetCards()
                         .OfType<Creature>()
                         .FirstOrDefault();
+                    if (pick == null) return;
                     // Edicts are "target player sacrifices" — CR 701.16
-                    // sacrifice bypasses Indestructible / regeneration.
-                    if (pick != null) OracleSpellBinder.MoveToGraveyard(pick, Majik.Core.Zones.ZoneMoveReason.Sacrifice);
+                    // sacrifice bypasses Indestructible / regeneration. With a
+                    // bus, publish a PermanentSacrificedEvent crediting the
+                    // target player (CR 701.16a) so "whenever an opponent
+                    // sacrifices …" aristocrat payoffs (It That Betrays,
+                    // Mayhem Devil) fire on the edict path.
+                    if (eventBus != null) Fx.Sacrifice(pick, tp, eventBus);
+                    else Fx.Sacrifice(pick);
                 }) };
             });
     }
@@ -755,6 +764,7 @@ public sealed class EachOpponentSacrificesCreatureTemplate : ISpellTemplate
     public SpellDefinition Rehydrate(IReadOnlyDictionary<string, string> @params, SpellBindContext ctx)
     {
         var caster = ctx.Caster;
+        var eventBus = ctx.EventBus;
         return new SpellDefinition(
             Modes: Array.Empty<string>(),
             HasVariableX: false,
@@ -771,9 +781,14 @@ public sealed class EachOpponentSacrificesCreatureTemplate : ISpellTemplate
                         var pick = pl.Zones.Battlefield.GetCards()
                             .OfType<Creature>()
                             .FirstOrDefault();
+                        if (pick == null) continue;
                         // "Each opponent sacrifices a creature" — CR 701.16
                         // sacrifice bypasses Indestructible / regeneration.
-                        if (pick != null) OracleSpellBinder.MoveToGraveyard(pick, Majik.Core.Zones.ZoneMoveReason.Sacrifice);
+                        // With a bus, publish a PermanentSacrificedEvent
+                        // crediting each affected opponent (CR 701.16a) so
+                        // aristocrat payoffs fire.
+                        if (eventBus != null) Fx.Sacrifice(pick, pl, eventBus);
+                        else Fx.Sacrifice(pick);
                     }
                 }) };
             });

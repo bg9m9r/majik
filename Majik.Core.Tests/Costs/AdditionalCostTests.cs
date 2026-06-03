@@ -1,7 +1,9 @@
+using System.Collections.Generic;
 using FluentAssertions;
 using Majik.Core.Cards;
 using Majik.Core.Costs;
 using Majik.Core.Domain.Exceptions;
+using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Zones;
 using Xunit;
@@ -166,6 +168,62 @@ public class AdditionalCostTests
         // Assert
         cost.CostType.Should().Be(AdditionalCostType.Sacrifice);
         cost.Description.Should().Contain("Sacrifice");
+    }
+
+    // -----------------------------------------------------------------------
+    // Bus-aware sac cost — pays down thread-bus-into-edict-sacrifice-closures.
+    // Paying a "Sacrifice this permanent" activation cost with an event bus
+    // publishes a PermanentSacrificedEvent crediting the cost-payer (the
+    // permanent's controller, CR 701.16a) so aristocrat payoffs fire.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void Pay_SacrificeCost_WithEventBus_PublishesPermanentSacrificedEvent()
+    {
+        // Arrange
+        var player = new Player("Alice", 20);
+        var permanent = new Creature("Grizzly Bears", "1G", 2, 2);
+        permanent.SetOwner(player);
+        permanent.SetController(player);
+        player.Zones.Battlefield.AddCard(permanent);
+        permanent.SetZone(ZoneType.Battlefield);
+
+        var bus = new EventBus();
+        var sacrificed = new List<PermanentSacrificedEvent>();
+        bus.Subscribe<PermanentSacrificedEvent>(ev => sacrificed.Add(ev));
+
+        var cost = AdditionalCost.Sacrifice(permanent, bus);
+
+        // Act
+        cost.Pay(player);
+
+        // Assert — real sacrifice + a single event crediting the payer.
+        permanent.Zone.Should().Be(ZoneType.Graveyard);
+        sacrificed.Should().ContainSingle()
+            .Which.Should().Match<PermanentSacrificedEvent>(ev =>
+                ev.SacrificedCard == permanent
+                && ev.SacrificingPlayer == player
+                && !ev.WasToken);
+    }
+
+    [Fact]
+    public void Pay_SacrificeCost_NoEventBus_PublishesNothing_StillSacrifices()
+    {
+        // Arrange
+        var player = new Player("Alice", 20);
+        var permanent = new Creature("Grizzly Bears", "1G", 2, 2);
+        permanent.SetOwner(player);
+        permanent.SetController(player);
+        player.Zones.Battlefield.AddCard(permanent);
+        permanent.SetZone(ZoneType.Battlefield);
+
+        var cost = AdditionalCost.Sacrifice(permanent);
+
+        // Act — legacy posture: no bus, the card still hits the graveyard.
+        cost.Pay(player);
+
+        // Assert
+        permanent.Zone.Should().Be(ZoneType.Graveyard);
     }
 
 }

@@ -2,9 +2,11 @@ using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
 using Majik.Core.Combat;
+using Majik.Core.Events;
 using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
+using Majik.Core.Primitives;
 using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
@@ -118,7 +120,8 @@ public static class PickYourPoisonFactory
     public static SpellDefinition BuildDefinition(
         Player caster,
         IReadOnlyList<Player> allPlayers,
-        IPlayerAgent? agent)
+        IPlayerAgent? agent,
+        IEventBus? eventBus = null)
     {
         ArgumentNullException.ThrowIfNull(caster);
         ArgumentNullException.ThrowIfNull(allPlayers);
@@ -150,7 +153,7 @@ public static class PickYourPoisonFactory
                     if (!seen.Add(raw)) continue;      // CR 700.2d — each mode at most once
                     if (seen.Count > PickCount) break; // CR 700.2d — pick count cap
 
-                    effectsOut.Add(BuildModeEffect(raw, caster, allPlayers, agent, p));
+                    effectsOut.Add(BuildModeEffect(raw, caster, allPlayers, agent, p, eventBus));
                 }
                 return effectsOut;
             });
@@ -161,7 +164,8 @@ public static class PickYourPoisonFactory
         Player caster,
         IReadOnlyList<Player> allPlayers,
         IPlayerAgent? agent,
-        ChosenSpellParams p)
+        ChosenSpellParams p,
+        IEventBus? eventBus)
     {
         var (label, filter) = mode switch
         {
@@ -228,8 +232,11 @@ public static class PickYourPoisonFactory
                 }
 
                 // CR 701.16 — sacrifice: move permanent from battlefield to
-                // its owner's graveyard. Bypasses Indestructible / regen.
-                OracleSpellBinder.MoveToGraveyard(pick, ZoneMoveReason.Sacrifice);
+                // its owner's graveyard. Bypasses Indestructible / regen. With
+                // a bus, publish a PermanentSacrificedEvent crediting the
+                // affected opponent (CR 701.16a) for aristocrat payoffs.
+                if (eventBus != null) Fx.Sacrifice(pick, pl, eventBus);
+                else Fx.Sacrifice(pick);
             }
         });
     }

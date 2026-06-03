@@ -2,9 +2,11 @@ using Majik.Core.Abilities;
 using Majik.Core.CardData.Definitions;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Events;
 using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
+using Majik.Core.Primitives;
 using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
@@ -105,10 +107,15 @@ public static class LilianasTriumphFactory
     /// "of their choice" sacrifice and discard picks. When null, the pick falls
     /// back deterministically to the first matching card in zone order
     /// (matches <see cref="SheoldredsEdictFactory"/> / <see cref="MindRotFactory"/>).</param>
+    /// <param name="eventBus">Optional event bus. When supplied, each affected
+    /// opponent's forced sacrifice publishes a
+    /// <see cref="PermanentSacrificedEvent"/> (CR 701.16a) so aristocrat
+    /// payoffs fire on the Liliana's Triumph path.</param>
     public static SpellDefinition BuildDefinition(
         Player caster,
         IReadOnlyList<Player> allPlayers,
-        IPlayerAgent? agent)
+        IPlayerAgent? agent,
+        IEventBus? eventBus = null)
     {
         ArgumentNullException.ThrowIfNull(caster);
         ArgumentNullException.ThrowIfNull(allPlayers);
@@ -163,7 +170,10 @@ public static class LilianasTriumphFactory
                             }
 
                             // CR 701.16 — sacrifice (bypasses Indestructible / regen).
-                            OracleSpellBinder.MoveToGraveyard(pick, ZoneMoveReason.Sacrifice);
+                            // With a bus, publish a PermanentSacrificedEvent crediting
+                            // the affected opponent (CR 701.16a) for aristocrat payoffs.
+                            if (eventBus != null) Fx.Sacrifice(pick, pl, eventBus);
+                            else Fx.Sacrifice(pick);
                         }
 
                         // --- Discard rider: "If you control a Liliana

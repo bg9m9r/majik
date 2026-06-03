@@ -95,10 +95,15 @@ public static class SuddenEdictFactory
     /// <param name="agent">Optional agent for the <em>target player</em> (the
     /// one who must sacrifice). When null, the pick falls back deterministically
     /// to the first creature in battlefield order.</param>
+    /// <param name="eventBus">Optional event bus threaded to Diabolic Edict's
+    /// shared body so the forced sacrifice publishes a
+    /// <see cref="Events.PermanentSacrificedEvent"/> (CR 701.16a) for
+    /// aristocrat payoffs.</param>
     public static SpellDefinition BuildSpellDefinition(
         Func<object, object> resolver,
-        IPlayerAgent? agent) =>
+        IPlayerAgent? agent,
+        Events.IEventBus? eventBus = null) =>
         // Split second is a static restriction on the stack, not part of the
         // resolve body — the sacrifice effect is exactly Diabolic Edict's.
-        DiabolicEdictFactory.BuildSpellDefinition(resolver, agent);
+        DiabolicEdictFactory.BuildSpellDefinition(resolver, agent, eventBus);
 }

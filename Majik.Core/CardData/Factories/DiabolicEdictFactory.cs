@@ -1,9 +1,11 @@
 using Majik.Core.Abilities;
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Events;
 using Majik.Core.Game;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
+using Majik.Core.Primitives;
 using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
@@ -84,9 +86,18 @@ public static class DiabolicEdictFactory
     /// deterministically to the first creature in battlefield order —
     /// matches <c>TargetPlayerSacrificesCreatureTemplate</c> and keeps
     /// Annihilator / Bone Splinters test-fixture parity.</param>
+    /// <param name="eventBus">Optional event bus. When supplied, the forced
+    /// sacrifice routes through the bus-aware
+    /// <see cref="Fx.Sacrifice(ICard, Player, IEventBus)"/> overload so a
+    /// <see cref="PermanentSacrificedEvent"/> (CR 701.16a) fires crediting the
+    /// target player as the sacrificer — the surface "whenever an opponent
+    /// sacrifices …" aristocrat payoffs (It That Betrays, Mayhem Devil,
+    /// Writhing Chrysalis) observe. Null preserves the legacy publish-nothing
+    /// posture.</param>
     public static SpellDefinition BuildSpellDefinition(
         Func<object, object> resolver,
-        IPlayerAgent? agent)
+        IPlayerAgent? agent,
+        IEventBus? eventBus = null)
     {
         ArgumentNullException.ThrowIfNull(resolver);
 
@@ -153,8 +164,20 @@ public static class DiabolicEdictFactory
 
                         // CR 701.16 — sacrifice: move permanent from
                         // battlefield to its owner's graveyard. Bypasses
-                        // Indestructible and regeneration shields.
-                        OracleSpellBinder.MoveToGraveyard(pick, ZoneMoveReason.Sacrifice);
+                        // Indestructible and regeneration shields. With a bus,
+                        // publish a PermanentSacrificedEvent crediting the
+                        // target player (CR 701.16a — the permanent's
+                        // controller is the sacrificing player) so aristocrat
+                        // payoffs fire; without one, the bare publish-nothing
+                        // overload preserves legacy posture.
+                        if (eventBus != null)
+                        {
+                            Fx.Sacrifice(pick, victim, eventBus);
+                        }
+                        else
+                        {
+                            Fx.Sacrifice(pick);
+                        }
                     }),
                 };
             });
