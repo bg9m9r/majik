@@ -841,4 +841,280 @@ public class JsonTriggerConditionsTests
 
         triggers.PendingCount.Should().Be(0, "'whenever THIS creature deals combat damage' is self-scoped");
     }
+
+    // ------------------------------------------------------------------
+    // whenever_another_creature_dies — CR 603.6e / CR 700.4, over
+    // CardMovedEvent (Battlefield → Graveyard, self-excluded). Mirror of
+    // whenever_another_creature_enters. Default any-controller; optional
+    // youControlOnly scope + nontokenOnly + subtype tribal filter.
+    // ------------------------------------------------------------------
+
+    // Blood Artist shape: ANY creature dying (either player's) fires it.
+    private const string AnotherCreatureDiesJson = """
+    {
+      "name": "Test Blood Artist",
+      "types": ["Creature"],
+      "manaCost": "1B",
+      "power": 0,
+      "toughness": 1,
+      "abilities": [
+        {
+          "kind": "triggered",
+          "trigger": { "type": "whenever_another_creature_dies" },
+          "effects": [ { "type": "gain_life_self", "amount": 1 } ]
+        }
+      ]
+    }
+    """;
+
+    [Fact]
+    public void AnotherCreatureDies_Fires_OnOtherCreature_GainsLife()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        BuildAndRegister(AnotherCreatureDiesJson, triggers);
+
+        var other = new Creature("Bear", "1G", 2, 2) { Owner = _alice };
+        other.SetController(_alice);
+        bus.Publish(new CardMovedEvent(other, ZoneType.Battlefield, ZoneType.Graveyard));
+
+        triggers.PendingCount.Should().Be(1,
+            "another creature dying fires the trigger (CR 603.6e / 700.4)");
+        triggers.PutPendingTriggersOnStack(_alice);
+        ResolveAll(stack);
+
+        _alice.LifeTotal.Should().Be(21);
+    }
+
+    [Fact]
+    public void AnotherCreatureDies_DoesNotFire_ForSelf()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        var (_, card) = BuildAndRegister(AnotherCreatureDiesJson, triggers);
+
+        // The permanent's OWN death must not fire its "another creature" trigger.
+        bus.Publish(new CardMovedEvent(card, ZoneType.Battlefield, ZoneType.Graveyard));
+
+        triggers.PendingCount.Should().Be(0, "'ANOTHER creature' excludes the source itself (CR 603.6e)");
+    }
+
+    [Fact]
+    public void AnotherCreatureDies_DoesNotFire_OnBounceToHand()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        BuildAndRegister(AnotherCreatureDiesJson, triggers);
+
+        var other = new Creature("Bear", "1G", 2, 2) { Owner = _alice };
+        other.SetController(_alice);
+        // Battlefield → Hand is not a death (CR 700.4 — dies = to graveyard).
+        bus.Publish(new CardMovedEvent(other, ZoneType.Battlefield, ZoneType.Hand));
+
+        triggers.PendingCount.Should().Be(0, "leaving the battlefield to hand is not a death");
+    }
+
+    [Fact]
+    public void AnotherCreatureDies_DoesNotFire_ForNoncreature()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        BuildAndRegister(AnotherCreatureDiesJson, triggers);
+
+        var land = new Land("Forest") { Owner = _alice };
+        land.SetController(_alice);
+        bus.Publish(new CardMovedEvent(land, ZoneType.Battlefield, ZoneType.Graveyard));
+
+        triggers.PendingCount.Should().Be(0, "a land going to the graveyard is not 'another creature' dying");
+    }
+
+    [Fact]
+    public void AnotherCreatureDies_Default_Fires_ForOpponentCreature()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        BuildAndRegister(AnotherCreatureDiesJson, triggers);
+
+        var enemy = new Creature("Enemy Bear", "1G", 2, 2) { Owner = _bob };
+        enemy.SetController(_bob);
+        bus.Publish(new CardMovedEvent(enemy, ZoneType.Battlefield, ZoneType.Graveyard));
+
+        triggers.PendingCount.Should().Be(1,
+            "the default (un-scoped) 'another creature dies' fires for ANY creature (Blood Artist)");
+    }
+
+    // youControlOnly scope: only creatures the controller controls fire it.
+    private const string AnotherCreatureYouControlDiesJson = """
+    {
+      "name": "Test Zulaport Cutthroat",
+      "types": ["Creature"],
+      "manaCost": "1B",
+      "power": 1,
+      "toughness": 1,
+      "abilities": [
+        {
+          "kind": "triggered",
+          "trigger": { "type": "whenever_another_creature_dies", "youControlOnly": true },
+          "effects": [ { "type": "gain_life_self", "amount": 1 } ]
+        }
+      ]
+    }
+    """;
+
+    [Fact]
+    public void AnotherCreatureDies_YouControlOnly_DoesNotFire_ForOpponentCreature()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        BuildAndRegister(AnotherCreatureYouControlDiesJson, triggers);
+
+        var enemy = new Creature("Enemy Bear", "1G", 2, 2) { Owner = _bob };
+        enemy.SetController(_bob);
+        bus.Publish(new CardMovedEvent(enemy, ZoneType.Battlefield, ZoneType.Graveyard));
+
+        triggers.PendingCount.Should().Be(0,
+            "youControlOnly scope excludes opponents' creatures dying (CR 109.5)");
+    }
+
+    [Fact]
+    public void AnotherCreatureDies_YouControlOnly_Fires_ForOwnCreature()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        BuildAndRegister(AnotherCreatureYouControlDiesJson, triggers);
+
+        var own = new Creature("Bear", "1G", 2, 2) { Owner = _alice };
+        own.SetController(_alice);
+        bus.Publish(new CardMovedEvent(own, ZoneType.Battlefield, ZoneType.Graveyard));
+
+        triggers.PendingCount.Should().Be(1, "youControlOnly scope fires for the controller's own creature dying");
+    }
+
+    // nontokenOnly filter: a token creature dying does NOT fire (Midnight Reaper).
+    private const string NontokenCreatureYouControlDiesJson = """
+    {
+      "name": "Test Midnight Reaper",
+      "types": ["Creature"],
+      "manaCost": "2B",
+      "power": 3,
+      "toughness": 2,
+      "abilities": [
+        {
+          "kind": "triggered",
+          "trigger": { "type": "whenever_another_creature_dies", "youControlOnly": true, "nontokenOnly": true },
+          "effects": [ { "type": "draw_card", "amount": 1 } ]
+        }
+      ]
+    }
+    """;
+
+    [Fact]
+    public void AnotherCreatureDies_NontokenOnly_DoesNotFire_ForToken()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        BuildAndRegister(NontokenCreatureYouControlDiesJson, triggers);
+
+        var token = new Creature("Zombie", "", 2, 2) { Owner = _alice };
+        token.SetController(_alice);
+        token.MarkAsToken();
+        bus.Publish(new CardMovedEvent(token, ZoneType.Battlefield, ZoneType.Graveyard));
+
+        triggers.PendingCount.Should().Be(0,
+            "nontokenOnly excludes a token creature dying (Midnight Reaper, CR 111)");
+    }
+
+    [Fact]
+    public void AnotherCreatureDies_NontokenOnly_Fires_ForNontoken()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        BuildAndRegister(NontokenCreatureYouControlDiesJson, triggers);
+
+        var nontoken = new Creature("Bear", "1G", 2, 2) { Owner = _alice };
+        nontoken.SetController(_alice);
+        bus.Publish(new CardMovedEvent(nontoken, ZoneType.Battlefield, ZoneType.Graveyard));
+
+        triggers.PendingCount.Should().Be(1, "a nontoken creature you control dying fires it");
+    }
+
+    // ------------------------------------------------------------------
+    // subtype/tribal filter on whenever_another_creature_enters — the
+    // Mardu Woe-Reaper "or another Warrior you control enters" shape.
+    // includeSelf lets the source's OWN entry also fire ("this creature or
+    // another Warrior").
+    // ------------------------------------------------------------------
+
+    private const string AnotherWarriorEntersJson = """
+    {
+      "name": "Test Warrior Lord",
+      "types": ["Creature"],
+      "manaCost": "W",
+      "power": 2,
+      "toughness": 1,
+      "subtypes": ["Human", "Warrior"],
+      "abilities": [
+        {
+          "kind": "triggered",
+          "trigger": { "type": "whenever_another_creature_enters", "youControlOnly": true, "subtype": "Warrior", "includeSelf": true },
+          "effects": [ { "type": "gain_life_self", "amount": 1 } ]
+        }
+      ]
+    }
+    """;
+
+    [Fact]
+    public void AnotherCreatureEnters_SubtypeFilter_Fires_ForMatchingSubtype()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        BuildAndRegister(AnotherWarriorEntersJson, triggers);
+
+        var warrior = new Creature("Goblin Warrior", "R", 2, 2, subtypes: new[] { CardSubtype.Goblin, CardSubtype.Warrior }) { Owner = _alice };
+        warrior.SetController(_alice);
+        bus.Publish(new CardMovedEvent(warrior, ZoneType.Hand, ZoneType.Battlefield));
+
+        triggers.PendingCount.Should().Be(1, "a Warrior you control entering fires the subtype-gated trigger");
+    }
+
+    [Fact]
+    public void AnotherCreatureEnters_SubtypeFilter_DoesNotFire_ForNonMatchingSubtype()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        BuildAndRegister(AnotherWarriorEntersJson, triggers);
+
+        var nonWarrior = new Creature("Bear", "1G", 2, 2, subtypes: new[] { CardSubtype.Bear }) { Owner = _alice };
+        nonWarrior.SetController(_alice);
+        bus.Publish(new CardMovedEvent(nonWarrior, ZoneType.Hand, ZoneType.Battlefield));
+
+        triggers.PendingCount.Should().Be(0, "a non-Warrior creature does not fire the subtype-gated trigger");
+    }
+
+    [Fact]
+    public void AnotherCreatureEnters_IncludeSelf_Fires_ForOwnEntry()
+    {
+        var bus = new EventBus();
+        var stack = new Majik.Core.Stack.Stack(bus);
+        var triggers = new TriggerManager(stack, bus);
+        var (_, card) = BuildAndRegister(AnotherWarriorEntersJson, triggers);
+
+        // includeSelf + the source is itself a Warrior → its own entry fires it
+        // ("this creature OR another Warrior you control enters").
+        bus.Publish(new CardMovedEvent(card, ZoneType.Hand, ZoneType.Battlefield));
+
+        triggers.PendingCount.Should().Be(1,
+            "includeSelf lets the source's own entry fire ('this creature or another Warrior', Mardu Woe-Reaper)");
+    }
 }
