@@ -5,6 +5,7 @@
   "manaCost": "{4}{R}",
   "power": 3,
   "toughness": 3,
+  "keywords": ["Haste"],
   "abilities": [
     {
       "kind": "triggered",

@@ -58,13 +58,14 @@ namespace Majik.Core.CardData.Factories;
 /// <see cref="ContinuousEffectsService"/> (so the gain_control verb can register
 /// its control-change on the ABILITY path) and stamps Devoid.
 ///
-/// ## Note on the printed Haste keyword
+/// ## Printed Devoid + Haste keywords
 ///
-/// Eldrazi Obligator itself has Haste. The JSON schema does not model standalone
-/// keyword lines on creatures, so the self-Haste keyword is not wired here (the
-/// same residual recorded for Zealous Conscripts); the gameplay-relevant
-/// behaviour (the optional cast-trigger steal + the stolen creature's haste
-/// rider) is fully implemented.
+/// Eldrazi Obligator's printed keyword lines — Devoid (CR 702.114) and Haste
+/// (CR 702.10) — are declared in the embedded JSON's <c>"keywords"</c> array.
+/// The runtime stamps the colourless flag for Devoid (so the {2}{R} body is
+/// colourless) and a <see cref="Majik.Core.Abilities.KeywordAbility"/> "Haste"
+/// marker that combat reads. (Previously the Devoid flag was set in this
+/// factory and the self-Haste was deferred; both are now JSON-driven.)
 /// </summary>
 [CardName("Eldrazi Obligator")]
 public static class EldraziObligatorFactory
@@ -98,10 +99,11 @@ public static class EldraziObligatorFactory
         ArgumentNullException.ThrowIfNull(owner);
 
         var definition = CardDefinitionLoader.FromEmbeddedResource(Slug);
+        // CR 702.114 — Devoid + CR 702.10 — Haste: both printed keyword lines
+        // are now declared in the embedded JSON's "keywords" array, so the
+        // runtime stamps the colourless flag (Devoid) and the Haste marker.
         var card = (Creature)CardDefinitionFactory.Build(
             definition, owner, replacements: null, continuous: continuousEffects);
-        // CR 702.114 — Devoid: the card is colorless despite its {R} pip.
-        card.SetDevoid(true);
         return card;
     }
 }

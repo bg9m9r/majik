@@ -145,6 +145,18 @@ public static class CardDefRuntime
         foreach (var keyword in def.Keywords)
         {
             card.AddAbility(new KeywordAbility(keyword, card, owner));
+
+            // CR 702.114 — Devoid. The printed keyword makes the card
+            // colourless, overriding the coloured pips in its mana cost
+            // (Eldrazi Obligator's {2}{R} stays colourless). Stamp the
+            // IsDevoid flag so CardColors.GetColors short-circuits to the
+            // empty colour set; the KeywordAbility marker above keeps Devoid
+            // visible to introspection (UI / bots) like any other keyword.
+            if (card is Card devoidCard
+                && string.Equals(keyword, "Devoid", StringComparison.OrdinalIgnoreCase))
+            {
+                devoidCard.SetDevoid(true);
+            }
         }
 
         foreach (var produces in def.ManaAbilities)

@@ -46,13 +46,14 @@ namespace Majik.Core.CardData.Factories;
 /// gain_control verb can register its continuous control-change effect on the
 /// ABILITY path (mirroring how the spell path threads the same service).
 ///
-/// ## Note on the printed Haste keyword
+/// ## Printed Haste keyword
 ///
 /// Zealous Conscripts itself has Haste (it can attack the turn it enters). The
-/// JSON schema does not model standalone keyword lines on creatures, so the
-/// self-Haste keyword is not wired here; the gameplay-relevant behaviour (the
-/// ETB steal + the stolen permanent's haste rider) is fully implemented. The
-/// self-Haste residual is recorded in the v1 deferrals backlog.
+/// printed keyword line is declared in the embedded JSON's <c>"keywords"</c>
+/// array (CR 702.10), so the runtime stamps a
+/// <see cref="Majik.Core.Abilities.KeywordAbility"/> "Haste" marker that
+/// <see cref="Majik.Core.Combat.CombatAbilities.HasHaste"/> reads — no bespoke
+/// wiring. (Previously deferred; closed with the JSON keywords-array seam.)
 /// </summary>
 [CardName("Zealous Conscripts")]
 public static class ZealousConscriptsFactory

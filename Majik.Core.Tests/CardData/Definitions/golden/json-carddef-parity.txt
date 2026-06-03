@@ -9854,8 +9854,11 @@
   "loyalty": null,
   "abilities": {
     "keyword": {
-      "count": 0,
-      "list": []
+      "count": 2,
+      "list": [
+        "Devoid",
+        "Haste"
+      ]
     },
     "mana": {
       "count": 0,
@@ -9885,9 +9888,7 @@
     "list": []
   },
   "mdfc": null,
-  "colors": [
-    "Red"
-  ]
+  "colors": []
 }
 ==== electrickery ====
 {
@@ -44057,8 +44058,10 @@
   "loyalty": null,
   "abilities": {
     "keyword": {
-      "count": 0,
-      "list": []
+      "count": 1,
+      "list": [
+        "Haste"
+      ]
     },
     "mana": {
       "count": 0,
