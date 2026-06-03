@@ -42,6 +42,7 @@ namespace Majik.Core.CardData.Definitions;
 [JsonDerivedType(typeof(AmassSelfEffectDef), "amass_self")]
 [JsonDerivedType(typeof(GainControlEffectDef), "gain_control")]
 [JsonDerivedType(typeof(FightEffectDef), "fight")]
+[JsonDerivedType(typeof(ExploreSelfEffectDef), "explore_self")]
 [JsonDerivedType(typeof(ExploreTargetEffectDef), "explore_target")]
 [JsonDerivedType(typeof(PumpTargetEffectDef), "pump_target")]
 [JsonDerivedType(typeof(GrantKeywordUntilEotTargetEffectDef), "grant_keyword_until_eot_target")]
@@ -735,6 +736,35 @@ public sealed class AmassSelfEffectDef : EffectDefinition
 {
     public int Amount { get; set; } = 1;
     public string Tribe { get; set; } = "Zombie";
+}
+
+/// <summary>
+/// "This creature explores" (CR 701.40) — the self explore verb. The
+/// declarative serialization of the Explore keyword action onto the shared
+/// <see cref="Majik.Core.Keywords.ExploreAction.ExploreAsync"/> primitive
+/// (PR #2237), with the SOURCE permanent as the exploring permanent (no target
+/// chosen). This is the declarative form of the ETB-explore family
+/// (<see cref="Majik.Core.CardData.Factories.ExploreEtb"/>): each of the
+/// <see cref="Count"/> explores reveals the controller's top card → land to
+/// hand, else a +1/+1 counter on the source + keep-on-top/graveyard choice
+/// (CR 701.40b/c/d), publishing a
+/// <see cref="Majik.Core.Events.CreatureExploredEvent"/> per explore so
+/// "Whenever a creature you control explores" payoffs (Wildgrowth Walker) fire
+/// (CR 701.40e).
+///
+/// <para>
+/// <see cref="Count"/> defaults to 1; Jadelight Ranger ("explores, then it
+/// explores again") is the <c>count: 2</c> case. The exploring permanent is
+/// always the ability's source — its controller (re-resolved at execute time,
+/// so a control change since the ability was put on the stack carries) reveals
+/// and the counter, if any, lands on it (CR 701.40a). No target request — the
+/// source explores itself.
+/// </para>
+/// </summary>
+public sealed class ExploreSelfEffectDef : EffectDefinition
+{
+    /// <summary>Number of sequential explores (default 1; Jadelight = 2).</summary>
+    public int Count { get; set; } = 1;
 }
 
 /// <summary>
