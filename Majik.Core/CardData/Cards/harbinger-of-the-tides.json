@@ -1,0 +1,21 @@
+{
+  "name": "Harbinger of the Tides",
+  "manaCost": "{U}{U}",
+  "types": ["Creature"],
+  "subtypes": ["Merfolk", "Wizard"],
+  "power": 2,
+  "toughness": 2,
+  "abilities": [
+    {
+      "kind": "triggered",
+      "trigger": { "type": "etb_self" },
+      "effects": [
+        {
+          "type": "return_to_hand",
+          "targetFilter": "tapped_creature_opponent_controls",
+          "optional": true
+        }
+      ]
+    }
+  ]
+}

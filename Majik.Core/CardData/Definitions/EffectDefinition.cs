@@ -442,11 +442,22 @@ public sealed class ReturnToHandEffectDef : EffectDefinition
 {
     public string TargetFilter { get; set; } = "permanent";
 
+    /// <summary>
+    /// CR 603.3d / CR 115.1b — when <c>true</c>, the bounce is a "you MAY
+    /// return target …" optional: the target request is declared with
+    /// <c>MinTargets: 0</c> so the controller may decline (choose no target),
+    /// in which case the bounce does not happen. Canonical case: Harbinger of
+    /// the Tides — "you may return target tapped creature an opponent controls
+    /// to its owner's hand." Default <c>false</c> = a mandatory single-target
+    /// bounce (Aether Adept's "return target creature to its owner's hand").
+    /// </summary>
+    public bool Optional { get; set; }
+
     /// <inheritdoc />
     public override Majik.Core.Players.Agents.TargetRequest? ToTargetRequest() =>
         TargetFilters.ToTargetRequest(
             TargetFilter, "return to its owner's hand",
-            Majik.Core.Cards.BotIntent.Bounce);
+            Majik.Core.Cards.BotIntent.Bounce, optional: Optional);
 }
 
 /// <summary>

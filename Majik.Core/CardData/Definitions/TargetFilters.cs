@@ -69,6 +69,14 @@ public static class TargetFilters
     {
         "creature_you_control" => ControlScope.YouControl,
         "creature_you_dont_control" or "creature_you_don't_control" => ControlScope.YouDontControl,
+        // CR 109.5 — "tapped creature an opponent controls" (Harbinger of the
+        // Tides). The base predicate gates on a TAPPED battlefield creature;
+        // the "an opponent controls" rider is applied context-aware here
+        // (anyone but the resolving controller), since Resolve/Matches have no
+        // resolving-player context. Reuses YouDontControl — every player other
+        // than ctx.Self is an opponent in 1v1 (and the rider already means
+        // "not controlled by you", the CR-defined opponent set for targeting).
+        "tapped_creature_opponent_controls" => ControlScope.YouDontControl,
         // CR 109.5 / 205.3m — a "Wizard you control" is a battlefield creature
         // with the Wizard subtype under the resolving controller. Canonical
         // case: Riptide Laboratory — "{1}{U}, {T}: Return target Wizard you
@@ -121,6 +129,17 @@ public static class TargetFilters
                 ($"target player to {verb}", o => o is Player),
             "creature" =>
                 ($"{verb} target creature", o => o is Creature c && OnBattlefield(c)),
+            // CR 109.5 / 701.20 — "tapped creature an opponent controls"
+            // (Harbinger of the Tides ETB). Base predicate: a TAPPED
+            // battlefield creature. The "an opponent controls" rider is layered
+            // on in the candidate gatherer (ToTargetRequest, control-scoped to
+            // "you don't control") so the resolving controller can't pick their
+            // own creature; the CR 608.2b resolution re-check applies the
+            // tapped+creature predicate (control is locked at announcement,
+            // CR 601.2c, and not re-checked).
+            "tapped_creature_opponent_controls" =>
+                ($"{verb} target tapped creature an opponent controls",
+                    o => o is Creature c && OnBattlefield(c) && c.IsTapped),
             // CR 109.5 — control-scoped creature filters. The base predicate is
             // a battlefield creature; the "you control" / "you don't control"
             // rider is applied context-aware in the candidate gatherer
