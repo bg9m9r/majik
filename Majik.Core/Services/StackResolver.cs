@@ -198,6 +198,15 @@ public class StackResolver
 
         var card = spell.Card;
 
+        // CR 608.3 override — a spell whose resolution returned ITSELF to its
+        // owner's hand (Recross the Paths clash-win). Consume the per-cast
+        // sentinel so a later cast / recast from hand starts clean.
+        if (card is Card concreteCard && concreteCard.ReturnToHandOnResolution)
+        {
+            concreteCard.ClearReturnToHandOnResolution();
+            return ZoneType.Hand;
+        }
+
         // Permanents go to battlefield
         if (card.HasType(Cards.Types.CardType.Creature) ||
             card.HasType(Cards.Types.CardType.Land) ||
