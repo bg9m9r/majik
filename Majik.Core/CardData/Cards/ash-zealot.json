@@ -1,0 +1,16 @@
+{
+  "name": "Ash Zealot",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Warrior"],
+  "manaCost": "{R}{R}",
+  "power": 2,
+  "toughness": 2,
+  "keywords": ["First strike", "Haste"],
+  "abilities": [
+    {
+      "kind": "triggered",
+      "trigger": { "type": "whenever_a_player_casts_spell", "fromGraveyardOnly": true },
+      "effects": [ { "type": "deal_damage_to_triggering_player", "amount": 3 } ]
+    }
+  ]
+}
