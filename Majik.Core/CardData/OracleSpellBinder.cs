@@ -163,6 +163,7 @@ public static class OracleSpellBinder
             new SpellTemplates.Templates.Bespoke.DeflectingPalmFamilyTemplate(),
             new SpellTemplates.Templates.Bespoke.UntapUpToTwoAndPumpTemplate(),
             new SpellTemplates.Templates.Bespoke.MassDamageFromSourcePowerTemplate(),
+            new SpellTemplates.Templates.Bespoke.StaticDischargeTemplate(),
             new SpellTemplates.Templates.Bespoke.PumpThenReturnTemplate(),
             new SpellTemplates.Templates.Bespoke.NextSpellCopyTemplate(),
             new SpellTemplates.Templates.Bespoke.ThoughtseizePatternTemplate(),
