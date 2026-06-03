@@ -19,9 +19,21 @@ namespace Majik.Core.CardData.Definitions;
 /// <see cref="Majik.Core.Targeting.TargetCollection"/> pipeline — the same as
 /// a hand-written factory.
 /// </summary>
+/// <para>
+/// The <see cref="Build"/> closure additionally receives the live per-game
+/// <see cref="ContinuousEffectsService"/> (or <c>null</c> on the pure-shape
+/// test path) so a verb that registers a CR 613 continuous effect — currently
+/// <see cref="GainControlEffectDef"/> (the Threaten / Zealous Conscripts "gain
+/// control until end of turn" family, which installs a
+/// <see cref="Majik.Core.Effects.TemporaryControlChangeEffect"/> + an until-EOT
+/// haste grant) — can reach it at materialization time on the ABILITY path,
+/// mirroring how <see cref="CardDefRuntime.BuildSpellDefinitionFromEffects"/>
+/// threads it on the SPELL path. Verbs that don't need it ignore the extra
+/// argument, so the produced effect is byte-identical for them.
+/// </para>
 internal sealed record CardDefEffectSpec(
     TargetRequest? Request,
-    Func<ICard, Player, ReplacementBus?, int, IEffect> Build,
+    Func<ICard, Player, ReplacementBus?, int, ContinuousEffectsService?, IEffect> Build,
     TargetRequest? ExtraRequest = null);
 
 /// <summary>
@@ -50,8 +62,13 @@ internal sealed record CardDefEffectSpec(
 /// </summary>
 public abstract class CardDefAbility
 {
-    /// <summary>Materialize this ability for the live card + controller.</summary>
-    internal abstract IAbility Build(ICard card, Player controller, ReplacementBus? replacements);
+    /// <summary>Materialize this ability for the live card + controller.
+    /// <paramref name="continuous"/> is the live per-game continuous-effects
+    /// service threaded to verbs that register a CR 613 continuous effect
+    /// (currently <c>gain_control</c>); <c>null</c> on the pure-shape path.</summary>
+    internal abstract IAbility Build(
+        ICard card, Player controller, ReplacementBus? replacements,
+        ContinuousEffectsService? continuous = null);
 }
 
 /// <summary>
@@ -66,7 +83,9 @@ public sealed class CardDefManaAbility : CardDefAbility
 
     internal CardDefManaAbility(Func<ICard, Player, ManaAbility> builder) => _builder = builder;
 
-    internal override IAbility Build(ICard card, Player controller, ReplacementBus? replacements) =>
+    internal override IAbility Build(
+        ICard card, Player controller, ReplacementBus? replacements,
+        ContinuousEffectsService? continuous = null) =>
         _builder(card, controller);
 }
 
@@ -92,10 +111,13 @@ public sealed class CardDefActivatedAbility : CardDefAbility
         SorcerySpeed = sorcerySpeed;
     }
 
-    internal override IAbility Build(ICard card, Player controller, ReplacementBus? replacements)
+    internal override IAbility Build(
+        ICard card, Player controller, ReplacementBus? replacements,
+        ContinuousEffectsService? continuous = null)
     {
         var costs = CostBuilders.Select(b => b(card)).ToArray();
-        var (effects, requests) = CardDefAbilityEffects.Materialize(EffectSpecs, card, controller, replacements);
+        var (effects, requests) = CardDefAbilityEffects.Materialize(
+            EffectSpecs, card, controller, replacements, continuous);
         // PLAN 01 (Slice F) — declare the ability's target requests so
         // AbilityActivationFlow.ActivateAsync collects them via the shared
         // TargetCollection pipeline (CR 602.2b) and stamps ChosenTargets that
@@ -138,10 +160,13 @@ public sealed class CardDefTriggeredAbility : CardDefAbility
         ActiveZones = activeZones;
     }
 
-    internal override IAbility Build(ICard card, Player controller, ReplacementBus? replacements)
+    internal override IAbility Build(
+        ICard card, Player controller, ReplacementBus? replacements,
+        ContinuousEffectsService? continuous = null)
     {
         var condition = TriggerBuilder(card);
-        var (effects, requests) = CardDefAbilityEffects.Materialize(EffectSpecs, card, controller, replacements);
+        var (effects, requests) = CardDefAbilityEffects.Materialize(
+            EffectSpecs, card, controller, replacements, continuous);
         return new TriggeredAbility(
             source: card,
             controller: controller,
@@ -167,7 +192,8 @@ internal static class CardDefAbilityEffects
         IReadOnlyList<CardDefEffectSpec> specs,
         ICard card,
         Player controller,
-        ReplacementBus? replacements)
+        ReplacementBus? replacements,
+        ContinuousEffectsService? continuous = null)
     {
         var effects = new IEffect[specs.Count];
         var requests = new List<TargetRequest>();
@@ -188,7 +214,7 @@ internal static class CardDefAbilityEffects
                     requests.Add(spec.ExtraRequest);
                 }
             }
-            effects[i] = spec.Build(card, controller, replacements, index);
+            effects[i] = spec.Build(card, controller, replacements, index, continuous);
         }
         return (effects, requests);
     }

@@ -37,10 +37,28 @@ public static class CardDefinitionFactory
     /// is null, counter placements fall through to a direct add — same
     /// behaviour as today's untouched callers.
     /// </summary>
-    public static ICard Build(CardDefinition definition, Player owner, ReplacementBus? replacements)
+    public static ICard Build(CardDefinition definition, Player owner, ReplacementBus? replacements) =>
+        Build(definition, owner, replacements, continuous: null);
+
+    /// <summary>
+    /// Materialize a card, threading the live per-game
+    /// <see cref="ContinuousEffectsService"/> to its abilities so an ability-path
+    /// verb that registers a CR 613 continuous effect can reach it. The only
+    /// such verb today is <c>gain_control</c> (the Threaten / Zealous Conscripts
+    /// "gain control until end of turn" family): on an ETB / activated ability
+    /// it installs a <see cref="Majik.Core.Effects.TemporaryControlChangeEffect"/>
+    /// + an until-EOT haste grant against this service. Mirrors the SPELL-path
+    /// threading in <see cref="CardDefRuntime.BuildSpellDefinitionFromEffects"/>.
+    /// When <paramref name="continuous"/> is null the produced card is identical
+    /// to the <see cref="Build(CardDefinition, Player, ReplacementBus?)"/> result
+    /// for every verb (the control swap simply no-ops, the pure-shape posture).
+    /// </summary>
+    public static ICard Build(
+        CardDefinition definition, Player owner, ReplacementBus? replacements,
+        ContinuousEffectsService? continuous)
     {
         ArgumentNullException.ThrowIfNull(definition);
         ArgumentNullException.ThrowIfNull(owner);
-        return CardDefRuntime.Build(definition.ToCardDef(), owner, replacements);
+        return CardDefRuntime.Build(definition.ToCardDef(), owner, replacements, continuous);
     }
 }

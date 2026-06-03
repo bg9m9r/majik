@@ -1,0 +1,23 @@
+{
+  "name": "Zealous Conscripts",
+  "types": ["Creature"],
+  "subtypes": ["Human", "Warrior"],
+  "manaCost": "{4}{R}",
+  "power": 3,
+  "toughness": 3,
+  "abilities": [
+    {
+      "kind": "triggered",
+      "trigger": { "type": "etb_self" },
+      "effects": [
+        {
+          "type": "gain_control",
+          "targetFilter": "permanent",
+          "duration": "end_of_turn",
+          "untap": true,
+          "gainsHaste": true
+        }
+      ]
+    }
+  ]
+}
