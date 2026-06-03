@@ -80,13 +80,31 @@ public class ManaAbility : IManaAbility
         SpendRestriction = spendRestriction;
     }
 
-    public ManaAbility(object source, Player controller, Func<ManaCost> manaGenerator, Func<bool>? canActivateCheck = null)
+    /// <param name="printedManaGenerated">Optional inspection seed for
+    /// <see cref="ManaGenerated"/> BEFORE the first <see cref="Activate"/>.
+    /// Dynamic-generator abilities otherwise expose <see cref="ManaCost.Zero"/>
+    /// until activated, which mis-informs pre-activation readers that inspect
+    /// the produced colour (the bot's mana picker in
+    /// <c>HeuristicBotAgent</c>, UI mana-source hints). When supplied — e.g. a
+    /// Treasure's base "one mana of colour X" while a Goldspan-style modifier
+    /// could later double the LIVE production — the printed amount is shown for
+    /// inspection without evaluating the generator (which may have side effects,
+    /// like Cabal Coffers paying {2}). The generator still computes the real
+    /// amount on activation.</param>
+    public ManaAbility(
+        object source,
+        Player controller,
+        Func<ManaCost> manaGenerator,
+        Func<bool>? canActivateCheck = null,
+        ManaCost? printedManaGenerated = null)
     {
         Source = source ?? throw new ArgumentNullException(nameof(source));
         Controller = controller ?? throw new ArgumentNullException(nameof(controller));
         _manaGenerator = manaGenerator ?? throw new ArgumentNullException(nameof(manaGenerator));
         _canActivateCheck = canActivateCheck;
-        ManaGenerated = ManaCost.Zero; // Will be set when activated
+        // Inspection seed (printed amount) when provided, else Zero until the
+        // generator runs at Activate time.
+        ManaGenerated = printedManaGenerated ?? ManaCost.Zero;
         _tapsAsCost = true;
     }
 
