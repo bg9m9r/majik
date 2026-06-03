@@ -5,5 +5,13 @@
   "manaCost": "{3}{R}{R}",
   "power": 5,
   "toughness": 5,
-  "abilities": []
+  "abilities": [
+    {
+      "kind": "triggered",
+      "trigger": { "type": "etb_self" },
+      "effects": [
+        { "type": "damage_and_tap_each_flyer_opponents_control", "amount": 1 }
+      ]
+    }
+  ]
 }

@@ -1150,6 +1150,8 @@ public static class CardDefRuntime
             PumpSelfEffectDef pumpSelf => BuildPumpSelfEffect(pumpSelf, card),
             GrantKeywordUntilEotTargetEffectDef grant => BuildGrantKeywordUntilEotTargetEffect(grant, card, targetRequestIndex),
             BecomesArtifactTargetEffectDef artifact => BuildBecomesArtifactTargetEffect(artifact, card, targetRequestIndex),
+            DamageAndTapEachFlyerOpponentsControlEffectDef flyers =>
+                BuildDamageAndTapEachFlyerOpponentsControlEffect(flyers, card),
             GainLifeSelfEffectDef gain => BuildGainLifeSelfEffect(gain, card, controller),
             LoseLifeSelfEffectDef loseSelf => BuildLoseLifeSelfEffect(loseSelf, card, controller),
             LoseLifeTargetEffectDef lose => BuildLoseLifeTargetEffect(lose, card, targetRequestIndex),
@@ -1871,6 +1873,65 @@ public static class CardDefRuntime
                 {
                     Fx.Tap(permanent);
                 }
+                return ValueTask.CompletedTask;
+            });
+    }
+
+    private static IEffect BuildDamageAndTapEachFlyerOpponentsControlEffect(
+        DamageAndTapEachFlyerOpponentsControlEffectDef def, ICard card)
+    {
+        // Thundermaw Hellkite ETB — the group-apply form of the single-target
+        // deal_damage + tap_target verbs (CR 109.5 "opponents", CR 702.9 Flying,
+        // CR 701.21a Tap). Untargeted (CR 608.2 — affects each member of a
+        // defined set), so no ChosenTargets read. At resolution it:
+        //   1. Snapshots every battlefield creature with the effective Flying
+        //      keyword (CR 613.1f — printed OR granted) controlled by a player
+        //      OTHER than this ability's controller (CR 109.5 "your opponents").
+        //      The snapshot is taken BEFORE any mutation so the "those creatures"
+        //      tap clause acts on the SAME set the damage hit (CR 700.3).
+        //   2. Deals Amount damage to each via Fx.DealDamageAny(source=card),
+        //      then taps each surviving battlefield member via Fx.Tap.
+        // A creature that dies to the damage SBA before the tap pass is skipped
+        // for the tap (it has left the battlefield) — tapping it would be a
+        // meaningless no-op anyway (CR 701.21b).
+        var amount = def.Amount;
+        return new Effect(
+            $"{card.Name}: deal {amount} damage to each creature with flying your opponents control, then tap those creatures",
+            ctx =>
+            {
+                // Resolve the controller live so a control change carries the
+                // ability (CR 109.5); fall back to the resolution controller.
+                var controller = (card as Permanent)?.Controller ?? ctx.Controller;
+                if (controller == null || ctx.Game == null) return ValueTask.CompletedTask;
+
+                var source = card as Creature;
+
+                // Step 1 — snapshot the set (opponents' battlefield flyers).
+                var flyers = new List<Creature>();
+                foreach (var player in ctx.Game.AllPlayers)
+                {
+                    if (ReferenceEquals(player, controller)) continue;
+                    var battlefield = player.Zones?.Battlefield;
+                    if (battlefield == null) continue;
+                    foreach (var c in battlefield.GetCards().OfType<Creature>())
+                    {
+                        if (c.HasEffectiveKeyword("Flying")) flyers.Add(c);
+                    }
+                }
+
+                // Step 2 — damage each, then tap each survivor.
+                foreach (var flyer in flyers)
+                {
+                    Fx.DealDamageAny(flyer, amount, source);
+                }
+                foreach (var flyer in flyers)
+                {
+                    if (flyer.Zone == ZoneType.Battlefield && !flyer.IsTapped)
+                    {
+                        Fx.Tap(flyer);
+                    }
+                }
+
                 return ValueTask.CompletedTask;
             });
     }
