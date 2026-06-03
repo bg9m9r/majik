@@ -184,8 +184,8 @@ public sealed class GameFacade : IDisposable
     private Player? _currentActivePlayer;
     // Since Slice 3 the phase value already carries the precombat /
     // postcombat distinction (CR 505), so the wire/UI labels need no
-    // disambiguation. The outer TurnStateMachine state is still tracked for
-    // TurnStateChangedEvent payloads and other turn-state consumers.
+    // disambiguation. The turn-level (phase) state is still tracked here,
+    // fed by TurnDriver's TurnStateChangedEvent, for turn-state consumers.
     private TurnStateType? _currentTurnState;
 
     public Guid GameId { get; private set; } = Guid.NewGuid();

@@ -443,9 +443,9 @@ public sealed class TurnDriver
     /// CR 500.1 — advance the outer turn-level state and publish a
     /// <see cref="Majik.Core.Events.TurnStateChangedEvent"/> so downstream
     /// wire code can recover which main phase we're in (CR 505). This is
-    /// the only place the live turn flow surfaces the turn-state; the
-    /// dedicated <see cref="StateMachine.TurnStateMachine"/> is not driven
-    /// in the production match path. No-op when the state hasn't actually
+    /// the only place the live turn flow surfaces the turn-state; there is
+    /// no separate turn-level state machine in the production match path.
+    /// No-op when the state hasn't actually
     /// changed, so repeated entries (e.g. extra combat phases re-entering
     /// Combat) don't emit redundant events.
     /// </summary>
