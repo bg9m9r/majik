@@ -38,6 +38,12 @@ namespace Majik.Core.Players.Agents;
 ///   exposes <see cref="KickerAltCostProbe.KickerCostFor"/> +
 ///   <see cref="KickerAltCostProbe.BuildAdditionalCost"/> for the
 ///   bot's "should I pay the kicker?" decision.</item>
+///   <item><see cref="MultikickerAltCostProbe"/> — CR 702.32 Multikicker.
+///   Like Kicker, an <em>additional</em> cost (yields no
+///   <see cref="IAlternativeCost"/> candidates); exposes
+///   <see cref="MultikickerAltCostProbe.MultikickerCostFor"/> +
+///   <see cref="MultikickerAltCostProbe.BuildAdditionalCost"/> for the
+///   bot's "how many times do I kick?" decision (Everflowing Chalice).</item>
 ///   <item><see cref="ImproviseAltCostProbe"/> — CR 702.127 Improvise.
 ///   Wrapped as a discovery-friendly <see cref="ImproviseAlternativeCost"/>
 ///   shim (the underlying <see cref="ImproviseAdditionalCost"/> rides on
@@ -125,6 +131,7 @@ public sealed class AlternativeCostProbeRegistry : IAlternativeCostProbe
             .Register(new EnergyAltCostProbe(EnergyAltCostProbe.DefaultLookup))
             .Register(new EscapeAltCostProbe(EscapeAltCostProbe.DefaultLookup))
             .Register(new KickerAltCostProbe(KickerAltCostProbe.DefaultLookup))
+            .Register(new MultikickerAltCostProbe(MultikickerAltCostProbe.DefaultLookup))
             .Register(new SuspendAltCostProbe(SuspendAltCostProbe.DefaultLookup))
             .Register(new ImproviseAltCostProbe())
             .Register(new ConvokeAltCostProbe());
