@@ -167,10 +167,37 @@ public class Permanent : Card
     }
 
     /// <summary>
+    /// Abilities that are intrinsic to this permanent's face-down state —
+    /// they survive the CR 708.2 ability-suppression that hides the
+    /// underlying card's printed abilities. The only current member is the
+    /// <b>ward {2}</b> a cloaked permanent has (CR 702.168a / CR 708.4):
+    /// cloak's definition gives the face-down 2/2 ward {2}, so that ward is
+    /// one of the face-down permanent's abilities even though the
+    /// underlying card's printed abilities are hidden. Populated by
+    /// <see cref="MarkFaceDownIntrinsicAbility"/>.
+    /// </summary>
+    private readonly HashSet<Majik.Core.Abilities.IAbility> _faceDownIntrinsicAbilities = new();
+
+    /// <summary>
+    /// Flag <paramref name="ability"/> (which must already be attached via
+    /// <see cref="Card.AddAbility"/>) as intrinsic to this permanent's
+    /// face-down state so it is surfaced by <see cref="EffectiveAbilities"/>
+    /// while <see cref="IsFaceDown"/> is true. Used for the cloak ward {2}
+    /// (CR 702.168a) — see <see cref="EffectiveAbilities"/>.
+    /// </summary>
+    public void MarkFaceDownIntrinsicAbility(Majik.Core.Abilities.IAbility ability)
+    {
+        if (ability is null) throw new ArgumentNullException(nameof(ability));
+        _faceDownIntrinsicAbilities.Add(ability);
+    }
+
+    /// <summary>
     /// CR 708.2 — abilities visible to the engine for this permanent.
     /// While <see cref="IsFaceDown"/> is true, this returns the empty
     /// set even if native abilities are attached, AND any abilities
-    /// granted by manifest / morph (e.g. "turn face up for cost")
+    /// granted by manifest / morph (e.g. "turn face up for cost") plus
+    /// any abilities intrinsic to the face-down state (the cloak ward {2},
+    /// CR 702.168a — see <see cref="MarkFaceDownIntrinsicAbility"/>)
     /// remain queryable via <see cref="Abilities"/> — those are the
     /// face-down permanent's *only* abilities. Callers that need to
     /// query a face-down permanent's playable abilities should use
@@ -180,7 +207,8 @@ public class Permanent : Card
     public IReadOnlyList<Majik.Core.Abilities.IAbility> EffectiveAbilities
         => IsFaceDown
             ? Abilities
-                .Where(a => a is Majik.Core.Abilities.FaceDownActivatedAbility)
+                .Where(a => a is Majik.Core.Abilities.FaceDownActivatedAbility
+                            || _faceDownIntrinsicAbilities.Contains(a))
                 .ToList()
                 .AsReadOnly()
             : Abilities;
