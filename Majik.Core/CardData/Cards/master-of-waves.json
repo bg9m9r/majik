@@ -1,0 +1,9 @@
+{
+  "name": "Master of Waves",
+  "types": ["Creature"],
+  "subtypes": ["Merfolk", "Wizard"],
+  "manaCost": "{3}{U}",
+  "power": 2,
+  "toughness": 1,
+  "abilities": []
+}
