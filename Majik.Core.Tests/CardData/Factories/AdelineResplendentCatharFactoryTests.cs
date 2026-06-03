@@ -112,7 +112,7 @@ public class AdelineResplendentCatharFactoryTests
     {
         var bus = new EventBus();
         // Wire the effects service to the bus so its CR-613 memoization cache
-        // invalidates on game events (matches production GameDependencies and
+        // invalidates on game events (matches the live ContinuousEffectsService bus wiring and
         // the Tarmogoyf CDA test).
         var effects = new ContinuousEffectsService(bus);
 

@@ -75,13 +75,15 @@ The official Magic: The Gathering Comprehensive Rules (2025-11-14) are the sourc
 ### Game state machine + turn/phase/step flow
 
 - `GameStateMachine` — `Initializing | Mulligan | Playing | GameOver` (`Majik.Core/StateMachine/`). The only live state machine.
-- Turn-level (phase) and step-level flow is **not** a state machine — in the live engine (`GameFacade` → `GameDriver` → `TurnDriver`) it's driven directly by `TurnDriver`, which emits the typed `PhaseStateChangedEvent` per CR-505 phase + `StepStartedEvent` per step. The vocabulary lives in two enums that now match the Comprehensive Rules: `PhaseStateType` (= MTG phases: TurnBeginning/PreCombatMain/Combat/PostCombatMain/TurnEnding) and `StepStateType` (= MTG steps: Untap/Upkeep/Draw/…/Cleanup). (The `Domain.Aggregates.Game` + `PhaseManager` aggregate is a separate, test-only path and does not run in production matches.)
+- Turn-level (phase) and step-level flow is **not** a state machine — in the live engine (`GameFacade` → `GameDriver` → `TurnDriver`) it's driven directly by `TurnDriver`, which emits the typed `PhaseStateChangedEvent` per CR-505 phase + `StepStartedEvent` per step. The vocabulary lives in two enums that now match the Comprehensive Rules: `PhaseStateType` (= MTG phases: TurnBeginning/PreCombatMain/Combat/PostCombatMain/TurnEnding) and `StepStateType` (= MTG steps: Untap/Upkeep/Draw/…/Cleanup).
 
-Phases are pluggable (`Majik.Core/Game/Phases/`). The sequence supports MTG's extra-turn / extra-phase / extra-step insertion (Rule 500.7–9). Flow is coordinated by `PhaseSequence` + `TurnManager` + `PhaseManager` + `PriorityManager`.
+Phases are pluggable (`Majik.Core/Game/Phases/`). The sequence supports MTG's extra-turn / extra-phase / extra-step insertion (Rule 500.7–9). `TurnDriver` + `PriorityManager` coordinate the live flow.
 
-### Aggregate root
+### Engine entry point
 
-`Majik.Core.Domain.Aggregates.Game` owns players, state machines, stack, managers (`TurnManager`, `PhaseManager`, `PriorityManager`, `StackResolver`, `CombatManager`), `StateBasedActions`, and the `EventBus`. New gameplay surfaces are coordinated through `Game`, not wired directly.
+The live engine is **`Majik.Core.Api.GameFacade`** → **`GameDriver`** → **`TurnDriver`**. `GameFacade.Create` builds the facade + driver; the server reaches it via `ServerGameFactory`/`GameRegistry`. Shared subsystems (`ZoneService`, `StateBasedActions`, `StackResolver`, `CombatManager`, `ContinuousEffectsService`, `GameStateMachine`) are composed into this path. New gameplay surfaces are coordinated through `GameFacade`/`TurnDriver`.
+
+(There is no `Game` aggregate root — an earlier `Domain.Aggregates.Game` + `PhaseManager` parallel design was vestigial and removed; the engine has only the facade/driver path above.)
 
 ### Event bus
 
