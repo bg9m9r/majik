@@ -1,0 +1,9 @@
+{
+  "name": "Boggart Harbinger",
+  "types": ["Creature"],
+  "subtypes": ["Goblin", "Shaman"],
+  "manaCost": "{2}{B}",
+  "power": 2,
+  "toughness": 1,
+  "abilities": []
+}
