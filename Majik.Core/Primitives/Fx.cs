@@ -86,6 +86,11 @@ public static class Fx
             // ability cost (not damage), so the flag is recorded at the damage
             // seam, not inside RemoveLoyalty.
             case Planeswalker pw: pw.RecordDamageDealt(amount); pw.RemoveLoyalty(amount); break;
+            // CR 711 / 306.7 — a creature-front transform DFC flipped to its
+            // planeswalker back carries a transient loyalty body (not a
+            // Planeswalker C# instance); damage to it removes loyalty.
+            case Permanent p when p.IsEffectivePlaneswalker():
+                p.RecordDamageDealt(amount); p.RemoveTransientLoyalty(amount); break;
             default: OracleSpellBinder.DealDamage(target, amount); break;
         }
     }
@@ -106,6 +111,10 @@ public static class Fx
             // CR 120.3 — see the parameterless overload: stamp the planeswalker
             // "was dealt damage this turn" flag at the damage seam.
             case Planeswalker pw: pw.RecordDamageDealt(amount); pw.RemoveLoyalty(amount); break;
+            // CR 711 / 306.7 — transient-loyalty back-face planeswalker body on
+            // a non-Planeswalker permanent absorbs damage as loyalty removal.
+            case Permanent p when p.IsEffectivePlaneswalker():
+                p.RecordDamageDealt(amount); p.RemoveTransientLoyalty(amount); break;
             default: OracleSpellBinder.DealDamage(target, amount, source); break;
         }
     }

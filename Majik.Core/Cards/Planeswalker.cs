@@ -78,4 +78,23 @@ public class Planeswalker : Permanent
     {
         return Loyalty <= 0;
     }
+
+    /// <summary>
+    /// CR 306.5b — a real planeswalker's effective loyalty is its own
+    /// authoritative <see cref="Loyalty"/> field, NOT the transient surface
+    /// (which exists for creature-front transform DFC backs). Overrides the
+    /// <see cref="Permanent.GetEffectiveLoyalty"/> default so the loyalty
+    /// subsystem reads one value for both shapes.
+    /// </summary>
+    public override int? GetEffectiveLoyalty() => Loyalty;
+
+    /// <summary>
+    /// CR 306.7 — loyalty removal on a real planeswalker routes to its own
+    /// field (not the transient surface).
+    /// </summary>
+    public override bool RemoveTransientLoyalty(int amount)
+    {
+        RemoveLoyalty(amount);
+        return true;
+    }
 }

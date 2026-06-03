@@ -426,6 +426,10 @@ public enum CardSubtype
     /// (Murders at Karlov Manor / Modern Horizons line). CR 205.3m.</summary>
     Kaito,
 
+    /// <summary>Ral planeswalker subtype — Ral, Leyline Prodigy (back face of
+    /// Ral, Monsoon Mage). CR 205.3m.</summary>
+    Ral,
+
     /// <summary>Tezzeret planeswalker subtype — Tezzeret, Agent of Bolas
     /// (Mirrodin Besieged) and the rest of the Tezzeret lineage. CR 205.3m.</summary>
     Tezzeret,

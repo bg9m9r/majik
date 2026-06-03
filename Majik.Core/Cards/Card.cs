@@ -1216,11 +1216,37 @@ public class Card : ICard
             // Card.ActiveEffects lives on Permanent. Idempotent / null-safe.
             if (value != null && this is Permanent perm)
             {
-                value.OnTransformed = () => perm.ActiveEffects?.BumpGeneration();
+                value.OnTransformed = () =>
+                {
+                    perm.ActiveEffects?.BumpGeneration();
+                    SyncTransientLoyalty(perm, value);
+                };
+                // CR 711 — seed/clear the transient loyalty body for the
+                // INITIAL face too (a permanent that enters already on its
+                // planeswalker back, or has its state attached after a flip).
+                SyncTransientLoyalty(perm, value);
             }
         }
     }
     private Majik.Core.CardData.MDFCs.MdfcState? _mdfcState;
+
+    /// <summary>
+    /// CR 711 / 306.5b — keep a non-planeswalker permanent's transient loyalty
+    /// body in sync with its active face. A creature-front transform DFC whose
+    /// BACK face is a planeswalker (Ral, Monsoon Mage // Ral, Leyline Prodigy)
+    /// gains a working loyalty body on flip and loses it on flip-back, so the
+    /// loyalty-death SBA (CR 704.5j) and loyalty-removing damage apply to the
+    /// back face without re-classing the runtime <see cref="Permanent"/> to a
+    /// <see cref="Planeswalker"/>. A real <see cref="Planeswalker"/> instance
+    /// holds authoritative loyalty itself and is left untouched.
+    /// </summary>
+    private static void SyncTransientLoyalty(
+        Permanent perm, Majik.Core.CardData.MDFCs.MdfcState state)
+    {
+        if (perm is Planeswalker) return;
+        var backLoyalty = state.BackFaceCharacteristics?.Loyalty;
+        perm.SetTransientLoyalty(state.IsBackFace ? backLoyalty : null);
+    }
 
     /// <summary>
     /// CR 715 — Adventure half descriptor. Non-null on adventurer cards
