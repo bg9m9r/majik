@@ -1,0 +1,7 @@
+{
+  "name": "Fable of the Mirror-Breaker",
+  "types": ["Enchantment"],
+  "subtypes": ["Saga"],
+  "manaCost": "{2}{R}",
+  "abilities": []
+}
