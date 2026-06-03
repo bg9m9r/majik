@@ -111,6 +111,9 @@ public enum CardSubtype
     Nymph,
     /// <summary>Minotaur creature subtype — Boros Reckoner. CR 205.3m.</summary>
     Minotaur,
+    /// <summary>Manticore creature subtype — Conquering Manticore (Born of the
+    /// Gods). CR 205.3m.</summary>
+    Manticore,
     /// <summary>Praetor creature subtype — Sheoldred, the Apocalypse; the New
     /// Phyrexia / Phyrexia: All Will Be One praetor cycles. CR 205.3m.</summary>
     Praetor,
