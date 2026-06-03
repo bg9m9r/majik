@@ -26,6 +26,14 @@ namespace Majik.Core.Costs;
 ///    (CR 702.16 — Scion of Draco / Tribal Flames family) where the
 ///    reduction is "{N} per distinct basic land type" rather than per
 ///    instance.
+/// 3. Board-aware whole-reduction function (<see cref="ContextReducer"/>):
+///    same shape as #2 but the closure receives a <see cref="ReducerContext"/>
+///    carrying the caster <b>and the full player roster</b>, so the
+///    reduction can count permanents an <i>opponent</i> controls
+///    (Hagra Mauling — "costs {1} less if an opponent controls no basic
+///    lands"; Affinity-for-opponent-permanents-style reducers). This widens
+///    the closure's input beyond the caster — the caster-only
+///    <see cref="TotalReducer"/> seam could only see the caster's own board.
 /// </summary>
 public class CostReductionAbility : IAbility
 {
@@ -44,6 +52,20 @@ public class CostReductionAbility : IAbility
     /// distinct basic land types × {N}).</summary>
     public Func<Player, int>? TotalReducer { get; }
 
+    /// <summary>Optional board-aware whole-reduction computation. When
+    /// non-null, this takes precedence over <see cref="PerInstance"/> /
+    /// <see cref="TotalReducer"/>: the function receives a
+    /// <see cref="ReducerContext"/> (caster + full player roster) and returns
+    /// the total generic reduction to apply. This is the seam that lets a
+    /// reducer enumerate permanents an opponent controls (Hagra Mauling,
+    /// Affinity-for-opponent-permanents). When no player roster is threaded
+    /// into <see cref="CostReduction.GetEffectiveCost(ICard, Player,
+    /// IEnumerable{Player}?)"/> (callers passing <c>allPlayers: null</c>) the
+    /// context still carries the caster alone, so opponent-board-aware
+    /// reducers gracefully see an empty opponent set and contribute nothing
+    /// (pre-roster cost-calc behaviour for shape tests / agents).</summary>
+    public Func<ReducerContext, int>? ContextReducer { get; }
+
     public string Description { get; }
 
     public CostReductionAbility(int perInstance, Func<ICard, bool> predicate, string description)
@@ -52,6 +74,7 @@ public class CostReductionAbility : IAbility
         PerInstance = perInstance;
         Predicate = predicate ?? throw new ArgumentNullException(nameof(predicate));
         TotalReducer = null;
+        ContextReducer = null;
         Description = description ?? string.Empty;
     }
 
@@ -62,6 +85,23 @@ public class CostReductionAbility : IAbility
     public CostReductionAbility(Func<Player, int> totalReducer, string description)
     {
         TotalReducer = totalReducer ?? throw new ArgumentNullException(nameof(totalReducer));
+        ContextReducer = null;
+        PerInstance = 0;
+        Predicate = static _ => false;
+        Description = description ?? string.Empty;
+    }
+
+    /// <summary>Construct a board-aware whole-reduction cost reducer
+    /// (Hagra Mauling et al.). <paramref name="contextReducer"/> receives a
+    /// <see cref="ReducerContext"/> (caster + full player roster) and returns
+    /// the full generic-mana reduction; floor-at-zero is enforced in
+    /// <see cref="CostReduction.GetEffectiveCost"/>. This is the seam the
+    /// caster-only <see cref="TotalReducer"/> could not satisfy — it lets the
+    /// closure enumerate opponent-controlled permanents (CR 117.7).</summary>
+    public CostReductionAbility(Func<ReducerContext, int> contextReducer, string description)
+    {
+        ContextReducer = contextReducer ?? throw new ArgumentNullException(nameof(contextReducer));
+        TotalReducer = null;
         PerInstance = 0;
         Predicate = static _ => false;
         Description = description ?? string.Empty;
@@ -69,6 +109,64 @@ public class CostReductionAbility : IAbility
 
     public static CostReductionAbility AffinityFor(CardType type) =>
         new(1, c => c.HasType(type), $"Affinity for {type.ToString().ToLowerInvariant()}s");
+}
+
+/// <summary>
+/// CR 117.7 cost-reduction evaluation context. Widens the caster-only input
+/// of <see cref="CostReductionAbility.TotalReducer"/> so a board-aware
+/// reducer closure can enumerate permanents an <i>opponent</i> controls.
+///
+/// <para><see cref="Caster"/> is the player casting the spell;
+/// <see cref="AllPlayers"/> is the full player roster threaded from the cast
+/// flow. <see cref="Opponents"/> is the convenience projection (everyone in
+/// the roster who is not the caster). When the cost-calc caller supplies no
+/// roster (<c>allPlayers: null</c>), the context carries the caster alone and
+/// <see cref="Opponents"/> is empty — opponent-board-aware reducers then
+/// contribute nothing, preserving pre-roster behaviour for shape tests /
+/// affordability probes.</para>
+/// </summary>
+public readonly struct ReducerContext
+{
+    /// <summary>The player casting the spell whose cost is being computed.</summary>
+    public Player Caster { get; }
+
+    /// <summary>The full player roster threaded from the cast flow. Always
+    /// includes <see cref="Caster"/>; never null (the caster-only fallback
+    /// yields a single-element roster).</summary>
+    public IReadOnlyList<Player> AllPlayers { get; }
+
+    public ReducerContext(Player caster, IEnumerable<Player>? allPlayers)
+    {
+        Caster = caster ?? throw new ArgumentNullException(nameof(caster));
+        var roster = allPlayers?.Where(p => p != null).ToList();
+        if (roster == null || roster.Count == 0)
+        {
+            roster = new List<Player> { caster };
+        }
+        else if (!roster.Any(p => ReferenceEquals(p, caster)))
+        {
+            // Defensive: a roster that somehow omits the caster still names
+            // the caster so caster-relative counts stay correct.
+            roster.Insert(0, caster);
+        }
+        AllPlayers = roster;
+    }
+
+    /// <summary>Every player in the roster who is not the caster (CR 102.2).
+    /// Empty when the caster-only fallback applies.</summary>
+    public IEnumerable<Player> Opponents
+    {
+        get
+        {
+            // Copy 'this'-backed members to locals — a struct's iterator /
+            // closure can't capture 'this' (CS1673).
+            var caster = Caster;
+            foreach (var p in AllPlayers)
+            {
+                if (!ReferenceEquals(p, caster)) yield return p;
+            }
+        }
+    }
 }
 
 /// <summary>
@@ -174,7 +272,12 @@ public static class CostReduction
     /// <summary>
     /// CR 117.7 / 601.2f cost calculation. Applies (in order):
     ///   1. Printed cost reductions on the card itself
-    ///      (<see cref="CostReductionAbility"/> — Affinity, Domain, …).
+    ///      (<see cref="CostReductionAbility"/> — Affinity, Domain,
+    ///      opponent-board-aware reducers via
+    ///      <see cref="CostReductionAbility.ContextReducer"/> — Hagra
+    ///      Mauling, …). The board-aware shape receives the player roster
+    ///      passed via <paramref name="allPlayers"/>; null collapses it to a
+    ///      caster-only context (opponent counts read as zero).
     ///   2. Subtractive riders from battlefield permanents under the caster
     ///      (<see cref="SpellCostReductionAbility"/> — Goblin Electromancer,
     ///      Baral, …) — "&lt;X&gt; spells you cast cost {N} less". Always
@@ -207,8 +310,22 @@ public static class CostReduction
         if (reducers.Count > 0)
         {
             var battlefield = caster.Zones.Battlefield.GetCards().ToList();
+            ReducerContext? reducerContext = null;
             foreach (var r in reducers)
             {
+                if (r.ContextReducer != null)
+                {
+                    // Board-aware whole-reduction shape (Hagra Mauling et al.).
+                    // The closure receives the caster + full player roster so
+                    // it can count permanents an opponent controls. When the
+                    // caller supplied no roster, ReducerContext degrades to a
+                    // caster-only roster and Opponents is empty (the reducer
+                    // sees no opponent board, contributes per its own logic).
+                    reducerContext ??= new ReducerContext(caster, allPlayers);
+                    totalReduction += Math.Max(0, r.ContextReducer(reducerContext.Value));
+                    continue;
+                }
+
                 if (r.TotalReducer != null)
                 {
                     // Whole-reduction shape (Domain et al.). The function
