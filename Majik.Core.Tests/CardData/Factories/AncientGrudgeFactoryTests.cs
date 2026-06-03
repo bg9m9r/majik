@@ -104,6 +104,21 @@ public class AncientGrudgeFactoryTests
     }
 
     [Fact]
+    public void TargetEnchantment_DoesNothing()
+    {
+        // An enchantment is not a legal target for Ancient Grudge. If somehow
+        // resolved against one (type changed after targeting), the shared
+        // destroy_target verb re-checks the "artifact" filter at resolution
+        // (CR 608.2b) and fizzles cleanly.
+        var enchantment = NewControlledEnchantment(_bob, "Sylvan Library", "{1}{G}");
+
+        ResolveAgainst(enchantment);
+
+        enchantment.Zone.Should().Be(ZoneType.Battlefield,
+            because: "Ancient Grudge destroys artifacts only, not enchantments (CR 608.2b)");
+    }
+
+    [Fact]
     public void TargetNotOnBattlefield_DoesNothing()
     {
         var artifact = NewControlledArtifact(_bob, "Sol Ring", "{1}");
@@ -166,6 +181,16 @@ public class AncientGrudgeFactoryTests
     private Creature NewControlledCreature(Player owner, string name, string cost, int p, int t)
     {
         var card = new Creature(name, cost, p, t);
+        card.SetOwner(owner);
+        card.SetController(owner);
+        card.SetZone(ZoneType.Battlefield);
+        owner.Zones.Battlefield.AddCard(card);
+        return card;
+    }
+
+    private Enchantment NewControlledEnchantment(Player owner, string name, string cost)
+    {
+        var card = new Enchantment(name, cost);
         card.SetOwner(owner);
         card.SetController(owner);
         card.SetZone(ZoneType.Battlefield);
