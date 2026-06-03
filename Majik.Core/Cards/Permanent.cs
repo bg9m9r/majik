@@ -417,6 +417,88 @@ public class Permanent : Card
     /// <see cref="ResetTurnState"/>.</summary>
     public bool LoyaltyAbilityActivatedThisTurn { get; internal set; }
 
+    // -----------------------------------------------------------------------
+    // CR 711 / 306.5b — transient ("effective") loyalty surface.
+    //
+    // A planeswalker CARD is a <see cref="Planeswalker"/> C# instance carrying
+    // its own <see cref="Planeswalker.Loyalty"/> field. But a transform DFC
+    // whose FRONT face is a creature (Ral, Monsoon Mage; Tamiyo, Compleated
+    // Sage; etc.) is built as a <see cref="Creature"/> instance — flipping to
+    // its planeswalker BACK face cannot re-class the runtime object without
+    // touching zone/identity. Re-classing is the trap the v1-deferral
+    // (#19a, planeswalker-back-and-copy-reclass-loyalty-body) calls out.
+    //
+    // Instead, a non-planeswalker permanent can carry a PARALLEL transient
+    // loyalty body: a nullable loyalty value that the loyalty subsystem
+    // consults through <see cref="GetEffectiveLoyalty"/> /
+    // <see cref="IsEffectivePlaneswalker"/> rather than the concrete
+    // <see cref="Planeswalker"/> subclass — mirroring how
+    // <see cref="GetEffectiveColors"/> / supertypes decoupled those from the
+    // subclass. The back-face Layer-0 seed (BackFaceCharacteristics) already
+    // stamps the Planeswalker TYPE through Compute; this surface gives that
+    // type a working loyalty body so the loyalty=0 death SBA (CR 704.5j) and
+    // loyalty-removing damage (CR 120.3 / 306.7) apply to it.
+    //
+    // <see cref="Planeswalker"/> overrides the accessors to read its own
+    // <see cref="Planeswalker.Loyalty"/>, so a real planeswalker keeps its
+    // authoritative loyalty field and this transient surface is inert on it.
+    // -----------------------------------------------------------------------
+
+    private int? _transientLoyalty;
+
+    /// <summary>
+    /// CR 711 — grant (or clear, with <c>null</c>) a transient planeswalker
+    /// loyalty body to a non-planeswalker permanent. Set on transform to a
+    /// planeswalker back face (seeded from
+    /// <see cref="Majik.Core.CardData.MDFCs.BackFaceCharacteristics.Loyalty"/>);
+    /// cleared on transform back to the front face. No-op semantics for a real
+    /// <see cref="Planeswalker"/> (which holds authoritative loyalty itself).
+    /// </summary>
+    public void SetTransientLoyalty(int? startingLoyalty)
+    {
+        if (startingLoyalty is < 0)
+            throw new ArgumentException("Loyalty cannot be negative", nameof(startingLoyalty));
+        _transientLoyalty = startingLoyalty;
+    }
+
+    /// <summary>
+    /// CR 306.5b — this permanent's current loyalty when it carries a
+    /// planeswalker body, else <c>null</c>. A real <see cref="Planeswalker"/>
+    /// overrides this to return its own loyalty; a creature-front transform DFC
+    /// flipped to a planeswalker back returns the transient value.
+    /// </summary>
+    public virtual int? GetEffectiveLoyalty() => _transientLoyalty;
+
+    /// <summary>
+    /// True when this permanent has a working loyalty body — either a real
+    /// <see cref="Planeswalker"/> or a non-planeswalker carrying a transient
+    /// loyalty surface (CR 711 back-face planeswalker).
+    /// </summary>
+    public bool IsEffectivePlaneswalker() => GetEffectiveLoyalty().HasValue;
+
+    /// <summary>
+    /// CR 704.5j — true when this permanent has a loyalty body that has dropped
+    /// to 0 (so the planeswalker-death SBA destroys it). False when it carries
+    /// no loyalty body.
+    /// </summary>
+    public bool IsLoyaltyDead() => GetEffectiveLoyalty() is { } loyalty && loyalty <= 0;
+
+    /// <summary>
+    /// CR 306.7 / 120.3 — remove <paramref name="amount"/> loyalty from a
+    /// transient loyalty body (damage / loyalty-cost). Floors at 0. No-op when
+    /// this permanent has no transient body (a real <see cref="Planeswalker"/>
+    /// removes from its own field). Returns <c>true</c> if a transient body
+    /// absorbed the removal.
+    /// </summary>
+    public virtual bool RemoveTransientLoyalty(int amount)
+    {
+        if (amount < 0)
+            throw new ArgumentException("Loyalty removal cannot be negative", nameof(amount));
+        if (_transientLoyalty is not { } current) return false;
+        _transientLoyalty = Math.Max(0, current - amount);
+        return true;
+    }
+
     /// <summary>
     /// CR 305.2 / 720 — the number of <em>additional</em> land plays this
     /// permanent grants its controller each turn while it is on the

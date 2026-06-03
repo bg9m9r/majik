@@ -22,12 +22,20 @@ namespace Majik.Core.CardData.MDFCs;
 /// face-down (CR 708.2) still wins over the back-face seed.</para>
 ///
 /// <para>The optional <see cref="Loyalty"/> records a planeswalker back's
-/// starting loyalty. It is carried for completeness but NOT yet honoured by
-/// the loyalty subsystem — a creature-front C# instance is a
-/// <see cref="Majik.Core.Cards.Creature"/>, not a
-/// <see cref="Majik.Core.Cards.Planeswalker"/>, so loyalty-ability
-/// activation + the loyalty=0 death SBA remain a documented residual
-/// (v1-deferrals #19a).</para>
+/// starting loyalty. On transform to the back face it seeds the
+/// <see cref="Majik.Core.Cards.Permanent"/> transient-loyalty surface
+/// (<see cref="Majik.Core.Cards.Permanent.SetTransientLoyalty"/>) so a
+/// creature-front C# instance — a <see cref="Majik.Core.Cards.Creature"/>,
+/// NOT a <see cref="Majik.Core.Cards.Planeswalker"/> — carries a working
+/// loyalty body without re-classing: loyalty-removing DAMAGE (CR 306.7 /
+/// 120.3) and the loyalty=0 DEATH SBA (CR 704.5j) both consult it via
+/// <see cref="Majik.Core.Cards.Permanent.GetEffectiveLoyalty"/> /
+/// <see cref="Majik.Core.Cards.Permanent.IsLoyaltyDead"/>. The back face's
+/// activated LOYALTY ABILITIES ([+1]/[−2]/…) are still not wired — those are
+/// keyed on the <see cref="Majik.Core.Abilities.LoyaltyAbility"/> /
+/// <see cref="Majik.Core.Cards.Planeswalker"/> activation surface and remain
+/// the residual of v1-deferrals #19a (low value — the played face is the
+/// creature front).</para>
 /// </summary>
 public sealed class BackFaceCharacteristics
 {

@@ -6,6 +6,7 @@ using Majik.Core.Costs;
 using Majik.Core.Domain.DomainEvents;
 using Majik.Core.Events;
 using Majik.Core.Players;
+using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
 
 namespace Majik.Core.CardData.Factories;
@@ -60,12 +61,18 @@ namespace Majik.Core.CardData.Factories;
 ///   matching the Ajani / Tamiyo transform posture. A true exile + return would
 ///   require the same Layer-0 / per-face hot-swap that DFC permanents still
 ///   lack (see Ajani deferral note).
-/// - <b>Back-face loyalty abilities + planeswalker body.</b> Ral, Leyline
-///   Prodigy's enters-with-extra-loyalty rider and [+1] / [-2] / [-8] loyalty
-///   abilities and the Planeswalker characteristics (loyalty 2) are not wired.
-///   The back face is shape-only tracked through
-///   <see cref="MdfcState.BackFaceName"/> — identical to Ajani, Nacatl Avenger
-///   / Tamiyo, Seasoned Scholar.
+/// - <b>Back-face planeswalker BODY (loyalty 2) — wired (v1).</b> The
+///   <see cref="MdfcState"/> now carries a <see cref="BackFaceCharacteristics"/>
+///   planeswalker back: flipping to Ral, Leyline Prodigy stamps the
+///   Planeswalker TYPE + Ral subtype + Legendary + UR colour through Compute
+///   (CR 711 Layer-0 seed) AND seeds a transient loyalty-2 body on the
+///   <see cref="Permanent"/> surface (CR 306.5b) so loyalty-removing damage
+///   (CR 306.7) and the loyalty=0 death SBA (CR 704.5j) apply to the back face
+///   — no re-classing of the <see cref="Creature"/> instance. <b>Still
+///   deferred:</b> the back-face activated LOYALTY ABILITIES ([+1] / [−2] /
+///   [−8]) and the enters-with-extra-loyalty rider (keyed on the
+///   <see cref="LoyaltyAbility"/> / <see cref="Planeswalker"/> activation
+///   surface). Low value — the played face is the creature front.
 /// - <b>"You may exile Ral" prompt.</b> A win auto-transforms rather than
 ///   prompting whether to exile/return. Same deterministic posture as every
 ///   other v1 "you may" (Sun Titan / Stoneforge Mystic / Ajani).
@@ -124,9 +131,27 @@ public static class RalMonsoonMageFactory
         card.SetOwner(owner);
         card.SetController(owner);
 
-        // CR 711 — DFC face tracker. Starts on the front face (Ral, Monsoon
-        // Mage); winning the coin flip flips IsBackFace.
-        card.MdfcState = new MdfcState(FrontName, BackName);
+        // CR 711 — DFC face tracker with the planeswalker back-face Layer-0
+        // seed. Starts on the front face (Ral, Monsoon Mage); winning the coin
+        // flip flips IsBackFace → Ral, Leyline Prodigy (Legendary Planeswalker —
+        // Ral, loyalty 2). The BackFaceCharacteristics.Loyalty grants a
+        // transient loyalty body to this Creature instance on flip (CR 306.5b /
+        // 704.5j) without re-classing it to a Planeswalker; the back-face seed
+        // also stamps the Planeswalker TYPE through Compute.
+        card.MdfcState = new MdfcState(
+            FrontName,
+            BackName,
+            new BackFaceCharacteristics(
+                name: BackName,
+                isCreature: false,
+                power: 0,
+                toughness: 0,
+                types: new[] { CardType.Planeswalker },
+                subtypes: new[] { CardSubtype.Ral },
+                supertypes: new[] { CardSupertype.Legendary },
+                keywords: null,
+                colors: new[] { ManaColor.Blue, ManaColor.Red },
+                loyalty: 2));
 
         // CR 117.7 — "Instant and sorcery spells you cast cost {1} less to
         // cast." Exact Baral / Goblin Electromancer shape; scoped to the
