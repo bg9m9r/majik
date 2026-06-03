@@ -43,6 +43,9 @@ namespace Majik.Core.CardData.Definitions;
 [JsonDerivedType(typeof(GainControlEffectDef), "gain_control")]
 [JsonDerivedType(typeof(FightEffectDef), "fight")]
 [JsonDerivedType(typeof(ExploreTargetEffectDef), "explore_target")]
+[JsonDerivedType(typeof(PumpTargetEffectDef), "pump_target")]
+[JsonDerivedType(typeof(GrantKeywordUntilEotTargetEffectDef), "grant_keyword_until_eot_target")]
+[JsonDerivedType(typeof(BecomesArtifactTargetEffectDef), "becomes_artifact_target")]
 public abstract class EffectDefinition
 {
     /// <summary>
@@ -775,4 +778,139 @@ public sealed class ExploreTargetEffectDef : EffectDefinition
     public override Majik.Core.Players.Agents.TargetRequest? ToTargetRequest() =>
         TargetFilters.ToTargetRequest(
             TargetFilter, "explore", Majik.Core.Cards.BotIntent.Buff);
+}
+
+/// <summary>
+/// "Target creature gets +X/+X until end of turn" (CR 611 continuous effect,
+/// CR 514.2 end-of-turn expiry) — the targeted declarative pump verb onto the
+/// pre-existing <see cref="Majik.Core.Effects.PumpUntilEndOfTurnEffect"/>
+/// primitive (the Layer-7c +P/+T modifier the fluent <c>pump_self</c> /
+/// <c>PumpUntilEndOfTurn</c> family already emits). At resolution the effect
+/// reads the chosen creature off
+/// <see cref="Majik.Core.Abilities.ResolutionContext.ChosenTargets"/> at the
+/// reserved index and registers the +<see cref="Power"/>/+<see cref="Toughness"/>
+/// modifier on <b>that creature's own</b>
+/// <see cref="Majik.Core.Effects.ContinuousEffectsService"/>
+/// (<see cref="Majik.Core.Cards.Creature.ActiveEffects"/>) — the same posture
+/// the fluent <c>PumpUntilEndOfTurn</c> <see cref="MaterializeStep"/> uses, so
+/// the modifier auto-expires at the cleanup step.
+///
+/// <para>Signed values are honoured: a negative
+/// <see cref="Power"/> / <see cref="Toughness"/> models the "−X/−X until end of
+/// turn" debuff half (CR 611) — the Layer-7c effect simply adds a negative
+/// delta. CR 608.2b — an illegal target at resolution (the creature has left
+/// the battlefield since the ability was put on the stack) fizzles cleanly: no
+/// modifier. Without a live continuous-effects service (pure-shape test path)
+/// the registration no-ops, mirroring
+/// <see cref="GainControlEffectDef"/>'s posture.</para>
+///
+/// <para>Canonical case: Okina, Temple to the Grandfathers —
+/// <c>"{G}, {T}: Target legendary creature gets +1/+1 until end of turn."</c>
+/// (<see cref="TargetFilter"/> <c>"legendary_creature"</c>).</para>
+/// </summary>
+public sealed class PumpTargetEffectDef : EffectDefinition
+{
+    /// <summary>The power delta (may be negative for a −X/−X debuff). Default 1.</summary>
+    public int Power { get; set; } = 1;
+
+    /// <summary>The toughness delta (may be negative). Default 1.</summary>
+    public int Toughness { get; set; } = 1;
+
+    /// <summary>Target filter (default <c>"creature"</c>).</summary>
+    public string TargetFilter { get; set; } = "creature";
+
+    /// <inheritdoc />
+    public override Majik.Core.Players.Agents.TargetRequest? ToTargetRequest() =>
+        TargetFilters.ToTargetRequest(
+            TargetFilter,
+            $"get +{Power}/+{Toughness} until end of turn",
+            Power < 0 || Toughness < 0
+                ? Majik.Core.Cards.BotIntent.Removal
+                : Majik.Core.Cards.BotIntent.Buff);
+}
+
+/// <summary>
+/// "Target creature gains [keyword] until end of turn" (CR 613.1c Layer-6
+/// keyword grant, CR 514.2 end-of-turn expiry) — the targeted declarative
+/// keyword-grant verb onto the pre-existing
+/// <see cref="Majik.Core.Effects.GrantKeywordUntilEndOfTurnEffect"/> primitive
+/// (the same until-EOT grant <see cref="GainControlEffectDef"/>'s haste rider
+/// and the Temur Battle Rage / Berserk pump family use). At resolution the
+/// effect reads the chosen creature off
+/// <see cref="Majik.Core.Abilities.ResolutionContext.ChosenTargets"/> at the
+/// reserved index and registers a <see cref="Keyword"/> grant on <b>that
+/// creature's own</b> <see cref="Majik.Core.Cards.Creature.ActiveEffects"/>, so
+/// it auto-expires at cleanup. CR 608.2b — an illegal target at resolution
+/// fizzles cleanly: no grant. Without a live continuous-effects service
+/// (pure-shape test path) the registration no-ops.
+///
+/// <para>Canonical cases:
+/// <list type="bullet">
+///   <item>Soaring Seacliff — "When this land enters, target creature gains
+///   flying until end of turn." (<see cref="Keyword"/> <c>"Flying"</c>).</item>
+///   <item>Sunhome, Fortress of the Legion — "{2}{R}{W}, {T}: Target creature
+///   gains double strike until end of turn." (<see cref="Keyword"/>
+///   <c>"Double strike"</c>).</item>
+/// </list></para>
+/// </summary>
+public sealed class GrantKeywordUntilEotTargetEffectDef : EffectDefinition
+{
+    /// <summary>The keyword granted until end of turn (e.g. <c>"Flying"</c>,
+    /// <c>"Double strike"</c>, <c>"Trample"</c>, <c>"Haste"</c>). The keyword
+    /// HashSet uses <see cref="System.StringComparer.OrdinalIgnoreCase"/>, so
+    /// casing is irrelevant; the engine's canonical capitalization is preferred
+    /// for readability.</summary>
+    public string Keyword { get; set; } = "Flying";
+
+    /// <summary>Target filter (default <c>"creature"</c>).</summary>
+    public string TargetFilter { get; set; } = "creature";
+
+    /// <inheritdoc />
+    public override Majik.Core.Players.Agents.TargetRequest? ToTargetRequest() =>
+        TargetFilters.ToTargetRequest(
+            TargetFilter, $"gain {Keyword} until end of turn",
+            Majik.Core.Cards.BotIntent.Buff);
+}
+
+/// <summary>
+/// "Target [filter] becomes an artifact in addition to its other types until
+/// end of turn" (CR 613.1d Layer-4 type-add, CR 514.2 end-of-turn expiry) — the
+/// Liquimetal Coating / Liquimetal Torque family. The targeted declarative verb
+/// onto the pre-existing
+/// <see cref="Majik.Core.Effects.LiquimetalCoatingAddArtifactEffect"/> primitive
+/// (the EOT-expiring Layer-4 add-artifact effect; the source-anchored
+/// <see cref="Majik.Core.Effects.AddCardTypeEffect"/> from the enters-as-copy PR
+/// is its non-expiring sibling). At resolution the effect reads the chosen
+/// permanent off <see cref="Majik.Core.Abilities.ResolutionContext.ChosenTargets"/>
+/// at the reserved index and registers the add-artifact modifier on <b>that
+/// permanent's own</b> <see cref="Majik.Core.Cards.Permanent.ActiveEffects"/>,
+/// so the printed types remain present (the ADD union) and the modifier expires
+/// at cleanup. CR 608.2b — an illegal target at resolution fizzles cleanly: no
+/// type-add. Without a live continuous-effects service (pure-shape test path)
+/// the registration no-ops, mirroring the hand-rolled Liquimetal Coating
+/// factory's posture.
+///
+/// <para>Canonical cases:
+/// <list type="bullet">
+///   <item>Liquimetal Coating — "{T}: Target permanent becomes an artifact in
+///   addition to its other types until end of turn." (<see cref="TargetFilter"/>
+///   <c>"permanent"</c>).</item>
+///   <item>Liquimetal Torque — "{T}: Target nonland permanent becomes an
+///   artifact in addition to its other types until end of turn."
+///   (<see cref="TargetFilter"/> <c>"nonland_permanent"</c>).</item>
+/// </list></para>
+///
+/// <see cref="TargetFilter"/> is the filter string the runtime translates into a
+/// <see cref="Majik.Core.Players.Agents.TargetRequest"/> (e.g. <c>"permanent"</c>,
+/// <c>"nonland_permanent"</c>).
+/// </summary>
+public sealed class BecomesArtifactTargetEffectDef : EffectDefinition
+{
+    /// <summary>Target filter (default <c>"permanent"</c>).</summary>
+    public string TargetFilter { get; set; } = "permanent";
+
+    /// <inheritdoc />
+    public override Majik.Core.Players.Agents.TargetRequest? ToTargetRequest() =>
+        TargetFilters.ToTargetRequest(
+            TargetFilter, "becomes an artifact until end of turn");
 }

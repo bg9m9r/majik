@@ -1,0 +1,17 @@
+{
+  "name": "Sunhome, Fortress of the Legion",
+  "types": ["Land"],
+  "abilities": [
+    { "kind": "mana", "produces": "C" },
+    {
+      "kind": "activated",
+      "costs": [
+        { "type": "mana", "amount": "{2}{R}{W}" },
+        { "type": "tap_self" }
+      ],
+      "effects": [
+        { "type": "grant_keyword_until_eot_target", "keyword": "Double strike", "targetFilter": "creature" }
+      ]
+    }
+  ]
+}

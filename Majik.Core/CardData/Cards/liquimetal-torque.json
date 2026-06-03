@@ -1,0 +1,17 @@
+{
+  "name": "Liquimetal Torque",
+  "types": ["Artifact"],
+  "manaCost": "{2}",
+  "abilities": [
+    { "kind": "mana", "produces": "C" },
+    {
+      "kind": "activated",
+      "costs": [
+        { "type": "tap_self" }
+      ],
+      "effects": [
+        { "type": "becomes_artifact_target", "targetFilter": "nonland_permanent" }
+      ]
+    }
+  ]
+}
