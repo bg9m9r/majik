@@ -1,0 +1,5 @@
+{
+  "name": "Inspiring Call",
+  "types": ["Instant"],
+  "manaCost": "{2}{G}"
+}
