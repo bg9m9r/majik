@@ -1,0 +1,9 @@
+{
+  "name": "Vivien, Champion of the Wilds",
+  "types": ["Planeswalker"],
+  "supertypes": ["Legendary"],
+  "subtypes": ["Vivien"],
+  "manaCost": "{2}{G}",
+  "loyalty": 4,
+  "abilities": []
+}

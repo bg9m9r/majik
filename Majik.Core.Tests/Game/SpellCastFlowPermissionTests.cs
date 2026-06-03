@@ -111,6 +111,71 @@ public class SpellCastFlowPermissionTests
     }
 
     [Fact]
+    public async Task BolasTopCast_WithPayLifeAltCost_CastsForZeroMana_AndPaysLifeOnResolve()
+    {
+        // CR 118.9 / 116.3a — Bolas's Citadel: a spell cast from the top of the
+        // library under the Any grant whose mandatory alt cost is "pay life
+        // equal to its mana value rather than pay its mana cost" goes onto the
+        // stack paying ZERO mana; the life (== mana value) is paid on resolve.
+        using var _ = Majik.Core.Rules.LibraryTopPlayPermissions.PushScope();
+
+        var creature = new Creature("Goblin Bear", "{2}{R}", 2, 2) { Owner = _alice, Zone = ZoneType.Library };
+        _alice.Zones.Library.AddCard(creature);
+        Majik.Core.Rules.LibraryTopPlayPermissions.AddGrant(
+            new object(), _alice, Majik.Core.Rules.TopPlayFilter.Any,
+            revealsTop: true, extraPredicate: null,
+            topCastAltCostFactory: () => new Majik.Core.Costs.PayLifeEqualToManaValueAlternativeCost());
+
+        // The grant supplies the mandatory alt cost for the top card.
+        var alt = Majik.Core.Rules.LibraryTopPlayPermissions
+            .MandatoryTopCastAltCostFor(_alice, creature);
+        alt.Should().NotBeNull();
+
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
+        var agent = new ScriptedAgent();
+        agent.QueueMana(ManaPayment.Empty); // alt mana cost is {0}
+
+        var spell = await _flow.CastAsync(_alice, creature,
+            SpellDefinition.Vanilla(_ => System.Array.Empty<IEffect>()),
+            agent, ctx, alternativeCost: alt);
+
+        _stack.Count.Should().Be(1);
+        creature.Zone.Should().Be(ZoneType.Stack);
+        spell.WasCastFromLibrary.Should().BeTrue();
+        spell.WasFreeCast.Should().BeTrue("no mana is spent — the pay-life alt cost is {0} mana");
+
+        // Resolve the spell so the alt cost's OnResolved fires (CR 118.8).
+        foreach (var effect in spell.Effects) effect.Execute();
+        _alice.LifeTotal.Should().Be(17, "mana value 3 paid as life on resolve");
+    }
+
+    [Fact]
+    public async Task BolasTopCast_WithAltCost_ButNoGrant_StillRejected()
+    {
+        // CR 601.3e — the pay-life alt cost is NOT a zone permission on its own.
+        // A library-zone cast carrying the alt cost but with no registered
+        // cast-from-top grant must still be rejected (an arbitrary library card
+        // can't be cast just by attaching the alt cost).
+        using var _ = Majik.Core.Rules.LibraryTopPlayPermissions.PushScope();
+
+        var creature = new Creature("Goblin Bear", "{2}{R}", 2, 2) { Owner = _alice, Zone = ZoneType.Library };
+        _alice.Zones.Library.AddCard(creature);
+
+        var ctx = new GameContext(_alice, new[] { _alice, _bob }, _alice, 1, PhaseStateType.PreCombatMain, _stack);
+        var agent = new ScriptedAgent();
+        agent.QueueMana(ManaPayment.Empty);
+
+        var act = async () => await _flow.CastAsync(_alice, creature,
+            SpellDefinition.Vanilla(_ => System.Array.Empty<IEffect>()),
+            agent, ctx,
+            alternativeCost: new Majik.Core.Costs.PayLifeEqualToManaValueAlternativeCost());
+
+        await act.Should().ThrowAsync<System.InvalidOperationException>()
+            .WithMessage("*top of your library*");
+        _stack.Count.Should().Be(0);
+    }
+
+    [Fact]
     public async Task TopOfLibraryNonland_NotTheTopCard_Throws()
     {
         // CR 601.3e — only the TOP card is a legal cast source even under a

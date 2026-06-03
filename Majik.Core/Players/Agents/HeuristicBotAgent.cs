@@ -255,6 +255,27 @@ public sealed class HeuristicBotAgent : IPlayerAgent
                 Rules.LibraryTopPlayPermissions.CastableSpellFromTop(ctx.Self), card);
         var inHand = card.Zone == ZoneType.Hand || castableFromTop;
 
+        // CR 118.9 — a top-cast under a grant that REQUIRES an alternative cost
+        // (Bolas's Citadel: pay life equal to mana value rather than mana) must
+        // be routed with that alt cost INSTEAD of its printed cost. Emit exactly
+        // that single bid (no printed-cost bid — the printed mana cost is not a
+        // legal payment for a Bolas top-cast).
+        if (castableFromTop)
+        {
+            var mandatoryAlt =
+                Rules.LibraryTopPlayPermissions.MandatoryTopCastAltCostFor(ctx.Self, card);
+            if (mandatoryAlt != null)
+            {
+                if (mandatoryAlt.CanCastFor(card, ctx.Self)
+                    && TryPickManaSources(ctx.Self, mandatoryAlt.AlternativeManaCost) != null)
+                {
+                    bids.Add((card, mandatoryAlt.AlternativeManaCost, mandatoryAlt,
+                        printedCost.TotalValue + vanillaPenalty));
+                }
+                return;
+            }
+        }
+
         var altBids = EnumerateAlternativeCostBids(ctx, card);
 
         if (inHand)

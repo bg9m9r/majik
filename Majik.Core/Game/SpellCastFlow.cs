@@ -307,12 +307,14 @@ public sealed class SpellCastFlow
         // permission (Mystic Forge, Bolas's Citadel, Conspicuous Snoop, the
         // Augur of Autumn Coven clause, Oracle of Mul Daya, …). Verify the live
         // grant authorizes THIS card BEFORE any zone mutation, so an arbitrary
-        // library card can never be moved to the stack. Alt-cost casts carry
-        // their own zone permission (Suspend / Foretell move the card from
-        // Exile, not the library) and bypass this check; a plain library cast
-        // must be backed by a registered grant.
-        if (alternativeCost == null
-            && card.Zone == ZoneType.Library
+        // library card can never be moved to the stack. This check applies even
+        // when an alternative cost is supplied: Bolas's Citadel's pay-life-equal-
+        // to-mana-value (CR 118.9) is the cast-from-top cost itself, so a
+        // library-zone alt-cost cast must STILL be backed by a registered grant
+        // — the alt cost does not grant zone permission on its own. Other
+        // alt-cost casts (Suspend / Foretell) move the card from Exile, not the
+        // library, so they never reach this branch.
+        if (card.Zone == ZoneType.Library
             && !Majik.Core.Rules.LibraryTopPlayPermissions.MayCastTopCard(caster, card))
         {
             throw new InvalidOperationException(

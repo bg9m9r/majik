@@ -1,5 +1,6 @@
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Costs;
 using Majik.Core.Game;
 using Majik.Core.Players;
 
@@ -82,11 +83,17 @@ public static class LibraryTopPlayPermissions
     /// <summary>Per-game store: the token-keyed grant list and its lock.</summary>
     public sealed class Store
     {
-        // Each entry: (token, controller, filter, revealsTop, extraPredicate).
+        // Each entry: (token, controller, filter, revealsTop, extraPredicate,
+        // topCastAltCostFactory).
         // extraPredicate (nullable) ANDs an extra per-card restriction on top of
         // the type filter — e.g. Conspicuous Snoop's "Goblin card" subtype gate
         // on its Creatures grant. Null means "no extra restriction".
-        internal readonly List<(object Token, Player Controller, TopPlayFilter Filter, bool RevealsTop, Func<ICard, bool>? ExtraPredicate)> Grants = new();
+        // topCastAltCostFactory (nullable) — when set, a spell cast under THIS
+        // grant must be cast using the produced alternative cost INSTEAD of its
+        // printed mana cost (CR 118.9). Bolas's Citadel: "pay life equal to its
+        // mana value rather than pay its mana cost." Null = cast with the
+        // printed cost (Mystic Forge / Augur Coven / Conspicuous Snoop).
+        internal readonly List<(object Token, Player Controller, TopPlayFilter Filter, bool RevealsTop, Func<ICard, bool>? ExtraPredicate, Func<IAlternativeCost>? TopCastAltCostFactory)> Grants = new();
         internal readonly object Gate = new();
     }
 
@@ -115,7 +122,8 @@ public static class LibraryTopPlayPermissions
     /// </summary>
     public static void AddGrant(
         object token, Player controller, TopPlayFilter filter, bool revealsTop = true,
-        Func<ICard, bool>? extraPredicate = null)
+        Func<ICard, bool>? extraPredicate = null,
+        Func<IAlternativeCost>? topCastAltCostFactory = null)
     {
         ArgumentNullException.ThrowIfNull(token);
         ArgumentNullException.ThrowIfNull(controller);
@@ -131,7 +139,7 @@ public static class LibraryTopPlayPermissions
                     return;
                 }
             }
-            store.Grants.Add((token, controller, filter, revealsTop, extraPredicate));
+            store.Grants.Add((token, controller, filter, revealsTop, extraPredicate, topCastAltCostFactory));
         }
     }
 
@@ -255,6 +263,48 @@ public static class LibraryTopPlayPermissions
                 }
             }
             return false;
+        }
+    }
+
+    /// <summary>
+    /// CR 118.9 — if <paramref name="card"/> is castable from the top of
+    /// <paramref name="controller"/>'s library under a grant that REQUIRES an
+    /// alternative cost (Bolas's Citadel: "pay life equal to its mana value
+    /// rather than pay its mana cost"), produce a fresh instance of that
+    /// alternative cost. Returns null when the card is castable with its printed
+    /// cost (Mystic Forge / Augur Coven / Conspicuous Snoop carry no alt-cost
+    /// factory) or when no covering grant matches.
+    ///
+    /// <para>
+    /// Used by the cast enumeration (<see cref="Majik.Core.Players.Agents.HeuristicBotAgent"/>)
+    /// + <see cref="Majik.Core.Game.TurnDriver"/> to attach the mandatory
+    /// pay-life alt cost when routing a Bolas's Citadel top-cast through
+    /// <see cref="Majik.Core.Game.SpellCastFlow"/>. When several grants cover the
+    /// card, the FIRST grant carrying an alt-cost factory wins (a Bolas grant +
+    /// a Mystic-Forge grant on the same card: Bolas's pay-life requirement is
+    /// the binding one — CR 118.9 alt costs are exclusive).
+    /// </para>
+    /// </summary>
+    public static IAlternativeCost? MandatoryTopCastAltCostFor(Player controller, ICard card)
+    {
+        if (controller == null || card == null) return null;
+        if (card.HasType(CardType.Land)) return null;
+        if (!ReferenceEquals(TopOfLibrary(controller), card)) return null;
+
+        var store = Current;
+        lock (store.Gate)
+        {
+            foreach (var g in store.Grants)
+            {
+                if (!ReferenceEquals(g.Controller, controller)) continue;
+                if (g.TopCastAltCostFactory == null) continue;
+                if (MatchesCast(g.Filter, card)
+                    && (g.ExtraPredicate == null || g.ExtraPredicate(card)))
+                {
+                    return g.TopCastAltCostFactory();
+                }
+            }
+            return null;
         }
     }
 
