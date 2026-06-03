@@ -20,6 +20,7 @@ namespace Majik.Core.CardData.Definitions;
 [JsonDerivedType(typeof(RemoveCounterCostDef), "remove_counter")]
 [JsonDerivedType(typeof(TapSelfCostDef), "tap_self")]
 [JsonDerivedType(typeof(SacrificeSelfCostDef), "sacrifice_self")]
+[JsonDerivedType(typeof(SacrificeArtifactCostDef), "sacrifice_artifact")]
 [JsonDerivedType(typeof(DiscardSelfCostDef), "discard_self")]
 public abstract class CostDefinition
 {
@@ -64,6 +65,26 @@ public sealed class TapSelfCostDef : CostDefinition { }
 /// <summary>Sacrifice this permanent — CR 701.16. No additional fields;
 /// the cost always targets the activating permanent itself.</summary>
 public sealed class SacrificeSelfCostDef : CostDefinition { }
+
+/// <summary>
+/// "Sacrifice an artifact" — a non-mana activation cost (CR 117 / CR 701.16)
+/// that sacrifices an artifact the controller controls (NOT necessarily this
+/// permanent). Routes through the pre-existing
+/// <see cref="Majik.Core.Costs.SacrificeAnArtifactCost"/> rail (the same one
+/// Arcbound Ravager / Atog use). Distinct from <see cref="SacrificeSelfCostDef"/>
+/// (which sacrifices the source permanent). The source is eligible to pay
+/// itself if it is an artifact (CR 701.16 — Arcbound Ravager); Atog is not an
+/// artifact, so it never sacrifices itself.
+///
+/// <para>When <see cref="Nontoken"/> is true the picker excludes token
+/// artifacts (CR 111.8 — Thopter Foundry's "Sacrifice a nontoken artifact").
+/// Default false.</para>
+/// </summary>
+public sealed class SacrificeArtifactCostDef : CostDefinition
+{
+    /// <summary>Exclude token artifacts from the picker (CR 111.8). Default false.</summary>
+    public bool Nontoken { get; set; }
+}
 
 /// <summary>Discard this card — required for activated abilities that
 /// fire from the hand (Channel, CR 702.74). No additional fields.</summary>

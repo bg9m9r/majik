@@ -1077,6 +1077,7 @@ public static class CardDefRuntime
             RemoveCounterCostDef rc => BuildRemoveCounterCost(rc, card),
             TapSelfCostDef => BuildTapSelfCost(card),
             SacrificeSelfCostDef => BuildSacrificeSelfCost(card),
+            SacrificeArtifactCostDef sa => Primitives.Costs.SacrificeAnArtifact(sa.Nontoken),
             DiscardSelfCostDef => Primitives.Costs.DiscardSelf(card),
             _ => throw new NotSupportedException(
                 $"Cost '{definition.GetType().Name}' is not yet supported by CardDefRuntime."),
@@ -1144,6 +1145,7 @@ public static class CardDefRuntime
             ExploreSelfEffectDef exploreSelf => BuildExploreSelfEffect(exploreSelf, card, controller),
             ExploreTargetEffectDef explore => BuildExploreTargetEffect(explore, card, targetRequestIndex),
             PumpTargetEffectDef pump => BuildPumpTargetEffect(pump, card, targetRequestIndex),
+            PumpSelfEffectDef pumpSelf => BuildPumpSelfEffect(pumpSelf, card),
             GrantKeywordUntilEotTargetEffectDef grant => BuildGrantKeywordUntilEotTargetEffect(grant, card, targetRequestIndex),
             BecomesArtifactTargetEffectDef artifact => BuildBecomesArtifactTargetEffect(artifact, card, targetRequestIndex),
             GainLifeSelfEffectDef gain => BuildGainLifeSelfEffect(gain, card, controller),
@@ -1426,6 +1428,31 @@ public static class CardDefRuntime
                         new PumpUntilEndOfTurnEffect(creature, p, t));
                 }
                 return ValueTask.CompletedTask;
+            });
+    }
+
+    private static IEffect BuildPumpSelfEffect(PumpSelfEffectDef def, ICard card)
+    {
+        // CR 611 / CR 514.2 — the Subject=self +X/+X (signed: also −X/−X) verb.
+        // Registers a Layer-7c PumpUntilEndOfTurnEffect on the SOURCE creature's
+        // OWN ActiveEffects (no target slot) — the same posture the fluent
+        // PumpUntilEndOfTurn MaterializeStep uses, so the modifier auto-expires
+        // at the cleanup step and stacks additively per activation (CR 611.2c).
+        // Source not a battlefield creature / ActiveEffects null (pure-shape
+        // test path) → silent no-op, mirroring BuildPumpTargetEffect.
+        var p = def.Power;
+        var t = def.Toughness;
+        return new Effect(
+            $"{card.Name}: gets {(p < 0 ? "" : "+")}{p}/{(t < 0 ? "" : "+")}{t} until EOT",
+            () =>
+            {
+                if (card is Creature creature
+                    && creature.Zone == ZoneType.Battlefield
+                    && creature.ActiveEffects != null)
+                {
+                    creature.ActiveEffects.Register(
+                        new PumpUntilEndOfTurnEffect(creature, p, t));
+                }
             });
     }
 

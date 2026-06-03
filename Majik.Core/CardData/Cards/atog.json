@@ -1,0 +1,19 @@
+{
+  "name": "Atog",
+  "types": ["Creature"],
+  "subtypes": ["Atog"],
+  "manaCost": "{1}{R}",
+  "power": 1,
+  "toughness": 2,
+  "abilities": [
+    {
+      "kind": "activated",
+      "costs": [
+        { "type": "sacrifice_artifact" }
+      ],
+      "effects": [
+        { "type": "pump_self", "power": 2, "toughness": 2 }
+      ]
+    }
+  ]
+}

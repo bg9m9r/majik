@@ -45,6 +45,7 @@ namespace Majik.Core.CardData.Definitions;
 [JsonDerivedType(typeof(ExploreSelfEffectDef), "explore_self")]
 [JsonDerivedType(typeof(ExploreTargetEffectDef), "explore_target")]
 [JsonDerivedType(typeof(PumpTargetEffectDef), "pump_target")]
+[JsonDerivedType(typeof(PumpSelfEffectDef), "pump_self")]
 [JsonDerivedType(typeof(GrantKeywordUntilEotTargetEffectDef), "grant_keyword_until_eot_target")]
 [JsonDerivedType(typeof(BecomesArtifactTargetEffectDef), "becomes_artifact_target")]
 public abstract class EffectDefinition
@@ -857,6 +858,46 @@ public sealed class PumpTargetEffectDef : EffectDefinition
             Power < 0 || Toughness < 0
                 ? Majik.Core.Cards.BotIntent.Removal
                 : Majik.Core.Cards.BotIntent.Buff);
+}
+
+/// <summary>
+/// "This creature gets +X/+X until end of turn" (CR 611 continuous effect,
+/// CR 514.2 end-of-turn expiry) — the <b>Subject=self</b> mirror of
+/// <see cref="PumpTargetEffectDef"/>. Registers the SAME Layer-7c
+/// <see cref="Majik.Core.Effects.PumpUntilEndOfTurnEffect"/> primitive, but on
+/// the SOURCE card's own
+/// <see cref="Majik.Core.Effects.ContinuousEffectsService"/>
+/// (<see cref="Majik.Core.Cards.Creature.ActiveEffects"/>) with <b>no target
+/// slot</b> — the exact posture the fluent <c>PumpUntilEndOfTurn</c>
+/// <see cref="MaterializeStep"/> already uses. No
+/// <see cref="ToTargetRequest"/> (returns <c>null</c>), so the owning ability
+/// declares no target and CR 601.2c targeting does not apply.
+///
+/// <para>Each resolution adds its own delta (CR 611.2c — multiple +N/+N
+/// instances are additive), so a repeatable self-pump activation stacks. Signed
+/// values are honoured: a negative <see cref="Power"/> / <see cref="Toughness"/>
+/// models "−X/−X until end of turn". The modifier only applies while the source
+/// is a battlefield <see cref="Majik.Core.Cards.Creature"/>; off-battlefield or
+/// non-creature → silent no-op (the pure-shape test path without an
+/// <c>ActiveEffects</c> service also no-ops, mirroring
+/// <see cref="PumpTargetEffectDef"/>).</para>
+///
+/// <para>Canonical case: Atog —
+/// <c>"Sacrifice an artifact: This creature gets +2/+2 until end of turn."</c>
+/// (<see cref="Power"/> = <see cref="Toughness"/> = 2, paired with the
+/// <see cref="SacrificeArtifactCostDef"/> activation cost). Also feeds the
+/// Sunhome / self-pumping family.</para>
+/// </summary>
+public sealed class PumpSelfEffectDef : EffectDefinition
+{
+    /// <summary>The power delta (may be negative for a −X/−X). Default 1.</summary>
+    public int Power { get; set; } = 1;
+
+    /// <summary>The toughness delta (may be negative). Default 1.</summary>
+    public int Toughness { get; set; } = 1;
+
+    // No ToTargetRequest override — a self-pump targets nothing (inherits the
+    // base null), so the owning ability reserves no target slot.
 }
 
 /// <summary>

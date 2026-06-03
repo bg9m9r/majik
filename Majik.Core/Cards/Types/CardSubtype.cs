@@ -39,6 +39,9 @@ public enum CardSubtype
     Elemental,
     Bear,
     Insect,
+    /// <summary>Atog creature subtype — Atog (Antiquities), the artifact-eating
+    /// "Atog" sacrifice-payoff family. CR 205.3m.</summary>
+    Atog,
     Spirit,
     Warrior,
     /// <summary>Warlock creature subtype — Witch Enchanter (Wilds of
