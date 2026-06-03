@@ -946,6 +946,9 @@ public sealed class TurnDriver
         foreach (var permanent in _players.SelectMany(p => p.Zones.Battlefield.GetCards().OfType<Permanent>()))
         {
             if (permanent is Creature creature) creature.ClearDamage();
+            // CR 514.2 — the per-turn "was dealt damage this turn" flag
+            // (Needle Drop etc., CR 120.3) clears alongside marked damage.
+            permanent.ClearWasDealtDamageThisTurn();
             permanent.ClearRegenerationShields();
         }
 

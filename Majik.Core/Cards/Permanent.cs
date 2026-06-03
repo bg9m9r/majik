@@ -483,6 +483,44 @@ public class Permanent : Card
     public void ClearRegenerationShields() => _regenerationShields = 0;
 
     /// <summary>
+    /// CR 120.3 — true once this permanent has been dealt damage at least
+    /// once during the current turn. Distinct from marked
+    /// <see cref="Majik.Core.Cards.Creature.Damage"/>: a creature healed /
+    /// regenerated (or whose damage became -1/-1 counters via wither) still
+    /// "was dealt damage this turn", and a planeswalker that took loyalty-
+    /// removing damage carries no marked-damage at all. The flag is stamped
+    /// on every permanent-damage seam via <see cref="RecordDamageDealt"/>
+    /// (combat + noncombat creature damage, wither/infect counter
+    /// redirection, planeswalker damage) so payoffs that gate on "a creature
+    /// that was dealt damage this turn" / "any target that was dealt damage
+    /// this turn" (Needle Drop, CR 120.3) observe the precise condition.
+    /// Cleared during the cleanup step (CR 514.2) alongside marked damage by
+    /// <see cref="Majik.Core.Game.TurnDriver"/>.
+    /// </summary>
+    public bool WasDealtDamageThisTurn { get; private set; }
+
+    /// <summary>
+    /// CR 120.3 — record that this permanent was dealt
+    /// <paramref name="amount"/> damage this turn, setting
+    /// <see cref="WasDealtDamageThisTurn"/>. A non-positive amount is not
+    /// "damage" and is ignored (CR 120.3 — 0 damage isn't dealt). The
+    /// marked-damage / loyalty-removal / counter bookkeeping itself stays with
+    /// the caller (e.g. <see cref="Majik.Core.Cards.Creature.TakeDamage"/>,
+    /// the wither counter branches, planeswalker loyalty removal) — this only
+    /// stamps the per-turn "was dealt damage" flag.
+    /// </summary>
+    public void RecordDamageDealt(int amount)
+    {
+        if (amount > 0) WasDealtDamageThisTurn = true;
+    }
+
+    /// <summary>
+    /// CR 514.2 — clear the per-turn "was dealt damage this turn" flag during
+    /// the cleanup step, alongside the marked-damage sweep.
+    /// </summary>
+    public void ClearWasDealtDamageThisTurn() => WasDealtDamageThisTurn = false;
+
+    /// <summary>
     /// Clear per-turn flags (loyalty-once-per-turn, attacked-this-turn,
     /// summoning sickness). Called by the engine during the untap step.
     /// </summary>

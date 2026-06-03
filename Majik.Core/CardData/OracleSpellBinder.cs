@@ -349,6 +349,10 @@ public static class OracleSpellBinder
                 // -1/-1 counters instead of marked damage.
                 if (Combat.CombatAbilities.DealsCreatureDamageAsMinusCounters(source))
                 {
+                    // CR 120.3 — wither redirects damage to counters but the
+                    // creature was still dealt damage this turn; TakeDamage's
+                    // stamp is bypassed here, so record it explicitly.
+                    c.RecordDamageDealt(n);
                     c.Counters.Add(Counters.CounterType.MinusOneMinusOne, n);
                 }
                 else

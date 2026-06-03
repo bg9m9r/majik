@@ -344,6 +344,10 @@ public sealed class CombatFlow
         // the Layer 7c P/T mod + CR 704.5g state-based action.
         if (CombatAbilities.DealsCreatureDamageAsMinusCounters(source))
         {
+            // CR 702.90b — wither changes the FORM (counters, not marked
+            // damage), but the creature WAS still dealt damage this turn
+            // (CR 120.3). TakeDamage's stamp is bypassed here, so record it.
+            target.RecordDamageDealt(intent.Amount);
             target.Counters.Add(Majik.Core.Counters.CounterType.MinusOneMinusOne, intent.Amount);
         }
         else
@@ -369,6 +373,11 @@ public sealed class CombatFlow
         intent = _replacements?.Apply(intent) ?? intent;
         if (intent == null || intent.Amount <= 0) return;
 
+        // CR 120.3 — a planeswalker dealt damage (loyalty removal) "was dealt
+        // damage this turn" too. RemoveLoyalty is shared with loyalty-ability
+        // costs (NOT damage), so the flag is stamped here at the damage seam,
+        // not inside RemoveLoyalty.
+        target.RecordDamageDealt(intent.Amount);
         target.RemoveLoyalty(intent.Amount);
         if (CombatAbilities.HasLifelink(source) && source.Controller != null)
         {

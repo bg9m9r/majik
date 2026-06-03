@@ -81,7 +81,11 @@ public static class Fx
         if (amount <= 0) return;
         switch (target)
         {
-            case Planeswalker pw: pw.RemoveLoyalty(amount); break;
+            // CR 120.3 — stamp "was dealt damage this turn" on a planeswalker
+            // dealt noncombat damage. RemoveLoyalty alone is also a loyalty-
+            // ability cost (not damage), so the flag is recorded at the damage
+            // seam, not inside RemoveLoyalty.
+            case Planeswalker pw: pw.RecordDamageDealt(amount); pw.RemoveLoyalty(amount); break;
             default: OracleSpellBinder.DealDamage(target, amount); break;
         }
     }
@@ -99,7 +103,9 @@ public static class Fx
         if (amount <= 0) return;
         switch (target)
         {
-            case Planeswalker pw: pw.RemoveLoyalty(amount); break;
+            // CR 120.3 — see the parameterless overload: stamp the planeswalker
+            // "was dealt damage this turn" flag at the damage seam.
+            case Planeswalker pw: pw.RecordDamageDealt(amount); pw.RemoveLoyalty(amount); break;
             default: OracleSpellBinder.DealDamage(target, amount, source); break;
         }
     }
@@ -163,6 +169,10 @@ public static class Fx
         // toughness; deathtouch still independently marks the target.
         if (Combat.CombatAbilities.DealsCreatureDamageAsMinusCounters(source))
         {
+            // CR 120.3 — wither redirects the FORM to counters but the
+            // creature was still dealt damage this turn; TakeDamage's stamp
+            // is bypassed on this branch, so record it explicitly.
+            target.RecordDamageDealt(amount);
             target.Counters.Add(CounterType.MinusOneMinusOne, amount);
         }
         else

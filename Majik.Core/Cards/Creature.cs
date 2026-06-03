@@ -147,6 +147,11 @@ public class Creature : Permanent
             throw new ArgumentException("Damage amount cannot be negative", nameof(amount));
         }
 
+        // CR 120.3 — stamp the per-turn "was dealt damage this turn" flag at
+        // the single common creature-damage sink (every combat / noncombat /
+        // ping path routes here). A 0-amount deal is not damage and is
+        // filtered by RecordDamageDealt.
+        RecordDamageDealt(amount);
         Damage += amount;
     }
 
