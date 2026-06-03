@@ -1,0 +1,9 @@
+{
+  "name": "Oracle of Mul Daya",
+  "types": ["Creature"],
+  "subtypes": ["Elf", "Shaman"],
+  "manaCost": "{3}{G}",
+  "power": 2,
+  "toughness": 2,
+  "abilities": []
+}
