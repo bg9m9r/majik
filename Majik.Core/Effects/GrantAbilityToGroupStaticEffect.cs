@@ -5,6 +5,8 @@ using Majik.Core.Zones;
 
 namespace Majik.Core.Effects;
 
+// (TriggerManager lives in Majik.Core.Abilities — already imported above.)
+
 /// <summary>
 /// CR 613.1f — Layer 6 ability-adding continuous static that grants a
 /// specified ability (activated / mana / triggered / keyword) to EVERY
@@ -51,6 +53,7 @@ public sealed class GrantAbilityToGroupStaticEffect : ContinuousEffect
     private readonly Func<Permanent, bool> _scope;
     private readonly Func<Permanent, IReadOnlyList<IAbility>> _abilityFactory;
     private readonly Func<IEnumerable<Permanent>> _membershipProvider;
+    private readonly TriggerManager? _triggers;
 
     // Per-bearer granted abilities, so each can be revoked precisely when a
     // bearer drops out of the membership set. Reference-keyed: identity, not
@@ -74,16 +77,32 @@ public sealed class GrantAbilityToGroupStaticEffect : ContinuousEffect
     /// the source controller's battlefield. Re-read on every
     /// <see cref="Sync"/> so newly-entered permanents are picked up
     /// (CR 611.2c).</param>
+    /// <param name="triggers">Optional live <see cref="TriggerManager"/>. When
+    /// supplied, every granted ability that is an
+    /// <see cref="ITriggeredAbility"/> is REGISTERED with the manager as it is
+    /// granted to a member and UNREGISTERED when the grant is revoked (member
+    /// left the group, or the source left play). This is what makes a
+    /// group-granted TRIGGERED ability actually fire — unlike an
+    /// activated / mana ability (which surfaces purely through the bearer's
+    /// <see cref="Card.Abilities"/> list with no manager wiring), a triggered
+    /// ability must be in the manager's evaluation set to match events. The
+    /// canonical case is Kataki, War's Wage — "All artifacts have 'At the
+    /// beginning of your upkeep, sacrifice this artifact unless you pay {1}.'"
+    /// Null ⇒ activated / mana grants only (legacy #2322 behaviour); any
+    /// granted triggered abilities are attached to the bearer but never
+    /// registered (they would not fire).</param>
     public GrantAbilityToGroupStaticEffect(
         Permanent source,
         Func<Permanent, bool> scope,
         Func<Permanent, IReadOnlyList<IAbility>> abilityFactory,
-        Func<IEnumerable<Permanent>> membershipProvider)
+        Func<IEnumerable<Permanent>> membershipProvider,
+        TriggerManager? triggers = null)
     {
         _source = source ?? throw new ArgumentNullException(nameof(source));
         _scope = scope ?? throw new ArgumentNullException(nameof(scope));
         _abilityFactory = abilityFactory ?? throw new ArgumentNullException(nameof(abilityFactory));
         _membershipProvider = membershipProvider ?? throw new ArgumentNullException(nameof(membershipProvider));
+        _triggers = triggers;
     }
 
     public override Layer Layer => Layer.Abilities;
@@ -161,6 +180,14 @@ public sealed class GrantAbilityToGroupStaticEffect : ContinuousEffect
             foreach (var ability in abilities)
             {
                 member.AddAbility(ability);
+                // CR 603 — a group-granted TRIGGERED ability must join the live
+                // TriggerManager's evaluation set to fire; the member doesn't
+                // cross a zone boundary on a grant, so the manager's auto-bind
+                // on CardMovedEvent never sees it. Register explicitly.
+                if (_triggers != null && ability is ITriggeredAbility triggered)
+                {
+                    _triggers.RegisterTriggeredAbility(triggered);
+                }
             }
             _granted[member] = abilities;
         }
@@ -184,6 +211,13 @@ public sealed class GrantAbilityToGroupStaticEffect : ContinuousEffect
         foreach (var ability in abilities)
         {
             bearer.RemoveAbility(ability);
+            // CR 613.6e — when the grant ends the granted ability is lost; a
+            // granted triggered ability must also leave the manager's set so it
+            // stops matching events.
+            if (_triggers != null && ability is ITriggeredAbility triggered)
+            {
+                _triggers.UnregisterTriggeredAbility(triggered);
+            }
         }
         _granted.Remove(bearer);
     }

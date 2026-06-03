@@ -5,6 +5,8 @@ using Majik.Core.Zones;
 
 namespace Majik.Core.Effects;
 
+// (TriggerManager lives in Majik.Core.Abilities — already imported above.)
+
 /// <summary>
 /// Reusable lifecycle binder for a CR 613.1f Layer-6 group ability-grant
 /// (<see cref="GrantAbilityToGroupStaticEffect"/>) — the battlefield-gated
@@ -30,6 +32,7 @@ public sealed class GrantAbilityToGroupLifecycle
     private readonly Func<Permanent, bool> _scope;
     private readonly Func<Permanent, IReadOnlyList<IAbility>> _abilityFactory;
     private readonly Func<IEnumerable<Permanent>> _membershipProvider;
+    private readonly TriggerManager? _triggers;
     private readonly Action<CardMovedEvent> _handler;
     private GrantAbilityToGroupStaticEffect? _registered;
     private bool _attached;
@@ -47,13 +50,22 @@ public sealed class GrantAbilityToGroupLifecycle
     /// member.</param>
     /// <param name="membershipProvider">Returns the live candidate set
     /// (typically the source controller's battlefield).</param>
+    /// <param name="triggers">Optional live <see cref="TriggerManager"/>,
+    /// threaded into the registered
+    /// <see cref="GrantAbilityToGroupStaticEffect"/> so a TRIGGERED ability
+    /// granted to the group is registered / unregistered with the manager as
+    /// membership changes (e.g. Kataki's per-artifact upkeep tax). Null for the
+    /// activated / mana group-grant family (Chromatic Lantern, Cryptolith
+    /// Rite), where the granted abilities surface purely through the bearer's
+    /// <see cref="Card.Abilities"/> list.</param>
     public GrantAbilityToGroupLifecycle(
         Permanent source,
         ContinuousEffectsService layers,
         IEventBus? eventBus,
         Func<Permanent, bool> scope,
         Func<Permanent, IReadOnlyList<IAbility>> abilityFactory,
-        Func<IEnumerable<Permanent>> membershipProvider)
+        Func<IEnumerable<Permanent>> membershipProvider,
+        TriggerManager? triggers = null)
     {
         _source = source ?? throw new ArgumentNullException(nameof(source));
         _effects = layers ?? throw new ArgumentNullException(nameof(layers));
@@ -61,6 +73,7 @@ public sealed class GrantAbilityToGroupLifecycle
         _scope = scope ?? throw new ArgumentNullException(nameof(scope));
         _abilityFactory = abilityFactory ?? throw new ArgumentNullException(nameof(abilityFactory));
         _membershipProvider = membershipProvider ?? throw new ArgumentNullException(nameof(membershipProvider));
+        _triggers = triggers;
         _handler = OnEvent;
     }
 
@@ -110,7 +123,8 @@ public sealed class GrantAbilityToGroupLifecycle
                 _source,
                 _scope,
                 _abilityFactory,
-                _membershipProvider);
+                _membershipProvider,
+                _triggers);
             _effects.Register(_registered);
             _registered.Sync();
         }
