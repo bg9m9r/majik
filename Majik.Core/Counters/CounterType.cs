@@ -46,6 +46,19 @@ public sealed record CounterType(string Name)
     public static readonly CounterType Time = new("Time");
 
     /// <summary>
+    /// CR 711 / CR 122.1 — Level counters. Placed by the Level up keyword
+    /// (CR 702.87 — "{cost}: Put a level counter on this. Level up only as a
+    /// sorcery.") on leveler cards (Rise of the Eldrazi: Joraga Treespeaker,
+    /// Transcendent Master, …). The accumulated level-counter count selects
+    /// the creature's active level band (CR 107.8 — the {LEVEL N1-N2} /
+    /// {LEVEL N3+} static abilities each set the creature's base P/T and
+    /// abilities while its count is inside that band's range). Modeled by
+    /// <see cref="Majik.Core.Effects.LevelBandEffect"/> (the P/T half) plus
+    /// per-band ability grants wired by the leveler's factory.
+    /// </summary>
+    public static readonly CounterType Level = new("Level");
+
+    /// <summary>
     /// CR 122 — Void counters. Card-specific marker used by Dauthi
     /// Voidwalker (Modern Horizons 2). When an opponent's card would go
     /// to a graveyard, it is exiled with a void counter instead; removing
