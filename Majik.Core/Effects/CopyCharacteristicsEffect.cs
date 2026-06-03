@@ -57,12 +57,19 @@ namespace Majik.Core.Effects;
 /// and a clone of a colored permanent copies its colour (read back via
 /// <see cref="Permanent.GetEffectiveColors"/>).
 ///
+/// ## Name / mana cost (now surfaced through the layer system)
+/// CR 707.2 — name and mana cost are copiable. <see cref="Card.Name"/> /
+/// <see cref="Card.ManaCost"/> stay immutable on the runtime instance, but this
+/// effect overwrites the Layer-1 effective name / mana-cost slots
+/// (<see cref="PermanentCharacteristics.Name"/> /
+/// <see cref="PermanentCharacteristics.ManaCost"/>), so a clone of a permanent
+/// named X reads back as named X via <see cref="Permanent.GetEffectiveName"/>
+/// (same-name matching — Izzet Staticaster, "another permanent named X") and
+/// reports the copied mana cost via <see cref="Permanent.GetEffectiveManaCost"/>
+/// (mana-value reads). <see cref="CopiedName"/> / <see cref="CopiedManaCost"/>
+/// remain for direct inspection.
+///
 /// ## v1 lossy
-/// - <b>Name / mana cost</b> are copiable (CR 707.2) but
-///   <see cref="Card.Name"/> / <see cref="Card.ManaCost"/> are immutable on
-///   the runtime instance; the copied identity is exposed via
-///   <see cref="CopiedName"/> / <see cref="CopiedManaCost"/> rather than
-///   mutating the target card.
 /// - <b>Non-keyword abilities</b> — only <see cref="KeywordAbility"/>
 ///   markers are mirrored into the keyword set; arbitrary printed activated /
 ///   triggered abilities of the source are not re-instantiated on the target
@@ -157,6 +164,13 @@ public sealed class CopyCharacteristicsEffect : ContinuousEffect
     /// </summary>
     private void ApplyShared(PermanentCharacteristics chars)
     {
+        // CR 707.2 / 613.2 (Layer 1) — name + mana cost are copiable values.
+        // The runtime Card.Name / Card.ManaCost stay immutable; overwrite the
+        // layer-system effective slots so GetEffectiveName / GetEffectiveManaCost
+        // (same-name matching, mana-value reads) report the copied identity.
+        chars.Name = _source.Name;
+        chars.ManaCost = _source.ManaCost;
+
         chars.Types.Clear();
         foreach (var t in _source.CardTypes) chars.Types.Add(t);
 

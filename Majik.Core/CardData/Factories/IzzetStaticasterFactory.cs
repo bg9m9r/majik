@@ -27,13 +27,13 @@ namespace Majik.Core.CardData.Factories;
 ///     <li>Deal 1 damage to the chosen target creature.</li>
 ///     <li>Iterate ALL creatures reachable via
 ///         <paramref name="allCreaturesResolver"/> and deal 1 damage to
-///         each creature whose <see cref="ICard.Name"/> equals the target's
+///         each creature whose EFFECTIVE name equals the target's effective
 ///         name, excluding the already-damaged target ("each OTHER creature
 ///         with the same name" — CR 109.2 exact string match).</li>
 ///   </ol>
-///   "Same name" = <c>creature.Name == target.Name</c> (exact string match,
-///   case-sensitive; matches the Plague Engineer / Surgical Extraction name-
-///   equality convention used elsewhere in the engine).
+///   "Same name" = <c>creature.GetEffectiveName() == target.GetEffectiveName()</c>
+///   (CR 707.2 — reads the copy-effect Layer-1 name slot so a clone of the
+///   target counts; exact string match, case-sensitive).
 ///   Damage is dispatched via <c>Creature.TakeDamage(1)</c>.
 ///
 /// ## Overloads
@@ -126,11 +126,15 @@ public static class IzzetStaticasterFactory
                 // (already damaged) and any creature whose name doesn't match.
                 if (allCreaturesResolver == null) return;
 
+                // CR 707.2 — "same name" reads the EFFECTIVE name so a clone of
+                // the target (copy effect overwrites the Layer-1 name slot) is
+                // counted, not just printed-name twins.
+                var targetName = targetCreature.GetEffectiveName();
                 var allCreatures = allCreaturesResolver();
                 foreach (var other in allCreatures)
                 {
                     if (ReferenceEquals(other, targetCreature)) continue;
-                    if (other.Name != targetCreature.Name) continue;
+                    if (other.GetEffectiveName() != targetName) continue;
                     other.TakeDamage(1);
                 }
             });
