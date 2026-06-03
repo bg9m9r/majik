@@ -177,6 +177,87 @@ public class JsonSpellEffectsTests
     }
 
     [Fact]
+    public void TwoFights_DeclareFourContiguousTargetRequests()
+    {
+        // Two source:"target" fights in one spell exercise the N-slot list
+        // threading across MULTIPLE multi-slot effects: each contributes a
+        // primary + one extra, so the spell announces four ordered slots
+        // (fighterA, otherA, fighterB, otherB) — proving ToExtraTargetRequests
+        // is appended as an ordered run, not a single fixed 2nd slot.
+        var def = CardDefRuntime.BuildSpellDefinitionFromEffects(
+            "Double Prey",
+            new EffectDefinition[]
+            {
+                new FightEffectDef
+                {
+                    Source = "target",
+                    ControllerTargetFilter = "creature_you_control",
+                    TargetFilter = "creature_you_dont_control",
+                },
+                new FightEffectDef
+                {
+                    Source = "target",
+                    ControllerTargetFilter = "creature_you_control",
+                    TargetFilter = "creature_you_dont_control",
+                },
+            });
+
+        def.TargetRequests.Should().HaveCount(4);
+    }
+
+    // ── N-slot extra-target hook (generalization of the fight 2-slot path) ────
+
+    /// <summary>Records the <see cref="ResolutionContext.ChosenTargets"/> it
+    /// is handed so the test can assert the spell bridge delivered every
+    /// contiguous slot in order.</summary>
+    private sealed class RecordingEffect : Majik.Core.Abilities.IEffect
+    {
+        public System.Collections.Generic.IReadOnlyList<
+            System.Collections.Generic.IReadOnlyList<object>>? Seen { get; private set; }
+
+        public string Description => "recording";
+
+        public System.Threading.Tasks.ValueTask ExecuteAsync(
+            Majik.Core.Abilities.ResolutionContext ctx)
+        {
+            Seen = ctx.ChosenTargets;
+            return System.Threading.Tasks.ValueTask.CompletedTask;
+        }
+    }
+
+    [Fact]
+    public async Task SpellTargetedEffect_DeliversThreeOrderedPicks_ForNSlotVerb()
+    {
+        // The 2nd-target hook generalized to N slots: an effect that declares a
+        // primary + TWO extra contiguous slots must read its three picks at
+        // ChosenTargets[0..2] in declaration order at resolution. This is the
+        // one-up of the fight (CR 701.12) two-slot path — proves the spell
+        // adapter threads an ordered LIST of extra picks, not a single 2nd slot.
+        var primary = new object();
+        var extra1 = new object();
+        var extra2 = new object();
+
+        var inner = new RecordingEffect();
+        var wrapped = new CardDefRuntime.SpellTargetedEffect(
+            inner,
+            picks: new[] { primary },
+            extraPicks: new System.Collections.Generic.IReadOnlyList<object>[]
+            {
+                new[] { extra1 },
+                new[] { extra2 },
+            });
+
+        await wrapped.ExecuteAsync(Majik.Core.Abilities.ResolutionContext.Legacy);
+
+        inner.Seen.Should().NotBeNull();
+        var seen = inner.Seen!;
+        seen.Should().HaveCount(3, "primary + two extra contiguous slots");
+        seen[0].Should().ContainSingle().Which.Should().BeSameAs(primary);
+        seen[1].Should().ContainSingle().Which.Should().BeSameAs(extra1);
+        seen[2].Should().ContainSingle().Which.Should().BeSameAs(extra2);
+    }
+
+    [Fact]
     public async Task PreyUpon_BothCreatures_TakeEachOthersPower()
     {
         var mine = OnBattlefield(new Creature("Mine", "{G}", 3, 4), _alice);

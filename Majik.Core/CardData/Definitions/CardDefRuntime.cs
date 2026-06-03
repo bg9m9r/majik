@@ -446,10 +446,11 @@ public static class CardDefRuntime
         // at resolution, or -1 for an untargeted effect.
         var targetRequests = new List<TargetRequest>();
         var slotForEffect = new int[effects.Count];
-        // CR 701.12 fight (source: "target") — whether each effect declared a
-        // SECOND contiguous slot (the "other" creature) right after its
-        // primary. The adapter below then re-presents both picks.
-        var hasExtraSlot = new bool[effects.Count];
+        // CR 701.12 fight (source: "target") — how many ADDITIONAL contiguous
+        // slots each effect declared (the "other" creature, and N-slot verbs
+        // more) right after its primary. The adapter below then re-presents the
+        // primary + that many extra picks. 0 = the common single-slot case.
+        var extraSlotCount = new int[effects.Count];
         // The slot index of the most-recently declared targeted effect, so a
         // rider verb (SharesPreviousTargetSlot — e.g. Vapor Snag's "its
         // controller loses 1 life") reuses it instead of declaring a new
@@ -464,11 +465,11 @@ public static class CardDefRuntime
                 slotForEffect[i] = targetRequests.Count;
                 lastTargetedSlot = targetRequests.Count;
                 targetRequests.Add(request);
-                var extra = effect.ToExtraTargetRequest();
-                if (extra is not null)
+                var extras = effect.ToExtraTargetRequests();
+                if (extras is { Count: > 0 })
                 {
-                    hasExtraSlot[i] = true;
-                    targetRequests.Add(extra);
+                    extraSlotCount[i] = extras.Count;
+                    targetRequests.AddRange(extras);
                 }
             }
             else if (effect.SharesPreviousTargetSlot)
@@ -542,16 +543,20 @@ public static class CardDefRuntime
                         ? chosen.Targets[slot]
                         : (IReadOnlyList<object>)Array.Empty<object>();
 
-                    if (hasExtraSlot[i])
+                    if (extraSlotCount[i] > 0)
                     {
-                        // CR 701.12 fight — a two-slot verb reads its primary
-                        // pick at index 0 and its extra pick at index 1. Present
-                        // both contiguous spell slots so the shared builder
-                        // (invoked with index 0) sees [fighter, other].
-                        var extraSlot = slot + 1;
-                        var extraPicks = extraSlot < chosen.Targets.Count
-                            ? chosen.Targets[extraSlot]
-                            : (IReadOnlyList<object>)Array.Empty<object>();
+                        // CR 701.12 fight — an N-slot verb reads its primary pick
+                        // at index 0 and its extra picks at index 1 … N. Present
+                        // all contiguous spell slots so the shared builder
+                        // (invoked with index 0) sees [primary, extra1, …].
+                        var extraPicks = new IReadOnlyList<object>[extraSlotCount[i]];
+                        for (var e = 0; e < extraSlotCount[i]; e++)
+                        {
+                            var extraSlot = slot + 1 + e;
+                            extraPicks[e] = extraSlot < chosen.Targets.Count
+                                ? chosen.Targets[extraSlot]
+                                : (IReadOnlyList<object>)Array.Empty<object>();
+                        }
                         built[i] = new SpellTargetedEffect(inner, picks, extraPicks);
                         continue;
                     }
@@ -570,19 +575,20 @@ public static class CardDefRuntime
     /// delegating, so the ability effect's resolve + CR 608.2b illegal-target
     /// fizzle run byte-identically on the spell path.
     /// </summary>
-    private sealed class SpellTargetedEffect : IEffect
+    internal sealed class SpellTargetedEffect : IEffect
     {
         private readonly IEffect _inner;
         private readonly IReadOnlyList<object> _picks;
-        // CR 701.12 fight (source: "target") — the second contiguous slot's
-        // picks (the "other" creature), or null for the common single-slot
-        // case. When present the inner builder reads slot 0 (primary) + slot 1.
-        private readonly IReadOnlyList<object>? _extraPicks;
+        // CR 701.12 fight (source: "target") — the additional contiguous slots'
+        // picks (the "other" creature, and N-slot verbs more) in order, or null
+        // for the common single-slot case. When present the inner builder reads
+        // slot 0 (primary) + slots 1 … N.
+        private readonly IReadOnlyList<IReadOnlyList<object>>? _extraPicks;
 
         internal SpellTargetedEffect(
             IEffect inner,
             IReadOnlyList<object> picks,
-            IReadOnlyList<object>? extraPicks = null)
+            IReadOnlyList<IReadOnlyList<object>>? extraPicks = null)
         {
             _inner = inner;
             _picks = picks;
@@ -593,9 +599,20 @@ public static class CardDefRuntime
 
         public ValueTask ExecuteAsync(ResolutionContext ctx)
         {
-            var chosen = _extraPicks is null
-                ? new[] { _picks }
-                : new[] { _picks, _extraPicks };
+            IReadOnlyList<object>[] chosen;
+            if (_extraPicks is null or { Count: 0 })
+            {
+                chosen = new[] { _picks };
+            }
+            else
+            {
+                chosen = new IReadOnlyList<object>[_extraPicks.Count + 1];
+                chosen[0] = _picks;
+                for (var e = 0; e < _extraPicks.Count; e++)
+                {
+                    chosen[e + 1] = _extraPicks[e];
+                }
+            }
             var scoped = ctx with { ChosenTargets = chosen };
             return _inner.ExecuteAsync(scoped);
         }
@@ -2243,7 +2260,7 @@ public static class CardDefRuntime
         //   (at targetRequestIndex) is the OTHER creature.
         // source "target": the FIGHTER is the chosen creature at
         //   targetRequestIndex; the OTHER creature is the NEXT slot
-        //   (targetRequestIndex + 1) declared via ToExtraTargetRequest.
+        //   (targetRequestIndex + 1) declared via ToExtraTargetRequests.
         //
         // CR 608.2b / 701.12c — a fight needs BOTH creatures present on the
         // battlefield at resolution; if either is gone/illegal the whole fight

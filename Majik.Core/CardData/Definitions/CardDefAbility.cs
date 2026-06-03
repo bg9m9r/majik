@@ -50,7 +50,7 @@ namespace Majik.Core.CardData.Definitions;
 internal sealed record CardDefEffectSpec(
     TargetRequest? Request,
     Func<ICard, Player, ReplacementBus?, int, ContinuousEffectsService?, IEffect> Build,
-    TargetRequest? ExtraRequest = null,
+    IReadOnlyList<TargetRequest>? ExtraRequests = null,
     bool SharesPreviousTargetSlot = false);
 
 /// <summary>
@@ -249,13 +249,13 @@ internal static class CardDefAbilityEffects
                 index = requests.Count;
                 lastTargetedSlot = requests.Count;
                 requests.Add(spec.Request);
-                // CR 701.12 fight (source: "target") — the verb declares a
-                // SECOND contiguous target slot (the "other" creature) right
-                // after its primary (the fighter). It reads its two picks at
-                // index and index+1 at resolution.
-                if (spec.ExtraRequest is not null)
+                // CR 701.12 fight (source: "target") — the verb declares one or
+                // more ADDITIONAL contiguous target slots (the "other" creature,
+                // and N-slot verbs more) right after its primary (the fighter).
+                // It reads its picks at index, index+1, … index+N at resolution.
+                if (spec.ExtraRequests is { Count: > 0 } extras)
                 {
-                    requests.Add(spec.ExtraRequest);
+                    requests.AddRange(extras);
                 }
             }
             else if (spec.SharesPreviousTargetSlot)
