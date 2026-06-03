@@ -350,13 +350,35 @@ public sealed class TurnDriver
         SetPhase(PhaseStateType.DeclareAttackers);
         await RunCombat(activePlayer, defender, ct);
 
-        // CR 506.4 — additional combat phases drain the queue.
-        while (_additionalCombats.TryConsume())
+        // CR 506.4 / CR 505.1b — additional combat phases drain the queue.
+        // Each grant re-enters the full combat sequence; grants created by
+        // "additional combat phase followed by an additional main phase"
+        // effects (Relentless Assault, World at War) ALSO insert an extra
+        // postcombat main phase before the next grant / the turn's real
+        // postcombat main. Combat-only grants (Combat Celebrant, Fear of
+        // Missing Out) do not.
+        while (_additionalCombats.TryConsume(out var followedByMainPhase))
         {
+            SetTurnState(TurnStateType.Combat);
             SetPhase(PhaseStateType.BeginningOfCombat);
             await PriorityRound(activePlayer, ct);
             SetPhase(PhaseStateType.DeclareAttackers);
             await RunCombat(activePlayer, defender, ct);
+
+            // CR 511 — every combat phase has its own end-of-combat step, so
+            // "until end of combat" durations expire per extra combat too.
+            SetPhase(PhaseStateType.EndOfCombat);
+
+            if (followedByMainPhase)
+            {
+                // CR 505.1b — the additional main phase. A main phase (it has
+                // no defined steps) where the active player gets priority
+                // (CR 505.4). It's a postcombat main (it follows a combat
+                // phase) so it carries the PostCombatMain turn-state label.
+                SetTurnState(TurnStateType.PostCombatMain);
+                SetPhase(PhaseStateType.PostCombatMain);
+                await PriorityRound(activePlayer, ct);
+            }
         }
         // Per-turn reset so the queue doesn't bleed into the next turn.
         _additionalCombats.Reset();
