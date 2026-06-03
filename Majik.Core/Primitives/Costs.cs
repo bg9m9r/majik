@@ -67,6 +67,17 @@ public static class Costs
     }
 
     /// <summary>
+    /// CR 117 / 701.16 — "Sacrifice an artifact" activation cost: sacrifice an
+    /// artifact the controller controls (Atog / Arcbound Ravager). Routes
+    /// through the pre-existing <see cref="SacrificeAnArtifactCost"/> rail.
+    /// When <paramref name="requireNontoken"/> is true, token artifacts are
+    /// excluded (CR 111.8 — Thopter Foundry). The source is not excluded — it
+    /// can pay itself if it is an artifact.
+    /// </summary>
+    public static ICost SacrificeAnArtifact(bool requireNontoken = false)
+        => new SacrificeAnArtifactCost(excludeSource: null, requireNontoken: requireNontoken);
+
+    /// <summary>
     /// CR 601.2f — a mana activation cost. <paramref name="manaCostString"/>
     /// accepts bracketed (<c>"{1}{R}"</c>) or unbracketed (<c>"1R"</c>)
     /// forms; an empty / whitespace string yields a zero cost. Mirrors the
