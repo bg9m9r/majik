@@ -27,9 +27,10 @@ namespace Majik.Core.CardData.Definitions;
 /// </para>
 ///
 /// <para>
-/// {C} (CR 107.4c colorless pip) folds into a generic pip in v1's pool model
-/// (<see cref="ManaCost.Parse"/>), so e.g. <c>{1}{C}</c> is charged as two
-/// generic mana — the same simplification snow ({S}) carries.
+/// {C} (CR 107.4c colorless pip) is a real payable unit: <c>{1}{C}</c> demands
+/// one generic plus one COLORLESS mana, and the colorless pip can be paid only
+/// from a colorless source (<see cref="ManaPool.Colorless"/>, CR 106.1b) — a
+/// plain {2} no longer satisfies it. ({S} snow still folds to generic.)
 /// </para>
 /// </summary>
 internal static class OptionalManaRider

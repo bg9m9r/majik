@@ -21,9 +21,9 @@ namespace Majik.Core.CardData.Factories;
 /// <list type="bullet">
 /// <item><see cref="WastelandFactory"/> — the repeatable
 ///   <b>{T}: Add {C}</b> <see cref="ManaAbility"/> (CR 605.1, no stack).
-///   {C} (colourless, CR 107.4c) has no dedicated <see cref="ManaCost"/>
-///   bucket today; <c>ManaCost.Parse("C")</c> folds it into Generic, exactly
-///   as Wasteland / Urza's Saga do.</item>
+///   {C} (colourless, CR 107.4c) is the colorless mana TYPE: <c>ManaCost.Parse("C")</c>
+///   tags it colorless (a subset of Generic per CR 106.1b) so it pays generic
+///   pips yet is the only mana that can pay a {C} cost pip.</item>
 /// <item><see cref="SavaiTriomeFactory"/> — the unconditional
 ///   <b>enters-tapped</b> replacement (CR 614.1c) via
 ///   <see cref="EntersTappedReplacement"/> on the supplied

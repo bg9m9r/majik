@@ -166,11 +166,12 @@ public static class KarnLegacyReforgedFactory
                 var artifacts = ArtifactsControlled(owner);
                 if (artifacts <= 0) return;
 
-                // {C} × artifacts — colorless mana stored in the Generic
-                // bucket (CR 106.1b), each unit carrying the artifact-spell
-                // spend-restriction (CR 106.4) AND the doesn't-empty rider
-                // (CR 500.4 exception).
-                var mana = ManaCost.Parse($"{artifacts}");
+                // {C} × artifacts — colorless mana (CR 107.4c, a tagged subset
+                // of the Generic bucket per CR 106.1b), each unit carrying the
+                // artifact-spell spend-restriction (CR 106.4) AND the doesn't-
+                // empty rider (CR 500.4 exception). Built as N "C" pips so the
+                // produced mana is the colorless TYPE, not plain generic.
+                var mana = ManaCost.Parse(new string('C', artifacts));
                 owner.AddManaToPool(
                     mana,
                     provenanceSource: card,
