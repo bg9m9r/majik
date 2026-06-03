@@ -25,6 +25,17 @@ namespace Majik.Core.CardData.Factories;
 ///   exiles it. If the exiled card is a creature card, a +1/+1 counter is
 ///   placed on the first creature the controller controls on the battlefield.
 ///   (Full targeting deferred — see below.)
+/// - <b>Static: mana-colour-substitution</b> (CR 609.4b): "you may spend mana
+///   as though it were mana of any color to activate abilities of creatures
+///   you control" is wired as a
+///   <see cref="Majik.Core.Costs.ManaColorSubstitutionPermission"/> with
+///   <see cref="Majik.Core.Costs.ManaSpendPurpose.ActivateCreatureAbilities"/>.
+///   The reusable payment-time substitution primitive (shared with Robber of
+///   the Rich's clause) folds a creature ability's coloured pips into generic
+///   when this permission is active, so a
+///   <see cref="Majik.Core.Costs.ManaColorSubstitutableManaCost"/> used as the
+///   mana component of a creature's activated ability accepts any colour. The
+///   mana value is unchanged (CR 106.6) — only which mana qualifies widens.
 ///
 /// ## Deferred (v1 gaps)
 /// - <b>Graveyard targeting</b>: "target card from a graveyard" should
@@ -35,10 +46,6 @@ namespace Majik.Core.CardData.Factories;
 ///   counter placement should prompt the controller. v1 auto-picks the first
 ///   creature on the controller's battlefield. Deferred alongside graveyard
 ///   targeting.
-/// - <b>Static: mana-color-substitute</b>: "you may spend mana as though it
-///   were mana of any color to activate abilities of creatures you control"
-///   requires a replacement effect on mana payment during ability activation.
-///   Deferred until the mana-payment replacement infrastructure is in place.
 /// - <b>Static: ability-grant via imprint</b>: "creatures you control with
 ///   +1/+1 counters … have all activated abilities of all creature cards
 ///   exiled" — imprint <em>storage</em> is wired (CR 702.49;
@@ -61,6 +68,21 @@ public static class AgathasSoulCauldronFactory
         var cauldron = new Artifact("Agatha's Soul Cauldron", "{2}");
         cauldron.SetOwner(owner);
         cauldron.SetController(owner);
+
+        // ----------------------------------------------------------------
+        // "You may spend mana as though it were mana of any color to activate
+        // abilities of creatures you control." (CR 609.4b.)
+        //
+        // Reusable payment-time mana-colour-substitution permission. A
+        // creature's activated ability whose mana component is a
+        // ManaColorSubstitutableManaCost(..., ManaSpendPurpose
+        // .ActivateCreatureAbilities) consults this static and folds its
+        // coloured pips to generic while the Cauldron is on the battlefield —
+        // the same permissive fold Robber of the Rich's clause uses, generalized
+        // into a static the payment path queries.
+        // ----------------------------------------------------------------
+        cauldron.AddAbility(new ManaColorSubstitutionPermission(
+            cauldron, owner, ManaSpendPurpose.ActivateCreatureAbilities));
 
         // ----------------------------------------------------------------
         // {T}: Exile target card from a graveyard.
