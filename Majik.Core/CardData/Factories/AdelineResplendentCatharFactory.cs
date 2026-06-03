@@ -71,20 +71,31 @@ namespace Majik.Core.CardData.Factories;
 ///   are "put onto the battlefield attacking" rather than declared, they do
 ///   not re-trigger attack triggers (CR 508.3g).
 ///
+/// - <b>Per-opponent planeswalker band (CR 508.4)</b> — "that player OR a
+///   planeswalker they control": the optional
+///   <c>planeswalkerChoiceForOpponent</c> resolver may return, per opponent, a
+///   planeswalker that opponent controls; the opponent's token is then spliced
+///   in tapped and attacking that planeswalker via the
+///   <see cref="CombatManager.AddTappedAndAttackingToken(Creature, Planeswalker?)"/>
+///   overload (validated by <see cref="Combat.AddAttackerInProgress"/> — the
+///   planeswalker must belong to the combat's defending player). A null choice
+///   (or null resolver) keeps the token attacking the opponent directly, the
+///   existing 2-player behaviour. The distinct attacked-defender set is exposed
+///   off <see cref="Combat.AttackedDefenders"/>.
+///
 /// ## Deferred (v1 gaps)
 ///
 /// - <b>Multiplayer per-opponent defenders</b>: the printed token attacks
 ///   "that player or a planeswalker they control" — i.e. each token attacks
 ///   ITS opponent. In 2-player (the engine's combat model) there is exactly
 ///   one opponent and the in-progress combat already targets that opponent, so
-///   <see cref="CombatManager.AddTappedAndAttackingToken"/> (which mirrors the
-///   combat's single defender) is exact. A true multiplayer combat with
-///   per-opponent attacking-bands is deferred behind the same single-defender
-///   combat model as <see cref="HeroOfBladeholdFactory"/>.
-/// - <b>Planeswalker-attack choice</b>: "that player OR a planeswalker they
-///   control" — v1 always attacks the player (the combat's defending player).
-///   Choosing a planeswalker the opponent controls is deferred behind
-///   agent-driven attack-target selection.
+///   <see cref="CombatManager.AddTappedAndAttackingToken(Creature)"/> (which
+///   mirrors the combat's single defender) is exact. A true multiplayer combat
+///   with simultaneous per-opponent attacking-bands (one combat against several
+///   distinct defending players at once) is still deferred behind the
+///   single-DefendingPlayer storage model; the
+///   <see cref="Combat.AttackedDefenders"/> projection enumerates the defenders
+///   the model can already represent.
 /// - <b>No-combat fallback</b>: when no combat is live the token enters
 ///   untapped, not attacking (the "tapped and attacking" fidelity requires a
 ///   combat to splice into — same no-combat fallback as Hero of Bladehold).
@@ -114,7 +125,8 @@ public static class AdelineResplendentCatharFactory
     /// </summary>
     public static Creature Create(Player owner) =>
         Create(owner, effects: null, eventBus: null, creaturesYouControlSource: null,
-            opponentResolver: null, triggers: null, combat: null);
+            opponentResolver: null, triggers: null, combat: null,
+            planeswalkerChoiceForOpponent: null);
 
     /// <summary>
     /// Construct Adeline with optional runtime services.
@@ -148,6 +160,30 @@ public static class AdelineResplendentCatharFactory
         Func<IReadOnlyList<Player>>? opponentResolver,
         TriggerManager? triggers,
         CombatManager? combat)
+        => Create(owner, effects, eventBus, creaturesYouControlSource,
+            opponentResolver, triggers, combat, planeswalkerChoiceForOpponent: null);
+
+    /// <summary>
+    /// Construct Adeline with optional runtime services, including the
+    /// per-opponent planeswalker-attack choice for the token's "that player OR a
+    /// planeswalker they control" band (CR 508.4).
+    /// </summary>
+    /// <param name="planeswalkerChoiceForOpponent">Optional resolver invoked once
+    /// per opponent at attack-trigger resolution. When it returns a non-null
+    /// <see cref="Planeswalker"/> (which that opponent must control), the
+    /// opponent's token is created tapped and attacking that planeswalker instead
+    /// of the opponent directly (CR 508.4). When null — or when it returns null
+    /// for an opponent — the token attacks that opponent (the player), preserving
+    /// the existing 2-player behaviour.</param>
+    public static Creature Create(
+        Player owner,
+        ContinuousEffectsService? effects,
+        IEventBus? eventBus,
+        Func<IEnumerable<ICard>>? creaturesYouControlSource,
+        Func<IReadOnlyList<Player>>? opponentResolver,
+        TriggerManager? triggers,
+        CombatManager? combat,
+        Func<Player, Planeswalker?>? planeswalkerChoiceForOpponent)
     {
         ArgumentNullException.ThrowIfNull(owner);
 
@@ -168,7 +204,7 @@ public static class AdelineResplendentCatharFactory
             lifecycle.Attach();
         }
 
-        AddAttackTrigger(card, owner, opponentResolver, triggers, combat);
+        AddAttackTrigger(card, owner, opponentResolver, triggers, combat, planeswalkerChoiceForOpponent);
 
         return card;
     }
@@ -193,7 +229,8 @@ public static class AdelineResplendentCatharFactory
         Player owner,
         Func<IReadOnlyList<Player>>? opponentResolver,
         TriggerManager? triggers,
-        CombatManager? combat)
+        CombatManager? combat,
+        Func<Player, Planeswalker?>? planeswalkerChoiceForOpponent)
     {
         var condition = new EventTriggerCondition<AttackersDeclaredEvent>((e, _) =>
             // "Whenever you attack" — only when Adeline's controller is the
@@ -202,7 +239,7 @@ public static class AdelineResplendentCatharFactory
 
         var effect = new Effect(
             $"{CardName}: on attack, create a 1/1 white Human token tapped & attacking for each opponent",
-            () => ResolveAttackTrigger(card, owner, opponentResolver, combat));
+            () => ResolveAttackTrigger(card, owner, opponentResolver, combat, planeswalkerChoiceForOpponent));
 
         var trigger = new TriggeredAbility(
             source: card,
@@ -220,7 +257,8 @@ public static class AdelineResplendentCatharFactory
         Creature card,
         Player owner,
         Func<IReadOnlyList<Player>>? opponentResolver,
-        CombatManager? combat)
+        CombatManager? combat,
+        Func<Player, Planeswalker?>? planeswalkerChoiceForOpponent)
     {
         if (opponentResolver == null) return;
         var controller = card.Controller ?? owner;
@@ -244,12 +282,22 @@ public static class AdelineResplendentCatharFactory
 
             var token = TokenFactory.CreateOnBattlefield(spec, controller);
 
-            // CR 508.3 / 508.4 — splice the token into the in-progress combat
-            // as a tapped and attacking token. In 2-player the combat's single
-            // defender IS the opponent, so the token attacks "that player".
-            // When no combat is live the token stays on the battlefield
-            // untapped (no-combat fallback, same as Hero of Bladehold).
-            combat?.AddTappedAndAttackingToken(token);
+            // CR 508.4 — "that player OR a planeswalker they control". If the
+            // choice resolver returns a planeswalker that opponent controls, the
+            // token attacks it; otherwise the token attacks the opponent (the
+            // player). In 2-player the combat's single defender IS the opponent,
+            // so a null choice yields a token attacking "that player". When no
+            // combat is live the token stays on the battlefield untapped
+            // (no-combat fallback, same as Hero of Bladehold).
+            var chosenWalker = planeswalkerChoiceForOpponent?.Invoke(opp);
+            if (chosenWalker != null && ReferenceEquals(chosenWalker.Controller, opp))
+            {
+                combat?.AddTappedAndAttackingToken(token, chosenWalker);
+            }
+            else
+            {
+                combat?.AddTappedAndAttackingToken(token);
+            }
         }
     }
 

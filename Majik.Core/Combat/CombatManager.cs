@@ -161,6 +161,21 @@ public class CombatManager
     /// back to a plain battlefield token).
     /// </summary>
     public Attacker? AddTappedAndAttackingToken(Creature creature)
+        => AddTappedAndAttackingToken(creature, targetPlaneswalker: null);
+
+    /// <summary>
+    /// CR 508.4 overload — splice a tapped-and-attacking token into the current
+    /// combat against a <b>specified defender</b>. When
+    /// <paramref name="targetPlaneswalker"/> is non-null the token attacks that
+    /// planeswalker (which must be controlled by the combat's defending player —
+    /// "that player OR a planeswalker they control", Adeline); when null the
+    /// token attacks the combat's own defender exactly as the parameterless
+    /// overload does. The planeswalker band is validated by
+    /// <see cref="Combat.AddAttackerInProgress"/> (CR 508.4 — same defending
+    /// player). Returns the created <see cref="Attacker"/>, or <c>null</c> when
+    /// no combat is in progress.
+    /// </summary>
+    public Attacker? AddTappedAndAttackingToken(Creature creature, Cards.Planeswalker? targetPlaneswalker)
     {
         if (creature == null)
         {
@@ -179,12 +194,18 @@ public class CombatManager
             creature.Tap();
         }
 
-        // CR 508.4 — attacking the same defender as the combat it joins. The
-        // combat targets exactly one of a player / planeswalker; mirror that.
+        // CR 508.4 — attacking the chosen defender. When a planeswalker is
+        // specified the token bands against it (it must belong to the combat's
+        // defending player); otherwise mirror the combat's single defender. The
+        // combat targets exactly one of a player / planeswalker, so pick the
+        // player band only when no planeswalker is chosen.
+        Player? bandPlayer = targetPlaneswalker != null ? null : _currentCombat.DefendingPlayer;
+        Cards.Planeswalker? bandWalker = targetPlaneswalker ?? _currentCombat.TargetPlaneswalker;
+
         var attacker = new Attacker(
             creature,
-            _currentCombat.DefendingPlayer,
-            _currentCombat.TargetPlaneswalker,
+            bandPlayer,
+            bandWalker,
             CombatAbilities.HasFirstStrike(creature),
             CombatAbilities.HasDoubleStrike(creature),
             CombatAbilities.HasTrample(creature),
