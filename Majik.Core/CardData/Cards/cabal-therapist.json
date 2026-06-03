@@ -1,0 +1,8 @@
+{
+  "name": "Cabal Therapist",
+  "types": ["Creature"],
+  "subtypes": ["Horror"],
+  "manaCost": "{B}",
+  "power": 1,
+  "toughness": 1
+}
