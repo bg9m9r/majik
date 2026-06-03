@@ -17,7 +17,7 @@ public class AttackRestrictionTests
         var bear = new Creature("Bear", "1G", 2, 2)
         { Owner = _alice, Controller = _alice, Zone = ZoneType.Battlefield };
 
-        var restriction = new PayPerAttackerRestriction(_bob, ManaCost.Parse("2"));
+        var restriction = PayPerAttackerRestriction.FlatMana(_bob, ManaCost.Parse("2"));
         var reg = new AttackRestrictionRegistry();
         reg.Register(restriction);
 
@@ -34,7 +34,7 @@ public class AttackRestrictionTests
         var bear = new Creature("Bear", "1G", 2, 2)
         { Owner = _alice, Controller = _alice, Zone = ZoneType.Battlefield };
 
-        var restriction = new PayPerAttackerRestriction(_bob, ManaCost.Parse("2"));
+        var restriction = PayPerAttackerRestriction.FlatMana(_bob, ManaCost.Parse("2"));
         var reg = new AttackRestrictionRegistry();
         reg.Register(restriction);
 
@@ -47,7 +47,7 @@ public class AttackRestrictionTests
         var bear = new Creature("Bear", "1G", 2, 2)
         { Owner = _alice, Controller = _alice, Zone = ZoneType.Battlefield };
 
-        var restriction = new PayPerAttackerRestriction(_bob, ManaCost.Parse("2"));
+        var restriction = PayPerAttackerRestriction.FlatMana(_bob, ManaCost.Parse("2"));
         var reg = new AttackRestrictionRegistry();
         reg.Register(restriction);
         restriction.MarkPaid(bear);

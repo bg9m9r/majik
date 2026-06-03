@@ -26,25 +26,94 @@ public abstract class AttackRestriction
     public abstract bool MayAttack(Creature attacker, object defender);
 }
 
-/// <summary>Pay-N-per-attacker restriction (Ghostly Prison / Propaganda).
-/// The protected defender is set at construction; <see cref="MayAttack"/>
-/// returns true only if the attacker's controller has pre-deposited the
-/// required mana via <see cref="MarkPaid"/>.</summary>
+/// <summary>
+/// Pay-N-per-attacker restriction (CR 508.1g) — the "attack-tax paywall"
+/// behind Ghostly Prison / Propaganda / Sphere of Safety / Norn's Annex:
+/// "Creatures can't attack [you / you or planeswalkers you control] unless
+/// their controller pays {cost} for each creature [attacking that defender]."
+///
+/// The protected defender is the controlling player; optionally the
+/// planeswalkers that player controls are also protected (Sphere of Safety —
+/// "you or planeswalkers you control"). <see cref="MayAttack"/> returns true
+/// only once the attacker's controller has paid the per-attacker cost via
+/// <see cref="MarkPaid"/> — the engine charges this in
+/// <see cref="CombatFlow"/> right after attackers are declared (CR 508.1g).
+///
+/// The cost is supplied as a <see cref="Func{ManaCost}"/> evaluated at
+/// declare-attackers time so dynamic taxes (Sphere of Safety: {X} where X is
+/// the number of enchantments the protected player controls) recompute against
+/// the current board, while a flat tax (Ghostly Prison / Propaganda: {2}) is
+/// just a constant-returning closure.
+/// </summary>
 public sealed class PayPerAttackerRestriction : AttackRestriction
 {
     private readonly Player _protectedPlayer;
-    private readonly ManaCost _costPerAttacker;
+    private readonly Func<ManaCost> _costPerAttacker;
+    private readonly bool _protectsPlaneswalkers;
+    private readonly Func<bool>? _isActive;
     private readonly HashSet<Creature> _paid = new();
 
-    public PayPerAttackerRestriction(Player protectedPlayer, ManaCost costPerAttacker)
+    private PayPerAttackerRestriction(
+        Player protectedPlayer,
+        Func<ManaCost> costPerAttacker,
+        bool protectsPlaneswalkers,
+        Func<bool>? isActive = null)
     {
         _protectedPlayer = protectedPlayer ?? throw new ArgumentNullException(nameof(protectedPlayer));
         _costPerAttacker = costPerAttacker ?? throw new ArgumentNullException(nameof(costPerAttacker));
+        _protectsPlaneswalkers = protectsPlaneswalkers;
+        _isActive = isActive;
     }
 
-    public ManaCost CostPerAttacker => _costPerAttacker;
+    /// <summary>The protected player.</summary>
+    public Player ProtectedPlayer => _protectedPlayer;
 
-    public override bool Protects(object defender) => ReferenceEquals(defender, _protectedPlayer);
+    /// <summary>True when this restriction also protects the planeswalkers the
+    /// protected player controls (Sphere of Safety).</summary>
+    public bool ProtectsPlaneswalkers => _protectsPlaneswalkers;
+
+    /// <summary>Ghostly Prison / Propaganda — flat {cost} per attacker on the
+    /// protected player only. <paramref name="isActive"/>, when supplied, gates
+    /// the paywall on the source enchantment still being on the battlefield, so
+    /// the restriction auto-deactivates when the enchantment leaves (no LTB
+    /// unregister needed — mirrors Static Prison's zone-guarded replacement).</summary>
+    public static PayPerAttackerRestriction FlatMana(
+        Player protectedPlayer, ManaCost cost, Func<bool>? isActive = null)
+    {
+        ArgumentNullException.ThrowIfNull(cost);
+        return new PayPerAttackerRestriction(
+            protectedPlayer, () => cost, protectsPlaneswalkers: false, isActive);
+    }
+
+    /// <summary>Sphere of Safety / Norn's Annex — dynamic per-attacker cost
+    /// (recomputed at declare-attackers) plus optional planeswalker protection.
+    /// <paramref name="isActive"/> gates the paywall on the source still being
+    /// on the battlefield (see <see cref="FlatMana"/>).</summary>
+    public static PayPerAttackerRestriction Dynamic(
+        Player protectedPlayer,
+        Func<ManaCost> costPerAttacker,
+        bool protectsPlaneswalkers = false,
+        Func<bool>? isActive = null)
+        => new(protectedPlayer, costPerAttacker, protectsPlaneswalkers, isActive);
+
+    /// <summary>CR 508.1g — the cost the controller must pay for each attacker
+    /// attacking the protected defender, evaluated now (so a dynamic tax sees
+    /// the current board).</summary>
+    public ManaCost CostPerAttacker => _costPerAttacker();
+
+    /// <summary>True when the paywall is currently in force (the source
+    /// enchantment is on the battlefield). Always true when no
+    /// <c>isActive</c> gate was supplied.</summary>
+    public bool IsActive => _isActive?.Invoke() ?? true;
+
+    public override bool Protects(object defender)
+    {
+        if (!IsActive) return false;
+        if (ReferenceEquals(defender, _protectedPlayer)) return true;
+        if (_protectsPlaneswalkers && defender is Planeswalker pw)
+            return ReferenceEquals(pw.Controller, _protectedPlayer);
+        return false;
+    }
 
     public override bool MayAttack(Creature attacker, object defender)
     {

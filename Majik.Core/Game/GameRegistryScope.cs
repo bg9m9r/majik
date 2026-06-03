@@ -64,6 +64,7 @@ public static class GameRegistryScope
             LibraryTopPlayPermissions.PushScope(),
             ActivatedAbilityRestrictions.PushScope(),
             ControlPlayerRegistryProvider.PushScope(),
+            Majik.Core.Combat.AttackRestrictionRegistryProvider.PushScope(),
         };
         return new CompositeScope(scopes);
     }
