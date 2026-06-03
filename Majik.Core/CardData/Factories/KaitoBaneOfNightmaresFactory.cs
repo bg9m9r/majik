@@ -83,21 +83,42 @@ namespace Majik.Core.CardData.Factories;
 ///   one, so a creature stunned by Kaito stays tapped through one untap step
 ///   per counter.
 ///
-/// ## Deferred (v1 gaps)
-/// - <b>Animation through Compute / combat.</b> Like Mutavault / Karn's
-///   animate, the Layer-4 grant + Layer-7b P/T are registered for layer-system
-///   correctness, but <see cref="ContinuousEffectsService.Compute(Permanent)"/>
-///   surfaces creature P/T only for runtime <see cref="Creature"/> instances;
-///   Kaito is a <see cref="Planeswalker"/> runtime instance, so the 3/4 body
-///   does not yet flow into combat math (same gap noted on Mutavault).
+/// ## Implemented (PW-animation→Compute P/T + emblem anthem)
+/// - <b>Animation P/T through Compute.</b> The Layer-4 Ninja-creature grant +
+///   Layer-7b 3/4 set-base now SURFACE through
+///   <see cref="ContinuousEffectsService.Compute(Permanent)"/>: the #1720
+///   creature-row upgrade re-seeds ANY non-creature permanent (including a
+///   <see cref="Planeswalker"/> runtime instance) as a
+///   <see cref="CreatureCharacteristics"/> the moment a Layer-4 effect grants
+///   <see cref="CardType.Creature"/> (CR 613.1c/613.7b), so the animated 3/4
+///   body computes — keyed off the per-game service Kaito's
+///   <c>ActiveEffects</c> is wired to (effects-aware
+///   <see cref="Create(Player, ContinuousEffectsService)"/> overload, prod via
+///   the #2305 instance-swap seam).
+/// - <b>Emblem anthem (CR 114 / 613.7c).</b> The +1 emblem's continuous
+///   "Ninjas you control get +1/+1" is now AUTO-REGISTERED live as an
+///   <see cref="EmblemAnthemEffect"/> into the per-game service at emblem
+///   creation (when the service is wired), so the Layer-7c boost flows through
+///   Compute + combat in a real match — no longer merely structural.
 /// - <b>"Can't be attacked the turn it enters."</b> Kaito's printed ability
 ///   that protects him the turn he enters is part of the Ninjutsu-era
 ///   templating in some printings; the verified Scryfall oracle for this card
 ///   does not carry that clause, so nothing is modelled for it.
-/// - <b>Emblem anthem layer.</b> The +1 emblem's continuous "+1/+1 to Ninjas
-///   you control" is structural (the emblem object exists in the command
-///   zone); the live anthem layer-7c effect is not auto-registered (same
-///   posture as the Liliana / Wrenn emblems).
+///
+/// ## Deferred (v1 gaps)
+/// - <b>Animated Kaito as a combat PARTICIPANT.</b> Although the animated 3/4
+///   P/T surfaces through Compute, Kaito's runtime instance is a
+///   <see cref="Planeswalker"/>, not a <see cref="Creature"/>. The entire
+///   combat subsystem — eligible-attacker gathering
+///   (<c>TurnDriver.RunCombat</c> + <c>CombatManager.GetValidAttackers</c>
+///   both <c>.OfType&lt;Creature&gt;()</c>), the <c>Attacker</c>/<c>Blocker</c>
+///   declarations, and damage assignment — is keyed on <see cref="Creature"/>
+///   C# instances, so an animated planeswalker can never be DECLARED as an
+///   attacker or blocker. Closing this needs creature↔planeswalker re-classing
+///   (re-instancing the permanent on animation, touching zone/identity) or a
+///   parallel <c>Permanent</c>-level combat surface every combat site consults
+///   — a multi-file engine effort beyond a focused PR (same instance-class gap
+///   as the Mutavault manland / DFC planeswalker-loyalty-back residual #19a).
 /// </summary>
 [CardName("Kaito, Bane of Nightmares")]
 public static class KaitoBaneOfNightmaresFactory
@@ -126,6 +147,23 @@ public static class KaitoBaneOfNightmaresFactory
     public static Planeswalker Create(Player owner) =>
         Create(owner, opponentsResolver: null, tapTargetResolver: null,
                effects: null, isControllersTurn: null, eventBus: null);
+
+    /// <summary>
+    /// Effects-aware overload (CR 613.7c). The production routed
+    /// (instance-swap) build dispatches to this via the source-generated
+    /// <c>CreateGeneratedWithEffects</c> seam (deferral #19 / instance-swap
+    /// prod-wiring cluster, PR #2305) so the per-game
+    /// <see cref="ContinuousEffectsService"/> reaches Kaito in a real match.
+    /// With the service wired, the "becomes a 3/4 Ninja creature during your
+    /// turn" animation effects register (so Kaito's animated P/T surfaces
+    /// through <see cref="ContinuousEffectsService.Compute(Permanent)"/> +
+    /// combat math, CR 613.1c/613.7b via the #1720 creature-row upgrade), and
+    /// the +1 emblem's "Ninjas you control get +1/+1" anthem auto-registers
+    /// LIVE on resolution (CR 114 / 613.7c) instead of being merely structural.
+    /// </summary>
+    public static Planeswalker Create(Player owner, ContinuousEffectsService effects) =>
+        Create(owner, opponentsResolver: null, tapTargetResolver: null,
+               effects: effects, isControllersTurn: null, eventBus: null);
 
     /// <summary>
     /// Construct Kaito, Bane of Nightmares.
@@ -172,9 +210,13 @@ public static class KaitoBaneOfNightmaresFactory
         kaito.AddAbility(new NinjutsuAbility(kaito, NinjutsuCost, owner));
 
         // -- +1: You get an emblem with "Ninjas you control get +1/+1." -----
-        // CR 606 (loyalty) + CR 114 (emblem). Structural emblem — the anthem
-        // layer is delivered by the continuous-effects service when present
-        // (same posture as Liliana / Wrenn emblems).
+        // CR 606 (loyalty) + CR 114 (emblem) + CR 613.7c (the anthem). Mints
+        // the emblem in the controller's command zone and, when a per-game
+        // ContinuousEffectsService is wired, registers the emblem's continuous
+        // "Ninjas you control get +1/+1" anthem (EmblemAnthemEffect) LIVE so
+        // the Layer-7c boost surfaces through Compute + combat in a real match
+        // (not merely structural). The effect object is held by the emblem
+        // (CR 114 — emblems last the rest of the game; no teardown).
         kaito.AddAbility(new LoyaltyAbility(kaito, Plus1Loyalty, () =>
         {
             var controller = kaito.Controller ?? owner;
@@ -183,6 +225,17 @@ public static class KaitoBaneOfNightmaresFactory
                 sourceName: $"{CardName} — \"Ninjas you control get +1/+1\" emblem",
                 abilities: Array.Empty<IAbility>());
             controller.AddEmblem(emblem);
+
+            if (effects != null)
+            {
+                var anthem = new EmblemAnthemEffect(
+                    controller: controller,
+                    matchingSubtype: CardSubtype.Ninja,
+                    power: 1,
+                    toughness: 1);
+                effects.Register(anthem);
+                emblem.AddEffect(anthem);
+            }
         }));
 
         // -- 0: Surveil 2. Then draw a card for each opponent who lost life
@@ -238,6 +291,12 @@ public static class KaitoBaneOfNightmaresFactory
         // static ability, re-evaluated continuously via IsActive()).
         if (effects != null)
         {
+            // Wire the per-game service onto Kaito so its animated P/T computes
+            // through Compute(Permanent) (CR 613) — the #1720 creature-row
+            // upgrade re-seeds this Planeswalker instance as a creature row the
+            // moment the Layer-4 grant below applies.
+            kaito.ActiveEffects = effects;
+
             bool Gate() => kaito.Zone == ZoneType.Battlefield
                            && kaito.Loyalty > 0
                            && (isControllersTurn?.Invoke() ?? true);
