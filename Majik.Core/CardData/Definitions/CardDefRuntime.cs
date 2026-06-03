@@ -1252,6 +1252,8 @@ public static class CardDefRuntime
             GainLifeSelfEffectDef gain => BuildGainLifeSelfEffect(gain, card, controller),
             LoseLifeSelfEffectDef loseSelf => BuildLoseLifeSelfEffect(loseSelf, card, controller),
             LoseLifeTargetEffectDef lose => BuildLoseLifeTargetEffect(lose, card, targetRequestIndex),
+            LoseLifeEachOpponentEffectDef loseEach => BuildLoseLifeEachOpponentEffect(loseEach, card),
+            DealDamageEachOpponentEffectDef dmgEach => BuildDealDamageEachOpponentEffect(dmgEach, card),
             MillThenPickFirstMatchingToHandEffectDef mp => BuildMillThenPickEffect(mp, card, controller),
             ConniveSelfEffectDef connive => BuildConniveSelfEffect(connive, card),
             AmassSelfEffectDef amass => BuildAmassSelfEffect(amass, card, controller),
@@ -1481,6 +1483,60 @@ public static class CardDefRuntime
                     _ => null,
                 };
                 if (victim != null) Fx.LoseLife(victim, amount);
+                return ValueTask.CompletedTask;
+            });
+    }
+
+    private static IEffect BuildLoseLifeEachOpponentEffect(LoseLifeEachOpponentEffectDef def, ICard card)
+    {
+        // CR 119.3 + CR 109.5 — untargeted "each opponent loses N life". A group
+        // effect (CR 608.2): no ChosenTargets read, no target slot. The opponent
+        // set is resolved LIVE at resolution off ctx.Game so a control change
+        // carries the trigger (CR 109.5 — the live controller's opponents);
+        // mirrors the opponent enumeration in
+        // BuildDamageAndTapEachFlyerOpponentsControlEffect. Routes each drain
+        // through the shared Fx.LoseLife primitive (Player.LoseLife).
+        var amount = def.Amount;
+        return new Effect(
+            $"{card.Name}: each opponent loses {amount} life",
+            ctx =>
+            {
+                var controller = (card as Permanent)?.Controller ?? ctx.Controller;
+                if (controller == null || ctx.Game == null) return ValueTask.CompletedTask;
+
+                foreach (var player in ctx.Game.AllPlayers)
+                {
+                    if (ReferenceEquals(player, controller)) continue;
+                    Fx.LoseLife(player, amount);
+                }
+
+                return ValueTask.CompletedTask;
+            });
+    }
+
+    private static IEffect BuildDealDamageEachOpponentEffect(DealDamageEachOpponentEffectDef def, ICard card)
+    {
+        // CR 119 + CR 109.5 — untargeted "deals N damage to each opponent". The
+        // damage sibling of BuildLoseLifeEachOpponentEffect: a group effect (CR
+        // 608.2, no target slot) whose opponent set is resolved LIVE off ctx.Game
+        // (control change carries the trigger, CR 109.5). Damage routes through
+        // the source-aware Fx.DealDamageAny so an infect / wither source carries
+        // (CR 702.90) — the source is the card itself when it is a creature.
+        var amount = def.Amount;
+        return new Effect(
+            $"{card.Name}: deal {amount} damage to each opponent",
+            ctx =>
+            {
+                var controller = (card as Permanent)?.Controller ?? ctx.Controller;
+                if (controller == null || ctx.Game == null) return ValueTask.CompletedTask;
+
+                var source = card as Creature;
+                foreach (var player in ctx.Game.AllPlayers)
+                {
+                    if (ReferenceEquals(player, controller)) continue;
+                    Fx.DealDamageAny(player, amount, source);
+                }
+
                 return ValueTask.CompletedTask;
             });
     }

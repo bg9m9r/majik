@@ -39,6 +39,8 @@ namespace Majik.Core.CardData.Definitions;
 [JsonDerivedType(typeof(GainLifeSelfEffectDef), "gain_life_self")]
 [JsonDerivedType(typeof(LoseLifeSelfEffectDef), "lose_life_self")]
 [JsonDerivedType(typeof(LoseLifeTargetEffectDef), "lose_life_target")]
+[JsonDerivedType(typeof(LoseLifeEachOpponentEffectDef), "lose_life_each_opponent")]
+[JsonDerivedType(typeof(DealDamageEachOpponentEffectDef), "deal_damage_each_opponent")]
 [JsonDerivedType(typeof(MillThenPickFirstMatchingToHandEffectDef), "mill_then_pick_first_matching_to_hand")]
 [JsonDerivedType(typeof(ConniveSelfEffectDef), "connive_self")]
 [JsonDerivedType(typeof(AmassSelfEffectDef), "amass_self")]
@@ -919,6 +921,57 @@ public sealed class LoseLifeTargetEffectDef : EffectDefinition
         IsRider
             ? null
             : TargetFilters.ToTargetRequest(TargetFilter, $"lose {Amount} life");
+}
+
+/// <summary>
+/// "Each opponent loses N life" (CR 119.3 + CR 109.5 "opponents") — the
+/// <b>untargeted</b>, opponent-scoped life-loss verb. Unlike
+/// <see cref="LoseLifeTargetEffectDef"/> (which announces a target the spell /
+/// ability must declare and that can be removed in response), this verb
+/// resolves its victims live off the resolution context — every player OTHER
+/// than the effect's controller (CR 109.5) — and drains each through the shared
+/// <see cref="Majik.Core.Primitives.Fx.LoseLife"/> primitive. It needs no
+/// <see cref="TargetRequest"/> and no shared-slot rider (it is a group effect,
+/// CR 608.2), mirroring how
+/// <see cref="DamageAndTapEachFlyerOpponentsControlEffectDef"/> enumerates the
+/// opponent set off <c>ctx.Game</c>.
+///
+/// <para>
+/// Models the aristocrat / punisher drain-each-opponent family that fires
+/// without targeting — Corpse Knight ("Whenever another creature you control
+/// enters, each opponent loses 1 life"), Bastion of Remembrance, Cruel
+/// Celebrant's payoff. Default <see cref="Amount"/> = 1.
+/// </para>
+/// </summary>
+public sealed class LoseLifeEachOpponentEffectDef : EffectDefinition
+{
+    public int Amount { get; set; } = 1;
+}
+
+/// <summary>
+/// "[Source] deals N damage to each opponent" (CR 119 + CR 109.5
+/// "opponents") — the <b>untargeted</b>, opponent-scoped deal-damage verb, the
+/// damage sibling of <see cref="LoseLifeEachOpponentEffectDef"/>. The single-
+/// target <see cref="DealDamageEffectDef"/> announces an any-target slot; this
+/// verb instead resolves its victims live off the resolution context — every
+/// player OTHER than the effect's controller (CR 109.5) — and routes
+/// <see cref="Amount"/> damage to each through the shared
+/// <see cref="Majik.Core.Primitives.Fx.DealDamageAny(object,int,Majik.Core.Cards.Creature?)"/>
+/// primitive (source-aware so infect / wither off the source carry, CR
+/// 702.90). No <see cref="TargetRequest"/> — a group effect (CR 608.2),
+/// enumerated off <c>ctx.Game</c> like
+/// <see cref="DamageAndTapEachFlyerOpponentsControlEffectDef"/>.
+///
+/// <para>
+/// Models the "ping each opponent" punisher payoff family — Impact Tremors
+/// ("Whenever a creature you control enters, this deals 1 damage to each
+/// opponent"), Witty Roastmaster, Purphoros's ETB ping. Default
+/// <see cref="Amount"/> = 1.
+/// </para>
+/// </summary>
+public sealed class DealDamageEachOpponentEffectDef : EffectDefinition
+{
+    public int Amount { get; set; } = 1;
 }
 
 /// <summary>

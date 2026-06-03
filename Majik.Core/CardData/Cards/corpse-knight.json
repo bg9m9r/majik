@@ -1,0 +1,20 @@
+{
+  "name": "Corpse Knight",
+  "types": ["Creature"],
+  "subtypes": ["Zombie", "Knight"],
+  "manaCost": "{W}{B}",
+  "power": 2,
+  "toughness": 2,
+  "abilities": [
+    {
+      "kind": "triggered",
+      "trigger": {
+        "type": "whenever_another_creature_enters",
+        "youControlOnly": true
+      },
+      "effects": [
+        { "type": "lose_life_each_opponent", "amount": 1 }
+      ]
+    }
+  ]
+}
