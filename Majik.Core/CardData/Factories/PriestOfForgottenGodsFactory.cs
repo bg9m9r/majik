@@ -140,8 +140,10 @@ public static class PriestOfForgottenGodsFactory
                 // sacrifice-another-creature costs. Each excludes the Priest
                 // itself; CostPayment pays them in sequence, so the second
                 // cannot re-pick the creature the first already sacrificed.
-                new SacrificeAnotherCreatureCost(card),
-                new SacrificeAnotherCreatureCost(card),
+                // CR 701.16a — thread the bus so each of the two sacrifices
+                // fires PermanentSacrificedEvent for "whenever you sacrifice …".
+                new SacrificeAnotherCreatureCost(card, eventBus),
+                new SacrificeAnotherCreatureCost(card, eventBus),
             },
             effects: new IEffect[]
             {

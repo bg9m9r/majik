@@ -162,20 +162,24 @@ public static class BolassCitadelFactory
                 }
             });
 
+        // CR 701.16a — thread the engine bus into the sacrifice cost so each
+        // of the ten nonland permanents fires PermanentSacrificedEvent and
+        // "whenever you sacrifice …" aristocrat payoffs trigger.
+        var bus = continuousEffects?.EventBus;
+
         citadel.AddAbility(new ActivatedAbility(
             source: citadel,
             controller: owner,
             costs: new ICost[]
             {
                 AdditionalCost.Tap(citadel),
-                new SacrificeNNonlandPermanentsCost(SacrificeCount),
+                new SacrificeNNonlandPermanentsCost(SacrificeCount, bus),
             },
             effects: new IEffect[] { drainEffect }));
 
         // CR 601.3e / CR 305.6 / CR 715.4 / CR 118.9 — live "may play lands +
         // cast spells from the top, revealed; pay life equal to mana value for a
         // top-cast" grant, battlefield-gated.
-        var bus = continuousEffects?.EventBus;
         if (bus != null)
         {
             new LibraryTopPlayStaticEffect(

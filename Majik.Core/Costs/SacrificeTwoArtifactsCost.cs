@@ -1,5 +1,6 @@
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Zones;
 
@@ -37,6 +38,7 @@ public sealed class SacrificeTwoArtifactsCost : ICost
     public const int Count = 2;
 
     private readonly Permanent? _excludeSource;
+    private readonly IEventBus? _eventBus;
 
     /// <summary>
     /// Optionally set by the agent to indicate which two artifacts to
@@ -55,9 +57,13 @@ public sealed class SacrificeTwoArtifactsCost : ICost
     /// "sacrifice two artifacts other than ~"). Default null — the
     /// source is eligible if it is itself an artifact.
     /// </summary>
-    public SacrificeTwoArtifactsCost(Permanent? excludeSource = null)
+    /// <param name="eventBus">Optional event bus — publishes a
+    /// <see cref="PermanentSacrificedEvent"/> (CR 701.16a) per sacrifice so
+    /// aristocrat payoffs fire. Null preserves the legacy posture.</param>
+    public SacrificeTwoArtifactsCost(Permanent? excludeSource = null, IEventBus? eventBus = null)
     {
         _excludeSource = excludeSource;
+        _eventBus = eventBus;
     }
 
     public string Description =>
@@ -87,9 +93,7 @@ public sealed class SacrificeTwoArtifactsCost : ICost
 
         foreach (var pick in picks)
         {
-            player.Zones.Battlefield.RemoveCard(pick);
-            player.Zones.Graveyard.AddCard(pick);
-            pick.SetZone(ZoneType.Graveyard);
+            SacrificeCostHelper.Sacrifice(player, pick, _eventBus);
         }
 
         Targets = picks;

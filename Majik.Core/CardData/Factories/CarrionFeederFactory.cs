@@ -98,7 +98,10 @@ public static class CarrionFeederFactory
         // CR 602 (activated abilities) + CR 614 (replacement effects on
         // counter placement).
         // ----------------------------------------------------------------
-        var sacrificeCost = new SacrificeAnotherCreatureCost(card);
+        // CR 701.16a — thread the engine bus into the sacrifice cost so the
+        // sacrificed creature fires PermanentSacrificedEvent and "whenever you
+        // sacrifice …" aristocrat payoffs trigger on this sac outlet.
+        var sacrificeCost = new SacrificeAnotherCreatureCost(card, effects?.EventBus);
 
         var ability = new CarrionFeederAbility(
             source: card,

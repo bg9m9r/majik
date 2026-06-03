@@ -218,7 +218,9 @@ public static class SaiMasterThopteristFactory
             costs: new ICost[]
             {
                 new ManaCostCost(ActivationCost),
-                new SacrificeTwoArtifactsCost(excludeSource: card),
+                // CR 701.16a — thread the bus so each sacrificed artifact fires
+                // PermanentSacrificedEvent for "whenever you sacrifice …" payoffs.
+                new SacrificeTwoArtifactsCost(excludeSource: card, eventBus: eventBus),
             },
             effects: new IEffect[] { drawEffect });
 

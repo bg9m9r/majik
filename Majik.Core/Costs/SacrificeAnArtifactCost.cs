@@ -1,5 +1,6 @@
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Zones;
 
@@ -36,6 +37,7 @@ public sealed class SacrificeAnArtifactCost : ICost
 {
     private readonly Permanent? _excludeSource;
     private readonly bool _requireNontoken;
+    private readonly IEventBus? _eventBus;
 
     /// <summary>
     /// Optionally set by the agent to indicate which artifact to
@@ -58,10 +60,14 @@ public sealed class SacrificeAnArtifactCost : ICost
     /// are excluded from the picker (CR 111.8 — Thopter Foundry's
     /// "Sacrifice a nontoken artifact"); default false.
     /// </summary>
-    public SacrificeAnArtifactCost(Permanent? excludeSource = null, bool requireNontoken = false)
+    /// <param name="eventBus">Optional event bus — publishes a
+    /// <see cref="PermanentSacrificedEvent"/> (CR 701.16a) on payment so
+    /// aristocrat payoffs fire. Null preserves the legacy posture.</param>
+    public SacrificeAnArtifactCost(Permanent? excludeSource = null, bool requireNontoken = false, IEventBus? eventBus = null)
     {
         _excludeSource = excludeSource;
         _requireNontoken = requireNontoken;
+        _eventBus = eventBus;
     }
 
     public string Description =>
@@ -100,9 +106,7 @@ public sealed class SacrificeAnArtifactCost : ICost
             throw new InvalidOperationException(
                 $"Cannot pay {Description}: no eligible artifact to sacrifice.");
 
-        player.Zones.Battlefield.RemoveCard(pick);
-        player.Zones.Graveyard.AddCard(pick);
-        pick.SetZone(ZoneType.Graveyard);
+        SacrificeCostHelper.Sacrifice(player, pick, _eventBus);
         Target = pick;
     }
 }

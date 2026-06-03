@@ -1,5 +1,6 @@
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Zones;
 
@@ -36,6 +37,7 @@ namespace Majik.Core.Costs;
 public sealed class SacrificeFilteredCost : ICost
 {
     private readonly Func<Permanent, bool> _filter;
+    private readonly IEventBus? _eventBus;
 
     /// <summary>
     /// The chosen permanent to sacrifice. May be pre-set by the agent;
@@ -56,17 +58,21 @@ public sealed class SacrificeFilteredCost : ICost
     /// <c>p =&gt; p.HasSubtype(CardSubtype.Desert)</c>).</param>
     /// <param name="description">Human-readable cost text
     /// (e.g. "sacrifice a token", "sacrifice a Desert").</param>
-    public SacrificeFilteredCost(Func<Permanent, bool> filter, string description)
+    /// <param name="eventBus">Optional event bus — publishes a
+    /// <see cref="PermanentSacrificedEvent"/> (CR 701.16a) on payment so
+    /// aristocrat payoffs fire. Null preserves the legacy posture.</param>
+    public SacrificeFilteredCost(Func<Permanent, bool> filter, string description, IEventBus? eventBus = null)
     {
         _filter = filter ?? throw new ArgumentNullException(nameof(filter));
         Description = description ?? "sacrifice a permanent";
+        _eventBus = eventBus;
     }
 
     /// <summary>
     /// "Sacrifice a token" (CR 111.8 / 701.16) — Fountainport's draw ability.
     /// </summary>
-    public static SacrificeFilteredCost ForToken() =>
-        new(p => p.IsToken, "sacrifice a token");
+    public static SacrificeFilteredCost ForToken(IEventBus? eventBus = null) =>
+        new(p => p.IsToken, "sacrifice a token", eventBus);
 
     /// <summary>
     /// "Sacrifice a &lt;subtype&gt;" (CR 701.16) — Scavenger Grounds
@@ -74,8 +80,8 @@ public sealed class SacrificeFilteredCost : ICost
     /// the permanent's printed/effective subtype set via
     /// <see cref="Card.HasSubtype"/>.
     /// </summary>
-    public static SacrificeFilteredCost ForSubtype(CardSubtype subtype) =>
-        new(p => p.HasSubtype(subtype), $"sacrifice a {subtype}");
+    public static SacrificeFilteredCost ForSubtype(CardSubtype subtype, IEventBus? eventBus = null) =>
+        new(p => p.HasSubtype(subtype), $"sacrifice a {subtype}", eventBus);
 
     private bool IsEligible(Permanent p) =>
         p.Zone == ZoneType.Battlefield && _filter(p);
@@ -104,9 +110,7 @@ public sealed class SacrificeFilteredCost : ICost
             throw new InvalidOperationException(
                 $"Cannot pay {Description}: no eligible permanent to sacrifice.");
 
-        player.Zones.Battlefield.RemoveCard(pick);
-        player.Zones.Graveyard.AddCard(pick);
-        pick.SetZone(ZoneType.Graveyard);
+        SacrificeCostHelper.Sacrifice(player, pick, _eventBus);
         Target = pick;
     }
 }

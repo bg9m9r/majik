@@ -1,5 +1,6 @@
 using Majik.Core.Cards;
 using Majik.Core.Cards.Types;
+using Majik.Core.Events;
 using Majik.Core.Players;
 using Majik.Core.Zones;
 
@@ -40,6 +41,16 @@ namespace Majik.Core.Costs;
 /// </summary>
 public sealed class SacrificeAnArtifactOrCreatureAdditionalCost : IAdditionalCost
 {
+    private readonly IEventBus? _eventBus;
+
+    /// <param name="eventBus">Optional event bus — publishes a
+    /// <see cref="PermanentSacrificedEvent"/> (CR 701.16a) on payment so
+    /// aristocrat payoffs fire. Null preserves the legacy posture.</param>
+    public SacrificeAnArtifactOrCreatureAdditionalCost(IEventBus? eventBus = null)
+    {
+        _eventBus = eventBus;
+    }
+
     /// <summary>The permanent sacrificed by <see cref="Pay"/> (an artifact or
     /// a creature). Null before payment.</summary>
     public Permanent? Sacrificed { get; private set; }
@@ -78,9 +89,7 @@ public sealed class SacrificeAnArtifactOrCreatureAdditionalCost : IAdditionalCos
             .FirstOrDefault(IsArtifactOrCreature);
         if (pick == null) return false;
 
-        caster.Zones.Battlefield.RemoveCard(pick);
-        caster.Zones.Graveyard.AddCard(pick);
-        pick.SetZone(ZoneType.Graveyard);
+        SacrificeCostHelper.Sacrifice(caster, pick, _eventBus);
         Sacrificed = pick;
         return true;
     }
