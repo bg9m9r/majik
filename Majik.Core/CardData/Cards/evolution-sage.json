@@ -1,0 +1,8 @@
+{
+  "name": "Evolution Sage",
+  "types": ["Creature"],
+  "subtypes": ["Elf", "Druid"],
+  "manaCost": "{2}{G}",
+  "power": 3,
+  "toughness": 2
+}
