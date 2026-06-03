@@ -567,7 +567,8 @@ public class Player
     public void AddManaToPool(
         ValueObjects.ManaCost mana,
         object? provenanceSource = null,
-        Action<Cards.ICard?>? onSpent = null)
+        Action<Cards.ICard?>? onSpent = null,
+        Mana.SpendRestriction? restriction = null)
     {
         if (mana == null)
         {
@@ -581,13 +582,20 @@ public class Player
 
         _manaPool = _manaPool.Add(mana);
 
-        if (provenanceSource != null)
+        // CR 106.4 — a colored unit is provenance-stamped when it has a
+        // reaction-firing source (Arena of Glory's exert haste rider) OR a
+        // spend-restriction rider (Ancient Ziggurat's "creature spell only").
+        // Either alone records a slot; restriction-only slots let the payment
+        // resolver gate the spend without any OnSpent callback. When only a
+        // restriction is present we fall back to `this` as the slot source.
+        if (provenanceSource != null || restriction != null)
         {
-            AddProvenanceSlots(provenanceSource, ValueObjects.ManaColor.White, mana.White, onSpent);
-            AddProvenanceSlots(provenanceSource, ValueObjects.ManaColor.Blue, mana.Blue, onSpent);
-            AddProvenanceSlots(provenanceSource, ValueObjects.ManaColor.Black, mana.Black, onSpent);
-            AddProvenanceSlots(provenanceSource, ValueObjects.ManaColor.Red, mana.Red, onSpent);
-            AddProvenanceSlots(provenanceSource, ValueObjects.ManaColor.Green, mana.Green, onSpent);
+            var source = provenanceSource ?? (object)this;
+            AddProvenanceSlots(source, ValueObjects.ManaColor.White, mana.White, onSpent, restriction);
+            AddProvenanceSlots(source, ValueObjects.ManaColor.Blue, mana.Blue, onSpent, restriction);
+            AddProvenanceSlots(source, ValueObjects.ManaColor.Black, mana.Black, onSpent, restriction);
+            AddProvenanceSlots(source, ValueObjects.ManaColor.Red, mana.Red, onSpent, restriction);
+            AddProvenanceSlots(source, ValueObjects.ManaColor.Green, mana.Green, onSpent, restriction);
         }
     }
 
@@ -595,11 +603,12 @@ public class Player
         object source,
         ValueObjects.ManaColor color,
         int count,
-        Action<Cards.ICard?>? onSpent)
+        Action<Cards.ICard?>? onSpent,
+        Mana.SpendRestriction? restriction = null)
     {
         for (var i = 0; i < count; i++)
         {
-            _manaProvenance.Add(new Mana.ManaProvenanceSlot(source, color, onSpent));
+            _manaProvenance.Add(new Mana.ManaProvenanceSlot(source, color, onSpent, restriction));
         }
     }
 
@@ -654,12 +663,22 @@ public class Player
         int count,
         Cards.ICard? spentOn)
     {
+        // CR 106.4 — a restricted slot may only be CONSUMED to pay a spend its
+        // restriction permits. The resolver's payment gate already guaranteed
+        // the cost is payable from the satisfying mana, so here we skip
+        // restricted slots that don't match the spent-on object and consume the
+        // satisfying ones (unrestricted slots always match). This keeps a
+        // creature-only green floating when an instant was paid from an
+        // unrestricted green in the same colored bucket.
+        var spell = spentOn != null ? new Majik.Core.Spells.Spell(spentOn, this) : null;
+
         var consumed = 0;
-        // FIFO: oldest matching slot first (front of the list).
+        // FIFO: oldest matching slot first (front of the list). Skip slots
+        // whose restriction the spend doesn't satisfy (they stay floating).
         for (var i = 0; i < _manaProvenance.Count && consumed < count;)
         {
             var slot = _manaProvenance[i];
-            if (slot.Color == color)
+            if (slot.Color == color && slot.CanSpendOn(spell))
             {
                 _manaProvenance.RemoveAt(i);
                 slot.OnSpent?.Invoke(spentOn);
@@ -695,6 +714,30 @@ public class Player
         }
 
         return success;
+    }
+
+    /// <summary>
+    /// CR 106.4 — temporarily remove the given colored mana from the pool
+    /// WITHOUT touching the provenance ledger, so the
+    /// <see cref="Majik.Core.Costs.ManaPaymentResolver"/> can hold back
+    /// spend-restricted mana across a bucketed payment (the pool has no
+    /// per-slot view and would otherwise greedily spend a restricted unit on a
+    /// generic pip). Pair with <see cref="RestoreColoredMana"/> — the withheld
+    /// mana stays floating with its restriction slots intact. Clamped at zero.
+    /// </summary>
+    public void WithholdColoredMana(int white, int blue, int black, int red, int green)
+    {
+        _manaPool = _manaPool.RemoveColored(white, blue, black, red, green);
+    }
+
+    /// <summary>
+    /// CR 106.4 — restore mana previously held back by
+    /// <see cref="WithholdColoredMana"/> after a payment, again without
+    /// touching the provenance ledger (the slots were never removed).
+    /// </summary>
+    public void RestoreColoredMana(int white, int blue, int black, int red, int green)
+    {
+        _manaPool = _manaPool.AddColored(white, blue, black, red, green);
     }
 
     /// <summary>

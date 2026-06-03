@@ -20,12 +20,13 @@ namespace Majik.Core.Mana;
 /// payment resolver will eventually consume when ManaPool's internal
 /// representation moves from buckets-of-counts to a list-of-tags.</para>
 ///
-/// <para><b>Engine wiring status (2026-05):</b> data type only.
-/// <see cref="Majik.Core.Abilities.ManaAbility"/> exposes a
-/// <c>SpendRestriction?</c> slot so factories can stamp the rider; the
-/// payment-gate side (filtering tagged entries in
-/// <see cref="Majik.Core.Costs.ManaPaymentResolver"/>) is deferred — see
-/// <see cref="SpendRestriction"/> xmldoc.</para>
+/// <para><b>Engine wiring status (2026-06):</b> the payment gate now ships
+/// (see <see cref="SpendRestriction"/> xmldoc). The live restriction rider
+/// rides each produced colored unit via
+/// <see cref="ManaProvenanceSlot.Restriction"/> in the per-slot provenance
+/// ledger; <c>ManaTag</c> remains the standalone value-object for callers
+/// (debug strings, future ManaPool-tag migration) that want to pair a colour
+/// with a restriction outside the ledger.</para>
 /// </summary>
 public sealed class ManaTag : IEquatable<ManaTag>
 {

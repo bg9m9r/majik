@@ -37,12 +37,17 @@ namespace Majik.Core.CardData.Factories;
 ///   separate path that doesn't surface an <c>ISpell</c>); the predicate
 ///   is conservative — spell-side only.
 ///
-///   <b>Payment-gate enforcement</b> (filtering tagged pool entries
-///   when paying a non-Eldrazi cost) is deferred until
-///   <see cref="ManaPool"/> grows per-slot tags — today the pool stores
-///   bucketed colour/generic counts only. Same posture as Cavern of
-///   Souls' rider (see <see cref="CavernOfSoulsFactory"/> xmldoc); both
-///   unlock together when the resolver consumes the tag.
+///   <b>Payment-gate enforcement</b> for COLORED restricted mana is now
+///   live (Ancient Ziggurat / Cavern of Souls — see those factories'
+///   xmldoc). Eldrazi Temple, however, produces COLORLESS ({C}{C}) mana,
+///   which folds into the engine's generic bucket and is never recorded in
+///   the colored per-slot provenance ledger the gate consumes ("generic
+///   mana is never tagged" — <see cref="Majik.Core.Mana.ManaProvenanceSlot"/>).
+///   So Eldrazi Temple's restriction stays observational metadata until the
+///   provenance ledger grows a colorless/generic slot dimension — a separate
+///   slice. The factory still stamps the rider so it unlocks the moment that
+///   lands. (The "or activated abilities of Eldrazi" half also remains
+///   spell-only.)
 /// </summary>
 [CardName("Eldrazi Temple")]
 public static class EldraziTempleFactory
@@ -74,9 +79,10 @@ public static class EldraziTempleFactory
         //   or activate abilities of Eldrazi.
         // Second ManaAbility producing 2 generic, with a SpendRestriction
         // stamping the Eldrazi-subtype predicate on the generated mana.
-        // Payment-gate side is still deferred (see class xmldoc) — the
-        // rider is observational metadata on the ability until ManaPool
-        // grows per-slot tag awareness.
+        // The colored spend-restriction gate is live (Ziggurat / Cavern),
+        // but this ability's mana is COLORLESS ({C}{C}) — it folds into the
+        // generic bucket, which the colored provenance ledger doesn't track,
+        // so the gate doesn't yet enforce this rider (see class xmldoc).
         // ----------------------------------------------------------------
         var eldraziRestriction = new SpendRestriction(
             "Eldrazi spell or ability",

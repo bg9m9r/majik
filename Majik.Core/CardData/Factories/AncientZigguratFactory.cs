@@ -30,7 +30,7 @@ namespace Majik.Core.CardData.Factories;
 ///   <see cref="SpendRestriction"/> — the JSON <c>{ "kind": "mana" }</c>
 ///   shape produces only unrestricted abilities.
 ///
-/// ## Spend-restriction (v1 data, payment-gate deferred)
+/// ## Spend-restriction (enforced)
 /// - <b>"Spend this mana only to cast a creature spell"</b>: each of the
 ///   five "any colour" <see cref="ManaAbility"/> instances stamps a shared
 ///   <see cref="SpendRestriction"/> with the predicate
@@ -39,13 +39,14 @@ namespace Majik.Core.CardData.Factories;
 ///   restriction). Unlike Cavern of Souls there is no chosen-type
 ///   refinement — Ancient Ziggurat restricts to any creature spell.
 ///
-///   <b>Payment-gate enforcement</b> (filtering tagged pool entries when
-///   paying a non-creature cost) is deferred until <see cref="ManaPool"/>
-///   grows per-slot tags — today the pool stores bucketed colour counts
-///   only. The restriction is observational metadata on the ability until
-///   the resolver consumes the tag. Same posture as Cavern of Souls /
-///   Delighted Halfling (see those factories' xmldoc); all unlock
-///   together.
+///   <b>Payment-gate enforcement is live.</b> The
+///   <see cref="Majik.Core.Costs.ManaPaymentResolver"/> rides the
+///   restriction onto each produced colored unit (a
+///   <see cref="Majik.Core.Mana.ManaProvenanceSlot"/>) and treats those
+///   units as unavailable when the cast object isn't a creature spell —
+///   rejecting the payment atomically (the land stays untapped). The
+///   restricted mana can still pay a creature spell. Cavern of Souls /
+///   Eldrazi Temple share the same gate.
 /// </summary>
 [CardName("Ancient Ziggurat")]
 public static class AncientZigguratFactory

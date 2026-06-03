@@ -120,6 +120,31 @@ public class ManaPool : IEquatable<ManaPool>
     }
 
     /// <summary>
+    /// Return a copy of this pool with the given colored counts removed
+    /// (clamped at zero). Generic is untouched. Used by the
+    /// <see cref="Majik.Core.Costs.ManaPaymentResolver"/> spend-restriction
+    /// gate (CR 106.4) to model "this restricted colored mana is unavailable
+    /// for the current spend" without mutating the real pool — the gate then
+    /// checks whether the remaining (spendable) mana still covers the cost.
+    /// </summary>
+    public ManaPool RemoveColored(int white = 0, int blue = 0, int black = 0, int red = 0, int green = 0)
+    {
+        if (white < 0 || blue < 0 || black < 0 || red < 0 || green < 0)
+        {
+            throw new ArgumentException("Mana amounts cannot be negative");
+        }
+
+        return new ManaPool(
+            Generic,
+            Math.Max(0, White - white),
+            Math.Max(0, Blue - blue),
+            Math.Max(0, Black - black),
+            Math.Max(0, Red - red),
+            Math.Max(0, Green - green)
+        );
+    }
+
+    /// <summary>
     /// Remove mana from the pool (for paying costs).
     /// Returns the new pool and whether the payment was successful.
     /// </summary>
