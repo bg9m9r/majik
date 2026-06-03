@@ -5,6 +5,7 @@ using Majik.Core.Costs;
 using Majik.Core.Effects;
 using Majik.Core.Players;
 using Majik.Core.Players.Agents;
+using Majik.Core.Primitives;
 using Majik.Core.ValueObjects;
 using Majik.Core.Zones;
 using Creature = Majik.Core.Cards.Creature;
@@ -55,16 +56,22 @@ namespace Majik.Core.CardData.Factories;
 ///   effective colours do NOT contain the chosen colour".
 ///   <see cref="Majik.Core.Combat.BlockLegality.CanBlock"/> consults it.
 ///
-/// ## v1 gaps (consistent with the rest of the engine)
-/// - <b>Agent-side colour prompt</b>: CR 601.2c — "choose a color" is made as
-///   the ability is activated. v1 takes the colour as a parameter to
-///   <see cref="ResolveColorGrant"/> (tests/bots supply it); the dispatcher
-///   activated-ability closure defaults to white. Same posture as
-///   <see cref="MotherOfRunesFactory"/>'s colour pick.
-/// - <b>Coven enforcement at activation</b>: <see cref="CanActivateCoven"/>
-///   exposes the gate; wiring it as the activated ability's
-///   live <c>CanActivate</c> predicate follows the same deferred posture as
-///   other "activate only if" riders.
+/// ## Agent-side colour prompt (CR 601.2c)
+/// The Coven grant's resolve effect routes the "choose a color" decision
+/// through the controller's agent via the declarative
+/// <see cref="IPlayerAgent.ChooseAsync"/> sink (<see cref="ChoiceKind.PickOne"/>
+/// over the five colours, mirroring <see cref="SerrasEmissaryFactory"/>'s
+/// card-type pick). A red-picking player gets a red hexproof-from + can't-be-
+/// blocked-by grant; only the shape-only path (no agent / no game — direct
+/// <see cref="ResolveColorGrant"/> invocation by tests / bots) defaults to
+/// white.
+///
+/// ## Coven enforcement at activation (CR 602.5c / CR 702.150)
+/// The activated ability carries <see cref="CanActivateCoven"/> as its live
+/// <c>canActivateCheck</c> predicate, so <see cref="Rules.ActionValidator"/>
+/// and <see cref="Services.AbilityActivator"/> reject the activation unless the
+/// controller currently controls three or more creatures with different
+/// powers. <see cref="Abilities.ActivatedAbility.CanActivateNow"/> reflects it.
 /// </summary>
 [CardName("Sungold Sentinel")]
 public static class SungoldSentinelFactory
@@ -115,15 +122,29 @@ public static class SungoldSentinelFactory
         // that color until end of turn and can't be blocked by creatures of
         // that color this turn. CR 602.1.
         // ----------------------------------------------------------------
-        var grantEffect = new Effect(
-            $"{CardName}: gains hexproof-from-colour + can't-be-blocked-by-colour EOT",
-            () => ResolveColorGrant(card, ManaColor.White, card.ActiveEffects));
+        // CR 601.2c — "Choose a color" is made by the activating player's
+        // agent as the ability resolves. The grant effect reads the live
+        // ResolutionContext, prompts the controller's agent for one of the five
+        // colours (default white if no agent / game is available, e.g. shape-
+        // only tests), then applies the until-end-of-turn grant. Mirrors
+        // SerrasEmissaryFactory.ChooseTypeAsync.
+        var grantEffect = Fx.Inline(
+            $"{CardName}: choose a colour; gain hexproof-from-colour + can't-be-blocked-by-colour EOT",
+            async ctx =>
+            {
+                var color = await ChooseColorAsync(owner, ctx).ConfigureAwait(false);
+                ResolveColorGrant(card, color, card.ActiveEffects);
+            });
 
         var covenAbility = new ActivatedAbility(
             source: card,
             controller: owner,
             costs: new ICost[] { new ManaCostCost(CovenActivationCost) },
-            effects: new IEffect[] { grantEffect });
+            effects: new IEffect[] { grantEffect },
+            // CR 602.5c — "Activate only if you control three or more creatures
+            // with different powers" (Coven, CR 702.150). Re-evaluated live on
+            // every activation attempt.
+            canActivateCheck: () => CanActivateCoven(owner));
 
         card.AddAbility(covenAbility);
 
@@ -221,6 +242,40 @@ public static class SungoldSentinelFactory
                 source: self,
                 predicate: blocker => !BlockerIsColor(blocker, color),
                 expiresAtEndOfTurn: true));
+    }
+
+    /// <summary>The five colours offered by "Choose a color" (CR 105.1 — only
+    /// the five mana colours; colourless is not a colour, CR 105.2c).</summary>
+    private static readonly ManaColor[] ChoosableColors =
+    {
+        ManaColor.White, ManaColor.Blue, ManaColor.Black, ManaColor.Red, ManaColor.Green,
+    };
+
+    /// <summary>
+    /// CR 601.2c — prompt the activating player's agent to choose one of the
+    /// five colours for the Coven grant. Routes through the single declarative
+    /// <see cref="IPlayerAgent.ChooseAsync"/> sink as a
+    /// <see cref="ChoiceKind.PickOne"/> over the colours (mirrors
+    /// <see cref="SerrasEmissaryFactory"/>'s card-type pick). Falls back to
+    /// <see cref="ManaColor.White"/> when no agent / game is available (the
+    /// shape-only path used by direct-invocation tests / bots).
+    /// </summary>
+    private static async System.Threading.Tasks.ValueTask<ManaColor> ChooseColorAsync(
+        Player controller, Majik.Core.Abilities.ResolutionContext ctx)
+    {
+        var agent = ctx.Agent ?? AgentRegistry.Get(controller);
+        if (agent == null || ctx.Game == null) return ManaColor.White;
+
+        var req = new ChoiceRequest(
+            ChoiceKind.PickOne,
+            $"{CardName} — choose a color",
+            Min: 1, Max: 1,
+            Candidates: ChoosableColors.Cast<object>().ToList(),
+            Intent: BotIntent.Protection);
+
+        var picked = await agent.ChooseAsync(ctx.Game, req, ctx.Ct).ConfigureAwait(false);
+        if (picked != null && picked.Count > 0 && picked[0] is ManaColor c) return c;
+        return ManaColor.White;
     }
 
     private static bool BlockerIsColor(ICard blocker, ManaColor color)
