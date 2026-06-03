@@ -1,0 +1,6 @@
+{
+  "name": "The Ozolith",
+  "types": ["Artifact"],
+  "supertypes": ["Legendary"],
+  "manaCost": "{1}"
+}
