@@ -31,10 +31,27 @@ namespace Majik.Core.CardData.Definitions;
 /// threads it on the SPELL path. Verbs that don't need it ignore the extra
 /// argument, so the produced effect is byte-identical for them.
 /// </para>
+/// <para>
+/// <see cref="SharesPreviousTargetSlot"/> marks a <b>rider</b> effect that
+/// reuses the immediately-preceding targeted effect's chosen target instead of
+/// declaring its own slot — the canonical case being the "its controller loses
+/// N life" half of a Vapor-Snag-style bounce (<see
+/// cref="LoseLifeTargetEffectDef"/> in <c>Subject="controller"</c> mode). The
+/// flag mirrors <see cref="EffectDefinition.SharesPreviousTargetSlot"/>; when
+/// set, the spec contributes NO <see cref="TargetRequest"/> (so
+/// <see cref="Request"/> must be <c>null</c>) and
+/// <see cref="CardDefAbilityEffects.Materialize"/> hands the
+/// <see cref="Build"/> closure the <c>targetRequestIndex</c> of the most-recent
+/// targeted effect — exactly as
+/// <see cref="CardDefRuntime.BuildSpellDefinitionFromEffects"/> does on the
+/// SPELL path — so the rider reads the SHARED pick at resolution and fizzles
+/// with its host (CR 608.2b) when that target is illegal.
+/// </para>
 internal sealed record CardDefEffectSpec(
     TargetRequest? Request,
     Func<ICard, Player, ReplacementBus?, int, ContinuousEffectsService?, IEffect> Build,
-    TargetRequest? ExtraRequest = null);
+    TargetRequest? ExtraRequest = null,
+    bool SharesPreviousTargetSlot = false);
 
 /// <summary>
 /// Canonical, runtime-agnostic representation of a card ability carried on
@@ -197,6 +214,13 @@ internal static class CardDefAbilityEffects
     {
         var effects = new IEffect[specs.Count];
         var requests = new List<TargetRequest>();
+        // The slot index of the most-recently declared targeted effect, so a
+        // rider spec (SharesPreviousTargetSlot — e.g. Vapor Snag's "its
+        // controller loses N life" on an activated/triggered ability) reuses it
+        // instead of declaring a fresh slot. -1 until the first targeted effect
+        // appears. Mirrors CardDefRuntime.BuildSpellDefinitionFromEffects on
+        // the SPELL path so the rider behaves identically on both paths.
+        var lastTargetedSlot = -1;
         for (var i = 0; i < specs.Count; i++)
         {
             var spec = specs[i];
@@ -204,6 +228,7 @@ internal static class CardDefAbilityEffects
             if (spec.Request is not null)
             {
                 index = requests.Count;
+                lastTargetedSlot = requests.Count;
                 requests.Add(spec.Request);
                 // CR 701.12 fight (source: "target") — the verb declares a
                 // SECOND contiguous target slot (the "other" creature) right
@@ -213,6 +238,14 @@ internal static class CardDefAbilityEffects
                 {
                     requests.Add(spec.ExtraRequest);
                 }
+            }
+            else if (spec.SharesPreviousTargetSlot)
+            {
+                // Rider — reuse the preceding targeted effect's slot (no new
+                // TargetRequest). Falls back to untargeted (-1) if it is the
+                // first effect, so the rider's resolution-time target read sees
+                // no pick and fizzles cleanly (CR 608.2b).
+                index = lastTargetedSlot;
             }
             effects[i] = spec.Build(card, controller, replacements, index, continuous);
         }

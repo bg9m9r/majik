@@ -658,4 +658,120 @@ public class JsonTargetingEffectsTests
         candidates.Should().Contain(deadBear);
         candidates.Should().NotContain(deadBolt, "a creature-card-in-graveyard filter offers no instants");
     }
+
+    // ------------------------------------------------------------------
+    // ABILITY-PATH shared-slot rider (lose_life_target, Subject "controller").
+    // Mirrors the SPELL-path Vapor Snag rider, but proves the SAME
+    // "Return target creature to its owner's hand. Its controller loses N
+    // life." rider works on an ACTIVATED / TRIGGERED ability — i.e. the
+    // SharesPreviousTargetSlot wiring is threaded through
+    // CardDefAbilityEffects.Materialize, not only the spell bridge.
+    // ------------------------------------------------------------------
+
+    /// <summary>Build a live activated ability "{0}: Return target creature to
+    /// its owner's hand. Its controller loses 1 life." through the prod
+    /// JSON-def → factory path and return its single
+    /// <see cref="ActivatedAbility"/>.</summary>
+    private ActivatedAbility BuildBounceDrainAbility(int loseAmount = 1)
+    {
+        var def = new Majik.Core.CardData.Definitions.CardDefinition
+        {
+            Name = "Vapor Drone",
+            Types = new List<string> { "Artifact" },
+            ManaCost = "2",
+            Abilities = new List<Majik.Core.CardData.Definitions.AbilityDefinition>
+            {
+                new Majik.Core.CardData.Definitions.ActivatedAbilityDefinition
+                {
+                    Costs = new List<Majik.Core.CardData.Definitions.CostDefinition>
+                    {
+                        new Majik.Core.CardData.Definitions.ManaCostDef { Amount = "0" },
+                    },
+                    Effects = new List<Majik.Core.CardData.Definitions.EffectDefinition>
+                    {
+                        new Majik.Core.CardData.Definitions.ReturnToHandEffectDef { TargetFilter = "creature" },
+                        new Majik.Core.CardData.Definitions.LoseLifeTargetEffectDef
+                        {
+                            Amount = loseAmount,
+                            Subject = "controller",
+                        },
+                    },
+                },
+            },
+        };
+
+        var card = Majik.Core.CardData.Definitions.CardDefinitionFactory.Build(def, _alice);
+        return card.Abilities.OfType<ActivatedAbility>().Single();
+    }
+
+    [Fact]
+    public void AbilityRider_BounceThenLoseLife_DeclaresExactlyOneTargetSlot()
+    {
+        var ability = BuildBounceDrainAbility();
+
+        // CR 601.2c — the bounce + "its controller loses N life" rider share a
+        // single printed target (the bounced creature). The rider must NOT add
+        // its own slot, so the ability declares exactly one TargetRequest.
+        ability.TargetRequests.Should().HaveCount(1, "the lose-life rider shares the bounce's target slot");
+        ability.TargetRequests[0].MinTargets.Should().Be(1);
+        ability.TargetRequests[0].MaxTargets.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task AbilityRider_BounceThenLoseLife_BouncesAndDrainsThatControllersLife()
+    {
+        var ability = BuildBounceDrainAbility(loseAmount: 1);
+        var victim = OnBattlefield(new Creature("Bounced Bear", "{1}{G}", 2, 2), _bob);
+
+        await ActivateAndResolve(ability, victim);
+
+        victim.Zone.Should().Be(ZoneType.Hand, "the chosen creature is returned to its owner's hand");
+        _bob.Zones.Hand.GetCards().Should().Contain(victim);
+        _bob.LifeTotal.Should().Be(19, "its controller loses 1 life (CR 119.3), reading the SHARED bounce slot");
+    }
+
+    [Fact]
+    public async Task AbilityRider_IllegalTarget_NeitherBounceNorLifeLoss()
+    {
+        var ability = BuildBounceDrainAbility(loseAmount: 1);
+
+        // CR 608.2b — no legal target supplied: both the bounce and the shared
+        // "its controller" rider fizzle cleanly (no life loss off an empty slot).
+        await ActivateAndResolve(ability, chosen: null);
+
+        _bob.LifeTotal.Should().Be(20, "no shared target → the rider has no controller to drain");
+    }
+
+    [Fact]
+    public async Task AbilityRider_TargetLeftBattlefieldBeforeResolution_RiderFizzles()
+    {
+        // CR 608.2g / 608.2b — the chosen creature left the battlefield (e.g.
+        // died in response) BEFORE the ability resolved. The resolution-start
+        // snapshot never captured a battlefield controller for the shared slot,
+        // so the bounce no-ops AND the "its controller loses N life" rider
+        // fizzles — no spurious life loss off a last-known controller.
+        var ability = BuildBounceDrainAbility(loseAmount: 1);
+        var victim = OnBattlefield(new Creature("Doomed Bear", "{1}{G}", 2, 2), _bob);
+
+        var stack = new Majik.Core.Stack.Stack(_bus);
+        var flow = new AbilityActivationFlow(stack, _bus);
+        var ctx = NewContext(stack);
+        var agent = new ScriptedAgent();
+        agent.QueueTargets(new[] { (object)victim });
+
+        await flow.ActivateAsync(
+            _alice, ability,
+            targetRequests: ability.TargetRequests,
+            cost: null, agent: agent, ctx: ctx);
+
+        // The target leaves the battlefield AFTER it was chosen but BEFORE the
+        // ability resolves (it's now in the graveyard / hand — no longer legal).
+        _bob.Zones.Battlefield.RemoveCard(victim);
+        victim.SetZone(ZoneType.Graveyard);
+        _bob.Zones.Graveyard.AddCard(victim);
+
+        await ability.ResolveAsync(agent, ctx);
+
+        _bob.LifeTotal.Should().Be(20, "the shared target was illegal at resolution start → the rider fizzles (CR 608.2b)");
+    }
 }

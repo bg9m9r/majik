@@ -1224,10 +1224,19 @@ public static class CardDefRuntime
         // subject is "controller"). The life loss lands on:
         //   - the chosen Player directly (a player's "controller" is itself), or
         //   - the chosen Permanent's controller ("its controller loses N life").
-        // CR 608.2b — when the shared/own target is illegal at resolution (a
-        // bounced permanent has left the battlefield), "its controller" is
-        // undefined, so the rider fizzles cleanly with its host. Routes through
-        // the shared Fx.LoseLife primitive.
+        //
+        // CR 608.2g — LAST-KNOWN information. The host effect (e.g. the bounce
+        // half of a Vapor-Snag-style ability) runs FIRST in printed order and
+        // moves the shared target off the battlefield, so by the time this rider
+        // runs the permanent is already in its owner's hand. "Its controller"
+        // therefore uses the controller the permanent had immediately before it
+        // left. We read that from ResolutionContext.SharedSlotControllers, which
+        // snapshots each chosen slot's controller at resolution START (gated on
+        // Zone == Battlefield) — the ability-path analogue of the SPELL bridge's
+        // pre-host snapshot. So a LEGAL bounce still drains, while a target that
+        // left in RESPONSE (never captured) fizzles cleanly (CR 608.2b). A
+        // Player target ("target player loses N life") drains itself directly
+        // and needs no snapshot.
         var amount = def.Amount;
         return new Effect(
             $"{card.Name}: target loses {amount} life",
@@ -1237,8 +1246,10 @@ public static class CardDefRuntime
                 var victim = live switch
                 {
                     Player player => player,
-                    Permanent permanent when permanent.Zone == ZoneType.Battlefield
-                        => permanent.Controller,
+                    Permanent => targetRequestIndex >= 0
+                        && ctx.SharedSlotControllers.TryGetValue(targetRequestIndex, out var c)
+                        ? c
+                        : null,
                     _ => null,
                 };
                 if (victim != null) Fx.LoseLife(victim, amount);
