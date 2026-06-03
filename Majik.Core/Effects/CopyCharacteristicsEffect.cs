@@ -69,11 +69,33 @@ namespace Majik.Core.Effects;
 /// (mana-value reads). <see cref="CopiedName"/> / <see cref="CopiedManaCost"/>
 /// remain for direct inspection.
 ///
+/// ## Arbitrary printed activated / triggered abilities (CR 707.2)
+/// A copy gets ALL the source's copiable abilities, not only its keyword
+/// markers. The keyword markers are mirrored into the characteristic keyword
+/// set by this effect's layer pass (above). The source's printed NON-keyword
+/// activated / triggered abilities (which carry costs / targets / closures
+/// that capture the source permanent) cannot be re-pointed in place — their
+/// closures reference the original source. They are instead RE-INSTANTIATED
+/// bound to the target via a caller-supplied <c>abilityRebind</c> delegate and
+/// granted onto the copy through the existing <see cref="GrantAbilityEffect"/>
+/// primitive by <see cref="RegisterCopy"/>. The grant shares the copy's
+/// lifetime: it follows the copy onto the battlefield, is revoked when the copy
+/// leaves play (CR 613.6e), and (for an until-EOT copy) is dropped at the
+/// cleanup step (CR 514.2). Granted triggered abilities auto-register with the
+/// <see cref="Abilities.TriggerManager"/> the moment they land on the copy's
+/// <see cref="Card.Abilities"/> list (its <c>SyncCardRegistration</c> re-scans
+/// the bearer). A <c>null</c> rebind reproduces the legacy keyword-only posture.
+///
 /// ## v1 lossy
-/// - <b>Non-keyword abilities</b> — only <see cref="KeywordAbility"/>
-///   markers are mirrored into the keyword set; arbitrary printed activated /
-///   triggered abilities of the source are not re-instantiated on the target
-///   (same boundary as <see cref="CopyEffect"/>).
+/// - <b>Ability rebind is caller-supplied</b> — there is no generic
+///   closure-introspection that re-points an arbitrary printed ability's
+///   captured source. The clone seam (<see cref="EntersAsCopyReplacement"/>) /
+///   the bespoke factory provides the rebind, which re-creates the source's
+///   activated / triggered abilities bound to the target. A source whose
+///   <see cref="RebindablePrintedAbilities"/> rebuild requires data not carried
+///   on the runtime instance (e.g. an oracle-bound closure) stays
+///   keyword-only — but the common case (an ability that only references its
+///   own source / controller) rebinds cleanly.
 /// </summary>
 public sealed class CopyCharacteristicsEffect : ContinuousEffect
 {
@@ -199,6 +221,118 @@ public sealed class CopyCharacteristicsEffect : ContinuousEffect
         foreach (var kw in _source.Abilities.OfType<KeywordAbility>())
         {
             chars.Keywords.Add(kw.Keyword);
+        }
+    }
+
+    /// <summary>
+    /// CR 707.2 — register a "becomes a copy of <paramref name="source"/>"
+    /// effect on <paramref name="effects"/> that copies the FULL copiable
+    /// characteristics PLUS the source's printed activated / triggered
+    /// abilities (re-instantiated bound to <paramref name="target"/>).
+    ///
+    /// Builds on the existing primitives: the characteristic copy is the
+    /// ordinary <see cref="CopyCharacteristicsEffect"/>; each rebuilt non-keyword
+    /// ability is granted onto the target through a companion
+    /// <see cref="GrantAbilityEffect"/> (source = target), so the grant follows
+    /// the copy's lifetime, revokes when the copy leaves play (CR 613.6e), and
+    /// — when <paramref name="expiresAtEndOfTurn"/> is set — is dropped at the
+    /// cleanup step alongside the copy (CR 514.2). Triggered abilities auto-bind
+    /// to the <see cref="Abilities.TriggerManager"/> the moment they land on the
+    /// copy's <see cref="Card.Abilities"/> list.
+    /// </summary>
+    /// <param name="effects">The continuous-effects service to register on.</param>
+    /// <param name="target">The permanent that becomes a copy (modified in place).</param>
+    /// <param name="source">The permanent whose copiable characteristics +
+    /// printed abilities are copied.</param>
+    /// <param name="abilityRebind">
+    /// Re-creates the source's printed NON-keyword activated / triggered
+    /// abilities bound to the target (CR 707.2). Receives <c>(source, target)</c>
+    /// and returns target-bound <see cref="IAbility"/> instances. Null ⇒
+    /// keyword-only copy (legacy posture). The default rebind for the common
+    /// "ability references only its own source" case is
+    /// <see cref="RebindablePrintedAbilities"/> — but it cannot rebuild abilities
+    /// whose closures capture the source (those are caller-rebuilt or stay
+    /// keyword-only).
+    /// </param>
+    /// <param name="expiresAtEndOfTurn">When true, both the copy and the
+    /// mirrored abilities drop at the cleanup step (CR 514.2).</param>
+    /// <returns>The registered <see cref="CopyCharacteristicsEffect"/>.</returns>
+    public static CopyCharacteristicsEffect RegisterCopy(
+        ContinuousEffectsService effects,
+        Permanent target,
+        Permanent source,
+        Func<Permanent, Permanent, IEnumerable<IAbility>>? abilityRebind = null,
+        bool expiresAtEndOfTurn = false)
+    {
+        ArgumentNullException.ThrowIfNull(effects);
+        ArgumentNullException.ThrowIfNull(target);
+        ArgumentNullException.ThrowIfNull(source);
+
+        var copy = new CopyCharacteristicsEffect(target, source, expiresAtEndOfTurn);
+        effects.Register(copy);
+
+        if (abilityRebind != null)
+        {
+            foreach (var ability in abilityRebind(source, target))
+            {
+                if (ability == null) continue;
+                // CR 613.1f Layer-6 grant; source = target so the grant lives
+                // exactly as long as the copy does (and shares its EOT lifetime).
+                effects.Register(new GrantAbilityEffect(
+                    source: target,
+                    target: target,
+                    ability: ability,
+                    expiresAtEndOfTurn: expiresAtEndOfTurn));
+            }
+        }
+
+        return copy;
+    }
+
+    /// <summary>
+    /// CR 707.2 — the source's printed NON-keyword activated + triggered
+    /// abilities (keyword markers are handled by the layer pass). Surfaced for
+    /// inspection and as the input a caller's rebind delegate maps over. NOTE:
+    /// these instances are still bound to <paramref name="source"/> — a rebind
+    /// delegate must re-create equivalents bound to the copy target before they
+    /// are granted (their costs / closures capture the original source).
+    /// </summary>
+    public static IReadOnlyList<IAbility> RebindablePrintedAbilities(Permanent source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        return source.Abilities
+            .Where(a => a is ActivatedAbility or TriggeredAbility && a is not ManaAbility)
+            .ToList();
+    }
+
+    /// <summary>
+    /// CR 707.2 — the default ability-rebind for the copy machinery: re-creates
+    /// the source's printed non-keyword activated / triggered abilities
+    /// (<see cref="RebindablePrintedAbilities"/>) bound to the copy target via
+    /// <see cref="ActivatedAbility.RebindTo"/> / <see cref="TriggeredAbility.RebindTo"/>.
+    /// Correct for the common "ability references only its own source /
+    /// controller" case (the boundary is documented on the RebindTo methods).
+    /// Pass this as the <c>abilityRebind</c> argument of <see cref="RegisterCopy"/>.
+    /// </summary>
+    public static IEnumerable<IAbility> DefaultAbilityRebind(Permanent source, Permanent target)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(target);
+
+        var controller = target.Controller ?? target.Owner
+            ?? throw new InvalidOperationException("Copy target has no controller/owner to rebind abilities to.");
+
+        foreach (var ability in RebindablePrintedAbilities(source))
+        {
+            switch (ability)
+            {
+                case ActivatedAbility aa:
+                    yield return aa.RebindTo(target, controller);
+                    break;
+                case TriggeredAbility ta:
+                    yield return ta.RebindTo(target, controller);
+                    break;
+            }
         }
     }
 }

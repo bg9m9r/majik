@@ -137,6 +137,33 @@ public class ActivatedAbility : IActivatedAbility
     }
 
     /// <summary>
+    /// CR 707.2 — re-instantiate this activated ability bound to a new source
+    /// permanent + controller, preserving the structural fields (costs,
+    /// effects, target requests, sorcery-speed rider, "activate only if" gate).
+    /// Used by the copy machinery to mirror a SOURCE permanent's printed
+    /// activated abilities onto the COPY so the copy can activate them as its
+    /// own (the stack object is sourced from the copy via
+    /// <see cref="Services.AbilityActivator"/>).
+    ///
+    /// NOTE (v1 boundary): cost / effect closures that captured the ORIGINAL
+    /// source permanent directly (rather than reading it from the ability) still
+    /// reference the original — those abilities must be rebuilt by a bespoke
+    /// per-card rebind. This generic rebind is correct for the common case where
+    /// the ability references only its own <see cref="Source"/> /
+    /// <see cref="Controller"/>.
+    /// </summary>
+    public ActivatedAbility RebindTo(object newSource, Player newController) =>
+        new(
+            source: newSource ?? throw new ArgumentNullException(nameof(newSource)),
+            controller: newController ?? throw new ArgumentNullException(nameof(newController)),
+            targets: _targets.Count > 0 ? _targets : null,
+            costs: _costs.Count > 0 ? _costs : null,
+            effects: _effects.Count > 0 ? _effects : null,
+            targetRequests: TargetRequests.Count > 0 ? TargetRequests : null,
+            sorcerySpeed: IsSorcerySpeed,
+            canActivateCheck: _canActivateCheck);
+
+    /// <summary>
     /// Store the targets chosen by the activating player's agent. Called by
     /// <see cref="AbilityActivationFlow.ActivateAsync"/> after the agent
     /// responds to each <see cref="TargetRequest"/>.

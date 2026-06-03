@@ -156,9 +156,20 @@ public sealed class EntersAsCopyReplacement : IReplacementEffect<ZoneMoveIntent>
 
         // CR 707.2 — full copiable characteristics copy (lasts while on the
         // battlefield, Clone-style). Source may be an artifact / land /
-        // planeswalker, not just a creature.
-        _effects.Register(new CopyCharacteristicsEffect(
-            target, source, expiresAtEndOfTurn: false));
+        // planeswalker, not just a creature. RegisterCopy ALSO mirrors the
+        // source's printed non-keyword activated / triggered abilities onto the
+        // entering permanent (re-instantiated bound to it via the default
+        // rebind), so a clone of an ability permanent (Phyrexian Metamorph /
+        // Spark Double / Vesuva onto an ability source) gets the source's
+        // abilities, not just its keyword markers. Granted triggered abilities
+        // auto-bind to the TriggerManager when they land on the copy's
+        // Abilities list; the grant revokes when the copy leaves play (CR 613.6e).
+        CopyCharacteristicsEffect.RegisterCopy(
+            _effects,
+            target,
+            source,
+            abilityRebind: CopyCharacteristicsEffect.DefaultAbilityRebind,
+            expiresAtEndOfTurn: false);
 
         // CR 706.9c / 613.1d — "it's an [type] in addition to its other types".
         if (_options.AddTypeOnCopy is { } addType)

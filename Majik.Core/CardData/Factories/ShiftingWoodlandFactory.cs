@@ -189,8 +189,18 @@ public static class ShiftingWoodlandFactory
 
                 // CR 707.2 / 613.2 Layer 1 — becomes a copy in place until
                 // end of turn (dropped at the cleanup step by ExpireEndOfTurn).
-                effects.Register(new CopyCharacteristicsEffect(
-                    land, source, expiresAtEndOfTurn: true));
+                // RegisterCopy also mirrors the copied permanent's printed
+                // non-keyword activated / triggered abilities onto the land
+                // (re-instantiated bound to it), so copying an ability creature
+                // in the graveyard grants its abilities until end of turn, not
+                // just its keyword markers (CR 707.2). The grants share the
+                // until-EOT lifetime and drop at the cleanup step.
+                CopyCharacteristicsEffect.RegisterCopy(
+                    effects,
+                    land,
+                    source,
+                    abilityRebind: CopyCharacteristicsEffect.DefaultAbilityRebind,
+                    expiresAtEndOfTurn: true);
             });
 
         copyAbility = new ActivatedAbility(

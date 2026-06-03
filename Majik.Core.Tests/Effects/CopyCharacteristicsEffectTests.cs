@@ -181,6 +181,121 @@ public class CopyCharacteristicsEffectTests
             "a copy of a colourless source is colourless");
     }
 
+    // -----------------------------------------------------------------------
+    // Arbitrary printed activated / triggered abilities (deferral pay-down)
+    // CR 707.2 — a copy gets the source's printed abilities, re-instantiated
+    // bound to the copy (not just the source's keyword markers).
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void RegisterCopy_DefaultRebind_MirrorsSourcesPrintedActivatedAbility_BoundToTarget()
+    {
+        var svc = new ContinuousEffectsService();
+        var land = BattlefieldLand(_alice);
+        land.ActiveEffects = svc;
+
+        // Source: a creature card whose printed text includes a non-keyword
+        // activated ability. The DEFAULT rebind (the production path) re-creates
+        // it bound to the TARGET via ActivatedAbility.RebindTo (CR 707.2).
+        var source = new Creature("Prodigal Sorcerer", "{2}{U}", 1, 1) { Owner = _alice };
+        var printed = new ActivatedAbility(
+            source: source, controller: _alice,
+            effects: System.Array.Empty<IEffect>());
+        source.AddAbility(printed);
+
+        CopyCharacteristicsEffect.RegisterCopy(
+            svc, land, source,
+            abilityRebind: CopyCharacteristicsEffect.DefaultAbilityRebind);
+
+        svc.Compute(land); // drives the GrantAbilityEffect sync
+
+        var granted = land.Abilities.OfType<ActivatedAbility>().Single();
+        granted.Source.Should().BeSameAs(land,
+            "the copied activated ability is re-instantiated bound to the copy");
+        granted.Should().NotBeSameAs(printed,
+            "a fresh instance is built — the source's own ability instance is untouched");
+        source.Abilities.OfType<ActivatedAbility>().Single().Source.Should().BeSameAs(source,
+            "the SOURCE keeps its own ability bound to itself");
+    }
+
+    [Fact]
+    public void RegisterCopy_DefaultRebind_MirrorsSourcesPrintedTriggeredAbility_BoundToTarget()
+    {
+        var svc = new ContinuousEffectsService();
+        var land = BattlefieldLand(_alice);
+        land.ActiveEffects = svc;
+
+        var source = new Creature("Trigger Bear", "{1}{G}", 2, 2) { Owner = _alice };
+        source.AddAbility(new TriggeredAbility(
+            source: source, controller: _alice,
+            condition: Triggers.OnEnterBattlefieldSelf(source)));
+
+        CopyCharacteristicsEffect.RegisterCopy(
+            svc, land, source,
+            abilityRebind: CopyCharacteristicsEffect.DefaultAbilityRebind);
+
+        svc.Compute(land);
+
+        var granted = land.Abilities.OfType<TriggeredAbility>().Single();
+        granted.Source.Should().BeSameAs(land,
+            "the copied triggered ability is re-instantiated bound to the copy");
+    }
+
+    [Fact]
+    public void RegisterCopy_DefaultRebind_SkipsKeywordAndManaAbilities()
+    {
+        var svc = new ContinuousEffectsService();
+        var land = BattlefieldLand(_alice);
+        land.ActiveEffects = svc;
+
+        var source = new Creature("Mixed", "{1}{G}", 2, 2) { Owner = _alice };
+        // Keyword markers go through the layer pass (not the ability grant);
+        // mana abilities are not "printed activated abilities" for this purpose.
+        source.AddAbility(new KeywordAbility("Flying", source, _alice));
+        source.AddAbility(new ActivatedAbility(
+            source: source, controller: _alice, effects: System.Array.Empty<IEffect>()));
+
+        CopyCharacteristicsEffect.RegisterCopy(
+            svc, land, source,
+            abilityRebind: CopyCharacteristicsEffect.DefaultAbilityRebind);
+
+        svc.Compute(land);
+
+        land.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1,
+            "only the non-keyword activated ability is mirrored as a grant");
+        land.Abilities.OfType<KeywordAbility>().Should().BeEmpty(
+            "keyword markers surface through the characteristic keyword set, not as granted abilities");
+        // The copied Flying keyword surfaces through Compute's keyword set.
+        svc.Compute(land).Keywords.Should().Contain("Flying");
+    }
+
+    [Fact]
+    public void RegisterCopy_DefaultRebind_MirroredAbilities_RevokedAtEndOfTurn()
+    {
+        var svc = new ContinuousEffectsService();
+        var land = BattlefieldLand(_alice);
+        land.ActiveEffects = svc;
+
+        var source = new Creature("Prodigal Sorcerer", "{2}{U}", 1, 1) { Owner = _alice };
+        source.AddAbility(new ActivatedAbility(
+            source: source, controller: _alice,
+            effects: System.Array.Empty<IEffect>()));
+
+        CopyCharacteristicsEffect.RegisterCopy(
+            svc, land, source, expiresAtEndOfTurn: true,
+            abilityRebind: CopyCharacteristicsEffect.DefaultAbilityRebind);
+
+        svc.Compute(land);
+        land.Abilities.OfType<ActivatedAbility>().Should().HaveCount(1);
+
+        // CR 514.2 — cleanup lifts the until-EOT copy AND its mirrored abilities.
+        svc.ExpireEndOfTurn();
+        svc.Compute(land);
+
+        land.Abilities.OfType<ActivatedAbility>().Should().BeEmpty(
+            "the mirrored ability is revoked when the until-EOT copy expires");
+    }
+
     [Fact]
     public void Copy_OntoCreature_SurfacesCopiedNameThroughEffectiveName()
     {
