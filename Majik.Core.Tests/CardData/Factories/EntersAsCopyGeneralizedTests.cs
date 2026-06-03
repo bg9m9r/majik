@@ -371,4 +371,49 @@ public class EntersAsCopyGeneralizedTests
         sd.Power.Should().Be(0, "no copy source → printed 0/0");
         sd.Toughness.Should().Be(0);
     }
+
+    // -----------------------------------------------------------------------
+    // CR 707.2 — a clone of an ability permanent gets the source's printed
+    // non-keyword activated / triggered abilities (re-instantiated bound to the
+    // clone), not just its keyword markers (deferral pay-down).
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void SparkDouble_CopyOfAbilityCreature_MirrorsPrintedActivatedAbility_BoundToClone()
+    {
+        var bus = new ReplacementBus();
+        var effects = new ContinuousEffectsService();
+
+        // Source creature with a printed "{T}: do X" activated ability (a
+        // Prodigal Sorcerer-style pinger). The clone must get this ability bound
+        // to ITSELF, not the source.
+        var sorcerer = new Creature("Prodigal Sorcerer", "{2}{U}", 1, 1);
+        sorcerer.SetOwner(_alice);
+        sorcerer.SetController(_alice);
+        var printed = new ActivatedAbility(
+            source: sorcerer, controller: _alice,
+            effects: System.Array.Empty<IEffect>());
+        sorcerer.AddAbility(printed);
+        _alice.Zones.Battlefield.AddCard(sorcerer);
+        sorcerer.SetZone(ZoneType.Battlefield);
+
+        var sd = SparkDoubleFactory.Create(_alice, replacements: bus, effects: effects);
+        sd.SetZone(ZoneType.Hand);
+        _alice.Zones.Hand.AddCard(sd);
+
+        var zones = new ZoneService(eventBus: null, replacements: bus);
+        zones.MoveCard(sd, ZoneType.Hand, ZoneType.Battlefield, _alice);
+
+        // Drive the layer pass so the GrantAbilityEffect syncs the mirrored
+        // ability onto the clone.
+        effects.Compute(sd);
+
+        var mirrored = sd.Abilities.OfType<ActivatedAbility>().Single();
+        mirrored.Source.Should().BeSameAs(sd,
+            "CR 707.2 — the clone's copy of the printed activated ability is bound to the clone");
+        mirrored.Should().NotBeSameAs(printed,
+            "a fresh instance was built; the source keeps its own");
+        sorcerer.Abilities.OfType<ActivatedAbility>().Single().Source.Should().BeSameAs(sorcerer,
+            "the source's own ability is untouched");
+    }
 }

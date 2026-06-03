@@ -120,6 +120,33 @@ public class TriggeredAbility : ITriggeredAbility
     }
 
     /// <summary>
+    /// CR 707.2 — re-instantiate this triggered ability bound to a new source
+    /// permanent + controller, preserving the structural fields (condition,
+    /// effects, target requests, intervening-if, active zones, active-face
+    /// gate). Used by the copy machinery to mirror a SOURCE permanent's printed
+    /// triggered abilities onto the COPY: the copy's instance gates its zone /
+    /// trigger checks on the copy (CR 711.3 / 603), and conditions that read
+    /// <c>ability.Source</c> / <c>ability.Controller</c> see the copy.
+    ///
+    /// NOTE (v1 boundary): effect closures that captured the ORIGINAL source
+    /// permanent directly (rather than reading it from the ability) still point
+    /// at the original — those abilities must be rebuilt by a bespoke per-card
+    /// rebind. This generic rebind is correct for the common case where the
+    /// ability references only its own <see cref="Source"/> / <see cref="Controller"/>.
+    /// </summary>
+    public TriggeredAbility RebindTo(object newSource, Player newController) =>
+        new(
+            source: newSource ?? throw new ArgumentNullException(nameof(newSource)),
+            controller: newController ?? throw new ArgumentNullException(nameof(newController)),
+            condition: Condition,
+            targets: _targets.Count > 0 ? _targets : null,
+            effects: _effects.Count > 0 ? _effects : null,
+            interveningIf: InterveningIf,
+            activeZones: ActiveZones,
+            targetRequests: TargetRequests.Count > 0 ? TargetRequests : null,
+            activeWhen: ActiveWhen);
+
+    /// <summary>
     /// Store the targets chosen by the controller's agent. Called by
     /// <see cref="TriggerManager.PutPendingTriggersOnStackAsync"/> immediately
     /// before pushing the ability onto the stack.
