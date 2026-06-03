@@ -133,6 +133,31 @@ public class Player
     public bool HasHexproof =>
         Majik.Core.Rules.PlayerStaticAbilities.HasHexproof(this);
 
+    /// <summary>
+    /// CR 702.18 — player-shroud query. True iff at least one active
+    /// player-shroud grant (registered through
+    /// <see cref="Majik.Core.Rules.PlayerStaticAbilities"/>) targets this
+    /// player. Lights up while Solitary Confinement is on the battlefield.
+    /// Unlike hexproof, shroud blocks ALL targeting — including this player's
+    /// OWN spells and abilities (CR 702.18a). Consulted by
+    /// <see cref="Majik.Core.Rules.ActionValidator"/> at cast / activation
+    /// time and by <see cref="Majik.Core.Targeting.TargetLegality"/> at
+    /// resolution time (CR 608.2b).
+    /// </summary>
+    public bool HasShroud =>
+        Majik.Core.Rules.PlayerStaticAbilities.HasShroud(this);
+
+    /// <summary>
+    /// CR 702.16 — player-level protection from a card type. True iff at least
+    /// one active grant gives this player protection from
+    /// <paramref name="type"/> (Serra's Emissary's "You ... have protection
+    /// from the chosen card type"). A spell or ability whose source is of that
+    /// card type can't target this player, and combat/spell damage from such a
+    /// source to this player is prevented (CR 702.16e).
+    /// </summary>
+    public bool HasProtectionFromCardType(Cards.Types.CardType type) =>
+        Majik.Core.Rules.PlayerStaticAbilities.HasProtectionFromCardType(this, type);
+
     // ── CR 122 — counters on PLAYERS (poison / energy / experience / …) ──────
     //
     // Counters that sit on the PLAYER, not on any permanent. Poison
