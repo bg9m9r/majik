@@ -1,0 +1,10 @@
+{
+  "name": "Boon Satyr",
+  "types": ["Creature", "Enchantment"],
+  "subtypes": ["Satyr"],
+  "manaCost": "{1}{G}{G}",
+  "power": 4,
+  "toughness": 2,
+  "colors": ["G"],
+  "abilities": []
+}
